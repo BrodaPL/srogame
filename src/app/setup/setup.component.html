@@ -1,0 +1,83 @@
+<main class="page">
+  <section class="panel">
+    <header class="panel__header">
+      <p class="eyebrow">SroGame Core</p>
+      <h1>Command Center Boot</h1>
+      <p class="subtitle">
+        Define your commander profile and starting stockpile before launch.
+      </p>
+    </header>
+
+    <form class="setup-form" (ngSubmit)="startGame()">
+      <div class="field">
+        <label for="playerName">Player name</label>
+        <input
+          id="playerName"
+          name="playerName"
+          type="text"
+          placeholder="Commander Nova"
+          [(ngModel)]="form.playerName"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="metal">Starting metal</label>
+        <input
+          id="metal"
+          name="metal"
+          type="number"
+          min="0"
+          step="1"
+          placeholder="750"
+          [(ngModel)]="form.startingMetal"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="crystal">Starting crystal</label>
+        <input
+          id="crystal"
+          name="crystal"
+          type="number"
+          min="0"
+          step="1"
+          placeholder="420"
+          [(ngModel)]="form.startingCrystal"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="deuterium">Starting deuterium</label>
+        <input
+          id="deuterium"
+          name="deuterium"
+          type="number"
+          min="0"
+          step="1"
+          placeholder="180"
+          [(ngModel)]="form.startingDeuterium"
+          required
+        />
+      </div>
+
+      <button class="start-button" type="submit" [disabled]="!canStart()">
+        Start new game
+      </button>
+    </form>
+
+    @if (savedConfig()) {
+      <div class="saved">
+        <p class="saved__title">Saved config</p>
+        <p>
+          {{ savedConfig()!.playerName }} starts with
+          {{ savedConfig()!.startingMetal }} metal,
+          {{ savedConfig()!.startingCrystal }} crystal,
+          {{ savedConfig()!.startingDeuterium }} deuterium.
+        </p>
+      </div>
+    }
+  </section>
+</main>

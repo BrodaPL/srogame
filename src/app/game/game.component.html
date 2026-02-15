@@ -1,0 +1,37 @@
+<main class="game">
+  @if (config) {
+    <header class="game__header">
+      <div>
+        <p class="eyebrow">SroGame Online</p>
+        <h1>Welcome, {{ config.playerName }}</h1>
+      </div>
+      <a class="link" routerLink="/">Edit setup</a>
+    </header>
+
+    <section class="resources">
+      <article class="resource">
+        <h2>Metal</h2>
+        <p>{{ config.startingMetal }}</p>
+      </article>
+      <article class="resource">
+        <h2>Crystal</h2>
+        <p>{{ config.startingCrystal }}</p>
+      </article>
+      <article class="resource">
+        <h2>Deuterium</h2>
+        <p>{{ config.startingDeuterium }}</p>
+      </article>
+    </section>
+
+    <section class="status">
+      <h3>Command Status</h3>
+      <p>Your empire is online. Next: resource production, build queue.</p>
+    </section>
+  } @else {
+    <section class="empty">
+      <h1>No setup found</h1>
+      <p>Start a new game to initialize your commander profile.</p>
+      <a class="link button" routerLink="/">Go to setup</a>
+    </section>
+  }
+</main>
