@@ -11,8 +11,7 @@ type GameSetup = {
 @Component({
   selector: 'app-game',
   imports: [RouterLink],
-  templateUrl: './game.component.html',
-  styleUrl: './game.component.css'
+  templateUrl: './game.component.html'
 })
 export class GameComponent {
   protected readonly config = this.loadConfig();

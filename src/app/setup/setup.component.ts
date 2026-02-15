@@ -1,6 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import {Router, RouterLink} from '@angular/router';
 
 type GameSetup = {
   playerName: string;
@@ -18,9 +18,8 @@ type GameSetupForm = {
 
 @Component({
   selector: 'app-setup',
-  imports: [FormsModule],
-  templateUrl: './setup.component.html',
-  styleUrl: './setup.component.css'
+  imports: [FormsModule, RouterLink],
+  templateUrl: './setup.component.html'
 })
 export class SetupComponent {
   protected readonly savedConfig = signal<GameSetup | null>(null);
