@@ -1,0 +1,22 @@
+export enum BuildingType {
+  METAL_MINE = 'Metal Mine',
+  CRYSTAL_MINE = 'Crystal Mine',
+  DEUTERIUM_SYNTHESIZER = 'Deuterium Synthesizer',
+  NUCLEAR_PLANT = 'Nuclear Plant',
+  FUSION_REACTOR = 'Fusion Reactor',
+  METAL_STORAGE = 'Metal Storage',
+  CRYSTAL_STORAGE = 'Crystal Storage',
+  DEUTERIUM_TANK = 'Deuterium Tank',
+  ROBOTICS_FACTORY = 'Robotics Factory',
+  SHIPYARD = 'Shipyard',
+  RESEARCH_LAB = 'Research Lab',
+  ALLIANCE_DEPOT = 'Alliance Depot',
+  MISSILE_SILO = 'Missile Silo',
+  NANITE_FACTORY = 'Nanite Factory',
+  TERRAFORMER = 'Terraformer',
+  SPACEPORT = 'Spaceport',
+  SENSOR_PHALANX = 'Sensor Phalanx',
+  JUMP_GATE = 'Jump Gate',
+  INTERSTELLAR_TRADE_PORT = 'Interstellar Trade Port',
+  BUNKER_NETWORK = 'Bunker Network'
+}
