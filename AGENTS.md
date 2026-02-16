@@ -24,6 +24,7 @@ This file captures session context for collaborators and future AI agents.
 - Setup UI + logic: `src/app/setup/setup.component.ts`, `src/app/setup/setup.component.html`
 - Game UI + logic: `src/app/game/game.component.ts`, `src/app/game/game.component.html`
 - Models: `src/app/models/resources-pack.ts`
+- Models: `src/app/models/building-type.ts`, `src/app/models/technology-type.ts`, `src/app/models/building-requirement.ts`, `src/app/models/tech-requirement.ts`, `src/app/models/weapon-type.ts`, `src/app/models/weapon.ts`, `src/app/models/technology.ts`, `src/app/models/building.ts`, `src/app/models/hull-class.ts`, `src/app/models/ship.ts`, `src/app/models/ship-instance.ts`, `src/app/models/ship-group.ts`, `src/app/models/planet.ts`, `src/app/models/planet-type.ts`, `src/app/models/solar-system.ts`, `src/app/models/galaxy.ts`, `src/app/models/player.ts`, `src/app/models/fleet.ts`
 - Logging: `src/app/core/logger.ts`
 
 ## Dev Commands
@@ -32,6 +33,7 @@ This file captures session context for collaborators and future AI agents.
 - `npm run test`
 
 ## Session Notes (most recent first)
+- 2026-02-15: Added domain models for resources, buildings, tech, ships, fleets, planets, solar systems, galaxies, and players.
 - 2026-02-15: Added main menu + new routes, centralized CSS in `src/styles.css`, added `ResourcesPack` model and global logger.
 - 2026-02-15: Created this AGENTS.md to persist context. Explained basic Angular/TypeScript features in the current codebase.
 
