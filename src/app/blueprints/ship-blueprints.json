@@ -1,0 +1,27 @@
+{
+  "ships": [
+    {
+      "name": "Scout",
+      "hullClass": "SMALL",
+      "canJump": false,
+      "size": 1,
+      "evasionChance": [0.3, 0.2, 0.1],
+      "hullPointsCapacity": 100,
+      "shieldCapacity": 10,
+      "defense": 0,
+      "weapons": [
+        { "type": "BEAM", "dmg": 5, "shots": 1 }
+      ],
+      "cargoCapacity": 50,
+      "hangarCapacity": 0,
+      "jumpCost": 0,
+      "cost": { "metal": 3000, "crystal": 1000, "deuterium": 0 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "ENERGY_TECHNOLOGY", "level": 1 }
+      ]
+    }
+  ]
+}

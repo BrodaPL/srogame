@@ -1,0 +1,17 @@
+{
+  "technologies": [
+    {
+      "type": "ENERGY_TECHNOLOGY",
+      "cost": [
+        { "metal": 0, "crystal": 800, "deuterium": 400 },
+        { "metal": 0, "crystal": 1600, "deuterium": 800 }
+      ],
+      "energyRequired": [0, 0],
+      "researchTime": [60, 120],
+      "buildingRequirements": [
+        { "building": "RESEARCH_LAB", "level": 1 }
+      ],
+      "techRequirements": []
+    }
+  ]
+}
