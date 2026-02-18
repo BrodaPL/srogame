@@ -1,6 +1,6 @@
 import { Building } from './building';
 import { Fleet } from './fleet';
-import { PlanetType } from './planet-type';
+import { PlanetType } from './enum/planet-type';
 import { Player } from './player';
 import { ResourcesPack } from './resources-pack';
 import { Ship } from './ship';
@@ -29,3 +29,4 @@ export class Planet {
     public shipyardQueue: Ship[]
   ) {}
 }
+

@@ -1,27 +1,360 @@
 {
   "ships": [
     {
-      "name": "Scout",
+      "name": "Fighter",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 1,
-      "evasionChance": [0.3, 0.2, 0.1],
-      "hullPointsCapacity": 100,
-      "shieldCapacity": 10,
+      "evasionChance": 0.3,
+      "hullPointsCapacity": 20,
+      "shieldCapacity": 0,
       "defense": 0,
       "weapons": [
-        { "type": "BEAM", "dmg": 5, "shots": 1 }
+        { "type": "BEAM", "dmg": 10, "shots": 1 }
+      ],
+      "cargoCapacity": 0,
+      "hangarCapacity": 0,
+      "jumpCost": 0,
+      "cost": { "metal": 20, "crystal": 10, "deuterium": 0 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Assualt Fighter",
+      "hullClass": "SMALL",
+      "canJump": false,
+      "size": 2,
+      "evasionChance": 0.2,
+      "hullPointsCapacity": 30,
+      "shieldCapacity": 0,
+      "defense": 0,
+      "weapons": [
+        { "type": "MISSILE", "dmg": 20, "shots": 2 }
+      ],
+      "cargoCapacity": 0,
+      "hangarCapacity": 0,
+      "jumpCost": 0,
+      "cost": { "metal": 30, "crystal": 10, "deuterium": 10 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Corvet",
+      "hullClass": "SMALL",
+      "canJump": false,
+      "size": 3,
+      "evasionChance": 0.1,
+      "hullPointsCapacity": 80,
+      "shieldCapacity": 40,
+      "defense": 1,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 1 },
+        { "type": "MISSILE", "dmg": 20, "shots": 1 }
+      ],
+      "cargoCapacity": 0,
+      "hangarCapacity": 0,
+      "jumpCost": 0,
+      "cost": { "metal": 80, "crystal": 40, "deuterium": 10 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Spy Prob",
+      "hullClass": "SMALL",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 10,
+      "shieldCapacity": 0,
+      "defense": 0,
+      "weapons": [],
+      "cargoCapacity": 0,
+      "hangarCapacity": 0,
+      "jumpCost": 0.5,
+      "cost": { "metal": 0, "crystal": 20, "deuterium": 10 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Cruser",
+      "hullClass": "MEDIUM",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 100,
+      "shieldCapacity": 40,
+      "defense": 0.1,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 1 },
+        { "type": "MISSILE", "dmg": 20, "shots": 1 },
+        { "type": "RAIL_GUN", "dmg": 10, "shots": 1 }
+      ],
+      "cargoCapacity": 50,
+      "hangarCapacity": 1,
+      "jumpCost": 1,
+      "cost": { "metal": 120, "crystal": 60, "deuterium": 20 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Battle Ship",
+      "hullClass": "MEDIUM",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 140,
+      "shieldCapacity": 80,
+      "defense": 0.2,
+      "weapons": [
+        { "type": "BEAM", "dmg": 20, "shots": 1 },
+        { "type": "MISSILE", "dmg": 30, "shots": 1 }
+      ],
+      "cargoCapacity": 120,
+      "hangarCapacity": 4,
+      "jumpCost": 2,
+      "cost": { "metal": 250, "crystal": 100, "deuterium": 20 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Frigate",
+      "hullClass": "MEDIUM",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 160,
+      "shieldCapacity": 80,
+      "defense": 0.3,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 1 },
+        { "type": "MISSILE", "dmg": 40, "shots": 1 },
+        { "type": "RAIL_GUN", "dmg": 10, "shots": 2 }
       ],
       "cargoCapacity": 50,
       "hangarCapacity": 0,
-      "jumpCost": 0,
-      "cost": { "metal": 3000, "crystal": 1000, "deuterium": 0 },
-      "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 1 }
+      "jumpCost": 1,
+      "cost": { "metal": 300, "crystal": 80, "deuterium": 20 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Transporter",
+      "hullClass": "MEDIUM",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 60,
+      "shieldCapacity": 20,
+      "defense": 0,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 1 }
       ],
-      "techRequirements": [
-        { "tech": "ENERGY_TECHNOLOGY", "level": 1 }
-      ]
+      "cargoCapacity": 600,
+      "hangarCapacity": 0,
+      "jumpCost": 1,
+      "cost": { "metal": 150, "crystal": 30, "deuterium": 10 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Battle Cruser",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 300,
+      "shieldCapacity": 140,
+      "defense": 1,
+      "weapons": [
+        { "type": "BEAM", "dmg": 20, "shots": 4 },
+        { "type": "MISSILE", "dmg": 30, "shots": 1 },
+        { "type": "RAIL_GUN", "dmg": 10, "shots": 1 }
+      ],
+      "cargoCapacity": 200,
+      "hangarCapacity": 2,
+      "jumpCost": 2,
+      "cost": { "metal": 550, "crystal": 250, "deuterium": 50 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Destroyer",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 250,
+      "shieldCapacity": 160,
+      "defense": 1,
+      "weapons": [
+        { "type": "MISSILE", "dmg": 40, "shots": 1 },
+        { "type": "RAIL_GUN", "dmg": 30, "shots": 2 }
+      ],
+      "cargoCapacity": 200,
+      "hangarCapacity": 0,
+      "jumpCost": 2,
+      "cost": { "metal": 450, "crystal": 250, "deuterium": 50 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Dreadnoth",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 200,
+      "shieldCapacity": 200,
+      "defense": 1,
+      "weapons": [
+        { "type": "BEAM", "dmg": 20, "shots": 1 },
+        { "type": "MISSILE", "dmg": 50, "shots": 3 }
+      ],
+      "cargoCapacity": 200,
+      "hangarCapacity": 0,
+      "jumpCost": 2,
+      "cost": { "metal": 250, "crystal": 300, "deuterium": 80 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Carrier",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 200,
+      "shieldCapacity": 150,
+      "defense": 0.5,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 2 }
+      ],
+      "cargoCapacity": 600,
+      "hangarCapacity": 15,
+      "jumpCost": 3,
+      "cost": { "metal": 300, "crystal": 150, "deuterium": 100 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Cargo Support",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 150,
+      "shieldCapacity": 150,
+      "defense": 0.5,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 2 }
+      ],
+      "cargoCapacity": 1000,
+      "hangarCapacity": 0,
+      "jumpCost": 2,
+      "cost": { "metal": 300, "crystal": 100, "deuterium": 50 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Mass Hauler",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 120,
+      "shieldCapacity": 100,
+      "defense": 0.2,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 1 }
+      ],
+      "cargoCapacity": 2500,
+      "hangarCapacity": 0,
+      "jumpCost": 3,
+      "cost": { "metal": 450, "crystal": 100, "deuterium": 30 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Colonizer",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 200,
+      "shieldCapacity": 100,
+      "defense": 0.1,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 1 }
+      ],
+      "cargoCapacity": 1000,
+      "hangarCapacity": 6,
+      "jumpCost": 5,
+      "cost": { "metal": 600, "crystal": 300, "deuterium": 100 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Titan",
+      "hullClass": "TITAN",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 800,
+      "shieldCapacity": 1000,
+      "defense": 1.5,
+      "weapons": [
+        { "type": "BEAM", "dmg": 30, "shots": 8 },
+        { "type": "MISSILE", "dmg": 50, "shots": 4 },
+        { "type": "RAIL_GUN", "dmg": 20, "shots": 4 }
+      ],
+      "cargoCapacity": 1000,
+      "hangarCapacity": 12,
+      "jumpCost": 10,
+      "cost": { "metal": 1800, "crystal": 1200, "deuterium": 400 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Bechemoth",
+      "hullClass": "TITAN",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 800,
+      "shieldCapacity": 800,
+      "defense": 1.5,
+      "weapons": [
+        { "type": "BEAM", "dmg": 300, "shots": 1 },
+        { "type": "MISSILE", "dmg": 250, "shots": 2 },
+        { "type": "RAIL_GUN", "dmg": 20, "shots": 2 }
+      ],
+      "cargoCapacity": 1000,
+      "hangarCapacity": 0,
+      "jumpCost": 10,
+      "cost": { "metal": 1400, "crystal": 1000, "deuterium": 800 },
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "name": "Fleet Carrier",
+      "hullClass": "TITAN",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 600,
+      "shieldCapacity": 1000,
+      "defense": 1,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 4 },
+        { "type": "MISSILE", "dmg": 30, "shots": 1 }
+      ],
+      "cargoCapacity": 1200,
+      "hangarCapacity": 90,
+      "jumpCost": 8,
+      "cost": { "metal": 1400, "crystal": 600, "deuterium": 400 },
+      "buildingRequirements": [],
+      "techRequirements": []
     }
   ]
 }
+

@@ -1,4 +1,4 @@
-import { HullClass } from './hull-class';
+import { HullClass } from './enum/hull-class';
 import { ShipInstance } from './ship-instance';
 
 export class ShipGroup {
@@ -8,3 +8,4 @@ export class ShipGroup {
     public ships: ShipInstance[]
   ) {}
 }
+

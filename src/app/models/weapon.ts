@@ -1,4 +1,4 @@
-import { WeaponType } from './weapon-type';
+import { WeaponType } from './enum/weapon-type';
 
 export class Weapon {
   constructor(
@@ -7,3 +7,4 @@ export class Weapon {
     public shots: number
   ) {}
 }
+

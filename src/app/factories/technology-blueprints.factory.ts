@@ -1,11 +1,11 @@
 import technologyBlueprintsData from '../blueprints/technology-blueprints.json';
 import { BuildingRequirement } from '../models/building-requirement';
-import { BuildingType } from '../models/building-type';
+import { BuildingType } from '../models/enum/building-type';
 import { ResourcesPack } from '../models/resources-pack';
 import { TechRequirement } from '../models/tech-requirement';
 import { Technology } from '../models/technology';
 import { TechnologyBlueprints } from '../models/technology-blueprints';
-import { TechnologyType } from '../models/technology-type';
+import { TechnologyType } from '../models/enum/technology-type';
 
 interface TechnologyBlueprintsJson {
   technologies: TechnologyBlueprintJson[];
@@ -13,7 +13,7 @@ interface TechnologyBlueprintsJson {
 
 interface TechnologyBlueprintJson {
   type: string;
-  cost: ResourcesPackJson[];
+  basicCost: ResourcesPackJson;
   energyRequired: number[];
   researchTime: number[];
   buildingRequirements: BuildingRequirementJson[];
@@ -52,13 +52,13 @@ export class TechnologyBlueprintsFactory {
   }
 
   private static toTechnology(entry: TechnologyBlueprintJson): Technology {
-    const costs = entry.cost ?? [];
+    const cost = entry.basicCost ?? { metal: 0, crystal: 0, deuterium: 0 };
     const buildingRequirements = entry.buildingRequirements ?? [];
     const techRequirements = entry.techRequirements ?? [];
 
     return new Technology(
       this.parseEnumKey(TechnologyType, entry.type, 'TechnologyType'),
-      costs.map((cost) => new ResourcesPack(cost.metal, cost.crystal, cost.deuterium)),
+      new ResourcesPack(cost.metal, cost.crystal, cost.deuterium),
       entry.energyRequired ?? [],
       entry.researchTime ?? [],
       buildingRequirements.map((requirement) => new BuildingRequirement(
@@ -84,3 +84,4 @@ export class TechnologyBlueprintsFactory {
     throw new Error(`Unknown ${label} key: ${key}`);
   }
 }
+

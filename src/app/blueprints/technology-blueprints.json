@@ -2,16 +2,133 @@
   "technologies": [
     {
       "type": "ENERGY_TECHNOLOGY",
-      "cost": [
-        { "metal": 0, "crystal": 800, "deuterium": 400 },
-        { "metal": 0, "crystal": 1600, "deuterium": 800 }
-      ],
-      "energyRequired": [0, 0],
-      "researchTime": [60, 120],
-      "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 1 }
-      ],
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "WAVE_PARTICLE_TECHNOLOGY",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "MATERIAL_TECHNOLOGY",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "HYPERSPACE_TECHNOLOGY",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "ESPIONAGE_TECHNOLOGY",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "COMPUTER_TECHNOLOGY",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "ASTROPHYSICS_TECHNOLOGY",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "INTERGALACTIC_RESEARCH_NETWORK",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "GRAVITON_TECHNOLOGY",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "SHIELDING_TECHNOLOGY",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "ARMOUR_TECHNOLOGY",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "RAILGUNS_WEAPONS",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "BEAMS_WEAPONS",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "MISSILES_WEAPONS",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "FUSION_DRIVE",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
+      "techRequirements": []
+    },
+    {
+      "type": "HYPERSPACE_DRIVE",
+      "basicCost": { "metal": 0, "crystal": 0, "deuterium": 0 },
+      "energyRequired": [0],
+      "researchTime": [0],
+      "buildingRequirements": [],
       "techRequirements": []
     }
   ]
 }
+
+

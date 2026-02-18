@@ -1,4 +1,4 @@
-import { TechnologyType } from './technology-type';
+import { TechnologyType } from './enum/technology-type';
 
 export class TechRequirement {
   constructor(
@@ -6,3 +6,4 @@ export class TechRequirement {
     public level: number
   ) {}
 }
+

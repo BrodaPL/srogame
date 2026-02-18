@@ -2,10 +2,10 @@ import buildingBlueprintsData from '../blueprints/building-blueprints.json';
 import { Building } from '../models/building';
 import { BuildingBlueprints } from '../models/building-blueprints';
 import { BuildingRequirement } from '../models/building-requirement';
-import { BuildingType } from '../models/building-type';
+import { BuildingType } from '../models/enum/building-type';
 import { ResourcesPack } from '../models/resources-pack';
 import { TechRequirement } from '../models/tech-requirement';
-import { TechnologyType } from '../models/technology-type';
+import { TechnologyType } from '../models/enum/technology-type';
 
 interface BuildingBlueprintsJson {
   buildings: BuildingBlueprintJson[];
@@ -14,10 +14,10 @@ interface BuildingBlueprintsJson {
 interface BuildingBlueprintJson {
   type: string;
   description: string;
-  cost: ResourcesPackJson[];
+  basicCost: ResourcesPackJson;
   level: number;
   currentPowerConsumption: number;
-  powerConsumption: number[];
+  powerConsumption: number;
   buildingRequirements: BuildingRequirementJson[];
   techRequirements: TechRequirementJson[];
   production1: number[];
@@ -57,17 +57,17 @@ export class BuildingBlueprintsFactory {
   }
 
   private static toBuilding(entry: BuildingBlueprintJson): Building {
-    const costs = entry.cost ?? [];
+    const cost = entry.basicCost ?? { metal: 0, crystal: 0, deuterium: 0 };
     const buildingRequirements = entry.buildingRequirements ?? [];
     const techRequirements = entry.techRequirements ?? [];
 
     return new Building(
       this.parseEnumKey(BuildingType, entry.type, 'BuildingType'),
       entry.description,
-      costs.map((cost) => new ResourcesPack(cost.metal, cost.crystal, cost.deuterium)),
+      new ResourcesPack(cost.metal, cost.crystal, cost.deuterium),
       entry.level,
       entry.currentPowerConsumption,
-      entry.powerConsumption ?? [],
+      entry.powerConsumption ?? 0,
       buildingRequirements.map((requirement) => new BuildingRequirement(
         this.parseEnumKey(BuildingType, requirement.building, 'BuildingType'),
         requirement.level
@@ -94,3 +94,4 @@ export class BuildingBlueprintsFactory {
     throw new Error(`Unknown ${label} key: ${key}`);
   }
 }
+

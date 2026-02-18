@@ -24,7 +24,7 @@ This file captures session context for collaborators and future AI agents.
 - Setup UI + logic: `src/app/setup/setup.component.ts`, `src/app/setup/setup.component.html`
 - Game UI + logic: `src/app/game/game.component.ts`, `src/app/game/game.component.html`
 - Models: `src/app/models/resources-pack.ts`
-- Models: `src/app/models/building-type.ts`, `src/app/models/technology-type.ts`, `src/app/models/building-requirement.ts`, `src/app/models/tech-requirement.ts`, `src/app/models/weapon-type.ts`, `src/app/models/weapon.ts`, `src/app/models/technology.ts`, `src/app/models/building.ts`, `src/app/models/hull-class.ts`, `src/app/models/ship.ts`, `src/app/models/ship-instance.ts`, `src/app/models/ship-group.ts`, `src/app/models/planet.ts`, `src/app/models/planet-type.ts`, `src/app/models/solar-system.ts`, `src/app/models/galaxy.ts`, `src/app/models/player.ts`, `src/app/models/fleet.ts`
+- Models: `src/app/models/enum/building-type.ts`, `src/app/models/enum/technology-type.ts`, `src/app/models/building-requirement.ts`, `src/app/models/tech-requirement.ts`, `src/app/models/enum/weapon-type.ts`, `src/app/models/weapon.ts`, `src/app/models/technology.ts`, `src/app/models/building.ts`, `src/app/models/enum/hull-class.ts`, `src/app/models/ship.ts`, `src/app/models/ship-instance.ts`, `src/app/models/ship-group.ts`, `src/app/models/planet.ts`, `src/app/models/enum/planet-type.ts`, `src/app/models/solar-system.ts`, `src/app/models/galaxy.ts`, `src/app/models/player.ts`, `src/app/models/fleet.ts`
 - Logging: `src/app/core/logger.ts`
 
 ## Dev Commands
@@ -33,6 +33,7 @@ This file captures session context for collaborators and future AI agents.
 - `npm run test`
 
 ## Session Notes (most recent first)
+- 2026-02-18: Moved enums into `src/app/models/enum/`. Updated ship blueprints (evasionChance scalar; scaled hull/shield/dmg/cargo/cost by 10). Building/Technology blueprints now use `basicCost`, both populated with placeholders. Building `cost`/`powerConsumption` now scalar; Technology `basicCost` now scalar. Added `getCostForLevel(levelParam)` to Building and Technology.
 - 2026-02-17: Added ship/building/technology blueprints with JSON sources, factories to hydrate them, and new blueprint container models (`ShipBlueprints`, `BuildingBlueprints`, `TechnologyBlueprints`). JSON uses enum identifiers and lives in `src/app/blueprints/`.
 - 2026-02-15: Added domain models for resources, buildings, tech, ships, fleets, planets, solar systems, galaxies, and players.
 - 2026-02-15: Added main menu + new routes, centralized CSS in `src/styles.css`, added `ResourcesPack` model and global logger.

@@ -2,6 +2,7 @@ export enum BuildingType {
   METAL_MINE = 'Metal Mine',
   CRYSTAL_MINE = 'Crystal Mine',
   DEUTERIUM_SYNTHESIZER = 'Deuterium Synthesizer',
+  SOLAR_WIND_GEOTHERMAL = 'Solar, Wind and Geothermal power plants',
   NUCLEAR_PLANT = 'Nuclear Plant',
   FUSION_REACTOR = 'Fusion Reactor',
   METAL_STORAGE = 'Metal Storage',

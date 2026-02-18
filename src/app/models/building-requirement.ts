@@ -1,4 +1,4 @@
-import { BuildingType } from './building-type';
+import { BuildingType } from './enum/building-type';
 
 export class BuildingRequirement {
   constructor(
@@ -6,3 +6,4 @@ export class BuildingRequirement {
     public level: number
   ) {}
 }
+

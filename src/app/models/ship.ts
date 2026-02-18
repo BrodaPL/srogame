@@ -1,5 +1,5 @@
 import { BuildingRequirement } from './building-requirement';
-import { HullClass } from './hull-class';
+import { HullClass } from './enum/hull-class';
 import { ResourcesPack } from './resources-pack';
 import { TechRequirement } from './tech-requirement';
 import { Weapon } from './weapon';
@@ -10,7 +10,7 @@ export class Ship {
     public hullClass: HullClass,
     public canJump: boolean,
     public size: number,
-    public evasionChance: number[],
+    public evasionChance: number,
     public hullPointsCapacity: number,
     public shieldCapacity: number,
     public defense: number,
@@ -23,3 +23,4 @@ export class Ship {
     public techRequirements: TechRequirement[]
   ) {}
 }
+

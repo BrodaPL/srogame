@@ -1,5 +1,5 @@
 import { Building } from './building';
-import { BuildingType } from './building-type';
+import { BuildingType } from './enum/building-type';
 
 export class BuildingBlueprints {
   constructor(public buildingsMap: Map<BuildingType, Building> = new Map()) {}
@@ -12,3 +12,4 @@ export class BuildingBlueprints {
     return this.buildingsMap.get(type);
   }
 }
+

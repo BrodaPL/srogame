@@ -1,5 +1,5 @@
 import { Ship } from './ship';
-import { TechnologyType } from './technology-type';
+import { TechnologyType } from './enum/technology-type';
 
 export class ShipBlueprints {
   constructor(public shipsMap: Map<string, Ship> = new Map()) {
@@ -40,3 +40,4 @@ export class ShipBlueprints {
 
   }
 }
+

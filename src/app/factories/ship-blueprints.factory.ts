@@ -1,14 +1,14 @@
 import shipBlueprintsData from '../blueprints/ship-blueprints.json';
 import { BuildingRequirement } from '../models/building-requirement';
-import { BuildingType } from '../models/building-type';
-import { HullClass } from '../models/hull-class';
+import { BuildingType } from '../models/enum/building-type';
+import { HullClass } from '../models/enum/hull-class';
 import { ResourcesPack } from '../models/resources-pack';
 import { Ship } from '../models/ship';
 import { ShipBlueprints } from '../models/ship-blueprints';
 import { TechRequirement } from '../models/tech-requirement';
-import { TechnologyType } from '../models/technology-type';
+import { TechnologyType } from '../models/enum/technology-type';
 import { Weapon } from '../models/weapon';
-import { WeaponType } from '../models/weapon-type';
+import { WeaponType } from '../models/enum/weapon-type';
 
 interface ShipBlueprintsJson {
   ships: ShipBlueprintJson[];
@@ -19,7 +19,7 @@ interface ShipBlueprintJson {
   hullClass: string;
   canJump: boolean;
   size: number;
-  evasionChance: number[];
+  evasionChance: number;
   hullPointsCapacity: number;
   shieldCapacity: number;
   defense: number;
@@ -79,7 +79,7 @@ export class ShipBlueprintsFactory {
       this.parseEnumKey(HullClass, entry.hullClass, 'HullClass'),
       entry.canJump,
       entry.size,
-      entry.evasionChance ?? [],
+      entry.evasionChance ?? 0,
       entry.hullPointsCapacity,
       entry.shieldCapacity,
       entry.defense,
@@ -115,3 +115,4 @@ export class ShipBlueprintsFactory {
     throw new Error(`Unknown ${label} key: ${key}`);
   }
 }
+
