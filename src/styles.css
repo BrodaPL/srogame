@@ -118,6 +118,207 @@ app-root {
   transform: translateY(-1px);
 }
 
+.encyclopedia-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.encyclopedia-meta {
+  margin: 0;
+  font-weight: 600;
+  color: rgba(20, 22, 24, 0.7);
+}
+
+.encyclopedia-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.ship-card {
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 18px 32px rgba(20, 22, 24, 0.08);
+  display: grid;
+  gap: 1.2rem;
+}
+
+.ship-media {
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.45));
+  border: 1px solid rgba(20, 22, 24, 0.08);
+  display: block;
+}
+
+.ship-image {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.15));
+}
+
+.building-image {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.14));
+}
+
+.ship-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ship-card__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.ship-card__subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: rgba(20, 22, 24, 0.7);
+}
+
+.ship-card__subtitle--wide {
+  max-width: 60ch;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--accent-dark);
+  text-align: center;
+}
+
+.badge--jump {
+  border-color: rgba(42, 161, 152, 0.35);
+  color: var(--teal);
+  background: rgba(42, 161, 152, 0.12);
+}
+
+.ship-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.ship-stat {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ship-stat__label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  color: rgba(20, 22, 24, 0.55);
+}
+
+.ship-stat__value {
+  font-weight: 600;
+}
+
+.ship-section {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.ship-section__title {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  color: rgba(20, 22, 24, 0.6);
+}
+
+.weapon-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.weapon-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.weapon-chip {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.weapon-meta {
+  font-size: 0.85rem;
+  color: rgba(20, 22, 24, 0.75);
+}
+
+.ship-empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(20, 22, 24, 0.6);
+}
+
+.cost-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-family: var(--font-mono), serif;
+  font-size: 0.85rem;
+}
+
+.cost-chip {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 0.25rem 0.6rem;
+  background: rgba(245, 245, 245, 0.9);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cost-chip--crystal {
+  background: rgba(203, 232, 255, 0.7);
+}
+
+.cost-chip--deuterium {
+  background: rgba(203, 245, 214, 0.75);
+}
+
+.cost-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
 .setup-form {
   display: grid;
   gap: 1.25rem;

@@ -1,11 +1,61 @@
 <main class="page">
-  <section class="panel panel--compact">
+  <section class="panel">
     <header class="panel__header">
       <p class="eyebrow">Encyclopedia</p>
       <h1>Technologies</h1>
-      <p class="subtitle">Technology entries will be listed here.</p>
+      <p class="subtitle">Research paths, drives, and combat science.</p>
     </header>
 
-    <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+    <div class="encyclopedia-toolbar">
+      <p class="encyclopedia-meta">{{ technologies.length }} technologies cataloged</p>
+      <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+    </div>
+
+    <div class="encyclopedia-grid">
+      <article class="ship-card" *ngFor="let tech of technologies; let isFirst = first">
+        <div class="ship-media">
+          <img
+            class="building-image"
+            [src]="tech.imagePath"
+            [alt]="tech.type + ' image'"
+            [attr.loading]="isFirst ? 'eager' : 'lazy'"
+          />
+        </div>
+        <header class="ship-card__header">
+          <div>
+            <h2 class="ship-card__title">{{ tech.type }}</h2>
+          </div>
+        </header>
+
+        <div class="ship-stats">
+          <div class="ship-stat">
+            <span class="ship-stat__label">Energy</span>
+            <span class="ship-stat__value">{{ tech.energyRequired[0] ?? 0 }}</span>
+          </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Research</span>
+            <span class="ship-stat__value">{{ tech.researchTime[0] ?? 0 }}</span>
+          </div>
+        </div>
+
+        <div class="ship-section">
+          <p class="ship-section__title">Cost</p>
+          <div class="cost-row">
+            <span class="cost-chip">
+              <img class="cost-icon" src="images/icons/Metal.PNG.webp" alt="Metal" />
+              {{ tech.basicCost.metal }}
+            </span>
+            <span class="cost-chip cost-chip--crystal">
+              <img class="cost-icon" src="images/icons/Crystal.PNG.webp" alt="Crystal" />
+              {{ tech.basicCost.crystal }}
+            </span>
+            <span class="cost-chip cost-chip--deuterium">
+              <img class="cost-icon" src="images/icons/Deutrium.PNG.webp" alt="Deuterium" />
+              {{ tech.basicCost.deuterium }}
+            </span>
+          </div>
+        </div>
+      </article>
+    </div>
   </section>
 </main>

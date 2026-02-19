@@ -7,6 +7,7 @@ import { Weapon } from './weapon';
 export class Ship {
   constructor(
     public name: string,
+    public imagePath: string,
     public hullClass: HullClass,
     public canJump: boolean,
     public size: number,

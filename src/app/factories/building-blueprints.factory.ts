@@ -14,6 +14,7 @@ interface BuildingBlueprintsJson {
 interface BuildingBlueprintJson {
   type: string;
   description: string;
+  imagePath?: string;
   basicCost: ResourcesPackJson;
   level: number;
   currentPowerConsumption: number;
@@ -42,6 +43,31 @@ interface TechRequirementJson {
 }
 
 export class BuildingBlueprintsFactory {
+  private static readonly defaultImagePath = 'images/buildings/Metal_Mine.webp';
+  private static readonly buildingImageMap: Record<string, string> = {
+    METAL_MINE: 'images/buildings/Metal_Mine.webp',
+    CRYSTAL_MINE: 'images/buildings/CrystalMine.webp',
+    DEUTERIUM_SYNTHESIZER: 'images/buildings/Deuterium_Synthesizer.webp',
+    SOLAR_WIND_GEOTHERMAL: 'images/buildings/Solar_Plant.webp',
+    NUCLEAR_PLANT: 'images/buildings/Fusion_Reactor.webp',
+    FUSION_REACTOR: 'images/buildings/Fusion_Reactor.webp',
+    METAL_STORAGE: 'images/buildings/Metal_Storage.webp',
+    CRYSTAL_STORAGE: 'images/buildings/Crystal_Storage.webp',
+    DEUTERIUM_TANK: 'images/buildings/Deuterium_Tank.webp',
+    ROBOTICS_FACTORY: 'images/buildings/Robotics_Factory.webp',
+    SHIPYARD: 'images/buildings/Shipyard.webp',
+    RESEARCH_LAB: 'images/buildings/Research_Lab.webp',
+    ALLIANCE_DEPOT: 'images/buildings/Alliance_Depot.webp',
+    MISSILE_SILO: 'images/buildings/Missile_Silo.webp',
+    NANITE_FACTORY: 'images/buildings/Nanite_Factory.webp',
+    TERRAFORMER: 'images/buildings/Terraformer.webp',
+    SPACEPORT: 'images/buildings/Space_Dock.webp',
+    SENSOR_PHALANX: 'images/buildings/Sensor_Phalanx.webp',
+    JUMP_GATE: 'images/buildings/Jump_Gate.webp',
+    INTERSTELLAR_TRADE_PORT: 'images/buildings/Shipyard.webp',
+    BUNKER_NETWORK: 'images/buildings/Metal_Storage.webp'
+  };
+
   static fromDefaultJson(): BuildingBlueprints {
     return this.fromJson(buildingBlueprintsData as BuildingBlueprintsJson);
   }
@@ -60,10 +86,12 @@ export class BuildingBlueprintsFactory {
     const cost = entry.basicCost ?? { metal: 0, crystal: 0, deuterium: 0 };
     const buildingRequirements = entry.buildingRequirements ?? [];
     const techRequirements = entry.techRequirements ?? [];
+    const imagePath = this.resolveImagePath(entry);
 
     return new Building(
       this.parseEnumKey(BuildingType, entry.type, 'BuildingType'),
       entry.description,
+      imagePath,
       new ResourcesPack(cost.metal, cost.crystal, cost.deuterium),
       entry.level,
       entry.currentPowerConsumption,
@@ -82,6 +110,14 @@ export class BuildingBlueprintsFactory {
     );
   }
 
+  private static resolveImagePath(entry: BuildingBlueprintJson): string {
+    if (entry.imagePath && entry.imagePath.trim().length > 0) {
+      return entry.imagePath;
+    }
+
+    return this.buildingImageMap[entry.type] ?? this.defaultImagePath;
+  }
+
   private static parseEnumKey<T extends string>(
     enumObject: Record<string, T>,
     key: string,
@@ -94,4 +130,3 @@ export class BuildingBlueprintsFactory {
     throw new Error(`Unknown ${label} key: ${key}`);
   }
 }
-

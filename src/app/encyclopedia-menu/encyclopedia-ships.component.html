@@ -1,11 +1,108 @@
 <main class="page">
-  <section class="panel panel--compact">
+  <section class="panel">
     <header class="panel__header">
       <p class="eyebrow">Encyclopedia</p>
       <h1>Ships</h1>
-      <p class="subtitle">Ship entries will be listed here.</p>
+      <p class="subtitle">Detailed hull data sourced from the ship blueprints.</p>
     </header>
 
-    <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+    <div class="encyclopedia-toolbar">
+      <p class="encyclopedia-meta">{{ ships.length }} ships cataloged</p>
+      <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+    </div>
+
+    <div class="encyclopedia-grid">
+      <article class="ship-card" *ngFor="let ship of ships; let isFirst = first">
+        <div class="ship-media">
+          <img
+            class="ship-image"
+            [src]="ship.imagePath"
+            [alt]="ship.name + ' image'"
+            [attr.loading]="isFirst ? 'eager' : 'lazy'"
+          />
+        </div>
+        <header class="ship-card__header">
+          <div>
+            <h2 class="ship-card__title">{{ ship.name }}</h2>
+          </div>
+          <span class="badge" [class.badge--jump]="ship.canJump">
+            {{ ship.hullClass }}
+          </span>
+        </header>
+
+        <div class="ship-stats">
+          <div class="ship-stat">
+            <span class="ship-stat__label">Size</span>
+            <span class="ship-stat__value">{{ ship.size }}</span>
+          </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Evasion</span>
+            <span class="ship-stat__value">{{ ship.evasionChance * 100 }}%</span>
+          </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Hull</span>
+            <span class="ship-stat__value">{{ ship.hullPointsCapacity }}</span>
+          </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Shield</span>
+            <span class="ship-stat__value">{{ ship.shieldCapacity }}</span>
+          </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Defense</span>
+            <span class="ship-stat__value">{{ ship.defense }}</span>
+          </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Cargo</span>
+            <span class="ship-stat__value">{{ ship.cargoCapacity }}</span>
+          </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Hangar</span>
+            <span class="ship-stat__value">{{ ship.hangarCapacity }}</span>
+          </div>
+          <div class="ship-stat" *ngIf="ship.canJump; else noJump">
+            <span class="ship-stat__label">Jump cost</span>
+            <span class="ship-stat__value">{{ ship.jumpCost }}</span>
+          </div>
+          <ng-template #noJump>
+            <div class="ship-stat">
+              <span class="ship-stat__label">Jump</span>
+              <span class="ship-stat__value">No Hyper Jump Ability</span>
+            </div>
+          </ng-template>
+        </div>
+
+        <div class="ship-section">
+          <p class="ship-section__title">Weapons</p>
+          <ul class="weapon-list" *ngIf="ship.weapons.length > 0; else noWeapons">
+            <li class="weapon-item" *ngFor="let weapon of ship.weapons">
+              <span class="weapon-chip">{{ weapon.type }}</span>
+              <span class="weapon-meta">{{ weapon.dmg }} dmg</span>
+              <span class="weapon-meta">{{ weapon.shots }} shots</span>
+            </li>
+          </ul>
+          <ng-template #noWeapons>
+            <p class="ship-empty">Unarmed</p>
+          </ng-template>
+        </div>
+
+        <div class="ship-section">
+          <p class="ship-section__title">Cost</p>
+          <div class="cost-row">
+            <span class="cost-chip">
+              <img class="cost-icon" src="images/icons/Metal.PNG.webp" alt="Metal" />
+              {{ ship.cost.metal }}
+            </span>
+            <span class="cost-chip cost-chip--crystal">
+              <img class="cost-icon" src="images/icons/Crystal.PNG.webp" alt="Crystal" />
+              {{ ship.cost.crystal }}
+            </span>
+            <span class="cost-chip cost-chip--deuterium">
+              <img class="cost-icon" src="images/icons/Deutrium.PNG.webp" alt="Deuterium" />
+              {{ ship.cost.deuterium }}
+            </span>
+          </div>
+        </div>
+      </article>
+    </div>
   </section>
 </main>

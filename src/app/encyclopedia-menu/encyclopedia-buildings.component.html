@@ -1,11 +1,75 @@
 <main class="page">
-  <section class="panel panel--compact">
+  <section class="panel">
     <header class="panel__header">
       <p class="eyebrow">Encyclopedia</p>
       <h1>Buildings</h1>
-      <p class="subtitle">Building entries will be listed here.</p>
+      <p class="subtitle">Core planetary infrastructure and specialized facilities.</p>
     </header>
 
-    <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+    <div class="encyclopedia-toolbar">
+      <p class="encyclopedia-meta">{{ buildings.length }} buildings cataloged</p>
+      <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+    </div>
+
+    <div class="encyclopedia-grid">
+      <article class="ship-card" *ngFor="let building of buildings; let isFirst = first">
+        <div class="ship-media">
+          <img
+            class="building-image"
+            [src]="building.imagePath"
+            [alt]="building.type + ' image'"
+            [attr.loading]="isFirst ? 'eager' : 'lazy'"
+          />
+        </div>
+        <header class="ship-card__header">
+          <div>
+            <h2 class="ship-card__title">{{ building.type }}</h2>
+            <p class="ship-card__subtitle ship-card__subtitle--wide">{{ building.description }}</p>
+          </div>
+        </header>
+
+        <div class="ship-stats">
+          <div class="ship-stat">
+            <span class="ship-stat__label">Level</span>
+            <span class="ship-stat__value">{{ building.level }}</span>
+          </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Power</span>
+            <span class="ship-stat__value">{{ building.powerConsumption }}</span>
+          </div>
+        </div>
+
+        <div class="ship-section">
+          <p class="ship-section__title">Cost</p>
+          <div class="cost-row">
+            <span class="cost-chip">
+              <img class="cost-icon" src="images/icons/Metal.PNG.webp" alt="Metal" />
+              {{ building.basicCost.metal }}
+            </span>
+            <span class="cost-chip cost-chip--crystal">
+              <img class="cost-icon" src="images/icons/Crystal.PNG.webp" alt="Crystal" />
+              {{ building.basicCost.crystal }}
+            </span>
+            <span class="cost-chip cost-chip--deuterium">
+              <img class="cost-icon" src="images/icons/Deutrium.PNG.webp" alt="Deuterium" />
+              {{ building.basicCost.deuterium }}
+            </span>
+          </div>
+        </div>
+
+        <div class="ship-section" *ngIf="building.production1.length > 0; else noProduction">
+          <p class="ship-section__title">Production</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">
+            Base output: {{ building.production1[0] }}
+          </p>
+        </div>
+        <ng-template #noProduction>
+          <div class="ship-section">
+            <p class="ship-section__title">Production</p>
+            <p class="ship-card__subtitle ship-card__subtitle--wide">No production output</p>
+          </div>
+        </ng-template>
+      </article>
+    </div>
   </section>
 </main>

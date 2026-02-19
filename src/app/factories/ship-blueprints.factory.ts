@@ -16,6 +16,7 @@ interface ShipBlueprintsJson {
 
 interface ShipBlueprintJson {
   name: string;
+  imagePath?: string;
   hullClass: string;
   canJump: boolean;
   size: number;
@@ -55,6 +56,28 @@ interface TechRequirementJson {
 }
 
 export class ShipBlueprintsFactory {
+  private static readonly defaultImagePath = 'images/ships/Light_Fighter.webp';
+  private static readonly shipImageMap: Record<string, string> = {
+    'Fighter': 'images/ships/Light_Fighter.webp',
+    'Assualt Fighter': 'images/ships/Heavy_Fighter.webp',
+    'Corvet': 'images/ships/Cruiser.webp',
+    'Spy Prob': 'images/ships/Espionage_Probe.webp',
+    'Cruser': 'images/ships/Cruiser.webp',
+    'Battle Ship': 'images/ships/Battleship.webp',
+    'Frigate': 'images/ships/Battlecruiser.webp',
+    'Transporter': 'images/ships/Small_Cargo.webp',
+    'Battle Cruser': 'images/ships/Battlecruiser.webp',
+    'Destroyer': 'images/ships/Destroyer.webp',
+    'Dreadnoth': 'images/ships/Death_Star.webp',
+    'Carrier': 'images/ships/Reaper.webp',
+    'Cargo Support': 'images/ships/Large_Cargo.webp',
+    'Mass Hauler': 'images/ships/Large_Cargo.webp',
+    'Colonizer': 'images/ships/Colony_Ship.webp',
+    'Titan': 'images/ships/Death_Star.webp',
+    'Bechemoth': 'images/ships/Death_Star.webp',
+    'Fleet Carrier': 'images/ships/Pathfinder.webp'
+  };
+
   static fromDefaultJson(): ShipBlueprints {
     return this.fromJson(shipBlueprintsData as ShipBlueprintsJson);
   }
@@ -73,9 +96,11 @@ export class ShipBlueprintsFactory {
     const weapons = entry.weapons ?? [];
     const buildingRequirements = entry.buildingRequirements ?? [];
     const techRequirements = entry.techRequirements ?? [];
+    const imagePath = this.resolveImagePath(entry);
 
     return new Ship(
       entry.name,
+      imagePath,
       this.parseEnumKey(HullClass, entry.hullClass, 'HullClass'),
       entry.canJump,
       entry.size,
@@ -101,6 +126,14 @@ export class ShipBlueprintsFactory {
         requirement.level
       ))
     );
+  }
+
+  private static resolveImagePath(entry: ShipBlueprintJson): string {
+    if (entry.imagePath && entry.imagePath.trim().length > 0) {
+      return entry.imagePath;
+    }
+
+    return this.shipImageMap[entry.name] ?? this.defaultImagePath;
   }
 
   private static parseEnumKey<T extends string>(

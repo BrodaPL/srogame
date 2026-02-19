@@ -2,6 +2,7 @@
   "ships": [
     {
       "name": "Fighter",
+      "imagePath": "images/ships/Light_Fighter.webp",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 1,
@@ -21,6 +22,7 @@
     },
     {
       "name": "Assualt Fighter",
+      "imagePath": "images/ships/Heavy_Fighter.webp",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 2,
@@ -40,6 +42,7 @@
     },
     {
       "name": "Corvet",
+      "imagePath": "images/ships/Cruiser.webp",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 3,
@@ -60,6 +63,7 @@
     },
     {
       "name": "Spy Prob",
+      "imagePath": "images/ships/Espionage_Probe.webp",
       "hullClass": "SMALL",
       "canJump": true,
       "size": 0,
@@ -77,6 +81,7 @@
     },
     {
       "name": "Cruser",
+      "imagePath": "images/ships/Cruiser.webp",
       "hullClass": "MEDIUM",
       "canJump": true,
       "size": 0,
@@ -98,6 +103,7 @@
     },
     {
       "name": "Battle Ship",
+      "imagePath": "images/ships/Battleship.webp",
       "hullClass": "MEDIUM",
       "canJump": true,
       "size": 0,
@@ -118,6 +124,7 @@
     },
     {
       "name": "Frigate",
+      "imagePath": "images/ships/Battlecruiser.webp",
       "hullClass": "MEDIUM",
       "canJump": true,
       "size": 0,
@@ -139,6 +146,7 @@
     },
     {
       "name": "Transporter",
+      "imagePath": "images/ships/Small_Cargo.webp",
       "hullClass": "MEDIUM",
       "canJump": true,
       "size": 0,
@@ -158,6 +166,7 @@
     },
     {
       "name": "Battle Cruser",
+      "imagePath": "images/ships/Battlecruiser.webp",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -179,6 +188,7 @@
     },
     {
       "name": "Destroyer",
+      "imagePath": "images/ships/Destroyer.webp",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -199,6 +209,7 @@
     },
     {
       "name": "Dreadnoth",
+      "imagePath": "images/ships/Death_Star.webp",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -219,6 +230,7 @@
     },
     {
       "name": "Carrier",
+      "imagePath": "images/ships/Reaper.webp",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -238,6 +250,7 @@
     },
     {
       "name": "Cargo Support",
+      "imagePath": "images/ships/Large_Cargo.webp",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -257,6 +270,7 @@
     },
     {
       "name": "Mass Hauler",
+      "imagePath": "images/ships/Large_Cargo.webp",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -276,6 +290,7 @@
     },
     {
       "name": "Colonizer",
+      "imagePath": "images/ships/Colony_Ship.webp",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -295,6 +310,7 @@
     },
     {
       "name": "Titan",
+      "imagePath": "images/ships/Death_Star.webp",
       "hullClass": "TITAN",
       "canJump": true,
       "size": 0,
@@ -316,6 +332,7 @@
     },
     {
       "name": "Bechemoth",
+      "imagePath": "images/ships/Death_Star.webp",
       "hullClass": "TITAN",
       "canJump": true,
       "size": 0,
@@ -337,6 +354,7 @@
     },
     {
       "name": "Fleet Carrier",
+      "imagePath": "images/ships/Pathfinder.webp",
       "hullClass": "TITAN",
       "canJump": true,
       "size": 0,
@@ -357,4 +375,3 @@
     }
   ]
 }
-

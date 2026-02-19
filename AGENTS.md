@@ -10,10 +10,14 @@ This file captures session context for collaborators and future AI agents.
 - Persistence (current): Uses browser localStorage key `srogame:setup`.
 
 ## Current Behavior
-- Route `/` shows main menu (load, singleplayer, multiplayer, help/about).
+- Route `/` shows main menu (load, singleplayer, multiplayer, encyclopedia, help/about).
 - Route `/setup` shows setup form (player name + starting metal/crystal/deuterium).
 - Route `/game` shows game view if config exists, otherwise prompts to go to setup.
+- Route `/encyclopedia` shows encyclopedia menu with ships/buildings/technologies links.
 - Routes `/load`, `/multiplayer`, `/help` are placeholders.
+- Route `/encyclopedia/ships` shows ship cards sourced from ship blueprints (images + stats + costs).
+- Route `/encyclopedia/buildings` shows building cards sourced from building blueprints (images + basic stats + costs).
+- Route `/encyclopedia/technologies` shows technology cards sourced from tech blueprints (images + basic stats + costs).
 
 ## Key Files
 - App bootstrap: `src/main.ts`, `src/app/app.config.ts`
@@ -21,6 +25,10 @@ This file captures session context for collaborators and future AI agents.
 - Root component: `src/app/app.ts`, `src/app/app.html`
 - Global styles: `src/styles.css`
 - Main menu UI + logic: `src/app/main-menu/main-menu.component.ts`, `src/app/main-menu/main-menu.component.html`
+- Encyclopedia menu UI + logic: `src/app/encyclopedia-menu/encyclopedia-menu.component.ts`, `src/app/encyclopedia-menu/encyclopedia-menu.component.html`
+- Encyclopedia placeholders: `src/app/encyclopedia-menu/encyclopedia-ships.component.ts`, `src/app/encyclopedia-menu/encyclopedia-buildings.component.ts`, `src/app/encyclopedia-menu/encyclopedia-technologies.component.ts`
+- Encyclopedias render blueprints: `src/app/encyclopedia-menu/encyclopedia-ships.component.html`, `src/app/encyclopedia-menu/encyclopedia-buildings.component.html`, `src/app/encyclopedia-menu/encyclopedia-technologies.component.html`
+- Blueprints: `src/app/blueprints/ship-blueprints.json`, `src/app/blueprints/building-blueprints.json`, `src/app/blueprints/technology-blueprints.json`
 - Setup UI + logic: `src/app/setup/setup.component.ts`, `src/app/setup/setup.component.html`
 - Game UI + logic: `src/app/game/game.component.ts`, `src/app/game/game.component.html`
 - Models: `src/app/models/resources-pack.ts`
@@ -33,6 +41,8 @@ This file captures session context for collaborators and future AI agents.
 - `npm run test`
 
 ## Session Notes (most recent first)
+- 2026-02-19: Added ship/building/technology encyclopedia views with cards, images, and costs. Added imagePath fields to Ship/Building/Technology + blueprints. Moved image assets under `public/images` and added icons for resource costs. Fixed missing tech image reference.
+- 2026-02-19: Added encyclopedia menu route and main menu button. Added placeholder routes + components for ships/buildings/technologies in `src/app/encyclopedia-menu/`.
 - 2026-02-18: Moved enums into `src/app/models/enum/`. Updated ship blueprints (evasionChance scalar; scaled hull/shield/dmg/cargo/cost by 10). Building/Technology blueprints now use `basicCost`, both populated with placeholders. Building `cost`/`powerConsumption` now scalar; Technology `basicCost` now scalar. Added `getCostForLevel(levelParam)` to Building and Technology.
 - 2026-02-17: Added ship/building/technology blueprints with JSON sources, factories to hydrate them, and new blueprint container models (`ShipBlueprints`, `BuildingBlueprints`, `TechnologyBlueprints`). JSON uses enum identifiers and lives in `src/app/blueprints/`.
 - 2026-02-15: Added domain models for resources, buildings, tech, ships, fleets, planets, solar systems, galaxies, and players.

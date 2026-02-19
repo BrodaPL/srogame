@@ -6,6 +6,7 @@ import { TechnologyType } from './enum/technology-type';
 export class Technology {
   constructor(
     public type: TechnologyType,
+    public imagePath: string,
     public basicCost: ResourcesPack,
     public energyRequired: number[],
     public researchTime: number[],

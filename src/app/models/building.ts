@@ -8,6 +8,7 @@ export class Building {
   constructor(
     public type: BuildingType,
     public description: string,
+    public imagePath: string,
     public basicCost: ResourcesPack,
     public level: number,
     public currentPowerConsumption: number,
@@ -32,4 +33,3 @@ export class Building {
     );
   }
 }
-
