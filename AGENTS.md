@@ -32,7 +32,7 @@ This file captures session context for collaborators and future AI agents.
 - Setup UI + logic: `src/app/setup/setup.component.ts`, `src/app/setup/setup.component.html`
 - Game UI + logic: `src/app/game/game.component.ts`, `src/app/game/game.component.html`
 - Models: `src/app/models/resources-pack.ts`
-- Models: `src/app/models/enum/building-type.ts`, `src/app/models/enum/technology-type.ts`, `src/app/models/building-requirement.ts`, `src/app/models/tech-requirement.ts`, `src/app/models/enum/weapon-type.ts`, `src/app/models/weapon.ts`, `src/app/models/technology.ts`, `src/app/models/building.ts`, `src/app/models/enum/hull-class.ts`, `src/app/models/ship.ts`, `src/app/models/ship-instance.ts`, `src/app/models/ship-group.ts`, `src/app/models/planet.ts`, `src/app/models/enum/planet-type.ts`, `src/app/models/solar-system.ts`, `src/app/models/galaxy.ts`, `src/app/models/player.ts`, `src/app/models/fleet.ts`
+- Models: `src/app/models/enum/building-type.ts`, `src/app/models/enum/technology-type.ts`, `src/app/models/building-requirement.ts`, `src/app/models/tech-requirement.ts`, `src/app/models/enum/weapon-type.ts`, `src/app/models/weapon.ts`, `src/app/models/technology.ts`, `src/app/models/building.ts`, `src/app/models/enum/hull-class.ts`, `src/app/models/ship.ts`, `src/app/models/ship-instance.ts`, `src/app/models/ship-group.ts`, `src/app/models/planet.ts`, `src/app/models/enum/planet-type.ts`, `src/app/models/enum/player-type.ts`, `src/app/models/planet-type-assets.ts`, `src/app/models/solar-system.ts`, `src/app/models/galaxy.ts`, `src/app/models/player.ts`, `src/app/models/fleet.ts`
 - Logging: `src/app/core/logger.ts`
 
 ## Dev Commands
@@ -41,6 +41,7 @@ This file captures session context for collaborators and future AI agents.
 - `npm run test`
 
 ## Session Notes (most recent first)
+- 2026-02-20: Switched global UI to a dark, space-themed palette in `src/styles.css`; adjusted encyclopedia cost chips (bigger icons, tighter padding). Renamed `public/images/planet_view/*_Backdrop.webp` files to remove `_Backdrop`. Added `PlanetType` image mapping (`PLANET_TYPE_IMAGES`) with resources/facilities views and updated to `OCEANIC`. Added `PlayerType` enum. Added `Planet.createRandomEmpty` factory with randomized planet parameters and modifiers rounded to 2 decimals.
 - 2026-02-19: Added ship/building/technology encyclopedia views with cards, images, and costs. Added imagePath fields to Ship/Building/Technology + blueprints. Moved image assets under `public/images` and added icons for resource costs. Fixed missing tech image reference.
 - 2026-02-19: Added encyclopedia menu route and main menu button. Added placeholder routes + components for ships/buildings/technologies in `src/app/encyclopedia-menu/`.
 - 2026-02-18: Moved enums into `src/app/models/enum/`. Updated ship blueprints (evasionChance scalar; scaled hull/shield/dmg/cargo/cost by 10). Building/Technology blueprints now use `basicCost`, both populated with placeholders. Building `cost`/`powerConsumption` now scalar; Technology `basicCost` now scalar. Added `getCostForLevel(levelParam)` to Building and Technology.
