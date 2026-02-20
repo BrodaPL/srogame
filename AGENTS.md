@@ -41,6 +41,7 @@ This file captures session context for collaborators and future AI agents.
 - `npm run test`
 
 ## Session Notes (most recent first)
+- 2026-02-20: Refactored `Planet` random generation: modifier ranges are now per `PlanetType`, colonization difficulty is per type, added `createStartingPlanet` (size 160, zero modifiers, type limited to Jungle/Savanna/Oceanic), `solarSystem` is required on `Planet`, and `owner` is now nullable with factories defaulting to null.
 - 2026-02-20: Switched global UI to a dark, space-themed palette in `src/styles.css`; adjusted encyclopedia cost chips (bigger icons, tighter padding). Renamed `public/images/planet_view/*_Backdrop.webp` files to remove `_Backdrop`. Added `PlanetType` image mapping (`PLANET_TYPE_IMAGES`) with resources/facilities views and updated to `OCEANIC`. Added `PlayerType` enum. Added `Planet.createRandomEmpty` factory with randomized planet parameters and modifiers rounded to 2 decimals.
 - 2026-02-19: Added ship/building/technology encyclopedia views with cards, images, and costs. Added imagePath fields to Ship/Building/Technology + blueprints. Moved image assets under `public/images` and added icons for resource costs. Fixed missing tech image reference.
 - 2026-02-19: Added encyclopedia menu route and main menu button. Added placeholder routes + components for ships/buildings/technologies in `src/app/encyclopedia-menu/`.
