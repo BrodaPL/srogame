@@ -14,6 +14,8 @@
 body {
   margin: 0;
   font-family: var(--font-sans), serif;
+  background: #0b0f14;
+  color: #e6edf5;
 }
 
 app-root {
@@ -21,24 +23,30 @@ app-root {
 }
 
 .page {
-  --ink: #141618;
-  --panel: #f5f0e8;
-  --panel-shadow: rgba(16, 20, 24, 0.15);
-  --accent: #ff6b3d;
-  --accent-dark: #c24c2b;
-  --teal: #2aa198;
-  --line: rgba(20, 22, 24, 0.2);
-  --glow: rgba(255, 107, 61, 0.28);
+  --ink: #e6edf5;
+  --panel: #1a2029;
+  --panel-shadow: rgba(0, 0, 0, 0.5);
+  --accent: #ff7a4f;
+  --accent-dark: #ff9a7a;
+  --teal: #3cc9bd;
+  --line: rgba(255, 255, 255, 0.08);
+  --glow: rgba(255, 122, 79, 0.35);
+  --muted: rgba(230, 237, 245, 0.72);
+  --muted-soft: rgba(230, 237, 245, 0.55);
+  --surface: rgba(18, 23, 30, 0.92);
+  --surface-strong: rgba(14, 18, 24, 0.95);
 
   color: var(--ink);
+  color-scheme: dark;
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 2.5rem 1.5rem 3rem;
   background:
-    radial-gradient(circle at 15% 15%, rgba(42, 161, 152, 0.35), transparent 45%),
-    radial-gradient(circle at 85% 10%, rgba(255, 107, 61, 0.35), transparent 40%),
-    linear-gradient(130deg, #f8f3ea, #efe9df 55%, #f5f0e8);
+    radial-gradient(circle at 15% 15%, rgba(60, 201, 189, 0.25), transparent 45%),
+    radial-gradient(circle at 85% 10%, rgba(255, 122, 79, 0.3), transparent 40%),
+    radial-gradient(circle at 75% 70%, rgba(106, 137, 255, 0.18), transparent 55%),
+    linear-gradient(135deg, #0b0f14, #121824 55%, #0b0f14);
 }
 
 .panel {
@@ -47,7 +55,7 @@ app-root {
   border-radius: 32px;
   padding: 2.75rem 3rem 2.5rem;
   box-shadow: 0 32px 60px var(--panel-shadow);
-  border: 1px solid rgba(20, 22, 24, 0.12);
+  border: 1px solid var(--line);
   position: relative;
   overflow: hidden;
 }
@@ -63,7 +71,7 @@ app-root {
   inset: -40% 35% auto auto;
   width: 260px;
   height: 260px;
-  background: radial-gradient(circle, rgba(42, 161, 152, 0.25), transparent 70%);
+  background: radial-gradient(circle, rgba(60, 201, 189, 0.22), transparent 70%);
   pointer-events: none;
 }
 
@@ -92,7 +100,7 @@ app-root {
   font-size: 1rem;
   max-width: 35ch;
   line-height: 1.5;
-  color: rgba(20, 22, 24, 0.75);
+  color: var(--muted);
 }
 
 .menu {
@@ -103,7 +111,7 @@ app-root {
 .menu-button {
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--surface);
   padding: 0.95rem 1.4rem;
   font-size: 1rem;
   font-weight: 600;
@@ -130,7 +138,7 @@ app-root {
 .encyclopedia-meta {
   margin: 0;
   font-weight: 600;
-  color: rgba(20, 22, 24, 0.7);
+  color: var(--muted);
 }
 
 .encyclopedia-grid {
@@ -143,8 +151,8 @@ app-root {
   border-radius: 24px;
   border: 1px solid var(--line);
   padding: 1.5rem;
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 18px 32px rgba(20, 22, 24, 0.08);
+  background: var(--surface);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.45);
   display: grid;
   gap: 1.2rem;
 }
@@ -152,8 +160,8 @@ app-root {
 .ship-media {
   border-radius: 20px;
   overflow: hidden;
-  background: linear-gradient(140deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.45));
-  border: 1px solid rgba(20, 22, 24, 0.08);
+  background: linear-gradient(140deg, rgba(32, 39, 52, 0.9), rgba(17, 22, 30, 0.8));
+  border: 1px solid var(--line);
   display: block;
 }
 
@@ -189,7 +197,7 @@ app-root {
 .ship-card__subtitle {
   margin: 0.35rem 0 0;
   font-size: 0.9rem;
-  color: rgba(20, 22, 24, 0.7);
+  color: var(--muted);
 }
 
 .ship-card__subtitle--wide {
@@ -204,15 +212,15 @@ app-root {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--accent-dark);
   text-align: center;
 }
 
 .badge--jump {
-  border-color: rgba(42, 161, 152, 0.35);
+  border-color: rgba(60, 201, 189, 0.4);
   color: var(--teal);
-  background: rgba(42, 161, 152, 0.12);
+  background: rgba(60, 201, 189, 0.16);
 }
 
 .ship-stats {
@@ -231,7 +239,7 @@ app-root {
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-weight: 700;
-  color: rgba(20, 22, 24, 0.55);
+  color: var(--muted-soft);
 }
 
 .ship-stat__value {
@@ -249,7 +257,7 @@ app-root {
   text-transform: uppercase;
   letter-spacing: 0.2em;
   font-weight: 700;
-  color: rgba(20, 22, 24, 0.6);
+  color: var(--muted-soft);
 }
 
 .weapon-list {
@@ -273,18 +281,18 @@ app-root {
   padding: 0.2rem 0.55rem;
   font-size: 0.75rem;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .weapon-meta {
   font-size: 0.85rem;
-  color: rgba(20, 22, 24, 0.75);
+  color: var(--muted);
 }
 
 .ship-empty {
   margin: 0;
   font-size: 0.9rem;
-  color: rgba(20, 22, 24, 0.6);
+  color: var(--muted-soft);
 }
 
 .cost-row {
@@ -298,24 +306,24 @@ app-root {
 .cost-chip {
   border-radius: 999px;
   border: 1px solid var(--line);
-  padding: 0.25rem 0.6rem;
-  background: rgba(245, 245, 245, 0.9);
+  padding: 0.1rem 0.2rem;
+  background: rgba(255, 255, 255, 0.06);
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .cost-chip--crystal {
-  background: rgba(203, 232, 255, 0.7);
+  background: rgba(78, 140, 255, 0.2);
 }
 
 .cost-chip--deuterium {
-  background: rgba(203, 245, 214, 0.75);
+  background: rgba(70, 200, 140, 0.2);
 }
 
 .cost-icon {
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   object-fit: contain;
 }
 
@@ -340,7 +348,8 @@ app-root {
   padding: 0.85rem 1rem;
   font-size: 1rem;
   font-family: var(--font-mono), serif;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--surface-strong);
+  color: var(--ink);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
@@ -381,8 +390,8 @@ app-root {
   margin-top: 2rem;
   padding: 1rem 1.25rem;
   border-radius: 18px;
-  border: 1px solid rgba(42, 161, 152, 0.3);
-  background: rgba(42, 161, 152, 0.08);
+  border: 1px solid rgba(60, 201, 189, 0.3);
+  background: rgba(60, 201, 189, 0.1);
   font-size: 0.95rem;
   line-height: 1.6;
 }
