@@ -1,4 +1,5 @@
 import { Planet } from './planet';
+import { PlanetType } from './enum/planet-type';
 
 export type SolarSystemCoordinates = {
   x: number;
@@ -7,10 +8,73 @@ export type SolarSystemCoordinates = {
 
 export class SolarSystem {
   constructor(
-    public name: string,
+    name: string,
+    planetNumber: number,
     public isGalaxyCenter: boolean,
     public isVoid: boolean,
-    public readonly coordinates: SolarSystemCoordinates,
-    public planets: Planet[]
-  ) {}
+    public readonly coordinates: SolarSystemCoordinates
+  ) {
+    this.name = isVoid ? 'Void' : name;
+    this.planets = SolarSystem.buildPlanets(this, planetNumber);
+  }
+
+  public name: string;
+  public planets: Planet[];
+
+  private static buildPlanets(system: SolarSystem, planetNumber: number): Planet[] {
+    if (system.isGalaxyCenter || system.isVoid) {
+      return [];
+    }
+
+    const normalizedPlanetNumber = SolarSystem.clampPlanetNumber(planetNumber);
+    if (normalizedPlanetNumber < 0) {
+      return [];
+    }
+
+    if (normalizedPlanetNumber === 0) {
+      return Math.random() < 0.5
+        ? [SolarSystem.createPlanet(system, 1, PlanetType.ASTEROIDS)]
+        : [];
+    }
+    if (normalizedPlanetNumber === -1) {
+      return Math.random() < 0.25
+        ? [SolarSystem.createPlanet(system, 1, PlanetType.ASTEROIDS)]
+        : [];
+    }
+    if (normalizedPlanetNumber === -2) {
+      return Math.random() < 0.10
+        ? [SolarSystem.createPlanet(system, 1, PlanetType.ASTEROIDS)]
+        : [];
+    }
+
+    const planets: Planet[] = [];
+    for (let i = 1; i <= normalizedPlanetNumber; i += 1) {
+      planets.push(SolarSystem.createPlanet(system, i));
+    }
+
+    return planets;
+  }
+
+  private static createPlanet(
+    system: SolarSystem,
+    index: number,
+    forcedType?: PlanetType
+  ): Planet {
+    const planet = Planet.createRandomEmpty('', index, system, null, forcedType);
+    planet.name = SolarSystem.buildPlanetName(system.name, index, planet.type);
+    return planet;
+  }
+
+  private static buildPlanetName(
+    systemName: string,
+    index: number,
+    planetType: PlanetType
+  ): string {
+    const typeInitial = planetType.charAt(0);
+    return `${systemName} ${index}-${typeInitial}`;
+  }
+
+  private static clampPlanetNumber(planetNumber: number): number {
+    return Math.max(-10, Math.min(10, planetNumber));
+  }
 }

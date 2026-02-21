@@ -1,0 +1,275 @@
+<main class="page">
+  <section class="panel">
+    <header class="panel__header">
+      <p class="eyebrow">SroGame Core</p>
+      <h1>Galaxy Initialization</h1>
+      <p class="subtitle">
+        Configure the galaxy layout, populations, and starting resources.
+      </p>
+    </header>
+
+    <form class="setup-form" (ngSubmit)="startGame()">
+      <div class="field">
+        <label for="galaxyName">Galaxy name</label>
+        <input
+          id="galaxyName"
+          name="galaxyName"
+          type="text"
+          placeholder="Aetheria"
+          [(ngModel)]="form.galaxyName"
+          required
+        />
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="galaxyWidth">Galaxy width</label>
+          <input
+            id="galaxyWidth"
+            name="galaxyWidth"
+            type="number"
+            min="10"
+            max="100"
+            step="1"
+            placeholder="25"
+            [(ngModel)]="form.galaxyWidth"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label for="galaxyHeight">Galaxy height</label>
+          <input
+            id="galaxyHeight"
+            name="galaxyHeight"
+            type="number"
+            min="10"
+            max="100"
+            step="1"
+            placeholder="20"
+            [(ngModel)]="form.galaxyHeight"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="galaxyCenterSize">Galaxy center size (%)</label>
+          <input
+            id="galaxyCenterSize"
+            name="galaxyCenterSize"
+            type="number"
+            min="5"
+            max="35"
+            step="1"
+            placeholder="10"
+            [(ngModel)]="form.galaxyCenterSize"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label for="voidChance">Void chance (%)</label>
+          <input
+            id="voidChance"
+            name="voidChance"
+            type="number"
+            min="0"
+            max="35"
+            step="1"
+            placeholder="5"
+            [(ngModel)]="form.voidChance"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="starsAmountModifierMin">Stars amount modifier min</label>
+          <input
+            id="starsAmountModifierMin"
+            name="starsAmountModifierMin"
+            type="number"
+            min="-10"
+            max="0"
+            step="1"
+            placeholder="-1"
+            [(ngModel)]="form.starsAmountModifierMin"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label for="starsAmountModifierMax">Stars amount modifier max</label>
+          <input
+            id="starsAmountModifierMax"
+            name="starsAmountModifierMax"
+            type="number"
+            min="1"
+            max="9"
+            step="1"
+            placeholder="4"
+            [(ngModel)]="form.starsAmountModifierMax"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="playerAmount">Player amount</label>
+        <input
+          id="playerAmount"
+          name="playerAmount"
+          type="number"
+          min="1"
+          max="4"
+          step="1"
+          placeholder="1"
+          [(ngModel)]="form.playerAmount"
+          required
+        />
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="botsAmount">Bots amount</label>
+          <input
+            id="botsAmount"
+            name="botsAmount"
+            type="number"
+            min="0"
+            max="12"
+            step="1"
+            placeholder="0"
+            [(ngModel)]="form.botsAmount"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label for="botDifficulty">Bot difficulty (%)</label>
+          <input
+            id="botDifficulty"
+            name="botDifficulty"
+            type="number"
+            min="-75"
+            max="200"
+            step="1"
+            placeholder="0"
+            [(ngModel)]="form.botDifficulty"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="neutralBotsAmount">Neutral bots amount (%)</label>
+          <input
+            id="neutralBotsAmount"
+            name="neutralBotsAmount"
+            type="number"
+            min="0"
+            max="10"
+            step="1"
+            placeholder="1"
+            [(ngModel)]="form.neutralBotsAmount"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label for="neutralBotsDifficulty">Neutral bots difficulty (%)</label>
+          <input
+            id="neutralBotsDifficulty"
+            name="neutralBotsDifficulty"
+            type="number"
+            min="-100"
+            max="200"
+            step="1"
+            placeholder="0"
+            [(ngModel)]="form.neutralBotsDifficulty"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="starting-resources">Starting resources</label>
+        <div class="resource-group" id="starting-resources">
+          <div class="resource-input">
+            <label class="sr-only" for="metal">Metal</label>
+            <img class="resource-icon" src="images/icons/Metal.PNG.webp" alt="Metal" />
+            <input
+              id="metal"
+              name="metal"
+              type="number"
+              min="0"
+              max="999999"
+              step="1"
+              placeholder="6"
+              [(ngModel)]="form.startingMetal"
+              required
+            />
+          </div>
+
+          <div class="resource-input">
+            <label class="sr-only" for="crystal">Crystal</label>
+            <img class="resource-icon" src="images/icons/Crystal.PNG.webp" alt="Crystal" />
+            <input
+              id="crystal"
+              name="crystal"
+              type="number"
+              min="0"
+              max="999999"
+              step="1"
+              placeholder="3"
+              [(ngModel)]="form.startingCrystal"
+              required
+            />
+          </div>
+
+          <div class="resource-input">
+            <label class="sr-only" for="deuterium">Deuterium</label>
+            <img class="resource-icon" src="images/icons/Deutrium.PNG.webp" alt="Deuterium" />
+            <input
+              id="deuterium"
+              name="deuterium"
+              type="number"
+              min="0"
+              max="999999"
+              step="1"
+              placeholder="1"
+              [(ngModel)]="form.startingDeuterium"
+              required
+            />
+          </div>
+        </div>
+      </div>
+
+      <button class="start-button" type="submit" [disabled]="!canStart()">
+        Start new game
+      </button>
+    </form>
+
+    @if (savedConfig()) {
+      <div class="saved">
+        <p class="saved__title">Saved config</p>
+        <p>
+          {{ savedConfig()!.galaxyName }} ({{ savedConfig()!.galaxyWidth }}x{{ savedConfig()!.galaxyHeight }}) with
+          {{ savedConfig()!.playerAmount }} players, {{ savedConfig()!.botsAmount }} bots.
+          Starting resources:
+          {{ savedConfig()!.startingResources.metal }} metal,
+          {{ savedConfig()!.startingResources.crystal }} crystal,
+          {{ savedConfig()!.startingResources.deuterium }} deuterium.
+        </p>
+      </div>
+    }
+    <div class="saved">
+      <a class="link button" routerLink="/">Back to main menu</a>
+    </div>
+
+  </section>
+</main>

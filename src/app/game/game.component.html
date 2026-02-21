@@ -3,7 +3,12 @@
     <header class="game__header">
       <div>
         <p class="eyebrow">SroGame Online</p>
-        <h1>Welcome, {{ config.playerName }}</h1>
+        <h1>Galaxy: {{ config.galaxyName }}</h1>
+        <p>
+          Size: {{ config.galaxyWidth }}x{{ config.galaxyHeight }},
+          Players: {{ config.playerAmount }},
+          Bots: {{ config.botsAmount }}
+        </p>
       </div>
       <a class="link" routerLink="/setup">Edit setup</a>
     </header>
@@ -11,15 +16,15 @@
     <section class="resources">
       <article class="resource">
         <h2>Metal</h2>
-        <p>{{ config.startingMetal }}</p>
+        <p>{{ config.startingResources.metal }}</p>
       </article>
       <article class="resource">
         <h2>Crystal</h2>
-        <p>{{ config.startingCrystal }}</p>
+        <p>{{ config.startingResources.crystal }}</p>
       </article>
       <article class="resource">
         <h2>Deuterium</h2>
-        <p>{{ config.startingDeuterium }}</p>
+        <p>{{ config.startingResources.deuterium }}</p>
       </article>
     </section>
 

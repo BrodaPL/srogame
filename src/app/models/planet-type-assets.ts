@@ -31,5 +31,9 @@ export const PLANET_TYPE_IMAGES: Record<PlanetType, PlanetViewImages> = {
   [PlanetType.OCEANIC]: {
     resources: 'images/planet_view/Oceanic_Planet_Resources.webp',
     facilities: 'images/planet_view/Oceanic_Planet_Facilities.webp'
-  }
+  },
+  [PlanetType.ASTEROIDS]: {
+  resources: 'images/planet_view/Asteroid_Planet_Resources.webp',
+  facilities: 'images/planet_view/Asteroid_Planet_Facilities.webp'
+}
 };

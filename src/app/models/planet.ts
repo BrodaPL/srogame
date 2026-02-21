@@ -62,9 +62,10 @@ export class Planet {
     name: string,
     order: number,
     solarSystem: SolarSystem,
-    owner: Player | null = null
+    owner: Player | null = null,
+    forcedType?: PlanetType
   ): Planet {
-    const type = Planet.randomPlanetType();
+    const type = forcedType ?? Planet.randomPlanetType();
     // Pick modifier ranges based on planet type, then roll actual values within those ranges.
     const modifierRanges = Planet.modifierRangesFor(type);
     const colonizationRange = Planet.colonizationDifficultyRangeFor(type);

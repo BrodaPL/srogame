@@ -6,10 +6,14 @@ export class Galaxy {
   public static buildSolarSystemNamePool(shuffle = true): string[] {
     const names: string[] = [];
 
+    const MAX_NAME_LENGTH = 15;
     for (const prefix of NAMES_LIST) {
-      names.push(`${prefix}`);
+        names.push(`${prefix}`);
       for (const suffix of NAMES_LIST) {
-        names.push(`${prefix} ${suffix}`);
+        const combinedName = `${prefix} ${suffix}`;
+        if (combinedName.length <= MAX_NAME_LENGTH) {
+          names.push(combinedName);
+        }
       }
     }
 
