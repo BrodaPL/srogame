@@ -178,6 +178,15 @@ export class Planet {
       scienceModifier: Planet.percentRange(-40, 40),
       industryModifier: Planet.percentRange(-50, 20),
     },
+    [PlanetType.ASTEROIDS]: {
+      metalModifier: Planet.percentRange(-75, 75),
+      crystalModifier: Planet.percentRange(-75, 75),
+      deuteriumModifier: Planet.percentRange(-75, 75),
+      energyModifierRES: Planet.percentRange(-100, -80),
+      energyModifierNuclear: Planet.percentRange(-20, 40),
+      scienceModifier: Planet.percentRange(-60, 60),
+      industryModifier: Planet.percentRange(-60, -20),
+    },
   };
 
   private static readonly PLANET_COLONIZATION_DIFFICULTY_RANGES: Record<
@@ -190,6 +199,7 @@ export class Planet {
     [PlanetType.JUNGLE]: { min: 2, max: 4 },
     [PlanetType.SAVANNA]: { min: 1, max: 3 },
     [PlanetType.OCEANIC]: { min: 3, max: 6 },
+    [PlanetType.ASTEROIDS]: { min: 50, max: 50 },
   };
 
   private static randomPlanetType(): PlanetType {

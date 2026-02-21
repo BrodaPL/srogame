@@ -5,4 +5,5 @@ export enum PlanetType {
   JUNGLE = "Jungle",
   SAVANNA = "Savanna",
   OCEANIC = "Oceanic",
+  ASTEROIDS = "Asteroids",
 }
