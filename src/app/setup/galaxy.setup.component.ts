@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NAMES_LIST } from '../models/enum/names-list';
+import { GalaxyCreator } from '../models/galaxy-creator';
 import { ResourcesPack } from '../models/resources-pack';
 
 type GalaxySetup = {
@@ -133,6 +134,8 @@ export class GalaxySetupComponent {
     };
 
     localStorage.setItem('srogame:setup', JSON.stringify(config));
+    const galaxy = new GalaxyCreator(config).createGalaxy();
+    localStorage.setItem('srogame:galaxy', JSON.stringify(galaxy));
     this.savedConfig.set(config);
     this.router.navigate(['/game']);
   }

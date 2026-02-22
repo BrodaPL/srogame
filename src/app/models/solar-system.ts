@@ -21,13 +21,17 @@ export class SolarSystem {
   public name: string;
   public planets: Planet[];
 
-  private static buildPlanets(system: SolarSystem, planetNumber: number): Planet[] {
-    if (system.isGalaxyCenter || system.isVoid) {
-      return [];
-    }
+  public static createVoid(coordinates: SolarSystemCoordinates): SolarSystem {
+    return new SolarSystem('Void', -1, false, true, coordinates);
+  }
 
+  public static createGalaxyCenter(coordinates: SolarSystemCoordinates): SolarSystem {
+    return new SolarSystem('Galaxy Center', -1, true, false, coordinates);
+  }
+
+  private static buildPlanets(system: SolarSystem, planetNumber: number): Planet[] {
     const normalizedPlanetNumber = SolarSystem.clampPlanetNumber(planetNumber);
-    if (normalizedPlanetNumber < 0) {
+    if (normalizedPlanetNumber < -2) {
       return [];
     }
 
