@@ -1,11 +1,11 @@
 import buildingBlueprintsData from '../blueprints/building-blueprints.json';
-import { Building } from '../models/building';
-import { BuildingBlueprints } from '../models/building-blueprints';
-import { BuildingRequirement } from '../models/building-requirement';
-import { BuildingType } from '../models/enum/building-type';
+import { Building } from '../models/buildings/building';
+import { BuildingBlueprints } from '../models/buildings/building-blueprints';
+import { BuildingRequirement } from '../models/buildings/building-requirement';
+import { BuildingType } from '../models/enums/building-type';
 import { ResourcesPack } from '../models/resources-pack';
-import { TechRequirement } from '../models/tech-requirement';
-import { TechnologyType } from '../models/enum/technology-type';
+import { TechRequirement } from '../models/tech/tech-requirement';
+import { TechnologyType } from '../models/enums/technology-type';
 
 interface BuildingBlueprintsJson {
   buildings: BuildingBlueprintJson[];

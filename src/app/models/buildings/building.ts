@@ -1,8 +1,8 @@
-import { ResourcesPack } from './resources-pack';
+import { ResourcesPack } from '../resources-pack';
 import {BuildingRequirement} from './building-requirement';
-import {TechRequirement} from './tech-requirement';
-import {BuildingType} from './enum/building-type';
-import {Logger} from '../core/logger';
+import {TechRequirement} from '../tech/tech-requirement';
+import {BuildingType} from '../enums/building-type';
+import {Logger} from '../../core/logger';
 
 export class Building {
   constructor(

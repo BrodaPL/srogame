@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
-import { NAMES_LIST } from '../models/enum/names-list';
+import { NAMES_LIST } from '../models/enums/names-list';
 import { GalaxySetup } from '../models/game-api-types';
 import { ResourcesPack } from '../models/resources-pack';
 

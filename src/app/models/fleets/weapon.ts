@@ -1,4 +1,4 @@
-import { WeaponType } from './enum/weapon-type';
+import { WeaponType } from '../enums/weapon-type';
 
 export class Weapon {
   constructor(

@@ -2,7 +2,7 @@ import { NgFor, NgIf } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { BuildingBlueprintsFactory } from '../factories/building-blueprints.factory';
-import { Building } from '../models/building';
+import { Building } from '../models/buildings/building';
 
 @Component({
   selector: 'app-encyclopedia-buildings',

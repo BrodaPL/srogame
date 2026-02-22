@@ -1,5 +1,5 @@
 import { Building } from './building';
-import { BuildingType } from './enum/building-type';
+import { BuildingType } from '../enums/building-type';
 
 export class BuildingBlueprints {
   constructor(public buildingsMap: Map<BuildingType, Building> = new Map()) {}

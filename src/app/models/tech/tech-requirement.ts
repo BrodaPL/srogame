@@ -1,4 +1,4 @@
-import { TechnologyType } from './enum/technology-type';
+import { TechnologyType } from '../enums/technology-type';
 
 export class TechRequirement {
   constructor(

@@ -1,5 +1,5 @@
 import { Technology } from './technology';
-import { TechnologyType } from './enum/technology-type';
+import { TechnologyType } from '../enums/technology-type';
 
 export class TechnologyBlueprints {
   constructor(public techByType: Map<TechnologyType, Technology> = new Map()) {}

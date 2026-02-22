@@ -1,7 +1,7 @@
-import { BuildingRequirement } from './building-requirement';
-import { ResourcesPack } from './resources-pack';
+import { BuildingRequirement } from '../buildings/building-requirement';
+import { ResourcesPack } from '../resources-pack';
 import { TechRequirement } from './tech-requirement';
-import { TechnologyType } from './enum/technology-type';
+import { TechnologyType } from '../enums/technology-type';
 
 export class Technology {
   constructor(

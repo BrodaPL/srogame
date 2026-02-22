@@ -1,11 +1,11 @@
 import { Destination } from './destination';
-import { Player } from './player';
+import { PlayerID } from '../player-id';
 import { ShipInstance } from './ship-instance';
-import {ShipGroup} from './ship-group';
+import { ShipGroup } from './ship-group';
 
 export class Fleet {
   constructor(
-    public owner: Player,
+    public owner: PlayerID,
     public destination: Destination,
     public groups: ShipGroup[]
   ) {}

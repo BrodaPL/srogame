@@ -32,8 +32,12 @@ This file captures session context for collaborators and future AI agents.
 - Setup UI + logic: `src/app/setup/setup.component.ts`, `src/app/setup/setup.component.html` (legacy)
 - Galaxy setup UI + logic: `src/app/setup/galaxy.setup.component.ts`, `src/app/setup/galaxy.setup.component.html`
 - Game UI + logic: `src/app/game/game.component.ts`, `src/app/game/game.component.html`
-- Models: `src/app/models/resources-pack.ts`
-- Models: `src/app/models/enum/building-type.ts`, `src/app/models/enum/technology-type.ts`, `src/app/models/building-requirement.ts`, `src/app/models/tech-requirement.ts`, `src/app/models/enum/weapon-type.ts`, `src/app/models/weapon.ts`, `src/app/models/technology.ts`, `src/app/models/building.ts`, `src/app/models/enum/hull-class.ts`, `src/app/models/ship.ts`, `src/app/models/ship-instance.ts`, `src/app/models/ship-group.ts`, `src/app/models/planet.ts`, `src/app/models/enum/planet-type.ts`, `src/app/models/enum/player-type.ts`, `src/app/models/planet-type-assets.ts`, `src/app/models/solar-system.ts`, `src/app/models/galaxy.ts`, `src/app/models/player.ts`, `src/app/models/fleet.ts`
+- Models (core): `src/app/models/resources-pack.ts`, `src/app/models/player-id.ts`, `src/app/models/player.ts`, `src/app/models/game-api-types.ts`
+- Models (enums): `src/app/models/enums/building-type.ts`, `src/app/models/enums/technology-type.ts`, `src/app/models/enums/weapon-type.ts`, `src/app/models/enums/hull-class.ts`, `src/app/models/enums/planet-type.ts`, `src/app/models/enums/player-type.ts`, `src/app/models/enums/names-list.ts`
+- Models (buildings): `src/app/models/buildings/building.ts`, `src/app/models/buildings/building-blueprints.ts`, `src/app/models/buildings/building-requirement.ts`
+- Models (fleets): `src/app/models/fleets/fleet.ts`, `src/app/models/fleets/ship.ts`, `src/app/models/fleets/ship-instance.ts`, `src/app/models/fleets/ship-group.ts`, `src/app/models/fleets/ship-blueprints.ts`, `src/app/models/fleets/weapon.ts`, `src/app/models/fleets/destination.ts`
+- Models (planets): `src/app/models/planets/planet.ts`, `src/app/models/planets/solar-system.ts`, `src/app/models/planets/galaxy.ts`, `src/app/models/planets/galaxy-creator.ts`, `src/app/models/planets/planet-type-assets.ts`
+- Models (tech): `src/app/models/tech/technology.ts`, `src/app/models/tech/technology-blueprints.ts`, `src/app/models/tech/tech-requirement.ts`
 - Logging: `src/app/core/logger.ts`
 - In-memory state: `src/app/core/game-state.service.ts`
 - API client: `src/app/core/game-api.service.ts`, `src/app/core/player-session.service.ts`, `src/app/models/game-api-types.ts`
@@ -46,6 +50,8 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-02-22: Introduced `PlayerID` (shared id+name), updated `Player` to store `playerId`, and changed `Planet`/`Fleet` ownership to `PlayerID`. Added player maps to `Galaxy` (human/bot/neutral + name lookup).
+- 2026-02-22: Reorganized models into folders: `buildings/`, `fleets/`, `planets/`, `tech/`, `enums/`, with updated imports and server model paths.
 - 2026-02-22: Fixed server import interop for `GalaxyCreator` (ESM/CJS) so `npm run dev` starts. Now have one common `GalaxySetup` type for client and server. User made additional minor local fixes after server startup (details not recorded).
 - 2026-02-22: Added Node + Express server under `server/` with in-memory Galaxy (`POST /api/game/start`, `GET /api/game/state`). Client now calls API to start/load game; stores player session in localStorage; galaxy preview uses server snapshot. Added commander name to setup form. Added API/client services and shared API types.
 - 2026-02-22: Added `createGalaxy` step to override systems within `galaxyCenterRadius` to `SolarSystem.createGalaxyCenter`. Added galaxy preview grid to `/game` (void=black, center=yellow, regular=dark blue w/ coords). Added `GameStateService` to keep Galaxy in memory only; removed galaxy JSON persistence. Setup now stores galaxy in memory, not localStorage.
@@ -56,7 +62,7 @@ This file captures session context for collaborators and future AI agents.
 - 2026-02-20: Switched global UI to a dark, space-themed palette in `src/styles.css`; adjusted encyclopedia cost chips (bigger icons, tighter padding). Renamed `public/images/planet_view/*_Backdrop.webp` files to remove `_Backdrop`. Added `PlanetType` image mapping (`PLANET_TYPE_IMAGES`) with resources/facilities views and updated to `OCEANIC`. Added `PlayerType` enum. Added `Planet.createRandomEmpty` factory with randomized planet parameters and modifiers rounded to 2 decimals.
 - 2026-02-19: Added ship/building/technology encyclopedia views with cards, images, and costs. Added imagePath fields to Ship/Building/Technology + blueprints. Moved image assets under `public/images` and added icons for resource costs. Fixed missing tech image reference.
 - 2026-02-19: Added encyclopedia menu route and main menu button. Added placeholder routes + components for ships/buildings/technologies in `src/app/encyclopedia-menu/`.
-- 2026-02-18: Moved enums into `src/app/models/enum/`. Updated ship blueprints (evasionChance scalar; scaled hull/shield/dmg/cargo/cost by 10). Building/Technology blueprints now use `basicCost`, both populated with placeholders. Building `cost`/`powerConsumption` now scalar; Technology `basicCost` now scalar. Added `getCostForLevel(levelParam)` to Building and Technology.
+- 2026-02-18: Moved enums into `src/app/models/enums/`. Updated ship blueprints (evasionChance scalar; scaled hull/shield/dmg/cargo/cost by 10). Building/Technology blueprints now use `basicCost`, both populated with placeholders. Building `cost`/`powerConsumption` now scalar; Technology `basicCost` now scalar. Added `getCostForLevel(levelParam)` to Building and Technology.
 - 2026-02-17: Added ship/building/technology blueprints with JSON sources, factories to hydrate them, and new blueprint container models (`ShipBlueprints`, `BuildingBlueprints`, `TechnologyBlueprints`). JSON uses enum identifiers and lives in `src/app/blueprints/`.
 - 2026-02-15: Added domain models for resources, buildings, tech, ships, fleets, planets, solar systems, galaxies, and players.
 - 2026-02-15: Added main menu + new routes, centralized CSS in `src/styles.css`, added `ResourcesPack` model and global logger.

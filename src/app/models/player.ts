@@ -1,11 +1,12 @@
-import { Planet } from './planet';
-import { Technology } from './technology';
-import {Fleet} from './fleet';
-import {PlayerType} from './enum/player-type';
+import { Planet } from './planets/planet';
+import { Technology } from './tech/technology';
+import { Fleet } from './fleets/fleet';
+import { PlayerType } from './enums/player-type';
+import { PlayerID } from './player-id';
 
 export class Player {
   constructor(
-    public name: string,
+    public playerId: PlayerID,
     public planets: Planet[],
     public tech: Technology[],
     public fleets: Fleet[],

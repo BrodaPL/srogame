@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { randomUUID } from 'node:crypto';
-import galaxyCreatorModule from '../../src/app/models/galaxy-creator.js';
-import type { Galaxy } from '../../src/app/models/galaxy.js';
+import galaxyCreatorModule from '../../src/app/models/planets/galaxy-creator.js';
+import type { Galaxy } from '../../src/app/models/planets/galaxy.js';
 import type {
   GalaxySetup,
   PlayerSession,
@@ -13,7 +13,7 @@ import type {
 } from '../../src/app/models/game-api-types.js';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
-  GalaxyCreator: typeof import('../../src/app/models/galaxy-creator.js').GalaxyCreator;
+  GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
 };
 
 const app = express();

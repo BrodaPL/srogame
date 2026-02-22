@@ -2,7 +2,7 @@ import { NgFor, NgIf } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TechnologyBlueprintsFactory } from '../factories/technology-blueprints.factory';
-import { Technology } from '../models/technology';
+import { Technology } from '../models/tech/technology';
 
 @Component({
   selector: 'app-encyclopedia-technologies',

@@ -1,4 +1,4 @@
-import { BuildingType } from './enum/building-type';
+import { BuildingType } from '../enums/building-type';
 
 export class BuildingRequirement {
   constructor(
