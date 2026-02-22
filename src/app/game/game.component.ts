@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { GameStateService } from '../core/game-state.service';
 
 type GalaxySetup = {
   galaxyName: string;
@@ -27,6 +28,13 @@ type GalaxySetup = {
 })
 export class GameComponent {
   protected readonly config = this.loadConfig();
+  protected readonly gridCellSize = 18;
+
+  constructor(private readonly gameState: GameStateService) {}
+
+  protected get galaxy() {
+    return this.gameState.galaxy;
+  }
 
   private loadConfig(): GalaxySetup | null {
     const stored = localStorage.getItem('srogame:setup');

@@ -7,12 +7,12 @@ This file captures session context for collaborators and future AI agents.
 - Stack: Angular (standalone components), TypeScript
 - Purpose: Browser game similar to OGame but simplified, turn-based (not real-time), supports single-player and small-scale multiplayer. PvE is primary, PvP is possible. Enemy AI will be simplistic and RNG-driven with scaling.
 - Secondary purpose: Learning TypeScript and Angular through building the game.
-- Persistence (current): Uses browser localStorage key `srogame:setup`.
+- Persistence (current): Uses browser localStorage key `srogame:setup`. Galaxy is in-memory during the SPA session.
 
 ## Current Behavior
 - Route `/` shows main menu (load, singleplayer, multiplayer, encyclopedia, help/about).
 - Route `/setup` shows setup form (player name + starting metal/crystal/deuterium).
-- Route `/game` shows game view if config exists, otherwise prompts to go to setup.
+- Route `/game` shows game view if config exists, otherwise prompts to go to setup. Shows a galaxy preview grid when in-memory galaxy exists.
 - Route `/encyclopedia` shows encyclopedia menu with ships/buildings/technologies links.
 - Routes `/load`, `/multiplayer`, `/help` are placeholders.
 - Route `/encyclopedia/ships` shows ship cards sourced from ship blueprints (images + stats + costs).
@@ -29,11 +29,13 @@ This file captures session context for collaborators and future AI agents.
 - Encyclopedia placeholders: `src/app/encyclopedia-menu/encyclopedia-ships.component.ts`, `src/app/encyclopedia-menu/encyclopedia-buildings.component.ts`, `src/app/encyclopedia-menu/encyclopedia-technologies.component.ts`
 - Encyclopedias render blueprints: `src/app/encyclopedia-menu/encyclopedia-ships.component.html`, `src/app/encyclopedia-menu/encyclopedia-buildings.component.html`, `src/app/encyclopedia-menu/encyclopedia-technologies.component.html`
 - Blueprints: `src/app/blueprints/ship-blueprints.json`, `src/app/blueprints/building-blueprints.json`, `src/app/blueprints/technology-blueprints.json`
-- Setup UI + logic: `src/app/setup/setup.component.ts`, `src/app/setup/setup.component.html`
+- Setup UI + logic: `src/app/setup/setup.component.ts`, `src/app/setup/setup.component.html` (legacy)
+- Galaxy setup UI + logic: `src/app/setup/galaxy.setup.component.ts`, `src/app/setup/galaxy.setup.component.html`
 - Game UI + logic: `src/app/game/game.component.ts`, `src/app/game/game.component.html`
 - Models: `src/app/models/resources-pack.ts`
 - Models: `src/app/models/enum/building-type.ts`, `src/app/models/enum/technology-type.ts`, `src/app/models/building-requirement.ts`, `src/app/models/tech-requirement.ts`, `src/app/models/enum/weapon-type.ts`, `src/app/models/weapon.ts`, `src/app/models/technology.ts`, `src/app/models/building.ts`, `src/app/models/enum/hull-class.ts`, `src/app/models/ship.ts`, `src/app/models/ship-instance.ts`, `src/app/models/ship-group.ts`, `src/app/models/planet.ts`, `src/app/models/enum/planet-type.ts`, `src/app/models/enum/player-type.ts`, `src/app/models/planet-type-assets.ts`, `src/app/models/solar-system.ts`, `src/app/models/galaxy.ts`, `src/app/models/player.ts`, `src/app/models/fleet.ts`
 - Logging: `src/app/core/logger.ts`
+- In-memory state: `src/app/core/game-state.service.ts`
 
 ## Dev Commands
 - `npm run start` (ng serve)
@@ -41,6 +43,7 @@ This file captures session context for collaborators and future AI agents.
 - `npm run test`
 
 ## Session Notes (most recent first)
+- 2026-02-22: Added `createGalaxy` step to override systems within `galaxyCenterRadius` to `SolarSystem.createGalaxyCenter`. Added galaxy preview grid to `/game` (void=black, center=yellow, regular=dark blue w/ coords). Added `GameStateService` to keep Galaxy in memory only; removed galaxy JSON persistence. Setup now stores galaxy in memory, not localStorage.
 - 2026-02-22: Added `GalaxyCreator` with instance-based galaxy setup, center/radius calculations, and `createGalaxy()` that fills a void grid with random `SolarSystem`s inside the galaxy radius (name pool + random planet count). Setup now builds and stores this galaxy on start.
 - 2026-02-21: Added random `SolarSystem` constructor logic (planet generation rules, naming, clamped planet count, void/galaxy-center handling) and optional forced planet type to `Planet.createRandomEmpty`. Reworked setup into `galaxy.setup.component` to capture galaxy-generation params (size, center/void, stars modifiers, bots, difficulties, starting resources), added random galaxy name default, updated game view config display, and reorganized setup UI into row groupings with resource icon inputs and validation caps (max 999999) plus styling updates.
 - 2026-02-21: Added `SolarSystem.coordinates` (readonly), created `names-list.ts` with single-word names for solar systems, and added `Galaxy.buildSolarSystemNamePool()` to generate all prefix+suffix permutations with optional shuffle. User later expanded `names-list.ts` to 1600+ unique names and updated `buildSolarSystemNamePool` to include single-word names as well.

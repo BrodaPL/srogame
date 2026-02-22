@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NAMES_LIST } from '../models/enum/names-list';
 import { GalaxyCreator } from '../models/galaxy-creator';
+import { GameStateService } from '../core/game-state.service';
 import { ResourcesPack } from '../models/resources-pack';
 
 type GalaxySetup = {
@@ -47,7 +48,10 @@ export class GalaxySetupComponent {
   protected readonly savedConfig = signal<GalaxySetup | null>(null);
   protected form: GalaxySetupForm;
 
-  constructor(private readonly router: Router) {
+  constructor(
+    private readonly router: Router,
+    private readonly gameState: GameStateService
+  ) {
     this.form = this.createDefaultForm();
 
     const stored = localStorage.getItem('srogame:setup');
@@ -135,7 +139,7 @@ export class GalaxySetupComponent {
 
     localStorage.setItem('srogame:setup', JSON.stringify(config));
     const galaxy = new GalaxyCreator(config).createGalaxy();
-    localStorage.setItem('srogame:galaxy', JSON.stringify(galaxy));
+    this.gameState.setGalaxy(galaxy);
     this.savedConfig.set(config);
     this.router.navigate(['/game']);
   }
@@ -252,4 +256,5 @@ export class GalaxySetupComponent {
       config.startingResources.deuterium <= 999999
     );
   }
+
 }

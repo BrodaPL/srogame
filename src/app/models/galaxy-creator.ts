@@ -2,8 +2,14 @@ import { Galaxy } from './galaxy';
 import { SolarSystem } from './solar-system';
 import { ResourcesPack } from './resources-pack';
 
+
 export class GalaxyCreator {
   public readonly galaxyCenterRadius: number;
+
+  /**
+   * All methods in this class should use internal galaxyWidth and galaxyHeight
+   * GalaxySetup galaxyWidth galaxyHeight should be avoided (except in constructor).
+   */
   public readonly galaxyRadius: number;
   public readonly galaxyWidth: number;
   public readonly galaxyHeight: number;
@@ -23,19 +29,25 @@ export class GalaxyCreator {
   }
 
   public createGalaxy(): Galaxy {
+    //1. Start with a void-filled galaxy grid sized for the configured width/height.
     const galaxy = this.createEmptyGalaxy();
+    //1.1 Build a shuffled pool of system names to assign deterministically as we fill.
     const namePool = Galaxy.buildSolarSystemNamePool(true);
     let nameIndex = 0;
 
+    //2. create actual StarSystems with planets in the circle field.
     for (let y = 0; y < this.galaxyHeight; y += 1) {
       for (let x = 0; x < this.galaxyWidth; x += 1) {
+        // Only place systems inside the circular galaxy radius; leave the rest as void.
         if (this.distanceFromCenter(x, y) <= this.galaxyRadius) {
-          const name = namePool[nameIndex % namePool.length];
-          nameIndex += 1;
+          const name = namePool[nameIndex % namePool.length]; //this is clever!
+          nameIndex++;
+          // Pick a planet count within the configured stars amount modifier range.
           const planetNumber = this.randomInt(
             this.setup.starsAmountModifier[0],
             this.setup.starsAmountModifier[1]
           );
+          // Replace the void tile with a generated SolarSystem at these coordinates.
           galaxy.stars[y][x] = new SolarSystem(
             name,
             planetNumber,
@@ -43,6 +55,15 @@ export class GalaxyCreator {
             false,
             { x, y }
           );
+        }
+      }
+    }
+
+    //3. Create galaxyCenter systems in the radius of the of this.galaxyCenterRadius
+    for (let y = 0; y < this.galaxyHeight; y += 1) {
+      for (let x = 0; x < this.galaxyWidth; x += 1) {
+        if (this.distanceFromCenter(x, y) <= this.galaxyCenterRadius) {
+          galaxy.stars[y][x] = SolarSystem.createGalaxyCenter({ x, y });
         }
       }
     }

@@ -596,6 +596,74 @@ app-root {
   color: var(--muted);
 }
 
+.galaxy-preview {
+  display: grid;
+  gap: 1rem;
+  background: rgba(12, 16, 22, 0.7);
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  padding: 1.25rem;
+}
+
+.galaxy-preview__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.galaxy-preview__header h3 {
+  margin: 0;
+}
+
+.galaxy-preview__meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-family: var(--font-mono), serif;
+}
+
+.galaxy-grid {
+  --cell-size: 18px;
+  display: grid;
+  gap: 2px;
+  padding: 0.75rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 7, 10, 0.85);
+  max-width: 100%;
+  overflow: auto;
+}
+
+.galaxy-cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  background: #0e2242;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  color: #cfe1ff;
+  font-size: 0.45rem;
+  line-height: 1;
+  font-family: var(--font-mono), serif;
+}
+
+.galaxy-cell--void {
+  background: #000;
+}
+
+.galaxy-cell--center {
+  background: #f6b44c;
+  color: #101316;
+  font-weight: 700;
+}
+
+.galaxy-coords {
+  display: block;
+  opacity: 0.9;
+  transform: translateY(-0.5px);
+}
+
 .empty {
   display: grid;
   gap: 0.75rem;
