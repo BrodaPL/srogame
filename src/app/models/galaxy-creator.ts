@@ -1,6 +1,6 @@
 import { Galaxy } from './galaxy';
 import { SolarSystem } from './solar-system';
-import { ResourcesPack } from './resources-pack';
+import type { GalaxySetup } from './game-api-types';
 
 
 export class GalaxyCreator {
@@ -97,18 +97,3 @@ export class GalaxyCreator {
     return Math.floor(Math.random() * (high - low + 1)) + low;
   }
 }
-
-type GalaxySetup = {
-  galaxyName: string;
-  galaxyWidth: number;
-  galaxyHeight: number;
-  galaxyCenterSize: number;
-  voidChance: number;
-  starsAmountModifier: [number, number];
-  playerAmount: number;
-  botsAmount: number;
-  botDifficulty: number;
-  neutralBotsAmount: number;
-  neutralBotsDifficulty: number;
-  startingResources: ResourcesPack;
-};

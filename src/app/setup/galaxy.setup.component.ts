@@ -1,27 +1,15 @@
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { NAMES_LIST } from '../models/enum/names-list';
-import { GalaxyCreator } from '../models/galaxy-creator';
+import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
+import { PlayerSessionService } from '../core/player-session.service';
+import { NAMES_LIST } from '../models/enum/names-list';
+import { GalaxySetup } from '../models/game-api-types';
 import { ResourcesPack } from '../models/resources-pack';
 
-type GalaxySetup = {
-  galaxyName: string;
-  galaxyWidth: number;
-  galaxyHeight: number;
-  galaxyCenterSize: number;
-  voidChance: number;
-  starsAmountModifier: [number, number];
-  playerAmount: number;
-  botsAmount: number;
-  botDifficulty: number;
-  neutralBotsAmount: number;
-  neutralBotsDifficulty: number;
-  startingResources: ResourcesPack;
-};
-
 type GalaxySetupForm = {
+  playerName: string;
   galaxyName: string;
   galaxyWidth: string;
   galaxyHeight: string;
@@ -46,11 +34,15 @@ type GalaxySetupForm = {
 })
 export class GalaxySetupComponent {
   protected readonly savedConfig = signal<GalaxySetup | null>(null);
+  protected isStarting = false;
+  protected startError: string | null = null;
   protected form: GalaxySetupForm;
 
   constructor(
     private readonly router: Router,
-    private readonly gameState: GameStateService
+    private readonly gameState: GameStateService,
+    private readonly gameApi: GameApiService,
+    private readonly playerSession: PlayerSessionService
   ) {
     this.form = this.createDefaultForm();
 
@@ -63,7 +55,7 @@ export class GalaxySetupComponent {
       const parsed = JSON.parse(stored) as GalaxySetup;
       if (this.isValidConfig(parsed)) {
         this.savedConfig.set(parsed);
-        this.form = this.formFromConfig(parsed);
+        this.form = this.formFromConfig(parsed, this.form.playerName);
       }
     } catch {
       localStorage.removeItem('srogame:setup');
@@ -71,6 +63,7 @@ export class GalaxySetupComponent {
   }
 
   protected canStart(): boolean {
+    const playerName = this.form.playerName.trim();
     const name = this.form.galaxyName.trim();
     const width = this.parseIntegerInRange(this.form.galaxyWidth, 10, 100);
     const height = this.parseIntegerInRange(this.form.galaxyHeight, 10, 100);
@@ -92,6 +85,7 @@ export class GalaxySetupComponent {
     const deuterium = this.parseNonNegativeInteger(this.form.startingDeuterium);
 
     return (
+      Boolean(playerName) &&
       Boolean(name) &&
       width !== null &&
       height !== null &&
@@ -111,10 +105,11 @@ export class GalaxySetupComponent {
   }
 
   protected startGame(): void {
-    if (!this.canStart()) {
+    if (!this.canStart() || this.isStarting) {
       return;
     }
 
+    const playerName = this.form.playerName.trim();
     const config: GalaxySetup = {
       galaxyName: this.form.galaxyName.trim(),
       galaxyWidth: Number(this.form.galaxyWidth),
@@ -137,15 +132,29 @@ export class GalaxySetupComponent {
       )
     };
 
-    localStorage.setItem('srogame:setup', JSON.stringify(config));
-    const galaxy = new GalaxyCreator(config).createGalaxy();
-    this.gameState.setGalaxy(galaxy);
-    this.savedConfig.set(config);
-    this.router.navigate(['/game']);
+    this.isStarting = true;
+    this.startError = null;
+
+    this.gameApi.startGame({ setup: config, playerName }).subscribe({
+      next: (response) => {
+        localStorage.setItem('srogame:setup', JSON.stringify(config));
+        this.playerSession.save(response.player);
+        this.gameState.setGalaxy(response.galaxy);
+        this.savedConfig.set(config);
+        this.isStarting = false;
+        this.router.navigate(['/game']);
+      },
+      error: () => {
+        this.startError = 'Unable to reach the game server.';
+        this.isStarting = false;
+      }
+    });
   }
 
   private createDefaultForm(): GalaxySetupForm {
+    const existingPlayer = this.playerSession.load();
     return {
+      playerName: existingPlayer?.name ?? 'Commander',
       galaxyName: this.randomGalaxyName(),
       galaxyWidth: '25',
       galaxyHeight: '20',
@@ -164,8 +173,9 @@ export class GalaxySetupComponent {
     };
   }
 
-  private formFromConfig(config: GalaxySetup): GalaxySetupForm {
+  private formFromConfig(config: GalaxySetup, playerName: string): GalaxySetupForm {
     return {
+      playerName,
       galaxyName: config.galaxyName,
       galaxyWidth: String(config.galaxyWidth),
       galaxyHeight: String(config.galaxyHeight),

@@ -33,6 +33,20 @@
       <p>Your empire is online. Next: resource production, build queue.</p>
     </section>
 
+    @if (isLoading) {
+      <section class="status status--info">
+        <h3>Galaxy Status</h3>
+        <p>Loading galaxy data from server...</p>
+      </section>
+    }
+
+    @if (stateError) {
+      <section class="status status--error">
+        <h3>Galaxy Status</h3>
+        <p>{{ stateError }}</p>
+      </section>
+    }
+
     @if (galaxy) {
       <section class="galaxy-preview">
         <div class="galaxy-preview__header">

@@ -1,39 +1,56 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
-
-type GalaxySetup = {
-  galaxyName: string;
-  galaxyWidth: number;
-  galaxyHeight: number;
-  galaxyCenterSize: number;
-  voidChance: number;
-  starsAmountModifier: [number, number];
-  playerAmount: number;
-  botsAmount: number;
-  botDifficulty: number;
-  neutralBotsAmount: number;
-  neutralBotsDifficulty: number;
-  startingResources: {
-    metal: number;
-    crystal: number;
-    deuterium: number;
-  };
-};
+import { PlayerSessionService } from '../core/player-session.service';
+import { GalaxySetup, GalaxySnapshot } from '../models/game-api-types';
 
 @Component({
   selector: 'app-game',
   imports: [RouterLink],
   templateUrl: './game.component.html'
 })
-export class GameComponent {
+export class GameComponent implements OnInit {
   protected readonly config = this.loadConfig();
   protected readonly gridCellSize = 18;
+  protected galaxy: GalaxySnapshot | null = null;
+  protected stateError: string | null = null;
+  protected isLoading = false;
 
-  constructor(private readonly gameState: GameStateService) {}
+  constructor(
+    private readonly gameState: GameStateService,
+    private readonly gameApi: GameApiService,
+    private readonly playerSession: PlayerSessionService
+  ) {}
 
-  protected get galaxy() {
-    return this.gameState.galaxy;
+  public ngOnInit(): void {
+    if (!this.config) {
+      return;
+    }
+
+    this.galaxy = this.gameState.galaxy;
+
+    const session = this.playerSession.load();
+    if (!session) {
+      this.stateError = 'No player session found. Start a new game.';
+      return;
+    }
+
+    this.isLoading = true;
+    this.stateError = null;
+
+    this.gameApi.getGameState(session.token).subscribe({
+      next: (response) => {
+        this.gameState.setGalaxy(response.galaxy);
+        this.galaxy = response.galaxy;
+        this.isLoading = false;
+      },
+      error: () => {
+        this.stateError = 'Unable to load galaxy from server.';
+        this.galaxy = null;
+        this.isLoading = false;
+      }
+    });
   }
 
   private loadConfig(): GalaxySetup | null {

@@ -1,13 +1,13 @@
 import { Injectable } from '@angular/core';
-import { Galaxy } from '../models/galaxy';
+import { GalaxySnapshot } from '../models/game-api-types';
 
 @Injectable({
   providedIn: 'root'
 })
 export class GameStateService {
-  public galaxy: Galaxy | null = null;
+  public galaxy: GalaxySnapshot | null = null;
 
-  public setGalaxy(galaxy: Galaxy): void {
+  public setGalaxy(galaxy: GalaxySnapshot): void {
     this.galaxy = galaxy;
   }
 

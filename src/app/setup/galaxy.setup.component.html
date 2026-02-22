@@ -10,6 +10,18 @@
 
     <form class="setup-form" (ngSubmit)="startGame()">
       <div class="field">
+        <label for="playerName">Commander name</label>
+        <input
+          id="playerName"
+          name="playerName"
+          type="text"
+          placeholder="Commander"
+          [(ngModel)]="form.playerName"
+          required
+        />
+      </div>
+
+      <div class="field">
         <label for="galaxyName">Galaxy name</label>
         <input
           id="galaxyName"
@@ -249,9 +261,13 @@
         </div>
       </div>
 
-      <button class="start-button" type="submit" [disabled]="!canStart()">
+      <button class="start-button" type="submit" [disabled]="!canStart() || isStarting">
         Start new game
       </button>
+
+      @if (startError) {
+        <p class="form-error">{{ startError }}</p>
+      }
     </form>
 
     @if (savedConfig()) {

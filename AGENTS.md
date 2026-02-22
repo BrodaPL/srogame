@@ -7,7 +7,7 @@ This file captures session context for collaborators and future AI agents.
 - Stack: Angular (standalone components), TypeScript
 - Purpose: Browser game similar to OGame but simplified, turn-based (not real-time), supports single-player and small-scale multiplayer. PvE is primary, PvP is possible. Enemy AI will be simplistic and RNG-driven with scaling.
 - Secondary purpose: Learning TypeScript and Angular through building the game.
-- Persistence (current): Uses browser localStorage key `srogame:setup`. Galaxy is in-memory during the SPA session.
+- Persistence (current): Uses browser localStorage key `srogame:setup` and `srogame:player`. Galaxy is held in server memory and fetched via API.
 
 ## Current Behavior
 - Route `/` shows main menu (load, singleplayer, multiplayer, encyclopedia, help/about).
@@ -36,13 +36,18 @@ This file captures session context for collaborators and future AI agents.
 - Models: `src/app/models/enum/building-type.ts`, `src/app/models/enum/technology-type.ts`, `src/app/models/building-requirement.ts`, `src/app/models/tech-requirement.ts`, `src/app/models/enum/weapon-type.ts`, `src/app/models/weapon.ts`, `src/app/models/technology.ts`, `src/app/models/building.ts`, `src/app/models/enum/hull-class.ts`, `src/app/models/ship.ts`, `src/app/models/ship-instance.ts`, `src/app/models/ship-group.ts`, `src/app/models/planet.ts`, `src/app/models/enum/planet-type.ts`, `src/app/models/enum/player-type.ts`, `src/app/models/planet-type-assets.ts`, `src/app/models/solar-system.ts`, `src/app/models/galaxy.ts`, `src/app/models/player.ts`, `src/app/models/fleet.ts`
 - Logging: `src/app/core/logger.ts`
 - In-memory state: `src/app/core/game-state.service.ts`
+- API client: `src/app/core/game-api.service.ts`, `src/app/core/player-session.service.ts`, `src/app/models/game-api-types.ts`
+- Server (Node + Express): `server/src/index.ts` (in-memory galaxy, start + state endpoints)
 
 ## Dev Commands
 - `npm run start` (ng serve)
 - `npm run build`
 - `npm run test`
+- `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-02-22: Fixed server import interop for `GalaxyCreator` (ESM/CJS) so `npm run dev` starts. Now have one common `GalaxySetup` type for client and server. User made additional minor local fixes after server startup (details not recorded).
+- 2026-02-22: Added Node + Express server under `server/` with in-memory Galaxy (`POST /api/game/start`, `GET /api/game/state`). Client now calls API to start/load game; stores player session in localStorage; galaxy preview uses server snapshot. Added commander name to setup form. Added API/client services and shared API types.
 - 2026-02-22: Added `createGalaxy` step to override systems within `galaxyCenterRadius` to `SolarSystem.createGalaxyCenter`. Added galaxy preview grid to `/game` (void=black, center=yellow, regular=dark blue w/ coords). Added `GameStateService` to keep Galaxy in memory only; removed galaxy JSON persistence. Setup now stores galaxy in memory, not localStorage.
 - 2026-02-22: Added `GalaxyCreator` with instance-based galaxy setup, center/radius calculations, and `createGalaxy()` that fills a void grid with random `SolarSystem`s inside the galaxy radius (name pool + random planet count). Setup now builds and stores this galaxy on start.
 - 2026-02-21: Added random `SolarSystem` constructor logic (planet generation rules, naming, clamped planet count, void/galaxy-center handling) and optional forced planet type to `Planet.createRandomEmpty`. Reworked setup into `galaxy.setup.component` to capture galaxy-generation params (size, center/void, stars modifiers, bots, difficulties, starting resources), added random galaxy name default, updated game view config display, and reorganized setup UI into row groupings with resource icon inputs and validation caps (max 999999) plus styling updates.
