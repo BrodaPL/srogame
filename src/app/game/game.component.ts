@@ -12,7 +12,7 @@ import { GalaxySetup, GalaxySnapshot } from '../models/game-api-types';
 })
 export class GameComponent implements OnInit {
   protected readonly config = this.loadConfig();
-  protected readonly gridCellSize = 18;
+  protected readonly gridCellSize = 24;
   protected galaxy: GalaxySnapshot | null = null;
   protected stateError: string | null = null;
   protected isLoading = false;

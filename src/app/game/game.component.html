@@ -68,7 +68,7 @@
                 [class.galaxy-cell--void]="system.isVoid"
                 [class.galaxy-cell--center]="system.isGalaxyCenter"
               >
-                @if (!system.isVoid && !system.isGalaxyCenter) {
+                @if (!system.isGalaxyCenter) {
                   <span class="galaxy-coords">
                     {{ system.coordinates.x }},{{ system.coordinates.y }}
                   </span>

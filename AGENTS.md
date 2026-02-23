@@ -50,6 +50,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-02-22: Galaxy Preview tweaks: larger cells (22px), scrollable grid, hover-to-reveal coords (including void), hover scale and border highlight.
 - 2026-02-22: Introduced `PlayerID` (shared id+name), updated `Player` to store `playerId`, and changed `Planet`/`Fleet` ownership to `PlayerID`. Added player maps to `Galaxy` (human/bot/neutral + name lookup).
 - 2026-02-22: Reorganized models into folders: `buildings/`, `fleets/`, `planets/`, `tech/`, `enums/`, with updated imports and server model paths.
 - 2026-02-22: Fixed server import interop for `GalaxyCreator` (ESM/CJS) so `npm run dev` starts. Now have one common `GalaxySetup` type for client and server. User made additional minor local fixes after server startup (details not recorded).

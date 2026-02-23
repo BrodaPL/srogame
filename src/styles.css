@@ -640,13 +640,14 @@ app-root {
 }
 
 .galaxy-grid {
-  --cell-size: 18px;
+  --cell-size: 24px;
   display: grid;
   gap: 2px;
   padding: 0.75rem;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(5, 7, 10, 0.85);
+  max-height: 70vh;
   max-width: 100%;
   overflow: auto;
 }
@@ -656,12 +657,21 @@ app-root {
   height: var(--cell-size);
   background: #0e2242;
   border-radius: 3px;
+  border: 1px solid transparent;
   display: grid;
   place-items: center;
   color: #cfe1ff;
   font-size: 0.45rem;
   line-height: 1;
   font-family: var(--font-mono), serif;
+  transform-origin: center;
+  transition: transform 0.12s ease;
+}
+
+.galaxy-cell:hover {
+  transform: scale(1.4);
+  z-index: 2;
+  border-color: rgba(255, 255, 255, 0.8);
 }
 
 .galaxy-cell--void {
@@ -676,8 +686,13 @@ app-root {
 
 .galaxy-coords {
   display: block;
-  opacity: 0.9;
+  opacity: 0;
   transform: translateY(-0.5px);
+  transition: opacity 0.15s ease;
+}
+
+.galaxy-cell:hover .galaxy-coords {
+  opacity: 0.9;
 }
 
 .empty {
