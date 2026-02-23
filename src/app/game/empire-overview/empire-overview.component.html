@@ -1,0 +1,82 @@
+<section class="empire-overview">
+  <div class="empire-overview__top">
+    <section class="overview-card">
+      <h3>Empire Income</h3>
+      <p class="overview-muted">Summed resource income across all planets.</p>
+      <div class="overview-stats">
+        <div class="overview-stat">
+          <span class="overview-stat__label">Metal / h</span>
+          <span class="overview-stat__value">0</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Crystal / h</span>
+          <span class="overview-stat__value">0</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Deuterium / h</span>
+          <span class="overview-stat__value">0</span>
+        </div>
+      </div>
+      <p class="overview-muted">No planets yet. Income will appear once colonies are established.</p>
+    </section>
+
+    <section class="overview-card">
+      <h3>Research Queue</h3>
+      <p class="overview-empty">No active research.</p>
+      <div class="overview-list">
+        <div class="overview-list__item">
+          <span>Research slot 1</span>
+          <span class="overview-muted">Idle</span>
+        </div>
+        <div class="overview-list__item">
+          <span>Research slot 2</span>
+          <span class="overview-muted">Idle</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="overview-nav">
+    <a class="overview-nav__button" routerLink="/game/galaxy">Galaxy Preview</a>
+    <a class="overview-nav__button" routerLink="/game/reports">Reports</a>
+    <a class="overview-nav__button" routerLink="/game/tech">Technology Overview</a>
+  </section>
+
+  <section class="overview-card">
+    <h3>Planets</h3>
+    <div class="overview-table-wrapper">
+      <table class="overview-table">
+        <thead>
+          <tr>
+            <th>Planet Name</th>
+            <th>Type</th>
+            <th>Resources</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="overview-table__empty">
+            <td colspan="3">No planets yet.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="overview-card">
+    <h3>Fleets</h3>
+    <div class="overview-list">
+      <div class="overview-list__item">
+        <span>Fleet Alpha</span>
+        <span class="overview-muted">Idle · (0, 0)</span>
+      </div>
+      <div class="overview-list__item">
+        <span>Scout Wing</span>
+        <span class="overview-muted">En route · (12, 8)</span>
+      </div>
+      <div class="overview-list__item">
+        <span>Defense Squadron</span>
+        <span class="overview-muted">Docked · (0, 0)</span>
+      </div>
+    </div>
+  </section>
+</section>

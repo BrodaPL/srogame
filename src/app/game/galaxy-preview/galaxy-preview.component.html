@@ -1,0 +1,37 @@
+<section class="galaxy-preview">
+  <div class="galaxy-preview__header">
+    <h3>Galaxy Preview</h3>
+    @if (gameState.galaxy) {
+      <p class="galaxy-preview__meta">
+        {{ gameState.galaxy.stars[0].length }}x{{ gameState.galaxy.stars.length }}
+      </p>
+    }
+  </div>
+
+  @if (gameState.galaxy) {
+    <div
+      class="galaxy-grid"
+      [style.grid-template-columns]="
+        'repeat(' + gameState.galaxy.stars[0].length + ', ' + gridCellSize + 'px)'
+      "
+    >
+      @for (row of gameState.galaxy.stars; track $index) {
+        @for (system of row; track $index) {
+          <div
+            class="galaxy-cell"
+            [class.galaxy-cell--void]="system.isVoid"
+            [class.galaxy-cell--center]="system.isGalaxyCenter"
+          >
+            @if (!system.isGalaxyCenter) {
+              <span class="galaxy-coords">
+                {{ system.coordinates.x }},{{ system.coordinates.y }}
+              </span>
+            }
+          </div>
+        }
+      }
+    </div>
+  } @else {
+    <p class="overview-empty">Galaxy data not loaded yet.</p>
+  }
+</section>
