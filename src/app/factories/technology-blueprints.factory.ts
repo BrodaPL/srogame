@@ -47,6 +47,7 @@ export class TechnologyBlueprintsFactory {
     ESPIONAGE_TECHNOLOGY: 'images/technologies/Espionage_Technology.webp',
     COMPUTER_TECHNOLOGY: 'images/technologies/Computer_Technology.webp',
     ASTROPHYSICS_TECHNOLOGY: 'images/technologies/Astrophysics_and_Expedition_Technologies.webp',
+    ADAPTIVE_TECHNOLOGY: 'images/technologies/Astrophysics_and_Expedition_Technologies.webp',
     INTERGALACTIC_RESEARCH_NETWORK: 'images/technologies/Intergalactic_Research_Network.webp',
     GRAVITON_TECHNOLOGY: 'images/technologies/Graviton_Technology.webp',
     SHIELDING_TECHNOLOGY: 'images/technologies/Shielding_Technology.webp',

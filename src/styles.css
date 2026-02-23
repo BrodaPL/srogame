@@ -418,7 +418,25 @@ app-root {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
+.setup-form select {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+  font-family: var(--font-mono), serif;
+  background: var(--surface-strong);
+  color: var(--ink);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
 .setup-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--glow);
+  transform: translateY(-1px);
+}
+
+.setup-form select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 4px var(--glow);

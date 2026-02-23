@@ -1,4 +1,7 @@
+import type { GameType } from './enums/game-type';
+
 export type GalaxySetup = {
+  gameType: GameType;
   galaxyName: string;
   galaxyWidth: number;
   galaxyHeight: number;

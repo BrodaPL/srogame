@@ -99,8 +99,16 @@ function buildGalaxySnapshot(galaxy: Galaxy): GalaxySnapshot {
 }
 
 function isValidSetup(setup: GalaxySetup): boolean {
+  const gameTypeValue = (setup as { gameType?: unknown }).gameType;
+  const gameTypeValid =
+    gameTypeValue === undefined ||
+    gameTypeValue === 'PvP' ||
+    gameTypeValue === 'PvPvE' ||
+    gameTypeValue === 'PvE';
+
   return (
     !!setup &&
+    gameTypeValid &&
     typeof setup.galaxyName === 'string' &&
     setup.galaxyName.trim().length > 0 &&
     Number.isInteger(setup.galaxyWidth) &&

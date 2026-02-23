@@ -5,10 +5,12 @@ import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
 import { NAMES_LIST } from '../models/enums/names-list';
+import { GameType } from '../models/enums/game-type';
 import { GalaxySetup } from '../models/game-api-types';
 import { ResourcesPack } from '../models/resources-pack';
 
 type GalaxySetupForm = {
+  gameType: GameType;
   playerName: string;
   galaxyName: string;
   galaxyWidth: string;
@@ -63,6 +65,7 @@ export class GalaxySetupComponent {
   }
 
   protected canStart(): boolean {
+    const gameTypeValid = this.isValidGameType(this.form.gameType);
     const playerName = this.form.playerName.trim();
     const name = this.form.galaxyName.trim();
     const width = this.parseIntegerInRange(this.form.galaxyWidth, 10, 100);
@@ -85,6 +88,7 @@ export class GalaxySetupComponent {
     const deuterium = this.parseNonNegativeInteger(this.form.startingDeuterium);
 
     return (
+      gameTypeValid &&
       Boolean(playerName) &&
       Boolean(name) &&
       width !== null &&
@@ -111,6 +115,7 @@ export class GalaxySetupComponent {
 
     const playerName = this.form.playerName.trim();
     const config: GalaxySetup = {
+      gameType: this.form.gameType,
       galaxyName: this.form.galaxyName.trim(),
       galaxyWidth: Number(this.form.galaxyWidth),
       galaxyHeight: Number(this.form.galaxyHeight),
@@ -154,6 +159,7 @@ export class GalaxySetupComponent {
   private createDefaultForm(): GalaxySetupForm {
     const existingPlayer = this.playerSession.load();
     return {
+      gameType: GameType.PVE,
       playerName: existingPlayer?.name ?? 'Commander',
       galaxyName: this.randomGalaxyName(),
       galaxyWidth: '25',
@@ -175,6 +181,7 @@ export class GalaxySetupComponent {
 
   private formFromConfig(config: GalaxySetup, playerName: string): GalaxySetupForm {
     return {
+      gameType: this.normalizeGameType(config.gameType),
       playerName,
       galaxyName: config.galaxyName,
       galaxyWidth: String(config.galaxyWidth),
@@ -217,7 +224,11 @@ export class GalaxySetupComponent {
   }
 
   private isValidConfig(config: GalaxySetup): boolean {
+    const gameTypeValue = (config as { gameType?: unknown }).gameType;
+    const gameTypeValid = gameTypeValue === undefined || this.isValidGameType(gameTypeValue);
+
     return (
+      gameTypeValid &&
       typeof config.galaxyName === 'string' &&
       config.galaxyName.trim().length > 0 &&
       Number.isInteger(config.galaxyWidth) &&
@@ -265,6 +276,14 @@ export class GalaxySetupComponent {
       config.startingResources.deuterium >= 0 &&
       config.startingResources.deuterium <= 999999
     );
+  }
+
+  private normalizeGameType(value: unknown): GameType {
+    return this.isValidGameType(value) ? value : GameType.PVE;
+  }
+
+  private isValidGameType(value: unknown): value is GameType {
+    return value === GameType.PVP || value === GameType.PVPVE || value === GameType.PVE;
   }
 
 }

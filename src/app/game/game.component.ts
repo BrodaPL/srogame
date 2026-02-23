@@ -3,6 +3,7 @@ import { RouterLink, RouterOutlet } from '@angular/router';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
+import { GameType } from '../models/enums/game-type';
 import { GalaxySetup } from '../models/game-api-types';
 
 @Component({
@@ -66,7 +67,11 @@ export class GameComponent implements OnInit {
   }
 
   private isValidConfig(config: GalaxySetup): boolean {
+    const gameTypeValue = (config as { gameType?: unknown }).gameType;
+    const gameTypeValid = gameTypeValue === undefined || this.isValidGameType(gameTypeValue);
+
     return (
+      gameTypeValid &&
       typeof config.galaxyName === 'string' &&
       config.galaxyName.trim().length > 0 &&
       Number.isInteger(config.galaxyWidth) &&
@@ -111,5 +116,9 @@ export class GameComponent implements OnInit {
       Number.isFinite(config.startingResources?.deuterium) &&
       config.startingResources.deuterium >= 0
     );
+  }
+
+  private isValidGameType(value: unknown): value is GameType {
+    return value === GameType.PVP || value === GameType.PVPVE || value === GameType.PVE;
   }
 }

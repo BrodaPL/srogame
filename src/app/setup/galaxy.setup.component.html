@@ -33,6 +33,20 @@
         />
       </div>
 
+      <div class="field">
+        <label for="gameType">Game type</label>
+        <select
+          id="gameType"
+          name="gameType"
+          [(ngModel)]="form.gameType"
+          required
+        >
+          <option value="PvP">PvP</option>
+          <option value="PvPvE">PvPvE</option>
+          <option value="PvE">PvE</option>
+        </select>
+      </div>
+
       <div class="field-row">
         <div class="field">
           <label for="galaxyWidth">Galaxy width</label>

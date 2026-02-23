@@ -1,11 +1,12 @@
 export enum TechnologyType {
   ENERGY_TECHNOLOGY = 'Energy Technology',
-  WAVE_PARTICLE_TECHNOLOGY = 'Wave-Particle Technology',
+  // WAVE_PARTICLE_TECHNOLOGY = 'Wave-Particle Technology',
   MATERIAL_TECHNOLOGY = 'Material Technology',
   HYPERSPACE_TECHNOLOGY = 'Hyperspace Technology',
   ESPIONAGE_TECHNOLOGY = 'Espionage Technology',
   COMPUTER_TECHNOLOGY = 'Computer Technology',
   ASTROPHYSICS_TECHNOLOGY = 'Astrophysics Technology',
+  ADAPTIVE_TECHNOLOGY = 'Adaptive Technology',
   INTERGALACTIC_RESEARCH_NETWORK = 'Intergalactic Research Network',
   GRAVITON_TECHNOLOGY = 'Graviton Technology',
   SHIELDING_TECHNOLOGY = 'Shielding Technology',

@@ -11,7 +11,7 @@ This file captures session context for collaborators and future AI agents.
 
 ## Current Behavior
 - Route `/` shows main menu (load, singleplayer, multiplayer, encyclopedia, help/about).
-- Route `/setup` shows setup form (player name + starting metal/crystal/deuterium).
+- Route `/setup` shows setup form (player name, game type, starting metal/crystal/deuterium).
 - Route `/game` shows game view if config exists, otherwise prompts to go to setup. Shows a galaxy preview grid when in-memory galaxy exists.
 - Route `/encyclopedia` shows encyclopedia menu with ships/buildings/technologies links.
 - Routes `/load`, `/multiplayer`, `/help` are placeholders.
@@ -33,10 +33,10 @@ This file captures session context for collaborators and future AI agents.
 - Galaxy setup UI + logic: `src/app/setup/galaxy.setup.component.ts`, `src/app/setup/galaxy.setup.component.html`
 - Game UI + logic: `src/app/game/game.component.ts`, `src/app/game/game.component.html`
 - Models (core): `src/app/models/resources-pack.ts`, `src/app/models/player-id.ts`, `src/app/models/player.ts`, `src/app/models/game-api-types.ts`
-- Models (enums): `src/app/models/enums/building-type.ts`, `src/app/models/enums/technology-type.ts`, `src/app/models/enums/weapon-type.ts`, `src/app/models/enums/hull-class.ts`, `src/app/models/enums/planet-type.ts`, `src/app/models/enums/player-type.ts`, `src/app/models/enums/names-list.ts`
+- Models (enums): `src/app/models/enums/building-type.ts`, `src/app/models/enums/technology-type.ts`, `src/app/models/enums/weapon-type.ts`, `src/app/models/enums/hull-class.ts`, `src/app/models/enums/planet-type.ts`, `src/app/models/enums/player-type.ts`, `src/app/models/enums/game-type.ts`, `src/app/models/enums/names-list.ts`
 - Models (buildings): `src/app/models/buildings/building.ts`, `src/app/models/buildings/building-blueprints.ts`, `src/app/models/buildings/building-requirement.ts`
 - Models (fleets): `src/app/models/fleets/fleet.ts`, `src/app/models/fleets/ship.ts`, `src/app/models/fleets/ship-instance.ts`, `src/app/models/fleets/ship-group.ts`, `src/app/models/fleets/ship-blueprints.ts`, `src/app/models/fleets/weapon.ts`, `src/app/models/fleets/destination.ts`
-- Models (planets): `src/app/models/planets/planet.ts`, `src/app/models/planets/solar-system.ts`, `src/app/models/planets/galaxy.ts`, `src/app/models/planets/galaxy-creator.ts`, `src/app/models/planets/planet-type-assets.ts`
+- Models (planets): `src/app/models/planets/planet.ts`, `src/app/models/planets/solar-system.ts`, `src/app/models/planets/galaxy.ts`, `src/app/models/planets/galaxy-creator.ts`, `src/app/models/planets/planet-type-assets.ts`, `src/app/models/planets/planet-image-helper.ts`
 - Models (tech): `src/app/models/tech/technology.ts`, `src/app/models/tech/technology-blueprints.ts`, `src/app/models/tech/tech-requirement.ts`
 - Logging: `src/app/core/logger.ts`
 - In-memory state: `src/app/core/game-state.service.ts`
@@ -50,6 +50,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-02-23: Added `GameType` enum and game type selection (PvP/PvPvE/PvE) to galaxy setup; `GalaxySetup` now includes `gameType` with validation updates on client/server. Added `PlanetImageHelper` for size-based planet images in `public/images/planet_blank`. Fixed ship blueprints `techRequirements` JSON shape.
 - 2026-02-23: Added game subpages under `/game` with child routing and default Empire Overview. Galaxy Preview moved into its own screen; Reports and Tech Overview mockups added. Game view now uses a shell + router-outlet. Added overview UI styles and kept galaxy grid styling (22px cells, hover zoom/border).
 - 2026-02-22: Galaxy Preview tweaks: larger cells (22px), scrollable grid, hover-to-reveal coords (including void), hover scale and border highlight.
 - 2026-02-22: Introduced `PlayerID` (shared id+name), updated `Player` to store `playerId`, and changed `Planet`/`Fleet` ownership to `PlayerID`. Added player maps to `Galaxy` (human/bot/neutral + name lookup).
