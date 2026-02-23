@@ -4,6 +4,10 @@ import { EncyclopediaMenuComponent } from './encyclopedia-menu/encyclopedia-menu
 import { EncyclopediaShipsComponent } from './encyclopedia-menu/encyclopedia-ships.component';
 import { EncyclopediaTechnologiesComponent } from './encyclopedia-menu/encyclopedia-technologies.component';
 import { GameComponent } from './game/game.component';
+import { EmpireOverviewComponent } from './game/empire-overview/empire-overview.component';
+import { GalaxyPreviewComponent } from './game/galaxy-preview/galaxy-preview.component';
+import { ReportsComponent } from './game/reports/reports.component';
+import { TechOverviewComponent } from './game/tech-overview/tech-overview.component';
 import { HelpAboutComponent } from './help-about/help-about.component';
 import { LoadGameComponent } from './load-game/load-game.component';
 import { MainMenuComponent } from './main-menu/main-menu.component';
@@ -20,6 +24,16 @@ export const routes: Routes = [
   { path: 'encyclopedia/ships', component: EncyclopediaShipsComponent },
   { path: 'encyclopedia/buildings', component: EncyclopediaBuildingsComponent },
   { path: 'encyclopedia/technologies', component: EncyclopediaTechnologiesComponent },
-  { path: 'game', component: GameComponent },
+  {
+    path: 'game',
+    component: GameComponent,
+    children: [
+      { path: '', redirectTo: 'overview', pathMatch: 'full' },
+      { path: 'overview', component: EmpireOverviewComponent },
+      { path: 'galaxy', component: GalaxyPreviewComponent },
+      { path: 'reports', component: ReportsComponent },
+      { path: 'tech', component: TechOverviewComponent }
+    ]
+  },
   { path: '**', redirectTo: '' }
 ];

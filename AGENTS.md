@@ -50,6 +50,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-02-23: Added game subpages under `/game` with child routing and default Empire Overview. Galaxy Preview moved into its own screen; Reports and Tech Overview mockups added. Game view now uses a shell + router-outlet. Added overview UI styles and kept galaxy grid styling (22px cells, hover zoom/border).
 - 2026-02-22: Galaxy Preview tweaks: larger cells (22px), scrollable grid, hover-to-reveal coords (including void), hover scale and border highlight.
 - 2026-02-22: Introduced `PlayerID` (shared id+name), updated `Player` to store `playerId`, and changed `Planet`/`Fleet` ownership to `PlayerID`. Added player maps to `Galaxy` (human/bot/neutral + name lookup).
 - 2026-02-22: Reorganized models into folders: `buildings/`, `fleets/`, `planets/`, `tech/`, `enums/`, with updated imports and server model paths.

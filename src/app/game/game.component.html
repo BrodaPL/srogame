@@ -13,26 +13,6 @@
       <a class="link" routerLink="/setup">Edit setup</a>
     </header>
 
-    <section class="resources">
-      <article class="resource">
-        <h2>Metal</h2>
-        <p>{{ config.startingResources.metal }}</p>
-      </article>
-      <article class="resource">
-        <h2>Crystal</h2>
-        <p>{{ config.startingResources.crystal }}</p>
-      </article>
-      <article class="resource">
-        <h2>Deuterium</h2>
-        <p>{{ config.startingResources.deuterium }}</p>
-      </article>
-    </section>
-
-    <section class="status">
-      <h3>Command Status</h3>
-      <p>Your empire is online. Next: resource production, build queue.</p>
-    </section>
-
     @if (isLoading) {
       <section class="status status--info">
         <h3>Galaxy Status</h3>
@@ -47,38 +27,7 @@
       </section>
     }
 
-    @if (galaxy) {
-      <section class="galaxy-preview">
-        <div class="galaxy-preview__header">
-          <h3>Galaxy Preview</h3>
-          <p class="galaxy-preview__meta">
-            {{ galaxy.stars[0].length }}x{{ galaxy.stars.length }}
-          </p>
-        </div>
-        <div
-          class="galaxy-grid"
-          [style.grid-template-columns]="
-            'repeat(' + galaxy.stars[0].length + ', ' + gridCellSize + 'px)'
-          "
-        >
-          @for (row of galaxy.stars; track $index) {
-            @for (system of row; track $index) {
-              <div
-                class="galaxy-cell"
-                [class.galaxy-cell--void]="system.isVoid"
-                [class.galaxy-cell--center]="system.isGalaxyCenter"
-              >
-                @if (!system.isGalaxyCenter) {
-                  <span class="galaxy-coords">
-                    {{ system.coordinates.x }},{{ system.coordinates.y }}
-                  </span>
-                }
-              </div>
-            }
-          }
-        </div>
-      </section>
-    }
+    <router-outlet />
   } @else {
     <section class="empty">
       <h1>No setup found</h1>

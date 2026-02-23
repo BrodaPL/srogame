@@ -1,19 +1,17 @@
 import { Component, OnInit } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
-import { GalaxySetup, GalaxySnapshot } from '../models/game-api-types';
+import { GalaxySetup } from '../models/game-api-types';
 
 @Component({
   selector: 'app-game',
-  imports: [RouterLink],
+  imports: [RouterLink, RouterOutlet],
   templateUrl: './game.component.html'
 })
 export class GameComponent implements OnInit {
   protected readonly config = this.loadConfig();
-  protected readonly gridCellSize = 24;
-  protected galaxy: GalaxySnapshot | null = null;
   protected stateError: string | null = null;
   protected isLoading = false;
 
@@ -28,8 +26,6 @@ export class GameComponent implements OnInit {
       return;
     }
 
-    this.galaxy = this.gameState.galaxy;
-
     const session = this.playerSession.load();
     if (!session) {
       this.stateError = 'No player session found. Start a new game.';
@@ -42,12 +38,10 @@ export class GameComponent implements OnInit {
     this.gameApi.getGameState(session.token).subscribe({
       next: (response) => {
         this.gameState.setGalaxy(response.galaxy);
-        this.galaxy = response.galaxy;
         this.isLoading = false;
       },
       error: () => {
         this.stateError = 'Unable to load galaxy from server.';
-        this.galaxy = null;
         this.isLoading = false;
       }
     });
