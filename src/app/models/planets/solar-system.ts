@@ -8,6 +8,8 @@ export type SolarSystemCoordinates = {
 };
 
 export class SolarSystem {
+  public isCenterEdge = false;
+
   constructor(
     name: string,
     planetNumber: number,

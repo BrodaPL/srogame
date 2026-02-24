@@ -68,6 +68,37 @@ export class GalaxyCreator {
         }
       }
     }
+    //4. Apply void chance to non-void, non-center systems (with higher odds at the edge).
+    for (let y = 0; y < this.galaxyHeight; y += 1) {
+      for (let x = 0; x < this.galaxyWidth; x += 1) {
+        const system = galaxy.stars[y][x];
+        const distance = this.distanceFromCenter(x, y);
+        const isEdge = Math.abs(distance - this.galaxyRadius) <= 0.75;
+        const isCenterEdge = Math.abs(distance - this.galaxyCenterRadius) <= 0.75;
+
+        system.isCenterEdge = isCenterEdge;
+
+        if (system.isVoid || system.isGalaxyCenter) {
+          continue;
+        }
+
+        if (isEdge && Math.random() < 0.5) {
+          const voidSystem = SolarSystem.createVoid({ x, y });
+          voidSystem.isCenterEdge = isCenterEdge;
+          galaxy.stars[y][x] = voidSystem;
+          continue;
+        }
+
+        const baseVoidChance = this.setup.voidChance / 100;
+        const adjustedVoidChance = isCenterEdge ? baseVoidChance * 0.5 : baseVoidChance;
+
+        if (Math.random() < adjustedVoidChance) {
+          const voidSystem = SolarSystem.createVoid({ x, y });
+          voidSystem.isCenterEdge = isCenterEdge;
+          galaxy.stars[y][x] = voidSystem;
+        }
+      }
+    }
 
     return galaxy;
   }
