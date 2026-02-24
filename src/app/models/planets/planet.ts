@@ -16,7 +16,9 @@ type ModifierKey =
   | 'energyModifierRES'
   | 'energyModifierNuclear'
   | 'scienceModifier'
-  | 'industryModifier';
+  | 'industryModifier'
+  | 'anomaliesAndNoise'
+  | 'hyperspaceParameters';
 
 type ModifierRange = {
   min: number;
@@ -45,6 +47,8 @@ export class Planet {
       new ResourcesPack(0, 0, 0),
       160,
       [],
+      0,
+      0,
       0,
       0,
       0,
@@ -91,6 +95,8 @@ export class Planet {
       Planet.randomFloat(modifierRanges.energyModifierNuclear.min, modifierRanges.energyModifierNuclear.max),
       Planet.randomFloat(modifierRanges.scienceModifier.min, modifierRanges.scienceModifier.max),
       Planet.randomFloat(modifierRanges.industryModifier.min, modifierRanges.industryModifier.max),
+      Planet.randomSteppedFloat(modifierRanges.anomaliesAndNoise.min, modifierRanges.anomaliesAndNoise.max, 0.05),
+      Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05),
       new Map<PlayerID, PlanetaryReportData>(),
       [],
       [],
@@ -118,6 +124,10 @@ export class Planet {
     public energyModifierNuclear: number,
     public scienceModifier: number,
     public industryModifier: number,
+    // Affects Sensor Phalanx range. -60%..60%. Each 15% also shifts espionage level. 5% steps.
+    public anomaliesAndNoise: number,
+    // -80%..50%. Affects Jumpgate + Interstellar Trade Port capacity base level. 5% steps.
+    public hyperspaceParameters: number,
     public lastReportData: Map<PlayerID, PlanetaryReportData>,
     public technologyQueue: Technology[],
     public buildingQueue: Building[],
@@ -137,6 +147,8 @@ export class Planet {
       energyModifierNuclear: Planet.percentRange(-20, 50),
       scienceModifier: Planet.percentRange(-10, 50),
       industryModifier: Planet.percentRange(-30, 50),
+      anomaliesAndNoise: Planet.percentRange(-20, 60),
+      hyperspaceParameters: Planet.percentRange(-80, 50),
     },
     [PlanetType.DRY]: {
       metalModifier: Planet.percentRange(-30, 50),
@@ -146,6 +158,8 @@ export class Planet {
       energyModifierNuclear: Planet.percentRange(-50, 30),
       scienceModifier: Planet.percentRange(-50, 50),
       industryModifier: Planet.percentRange(-50, 30),
+      anomaliesAndNoise: Planet.percentRange(-40, 60),
+      hyperspaceParameters: Planet.percentRange(-80, 50),
     },
     [PlanetType.ICE]: {
       metalModifier: Planet.percentRange(-50, 50),
@@ -155,6 +169,8 @@ export class Planet {
       energyModifierNuclear: Planet.percentRange(-30, 50),
       scienceModifier: Planet.percentRange(-50, 50),
       industryModifier: Planet.percentRange(-50, 30),
+      anomaliesAndNoise: Planet.percentRange(-30, 60),
+      hyperspaceParameters: Planet.percentRange(-80, 50),
     },
     [PlanetType.JUNGLE]: {
       metalModifier: Planet.percentRange(-50, 50),
@@ -164,6 +180,8 @@ export class Planet {
       energyModifierNuclear: Planet.percentRange(-50, 50),
       scienceModifier: Planet.percentRange(-50, 40),
       industryModifier: Planet.percentRange(-50, 40),
+      anomaliesAndNoise: Planet.percentRange(-60, 40),
+      hyperspaceParameters: Planet.percentRange(-80, 50),
     },
     [PlanetType.SAVANNA]: {
       metalModifier: Planet.percentRange(-50, 30),
@@ -173,6 +191,8 @@ export class Planet {
       energyModifierNuclear: Planet.percentRange(-50, 50),
       scienceModifier: Planet.percentRange(-40, 40),
       industryModifier: Planet.percentRange(-30, 50),
+      anomaliesAndNoise: Planet.percentRange(-60, 40),
+      hyperspaceParameters: Planet.percentRange(-80, 50),
     },
     [PlanetType.OCEANIC]: {
       metalModifier: Planet.percentRange(-50, 40),
@@ -182,6 +202,8 @@ export class Planet {
       energyModifierNuclear: Planet.percentRange(-30, 50),
       scienceModifier: Planet.percentRange(-40, 40),
       industryModifier: Planet.percentRange(-50, 20),
+      anomaliesAndNoise: Planet.percentRange(-60, 40),
+      hyperspaceParameters: Planet.percentRange(-80, 50),
     },
     [PlanetType.VOLCANIC]: {
       metalModifier: Planet.percentRange(10, 50),
@@ -191,6 +213,8 @@ export class Planet {
       energyModifierNuclear: Planet.percentRange(20, 50),
       scienceModifier: Planet.percentRange(-10, 50),
       industryModifier: Planet.percentRange(-30, 40),
+      anomaliesAndNoise: Planet.percentRange(-60, 20),
+      hyperspaceParameters: Planet.percentRange(-80, 50),
     },
     [PlanetType.ASTEROIDS]: {
       metalModifier: Planet.percentRange(-75, 75),
@@ -200,6 +224,8 @@ export class Planet {
       energyModifierNuclear: Planet.percentRange(-20, 40),
       scienceModifier: Planet.percentRange(-60, 60),
       industryModifier: Planet.percentRange(-60, -20),
+      anomaliesAndNoise: Planet.percentRange(-60, 60),
+      hyperspaceParameters: Planet.percentRange(-80, 50),
     },
   };
 
@@ -249,6 +275,17 @@ export class Planet {
 
   private static randomFloat(min: number, max: number, decimals = 2): number {
     const value = Math.random() * (max - min) + min;
+    const factor = Math.pow(10, decimals);
+    return Math.round(value * factor) / factor;
+  }
+
+  private static randomSteppedFloat(min: number, max: number, step: number, decimals = 2): number {
+    if (step <= 0) {
+      return Planet.randomFloat(min, max, decimals);
+    }
+
+    const steps = Math.floor((max - min) / step);
+    const value = min + step * Planet.randomInt(0, steps);
     const factor = Math.pow(10, decimals);
     return Math.round(value * factor) / factor;
   }

@@ -17,11 +17,13 @@
       "hangarCapacity": 0,
       "jumpCost": 0,
       "cost": { "metal": 20, "crystal": 10, "deuterium": 0 },
-      "buildingRequirements": [ ],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 1 },
-			{ "tech": "BEAMS_WEAPONS", "level": 1 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 1 },
+        { "tech": "BEAMS_WEAPONS", "level": 1 }
+      ]
     },
     {
       "name": "Assualt Fighter",
@@ -40,11 +42,13 @@
       "hangarCapacity": 0,
       "jumpCost": 0,
       "cost": { "metal": 30, "crystal": 20, "deuterium": 10 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 1 },
-			{ "tech": "MISSILES_WEAPONS", "level": 1 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 1 },
+        { "tech": "MISSILES_WEAPONS", "level": 1 }
+      ]
     },
     {
       "name": "Corvet",
@@ -64,14 +68,16 @@
       "hangarCapacity": 0,
       "jumpCost": 0,
       "cost": { "metal": 80, "crystal": 40, "deuterium": 10 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 2 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 1 },
-			{ "tech": "MISSILES_WEAPONS", "level": 1 },
-			{ "tech": "BEAMS_WEAPONS", "level": 1 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 2 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 2 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 1 },
+        { "tech": "MISSILES_WEAPONS", "level": 1 },
+        { "tech": "BEAMS_WEAPONS", "level": 1 }
+      ]
     },
     {
       "name": "Spy Prob",
@@ -88,13 +94,36 @@
       "hangarCapacity": 0,
       "jumpCost": 0,
       "cost": { "metal": 0, "crystal": 20, "deuterium": 10 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 1 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 1 },
-			{ "tech": "HYPERSPACE_TECHNOLOGY", "level": 1 },
-			{ "tech": "ESPIONAGE_TECHNOLOGY", "level": 1 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 1 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 1 },
+        { "tech": "HYPERSPACE_TECHNOLOGY", "level": 1 },
+        { "tech": "ESPIONAGE_TECHNOLOGY", "level": 1 }
+      ]
+    },
+    {
+      "name": "Repair Drone",
+      "imagePath": "images/ships/Light_Fighter.webp",
+      "hullClass": "SMALL",
+      "canJump": false,
+      "size": 2,
+      "evasionChance": 0,
+      "hullPointsCapacity": 10,
+      "shieldCapacity": 0,
+      "defense": 0,
+      "weapons": [
+        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 1 }
+      ],
+      "cargoCapacity": 0,
+      "hangarCapacity": 0,
+      "jumpCost": 0,
+      "cost": { "metal": 40, "crystal": 25, "deuterium": 5 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 2 }
+      ]
     },
     {
       "name": "Cruser",
@@ -115,16 +144,18 @@
       "hangarCapacity": 1,
       "jumpCost": 1,
       "cost": { "metal": 120, "crystal": 60, "deuterium": 20 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 2 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 1 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 2 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
-			{ "tech": "BEAMS_WEAPONS", "level": 1 },
-			{ "tech": "MISSILES_WEAPONS", "level": 1 },
-			{ "tech": "RAILGUNS_WEAPONS", "level": 1 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 3 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 2 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 1 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 2 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
+        { "tech": "BEAMS_WEAPONS", "level": 1 },
+        { "tech": "MISSILES_WEAPONS", "level": 1 },
+        { "tech": "RAILGUNS_WEAPONS", "level": 1 }
+      ]
     },
     {
       "name": "Battle Ship",
@@ -144,15 +175,17 @@
       "hangarCapacity": 4,
       "jumpCost": 2,
       "cost": { "metal": 250, "crystal": 100, "deuterium": 20 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 3 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 2 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 3 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
-			{ "tech": "BEAMS_WEAPONS", "level": 2 },
-			{ "tech": "MISSILES_WEAPONS", "level": 2 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 4 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 3 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 2 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 3 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
+        { "tech": "BEAMS_WEAPONS", "level": 2 },
+        { "tech": "MISSILES_WEAPONS", "level": 2 }
+      ]
     },
     {
       "name": "Frigate",
@@ -173,16 +206,18 @@
       "hangarCapacity": 0,
       "jumpCost": 1,
       "cost": { "metal": 300, "crystal": 80, "deuterium": 20 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 3 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 2 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 4 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
-			{ "tech": "BEAMS_WEAPONS", "level": 2 },
-			{ "tech": "MISSILES_WEAPONS", "level": 3 },
-			{ "tech": "RAILGUNS_WEAPONS", "level": 2 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 4 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 3 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 2 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 4 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
+        { "tech": "BEAMS_WEAPONS", "level": 2 },
+        { "tech": "MISSILES_WEAPONS", "level": 3 },
+        { "tech": "RAILGUNS_WEAPONS", "level": 2 }
+      ]
     },
     {
       "name": "Transporter",
@@ -201,14 +236,16 @@
       "hangarCapacity": 0,
       "jumpCost": 1,
       "cost": { "metal": 150, "crystal": 30, "deuterium": 10 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 2 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 1 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 1 },
-			{ "tech": "BEAMS_WEAPONS", "level": 1 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 3 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 2 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 1 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 1 },
+        { "tech": "BEAMS_WEAPONS", "level": 1 }
+      ]
     },
     {
       "name": "Battle Cruser",
@@ -229,17 +266,19 @@
       "hangarCapacity": 2,
       "jumpCost": 2,
       "cost": { "metal": 550, "crystal": 250, "deuterium": 50 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 4 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 3 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 5 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 3 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 3 },
-			{ "tech": "BEAMS_WEAPONS", "level": 2 },
-			{ "tech": "MISSILES_WEAPONS", "level": 2 },
-			{ "tech": "RAILGUNS_WEAPONS", "level": 2 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 6 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 4 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 3 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 5 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 3 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 3 },
+        { "tech": "BEAMS_WEAPONS", "level": 2 },
+        { "tech": "MISSILES_WEAPONS", "level": 2 },
+        { "tech": "RAILGUNS_WEAPONS", "level": 2 }
+      ]
     },
     {
       "name": "Destroyer",
@@ -259,16 +298,18 @@
       "hangarCapacity": 0,
       "jumpCost": 2,
       "cost": { "metal": 450, "crystal": 250, "deuterium": 50 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 4 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 3 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 5 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 3 },
-			{ "tech": "MISSILES_WEAPONS", "level": 3 },
-			{ "tech": "RAILGUNS_WEAPONS", "level": 4 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 6 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 4 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 3 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 5 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 3 },
+        { "tech": "MISSILES_WEAPONS", "level": 3 },
+        { "tech": "RAILGUNS_WEAPONS", "level": 4 }
+      ]
     },
     {
       "name": "Dreadnoth",
@@ -288,16 +329,18 @@
       "hangarCapacity": 0,
       "jumpCost": 2,
       "cost": { "metal": 250, "crystal": 300, "deuterium": 80 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 4 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 3 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 5 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 4 },
-			{ "tech": "MISSILES_WEAPONS", "level": 4 },
-			{ "tech": "BEAMS_WEAPONS", "level": 3 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 6 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 4 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 3 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 5 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 4 },
+        { "tech": "MISSILES_WEAPONS", "level": 4 },
+        { "tech": "BEAMS_WEAPONS", "level": 3 }
+      ]
     },
     {
       "name": "Carrier",
@@ -310,22 +353,25 @@
       "shieldCapacity": 150,
       "defense": 5,
       "weapons": [
-        { "type": "BEAM", "dmg": 10, "shots": 2 }
+        { "type": "BEAM", "dmg": 10, "shots": 2 },
+        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 3 }
       ],
       "cargoCapacity": 600,
       "hangarCapacity": 15,
       "jumpCost": 3,
       "cost": { "metal": 300, "crystal": 150, "deuterium": 100 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 4 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 3 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 4 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 5 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 3 },
-			{ "tech": "COMPUTER_TECHNOLOGY", "level": 4 },
-			{ "tech": "BEAMS_WEAPONS", "level": 2 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 6 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 4 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 3 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 4 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 5 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 3 },
+        { "tech": "COMPUTER_TECHNOLOGY", "level": 4 },
+        { "tech": "BEAMS_WEAPONS", "level": 2 }
+      ]
     },
     {
       "name": "Cargo Support",
@@ -338,21 +384,24 @@
       "shieldCapacity": 150,
       "defense": 5,
       "weapons": [
-        { "type": "BEAM", "dmg": 10, "shots": 2 }
+        { "type": "BEAM", "dmg": 10, "shots": 2 },
+        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 2 }
       ],
       "cargoCapacity": 1000,
       "hangarCapacity": 0,
       "jumpCost": 2,
       "cost": { "metal": 300, "crystal": 100, "deuterium": 50 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 3 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 2 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 3 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 3 },
-			{ "tech": "BEAMS_WEAPONS", "level": 2 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 5 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 3 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 2 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 3 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 3 },
+        { "tech": "BEAMS_WEAPONS", "level": 2 }
+      ]
     },
     {
       "name": "Mass Hauler",
@@ -371,15 +420,17 @@
       "hangarCapacity": 0,
       "jumpCost": 3,
       "cost": { "metal": 450, "crystal": 100, "deuterium": 30 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 4 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 3 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 2 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 3 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
-			{ "tech": "BEAMS_WEAPONS", "level": 1 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 5 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 4 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 3 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 2 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 3 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
+        { "tech": "BEAMS_WEAPONS", "level": 1 }
+      ]
     },
     {
       "name": "Colonizer",
@@ -392,25 +443,28 @@
       "shieldCapacity": 100,
       "defense": 2,
       "weapons": [
-        { "type": "BEAM", "dmg": 10, "shots": 1 }
+        { "type": "BEAM", "dmg": 10, "shots": 1 },
+        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 2 }
       ],
       "cargoCapacity": 1000,
       "hangarCapacity": 6,
       "jumpCost": 5,
       "cost": { "metal": 600, "crystal": 300, "deuterium": 100 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 3 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 2 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 2 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
-			{ "tech": "BEAMS_WEAPONS", "level": 1 },
-			{ "tech": "ENERGY_TECHNOLOGY", "level": 3 },
-			{ "tech": "COMPUTER_TECHNOLOGY", "level": 2 },
-			{ "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 2 },
-			{ "tech": "ADAPTIVE_TECHNOLOGY", "level": 1 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 4 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 3 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 2 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 2 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
+        { "tech": "BEAMS_WEAPONS", "level": 1 },
+        { "tech": "ENERGY_TECHNOLOGY", "level": 3 },
+        { "tech": "COMPUTER_TECHNOLOGY", "level": 2 },
+        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 2 },
+        { "tech": "ADAPTIVE_TECHNOLOGY", "level": 1 }
+      ]
     },
     {
       "name": "Titan",
@@ -425,23 +479,26 @@
       "weapons": [
         { "type": "BEAM", "dmg": 30, "shots": 8 },
         { "type": "MISSILE", "dmg": 50, "shots": 4 },
-        { "type": "RAIL_GUN", "dmg": 20, "shots": 4 }
+        { "type": "RAIL_GUN", "dmg": 20, "shots": 4 },
+        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 4 }
       ],
       "cargoCapacity": 1000,
       "hangarCapacity": 12,
       "jumpCost": 9,
       "cost": { "metal": 1800, "crystal": 1200, "deuterium": 400 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 5 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 4 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 6 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 5 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 7 },
-			{ "tech": "BEAMS_WEAPONS", "level": 4 },
-			{ "tech": "MISSILES_WEAPONS", "level": 4 },
-			{ "tech": "RAILGUNS_WEAPONS", "level": 4 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 7 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 5 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 4 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 6 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 5 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 7 },
+        { "tech": "BEAMS_WEAPONS", "level": 4 },
+        { "tech": "MISSILES_WEAPONS", "level": 4 },
+        { "tech": "RAILGUNS_WEAPONS", "level": 4 }
+      ]
     },
     {
       "name": "Bechemoth",
@@ -462,17 +519,19 @@
       "hangarCapacity": 0,
       "jumpCost": 10,
       "cost": { "metal": 1400, "crystal": 1000, "deuterium": 800 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 5 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 4 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 6 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 6 },
-			{ "tech": "BEAMS_WEAPONS", "level": 8 },
-			{ "tech": "MISSILES_WEAPONS", "level": 6 },
-			{ "tech": "RAILGUNS_WEAPONS", "level": 4 }
-		]
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 7 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 5 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 4 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 6 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 6 },
+        { "tech": "BEAMS_WEAPONS", "level": 9 },
+        { "tech": "MISSILES_WEAPONS", "level": 7 },
+        { "tech": "RAILGUNS_WEAPONS", "level": 4 }
+      ]
     },
     {
       "name": "Fleet Carrier",
@@ -481,28 +540,68 @@
       "canJump": true,
       "size": 0,
       "evasionChance": 0,
-      "hullPointsCapacity": 600,
+      "hullPointsCapacity": 800,
       "shieldCapacity": 1000,
       "defense": 7,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 4 },
-        { "type": "MISSILE", "dmg": 30, "shots": 1 }
+        { "type": "MISSILE", "dmg": 30, "shots": 1 },
+        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 8 }
       ],
       "cargoCapacity": 1200,
       "hangarCapacity": 90,
       "jumpCost": 8,
-      "cost": { "metal": 1400, "crystal": 600, "deuterium": 400 },
-      "buildingRequirements": [],
-		"techRequirements": [
-			{ "tech": "FUSION_DRIVE", "level": 5 },
-			{ "tech": "HYPERSPACE_DRIVE", "level": 4 },
-			{ "tech": "ARMOUR_TECHNOLOGY", "level": 6 },
-			{ "tech": "MATERIAL_TECHNOLOGY", "level": 6 },
-			{ "tech": "SHIELDING_TECHNOLOGY", "level": 6 },
-			{ "tech": "BEAMS_WEAPONS", "level": 2 },
-			{ "tech": "MISSILES_WEAPONS", "level": 2 },
-			{ "tech": "COMPUTER_TECHNOLOGY", "level": 6 }
-		]
+      "cost": { "metal": 1600, "crystal": 600, "deuterium": 400 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 8 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 5 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 4 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 6 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 6 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 6 },
+        { "tech": "BEAMS_WEAPONS", "level": 2 },
+        { "tech": "MISSILES_WEAPONS", "level": 2 },
+        { "tech": "COMPUTER_TECHNOLOGY", "level": 6 }
+      ]
+    },
+    {
+      "name": "Mother Ship",
+      "imagePath": "images/ships/Death_Star.webp",
+      "hullClass": "STATION",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 10000,
+      "shieldCapacity": 20000,
+      "defense": 9,
+      "weapons": [
+        { "type": "BEAM", "dmg": 20, "shots": 40 },
+        { "type": "BEAM", "dmg": 300, "shots": 8 },
+        { "type": "MISSILE", "dmg": 30, "shots": 16 },
+        { "type": "MISSILE", "dmg": 50, "shots": 8 },
+        { "type": "RAILGUNS_WEAPONS", "dmg": 10, "shots": 16 },
+        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 20 },
+        { "type": "REPAIR_EQIPMENT", "dmg": 400, "shots": 2 }
+      ],
+      "cargoCapacity": 100000,
+      "hangarCapacity": 100,
+      "jumpCost": 100,
+      "cost": { "metal": 50000, "crystal": 50000, "deuterium": 20000 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 10 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 7 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 5 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 8 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 8 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 8 },
+        { "tech": "BEAMS_WEAPONS", "level": 5 },
+        { "tech": "MISSILES_WEAPONS", "level": 3 },
+        { "tech": "COMPUTER_TECHNOLOGY", "level": 8 }
+      ]
     }
   ]
 }

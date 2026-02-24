@@ -50,6 +50,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-02-24: Added `WeaponType.REPAIR_EQIPMENT`. Added `anomaliesAndNoise` (-60%..60% in 5% steps) and `hyperspaceParameters` (-80%..50% in 5% steps) to `Planet`, including modifier ranges for all planet types and stepped random generation.
 - 2026-02-23: Added `isCenterEdge` to `SolarSystem` and applied center-edge void reduction (50% of `voidChance`). Galaxy creation now adds a 50% void chance on galaxy edge systems. Added reports model: `PlanetaryReportData` and new report fields on `Planet` and `SolarSystem` (`lastReportData` map and `discoveredByPlayer` set). Added `GameType` enum and game type selection (PvP/PvPvE/PvE) to galaxy setup; `GalaxySetup` now includes `gameType` with validation updates on client/server. Added `PlanetImageHelper` for size-based planet images in `public/images/planet_blank`. Fixed ship blueprints `techRequirements` JSON shape.
 - 2026-02-23: Added game subpages under `/game` with child routing and default Empire Overview. Galaxy Preview moved into its own screen; Reports and Tech Overview mockups added. Game view now uses a shell + router-outlet. Added overview UI styles and kept galaxy grid styling (22px cells, hover zoom/border).
 - 2026-02-22: Galaxy Preview tweaks: larger cells (22px), scrollable grid, hover-to-reveal coords (including void), hover scale and border highlight.

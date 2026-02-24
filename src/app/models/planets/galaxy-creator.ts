@@ -68,6 +68,7 @@ export class GalaxyCreator {
         }
       }
     }
+
     //4. Apply void chance to non-void, non-center systems (with higher odds at the edge).
     for (let y = 0; y < this.galaxyHeight; y += 1) {
       for (let x = 0; x < this.galaxyWidth; x += 1) {
