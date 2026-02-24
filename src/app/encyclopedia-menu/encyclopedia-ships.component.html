@@ -17,13 +17,13 @@
           <img
             class="ship-image"
             [src]="ship.imagePath"
-            [alt]="ship.name + ' image'"
+            [alt]="ship.type + ' image'"
             [attr.loading]="isFirst ? 'eager' : 'lazy'"
           />
         </div>
         <header class="ship-card__header">
           <div>
-            <h2 class="ship-card__title">{{ ship.name }}</h2>
+            <h2 class="ship-card__title">{{ ship.type }}</h2>
           </div>
           <span class="badge" [class.badge--jump]="ship.canJump">
             {{ ship.hullClass }}

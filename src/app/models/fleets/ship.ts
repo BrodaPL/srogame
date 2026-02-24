@@ -1,12 +1,13 @@
 import { BuildingRequirement } from '../buildings/building-requirement';
 import { HullClass } from '../enums/hull-class';
+import { ShipType } from '../enums/ship-type';
 import { ResourcesPack } from '../resources-pack';
 import { TechRequirement } from '../tech/tech-requirement';
 import { Weapon } from './weapon';
 
 export class Ship {
   constructor(
-    public name: string,
+    public type: ShipType,
     public imagePath: string,
     public hullClass: HullClass,
     public canJump: boolean,
@@ -24,4 +25,3 @@ export class Ship {
     public techRequirements: TechRequirement[]
   ) {}
 }
-

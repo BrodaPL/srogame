@@ -8,17 +8,9 @@ import { Ship } from '../fleets/ship';
 import { SolarSystem } from './solar-system';
 import { Technology } from '../tech/technology';
 import { ShipInstance } from '../fleets/ship-instance';
+import { PlanetaryParameters } from './planetary-parameters';
 
-type ModifierKey =
-  | 'metalModifier'
-  | 'crystalModifier'
-  | 'deuteriumModifier'
-  | 'energyModifierRES'
-  | 'energyModifierNuclear'
-  | 'scienceModifier'
-  | 'industryModifier'
-  | 'anomaliesAndNoise'
-  | 'hyperspaceParameters';
+type ModifierKey = keyof PlanetaryParameters;
 
 type ModifierRange = {
   min: number;
@@ -47,15 +39,17 @@ export class Planet {
       new ResourcesPack(0, 0, 0),
       160,
       [],
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      new PlanetaryParameters(
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ),
       new Map<PlayerID, PlanetaryReportData>(),
       [],
       [],
@@ -88,15 +82,17 @@ export class Planet {
       new ResourcesPack(0, 0, 0),
       Planet.randomInt(90, 200),
       [],
-      Planet.randomFloat(modifierRanges.metalModifier.min, modifierRanges.metalModifier.max),
-      Planet.randomFloat(modifierRanges.crystalModifier.min, modifierRanges.crystalModifier.max),
-      Planet.randomFloat(modifierRanges.deuteriumModifier.min, modifierRanges.deuteriumModifier.max),
-      Planet.randomFloat(modifierRanges.energyModifierRES.min, modifierRanges.energyModifierRES.max),
-      Planet.randomFloat(modifierRanges.energyModifierNuclear.min, modifierRanges.energyModifierNuclear.max),
-      Planet.randomFloat(modifierRanges.scienceModifier.min, modifierRanges.scienceModifier.max),
-      Planet.randomFloat(modifierRanges.industryModifier.min, modifierRanges.industryModifier.max),
-      Planet.randomSteppedFloat(modifierRanges.anomaliesAndNoise.min, modifierRanges.anomaliesAndNoise.max, 0.05),
-      Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05),
+      new PlanetaryParameters(
+        Planet.randomFloat(modifierRanges.metalModifier.min, modifierRanges.metalModifier.max),
+        Planet.randomFloat(modifierRanges.crystalModifier.min, modifierRanges.crystalModifier.max),
+        Planet.randomFloat(modifierRanges.deuteriumModifier.min, modifierRanges.deuteriumModifier.max),
+        Planet.randomFloat(modifierRanges.energyModifierRES.min, modifierRanges.energyModifierRES.max),
+        Planet.randomFloat(modifierRanges.energyModifierNuclear.min, modifierRanges.energyModifierNuclear.max),
+        Planet.randomFloat(modifierRanges.scienceModifier.min, modifierRanges.scienceModifier.max),
+        Planet.randomFloat(modifierRanges.industryModifier.min, modifierRanges.industryModifier.max),
+        Planet.randomSteppedFloat(modifierRanges.anomaliesAndNoise.min, modifierRanges.anomaliesAndNoise.max, 0.05),
+        Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05)
+      ),
       new Map<PlayerID, PlanetaryReportData>(),
       [],
       [],
@@ -117,17 +113,7 @@ export class Planet {
     public spaceDebris: ResourcesPack,
     public size: number,
     public buildings: Building[],
-    public metalModifier: number,
-    public crystalModifier: number,
-    public deuteriumModifier: number,
-    public energyModifierRES: number,
-    public energyModifierNuclear: number,
-    public scienceModifier: number,
-    public industryModifier: number,
-    // Affects Sensor Phalanx range. -60%..60%. Each 15% also shifts espionage level. 5% steps.
-    public anomaliesAndNoise: number,
-    // -80%..50%. Affects Jumpgate + Interstellar Trade Port capacity base level. 5% steps.
-    public hyperspaceParameters: number,
+    public planetaryParameters: PlanetaryParameters,
     public lastReportData: Map<PlayerID, PlanetaryReportData>,
     public technologyQueue: Technology[],
     public buildingQueue: Building[],

@@ -1,17 +1,18 @@
-import {Ship} from './ship';
-import {TechnologyType} from '../enums/technology-type';
+import { Ship } from './ship';
+import { ShipType } from '../enums/ship-type';
+import { TechnologyType } from '../enums/technology-type';
 
 export class ShipBlueprints {
-  constructor(public shipsMap: Map<string, Ship> = new Map()) {
+  constructor(public shipsMap: Map<ShipType, Ship> = new Map()) {
 
   }
 
   add(ship: Ship): void {
-    this.shipsMap.set(ship.name, ship);
+    this.shipsMap.set(ship.type, ship);
   }
 
-  get(name: string): Ship | undefined {
-    return this.shipsMap.get(name);
+  get(type: ShipType): Ship | undefined {
+    return this.shipsMap.get(type);
   }
 
   techUpdate(tech: TechnologyType): void {
@@ -41,4 +42,3 @@ export class ShipBlueprints {
 
   }
 }
-
