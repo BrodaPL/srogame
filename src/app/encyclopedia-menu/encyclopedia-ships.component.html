@@ -17,13 +17,13 @@
           <img
             class="ship-image"
             [src]="ship.imagePath"
-            [alt]="ship.type + ' image'"
+            [alt]="ship.getName() + ' image'"
             [attr.loading]="isFirst ? 'eager' : 'lazy'"
           />
         </div>
         <header class="ship-card__header">
           <div>
-            <h2 class="ship-card__title">{{ ship.type }}</h2>
+            <h2 class="ship-card__title">{{ ship.getName() }}</h2>
           </div>
           <span class="badge" [class.badge--jump]="ship.canJump">
             {{ ship.hullClass }}
@@ -82,6 +82,31 @@
           </ul>
           <ng-template #noWeapons>
             <p class="ship-empty">Unarmed</p>
+          </ng-template>
+        </div>
+
+        <div class="ship-section">
+          <p class="ship-section__title">Requirements</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">Buildings</p>
+          <ul class="weapon-list" *ngIf="ship.buildingRequirements.length > 0; else noBuildingReq">
+            <li class="weapon-item" *ngFor="let requirement of ship.buildingRequirements">
+              <span class="weapon-chip">{{ requirement.building }}</span>
+              <span class="weapon-meta">Level {{ requirement.level }}</span>
+            </li>
+          </ul>
+          <ng-template #noBuildingReq>
+            <p class="ship-empty">No building requirements</p>
+          </ng-template>
+
+          <p class="ship-card__subtitle ship-card__subtitle--wide">Technologies</p>
+          <ul class="weapon-list" *ngIf="ship.techRequirements.length > 0; else noTechReq">
+            <li class="weapon-item" *ngFor="let requirement of ship.techRequirements">
+              <span class="weapon-chip">{{ requirement.tech }}</span>
+              <span class="weapon-meta">Level {{ requirement.level }}</span>
+            </li>
+          </ul>
+          <ng-template #noTechReq>
+            <p class="ship-empty">No tech requirements</p>
           </ng-template>
         </div>
 

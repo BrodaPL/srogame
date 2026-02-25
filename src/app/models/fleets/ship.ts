@@ -24,4 +24,8 @@ export class Ship {
     public buildingRequirements: BuildingRequirement[],
     public techRequirements: TechRequirement[]
   ) {}
+
+  getName(): string {
+    return this.type;
+  }
 }

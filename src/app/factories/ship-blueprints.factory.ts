@@ -16,7 +16,7 @@ interface ShipBlueprintsJson {
 }
 
 interface ShipBlueprintJson {
-  name: string;
+  type: string;
   imagePath?: string;
   hullClass: string;
   canJump: boolean;
@@ -60,23 +60,23 @@ export class ShipBlueprintsFactory {
   private static readonly defaultImagePath = 'images/ships/Light_Fighter.webp';
   private static readonly shipImageMap: Partial<Record<ShipType, string>> = {
     [ShipType.FIGHTER]: 'images/ships/Light_Fighter.webp',
-    [ShipType.ASSUALT_FIGHTER]: 'images/ships/Heavy_Fighter.webp',
-    [ShipType.CORVET]: 'images/ships/Cruiser.webp',
-    [ShipType.SPY_PROB]: 'images/ships/Espionage_Probe.webp',
+    [ShipType.ASSAULT_FIGHTER]: 'images/ships/Heavy_Fighter.webp',
+    [ShipType.CORVETTE]: 'images/ships/Cruiser.webp',
+    [ShipType.SPY_PROBE]: 'images/ships/Espionage_Probe.webp',
     [ShipType.REPAIR_DRONE]: 'images/ships/Light_Fighter.webp',
-    [ShipType.CRUSER]: 'images/ships/Cruiser.webp',
+    [ShipType.CRUISER]: 'images/ships/Cruiser.webp',
     [ShipType.BATTLE_SHIP]: 'images/ships/Battleship.webp',
     [ShipType.FRIGATE]: 'images/ships/Battlecruiser.webp',
     [ShipType.TRANSPORTER]: 'images/ships/Small_Cargo.webp',
-    [ShipType.BATTLE_CRUSER]: 'images/ships/Battlecruiser.webp',
+    [ShipType.BATTLE_CRUISER]: 'images/ships/Battlecruiser.webp',
     [ShipType.DESTROYER]: 'images/ships/Destroyer.webp',
-    [ShipType.DREADNOTH]: 'images/ships/Death_Star.webp',
+    [ShipType.DREADNOUGHT]: 'images/ships/Death_Star.webp',
     [ShipType.CARRIER]: 'images/ships/Reaper.webp',
     [ShipType.CARGO_SUPPORT]: 'images/ships/Large_Cargo.webp',
     [ShipType.MASS_HAULER]: 'images/ships/Large_Cargo.webp',
     [ShipType.COLONIZER]: 'images/ships/Colony_Ship.webp',
     [ShipType.TITAN]: 'images/ships/Death_Star.webp',
-    [ShipType.BECHEMOTH]: 'images/ships/Death_Star.webp',
+    [ShipType.BEHEMOTH]: 'images/ships/Death_Star.webp',
     [ShipType.FLEET_CARRIER]: 'images/ships/Pathfinder.webp',
     [ShipType.MOTHER_SHIP]: 'images/ships/Death_Star.webp'
   };
@@ -99,7 +99,7 @@ export class ShipBlueprintsFactory {
     const weapons = entry.weapons ?? [];
     const buildingRequirements = entry.buildingRequirements ?? [];
     const techRequirements = entry.techRequirements ?? [];
-    const type = this.parseEnumKeyOrValue(ShipType, entry.name, 'ShipType');
+    const type = this.parseEnumKey(ShipType, entry.type, 'ShipType');
     const imagePath = this.resolveImagePath(entry, type);
 
     return new Ship(
@@ -152,20 +152,4 @@ export class ShipBlueprintsFactory {
     throw new Error(`Unknown ${label} key: ${key}`);
   }
 
-  private static parseEnumKeyOrValue<T extends string>(
-    enumObject: Record<string, T>,
-    keyOrValue: string,
-    label: string
-  ): T {
-    if (keyOrValue in enumObject) {
-      return enumObject[keyOrValue];
-    }
-
-    const match = Object.values(enumObject).find((value) => value === keyOrValue);
-    if (match) {
-      return match as T;
-    }
-
-    throw new Error(`Unknown ${label} key or value: ${keyOrValue}`);
-  }
 }

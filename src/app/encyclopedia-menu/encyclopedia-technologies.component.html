@@ -39,6 +39,31 @@
         </div>
 
         <div class="ship-section">
+          <p class="ship-section__title">Requirements</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">Buildings</p>
+          <ul class="weapon-list" *ngIf="tech.buildingRequirements.length > 0; else noBuildingReq">
+            <li class="weapon-item" *ngFor="let requirement of tech.buildingRequirements">
+              <span class="weapon-chip">{{ requirement.building }}</span>
+              <span class="weapon-meta">Level {{ requirement.level }}</span>
+            </li>
+          </ul>
+          <ng-template #noBuildingReq>
+            <p class="ship-empty">No building requirements</p>
+          </ng-template>
+
+          <p class="ship-card__subtitle ship-card__subtitle--wide">Technologies</p>
+          <ul class="weapon-list" *ngIf="tech.techRequirements.length > 0; else noTechReq">
+            <li class="weapon-item" *ngFor="let requirement of tech.techRequirements">
+              <span class="weapon-chip">{{ requirement.tech }}</span>
+              <span class="weapon-meta">Level {{ requirement.level }}</span>
+            </li>
+          </ul>
+          <ng-template #noTechReq>
+            <p class="ship-empty">No tech requirements</p>
+          </ng-template>
+        </div>
+
+        <div class="ship-section">
           <p class="ship-section__title">Cost</p>
           <div class="cost-row">
             <span class="cost-chip">

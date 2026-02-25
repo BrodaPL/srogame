@@ -1,7 +1,7 @@
 {
   "ships": [
     {
-      "name": "Fighter",
+      "type": "FIGHTER",
       "imagePath": "images/ships/Light_Fighter.webp",
       "hullClass": "SMALL",
       "canJump": false,
@@ -26,7 +26,7 @@
       ]
     },
     {
-      "name": "Assualt Fighter",
+      "type": "ASSAULT_FIGHTER",
       "imagePath": "images/ships/Heavy_Fighter.webp",
       "hullClass": "SMALL",
       "canJump": false,
@@ -51,7 +51,7 @@
       ]
     },
     {
-      "name": "Corvet",
+      "type": "CORVETTE",
       "imagePath": "images/ships/Cruiser.webp",
       "hullClass": "SMALL",
       "canJump": false,
@@ -80,7 +80,7 @@
       ]
     },
     {
-      "name": "Spy Prob",
+      "type": "SPY_PROBE",
       "imagePath": "images/ships/Espionage_Probe.webp",
       "hullClass": "SMALL",
       "canJump": true,
@@ -105,7 +105,7 @@
       ]
     },
     {
-      "name": "Repair Drone",
+      "type": "REPAIR_DRONE",
       "imagePath": "images/ships/Light_Fighter.webp",
       "hullClass": "SMALL",
       "canJump": false,
@@ -126,7 +126,7 @@
       ]
     },
     {
-      "name": "Cruser",
+      "type": "CRUISER",
       "imagePath": "images/ships/Cruiser.webp",
       "hullClass": "MEDIUM",
       "canJump": true,
@@ -158,7 +158,7 @@
       ]
     },
     {
-      "name": "Battle Ship",
+      "type": "BATTLE_SHIP",
       "imagePath": "images/ships/Battleship.webp",
       "hullClass": "MEDIUM",
       "canJump": true,
@@ -188,7 +188,7 @@
       ]
     },
     {
-      "name": "Frigate",
+      "type": "FRIGATE",
       "imagePath": "images/ships/Battlecruiser.webp",
       "hullClass": "MEDIUM",
       "canJump": true,
@@ -220,7 +220,7 @@
       ]
     },
     {
-      "name": "Transporter",
+      "type": "TRANSPORTER",
       "imagePath": "images/ships/Small_Cargo.webp",
       "hullClass": "MEDIUM",
       "canJump": true,
@@ -248,7 +248,7 @@
       ]
     },
     {
-      "name": "Battle Cruser",
+      "type": "BATTLE_CRUISER",
       "imagePath": "images/ships/Battlecruiser.webp",
       "hullClass": "BIG",
       "canJump": true,
@@ -281,7 +281,7 @@
       ]
     },
     {
-      "name": "Destroyer",
+      "type": "DESTROYER",
       "imagePath": "images/ships/Destroyer.webp",
       "hullClass": "BIG",
       "canJump": true,
@@ -312,7 +312,7 @@
       ]
     },
     {
-      "name": "Dreadnoth",
+      "type": "DREADNOUGHT",
       "imagePath": "images/ships/Death_Star.webp",
       "hullClass": "BIG",
       "canJump": true,
@@ -343,7 +343,7 @@
       ]
     },
     {
-      "name": "Carrier",
+      "type": "CARRIER",
       "imagePath": "images/ships/Reaper.webp",
       "hullClass": "BIG",
       "canJump": true,
@@ -374,7 +374,7 @@
       ]
     },
     {
-      "name": "Cargo Support",
+      "type": "CARGO_SUPPORT",
       "imagePath": "images/ships/Large_Cargo.webp",
       "hullClass": "BIG",
       "canJump": true,
@@ -404,7 +404,7 @@
       ]
     },
     {
-      "name": "Mass Hauler",
+      "type": "MASS_HAULER",
       "imagePath": "images/ships/Large_Cargo.webp",
       "hullClass": "BIG",
       "canJump": true,
@@ -433,7 +433,7 @@
       ]
     },
     {
-      "name": "Colonizer",
+      "type": "COLONIZER",
       "imagePath": "images/ships/Colony_Ship.webp",
       "hullClass": "BIG",
       "canJump": true,
@@ -467,7 +467,7 @@
       ]
     },
     {
-      "name": "Titan",
+      "type": "TITAN",
       "imagePath": "images/ships/Death_Star.webp",
       "hullClass": "TITAN",
       "canJump": true,
@@ -501,7 +501,7 @@
       ]
     },
     {
-      "name": "Bechemoth",
+      "type": "BEHEMOTH",
       "imagePath": "images/ships/Death_Star.webp",
       "hullClass": "TITAN",
       "canJump": true,
@@ -534,7 +534,7 @@
       ]
     },
     {
-      "name": "Fleet Carrier",
+      "type": "FLEET_CARRIER",
       "imagePath": "images/ships/Pathfinder.webp",
       "hullClass": "TITAN",
       "canJump": true,
@@ -567,7 +567,7 @@
       ]
     },
     {
-      "name": "Mother Ship",
+      "type": "MOTHER_SHIP",
       "imagePath": "images/ships/Death_Star.webp",
       "hullClass": "STATION",
       "canJump": true,
@@ -581,7 +581,7 @@
         { "type": "BEAM", "dmg": 300, "shots": 8 },
         { "type": "MISSILE", "dmg": 30, "shots": 16 },
         { "type": "MISSILE", "dmg": 50, "shots": 8 },
-        { "type": "RAILGUNS_WEAPONS", "dmg": 10, "shots": 16 },
+        { "type": "RAIL_GUN", "dmg": 10, "shots": 16 },
         { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 20 },
         { "type": "REPAIR_EQIPMENT", "dmg": 400, "shots": 2 }
       ],
