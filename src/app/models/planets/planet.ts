@@ -1,4 +1,5 @@
 import { Building } from '../buildings/building';
+import { BuildingType } from '../enums/building-type';
 import { Fleet } from '../fleets/fleet';
 import { PlanetType } from '../enums/planet-type';
 import { PlayerID } from '../player-id';
@@ -38,7 +39,7 @@ export class Planet {
       [],
       new ResourcesPack(0, 0, 0),
       160,
-      [],
+      new Map<BuildingType, number>(),
       new PlanetaryParameters(
         0,
         0,
@@ -81,7 +82,7 @@ export class Planet {
       [],
       new ResourcesPack(0, 0, 0),
       Planet.randomInt(90, 200),
-      [],
+      new Map<BuildingType, number>(),
       new PlanetaryParameters(
         Planet.randomFloat(modifierRanges.metalModifier.min, modifierRanges.metalModifier.max),
         Planet.randomFloat(modifierRanges.crystalModifier.min, modifierRanges.crystalModifier.max),
@@ -112,7 +113,7 @@ export class Planet {
     public fleets: Fleet[],
     public spaceDebris: ResourcesPack,
     public size: number,
-    public buildings: Building[],
+    public buildings: Map<BuildingType, number>,
     public planetaryParameters: PlanetaryParameters,
     public lastReportData: Map<PlayerID, PlanetaryReportData>,
     public technologyQueue: Technology[],
@@ -120,6 +121,70 @@ export class Planet {
     public shipyardQueue: Ship[],
     public orbitShips: ShipInstance[]
   ) {}
+
+  public getBuildingLevel(type: BuildingType): number {
+    return this.buildings.get(type) ?? 0;
+  }
+
+  public setBuildingLevel(type: BuildingType, level: number): void {
+    const normalized = Math.max(0, Math.floor(level));
+    if (normalized === 0) {
+      this.buildings.delete(type);
+      return;
+    }
+
+    this.buildings.set(type, normalized);
+  }
+
+  public addBuildingLevel(type: BuildingType, delta = 1): number {
+    const next = this.getBuildingLevel(type) + delta;
+    this.setBuildingLevel(type, next);
+    return this.getBuildingLevel(type);
+  }
+
+  public static buildingLevelsFromRecord(
+    record: Record<string, number> | null | undefined
+  ): Map<BuildingType, number> {
+    const map = new Map<BuildingType, number>();
+    if (!record) {
+      return map;
+    }
+
+    for (const [key, value] of Object.entries(record)) {
+      if (!Number.isFinite(value)) {
+        continue;
+      }
+
+      const normalized = Math.max(0, Math.floor(value));
+      if (normalized === 0) {
+        continue;
+      }
+
+      map.set(key as BuildingType, normalized);
+    }
+
+    return map;
+  }
+
+  public static buildingLevelsToRecord(
+    map: Map<BuildingType, number>
+  ): Record<string, number> {
+    const record: Record<string, number> = {};
+    for (const [type, level] of map.entries()) {
+      if (!Number.isFinite(level)) {
+        continue;
+      }
+
+      const normalized = Math.max(0, Math.floor(level));
+      if (normalized === 0) {
+        continue;
+      }
+
+      record[type] = normalized;
+    }
+
+    return record;
+  }
 
   // Per-planet type ranges. Keep ranges in percent, converted to multipliers via percentRange().
   private static readonly PLANET_MODIFIER_RANGES: Record<

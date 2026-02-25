@@ -1,0 +1,22 @@
+export enum ShipType {
+  FIGHTER = 'Fighter',
+  ASSAULT_FIGHTER = 'Assault Fighter',
+  CORVETTE = 'Corvette',
+  SPY_PROBE = 'Spy Probe',
+  REPAIR_DRONE = 'Repair Drone',
+  CRUISER = 'Cruiser',
+  BATTLE_SHIP = 'Battle Ship',
+  FRIGATE = 'Frigate',
+  TRANSPORTER = 'Transporter',
+  BATTLE_CRUISER = 'Battle Cruiser',
+  DESTROYER = 'Destroyer',
+  DREADNOUGHT = 'Dreadnought',
+  CARRIER = 'Carrier',
+  CARGO_SUPPORT = 'Cargo Support',
+  MASS_HAULER = 'Mass Hauler',
+  COLONIZER = 'Colonizer',
+  TITAN = 'Titan',
+  BEHEMOTH = 'Behemoth',
+  FLEET_CARRIER = 'Fleet Carrier',
+  MOTHER_SHIP = 'Mother Ship'
+}

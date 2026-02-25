@@ -1,6 +1,6 @@
-import { Building } from '../buildings/building';
+import { BuildingType } from '../enums/building-type';
 import { ResourcesPack } from '../resources-pack';
-import { Technology } from '../tech/technology';
+import { TechnologyType } from '../enums/technology-type';
 import { ShipInstance } from '../fleets/ship-instance';
 import { DefencesQueue } from './defences-queue';
 import { DefenceBuildingInstances } from './defence-building-instances';
@@ -18,9 +18,9 @@ export class PlanetaryReportData {
     public averageTechLevel: number,
     public totalDefencesAmount: number,
     public totalShipsAmount: number,
-    public buildingsLevels: Building[],
+    public buildingsLevels: Map<BuildingType, number>,
     public resourcesAmount: ResourcesPack,
-    public techLevels: Technology[],
+    public techLevels: Map<TechnologyType, number>,
     public defences: DefenceBuildingInstances[],
     public ships: ShipInstance[],
     public shipyardProduction: ShipyardQueue,
