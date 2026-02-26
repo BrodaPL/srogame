@@ -50,6 +50,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-02-26: Updated `RngResourceGenerator` scaling to `base * (RESOURCE_LEVEL_GROWTH ** level)` with a shared `RESOURCE_LEVEL_GROWTH` constant; adjusted resource generator tests to use the constant and float comparisons.
 - 2026-02-25: Refactored `Planet.buildings` and `Player.tech` to maps of enum to level with helper accessors and serialization helpers. Updated `PlanetaryReportData` level fields to maps. Implemented RNG building/technology generators to return map levels driven by `LevelMappings`, and added log-style unit tests for both generators.
 - 2026-02-25: Added RNG generator stubs (buildings/ships/tech/resources). Implemented `RngResourceGenerator.generateWithModifiersAndRng` to apply ±percent randomness per resource.
 - 2026-02-24: Expanded `PlanetaryReportData` with report metadata, averages, and detailed lists. Added placeholder report queue/defence classes: `DefenceBuildingInstances`, `ShipyardQueue`, `DefencesQueue`, `ResearchQueue`.

@@ -1,0 +1,43 @@
+<main class="page">
+  <section class="panel">
+    <header class="panel__header">
+      <p class="eyebrow">Encyclopedia</p>
+      <h1>Mechanics</h1>
+      <p class="subtitle">How the turn loop, economy, and systems behave in SROGame.</p>
+    </header>
+
+    <div class="encyclopedia-toolbar">
+      <p class="encyclopedia-meta">{{ mechanics.length }} mechanics topics</p>
+      <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+    </div>
+
+    <div class="encyclopedia-grid">
+      <article class="ship-card" *ngFor="let mechanic of mechanics">
+        <header class="ship-card__header">
+          <div>
+            <h2 class="ship-card__title">{{ mechanic.title }}</h2>
+            <p class="ship-card__subtitle ship-card__subtitle--wide">{{ mechanic.summary }}</p>
+          </div>
+        </header>
+
+        <div class="ship-section" *ngIf="mechanic.tags?.length">
+          <p class="ship-section__title">Focus</p>
+          <ul class="weapon-list">
+            <li class="weapon-item" *ngFor="let tag of mechanic.tags">
+              <span class="weapon-chip">{{ tag }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="ship-section">
+          <p class="ship-section__title">Notes</p>
+          <ul class="weapon-list">
+            <li class="weapon-item" *ngFor="let note of mechanic.bullets">
+              <span class="weapon-meta">{{ note }}</span>
+            </li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>

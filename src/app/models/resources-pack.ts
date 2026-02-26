@@ -51,4 +51,12 @@ export class ResourcesPack {
       this.deuterium - pack.deuterium >= 0
     );
   }
+
+  public getTotalResourceAmount(): number {
+    return this.metal + this.crystal + this.deuterium;
+  }
+
+  public getTotalValuedResourceAmount(): number {
+    return this.metal + this.crystal * 2 + this.deuterium * 3;
+  }
 }

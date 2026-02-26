@@ -1,6 +1,7 @@
 import { TechnologyType } from '../models/enums/technology-type';
 import { LevelMappings } from './level-mappings';
 
+// Generates technology levels based on player level, availability, and weight mapping.
 export class RngTechnologyGenerator {
   generate(level: number): Map<TechnologyType, number> {
     const levels = new Map<TechnologyType, number>();
@@ -19,6 +20,7 @@ export class RngTechnologyGenerator {
     availableFromLevel: number,
     weight: number
   ): number {
+    // Unavailable tech stays at level 0.
     if (availableFromLevel > playerLevel) {
       return 0;
     }

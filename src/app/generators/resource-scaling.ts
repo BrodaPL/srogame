@@ -1,0 +1,1 @@
+export const RESOURCE_LEVEL_GROWTH = 1.55;

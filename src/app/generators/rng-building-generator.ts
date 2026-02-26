@@ -1,6 +1,7 @@
 import { BuildingType } from '../models/enums/building-type';
 import { LevelMappings } from './level-mappings';
 
+// Generates building levels based on player level, availability, and weight mapping.
 export class RngBuildingGenerator {
   generate(level: number): Map<BuildingType, number> {
     const levels = new Map<BuildingType, number>();
@@ -19,6 +20,7 @@ export class RngBuildingGenerator {
     availableFromLevel: number,
     weight: number
   ): number {
+    // Unavailable buildings stay at level 0.
     if (availableFromLevel > playerLevel) {
       return 0;
     }
