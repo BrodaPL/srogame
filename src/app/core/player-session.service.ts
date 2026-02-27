@@ -38,8 +38,8 @@ export class PlayerSessionService {
       !!session &&
       Number.isInteger(session.id) &&
       session.id >= 0 &&
-      typeof session.name === 'string' &&
-      session.name.trim().length > 0 &&
+      typeof session.playerName === 'string' &&
+      session.playerName.trim().length > 0 &&
       typeof session.token === 'string' &&
       session.token.trim().length > 0
     );

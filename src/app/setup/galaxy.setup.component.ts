@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
-import { PlayerSessionService } from '../core/player-session.service';
+import { AuthStateService } from '../core/auth-state.service';
 import { NAMES_LIST } from '../models/enums/names-list';
 import { GameType } from '../models/enums/game-type';
 import { GalaxySetup } from '../models/game-api-types';
@@ -11,7 +11,6 @@ import { ResourcesPack } from '../models/resources-pack';
 
 type GalaxySetupForm = {
   gameType: GameType;
-  playerName: string;
   galaxyName: string;
   galaxyWidth: string;
   galaxyHeight: string;
@@ -36,6 +35,7 @@ type GalaxySetupForm = {
 })
 export class GalaxySetupComponent {
   protected readonly savedConfig = signal<GalaxySetup | null>(null);
+  protected readonly session: AuthStateService['session'];
   protected isStarting = false;
   protected startError: string | null = null;
   protected form: GalaxySetupForm;
@@ -44,8 +44,9 @@ export class GalaxySetupComponent {
     private readonly router: Router,
     private readonly gameState: GameStateService,
     private readonly gameApi: GameApiService,
-    private readonly playerSession: PlayerSessionService
+    private readonly authState: AuthStateService
   ) {
+    this.session = this.authState.session;
     this.form = this.createDefaultForm();
 
     const stored = localStorage.getItem('srogame:setup');
@@ -57,7 +58,7 @@ export class GalaxySetupComponent {
       const parsed = JSON.parse(stored) as GalaxySetup;
       if (this.isValidConfig(parsed)) {
         this.savedConfig.set(parsed);
-        this.form = this.formFromConfig(parsed, this.form.playerName);
+        this.form = this.formFromConfig(parsed);
       }
     } catch {
       localStorage.removeItem('srogame:setup');
@@ -66,7 +67,6 @@ export class GalaxySetupComponent {
 
   protected canStart(): boolean {
     const gameTypeValid = this.isValidGameType(this.form.gameType);
-    const playerName = this.form.playerName.trim();
     const name = this.form.galaxyName.trim();
     const width = this.parseIntegerInRange(this.form.galaxyWidth, 10, 100);
     const height = this.parseIntegerInRange(this.form.galaxyHeight, 10, 100);
@@ -89,7 +89,7 @@ export class GalaxySetupComponent {
 
     return (
       gameTypeValid &&
-      Boolean(playerName) &&
+      Boolean(this.session()) &&
       Boolean(name) &&
       width !== null &&
       height !== null &&
@@ -113,7 +113,12 @@ export class GalaxySetupComponent {
       return;
     }
 
-    const playerName = this.form.playerName.trim();
+    const session = this.session();
+    if (!session) {
+      this.startError = 'Login required to start a game.';
+      return;
+    }
+
     const config: GalaxySetup = {
       gameType: this.form.gameType,
       galaxyName: this.form.galaxyName.trim(),
@@ -140,10 +145,9 @@ export class GalaxySetupComponent {
     this.isStarting = true;
     this.startError = null;
 
-    this.gameApi.startGame({ setup: config, playerName }).subscribe({
+    this.gameApi.startGame({ setup: config }, session.token).subscribe({
       next: (response) => {
         localStorage.setItem('srogame:setup', JSON.stringify(config));
-        this.playerSession.save(response.player);
         this.gameState.setGalaxy(response.galaxy);
         this.savedConfig.set(config);
         this.isStarting = false;
@@ -157,10 +161,8 @@ export class GalaxySetupComponent {
   }
 
   private createDefaultForm(): GalaxySetupForm {
-    const existingPlayer = this.playerSession.load();
     return {
       gameType: GameType.PVE,
-      playerName: existingPlayer?.name ?? 'Commander',
       galaxyName: this.randomGalaxyName(),
       galaxyWidth: '25',
       galaxyHeight: '20',
@@ -179,10 +181,9 @@ export class GalaxySetupComponent {
     };
   }
 
-  private formFromConfig(config: GalaxySetup, playerName: string): GalaxySetupForm {
+  private formFromConfig(config: GalaxySetup): GalaxySetupForm {
     return {
       gameType: this.normalizeGameType(config.gameType),
-      playerName,
       galaxyName: config.galaxyName,
       galaxyWidth: String(config.galaxyWidth),
       galaxyHeight: String(config.galaxyHeight),

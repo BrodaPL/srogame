@@ -1,6 +1,5 @@
 import { SolarSystem } from './solar-system';
 import { Player } from '../player';
-import { PlayerID } from '../player-id';
 import { NAMES_LIST } from '../enums/names-list';
 
 export class Galaxy {
@@ -29,10 +28,10 @@ export class Galaxy {
     public name: string,
     public players: Player[],
     public stars: SolarSystem[][],
-    public humanPlayerMap: Map<PlayerID, Player> = new Map(),
-    public botPlayerMap: Map<PlayerID, Player> = new Map(),
-    public neutralPlayerMap: Map<PlayerID, Player> = new Map(),
-    public playerNameMap: Map<string, PlayerID> = new Map()
+    public humanPlayerMap: Map<number, Player> = new Map(),
+    public botPlayerMap: Map<number, Player> = new Map(),
+    public neutralPlayerMap: Map<number, Player> = new Map(),
+    public playerNameMap: Map<string, number> = new Map()
   ) {}
 
   private static shuffleInPlace(values: string[]): void {

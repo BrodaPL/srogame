@@ -22,8 +22,18 @@ export type GalaxySetup = {
 
 export type PlayerSession = {
   id: number;
-  name: string;
+  playerName: string;
   token: string;
+};
+
+export type RegisterRequest = {
+  playerName: string;
+  password: string;
+};
+
+export type LoginRequest = {
+  playerName: string;
+  password: string;
 };
 
 export type GalaxySystemSnapshot = {
@@ -42,7 +52,6 @@ export type GalaxySnapshot = {
 
 export type StartGameRequest = {
   setup: GalaxySetup;
-  playerName: string;
 };
 
 export type StartGameResponse = {

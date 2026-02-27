@@ -7,12 +7,13 @@ This file captures session context for collaborators and future AI agents.
 - Stack: Angular (standalone components), TypeScript
 - Purpose: Browser game similar to OGame but simplified, turn-based (not real-time), supports single-player and small-scale multiplayer. PvE is primary, PvP is possible. Enemy AI will be simplistic and RNG-driven with scaling.
 - Secondary purpose: Learning TypeScript and Angular through building the game.
-- Persistence (current): Uses browser localStorage key `srogame:setup` and `srogame:player`. Galaxy is held in server memory and fetched via API.
+- Persistence (current): Uses browser localStorage key `srogame:setup` and `srogame:player` (auth session). Galaxy is held in server memory and fetched via API. Accounts + sessions are stored in `server/data/auth.json`.
 
 ## Current Behavior
 - Route `/` shows main menu (load, singleplayer, multiplayer, encyclopedia, help/about).
-- Route `/setup` shows setup form (player name, game type, starting metal/crystal/deuterium).
+- Route `/setup` shows setup form (game type, starting metal/crystal/deuterium) and requires login; player name is read-only from session.
 - Route `/game` shows game view if config exists, otherwise prompts to go to setup. Shows a galaxy preview grid when in-memory galaxy exists.
+- Route `/login` shows login/register form.
 - Route `/encyclopedia` shows encyclopedia menu with ships/buildings/technologies links.
 - Routes `/load`, `/multiplayer`, `/help` are placeholders.
 - Route `/encyclopedia/ships` shows ship cards sourced from ship blueprints (images + stats + costs).
@@ -32,7 +33,7 @@ This file captures session context for collaborators and future AI agents.
 - Setup UI + logic: `src/app/setup/setup.component.ts`, `src/app/setup/setup.component.html` (legacy)
 - Galaxy setup UI + logic: `src/app/setup/galaxy.setup.component.ts`, `src/app/setup/galaxy.setup.component.html`
 - Game UI + logic: `src/app/game/game.component.ts`, `src/app/game/game.component.html`
-- Models (core): `src/app/models/resources-pack.ts`, `src/app/models/player-id.ts`, `src/app/models/player.ts`, `src/app/models/game-api-types.ts`
+- Models (core): `src/app/models/resources-pack.ts`, `src/app/models/player.ts`, `src/app/models/game-api-types.ts`
 - Models (enums): `src/app/models/enums/building-type.ts`, `src/app/models/enums/technology-type.ts`, `src/app/models/enums/weapon-type.ts`, `src/app/models/enums/hull-class.ts`, `src/app/models/enums/planet-type.ts`, `src/app/models/enums/player-type.ts`, `src/app/models/enums/game-type.ts`, `src/app/models/enums/names-list.ts`
 - Models (buildings): `src/app/models/buildings/building.ts`, `src/app/models/buildings/building-blueprints.ts`, `src/app/models/buildings/building-requirement.ts`
 - Models (fleets): `src/app/models/fleets/fleet.ts`, `src/app/models/fleets/ship.ts`, `src/app/models/fleets/ship-instance.ts`, `src/app/models/fleets/ship-group.ts`, `src/app/models/fleets/ship-blueprints.ts`, `src/app/models/fleets/weapon.ts`, `src/app/models/fleets/destination.ts`
@@ -40,8 +41,9 @@ This file captures session context for collaborators and future AI agents.
 - Models (tech): `src/app/models/tech/technology.ts`, `src/app/models/tech/technology-blueprints.ts`, `src/app/models/tech/tech-requirement.ts`
 - Logging: `src/app/core/logger.ts`
 - In-memory state: `src/app/core/game-state.service.ts`
-- API client: `src/app/core/game-api.service.ts`, `src/app/core/player-session.service.ts`, `src/app/models/game-api-types.ts`
-- Server (Node + Express): `server/src/index.ts` (in-memory galaxy, start + state endpoints)
+- API client: `src/app/core/game-api.service.ts`, `src/app/core/auth-api.service.ts`, `src/app/core/auth-state.service.ts`, `src/app/core/player-session.service.ts`, `src/app/models/game-api-types.ts`
+- Auth UI: `src/app/auth/auth.component.ts`, `src/app/auth/auth.component.html`
+- Server (Node + Express): `server/src/index.ts` (auth endpoints, in-memory galaxy, start + state endpoints)
 
 ## Dev Commands
 - `npm run start` (ng serve)
@@ -50,6 +52,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-02-27: Removed `PlayerID` wrapper in favor of `playerId: number` and `playerName: string`, renamed ownership fields to `ownerId`, and made `playerName` consistent in API/session models. Added JSON-backed auth (register/login/me/logout), auth UI at `/login`, main menu login status + logout, and enforced auth for game start/state. Implemented case-insensitive playerName uniqueness on server. Added `GAME_DESIGN_DOC_TEMPLATE.md`.
 - 2026-02-26: Updated `RngResourceGenerator` scaling to `base * (RESOURCE_LEVEL_GROWTH ** level)` with a shared `RESOURCE_LEVEL_GROWTH` constant; adjusted resource generator tests to use the constant and float comparisons.
 - 2026-02-25: Refactored `Planet.buildings` and `Player.tech` to maps of enum to level with helper accessors and serialization helpers. Updated `PlanetaryReportData` level fields to maps. Implemented RNG building/technology generators to return map levels driven by `LevelMappings`, and added log-style unit tests for both generators.
 - 2026-02-25: Added RNG generator stubs (buildings/ships/tech/resources). Implemented `RngResourceGenerator.generateWithModifiersAndRng` to apply ±percent randomness per resource.

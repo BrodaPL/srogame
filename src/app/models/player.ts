@@ -2,11 +2,11 @@ import { Planet } from './planets/planet';
 import { TechnologyType } from './enums/technology-type';
 import { Fleet } from './fleets/fleet';
 import { PlayerType } from './enums/player-type';
-import { PlayerID } from './player-id';
 
 export class Player {
   constructor(
-    public playerId: PlayerID,
+    public playerId: number,
+    public playerName: string,
     public planets: Planet[],
     public tech: Map<TechnologyType, number>,
     public fleets: Fleet[],

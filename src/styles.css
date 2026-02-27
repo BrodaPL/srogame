@@ -418,6 +418,16 @@ app-root {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
+.readonly-value {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+  font-family: var(--font-mono), serif;
+  background: var(--surface-strong);
+  color: var(--ink);
+}
+
 .setup-form select {
   border-radius: 14px;
   border: 1px solid var(--line);

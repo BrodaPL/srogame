@@ -5,8 +5,7 @@ import {
   StartGameRequest,
   StartGameResponse
 } from '../models/game-api-types';
-
-const API_BASE_URL = 'http://localhost:3000/api';
+import { API_BASE_URL } from './api-constants';
 
 @Injectable({
   providedIn: 'root'
@@ -14,14 +13,24 @@ const API_BASE_URL = 'http://localhost:3000/api';
 export class GameApiService {
   constructor(private readonly http: HttpClient) {}
 
-  public startGame(request: StartGameRequest) {
-    return this.http.post<StartGameResponse>(`${API_BASE_URL}/game/start`, request);
+  public startGame(request: StartGameRequest, token: string) {
+    return this.http.post<StartGameResponse>(
+      `${API_BASE_URL}/game/start`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
   }
 
   public getGameState(token: string) {
-    const headers = new HttpHeaders({
+    return this.http.get<GameStateResponse>(
+      `${API_BASE_URL}/game/state`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  private authHeaders(token: string): HttpHeaders {
+    return new HttpHeaders({
       Authorization: `Bearer ${token}`
     });
-    return this.http.get<GameStateResponse>(`${API_BASE_URL}/game/state`, { headers });
   }
 }

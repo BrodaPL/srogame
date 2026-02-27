@@ -10,15 +10,13 @@
 
     <form class="setup-form" (ngSubmit)="startGame()">
       <div class="field">
-        <label for="playerName">Commander name</label>
-        <input
-          id="playerName"
-          name="playerName"
-          type="text"
-          placeholder="Commander"
-          [(ngModel)]="form.playerName"
-          required
-        />
+        <label>Player name</label>
+        @if (session()) {
+          <div class="readonly-value">{{ session()!.playerName }}</div>
+        } @else {
+          <p class="form-error">Login required to start a game.</p>
+          <a class="link button" routerLink="/login">Go to login</a>
+        }
       </div>
 
       <div class="field">

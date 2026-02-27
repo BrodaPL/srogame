@@ -2,7 +2,6 @@ import { Building } from '../buildings/building';
 import { BuildingType } from '../enums/building-type';
 import { Fleet } from '../fleets/fleet';
 import { PlanetType } from '../enums/planet-type';
-import { PlayerID } from '../player-id';
 import { PlanetaryReportData } from '../reports/planetary-report-data';
 import { ResourcesPack } from '../resources-pack';
 import { Ship } from '../fleets/ship';
@@ -23,7 +22,7 @@ export class Planet {
     name: string,
     order: number,
     solarSystem: SolarSystem,
-    owner: PlayerID | null = null
+    ownerId: number | null = null
   ): Planet {
     const type = Planet.randomStartingPlanetType();
     const colonizationRange = Planet.colonizationDifficultyRangeFor(type);
@@ -34,7 +33,7 @@ export class Planet {
       Planet.randomInt(colonizationRange.min, colonizationRange.max),
       order,
       solarSystem,
-      owner,
+      ownerId,
       new ResourcesPack(0, 0, 0),
       [],
       new ResourcesPack(0, 0, 0),
@@ -51,7 +50,7 @@ export class Planet {
         0,
         0
       ),
-      new Map<PlayerID, PlanetaryReportData>(),
+      new Map<number, PlanetaryReportData>(),
       [],
       [],
       [],
@@ -63,7 +62,7 @@ export class Planet {
     name: string,
     order: number,
     solarSystem: SolarSystem,
-    owner: PlayerID | null = null,
+    ownerId: number | null = null,
     forcedType?: PlanetType
   ): Planet {
     const type = forcedType ?? Planet.randomPlanetType();
@@ -77,7 +76,7 @@ export class Planet {
       Planet.randomInt(colonizationRange.min, colonizationRange.max),
       order,
       solarSystem,
-      owner,
+      ownerId,
       new ResourcesPack(0, 0, 0),
       [],
       new ResourcesPack(0, 0, 0),
@@ -94,7 +93,7 @@ export class Planet {
         Planet.randomSteppedFloat(modifierRanges.anomaliesAndNoise.min, modifierRanges.anomaliesAndNoise.max, 0.05),
         Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05)
       ),
-      new Map<PlayerID, PlanetaryReportData>(),
+      new Map<number, PlanetaryReportData>(),
       [],
       [],
       [],
@@ -108,14 +107,14 @@ export class Planet {
     public colonizationDifficulty: number,
     public order: number,
     public solarSystem: SolarSystem,
-    public owner: PlayerID | null,
+    public ownerId: number | null,
     public resources: ResourcesPack,
     public fleets: Fleet[],
     public spaceDebris: ResourcesPack,
     public size: number,
     public buildings: Map<BuildingType, number>,
     public planetaryParameters: PlanetaryParameters,
-    public lastReportData: Map<PlayerID, PlanetaryReportData>,
+    public lastReportData: Map<number, PlanetaryReportData>,
     public technologyQueue: Technology[],
     public buildingQueue: Building[],
     public shipyardQueue: Ship[],

@@ -4,6 +4,7 @@ import { EncyclopediaMechanicsComponent } from './encyclopedia-menu/encyclopedia
 import { EncyclopediaMenuComponent } from './encyclopedia-menu/encyclopedia-menu.component';
 import { EncyclopediaShipsComponent } from './encyclopedia-menu/encyclopedia-ships.component';
 import { EncyclopediaTechnologiesComponent } from './encyclopedia-menu/encyclopedia-technologies.component';
+import { AuthComponent } from './auth/auth.component';
 import { GameComponent } from './game/game.component';
 import { EmpireOverviewComponent } from './game/empire-overview/empire-overview.component';
 import { GalaxyPreviewComponent } from './game/galaxy-preview/galaxy-preview.component';
@@ -17,6 +18,7 @@ import { GalaxySetupComponent } from './setup/galaxy.setup.component';
 
 export const routes: Routes = [
   { path: '', component: MainMenuComponent },
+  { path: 'login', component: AuthComponent },
   { path: 'setup', component: GalaxySetupComponent },
   { path: 'load', component: LoadGameComponent },
   { path: 'multiplayer', component: MultiplayerComponent },

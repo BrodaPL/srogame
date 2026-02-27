@@ -3,9 +3,23 @@
     <header class="panel__header">
       <p class="eyebrow">Main Menu</p>
       <h1>Srogame</h1>
+      @if (session()) {
+        <p class="subtitle">Logged in as {{ session()!.playerName }}</p>
+      } @else {
+        <p class="subtitle">Not logged in</p>
+      }
     </header>
 
     <nav class="menu">
+      @if (!session()) {
+        <button class="menu-button" type="button" routerLink="/login">
+          Login / Register
+        </button>
+      } @else {
+        <button class="menu-button" type="button" (click)="logout()">
+          Logout
+        </button>
+      }
       <button class="menu-button" type="button" routerLink="/load">
         Load Game
       </button>
