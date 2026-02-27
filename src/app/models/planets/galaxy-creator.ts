@@ -1,6 +1,15 @@
 import { Galaxy } from './galaxy';
+import { Planet } from './planet';
 import { SolarSystem } from './solar-system';
+import { Player } from '../player';
+import { GameType } from '../enums/game-type';
+import { PlayerType } from '../enums/player-type';
 import type { GalaxySetup } from '../game-api-types';
+import { RngBuildingGenerator } from '../../generators/rng-building-generator';
+import { RngTechnologyGenerator } from '../../generators/rng-technology-generator';
+import { RngShipsGenerator } from '../../generators/rng-ships-generator';
+import { RngResourceGenerator } from '../../generators/rng-resource-generator';
+import { BuildingType } from '../enums/building-type';
 
 
 export class GalaxyCreator {
@@ -28,7 +37,7 @@ export class GalaxyCreator {
     return new Galaxy(this.setup.galaxyName, [], stars);
   }
 
-  public createGalaxy(): Galaxy {
+  public createGalaxy(playerNames: string[] = []): Galaxy {
     //1. Start with a void-filled galaxy grid sized for the configured width/height.
     const galaxy = this.createEmptyGalaxy();
     //1.1 Build a shuffled pool of system names to assign deterministically as we fill.
@@ -101,6 +110,71 @@ export class GalaxyCreator {
       }
     }
 
+    this.assignStartingPlayers(galaxy, playerNames);
+
+    //5. GameType specific modifications
+    if (this.setup.gameType === GameType.SANDBOX) {
+      const neutralChance = Math.max(0, Math.min(1, this.setup.neutralBotsAmount / 100));
+      const minLevelRaw = 1 * (1 + (this.setup.neutralBotsDifficulty * 2) / 100);
+      const maxLevelRaw = 12 * (1 + this.setup.neutralBotsDifficulty / 100);
+      const minLevel = Math.max(1, Math.floor(minLevelRaw));
+      const maxLevel = Math.max(minLevel, Math.floor(maxLevelRaw));
+
+      const buildingGenerator = new RngBuildingGenerator();
+      const techGenerator = new RngTechnologyGenerator();
+      const shipGenerator = new RngShipsGenerator();
+      const resourceGenerator = new RngResourceGenerator();
+
+      let nextPlayerId = galaxy.players.reduce(
+        (maxId, player) => Math.max(maxId, player.playerId),
+        0
+      ) + 1;
+
+      for (const row of galaxy.stars) {
+        for (const system of row) {
+          if (system.isVoid) {
+            continue;
+          }
+
+          for (const planet of system.planets) {
+            if (planet.ownerId !== null) {
+              continue;
+            }
+
+            if (neutralChance <= 0 || Math.random() >= neutralChance) {
+              continue;
+            }
+
+            const level = this.randomInt(minLevel, maxLevel);
+            const playerName = `N-${nextPlayerId}`;
+            const tech = techGenerator.generate(level);
+            const targetShipsValue = resourceGenerator
+              .generateSimple(level)
+              .getTotalValuedResourceAmount();
+            const orbitShips = shipGenerator.generate(level, targetShipsValue);
+
+            planet.ownerId = nextPlayerId;
+            planet.buildings = buildingGenerator.generate(level);
+            planet.orbitShips = orbitShips;
+
+            const player = new Player(
+              nextPlayerId,
+              playerName,
+              [planet],
+              tech,
+              [],
+              PlayerType.NEUTRAL
+            );
+
+            galaxy.players.push(player);
+            galaxy.neutralPlayerMap.set(player.playerId, player);
+            galaxy.playerNameMap.set(player.playerName, player.playerId);
+            nextPlayerId += 1;
+          }
+        }
+      }
+    }
+
     return galaxy;
   }
 
@@ -128,5 +202,145 @@ export class GalaxyCreator {
     const low = Math.min(min, max);
     const high = Math.max(min, max);
     return Math.floor(Math.random() * (high - low + 1)) + low;
+  }
+
+  private assignStartingPlayers(galaxy: Galaxy, playerNames: string[]): void {
+    const targetCount = Math.max(0, Math.floor(this.setup.playerAmount));
+    if (targetCount <= 0) {
+      return;
+    }
+
+    const availablePlanets = this.collectAvailablePlanets(galaxy);
+    if (availablePlanets.length === 0) {
+      return;
+    }
+
+    const normalizedNames = playerNames
+      .map((name) => (typeof name === 'string' ? name.trim() : ''))
+      .filter((name) => name.length > 0);
+
+    const playersById = new Map<number, Player>(
+      galaxy.players.map((player) => [player.playerId, player])
+    );
+
+    for (let index = 0; index < targetCount; index += 1) {
+      if (availablePlanets.length === 0) {
+        return;
+      }
+
+      const name = normalizedNames[index] ?? `Player-${index + 1}`;
+      const candidateIndex = this.randomInt(0, availablePlanets.length - 1);
+      const slot = availablePlanets.splice(candidateIndex, 1)[0];
+      const playerId = index + 1;
+
+      const previousOwner = slot.planet.ownerId !== null
+        ? playersById.get(slot.planet.ownerId) ?? null
+        : null;
+      if (previousOwner) {
+        previousOwner.planets = previousOwner.planets.filter((planet) => planet !== slot.planet);
+        if (previousOwner.planets.length === 0) {
+          galaxy.players = galaxy.players.filter((player) => player !== previousOwner);
+          galaxy.humanPlayerMap.delete(previousOwner.playerId);
+          galaxy.botPlayerMap.delete(previousOwner.playerId);
+          galaxy.neutralPlayerMap.delete(previousOwner.playerId);
+          galaxy.playerNameMap.delete(previousOwner.playerName);
+          playersById.delete(previousOwner.playerId);
+        }
+      }
+
+      const startingPlanet = Planet.createStartingPlanet(
+        slot.planet.name,
+        slot.planet.order,
+        slot.system,
+        playerId
+      );
+      startingPlanet.name = this.buildPlanetName(
+        slot.system.name,
+        slot.planet.order,
+        startingPlanet.type
+      );
+      startingPlanet.buildings = this.createStartingBuildings();
+      startingPlanet.orbitShips = [];
+
+      slot.system.planets[slot.index] = startingPlanet;
+
+      const player = new Player(
+        playerId,
+        name,
+        [startingPlanet],
+        new Map(),
+        [],
+        PlayerType.PLAYER
+      );
+
+      galaxy.players.push(player);
+      galaxy.humanPlayerMap.set(playerId, player);
+      galaxy.playerNameMap.set(player.playerName, playerId);
+    }
+  }
+
+  private collectAvailablePlanets(
+    galaxy: Galaxy
+  ): Array<{ system: SolarSystem; planet: Planet; index: number }> {
+    const planets: Array<{ system: SolarSystem; planet: Planet; index: number }> = [];
+    const playersById = new Map<number, Player>(
+      galaxy.players.map((player) => [player.playerId, player])
+    );
+
+    for (const row of galaxy.stars) {
+      for (const system of row) {
+        if (system.isVoid || system.isGalaxyCenter) {
+          continue;
+        }
+
+        system.planets.forEach((planet, index) => {
+          if (planet.ownerId === null) {
+            planets.push({ system, planet, index });
+            return;
+          }
+
+          const owner = playersById.get(planet.ownerId);
+          if (!owner) {
+            planets.push({ system, planet, index });
+            return;
+          }
+
+          if (owner.type === PlayerType.NEUTRAL || owner.type === PlayerType.ABANDONED) {
+            planets.push({ system, planet, index });
+          }
+        });
+      }
+    }
+
+    return planets;
+  }
+
+  private createStartingBuildings(): Map<BuildingType, number> {
+    const map = new Map<BuildingType, number>();
+    const starters: BuildingType[] = [
+      BuildingType.METAL_MINE,
+      BuildingType.CRYSTAL_MINE,
+      BuildingType.SOLAR_WIND_GEOTHERMAL,
+      BuildingType.NUCLEAR_PLANT,
+      BuildingType.METAL_STORAGE,
+      BuildingType.CRYSTAL_STORAGE,
+      BuildingType.DEUTERIUM_TANK,
+      BuildingType.ROBOTICS_FACTORY
+    ];
+
+    for (const type of starters) {
+      map.set(type, 1);
+    }
+
+    return map;
+  }
+
+  private buildPlanetName(
+    systemName: string,
+    index: number,
+    planetType: Planet['type']
+  ): string {
+    const typeInitial = planetType.charAt(0);
+    return `${systemName} ${index}-${typeInitial}`;
   }
 }

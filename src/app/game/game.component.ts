@@ -119,6 +119,11 @@ export class GameComponent implements OnInit {
   }
 
   private isValidGameType(value: unknown): value is GameType {
-    return value === GameType.PVP || value === GameType.PVPVE || value === GameType.PVE;
+    return (
+      value === GameType.PVP ||
+      value === GameType.PVPVE ||
+      value === GameType.PVE ||
+      value === GameType.SANDBOX
+    );
   }
 }

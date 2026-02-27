@@ -1,0 +1,94 @@
+<main class="page">
+  <section class="panel">
+    <header class="panel__header">
+      <p class="eyebrow">Account</p>
+      <h1>Login or Register</h1>
+      <p class="subtitle">Use your player name to access the server.</p>
+    </header>
+
+    <div class="setup-form">
+      <section class="field">
+        <h2>Login</h2>
+        <div class="field">
+          <label for="loginName">Player name</label>
+          <input
+            id="loginName"
+            name="loginName"
+            type="text"
+            placeholder="Commander"
+            [(ngModel)]="loginName"
+            required
+          />
+        </div>
+        <div class="field">
+          <label for="loginPassword">Password</label>
+          <input
+            id="loginPassword"
+            name="loginPassword"
+            type="password"
+            placeholder="********"
+            [(ngModel)]="loginPassword"
+            required
+          />
+        </div>
+        <button class="start-button" type="button" (click)="login()" [disabled]="isLoggingIn">
+          Log in
+        </button>
+        @if (loginError) {
+          <div class="status status--error">
+            <p>{{ loginError }}</p>
+          </div>
+        }
+      </section>
+
+      <section class="field">
+        <h2>Register</h2>
+        <div class="field">
+          <label for="registerName">Player name</label>
+          <input
+            id="registerName"
+            name="registerName"
+            type="text"
+            placeholder="Commander"
+            [(ngModel)]="registerName"
+            required
+          />
+        </div>
+        <div class="field">
+          <label for="registerPassword">Password</label>
+          <input
+            id="registerPassword"
+            name="registerPassword"
+            type="password"
+            placeholder="********"
+            [(ngModel)]="registerPassword"
+            required
+          />
+        </div>
+        <div class="field">
+          <label for="registerPasswordConfirm">Confirm password</label>
+          <input
+            id="registerPasswordConfirm"
+            name="registerPasswordConfirm"
+            type="password"
+            placeholder="********"
+            [(ngModel)]="registerPasswordConfirm"
+            required
+          />
+        </div>
+        <button class="start-button" type="button" (click)="register()" [disabled]="isRegistering">
+          Create account
+        </button>
+        @if (registerError) {
+          <div class="status status--error">
+            <p>{{ registerError }}</p>
+          </div>
+        }
+      </section>
+
+      <div class="saved">
+        <a class="link button" routerLink="/">Back to main menu</a>
+      </div>
+    </div>
+  </section>
+</main>

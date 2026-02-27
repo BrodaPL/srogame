@@ -1,5 +1,6 @@
 export enum GameType {
   PVP = 'PvP',
   PVPVE = 'PvPvE',
-  PVE = 'PvE'
+  PVE = 'PvE',
+  SANDBOX = 'Sandbox'
 }

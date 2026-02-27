@@ -52,7 +52,7 @@ app.post('/api/auth/register', (req, res) => {
   const playerNameKey = toPlayerNameKey(playerName);
   const data = loadAuthData();
   if (data.accounts.some((account) => account.playerNameKey === playerNameKey)) {
-    return res.status(409).json({ error: 'Player name already exists.' });
+    return res.status(409).json({ error: 'User already exists.' });
   }
 
   const now = new Date().toISOString();
@@ -85,8 +85,11 @@ app.post('/api/auth/login', (req, res) => {
   const data = loadAuthData();
   const playerNameKey = toPlayerNameKey(playerName);
   const account = data.accounts.find((entry) => entry.playerNameKey === playerNameKey);
-  if (!account || !verifyPassword(password, account.passwordHash)) {
-    return res.status(401).json({ error: 'Invalid credentials.' });
+  if (!account) {
+    return res.status(404).json({ error: 'No such user.' });
+  }
+  if (!verifyPassword(password, account.passwordHash)) {
+    return res.status(401).json({ error: 'Wrong password.' });
   }
 
   const now = new Date().toISOString();
@@ -129,7 +132,7 @@ app.post('/api/game/start', (req, res) => {
     return res.status(400).json({ error: 'Invalid setup payload.' });
   }
 
-  currentGalaxy = new GalaxyCreator(body.setup).createGalaxy();
+  currentGalaxy = new GalaxyCreator(body.setup).createGalaxy([auth.session.playerName]);
   currentGameOwnerId = auth.session.accountId;
 
   const response: StartGameResponse = {
@@ -365,7 +368,8 @@ function isValidSetup(setup: GalaxySetup): boolean {
     gameTypeValue === undefined ||
     gameTypeValue === 'PvP' ||
     gameTypeValue === 'PvPvE' ||
-    gameTypeValue === 'PvE';
+    gameTypeValue === 'PvE' ||
+    gameTypeValue === 'Sandbox';
 
   return (
     !!setup &&
