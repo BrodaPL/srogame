@@ -7,9 +7,11 @@ import { DefenceBuildingInstances } from './defence-building-instances';
 import { ResearchQueue } from './research-queue';
 import { ShipyardQueue } from './shipyard-queue';
 
-export class PlanetaryReportData {
+// Note: STAR_SYSTEM_ESPIONAGE requires X Spy Probes, where X is the number of planets in the target StarSystem.
+// Each probe generates EspionageReportData for each planet.
+export class EspionageReportData {
   constructor(
-    // contains just turn number of when report was generated
+    // contains just turn number of when a report was generated
     public reportDate: number,
     // if true, then show planet modifiers values
     public planetaryParameters: boolean,

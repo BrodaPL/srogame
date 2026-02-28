@@ -2,7 +2,7 @@ import { Building } from '../buildings/building';
 import { BuildingType } from '../enums/building-type';
 import { Fleet } from '../fleets/fleet';
 import { PlanetType } from '../enums/planet-type';
-import { PlanetaryReportData } from '../reports/planetary-report-data';
+import { EspionageReportData } from '../reports/espionage-report-data';
 import { ResourcesPack } from '../resources-pack';
 import { Ship } from '../fleets/ship';
 import { SolarSystem } from './solar-system';
@@ -50,7 +50,7 @@ export class Planet {
         0,
         0
       ),
-      new Map<number, PlanetaryReportData>(),
+      new Map<number, EspionageReportData>(),
       [],
       [],
       [],
@@ -93,7 +93,7 @@ export class Planet {
         Planet.randomSteppedFloat(modifierRanges.anomaliesAndNoise.min, modifierRanges.anomaliesAndNoise.max, 0.05),
         Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05)
       ),
-      new Map<number, PlanetaryReportData>(),
+      new Map<number, EspionageReportData>(),
       [],
       [],
       [],
@@ -114,7 +114,7 @@ export class Planet {
     public size: number,
     public buildings: Map<BuildingType, number>,
     public planetaryParameters: PlanetaryParameters,
-    public lastReportData: Map<number, PlanetaryReportData>,
+    public lastReportData: Map<number, EspionageReportData>,
     public technologyQueue: Technology[],
     public buildingQueue: Building[],
     public shipyardQueue: Ship[],

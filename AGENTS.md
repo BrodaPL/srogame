@@ -52,6 +52,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-02-28: Renamed `PlanetaryReportData` to `EspionageReportData` with a STAR_SYSTEM_ESPIONAGE probe note. Added `ReportType` and `FleetMissionType` enums.
 - 2026-02-27: Added `/login` auth UI error messaging with immediate change detection; server now returns specific login/register error strings (no such user, wrong password, user already exists). Added Sandbox game type; Sandbox neutral spawns based on `neutralBotsAmount` with RNG level scaling. Starting player planets now created via `Planet.createStartingPlanet` (Savanna/Jungle/Oceanic, size 160, zero parameters) and seeded with starter buildings; players can override neutral/abandoned planets.
 - 2026-02-27: Removed `PlayerID` wrapper in favor of `playerId: number` and `playerName: string`, renamed ownership fields to `ownerId`, and made `playerName` consistent in API/session models. Added JSON-backed auth (register/login/me/logout), auth UI at `/login`, main menu login status + logout, and enforced auth for game start/state. Implemented case-insensitive playerName uniqueness on server. Added `GAME_DESIGN_DOC_TEMPLATE.md`.
 - 2026-02-26: Updated `RngResourceGenerator` scaling to `base * (RESOURCE_LEVEL_GROWTH ** level)` with a shared `RESOURCE_LEVEL_GROWTH` constant; adjusted resource generator tests to use the constant and float comparisons.
