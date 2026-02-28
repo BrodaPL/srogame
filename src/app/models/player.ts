@@ -2,6 +2,8 @@ import { Planet } from './planets/planet';
 import { TechnologyType } from './enums/technology-type';
 import { Fleet } from './fleets/fleet';
 import { PlayerType } from './enums/player-type';
+import { StarSystemNote } from './planets/star-system-note';
+import { SolarSystemCoordinates } from './planets/solar-system';
 
 export class Player {
   constructor(
@@ -10,7 +12,8 @@ export class Player {
     public planets: Planet[],
     public tech: Map<TechnologyType, number>,
     public fleets: Fleet[],
-    public type: PlayerType
+    public type: PlayerType,
+    public starSystemNotes: Map<SolarSystemCoordinates, StarSystemNote>
   ) {}
 
   public getTechLevel(type: TechnologyType): number {

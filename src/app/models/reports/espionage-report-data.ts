@@ -6,6 +6,7 @@ import { DefencesQueue } from './defences-queue';
 import { DefenceBuildingInstances } from './defence-building-instances';
 import { ResearchQueue } from './research-queue';
 import { ShipyardQueue } from './shipyard-queue';
+import { PlanetaryParameters } from '../planets/planetary-parameters';
 
 // Note: STAR_SYSTEM_ESPIONAGE requires X Spy Probes, where X is the number of planets in the target StarSystem.
 // Each probe generates EspionageReportData for each planet.
@@ -13,13 +14,7 @@ export class EspionageReportData {
   constructor(
     // contains just turn number of when a report was generated
     public reportDate: number,
-    // if true, then show planet modifiers values
-    public planetaryParameters: boolean,
-    public averageBuildingLevel: number,
-    public averageTotalResources: number,
-    public averageTechLevel: number,
-    public totalDefencesAmount: number,
-    public totalShipsAmount: number,
+    public planetaryParameters: PlanetaryParameters,
     public buildingsLevels: Map<BuildingType, number>,
     public resourcesAmount: ResourcesPack,
     public techLevels: Map<TechnologyType, number>,

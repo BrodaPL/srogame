@@ -163,7 +163,8 @@ export class GalaxyCreator {
               [planet],
               tech,
               [],
-              PlayerType.NEUTRAL
+              PlayerType.NEUTRAL,
+              new Map()
             );
 
             galaxy.players.push(player);
@@ -270,7 +271,8 @@ export class GalaxyCreator {
         [startingPlanet],
         new Map(),
         [],
-        PlayerType.PLAYER
+        PlayerType.PLAYER,
+        new Map()
       );
 
       galaxy.players.push(player);
