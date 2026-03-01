@@ -34,10 +34,10 @@ This file captures session context for collaborators and future AI agents.
 - Galaxy setup UI + logic: `src/app/setup/galaxy.setup.component.ts`, `src/app/setup/galaxy.setup.component.html`
 - Game UI + logic: `src/app/game/game.component.ts`, `src/app/game/game.component.html`
 - Models (core): `src/app/models/resources-pack.ts`, `src/app/models/player.ts`, `src/app/models/game-api-types.ts`
-- Models (enums): `src/app/models/enums/building-type.ts`, `src/app/models/enums/technology-type.ts`, `src/app/models/enums/weapon-type.ts`, `src/app/models/enums/hull-class.ts`, `src/app/models/enums/planet-type.ts`, `src/app/models/enums/player-type.ts`, `src/app/models/enums/game-type.ts`, `src/app/models/enums/names-list.ts`
+- Models (enums): `src/app/models/enums/building-type.ts`, `src/app/models/enums/technology-type.ts`, `src/app/models/enums/weapon-type.ts`, `src/app/models/enums/hull-class.ts`, `src/app/models/enums/planet-type.ts`, `src/app/models/enums/player-type.ts`, `src/app/models/enums/game-type.ts`, `src/app/models/enums/names-list.ts`, `src/app/models/enums/sensor-phalanx-report-type.ts`
 - Models (buildings): `src/app/models/buildings/building.ts`, `src/app/models/buildings/building-blueprints.ts`, `src/app/models/buildings/building-requirement.ts`
 - Models (fleets): `src/app/models/fleets/fleet.ts`, `src/app/models/fleets/ship.ts`, `src/app/models/fleets/ship-instance.ts`, `src/app/models/fleets/ship-group.ts`, `src/app/models/fleets/ship-blueprints.ts`, `src/app/models/fleets/weapon.ts`, `src/app/models/fleets/destination.ts`
-- Models (planets): `src/app/models/planets/planet.ts`, `src/app/models/planets/solar-system.ts`, `src/app/models/planets/galaxy.ts`, `src/app/models/planets/galaxy-creator.ts`, `src/app/models/planets/planet-type-assets.ts`, `src/app/models/planets/planet-image-helper.ts`
+- Models (planets): `src/app/models/planets/planet.ts`, `src/app/models/planets/solar-system.ts`, `src/app/models/planets/galaxy.ts`, `src/app/models/planets/galaxy-creator.ts`, `src/app/models/planets/planet-type-assets.ts`, `src/app/models/planets/planet-image-helper.ts`, `src/app/models/planets/star-system-note.ts`
 - Models (tech): `src/app/models/tech/technology.ts`, `src/app/models/tech/technology-blueprints.ts`, `src/app/models/tech/tech-requirement.ts`
 - Logging: `src/app/core/logger.ts`
 - In-memory state: `src/app/core/game-state.service.ts`
@@ -52,6 +52,8 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-03-01: Added `EspionageReportGenerator` with unit tests. Added logging to the espionage report generator tests; use console logging in unit tests to show intermediate values.
+- 2026-03-01: `EspionageReportData` now stores `planetaryParameters: PlanetaryParameters` instead of averaged/outdated fields. Added `SensorPhalanxReportType` enum. Added `StarSystemNote` and `Player.starSystemNotes` map keyed by `SolarSystemCoordinates`.
 - 2026-02-28: Renamed `PlanetaryReportData` to `EspionageReportData` with a STAR_SYSTEM_ESPIONAGE probe note. Added `ReportType` and `FleetMissionType` enums.
 - 2026-02-27: Added `/login` auth UI error messaging with immediate change detection; server now returns specific login/register error strings (no such user, wrong password, user already exists). Added Sandbox game type; Sandbox neutral spawns based on `neutralBotsAmount` with RNG level scaling. Starting player planets now created via `Planet.createStartingPlanet` (Savanna/Jungle/Oceanic, size 160, zero parameters) and seeded with starter buildings; players can override neutral/abandoned planets.
 - 2026-02-27: Removed `PlayerID` wrapper in favor of `playerId: number` and `playerName: string`, renamed ownership fields to `ownerId`, and made `playerName` consistent in API/session models. Added JSON-backed auth (register/login/me/logout), auth UI at `/login`, main menu login status + logout, and enforced auth for game start/state. Implemented case-insensitive playerName uniqueness on server. Added `GAME_DESIGN_DOC_TEMPLATE.md`.
