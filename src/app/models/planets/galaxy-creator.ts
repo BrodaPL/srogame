@@ -154,7 +154,7 @@ export class GalaxyCreator {
             const orbitShips = shipGenerator.generate(level, targetShipsValue);
 
             planet.ownerId = nextPlayerId;
-            planet.buildings = buildingGenerator.generate(level);
+            planet.buildingsLevels = buildingGenerator.generate(level);
             planet.orbitShips = orbitShips;
 
             const player = new Player(
@@ -260,7 +260,7 @@ export class GalaxyCreator {
         slot.planet.order,
         startingPlanet.type
       );
-      startingPlanet.buildings = this.createStartingBuildings();
+      startingPlanet.buildingsLevels = this.createStartingBuildings();
       startingPlanet.orbitShips = [];
 
       slot.system.planets[slot.index] = startingPlanet;

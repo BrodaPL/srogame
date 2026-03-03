@@ -52,6 +52,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-03-03: Renamed `Planet.buildings` to `buildingsLevels` and updated usages. Added `Planet.getBuildingProductionValue1` plus metal/crystal/deuterium gain helpers (adaptive tech + planetary modifiers). Added `Planet` unit tests for production/gain calculations.
 - 2026-03-01: Added `EspionageReportGenerator` with unit tests. Added logging to the espionage report generator tests; use console logging in unit tests to show intermediate values.
 - 2026-03-01: `EspionageReportData` now stores `planetaryParameters: PlanetaryParameters` instead of averaged/outdated fields. Added `SensorPhalanxReportType` enum. Added `StarSystemNote` and `Player.starSystemNotes` map keyed by `SolarSystemCoordinates`.
 - 2026-02-28: Renamed `PlanetaryReportData` to `EspionageReportData` with a STAR_SYSTEM_ESPIONAGE probe note. Added `ReportType` and `FleetMissionType` enums.

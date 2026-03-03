@@ -1,5 +1,6 @@
 import { Building } from '../buildings/building';
 import { BuildingType } from '../enums/building-type';
+import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { Fleet } from '../fleets/fleet';
 import { PlanetType } from '../enums/planet-type';
 import { EspionageReportData } from '../reports/espionage-report-data';
@@ -18,6 +19,8 @@ type ModifierRange = {
 };
 
 export class Planet {
+  private static buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
+
   public static createStartingPlanet(
     name: string,
     order: number,
@@ -112,7 +115,7 @@ export class Planet {
     public fleets: Fleet[],
     public spaceDebris: ResourcesPack,
     public size: number,
-    public buildings: Map<BuildingType, number>,
+    public buildingsLevels: Map<BuildingType, number>,
     public planetaryParameters: PlanetaryParameters,
     public lastReportData: Map<number, EspionageReportData>,
     public technologyQueue: Technology[],
@@ -122,23 +125,63 @@ export class Planet {
   ) {}
 
   public getBuildingLevel(type: BuildingType): number {
-    return this.buildings.get(type) ?? 0;
+    return this.buildingsLevels.get(type) ?? 0;
   }
 
   public setBuildingLevel(type: BuildingType, level: number): void {
     const normalized = Math.max(0, Math.floor(level));
     if (normalized === 0) {
-      this.buildings.delete(type);
+      this.buildingsLevels.delete(type);
       return;
     }
 
-    this.buildings.set(type, normalized);
+    this.buildingsLevels.set(type, normalized);
   }
 
   public addBuildingLevel(type: BuildingType, delta = 1): number {
     const next = this.getBuildingLevel(type) + delta;
     this.setBuildingLevel(type, next);
     return this.getBuildingLevel(type);
+  }
+
+  public getBuildingProductionValue1(type: BuildingType): number {
+    const level = this.getBuildingLevel(type);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = Planet.buildingBlueprints.get(type);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const value = blueprint.production1[level];
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  public getMetalGain(adaptiveTechnologyLevel: number): number {
+    return this.getBuildingProductionValue1(BuildingType.METAL_MINE)
+      * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
+      * this.planetaryParameters.metalModifier;
+  }
+
+  public getCrystalGain(adaptiveTechnologyLevel: number): number {
+    return this.getBuildingProductionValue1(BuildingType.CRYSTAL_MINE)
+      * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
+      * this.planetaryParameters.crystalModifier;
+  }
+
+  public getDeuteriumGain(adaptiveTechnologyLevel: number): number {
+    return this.getBuildingProductionValue1(BuildingType.DEUTERIUM_SYNTHESIZER)
+      * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
+      * this.planetaryParameters.deuteriumModifier;
+  }
+
+  private static adaptiveTechnologyMultiplier(adaptiveTechnologyLevel: number): number {
+    const normalized = Number.isFinite(adaptiveTechnologyLevel)
+      ? adaptiveTechnologyLevel
+      : 0;
+    return (normalized / 100) + 1;
   }
 
   public static buildingLevelsFromRecord(

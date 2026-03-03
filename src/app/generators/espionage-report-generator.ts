@@ -32,7 +32,7 @@ export class EspionageReportGenerator {
     const includeQueues = reportLevel >= 12;
 
     const buildingsAverage = includeAverageBuildings
-      ? this.averageMapValue(planet.buildings)
+      ? this.averageMapValue(planet.buildingsLevels)
       : 0;
     const totalResources = includeTotalResources
       ? planet.resources.getTotalResourceAmount()
@@ -46,7 +46,7 @@ export class EspionageReportGenerator {
       : 0;
 
     const detailedBuildings = includeDetailedBuildings
-      ? new Map(planet.buildings)
+      ? new Map(planet.buildingsLevels)
       : new Map();
     const detailedResources = includeDetailedResources
       ? new ResourcesPack(
