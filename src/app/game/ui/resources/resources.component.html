@@ -1,0 +1,29 @@
+<section class="resources-bar">
+  <div class="resources-bar__title">{{ viewName }}</div>
+  <div class="resources-bar__items">
+    <div class="resource">
+      <span class="resource__label">Metal</span>
+      <span class="resource__value">
+        {{ formatResource(metal) }}{{ formatCapacitySuffix(metal) }}
+      </span>
+    </div>
+    <div class="resource">
+      <span class="resource__label">Crystal</span>
+      <span class="resource__value">
+        {{ formatResource(crystal) }}{{ formatCapacitySuffix(crystal) }}
+      </span>
+    </div>
+    <div class="resource">
+      <span class="resource__label">Deuterium</span>
+      <span class="resource__value">
+        {{ formatResource(deuterium) }}{{ formatCapacitySuffix(deuterium) }}
+      </span>
+    </div>
+    <div class="resource">
+      <span class="resource__label">Energy</span>
+      <span class="resource__value">
+        {{ formatResource(energy) }}{{ formatCapacitySuffix(energy) }}
+      </span>
+    </div>
+  </div>
+</section>

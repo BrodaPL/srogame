@@ -9,7 +9,7 @@
       "evasionChance": 0.35,
       "hullPointsCapacity": 20,
       "shieldCapacity": 0,
-      "defense": 0,
+      "armor": 0,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 }
       ],
@@ -34,7 +34,7 @@
       "evasionChance": 0.2,
       "hullPointsCapacity": 30,
       "shieldCapacity": 0,
-      "defense": 0,
+      "armor": 0,
       "weapons": [
         { "type": "MISSILE", "dmg": 20, "shots": 2 }
       ],
@@ -59,7 +59,7 @@
       "evasionChance": 0.1,
       "hullPointsCapacity": 80,
       "shieldCapacity": 40,
-      "defense": 2,
+      "armor": 2,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 },
         { "type": "MISSILE", "dmg": 20, "shots": 1 }
@@ -88,7 +88,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 10,
       "shieldCapacity": 0,
-      "defense": 0,
+      "armor": 0,
       "weapons": [],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
@@ -113,7 +113,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 10,
       "shieldCapacity": 0,
-      "defense": 0,
+      "armor": 0,
       "weapons": [
         { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 1 }
       ],
@@ -134,7 +134,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 100,
       "shieldCapacity": 40,
-      "defense": 3,
+      "armor": 3,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 },
         { "type": "MISSILE", "dmg": 20, "shots": 1 },
@@ -166,7 +166,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 140,
       "shieldCapacity": 80,
-      "defense": 4,
+      "armor": 4,
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 1 },
         { "type": "MISSILE", "dmg": 30, "shots": 1 }
@@ -196,7 +196,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 160,
       "shieldCapacity": 80,
-      "defense": 4,
+      "armor": 4,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 },
         { "type": "MISSILE", "dmg": 40, "shots": 1 },
@@ -228,7 +228,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 60,
       "shieldCapacity": 20,
-      "defense": 2,
+      "armor": 2,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 }
       ],
@@ -256,7 +256,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 300,
       "shieldCapacity": 140,
-      "defense": 6,
+      "armor": 6,
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 4 },
         { "type": "MISSILE", "dmg": 30, "shots": 1 },
@@ -289,7 +289,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 250,
       "shieldCapacity": 160,
-      "defense": 6,
+      "armor": 6,
       "weapons": [
         { "type": "MISSILE", "dmg": 40, "shots": 1 },
         { "type": "RAIL_GUN", "dmg": 30, "shots": 2 }
@@ -320,7 +320,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 200,
       "shieldCapacity": 200,
-      "defense": 6,
+      "armor": 6,
       "weapons": [
         { "type": "BEAM", "dmg": 30, "shots": 1 },
         { "type": "MISSILE", "dmg": 50, "shots": 3 }
@@ -351,7 +351,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 200,
       "shieldCapacity": 150,
-      "defense": 5,
+      "armor": 5,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 2 },
         { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 3 }
@@ -382,7 +382,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 150,
       "shieldCapacity": 150,
-      "defense": 5,
+      "armor": 5,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 2 },
         { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 2 }
@@ -412,7 +412,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 120,
       "shieldCapacity": 100,
-      "defense": 3,
+      "armor": 3,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 }
       ],
@@ -441,7 +441,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 200,
       "shieldCapacity": 100,
-      "defense": 2,
+      "armor": 2,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 },
         { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 2 }
@@ -475,7 +475,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 800,
       "shieldCapacity": 1000,
-      "defense": 8,
+      "armor": 8,
       "weapons": [
         { "type": "BEAM", "dmg": 30, "shots": 8 },
         { "type": "MISSILE", "dmg": 50, "shots": 4 },
@@ -509,7 +509,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 800,
       "shieldCapacity": 800,
-      "defense": 8,
+      "armor": 8,
       "weapons": [
         { "type": "BEAM", "dmg": 300, "shots": 1 },
         { "type": "MISSILE", "dmg": 250, "shots": 2 },
@@ -542,7 +542,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 800,
       "shieldCapacity": 1000,
-      "defense": 7,
+      "armor": 7,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 4 },
         { "type": "MISSILE", "dmg": 30, "shots": 1 },
@@ -575,7 +575,7 @@
       "evasionChance": 0,
       "hullPointsCapacity": 10000,
       "shieldCapacity": 20000,
-      "defense": 9,
+      "armor": 9,
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 40 },
         { "type": "BEAM", "dmg": 300, "shots": 8 },
@@ -605,3 +605,4 @@
     }
   ]
 }
+

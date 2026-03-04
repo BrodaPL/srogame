@@ -1,0 +1,20 @@
+<section class="planet-data">
+  <div class="planet-data__left">
+    <p class="planet-data__owner">{{ ownerLabel() }}</p>
+    <h2 class="planet-data__name">{{ planetNameLabel() }}</h2>
+    @if (planetImagePath) {
+      <img class="planet-data__image" [src]="planetImagePath" [alt]="planetNameLabel() + ' image'" />
+    }
+    <p class="planet-data__meta">{{ planetSizeLabel() }} | {{ planetTypeLabel() }}</p>
+  </div>
+
+  <div class="planet-data__right">
+    <span class="planet-data__tag" [title]="planetaryParametersTooltip()">Planetary Parameters</span>
+    <span class="planet-data__tag" [title]="resourcesTooltip()">Resources</span>
+    <span class="planet-data__tag" [title]="buildingsTooltip()">Buildings</span>
+    <span class="planet-data__tag" [title]="technologiesTooltip()">Technology</span>
+    <span class="planet-data__tag" [title]="defencesTooltip()">Defences</span>
+    <span class="planet-data__tag" [title]="shipsTooltip()">Ships</span>
+    <span class="planet-data__tag" [title]="queuesTooltip()">Queues</span>
+  </div>
+</section>

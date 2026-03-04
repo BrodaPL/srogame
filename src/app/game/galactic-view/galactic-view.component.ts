@@ -1,11 +1,13 @@
 import { Component } from '@angular/core';
 import { GameStateService } from '../../core/game-state.service';
+import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
 @Component({
-  selector: 'app-galaxy-preview',
-  templateUrl: './galaxy-preview.component.html'
+  selector: 'app-galactic-view',
+  imports: [TopMenuComponent],
+  templateUrl: './galactic-view.component.html'
 })
-export class GalaxyPreviewComponent {
+export class GalacticViewComponent {
   protected readonly gridCellSize = 22;
 
   constructor(protected readonly gameState: GameStateService) {}
