@@ -32,27 +32,27 @@ export class EspionageReportGenerator {
     const includeQueues = reportLevel >= 12;
 
     const buildingsAverage = includeAverageBuildings
-      ? this.averageMapValue(planet.buildingsLevels)
+      ? this.averageMapValue(planet.Objects.buildingsLevels)
       : 0;
     const totalResources = includeTotalResources
-      ? planet.resources.getTotalResourceAmount()
+      ? planet.Objects.resources.getTotalResourceAmount()
       : 0;
     const techAverage = includeAverageTech
       ? this.averageMapValue(planetOwner?.tech ?? new Map())
       : 0;
     const totalDefences = includeTotalDefences ? this.getDefencesAmount() : 0;
     const totalShips = includeTotalShips
-      ? planet.orbitShips.length
+      ? planet.Objects.orbitShips.length
       : 0;
 
     const detailedBuildings = includeDetailedBuildings
-      ? new Map(planet.buildingsLevels)
+      ? new Map(planet.Objects.buildingsLevels)
       : new Map();
     const detailedResources = includeDetailedResources
       ? new ResourcesPack(
-        planet.resources.metal,
-        planet.resources.crystal,
-        planet.resources.deuterium
+        planet.Objects.resources.metal,
+        planet.Objects.resources.crystal,
+        planet.Objects.resources.deuterium
       )
       : new ResourcesPack(0, 0, 0);
     const detailedTech = includeDetailedTech
@@ -60,7 +60,7 @@ export class EspionageReportGenerator {
       : new Map();
     const detailedDefences = includeDetailedDefences ? this.getDefenceInstances() : [];
     const detailedShips = includeDetailedShips
-      ? [...planet.orbitShips]
+      ? [...planet.Objects.orbitShips]
       : [];
 
     const shipyardProduction = includeQueues ? new ShipyardQueue() : new ShipyardQueue();
@@ -70,7 +70,7 @@ export class EspionageReportGenerator {
 
     return new EspionageReportData(
       Date.now(), //TODO replace with current turn number
-      planet.planetaryParameters,
+      planet.Info.planetaryParameters,
       buildingsAverage,
       totalResources,
       techAverage,
@@ -97,7 +97,7 @@ export class EspionageReportGenerator {
     const attackerTech = player.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY);
     const defenderTech = planetOwner?.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY) ?? 0;
     const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
-    const planetModifier = 1 + (planet.planetaryParameters.anomaliesAndNoise / 100);
+    const planetModifier = 1 + (planet.Info.planetaryParameters.anomaliesAndNoise / 100);
     const normalizedProbes = Math.max(0, Math.floor(probeAmount));
 
     return Math.floor(attackerTech * planetModifier)

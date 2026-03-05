@@ -68,7 +68,7 @@ export class SolarSystem {
     forcedType?: PlanetType
   ): Planet {
     const planet = Planet.createRandomEmpty('', index, system, null, forcedType);
-    planet.name = SolarSystem.buildPlanetName(system.name, index, planet.type);
+    planet.BasicInfo.name = SolarSystem.buildPlanetName(system.name, index, planet.BasicInfo.type);
     return planet;
   }
 

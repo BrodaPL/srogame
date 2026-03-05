@@ -1,4 +1,4 @@
-import { Planet } from './planet';
+import { Planet, PlanetBasicInfo, PlanetInfo, PlanetObjects } from './planet';
 import { PlanetType } from '../enums/planet-type';
 import { SolarSystem } from './solar-system';
 import { ResourcesPack } from '../resources-pack';
@@ -25,23 +25,21 @@ describe('Planet', () => {
     );
 
     return new Planet(
-      'Test Planet',
-      PlanetType.BARREN,
-      0,
-      1,
-      system,
-      null,
-      new ResourcesPack(0, 0, 0),
-      [],
-      new ResourcesPack(0, 0, 0),
-      100,
-      new Map(),
-      modifiers,
-      new Map(),
-      [],
-      [],
-      [],
-      []
+      new PlanetBasicInfo('Test Planet', PlanetType.BARREN, 0, 1, system, '', 100),
+      new PlanetInfo(null, modifiers),
+      new PlanetObjects(
+        new ResourcesPack(0, 0, 0),
+        new Map(),
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        new ResourcesPack(0, 0, 0)
+      ),
+      new Map()
     );
   };
 

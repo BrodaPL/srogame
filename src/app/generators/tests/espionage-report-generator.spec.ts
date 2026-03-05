@@ -2,7 +2,7 @@ import { EspionageReportGenerator } from '../espionage-report-generator';
 import { Player } from '../../models/player';
 import { PlayerType } from '../../models/enums/player-type';
 import { TechnologyType } from '../../models/enums/technology-type';
-import { Planet } from '../../models/planets/planet';
+import { Planet, PlanetBasicInfo, PlanetInfo, PlanetObjects } from '../../models/planets/planet';
 import { PlanetType } from '../../models/enums/planet-type';
 import { SolarSystem } from '../../models/planets/solar-system';
 import { ResourcesPack } from '../../models/resources-pack';
@@ -21,27 +21,25 @@ describe('EspionageReportGenerator', () => {
   ): Player => new Player(playerId, playerName, [], techLevels, [], PlayerType.PLAYER, new Map());
 
   const createPlanet = (system: SolarSystem, orbitShips: ShipInstance[]): Planet => new Planet(
-    'Test',
-    PlanetType.JUNGLE,
-    1,
-    1,
-    system,
-    2,
-    new ResourcesPack(100, 200, 300),
-    [],
-    new ResourcesPack(0, 0, 0),
-    100,
-    new Map<BuildingType, number>([
-      [BuildingType.METAL_MINE, 4],
-      [BuildingType.BUNKER_NETWORK, 9],
-      [BuildingType.SHIPYARD, 2]
-    ]),
-    new PlanetaryParameters(0, 0, 0, 0, 0, 0, 0, 0, 0),
-    new Map(),
-    [],
-    [],
-    [],
-    orbitShips
+    new PlanetBasicInfo('Test', PlanetType.JUNGLE, 1, 1, system, '', 100),
+    new PlanetInfo(2, new PlanetaryParameters(0, 0, 0, 0, 0, 0, 0, 0, 0)),
+    new PlanetObjects(
+      new ResourcesPack(100, 200, 300),
+      new Map<BuildingType, number>([
+        [BuildingType.METAL_MINE, 4],
+        [BuildingType.BUNKER_NETWORK, 9],
+        [BuildingType.SHIPYARD, 2]
+      ]),
+      [],
+      [],
+      [],
+      [],
+      [],
+      orbitShips,
+      [],
+      new ResourcesPack(0, 0, 0)
+    ),
+    new Map()
   );
 
   it('includes detailed data for high report levels', () => {
@@ -97,7 +95,7 @@ describe('EspionageReportGenerator', () => {
       ships: report.ships
     });
 
-    expect(report.planetaryParameters).toBe(planet.planetaryParameters);
+    expect(report.planetaryParameters).toBe(planet.Info.planetaryParameters);
     expect(report.averageBuildingLevel).toBeCloseTo((4 + 9 + 2) / 3, 6);
     expect(report.averageTotalResources).toBe(600);
     expect(report.averageTechLevel).toBeCloseTo((4 + 2) / 2, 6);
@@ -138,7 +136,7 @@ describe('EspionageReportGenerator', () => {
       ships: report.ships
     });
 
-    expect(report.planetaryParameters).toBe(planet.planetaryParameters);
+    expect(report.planetaryParameters).toBe(planet.Info.planetaryParameters);
     expect(report.averageBuildingLevel).toBe(0);
     expect(report.averageTotalResources).toBe(0);
     expect(report.averageTechLevel).toBe(0);

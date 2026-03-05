@@ -4,6 +4,7 @@ import { SolarSystem } from './solar-system';
 import { Player } from '../player';
 import { GameType } from '../enums/game-type';
 import { PlayerType } from '../enums/player-type';
+import { PlanetType } from '../enums/planet-type';
 import type { GalaxySetup } from '../game-api-types';
 import { RngBuildingGenerator } from '../../generators/rng-building-generator';
 import { RngTechnologyGenerator } from '../../generators/rng-technology-generator';
@@ -137,7 +138,7 @@ export class GalaxyCreator {
           }
 
           for (const planet of system.planets) {
-            if (planet.ownerId !== null) {
+            if (planet.Info.ownerId !== null) {
               continue;
             }
 
@@ -153,9 +154,9 @@ export class GalaxyCreator {
               .getTotalValuedResourceAmount();
             const orbitShips = shipGenerator.generate(level, targetShipsValue);
 
-            planet.ownerId = nextPlayerId;
-            planet.buildingsLevels = buildingGenerator.generate(level);
-            planet.orbitShips = orbitShips;
+            planet.Info.ownerId = nextPlayerId;
+            planet.Objects.buildingsLevels = buildingGenerator.generate(level);
+            planet.Objects.orbitShips = orbitShips;
 
             const player = new Player(
               nextPlayerId,
@@ -234,8 +235,8 @@ export class GalaxyCreator {
       const slot = availablePlanets.splice(candidateIndex, 1)[0];
       const playerId = index + 1;
 
-      const previousOwner = slot.planet.ownerId !== null
-        ? playersById.get(slot.planet.ownerId) ?? null
+      const previousOwner = slot.planet.Info.ownerId !== null
+        ? playersById.get(slot.planet.Info.ownerId) ?? null
         : null;
       if (previousOwner) {
         previousOwner.planets = previousOwner.planets.filter((planet) => planet !== slot.planet);
@@ -250,18 +251,18 @@ export class GalaxyCreator {
       }
 
       const startingPlanet = Planet.createStartingPlanet(
-        slot.planet.name,
-        slot.planet.order,
+        slot.planet.BasicInfo.name,
+        slot.planet.BasicInfo.order,
         slot.system,
         playerId
       );
-      startingPlanet.name = this.buildPlanetName(
+      startingPlanet.BasicInfo.name = this.buildPlanetName(
         slot.system.name,
-        slot.planet.order,
-        startingPlanet.type
+        slot.planet.BasicInfo.order,
+        startingPlanet.BasicInfo.type
       );
-      startingPlanet.buildingsLevels = this.createStartingBuildings();
-      startingPlanet.orbitShips = [];
+      startingPlanet.Objects.buildingsLevels = this.createStartingBuildings();
+      startingPlanet.Objects.orbitShips = [];
 
       slot.system.planets[slot.index] = startingPlanet;
 
@@ -296,12 +297,12 @@ export class GalaxyCreator {
         }
 
         system.planets.forEach((planet, index) => {
-          if (planet.ownerId === null) {
+          if (planet.Info.ownerId === null) {
             planets.push({ system, planet, index });
             return;
           }
 
-          const owner = playersById.get(planet.ownerId);
+          const owner = playersById.get(planet.Info.ownerId);
           if (!owner) {
             planets.push({ system, planet, index });
             return;
@@ -340,7 +341,7 @@ export class GalaxyCreator {
   private buildPlanetName(
     systemName: string,
     index: number,
-    planetType: Planet['type']
+    planetType: PlanetType
   ): string {
     const typeInitial = planetType.charAt(0);
     return `${systemName} ${index}-${typeInitial}`;

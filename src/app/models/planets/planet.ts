@@ -3,13 +3,15 @@ import { BuildingType } from '../enums/building-type';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { Fleet } from '../fleets/fleet';
 import { PlanetType } from '../enums/planet-type';
-import { EspionageReportData } from '../reports/espionage-report-data';
 import { ResourcesPack } from '../resources-pack';
 import { Ship } from '../fleets/ship';
 import { SolarSystem } from './solar-system';
 import { Technology } from '../tech/technology';
 import { ShipInstance } from '../fleets/ship-instance';
 import { PlanetaryParameters } from './planetary-parameters';
+import { PlanetImageHelper } from './planet-image-helper';
+import { DefenceBuildingInstances } from '../reports/defence-building-instances';
+import { EspionageReportData } from '../reports/espionage-report-data';
 
 type ModifierKey = keyof PlanetaryParameters;
 
@@ -17,6 +19,40 @@ type ModifierRange = {
   min: number;
   max: number;
 };
+
+export class PlanetBasicInfo {
+  constructor(
+    public name: string,
+    public type: PlanetType,
+    public colonizationDifficulty: number,
+    public order: number,
+    public solarSystem: SolarSystem,
+    public image: string,
+    public size: number
+  ) {}
+}
+
+export class PlanetInfo {
+  constructor(
+    public ownerId: number | null,
+    public planetaryParameters: PlanetaryParameters
+  ) {}
+}
+
+export class PlanetObjects {
+  constructor(
+    public resources: ResourcesPack,
+    public buildingsLevels: Map<BuildingType, number>,
+    public defences: DefenceBuildingInstances[],
+    public ships: ShipInstance[],
+    public technologyQueue: Technology[],
+    public buildingQueue: Building[],
+    public shipyardQueue: Ship[],
+    public orbitShips: ShipInstance[],
+    public fleets: Fleet[],
+    public spaceDebris: ResourcesPack
+  ) {}
+}
 
 export class Planet {
   private static buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
@@ -29,35 +65,45 @@ export class Planet {
   ): Planet {
     const type = Planet.randomStartingPlanetType();
     const colonizationRange = Planet.colonizationDifficultyRangeFor(type);
+    const size = 160;
 
     return new Planet(
-      name,
-      type,
-      Planet.randomInt(colonizationRange.min, colonizationRange.max),
-      order,
-      solarSystem,
-      ownerId,
-      new ResourcesPack(0, 0, 0),
-      [],
-      new ResourcesPack(0, 0, 0),
-      160,
-      new Map<BuildingType, number>(),
-      new PlanetaryParameters(
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+      new PlanetBasicInfo(
+        name,
+        type,
+        Planet.randomInt(colonizationRange.min, colonizationRange.max),
+        order,
+        solarSystem,
+        PlanetImageHelper.getPlanetImage(type, size),
+        size
       ),
-      new Map<number, EspionageReportData>(),
-      [],
-      [],
-      [],
-      []
+      new PlanetInfo(
+        ownerId,
+        new PlanetaryParameters(
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        )
+      ),
+      new PlanetObjects(
+        new ResourcesPack(0, 0, 0),
+        new Map<BuildingType, number>(),
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        new ResourcesPack(0, 0, 0)
+      ),
+      new Map<number, EspionageReportData>()
     );
   }
 
@@ -72,70 +118,79 @@ export class Planet {
     // Pick modifier ranges based on planet type, then roll actual values within those ranges.
     const modifierRanges = Planet.modifierRangesFor(type);
     const colonizationRange = Planet.colonizationDifficultyRangeFor(type);
+    const size = Planet.randomInt(90, 200);
 
     return new Planet(
-      name,
-      type,
-      Planet.randomInt(colonizationRange.min, colonizationRange.max),
-      order,
-      solarSystem,
-      ownerId,
-      new ResourcesPack(0, 0, 0),
-      [],
-      new ResourcesPack(0, 0, 0),
-      Planet.randomInt(90, 200),
-      new Map<BuildingType, number>(),
-      new PlanetaryParameters(
-        Planet.randomFloat(modifierRanges.metalModifier.min, modifierRanges.metalModifier.max),
-        Planet.randomFloat(modifierRanges.crystalModifier.min, modifierRanges.crystalModifier.max),
-        Planet.randomFloat(modifierRanges.deuteriumModifier.min, modifierRanges.deuteriumModifier.max),
-        Planet.randomFloat(modifierRanges.energyModifierRES.min, modifierRanges.energyModifierRES.max),
-        Planet.randomFloat(modifierRanges.energyModifierNuclear.min, modifierRanges.energyModifierNuclear.max),
-        Planet.randomFloat(modifierRanges.scienceModifier.min, modifierRanges.scienceModifier.max),
-        Planet.randomFloat(modifierRanges.industryModifier.min, modifierRanges.industryModifier.max),
-        Planet.randomSteppedFloat(modifierRanges.anomaliesAndNoise.min, modifierRanges.anomaliesAndNoise.max, 0.05),
-        Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05)
+      new PlanetBasicInfo(
+        name,
+        type,
+        Planet.randomInt(colonizationRange.min, colonizationRange.max),
+        order,
+        solarSystem,
+        PlanetImageHelper.getPlanetImage(type, size),
+        size
       ),
-      new Map<number, EspionageReportData>(),
-      [],
-      [],
-      [],
-      []
+      new PlanetInfo(
+        ownerId,
+        new PlanetaryParameters(
+          Planet.randomFloat(modifierRanges.metalModifier.min, modifierRanges.metalModifier.max),
+          Planet.randomFloat(modifierRanges.crystalModifier.min, modifierRanges.crystalModifier.max),
+          Planet.randomFloat(modifierRanges.deuteriumModifier.min, modifierRanges.deuteriumModifier.max),
+          Planet.randomFloat(modifierRanges.energyModifierRES.min, modifierRanges.energyModifierRES.max),
+          Planet.randomFloat(modifierRanges.energyModifierNuclear.min, modifierRanges.energyModifierNuclear.max),
+          Planet.randomFloat(modifierRanges.scienceModifier.min, modifierRanges.scienceModifier.max),
+          Planet.randomFloat(modifierRanges.industryModifier.min, modifierRanges.industryModifier.max),
+          Planet.randomSteppedFloat(modifierRanges.anomaliesAndNoise.min, modifierRanges.anomaliesAndNoise.max, 0.05),
+          Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05)
+        )
+      ),
+      new PlanetObjects(
+        new ResourcesPack(0, 0, 0),
+        new Map<BuildingType, number>(),
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        new ResourcesPack(0, 0, 0)
+      ),
+      new Map<number, EspionageReportData>()
     );
   }
 
   constructor(
-    public name: string,
-    public type: PlanetType,
-    public colonizationDifficulty: number,
-    public order: number,
-    public solarSystem: SolarSystem,
-    public ownerId: number | null,
-    public resources: ResourcesPack,
-    public fleets: Fleet[],
-    public spaceDebris: ResourcesPack,
-    public size: number,
-    public buildingsLevels: Map<BuildingType, number>,
-    public planetaryParameters: PlanetaryParameters,
-    public lastReportData: Map<number, EspionageReportData>,
-    public technologyQueue: Technology[],
-    public buildingQueue: Building[],
-    public shipyardQueue: Ship[],
-    public orbitShips: ShipInstance[]
-  ) {}
+    public BasicInfo: PlanetBasicInfo,
+    public Info: PlanetInfo,
+    public Objects: PlanetObjects,
+    lastReportData: Map<number, EspionageReportData>
+  ) {
+    this._lastReportData = lastReportData;
+  }
+
+  private _lastReportData: Map<number, EspionageReportData>;
+
+  public get lastReportData(): Map<number, EspionageReportData> {
+    return this._lastReportData;
+  }
+
+  public set lastReportData(value: Map<number, EspionageReportData>) {
+    this._lastReportData = value;
+  }
 
   public getBuildingLevel(type: BuildingType): number {
-    return this.buildingsLevels.get(type) ?? 0;
+    return this.Objects.buildingsLevels.get(type) ?? 0;
   }
 
   public setBuildingLevel(type: BuildingType, level: number): void {
     const normalized = Math.max(0, Math.floor(level));
     if (normalized === 0) {
-      this.buildingsLevels.delete(type);
+      this.Objects.buildingsLevels.delete(type);
       return;
     }
 
-    this.buildingsLevels.set(type, normalized);
+    this.Objects.buildingsLevels.set(type, normalized);
   }
 
   public addBuildingLevel(type: BuildingType, delta = 1): number {
@@ -162,19 +217,19 @@ export class Planet {
   public getMetalGain(adaptiveTechnologyLevel: number): number {
     return this.getBuildingProductionValue1(BuildingType.METAL_MINE)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.planetaryParameters.metalModifier;
+      * this.Info.planetaryParameters.metalModifier;
   }
 
   public getCrystalGain(adaptiveTechnologyLevel: number): number {
     return this.getBuildingProductionValue1(BuildingType.CRYSTAL_MINE)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.planetaryParameters.crystalModifier;
+      * this.Info.planetaryParameters.crystalModifier;
   }
 
   public getDeuteriumGain(adaptiveTechnologyLevel: number): number {
     return this.getBuildingProductionValue1(BuildingType.DEUTERIUM_SYNTHESIZER)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.planetaryParameters.deuteriumModifier;
+      * this.Info.planetaryParameters.deuteriumModifier;
   }
 
   private static adaptiveTechnologyMultiplier(adaptiveTechnologyLevel: number): number {
