@@ -161,9 +161,9 @@ export class Planet {
   }
 
   constructor(
-    public BasicInfo: PlanetBasicInfo,
-    public Info: PlanetInfo,
-    public Objects: PlanetObjects,
+    public basicInfo: PlanetBasicInfo,
+    public info: PlanetInfo,
+    public objects: PlanetObjects,
     lastReportData: Map<number, EspionageReportData>
   ) {
     this._lastReportData = lastReportData;
@@ -180,17 +180,17 @@ export class Planet {
   }
 
   public getBuildingLevel(type: BuildingType): number {
-    return this.Objects.buildingsLevels.get(type) ?? 0;
+    return this.objects.buildingsLevels.get(type) ?? 0;
   }
 
   public setBuildingLevel(type: BuildingType, level: number): void {
     const normalized = Math.max(0, Math.floor(level));
     if (normalized === 0) {
-      this.Objects.buildingsLevels.delete(type);
+      this.objects.buildingsLevels.delete(type);
       return;
     }
 
-    this.Objects.buildingsLevels.set(type, normalized);
+    this.objects.buildingsLevels.set(type, normalized);
   }
 
   public addBuildingLevel(type: BuildingType, delta = 1): number {
@@ -217,19 +217,19 @@ export class Planet {
   public getMetalGain(adaptiveTechnologyLevel: number): number {
     return this.getBuildingProductionValue1(BuildingType.METAL_MINE)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.Info.planetaryParameters.metalModifier;
+      * this.info.planetaryParameters.metalModifier;
   }
 
   public getCrystalGain(adaptiveTechnologyLevel: number): number {
     return this.getBuildingProductionValue1(BuildingType.CRYSTAL_MINE)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.Info.planetaryParameters.crystalModifier;
+      * this.info.planetaryParameters.crystalModifier;
   }
 
   public getDeuteriumGain(adaptiveTechnologyLevel: number): number {
     return this.getBuildingProductionValue1(BuildingType.DEUTERIUM_SYNTHESIZER)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.Info.planetaryParameters.deuteriumModifier;
+      * this.info.planetaryParameters.deuteriumModifier;
   }
 
   private static adaptiveTechnologyMultiplier(adaptiveTechnologyLevel: number): number {

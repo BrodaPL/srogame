@@ -8,6 +8,7 @@ This file captures session context for collaborators and future AI agents.
 - Purpose: Browser game similar to OGame but simplified, turn-based (not real-time), supports single-player and small-scale multiplayer. PvE is primary, PvP is possible. Enemy AI will be simplistic and RNG-driven with scaling.
 - Secondary purpose: Learning TypeScript and Angular through building the game.
 - Persistence (current): Uses browser localStorage key `srogame:setup` and `srogame:player` (auth session). Galaxy is held in server memory and fetched via API. Accounts + sessions are stored in `server/data/auth.json`.
+- Conventions: Use camelCase for variable names.
 
 ## Current Behavior
 - Route `/` shows main menu (load, singleplayer, multiplayer, encyclopedia, help/about).
@@ -52,6 +53,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-03-06: Added client-facing API DTOs and endpoints (`/api/game/client-galaxy`, `/api/game/client-star-system`, `/api/game/client-planet`) with array serialization for `Map`/`Set` and coordinate payloads; added `includePlanets` query flag to lighten `client-galaxy` responses and adjusted client galaxy construction to avoid full planet creation when omitted. Updated `GameApiService` and `GalacticView` to fetch `ClientGalaxy` DTOs, added change detection for view updates, and aligned camelCase fields. Updated server TypeScript config to allow `.ts` type-only imports and switched server type imports accordingly.
 - 2026-03-05: Refactored `Planet` into `BasicInfo`, `Info`, and `Objects`, updated usages (galaxy creator, planet data UI, espionage report generator, tests), and made `lastReportData` a private field with getter/setter. Added client-side models: `ClientPlanet` (extends `Planet` with `ReportData`), `ClientStarSystem` (extends `SolarSystem` with `ClientInfo` + `ClientPlanet[]`), and `ClientGalaxy` (non-`Galaxy` wrapper with `ClientStarSystem[][]` and player name map).
 - 2026-03-04: Renamed Ship stat `defense` to `armor` across model, ship blueprints JSON, and encyclopedia UI. Reorganized `/game` views to new routes (Galactic/Imperium/StarSystem/Planet/Reports/Researches/Production/Buildings/Defence/Operations/SendFleet), moved galaxy preview into `GalacticView`, and added new empty view components. Added shared UI components under `src/app/game/ui`: `TopMenuComponent` (navigation), `ResourcesComponent` (resource bar), `PlanetDataComponent` (planet + espionage data tooltips). Wired TopMenu into all view templates, fixed template-literal TS errors in new UI components, and added TopMenu styling in `styles.css`.
 - 2026-03-03: Renamed `Planet.buildings` to `buildingsLevels` and updated usages. Added `Planet.getBuildingProductionValue1` plus metal/crystal/deuterium gain helpers (adaptive tech + planetary modifiers). Added `Planet` unit tests for production/gain calculations.

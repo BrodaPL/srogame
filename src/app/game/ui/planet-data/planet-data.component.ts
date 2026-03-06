@@ -19,7 +19,7 @@ export class PlanetDataComponent {
   }
 
   protected planetNameLabel(): string {
-    return this.planet?.BasicInfo.name ?? 'Unknown planet';
+    return this.planet?.basicInfo.name ?? 'Unknown planet';
   }
 
   protected planetSizeLabel(): string {
@@ -27,15 +27,15 @@ export class PlanetDataComponent {
       return 'Size: --';
     }
 
-    return `Size: ${this.planet.BasicInfo.size}`;
+    return `Size: ${this.planet.basicInfo.size}`;
   }
 
   protected planetTypeLabel(): string {
-    return `Type: ${this.planet?.BasicInfo.type ?? '--'}`;
+    return `Type: ${this.planet?.basicInfo.type ?? '--'}`;
   }
 
   protected planetaryParametersTooltip(): string {
-    const parameters = this.report?.planetaryParameters ?? this.planet?.Info.planetaryParameters;
+    const parameters = this.report?.planetaryParameters ?? this.planet?.info.planetaryParameters;
     if (!parameters) {
       return 'No planetary parameters data.';
     }
@@ -54,7 +54,7 @@ export class PlanetDataComponent {
     }
 
     if (this.planet) {
-      return this.formatResourcesPack(this.planet.Objects.resources);
+      return this.formatResourcesPack(this.planet.objects.resources);
     }
 
     return 'No resources data.';
@@ -72,8 +72,8 @@ export class PlanetDataComponent {
       return parts.length ? parts.join('\n') : 'No building data.';
     }
 
-    if (this.planet?.Objects.buildingsLevels?.size) {
-      return this.formatLevelMap(this.planet.Objects.buildingsLevels);
+    if (this.planet?.objects.buildingsLevels?.size) {
+      return this.formatLevelMap(this.planet.objects.buildingsLevels);
     }
 
     return 'No building data.';

@@ -3,7 +3,10 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import {
   GameStateResponse,
   StartGameRequest,
-  StartGameResponse
+  StartGameResponse,
+  ClientGalaxyDto,
+  ClientStarSystemDto,
+  ClientPlanetDto
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -25,6 +28,36 @@ export class GameApiService {
     return this.http.get<GameStateResponse>(
       `${API_BASE_URL}/game/state`,
       { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getClientGalaxy(token: string, includePlanets = false) {
+    return this.http.get<ClientGalaxyDto>(
+      `${API_BASE_URL}/game/client-galaxy`,
+      {
+        headers: this.authHeaders(token),
+        params: { includePlanets }
+      }
+    );
+  }
+
+  public getClientStarSystem(x: number, y: number, token: string) {
+    return this.http.get<ClientStarSystemDto>(
+      `${API_BASE_URL}/game/client-star-system`,
+      {
+        headers: this.authHeaders(token),
+        params: { x, y }
+      }
+    );
+  }
+
+  public getClientPlanet(x: number, y: number, z: number, token: string) {
+    return this.http.get<ClientPlanetDto>(
+      `${API_BASE_URL}/game/client-planet`,
+      {
+        headers: this.authHeaders(token),
+        params: { x, y, z }
+      }
     );
   }
 

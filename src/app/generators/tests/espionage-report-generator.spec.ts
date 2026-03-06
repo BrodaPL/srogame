@@ -95,7 +95,7 @@ describe('EspionageReportGenerator', () => {
       ships: report.ships
     });
 
-    expect(report.planetaryParameters).toBe(planet.Info.planetaryParameters);
+    expect(report.planetaryParameters).toBe(planet.info.planetaryParameters);
     expect(report.averageBuildingLevel).toBeCloseTo((4 + 9 + 2) / 3, 6);
     expect(report.averageTotalResources).toBe(600);
     expect(report.averageTechLevel).toBeCloseTo((4 + 2) / 2, 6);
@@ -136,7 +136,7 @@ describe('EspionageReportGenerator', () => {
       ships: report.ships
     });
 
-    expect(report.planetaryParameters).toBe(planet.Info.planetaryParameters);
+    expect(report.planetaryParameters).toBe(planet.info.planetaryParameters);
     expect(report.averageBuildingLevel).toBe(0);
     expect(report.averageTotalResources).toBe(0);
     expect(report.averageTechLevel).toBe(0);

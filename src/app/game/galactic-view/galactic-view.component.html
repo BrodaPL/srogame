@@ -2,21 +2,21 @@
 <section class="galaxy-preview">
   <div class="galaxy-preview__header">
     <h3>Galaxy Preview</h3>
-    @if (gameState.galaxy) {
+    @if (clientGalaxy) {
       <p class="galaxy-preview__meta">
-        {{ gameState.galaxy.stars[0].length }}x{{ gameState.galaxy.stars.length }}
+        {{ clientGalaxy.stars[0].length }}x{{ clientGalaxy.stars.length }}
       </p>
     }
   </div>
 
-  @if (gameState.galaxy) {
+  @if (clientGalaxy) {
     <div
       class="galaxy-grid"
       [style.grid-template-columns]="
-        'repeat(' + gameState.galaxy.stars[0].length + ', ' + gridCellSize + 'px)'
+        'repeat(' + clientGalaxy.stars[0].length + ', ' + gridCellSize + 'px)'
       "
     >
-      @for (row of gameState.galaxy.stars; track $index) {
+      @for (row of clientGalaxy.stars; track $index) {
         @for (system of row; track $index) {
           <div
             class="galaxy-cell"
@@ -32,6 +32,10 @@
         }
       }
     </div>
+  } @else if (isLoading) {
+    <p class="overview-empty">Loading galaxy data...</p>
+  } @else if (loadError) {
+    <p class="overview-empty">{{ loadError }}</p>
   } @else {
     <p class="overview-empty">Galaxy data not loaded yet.</p>
   }

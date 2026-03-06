@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import galaxyCreatorModule from '../../src/app/models/planets/galaxy-creator.js';
-import type { Galaxy } from '../../src/app/models/planets/galaxy.js';
+import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   GalaxySetup,
   PlayerSession,
@@ -14,9 +14,26 @@ import type {
   StartGameRequest,
   StartGameResponse,
   GameStateResponse,
+  ClientGalaxyDto,
+  ClientStarSystemDto,
+  ClientPlanetDto,
+  ClientCoordinates,
+  ClientReportDataDto,
+  ResourcesPackDto,
+  PlanetaryParametersDto,
+  BuildingLevelEntry,
+  TechLevelEntry,
+  ClientInfoDto,
+  PlayerNameEntry,
   LoginRequest,
   RegisterRequest
-} from '../../src/app/models/game-api-types.js';
+} from '../../src/app/models/game-api-types.ts';
+import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
+import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
+import type { ClientPlanet } from '../../src/app/models/planets/client-planet.ts';
+import type { PlanetaryParameters } from '../../src/app/models/planets/planetary-parameters.ts';
+import type { ResourcesPack } from '../../src/app/models/resources-pack.ts';
+import type { EspionageReportData } from '../../src/app/models/reports/espionage-report-data.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -162,6 +179,115 @@ app.get('/api/game/state', (req, res) => {
     galaxy: buildGalaxySnapshot(currentGalaxy)
   };
 
+  return res.status(200).json(response);
+});
+
+app.get('/api/game/client-galaxy', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const includePlanets = parseIncludePlanets(req.query.includePlanets);
+  const clientGalaxy = currentGalaxy.createClientGalaxy(playerId, includePlanets);
+  const response: ClientGalaxyDto = toClientGalaxyDto(clientGalaxy, includePlanets);
+  return res.status(200).json(response);
+});
+
+app.get('/api/game/client-star-system', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const x = parseNonNegativeInt(req.query.x);
+  const y = parseNonNegativeInt(req.query.y);
+  const z = parseOptionalInt(req.query.z);
+  if (x === null || y === null) {
+    return res.status(400).json({ error: 'Invalid coordinates.' });
+  }
+  if (z !== null && z >= 0) {
+    return res.status(400).json({ error: 'z must be < 0 for star system requests.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const clientSystem = currentGalaxy.createClientStarSystem(system, playerId, true);
+  const response: ClientStarSystemDto = toClientStarSystemDto(clientSystem, true);
+  return res.status(200).json(response);
+});
+
+app.get('/api/game/client-planet', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const x = parseNonNegativeInt(req.query.x);
+  const y = parseNonNegativeInt(req.query.y);
+  const z = parseNonNegativeInt(req.query.z);
+  if (x === null || y === null || z === null) {
+    return res.status(400).json({ error: 'Invalid coordinates.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, {
+    x,
+    y,
+    z
+  });
   return res.status(200).json(response);
 });
 
@@ -344,6 +470,193 @@ function getAuthSession(req: Request): { data: AuthData; session: AuthSession } 
   saveAuthData(data);
 
   return { data, session };
+}
+
+function resolvePlayerId(galaxy: Galaxy, session: AuthSession): number | null {
+  return galaxy.playerNameMap.get(session.playerName) ?? null;
+}
+
+function parseOptionalInt(value: unknown): number | null {
+  if (Array.isArray(value)) {
+    return parseOptionalInt(value[0]);
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function parseNonNegativeInt(value: unknown): number | null {
+  const parsed = parseOptionalInt(value);
+  if (parsed === null || parsed < 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function toResourcesPackDto(pack: ResourcesPack): ResourcesPackDto {
+  return {
+    metal: pack.metal,
+    crystal: pack.crystal,
+    deuterium: pack.deuterium
+  };
+}
+
+function toPlanetaryParametersDto(parameters: PlanetaryParameters): PlanetaryParametersDto {
+  return {
+    metalModifier: parameters.metalModifier,
+    crystalModifier: parameters.crystalModifier,
+    deuteriumModifier: parameters.deuteriumModifier,
+    energyModifierRES: parameters.energyModifierRES,
+    energyModifierNuclear: parameters.energyModifierNuclear,
+    scienceModifier: parameters.scienceModifier,
+    industryModifier: parameters.industryModifier,
+    anomaliesAndNoise: parameters.anomaliesAndNoise,
+    hyperspaceParameters: parameters.hyperspaceParameters
+  };
+}
+
+function toBuildingLevelEntries(map: Map<string, number>): BuildingLevelEntry[] {
+  const entries: BuildingLevelEntry[] = [];
+  for (const [type, level] of map.entries()) {
+    entries.push({ type, level } as BuildingLevelEntry);
+  }
+  return entries;
+}
+
+function toTechLevelEntries(map: Map<string, number>): TechLevelEntry[] {
+  const entries: TechLevelEntry[] = [];
+  for (const [type, level] of map.entries()) {
+    entries.push({ type, level } as TechLevelEntry);
+  }
+  return entries;
+}
+
+function toClientReportDataDto(reportData: EspionageReportData): ClientReportDataDto {
+  return {
+    reportDate: reportData.reportDate,
+    planetaryParameters: toPlanetaryParametersDto(reportData.planetaryParameters),
+    averageBuildingLevel: reportData.averageBuildingLevel,
+    averageTotalResources: reportData.averageTotalResources,
+    averageTechLevel: reportData.averageTechLevel,
+    totalDefencesAmount: reportData.totalDefencesAmount,
+    totalShipsAmount: reportData.totalShipsAmount,
+    buildingsLevels: toBuildingLevelEntries(reportData.buildingsLevels),
+    resourcesAmount: toResourcesPackDto(reportData.resourcesAmount),
+    techLevels: toTechLevelEntries(reportData.techLevels),
+    defences: reportData.defences,
+    ships: reportData.ships,
+    shipyardProduction: reportData.shipyardProduction,
+    defencesProduction: reportData.defencesProduction,
+    researchProduction: reportData.researchProduction,
+    buildingProduction: reportData.buildingProduction
+  };
+}
+
+function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordinates): ClientPlanetDto {
+  return {
+    coordinates,
+    basicInfo: {
+      name: clientPlanet.basicInfo.name,
+      type: clientPlanet.basicInfo.type,
+      colonizationDifficulty: clientPlanet.basicInfo.colonizationDifficulty,
+      order: clientPlanet.basicInfo.order,
+      image: clientPlanet.basicInfo.image,
+      size: clientPlanet.basicInfo.size
+    },
+    info: {
+      ownerId: clientPlanet.info.ownerId,
+      planetaryParameters: toPlanetaryParametersDto(clientPlanet.info.planetaryParameters)
+    },
+    objects: {
+      resources: toResourcesPackDto(clientPlanet.objects.resources),
+      buildingsLevels: toBuildingLevelEntries(clientPlanet.objects.buildingsLevels),
+      defences: clientPlanet.objects.defences,
+      ships: clientPlanet.objects.ships,
+      technologyQueue: clientPlanet.objects.technologyQueue,
+      buildingQueue: clientPlanet.objects.buildingQueue,
+      shipyardQueue: clientPlanet.objects.shipyardQueue,
+      orbitShips: clientPlanet.objects.orbitShips,
+      fleets: clientPlanet.objects.fleets,
+      spaceDebris: toResourcesPackDto(clientPlanet.objects.spaceDebris)
+    },
+    reportData: clientPlanet.reportData ? toClientReportDataDto(clientPlanet.reportData) : null
+  };
+}
+
+function toClientInfoDto(clientInfo: ClientStarSystem['clientInfo']): ClientInfoDto {
+  return {
+    ownedPlanetCount: clientInfo.ownedPlanetCount,
+    neutralPlanetCount: clientInfo.neutralPlanetCount,
+    botPlanetCount: clientInfo.botPlanetCount,
+    humanPlanetCount: clientInfo.humanPlanetCount
+  };
+}
+
+function toClientStarSystemDto(system: ClientStarSystem, includePlanets: boolean): ClientStarSystemDto {
+  const systemCoordinates: ClientCoordinates = {
+    x: system.coordinates.x,
+    y: system.coordinates.y,
+    z: -1
+  };
+  const planets = includePlanets
+    ? system.planets.map((planet, index) =>
+      toClientPlanetDto(planet, {
+        x: system.coordinates.x,
+        y: system.coordinates.y,
+        z: index
+      })
+    )
+    : [];
+
+  return {
+    coordinates: systemCoordinates,
+    name: system.name,
+    isGalaxyCenter: system.isGalaxyCenter,
+    isVoid: system.isVoid,
+    isCenterEdge: system.isCenterEdge,
+    discoveredByPlayer: Array.from(system.discoveredByPlayer),
+    planets,
+    clientInfo: toClientInfoDto(system.clientInfo)
+  };
+}
+
+function toPlayerNameEntries(playerNameMap: Map<number, string>): PlayerNameEntry[] {
+  const entries: PlayerNameEntry[] = [];
+  for (const [playerId, playerName] of playerNameMap.entries()) {
+    entries.push({ playerId, playerName });
+  }
+  return entries;
+}
+
+function toClientGalaxyDto(clientGalaxy: ClientGalaxy, includePlanets: boolean): ClientGalaxyDto {
+  return {
+    name: clientGalaxy.name,
+    stars: clientGalaxy.stars.map((row) =>
+      row.map((system) => toClientStarSystemDto(system, includePlanets))
+    ),
+    playerNames: toPlayerNameEntries(clientGalaxy.playerNameMap)
+  };
+}
+
+function parseIncludePlanets(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return parseIncludePlanets(value[0]);
+  }
+
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
 }
 
 function buildGalaxySnapshot(galaxy: Galaxy): GalaxySnapshot {

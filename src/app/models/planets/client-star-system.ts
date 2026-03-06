@@ -12,7 +12,7 @@ export class ClientInfo {
 
 export class ClientStarSystem extends SolarSystem {
   public override planets: ClientPlanet[];
-  public ClientInfo: ClientInfo;
+  public clientInfo: ClientInfo;
 
   constructor(
     name: string,
@@ -25,6 +25,6 @@ export class ClientStarSystem extends SolarSystem {
   ) {
     super(name, -10, isGalaxyCenter, isVoid, coordinates, discoveredByPlayer);
     this.planets = planets;
-    this.ClientInfo = clientInfo;
+    this.clientInfo = clientInfo;
   }
 }
