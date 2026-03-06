@@ -54,7 +54,7 @@ export class PlanetDataComponent {
     }
 
     if (this.planet) {
-      return this.formatResourcesPack(this.planet.objects.resources);
+      return this.formatResourcesPack(this.planet.rBDSFTQ.resources);
     }
 
     return 'No resources data.';
@@ -72,8 +72,8 @@ export class PlanetDataComponent {
       return parts.length ? parts.join('\n') : 'No building data.';
     }
 
-    if (this.planet?.objects.buildingsLevels?.size) {
-      return this.formatLevelMap(this.planet.objects.buildingsLevels);
+    if (this.planet?.rBDSFTQ.buildingsLevels?.size) {
+      return this.formatLevelMap(this.planet.rBDSFTQ.buildingsLevels);
     }
 
     return 'No building data.';
@@ -183,3 +183,5 @@ export class PlanetDataComponent {
     return JSON.stringify(queue);
   }
 }
+
+

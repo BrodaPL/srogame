@@ -2,30 +2,30 @@
 <section class="galaxy-preview">
   <div class="galaxy-preview__header">
     <h3>Galaxy Preview</h3>
-    @if (clientGalaxy) {
+    @if (galaxyPresentation) {
       <p class="galaxy-preview__meta">
-        {{ clientGalaxy.stars[0].length }}x{{ clientGalaxy.stars.length }}
+        {{ galaxyPresentation.galaxyBytes[0].length }}x{{ galaxyPresentation.galaxyBytes.length }}
       </p>
     }
   </div>
 
-  @if (clientGalaxy) {
+  @if (galaxyPresentation) {
     <div
       class="galaxy-grid"
       [style.grid-template-columns]="
-        'repeat(' + clientGalaxy.stars[0].length + ', ' + gridCellSize + 'px)'
+        'repeat(' + galaxyPresentation.galaxyBytes[0].length + ', ' + gridCellSize + 'px)'
       "
     >
-      @for (row of clientGalaxy.stars; track $index) {
-        @for (system of row; track $index) {
+      @for (row of galaxyPresentation.galaxyBytes; track $index; let rowIndex = $index) {
+        @for (cell of row; track $index; let colIndex = $index) {
           <div
             class="galaxy-cell"
-            [class.galaxy-cell--void]="system.isVoid"
-            [class.galaxy-cell--center]="system.isGalaxyCenter"
+            [class.galaxy-cell--void]="cell.planetsAndAsteroids[0] === -1"
+            [class.galaxy-cell--center]="cell.planetsAndAsteroids[0] === -2"
           >
-            @if (!system.isGalaxyCenter) {
+            @if (cell.planetsAndAsteroids[0] !== -2) {
               <span class="galaxy-coords">
-                {{ system.coordinates.x }},{{ system.coordinates.y }}
+                {{ colIndex }},{{ rowIndex }}
               </span>
             }
           </div>

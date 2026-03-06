@@ -1,4 +1,4 @@
-import { Planet, PlanetBasicInfo, PlanetInfo, PlanetObjects } from './planet';
+import { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ } from './planet';
 import { EspionageReportData } from '../reports/espionage-report-data';
 
 export class ClientPlanet extends Planet {
@@ -7,11 +7,12 @@ export class ClientPlanet extends Planet {
   constructor(
     basicInfo: PlanetBasicInfo,
     info: PlanetInfo,
-    objects: PlanetObjects,
+    rBDSFTQ: rBDSFTQ,
     reportData: EspionageReportData | null,
     lastReportData: Map<number, EspionageReportData> = new Map()
   ) {
-    super(basicInfo, info, objects, lastReportData);
+    super(basicInfo, info, rBDSFTQ, lastReportData);
     this.reportData = reportData;
   }
 }
+

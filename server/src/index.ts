@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import galaxyCreatorModule from '../../src/app/models/planets/galaxy-creator.js';
+import galaxyPresentationDataModule from '../../src/app/models/planets/galaxy-presentation-data.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   GalaxySetup,
@@ -15,6 +16,9 @@ import type {
   StartGameResponse,
   GameStateResponse,
   ClientGalaxyDto,
+  GalaxyPresentationDataDto,
+  GalaxyByteCellDto,
+  PlanetReportEntryDto,
   ClientStarSystemDto,
   ClientPlanetDto,
   ClientCoordinates,
@@ -34,9 +38,14 @@ import type { ClientPlanet } from '../../src/app/models/planets/client-planet.ts
 import type { PlanetaryParameters } from '../../src/app/models/planets/planetary-parameters.ts';
 import type { ResourcesPack } from '../../src/app/models/resources-pack.ts';
 import type { EspionageReportData } from '../../src/app/models/reports/espionage-report-data.ts';
+import type { GalaxyPresentationData as GalaxyPresentationDataType } from '../../src/app/models/planets/galaxy-presentation-data.ts';
+import type { GalaxyByteCell } from '../../src/app/models/planets/galaxy-byte-cell.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
+};
+const { GalaxyPresentationData } = galaxyPresentationDataModule as {
+  GalaxyPresentationData: typeof import('../../src/app/models/planets/galaxy-presentation-data.js').GalaxyPresentationData;
 };
 
 const app = express();
@@ -53,9 +62,11 @@ const PLAYER_NAME_MIN = 3;
 const PLAYER_NAME_MAX = 24;
 const PASSWORD_MIN = 6;
 const PASSWORD_MAX = 72;
+const PLAYER_TYPE_PLAYER = 'PLAYER' as const;
 
 let currentGalaxy: Galaxy | null = null;
 let currentGameOwnerId: number | null = null;
+let currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
 
 app.post('/api/auth/register', (req, res) => {
   const body = req.body as RegisterRequest | undefined;
@@ -151,6 +162,7 @@ app.post('/api/game/start', (req, res) => {
 
   currentGalaxy = new GalaxyCreator(body.setup).createGalaxy([auth.session.playerName]);
   currentGameOwnerId = auth.session.accountId;
+  currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
 
   const response: StartGameResponse = {
     player: toPlayerSession(auth.session),
@@ -179,6 +191,30 @@ app.get('/api/game/state', (req, res) => {
     galaxy: buildGalaxySnapshot(currentGalaxy)
   };
 
+  return res.status(200).json(response);
+});
+
+app.get('/api/game/galaxy-presentation-data', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const presentation = getPresentationData(currentGalaxy, playerId);
+  const response: GalaxyPresentationDataDto = toGalaxyPresentationDataDto(presentation);
   return res.status(200).json(response);
 });
 
@@ -288,6 +324,30 @@ app.get('/api/game/client-planet', (req, res) => {
     y,
     z
   });
+  return res.status(200).json(response);
+});
+
+app.get('/api/game/owned-planets', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const presentation = getPresentationData(currentGalaxy, playerId);
+  const response = presentation.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet));
   return res.status(200).json(response);
 });
 
@@ -576,18 +636,84 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       planetaryParameters: toPlanetaryParametersDto(clientPlanet.info.planetaryParameters)
     },
     objects: {
-      resources: toResourcesPackDto(clientPlanet.objects.resources),
-      buildingsLevels: toBuildingLevelEntries(clientPlanet.objects.buildingsLevels),
-      defences: clientPlanet.objects.defences,
-      ships: clientPlanet.objects.ships,
-      technologyQueue: clientPlanet.objects.technologyQueue,
-      buildingQueue: clientPlanet.objects.buildingQueue,
-      shipyardQueue: clientPlanet.objects.shipyardQueue,
-      orbitShips: clientPlanet.objects.orbitShips,
-      fleets: clientPlanet.objects.fleets,
-      spaceDebris: toResourcesPackDto(clientPlanet.objects.spaceDebris)
+      resources: toResourcesPackDto(clientPlanet.rBDSFTQ.resources),
+      buildingsLevels: toBuildingLevelEntries(clientPlanet.rBDSFTQ.buildingsLevels),
+      defences: clientPlanet.rBDSFTQ.defences,
+      ships: clientPlanet.rBDSFTQ.ships,
+      technologyQueue: clientPlanet.rBDSFTQ.technologyQueue,
+      buildingQueue: clientPlanet.rBDSFTQ.buildingQueue,
+      shipyardQueue: clientPlanet.rBDSFTQ.shipyardQueue,
+      orbitShips: clientPlanet.rBDSFTQ.orbitShips,
+      fleets: clientPlanet.rBDSFTQ.fleets,
+      spaceDebris: toResourcesPackDto(clientPlanet.rBDSFTQ.spaceDebris)
     },
     reportData: clientPlanet.reportData ? toClientReportDataDto(clientPlanet.reportData) : null
+  };
+}
+
+function toClientPlanetDtoFromClientPlanet(clientPlanet: ClientPlanet): ClientPlanetDto {
+  const systemCoordinates = clientPlanet.basicInfo.solarSystem.coordinates;
+  const z = Math.max(0, clientPlanet.basicInfo.order - 1);
+  return toClientPlanetDto(clientPlanet, {
+    x: systemCoordinates.x,
+    y: systemCoordinates.y,
+    z
+  });
+}
+
+function buildPresentationDataByPlayer(galaxy: Galaxy): Map<number, GalaxyPresentationDataType> {
+  const map = new Map<number, GalaxyPresentationDataType>();
+  for (const player of galaxy.players) {
+    if (player.type !== PLAYER_TYPE_PLAYER) {
+      continue;
+    }
+
+    map.set(player.playerId, GalaxyPresentationData.fromGalaxy(galaxy, player.playerId));
+  }
+  return map;
+}
+
+function getPresentationData(galaxy: Galaxy, playerId: number): GalaxyPresentationDataType {
+  const cached = currentGalaxyPresentationByPlayer.get(playerId);
+  if (cached) {
+    return cached;
+  }
+
+  const computed = GalaxyPresentationData.fromGalaxy(galaxy, playerId);
+  currentGalaxyPresentationByPlayer.set(playerId, computed);
+  return computed;
+}
+
+function toGalaxyByteCellDto(cell: GalaxyByteCell): GalaxyByteCellDto {
+  return {
+    planetsAndAsteroids: [cell.planetsAndAsteroids[0], cell.planetsAndAsteroids[1]]
+  };
+}
+
+function toPlanetReportEntryDto(
+  coordinates: { x: number; y: number; z: number },
+  reportData: EspionageReportData
+): PlanetReportEntryDto {
+  return {
+    coordinates: {
+      x: coordinates.x,
+      y: coordinates.y,
+      z: coordinates.z
+    },
+    reportData: toClientReportDataDto(reportData)
+  };
+}
+
+function toGalaxyPresentationDataDto(data: GalaxyPresentationDataType): GalaxyPresentationDataDto {
+  const reportMap: PlanetReportEntryDto[] = [];
+  for (const [coordinates, reportData] of data.reportMap.entries()) {
+    reportMap.push(toPlanetReportEntryDto(coordinates, reportData));
+  }
+
+  return {
+    reportMap,
+    galaxyBytes: data.galaxyBytes.map((row) => row.map((cell) => toGalaxyByteCellDto(cell))),
+    ownedPlanets: data.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet))
   };
 }
 
@@ -732,3 +858,5 @@ function isValidSetup(setup: GalaxySetup): boolean {
     setup.startingResources.deuterium >= 0
   );
 }
+
+

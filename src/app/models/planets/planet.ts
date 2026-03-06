@@ -39,7 +39,8 @@ export class PlanetInfo {
   ) {}
 }
 
-export class PlanetObjects {
+// rBDSFTQ stands for Resources, Buildings, Defences, Ships, Fleets, Technology, Queues.
+export class rBDSFTQ {
   constructor(
     public resources: ResourcesPack,
     public buildingsLevels: Map<BuildingType, number>,
@@ -91,7 +92,7 @@ export class Planet {
           0
         )
       ),
-      new PlanetObjects(
+      new rBDSFTQ(
         new ResourcesPack(0, 0, 0),
         new Map<BuildingType, number>(),
         [],
@@ -144,7 +145,7 @@ export class Planet {
           Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05)
         )
       ),
-      new PlanetObjects(
+      new rBDSFTQ(
         new ResourcesPack(0, 0, 0),
         new Map<BuildingType, number>(),
         [],
@@ -163,7 +164,7 @@ export class Planet {
   constructor(
     public basicInfo: PlanetBasicInfo,
     public info: PlanetInfo,
-    public objects: PlanetObjects,
+    public rBDSFTQ: rBDSFTQ,
     lastReportData: Map<number, EspionageReportData>
   ) {
     this._lastReportData = lastReportData;
@@ -180,17 +181,17 @@ export class Planet {
   }
 
   public getBuildingLevel(type: BuildingType): number {
-    return this.objects.buildingsLevels.get(type) ?? 0;
+    return this.rBDSFTQ.buildingsLevels.get(type) ?? 0;
   }
 
   public setBuildingLevel(type: BuildingType, level: number): void {
     const normalized = Math.max(0, Math.floor(level));
     if (normalized === 0) {
-      this.objects.buildingsLevels.delete(type);
+      this.rBDSFTQ.buildingsLevels.delete(type);
       return;
     }
 
-    this.objects.buildingsLevels.set(type, normalized);
+    this.rBDSFTQ.buildingsLevels.set(type, normalized);
   }
 
   public addBuildingLevel(type: BuildingType, delta = 1): number {
@@ -438,3 +439,6 @@ export class Planet {
     return Math.round(value * factor) / factor;
   }
 }
+
+
+

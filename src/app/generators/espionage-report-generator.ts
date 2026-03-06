@@ -32,27 +32,27 @@ export class EspionageReportGenerator {
     const includeQueues = reportLevel >= 12;
 
     const buildingsAverage = includeAverageBuildings
-      ? this.averageMapValue(planet.objects.buildingsLevels)
+      ? this.averageMapValue(planet.rBDSFTQ.buildingsLevels)
       : 0;
     const totalResources = includeTotalResources
-      ? planet.objects.resources.getTotalResourceAmount()
+      ? planet.rBDSFTQ.resources.getTotalResourceAmount()
       : 0;
     const techAverage = includeAverageTech
       ? this.averageMapValue(planetOwner?.tech ?? new Map())
       : 0;
     const totalDefences = includeTotalDefences ? this.getDefencesAmount() : 0;
     const totalShips = includeTotalShips
-      ? planet.objects.orbitShips.length
+      ? planet.rBDSFTQ.orbitShips.length
       : 0;
 
     const detailedBuildings = includeDetailedBuildings
-      ? new Map(planet.objects.buildingsLevels)
+      ? new Map(planet.rBDSFTQ.buildingsLevels)
       : new Map();
     const detailedResources = includeDetailedResources
       ? new ResourcesPack(
-        planet.objects.resources.metal,
-        planet.objects.resources.crystal,
-        planet.objects.resources.deuterium
+        planet.rBDSFTQ.resources.metal,
+        planet.rBDSFTQ.resources.crystal,
+        planet.rBDSFTQ.resources.deuterium
       )
       : new ResourcesPack(0, 0, 0);
     const detailedTech = includeDetailedTech
@@ -60,7 +60,7 @@ export class EspionageReportGenerator {
       : new Map();
     const detailedDefences = includeDetailedDefences ? this.getDefenceInstances() : [];
     const detailedShips = includeDetailedShips
-      ? [...planet.objects.orbitShips]
+      ? [...planet.rBDSFTQ.orbitShips]
       : [];
 
     const shipyardProduction = includeQueues ? new ShipyardQueue() : new ShipyardQueue();
@@ -135,3 +135,5 @@ export class EspionageReportGenerator {
     return [];
   }
 }
+
+

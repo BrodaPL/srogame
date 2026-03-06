@@ -187,3 +187,18 @@ export type ClientGalaxyDto = {
   stars: ClientStarSystemDto[][];
   playerNames: PlayerNameEntry[];
 };
+
+export type GalaxyByteCellDto = {
+  planetsAndAsteroids: [number, number];
+};
+
+export type PlanetReportEntryDto = {
+  coordinates: ClientCoordinates;
+  reportData: ClientReportDataDto;
+};
+
+export type GalaxyPresentationDataDto = {
+  reportMap: PlanetReportEntryDto[];
+  galaxyBytes: GalaxyByteCellDto[][];
+  ownedPlanets: ClientPlanetDto[];
+};

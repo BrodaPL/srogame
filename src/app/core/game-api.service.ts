@@ -6,7 +6,8 @@ import {
   StartGameResponse,
   ClientGalaxyDto,
   ClientStarSystemDto,
-  ClientPlanetDto
+  ClientPlanetDto,
+  GalaxyPresentationDataDto
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -41,6 +42,13 @@ export class GameApiService {
     );
   }
 
+  public getGalaxyPresentationData(token: string) {
+    return this.http.get<GalaxyPresentationDataDto>(
+      `${API_BASE_URL}/game/galaxy-presentation-data`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
   public getClientStarSystem(x: number, y: number, token: string) {
     return this.http.get<ClientStarSystemDto>(
       `${API_BASE_URL}/game/client-star-system`,
@@ -58,6 +66,13 @@ export class GameApiService {
         headers: this.authHeaders(token),
         params: { x, y, z }
       }
+    );
+  }
+
+  public getOwnedPlanets(token: string) {
+    return this.http.get<ClientPlanetDto[]>(
+      `${API_BASE_URL}/game/owned-planets`,
+      { headers: this.authHeaders(token) }
     );
   }
 

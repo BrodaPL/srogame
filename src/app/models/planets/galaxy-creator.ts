@@ -155,8 +155,8 @@ export class GalaxyCreator {
             const orbitShips = shipGenerator.generate(level, targetShipsValue);
 
             planet.info.ownerId = nextPlayerId;
-            planet.objects.buildingsLevels = buildingGenerator.generate(level);
-            planet.objects.orbitShips = orbitShips;
+            planet.rBDSFTQ.buildingsLevels = buildingGenerator.generate(level);
+            planet.rBDSFTQ.orbitShips = orbitShips;
 
             const player = new Player(
               nextPlayerId,
@@ -261,8 +261,8 @@ export class GalaxyCreator {
         slot.planet.basicInfo.order,
         startingPlanet.basicInfo.type
       );
-      startingPlanet.objects.buildingsLevels = this.createStartingBuildings();
-      startingPlanet.objects.orbitShips = [];
+      startingPlanet.rBDSFTQ.buildingsLevels = this.createStartingBuildings();
+      startingPlanet.rBDSFTQ.orbitShips = [];
 
       slot.system.planets[slot.index] = startingPlanet;
 
@@ -347,3 +347,5 @@ export class GalaxyCreator {
     return `${systemName} ${index}-${typeInitial}`;
   }
 }
+
+

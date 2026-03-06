@@ -2,7 +2,7 @@ import { SolarSystem } from './solar-system';
 import { Player } from '../player';
 import { NAMES_LIST } from '../enums/names-list';
 import { PlayerType } from '../enums/player-type';
-import { Planet, PlanetBasicInfo, PlanetInfo, PlanetObjects } from './planet';
+import { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ as RBDSFTQ } from './planet';
 import { PlanetaryParameters } from './planetary-parameters';
 import { ResourcesPack } from '../resources-pack';
 import { ClientGalaxy } from './client-galaxy';
@@ -57,9 +57,9 @@ export class Galaxy {
     const info = isOwnedByPlayer
       ? planet.info
       : new PlanetInfo(null, new PlanetaryParameters(0, 0, 0, 0, 0, 0, 0, 0, 0));
-    const objects = isOwnedByPlayer
-      ? planet.objects
-      : new PlanetObjects(
+    const rBDSFTQ = isOwnedByPlayer
+      ? planet.rBDSFTQ
+      : new RBDSFTQ(
         new ResourcesPack(0, 0, 0),
         new Map(),
         [],
@@ -72,7 +72,7 @@ export class Galaxy {
         new ResourcesPack(0, 0, 0)
       );
 
-    return new ClientPlanet(basicInfo, info, objects, reportData, new Map());
+    return new ClientPlanet(basicInfo, info, rBDSFTQ, reportData, new Map());
   }
 
   public createClientStarSystem(
@@ -164,3 +164,6 @@ export class Galaxy {
     }
   }
 }
+
+
+
