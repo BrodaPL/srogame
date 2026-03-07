@@ -131,7 +131,7 @@ export class Galaxy {
       const ownerType = playerTypeById.get(ownerId);
       if (ownerType === PlayerType.BOT) {
         clientInfo.botPlanetCount += 1;
-      } else if (ownerType === PlayerType.NEUTRAL || ownerType === PlayerType.ABANDONED) {
+      } else if (ownerType === PlayerType.NEUTRAL) {
         clientInfo.neutralPlanetCount += 1;
       } else if (ownerType === PlayerType.PLAYER) {
         clientInfo.humanPlanetCount += 1;

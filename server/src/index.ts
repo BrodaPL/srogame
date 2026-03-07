@@ -18,7 +18,7 @@ import type {
   ClientGalaxyDto,
   GalaxyPresentationDataDto,
   GalaxyByteCellDto,
-  PlanetReportEntryDto,
+  OwnershipByteCellDto,
   ClientStarSystemDto,
   ClientPlanetDto,
   ClientCoordinates,
@@ -40,6 +40,7 @@ import type { ResourcesPack } from '../../src/app/models/resources-pack.ts';
 import type { EspionageReportData } from '../../src/app/models/reports/espionage-report-data.ts';
 import type { GalaxyPresentationData as GalaxyPresentationDataType } from '../../src/app/models/planets/galaxy-presentation-data.ts';
 import type { GalaxyByteCell } from '../../src/app/models/planets/galaxy-byte-cell.ts';
+import type { OwnershipByteCell } from '../../src/app/models/planets/ownership-byte-cell.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -690,29 +691,18 @@ function toGalaxyByteCellDto(cell: GalaxyByteCell): GalaxyByteCellDto {
   };
 }
 
-function toPlanetReportEntryDto(
-  coordinates: { x: number; y: number; z: number },
-  reportData: EspionageReportData
-): PlanetReportEntryDto {
+function toOwnershipByteCellDto(cell: OwnershipByteCell): OwnershipByteCellDto {
   return {
-    coordinates: {
-      x: coordinates.x,
-      y: coordinates.y,
-      z: coordinates.z
-    },
-    reportData: toClientReportDataDto(reportData)
+    ownership: [cell.ownership[0], cell.ownership[1], cell.ownership[2], cell.ownership[3]]
   };
 }
 
 function toGalaxyPresentationDataDto(data: GalaxyPresentationDataType): GalaxyPresentationDataDto {
-  const reportMap: PlanetReportEntryDto[] = [];
-  for (const [coordinates, reportData] of data.reportMap.entries()) {
-    reportMap.push(toPlanetReportEntryDto(coordinates, reportData));
-  }
-
   return {
-    reportMap,
     galaxyBytes: data.galaxyBytes.map((row) => row.map((cell) => toGalaxyByteCellDto(cell))),
+    ownershipBytes: data.ownershipBytes.map((row) =>
+      row.map((cell) => toOwnershipByteCellDto(cell))
+    ),
     ownedPlanets: data.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet))
   };
 }

@@ -192,13 +192,12 @@ export type GalaxyByteCellDto = {
   planetsAndAsteroids: [number, number];
 };
 
-export type PlanetReportEntryDto = {
-  coordinates: ClientCoordinates;
-  reportData: ClientReportDataDto;
+export type OwnershipByteCellDto = {
+  ownership: [number, number, number, number];
 };
 
 export type GalaxyPresentationDataDto = {
-  reportMap: PlanetReportEntryDto[];
   galaxyBytes: GalaxyByteCellDto[][];
+  ownershipBytes: OwnershipByteCellDto[][];
   ownedPlanets: ClientPlanetDto[];
 };

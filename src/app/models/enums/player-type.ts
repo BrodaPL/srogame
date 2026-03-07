@@ -1,6 +1,5 @@
 export enum PlayerType {
   PLAYER = "PLAYER",
   BOT = "BOT",
-  NEUTRAL = "NEUTRAL",
-  ABANDONED = "ABANDONED"
+  NEUTRAL = "NEUTRAL"
 }

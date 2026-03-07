@@ -308,7 +308,7 @@ export class GalaxyCreator {
             return;
           }
 
-          if (owner.type === PlayerType.NEUTRAL || owner.type === PlayerType.ABANDONED) {
+          if (owner.type === PlayerType.NEUTRAL) {
             planets.push({ system, planet, index });
           }
         });
