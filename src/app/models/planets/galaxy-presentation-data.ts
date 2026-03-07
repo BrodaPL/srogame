@@ -7,13 +7,13 @@ import { PlayerType } from '../enums/player-type';
 export class GalaxyPresentationData {
   constructor(
     public galaxyBytes: GalaxyByteCell[][],
-    public ownershipBytes: OwnershipByteCell[][],
+    public ownershipBytes: Array<Array<OwnershipByteCell | null>>,
     public ownedPlanets: ClientPlanet[]
   ) {}
 
   public static fromGalaxy(galaxy: Galaxy, playerId: number): GalaxyPresentationData {
     const galaxyBytes: GalaxyByteCell[][] = [];
-    const ownershipBytes: OwnershipByteCell[][] = [];
+    const ownershipBytes: Array<Array<OwnershipByteCell | null>> = [];
     const ownedPlanets: ClientPlanet[] = [];
     const playerTypeById = new Map<number, PlayerType>();
 
@@ -23,7 +23,7 @@ export class GalaxyPresentationData {
 
     for (const row of galaxy.stars) {
       const byteRow: GalaxyByteCell[] = [];
-      const ownershipRow: OwnershipByteCell[] = [];
+      const ownershipRow: Array<OwnershipByteCell | null> = [];
       for (const system of row) {
         byteRow.push(GalaxyByteCell.fromSolarSystem(system));
         ownershipRow.push(OwnershipByteCell.fromSolarSystem(system, playerId, playerTypeById));

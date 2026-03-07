@@ -9,6 +9,7 @@ This file captures session context for collaborators and future AI agents.
 - Secondary purpose: Learning TypeScript and Angular through building the game.
 - Persistence (current): Uses browser localStorage key `srogame:setup` and `srogame:player` (auth session). Galaxy is held in server memory and fetched via API. Accounts + sessions are stored in `server/data/auth.json`.
 - Conventions: Use camelCase for variable names.
+- Collaboration preference: Use planning mode by default for regular development tasks.
 
 ## Current Behavior
 - Route `/` shows main menu (load, singleplayer, multiplayer, encyclopedia, help/about).
@@ -53,6 +54,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-03-07: Reworked Galactic View to consume `GalaxyPresentationDataDto` directly (not `ClientGalaxy`/`ClientStarSystem`) and render ownership states from `ownershipBytes` with unknown (`null`) handling, tooltips, and legend markers. `ownershipBytes` now returns `null` per cell when thePlayer has no espionage data for that system to reduce payload size. Kept `GalaxyPresentationData` cached in server memory per player per turn (no per-request recomputation).
 - 2026-03-07: Removed `PlayerType.ABANDONED`. Added `OwnershipByteCell` (counts ownership from the player's espionage reports only) and replaced `GalaxyPresentationData.reportMap` with `ownershipBytes` plus updated DTO/server serialization.
 - 2026-03-06: Renamed `PlanetObjects` to `rBDSFTQ` (Resources/Buildings/Defences/Ships/Fleets/Technology/Queues) and renamed the `Planet.objects` property to `Planet.rBDSFTQ`. Added `GalaxyByteCell` and `GalaxyPresentationData` models plus DTOs. Refactored client to use `GET /api/game/galaxy-presentation-data` for the Galactic view, added `GET /api/game/owned-planets`, and kept `client-star-system`/`client-planet` intact. Server now builds and caches `GalaxyPresentationData` per human player after galaxy creation and serves it from memory.
 - 2026-03-06: Added client-facing API DTOs and endpoints (`/api/game/client-galaxy`, `/api/game/client-star-system`, `/api/game/client-planet`) with array serialization for `Map`/`Set` and coordinate payloads; added `includePlanets` query flag to lighten `client-galaxy` responses and adjusted client galaxy construction to avoid full planet creation when omitted. Updated `GameApiService` and `GalacticView` to fetch `ClientGalaxy` DTOs, added change detection for view updates, and aligned camelCase fields. Updated server TypeScript config to allow `.ts` type-only imports and switched server type imports accordingly.

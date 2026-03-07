@@ -2,31 +2,57 @@
 <section class="galaxy-preview">
   <div class="galaxy-preview__header">
     <h3>Galaxy Preview</h3>
-    @if (galaxyPresentation) {
+    @if (gridHeight > 0 && gridWidth > 0) {
       <p class="galaxy-preview__meta">
-        {{ galaxyPresentation.galaxyBytes[0].length }}x{{ galaxyPresentation.galaxyBytes.length }}
+        {{ gridWidth }}x{{ gridHeight }}
       </p>
     }
   </div>
+  <div class="galaxy-legend">
+    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--owned"></span>You</span>
+    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--human"></span>Human</span>
+    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--bot"></span>Bot</span>
+    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--neutral"></span>Neutral</span>
+    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--mixed"></span>Mixed</span>
+    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--unknown"></span>Unknown</span>
+  </div>
 
-  @if (galaxyPresentation) {
+  @if (gridHeight > 0 && gridWidth > 0) {
     <div
       class="galaxy-grid"
       [style.grid-template-columns]="
-        'repeat(' + galaxyPresentation.galaxyBytes[0].length + ', ' + gridCellSize + 'px)'
+        'repeat(' + gridWidth + ', ' + gridCellSize + 'px)'
       "
     >
-      @for (row of galaxyPresentation.galaxyBytes; track $index; let rowIndex = $index) {
-        @for (cell of row; track $index; let colIndex = $index) {
+      @for (row of grid; track $index) {
+        @for (cell of row; track $index) {
           <div
             class="galaxy-cell"
-            [class.galaxy-cell--void]="cell.planetsAndAsteroids[0] === -1"
-            [class.galaxy-cell--center]="cell.planetsAndAsteroids[0] === -2"
+            [class.galaxy-cell--void]="cell.isVoid"
+            [class.galaxy-cell--center]="cell.isCenter"
+            [class.galaxy-cell--owned]="cell.ownershipKind === 'owned'"
+            [class.galaxy-cell--human]="cell.ownershipKind === 'human'"
+            [class.galaxy-cell--bot]="cell.ownershipKind === 'bot'"
+            [class.galaxy-cell--neutral]="cell.ownershipKind === 'neutral'"
+            [class.galaxy-cell--mixed]="cell.ownershipKind === 'mixed'"
+            [class.galaxy-cell--unknown]="cell.ownershipKind === 'unknown'"
+            [attr.title]="cell.tooltip"
           >
-            @if (cell.planetsAndAsteroids[0] !== -2) {
+            @if (!cell.isCenter) {
               <span class="galaxy-coords">
-                {{ colIndex }},{{ rowIndex }}
+                {{ cell.x }},{{ cell.y }}
               </span>
+            }
+            @if (!cell.isVoid && !cell.isCenter) {
+              <span
+                class="galaxy-marker"
+                [class.galaxy-marker--owned]="cell.ownershipKind === 'owned'"
+                [class.galaxy-marker--human]="cell.ownershipKind === 'human'"
+                [class.galaxy-marker--bot]="cell.ownershipKind === 'bot'"
+                [class.galaxy-marker--neutral]="cell.ownershipKind === 'neutral'"
+                [class.galaxy-marker--mixed]="cell.ownershipKind === 'mixed'"
+                [class.galaxy-marker--unknown]="cell.ownershipKind === 'unknown' || cell.ownershipKind === 'empty'"
+              ></span>
             }
           </div>
         }

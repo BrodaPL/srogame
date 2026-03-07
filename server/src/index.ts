@@ -691,7 +691,11 @@ function toGalaxyByteCellDto(cell: GalaxyByteCell): GalaxyByteCellDto {
   };
 }
 
-function toOwnershipByteCellDto(cell: OwnershipByteCell): OwnershipByteCellDto {
+function toOwnershipByteCellDto(cell: OwnershipByteCell | null): OwnershipByteCellDto | null {
+  if (!cell) {
+    return null;
+  }
+
   return {
     ownership: [cell.ownership[0], cell.ownership[1], cell.ownership[2], cell.ownership[3]]
   };

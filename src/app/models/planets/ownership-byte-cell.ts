@@ -22,17 +22,19 @@ export class OwnershipByteCell {
     system: SolarSystem,
     playerId: number,
     playerTypeById: Map<number, PlayerType>
-  ): OwnershipByteCell {
+  ): OwnershipByteCell | null {
     let ownedByPlayer = 0;
     let neutralOwned = 0;
     let botOwned = 0;
     let humanOwned = 0;
+    let hasAnyReportData = false;
 
     for (const planet of system.planets) {
       const reportData = planet.lastReportData.get(playerId);
       if (!reportData) {
         continue;
       }
+      hasAnyReportData = true;
 
       const ownerId = planet.info.ownerId;
       if (ownerId === playerId) {
@@ -53,6 +55,10 @@ export class OwnershipByteCell {
       } else {
         neutralOwned += 1;
       }
+    }
+
+    if (!hasAnyReportData) {
+      return null;
     }
 
     return new OwnershipByteCell(ownedByPlayer, neutralOwned, botOwned, humanOwned);

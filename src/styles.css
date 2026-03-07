@@ -861,6 +861,20 @@ app-root {
   font-family: var(--font-mono), serif;
 }
 
+.galaxy-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.85rem;
+}
+
+.galaxy-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .galaxy-grid {
 
   --cell-size: 22px;
@@ -883,6 +897,7 @@ app-root {
   border: 1px solid transparent;
   display: grid;
   place-items: center;
+  position: relative;
   color: #cfe1ff;
   font-size: 0.45rem;
   line-height: 1;
@@ -907,6 +922,26 @@ app-root {
   font-weight: 700;
 }
 
+.galaxy-cell--owned {
+  background: #1b4b2f;
+}
+
+.galaxy-cell--human {
+  background: #53232a;
+}
+
+.galaxy-cell--bot {
+  background: #1f4155;
+}
+
+.galaxy-cell--neutral {
+  background: #4a3d1f;
+}
+
+.galaxy-cell--mixed {
+  background: #5a3522;
+}
+
 .galaxy-coords {
   display: block;
   opacity: 0;
@@ -916,6 +951,45 @@ app-root {
 
 .galaxy-cell:hover .galaxy-coords {
   opacity: 0.9;
+}
+
+.galaxy-marker {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.galaxy-cell .galaxy-marker {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+}
+
+.galaxy-marker--owned {
+  background: #6de8ab;
+}
+
+.galaxy-marker--human {
+  background: #ff7f8d;
+}
+
+.galaxy-marker--bot {
+  background: #71d4ff;
+}
+
+.galaxy-marker--neutral {
+  background: #f2d17a;
+}
+
+.galaxy-marker--mixed {
+  background: #ffae73;
+}
+
+.galaxy-marker--unknown {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .empty {

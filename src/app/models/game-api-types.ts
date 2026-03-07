@@ -198,6 +198,6 @@ export type OwnershipByteCellDto = {
 
 export type GalaxyPresentationDataDto = {
   galaxyBytes: GalaxyByteCellDto[][];
-  ownershipBytes: OwnershipByteCellDto[][];
+  ownershipBytes: Array<Array<OwnershipByteCellDto | null>>;
   ownedPlanets: ClientPlanetDto[];
 };
