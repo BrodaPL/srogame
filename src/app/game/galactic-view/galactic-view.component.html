@@ -1,87 +1,244 @@
 <app-top-menu></app-top-menu>
-<section class="galaxy-preview">
-  <div class="galaxy-preview__header">
-    <h3>
-      Galaxy Preview
-      @if (gridHeight > 0 && gridWidth > 0) {
-        <span class="galaxy-preview__meta">
-          @if (galaxyName) {
-            {{ galaxyName }}
-          }
-          {{ gridWidth }}x{{ gridHeight }}
-        </span>
-      } @else if (galaxyName) {
-        <span class="galaxy-preview__meta">{{ galaxyName }}</span>
-      }
-    </h3>
-  </div>
-
-  @if (gridHeight > 0 && gridWidth > 0) {
-    <div
-      #topScroll
-      class="galaxy-grid-top-scroll"
-      (scroll)="onTopScrollbarScroll()"
-    >
-      <div
-        class="galaxy-grid-top-scroll__content"
-        [style.width.px]="topScrollContentWidth"
-      ></div>
+<div class="galactic-view-shell">
+  <section class="galaxy-preview">
+    <div class="galaxy-preview__header">
+      <h3>
+        Galaxy Preview
+        @if (gridHeight > 0 && gridWidth > 0) {
+          <span class="galaxy-preview__meta">
+            @if (galaxyName) {
+              {{ galaxyName }}
+            }
+            {{ gridWidth }}x{{ gridHeight }}
+          </span>
+        } @else if (galaxyName) {
+          <span class="galaxy-preview__meta">{{ galaxyName }}</span>
+        }
+      </h3>
     </div>
-    <div
-      #bottomScroll
-      class="galaxy-grid-scroll"
-      (scroll)="onBottomScrollbarScroll()"
-    >
+
+    @if (gridHeight > 0 && gridWidth > 0) {
       <div
-        class="galaxy-grid"
-        [style.grid-template-columns]="
-          'repeat(' + gridWidth + ', ' + gridCellSize + 'px)'
-        "
+        #topScroll
+        class="galaxy-grid-top-scroll"
+        (scroll)="onTopScrollbarScroll()"
       >
-        @for (row of grid; track $index) {
-          @for (cell of row; track $index) {
-            <div
-              class="galaxy-cell"
-              [class.galaxy-cell--void]="cell.isVoid"
-              [class.galaxy-cell--center]="cell.isCenter"
-              [class.galaxy-cell--no-data]="cell.fillKind === 'noData'"
-              [class.galaxy-cell--neutral-only]="cell.fillKind === 'neutralOnly'"
-              [class.galaxy-cell--player-only]="cell.fillKind === 'playerOnly'"
-              [class.galaxy-cell--bot-or-neutral]="cell.fillKind === 'botOrNeutral'"
-              [class.galaxy-cell--human-or-neutral]="cell.fillKind === 'humanOrNeutral'"
-              [class.galaxy-cell--human-bot-any-neutral]="cell.fillKind === 'humanBotAnyNeutral'"
-              [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
-              [class.galaxy-cell--with-note]="cell.noteBorderColor"
-              [style.--note-border-color]="cell.noteBorderColor"
-              [attr.title]="cell.tooltip"
-            >
-              @if (cell.valueLabel) {
-                <span
-                  class="galaxy-cell__value"
-                  [class.galaxy-cell__value--with-owned-markers]="cell.ownedPlanetsDotsLabel"
-                >
-                  {{ cell.valueLabel }}
+        <div
+          class="galaxy-grid-top-scroll__content"
+          [style.width.px]="topScrollContentWidth"
+        ></div>
+      </div>
+      <div
+        #bottomScroll
+        class="galaxy-grid-scroll"
+        (scroll)="onBottomScrollbarScroll()"
+      >
+        <div
+          class="galaxy-grid"
+          [style.grid-template-columns]="
+            'repeat(' + gridWidth + ', ' + gridCellSize + 'px)'
+          "
+        >
+          @for (row of grid; track $index) {
+            @for (cell of row; track $index) {
+              <div
+                class="galaxy-cell"
+                [class.galaxy-cell--selected]="selectedCell?.x === cell.x && selectedCell?.y === cell.y"
+                [class.galaxy-cell--void]="cell.isVoid"
+                [class.galaxy-cell--center]="cell.isCenter"
+                [class.galaxy-cell--no-data]="cell.fillKind === 'noData'"
+                [class.galaxy-cell--neutral-only]="cell.fillKind === 'neutralOnly'"
+                [class.galaxy-cell--player-only]="cell.fillKind === 'playerOnly'"
+                [class.galaxy-cell--bot-or-neutral]="cell.fillKind === 'botOrNeutral'"
+                [class.galaxy-cell--human-or-neutral]="cell.fillKind === 'humanOrNeutral'"
+                [class.galaxy-cell--human-bot-any-neutral]="cell.fillKind === 'humanBotAnyNeutral'"
+                [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
+                [class.galaxy-cell--with-note]="cell.noteBorderColor"
+                [style.--note-border-color]="cell.noteBorderColor"
+                [attr.title]="cell.tooltip"
+                (click)="onCellClick(cell)"
+              >
+                @if (cell.valueLabel) {
+                  <span
+                    class="galaxy-cell__value"
+                    [class.galaxy-cell__value--with-owned-markers]="cell.ownedPlanetsDotsLabel"
+                  >
+                    {{ cell.valueLabel }}
+                  </span>
+                }
+                @if (cell.ownedPlanetsDotsLabel) {
+                  <span class="galaxy-cell__owned-planets">
+                    {{ cell.ownedPlanetsDotsLabel }}
+                  </span>
+                }
+                <span class="galaxy-cell__hover-coords">
+                  {{ cell.coordsLabel }}
                 </span>
-              }
-              @if (cell.ownedPlanetsDotsLabel) {
-                <span class="galaxy-cell__owned-planets">
-                  {{ cell.ownedPlanetsDotsLabel }}
-                </span>
-              }
-              <span class="galaxy-cell__hover-coords">
-                {{ cell.coordsLabel }}
-              </span>
-            </div>
+              </div>
+            }
           }
+        </div>
+      </div>
+    } @else if (isLoading) {
+      <p class="overview-empty">Loading galaxy data...</p>
+    } @else if (loadError) {
+      <p class="overview-empty">{{ loadError }}</p>
+    } @else {
+      <p class="overview-empty">Galaxy data not loaded yet.</p>
+    }
+  </section>
+
+  <aside class="star-system-preview">
+    <h3 class="star-system-preview__title">Star System Preview</h3>
+
+    @if (!selectedCell) {
+      <p class="overview-empty">Click a galaxy cell to preview a star system.</p>
+    } @else {
+      <div class="star-system-preview__summary">
+        <p class="star-system-preview__name">{{ selectedStarSystemNameLabel() }}</p>
+        <p class="star-system-preview__meta-line">Coordinates: {{ selectedCoordinatesLabel() }}</p>
+        <p class="star-system-preview__meta-line">Planets: {{ selectedPlanetsCountLabel() }}</p>
+        <p class="star-system-preview__meta-line">Asteroids: {{ selectedAsteroidsCountLabel() }}</p>
+      </div>
+
+      <div class="star-system-preview__actions">
+        <button type="button" class="star-system-preview__button" disabled title="Coming in future session">
+          Send spy probes
+        </button>
+        <button type="button" class="star-system-preview__button" disabled title="Coming in future session">
+          Enter system
+        </button>
+
+        @if (selectedStarSystemNote()) {
+          <button
+            type="button"
+            class="star-system-preview__button"
+            [disabled]="areNoteActionsDisabled()"
+            (click)="openModifyNoteDialog()"
+          >
+            Modify note
+          </button>
+          <button
+            type="button"
+            class="star-system-preview__button star-system-preview__button--danger"
+            [disabled]="areNoteActionsDisabled()"
+            (click)="openDeleteNoteConfirm()"
+          >
+            Delete note
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="star-system-preview__button"
+            [disabled]="areNoteActionsDisabled()"
+            (click)="openAddNoteDialog()"
+          >
+            Add note
+          </button>
         }
       </div>
+
+      @if (noteActionError) {
+        <p class="form-error">{{ noteActionError }}</p>
+      }
+
+      @if (selectedSpecialInfoLabel(); as selectedSpecialInfo) {
+        <p class="star-system-preview__special">{{ selectedSpecialInfo }}</p>
+      }
+
+      @if (selectedStarSystemNote(); as selectedNote) {
+        <div
+          class="star-system-preview__note"
+          [style.--note-border-color]="selectedNote.borderColor"
+        >
+          {{ selectedNote.text }}
+        </div>
+      }
+
+      @if (selectedSystemLoading) {
+        <p class="overview-empty">Loading selected star system...</p>
+      } @else if (selectedSystemError) {
+        <p class="overview-empty">{{ selectedSystemError }}</p>
+      } @else if (selectedSystem) {
+        @if (selectedSystemPlanets.length > 0) {
+          <div class="star-system-preview__planets">
+            @for (planet of selectedSystemPlanets; track planet.coordinates.z) {
+              <app-mini-planet-preview [planet]="planet" />
+            }
+          </div>
+        } @else {
+          <p class="overview-empty">No planets in this star system.</p>
+        }
+      }
+    }
+  </aside>
+</div>
+
+@if (isNoteEditorOpen) {
+  <div class="note-modal-backdrop" (click)="closeNoteEditor()"></div>
+  <section class="note-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <h4 class="note-modal__title">{{ noteEditorTitleLabel() }}</h4>
+    <p class="note-modal__meta">
+      {{ selectedStarSystemNameLabel() }} | {{ selectedCoordinatesLabel() }}
+    </p>
+
+    <label class="note-modal__label" for="note-color">Border color</label>
+    <select
+      id="note-color"
+      class="note-modal__select"
+      [(ngModel)]="noteEditorColor"
+      [style.color]="noteEditorColor"
+    >
+      @for (option of noteColorOptions; track option.value) {
+        <option [ngValue]="option.value" [style.color]="option.value">{{ option.label }}</option>
+      }
+    </select>
+
+    <label class="note-modal__label" for="note-text">Note text</label>
+    <textarea
+      id="note-text"
+      class="note-modal__textarea"
+      [(ngModel)]="noteEditorText"
+      [attr.maxlength]="maxNoteLength"
+      rows="6"
+    ></textarea>
+    <p class="note-modal__counter">{{ noteEditorText.length }}/{{ maxNoteLength }}</p>
+
+    @if (noteEditorError) {
+      <p class="form-error">{{ noteEditorError }}</p>
+    }
+
+    <div class="note-modal__actions">
+      <button type="button" class="star-system-preview__button" (click)="closeNoteEditor()" [disabled]="isNoteActionLoading">
+        Cancel
+      </button>
+      <button type="button" class="star-system-preview__button" (click)="saveNote()" [disabled]="isNoteActionLoading">
+        Confirm
+      </button>
     </div>
-  } @else if (isLoading) {
-    <p class="overview-empty">Loading galaxy data...</p>
-  } @else if (loadError) {
-    <p class="overview-empty">{{ loadError }}</p>
-  } @else {
-    <p class="overview-empty">Galaxy data not loaded yet.</p>
-  }
-</section>
+  </section>
+}
+
+@if (isDeleteNoteConfirmOpen) {
+  <div class="note-modal-backdrop" (click)="closeDeleteNoteConfirm()"></div>
+  <section class="note-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <h4 class="note-modal__title">Delete Note</h4>
+    <p class="note-modal__meta">
+      Delete note for {{ selectedStarSystemNameLabel() }} ({{ selectedCoordinatesLabel() }})?
+    </p>
+    <div class="note-modal__actions">
+      <button type="button" class="star-system-preview__button" (click)="closeDeleteNoteConfirm()" [disabled]="isNoteActionLoading">
+        Cancel
+      </button>
+      <button
+        type="button"
+        class="star-system-preview__button star-system-preview__button--danger"
+        (click)="deleteNote()"
+        [disabled]="isNoteActionLoading"
+      >
+        Delete
+      </button>
+    </div>
+  </section>
+}
 

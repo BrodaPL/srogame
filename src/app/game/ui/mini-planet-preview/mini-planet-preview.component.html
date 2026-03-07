@@ -1,0 +1,42 @@
+<article class="mini-planet-preview">
+  <h4 class="mini-planet-preview__name">{{ planetNameLabel() }}</h4>
+
+  @if (planetImagePath(); as imagePath) {
+    <img class="mini-planet-preview__image" [src]="imagePath" [alt]="planetNameLabel() + ' image'" />
+  }
+
+  <div class="mini-planet-preview__tags">
+    @for (tag of tags; track tag.label) {
+      <span class="mini-planet-preview__tag" [attr.title]="tag.tooltip">
+        {{ tag.label }}
+      </span>
+    }
+  </div>
+
+  <div class="mini-planet-preview__actions">
+    <button
+      type="button"
+      class="mini-planet-preview__button"
+      disabled
+      title="Coming in future session"
+    >
+      View Planet
+    </button>
+    <button
+      type="button"
+      class="mini-planet-preview__button"
+      disabled
+      title="Coming in future session"
+    >
+      Spy Planet
+    </button>
+    <button
+      type="button"
+      class="mini-planet-preview__button"
+      [attr.title]="'Copy: ' + coordinatesLabel()"
+      (click)="copyCoordinates()"
+    >
+      Copy coordinates
+    </button>
+  </div>
+</article>

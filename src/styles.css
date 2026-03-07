@@ -844,6 +844,178 @@ app-root {
   padding: 1.25rem;
 }
 
+.galactic-view-shell {
+  position: relative;
+}
+
+.star-system-preview {
+  position: absolute;
+  top: 0;
+  right: calc(-1 * var(--right-feature-space) + 0.5rem);
+  width: calc(var(--right-feature-space) - 0.75rem);
+  max-height: calc(100vh - 1rem);
+  overflow-y: auto;
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+  padding: 0.85rem;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(12, 16, 22, 0.9);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35);
+}
+
+.star-system-preview__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.star-system-preview__summary {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.star-system-preview__name {
+  margin: 0;
+  font-weight: 700;
+}
+
+.star-system-preview__meta-line {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-family: var(--font-mono), serif;
+}
+
+.star-system-preview__actions {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.star-system-preview__button {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.star-system-preview__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.star-system-preview__button--danger {
+  border-color: rgba(255, 84, 84, 0.32);
+  color: #ffb4b4;
+}
+
+.note-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 35;
+}
+
+.note-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 1.5rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.9rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 16, 22, 0.97);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+  z-index: 40;
+}
+
+.note-modal__title {
+  margin: 0;
+}
+
+.note-modal__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.note-modal__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.note-modal__select,
+.note-modal__textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #000;
+  color: #fff;
+  font-family: var(--font-sans), serif;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.6rem;
+}
+
+.note-modal__select option {
+  background: #000;
+}
+
+.note-modal__textarea {
+  resize: vertical;
+  min-height: 110px;
+}
+
+.note-modal__counter {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  justify-self: end;
+}
+
+.note-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.star-system-preview__special {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.star-system-preview__note {
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid var(--note-border-color);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.6rem 0.7rem;
+  white-space: pre-wrap;
+  font-size: 0.86rem;
+}
+
+.star-system-preview__planets {
+  display: grid;
+  gap: 0.5rem;
+}
+
 .galaxy-preview__header {
   display: block;
 }
@@ -930,6 +1102,7 @@ app-root {
   font-family: var(--font-mono), serif;
   transform-origin: center;
   transition: transform 0.12s ease;
+  cursor: pointer;
 }
 
 .galaxy-cell:hover {
@@ -944,6 +1117,72 @@ app-root {
 
 .galaxy-cell--with-note:hover {
   border-color: var(--note-border-color);
+}
+
+.galaxy-cell--selected {
+  border-color: #f6b44c;
+  box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.4);
+}
+
+.mini-planet-preview {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mini-planet-preview__name {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.mini-planet-preview__image {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  justify-self: start;
+}
+
+.mini-planet-preview__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.mini-planet-preview__tag {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.16rem 0.5rem;
+  color: #dbe5f6;
+}
+
+.mini-planet-preview__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.mini-planet-preview__button {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #dbe5f6;
+  font-size: 0.66rem;
+  font-weight: 600;
+  padding: 0.16rem 0.48rem;
+  cursor: pointer;
+}
+
+.mini-planet-preview__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .galaxy-cell--void {
@@ -1039,6 +1278,13 @@ app-root {
   .game {
     --right-feature-space: 0px;
     padding: 0.5rem;
+  }
+
+  .star-system-preview {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin-top: 0.85rem;
   }
 }
 

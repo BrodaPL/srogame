@@ -206,6 +206,13 @@ export type StarSystemNoteDto = {
   text: string;
 };
 
+export type UpsertStarSystemNoteRequest = {
+  x: number;
+  y: number;
+  borderColor: NoteBorderColor;
+  text: string;
+};
+
 export type GalaxyPresentationDataDto = {
   galaxyBytes: GalaxyByteCellDto[][];
   ownershipBytes: Array<Array<OwnershipByteCellDto | null>>;

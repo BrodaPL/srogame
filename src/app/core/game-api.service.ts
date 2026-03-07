@@ -7,7 +7,9 @@ import {
   ClientGalaxyDto,
   ClientStarSystemDto,
   ClientPlanetDto,
-  GalaxyPresentationDataDto
+  GalaxyPresentationDataDto,
+  UpsertStarSystemNoteRequest,
+  StarSystemNoteDto
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -73,6 +75,24 @@ export class GameApiService {
     return this.http.get<ClientPlanetDto[]>(
       `${API_BASE_URL}/game/owned-planets`,
       { headers: this.authHeaders(token) }
+    );
+  }
+
+  public createOrUpdateStarSystemNote(request: UpsertStarSystemNoteRequest, token: string) {
+    return this.http.post<StarSystemNoteDto>(
+      `${API_BASE_URL}/game/star-system-note`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public deleteStarSystemNote(x: number, y: number, token: string) {
+    return this.http.delete<void>(
+      `${API_BASE_URL}/game/star-system-note`,
+      {
+        headers: this.authHeaders(token),
+        params: { x, y }
+      }
     );
   }
 

@@ -8,6 +8,8 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypt
 import galaxyCreatorModule from '../../src/app/models/planets/galaxy-creator.js';
 import galaxyPresentationDataModule from '../../src/app/models/planets/galaxy-presentation-data.js';
 import espionageReportGeneratorModule from '../../src/app/generators/espionage-report-generator.js';
+import starSystemNoteModule from '../../src/app/models/planets/star-system-note.js';
+import noteBorderColorModule from '../../src/app/models/enums/note-border-color.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   GalaxySetup,
@@ -32,7 +34,8 @@ import type {
   ClientInfoDto,
   PlayerNameEntry,
   LoginRequest,
-  RegisterRequest
+  RegisterRequest,
+  UpsertStarSystemNoteRequest
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -43,7 +46,8 @@ import type { EspionageReportData } from '../../src/app/models/reports/espionage
 import type { GalaxyPresentationData as GalaxyPresentationDataType } from '../../src/app/models/planets/galaxy-presentation-data.ts';
 import type { GalaxyByteCell } from '../../src/app/models/planets/galaxy-byte-cell.ts';
 import type { OwnershipByteCell } from '../../src/app/models/planets/ownership-byte-cell.ts';
-import type { StarSystemNote } from '../../src/app/models/planets/star-system-note.ts';
+import type { StarSystemNote as StarSystemNoteType } from '../../src/app/models/planets/star-system-note.ts';
+import type { NoteBorderColor as NoteBorderColorType } from '../../src/app/models/enums/note-border-color.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -53,6 +57,12 @@ const { GalaxyPresentationData } = galaxyPresentationDataModule as {
 };
 const { EspionageReportGenerator } = espionageReportGeneratorModule as {
   EspionageReportGenerator: typeof import('../../src/app/generators/espionage-report-generator.js').EspionageReportGenerator;
+};
+const { StarSystemNote } = starSystemNoteModule as {
+  StarSystemNote: typeof import('../../src/app/models/planets/star-system-note.js').StarSystemNote;
+};
+const { NoteBorderColor } = noteBorderColorModule as {
+  NoteBorderColor: typeof import('../../src/app/models/enums/note-border-color.js').NoteBorderColor;
 };
 
 const app = express();
@@ -71,7 +81,10 @@ const PASSWORD_MIN = 6;
 const PASSWORD_MAX = 72;
 const PLAYER_TYPE_PLAYER = 'PLAYER' as const;
 const SELF_REPORT_LEVEL = 999;
+const STARTING_SYSTEM_REPORT_LEVEL = 1;
+const STAR_SYSTEM_NOTE_TEXT_MAX_LENGTH = 500;
 const INITIAL_TURN_NUMBER = 1;
+const NOTE_BORDER_COLOR_VALUES = new Set<string>(Object.values(NoteBorderColor));
 
 let currentGalaxy: Galaxy | null = null;
 let currentGameOwnerId: number | null = null;
@@ -230,6 +243,89 @@ app.get('/api/game/galaxy-presentation-data', (req, res) => {
     starSystemNotes
   );
   return res.status(200).json(response);
+});
+
+app.post('/api/game/star-system-note', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as UpsertStarSystemNoteRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const borderColor = normalizeStarSystemNoteBorderColor(body?.borderColor);
+  const text = normalizeStarSystemNoteText(body?.text);
+
+  if (x === null || y === null || !borderColor || !text) {
+    return res.status(400).json({ error: 'Invalid star system note payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  if (system.isVoid || system.isGalaxyCenter) {
+    return res.status(400).json({ error: 'Cannot set note for Void or Galaxy Center.' });
+  }
+
+  const note = new StarSystemNote({ x, y }, borderColor, text);
+  system.starSystemNotes.set(playerId, note);
+
+  const response: StarSystemNoteDto = toStarSystemNoteDto(note);
+  return res.status(200).json(response);
+});
+
+app.delete('/api/game/star-system-note', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const x = parseNonNegativeInt(req.query.x);
+  const y = parseNonNegativeInt(req.query.y);
+  if (x === null || y === null) {
+    return res.status(400).json({ error: 'Invalid coordinates.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  if (system.isVoid || system.isGalaxyCenter) {
+    return res.status(400).json({ error: 'Cannot delete note for Void or Galaxy Center.' });
+  }
+
+  system.starSystemNotes.delete(playerId);
+  return res.status(204).send();
 });
 
 app.get('/api/game/client-galaxy', (req, res) => {
@@ -575,6 +671,40 @@ function parseNonNegativeInt(value: unknown): number | null {
   return parsed;
 }
 
+function parseBodyNonNegativeInt(value: unknown): number | null {
+  if (!Number.isInteger(value)) {
+    return null;
+  }
+
+  const parsed = value as number;
+  if (parsed < 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function normalizeStarSystemNoteText(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > STAR_SYSTEM_NOTE_TEXT_MAX_LENGTH) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function normalizeStarSystemNoteBorderColor(value: unknown): NoteBorderColorType | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return NOTE_BORDER_COLOR_VALUES.has(value) ? (value as NoteBorderColorType) : null;
+}
+
 function toResourcesPackDto(pack: ResourcesPack): ResourcesPackDto {
   return {
     metal: pack.metal,
@@ -700,6 +830,10 @@ function getPresentationData(galaxy: Galaxy, playerId: number): GalaxyPresentati
 
 function generateSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber: number): void {
   const reportGenerator = new EspionageReportGenerator();
+  const playersById = new Map<number, (typeof galaxy.players)[number]>();
+  for (const entry of galaxy.players) {
+    playersById.set(entry.playerId, entry);
+  }
 
   for (const player of galaxy.players) {
     if (player.type !== PLAYER_TYPE_PLAYER) {
@@ -727,6 +861,32 @@ function generateSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber: number):
         }
       }
     }
+
+    const homePlanet = player.planets[0];
+    const startingSystem = homePlanet?.basicInfo.solarSystem;
+    if (!homePlanet || !startingSystem) {
+      continue;
+    }
+
+    for (const planet of startingSystem.planets) {
+      if (planet === homePlanet || planet.lastReportData.has(player.playerId)) {
+        continue;
+      }
+
+      const ownerId = planet.info.ownerId;
+      const planetOwner = ownerId === null ? null : playersById.get(ownerId) ?? null;
+      const report = reportGenerator.createEspionageReport(
+        player,
+        planetOwner,
+        planet,
+        0,
+        {
+          forcedReportLevel: STARTING_SYSTEM_REPORT_LEVEL,
+          reportDate: turnNumber
+        }
+      );
+      planet.lastReportData.set(player.playerId, report);
+    }
   }
 }
 
@@ -746,7 +906,7 @@ function toOwnershipByteCellDto(cell: OwnershipByteCell | null): OwnershipByteCe
   };
 }
 
-function toStarSystemNoteDto(note: StarSystemNote): StarSystemNoteDto {
+function toStarSystemNoteDto(note: StarSystemNoteType): StarSystemNoteDto {
   return {
     coordinates: {
       x: note.coordinates.x,
@@ -759,7 +919,7 @@ function toStarSystemNoteDto(note: StarSystemNote): StarSystemNoteDto {
 
 function toGalaxyPresentationDataDto(
   data: GalaxyPresentationDataType,
-  starSystemNotes: StarSystemNote[]
+  starSystemNotes: StarSystemNoteType[]
 ): GalaxyPresentationDataDto {
   return {
     galaxyBytes: data.galaxyBytes.map((row) => row.map((cell) => toGalaxyByteCellDto(cell))),
