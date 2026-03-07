@@ -3,12 +3,14 @@ import type { Galaxy } from './galaxy';
 import { GalaxyByteCell } from './galaxy-byte-cell';
 import { OwnershipByteCell } from './ownership-byte-cell';
 import { PlayerType } from '../enums/player-type';
+import type { StarSystemNote } from './star-system-note';
 
 export class GalaxyPresentationData {
   constructor(
     public galaxyBytes: GalaxyByteCell[][],
     public ownershipBytes: Array<Array<OwnershipByteCell | null>>,
-    public ownedPlanets: ClientPlanet[]
+    public ownedPlanets: ClientPlanet[],
+    public starSystemNotes: StarSystemNote[] = []
   ) {}
 
   public static fromGalaxy(galaxy: Galaxy, playerId: number): GalaxyPresentationData {
@@ -38,6 +40,23 @@ export class GalaxyPresentationData {
       ownershipBytes.push(ownershipRow);
     }
 
-    return new GalaxyPresentationData(galaxyBytes, ownershipBytes, ownedPlanets);
+    return new GalaxyPresentationData(galaxyBytes, ownershipBytes, ownedPlanets, []);
+  }
+
+  public static collectStarSystemNotes(galaxy: Galaxy, playerId: number): StarSystemNote[] {
+    const starSystemNotes: StarSystemNote[] = [];
+
+    for (const row of galaxy.stars) {
+      for (const system of row) {
+        const note = system.starSystemNotes.get(playerId);
+        if (!note) {
+          continue;
+        }
+
+        starSystemNotes.push(note);
+      }
+    }
+
+    return starSystemNotes;
   }
 }

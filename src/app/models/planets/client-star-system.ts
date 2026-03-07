@@ -1,5 +1,6 @@
 import { ClientPlanet } from './client-planet';
 import { SolarSystem, type SolarSystemCoordinates } from './solar-system';
+import type { StarSystemNote } from './star-system-note';
 
 export class ClientInfo {
   constructor(
@@ -20,10 +21,11 @@ export class ClientStarSystem extends SolarSystem {
     isVoid: boolean,
     coordinates: SolarSystemCoordinates,
     discoveredByPlayer: Set<number>,
+    starSystemNotes: Map<number, StarSystemNote>,
     planets: ClientPlanet[],
     clientInfo: ClientInfo
   ) {
-    super(name, -10, isGalaxyCenter, isVoid, coordinates, discoveredByPlayer);
+    super(name, -10, isGalaxyCenter, isVoid, coordinates, discoveredByPlayer, starSystemNotes);
     this.planets = planets;
     this.clientInfo = clientInfo;
   }

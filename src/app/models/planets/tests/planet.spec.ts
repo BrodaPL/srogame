@@ -1,9 +1,9 @@
-import { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ } from './planet';
-import { PlanetType } from '../enums/planet-type';
-import { SolarSystem } from './solar-system';
-import { ResourcesPack } from '../resources-pack';
-import { PlanetaryParameters } from './planetary-parameters';
-import { BuildingType } from '../enums/building-type';
+import { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ } from '../planet';
+import { PlanetType } from '../../enums/planet-type';
+import { SolarSystem } from '../solar-system';
+import { ResourcesPack } from '../../resources-pack';
+import { PlanetaryParameters } from '../planetary-parameters';
+import { BuildingType } from '../../enums/building-type';
 
 describe('Planet', () => {
   const createPlanet = (overrides?: {
@@ -11,7 +11,15 @@ describe('Planet', () => {
     crystalModifier?: number;
     deuteriumModifier?: number;
   }): Planet => {
-    const system = new SolarSystem('Test System', -10, false, false, { x: 0, y: 0 }, new Set());
+    const system = new SolarSystem(
+      'Test System',
+      -10,
+      false,
+      false,
+      { x: 0, y: 0 },
+      new Set(),
+      new Map()
+    );
     const modifiers = new PlanetaryParameters(
       overrides?.metalModifier ?? 1,
       overrides?.crystalModifier ?? 1,

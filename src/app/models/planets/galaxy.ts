@@ -144,6 +144,7 @@ export class Galaxy {
       system.isVoid,
       system.coordinates,
       new Set(system.discoveredByPlayer),
+      new Map(system.starSystemNotes),
       clientPlanets,
       clientInfo
     );

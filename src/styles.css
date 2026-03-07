@@ -938,6 +938,14 @@ app-root {
   border-color: rgba(255, 255, 255, 0.8);
 }
 
+.galaxy-cell--with-note {
+  border-color: var(--note-border-color);
+}
+
+.galaxy-cell--with-note:hover {
+  border-color: var(--note-border-color);
+}
+
 .galaxy-cell--void {
   background: #000;
 }

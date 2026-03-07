@@ -13,6 +13,7 @@ import type {
   GalaxyByteCellDto,
   GalaxyPresentationDataDto,
   OwnershipByteCellDto,
+  StarSystemNoteDto,
   GalaxySetup
 } from '../../models/game-api-types';
 import { finalize } from 'rxjs';
@@ -37,6 +38,7 @@ type GalacticCellVm = {
   fillKind: CellFillKind;
   valueLabel: string;
   ownedPlanetsDotsLabel: string;
+  noteBorderColor: string | null;
   coordsLabel: string;
   tooltip: string;
 };
@@ -172,10 +174,16 @@ export class GalacticViewComponent implements OnInit {
   }
 
   private buildGrid(data: GalaxyPresentationDataDto): GalacticCellVm[][] {
+    const notesByCoordinates = new Map<string, StarSystemNoteDto>();
+    for (const note of data.starSystemNotes) {
+      notesByCoordinates.set(this.buildCoordinatesKey(note.coordinates.x, note.coordinates.y), note);
+    }
+
     return data.galaxyBytes.map((row, y) =>
       row.map((cell, x) => {
         const ownershipCell = data.ownershipBytes[y]?.[x] ?? null;
-        return this.toCellVm(cell, ownershipCell, x, y);
+        const note = notesByCoordinates.get(this.buildCoordinatesKey(x, y)) ?? null;
+        return this.toCellVm(cell, ownershipCell, note, x, y);
       })
     );
   }
@@ -183,6 +191,7 @@ export class GalacticViewComponent implements OnInit {
   private toCellVm(
     galaxyByte: GalaxyByteCellDto,
     ownershipCell: OwnershipByteCellDto | null,
+    note: StarSystemNoteDto | null,
     x: number,
     y: number
   ): GalacticCellVm {
@@ -194,6 +203,8 @@ export class GalacticViewComponent implements OnInit {
     const fillKind = this.resolveFillKind(ownership, isVoid, isCenter);
     const valueLabel = this.buildValueLabel(planets, asteroids, isVoid, isCenter);
     const ownedPlanetsDotsLabel = this.buildOwnedPlanetsDotsLabel(ownership, isVoid, isCenter);
+    const noteBorderColor = note?.borderColor ?? null;
+    const noteText = note?.text?.trim() ? note.text.trim() : null;
 
     return {
       x,
@@ -203,8 +214,18 @@ export class GalacticViewComponent implements OnInit {
       fillKind,
       valueLabel,
       ownedPlanetsDotsLabel,
+      noteBorderColor,
       coordsLabel: `${x}:${y}`,
-      tooltip: this.buildTooltip(x, y, planets, asteroids, ownership, isVoid, isCenter)
+      tooltip: this.buildTooltip(
+        x,
+        y,
+        planets,
+        asteroids,
+        ownership,
+        isVoid,
+        isCenter,
+        noteText
+      )
     };
   }
 
@@ -286,22 +307,29 @@ export class GalacticViewComponent implements OnInit {
     asteroids: number,
     ownership: [number, number, number, number] | null,
     isVoid: boolean,
-    isCenter: boolean
+    isCenter: boolean,
+    noteText: string | null
   ): string {
+    const noteSegment = noteText ? `\nNote: ${noteText}` : '';
+
     if (isVoid) {
-      return `${x},${y} | Void`;
+      return `${x},${y} | Void${noteSegment}`;
     }
     if (isCenter) {
-      return `${x},${y} | Galaxy Center`;
+      return `${x},${y} | Galaxy Center${noteSegment}`;
     }
 
     const visiblePlanets = Math.max(0, planets);
     const header = `${x},${y} | Planets: ${visiblePlanets}, Asteroids: ${asteroids}`;
     if (!ownership) {
-      return `${header} | No espionage data`;
+      return `${header} | No espionage data${noteSegment}`;
     }
 
     const [ownedByPlayer, neutralOwned, botOwned, humanOwned] = ownership;
-    return `${header} | You: ${ownedByPlayer}, Neutral: ${neutralOwned}, Bot: ${botOwned}, Human: ${humanOwned}`;
+    return `${header} | You: ${ownedByPlayer}, Neutral: ${neutralOwned}, Bot: ${botOwned}, Human: ${humanOwned}${noteSegment}`;
+  }
+
+  private buildCoordinatesKey(x: number, y: number): string {
+    return `${x}:${y}`;
   }
 }

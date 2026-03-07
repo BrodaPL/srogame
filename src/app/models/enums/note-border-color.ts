@@ -1,0 +1,15 @@
+export enum NoteBorderColor {
+  WHITE = '#FFFFFF',
+  LIGHT_GRAY = '#D3D3D3',
+  GRAY = '#808080',
+  YELLOW = '#FFD54F',
+  ORANGE = '#FF9800',
+  RED = '#E53935',
+  LIGHT_GREEN = '#8BC34A',
+  GREEN = '#2E7D32',
+  LIGHT_BLUE = '#64B5F6',
+  BLUE = '#1E88E5',
+  LIGHT_PURPLE = '#B39DDB',
+  PURPLE = '#7E57C2',
+  BROWN = '#8D6E63'
+}

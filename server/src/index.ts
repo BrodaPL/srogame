@@ -20,6 +20,7 @@ import type {
   GalaxyPresentationDataDto,
   GalaxyByteCellDto,
   OwnershipByteCellDto,
+  StarSystemNoteDto,
   ClientStarSystemDto,
   ClientPlanetDto,
   ClientCoordinates,
@@ -42,6 +43,7 @@ import type { EspionageReportData } from '../../src/app/models/reports/espionage
 import type { GalaxyPresentationData as GalaxyPresentationDataType } from '../../src/app/models/planets/galaxy-presentation-data.ts';
 import type { GalaxyByteCell } from '../../src/app/models/planets/galaxy-byte-cell.ts';
 import type { OwnershipByteCell } from '../../src/app/models/planets/ownership-byte-cell.ts';
+import type { StarSystemNote } from '../../src/app/models/planets/star-system-note.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -222,7 +224,11 @@ app.get('/api/game/galaxy-presentation-data', (req, res) => {
   }
 
   const presentation = getPresentationData(currentGalaxy, playerId);
-  const response: GalaxyPresentationDataDto = toGalaxyPresentationDataDto(presentation);
+  const starSystemNotes = GalaxyPresentationData.collectStarSystemNotes(currentGalaxy, playerId);
+  const response: GalaxyPresentationDataDto = toGalaxyPresentationDataDto(
+    presentation,
+    starSystemNotes
+  );
   return res.status(200).json(response);
 });
 
@@ -740,13 +746,28 @@ function toOwnershipByteCellDto(cell: OwnershipByteCell | null): OwnershipByteCe
   };
 }
 
-function toGalaxyPresentationDataDto(data: GalaxyPresentationDataType): GalaxyPresentationDataDto {
+function toStarSystemNoteDto(note: StarSystemNote): StarSystemNoteDto {
+  return {
+    coordinates: {
+      x: note.coordinates.x,
+      y: note.coordinates.y
+    },
+    borderColor: note.borderColor,
+    text: note.text
+  };
+}
+
+function toGalaxyPresentationDataDto(
+  data: GalaxyPresentationDataType,
+  starSystemNotes: StarSystemNote[]
+): GalaxyPresentationDataDto {
   return {
     galaxyBytes: data.galaxyBytes.map((row) => row.map((cell) => toGalaxyByteCellDto(cell))),
     ownershipBytes: data.ownershipBytes.map((row) =>
       row.map((cell) => toOwnershipByteCellDto(cell))
     ),
-    ownedPlanets: data.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet))
+    ownedPlanets: data.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet)),
+    starSystemNotes: starSystemNotes.map((note) => toStarSystemNoteDto(note))
   };
 }
 

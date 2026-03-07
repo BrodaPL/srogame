@@ -51,6 +51,8 @@
               [class.galaxy-cell--human-or-neutral]="cell.fillKind === 'humanOrNeutral'"
               [class.galaxy-cell--human-bot-any-neutral]="cell.fillKind === 'humanBotAnyNeutral'"
               [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
+              [class.galaxy-cell--with-note]="cell.noteBorderColor"
+              [style.--note-border-color]="cell.noteBorderColor"
               [attr.title]="cell.tooltip"
             >
               @if (cell.valueLabel) {

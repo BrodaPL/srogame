@@ -1,5 +1,6 @@
 import { Planet } from './planet';
 import { PlanetType } from '../enums/planet-type';
+import type { StarSystemNote } from './star-system-note';
 
 export type SolarSystemCoordinates = {
   x: number;
@@ -15,7 +16,8 @@ export class SolarSystem {
     public isGalaxyCenter: boolean,
     public isVoid: boolean,
     public readonly coordinates: SolarSystemCoordinates,
-    public discoveredByPlayer: Set<number>
+    public discoveredByPlayer: Set<number>,
+    public starSystemNotes: Map<number, StarSystemNote>
   ) {
     this.name = isVoid ? 'Void' : name;
     this.planets = SolarSystem.buildPlanets(this, planetNumber);
@@ -25,11 +27,27 @@ export class SolarSystem {
   public planets: Planet[];
 
   public static createVoid(coordinates: SolarSystemCoordinates): SolarSystem {
-    return new SolarSystem('Void', -1, false, true, coordinates, new Set<number>());
+    return new SolarSystem(
+      'Void',
+      -1,
+      false,
+      true,
+      coordinates,
+      new Set<number>(),
+      new Map<number, StarSystemNote>()
+    );
   }
 
   public static createGalaxyCenter(coordinates: SolarSystemCoordinates): SolarSystem {
-    return new SolarSystem('Galaxy Center', -1, true, false, coordinates, new Set<number>());
+    return new SolarSystem(
+      'Galaxy Center',
+      -1,
+      true,
+      false,
+      coordinates,
+      new Set<number>(),
+      new Map<number, StarSystemNote>()
+    );
   }
 
   private static buildPlanets(system: SolarSystem, planetNumber: number): Planet[] {

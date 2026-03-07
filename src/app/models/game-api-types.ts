@@ -12,6 +12,7 @@ import type { Fleet } from './fleets/fleet';
 import type { Ship } from './fleets/ship';
 import type { Technology } from './tech/technology';
 import type { Building } from './buildings/building';
+import type { NoteBorderColor } from './enums/note-border-color';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -196,8 +197,18 @@ export type OwnershipByteCellDto = {
   ownership: [number, number, number, number];
 };
 
+export type StarSystemNoteDto = {
+  coordinates: {
+    x: number;
+    y: number;
+  };
+  borderColor: NoteBorderColor;
+  text: string;
+};
+
 export type GalaxyPresentationDataDto = {
   galaxyBytes: GalaxyByteCellDto[][];
   ownershipBytes: Array<Array<OwnershipByteCellDto | null>>;
   ownedPlanets: ClientPlanetDto[];
+  starSystemNotes: StarSystemNoteDto[];
 };

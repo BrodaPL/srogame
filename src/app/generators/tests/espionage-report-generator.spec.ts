@@ -18,7 +18,7 @@ describe('EspionageReportGenerator', () => {
     playerId: number,
     playerName: string,
     techLevels: Map<TechnologyType, number>
-  ): Player => new Player(playerId, playerName, [], techLevels, [], PlayerType.PLAYER, new Map());
+  ): Player => new Player(playerId, playerName, [], techLevels, [], PlayerType.PLAYER);
 
   const createPlanet = (system: SolarSystem, orbitShips: ShipInstance[]): Planet => new Planet(
     new PlanetBasicInfo('Test', PlanetType.JUNGLE, 1, 1, system, '', 100),
