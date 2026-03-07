@@ -10,14 +10,21 @@ import { ShipyardQueue } from '../models/reports/shipyard-queue';
 import { BuildingQueue } from '../models/reports/building-queue';
 import { DefenceBuildingInstances } from '../models/reports/defence-building-instances';
 
+export type EspionageReportOptions = {
+  forcedReportLevel?: number;
+  reportDate?: number;
+};
+
 export class EspionageReportGenerator {
   public createEspionageReport(
     player: Player,
     planetOwner: Player | null,
     planet: Planet,
-    probeAmount: number
+    probeAmount: number,
+    options?: EspionageReportOptions
   ): EspionageReportData {
-    const reportLevel = this.calculateReportLevel(player, planetOwner, planet, probeAmount);
+    const reportLevel = this.resolveReportLevel(player, planetOwner, planet, probeAmount, options);
+    const reportDate = this.resolveReportDate(options);
 
     const includeAverageBuildings = reportLevel >= 2;
     const includeTotalResources = reportLevel >= 3;
@@ -69,7 +76,7 @@ export class EspionageReportGenerator {
     const buildingProduction = includeQueues ? new BuildingQueue() : new BuildingQueue();
 
     return new EspionageReportData(
-      Date.now(), //TODO replace with current turn number
+      reportDate,
       planet.info.planetaryParameters,
       buildingsAverage,
       totalResources,
@@ -86,6 +93,30 @@ export class EspionageReportGenerator {
       researchProduction,
       buildingProduction
     );
+  }
+
+  private resolveReportLevel(
+    player: Player,
+    planetOwner: Player | null,
+    planet: Planet,
+    probeAmount: number,
+    options?: EspionageReportOptions
+  ): number {
+    const forcedReportLevel = options?.forcedReportLevel;
+    if (Number.isFinite(forcedReportLevel)) {
+      return Math.max(0, Math.floor(forcedReportLevel as number));
+    }
+
+    return this.calculateReportLevel(player, planetOwner, planet, probeAmount);
+  }
+
+  private resolveReportDate(options?: EspionageReportOptions): number {
+    const reportDate = options?.reportDate;
+    if (Number.isFinite(reportDate)) {
+      return Math.floor(reportDate as number);
+    }
+
+    return Date.now(); // TODO replace with current turn number everywhere.
   }
 
   private calculateReportLevel(

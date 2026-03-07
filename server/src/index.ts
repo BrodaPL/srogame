@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import galaxyCreatorModule from '../../src/app/models/planets/galaxy-creator.js';
 import galaxyPresentationDataModule from '../../src/app/models/planets/galaxy-presentation-data.js';
+import espionageReportGeneratorModule from '../../src/app/generators/espionage-report-generator.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   GalaxySetup,
@@ -48,6 +49,9 @@ const { GalaxyCreator } = galaxyCreatorModule as {
 const { GalaxyPresentationData } = galaxyPresentationDataModule as {
   GalaxyPresentationData: typeof import('../../src/app/models/planets/galaxy-presentation-data.js').GalaxyPresentationData;
 };
+const { EspionageReportGenerator } = espionageReportGeneratorModule as {
+  EspionageReportGenerator: typeof import('../../src/app/generators/espionage-report-generator.js').EspionageReportGenerator;
+};
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -64,6 +68,8 @@ const PLAYER_NAME_MAX = 24;
 const PASSWORD_MIN = 6;
 const PASSWORD_MAX = 72;
 const PLAYER_TYPE_PLAYER = 'PLAYER' as const;
+const SELF_REPORT_LEVEL = 999;
+const INITIAL_TURN_NUMBER = 1;
 
 let currentGalaxy: Galaxy | null = null;
 let currentGameOwnerId: number | null = null;
@@ -163,6 +169,7 @@ app.post('/api/game/start', (req, res) => {
 
   currentGalaxy = new GalaxyCreator(body.setup).createGalaxy([auth.session.playerName]);
   currentGameOwnerId = auth.session.accountId;
+  generateSelfReportsForHumanPlayers(currentGalaxy, INITIAL_TURN_NUMBER);
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
 
   const response: StartGameResponse = {
@@ -683,6 +690,38 @@ function getPresentationData(galaxy: Galaxy, playerId: number): GalaxyPresentati
   const computed = GalaxyPresentationData.fromGalaxy(galaxy, playerId);
   currentGalaxyPresentationByPlayer.set(playerId, computed);
   return computed;
+}
+
+function generateSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber: number): void {
+  const reportGenerator = new EspionageReportGenerator();
+
+  for (const player of galaxy.players) {
+    if (player.type !== PLAYER_TYPE_PLAYER) {
+      continue;
+    }
+
+    for (const row of galaxy.stars) {
+      for (const system of row) {
+        for (const planet of system.planets) {
+          if (planet.info.ownerId !== player.playerId) {
+            continue;
+          }
+
+          const report = reportGenerator.createEspionageReport(
+            player,
+            player,
+            planet,
+            0,
+            {
+              forcedReportLevel: SELF_REPORT_LEVEL,
+              reportDate: turnNumber
+            }
+          );
+          planet.lastReportData.set(player.playerId, report);
+        }
+      }
+    }
+  }
 }
 
 function toGalaxyByteCellDto(cell: GalaxyByteCell): GalaxyByteCellDto {

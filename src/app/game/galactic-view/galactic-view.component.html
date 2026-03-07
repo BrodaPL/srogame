@@ -1,62 +1,78 @@
 <app-top-menu></app-top-menu>
 <section class="galaxy-preview">
   <div class="galaxy-preview__header">
-    <h3>Galaxy Preview</h3>
-    @if (gridHeight > 0 && gridWidth > 0) {
-      <p class="galaxy-preview__meta">
-        {{ gridWidth }}x{{ gridHeight }}
-      </p>
-    }
-  </div>
-  <div class="galaxy-legend">
-    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--owned"></span>You</span>
-    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--human"></span>Human</span>
-    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--bot"></span>Bot</span>
-    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--neutral"></span>Neutral</span>
-    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--mixed"></span>Mixed</span>
-    <span class="galaxy-legend__item"><span class="galaxy-marker galaxy-marker--unknown"></span>Unknown</span>
+    <h3>
+      Galaxy Preview
+      @if (gridHeight > 0 && gridWidth > 0) {
+        <span class="galaxy-preview__meta">
+          @if (galaxyName) {
+            {{ galaxyName }}
+          }
+          {{ gridWidth }}x{{ gridHeight }}
+        </span>
+      } @else if (galaxyName) {
+        <span class="galaxy-preview__meta">{{ galaxyName }}</span>
+      }
+    </h3>
   </div>
 
   @if (gridHeight > 0 && gridWidth > 0) {
     <div
-      class="galaxy-grid"
-      [style.grid-template-columns]="
-        'repeat(' + gridWidth + ', ' + gridCellSize + 'px)'
-      "
+      #topScroll
+      class="galaxy-grid-top-scroll"
+      (scroll)="onTopScrollbarScroll()"
     >
-      @for (row of grid; track $index) {
-        @for (cell of row; track $index) {
-          <div
-            class="galaxy-cell"
-            [class.galaxy-cell--void]="cell.isVoid"
-            [class.galaxy-cell--center]="cell.isCenter"
-            [class.galaxy-cell--owned]="cell.ownershipKind === 'owned'"
-            [class.galaxy-cell--human]="cell.ownershipKind === 'human'"
-            [class.galaxy-cell--bot]="cell.ownershipKind === 'bot'"
-            [class.galaxy-cell--neutral]="cell.ownershipKind === 'neutral'"
-            [class.galaxy-cell--mixed]="cell.ownershipKind === 'mixed'"
-            [class.galaxy-cell--unknown]="cell.ownershipKind === 'unknown'"
-            [attr.title]="cell.tooltip"
-          >
-            @if (!cell.isCenter) {
-              <span class="galaxy-coords">
-                {{ cell.x }},{{ cell.y }}
+      <div
+        class="galaxy-grid-top-scroll__content"
+        [style.width.px]="topScrollContentWidth"
+      ></div>
+    </div>
+    <div
+      #bottomScroll
+      class="galaxy-grid-scroll"
+      (scroll)="onBottomScrollbarScroll()"
+    >
+      <div
+        class="galaxy-grid"
+        [style.grid-template-columns]="
+          'repeat(' + gridWidth + ', ' + gridCellSize + 'px)'
+        "
+      >
+        @for (row of grid; track $index) {
+          @for (cell of row; track $index) {
+            <div
+              class="galaxy-cell"
+              [class.galaxy-cell--void]="cell.isVoid"
+              [class.galaxy-cell--center]="cell.isCenter"
+              [class.galaxy-cell--no-data]="cell.fillKind === 'noData'"
+              [class.galaxy-cell--neutral-only]="cell.fillKind === 'neutralOnly'"
+              [class.galaxy-cell--player-only]="cell.fillKind === 'playerOnly'"
+              [class.galaxy-cell--bot-or-neutral]="cell.fillKind === 'botOrNeutral'"
+              [class.galaxy-cell--human-or-neutral]="cell.fillKind === 'humanOrNeutral'"
+              [class.galaxy-cell--human-bot-any-neutral]="cell.fillKind === 'humanBotAnyNeutral'"
+              [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
+              [attr.title]="cell.tooltip"
+            >
+              @if (cell.valueLabel) {
+                <span
+                  class="galaxy-cell__value"
+                  [class.galaxy-cell__value--with-owned-markers]="cell.ownedPlanetsDotsLabel"
+                >
+                  {{ cell.valueLabel }}
+                </span>
+              }
+              @if (cell.ownedPlanetsDotsLabel) {
+                <span class="galaxy-cell__owned-planets">
+                  {{ cell.ownedPlanetsDotsLabel }}
+                </span>
+              }
+              <span class="galaxy-cell__hover-coords">
+                {{ cell.coordsLabel }}
               </span>
-            }
-            @if (!cell.isVoid && !cell.isCenter) {
-              <span
-                class="galaxy-marker"
-                [class.galaxy-marker--owned]="cell.ownershipKind === 'owned'"
-                [class.galaxy-marker--human]="cell.ownershipKind === 'human'"
-                [class.galaxy-marker--bot]="cell.ownershipKind === 'bot'"
-                [class.galaxy-marker--neutral]="cell.ownershipKind === 'neutral'"
-                [class.galaxy-marker--mixed]="cell.ownershipKind === 'mixed'"
-                [class.galaxy-marker--unknown]="cell.ownershipKind === 'unknown' || cell.ownershipKind === 'empty'"
-              ></span>
-            }
-          </div>
+            </div>
+          }
         }
-      }
+      </div>
     </div>
   } @else if (isLoading) {
     <p class="overview-empty">Loading galaxy data...</p>

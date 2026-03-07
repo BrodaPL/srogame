@@ -1,32 +1,5 @@
 <main class="game">
   @if (config) {
-    <header class="game__header">
-      <div>
-        <p class="eyebrow">SroGame Online</p>
-        <h1>Galaxy: {{ config.galaxyName }}</h1>
-        <p>
-          Size: {{ config.galaxyWidth }}x{{ config.galaxyHeight }},
-          Players: {{ config.playerAmount }},
-          Bots: {{ config.botsAmount }}
-        </p>
-      </div>
-      <a class="link" routerLink="/setup">Edit setup</a>
-    </header>
-
-    @if (isLoading) {
-      <section class="status status--info">
-        <h3>Galaxy Status</h3>
-        <p>Loading galaxy data from server...</p>
-      </section>
-    }
-
-    @if (stateError) {
-      <section class="status status--error">
-        <h3>Galaxy Status</h3>
-        <p>{{ stateError }}</p>
-      </section>
-    }
-
     <router-outlet />
   } @else {
     <section class="empty">

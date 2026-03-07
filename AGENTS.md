@@ -54,6 +54,7 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-03-07: GalaxyView visual polish: darkened in-cell number text and darkened `GalaxyCenter` cell color further for better contrast/readability.
 - 2026-03-07: Reworked Galactic View to consume `GalaxyPresentationDataDto` directly (not `ClientGalaxy`/`ClientStarSystem`) and render ownership states from `ownershipBytes` with unknown (`null`) handling, tooltips, and legend markers. `ownershipBytes` now returns `null` per cell when thePlayer has no espionage data for that system to reduce payload size. Kept `GalaxyPresentationData` cached in server memory per player per turn (no per-request recomputation).
 - 2026-03-07: Removed `PlayerType.ABANDONED`. Added `OwnershipByteCell` (counts ownership from the player's espionage reports only) and replaced `GalaxyPresentationData.reportMap` with `ownershipBytes` plus updated DTO/server serialization.
 - 2026-03-06: Renamed `PlanetObjects` to `rBDSFTQ` (Resources/Buildings/Defences/Ships/Fleets/Technology/Queues) and renamed the `Planet.objects` property to `Planet.rBDSFTQ`. Added `GalaxyByteCell` and `GalaxyPresentationData` models plus DTOs. Refactored client to use `GET /api/game/galaxy-presentation-data` for the Galactic view, added `GET /api/game/owned-planets`, and kept `client-star-system`/`client-planet` intact. Server now builds and caches `GalaxyPresentationData` per human player after galaxy creation and serves it from memory.

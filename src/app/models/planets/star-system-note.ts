@@ -1,9 +1,8 @@
-import { SolarSystemCoordinates } from './solar-system';
+import { NoteBorderColor } from '../enums/note-border-color';
 
 export class StarSystemNote {
   constructor(
-    public color: string,
-    public note: string,
-    public coordinate: SolarSystemCoordinates
+    public borderColor: NoteBorderColor,
+    public text: string
   ) {}
 }
