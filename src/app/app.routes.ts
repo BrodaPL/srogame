@@ -39,7 +39,7 @@ export const routes: Routes = [
     path: 'game',
     component: GameComponent,
     children: [
-      { path: '', redirectTo: 'imperium', pathMatch: 'full' },
+      { path: '', redirectTo: 'galactic', pathMatch: 'full' },
       { path: 'galactic', component: GalacticViewComponent },
       { path: 'imperium', component: ImperiumViewComponent },
       { path: 'star-system', component: StarSystemViewComponent },

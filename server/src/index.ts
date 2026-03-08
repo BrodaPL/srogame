@@ -10,6 +10,7 @@ import galaxyPresentationDataModule from '../../src/app/models/planets/galaxy-pr
 import espionageReportGeneratorModule from '../../src/app/generators/espionage-report-generator.js';
 import starSystemNoteModule from '../../src/app/models/planets/star-system-note.js';
 import noteBorderColorModule from '../../src/app/models/enums/note-border-color.js';
+import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   GalaxySetup,
@@ -30,12 +31,15 @@ import type {
   ResourcesPackDto,
   PlanetaryParametersDto,
   BuildingLevelEntry,
+  BuildingPowerConsumptionEntry,
   TechLevelEntry,
   ClientInfoDto,
   PlayerNameEntry,
   LoginRequest,
   RegisterRequest,
-  UpsertStarSystemNoteRequest
+  UpsertStarSystemNoteRequest,
+  SetBuildingPowerConsumptionRequest,
+  SetBuildingPowerConsumptionResponse
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -48,6 +52,7 @@ import type { GalaxyByteCell } from '../../src/app/models/planets/galaxy-byte-ce
 import type { OwnershipByteCell } from '../../src/app/models/planets/ownership-byte-cell.ts';
 import type { StarSystemNote as StarSystemNoteType } from '../../src/app/models/planets/star-system-note.ts';
 import type { NoteBorderColor as NoteBorderColorType } from '../../src/app/models/enums/note-border-color.ts';
+import type { BuildingType as BuildingTypeType } from '../../src/app/models/enums/building-type.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -63,6 +68,9 @@ const { StarSystemNote } = starSystemNoteModule as {
 };
 const { NoteBorderColor } = noteBorderColorModule as {
   NoteBorderColor: typeof import('../../src/app/models/enums/note-border-color.js').NoteBorderColor;
+};
+const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
+  BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
 };
 
 const app = express();
@@ -85,6 +93,8 @@ const STARTING_SYSTEM_REPORT_LEVEL = 1;
 const STAR_SYSTEM_NOTE_TEXT_MAX_LENGTH = 500;
 const INITIAL_TURN_NUMBER = 1;
 const NOTE_BORDER_COLOR_VALUES = new Set<string>(Object.values(NoteBorderColor));
+const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
+const BUILDING_TYPE_VALUES = new Set<string>(Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys()));
 
 let currentGalaxy: Galaxy | null = null;
 let currentGameOwnerId: number | null = null;
@@ -437,6 +447,77 @@ app.get('/api/game/client-planet', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.post('/api/game/power-consumption', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as SetBuildingPowerConsumptionRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const buildingType = normalizeBuildingType(body?.buildingType);
+  const currentPowerConsumption = parseBodyNonNegativeNumber(body?.currentPowerConsumption);
+
+  if (x === null || y === null || z === null || !buildingType || currentPowerConsumption === null) {
+    return res.status(400).json({ error: 'Invalid power consumption payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be modified.' });
+  }
+
+  const maxConsumption = planet.getMaxBuildingPowerConsumption(buildingType);
+  const powerPerLevel = BUILDING_BLUEPRINTS.get(buildingType)?.powerConsumption ?? 0;
+  if (maxConsumption <= 0 && currentPowerConsumption > 0) {
+    return res.status(400).json({ error: 'Building has no available power consumption.' });
+  }
+
+  if (powerPerLevel > 0) {
+    const withinBounds = currentPowerConsumption >= 0 && currentPowerConsumption <= maxConsumption;
+    const ratio = currentPowerConsumption / powerPerLevel;
+    const isMultiple = Math.abs(ratio - Math.round(ratio)) < 1e-9;
+    if (!withinBounds || !isMultiple) {
+      return res.status(400).json({ error: 'Invalid power consumption value for current building level.' });
+    }
+  }
+
+  const updatedPowerConsumption = planet.setCurrentBuildingPowerConsumption(
+    buildingType,
+    currentPowerConsumption
+  );
+
+  const response: SetBuildingPowerConsumptionResponse = {
+    buildingType,
+    currentPowerConsumption: updatedPowerConsumption
+  };
+  return res.status(200).json(response);
+});
+
 app.get('/api/game/owned-planets', (req, res) => {
   if (!currentGalaxy || currentGameOwnerId === null) {
     return res.status(404).json({ error: 'No active game.' });
@@ -684,6 +765,18 @@ function parseBodyNonNegativeInt(value: unknown): number | null {
   return parsed;
 }
 
+function parseBodyNonNegativeNumber(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+
+  if (value < 0) {
+    return null;
+  }
+
+  return value;
+}
+
 function normalizeStarSystemNoteText(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -703,6 +796,14 @@ function normalizeStarSystemNoteBorderColor(value: unknown): NoteBorderColorType
   }
 
   return NOTE_BORDER_COLOR_VALUES.has(value) ? (value as NoteBorderColorType) : null;
+}
+
+function normalizeBuildingType(value: unknown): BuildingTypeType | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return BUILDING_TYPE_VALUES.has(value) ? (value as BuildingTypeType) : null;
 }
 
 function toResourcesPackDto(pack: ResourcesPack): ResourcesPackDto {
@@ -732,6 +833,18 @@ function toBuildingLevelEntries(map: Map<string, number>): BuildingLevelEntry[] 
   for (const [type, level] of map.entries()) {
     entries.push({ type, level } as BuildingLevelEntry);
   }
+  return entries;
+}
+
+function toBuildingPowerConsumptionEntries(clientPlanet: ClientPlanet): BuildingPowerConsumptionEntry[] {
+  const entries: BuildingPowerConsumptionEntry[] = [];
+  for (const [type] of clientPlanet.rBDSFTQ.buildingsLevels.entries()) {
+    entries.push({
+      type: type as BuildingTypeType,
+      currentPowerConsumption: clientPlanet.getCurrentBuildingPowerConsumption(type as BuildingTypeType)
+    });
+  }
+
   return entries;
 }
 
@@ -782,6 +895,7 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
     objects: {
       resources: toResourcesPackDto(clientPlanet.rBDSFTQ.resources),
       buildingsLevels: toBuildingLevelEntries(clientPlanet.rBDSFTQ.buildingsLevels),
+      buildingsCurrentPowerConsumption: toBuildingPowerConsumptionEntries(clientPlanet),
       defences: clientPlanet.rBDSFTQ.defences,
       ships: clientPlanet.rBDSFTQ.ships,
       technologyQueue: clientPlanet.rBDSFTQ.technologyQueue,

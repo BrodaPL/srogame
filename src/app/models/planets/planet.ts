@@ -44,6 +44,7 @@ export class rBDSFTQ {
   constructor(
     public resources: ResourcesPack,
     public buildingsLevels: Map<BuildingType, number>,
+    public buildingsCurrentPowerConsumption: Map<BuildingType, number>,
     public defences: DefenceBuildingInstances[],
     public ships: ShipInstance[],
     public technologyQueue: Technology[],
@@ -81,19 +82,20 @@ export class Planet {
       new PlanetInfo(
         ownerId,
         new PlanetaryParameters(
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
         )
       ),
       new rBDSFTQ(
         new ResourcesPack(0, 0, 0),
+        new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
         [],
         [],
@@ -148,6 +150,7 @@ export class Planet {
       new rBDSFTQ(
         new ResourcesPack(0, 0, 0),
         new Map<BuildingType, number>(),
+        new Map<BuildingType, number>(),
         [],
         [],
         [],
@@ -188,16 +191,64 @@ export class Planet {
     const normalized = Math.max(0, Math.floor(level));
     if (normalized === 0) {
       this.rBDSFTQ.buildingsLevels.delete(type);
+      this.rBDSFTQ.buildingsCurrentPowerConsumption.delete(type);
       return;
     }
 
     this.rBDSFTQ.buildingsLevels.set(type, normalized);
+    this.normalizeCurrentPowerConsumption(type);
   }
 
   public addBuildingLevel(type: BuildingType, delta = 1): number {
     const next = this.getBuildingLevel(type) + delta;
     this.setBuildingLevel(type, next);
     return this.getBuildingLevel(type);
+  }
+
+  public getCurrentBuildingPowerConsumption(type: BuildingType): number {
+    const max = this.getMaxBuildingPowerConsumption(type);
+    if (max <= 0) {
+      return 0;
+    }
+
+    const stored = this.rBDSFTQ.buildingsCurrentPowerConsumption.get(type);
+    if (stored === undefined || !Number.isFinite(stored)) {
+      return max;
+    }
+
+    return Math.min(max, Math.max(0, stored));
+  }
+
+  public setCurrentBuildingPowerConsumption(type: BuildingType, value: number): number {
+    const max = this.getMaxBuildingPowerConsumption(type);
+    if (max <= 0) {
+      this.rBDSFTQ.buildingsCurrentPowerConsumption.delete(type);
+      return 0;
+    }
+
+    const normalizedValue = Number.isFinite(value) ? value : max;
+    const clamped = Math.min(max, Math.max(0, normalizedValue));
+    this.rBDSFTQ.buildingsCurrentPowerConsumption.set(type, clamped);
+    return clamped;
+  }
+
+  public getMaxBuildingPowerConsumption(type: BuildingType): number {
+    const level = this.getBuildingLevel(type);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = Planet.buildingBlueprints.get(type);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const powerPerLevel = blueprint.powerConsumption ?? 0;
+    if (powerPerLevel <= 0) {
+      return 0;
+    }
+
+    return level * powerPerLevel;
   }
 
   public getBuildingProductionValue1(type: BuildingType): number {
@@ -238,6 +289,22 @@ export class Planet {
       ? adaptiveTechnologyLevel
       : 0;
     return (normalized / 100) + 1;
+  }
+
+  private normalizeCurrentPowerConsumption(type: BuildingType): void {
+    const max = this.getMaxBuildingPowerConsumption(type);
+    if (max <= 0) {
+      this.rBDSFTQ.buildingsCurrentPowerConsumption.delete(type);
+      return;
+    }
+
+    const existing = this.rBDSFTQ.buildingsCurrentPowerConsumption.get(type);
+    if (existing === undefined || !Number.isFinite(existing)) {
+      this.rBDSFTQ.buildingsCurrentPowerConsumption.set(type, max);
+      return;
+    }
+
+    this.rBDSFTQ.buildingsCurrentPowerConsumption.set(type, Math.min(max, Math.max(0, existing)));
   }
 
   public static buildingLevelsFromRecord(
@@ -284,97 +351,97 @@ export class Planet {
     return record;
   }
 
-  // Per-planet type ranges. Keep ranges in percent, converted to multipliers via percentRange().
+  // Per-planet type ranges expressed directly as multipliers (e.g. 0.5..1.5).
   private static readonly PLANET_MODIFIER_RANGES: Record<
     PlanetType,
     Record<ModifierKey, ModifierRange>> = {
     [PlanetType.BARREN]: {
-      metalModifier: Planet.percentRange(-30, 50),
-      crystalModifier: Planet.percentRange(-30, 50),
-      deuteriumModifier: Planet.percentRange(-30, 50),
-      energyModifierRES: Planet.percentRange(-20, 50),
-      energyModifierNuclear: Planet.percentRange(-20, 50),
-      scienceModifier: Planet.percentRange(-10, 50),
-      industryModifier: Planet.percentRange(-30, 50),
-      anomaliesAndNoise: Planet.percentRange(-20, 60),
-      hyperspaceParameters: Planet.percentRange(-80, 50),
+      metalModifier: Planet.percentRange(0.7, 1.5),
+      crystalModifier: Planet.percentRange(0.7, 1.5),
+      deuteriumModifier: Planet.percentRange(0.7, 1.5),
+      energyModifierRES: Planet.percentRange(0.8, 1.5),
+      energyModifierNuclear: Planet.percentRange(0.8, 1.5),
+      scienceModifier: Planet.percentRange(0.9, 1.5),
+      industryModifier: Planet.percentRange(0.7, 1.5),
+      anomaliesAndNoise: Planet.percentRange(0.8, 1.6),
+      hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.DRY]: {
-      metalModifier: Planet.percentRange(-30, 50),
-      crystalModifier: Planet.percentRange(-30, 50),
-      deuteriumModifier: Planet.percentRange(-50, -20),
-      energyModifierRES: Planet.percentRange(-50, 30),
-      energyModifierNuclear: Planet.percentRange(-50, 30),
-      scienceModifier: Planet.percentRange(-50, 50),
-      industryModifier: Planet.percentRange(-50, 30),
-      anomaliesAndNoise: Planet.percentRange(-40, 60),
-      hyperspaceParameters: Planet.percentRange(-80, 50),
+      metalModifier: Planet.percentRange(0.7, 1.5),
+      crystalModifier: Planet.percentRange(0.7, 1.5),
+      deuteriumModifier: Planet.percentRange(0.5, 0.8),
+      energyModifierRES: Planet.percentRange(0.5, 1.3),
+      energyModifierNuclear: Planet.percentRange(0.5, 1.3),
+      scienceModifier: Planet.percentRange(0.5, 1.5),
+      industryModifier: Planet.percentRange(0.5, 1.3),
+      anomaliesAndNoise: Planet.percentRange(0.6, 1.6),
+      hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.ICE]: {
-      metalModifier: Planet.percentRange(-50, 50),
-      crystalModifier: Planet.percentRange(-50, 50),
-      deuteriumModifier: Planet.percentRange(-20, 50),
-      energyModifierRES: Planet.percentRange(-50, 10),
-      energyModifierNuclear: Planet.percentRange(-30, 50),
-      scienceModifier: Planet.percentRange(-50, 50),
-      industryModifier: Planet.percentRange(-50, 30),
-      anomaliesAndNoise: Planet.percentRange(-30, 60),
-      hyperspaceParameters: Planet.percentRange(-80, 50),
+      metalModifier: Planet.percentRange(0.5, 1.5),
+      crystalModifier: Planet.percentRange(0.5, 1.5),
+      deuteriumModifier: Planet.percentRange(0.8, 1.5),
+      energyModifierRES: Planet.percentRange(0.5, 1.1),
+      energyModifierNuclear: Planet.percentRange(0.7, 1.5),
+      scienceModifier: Planet.percentRange(0.5, 1.5),
+      industryModifier: Planet.percentRange(0.5, 1.3),
+      anomaliesAndNoise: Planet.percentRange(0.7, 1.6),
+      hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.JUNGLE]: {
-      metalModifier: Planet.percentRange(-50, 50),
-      crystalModifier: Planet.percentRange(-50, 50),
-      deuteriumModifier: Planet.percentRange(-50, 50),
-      energyModifierRES: Planet.percentRange(-40, 50),
-      energyModifierNuclear: Planet.percentRange(-50, 50),
-      scienceModifier: Planet.percentRange(-50, 40),
-      industryModifier: Planet.percentRange(-50, 40),
-      anomaliesAndNoise: Planet.percentRange(-60, 40),
-      hyperspaceParameters: Planet.percentRange(-80, 50),
+      metalModifier: Planet.percentRange(0.5, 1.5),
+      crystalModifier: Planet.percentRange(0.5, 1.5),
+      deuteriumModifier: Planet.percentRange(0.5, 1.5),
+      energyModifierRES: Planet.percentRange(0.6, 1.5),
+      energyModifierNuclear: Planet.percentRange(0.5, 1.5),
+      scienceModifier: Planet.percentRange(0.5, 1.4),
+      industryModifier: Planet.percentRange(0.5, 1.4),
+      anomaliesAndNoise: Planet.percentRange(0.4, 1.4),
+      hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.SAVANNA]: {
-      metalModifier: Planet.percentRange(-50, 30),
-      crystalModifier: Planet.percentRange(-50, 30),
-      deuteriumModifier: Planet.percentRange(-50, 30),
-      energyModifierRES: Planet.percentRange(-40, 40),
-      energyModifierNuclear: Planet.percentRange(-50, 50),
-      scienceModifier: Planet.percentRange(-40, 40),
-      industryModifier: Planet.percentRange(-30, 50),
-      anomaliesAndNoise: Planet.percentRange(-60, 40),
-      hyperspaceParameters: Planet.percentRange(-80, 50),
+      metalModifier: Planet.percentRange(0.5, 1.3),
+      crystalModifier: Planet.percentRange(0.5, 1.3),
+      deuteriumModifier: Planet.percentRange(0.5, 1.3),
+      energyModifierRES: Planet.percentRange(0.6, 1.4),
+      energyModifierNuclear: Planet.percentRange(0.5, 1.5),
+      scienceModifier: Planet.percentRange(0.6, 1.4),
+      industryModifier: Planet.percentRange(0.7, 1.5),
+      anomaliesAndNoise: Planet.percentRange(0.4, 1.4),
+      hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.OCEANIC]: {
-      metalModifier: Planet.percentRange(-50, 40),
-      crystalModifier: Planet.percentRange(-50, 40),
-      deuteriumModifier: Planet.percentRange(-10, 50),
-      energyModifierRES: Planet.percentRange(-40, 50),
-      energyModifierNuclear: Planet.percentRange(-30, 50),
-      scienceModifier: Planet.percentRange(-40, 40),
-      industryModifier: Planet.percentRange(-50, 20),
-      anomaliesAndNoise: Planet.percentRange(-60, 40),
-      hyperspaceParameters: Planet.percentRange(-80, 50),
+      metalModifier: Planet.percentRange(0.5, 1.4),
+      crystalModifier: Planet.percentRange(0.5, 1.4),
+      deuteriumModifier: Planet.percentRange(0.9, 1.5),
+      energyModifierRES: Planet.percentRange(0.6, 1.5),
+      energyModifierNuclear: Planet.percentRange(0.7, 1.5),
+      scienceModifier: Planet.percentRange(0.6, 1.4),
+      industryModifier: Planet.percentRange(0.5, 1.2),
+      anomaliesAndNoise: Planet.percentRange(0.4, 1.4),
+      hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.VOLCANIC]: {
-      metalModifier: Planet.percentRange(10, 50),
-      crystalModifier: Planet.percentRange(-10, 50),
-      deuteriumModifier: Planet.percentRange(-30, 40),
-      energyModifierRES: Planet.percentRange(10, 50),
-      energyModifierNuclear: Planet.percentRange(20, 50),
-      scienceModifier: Planet.percentRange(-10, 50),
-      industryModifier: Planet.percentRange(-30, 40),
-      anomaliesAndNoise: Planet.percentRange(-60, 20),
-      hyperspaceParameters: Planet.percentRange(-80, 50),
+      metalModifier: Planet.percentRange(1.1, 1.5),
+      crystalModifier: Planet.percentRange(0.9, 1.5),
+      deuteriumModifier: Planet.percentRange(0.7, 1.4),
+      energyModifierRES: Planet.percentRange(1.1, 1.5),
+      energyModifierNuclear: Planet.percentRange(1.2, 1.5),
+      scienceModifier: Planet.percentRange(0.9, 1.5),
+      industryModifier: Planet.percentRange(0.7, 1.4),
+      anomaliesAndNoise: Planet.percentRange(0.4, 1.2),
+      hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.ASTEROIDS]: {
-      metalModifier: Planet.percentRange(-75, 75),
-      crystalModifier: Planet.percentRange(-75, 75),
-      deuteriumModifier: Planet.percentRange(-75, 75),
-      energyModifierRES: Planet.percentRange(-100, -80),
-      energyModifierNuclear: Planet.percentRange(-20, 40),
-      scienceModifier: Planet.percentRange(-60, 60),
-      industryModifier: Planet.percentRange(-60, -20),
-      anomaliesAndNoise: Planet.percentRange(-60, 60),
-      hyperspaceParameters: Planet.percentRange(-80, 50),
+      metalModifier: Planet.percentRange(0.25, 1.75),
+      crystalModifier: Planet.percentRange(0.25, 1.75),
+      deuteriumModifier: Planet.percentRange(0.25, 1.75),
+      energyModifierRES: Planet.percentRange(0, 0.2),
+      energyModifierNuclear: Planet.percentRange(0.8, 1.4),
+      scienceModifier: Planet.percentRange(0.4, 1.6),
+      industryModifier: Planet.percentRange(0.4, 0.8),
+      anomaliesAndNoise: Planet.percentRange(0.4, 1.6),
+      hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
   };
 
@@ -402,11 +469,12 @@ export class Planet {
     return types[Planet.randomInt(0, types.length - 1)];
   }
 
-  private static percentRange(minPercent: number, maxPercent: number): ModifierRange {
-    // Convert percent deltas to multipliers. Example: -50%..+50% -> 0.5..1.5.
+  private static percentRange(minMultiplier: number, maxMultiplier: number): ModifierRange {
+    const min = Number.isFinite(minMultiplier) ? minMultiplier : 1;
+    const max = Number.isFinite(maxMultiplier) ? maxMultiplier : 1;
     return {
-      min: 1 + minPercent / 100,
-      max: 1 + maxPercent / 100,
+      min: Math.min(min, max),
+      max: Math.max(min, max),
     };
   }
 
@@ -439,6 +507,7 @@ export class Planet {
     return Math.round(value * factor) / factor;
   }
 }
+
 
 
 

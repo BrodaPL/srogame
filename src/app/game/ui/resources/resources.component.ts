@@ -57,4 +57,60 @@ export class ResourcesComponent {
     const sign = resource.productionPerTurn >= 0 ? '+' : '';
     return `${sign}${resource.productionPerTurn} / turn`;
   }
+
+  protected isEnergyOverloaded(resource: ResourceDisplay | null): boolean {
+    const usagePercent = this.energyUsagePercent(resource);
+    return usagePercent !== null && usagePercent > 100;
+  }
+
+  protected isEnergyAtHundred(resource: ResourceDisplay | null): boolean {
+    const usagePercent = this.energyUsagePercent(resource);
+    if (usagePercent === null || usagePercent > 100) {
+      return false;
+    }
+
+    return Math.abs(usagePercent - 100) < 0.0001;
+  }
+
+  protected isEnergyNearLimit(resource: ResourceDisplay | null): boolean {
+    const usagePercent = this.energyUsagePercent(resource);
+    if (usagePercent === null || usagePercent > 100) {
+      return false;
+    }
+
+    return usagePercent >= 90 && !this.isEnergyAtHundred(resource);
+  }
+
+  protected isEnergySafe(resource: ResourceDisplay | null): boolean {
+    const usagePercent = this.energyUsagePercent(resource);
+    if (usagePercent === null) {
+      return false;
+    }
+
+    return usagePercent < 90;
+  }
+
+  protected energyOverloadLabel(resource: ResourceDisplay | null): string {
+    return this.isEnergyOverloaded(resource) ? ' ! ! ! ' : '';
+  }
+
+  private energyUsagePercent(resource: ResourceDisplay | null): number | null {
+    if (!resource) {
+      return null;
+    }
+
+    if (resource.used === null || resource.used === undefined) {
+      return null;
+    }
+
+    if (resource.available === null || resource.available === undefined) {
+      return null;
+    }
+
+    if (resource.available <= 0) {
+      return resource.used > 0 ? Number.POSITIVE_INFINITY : 0;
+    }
+
+    return (resource.used / resource.available) * 100;
+  }
 }

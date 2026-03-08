@@ -30,6 +30,7 @@ describe('EspionageReportGenerator', () => {
         [BuildingType.BUNKER_NETWORK, 9],
         [BuildingType.SHIPYARD, 2]
       ]),
+      new Map<BuildingType, number>(),
       [],
       [],
       [],

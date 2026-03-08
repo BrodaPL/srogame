@@ -62,6 +62,7 @@ export class Galaxy {
       : new RBDSFTQ(
         new ResourcesPack(0, 0, 0),
         new Map(),
+        new Map(),
         [],
         [],
         [],

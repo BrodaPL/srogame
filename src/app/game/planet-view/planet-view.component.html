@@ -21,7 +21,14 @@
           @for (row of planetaryParameterRows(); track row.label) {
             <div class="planet-parameters-grid__row">
               <span class="planet-parameters-grid__label">{{ row.label }}</span>
-              <span class="planet-parameters-grid__value">{{ row.value }}</span>
+              <span
+                class="planet-parameters-grid__value"
+                [class.planet-parameters-grid__value--negative]="row.value < 0.9"
+                [class.planet-parameters-grid__value--positive]="row.value > 1.1"
+                [class.planet-parameters-grid__value--neutral]="row.value >= 0.9 && row.value <= 1.1"
+              >
+                {{ formatPlanetaryParameterPercent(row.value) }}
+              </span>
             </div>
           }
         </div>
@@ -35,7 +42,15 @@
           [alt]="planet.basicInfo.name + ' image'"
         />
         <p class="planet-view__planet-meta">
-          {{ coordinatesLabel }} | {{ planet.basicInfo.type }} | Size {{ planet.basicInfo.size }}
+          <button
+            type="button"
+            class="planet-view__coordinates-button"
+            [attr.title]="'Copy: ' + coordinatesLabel"
+            (click)="copyCoordinates()"
+          >
+            {{ coordinatesLabel }}
+          </button>
+          <span> | {{ planet.basicInfo.type }} | Size {{ usedPlanetSize() }} / {{ planet.basicInfo.size }}</span>
         </p>
       </div>
     </section>
@@ -76,7 +91,49 @@
                       Production: {{ buildingProductionAtCurrentLevel(building) }}
                     </p>
                     <p class="planet-building-card__meta">
-                      Power consumption: {{ buildingCurrentPowerConsumption(building) }}
+                      Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
+                    </p>
+                  }
+                  @if (shouldShowPowerManagement(building)) {
+                    <label class="planet-building-card__power-management">
+                      <span>Current power usage:</span>
+                      <select
+                        class="planet-building-card__power-select"
+                        [disabled]="isPowerManagementDisabled(building)"
+                        [ngModel]="buildingCurrentPowerConsumption(building)"
+                        (ngModelChange)="onBuildingPowerConsumptionChange(building, $event)"
+                      >
+                        @for (option of buildingPowerOptions(building); track option) {
+                          <option [ngValue]="option">{{ option }}</option>
+                        }
+                      </select>
+                    </label>
+                    @if (powerManagementError(building); as error) {
+                      <p class="planet-building-card__power-error">{{ error }}</p>
+                    }
+                  }
+                </div>
+                <div class="planet-building-card__cost">
+                  <p class="planet-building-card__section-title">{{ buildingCostHeader(building) }}</p>
+                  @for (cost of buildingCostRows(building); track cost.label) {
+                    <p
+                      class="planet-building-card__line"
+                      [class.planet-building-card__line--insufficient]="!cost.isEnough"
+                    >
+                      {{ cost.label }}: {{ cost.amount }}
+                    </p>
+                  }
+                </div>
+                <div class="planet-building-card__requirements">
+                  <p class="planet-building-card__section-title">Requirements (next level)</p>
+                  @for (requirement of buildingRequirementRows(building); track requirement.label) {
+                    <p
+                      class="planet-building-card__line"
+                      [class.planet-building-card__line--met]="requirement.isMet && !requirement.isPlaceholder"
+                      [class.planet-building-card__line--not-met]="!requirement.isMet"
+                      [class.planet-building-card__line--placeholder]="requirement.isPlaceholder"
+                    >
+                      {{ requirement.label }}
                     </p>
                   }
                 </div>
@@ -106,7 +163,49 @@
                       Production: {{ buildingProductionAtCurrentLevel(building) }}
                     </p>
                     <p class="planet-building-card__meta">
-                      Power consumption: {{ buildingCurrentPowerConsumption(building) }}
+                      Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
+                    </p>
+                  }
+                  @if (shouldShowPowerManagement(building)) {
+                    <label class="planet-building-card__power-management">
+                      <span>Current power usage:</span>
+                      <select
+                        class="planet-building-card__power-select"
+                        [disabled]="isPowerManagementDisabled(building)"
+                        [ngModel]="buildingCurrentPowerConsumption(building)"
+                        (ngModelChange)="onBuildingPowerConsumptionChange(building, $event)"
+                      >
+                        @for (option of buildingPowerOptions(building); track option) {
+                          <option [ngValue]="option">{{ option }}</option>
+                        }
+                      </select>
+                    </label>
+                    @if (powerManagementError(building); as error) {
+                      <p class="planet-building-card__power-error">{{ error }}</p>
+                    }
+                  }
+                </div>
+                <div class="planet-building-card__cost">
+                  <p class="planet-building-card__section-title">{{ buildingCostHeader(building) }}</p>
+                  @for (cost of buildingCostRows(building); track cost.label) {
+                    <p
+                      class="planet-building-card__line"
+                      [class.planet-building-card__line--insufficient]="!cost.isEnough"
+                    >
+                      {{ cost.label }}: {{ cost.amount }}
+                    </p>
+                  }
+                </div>
+                <div class="planet-building-card__requirements">
+                  <p class="planet-building-card__section-title">Requirements (next level)</p>
+                  @for (requirement of buildingRequirementRows(building); track requirement.label) {
+                    <p
+                      class="planet-building-card__line"
+                      [class.planet-building-card__line--met]="requirement.isMet && !requirement.isPlaceholder"
+                      [class.planet-building-card__line--not-met]="!requirement.isMet"
+                      [class.planet-building-card__line--placeholder]="requirement.isPlaceholder"
+                    >
+                      {{ requirement.label }}
                     </p>
                   }
                 </div>
@@ -124,33 +223,18 @@
         }
 
         @if (isActiveTab('ships')) {
-          <div class="overview-table-wrapper">
-            <table class="overview-table">
-              <thead>
-              <tr>
-                <th>Action</th>
-                <th>Ship Type</th>
-                <th>Amount</th>
-                <th>Total Cost</th>
-              </tr>
-              </thead>
-              <tbody>
-              @for (ship of shipBlueprints; track ship.type) {
-                <tr>
-                  <td>
-                    <button
-                      type="button"
-                      class="planet-ship-build-button"
-                      [disabled]="!canBuildShip(ship)"
-                      title="Build mechanics will be implemented in future sessions"
-                    >
-                      Build
-                    </button>
-                  </td>
-                  <td>{{ ship.type }}</td>
-                  <td>
+          <div class="planet-building-list">
+            @for (ship of shipBlueprints; track ship.type) {
+              <article class="planet-building-card planet-building-card--ship">
+                <img class="planet-building-card__image" [src]="ship.imagePath" [alt]="ship.type + ' image'" />
+                <div class="planet-building-card__main">
+                  <h4 class="planet-building-card__title">{{ ship.type }}</h4>
+                  <p class="planet-building-card__meta">Hull class: {{ ship.hullClass }}</p>
+                  <p class="planet-building-card__meta">Cargo: {{ ship.cargoCapacity }}</p>
+                  <label class="planet-building-card__amount">
+                    <span>Amount:</span>
                     <input
-                      class="planet-ship-amount-input"
+                      class="planet-building-card__amount-input"
                       type="number"
                       min="1"
                       step="1"
@@ -158,12 +242,52 @@
                       (ngModelChange)="onShipAmountInput(ship.type, $event)"
                       placeholder="amount"
                     />
-                  </td>
-                  <td>{{ shipTotalCostLabel(ship) }}</td>
-                </tr>
-              }
-              </tbody>
-            </table>
+                  </label>
+                </div>
+                <div class="planet-building-card__cost">
+                  <p class="planet-building-card__section-title">Single ship cost</p>
+                  @for (cost of shipSingleCostRows(ship); track cost.label) {
+                    <p
+                      class="planet-building-card__line"
+                      [class.planet-building-card__line--insufficient]="!cost.isEnough"
+                    >
+                      {{ cost.label }}: {{ cost.amount }}
+                    </p>
+                  }
+                  <p class="planet-building-card__section-title planet-building-card__section-title--spaced">Total cost</p>
+                  @for (cost of shipTotalCostRows(ship); track cost.label) {
+                    <p
+                      class="planet-building-card__line"
+                      [class.planet-building-card__line--insufficient]="!cost.isEnough && !cost.isPlaceholder"
+                      [class.planet-building-card__line--placeholder]="cost.isPlaceholder"
+                    >
+                      {{ cost.label }}: {{ cost.amount === null ? '--' : cost.amount }}
+                    </p>
+                  }
+                </div>
+                <div class="planet-building-card__requirements">
+                  <p class="planet-building-card__section-title">Requirements</p>
+                  @for (requirement of shipRequirementRows(ship); track requirement.label) {
+                    <p
+                      class="planet-building-card__line"
+                      [class.planet-building-card__line--met]="requirement.isMet && !requirement.isPlaceholder"
+                      [class.planet-building-card__line--not-met]="!requirement.isMet"
+                      [class.planet-building-card__line--placeholder]="requirement.isPlaceholder"
+                    >
+                      {{ requirement.label }}
+                    </p>
+                  }
+                </div>
+                <button
+                  type="button"
+                  class="planet-building-card__action"
+                  [disabled]="!canBuildShip(ship)"
+                  title="Build mechanics will be implemented in future sessions"
+                >
+                  Build
+                </button>
+              </article>
+            }
           </div>
         }
 

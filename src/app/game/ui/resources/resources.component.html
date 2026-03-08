@@ -30,8 +30,14 @@
     </div>
     <div class="resource">
       <span class="resource__label">Energy</span>
-      <span class="resource__value">
-        {{ formatResource(energy) }}{{ formatCapacitySuffix(energy) }}
+      <span
+        class="resource__value"
+        [class.resource__value--energy-over]="isEnergyOverloaded(energy)"
+        [class.resource__value--energy-full]="isEnergyAtHundred(energy)"
+        [class.resource__value--energy-near]="isEnergyNearLimit(energy)"
+        [class.resource__value--energy-safe]="isEnergySafe(energy)"
+      >
+        {{ formatResource(energy) }}{{ formatCapacitySuffix(energy) }}{{ energyOverloadLabel(energy) }}
       </span>
     </div>
   </div>

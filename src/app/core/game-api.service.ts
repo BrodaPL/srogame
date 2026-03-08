@@ -9,7 +9,9 @@ import {
   ClientPlanetDto,
   GalaxyPresentationDataDto,
   UpsertStarSystemNoteRequest,
-  StarSystemNoteDto
+  StarSystemNoteDto,
+  SetBuildingPowerConsumptionRequest,
+  SetBuildingPowerConsumptionResponse
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -93,6 +95,14 @@ export class GameApiService {
         headers: this.authHeaders(token),
         params: { x, y }
       }
+    );
+  }
+
+  public setBuildingPowerConsumption(request: SetBuildingPowerConsumptionRequest, token: string) {
+    return this.http.post<SetBuildingPowerConsumptionResponse>(
+      `${API_BASE_URL}/game/power-consumption`,
+      request,
+      { headers: this.authHeaders(token) }
     );
   }
 

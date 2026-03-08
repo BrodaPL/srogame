@@ -6,20 +6,22 @@ import { PlanetaryParameters } from '../planetary-parameters';
 import { BuildingType } from '../../enums/building-type';
 
 describe('Planet', () => {
+  const createSystem = (): SolarSystem => new SolarSystem(
+    'Test System',
+    -10,
+    false,
+    false,
+    { x: 0, y: 0 },
+    new Set(),
+    new Map()
+  );
+
   const createPlanet = (overrides?: {
     metalModifier?: number;
     crystalModifier?: number;
     deuteriumModifier?: number;
   }): Planet => {
-    const system = new SolarSystem(
-      'Test System',
-      -10,
-      false,
-      false,
-      { x: 0, y: 0 },
-      new Set(),
-      new Map()
-    );
+    const system = createSystem();
     const modifiers = new PlanetaryParameters(
       overrides?.metalModifier ?? 1,
       overrides?.crystalModifier ?? 1,
@@ -37,6 +39,7 @@ describe('Planet', () => {
       new PlanetInfo(null, modifiers),
       new rBDSFTQ(
         new ResourcesPack(0, 0, 0),
+        new Map(),
         new Map(),
         [],
         [],
@@ -94,6 +97,39 @@ describe('Planet', () => {
     expect(metalGain).toBeCloseTo(140 * multiplier * 1.2, 8);
     expect(crystalGain).toBeCloseTo(60 * multiplier * 0.8, 8);
     expect(deuteriumGain).toBeCloseTo(60 * multiplier * 1.1, 8);
+  });
+
+  it('creates starting planets with neutral multiplier parameters set to 1', () => {
+    const system = createSystem();
+    const startingPlanet = Planet.createStartingPlanet('Home', 1, system, 1);
+    const parameters = startingPlanet.info.planetaryParameters;
+
+    expect(parameters.metalModifier).toBe(1);
+    expect(parameters.crystalModifier).toBe(1);
+    expect(parameters.deuteriumModifier).toBe(1);
+    expect(parameters.energyModifierRES).toBe(1);
+    expect(parameters.energyModifierNuclear).toBe(1);
+    expect(parameters.scienceModifier).toBe(1);
+    expect(parameters.industryModifier).toBe(1);
+    expect(parameters.anomaliesAndNoise).toBe(1);
+    expect(parameters.hyperspaceParameters).toBe(1);
+  });
+
+  it('uses direct multiplier ranges for forced BARREN random planets', () => {
+    const system = createSystem();
+    for (let index = 0; index < 60; index += 1) {
+      const planet = Planet.createRandomEmpty(`Barren-${index}`, 1, system, null, PlanetType.BARREN);
+      const parameters = planet.info.planetaryParameters;
+
+      expect(parameters.metalModifier).toBeGreaterThanOrEqual(0.7);
+      expect(parameters.metalModifier).toBeLessThanOrEqual(1.5);
+      expect(parameters.scienceModifier).toBeGreaterThanOrEqual(0.9);
+      expect(parameters.scienceModifier).toBeLessThanOrEqual(1.5);
+      expect(parameters.anomaliesAndNoise).toBeGreaterThanOrEqual(0.8);
+      expect(parameters.anomaliesAndNoise).toBeLessThanOrEqual(1.6);
+      expect(parameters.hyperspaceParameters).toBeGreaterThanOrEqual(0.2);
+      expect(parameters.hyperspaceParameters).toBeLessThanOrEqual(1.5);
+    }
   });
 });
 

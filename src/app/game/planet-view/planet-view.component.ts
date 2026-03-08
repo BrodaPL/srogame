@@ -11,7 +11,7 @@ import { BuildingRequirement } from '../../models/buildings/building-requirement
 import { BuildingType } from '../../models/enums/building-type';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
-import type { ClientPlanetDto } from '../../models/game-api-types';
+import type { ClientPlanetDto, SetBuildingPowerConsumptionRequest } from '../../models/game-api-types';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { Ship } from '../../models/fleets/ship';
@@ -23,6 +23,25 @@ type PlanetTab = 'resources' | 'facilities' | 'ships' | 'defences' | 'operations
 type EnergyState = {
   used: number;
   available: number;
+};
+
+type BuildingCostRowVm = {
+  label: string;
+  amount: number;
+  isEnough: boolean;
+};
+
+type BuildingRequirementRowVm = {
+  label: string;
+  isMet: boolean;
+  isPlaceholder: boolean;
+};
+
+type ShipCostRowVm = {
+  label: string;
+  amount: number | null;
+  isEnough: boolean;
+  isPlaceholder: boolean;
 };
 
 @Component({
@@ -48,6 +67,9 @@ export class PlanetViewComponent implements OnInit {
 
   private readonly buildingBlueprintsByType: Map<BuildingType, Building>;
   private readonly buildingLevelsByType = new Map<BuildingType, number>();
+  private readonly buildingCurrentPowerByType = new Map<BuildingType, number>();
+  private readonly powerUpdateInFlightByType = new Set<BuildingType>();
+  private readonly powerUpdateErrorByType = new Map<BuildingType, string>();
   private readonly techLevelsByType = new Map<TechnologyType, number>();
   private readonly buildingQueueTypes = new Set<BuildingType>();
   private readonly shipAmountInputs = new Map<ShipType, string>();
@@ -109,8 +131,144 @@ export class PlanetViewComponent implements OnInit {
   }
 
   protected buildingCurrentPowerConsumption(building: Building): number {
+    const maxConsumption = this.maxBuildingPowerConsumption(building.type);
+    const current = this.buildingCurrentPowerByType.get(building.type);
+    if (current === undefined) {
+      return maxConsumption;
+    }
+
+    return this.roundNumber(Math.min(maxConsumption, Math.max(0, current)), 2);
+  }
+
+  protected buildingMaxPowerConsumption(building: Building): number {
+    return this.maxBuildingPowerConsumption(building.type);
+  }
+
+  protected shouldShowPowerManagement(building: Building): boolean {
     const level = this.buildingLevel(building.type);
-    return level * (building.powerConsumption ?? 0);
+    const powerPerLevel = building.powerConsumption ?? 0;
+    return level > 0 && powerPerLevel > 0;
+  }
+
+  protected isPowerManagementDisabled(building: Building): boolean {
+    const level = this.buildingLevel(building.type);
+    const powerPerLevel = building.powerConsumption ?? 0;
+    return (
+      level <= 0
+      || powerPerLevel <= 0
+      || this.powerUpdateInFlightByType.has(building.type)
+    );
+  }
+
+  protected powerManagementError(building: Building): string | null {
+    return this.powerUpdateErrorByType.get(building.type) ?? null;
+  }
+
+  protected buildingPowerOptions(building: Building): number[] {
+    const level = this.buildingLevel(building.type);
+    const powerPerLevel = building.powerConsumption ?? 0;
+    if (level <= 0 || powerPerLevel <= 0) {
+      return [0];
+    }
+
+    const options: number[] = [];
+    for (let index = 0; index <= level; index += 1) {
+      options.push(this.roundNumber(index * powerPerLevel, 2));
+    }
+
+    return options;
+  }
+
+  protected onBuildingPowerConsumptionChange(building: Building, rawValue: unknown): void {
+    if (this.isPowerManagementDisabled(building)) {
+      return;
+    }
+
+    const requested = Number(rawValue);
+    if (!Number.isFinite(requested)) {
+      return;
+    }
+
+    const planet = this.planet;
+    const session = this.playerSession.load();
+    if (!planet || !session) {
+      return;
+    }
+
+    const allowedOptions = this.buildingPowerOptions(building);
+    const normalized = allowedOptions.includes(requested)
+      ? requested
+      : this.maxBuildingPowerConsumption(building.type);
+    const previousValue = this.buildingCurrentPowerConsumption(building);
+    this.setBuildingCurrentPowerConsumption(building.type, normalized);
+    this.updateResourceDisplays();
+    this.powerUpdateInFlightByType.add(building.type);
+    this.powerUpdateErrorByType.delete(building.type);
+    this.cdr.markForCheck();
+
+    const request: SetBuildingPowerConsumptionRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      buildingType: building.type,
+      currentPowerConsumption: normalized
+    };
+
+    this.gameApi.setBuildingPowerConsumption(request, session.token)
+      .pipe(
+        timeout(10000),
+        finalize(() => {
+          this.powerUpdateInFlightByType.delete(building.type);
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe({
+        next: (response) => {
+          if (
+            !this.planet
+            || this.planet.coordinates.x !== request.x
+            || this.planet.coordinates.y !== request.y
+            || this.planet.coordinates.z !== request.z
+          ) {
+            return;
+          }
+
+          this.setBuildingCurrentPowerConsumption(building.type, response.currentPowerConsumption);
+          this.updateResourceDisplays();
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          if (
+            !this.planet
+            || this.planet.coordinates.x !== request.x
+            || this.planet.coordinates.y !== request.y
+            || this.planet.coordinates.z !== request.z
+          ) {
+            return;
+          }
+
+          this.setBuildingCurrentPowerConsumption(building.type, previousValue);
+          this.updateResourceDisplays();
+          this.powerUpdateErrorByType.set(
+            building.type,
+            error?.error?.error ?? 'Unable to update power consumption.'
+          );
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected formatPlanetaryParameterPercent(value: number): string {
+    const normalized = Number.isFinite(value) ? value : 0;
+    return `${Math.round(normalized * 100)}%`;
+  }
+
+  protected copyCoordinates(): void {
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+      return;
+    }
+
+    void navigator.clipboard.writeText(this.coordinatesLabel);
   }
 
   protected buildingBuildLabel(building: Building): string {
@@ -118,7 +276,7 @@ export class PlanetViewComponent implements OnInit {
   }
 
   protected canBuildBuilding(building: Building): boolean {
-    if (!this.planet || this.planet.info.ownerId === null || this.isBuildingInQueue(building.type)) {
+    if (!this.planet || this.planet.info.ownerId === null) {
       return false;
     }
 
@@ -136,28 +294,111 @@ export class PlanetViewComponent implements OnInit {
       return false;
     }
 
-    const projectedLevels = new Map(this.buildingLevelsByType);
-    projectedLevels.set(building.type, levelWeAreUpgradingTo);
-    const projectedEnergy = this.calculateEnergyState(projectedLevels);
-    return projectedEnergy.available >= projectedEnergy.used;
+    return true;
   }
 
   protected shipAmountInput(shipType: ShipType): string {
     return this.shipAmountInputs.get(shipType) ?? '';
   }
 
-  protected onShipAmountInput(shipType: ShipType, rawValue: string): void {
-    this.shipAmountInputs.set(shipType, rawValue);
+  protected onShipAmountInput(shipType: ShipType, rawValue: unknown): void {
+    const normalized = typeof rawValue === 'number'
+      ? String(rawValue)
+      : typeof rawValue === 'string'
+        ? rawValue
+        : '';
+    this.shipAmountInputs.set(shipType, normalized);
   }
 
-  protected shipTotalCostLabel(ship: Ship): string {
+  protected shipSingleCostRows(ship: Ship): BuildingCostRowVm[] {
+    const currentResources = this.planet?.objects.resources;
+    return [
+      {
+        label: 'Metal',
+        amount: ship.cost.metal,
+        isEnough: (currentResources?.metal ?? 0) >= ship.cost.metal
+      },
+      {
+        label: 'Crystal',
+        amount: ship.cost.crystal,
+        isEnough: (currentResources?.crystal ?? 0) >= ship.cost.crystal
+      },
+      {
+        label: 'Deuterium',
+        amount: ship.cost.deuterium,
+        isEnough: (currentResources?.deuterium ?? 0) >= ship.cost.deuterium
+      }
+    ];
+  }
+
+  protected shipTotalCostRows(ship: Ship): ShipCostRowVm[] {
     const amount = this.shipAmount(ship.type);
     if (amount === null) {
-      return '--';
+      return [
+        { label: 'Metal', amount: null, isEnough: true, isPlaceholder: true },
+        { label: 'Crystal', amount: null, isEnough: true, isPlaceholder: true },
+        { label: 'Deuterium', amount: null, isEnough: true, isPlaceholder: true }
+      ];
     }
 
     const total = this.multiplyCost(ship.cost, amount);
-    return `M ${total.metal}, C ${total.crystal}, D ${total.deuterium}`;
+    const currentResources = this.planet?.objects.resources;
+    return [
+      {
+        label: 'Metal',
+        amount: total.metal,
+        isEnough: (currentResources?.metal ?? 0) >= total.metal,
+        isPlaceholder: false
+      },
+      {
+        label: 'Crystal',
+        amount: total.crystal,
+        isEnough: (currentResources?.crystal ?? 0) >= total.crystal,
+        isPlaceholder: false
+      },
+      {
+        label: 'Deuterium',
+        amount: total.deuterium,
+        isEnough: (currentResources?.deuterium ?? 0) >= total.deuterium,
+        isPlaceholder: false
+      }
+    ];
+  }
+
+  protected shipRequirementRows(ship: Ship): BuildingRequirementRowVm[] {
+    const rows: BuildingRequirementRowVm[] = [];
+
+    for (const requirement of ship.buildingRequirements) {
+      const requiredLevel = Math.ceil(requirement.level);
+      const currentLevel = this.buildingLevel(requirement.building);
+      rows.push({
+        label: `B ${requirement.building}: ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false
+      });
+    }
+
+    for (const requirement of ship.techRequirements) {
+      const requiredLevel = Math.ceil(requirement.level);
+      const currentLevel = this.techLevel(requirement.tech);
+      rows.push({
+        label: `T ${requirement.tech}: ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false
+      });
+    }
+
+    if (rows.length === 0) {
+      return [
+        {
+          label: 'None',
+          isMet: true,
+          isPlaceholder: true
+        }
+      ];
+    }
+
+    return rows;
   }
 
   protected canBuildShip(ship: Ship): boolean {
@@ -183,7 +424,7 @@ export class PlanetViewComponent implements OnInit {
       return false;
     }
 
-    const energy = this.calculateEnergyState(this.buildingLevelsByType);
+    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
     return energy.available >= energy.used;
   }
 
@@ -212,6 +453,81 @@ export class PlanetViewComponent implements OnInit {
       { label: 'Anomalies and Noise', value: parameters.anomaliesAndNoise },
       { label: 'Hyperspace parameters', value: parameters.hyperspaceParameters }
     ];
+  }
+
+  protected usedPlanetSize(): number {
+    let used = 0;
+    for (const level of this.buildingLevelsByType.values()) {
+      used += level;
+    }
+
+    return used;
+  }
+
+  protected buildingCostHeader(building: Building): string {
+    return this.buildingLevel(building.type) <= 0
+      ? 'Initial cost'
+      : `Next level cost (L${this.buildingNextLevel(building)})`;
+  }
+
+  protected buildingCostRows(building: Building): BuildingCostRowVm[] {
+    const currentResources = this.planet?.objects.resources;
+    const cost = this.buildingNextLevelCost(building);
+
+    return [
+      {
+        label: 'Metal',
+        amount: cost.metal,
+        isEnough: (currentResources?.metal ?? 0) >= cost.metal
+      },
+      {
+        label: 'Crystal',
+        amount: cost.crystal,
+        isEnough: (currentResources?.crystal ?? 0) >= cost.crystal
+      },
+      {
+        label: 'Deuterium',
+        amount: cost.deuterium,
+        isEnough: (currentResources?.deuterium ?? 0) >= cost.deuterium
+      }
+    ];
+  }
+
+  protected buildingRequirementRows(building: Building): BuildingRequirementRowVm[] {
+    const targetLevel = this.buildingNextLevel(building);
+    const rows: BuildingRequirementRowVm[] = [];
+
+    for (const requirement of building.buildingRequirements) {
+      const requiredLevel = Math.ceil(targetLevel * requirement.level);
+      const currentLevel = this.buildingLevel(requirement.building);
+      rows.push({
+        label: `B ${requirement.building}: ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false
+      });
+    }
+
+    for (const requirement of building.techRequirements) {
+      const requiredLevel = Math.ceil(targetLevel * requirement.level);
+      const currentLevel = this.techLevel(requirement.tech);
+      rows.push({
+        label: `T ${requirement.tech}: ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false
+      });
+    }
+
+    if (rows.length === 0) {
+      return [
+        {
+          label: 'None',
+          isMet: true,
+          isPlaceholder: true
+        }
+      ];
+    }
+
+    return rows;
   }
 
   private loadPlanet(x: number, y: number, z: number): void {
@@ -286,6 +602,9 @@ export class PlanetViewComponent implements OnInit {
 
   private rebuildPlanetState(): void {
     this.buildingLevelsByType.clear();
+    this.buildingCurrentPowerByType.clear();
+    this.powerUpdateInFlightByType.clear();
+    this.powerUpdateErrorByType.clear();
     this.techLevelsByType.clear();
     this.buildingQueueTypes.clear();
 
@@ -297,6 +616,13 @@ export class PlanetViewComponent implements OnInit {
       this.buildingLevelsByType.set(entry.type as BuildingType, entry.level);
     }
 
+    for (const entry of this.planet.objects.buildingsCurrentPowerConsumption ?? []) {
+      this.buildingCurrentPowerByType.set(
+        entry.type as BuildingType,
+        this.roundNumber(Math.max(0, entry.currentPowerConsumption), 2)
+      );
+    }
+
     for (const queued of this.planet.objects.buildingQueue) {
       this.buildingQueueTypes.add(queued.type as BuildingType);
     }
@@ -305,6 +631,7 @@ export class PlanetViewComponent implements OnInit {
       this.techLevelsByType.set(entry.type as TechnologyType, entry.level);
     }
 
+    this.initializeBuildingCurrentPowerConsumption();
     this.updateResourceDisplays();
   }
 
@@ -342,7 +669,7 @@ export class PlanetViewComponent implements OnInit {
       capacityPercent: this.capacityPercent(resources.deuterium, deuteriumCapacity)
     };
 
-    const energy = this.calculateEnergyState(this.buildingLevelsByType);
+    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
     this.energyDisplay = {
       used: energy.used,
       available: energy.available
@@ -366,7 +693,10 @@ export class PlanetViewComponent implements OnInit {
     return this.getProductionAtLevelByType(storageType, this.buildingLevel(storageType));
   }
 
-  private calculateEnergyState(levels: Map<BuildingType, number>): EnergyState {
+  private calculateEnergyState(
+    levels: Map<BuildingType, number>,
+    currentPowerByType: Map<BuildingType, number>
+  ): EnergyState {
     const solarProduction = this.getProductionAtLevelByType(
       BuildingType.SOLAR_WIND_GEOTHERMAL,
       levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0
@@ -402,7 +732,12 @@ export class PlanetViewComponent implements OnInit {
         continue;
       }
 
-      usedEnergy += level * (blueprint.powerConsumption ?? 0);
+      const maxConsumption = Math.max(0, level * (blueprint.powerConsumption ?? 0));
+      const selectedConsumption = currentPowerByType.get(buildingType);
+      const normalizedConsumption = selectedConsumption === undefined
+        ? maxConsumption
+        : Math.min(maxConsumption, Math.max(0, selectedConsumption));
+      usedEnergy += normalizedConsumption;
     }
 
     return {
@@ -440,7 +775,8 @@ export class PlanetViewComponent implements OnInit {
   }
 
   private shipAmount(shipType: ShipType): number | null {
-    const raw = this.shipAmountInputs.get(shipType)?.trim() ?? '';
+    const stored = this.shipAmountInputs.get(shipType);
+    const raw = (stored ?? '').trim();
     if (!raw) {
       return null;
     }
@@ -499,6 +835,94 @@ export class PlanetViewComponent implements OnInit {
     }
 
     return value;
+  }
+
+  private buildingNextLevel(building: Building): number {
+    return this.buildingLevel(building.type) + 1;
+  }
+
+  private buildingNextLevelCost(building: Building): ResourcesPack {
+    const currentLevel = this.buildingLevel(building.type);
+    const multiplier = 2 ** currentLevel;
+    return new ResourcesPack(
+      building.basicCost.metal * multiplier,
+      building.basicCost.crystal * multiplier,
+      building.basicCost.deuterium * multiplier
+    );
+  }
+
+  private initializeBuildingCurrentPowerConsumption(): void {
+    const defaults = this.createDefaultPowerConsumptionMap(this.buildingLevelsByType);
+    for (const [buildingType, maxConsumption] of defaults.entries()) {
+      const currentConsumption = this.buildingCurrentPowerByType.get(buildingType);
+      const normalizedConsumption = currentConsumption === undefined
+        ? maxConsumption
+        : Math.min(maxConsumption, Math.max(0, currentConsumption));
+      this.setBuildingCurrentPowerConsumption(buildingType, normalizedConsumption);
+    }
+  }
+
+  private createProjectedPowerConsumptionMap(levels: Map<BuildingType, number>): Map<BuildingType, number> {
+    const projected = this.createDefaultPowerConsumptionMap(levels);
+    for (const [buildingType, currentConsumption] of this.buildingCurrentPowerByType.entries()) {
+      const maxConsumption = this.maxBuildingPowerConsumptionAtLevels(buildingType, levels);
+      if (maxConsumption <= 0) {
+        continue;
+      }
+
+      projected.set(
+        buildingType,
+        this.roundNumber(Math.min(maxConsumption, Math.max(0, currentConsumption)), 2)
+      );
+    }
+
+    return projected;
+  }
+
+  private createDefaultPowerConsumptionMap(levels: Map<BuildingType, number>): Map<BuildingType, number> {
+    const defaults = new Map<BuildingType, number>();
+    for (const [buildingType, level] of levels.entries()) {
+      const blueprint = this.buildingBlueprintsByType.get(buildingType);
+      if (!blueprint) {
+        continue;
+      }
+
+      const maxConsumption = Math.max(0, level * (blueprint.powerConsumption ?? 0));
+      defaults.set(buildingType, this.roundNumber(maxConsumption, 2));
+    }
+
+    return defaults;
+  }
+
+  private maxBuildingPowerConsumption(buildingType: BuildingType): number {
+    return this.maxBuildingPowerConsumptionAtLevels(buildingType, this.buildingLevelsByType);
+  }
+
+  private maxBuildingPowerConsumptionAtLevels(
+    buildingType: BuildingType,
+    levels: Map<BuildingType, number>
+  ): number {
+    const level = levels.get(buildingType) ?? 0;
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    return this.roundNumber(Math.max(0, level * (blueprint.powerConsumption ?? 0)), 2);
+  }
+
+  private setBuildingCurrentPowerConsumption(buildingType: BuildingType, powerConsumption: number): void {
+    const maxConsumption = this.maxBuildingPowerConsumption(buildingType);
+    if (maxConsumption <= 0) {
+      this.buildingCurrentPowerByType.delete(buildingType);
+      return;
+    }
+
+    const normalizedPower = this.roundNumber(
+      Math.min(maxConsumption, Math.max(0, powerConsumption)),
+      2
+    );
+    this.buildingCurrentPowerByType.set(buildingType, normalizedPower);
   }
 
   private parseNonNegativeInt(value: string | null): number | null {

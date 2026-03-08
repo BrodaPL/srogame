@@ -107,6 +107,11 @@ export type BuildingLevelEntry = {
   level: number;
 };
 
+export type BuildingPowerConsumptionEntry = {
+  type: BuildingType;
+  currentPowerConsumption: number;
+};
+
 export type TechLevelEntry = {
   type: TechnologyType;
   level: number;
@@ -148,6 +153,7 @@ export type ClientPlanetDto = {
   objects: {
     resources: ResourcesPackDto;
     buildingsLevels: BuildingLevelEntry[];
+    buildingsCurrentPowerConsumption: BuildingPowerConsumptionEntry[];
     defences: DefenceBuildingInstances[];
     ships: ShipInstance[];
     technologyQueue: Technology[];
@@ -158,6 +164,19 @@ export type ClientPlanetDto = {
     spaceDebris: ResourcesPackDto;
   };
   reportData: ClientReportDataDto | null;
+};
+
+export type SetBuildingPowerConsumptionRequest = {
+  x: number;
+  y: number;
+  z: number;
+  buildingType: BuildingType;
+  currentPowerConsumption: number;
+};
+
+export type SetBuildingPowerConsumptionResponse = {
+  buildingType: BuildingType;
+  currentPowerConsumption: number;
 };
 
 export type ClientInfoDto = {

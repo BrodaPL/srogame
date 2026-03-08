@@ -151,7 +151,7 @@ export class GalaxySetupComponent {
         this.gameState.setGalaxy(response.galaxy);
         this.savedConfig.set(config);
         this.isStarting = false;
-        this.router.navigate(['/game']);
+        this.router.navigate(['/game/galactic']);
       },
       error: () => {
         this.startError = 'Unable to reach the game server.';

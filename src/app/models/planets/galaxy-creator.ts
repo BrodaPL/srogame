@@ -11,6 +11,7 @@ import { RngTechnologyGenerator } from '../../generators/rng-technology-generato
 import { RngShipsGenerator } from '../../generators/rng-ships-generator';
 import { RngResourceGenerator } from '../../generators/rng-resource-generator';
 import { BuildingType } from '../enums/building-type';
+import { ResourcesPack } from '../resources-pack';
 
 
 export class GalaxyCreator {
@@ -156,7 +157,7 @@ export class GalaxyCreator {
             const orbitShips = shipGenerator.generate(level, targetShipsValue);
 
             planet.info.ownerId = nextPlayerId;
-            planet.rBDSFTQ.buildingsLevels = buildingGenerator.generate(level);
+            this.applyBuildingLevelsToPlanet(planet, buildingGenerator.generate(level));
             planet.rBDSFTQ.orbitShips = orbitShips;
 
             const player = new Player(
@@ -261,7 +262,8 @@ export class GalaxyCreator {
         slot.planet.basicInfo.order,
         startingPlanet.basicInfo.type
       );
-      startingPlanet.rBDSFTQ.buildingsLevels = this.createStartingBuildings();
+      this.applyBuildingLevelsToPlanet(startingPlanet, this.createStartingBuildings());
+      startingPlanet.rBDSFTQ.resources = this.createStartingResources();
       startingPlanet.rBDSFTQ.orbitShips = [];
 
       slot.system.planets[slot.index] = startingPlanet;
@@ -335,6 +337,23 @@ export class GalaxyCreator {
     }
 
     return map;
+  }
+
+  private applyBuildingLevelsToPlanet(planet: Planet, buildingLevels: Map<BuildingType, number>): void {
+    planet.rBDSFTQ.buildingsLevels.clear();
+    planet.rBDSFTQ.buildingsCurrentPowerConsumption.clear();
+
+    for (const [buildingType, level] of buildingLevels.entries()) {
+      planet.setBuildingLevel(buildingType, level);
+    }
+  }
+
+  private createStartingResources(): ResourcesPack {
+    return new ResourcesPack(
+      this.setup.startingResources.metal,
+      this.setup.startingResources.crystal,
+      this.setup.startingResources.deuterium
+    );
   }
 
   private buildPlanetName(
