@@ -1287,6 +1287,127 @@ app-root {
   cursor: not-allowed;
 }
 
+.researches-view {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.researches-view__labs,
+.researches-view__body {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(12, 16, 22, 0.88);
+  padding: 0.75rem;
+}
+
+.researches-view__labs-meta {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-family: var(--font-mono), serif;
+}
+
+.researches-view__labs-grid {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.researches-view__lab-item {
+  display: grid;
+  gap: 0.24rem;
+}
+
+.researches-view__lab-caption {
+  margin: 0;
+  color: #9fb0ca;
+  font-size: 0.74rem;
+  font-family: var(--font-mono), serif;
+}
+
+.research-tech-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.research-tech-card {
+  display: grid;
+  grid-template-columns: 170px minmax(200px, 0.9fr) minmax(140px, 0.7fr) minmax(170px, 0.9fr) minmax(235px, 1fr) auto;
+  align-items: center;
+  gap: 0.62rem;
+  padding: 0.52rem 0.6rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.research-tech-card__image {
+  width: 168px;
+  height: 168px;
+  object-fit: contain;
+}
+
+.research-tech-card__main {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.research-tech-card__title {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.research-tech-card__meta {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.research-tech-card__cost,
+.research-tech-card__requirements,
+.research-tech-card__labs {
+  display: grid;
+  align-content: start;
+  gap: 0.14rem;
+}
+
+.research-tech-card__lab-select {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #2f333b;
+  color: #f5f8ff;
+  font-size: 0.74rem;
+  padding: 0.14rem 0.38rem;
+  min-width: 210px;
+}
+
+.research-tech-card__lab-select option {
+  background: #2f333b;
+}
+
+.research-tech-card__action {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  min-width: 128px;
+  min-height: 48px;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+}
+
+.research-tech-card__action--ready {
+  border-color: rgba(72, 191, 118, 0.75);
+  background: rgba(48, 146, 86, 0.78);
+}
+
+.research-tech-card__action:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
 .planet-view {
   display: grid;
   gap: 0.85rem;
@@ -1731,6 +1852,16 @@ app-root {
 
   .planet-view__parameters {
     max-width: none;
+  }
+
+  .research-tech-card {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .research-tech-card__lab-select {
+    min-width: 0;
+    width: 100%;
   }
 }
 

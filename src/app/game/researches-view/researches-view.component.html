@@ -1,4 +1,113 @@
 <app-top-menu></app-top-menu>
-<section class="game-view game-view--researches-view"></section>
+
+<section class="researches-view">
+  @if (isLoading) {
+    <p class="overview-empty">Loading researches data...</p>
+  } @else if (loadError) {
+    <p class="overview-empty">{{ loadError }}</p>
+  } @else {
+    <section class="researches-view__labs">
+      <h3 class="planet-view__section-title">Research Labs</h3>
+      <p class="researches-view__labs-meta">
+        Free labs: {{ freeResearchLabs.length }} / {{ allOwnedPlanetsWithResearchLab.length }}
+        | Max labs per technology: {{ maxLabsPerTechnology }}
+      </p>
+
+      @if (allOwnedPlanetsWithResearchLab.length > 0) {
+        <div class="researches-view__labs-grid">
+          @for (planet of allOwnedPlanetsWithResearchLab; track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z) {
+            <div class="researches-view__lab-item">
+              <app-mini-planet-preview [planet]="planet"></app-mini-planet-preview>
+              <p class="researches-view__lab-caption">{{ researchLabSummaryLabel(planet) }}</p>
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="overview-empty">No owned planets with Research Lab level greater than 0.</p>
+      }
+    </section>
+
+    <section class="researches-view__body">
+      <h3 class="planet-view__section-title">Technologies</h3>
+      <div class="research-tech-list">
+        @for (technology of technologies; track technology.type) {
+          <article class="research-tech-card">
+            <img class="research-tech-card__image" [src]="technology.imagePath" [alt]="technology.type + ' image'" />
+
+            <div class="research-tech-card__main">
+              <h4 class="research-tech-card__title">{{ technology.type }}</h4>
+              @if (currentTechnologyLevel(technology.type) > 0) {
+                <p class="research-tech-card__meta">Level: {{ currentTechnologyLevel(technology.type) }}</p>
+              } @else {
+                <p class="research-tech-card__meta">Not researched yet.</p>
+              }
+              <p class="research-tech-card__meta">
+                Energy required: {{ technologyEnergyRequiredForTargetLevel(technology) }}
+              </p>
+              <p class="research-tech-card__meta">
+                Research time: {{ technologyResearchTimeForTargetLevel(technology) }}
+              </p>
+            </div>
+
+            <div class="research-tech-card__cost">
+              <p class="planet-building-card__section-title">
+                Next level cost (L{{ technologyTargetLevel(technology.type) }})
+              </p>
+              @for (cost of technologyCostRows(technology); track cost.label) {
+                <p
+                  class="planet-building-card__line"
+                  [class.planet-building-card__line--insufficient]="!cost.isEnough"
+                >
+                  {{ cost.label }}: {{ cost.amount }}
+                </p>
+              }
+            </div>
+
+            <div class="research-tech-card__requirements">
+              <p class="planet-building-card__section-title">Requirements</p>
+              @for (requirement of technologyRequirementRows(technology); track requirement.label) {
+                <p
+                  class="planet-building-card__line"
+                  [class.planet-building-card__line--met]="requirement.isMet && !requirement.isPlaceholder"
+                  [class.planet-building-card__line--not-met]="!requirement.isMet"
+                  [class.planet-building-card__line--placeholder]="requirement.isPlaceholder"
+                >
+                  {{ requirement.label }}
+                </p>
+              }
+            </div>
+
+            <div class="research-tech-card__labs">
+              <p class="planet-building-card__section-title">Assigned Research Labs</p>
+              @for (slotIndex of labSlotIndexes; track slotIndex) {
+                <select
+                  class="research-tech-card__lab-select"
+                  [disabled]="isLabDropdownDisabled(technology.type, slotIndex)"
+                  [ngModel]="selectedLabId(technology.type, slotIndex) ?? ''"
+                  (ngModelChange)="onLabSelectionChange(technology.type, slotIndex, $event)"
+                >
+                  <option [ngValue]="''">Select lab {{ slotIndex + 1 }}</option>
+                  @for (lab of labOptionsForSlot(technology.type, slotIndex); track lab.id) {
+                    <option [ngValue]="lab.id">{{ lab.label }}</option>
+                  }
+                </select>
+              }
+            </div>
+
+            <button
+              type="button"
+              class="research-tech-card__action"
+              [class.research-tech-card__action--ready]="canStartResearch(technology)"
+              [disabled]="!canStartResearch(technology)"
+              [attr.title]="researchButtonTitle(technology)"
+            >
+              START RESEARCH
+            </button>
+          </article>
+        }
+      </div>
+    </section>
+  }
+</section>
 
 
