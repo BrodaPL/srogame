@@ -13,6 +13,7 @@ export class Building {
     public level: number,
     public currentPowerConsumption: number,
     public powerConsumption: number,
+    public isFacility: boolean,
     public buildingRequirements: BuildingRequirement[],
     public techRequirements: TechRequirement[],
     public production1: number[],

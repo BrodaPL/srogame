@@ -1,4 +1,5 @@
 import { Component, Input, OnChanges } from '@angular/core';
+import { Router } from '@angular/router';
 import type { ClientPlanetDto, ClientReportDataDto } from '../../../models/game-api-types';
 
 type MiniPlanetTagVm = {
@@ -14,6 +15,8 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   @Input() planet: ClientPlanetDto | null = null;
 
   protected tags: MiniPlanetTagVm[] = [];
+
+  constructor(private readonly router: Router) {}
 
   public ngOnChanges(): void {
     this.tags = this.buildTags();
@@ -42,6 +45,27 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     void navigator.clipboard.writeText(this.coordinatesLabel());
+  }
+
+  protected canViewPlanet(): boolean {
+    return this.planet?.info.ownerId !== null;
+  }
+
+  protected openPlanetView(): void {
+    if (!this.planet || !this.canViewPlanet()) {
+      return;
+    }
+
+    void this.router.navigate(
+      ['/game/planet'],
+      {
+        queryParams: {
+          x: this.planet.coordinates.x,
+          y: this.planet.coordinates.y,
+          z: this.planet.coordinates.z
+        }
+      }
+    );
   }
 
   private buildTags(): MiniPlanetTagVm[] {

@@ -19,6 +19,7 @@ interface BuildingBlueprintJson {
   level: number;
   currentPowerConsumption: number;
   powerConsumption: number;
+  isFacility: boolean;
   buildingRequirements: BuildingRequirementJson[];
   techRequirements: TechRequirementJson[];
   production1: number[];
@@ -96,6 +97,7 @@ export class BuildingBlueprintsFactory {
       entry.level,
       entry.currentPowerConsumption,
       entry.powerConsumption ?? 0,
+      entry.isFacility ?? false,
       buildingRequirements.map((requirement) => new BuildingRequirement(
         this.parseEnumKey(BuildingType, requirement.building, 'BuildingType'),
         requirement.level

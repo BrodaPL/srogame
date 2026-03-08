@@ -6,18 +6,27 @@
       <span class="resource__value">
         {{ formatResource(metal) }}{{ formatCapacitySuffix(metal) }}
       </span>
+      @if (formatIncome(metal); as income) {
+        <span class="resource__sub-value">{{ income }}</span>
+      }
     </div>
     <div class="resource">
       <span class="resource__label">Crystal</span>
       <span class="resource__value">
         {{ formatResource(crystal) }}{{ formatCapacitySuffix(crystal) }}
       </span>
+      @if (formatIncome(crystal); as income) {
+        <span class="resource__sub-value">{{ income }}</span>
+      }
     </div>
     <div class="resource">
       <span class="resource__label">Deuterium</span>
       <span class="resource__value">
         {{ formatResource(deuterium) }}{{ formatCapacitySuffix(deuterium) }}
       </span>
+      @if (formatIncome(deuterium); as income) {
+        <span class="resource__sub-value">{{ income }}</span>
+      }
     </div>
     <div class="resource">
       <span class="resource__label">Energy</span>

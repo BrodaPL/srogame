@@ -1,4 +1,252 @@
 <app-top-menu></app-top-menu>
-<section class="game-view game-view--planet-view"></section>
 
+<section class="planet-view">
+  @if (isLoading) {
+    <p class="overview-empty">Loading planet data...</p>
+  } @else if (loadError) {
+    <p class="overview-empty">{{ loadError }}</p>
+  } @else if (planet) {
+    <app-resources
+      [viewName]="'Planet View'"
+      [metal]="metalDisplay"
+      [crystal]="crystalDisplay"
+      [deuterium]="deuteriumDisplay"
+      [energy]="energyDisplay"
+    ></app-resources>
 
+    <section class="planet-view__overview">
+      <div class="planet-view__parameters">
+        <h3 class="planet-view__section-title">Planet Parameters</h3>
+        <div class="planet-parameters-grid">
+          @for (row of planetaryParameterRows(); track row.label) {
+            <div class="planet-parameters-grid__row">
+              <span class="planet-parameters-grid__label">{{ row.label }}</span>
+              <span class="planet-parameters-grid__value">{{ row.value }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="planet-view__hero">
+        <h2 class="planet-view__planet-name">{{ planet.basicInfo.name }}</h2>
+        <img
+          class="planet-view__planet-image"
+          [src]="planet.basicInfo.image"
+          [alt]="planet.basicInfo.name + ' image'"
+        />
+        <p class="planet-view__planet-meta">
+          {{ coordinatesLabel }} | {{ planet.basicInfo.type }} | Size {{ planet.basicInfo.size }}
+        </p>
+      </div>
+    </section>
+
+    <section class="planet-tabs">
+      <div class="planet-tabs__header">
+        <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('resources')" (click)="setTab('resources')">
+          Resources
+        </button>
+        <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('facilities')" (click)="setTab('facilities')">
+          Facilities
+        </button>
+        <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('ships')" (click)="setTab('ships')">
+          Ships
+        </button>
+        <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('defences')" (click)="setTab('defences')">
+          Defences
+        </button>
+        <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('operations')" (click)="setTab('operations')">
+          Operations
+        </button>
+        <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('queues')" (click)="setTab('queues')">
+          Queues
+        </button>
+      </div>
+
+      <div class="planet-tabs__content">
+        @if (isActiveTab('resources')) {
+          <div class="planet-building-list">
+            @for (building of resourceBuildings; track building.type) {
+              <article class="planet-building-card">
+                <img class="planet-building-card__image" [src]="building.imagePath" [alt]="building.type + ' image'" />
+                <div class="planet-building-card__main">
+                  <h4 class="planet-building-card__title">{{ building.type }}</h4>
+                  <p class="planet-building-card__meta">Level: {{ buildingLevel(building.type) }}</p>
+                  @if (buildingLevel(building.type) > 0) {
+                    <p class="planet-building-card__meta">
+                      Production: {{ buildingProductionAtCurrentLevel(building) }}
+                    </p>
+                    <p class="planet-building-card__meta">
+                      Power consumption: {{ buildingCurrentPowerConsumption(building) }}
+                    </p>
+                  }
+                </div>
+                <button
+                  type="button"
+                  class="planet-building-card__action"
+                  [disabled]="!canBuildBuilding(building)"
+                  title="Build mechanics will be implemented in future sessions"
+                >
+                  {{ buildingBuildLabel(building) }}
+                </button>
+              </article>
+            }
+          </div>
+        }
+
+        @if (isActiveTab('facilities')) {
+          <div class="planet-building-list">
+            @for (building of facilityBuildings; track building.type) {
+              <article class="planet-building-card">
+                <img class="planet-building-card__image" [src]="building.imagePath" [alt]="building.type + ' image'" />
+                <div class="planet-building-card__main">
+                  <h4 class="planet-building-card__title">{{ building.type }}</h4>
+                  <p class="planet-building-card__meta">Level: {{ buildingLevel(building.type) }}</p>
+                  @if (buildingLevel(building.type) > 0) {
+                    <p class="planet-building-card__meta">
+                      Production: {{ buildingProductionAtCurrentLevel(building) }}
+                    </p>
+                    <p class="planet-building-card__meta">
+                      Power consumption: {{ buildingCurrentPowerConsumption(building) }}
+                    </p>
+                  }
+                </div>
+                <button
+                  type="button"
+                  class="planet-building-card__action"
+                  [disabled]="!canBuildBuilding(building)"
+                  title="Build mechanics will be implemented in future sessions"
+                >
+                  {{ buildingBuildLabel(building) }}
+                </button>
+              </article>
+            }
+          </div>
+        }
+
+        @if (isActiveTab('ships')) {
+          <div class="overview-table-wrapper">
+            <table class="overview-table">
+              <thead>
+              <tr>
+                <th>Action</th>
+                <th>Ship Type</th>
+                <th>Amount</th>
+                <th>Total Cost</th>
+              </tr>
+              </thead>
+              <tbody>
+              @for (ship of shipBlueprints; track ship.type) {
+                <tr>
+                  <td>
+                    <button
+                      type="button"
+                      class="planet-ship-build-button"
+                      [disabled]="!canBuildShip(ship)"
+                      title="Build mechanics will be implemented in future sessions"
+                    >
+                      Build
+                    </button>
+                  </td>
+                  <td>{{ ship.type }}</td>
+                  <td>
+                    <input
+                      class="planet-ship-amount-input"
+                      type="number"
+                      min="1"
+                      step="1"
+                      [ngModel]="shipAmountInput(ship.type)"
+                      (ngModelChange)="onShipAmountInput(ship.type, $event)"
+                      placeholder="amount"
+                    />
+                  </td>
+                  <td>{{ shipTotalCostLabel(ship) }}</td>
+                </tr>
+              }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (isActiveTab('defences')) {
+          <p class="planet-tab-placeholder">Go away. Defences are not implemented yet.</p>
+        }
+
+        @if (isActiveTab('operations')) {
+          <p class="planet-tab-placeholder">Go away. Operations are not implemented yet.</p>
+        }
+
+        @if (isActiveTab('queues')) {
+          <div class="planet-queues-grid">
+            <article class="planet-queue-card">
+              <h4 class="planet-view__section-title">Queued Buildings</h4>
+              @if (hasBuildingQueueEntries()) {
+                <div class="overview-table-wrapper">
+                  <table class="overview-table">
+                    <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Target level</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @for (queuedBuilding of planet.objects.buildingQueue; track queuedBuilding.type) {
+                      <tr>
+                        <td>{{ queuedBuilding.type }}</td>
+                        <td>{{ queuedBuilding.level }}</td>
+                      </tr>
+                    }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="overview-empty">No buildings queued.</p>
+              }
+            </article>
+
+            <article class="planet-queue-card">
+              <h4 class="planet-view__section-title">Queued Ships</h4>
+              @if (hasShipQueueEntries()) {
+                <div class="overview-table-wrapper">
+                  <table class="overview-table">
+                    <thead>
+                    <tr>
+                      <th>Type</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @for (queuedShip of planet.objects.shipyardQueue; track queuedShip.type) {
+                      <tr>
+                        <td>{{ queuedShip.type }}</td>
+                      </tr>
+                    }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="overview-empty">No ships queued.</p>
+              }
+            </article>
+
+            <article class="planet-queue-card">
+              <h4 class="planet-view__section-title">Queued Defences</h4>
+              <p class="overview-empty">No defences queued.</p>
+            </article>
+
+            <article class="planet-queue-card planet-queue-card--research">
+              <img
+                class="planet-queue-card__research-image"
+                src="images/technologies/Computer_Technology.webp"
+                alt="Research placeholder image"
+              />
+              <p class="planet-queue-card__research-label">
+                here will be displayed currently researched technology by Tech Lab on this planet.
+              </p>
+            </article>
+          </div>
+        }
+      </div>
+    </section>
+  } @else {
+    <p class="overview-empty">Planet data not loaded yet.</p>
+  }
+</section>
