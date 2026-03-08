@@ -1,9 +1,19 @@
-<article class="mini-planet-preview">
+<article
+  class="mini-planet-preview"
+  [class.mini-planet-preview--no-data]="isNoDataPlanet()"
+  [class.mini-planet-preview--player]="isPlayerOwnedPlanet()"
+  [class.mini-planet-preview--neutral]="isNeutralOwnedPlanet()"
+  [class.mini-planet-preview--human]="isHumanOwnedPlanet()"
+  [class.mini-planet-preview--bot]="isBotOwnedPlanet()"
+>
   <h4 class="mini-planet-preview__name">{{ planetNameLabel() }}</h4>
 
-  @if (planetImagePath(); as imagePath) {
-    <img class="mini-planet-preview__image" [src]="imagePath" [alt]="planetNameLabel() + ' image'" />
-  }
+  <div class="mini-planet-preview__media">
+    @if (planetImagePath(); as imagePath) {
+      <img class="mini-planet-preview__image" [src]="imagePath" [alt]="planetNameLabel() + ' image'" />
+    }
+    <p class="mini-planet-preview__owner">{{ ownershipLabel() }}</p>
+  </div>
 
   <div class="mini-planet-preview__tags">
     @for (tag of tags; track tag.label) {

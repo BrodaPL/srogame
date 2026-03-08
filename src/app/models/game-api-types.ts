@@ -13,6 +13,7 @@ import type { Ship } from './fleets/ship';
 import type { Technology } from './tech/technology';
 import type { Building } from './buildings/building';
 import type { NoteBorderColor } from './enums/note-border-color';
+import type { PlayerType } from './enums/player-type';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -148,6 +149,8 @@ export type ClientPlanetDto = {
   };
   info: {
     ownerId: number | null;
+    ownerPlayerType: PlayerType | null;
+    ownerPlayerName: string | null;
     planetaryParameters: PlanetaryParametersDto;
   };
   objects: {

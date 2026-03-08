@@ -890,6 +890,8 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
     },
     info: {
       ownerId: clientPlanet.info.ownerId,
+      ownerPlayerType: clientPlanet.ownerPlayerType,
+      ownerPlayerName: clientPlanet.ownerPlayerName,
       planetaryParameters: toPlanetaryParametersDto(clientPlanet.info.planetaryParameters)
     },
     objects: {

@@ -686,7 +686,8 @@ export class PlanetViewComponent implements OnInit {
 
   private resourceGain(buildingType: BuildingType, adaptiveTechLevel: number, modifier: number): number {
     const baseProduction = this.getProductionAtLevelByType(buildingType, this.buildingLevel(buildingType));
-    return baseProduction * (1 + adaptiveTechLevel / 100) * modifier;
+    const gain = baseProduction * (1 + adaptiveTechLevel / 100) * modifier;
+    return Number.isFinite(gain) ? Math.floor(gain) : 0;
   }
 
   private storageCapacity(storageType: BuildingType): number {
@@ -824,6 +825,20 @@ export class PlanetViewComponent implements OnInit {
   }
 
   private getProductionAtLevel(building: Building, level: number): number {
+    const baseProduction = this.getRawProductionAtLevel(building, level);
+    if (baseProduction <= 0) {
+      return 0;
+    }
+
+    const utilization = this.powerUtilizationAtLevel(
+      building.type,
+      level,
+      building.powerConsumption ?? 0
+    );
+    return Math.floor(baseProduction * utilization);
+  }
+
+  private getRawProductionAtLevel(building: Building, level: number): number {
     if (level <= 0) {
       return 0;
     }
@@ -835,6 +850,31 @@ export class PlanetViewComponent implements OnInit {
     }
 
     return value;
+  }
+
+  private powerUtilizationAtLevel(
+    buildingType: BuildingType,
+    level: number,
+    powerPerLevel: number
+  ): number {
+    if (level <= 0) {
+      return 0;
+    }
+
+    if (powerPerLevel <= 0) {
+      return 1;
+    }
+
+    const maxConsumption = Math.max(0, level * powerPerLevel);
+    if (maxConsumption <= 0) {
+      return 1;
+    }
+
+    const selectedConsumption = this.buildingCurrentPowerByType.get(buildingType);
+    const normalizedConsumption = selectedConsumption === undefined
+      ? maxConsumption
+      : Math.min(maxConsumption, Math.max(0, selectedConsumption));
+    return normalizedConsumption / maxConsumption;
   }
 
   private buildingNextLevel(building: Building): number {

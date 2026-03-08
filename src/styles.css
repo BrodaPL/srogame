@@ -1199,7 +1199,27 @@ app-root {
   padding: 0.55rem;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  background: #2a2f36;
+}
+
+.mini-planet-preview--player {
+  background: #23663a;
+}
+
+.mini-planet-preview--no-data {
+  background: #12161d;
+}
+
+.mini-planet-preview--neutral {
+  background: #8e96a1;
+}
+
+.mini-planet-preview--human {
+  background: #234d88;
+}
+
+.mini-planet-preview--bot {
+  background: #7a262d;
 }
 
 .mini-planet-preview__name {
@@ -1214,6 +1234,19 @@ app-root {
   height: 48px;
   object-fit: contain;
   justify-self: start;
+}
+
+.mini-planet-preview__media {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.mini-planet-preview__owner {
+  margin: 0;
+  font-size: 0.74rem;
+  font-family: var(--font-mono), serif;
+  color: #e8effa;
 }
 
 .mini-planet-preview__tags {

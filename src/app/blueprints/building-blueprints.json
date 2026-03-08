@@ -990,7 +990,7 @@
                       },
                       {
                           "type":  "BUNKER_NETWORK",
-                          "description":  "Decreases resources that can be plunder by enemy atack by 4%. (Base is 90%)",
+                          "description":  "Decreases resources that can be plunder by enemy attack by 4%. (Base is 90%)",
                           "imagePath":  "images/buildings/Metal_Storage.webp",
                           "basicCost":  {
                                             "metal":  60,
@@ -1021,9 +1021,29 @@
                                                        "level":  0.5
                                                    }
                                                ],
-                          "production1":  [
-
-                                          ],
+                        "production1":  [
+                          4,
+                          8,
+                          12,
+                          16,
+                          20,
+                          24,
+                          28,
+                          32,
+                          36,
+                          40,
+                          44,
+                          48,
+                          52,
+                          55,
+                          58,
+                          60,
+                           62,
+                          64,
+                          66,
+                          68,
+                          70
+                        ],
                           "production2":  [
 
                                           ],

@@ -63,7 +63,7 @@ describe('Planet', () => {
     const levelOneValue = planet.getBuildingProductionValue1(BuildingType.METAL_MINE);
     console.log('getBuildingProductionValue1', { level: 1, levelOneValue });
 
-    expect(levelOneValue).toBe(90);
+    expect(levelOneValue).toBe(60);
 
     planet.setBuildingLevel(BuildingType.METAL_MINE, 99);
     const outOfRangeValue = planet.getBuildingProductionValue1(BuildingType.METAL_MINE);
@@ -94,9 +94,23 @@ describe('Planet', () => {
       deuteriumGain
     });
 
-    expect(metalGain).toBeCloseTo(140 * multiplier * 1.2, 8);
-    expect(crystalGain).toBeCloseTo(60 * multiplier * 0.8, 8);
-    expect(deuteriumGain).toBeCloseTo(60 * multiplier * 1.1, 8);
+    expect(metalGain).toBe(Math.floor(90 * multiplier * 1.2));
+    expect(crystalGain).toBe(Math.floor(40 * multiplier * 0.8));
+    expect(deuteriumGain).toBe(Math.floor(40 * multiplier * 1.1));
+  });
+
+  it('scales building production by current power utilization and floors results', () => {
+    const planet = createPlanet();
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 5);
+
+    expect(planet.getMaxBuildingPowerConsumption(BuildingType.METAL_MINE)).toBe(5);
+    expect(planet.getBuildingProductionValue1(BuildingType.METAL_MINE)).toBe(300);
+
+    planet.setCurrentBuildingPowerConsumption(BuildingType.METAL_MINE, 3);
+
+    expect(planet.getBuildingPowerUtilization(BuildingType.METAL_MINE)).toBeCloseTo(0.6, 8);
+    expect(planet.getBuildingProductionValue1(BuildingType.METAL_MINE)).toBe(180);
+    expect(planet.getMetalGain(0)).toBe(180);
   });
 
   it('creates starting planets with neutral multiplier parameters set to 1', () => {

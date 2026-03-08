@@ -252,6 +252,51 @@ export class Planet {
   }
 
   public getBuildingProductionValue1(type: BuildingType): number {
+    const baseProduction = this.getRawBuildingProductionValue1(type);
+    if (baseProduction <= 0) {
+      return 0;
+    }
+
+    const utilization = this.getBuildingPowerUtilization(type);
+    return Math.floor(baseProduction * utilization);
+  }
+
+  public getBuildingPowerUtilization(type: BuildingType): number {
+    const max = this.getMaxBuildingPowerConsumption(type);
+    if (max <= 0) {
+      return 1;
+    }
+
+    const current = this.getCurrentBuildingPowerConsumption(type);
+    if (!Number.isFinite(current) || current <= 0) {
+      return 0;
+    }
+
+    return Math.min(1, Math.max(0, current / max));
+  }
+
+  public getMetalGain(adaptiveTechnologyLevel: number): number {
+    const gain = this.getBuildingProductionValue1(BuildingType.METAL_MINE)
+      * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
+      * this.info.planetaryParameters.metalModifier;
+    return Number.isFinite(gain) ? Math.floor(gain) : 0;
+  }
+
+  public getCrystalGain(adaptiveTechnologyLevel: number): number {
+    const gain = this.getBuildingProductionValue1(BuildingType.CRYSTAL_MINE)
+      * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
+      * this.info.planetaryParameters.crystalModifier;
+    return Number.isFinite(gain) ? Math.floor(gain) : 0;
+  }
+
+  public getDeuteriumGain(adaptiveTechnologyLevel: number): number {
+    const gain = this.getBuildingProductionValue1(BuildingType.DEUTERIUM_SYNTHESIZER)
+      * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
+      * this.info.planetaryParameters.deuteriumModifier;
+    return Number.isFinite(gain) ? Math.floor(gain) : 0;
+  }
+
+  private getRawBuildingProductionValue1(type: BuildingType): number {
     const level = this.getBuildingLevel(type);
     if (level <= 0) {
       return 0;
@@ -262,26 +307,8 @@ export class Planet {
       return 0;
     }
 
-    const value = blueprint.production1[level];
+    const value = blueprint.production1[level - 1];
     return Number.isFinite(value) ? value : 0;
-  }
-
-  public getMetalGain(adaptiveTechnologyLevel: number): number {
-    return this.getBuildingProductionValue1(BuildingType.METAL_MINE)
-      * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.info.planetaryParameters.metalModifier;
-  }
-
-  public getCrystalGain(adaptiveTechnologyLevel: number): number {
-    return this.getBuildingProductionValue1(BuildingType.CRYSTAL_MINE)
-      * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.info.planetaryParameters.crystalModifier;
-  }
-
-  public getDeuteriumGain(adaptiveTechnologyLevel: number): number {
-    return this.getBuildingProductionValue1(BuildingType.DEUTERIUM_SYNTHESIZER)
-      * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.info.planetaryParameters.deuteriumModifier;
   }
 
   private static adaptiveTechnologyMultiplier(adaptiveTechnologyLevel: number): number {

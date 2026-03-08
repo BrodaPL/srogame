@@ -1,6 +1,7 @@
 import { Component, Input, OnChanges } from '@angular/core';
 import { Router } from '@angular/router';
 import type { ClientPlanetDto, ClientReportDataDto } from '../../../models/game-api-types';
+import { PlayerType } from '../../../models/enums/player-type';
 
 type MiniPlanetTagVm = {
   label: string;
@@ -49,6 +50,52 @@ export class MiniPlanetPreviewComponent implements OnChanges {
 
   protected canViewPlanet(): boolean {
     return this.planet?.info.ownerId !== null;
+  }
+
+  protected ownershipLabel(): string {
+    if (!this.planet || this.planet.reportData === null) {
+      return 'Owned by: NO DATA';
+    }
+
+    if (this.planet.info.ownerId !== null) {
+      return `Owned by: ${this.planet.info.ownerPlayerName ?? 'UNKNOWN'}`;
+    }
+
+    if (this.planet.info.ownerPlayerType === PlayerType.NEUTRAL) {
+      return 'Owned by: NEUTRAL';
+    }
+
+    if (this.planet.info.ownerPlayerName) {
+      return `Owned by: ${this.planet.info.ownerPlayerName}`;
+    }
+
+    return 'Owned by: FREE';
+  }
+
+  protected isNoDataPlanet(): boolean {
+    return this.planet?.reportData === null;
+  }
+
+  protected isPlayerOwnedPlanet(): boolean {
+    return !this.isNoDataPlanet() && this.planet?.info.ownerId !== null;
+  }
+
+  protected isNeutralOwnedPlanet(): boolean {
+    return !this.isNoDataPlanet()
+      && this.planet?.info.ownerId === null
+      && this.planet?.info.ownerPlayerType === PlayerType.NEUTRAL;
+  }
+
+  protected isHumanOwnedPlanet(): boolean {
+    return !this.isNoDataPlanet()
+      && this.planet?.info.ownerId === null
+      && this.planet?.info.ownerPlayerType === PlayerType.PLAYER;
+  }
+
+  protected isBotOwnedPlanet(): boolean {
+    return !this.isNoDataPlanet()
+      && this.planet?.info.ownerId === null
+      && this.planet?.info.ownerPlayerType === PlayerType.BOT;
   }
 
   protected openPlanetView(): void {

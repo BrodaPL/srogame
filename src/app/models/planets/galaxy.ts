@@ -41,7 +41,12 @@ export class Galaxy {
     public playerNameMap: Map<string, number> = new Map()
   ) {}
 
-  public createClientPlanet(planet: Planet, playerId: number): ClientPlanet {
+  public createClientPlanet(
+    planet: Planet,
+    playerId: number,
+    playerTypeById: Map<number, PlayerType> = this.buildPlayerTypeMap(),
+    playerNameById: Map<number, string> = this.buildPlayerNameById()
+  ): ClientPlanet {
     const reportData = planet.lastReportData.get(playerId) ?? null;
     const basicInfo = new PlanetBasicInfo(
       planet.basicInfo.name,
@@ -72,8 +77,26 @@ export class Galaxy {
         [],
         new ResourcesPack(0, 0, 0)
       );
+    const ownerPlayerType = isOwnedByPlayer
+      ? PlayerType.PLAYER
+      : reportData && planet.info.ownerId !== null
+        ? playerTypeById.get(planet.info.ownerId) ?? null
+        : null;
+    const ownerPlayerName = isOwnedByPlayer
+      ? playerNameById.get(playerId) ?? null
+      : reportData && planet.info.ownerId !== null
+        ? playerNameById.get(planet.info.ownerId) ?? null
+        : null;
 
-    return new ClientPlanet(basicInfo, info, rBDSFTQ, reportData, new Map());
+    return new ClientPlanet(
+      basicInfo,
+      info,
+      rBDSFTQ,
+      ownerPlayerType,
+      ownerPlayerName,
+      reportData,
+      new Map()
+    );
   }
 
   public createClientStarSystem(
@@ -82,34 +105,47 @@ export class Galaxy {
     includePlanets = true
   ): ClientStarSystem {
     const playerTypeById = this.buildPlayerTypeMap();
-    return this.createClientStarSystemInternal(system, playerId, playerTypeById, includePlanets);
+    const playerNameById = this.buildPlayerNameById();
+    return this.createClientStarSystemInternal(
+      system,
+      playerId,
+      playerTypeById,
+      playerNameById,
+      includePlanets
+    );
   }
 
   public createClientGalaxy(playerId: number, includePlanets = true): ClientGalaxy {
     const playerTypeById = this.buildPlayerTypeMap();
-    const playerNameMap = new Map<number, string>();
-    for (const player of this.players) {
-      playerNameMap.set(player.playerId, player.playerName);
-    }
+    const playerNameById = this.buildPlayerNameById();
 
     const clientStars = this.stars.map((row) =>
       row.map((system) =>
-        this.createClientStarSystemInternal(system, playerId, playerTypeById, includePlanets)
+        this.createClientStarSystemInternal(
+          system,
+          playerId,
+          playerTypeById,
+          playerNameById,
+          includePlanets
+        )
       )
     );
 
-    return new ClientGalaxy(this.name, clientStars, playerNameMap);
+    return new ClientGalaxy(this.name, clientStars, playerNameById);
   }
 
   private createClientStarSystemInternal(
     system: SolarSystem,
     playerId: number,
     playerTypeById: Map<number, PlayerType>,
+    playerNameById: Map<number, string>,
     includePlanets: boolean
   ): ClientStarSystem {
     const clientInfo = new ClientInfo();
     const clientPlanets = includePlanets
-      ? system.planets.map((planet) => this.createClientPlanet(planet, playerId))
+      ? system.planets.map((planet) =>
+        this.createClientPlanet(planet, playerId, playerTypeById, playerNameById)
+      )
       : [];
 
     for (const planet of system.planets) {
@@ -155,6 +191,14 @@ export class Galaxy {
     const map = new Map<number, PlayerType>();
     for (const player of this.players) {
       map.set(player.playerId, player.type);
+    }
+    return map;
+  }
+
+  private buildPlayerNameById(): Map<number, string> {
+    const map = new Map<number, string>();
+    for (const player of this.players) {
+      map.set(player.playerId, player.playerName);
     }
     return map;
   }
