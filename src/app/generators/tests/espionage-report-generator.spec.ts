@@ -20,7 +20,7 @@ describe('EspionageReportGenerator', () => {
     techLevels: Map<TechnologyType, number>
   ): Player => new Player(playerId, playerName, [], techLevels, [], PlayerType.PLAYER);
 
-  const createPlanet = (system: SolarSystem, orbitShips: ShipInstance[]): Planet => new Planet(
+  const createPlanet = (system: SolarSystem, ships: ShipInstance[]): Planet => new Planet(
     new PlanetBasicInfo('Test', PlanetType.JUNGLE, 1, 1, system, '', 100),
     new PlanetInfo(2, new PlanetaryParameters(0, 0, 0, 0, 0, 0, 0, 0, 0)),
     new rBDSFTQ(
@@ -32,11 +32,10 @@ describe('EspionageReportGenerator', () => {
       ]),
       new Map<BuildingType, number>(),
       [],
+      ships,
       [],
       [],
       [],
-      [],
-      orbitShips,
       [],
       new ResourcesPack(0, 0, 0)
     ),
@@ -64,11 +63,11 @@ describe('EspionageReportGenerator', () => {
       [],
       []
     );
-    const orbitShips = [
+    const ships = [
       new ShipInstance(ship, 10, 5, 0, []),
       new ShipInstance(ship, 10, 5, 0, [])
     ];
-    const planet = createPlanet(system, orbitShips);
+    const planet = createPlanet(system, ships);
     const attackerTech = new Map<TechnologyType, number>([
       [TechnologyType.ESPIONAGE_TECHNOLOGY, 20]
     ]);
@@ -93,7 +92,7 @@ describe('EspionageReportGenerator', () => {
       resourcesAmount: report.resourcesAmount,
       techLevels: Array.from(report.techLevels.entries()),
       defences: report.defences,
-      ships: report.ships
+      ships: Array.from(report.ships.entries())
     });
 
     expect(report.planetaryParameters).toBe(planet.info.planetaryParameters);
@@ -104,7 +103,7 @@ describe('EspionageReportGenerator', () => {
     expect(report.buildingsLevels.size).toBe(3);
     expect(report.resourcesAmount.getTotalResourceAmount()).toBe(600);
     expect(report.techLevels.get(TechnologyType.ENERGY_TECHNOLOGY)).toBe(2);
-    expect(report.ships.length).toBe(2);
+    expect(report.ships.get(ShipType.FIGHTER)).toBe(2);
   });
 
   it('returns only planetary parameters for low report levels', () => {
@@ -134,7 +133,7 @@ describe('EspionageReportGenerator', () => {
       resourcesAmount: report.resourcesAmount,
       techLevels: Array.from(report.techLevels.entries()),
       defences: report.defences,
-      ships: report.ships
+      ships: Array.from(report.ships.entries())
     });
 
     expect(report.planetaryParameters).toBe(planet.info.planetaryParameters);
@@ -146,7 +145,7 @@ describe('EspionageReportGenerator', () => {
     expect(report.buildingsLevels.size).toBe(0);
     expect(report.resourcesAmount.getTotalResourceAmount()).toBe(0);
     expect(report.techLevels.size).toBe(0);
-    expect(report.ships.length).toBe(0);
+    expect(report.ships.size).toBe(0);
   });
 });
 

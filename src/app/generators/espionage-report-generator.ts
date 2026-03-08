@@ -2,6 +2,7 @@ import { Player } from '../models/player';
 import { Planet } from '../models/planets/planet';
 import { TechnologyType } from '../models/enums/technology-type';
 import { BuildingType } from '../models/enums/building-type';
+import { ShipType } from '../models/enums/ship-type';
 import { EspionageReportData } from '../models/reports/espionage-report-data';
 import { ResourcesPack } from '../models/resources-pack';
 import { DefencesQueue } from '../models/reports/defences-queue';
@@ -9,6 +10,7 @@ import { ResearchQueue } from '../models/reports/research-queue';
 import { ShipyardQueue } from '../models/reports/shipyard-queue';
 import { BuildingQueue } from '../models/reports/building-queue';
 import { DefenceBuildingInstances } from '../models/reports/defence-building-instances';
+import { ShipInstance } from '../models/fleets/ship-instance';
 
 export type EspionageReportOptions = {
   forcedReportLevel?: number;
@@ -49,7 +51,7 @@ export class EspionageReportGenerator {
       : 0;
     const totalDefences = includeTotalDefences ? this.getDefencesAmount() : 0;
     const totalShips = includeTotalShips
-      ? planet.rBDSFTQ.orbitShips.length
+      ? planet.rBDSFTQ.ships.length
       : 0;
 
     const detailedBuildings = includeDetailedBuildings
@@ -67,8 +69,8 @@ export class EspionageReportGenerator {
       : new Map();
     const detailedDefences = includeDetailedDefences ? this.getDefenceInstances() : [];
     const detailedShips = includeDetailedShips
-      ? [...planet.rBDSFTQ.orbitShips]
-      : [];
+      ? this.toShipAmountsMap(planet.rBDSFTQ.ships)
+      : new Map<ShipType, number>();
 
     const shipyardProduction = includeQueues ? new ShipyardQueue() : new ShipyardQueue();
     const defencesProduction = includeQueues ? new DefencesQueue() : new DefencesQueue();
@@ -93,6 +95,16 @@ export class EspionageReportGenerator {
       researchProduction,
       buildingProduction
     );
+  }
+
+  private toShipAmountsMap(ships: ShipInstance[]): Map<ShipType, number> {
+    const shipAmounts = new Map<ShipType, number>();
+    for (const shipInstance of ships) {
+      const shipType = shipInstance.type.type;
+      shipAmounts.set(shipType, (shipAmounts.get(shipType) ?? 0) + 1);
+    }
+
+    return shipAmounts;
   }
 
   private resolveReportLevel(

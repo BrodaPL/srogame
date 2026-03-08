@@ -294,9 +294,20 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       return null;
     }
 
-    const tooltip = hasTotalShips
+    let tooltip = hasTotalShips
       ? `Total ships: ${report.totalShipsAmount}`
       : `Ship entries: ${report.ships.length}`;
+
+    if (hasDetailedShips) {
+      const sortedDetails = [...report.ships]
+        .sort((left, right) => right.amount - left.amount || left.type.localeCompare(right.type))
+        .map((entry) => `${entry.type}: ${entry.amount}`)
+        .join('\n');
+      const totalFromDetails = report.ships.reduce((sum, entry) => sum + entry.amount, 0);
+      const totalLabel = hasTotalShips ? report.totalShipsAmount : totalFromDetails;
+
+      tooltip = `Total ships: ${totalLabel}\n${sortedDetails}`;
+    }
 
     return {
       label: 'Ships',

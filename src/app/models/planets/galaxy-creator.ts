@@ -10,11 +10,21 @@ import { RngBuildingGenerator } from '../../generators/rng-building-generator';
 import { RngTechnologyGenerator } from '../../generators/rng-technology-generator';
 import { RngShipsGenerator } from '../../generators/rng-ships-generator';
 import { RngResourceGenerator } from '../../generators/rng-resource-generator';
+import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { BuildingType } from '../enums/building-type';
 import { ResourcesPack } from '../resources-pack';
+import { ShipInstance } from '../fleets/ship-instance';
 
 
 export class GalaxyCreator {
+  private static readonly TEST_RANDOM_PLANETS_COUNT = 3;
+  private static readonly TEST_STARTING_SHIPS_PER_TYPE = 10;
+  private static readonly TEST_RANDOM_PLANET_LEVEL_MIN = 4;
+  private static readonly TEST_RANDOM_PLANET_LEVEL_MAX = 12;
+  private static readonly TEST_RANDOM_TECH_LEVEL_MIN = 4;
+  private static readonly TEST_RANDOM_TECH_LEVEL_MAX = 12;
+  private static readonly TEST_RANDOM_PLANET_STARTING_RESOURCES = 10000;
+
   public readonly galaxyCenterRadius: number;
 
   /**
@@ -114,6 +124,7 @@ export class GalaxyCreator {
     }
 
     this.assignStartingPlayers(galaxy, playerNames);
+    this.applyTestingSetupOptions(galaxy, playerNames);
 
     //5. GameType specific modifications
     if (this.setup.gameType === GameType.SANDBOX) {
@@ -154,11 +165,11 @@ export class GalaxyCreator {
             const targetShipsValue = resourceGenerator
               .generateSimple(level)
               .getTotalValuedResourceAmount();
-            const orbitShips = shipGenerator.generate(level, targetShipsValue);
+            const ships = shipGenerator.generate(level, targetShipsValue);
 
             planet.info.ownerId = nextPlayerId;
             this.applyBuildingLevelsToPlanet(planet, buildingGenerator.generate(level));
-            planet.rBDSFTQ.orbitShips = orbitShips;
+            planet.rBDSFTQ.ships = ships;
 
             const player = new Player(
               nextPlayerId,
@@ -205,6 +216,121 @@ export class GalaxyCreator {
     const low = Math.min(min, max);
     const high = Math.max(min, max);
     return Math.floor(Math.random() * (high - low + 1)) + low;
+  }
+
+  private applyTestingSetupOptions(galaxy: Galaxy, playerNames: string[]): void {
+    if (!this.setup.createRandomPlanets && !this.setup.createStartingShips) {
+      return;
+    }
+
+    const player = this.resolvePrimaryPlayerForTesting(galaxy, playerNames);
+    if (!player) {
+      return;
+    }
+
+    if (this.setup.createRandomPlanets) {
+      this.assignRandomPlanetsToPlayer(galaxy, player, GalaxyCreator.TEST_RANDOM_PLANETS_COUNT);
+      this.assignRandomTechToPlayer(player);
+    }
+
+    if (this.setup.createStartingShips) {
+      this.assignStartingShipsToPlayerPlanets(player, GalaxyCreator.TEST_STARTING_SHIPS_PER_TYPE);
+    }
+  }
+
+  private resolvePrimaryPlayerForTesting(galaxy: Galaxy, playerNames: string[]): Player | null {
+    const primaryName = playerNames[0]?.trim();
+    if (primaryName) {
+      for (const player of galaxy.humanPlayerMap.values()) {
+        if (player.playerName === primaryName) {
+          return player;
+        }
+      }
+    }
+
+    for (const player of galaxy.humanPlayerMap.values()) {
+      return player;
+    }
+
+    return null;
+  }
+
+  private assignRandomPlanetsToPlayer(galaxy: Galaxy, player: Player, amount: number): void {
+    const availablePlanets = this.collectAvailablePlanets(galaxy)
+      .filter((slot) => slot.planet.basicInfo.type !== PlanetType.ASTEROIDS);
+    const targetAmount = Math.max(0, Math.floor(amount));
+    const randomBuildingGenerator = new RngBuildingGenerator();
+
+    for (let index = 0; index < targetAmount; index += 1) {
+      if (availablePlanets.length === 0) {
+        return;
+      }
+
+      const candidateIndex = this.randomInt(0, availablePlanets.length - 1);
+      const slot = availablePlanets.splice(candidateIndex, 1)[0];
+      slot.planet.info.ownerId = player.playerId;
+
+      const randomLevel = this.randomInt(
+        GalaxyCreator.TEST_RANDOM_PLANET_LEVEL_MIN,
+        GalaxyCreator.TEST_RANDOM_PLANET_LEVEL_MAX
+      );
+      this.applyBuildingLevelsToPlanet(slot.planet, randomBuildingGenerator.generate(randomLevel));
+      slot.planet.rBDSFTQ.resources = new ResourcesPack(
+        GalaxyCreator.TEST_RANDOM_PLANET_STARTING_RESOURCES,
+        GalaxyCreator.TEST_RANDOM_PLANET_STARTING_RESOURCES,
+        GalaxyCreator.TEST_RANDOM_PLANET_STARTING_RESOURCES
+      );
+      slot.planet.rBDSFTQ.ships = [];
+      player.planets.push(slot.planet);
+    }
+  }
+
+  private assignRandomTechToPlayer(player: Player): void {
+    const randomTechGenerator = new RngTechnologyGenerator();
+    const randomLevel = this.randomInt(
+      GalaxyCreator.TEST_RANDOM_TECH_LEVEL_MIN,
+      GalaxyCreator.TEST_RANDOM_TECH_LEVEL_MAX
+    );
+    const randomTech = randomTechGenerator.generate(randomLevel);
+
+    player.tech.clear();
+    for (const [techType, level] of randomTech.entries()) {
+      if (level <= 0) {
+        continue;
+      }
+
+      player.tech.set(techType, level);
+    }
+  }
+
+  private assignStartingShipsToPlayerPlanets(player: Player, amountPerType: number): void {
+    const normalizedAmount = Math.max(0, Math.floor(amountPerType));
+    if (normalizedAmount <= 0) {
+      return;
+    }
+
+    const blueprints = ShipBlueprintsFactory.fromDefaultJson();
+    const shipsByType = Array.from(blueprints.shipsMap.values());
+    if (shipsByType.length === 0) {
+      return;
+    }
+
+    for (const planet of player.planets) {
+      const ships: ShipInstance[] = [];
+      for (const ship of shipsByType) {
+        for (let count = 0; count < normalizedAmount; count += 1) {
+          ships.push(new ShipInstance(
+            ship,
+            ship.hullPointsCapacity,
+            ship.shieldCapacity,
+            ship.cargoCapacity,
+            []
+          ));
+        }
+      }
+
+      planet.rBDSFTQ.ships = ships;
+    }
   }
 
   private assignStartingPlayers(galaxy: Galaxy, playerNames: string[]): void {
@@ -264,7 +390,7 @@ export class GalaxyCreator {
       );
       this.applyBuildingLevelsToPlanet(startingPlanet, this.createStartingBuildings());
       startingPlanet.rBDSFTQ.resources = this.createStartingResources();
-      startingPlanet.rBDSFTQ.orbitShips = [];
+      startingPlanet.rBDSFTQ.ships = [];
 
       slot.system.planets[slot.index] = startingPlanet;
 

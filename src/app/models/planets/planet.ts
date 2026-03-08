@@ -50,7 +50,6 @@ export class rBDSFTQ {
     public technologyQueue: Technology[],
     public buildingQueue: Building[],
     public shipyardQueue: Ship[],
-    public orbitShips: ShipInstance[],
     public fleets: Fleet[],
     public spaceDebris: ResourcesPack
   ) {}
@@ -97,7 +96,6 @@ export class Planet {
         new ResourcesPack(0, 0, 0),
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
-        [],
         [],
         [],
         [],
@@ -151,7 +149,6 @@ export class Planet {
         new ResourcesPack(0, 0, 0),
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
-        [],
         [],
         [],
         [],

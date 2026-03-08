@@ -33,6 +33,7 @@ import type {
   BuildingLevelEntry,
   BuildingPowerConsumptionEntry,
   TechLevelEntry,
+  ShipAmountEntry,
   ClientInfoDto,
   PlayerNameEntry,
   LoginRequest,
@@ -856,6 +857,15 @@ function toTechLevelEntries(map: Map<string, number>): TechLevelEntry[] {
   return entries;
 }
 
+function toShipAmountEntries(map: Map<unknown, number>): ShipAmountEntry[] {
+  const entries: ShipAmountEntry[] = [];
+  for (const [type, amount] of map.entries()) {
+    entries.push({ type: String(type), amount } as ShipAmountEntry);
+  }
+
+  return entries;
+}
+
 function toClientReportDataDto(reportData: EspionageReportData): ClientReportDataDto {
   return {
     reportDate: reportData.reportDate,
@@ -869,7 +879,7 @@ function toClientReportDataDto(reportData: EspionageReportData): ClientReportDat
     resourcesAmount: toResourcesPackDto(reportData.resourcesAmount),
     techLevels: toTechLevelEntries(reportData.techLevels),
     defences: reportData.defences,
-    ships: reportData.ships,
+    ships: toShipAmountEntries(reportData.ships),
     shipyardProduction: reportData.shipyardProduction,
     defencesProduction: reportData.defencesProduction,
     researchProduction: reportData.researchProduction,
@@ -903,7 +913,6 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       technologyQueue: clientPlanet.rBDSFTQ.technologyQueue,
       buildingQueue: clientPlanet.rBDSFTQ.buildingQueue,
       shipyardQueue: clientPlanet.rBDSFTQ.shipyardQueue,
-      orbitShips: clientPlanet.rBDSFTQ.orbitShips,
       fleets: clientPlanet.rBDSFTQ.fleets,
       spaceDebris: toResourcesPackDto(clientPlanet.rBDSFTQ.spaceDebris)
     },
@@ -1180,6 +1189,8 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Number.isInteger(setup.neutralBotsDifficulty) &&
     setup.neutralBotsDifficulty >= -100 &&
     setup.neutralBotsDifficulty <= 200 &&
+    (setup.createRandomPlanets === undefined || typeof setup.createRandomPlanets === 'boolean') &&
+    (setup.createStartingShips === undefined || typeof setup.createStartingShips === 'boolean') &&
     Number.isFinite(setup.startingResources?.metal) &&
     setup.startingResources.metal >= 0 &&
     Number.isFinite(setup.startingResources?.crystal) &&

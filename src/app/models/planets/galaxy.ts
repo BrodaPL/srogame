@@ -74,7 +74,6 @@ export class Galaxy {
         [],
         [],
         [],
-        [],
         new ResourcesPack(0, 0, 0)
       );
     const ownerPlayerType = isOwnedByPlayer

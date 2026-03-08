@@ -47,7 +47,6 @@ describe('Planet', () => {
         [],
         [],
         [],
-        [],
         new ResourcesPack(0, 0, 0)
       ),
       new Map()

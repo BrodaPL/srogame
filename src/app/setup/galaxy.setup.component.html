@@ -222,6 +222,30 @@
       </div>
 
       <div class="field">
+        <label>Testing options</label>
+        <div class="test-options">
+          <label class="checkbox-field" for="createRandomPlanets">
+            <input
+              id="createRandomPlanets"
+              name="createRandomPlanets"
+              type="checkbox"
+              [(ngModel)]="form.createRandomPlanets"
+            />
+            <span>Create random planets</span>
+          </label>
+          <label class="checkbox-field" for="createStartingShips">
+            <input
+              id="createStartingShips"
+              name="createStartingShips"
+              type="checkbox"
+              [(ngModel)]="form.createStartingShips"
+            />
+            <span>Create starting ships</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
         <label for="starting-resources">Starting resources</label>
         <div class="resource-group" id="starting-resources">
           <div class="resource-input">

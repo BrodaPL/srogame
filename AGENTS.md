@@ -13,7 +13,7 @@ This file captures session context for collaborators and future AI agents.
 
 ## Current Behavior
 - Route `/` shows main menu (load, singleplayer, multiplayer, encyclopedia, help/about).
-- Route `/setup` shows setup form (game type, starting metal/crystal/deuterium) and requires login; player name is read-only from session.
+- Route `/setup` shows setup form (game type, starting metal/crystal/deuterium, plus test-only checkboxes for random planets/starting ships) and requires login; player name is read-only from session.
 - Route `/game` shows game view if config exists, otherwise prompts to go to setup. Shows a galaxy preview grid when in-memory galaxy exists.
 - Route `/login` shows login/register form.
 - Route `/encyclopedia` shows encyclopedia menu with ships/buildings/technologies links.
@@ -54,6 +54,11 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-03-09: Refactored planet ship storage to a single field: removed `rBDSFTQ.orbitShips` and kept `rBDSFTQ.ships: ShipInstance[]` as canonical. Updated creators/mappers and DTOs accordingly (removed `objects.orbitShips` from `ClientPlanetDto` payload).
+- 2026-03-09: Refactored espionage detailed ships from `ShipInstance[]` to `Map<ShipType, number>` in `EspionageReportData`, added API transport shape `ShipAmountEntry[]`, and updated server serialization. `MiniPlanetPreview` and `PlanetData` Ships tooltip now display per-type ship amounts (with total) when detailed data is present (e.g. level-999 home report).
+- 2026-03-08: Added Galaxy Setup test-only checkboxes: `Create random planets` and `Create starting ships`, wired client + server setup validation + galaxy creation flow. `Create random planets` assigns 3 extra random planets to the main player with randomized building levels and randomized player tech; `Create starting ships` assigns 10 of every ship type on each owned planet.
+- 2026-03-08: Runtime verification pass completed through real auth/setup/game flow: both setup checkboxes were present and functional, start navigation reached `/game/galactic`, and API checks confirmed 4 owned planets (1+3), with 10 ships of each type per owned planet.
+- 2026-03-08: Testing-planet generation tweak: extra test planets now exclude `PlanetType.ASTEROIDS` and each generated test planet receives `10000` metal, `10000` crystal, and `10000` deuterium.
 - 2026-03-08: Implemented full `ResearchesView` (`/game/researches`) replacing placeholder. View now loads owned planets from API, lists planets with `RESEARCH_LAB > 0` using `MiniPlanetPreview`, computes per-lab research power (`floor(ResearchLab production1 * (1 + COMPUTER_TECHNOLOGY/100) * scienceModifier)`), and renders technologies as PlanetView-like rows with costs/requirements status coloring.
 - 2026-03-08: Added per-technology research lab assignment controls in `ResearchesView` with dynamic slot count based on `INTERGALACTIC_RESEARCH_NETWORK`: `maxLabs = floor(1.5 * sqrt(level) + 1)` (minimum 1). Dropdowns enable progressively (slot N requires slot N-1 selected), and one free Research Lab cannot be assigned to multiple technologies simultaneously. Labs already in `technologyQueue` are excluded as busy.
 - 2026-03-08: Added UI-only `START RESEARCH` enablement logic in `ResearchesView`. Button turns green and enables only when first assigned lab exists and the selected-lab planet meets conditions: resources, free energy after current consumption, building requirements, and tech requirements. No backend mutation endpoint for research start yet.

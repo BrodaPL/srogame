@@ -1,7 +1,7 @@
 import { BuildingType } from '../enums/building-type';
 import { ResourcesPack } from '../resources-pack';
 import { TechnologyType } from '../enums/technology-type';
-import { ShipInstance } from '../fleets/ship-instance';
+import { ShipType } from '../enums/ship-type';
 import { DefencesQueue } from './defences-queue';
 import { DefenceBuildingInstances } from './defence-building-instances';
 import { ResearchQueue } from './research-queue';
@@ -25,7 +25,7 @@ export class EspionageReportData {
     public resourcesAmount: ResourcesPack,
     public techLevels: Map<TechnologyType, number>,
     public defences: DefenceBuildingInstances[],
-    public ships: ShipInstance[],
+    public ships: Map<ShipType, number>,
     public shipyardProduction: ShipyardQueue,
     public defencesProduction: DefencesQueue,
     public researchProduction: ResearchQueue,

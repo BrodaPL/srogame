@@ -2,6 +2,7 @@ import type { GameType } from './enums/game-type';
 import type { PlanetType } from './enums/planet-type';
 import type { BuildingType } from './enums/building-type';
 import type { TechnologyType } from './enums/technology-type';
+import type { ShipType } from './enums/ship-type';
 import type { ShipInstance } from './fleets/ship-instance';
 import type { DefenceBuildingInstances } from './reports/defence-building-instances';
 import type { ShipyardQueue } from './reports/shipyard-queue';
@@ -28,6 +29,8 @@ export type GalaxySetup = {
   botDifficulty: number;
   neutralBotsAmount: number;
   neutralBotsDifficulty: number;
+  createRandomPlanets?: boolean;
+  createStartingShips?: boolean;
   startingResources: {
     metal: number;
     crystal: number;
@@ -118,6 +121,11 @@ export type TechLevelEntry = {
   level: number;
 };
 
+export type ShipAmountEntry = {
+  type: ShipType;
+  amount: number;
+};
+
 export type ClientReportDataDto = {
   reportDate: number;
   planetaryParameters: PlanetaryParametersDto;
@@ -130,7 +138,7 @@ export type ClientReportDataDto = {
   resourcesAmount: ResourcesPackDto;
   techLevels: TechLevelEntry[];
   defences: DefenceBuildingInstances[];
-  ships: ShipInstance[];
+  ships: ShipAmountEntry[];
   shipyardProduction: ShipyardQueue;
   defencesProduction: DefencesQueue;
   researchProduction: ResearchQueue;
@@ -162,7 +170,6 @@ export type ClientPlanetDto = {
     technologyQueue: Technology[];
     buildingQueue: Building[];
     shipyardQueue: Ship[];
-    orbitShips: ShipInstance[];
     fleets: Fleet[];
     spaceDebris: ResourcesPackDto;
   };

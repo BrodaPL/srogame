@@ -23,6 +23,8 @@ type GalaxySetupForm = {
   botDifficulty: string;
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
+  createRandomPlanets: boolean;
+  createStartingShips: boolean;
   startingMetal: string;
   startingCrystal: string;
   startingDeuterium: string;
@@ -135,6 +137,8 @@ export class GalaxySetupComponent {
       botDifficulty: Number(this.form.botDifficulty),
       neutralBotsAmount: Number(this.form.neutralBotsAmount),
       neutralBotsDifficulty: Number(this.form.neutralBotsDifficulty),
+      createRandomPlanets: this.form.createRandomPlanets,
+      createStartingShips: this.form.createStartingShips,
       startingResources: new ResourcesPack(
         Number(this.form.startingMetal),
         Number(this.form.startingCrystal),
@@ -175,6 +179,8 @@ export class GalaxySetupComponent {
       botDifficulty: '0',
       neutralBotsAmount: '1',
       neutralBotsDifficulty: '0',
+      createRandomPlanets: false,
+      createStartingShips: false,
       startingMetal: '6',
       startingCrystal: '3',
       startingDeuterium: '1'
@@ -196,6 +202,8 @@ export class GalaxySetupComponent {
       botDifficulty: String(config.botDifficulty),
       neutralBotsAmount: String(config.neutralBotsAmount),
       neutralBotsDifficulty: String(config.neutralBotsDifficulty),
+      createRandomPlanets: config.createRandomPlanets === true,
+      createStartingShips: config.createStartingShips === true,
       startingMetal: String(config.startingResources.metal),
       startingCrystal: String(config.startingResources.crystal),
       startingDeuterium: String(config.startingResources.deuterium)
@@ -267,6 +275,8 @@ export class GalaxySetupComponent {
       Number.isInteger(config.neutralBotsDifficulty) &&
       config.neutralBotsDifficulty >= -100 &&
       config.neutralBotsDifficulty <= 200 &&
+      (config.createRandomPlanets === undefined || typeof config.createRandomPlanets === 'boolean') &&
+      (config.createStartingShips === undefined || typeof config.createStartingShips === 'boolean') &&
       Number.isFinite(config.startingResources?.metal) &&
       config.startingResources.metal >= 0 &&
       config.startingResources.metal <= 999999 &&

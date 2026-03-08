@@ -110,10 +110,15 @@ export class PlanetDataComponent {
   protected shipsTooltip(): string {
     if (this.report) {
       if (Number.isFinite(this.report.totalShipsAmount)) {
+        if (this.report.ships?.size) {
+          return `Total ships: ${this.report.totalShipsAmount}\n${this.formatShipAmountMap(this.report.ships)}`;
+        }
+
         return `Total ships: ${this.report.totalShipsAmount}`;
       }
-      if (this.report.ships?.length) {
-        return `Ship entries: ${this.report.ships.length}`;
+
+      if (this.report.ships?.size) {
+        return this.formatShipAmountMap(this.report.ships);
       }
     }
 
@@ -168,6 +173,20 @@ export class PlanetDataComponent {
     }
 
     return rows.join('\n');
+  }
+
+  private formatShipAmountMap(shipAmounts: Map<unknown, number>): string {
+    if (!shipAmounts || shipAmounts.size === 0) {
+      return 'No ship data.';
+    }
+
+    const rows: Array<{ type: string; amount: number }> = [];
+    for (const [type, amount] of shipAmounts.entries()) {
+      rows.push({ type: String(type), amount });
+    }
+
+    rows.sort((left, right) => right.amount - left.amount || left.type.localeCompare(right.type));
+    return rows.map((row) => `${row.type}: ${row.amount}`).join('\n');
   }
 
   private formatQueue(queue: object | null | undefined): string {
