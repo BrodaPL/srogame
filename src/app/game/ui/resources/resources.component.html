@@ -40,5 +40,26 @@
         {{ formatResource(energy) }}{{ formatCapacitySuffix(energy) }}{{ energyOverloadLabel(energy) }}
       </span>
     </div>
+    <div class="resource resource--power">
+      <span class="resource__label">Powers</span>
+      <span
+        class="resource__power-line"
+        [class.resource__power-line--limited]="powers?.industryPowerLimited"
+      >
+        Industry: {{ formatPower(powers?.industryPower) }}
+      </span>
+      <span
+        class="resource__power-line"
+        [class.resource__power-line--limited]="powers?.shipyardPowerLimited"
+      >
+        Shipyard: {{ formatPower(powers?.shipyardPower) }}
+      </span>
+      <span
+        class="resource__power-line"
+        [class.resource__power-line--limited]="powers?.researchPowerLimited"
+      >
+        Research: {{ formatPower(powers?.researchPower) }}
+      </span>
+    </div>
   </div>
 </section>

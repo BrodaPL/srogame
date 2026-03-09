@@ -11,12 +11,17 @@ import { BuildingRequirement } from '../../models/buildings/building-requirement
 import { BuildingType } from '../../models/enums/building-type';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
-import type { ClientPlanetDto, SetBuildingPowerConsumptionRequest } from '../../models/game-api-types';
+import type {
+  BuildingQueueEntryDto,
+  ClientPlanetDto,
+  SetBuildingPowerConsumptionRequest,
+  StartBuildingConstructionRequest
+} from '../../models/game-api-types';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { Ship } from '../../models/fleets/ship';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
-import { ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
+import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
 
 type PlanetTab = 'resources' | 'facilities' | 'ships' | 'defences' | 'operations' | 'queues';
 
@@ -44,6 +49,17 @@ type ShipCostRowVm = {
   isPlaceholder: boolean;
 };
 
+type BuildingQueueRowVm = {
+  position: number;
+  buildingType: BuildingType;
+  fromLevel: number;
+  toLevel: number;
+  investedIndustryPower: number;
+  baseTotalConstructionTime: number;
+  estimatedTurnsForCompletion: number | null;
+  isHeadOfQueue: boolean;
+};
+
 @Component({
   selector: 'app-planet-view',
   imports: [TopMenuComponent, ResourcesComponent, FormsModule],
@@ -60,6 +76,7 @@ export class PlanetViewComponent implements OnInit {
   protected crystalDisplay: ResourceDisplay | null = null;
   protected deuteriumDisplay: ResourceDisplay | null = null;
   protected energyDisplay: ResourceDisplay | null = null;
+  protected powersDisplay: PlanetPowersDisplay | null = null;
 
   protected readonly resourceBuildings: Building[];
   protected readonly facilityBuildings: Building[];
@@ -72,6 +89,8 @@ export class PlanetViewComponent implements OnInit {
   private readonly powerUpdateErrorByType = new Map<BuildingType, string>();
   private readonly techLevelsByType = new Map<TechnologyType, number>();
   private readonly buildingQueueTypes = new Set<BuildingType>();
+  private readonly buildingStartInFlightByType = new Set<BuildingType>();
+  private readonly buildingStartErrorByType = new Map<BuildingType, string>();
   private readonly shipAmountInputs = new Map<ShipType, string>();
   private currentPlanetRequestKey = 0;
   private pendingPlanetRequests = 0;
@@ -272,11 +291,55 @@ export class PlanetViewComponent implements OnInit {
   }
 
   protected buildingBuildLabel(building: Building): string {
-    return this.isBuildingInQueue(building.type) ? 'Building in progress...' : 'Build';
+    if (this.isBuildingUnderConstruction(building.type)) {
+      return 'Under construction';
+    }
+
+    if (this.isBuildingQueued(building.type)) {
+      return 'Queued';
+    }
+
+    return 'Build';
+  }
+
+  protected buildingBuildTitle(building: Building): string {
+    if (this.isBuildingQueueFull()) {
+      return 'Queue full.';
+    }
+
+    if (this.buildingStartInFlightByType.has(building.type)) {
+      return 'Adding to queue...';
+    }
+
+    if (this.isBuildingUnderConstruction(building.type)) {
+      return 'Under construction.';
+    }
+
+    if (this.isBuildingQueued(building.type)) {
+      return 'Queued.';
+    }
+
+    if (!this.canBuildBuilding(building)) {
+      return 'Requirements not met or insufficient resources.';
+    }
+
+    return 'Add building to queue.';
   }
 
   protected canBuildBuilding(building: Building): boolean {
     if (!this.planet || this.planet.info.ownerId === null) {
+      return false;
+    }
+
+    if (this.buildingStartInFlightByType.has(building.type)) {
+      return false;
+    }
+
+    if (this.isBuildingQueueFull()) {
+      return false;
+    }
+
+    if (this.isBuildingQueued(building.type)) {
       return false;
     }
 
@@ -295,6 +358,74 @@ export class PlanetViewComponent implements OnInit {
     }
 
     return true;
+  }
+
+  protected onBuildBuilding(building: Building): void {
+    if (!this.canBuildBuilding(building)) {
+      return;
+    }
+
+    const planet = this.planet;
+    const session = this.playerSession.load();
+    if (!planet || !session) {
+      return;
+    }
+
+    this.buildingStartInFlightByType.add(building.type);
+    this.buildingStartErrorByType.delete(building.type);
+    this.cdr.markForCheck();
+
+    const request: StartBuildingConstructionRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      buildingType: building.type
+    };
+
+    this.gameApi.startBuildingConstruction(request, session.token)
+      .pipe(
+        timeout(10000),
+        finalize(() => {
+          this.buildingStartInFlightByType.delete(building.type);
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe({
+        next: (updatedPlanet) => {
+          if (
+            !this.planet
+            || this.planet.coordinates.x !== request.x
+            || this.planet.coordinates.y !== request.y
+            || this.planet.coordinates.z !== request.z
+          ) {
+            return;
+          }
+
+          this.planet = updatedPlanet;
+          this.rebuildPlanetState();
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          if (
+            !this.planet
+            || this.planet.coordinates.x !== request.x
+            || this.planet.coordinates.y !== request.y
+            || this.planet.coordinates.z !== request.z
+          ) {
+            return;
+          }
+
+          this.buildingStartErrorByType.set(
+            building.type,
+            error?.error?.error ?? 'Unable to add building to queue.'
+          );
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected buildingStartError(building: Building): string | null {
+    return this.buildingStartErrorByType.get(building.type) ?? null;
   }
 
   protected shipAmountInput(shipType: ShipType): string {
@@ -430,6 +561,51 @@ export class PlanetViewComponent implements OnInit {
 
   protected hasBuildingQueueEntries(): boolean {
     return (this.planet?.objects.buildingQueue?.length ?? 0) > 0;
+  }
+
+  protected currentBuildingQueueLength(): number {
+    return this.planet?.objects.buildingQueue?.length ?? 0;
+  }
+
+  protected maxBuildingQueueLength(): number {
+    const computerTechLevel = this.techLevel(TechnologyType.COMPUTER_TECHNOLOGY);
+    const roboticsFactoryLevel = this.buildingLevel(BuildingType.ROBOTICS_FACTORY);
+    const rawLimit = 1 + Math.sqrt(Math.max(0, computerTechLevel + roboticsFactoryLevel));
+    return Math.max(1, Math.floor(rawLimit));
+  }
+
+  protected queueTabTitle(): string {
+    return 'Upgrade COMPUTER_TECHNOLOGY and ROBOTICS_FACTORY to increase queue limit.';
+  }
+
+  protected buildingQueueRows(): BuildingQueueRowVm[] {
+    const queueEntries = this.planet?.objects.buildingQueue ?? [];
+    const industryPower = this.currentIndustryPower();
+    let cumulativeRemaining = 0;
+
+    return queueEntries.map((entry, index) => {
+      const buildingType = this.queueEntryBuildingType(entry);
+      const toLevel = this.queueEntryNextLevel(entry);
+      const fromLevel = Math.max(0, toLevel - 1);
+      const investedIndustryPower = this.queueEntryInvestedIndustryPower(entry);
+      const baseTotalConstructionTime = this.baseConstructionTime(buildingType, toLevel);
+      const remaining = Math.max(0, baseTotalConstructionTime - investedIndustryPower);
+      cumulativeRemaining += remaining;
+      const estimatedTurnsForCompletion = industryPower > 0
+        ? Math.ceil(cumulativeRemaining / industryPower)
+        : null;
+
+      return {
+        position: index + 1,
+        buildingType,
+        fromLevel,
+        toLevel,
+        investedIndustryPower,
+        baseTotalConstructionTime,
+        estimatedTurnsForCompletion,
+        isHeadOfQueue: index === 0
+      };
+    });
   }
 
   protected hasShipQueueEntries(): boolean {
@@ -605,6 +781,8 @@ export class PlanetViewComponent implements OnInit {
     this.buildingCurrentPowerByType.clear();
     this.powerUpdateInFlightByType.clear();
     this.powerUpdateErrorByType.clear();
+    this.buildingStartInFlightByType.clear();
+    this.buildingStartErrorByType.clear();
     this.techLevelsByType.clear();
     this.buildingQueueTypes.clear();
 
@@ -624,7 +802,7 @@ export class PlanetViewComponent implements OnInit {
     }
 
     for (const queued of this.planet.objects.buildingQueue) {
-      this.buildingQueueTypes.add(queued.type as BuildingType);
+      this.buildingQueueTypes.add(this.queueEntryBuildingType(queued));
     }
 
     for (const entry of this.planet.reportData?.techLevels ?? []) {
@@ -641,6 +819,7 @@ export class PlanetViewComponent implements OnInit {
       this.crystalDisplay = null;
       this.deuteriumDisplay = null;
       this.energyDisplay = null;
+      this.powersDisplay = null;
       return;
     }
 
@@ -673,6 +852,21 @@ export class PlanetViewComponent implements OnInit {
     this.energyDisplay = {
       used: energy.used,
       available: energy.available
+    };
+
+    this.powersDisplay = {
+      industryPower: this.currentIndustryPower(),
+      shipyardPower: this.currentShipyardPower(),
+      researchPower: this.currentResearchPower(),
+      industryPowerLimited: (
+        this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
+        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+      ),
+      shipyardPowerLimited: (
+        this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD)
+        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+      ),
+      researchPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.RESEARCH_LAB)
     };
   }
 
@@ -811,8 +1005,127 @@ export class PlanetViewComponent implements OnInit {
     );
   }
 
-  private isBuildingInQueue(buildingType: BuildingType): boolean {
+  private isBuildingQueued(buildingType: BuildingType): boolean {
     return this.buildingQueueTypes.has(buildingType);
+  }
+
+  private isBuildingUnderConstruction(buildingType: BuildingType): boolean {
+    const firstQueueEntry = this.planet?.objects.buildingQueue?.[0];
+    if (!firstQueueEntry) {
+      return false;
+    }
+
+    return this.queueEntryBuildingType(firstQueueEntry) === buildingType;
+  }
+
+  private isBuildingQueueFull(): boolean {
+    return this.currentBuildingQueueLength() >= this.maxBuildingQueueLength();
+  }
+
+  private queueEntryBuildingType(entry: BuildingQueueEntryDto): BuildingType {
+    if ((entry as { buildingType?: unknown }).buildingType) {
+      return (entry as { buildingType: BuildingType }).buildingType;
+    }
+
+    return (entry as unknown as { type: BuildingType }).type;
+  }
+
+  private queueEntryNextLevel(entry: BuildingQueueEntryDto): number {
+    const nextLevel = Number((entry as { nextLevel?: unknown }).nextLevel);
+    if (Number.isInteger(nextLevel) && nextLevel >= 1) {
+      return nextLevel;
+    }
+
+    const fallback = Number((entry as unknown as { level?: unknown }).level);
+    if (Number.isInteger(fallback) && fallback >= 1) {
+      return fallback;
+    }
+
+    return 1;
+  }
+
+  private queueEntryInvestedIndustryPower(entry: BuildingQueueEntryDto): number {
+    const invested = Number((entry as { investedIndustryPower?: unknown }).investedIndustryPower);
+    if (!Number.isFinite(invested) || invested < 0) {
+      return 0;
+    }
+
+    return Math.floor(invested);
+  }
+
+  private baseConstructionTime(buildingType: BuildingType, toLevel: number): number {
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint || toLevel < 1) {
+      return 0;
+    }
+
+    const cost = blueprint.getCostForLevel(toLevel);
+    return Math.max(0, Math.floor(cost.getTotalResourceAmount()));
+  }
+
+  private currentIndustryPower(): number {
+    const roboticsFactoryLevel = this.buildingLevel(BuildingType.ROBOTICS_FACTORY);
+    const naniteFactoryLevel = this.buildingLevel(BuildingType.NANITE_FACTORY);
+    const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
+
+    const roboticsPower = roboticsFactoryLevel <= 0
+      ? 5
+      : this.getProductionAtLevelByType(BuildingType.ROBOTICS_FACTORY, roboticsFactoryLevel);
+    const naniteMultiplier = naniteFactoryLevel <= 0
+      ? 1
+      : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+
+    const industryPower = roboticsPower * naniteMultiplier * industryModifier;
+    if (!Number.isFinite(industryPower) || industryPower <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(industryPower));
+  }
+
+  private currentShipyardPower(): number {
+    const shipyardLevel = this.buildingLevel(BuildingType.SHIPYARD);
+    const naniteFactoryLevel = this.buildingLevel(BuildingType.NANITE_FACTORY);
+    const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
+
+    const shipyardBasePower = shipyardLevel <= 0
+      ? 5
+      : this.getProductionAtLevelByType(BuildingType.SHIPYARD, shipyardLevel);
+    const naniteMultiplier = naniteFactoryLevel <= 0
+      ? 1
+      : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+
+    const shipyardPower = shipyardBasePower * naniteMultiplier * industryModifier;
+    if (!Number.isFinite(shipyardPower) || shipyardPower <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(shipyardPower));
+  }
+
+  private currentResearchPower(): number {
+    const researchLabLevel = this.buildingLevel(BuildingType.RESEARCH_LAB);
+    const computerTechnologyLevel = this.techLevel(TechnologyType.COMPUTER_TECHNOLOGY);
+    const scienceModifier = this.planet?.info.planetaryParameters.scienceModifier ?? 1;
+    const researchLabProduction = this.getProductionAtLevelByType(BuildingType.RESEARCH_LAB, researchLabLevel);
+    const computerMultiplier = 1 + ((computerTechnologyLevel * 5) / 100);
+
+    const researchPower = researchLabProduction * computerMultiplier * scienceModifier;
+    if (!Number.isFinite(researchPower) || researchPower <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(researchPower));
+  }
+
+  private isBuildingNotUsingFullPower(buildingType: BuildingType): boolean {
+    const maxConsumption = this.maxBuildingPowerConsumption(buildingType);
+    if (maxConsumption <= 0) {
+      return false;
+    }
+
+    const currentConsumption = this.buildingCurrentPowerByType.get(buildingType) ?? maxConsumption;
+    return currentConsumption < maxConsumption;
   }
 
   private getProductionAtLevelByType(buildingType: BuildingType, level: number): number {

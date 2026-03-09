@@ -12,7 +12,6 @@ import type { BuildingQueue } from './reports/building-queue';
 import type { Fleet } from './fleets/fleet';
 import type { Ship } from './fleets/ship';
 import type { Technology } from './tech/technology';
-import type { Building } from './buildings/building';
 import type { NoteBorderColor } from './enums/note-border-color';
 import type { PlayerType } from './enums/player-type';
 
@@ -116,6 +115,12 @@ export type BuildingPowerConsumptionEntry = {
   currentPowerConsumption: number;
 };
 
+export type BuildingQueueEntryDto = {
+  buildingType: BuildingType;
+  nextLevel: number;
+  investedIndustryPower: number;
+};
+
 export type TechLevelEntry = {
   type: TechnologyType;
   level: number;
@@ -168,12 +173,19 @@ export type ClientPlanetDto = {
     defences: DefenceBuildingInstances[];
     ships: ShipInstance[];
     technologyQueue: Technology[];
-    buildingQueue: Building[];
+    buildingQueue: BuildingQueueEntryDto[];
     shipyardQueue: Ship[];
     fleets: Fleet[];
     spaceDebris: ResourcesPackDto;
   };
   reportData: ClientReportDataDto | null;
+};
+
+export type StartBuildingConstructionRequest = {
+  x: number;
+  y: number;
+  z: number;
+  buildingType: BuildingType;
 };
 
 export type SetBuildingPowerConsumptionRequest = {

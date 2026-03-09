@@ -12,6 +12,7 @@
       [crystal]="crystalDisplay"
       [deuterium]="deuteriumDisplay"
       [energy]="energyDisplay"
+      [powers]="powersDisplay"
     ></app-resources>
 
     <section class="planet-view__overview">
@@ -72,8 +73,14 @@
         <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('operations')" (click)="setTab('operations')">
           Operations
         </button>
-        <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('queues')" (click)="setTab('queues')">
-          Queues
+        <button
+          type="button"
+          class="planet-tabs__tab"
+          [class.planet-tabs__tab--active]="isActiveTab('queues')"
+          [attr.title]="queueTabTitle()"
+          (click)="setTab('queues')"
+        >
+          Queues ({{ currentBuildingQueueLength() }}/{{ maxBuildingQueueLength() }})
         </button>
       </div>
 
@@ -141,10 +148,14 @@
                   type="button"
                   class="planet-building-card__action"
                   [disabled]="!canBuildBuilding(building)"
-                  title="Build mechanics will be implemented in future sessions"
+                  [attr.title]="buildingBuildTitle(building)"
+                  (click)="onBuildBuilding(building)"
                 >
                   {{ buildingBuildLabel(building) }}
                 </button>
+                @if (buildingStartError(building); as error) {
+                  <p class="planet-building-card__power-error">{{ error }}</p>
+                }
               </article>
             }
           </div>
@@ -213,10 +224,14 @@
                   type="button"
                   class="planet-building-card__action"
                   [disabled]="!canBuildBuilding(building)"
-                  title="Build mechanics will be implemented in future sessions"
+                  [attr.title]="buildingBuildTitle(building)"
+                  (click)="onBuildBuilding(building)"
                 >
                   {{ buildingBuildLabel(building) }}
                 </button>
+                @if (buildingStartError(building); as error) {
+                  <p class="planet-building-card__power-error">{{ error }}</p>
+                }
               </article>
             }
           </div>
@@ -308,15 +323,23 @@
                   <table class="overview-table">
                     <thead>
                     <tr>
+                      <th>#</th>
                       <th>Type</th>
-                      <th>Target level</th>
+                      <th>Upgrade</th>
+                      <th>Status</th>
+                      <th>Invested / base</th>
+                      <th>ETA (turns)</th>
                     </tr>
                     </thead>
                     <tbody>
-                    @for (queuedBuilding of planet.objects.buildingQueue; track queuedBuilding.type) {
+                    @for (queuedBuilding of buildingQueueRows(); track queuedBuilding.position) {
                       <tr>
-                        <td>{{ queuedBuilding.type }}</td>
-                        <td>{{ queuedBuilding.level }}</td>
+                        <td>{{ queuedBuilding.position }}</td>
+                        <td>{{ queuedBuilding.buildingType }}</td>
+                        <td>L{{ queuedBuilding.fromLevel }} -> L{{ queuedBuilding.toLevel }}</td>
+                        <td>{{ queuedBuilding.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
+                        <td>{{ queuedBuilding.investedIndustryPower }} / {{ queuedBuilding.baseTotalConstructionTime }}</td>
+                        <td>{{ queuedBuilding.estimatedTurnsForCompletion ?? '--' }}</td>
                       </tr>
                     }
                     </tbody>

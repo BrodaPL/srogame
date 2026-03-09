@@ -8,6 +8,15 @@ export type ResourceDisplay = {
   available?: number | null;
 };
 
+export type PlanetPowersDisplay = {
+  industryPower: number;
+  shipyardPower: number;
+  researchPower: number;
+  industryPowerLimited: boolean;
+  shipyardPowerLimited: boolean;
+  researchPowerLimited: boolean;
+};
+
 @Component({
   selector: 'app-resources',
   templateUrl: './resources.component.html'
@@ -18,6 +27,7 @@ export class ResourcesComponent {
   @Input() crystal: ResourceDisplay | null = null;
   @Input() deuterium: ResourceDisplay | null = null;
   @Input() energy: ResourceDisplay | null = null;
+  @Input() powers: PlanetPowersDisplay | null = null;
 
   protected formatResource(resource: ResourceDisplay | null): string {
     if (!resource) {
@@ -92,6 +102,14 @@ export class ResourcesComponent {
 
   protected energyOverloadLabel(resource: ResourceDisplay | null): string {
     return this.isEnergyOverloaded(resource) ? ' ! ! ! ' : '';
+  }
+
+  protected formatPower(value: number | null | undefined): string {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return '--';
+    }
+
+    return `${Math.floor(value)}`;
   }
 
   private energyUsagePercent(resource: ResourceDisplay | null): number | null {

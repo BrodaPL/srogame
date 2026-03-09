@@ -1,4 +1,3 @@
-import { Building } from '../buildings/building';
 import { BuildingType } from '../enums/building-type';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { Fleet } from '../fleets/fleet';
@@ -12,6 +11,7 @@ import { PlanetaryParameters } from './planetary-parameters';
 import { PlanetImageHelper } from './planet-image-helper';
 import { DefenceBuildingInstances } from '../reports/defence-building-instances';
 import { EspionageReportData } from '../reports/espionage-report-data';
+import { BuildingQueueEntry } from '../buildings/building-queue-entry';
 
 type ModifierKey = keyof PlanetaryParameters;
 
@@ -48,7 +48,7 @@ export class rBDSFTQ {
     public defences: DefenceBuildingInstances[],
     public ships: ShipInstance[],
     public technologyQueue: Technology[],
-    public buildingQueue: Building[],
+    public buildingQueue: BuildingQueueEntry[],
     public shipyardQueue: Ship[],
     public fleets: Fleet[],
     public spaceDebris: ResourcesPack

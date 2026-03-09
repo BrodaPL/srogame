@@ -11,7 +11,8 @@ import {
   UpsertStarSystemNoteRequest,
   StarSystemNoteDto,
   SetBuildingPowerConsumptionRequest,
-  SetBuildingPowerConsumptionResponse
+  SetBuildingPowerConsumptionResponse,
+  StartBuildingConstructionRequest
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -101,6 +102,14 @@ export class GameApiService {
   public setBuildingPowerConsumption(request: SetBuildingPowerConsumptionRequest, token: string) {
     return this.http.post<SetBuildingPowerConsumptionResponse>(
       `${API_BASE_URL}/game/power-consumption`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public startBuildingConstruction(request: StartBuildingConstructionRequest, token: string) {
+    return this.http.post<ClientPlanetDto>(
+      `${API_BASE_URL}/game/building-queue`,
       request,
       { headers: this.authHeaders(token) }
     );

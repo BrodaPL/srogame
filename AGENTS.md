@@ -54,6 +54,13 @@ This file captures session context for collaborators and future AI agents.
 - `cd server && npm run dev` (Express server)
 
 ## Session Notes (most recent first)
+- 2026-03-09: AGENTS.md maintenance update: consolidated latest PlanetView/GalacticView UI adjustments in session notes for handoff clarity.
+- 2026-03-09: Galactic View layout tweak: `Star System Preview` panel now stretches to the full height of the Galactic container (`top: 0; bottom: 0;`) instead of being capped by viewport height, so it better matches tall Galaxy Preview content.
+- 2026-03-09: Powers cell warning-state UX added. In PlanetView resource bar, each power line now turns bold yellow when related buildings are not using full selected power: Industry (`ROBOTICS_FACTORY` or `NANITE_FACTORY`), Shipyard (`SHIPYARD` or `NANITE_FACTORY`), Research (`RESEARCH_LAB` only).
+- 2026-03-09: PlanetView resource bar now includes a fifth stacked "Powers" cell (after Energy) showing `Industry power`, `Shipyard power`, and `Research power`. Industry power display reuses current queue ETA formula. Shipyard power mirrors industry formula with `SHIPYARD` instead of `ROBOTICS_FACTORY` (same Nanite and industry modifier behavior). Research power uses `floor(RESEARCH_LAB production1(level) * (1 + COMPUTER_TECHNOLOGY * 5 / 100) * scienceModifier)`.
+- 2026-03-09: Fixed building queue-limit mismatch bug in server enqueue validation. Root cause: server used enum keys (`'ROBOTICS_FACTORY'`, `'COMPUTER_TECHNOLOGY'`) instead of enum values (`'Robotics Factory'`, `'Computer Technology'`) when reading levels, which forced queue cap to `1` despite higher client display. Switched to runtime enum values in `server/src/index.ts`.
+- 2026-03-09: Implemented building-queue enqueue flow (turn progression still not implemented yet). Added `BuildingQueueEntry` model (`buildingType`, `nextLevel`, `investedIndustryPower`) and switched `Planet.rBDSFTQ.buildingQueue` to this type. Added API contract `StartBuildingConstructionRequest`, client API method `POST /api/game/building-queue`, and server endpoint validation (auth/ownership, queue cap, one entry per building type, building+tech requirements, resource check, resource deduction at enqueue). Queue cap uses `floor(1 + sqrt(COMPUTER_TECHNOLOGY + ROBOTICS_FACTORY))`. Endpoint returns fully updated `ClientPlanetDto`.
+- 2026-03-09: Updated `PlanetView` Build UX for server-backed queueing: Build buttons now call enqueue endpoint, show `Build`/`Queued`/`Under construction`, disable when queue is full or type already queued, and show server error text inline. Queues tab now shows current/limit plus tooltip guidance, and building queue table now displays position, type, `Lx -> Ly`, status, `invested/base`, and ETA in turns (client-side estimate using current industry power with Robotics L0 base 5 and Nanite L0 multiplier 1).
 - 2026-03-09: Refactored planet ship storage to a single field: removed `rBDSFTQ.orbitShips` and kept `rBDSFTQ.ships: ShipInstance[]` as canonical. Updated creators/mappers and DTOs accordingly (removed `objects.orbitShips` from `ClientPlanetDto` payload).
 - 2026-03-09: Refactored espionage detailed ships from `ShipInstance[]` to `Map<ShipType, number>` in `EspionageReportData`, added API transport shape `ShipAmountEntry[]`, and updated server serialization. `MiniPlanetPreview` and `PlanetData` Ships tooltip now display per-type ship amounts (with total) when detailed data is present (e.g. level-999 home report).
 - 2026-03-08: Added Galaxy Setup test-only checkboxes: `Create random planets` and `Create starting ships`, wired client + server setup validation + galaxy creation flow. `Create random planets` assigns 3 extra random planets to the main player with randomized building levels and randomized player tech; `Create starting ships` assigns 10 of every ship type on each owned planet.
@@ -117,6 +124,11 @@ This file captures session context for collaborators and future AI agents.
 
 ## Open Questions / Next Steps
 - None recorded yet.
+
+## Future Design Rules
+- Turn-resolution order: (1) update resources amounts, (2) progress building queues in this order: buildings -> facilities -> ships, (3) progress technology queues, (4) process fleet movement, (5) process operations (battles/spy/operations/transport/etc.).
+- Building deconstruction: available only when the building queue is empty, and deconstruction blocks the building queue until finished.
+- Max enqueued construction-ship orders: `maxShipyardQueueLength = 1 + sqrt(COMPUTER_TECHNOLOGY + SHIPYARD)`. This caps how many different ship manufacture orders can be enqueued simultaneously (e.g. cap `2` allows two distinct orders).
 
 
 ## Skills

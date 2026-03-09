@@ -10,7 +10,10 @@ import galaxyPresentationDataModule from '../../src/app/models/planets/galaxy-pr
 import espionageReportGeneratorModule from '../../src/app/generators/espionage-report-generator.js';
 import starSystemNoteModule from '../../src/app/models/planets/star-system-note.js';
 import noteBorderColorModule from '../../src/app/models/enums/note-border-color.js';
+import buildingTypeEnumModule from '../../src/app/models/enums/building-type.js';
+import technologyTypeEnumModule from '../../src/app/models/enums/technology-type.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
+import buildingQueueEntryModule from '../../src/app/models/buildings/building-queue-entry.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   GalaxySetup,
@@ -40,11 +43,13 @@ import type {
   RegisterRequest,
   UpsertStarSystemNoteRequest,
   SetBuildingPowerConsumptionRequest,
-  SetBuildingPowerConsumptionResponse
+  SetBuildingPowerConsumptionResponse,
+  StartBuildingConstructionRequest
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
 import type { ClientPlanet } from '../../src/app/models/planets/client-planet.ts';
+import type { Planet } from '../../src/app/models/planets/planet.ts';
 import type { PlanetaryParameters } from '../../src/app/models/planets/planetary-parameters.ts';
 import type { ResourcesPack } from '../../src/app/models/resources-pack.ts';
 import type { EspionageReportData } from '../../src/app/models/reports/espionage-report-data.ts';
@@ -54,6 +59,9 @@ import type { OwnershipByteCell } from '../../src/app/models/planets/ownership-b
 import type { StarSystemNote as StarSystemNoteType } from '../../src/app/models/planets/star-system-note.ts';
 import type { NoteBorderColor as NoteBorderColorType } from '../../src/app/models/enums/note-border-color.ts';
 import type { BuildingType as BuildingTypeType } from '../../src/app/models/enums/building-type.ts';
+import type { TechnologyType as TechnologyTypeType } from '../../src/app/models/enums/technology-type.ts';
+import type { Building } from '../../src/app/models/buildings/building.ts';
+import type { Player } from '../../src/app/models/player.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -70,8 +78,17 @@ const { StarSystemNote } = starSystemNoteModule as {
 const { NoteBorderColor } = noteBorderColorModule as {
   NoteBorderColor: typeof import('../../src/app/models/enums/note-border-color.js').NoteBorderColor;
 };
+const { BuildingType } = buildingTypeEnumModule as {
+  BuildingType: typeof import('../../src/app/models/enums/building-type.js').BuildingType;
+};
+const { TechnologyType } = technologyTypeEnumModule as {
+  TechnologyType: typeof import('../../src/app/models/enums/technology-type.js').TechnologyType;
+};
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
+};
+const { BuildingQueueEntry } = buildingQueueEntryModule as {
+  BuildingQueueEntry: typeof import('../../src/app/models/buildings/building-queue-entry.js').BuildingQueueEntry;
 };
 
 const app = express();
@@ -96,6 +113,8 @@ const INITIAL_TURN_NUMBER = 1;
 const NOTE_BORDER_COLOR_VALUES = new Set<string>(Object.values(NoteBorderColor));
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
 const BUILDING_TYPE_VALUES = new Set<string>(Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys()));
+const BUILDING_TYPE_ROBOTICS_FACTORY = BuildingType.ROBOTICS_FACTORY as BuildingTypeType;
+const TECH_TYPE_COMPUTER_TECHNOLOGY = TechnologyType.COMPUTER_TECHNOLOGY as TechnologyTypeType;
 
 let currentGalaxy: Galaxy | null = null;
 let currentGameOwnerId: number | null = null;
@@ -448,6 +467,92 @@ app.get('/api/game/client-planet', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.post('/api/game/building-queue', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as StartBuildingConstructionRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const buildingType = normalizeBuildingType(body?.buildingType);
+  if (x === null || y === null || z === null || !buildingType) {
+    return res.status(400).json({ error: 'Invalid building queue payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be modified.' });
+  }
+
+  const queueLimit = calculateMaxBuildingQueueLength(planet, player);
+  if (planet.rBDSFTQ.buildingQueue.length >= queueLimit) {
+    return res.status(400).json({ error: 'Queue full.' });
+  }
+
+  const alreadyQueued = planet.rBDSFTQ.buildingQueue.some(
+    (entry) => entry.buildingType === buildingType
+  );
+  if (alreadyQueued) {
+    return res.status(400).json({ error: 'Building type is already queued.' });
+  }
+
+  const building = BUILDING_BLUEPRINTS.get(buildingType);
+  if (!building) {
+    return res.status(400).json({ error: 'Unknown building type.' });
+  }
+
+  const nextLevel = planet.getBuildingLevel(buildingType) + 1;
+  if (!hasBuildingRequirements(planet, building, nextLevel)) {
+    return res.status(400).json({ error: 'Building requirements are not met.' });
+  }
+
+  if (!hasTechnologyRequirements(player, building, nextLevel)) {
+    return res.status(400).json({ error: 'Technology requirements are not met.' });
+  }
+
+  const cost = building.getCostForLevel(nextLevel);
+  if (!planet.rBDSFTQ.resources.isSufficient(cost)) {
+    return res.status(400).json({ error: 'Insufficient resources.' });
+  }
+
+  planet.rBDSFTQ.resources.subtractResourcePack(cost);
+  planet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(buildingType, nextLevel, 0));
+
+  const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
+  return res.status(200).json(response);
+});
+
 app.post('/api/game/power-consumption', (req, res) => {
   if (!currentGalaxy || currentGameOwnerId === null) {
     return res.status(404).json({ error: 'No active game.' });
@@ -726,6 +831,51 @@ function getAuthSession(req: Request): { data: AuthData; session: AuthSession } 
 
 function resolvePlayerId(galaxy: Galaxy, session: AuthSession): number | null {
   return galaxy.playerNameMap.get(session.playerName) ?? null;
+}
+
+function resolvePlayerById(galaxy: Galaxy, playerId: number): Player | null {
+  for (const player of galaxy.players) {
+    if (player.playerId === playerId) {
+      return player;
+    }
+  }
+
+  return null;
+}
+
+function calculateMaxBuildingQueueLength(planet: Planet, player: Player): number {
+  const roboticsFactoryLevel = planet.getBuildingLevel(BUILDING_TYPE_ROBOTICS_FACTORY);
+  const computerTechnologyLevel = player.getTechLevel(TECH_TYPE_COMPUTER_TECHNOLOGY);
+  const rawLimit = 1 + Math.sqrt(Math.max(0, computerTechnologyLevel + roboticsFactoryLevel));
+  return Math.max(1, Math.floor(rawLimit));
+}
+
+function hasBuildingRequirements(
+  planet: Planet,
+  building: Building,
+  nextLevel: number
+): boolean {
+  for (const requirement of building.buildingRequirements) {
+    const requiredLevel = Math.ceil(nextLevel * requirement.level);
+    const currentLevel = planet.getBuildingLevel(requirement.building as BuildingTypeType);
+    if (currentLevel < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasTechnologyRequirements(player: Player, building: Building, nextLevel: number): boolean {
+  for (const requirement of building.techRequirements) {
+    const requiredLevel = Math.ceil(nextLevel * requirement.level);
+    const currentLevel = player.getTechLevel(requirement.tech as TechnologyTypeType);
+    if (currentLevel < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function parseOptionalInt(value: unknown): number | null {
