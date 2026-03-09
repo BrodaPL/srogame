@@ -15,7 +15,9 @@ import type {
   BuildingQueueEntryDto,
   ClientPlanetDto,
   SetBuildingPowerConsumptionRequest,
-  StartBuildingConstructionRequest
+  ShipyardQueueEntryDto,
+  StartBuildingConstructionRequest,
+  StartShipyardConstructionRequest
 } from '../../models/game-api-types';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
@@ -60,6 +62,17 @@ type BuildingQueueRowVm = {
   isHeadOfQueue: boolean;
 };
 
+type ShipQueueRowVm = {
+  position: number;
+  shipType: ShipType;
+  amountCompleted: number;
+  amountTotal: number;
+  currentShipInvestedShipyardPower: number;
+  currentShipBaseConstructionTime: number;
+  estimatedTurnsForCompletion: number | null;
+  isHeadOfQueue: boolean;
+};
+
 @Component({
   selector: 'app-planet-view',
   imports: [TopMenuComponent, ResourcesComponent, FormsModule],
@@ -83,6 +96,7 @@ export class PlanetViewComponent implements OnInit {
   protected readonly shipBlueprints: Ship[];
 
   private readonly buildingBlueprintsByType: Map<BuildingType, Building>;
+  private readonly shipBlueprintsByType: Map<ShipType, Ship>;
   private readonly buildingLevelsByType = new Map<BuildingType, number>();
   private readonly buildingCurrentPowerByType = new Map<BuildingType, number>();
   private readonly powerUpdateInFlightByType = new Set<BuildingType>();
@@ -91,6 +105,8 @@ export class PlanetViewComponent implements OnInit {
   private readonly buildingQueueTypes = new Set<BuildingType>();
   private readonly buildingStartInFlightByType = new Set<BuildingType>();
   private readonly buildingStartErrorByType = new Map<BuildingType, string>();
+  private readonly shipStartInFlightByType = new Set<ShipType>();
+  private readonly shipStartErrorByType = new Map<ShipType, string>();
   private readonly shipAmountInputs = new Map<ShipType, string>();
   private currentPlanetRequestKey = 0;
   private pendingPlanetRequests = 0;
@@ -110,6 +126,7 @@ export class PlanetViewComponent implements OnInit {
 
     const ships = ShipBlueprintsFactory.fromDefaultJson();
     this.shipBlueprints = Array.from(ships.shipsMap.values());
+    this.shipBlueprintsByType = new Map(ships.shipsMap);
   }
 
   public ngOnInit(): void {
@@ -537,6 +554,18 @@ export class PlanetViewComponent implements OnInit {
       return false;
     }
 
+    if (this.buildingLevel(BuildingType.SHIPYARD) <= 0) {
+      return false;
+    }
+
+    if (this.shipStartInFlightByType.has(ship.type)) {
+      return false;
+    }
+
+    if (this.isShipQueueFull()) {
+      return false;
+    }
+
     const amount = this.shipAmount(ship.type);
     if (amount === null) {
       return false;
@@ -555,8 +584,105 @@ export class PlanetViewComponent implements OnInit {
       return false;
     }
 
-    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
-    return energy.available >= energy.used;
+    return true;
+  }
+
+  protected shipBuildLabel(ship: Ship): string {
+    if (this.isHeadShipQueueType(ship.type)) {
+      return 'Order more';
+    }
+
+    return 'Build';
+  }
+
+  protected shipBuildTitle(ship: Ship): string {
+    if (this.buildingLevel(BuildingType.SHIPYARD) <= 0) {
+      return 'Build Shipyard first.';
+    }
+
+    if (this.isShipQueueFull()) {
+      return 'Queue full. Upgrade COMPUTER_TECHNOLOGY and SHIPYARD to increase queue limit.';
+    }
+
+    if (this.shipStartInFlightByType.has(ship.type)) {
+      return 'Adding to queue...';
+    }
+
+    if (!this.canBuildShip(ship)) {
+      return 'Requirements not met or insufficient resources.';
+    }
+
+    return 'Add ship order to queue.';
+  }
+
+  protected onBuildShip(ship: Ship): void {
+    if (!this.canBuildShip(ship)) {
+      return;
+    }
+
+    const planet = this.planet;
+    const session = this.playerSession.load();
+    const amount = this.shipAmount(ship.type);
+    if (!planet || !session || amount === null) {
+      return;
+    }
+
+    this.shipStartInFlightByType.add(ship.type);
+    this.shipStartErrorByType.delete(ship.type);
+    this.cdr.markForCheck();
+
+    const request: StartShipyardConstructionRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      shipType: ship.type,
+      amount
+    };
+
+    this.gameApi.startShipyardConstruction(request, session.token)
+      .pipe(
+        timeout(10000),
+        finalize(() => {
+          this.shipStartInFlightByType.delete(ship.type);
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe({
+        next: (updatedPlanet) => {
+          if (
+            !this.planet
+            || this.planet.coordinates.x !== request.x
+            || this.planet.coordinates.y !== request.y
+            || this.planet.coordinates.z !== request.z
+          ) {
+            return;
+          }
+
+          this.planet = updatedPlanet;
+          this.rebuildPlanetState();
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          if (
+            !this.planet
+            || this.planet.coordinates.x !== request.x
+            || this.planet.coordinates.y !== request.y
+            || this.planet.coordinates.z !== request.z
+          ) {
+            return;
+          }
+
+          this.shipStartErrorByType.set(
+            ship.type,
+            error?.error?.error ?? 'Unable to add ship order to queue.'
+          );
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected shipStartError(ship: Ship): string | null {
+    return this.shipStartErrorByType.get(ship.type) ?? null;
   }
 
   protected hasBuildingQueueEntries(): boolean {
@@ -574,8 +700,23 @@ export class PlanetViewComponent implements OnInit {
     return Math.max(1, Math.floor(rawLimit));
   }
 
+  protected currentShipQueueLength(): number {
+    return this.planet?.objects.shipyardQueue?.length ?? 0;
+  }
+
+  protected maxShipQueueLength(): number {
+    const computerTechLevel = this.techLevel(TechnologyType.COMPUTER_TECHNOLOGY);
+    const shipyardLevel = this.buildingLevel(BuildingType.SHIPYARD);
+    const rawLimit = 1 + Math.sqrt(Math.max(0, computerTechLevel + shipyardLevel));
+    return Math.max(1, Math.floor(rawLimit));
+  }
+
+  protected queueTabLabel(): string {
+    return `Queues (B ${this.currentBuildingQueueLength()}/${this.maxBuildingQueueLength()} | S ${this.currentShipQueueLength()}/${this.maxShipQueueLength()})`;
+  }
+
   protected queueTabTitle(): string {
-    return 'Upgrade COMPUTER_TECHNOLOGY and ROBOTICS_FACTORY to increase queue limit.';
+    return 'Building queue limit: upgrade COMPUTER_TECHNOLOGY and ROBOTICS_FACTORY. Ship queue limit: upgrade COMPUTER_TECHNOLOGY and SHIPYARD.';
   }
 
   protected buildingQueueRows(): BuildingQueueRowVm[] {
@@ -610,6 +751,43 @@ export class PlanetViewComponent implements OnInit {
 
   protected hasShipQueueEntries(): boolean {
     return (this.planet?.objects.shipyardQueue?.length ?? 0) > 0;
+  }
+
+  protected shipQueueRows(): ShipQueueRowVm[] {
+    const queueEntries = this.planet?.objects.shipyardQueue ?? [];
+    const shipyardPower = this.currentShipyardPower();
+    let cumulativeRemaining = 0;
+
+    return queueEntries.map((entry, index) => {
+      const shipType = this.queueEntryShipType(entry);
+      const amountTotal = this.queueEntryShipAmount(entry);
+      const investedShipyardPower = this.queueEntryInvestedShipyardPower(entry);
+      const baseTotalConstructionTime = this.baseShipConstructionTime(shipType, amountTotal);
+      const singleShipBaseConstructionTime = this.baseShipConstructionTime(shipType, 1);
+      const remaining = Math.max(0, baseTotalConstructionTime - investedShipyardPower);
+      cumulativeRemaining += remaining;
+      const estimatedTurnsForCompletion = shipyardPower > 0
+        ? Math.ceil(cumulativeRemaining / shipyardPower)
+        : null;
+      const amountCompleted = this.shipAmountCompleted(shipType, amountTotal, investedShipyardPower);
+      const currentShipInvestedShipyardPower = this.currentShipInvestedPower(
+        amountCompleted,
+        amountTotal,
+        investedShipyardPower,
+        singleShipBaseConstructionTime
+      );
+
+      return {
+        position: index + 1,
+        shipType,
+        amountCompleted,
+        amountTotal,
+        currentShipInvestedShipyardPower,
+        currentShipBaseConstructionTime: singleShipBaseConstructionTime,
+        estimatedTurnsForCompletion,
+        isHeadOfQueue: index === 0
+      };
+    });
   }
 
   protected planetaryParameterRows(): Array<{ label: string; value: number }> {
@@ -783,6 +961,8 @@ export class PlanetViewComponent implements OnInit {
     this.powerUpdateErrorByType.clear();
     this.buildingStartInFlightByType.clear();
     this.buildingStartErrorByType.clear();
+    this.shipStartInFlightByType.clear();
+    this.shipStartErrorByType.clear();
     this.techLevelsByType.clear();
     this.buildingQueueTypes.clear();
 
@@ -977,7 +1157,7 @@ export class PlanetViewComponent implements OnInit {
     }
 
     const parsed = Number(raw);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
+    if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 100000) {
       return null;
     }
 
@@ -1022,6 +1202,19 @@ export class PlanetViewComponent implements OnInit {
     return this.currentBuildingQueueLength() >= this.maxBuildingQueueLength();
   }
 
+  private isShipQueueFull(): boolean {
+    return this.currentShipQueueLength() >= this.maxShipQueueLength();
+  }
+
+  private isHeadShipQueueType(shipType: ShipType): boolean {
+    const firstQueueEntry = this.planet?.objects.shipyardQueue?.[0];
+    if (!firstQueueEntry) {
+      return false;
+    }
+
+    return this.queueEntryShipType(firstQueueEntry) === shipType;
+  }
+
   private queueEntryBuildingType(entry: BuildingQueueEntryDto): BuildingType {
     if ((entry as { buildingType?: unknown }).buildingType) {
       return (entry as { buildingType: BuildingType }).buildingType;
@@ -1053,6 +1246,32 @@ export class PlanetViewComponent implements OnInit {
     return Math.floor(invested);
   }
 
+  private queueEntryShipType(entry: ShipyardQueueEntryDto): ShipType {
+    if ((entry as { shipType?: unknown }).shipType) {
+      return (entry as { shipType: ShipType }).shipType;
+    }
+
+    return (entry as unknown as { type: ShipType }).type;
+  }
+
+  private queueEntryShipAmount(entry: ShipyardQueueEntryDto): number {
+    const amount = Number((entry as { amount?: unknown }).amount);
+    if (Number.isInteger(amount) && amount >= 1) {
+      return amount;
+    }
+
+    return 1;
+  }
+
+  private queueEntryInvestedShipyardPower(entry: ShipyardQueueEntryDto): number {
+    const invested = Number((entry as { investedShipyardPower?: unknown }).investedShipyardPower);
+    if (!Number.isFinite(invested) || invested < 0) {
+      return 0;
+    }
+
+    return Math.floor(invested);
+  }
+
   private baseConstructionTime(buildingType: BuildingType, toLevel: number): number {
     const blueprint = this.buildingBlueprintsByType.get(buildingType);
     if (!blueprint || toLevel < 1) {
@@ -1061,6 +1280,49 @@ export class PlanetViewComponent implements OnInit {
 
     const cost = blueprint.getCostForLevel(toLevel);
     return Math.max(0, Math.floor(cost.getTotalResourceAmount()));
+  }
+
+  private baseShipConstructionTime(shipType: ShipType, amount: number): number {
+    const blueprint = this.shipBlueprintsByType.get(shipType);
+    if (!blueprint || amount < 1) {
+      return 0;
+    }
+
+    const singleCostTotal = Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount()));
+    return Math.max(0, singleCostTotal * amount);
+  }
+
+  private shipAmountCompleted(shipType: ShipType, amount: number, investedShipyardPower: number): number {
+    const blueprint = this.shipBlueprintsByType.get(shipType);
+    if (!blueprint || amount <= 0) {
+      return 0;
+    }
+
+    const singleCostTotal = Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount()));
+    if (singleCostTotal <= 0) {
+      return amount;
+    }
+
+    const completed = Math.floor(investedShipyardPower / singleCostTotal);
+    return Math.max(0, Math.min(amount, completed));
+  }
+
+  private currentShipInvestedPower(
+    amountCompleted: number,
+    amountTotal: number,
+    investedShipyardPower: number,
+    singleShipBaseConstructionTime: number
+  ): number {
+    if (singleShipBaseConstructionTime <= 0) {
+      return 0;
+    }
+
+    if (amountCompleted >= amountTotal) {
+      return singleShipBaseConstructionTime;
+    }
+
+    const remainder = investedShipyardPower % singleShipBaseConstructionTime;
+    return Math.max(0, Math.min(singleShipBaseConstructionTime, remainder));
   }
 
   private currentIndustryPower(): number {
@@ -1089,7 +1351,7 @@ export class PlanetViewComponent implements OnInit {
     const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
 
     const shipyardBasePower = shipyardLevel <= 0
-      ? 5
+      ? 0
       : this.getProductionAtLevelByType(BuildingType.SHIPYARD, shipyardLevel);
     const naniteMultiplier = naniteFactoryLevel <= 0
       ? 1

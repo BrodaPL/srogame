@@ -3,7 +3,6 @@ import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.f
 import { Fleet } from '../fleets/fleet';
 import { PlanetType } from '../enums/planet-type';
 import { ResourcesPack } from '../resources-pack';
-import { Ship } from '../fleets/ship';
 import { SolarSystem } from './solar-system';
 import { Technology } from '../tech/technology';
 import { ShipInstance } from '../fleets/ship-instance';
@@ -12,6 +11,7 @@ import { PlanetImageHelper } from './planet-image-helper';
 import { DefenceBuildingInstances } from '../reports/defence-building-instances';
 import { EspionageReportData } from '../reports/espionage-report-data';
 import { BuildingQueueEntry } from '../buildings/building-queue-entry';
+import { ShipyardQueueEntry } from '../fleets/shipyard-queue-entry';
 
 type ModifierKey = keyof PlanetaryParameters;
 
@@ -49,7 +49,7 @@ export class rBDSFTQ {
     public ships: ShipInstance[],
     public technologyQueue: Technology[],
     public buildingQueue: BuildingQueueEntry[],
-    public shipyardQueue: Ship[],
+    public shipyardQueue: ShipyardQueueEntry[],
     public fleets: Fleet[],
     public spaceDebris: ResourcesPack
   ) {}

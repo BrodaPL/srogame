@@ -10,7 +10,6 @@ import type { DefencesQueue } from './reports/defences-queue';
 import type { ResearchQueue } from './reports/research-queue';
 import type { BuildingQueue } from './reports/building-queue';
 import type { Fleet } from './fleets/fleet';
-import type { Ship } from './fleets/ship';
 import type { Technology } from './tech/technology';
 import type { NoteBorderColor } from './enums/note-border-color';
 import type { PlayerType } from './enums/player-type';
@@ -131,6 +130,12 @@ export type ShipAmountEntry = {
   amount: number;
 };
 
+export type ShipyardQueueEntryDto = {
+  shipType: ShipType;
+  amount: number;
+  investedShipyardPower: number;
+};
+
 export type ClientReportDataDto = {
   reportDate: number;
   planetaryParameters: PlanetaryParametersDto;
@@ -174,7 +179,7 @@ export type ClientPlanetDto = {
     ships: ShipInstance[];
     technologyQueue: Technology[];
     buildingQueue: BuildingQueueEntryDto[];
-    shipyardQueue: Ship[];
+    shipyardQueue: ShipyardQueueEntryDto[];
     fleets: Fleet[];
     spaceDebris: ResourcesPackDto;
   };
@@ -186,6 +191,14 @@ export type StartBuildingConstructionRequest = {
   y: number;
   z: number;
   buildingType: BuildingType;
+};
+
+export type StartShipyardConstructionRequest = {
+  x: number;
+  y: number;
+  z: number;
+  shipType: ShipType;
+  amount: number;
 };
 
 export type SetBuildingPowerConsumptionRequest = {

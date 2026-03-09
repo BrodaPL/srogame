@@ -80,7 +80,7 @@
           [attr.title]="queueTabTitle()"
           (click)="setTab('queues')"
         >
-          Queues ({{ currentBuildingQueueLength() }}/{{ maxBuildingQueueLength() }})
+          {{ queueTabLabel() }}
         </button>
       </div>
 
@@ -252,6 +252,7 @@
                       class="planet-building-card__amount-input"
                       type="number"
                       min="1"
+                      max="100000"
                       step="1"
                       [ngModel]="shipAmountInput(ship.type)"
                       (ngModelChange)="onShipAmountInput(ship.type, $event)"
@@ -297,10 +298,14 @@
                   type="button"
                   class="planet-building-card__action"
                   [disabled]="!canBuildShip(ship)"
-                  title="Build mechanics will be implemented in future sessions"
+                  [attr.title]="shipBuildTitle(ship)"
+                  (click)="onBuildShip(ship)"
                 >
-                  Build
+                  {{ shipBuildLabel(ship) }}
                 </button>
+                @if (shipStartError(ship); as error) {
+                  <p class="planet-building-card__power-error">{{ error }}</p>
+                }
               </article>
             }
           </div>
@@ -351,19 +356,31 @@
             </article>
 
             <article class="planet-queue-card">
-              <h4 class="planet-view__section-title">Queued Ships</h4>
+              <h4 class="planet-view__section-title">
+                Queued Ships ({{ currentShipQueueLength() }}/{{ maxShipQueueLength() }})
+              </h4>
               @if (hasShipQueueEntries()) {
                 <div class="overview-table-wrapper">
                   <table class="overview-table">
                     <thead>
                     <tr>
+                      <th>#</th>
                       <th>Type</th>
+                      <th>Amount completed</th>
+                      <th>Status</th>
+                      <th>Invested / base</th>
+                      <th>ETA (turns)</th>
                     </tr>
                     </thead>
                     <tbody>
-                    @for (queuedShip of planet.objects.shipyardQueue; track queuedShip.type) {
+                    @for (queuedShip of shipQueueRows(); track queuedShip.position) {
                       <tr>
-                        <td>{{ queuedShip.type }}</td>
+                        <td>{{ queuedShip.position }}</td>
+                        <td>{{ queuedShip.shipType }}</td>
+                        <td>{{ queuedShip.amountCompleted }}/{{ queuedShip.amountTotal }}</td>
+                        <td>{{ queuedShip.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
+                        <td>{{ queuedShip.currentShipInvestedShipyardPower }} / {{ queuedShip.currentShipBaseConstructionTime }}</td>
+                        <td>{{ queuedShip.estimatedTurnsForCompletion ?? '--' }}</td>
                       </tr>
                     }
                     </tbody>

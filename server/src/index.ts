@@ -12,8 +12,11 @@ import starSystemNoteModule from '../../src/app/models/planets/star-system-note.
 import noteBorderColorModule from '../../src/app/models/enums/note-border-color.js';
 import buildingTypeEnumModule from '../../src/app/models/enums/building-type.js';
 import technologyTypeEnumModule from '../../src/app/models/enums/technology-type.js';
+import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
+import shipBlueprintsFactoryModule from '../../src/app/factories/ship-blueprints.factory.js';
 import buildingQueueEntryModule from '../../src/app/models/buildings/building-queue-entry.js';
+import shipyardQueueEntryModule from '../../src/app/models/fleets/shipyard-queue-entry.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   GalaxySetup,
@@ -44,7 +47,8 @@ import type {
   UpsertStarSystemNoteRequest,
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
-  StartBuildingConstructionRequest
+  StartBuildingConstructionRequest,
+  StartShipyardConstructionRequest
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -60,7 +64,9 @@ import type { StarSystemNote as StarSystemNoteType } from '../../src/app/models/
 import type { NoteBorderColor as NoteBorderColorType } from '../../src/app/models/enums/note-border-color.ts';
 import type { BuildingType as BuildingTypeType } from '../../src/app/models/enums/building-type.ts';
 import type { TechnologyType as TechnologyTypeType } from '../../src/app/models/enums/technology-type.ts';
+import type { ShipType as ShipTypeType } from '../../src/app/models/enums/ship-type.ts';
 import type { Building } from '../../src/app/models/buildings/building.ts';
+import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Player } from '../../src/app/models/player.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
@@ -84,11 +90,20 @@ const { BuildingType } = buildingTypeEnumModule as {
 const { TechnologyType } = technologyTypeEnumModule as {
   TechnologyType: typeof import('../../src/app/models/enums/technology-type.js').TechnologyType;
 };
+const { ShipType } = shipTypeEnumModule as {
+  ShipType: typeof import('../../src/app/models/enums/ship-type.js').ShipType;
+};
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
 };
+const { ShipBlueprintsFactory } = shipBlueprintsFactoryModule as {
+  ShipBlueprintsFactory: typeof import('../../src/app/factories/ship-blueprints.factory.js').ShipBlueprintsFactory;
+};
 const { BuildingQueueEntry } = buildingQueueEntryModule as {
   BuildingQueueEntry: typeof import('../../src/app/models/buildings/building-queue-entry.js').BuildingQueueEntry;
+};
+const { ShipyardQueueEntry } = shipyardQueueEntryModule as {
+  ShipyardQueueEntry: typeof import('../../src/app/models/fleets/shipyard-queue-entry.js').ShipyardQueueEntry;
 };
 
 const app = express();
@@ -112,8 +127,11 @@ const STAR_SYSTEM_NOTE_TEXT_MAX_LENGTH = 500;
 const INITIAL_TURN_NUMBER = 1;
 const NOTE_BORDER_COLOR_VALUES = new Set<string>(Object.values(NoteBorderColor));
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
+const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
 const BUILDING_TYPE_VALUES = new Set<string>(Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys()));
+const SHIP_TYPE_VALUES = new Set<string>(Object.values(ShipType));
 const BUILDING_TYPE_ROBOTICS_FACTORY = BuildingType.ROBOTICS_FACTORY as BuildingTypeType;
+const BUILDING_TYPE_SHIPYARD = BuildingType.SHIPYARD as BuildingTypeType;
 const TECH_TYPE_COMPUTER_TECHNOLOGY = TechnologyType.COMPUTER_TECHNOLOGY as TechnologyTypeType;
 
 let currentGalaxy: Galaxy | null = null;
@@ -553,6 +571,90 @@ app.post('/api/game/building-queue', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.post('/api/game/shipyard-queue', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as StartShipyardConstructionRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const shipType = normalizeShipType(body?.shipType);
+  const amount = parseBodyIntInRange(body?.amount, 1, 100000);
+  if (x === null || y === null || z === null || !shipType || amount === null) {
+    return res.status(400).json({ error: 'Invalid shipyard queue payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be modified.' });
+  }
+
+  const shipyardLevel = planet.getBuildingLevel(BUILDING_TYPE_SHIPYARD);
+  if (shipyardLevel <= 0) {
+    return res.status(400).json({ error: 'Build Shipyard first.' });
+  }
+
+  const queueLimit = calculateMaxShipyardQueueLength(planet, player);
+  if (planet.rBDSFTQ.shipyardQueue.length >= queueLimit) {
+    return res.status(400).json({ error: 'Queue full.' });
+  }
+
+  const ship = SHIP_BLUEPRINTS.get(shipType);
+  if (!ship) {
+    return res.status(400).json({ error: 'Unknown ship type.' });
+  }
+
+  if (!hasShipBuildingRequirements(planet, ship)) {
+    return res.status(400).json({ error: 'Building requirements are not met.' });
+  }
+
+  if (!hasShipTechnologyRequirements(player, ship)) {
+    return res.status(400).json({ error: 'Technology requirements are not met.' });
+  }
+
+  const totalCost = multiplyResourcePack(ship.cost, amount);
+  if (!planet.rBDSFTQ.resources.isSufficient(totalCost)) {
+    return res.status(400).json({ error: 'Insufficient resources.' });
+  }
+
+  planet.rBDSFTQ.resources.subtractResourcePack(totalCost);
+  planet.rBDSFTQ.shipyardQueue.push(new ShipyardQueueEntry(shipType, amount, 0));
+
+  const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
+  return res.status(200).json(response);
+});
+
 app.post('/api/game/power-consumption', (req, res) => {
   if (!currentGalaxy || currentGameOwnerId === null) {
     return res.status(404).json({ error: 'No active game.' });
@@ -850,6 +952,13 @@ function calculateMaxBuildingQueueLength(planet: Planet, player: Player): number
   return Math.max(1, Math.floor(rawLimit));
 }
 
+function calculateMaxShipyardQueueLength(planet: Planet, player: Player): number {
+  const shipyardLevel = planet.getBuildingLevel(BUILDING_TYPE_SHIPYARD);
+  const computerTechnologyLevel = player.getTechLevel(TECH_TYPE_COMPUTER_TECHNOLOGY);
+  const rawLimit = 1 + Math.sqrt(Math.max(0, computerTechnologyLevel + shipyardLevel));
+  return Math.max(1, Math.floor(rawLimit));
+}
+
 function hasBuildingRequirements(
   planet: Planet,
   building: Building,
@@ -869,6 +978,30 @@ function hasBuildingRequirements(
 function hasTechnologyRequirements(player: Player, building: Building, nextLevel: number): boolean {
   for (const requirement of building.techRequirements) {
     const requiredLevel = Math.ceil(nextLevel * requirement.level);
+    const currentLevel = player.getTechLevel(requirement.tech as TechnologyTypeType);
+    if (currentLevel < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasShipBuildingRequirements(planet: Planet, ship: Ship): boolean {
+  for (const requirement of ship.buildingRequirements) {
+    const requiredLevel = Math.ceil(requirement.level);
+    const currentLevel = planet.getBuildingLevel(requirement.building as BuildingTypeType);
+    if (currentLevel < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasShipTechnologyRequirements(player: Player, ship: Ship): boolean {
+  for (const requirement of ship.techRequirements) {
+    const requiredLevel = Math.ceil(requirement.level);
     const currentLevel = player.getTechLevel(requirement.tech as TechnologyTypeType);
     if (currentLevel < requiredLevel) {
       return false;
@@ -916,6 +1049,19 @@ function parseBodyNonNegativeInt(value: unknown): number | null {
   return parsed;
 }
 
+function parseBodyIntInRange(value: unknown, min: number, max: number): number | null {
+  if (!Number.isInteger(value)) {
+    return null;
+  }
+
+  const parsed = value as number;
+  if (parsed < min || parsed > max) {
+    return null;
+  }
+
+  return parsed;
+}
+
 function parseBodyNonNegativeNumber(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return null;
@@ -955,6 +1101,22 @@ function normalizeBuildingType(value: unknown): BuildingTypeType | null {
   }
 
   return BUILDING_TYPE_VALUES.has(value) ? (value as BuildingTypeType) : null;
+}
+
+function normalizeShipType(value: unknown): ShipTypeType | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return SHIP_TYPE_VALUES.has(value) ? (value as ShipTypeType) : null;
+}
+
+function multiplyResourcePack(base: ResourcesPack, amount: number): ResourcesPack {
+  return {
+    metal: base.metal * amount,
+    crystal: base.crystal * amount,
+    deuterium: base.deuterium * amount
+  } as ResourcesPack;
 }
 
 function toResourcesPackDto(pack: ResourcesPack): ResourcesPackDto {
