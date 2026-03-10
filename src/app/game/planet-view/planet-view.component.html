@@ -396,15 +396,44 @@
               <p class="overview-empty">No defences queued.</p>
             </article>
 
-            <article class="planet-queue-card planet-queue-card--research">
-              <img
-                class="planet-queue-card__research-image"
-                src="images/technologies/Computer_Technology.webp"
-                alt="Research placeholder image"
-              />
-              <p class="planet-queue-card__research-label">
-                here will be displayed currently researched technology by Tech Lab on this planet.
-              </p>
+            <article class="planet-queue-card">
+              <h4 class="planet-view__section-title">Research</h4>
+              @if (hasResearchQueueEntries()) {
+                <div class="overview-table-wrapper">
+                  <table class="overview-table">
+                    <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Role</th>
+                      <th>Technology</th>
+                      <th>Level</th>
+                      <th>Helpers</th>
+                      <th>Main target</th>
+                      <th>Status</th>
+                      <th>Invested / base</th>
+                      <th>ETA (turns)</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @for (researchQueueEntry of researchQueueRows(); track researchQueueEntry.position) {
+                      <tr>
+                        <td>{{ researchQueueEntry.position }}</td>
+                        <td>{{ researchQueueEntry.role }}</td>
+                        <td>{{ researchQueueEntry.technologyType }}</td>
+                        <td>{{ researchQueueEntry.levelLabel }}</td>
+                        <td>{{ researchQueueEntry.helperLabsLabel }}</td>
+                        <td>{{ researchQueueEntry.targetLabel }}</td>
+                        <td>{{ researchQueueEntry.status }}</td>
+                        <td>{{ researchQueueEntry.investedLabel }}</td>
+                        <td>{{ researchQueueEntry.etaLabel }}</td>
+                      </tr>
+                    }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="overview-empty">No research activity on this planet.</p>
+              }
             </article>
           </div>
         }

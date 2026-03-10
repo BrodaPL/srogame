@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { finalize, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
@@ -9,7 +9,14 @@ import { Building } from '../../models/buildings/building';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
 import { TechnologyType } from '../../models/enums/technology-type';
-import type { BuildingLevelEntry, BuildingPowerConsumptionEntry, ClientPlanetDto } from '../../models/game-api-types';
+import type {
+  BuildingLevelEntry,
+  BuildingPowerConsumptionEntry,
+  ClientCoordinates,
+  ClientPlanetDto,
+  StartTechnologyResearchRequest,
+  TechnologyQueueEntryDto
+} from '../../models/game-api-types';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { Technology } from '../../models/tech/technology';
@@ -42,6 +49,19 @@ type ResearchRequirementRowVm = {
   isPlaceholder: boolean;
 };
 
+type ResearchQueueRowVm = {
+  position: number;
+  planetLabel: string;
+  technologyType: TechnologyType;
+  fromLevel: number;
+  toLevel: number;
+  helperLabsCount: number;
+  status: 'Researching';
+  investedResearchPower: number;
+  baseTotalResearchTime: number;
+  estimatedTurnsForCompletion: number | null;
+};
+
 @Component({
   selector: 'app-researches-view',
   imports: [TopMenuComponent, MiniPlanetPreviewComponent, FormsModule],
@@ -50,6 +70,7 @@ type ResearchRequirementRowVm = {
 export class ResearchesViewComponent implements OnInit {
   protected isLoading = false;
   protected loadError: string | null = null;
+  protected startResearchError: string | null = null;
   protected allOwnedPlanetsWithResearchLab: ClientPlanetDto[] = [];
   protected freeResearchLabs: ResearchLabVm[] = [];
   protected maxLabsPerTechnology = 1;
@@ -57,9 +78,11 @@ export class ResearchesViewComponent implements OnInit {
   protected readonly technologies: Technology[];
 
   private readonly buildingBlueprintsByType: Map<BuildingType, Building>;
+  private allOwnedPlanets: ClientPlanetDto[] = [];
+  private readonly allOwnedPlanetsById = new Map<string, ClientPlanetDto>();
   private readonly allResearchLabsById = new Map<string, ResearchLabVm>();
-  private readonly freeResearchLabsById = new Map<string, ResearchLabVm>();
   private readonly selectedLabsByTechnology = new Map<TechnologyType, Array<string | null>>();
+  private readonly researchStartInFlightByType = new Set<TechnologyType>();
   private techLevelsByType = new Map<TechnologyType, number>();
 
   constructor(
@@ -84,7 +107,15 @@ export class ResearchesViewComponent implements OnInit {
       return 'Research Lab not available.';
     }
 
-    const stateLabel = lab.isBusy ? 'BUSY' : 'FREE';
+    let stateLabel = 'FREE';
+    if (planet.objects.currentResearchQueue) {
+      stateLabel = `RESEARCHING ${planet.objects.currentResearchQueue.technologyType}`;
+    } else if (planet.objects.researchHelperFor) {
+      const helper = planet.objects.researchHelperFor;
+      const target = helper.mainResearchCoordinates;
+      stateLabel = `HELPING ${helper.technologyType} @ ${target.x}:${target.y}:${target.z}`;
+    }
+
     return `Research Lab L${lab.labLevel} | Power ${lab.researchPower} | ${stateLabel}`;
   }
 
@@ -180,15 +211,31 @@ export class ResearchesViewComponent implements OnInit {
   }
 
   protected labOptionsForSlot(technologyType: TechnologyType, slotIndex: number): ResearchLabVm[] {
+    const selectedId = this.selectedLabId(technologyType, slotIndex);
+    const selectedLab = selectedId ? (this.allResearchLabsById.get(selectedId) ?? null) : null;
     if (this.isLabDropdownDisabled(technologyType, slotIndex)) {
-      return [];
+      return selectedLab ? [selectedLab] : [];
     }
 
     const assignedElsewhere = this.assignedLabIdsExcluding(technologyType, slotIndex);
-    return this.freeResearchLabs.filter((lab) => !assignedElsewhere.has(lab.id));
+    const options = this.freeResearchLabs.filter((lab) => !assignedElsewhere.has(lab.id));
+    if (!selectedLab) {
+      return options;
+    }
+
+    const alreadyIncluded = options.some((entry) => entry.id === selectedLab.id);
+    if (alreadyIncluded) {
+      return options;
+    }
+
+    return [selectedLab, ...options];
   }
 
   protected isLabDropdownDisabled(technologyType: TechnologyType, slotIndex: number): boolean {
+    if (slotIndex === 0 && this.isTechnologyQueued(technologyType)) {
+      return true;
+    }
+
     if (this.freeResearchLabs.length === 0) {
       return true;
     }
@@ -223,8 +270,24 @@ export class ResearchesViewComponent implements OnInit {
   }
 
   protected canStartResearch(technology: Technology): boolean {
+    if (this.researchStartInFlightByType.has(technology.type)) {
+      return false;
+    }
+
+    if (this.isTechnologyQueued(technology.type)) {
+      return false;
+    }
+
     const firstLab = this.firstAssignedLab(technology.type);
     if (!firstLab) {
+      return false;
+    }
+
+    if (firstLab.isBusy) {
+      return false;
+    }
+
+    if (firstLab.planet.objects.currentResearchQueue || firstLab.planet.objects.researchHelperFor) {
       return false;
     }
 
@@ -249,10 +312,131 @@ export class ResearchesViewComponent implements OnInit {
     return true;
   }
 
+  protected researchButtonLabel(technology: Technology): string {
+    if (this.researchStartInFlightByType.has(technology.type)) {
+      return 'Researching';
+    }
+
+    if (this.isTechnologyQueued(technology.type)) {
+      return 'Researching';
+    }
+
+    const firstLab = this.firstAssignedLab(technology.type);
+    if (!firstLab) {
+      return 'START RESEARCH';
+    }
+
+    if (firstLab.planet.objects.currentResearchQueue) {
+      return firstLab.planet.objects.currentResearchQueue.technologyType === technology.type
+        ? 'Researching'
+        : 'Queued';
+    }
+
+    if (firstLab.planet.objects.researchHelperFor) {
+      return 'Queued';
+    }
+
+    return 'START RESEARCH';
+  }
+
   protected researchButtonTitle(technology: Technology): string {
+    if (this.researchStartInFlightByType.has(technology.type)) {
+      return 'Starting research...';
+    }
+
+    if (this.isTechnologyQueued(technology.type)) {
+      return 'Technology is already being researched.';
+    }
+
     return this.canStartResearch(technology)
-      ? 'Research mechanics will be implemented in future sessions'
-      : 'Select first free Research Lab and meet conditions to unlock';
+      ? 'Start research and add technology to queue.'
+      : 'Select first free Research Lab and meet conditions to unlock.';
+  }
+
+  protected onStartResearch(technology: Technology): void {
+    if (!this.canStartResearch(technology)) {
+      return;
+    }
+
+    const session = this.playerSession.load();
+    const firstLab = this.firstAssignedLab(technology.type);
+    if (!session || !firstLab) {
+      return;
+    }
+
+    const helperPlanets = this.selectedHelperCoordinates(technology.type);
+    const request: StartTechnologyResearchRequest = {
+      x: firstLab.planet.coordinates.x,
+      y: firstLab.planet.coordinates.y,
+      z: firstLab.planet.coordinates.z,
+      technologyType: technology.type,
+      helperPlanets
+    };
+
+    this.researchStartInFlightByType.add(technology.type);
+    this.startResearchError = null;
+    this.cdr.markForCheck();
+
+    this.gameApi.startTechnologyResearch(request, session.token)
+      .pipe(
+        timeout(10000),
+        finalize(() => {
+          this.researchStartInFlightByType.delete(technology.type);
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe({
+        next: (ownedPlanets) => {
+          this.applyOwnedPlanets(ownedPlanets);
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.startResearchError = error?.error?.error ?? 'Unable to add technology to queue.';
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected hasResearchQueueEntries(): boolean {
+    return this.researchQueueRows().length > 0;
+  }
+
+  protected researchQueueRows(): ResearchQueueRowVm[] {
+    const rows: ResearchQueueRowVm[] = [];
+    let position = 1;
+    for (const planet of this.allOwnedPlanets) {
+      const queue = planet.objects.currentResearchQueue;
+      if (!queue) {
+        continue;
+      }
+
+      const technologyType = this.queueEntryTechnologyType(queue);
+      const toLevel = this.queueEntryNextLevel(queue);
+      const investedResearchPower = this.queueEntryInvestedResearchPower(queue);
+      const helperLabs = this.queueEntryHelperLabs(queue);
+      const baseTotalResearchTime = this.baseResearchTime(technologyType, toLevel);
+      const remaining = Math.max(0, baseTotalResearchTime - investedResearchPower);
+      const researchPower = this.researchQueuePower(planet, technologyType, helperLabs);
+      const estimatedTurnsForCompletion = researchPower > 0
+        ? Math.ceil(remaining / researchPower)
+        : null;
+
+      rows.push({
+        position,
+        planetLabel: `${planet.basicInfo.name} [${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}]`,
+        technologyType,
+        fromLevel: Math.max(0, toLevel - 1),
+        toLevel,
+        helperLabsCount: helperLabs.length,
+        status: 'Researching',
+        investedResearchPower,
+        baseTotalResearchTime,
+        estimatedTurnsForCompletion
+      });
+      position += 1;
+    }
+
+    return rows;
   }
 
   private loadResearchesData(): void {
@@ -264,6 +448,7 @@ export class ResearchesViewComponent implements OnInit {
 
     this.isLoading = true;
     this.loadError = null;
+    this.startResearchError = null;
 
     this.gameApi.getOwnedPlanets(session.token)
       .pipe(finalize(() => {
@@ -284,6 +469,12 @@ export class ResearchesViewComponent implements OnInit {
 
   private applyOwnedPlanets(ownedPlanets: ClientPlanetDto[]): void {
     const sorted = [...ownedPlanets].sort((left, right) => this.comparePlanetCoordinates(left, right));
+    this.allOwnedPlanets = sorted;
+    this.allOwnedPlanetsById.clear();
+    for (const planet of sorted) {
+      this.allOwnedPlanetsById.set(this.planetId(planet), planet);
+    }
+
     this.techLevelsByType = this.buildTechLevelsMap(sorted);
 
     const planetsWithResearchLab = sorted.filter((planet) => this.buildingLevel(planet, BuildingType.RESEARCH_LAB) > 0);
@@ -298,10 +489,6 @@ export class ResearchesViewComponent implements OnInit {
     this.freeResearchLabs = allResearchLabs
       .filter((lab) => !lab.isBusy)
       .sort((left, right) => left.label.localeCompare(right.label));
-    this.freeResearchLabsById.clear();
-    for (const lab of this.freeResearchLabs) {
-      this.freeResearchLabsById.set(lab.id, lab);
-    }
 
     this.maxLabsPerTechnology = this.calculateMaxLabsPerTechnology();
     this.labSlotIndexes = Array.from({ length: this.maxLabsPerTechnology }, (_, index) => index);
@@ -319,7 +506,7 @@ export class ResearchesViewComponent implements OnInit {
       labLevel,
       researchPower,
       label: `${planet.basicInfo.name} L${labLevel} (${researchPower})`,
-      isBusy: (planet.objects.technologyQueue?.length ?? 0) > 0
+      isBusy: planet.objects.currentResearchQueue !== null || planet.objects.researchHelperFor !== null
     };
   }
 
@@ -327,7 +514,7 @@ export class ResearchesViewComponent implements OnInit {
     const basePower = this.buildingProductionValue(planet, BuildingType.RESEARCH_LAB, researchLabLevel);
     const computerLevel = this.currentTechnologyLevel(TechnologyType.COMPUTER_TECHNOLOGY);
     const scienceModifier = planet.info.planetaryParameters.scienceModifier;
-    const result = basePower * (1 + (computerLevel / 100)) * scienceModifier;
+    const result = basePower * (1 + ((computerLevel * 5) / 100)) * scienceModifier;
     return Number.isFinite(result) ? Math.floor(result) : 0;
   }
 
@@ -345,6 +532,16 @@ export class ResearchesViewComponent implements OnInit {
         { length: this.maxLabsPerTechnology },
         (_, index) => existing[index] ?? null
       );
+
+      const queued = this.queuedResearchForTechnology(technology.type);
+      if (queued) {
+        resized[0] = this.planetId(queued.planet);
+        const helperIds = this.queuedHelperLabIds(queued.queue);
+        for (let slotIndex = 1; slotIndex < resized.length; slotIndex += 1) {
+          resized[slotIndex] = helperIds[slotIndex - 1] ?? null;
+        }
+      }
+
       next.set(technology.type, resized);
     }
 
@@ -359,9 +556,29 @@ export class ResearchesViewComponent implements OnInit {
   private sanitizeLabSelections(): void {
     const freeLabIds = new Set(this.freeResearchLabs.map((lab) => lab.id));
     const globallyAssigned = new Set<string>();
+    const lockedMainLabByTechnology = new Map<TechnologyType, string>();
+    const queuedHelperLabIdsByTechnology = new Map<TechnologyType, Set<string>>();
+    for (const technology of this.technologies) {
+      const queued = this.queuedResearchForTechnology(technology.type);
+      if (!queued) {
+        continue;
+      }
+
+      lockedMainLabByTechnology.set(technology.type, this.planetId(queued.planet));
+      queuedHelperLabIdsByTechnology.set(
+        technology.type,
+        new Set(this.queuedHelperLabIds(queued.queue))
+      );
+    }
 
     for (const technology of this.technologies) {
       const selection = this.selectionArray(technology.type);
+      const lockedMainLabId = lockedMainLabByTechnology.get(technology.type) ?? null;
+      if (lockedMainLabId) {
+        selection[0] = lockedMainLabId;
+      }
+
+      const queuedHelperIds = queuedHelperLabIdsByTechnology.get(technology.type) ?? new Set<string>();
       for (let slotIndex = 0; slotIndex < selection.length; slotIndex += 1) {
         const previousSelected = slotIndex === 0 || selection[slotIndex - 1] !== null;
         const selectedLabId = selection[slotIndex];
@@ -370,7 +587,10 @@ export class ResearchesViewComponent implements OnInit {
           continue;
         }
 
-        if (!freeLabIds.has(selectedLabId) || globallyAssigned.has(selectedLabId)) {
+        const isLockedMain = slotIndex === 0 && lockedMainLabId === selectedLabId;
+        const isQueuedHelper = slotIndex > 0 && queuedHelperIds.has(selectedLabId);
+        const isSelectable = freeLabIds.has(selectedLabId) || isLockedMain || isQueuedHelper;
+        if (!isSelectable || globallyAssigned.has(selectedLabId)) {
           selection[slotIndex] = null;
           continue;
         }
@@ -427,7 +647,167 @@ export class ResearchesViewComponent implements OnInit {
       return null;
     }
 
-    return this.freeResearchLabsById.get(firstLabId) ?? null;
+    return this.allResearchLabsById.get(firstLabId) ?? null;
+  }
+
+  private isTechnologyQueued(technologyType: TechnologyType): boolean {
+    return this.queuedResearchForTechnology(technologyType) !== null;
+  }
+
+  private queuedResearchForTechnology(
+    technologyType: TechnologyType
+  ): { planet: ClientPlanetDto; queue: TechnologyQueueEntryDto } | null {
+    for (const planet of this.allOwnedPlanets) {
+      const queue = planet.objects.currentResearchQueue;
+      if (!queue) {
+        continue;
+      }
+
+      if (this.queueEntryTechnologyType(queue) === technologyType) {
+        return { planet, queue };
+      }
+    }
+
+    return null;
+  }
+
+  private queuedHelperLabIds(queue: TechnologyQueueEntryDto): string[] {
+    const ids: string[] = [];
+    for (const helperCoordinates of this.queueEntryHelperLabs(queue)) {
+      ids.push(`${helperCoordinates.x}:${helperCoordinates.y}:${helperCoordinates.z}`);
+    }
+
+    return ids;
+  }
+
+  private selectedHelperCoordinates(technologyType: TechnologyType): ClientCoordinates[] {
+    const selection = this.selectionArray(technologyType);
+    const helperCoordinates: ClientCoordinates[] = [];
+    const ids = new Set<string>();
+    for (let slotIndex = 1; slotIndex < selection.length; slotIndex += 1) {
+      const helperLabId = selection[slotIndex];
+      if (!helperLabId || ids.has(helperLabId)) {
+        continue;
+      }
+
+      const helperLab = this.allResearchLabsById.get(helperLabId);
+      if (!helperLab) {
+        continue;
+      }
+
+      ids.add(helperLabId);
+      helperCoordinates.push({
+        x: helperLab.planet.coordinates.x,
+        y: helperLab.planet.coordinates.y,
+        z: helperLab.planet.coordinates.z
+      });
+    }
+
+    return helperCoordinates;
+  }
+
+  private queueEntryTechnologyType(entry: TechnologyQueueEntryDto): TechnologyType {
+    return entry.technologyType as TechnologyType;
+  }
+
+  private queueEntryNextLevel(entry: TechnologyQueueEntryDto): number {
+    const parsed = Number(entry.nextLevel);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 1;
+    }
+
+    return Math.max(1, Math.floor(parsed));
+  }
+
+  private queueEntryInvestedResearchPower(entry: TechnologyQueueEntryDto): number {
+    const parsed = Number(entry.investedResearchPower);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return 0;
+    }
+
+    return Math.floor(parsed);
+  }
+
+  private queueEntryHelperLabs(entry: TechnologyQueueEntryDto): ClientCoordinates[] {
+    if (!Array.isArray(entry.helperLabs)) {
+      return [];
+    }
+
+    const uniqueIds = new Set<string>();
+    const result: ClientCoordinates[] = [];
+    for (const helper of entry.helperLabs) {
+      if (!helper || !Number.isInteger(helper.x) || !Number.isInteger(helper.y) || !Number.isInteger(helper.z)) {
+        continue;
+      }
+
+      if (helper.x < 0 || helper.y < 0 || helper.z < 0) {
+        continue;
+      }
+
+      const id = `${helper.x}:${helper.y}:${helper.z}`;
+      if (uniqueIds.has(id)) {
+        continue;
+      }
+
+      uniqueIds.add(id);
+      result.push({ x: helper.x, y: helper.y, z: helper.z });
+    }
+
+    return result;
+  }
+
+  private baseResearchTime(technologyType: TechnologyType, toLevel: number): number {
+    const technology = this.technologies.find((entry) => entry.type === technologyType);
+    if (!technology) {
+      return 0;
+    }
+
+    const cost = technology.getCostForLevel(toLevel);
+    const total = cost.getTotalResourceAmount();
+    if (!Number.isFinite(total) || total <= 0) {
+      return 0;
+    }
+
+    return Math.floor(total);
+  }
+
+  private researchQueuePower(
+    starterPlanet: ClientPlanetDto,
+    technologyType: TechnologyType,
+    helperLabs: ClientCoordinates[]
+  ): number {
+    let total = this.researchPower(
+      starterPlanet,
+      this.buildingLevel(starterPlanet, BuildingType.RESEARCH_LAB)
+    );
+
+    for (const helperCoordinates of helperLabs) {
+      const helperPlanet = this.allOwnedPlanetsById.get(
+        `${helperCoordinates.x}:${helperCoordinates.y}:${helperCoordinates.z}`
+      );
+      if (!helperPlanet) {
+        continue;
+      }
+
+      const helperReference = helperPlanet.objects.researchHelperFor;
+      if (!helperReference || helperReference.technologyType !== technologyType) {
+        continue;
+      }
+
+      const target = helperReference.mainResearchCoordinates;
+      if (
+        target.x !== starterPlanet.coordinates.x
+        || target.y !== starterPlanet.coordinates.y
+        || target.z !== starterPlanet.coordinates.z
+      ) {
+        continue;
+      }
+
+      const helperLevel = this.buildingLevel(helperPlanet, BuildingType.RESEARCH_LAB);
+      total += this.researchPower(helperPlanet, helperLevel);
+    }
+
+    return Math.max(0, Math.floor(total));
   }
 
   private selectionArray(technologyType: TechnologyType): Array<string | null> {

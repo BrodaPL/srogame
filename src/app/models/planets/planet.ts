@@ -4,7 +4,6 @@ import { Fleet } from '../fleets/fleet';
 import { PlanetType } from '../enums/planet-type';
 import { ResourcesPack } from '../resources-pack';
 import { SolarSystem } from './solar-system';
-import { Technology } from '../tech/technology';
 import { ShipInstance } from '../fleets/ship-instance';
 import { PlanetaryParameters } from './planetary-parameters';
 import { PlanetImageHelper } from './planet-image-helper';
@@ -12,6 +11,8 @@ import { DefenceBuildingInstances } from '../reports/defence-building-instances'
 import { EspionageReportData } from '../reports/espionage-report-data';
 import { BuildingQueueEntry } from '../buildings/building-queue-entry';
 import { ShipyardQueueEntry } from '../fleets/shipyard-queue-entry';
+import { TechnologyQueueEntry } from '../tech/technology-queue-entry';
+import { ResearchHelperFor } from '../tech/research-helper-for';
 
 type ModifierKey = keyof PlanetaryParameters;
 
@@ -47,7 +48,8 @@ export class rBDSFTQ {
     public buildingsCurrentPowerConsumption: Map<BuildingType, number>,
     public defences: DefenceBuildingInstances[],
     public ships: ShipInstance[],
-    public technologyQueue: Technology[],
+    public currentResearchQueue: TechnologyQueueEntry | null,
+    public researchHelperFor: ResearchHelperFor | null,
     public buildingQueue: BuildingQueueEntry[],
     public shipyardQueue: ShipyardQueueEntry[],
     public fleets: Fleet[],
@@ -98,7 +100,8 @@ export class Planet {
         new Map<BuildingType, number>(),
         [],
         [],
-        [],
+        null,
+        null,
         [],
         [],
         [],
@@ -151,7 +154,8 @@ export class Planet {
         new Map<BuildingType, number>(),
         [],
         [],
-        [],
+        null,
+        null,
         [],
         [],
         [],

@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { finalize, timeout } from 'rxjs';
@@ -6,6 +6,7 @@ import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
+import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
 import { Building } from '../../models/buildings/building';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
@@ -13,15 +14,18 @@ import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import type {
   BuildingQueueEntryDto,
+  ClientCoordinates,
   ClientPlanetDto,
   SetBuildingPowerConsumptionRequest,
   ShipyardQueueEntryDto,
   StartBuildingConstructionRequest,
-  StartShipyardConstructionRequest
+  StartShipyardConstructionRequest,
+  TechnologyQueueEntryDto
 } from '../../models/game-api-types';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { Ship } from '../../models/fleets/ship';
+import { Technology } from '../../models/tech/technology';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
 
@@ -73,12 +77,24 @@ type ShipQueueRowVm = {
   isHeadOfQueue: boolean;
 };
 
+type ResearchQueueRowVm = {
+  position: number;
+  role: 'Main lab' | 'Helper lab';
+  technologyType: TechnologyType;
+  levelLabel: string;
+  helperLabsLabel: string;
+  targetLabel: string;
+  status: 'Researching' | 'Helping';
+  investedLabel: string;
+  etaLabel: string;
+};
+
 @Component({
   selector: 'app-planet-view',
   imports: [TopMenuComponent, ResourcesComponent, FormsModule],
   templateUrl: './planet-view.component.html'
 })
-export class PlanetViewComponent implements OnInit {
+export class PlanetViewComponent implements OnInit, OnDestroy {
   protected planet: ClientPlanetDto | null = null;
   protected isLoading = false;
   protected loadError: string | null = null;
@@ -97,6 +113,7 @@ export class PlanetViewComponent implements OnInit {
 
   private readonly buildingBlueprintsByType: Map<BuildingType, Building>;
   private readonly shipBlueprintsByType: Map<ShipType, Ship>;
+  private readonly technologiesByType: Map<TechnologyType, Technology>;
   private readonly buildingLevelsByType = new Map<BuildingType, number>();
   private readonly buildingCurrentPowerByType = new Map<BuildingType, number>();
   private readonly powerUpdateInFlightByType = new Set<BuildingType>();
@@ -111,6 +128,8 @@ export class PlanetViewComponent implements OnInit {
   private currentPlanetRequestKey = 0;
   private pendingPlanetRequests = 0;
   private loadingSafetyTimer: ReturnType<typeof setTimeout> | null = null;
+  private queueTabRefreshTimer: ReturnType<typeof setInterval> | null = null;
+  private queueTabRefreshInFlight = false;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -127,6 +146,9 @@ export class PlanetViewComponent implements OnInit {
     const ships = ShipBlueprintsFactory.fromDefaultJson();
     this.shipBlueprints = Array.from(ships.shipsMap.values());
     this.shipBlueprintsByType = new Map(ships.shipsMap);
+
+    const technologies = TechnologyBlueprintsFactory.fromDefaultJson();
+    this.technologiesByType = new Map(technologies.techByType);
   }
 
   public ngOnInit(): void {
@@ -136,6 +158,7 @@ export class PlanetViewComponent implements OnInit {
       const z = this.parseNonNegativeInt(params.get('z'));
 
       if (x === null || y === null || z === null) {
+        this.stopQueueTabAutoRefresh();
         this.isLoading = false;
         this.loadError = 'Invalid planet coordinates in route.';
         this.planet = null;
@@ -149,8 +172,27 @@ export class PlanetViewComponent implements OnInit {
     });
   }
 
+  public ngOnDestroy(): void {
+    this.stopQueueTabAutoRefresh();
+    this.clearLoadingSafetyTimeout();
+  }
+
   protected setTab(tab: PlanetTab): void {
+    if (this.activeTab === tab) {
+      if (tab === 'queues') {
+        this.startQueueTabAutoRefresh();
+      }
+
+      return;
+    }
+
     this.activeTab = tab;
+    if (tab === 'queues') {
+      this.startQueueTabAutoRefresh();
+      return;
+    }
+
+    this.stopQueueTabAutoRefresh();
   }
 
   protected isActiveTab(tab: PlanetTab): boolean {
@@ -790,6 +832,58 @@ export class PlanetViewComponent implements OnInit {
     });
   }
 
+  protected hasResearchQueueEntries(): boolean {
+    return this.researchQueueRows().length > 0;
+  }
+
+  protected researchQueueRows(): ResearchQueueRowVm[] {
+    const rows: ResearchQueueRowVm[] = [];
+    const currentResearchQueue = this.planet?.objects.currentResearchQueue;
+    if (currentResearchQueue) {
+      const toLevel = this.queueEntryResearchNextLevel(currentResearchQueue);
+      const fromLevel = Math.max(0, toLevel - 1);
+      const helperLabs = this.queueEntryHelperLabs(currentResearchQueue);
+      const investedResearchPower = this.queueEntryInvestedResearchPower(currentResearchQueue);
+      const baseTotalResearchTime = this.baseResearchTime(
+        this.queueEntryTechnologyType(currentResearchQueue),
+        toLevel
+      );
+      const remainingResearchTime = Math.max(0, baseTotalResearchTime - investedResearchPower);
+      const estimatedTurnsForCompletion = this.currentResearchPower() > 0
+        ? Math.ceil(remainingResearchTime / this.currentResearchPower())
+        : null;
+
+      rows.push({
+        position: rows.length + 1,
+        role: 'Main lab',
+        technologyType: this.queueEntryTechnologyType(currentResearchQueue),
+        levelLabel: `L${fromLevel} -> L${toLevel}`,
+        helperLabsLabel: String(helperLabs.length),
+        targetLabel: '--',
+        status: 'Researching',
+        investedLabel: `${investedResearchPower} / ${baseTotalResearchTime}`,
+        etaLabel: estimatedTurnsForCompletion === null ? '--' : String(estimatedTurnsForCompletion)
+      });
+    }
+
+    const helperReference = this.planet?.objects.researchHelperFor;
+    if (helperReference) {
+      rows.push({
+        position: rows.length + 1,
+        role: 'Helper lab',
+        technologyType: helperReference.technologyType as TechnologyType,
+        levelLabel: '--',
+        helperLabsLabel: '--',
+        targetLabel: this.coordinatesToLabel(helperReference.mainResearchCoordinates),
+        status: 'Helping',
+        investedLabel: '--',
+        etaLabel: '--'
+      });
+    }
+
+    return rows;
+  }
+
   protected planetaryParameterRows(): Array<{ label: string; value: number }> {
     const parameters = this.planet?.info.planetaryParameters;
     if (!parameters) {
@@ -885,6 +979,7 @@ export class PlanetViewComponent implements OnInit {
   }
 
   private loadPlanet(x: number, y: number, z: number): void {
+    this.stopQueueTabAutoRefresh();
     this.currentPlanetRequestKey += 1;
     const requestKey = this.currentPlanetRequestKey;
 
@@ -1272,6 +1367,60 @@ export class PlanetViewComponent implements OnInit {
     return Math.floor(invested);
   }
 
+  private queueEntryTechnologyType(entry: TechnologyQueueEntryDto): TechnologyType {
+    return entry.technologyType as TechnologyType;
+  }
+
+  private queueEntryResearchNextLevel(entry: TechnologyQueueEntryDto): number {
+    const parsed = Number(entry.nextLevel);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 1;
+    }
+
+    return Math.max(1, Math.floor(parsed));
+  }
+
+  private queueEntryInvestedResearchPower(entry: TechnologyQueueEntryDto): number {
+    const parsed = Number(entry.investedResearchPower);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return 0;
+    }
+
+    return Math.floor(parsed);
+  }
+
+  private queueEntryHelperLabs(entry: TechnologyQueueEntryDto): ClientCoordinates[] {
+    if (!Array.isArray(entry.helperLabs)) {
+      return [];
+    }
+
+    const uniqueIds = new Set<string>();
+    const result: ClientCoordinates[] = [];
+    for (const helper of entry.helperLabs) {
+      if (!helper || !Number.isInteger(helper.x) || !Number.isInteger(helper.y) || !Number.isInteger(helper.z)) {
+        continue;
+      }
+
+      if (helper.x < 0 || helper.y < 0 || helper.z < 0) {
+        continue;
+      }
+
+      const id = this.coordinatesToLabel(helper);
+      if (uniqueIds.has(id)) {
+        continue;
+      }
+
+      uniqueIds.add(id);
+      result.push({
+        x: helper.x,
+        y: helper.y,
+        z: helper.z
+      });
+    }
+
+    return result;
+  }
+
   private baseConstructionTime(buildingType: BuildingType, toLevel: number): number {
     const blueprint = this.buildingBlueprintsByType.get(buildingType);
     if (!blueprint || toLevel < 1) {
@@ -1290,6 +1439,20 @@ export class PlanetViewComponent implements OnInit {
 
     const singleCostTotal = Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount()));
     return Math.max(0, singleCostTotal * amount);
+  }
+
+  private baseResearchTime(technologyType: TechnologyType, toLevel: number): number {
+    const technology = this.technologiesByType.get(technologyType);
+    if (!technology || toLevel < 1) {
+      return 0;
+    }
+
+    const total = technology.getCostForLevel(toLevel).getTotalResourceAmount();
+    if (!Number.isFinite(total) || total <= 0) {
+      return 0;
+    }
+
+    return Math.floor(total);
   }
 
   private shipAmountCompleted(shipType: ShipType, amount: number, investedShipyardPower: number): number {
@@ -1551,6 +1714,78 @@ export class PlanetViewComponent implements OnInit {
     }
 
     return parsed;
+  }
+
+  private coordinatesToLabel(coordinates: ClientCoordinates): string {
+    return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+  }
+
+  private startQueueTabAutoRefresh(): void {
+    if (this.queueTabRefreshTimer !== null) {
+      return;
+    }
+
+    this.refreshQueueTabPlanetState();
+    this.queueTabRefreshTimer = setInterval(() => {
+      this.refreshQueueTabPlanetState();
+    }, 3000);
+  }
+
+  private stopQueueTabAutoRefresh(): void {
+    if (this.queueTabRefreshTimer !== null) {
+      clearInterval(this.queueTabRefreshTimer);
+      this.queueTabRefreshTimer = null;
+    }
+
+    this.queueTabRefreshInFlight = false;
+  }
+
+  private refreshQueueTabPlanetState(): void {
+    if (this.activeTab !== 'queues') {
+      return;
+    }
+
+    if (this.queueTabRefreshInFlight || this.isLoading) {
+      return;
+    }
+
+    const planet = this.planet;
+    const session = this.playerSession.load();
+    if (!planet || !session) {
+      return;
+    }
+
+    const expectedX = planet.coordinates.x;
+    const expectedY = planet.coordinates.y;
+    const expectedZ = planet.coordinates.z;
+
+    this.queueTabRefreshInFlight = true;
+    this.gameApi.getClientPlanet(expectedX, expectedY, expectedZ, session.token)
+      .pipe(
+        timeout(8000),
+        finalize(() => {
+          this.queueTabRefreshInFlight = false;
+        })
+      )
+      .subscribe({
+        next: (updatedPlanet) => {
+          if (
+            !this.planet
+            || this.planet.coordinates.x !== expectedX
+            || this.planet.coordinates.y !== expectedY
+            || this.planet.coordinates.z !== expectedZ
+          ) {
+            return;
+          }
+
+          this.planet = updatedPlanet;
+          this.rebuildPlanetState();
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          // Keep polling silent for queue auto-refresh.
+        }
+      });
   }
 
   private roundNumber(value: number, precision: number): number {

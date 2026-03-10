@@ -10,7 +10,6 @@ import type { DefencesQueue } from './reports/defences-queue';
 import type { ResearchQueue } from './reports/research-queue';
 import type { BuildingQueue } from './reports/building-queue';
 import type { Fleet } from './fleets/fleet';
-import type { Technology } from './tech/technology';
 import type { NoteBorderColor } from './enums/note-border-color';
 import type { PlayerType } from './enums/player-type';
 
@@ -136,6 +135,18 @@ export type ShipyardQueueEntryDto = {
   investedShipyardPower: number;
 };
 
+export type TechnologyQueueEntryDto = {
+  technologyType: TechnologyType;
+  nextLevel: number;
+  investedResearchPower: number;
+  helperLabs: ClientCoordinates[];
+};
+
+export type ResearchHelperForDto = {
+  mainResearchCoordinates: ClientCoordinates;
+  technologyType: TechnologyType;
+};
+
 export type ClientReportDataDto = {
   reportDate: number;
   planetaryParameters: PlanetaryParametersDto;
@@ -177,7 +188,8 @@ export type ClientPlanetDto = {
     buildingsCurrentPowerConsumption: BuildingPowerConsumptionEntry[];
     defences: DefenceBuildingInstances[];
     ships: ShipInstance[];
-    technologyQueue: Technology[];
+    currentResearchQueue: TechnologyQueueEntryDto | null;
+    researchHelperFor: ResearchHelperForDto | null;
     buildingQueue: BuildingQueueEntryDto[];
     shipyardQueue: ShipyardQueueEntryDto[];
     fleets: Fleet[];
@@ -199,6 +211,14 @@ export type StartShipyardConstructionRequest = {
   z: number;
   shipType: ShipType;
   amount: number;
+};
+
+export type StartTechnologyResearchRequest = {
+  x: number;
+  y: number;
+  z: number;
+  technologyType: TechnologyType;
+  helperPlanets: ClientCoordinates[];
 };
 
 export type SetBuildingPowerConsumptionRequest = {

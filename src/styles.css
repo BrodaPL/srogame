@@ -1384,9 +1384,9 @@ app-root {
 
 .research-tech-card {
   display: grid;
-  grid-template-columns: 170px minmax(200px, 0.9fr) minmax(140px, 0.7fr) minmax(170px, 0.9fr) minmax(235px, 1fr) auto;
-  align-items: center;
-  gap: 0.62rem;
+  grid-template-columns: 170px minmax(210px, 0.9fr) minmax(170px, 0.75fr) minmax(360px, 1.4fr) max-content;
+  align-items: start;
+  gap: 0.72rem;
   padding: 0.52rem 0.6rem;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1430,7 +1430,31 @@ app-root {
   color: #f5f8ff;
   font-size: 0.74rem;
   padding: 0.14rem 0.38rem;
-  min-width: 210px;
+  min-width: 0;
+  width: 100%;
+}
+
+.research-tech-card__lab-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.research-tech-card__lab-label {
+  font-size: 0.74rem;
+  color: #a3bad8;
+  font-weight: 700;
+}
+
+.research-tech-card__cost-action {
+  grid-column: 5;
+  justify-self: end;
+  display: grid;
+  align-content: start;
+  justify-items: end;
+  gap: 0.55rem;
+  margin-left: 0.4rem;
 }
 
 .research-tech-card__lab-select option {
@@ -1438,6 +1462,7 @@ app-root {
 }
 
 .research-tech-card__action {
+  justify-self: end;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
@@ -1774,6 +1799,30 @@ app-root {
   padding: 0.6rem 0.65rem;
 }
 
+.planet-queue-table-wrap {
+  overflow-x: auto;
+}
+
+.planet-queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono), serif;
+  font-size: 0.76rem;
+}
+
+.planet-queue-table th,
+.planet-queue-table td {
+  text-align: left;
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  white-space: nowrap;
+}
+
+.planet-queue-table th {
+  color: #a3bad8;
+  font-weight: 700;
+}
+
 .planet-queue-card--research {
   display: flex;
   align-items: center;
@@ -1909,6 +1958,17 @@ app-root {
   .research-tech-card {
     grid-template-columns: 1fr;
     justify-items: start;
+  }
+
+  .research-tech-card__cost-action {
+    grid-column: auto;
+    justify-self: start;
+    margin-left: 0;
+    justify-items: start;
+  }
+
+  .research-tech-card__action {
+    justify-self: start;
   }
 
   .research-tech-card__lab-select {

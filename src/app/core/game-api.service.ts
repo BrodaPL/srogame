@@ -13,7 +13,8 @@ import {
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
   StartBuildingConstructionRequest,
-  StartShipyardConstructionRequest
+  StartShipyardConstructionRequest,
+  StartTechnologyResearchRequest
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -119,6 +120,14 @@ export class GameApiService {
   public startShipyardConstruction(request: StartShipyardConstructionRequest, token: string) {
     return this.http.post<ClientPlanetDto>(
       `${API_BASE_URL}/game/shipyard-queue`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public startTechnologyResearch(request: StartTechnologyResearchRequest, token: string) {
+    return this.http.post<ClientPlanetDto[]>(
+      `${API_BASE_URL}/game/technology-queue`,
       request,
       { headers: this.authHeaders(token) }
     );

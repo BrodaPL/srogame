@@ -15,8 +15,11 @@ import technologyTypeEnumModule from '../../src/app/models/enums/technology-type
 import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
 import shipBlueprintsFactoryModule from '../../src/app/factories/ship-blueprints.factory.js';
+import technologyBlueprintsFactoryModule from '../../src/app/factories/technology-blueprints.factory.js';
 import buildingQueueEntryModule from '../../src/app/models/buildings/building-queue-entry.js';
 import shipyardQueueEntryModule from '../../src/app/models/fleets/shipyard-queue-entry.js';
+import technologyQueueEntryModule from '../../src/app/models/tech/technology-queue-entry.js';
+import researchHelperForModule from '../../src/app/models/tech/research-helper-for.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   GalaxySetup,
@@ -48,7 +51,8 @@ import type {
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
   StartBuildingConstructionRequest,
-  StartShipyardConstructionRequest
+  StartShipyardConstructionRequest,
+  StartTechnologyResearchRequest
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -67,6 +71,7 @@ import type { TechnologyType as TechnologyTypeType } from '../../src/app/models/
 import type { ShipType as ShipTypeType } from '../../src/app/models/enums/ship-type.ts';
 import type { Building } from '../../src/app/models/buildings/building.ts';
 import type { Ship } from '../../src/app/models/fleets/ship.ts';
+import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
@@ -99,11 +104,20 @@ const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
 const { ShipBlueprintsFactory } = shipBlueprintsFactoryModule as {
   ShipBlueprintsFactory: typeof import('../../src/app/factories/ship-blueprints.factory.js').ShipBlueprintsFactory;
 };
+const { TechnologyBlueprintsFactory } = technologyBlueprintsFactoryModule as {
+  TechnologyBlueprintsFactory: typeof import('../../src/app/factories/technology-blueprints.factory.js').TechnologyBlueprintsFactory;
+};
 const { BuildingQueueEntry } = buildingQueueEntryModule as {
   BuildingQueueEntry: typeof import('../../src/app/models/buildings/building-queue-entry.js').BuildingQueueEntry;
 };
 const { ShipyardQueueEntry } = shipyardQueueEntryModule as {
   ShipyardQueueEntry: typeof import('../../src/app/models/fleets/shipyard-queue-entry.js').ShipyardQueueEntry;
+};
+const { TechnologyQueueEntry } = technologyQueueEntryModule as {
+  TechnologyQueueEntry: typeof import('../../src/app/models/tech/technology-queue-entry.js').TechnologyQueueEntry;
+};
+const { ResearchHelperFor } = researchHelperForModule as {
+  ResearchHelperFor: typeof import('../../src/app/models/tech/research-helper-for.js').ResearchHelperFor;
 };
 
 const app = express();
@@ -128,11 +142,15 @@ const INITIAL_TURN_NUMBER = 1;
 const NOTE_BORDER_COLOR_VALUES = new Set<string>(Object.values(NoteBorderColor));
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
+const TECHNOLOGY_BLUEPRINTS = TechnologyBlueprintsFactory.fromDefaultJson();
 const BUILDING_TYPE_VALUES = new Set<string>(Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys()));
 const SHIP_TYPE_VALUES = new Set<string>(Object.values(ShipType));
+const TECHNOLOGY_TYPE_VALUES = new Set<string>(Array.from(TECHNOLOGY_BLUEPRINTS.techByType.keys()));
 const BUILDING_TYPE_ROBOTICS_FACTORY = BuildingType.ROBOTICS_FACTORY as BuildingTypeType;
 const BUILDING_TYPE_SHIPYARD = BuildingType.SHIPYARD as BuildingTypeType;
+const BUILDING_TYPE_RESEARCH_LAB = BuildingType.RESEARCH_LAB as BuildingTypeType;
 const TECH_TYPE_COMPUTER_TECHNOLOGY = TechnologyType.COMPUTER_TECHNOLOGY as TechnologyTypeType;
+const TECH_TYPE_INTERGALACTIC_RESEARCH_NETWORK = TechnologyType.INTERGALACTIC_RESEARCH_NETWORK as TechnologyTypeType;
 
 let currentGalaxy: Galaxy | null = null;
 let currentGameOwnerId: number | null = null;
@@ -655,6 +673,165 @@ app.post('/api/game/shipyard-queue', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.post('/api/game/technology-queue', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as StartTechnologyResearchRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const technologyType = normalizeTechnologyType(body?.technologyType);
+  const helperCoordinates = parseResearchHelperCoordinates(body?.helperPlanets);
+  if (x === null || y === null || z === null || !technologyType || helperCoordinates === null) {
+    return res.status(400).json({ error: 'Invalid technology queue payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be modified.' });
+  }
+
+  if (planet.getBuildingLevel(BUILDING_TYPE_RESEARCH_LAB) <= 0) {
+    return res.status(400).json({ error: 'Build Research Lab first.' });
+  }
+
+  if (planet.rBDSFTQ.currentResearchQueue) {
+    return res.status(400).json({ error: 'Queue full.' });
+  }
+
+  if (planet.rBDSFTQ.researchHelperFor) {
+    return res.status(400).json({ error: 'Research Lab is currently assigned as helper.' });
+  }
+
+  const technology = TECHNOLOGY_BLUEPRINTS.get(technologyType);
+  if (!technology) {
+    return res.status(400).json({ error: 'Unknown technology type.' });
+  }
+
+  const technologyAlreadyQueued = player.planets.some((entry) => {
+    const queue = entry.rBDSFTQ.currentResearchQueue;
+    return queue !== null && queue.technologyType === technologyType;
+  });
+  if (technologyAlreadyQueued) {
+    return res.status(400).json({ error: 'Technology is already being researched.' });
+  }
+
+  const maxLabsPerTechnology = calculateMaxLabsPerTechnology(player);
+
+  const starterCoordinates: ClientCoordinates = { x, y, z };
+  const uniqueHelperCoordinates: ClientCoordinates[] = [];
+  const helperPlanets: Planet[] = [];
+  const helperIds = new Set<string>();
+
+  for (const coordinates of helperCoordinates) {
+    if (sameCoordinates(coordinates, starterCoordinates)) {
+      continue;
+    }
+
+    const helperId = toCoordinatesId(coordinates);
+    if (helperIds.has(helperId)) {
+      continue;
+    }
+
+    const helperSystem = currentGalaxy.stars[coordinates.y]?.[coordinates.x];
+    if (!helperSystem) {
+      return res.status(404).json({ error: 'Helper planet star system not found.' });
+    }
+
+    const helperPlanet = helperSystem.planets[coordinates.z];
+    if (!helperPlanet) {
+      return res.status(404).json({ error: 'Helper planet not found.' });
+    }
+
+    if (helperPlanet.info.ownerId !== playerId) {
+      return res.status(403).json({ error: 'Helper planet must be owned by you.' });
+    }
+
+    if (helperPlanet.getBuildingLevel(BUILDING_TYPE_RESEARCH_LAB) <= 0) {
+      return res.status(400).json({ error: 'Selected helper planet has no Research Lab.' });
+    }
+
+    if (helperPlanet.rBDSFTQ.currentResearchQueue || helperPlanet.rBDSFTQ.researchHelperFor) {
+      return res.status(400).json({ error: 'Selected helper lab is busy.' });
+    }
+
+    helperIds.add(helperId);
+    uniqueHelperCoordinates.push(coordinates);
+    helperPlanets.push(helperPlanet);
+  }
+
+  if ((1 + uniqueHelperCoordinates.length) > maxLabsPerTechnology) {
+    return res.status(400).json({ error: 'Too many helper labs assigned.' });
+  }
+
+  const nextLevel = player.getTechLevel(technologyType) + 1;
+  if (!hasResearchBuildingRequirements(planet, technology, nextLevel)) {
+    return res.status(400).json({ error: 'Building requirements are not met.' });
+  }
+
+  if (!hasResearchTechnologyRequirements(player, technology, nextLevel)) {
+    return res.status(400).json({ error: 'Technology requirements are not met.' });
+  }
+
+  const cost = technology.getCostForLevel(nextLevel);
+  if (!planet.rBDSFTQ.resources.isSufficient(cost)) {
+    return res.status(400).json({ error: 'Insufficient resources.' });
+  }
+
+  planet.rBDSFTQ.resources.subtractResourcePack(cost);
+  planet.rBDSFTQ.currentResearchQueue = new TechnologyQueueEntry(
+    technologyType,
+    nextLevel,
+    0,
+    uniqueHelperCoordinates
+  );
+
+  for (const helperPlanet of helperPlanets) {
+    helperPlanet.rBDSFTQ.researchHelperFor = new ResearchHelperFor(
+      {
+        x: starterCoordinates.x,
+        y: starterCoordinates.y,
+        z: starterCoordinates.z
+      },
+      technologyType
+    );
+  }
+
+  const presentation = getPresentationData(currentGalaxy, playerId);
+  const response = presentation.ownedPlanets.map((entry) => toClientPlanetDtoFromClientPlanet(entry));
+  return res.status(200).json(response);
+});
+
 app.post('/api/game/power-consumption', (req, res) => {
   if (!currentGalaxy || currentGameOwnerId === null) {
     return res.status(404).json({ error: 'No active game.' });
@@ -959,6 +1136,12 @@ function calculateMaxShipyardQueueLength(planet: Planet, player: Player): number
   return Math.max(1, Math.floor(rawLimit));
 }
 
+function calculateMaxLabsPerTechnology(player: Player): number {
+  const irnLevel = player.getTechLevel(TECH_TYPE_INTERGALACTIC_RESEARCH_NETWORK);
+  const rawLimit = Math.floor((1.5 * Math.sqrt(Math.max(0, irnLevel))) + 1);
+  return Math.max(1, rawLimit);
+}
+
 function hasBuildingRequirements(
   planet: Planet,
   building: Building,
@@ -1002,6 +1185,38 @@ function hasShipBuildingRequirements(planet: Planet, ship: Ship): boolean {
 function hasShipTechnologyRequirements(player: Player, ship: Ship): boolean {
   for (const requirement of ship.techRequirements) {
     const requiredLevel = Math.ceil(requirement.level);
+    const currentLevel = player.getTechLevel(requirement.tech as TechnologyTypeType);
+    if (currentLevel < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasResearchBuildingRequirements(
+  planet: Planet,
+  technology: Technology,
+  nextLevel: number
+): boolean {
+  for (const requirement of technology.buildingRequirements) {
+    const requiredLevel = Math.ceil(nextLevel * requirement.level);
+    const currentLevel = planet.getBuildingLevel(requirement.building as BuildingTypeType);
+    if (currentLevel < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasResearchTechnologyRequirements(
+  player: Player,
+  technology: Technology,
+  nextLevel: number
+): boolean {
+  for (const requirement of technology.techRequirements) {
+    const requiredLevel = Math.ceil(nextLevel * requirement.level);
     const currentLevel = player.getTechLevel(requirement.tech as TechnologyTypeType);
     if (currentLevel < requiredLevel) {
       return false;
@@ -1109,6 +1324,51 @@ function normalizeShipType(value: unknown): ShipTypeType | null {
   }
 
   return SHIP_TYPE_VALUES.has(value) ? (value as ShipTypeType) : null;
+}
+
+function normalizeTechnologyType(value: unknown): TechnologyTypeType | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return TECHNOLOGY_TYPE_VALUES.has(value) ? (value as TechnologyTypeType) : null;
+}
+
+function parseResearchHelperCoordinates(value: unknown): ClientCoordinates[] | null {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const parsed: ClientCoordinates[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const candidate = item as { x?: unknown; y?: unknown; z?: unknown };
+    const x = parseBodyNonNegativeInt(candidate.x);
+    const y = parseBodyNonNegativeInt(candidate.y);
+    const z = parseBodyNonNegativeInt(candidate.z);
+    if (x === null || y === null || z === null) {
+      return null;
+    }
+
+    parsed.push({ x, y, z });
+  }
+
+  return parsed;
+}
+
+function sameCoordinates(left: ClientCoordinates, right: ClientCoordinates): boolean {
+  return left.x === right.x && left.y === right.y && left.z === right.z;
+}
+
+function toCoordinatesId(coordinates: ClientCoordinates): string {
+  return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
 }
 
 function multiplyResourcePack(base: ResourcesPack, amount: number): ResourcesPack {
@@ -1222,7 +1482,8 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       buildingsCurrentPowerConsumption: toBuildingPowerConsumptionEntries(clientPlanet),
       defences: clientPlanet.rBDSFTQ.defences,
       ships: clientPlanet.rBDSFTQ.ships,
-      technologyQueue: clientPlanet.rBDSFTQ.technologyQueue,
+      currentResearchQueue: clientPlanet.rBDSFTQ.currentResearchQueue,
+      researchHelperFor: clientPlanet.rBDSFTQ.researchHelperFor,
       buildingQueue: clientPlanet.rBDSFTQ.buildingQueue,
       shipyardQueue: clientPlanet.rBDSFTQ.shipyardQueue,
       fleets: clientPlanet.rBDSFTQ.fleets,
