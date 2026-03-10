@@ -1,43 +1,107 @@
 <main class="page">
-  <section class="panel">
+  <section class="panel mechanics-panel">
     <header class="panel__header">
       <p class="eyebrow">Encyclopedia</p>
       <h1>Mechanics</h1>
-      <p class="subtitle">How the turn loop, economy, and systems behave in SROGame.</p>
+      <p class="subtitle">
+        Rulebook for current gameplay systems. Formulas and constraints here are aligned with the active client/server code.
+      </p>
     </header>
 
     <div class="encyclopedia-toolbar">
-      <p class="encyclopedia-meta">{{ mechanics.length }} mechanics topics</p>
+      <p class="encyclopedia-meta">{{ filteredMechanics.length }} / {{ mechanics.length }} topics shown</p>
       <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
     </div>
 
-    <div class="encyclopedia-grid">
-      <article class="ship-card" *ngFor="let mechanic of mechanics">
+    <section class="mechanics-overview">
+      <article class="mechanics-overview__item mechanics-overview__item--live">
+        <p class="mechanics-overview__label">Live</p>
+        <p class="mechanics-overview__value">{{ statusCount('Live') }}</p>
+      </article>
+      <article class="mechanics-overview__item mechanics-overview__item--partial">
+        <p class="mechanics-overview__label">Partial</p>
+        <p class="mechanics-overview__value">{{ statusCount('Partial') }}</p>
+      </article>
+      <article class="mechanics-overview__item mechanics-overview__item--planned">
+        <p class="mechanics-overview__label">Planned</p>
+        <p class="mechanics-overview__value">{{ statusCount('Planned') }}</p>
+      </article>
+    </section>
+
+    <section class="mechanics-filters">
+      <p class="mechanics-filters__title">Status filter</p>
+      <div class="mechanics-filter-row">
+        <button
+          class="mechanics-filter-button"
+          type="button"
+          *ngFor="let status of statusFilters"
+          [class.mechanics-filter-button--active]="selectedStatus === status"
+          (click)="setStatusFilter(status)"
+        >
+          {{ status }}
+          <span *ngIf="status === 'All'">({{ mechanics.length }})</span>
+          <span *ngIf="status !== 'All'">({{ statusCount(status) }})</span>
+        </button>
+      </div>
+
+      <p class="mechanics-filters__title">Category filter</p>
+      <div class="mechanics-filter-row">
+        <button
+          class="mechanics-filter-button"
+          type="button"
+          *ngFor="let category of categoryFilters"
+          [class.mechanics-filter-button--active]="selectedCategory === category"
+          (click)="setCategoryFilter(category)"
+        >
+          {{ category }}
+          <span *ngIf="category === 'All'">({{ mechanics.length }})</span>
+          <span *ngIf="category !== 'All'">({{ categoryCount(category) }})</span>
+        </button>
+      </div>
+    </section>
+
+    <div class="encyclopedia-grid mechanics-grid">
+      <article class="ship-card mechanics-card" *ngFor="let mechanic of filteredMechanics; trackBy: trackByTitle">
         <header class="ship-card__header">
           <div>
+            <p class="mechanics-card__category">{{ mechanic.category }}</p>
             <h2 class="ship-card__title">{{ mechanic.title }}</h2>
             <p class="ship-card__subtitle ship-card__subtitle--wide">{{ mechanic.summary }}</p>
           </div>
+          <span class="badge mechanics-status" [ngClass]="statusClass(mechanic.status)">
+            {{ mechanic.status }}
+          </span>
         </header>
 
-        <div class="ship-section" *ngIf="mechanic.tags?.length">
-          <p class="ship-section__title">Focus</p>
+        <div class="ship-section">
+          <p class="ship-section__title">How It Works</p>
           <ul class="weapon-list">
-            <li class="weapon-item" *ngFor="let tag of mechanic.tags">
-              <span class="weapon-chip">{{ tag }}</span>
+            <li class="weapon-item" *ngFor="let detail of mechanic.details">
+              <span class="weapon-meta">{{ detail }}</span>
             </li>
           </ul>
         </div>
 
-        <div class="ship-section">
+        <div class="ship-section" *ngIf="mechanic.formulas?.length">
+          <p class="ship-section__title">Formulas</p>
+          <ul class="mechanics-formula-list">
+            <li class="mechanics-formula-item" *ngFor="let formula of mechanic.formulas">
+              <code class="mechanics-formula">{{ formula }}</code>
+            </li>
+          </ul>
+        </div>
+
+        <div class="ship-section" *ngIf="mechanic.notes?.length">
           <p class="ship-section__title">Notes</p>
           <ul class="weapon-list">
-            <li class="weapon-item" *ngFor="let note of mechanic.bullets">
+            <li class="weapon-item" *ngFor="let note of mechanic.notes">
               <span class="weapon-meta">{{ note }}</span>
             </li>
           </ul>
         </div>
       </article>
     </div>
+
+    <p class="ship-empty" *ngIf="filteredMechanics.length === 0">No mechanics match the selected filters.</p>
   </section>
 </main>
