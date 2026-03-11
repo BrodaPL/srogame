@@ -13,6 +13,7 @@ import type { Fleet } from './fleets/fleet';
 import type { NoteBorderColor } from './enums/note-border-color';
 import type { PlayerType } from './enums/player-type';
 import type { FleetMissionType } from './enums/fleet-mission-type';
+import type { ReportType } from './enums/report-type';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -149,7 +150,15 @@ export type ResearchHelperForDto = {
 };
 
 export type ClientReportDataDto = {
-  reportDate: number;
+  reportId: number;
+  reportType: ReportType;
+  createdTurn: number;
+  title: string;
+  isRead: boolean;
+  sourceCoordinates: ClientCoordinates | null;
+  sourcePlanetName: string | null;
+  sourceSystemName: string | null;
+  senderPlayerName: string | null;
   planetaryParameters: PlanetaryParametersDto;
   averageBuildingLevel: number;
   averageTotalResources: number;
@@ -166,6 +175,49 @@ export type ClientReportDataDto = {
   researchProduction: ResearchQueue;
   buildingProduction: BuildingQueue;
 };
+
+export type PlayerReportDtoBase = {
+  reportId: number;
+  reportType: ReportType;
+  createdTurn: number;
+  title: string;
+  isRead: boolean;
+  sourceCoordinates: ClientCoordinates | null;
+  sourcePlanetName: string | null;
+  sourceSystemName: string | null;
+  senderPlayerName: string | null;
+};
+
+export type MessageReportDto = PlayerReportDtoBase & {
+  reportType: ReportType;
+  messageBody: string;
+};
+
+export type TextPlayerReportDto = PlayerReportDtoBase & {
+  reportType: ReportType;
+  body: string;
+};
+
+export type EspionagePlayerReportDto = PlayerReportDtoBase & {
+  reportType: ReportType;
+  planetaryParameters: PlanetaryParametersDto;
+  averageBuildingLevel: number;
+  averageTotalResources: number;
+  averageTechLevel: number;
+  totalDefencesAmount: number;
+  totalShipsAmount: number;
+  buildingsLevels: BuildingLevelEntry[];
+  resourcesAmount: ResourcesPackDto;
+  techLevels: TechLevelEntry[];
+  defences: DefenceBuildingInstances[];
+  ships: ShipAmountEntry[];
+  shipyardProduction: ShipyardQueue;
+  defencesProduction: DefencesQueue;
+  researchProduction: ResearchQueue;
+  buildingProduction: BuildingQueue;
+};
+
+export type PlayerReportDto = MessageReportDto | TextPlayerReportDto | EspionagePlayerReportDto;
 
 export type ClientPlanetDto = {
   coordinates: ClientCoordinates;
@@ -233,6 +285,18 @@ export type CreateFleetMissionRequest = {
 export type CreateFleetMissionResponse = {
   ownedPlanets: ClientPlanetDto[];
   activeFleets: Fleet[];
+};
+
+export type MarkPlayerReportReadRequest = {
+  reportId: number;
+};
+
+export type DeletePlayerReportsRequest = {
+  reportIds: number[];
+};
+
+export type DeletePlayerReportsResponse = {
+  deletedCount: number;
 };
 
 export type SetBuildingPowerConsumptionRequest = {

@@ -2,6 +2,7 @@ import { Planet } from './planets/planet';
 import { TechnologyType } from './enums/technology-type';
 import { Fleet } from './fleets/fleet';
 import { PlayerType } from './enums/player-type';
+import { PlayerReport } from './reports/player-report';
 
 export class Player {
   constructor(
@@ -10,7 +11,9 @@ export class Player {
     public planets: Planet[],
     public tech: Map<TechnologyType, number>,
     public fleets: Fleet[],
-    public type: PlayerType
+    public type: PlayerType,
+    public reports: PlayerReport[] = [],
+    public nextReportId = 1
   ) {}
 
   public getTechLevel(type: TechnologyType): number {
@@ -31,6 +34,40 @@ export class Player {
     const next = this.getTechLevel(type) + delta;
     this.setTechLevel(type, next);
     return this.getTechLevel(type);
+  }
+
+  public createReportId(): number {
+    const reportId = this.nextReportId;
+    this.nextReportId += 1;
+    return reportId;
+  }
+
+  public addReport(report: PlayerReport): void {
+    this.reports.push(report);
+    if (report.reportId >= this.nextReportId) {
+      this.nextReportId = report.reportId + 1;
+    }
+  }
+
+  public markReportAsRead(reportId: number): boolean {
+    const report = this.reports.find((entry) => entry.reportId === reportId);
+    if (!report) {
+      return false;
+    }
+
+    report.markAsRead();
+    return true;
+  }
+
+  public deleteReports(reportIds: number[]): number {
+    const selected = new Set(reportIds);
+    if (selected.size === 0) {
+      return 0;
+    }
+
+    const before = this.reports.length;
+    this.reports = this.reports.filter((report) => !selected.has(report.reportId));
+    return before - this.reports.length;
   }
 
   public static techLevelsFromRecord(

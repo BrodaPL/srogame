@@ -14,6 +14,7 @@ import buildingTypeEnumModule from '../../src/app/models/enums/building-type.js'
 import technologyTypeEnumModule from '../../src/app/models/enums/technology-type.js';
 import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
 import fleetMissionTypeEnumModule from '../../src/app/models/enums/fleet-mission-type.js';
+import reportTypeEnumModule from '../../src/app/models/enums/report-type.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
 import shipBlueprintsFactoryModule from '../../src/app/factories/ship-blueprints.factory.js';
 import technologyBlueprintsFactoryModule from '../../src/app/factories/technology-blueprints.factory.js';
@@ -55,7 +56,15 @@ import type {
   StartShipyardConstructionRequest,
   StartTechnologyResearchRequest,
   CreateFleetMissionRequest,
-  CreateFleetMissionResponse
+  CreateFleetMissionResponse,
+  PlayerReportDto,
+  PlayerReportDtoBase,
+  MessageReportDto,
+  TextPlayerReportDto,
+  EspionagePlayerReportDto,
+  MarkPlayerReportReadRequest,
+  DeletePlayerReportsRequest,
+  DeletePlayerReportsResponse
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -78,6 +87,9 @@ import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
+import type { PlayerReport } from '../../src/app/models/reports/player-report.ts';
+import type { MessageReport } from '../../src/app/models/reports/message-report.ts';
+import type { ReportType as ReportTypeType } from '../../src/app/models/enums/report-type.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -105,6 +117,9 @@ const { ShipType } = shipTypeEnumModule as {
 };
 const { FleetMissionType } = fleetMissionTypeEnumModule as {
   FleetMissionType: typeof import('../../src/app/models/enums/fleet-mission-type.js').FleetMissionType;
+};
+const { ReportType } = reportTypeEnumModule as {
+  ReportType: typeof import('../../src/app/models/enums/report-type.js').ReportType;
 };
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
@@ -942,6 +957,114 @@ app.get('/api/game/owned-planets', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.get('/api/game/reports', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const response = [...player.reports]
+    .sort((left, right) => right.createdTurn - left.createdTurn || right.reportId - left.reportId)
+    .map((report) => toPlayerReportDto(report));
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/reports/read', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as MarkPlayerReportReadRequest | undefined;
+  const reportId = parseBodyNonNegativeInt(body?.reportId);
+  if (reportId === null) {
+    return res.status(400).json({ error: 'Invalid report id.' });
+  }
+
+  const wasUpdated = player.markReportAsRead(reportId);
+  if (!wasUpdated) {
+    return res.status(404).json({ error: 'Report not found.' });
+  }
+
+  const report = player.reports.find((entry) => entry.reportId === reportId);
+  if (!report) {
+    return res.status(404).json({ error: 'Report not found.' });
+  }
+
+  return res.status(200).json(toPlayerReportDto(report));
+});
+
+app.post('/api/game/reports/delete', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as DeletePlayerReportsRequest | undefined;
+  const reportIds = parseBodyReportIds(body?.reportIds);
+  if (!reportIds) {
+    return res.status(400).json({ error: 'Invalid report ids.' });
+  }
+
+  const deletedCount = player.deleteReports(reportIds);
+  const response: DeletePlayerReportsResponse = { deletedCount };
+  return res.status(200).json(response);
+});
+
 app.get('/api/game/active-fleets', (req, res) => {
   if (!currentGalaxy || currentGameOwnerId === null) {
     return res.status(404).json({ error: 'No active game.' });
@@ -1474,6 +1597,24 @@ function parseBodyIntInRange(value: unknown, min: number, max: number): number |
   return parsed;
 }
 
+function parseBodyReportIds(value: unknown): number[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const reportIds: number[] = [];
+  for (const item of value) {
+    const reportId = parseBodyNonNegativeInt(item);
+    if (reportId === null) {
+      return null;
+    }
+
+    reportIds.push(reportId);
+  }
+
+  return reportIds;
+}
+
 function parseBodyNonNegativeNumber(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return null;
@@ -1772,9 +1913,29 @@ function toShipAmountEntries(map: Map<unknown, number>): ShipAmountEntry[] {
   return entries;
 }
 
+function toPlayerReportBaseDto(report: PlayerReport): PlayerReportDtoBase {
+  return {
+    reportId: report.reportId,
+    reportType: report.reportType as ReportTypeType,
+    createdTurn: report.createdTurn,
+    title: report.title,
+    isRead: report.isRead,
+    sourceCoordinates: report.sourceCoordinates
+      ? {
+        x: report.sourceCoordinates.x,
+        y: report.sourceCoordinates.y,
+        z: report.sourceCoordinates.z
+      }
+      : null,
+    sourcePlanetName: report.sourcePlanetName,
+    sourceSystemName: report.sourceSystemName,
+    senderPlayerName: report.senderPlayerName
+  };
+}
+
 function toClientReportDataDto(reportData: EspionageReportData): ClientReportDataDto {
   return {
-    reportDate: reportData.reportDate,
+    ...toPlayerReportBaseDto(reportData),
     planetaryParameters: toPlanetaryParametersDto(reportData.planetaryParameters),
     averageBuildingLevel: reportData.averageBuildingLevel,
     averageTotalResources: reportData.averageTotalResources,
@@ -1791,6 +1952,52 @@ function toClientReportDataDto(reportData: EspionageReportData): ClientReportDat
     researchProduction: reportData.researchProduction,
     buildingProduction: reportData.buildingProduction
   };
+}
+
+function toMessageReportDto(report: MessageReport): MessageReportDto {
+  return {
+    ...toPlayerReportBaseDto(report),
+    messageBody: report.messageBody
+  };
+}
+
+function toTextPlayerReportDto(report: PlayerReport & { body: string }): TextPlayerReportDto {
+  return {
+    ...toPlayerReportBaseDto(report),
+    body: report.body
+  };
+}
+
+function toEspionagePlayerReportDto(report: EspionageReportData): EspionagePlayerReportDto {
+  return {
+    ...toPlayerReportBaseDto(report),
+    planetaryParameters: toPlanetaryParametersDto(report.planetaryParameters),
+    averageBuildingLevel: report.averageBuildingLevel,
+    averageTotalResources: report.averageTotalResources,
+    averageTechLevel: report.averageTechLevel,
+    totalDefencesAmount: report.totalDefencesAmount,
+    totalShipsAmount: report.totalShipsAmount,
+    buildingsLevels: toBuildingLevelEntries(report.buildingsLevels),
+    resourcesAmount: toResourcesPackDto(report.resourcesAmount),
+    techLevels: toTechLevelEntries(report.techLevels),
+    defences: report.defences,
+    ships: toShipAmountEntries(report.ships),
+    shipyardProduction: report.shipyardProduction,
+    defencesProduction: report.defencesProduction,
+    researchProduction: report.researchProduction,
+    buildingProduction: report.buildingProduction
+  };
+}
+
+function toPlayerReportDto(report: PlayerReport): PlayerReportDto {
+  switch (report.reportType) {
+    case ReportType.MESSAGE:
+      return toMessageReportDto(report as MessageReport);
+    case ReportType.ESPIONAGE_REPORT:
+      return toEspionagePlayerReportDto(report as EspionageReportData);
+    default:
+      return toTextPlayerReportDto(report as PlayerReport & { body: string });
+  }
 }
 
 function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordinates): ClientPlanetDto {
@@ -1885,11 +2092,13 @@ function generateSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber: number):
             planet,
             0,
             {
+              reportId: player.createReportId(),
               forcedReportLevel: SELF_REPORT_LEVEL,
-              reportDate: turnNumber
+              createdTurn: turnNumber
             }
           );
-          planet.lastReportData.set(player.playerId, report);
+          planet.lastReportData.set(player.playerId, report.copy());
+          player.addReport(report.copy());
         }
       }
     }
@@ -1913,11 +2122,13 @@ function generateSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber: number):
         planet,
         0,
         {
+          reportId: player.createReportId(),
           forcedReportLevel: STARTING_SYSTEM_REPORT_LEVEL,
-          reportDate: turnNumber
+          createdTurn: turnNumber
         }
       );
-      planet.lastReportData.set(player.playerId, report);
+      planet.lastReportData.set(player.playerId, report.copy());
+      player.addReport(report.copy());
     }
   }
 }

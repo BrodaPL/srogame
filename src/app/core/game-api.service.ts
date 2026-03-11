@@ -16,7 +16,11 @@ import {
   StartShipyardConstructionRequest,
   StartTechnologyResearchRequest,
   CreateFleetMissionRequest,
-  CreateFleetMissionResponse
+  CreateFleetMissionResponse,
+  DeletePlayerReportsRequest,
+  DeletePlayerReportsResponse,
+  MarkPlayerReportReadRequest,
+  PlayerReportDto
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -145,6 +149,29 @@ export class GameApiService {
   public createFleetMission(request: CreateFleetMissionRequest, token: string) {
     return this.http.post<CreateFleetMissionResponse>(
       `${API_BASE_URL}/game/active-fleets`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getPlayerReports(token: string) {
+    return this.http.get<PlayerReportDto[]>(
+      `${API_BASE_URL}/game/reports`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public markPlayerReportAsRead(request: MarkPlayerReportReadRequest, token: string) {
+    return this.http.post<PlayerReportDto>(
+      `${API_BASE_URL}/game/reports/read`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public deletePlayerReports(request: DeletePlayerReportsRequest, token: string) {
+    return this.http.post<DeletePlayerReportsResponse>(
+      `${API_BASE_URL}/game/reports/delete`,
       request,
       { headers: this.authHeaders(token) }
     );

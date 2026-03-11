@@ -1,4 +1,328 @@
 <app-top-menu></app-top-menu>
-<section class="game-view game-view--reports-view"></section>
+
+<section class="reports-view">
+  @if (isLoading) {
+    <section class="status status--info">
+      <h3>Loading Reports</h3>
+      <p>Player inbox data is being read from the current galaxy state.</p>
+    </section>
+  } @else if (loadError) {
+    <section class="status status--error">
+      <h3>Reports unavailable</h3>
+      <p>{{ loadError }}</p>
+    </section>
+  } @else {
+    @if (actionError) {
+      <section class="status status--error">
+        <h3>Action failed</h3>
+        <p>{{ actionError }}</p>
+      </section>
+    }
+
+    <section class="overview-card reports-view__tabs">
+      <div class="reports-view__tab-list">
+        <button
+          class="reports-view__tab"
+          type="button"
+          [class.reports-view__tab--active]="isTabActive(allTab)"
+          (click)="setActiveTab(allTab)">
+          <span>All</span>
+          <span class="badge">{{ reportTypeCount(allTab) }}</span>
+        </button>
+
+        @for (reportType of reportTypes; track reportType) {
+          <button
+            class="reports-view__tab"
+            type="button"
+            [class.reports-view__tab--active]="isTabActive(reportType)"
+            (click)="setActiveTab(reportType)">
+            <span>{{ reportType }}</span>
+            <span class="badge">{{ reportTypeCount(reportType) }}</span>
+          </button>
+        }
+      </div>
+
+      <div class="reports-view__tabs-footer">
+        <p class="overview-muted">{{ visibleReports().length }} visible report(s) | {{ selectedReportIds.size }} selected</p>
+
+        <div class="reports-view__actions">
+          <button class="reports-view__compact-button" type="button" (click)="selectAllVisible()">
+            Select all visible
+          </button>
+          <button
+            class="reports-view__compact-button reports-view__compact-button--danger"
+            type="button"
+            [disabled]="selectedReportIds.size === 0 || isDeleting"
+            (click)="deleteSelectedReports()">
+            Delete selected
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="reports-view__layout">
+      <section class="overview-card reports-view__list">
+        <div class="reports-view__list-head">
+          <div>
+            <h3>Inbox</h3>
+            <p class="overview-muted">{{ visibleReports().length }} visible report(s)</p>
+          </div>
+          <span class="badge">{{ selectedReportIds.size }} selected</span>
+        </div>
+
+        @if (visibleReports().length === 0) {
+          <p class="overview-muted">No reports in this tab.</p>
+        } @else {
+          <div class="reports-view__items">
+            @for (report of visibleReports(); track report.reportId) {
+              <article
+                class="reports-view__item"
+                [class.reports-view__item--active]="selectedReportId === report.reportId"
+                [class.reports-view__item--unread]="!report.isRead"
+                (click)="openReport(report)">
+                <label class="reports-view__checkbox" (click)="$event.stopPropagation()">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected(report.reportId)"
+                    (change)="toggleReportSelection(report.reportId, $any($event.target).checked)" />
+                </label>
+
+                <div class="reports-view__item-main">
+                  <div class="reports-view__item-head">
+                    <h4>{{ report.title }}</h4>
+                    <span class="badge" [class.badge--jump]="!report.isRead">{{ report.reportType }}</span>
+                  </div>
+                  <div class="reports-view__item-meta">
+                    <span>Turn {{ report.createdTurn }}</span>
+                    <span>{{ coordinatesLabel(report) }}</span>
+                    <span>{{ report.isRead ? 'Read' : 'Unread' }}</span>
+                  </div>
+                </div>
+              </article>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="overview-card reports-view__detail">
+        @if (selectedReport(); as report) {
+          <div class="reports-view__detail-head">
+            <div>
+              <p class="eyebrow">Report Detail</p>
+              <h3>{{ report.title }}</h3>
+              <p class="overview-muted">{{ report.reportType }} | Turn {{ report.createdTurn }}</p>
+            </div>
+
+            <div class="reports-view__detail-preview">
+              @if (previewPlanet) {
+                <app-mini-planet-preview
+                  [planet]="previewPlanet"
+                  [showDefaultActions]="false">
+                </app-mini-planet-preview>
+              } @else {
+                <button
+                  class="reports-view__compact-button"
+                  type="button"
+                  [disabled]="!canPreviewLocation(report) || previewLoading"
+                  (click)="previewLocation(report)">
+                  {{ previewLoading ? 'Loading preview...' : 'Preview location' }}
+                </button>
+              }
+
+              @if (previewError) {
+                <p class="reports-view__preview-error">{{ previewError }}</p>
+              }
+            </div>
+          </div>
+
+          <div class="overview-stats reports-view__stats-grid">
+            <div class="overview-stat">
+              <span class="overview-stat__label">Status</span>
+              <span class="overview-stat__value">{{ report.isRead ? 'Read' : 'Unread' }}</span>
+            </div>
+            <div class="overview-stat">
+              <span class="overview-stat__label">Source</span>
+              <span class="overview-stat__value">{{ sourceLabel(report) }}</span>
+            </div>
+            <div class="overview-stat">
+              <span class="overview-stat__label">Coordinates</span>
+              <span class="overview-stat__value">{{ coordinatesLabel(report) }}</span>
+            </div>
+            <div class="overview-stat">
+              <span class="overview-stat__label">Sender</span>
+              <span class="overview-stat__value">{{ report.senderPlayerName ?? 'N/A' }}</span>
+            </div>
+          </div>
+
+          <section class="reports-view__detail-scroll">
+            @if (asEspionageReport(report); as espionageReport) {
+              <div class="reports-view__dossier">
+                <section class="reports-view__dossier-banner">
+                  <div>
+                    <p class="reports-view__dossier-kicker">Espionage Dossier</p>
+                    <h4 class="reports-view__dossier-title">{{ espionageReport.sourcePlanetName ?? report.title }}</h4>
+                    <p class="reports-view__dossier-copy">{{ dossierCopy(espionageReport) }}</p>
+                  </div>
+                  <div class="reports-view__dossier-badges">
+                    <span class="badge badge--jump">Scanner Intel</span>
+                    <span class="badge">Turn {{ espionageReport.createdTurn }}</span>
+                  </div>
+                </section>
+
+                <section class="reports-view__dossier-metrics">
+                  @for (metric of espionageSummaryMetrics(espionageReport); track metric.label) {
+                    <article class="reports-view__dossier-metric">
+                      <span class="reports-view__dossier-metric-label">{{ metric.label }}</span>
+                      <strong class="reports-view__dossier-metric-value">{{ metric.value }}</strong>
+                    </article>
+                  }
+                </section>
+
+                <section class="reports-view__dossier-section reports-view__dossier-section--resources">
+                  <div class="reports-view__dossier-section-head">
+                    <div>
+                      <p class="reports-view__dossier-section-kicker">Cargo Sweep</p>
+                      <h5 class="reports-view__dossier-section-title">Resources on Site</h5>
+                    </div>
+                  </div>
+
+                  <div class="reports-view__dossier-resources">
+                    @for (resource of espionageResourceRows(espionageReport); track resource.label) {
+                      <div class="reports-view__dossier-resource">
+                        <span class="reports-view__dossier-resource-label">{{ resource.label }}</span>
+                        <strong class="reports-view__dossier-resource-value">{{ resource.value }}</strong>
+                      </div>
+                    }
+                  </div>
+                </section>
+
+                <section class="reports-view__dossier-grid">
+                  <article class="reports-view__dossier-section">
+                    <div class="reports-view__dossier-section-head">
+                      <div>
+                        <p class="reports-view__dossier-section-kicker">Surface Scan</p>
+                        <h5 class="reports-view__dossier-section-title">Buildings</h5>
+                      </div>
+                    </div>
+
+                    @if (espionageBuildingRows(espionageReport).length > 0) {
+                      <div class="reports-view__dossier-list">
+                        @for (row of espionageBuildingRows(espionageReport); track trackDossierRow($index, row)) {
+                          <div class="reports-view__dossier-row">
+                            <span class="reports-view__dossier-row-label">{{ row.label }}</span>
+                            <span class="reports-view__dossier-row-value">{{ row.value }}</span>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <p class="reports-view__dossier-empty">No data.</p>
+                    }
+                  </article>
+
+                  <article class="reports-view__dossier-section">
+                    <div class="reports-view__dossier-section-head">
+                      <div>
+                        <p class="reports-view__dossier-section-kicker">Lab Trace</p>
+                        <h5 class="reports-view__dossier-section-title">Technologies</h5>
+                      </div>
+                    </div>
+
+                    @if (espionageTechnologyRows(espionageReport).length > 0) {
+                      <div class="reports-view__dossier-list">
+                        @for (row of espionageTechnologyRows(espionageReport); track trackDossierRow($index, row)) {
+                          <div class="reports-view__dossier-row">
+                            <span class="reports-view__dossier-row-label">{{ row.label }}</span>
+                            <span class="reports-view__dossier-row-value">{{ row.value }}</span>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <p class="reports-view__dossier-empty">No data.</p>
+                    }
+                  </article>
+
+                  <article class="reports-view__dossier-section">
+                    <div class="reports-view__dossier-section-head">
+                      <div>
+                        <p class="reports-view__dossier-section-kicker">Hangar Sweep</p>
+                        <h5 class="reports-view__dossier-section-title">Ships</h5>
+                      </div>
+                    </div>
+
+                    @if (espionageShipRows(espionageReport).length > 0) {
+                      <div class="reports-view__dossier-list">
+                        @for (row of espionageShipRows(espionageReport); track trackDossierRow($index, row)) {
+                          <div class="reports-view__dossier-row">
+                            <span class="reports-view__dossier-row-label">{{ row.label }}</span>
+                            <span class="reports-view__dossier-row-value">{{ row.value }}</span>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <p class="reports-view__dossier-empty">No data.</p>
+                    }
+                  </article>
+
+                  <article class="reports-view__dossier-section">
+                    <div class="reports-view__dossier-section-head">
+                      <div>
+                        <p class="reports-view__dossier-section-kicker">Perimeter Check</p>
+                        <h5 class="reports-view__dossier-section-title">Defences</h5>
+                      </div>
+                    </div>
+
+                    @if (espionageDefenceRows(espionageReport).length > 0) {
+                      <div class="reports-view__dossier-list">
+                        @for (row of espionageDefenceRows(espionageReport); track trackDossierRow($index, row)) {
+                          <div class="reports-view__dossier-row">
+                            <span class="reports-view__dossier-row-label">{{ row.label }}</span>
+                            <span class="reports-view__dossier-row-value">{{ row.value }}</span>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <p class="reports-view__dossier-empty">No data.</p>
+                    }
+                  </article>
+
+                  <article class="reports-view__dossier-section reports-view__dossier-section--wide">
+                    <div class="reports-view__dossier-section-head">
+                      <div>
+                        <p class="reports-view__dossier-section-kicker">Planet Profile</p>
+                        <h5 class="reports-view__dossier-section-title">Planetary Parameters</h5>
+                      </div>
+                    </div>
+
+                    <div class="reports-view__dossier-list reports-view__dossier-list--parameters">
+                      @for (row of espionageParameterRows(espionageReport); track trackDossierRow($index, row)) {
+                        <div class="reports-view__dossier-row">
+                          <span class="reports-view__dossier-row-label">{{ row.label }}</span>
+                          <span
+                            class="reports-view__dossier-row-value"
+                            [class.reports-view__dossier-row-value--positive]="row.tone === 'positive'"
+                            [class.reports-view__dossier-row-value--negative]="row.tone === 'negative'"
+                            [class.reports-view__dossier-row-value--neutral]="row.tone === 'neutral'">
+                            {{ row.value }}
+                          </span>
+                        </div>
+                      }
+                    </div>
+                  </article>
+                </section>
+              </div>
+            } @else {
+              <pre class="reports-view__detail-body">{{ report.show() }}</pre>
+            }
+          </section>
+        } @else {
+          <div class="reports-view__empty-detail">
+            <h3>Select a report</h3>
+            <p class="overview-muted">Choose an inbox entry to inspect its full content and preview its coordinates when planet data is available.</p>
+          </div>
+        }
+      </section>
+    </section>
+  }
+</section>
 
 

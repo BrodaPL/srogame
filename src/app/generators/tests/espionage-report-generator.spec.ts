@@ -19,7 +19,7 @@ describe('EspionageReportGenerator', () => {
     playerId: number,
     playerName: string,
     techLevels: Map<TechnologyType, number>
-  ): Player => new Player(playerId, playerName, [], techLevels, [], PlayerType.PLAYER);
+  ): Player => new Player(playerId, playerName, [], techLevels, [], PlayerType.PLAYER, []);
 
   const createPlanet = (system: SolarSystem, ships: ShipInstance[]): Planet => new Planet(
     new PlanetBasicInfo('Test', PlanetType.JUNGLE, 1, 1, system, '', 100),
@@ -84,7 +84,7 @@ describe('EspionageReportGenerator', () => {
     const report = generator.createEspionageReport(attacker, defender, planet, 16);
 
     console.log('report-level-high', {
-      reportDate: report.reportDate,
+      createdTurn: report.createdTurn,
       planetaryParameters: report.planetaryParameters,
       averageBuildingLevel: report.averageBuildingLevel,
       averageTotalResources: report.averageTotalResources,
@@ -125,7 +125,7 @@ describe('EspionageReportGenerator', () => {
     const report = generator.createEspionageReport(attacker, defender, planet, 1);
 
     console.log('report-level-low', {
-      reportDate: report.reportDate,
+      createdTurn: report.createdTurn,
       planetaryParameters: report.planetaryParameters,
       averageBuildingLevel: report.averageBuildingLevel,
       averageTotalResources: report.averageTotalResources,

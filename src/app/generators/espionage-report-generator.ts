@@ -14,7 +14,14 @@ import { ShipInstance } from '../models/fleets/ship-instance';
 
 export type EspionageReportOptions = {
   forcedReportLevel?: number;
-  reportDate?: number;
+  reportId?: number;
+  createdTurn?: number;
+  title?: string;
+  sourceCoordinates?: { x: number; y: number; z: number } | null;
+  sourcePlanetName?: string | null;
+  sourceSystemName?: string | null;
+  senderPlayerName?: string | null;
+  isRead?: boolean;
 };
 
 export class EspionageReportGenerator {
@@ -26,7 +33,15 @@ export class EspionageReportGenerator {
     options?: EspionageReportOptions
   ): EspionageReportData {
     const reportLevel = this.resolveReportLevel(player, planetOwner, planet, probeAmount, options);
-    const reportDate = this.resolveReportDate(options);
+    const createdTurn = this.resolveCreatedTurn(options);
+    const sourceCoordinates = options?.sourceCoordinates ?? {
+      x: planet.basicInfo.solarSystem.coordinates.x,
+      y: planet.basicInfo.solarSystem.coordinates.y,
+      z: Math.max(0, planet.basicInfo.order - 1)
+    };
+    const sourcePlanetName = options?.sourcePlanetName ?? planet.basicInfo.name;
+    const sourceSystemName = options?.sourceSystemName ?? planet.basicInfo.solarSystem.name;
+    const title = options?.title ?? `Espionage Report: ${sourcePlanetName} (${sourceCoordinates.x}:${sourceCoordinates.y}:${sourceCoordinates.z})`;
 
     const includeAverageBuildings = reportLevel >= 2;
     const includeTotalResources = reportLevel >= 3;
@@ -78,7 +93,16 @@ export class EspionageReportGenerator {
     const buildingProduction = includeQueues ? new BuildingQueue() : new BuildingQueue();
 
     return new EspionageReportData(
-      reportDate,
+      {
+        reportId: options?.reportId ?? 0,
+        createdTurn,
+        title,
+        isRead: options?.isRead ?? false,
+        sourceCoordinates,
+        sourcePlanetName,
+        sourceSystemName,
+        senderPlayerName: options?.senderPlayerName ?? planetOwner?.playerName ?? null
+      },
       planet.info.planetaryParameters,
       buildingsAverage,
       totalResources,
@@ -122,13 +146,13 @@ export class EspionageReportGenerator {
     return this.calculateReportLevel(player, planetOwner, planet, probeAmount);
   }
 
-  private resolveReportDate(options?: EspionageReportOptions): number {
-    const reportDate = options?.reportDate;
-    if (Number.isFinite(reportDate)) {
-      return Math.floor(reportDate as number);
+  private resolveCreatedTurn(options?: EspionageReportOptions): number {
+    const createdTurn = options?.createdTurn;
+    if (Number.isFinite(createdTurn)) {
+      return Math.floor(createdTurn as number);
     }
 
-    return Date.now(); // TODO replace with current turn number everywhere.
+    return 0;
   }
 
   private calculateReportLevel(
