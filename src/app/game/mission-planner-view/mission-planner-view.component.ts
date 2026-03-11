@@ -7,6 +7,7 @@ import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { ShipPurpose } from '../../models/enums/ship-purpose';
 import { ShipType } from '../../models/enums/ship-type';
+import { WeaponType } from '../../models/enums/weapon-type';
 import type {
   ClientCoordinates,
   ClientPlanetDto,
@@ -299,6 +300,10 @@ export class MissionPlannerViewComponent implements OnInit {
     return 0;
   }
 
+  protected repairSummaryLabel(): string {
+    return `${this.totalRepairPower()}|${this.totalRepairEquipmentCount()}x`;
+  }
+
   protected distancePreview(): number {
     if (!this.selectedOriginPlanet || !this.selectedTargetPlanet) {
       return 0;
@@ -326,6 +331,46 @@ export class MissionPlannerViewComponent implements OnInit {
     }
 
     return Math.max(0, weight * Math.max(1, distance));
+  }
+
+  protected totalRepairPower(): number {
+    let total = 0;
+    for (const entry of this.selectedShipEntries()) {
+      const blueprint = this.shipBlueprintsByType.get(entry.type);
+      if (!blueprint) {
+        continue;
+      }
+
+      for (const weapon of blueprint.weapons) {
+        if (weapon.type !== WeaponType.REPAIR_EQIPMENT) {
+          continue;
+        }
+
+        total += weapon.dmg * weapon.shots * entry.amount;
+      }
+    }
+
+    return total;
+  }
+
+  protected totalRepairEquipmentCount(): number {
+    let total = 0;
+    for (const entry of this.selectedShipEntries()) {
+      const blueprint = this.shipBlueprintsByType.get(entry.type);
+      if (!blueprint) {
+        continue;
+      }
+
+      for (const weapon of blueprint.weapons) {
+        if (weapon.type !== WeaponType.REPAIR_EQIPMENT) {
+          continue;
+        }
+
+        total += weapon.shots * entry.amount;
+      }
+    }
+
+    return total;
   }
 
   protected onMissionTypeChange(): void {

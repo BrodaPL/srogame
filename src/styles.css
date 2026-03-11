@@ -2255,6 +2255,10 @@ app-root {
   font-size: 0.95rem;
 }
 
+.mission-planner__summary-stat--compact .overview-stat__value {
+  font-size: 0.78rem;
+}
+
 .mission-planner__disabled-row {
   display: flex;
   flex-wrap: wrap;
