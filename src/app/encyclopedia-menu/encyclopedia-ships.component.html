@@ -24,6 +24,9 @@
         <header class="ship-card__header">
           <div>
             <h2 class="ship-card__title">{{ ship.getName() }}</h2>
+            <div class="ship-card__tags">
+              <span class="weapon-chip" *ngFor="let purpose of purposeLabels(ship)">{{ purpose }}</span>
+            </div>
           </div>
           <span class="badge" [class.badge--jump]="ship.canJump">
             {{ ship.hullClass }}

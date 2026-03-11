@@ -1,0 +1,306 @@
+<app-top-menu></app-top-menu>
+
+<section class="mission-planner">
+  @if (isLoading) {
+    <section class="status status--info">
+      <h3>Loading Mission Planner</h3>
+      <p>Owned planets are being loaded.</p>
+    </section>
+  } @else if (loadError) {
+    <section class="status status--error">
+      <h3>Mission Planner unavailable</h3>
+      <p>{{ loadError }}</p>
+    </section>
+  } @else {
+    <div class="mission-planner__layout">
+      <div class="mission-planner__main">
+        <section class="mission-planner__section overview-card">
+          <h3>Mission type</h3>
+          <div class="mission-planner__mission-list">
+            @for (option of missionOptions; track option.type) {
+              <button
+                type="button"
+                class="mission-planner__mission-option"
+                [class.mission-planner__mission-option--active]="selectedMissionType === option.type"
+                (click)="selectMissionType(option.type)"
+              >
+                <span class="mission-planner__mission-label">{{ option.label }}</span>
+                <span class="mission-planner__mission-description">{{ option.description }}</span>
+              </button>
+            }
+          </div>
+        </section>
+
+        <section class="mission-planner__section mission-planner__selectors">
+          <article class="overview-card">
+            <h3>Target</h3>
+            <p class="overview-muted mission-planner__microcopy">Paste coordinates like <code>32:22:7</code> or use the planet rail.</p>
+            <div class="mission-planner__coordinate-row">
+              <input
+                class="mission-planner__coordinate-input"
+                type="text"
+                [(ngModel)]="targetCoordinatesInput"
+                placeholder="x:y:z"
+              />
+              <button class="mission-planner__small-button" type="button" (click)="applyTargetCoordinatesInput()">
+                Resolve
+              </button>
+            </div>
+            @if (targetLookupError) {
+              <p class="form-error">{{ targetLookupError }}</p>
+            }
+            @if (selectedTargetPlanet) {
+              <app-mini-planet-preview
+                [planet]="selectedTargetPlanet"
+                [showDefaultActions]="false"
+              ></app-mini-planet-preview>
+            } @else {
+              <p class="overview-empty">No target planet resolved yet.</p>
+            }
+          </article>
+
+          <article class="overview-card">
+            <h3>Origin</h3>
+            <p class="overview-muted mission-planner__microcopy">Must be one of your planets. Planets with ships are preferred.</p>
+            <div class="mission-planner__coordinate-row">
+              <input
+                class="mission-planner__coordinate-input"
+                type="text"
+                [(ngModel)]="originCoordinatesInput"
+                placeholder="x:y:z"
+              />
+              <button class="mission-planner__small-button" type="button" (click)="applyOriginCoordinatesInput()">
+                Use
+              </button>
+            </div>
+            @if (selectedOriginPlanet) {
+              <app-mini-planet-preview
+                [planet]="selectedOriginPlanet"
+                [showDefaultActions]="false"
+              ></app-mini-planet-preview>
+            } @else {
+              <p class="overview-empty">No origin planet selected.</p>
+            }
+          </article>
+        </section>
+
+        <section class="mission-planner__section mission-planner__details">
+          <article class="overview-card mission-planner__summary-card">
+            <h3>Travel Summary</h3>
+            <div class="overview-stats mission-planner__summary-stats">
+              <div class="overview-stat">
+                <span class="overview-stat__label">Distance</span>
+                <span class="overview-stat__value">{{ distancePreview() }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">ETA</span>
+                <span class="overview-stat__value">{{ travelTurnsPreview() }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">Return ETA</span>
+                <span class="overview-stat__value">{{ travelTurnsPreview() }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">Fuel cost</span>
+                <span class="overview-stat__value">{{ fuelCostPreview() }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">Cargo used</span>
+                <span class="overview-stat__value">{{ usedCargoCapacity() }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">Cargo free</span>
+                <span class="overview-stat__value">{{ remainingCargoCapacity() }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">Hangar used</span>
+                <span class="overview-stat__value">{{ usedHangarCapacity() }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">Hangar total</span>
+                <span class="overview-stat__value">{{ totalHangarCapacity() }}</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="overview-card mission-planner__details-card">
+            <h3>Mission Details</h3>
+            @if (selectedMissionType === 'Spy') {
+              <p class="overview-muted mission-planner__compact-copy">Spy uses only Spy Probes. Cargo is disabled for this mission.</p>
+            } @else {
+              <div class="mission-planner__cargo-grid">
+                <label class="mission-planner__cargo-field">
+                  <span>Metal</span>
+                  <input type="number" min="0" [(ngModel)]="cargoMetal" />
+                </label>
+                <label class="mission-planner__cargo-field">
+                  <span>Crystal</span>
+                  <input type="number" min="0" [(ngModel)]="cargoCrystal" />
+                </label>
+                <label class="mission-planner__cargo-field">
+                  <span>Deuterium</span>
+                  <input type="number" min="0" [(ngModel)]="cargoDeuterium" />
+                </label>
+              </div>
+            }
+
+            <div class="mission-planner__disabled-row">
+              <button class="mission-planner__small-button" type="button" [disabled]="!speedSelectorEnabled">
+                Speed selector (later)
+              </button>
+              <button class="mission-planner__small-button" type="button" [disabled]="!fleetTemplatesEnabled">
+                Save as fleet template (later)
+              </button>
+            </div>
+          </article>
+        </section>
+
+        <section class="mission-planner__section mission-planner__details">
+          <article class="overview-card">
+            <h3>Launch Summary</h3>
+            <p class="overview-muted">
+              Mission: {{ selectedMissionType }} |
+              Ships: {{ totalSelectedShips() }} |
+              Cargo: {{ usedCargoCapacity() }} |
+              Fuel: {{ fuelCostPreview() }}
+            </p>
+            @if (selectedOriginPlanet && selectedTargetPlanet) {
+              <p class="overview-muted">
+                From {{ selectedOriginPlanet.basicInfo.name }} ({{ originCoordinatesInput }})
+                to {{ selectedTargetPlanet.basicInfo.name }} ({{ targetCoordinatesInput }})
+              </p>
+            }
+            @if (launchError) {
+              <p class="form-error">{{ launchError }}</p>
+            }
+            <button
+              class="start-button"
+              type="button"
+              [disabled]="!canLaunch()"
+              (click)="launchMission()"
+            >
+              {{ isLaunching ? 'Launching...' : 'Launch mission' }}
+            </button>
+          </article>
+
+          <article class="overview-card">
+            <h3>Requirements and Warnings</h3>
+            <div class="mission-planner__warnings">
+              @for (warning of warningRows(); track warning.text) {
+                <p
+                  class="mission-planner__warning"
+                  [class.mission-planner__warning--error]="warning.severity === 'error'"
+                  [class.mission-planner__warning--note]="warning.severity === 'note'"
+                >
+                  {{ warning.text }}
+                </p>
+              }
+            </div>
+          </article>
+        </section>
+
+        <section class="mission-planner__section overview-card">
+          <div class="mission-planner__section-head">
+            <div>
+              <h3>Fleet Composition</h3>
+              <p class="overview-muted">Mission type highlights the ships that are useful or required.</p>
+              <div class="mission-planner__purpose-filters">
+                @for (filter of purposeFilterEntries(); track filter.purpose) {
+                  <label class="mission-planner__purpose-filter">
+                    <input
+                      type="checkbox"
+                      [ngModel]="filter.checked"
+                      (ngModelChange)="togglePurposeFilter(filter.purpose, $event)"
+                    />
+                    <span>{{ filter.purpose }}</span>
+                  </label>
+                }
+              </div>
+            </div>
+            <button class="mission-planner__small-button" type="button" (click)="clearAllShips()">Clear all</button>
+          </div>
+
+          <div class="mission-planner__ships">
+            @for (row of selectedShipRows(); track row.type) {
+              <article
+                class="mission-planner__ship-row"
+                [class.mission-planner__ship-row--relevant]="row.isRelevant"
+                [class.mission-planner__ship-row--required]="row.isRequired"
+              >
+                <div class="mission-planner__ship-main">
+                  <h4 class="mission-planner__ship-title">{{ row.label }}</h4>
+                  <p class="mission-planner__ship-meta">
+                    Available: {{ row.available }} | Cargo: {{ row.cargoCapacity }} | Hangar: {{ row.hangarCapacity }}
+                  </p>
+                  <div class="mission-planner__ship-tags">
+                    @for (purpose of row.purposes; track purpose) {
+                      <span class="mission-planner__ship-tag">{{ purpose }}</span>
+                    }
+                  </div>
+                </div>
+                <div class="mission-planner__ship-actions">
+                  <button class="mission-planner__small-button" type="button" (click)="fillMax(row.type)" [disabled]="row.available <= 0">
+                    Max
+                  </button>
+                  <button class="mission-planner__small-button" type="button" (click)="clearShip(row.type)" [disabled]="row.selected <= 0">
+                    Clear
+                  </button>
+                  <input
+                    class="mission-planner__amount-input"
+                    type="number"
+                    min="0"
+                    [max]="row.available"
+                    [ngModel]="row.selected"
+                    (ngModelChange)="setShipAmount(row.type, $event)"
+                  />
+                </div>
+              </article>
+            }
+            @if (selectedShipRows().length === 0) {
+              <p class="overview-empty">No ships match the current purpose filters.</p>
+            }
+          </div>
+        </section>
+      </div>
+
+      <aside class="mission-planner__rail">
+        <section class="overview-card">
+          <h3>Owned Planets</h3>
+          <p class="overview-muted mission-planner__microcopy">Full empire list on the far right for fast origin/target selection.</p>
+          <div class="mission-planner__rail-list">
+            @for (planet of ownedPlanets; track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z) {
+              <app-mini-planet-preview
+                [planet]="planet"
+                [showDefaultActions]="false"
+                [showSelectionActions]="true"
+                [isSelected]="selectedOriginMatches(planet) || selectedTargetMatches(planet)"
+                (chooseAsOrigin)="selectOriginPlanet($event)"
+                (chooseAsTarget)="chooseTargetPlanet($event)"
+              ></app-mini-planet-preview>
+            }
+          </div>
+        </section>
+
+        <section class="overview-card">
+          <h3>Planets with Ships</h3>
+          <p class="overview-muted mission-planner__microcopy">Only non-owned planets where your ships are currently present.</p>
+          <div class="mission-planner__rail-list">
+            @for (planet of foreignPlanetsWithPlayerShips(); track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z) {
+              <app-mini-planet-preview
+                [planet]="planet"
+                [showDefaultActions]="false"
+                [showSelectionActions]="true"
+                [isSelected]="selectedOriginMatches(planet)"
+                (chooseAsOrigin)="selectOriginPlanet($event)"
+                (chooseAsTarget)="chooseTargetPlanet($event)"
+              ></app-mini-planet-preview>
+            }
+            @if (foreignPlanetsWithPlayerShips().length === 0) {
+              <p class="overview-empty">No non-owned planets with your ships are available yet.</p>
+            }
+          </div>
+        </section>
+      </aside>
+    </div>
+  }
+</section>

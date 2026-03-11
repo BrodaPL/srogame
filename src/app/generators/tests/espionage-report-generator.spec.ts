@@ -11,6 +11,7 @@ import { BuildingType } from '../../models/enums/building-type';
 import { Ship } from '../../models/fleets/ship';
 import { ShipInstance } from '../../models/fleets/ship-instance';
 import { ShipType } from '../../models/enums/ship-type';
+import { ShipPurpose } from '../../models/enums/ship-purpose';
 import { HullClass } from '../../models/enums/hull-class';
 
 describe('EspionageReportGenerator', () => {
@@ -59,6 +60,7 @@ describe('EspionageReportGenerator', () => {
       [],
       0,
       0,
+      new Set<ShipPurpose>([ShipPurpose.MILITARY]),
       0,
       new ResourcesPack(0, 0, 0),
       [],

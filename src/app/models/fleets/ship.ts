@@ -1,5 +1,6 @@
 import { BuildingRequirement } from '../buildings/building-requirement';
 import { HullClass } from '../enums/hull-class';
+import { ShipPurpose } from '../enums/ship-purpose';
 import { ShipType } from '../enums/ship-type';
 import { ResourcesPack } from '../resources-pack';
 import { TechRequirement } from '../tech/tech-requirement';
@@ -19,6 +20,7 @@ export class Ship {
     public weapons: Weapon[],
     public cargoCapacity: number,
     public hangarCapacity: number,
+    public purposes: Set<ShipPurpose>,
     public jumpCost: number,
     public cost: ResourcesPack,
     public buildingRequirements: BuildingRequirement[],

@@ -13,6 +13,7 @@ import noteBorderColorModule from '../../src/app/models/enums/note-border-color.
 import buildingTypeEnumModule from '../../src/app/models/enums/building-type.js';
 import technologyTypeEnumModule from '../../src/app/models/enums/technology-type.js';
 import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
+import fleetMissionTypeEnumModule from '../../src/app/models/enums/fleet-mission-type.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
 import shipBlueprintsFactoryModule from '../../src/app/factories/ship-blueprints.factory.js';
 import technologyBlueprintsFactoryModule from '../../src/app/factories/technology-blueprints.factory.js';
@@ -52,7 +53,9 @@ import type {
   SetBuildingPowerConsumptionResponse,
   StartBuildingConstructionRequest,
   StartShipyardConstructionRequest,
-  StartTechnologyResearchRequest
+  StartTechnologyResearchRequest,
+  CreateFleetMissionRequest,
+  CreateFleetMissionResponse
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -69,10 +72,12 @@ import type { NoteBorderColor as NoteBorderColorType } from '../../src/app/model
 import type { BuildingType as BuildingTypeType } from '../../src/app/models/enums/building-type.ts';
 import type { TechnologyType as TechnologyTypeType } from '../../src/app/models/enums/technology-type.ts';
 import type { ShipType as ShipTypeType } from '../../src/app/models/enums/ship-type.ts';
+import type { FleetMissionType as FleetMissionTypeType } from '../../src/app/models/enums/fleet-mission-type.ts';
 import type { Building } from '../../src/app/models/buildings/building.ts';
 import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
+import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -97,6 +102,9 @@ const { TechnologyType } = technologyTypeEnumModule as {
 };
 const { ShipType } = shipTypeEnumModule as {
   ShipType: typeof import('../../src/app/models/enums/ship-type.js').ShipType;
+};
+const { FleetMissionType } = fleetMissionTypeEnumModule as {
+  FleetMissionType: typeof import('../../src/app/models/enums/fleet-mission-type.js').FleetMissionType;
 };
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
@@ -145,12 +153,19 @@ const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
 const TECHNOLOGY_BLUEPRINTS = TechnologyBlueprintsFactory.fromDefaultJson();
 const BUILDING_TYPE_VALUES = new Set<string>(Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys()));
 const SHIP_TYPE_VALUES = new Set<string>(Object.values(ShipType));
+const FLEET_MISSION_TYPE_VALUES = new Set<string>(Object.values(FleetMissionType));
 const TECHNOLOGY_TYPE_VALUES = new Set<string>(Array.from(TECHNOLOGY_BLUEPRINTS.techByType.keys()));
 const BUILDING_TYPE_ROBOTICS_FACTORY = BuildingType.ROBOTICS_FACTORY as BuildingTypeType;
 const BUILDING_TYPE_SHIPYARD = BuildingType.SHIPYARD as BuildingTypeType;
 const BUILDING_TYPE_RESEARCH_LAB = BuildingType.RESEARCH_LAB as BuildingTypeType;
 const TECH_TYPE_COMPUTER_TECHNOLOGY = TechnologyType.COMPUTER_TECHNOLOGY as TechnologyTypeType;
 const TECH_TYPE_INTERGALACTIC_RESEARCH_NETWORK = TechnologyType.INTERGALACTIC_RESEARCH_NETWORK as TechnologyTypeType;
+const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
+  FleetMissionType.MOVE as FleetMissionTypeType,
+  FleetMissionType.TRANSPORT as FleetMissionTypeType,
+  FleetMissionType.SPY as FleetMissionTypeType,
+  FleetMissionType.COLONIZE as FleetMissionTypeType
+]);
 
 let currentGalaxy: Galaxy | null = null;
 let currentGameOwnerId: number | null = null;
@@ -927,6 +942,188 @@ app.get('/api/game/owned-planets', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.get('/api/game/active-fleets', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const response = currentGalaxy.activeFleets.filter((fleet) => fleet.ownerId === playerId);
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/active-fleets', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as CreateFleetMissionRequest | undefined;
+  const missionType = normalizeFleetMissionType(body?.missionType);
+  const origin = parseMissionCoordinates(body?.origin);
+  const target = parseMissionCoordinates(body?.target);
+  const ships = parseFleetShipStacks(body?.ships);
+  const cargo = parseResourcesPackPayload(body?.cargo);
+
+  if (!missionType || !origin || !target || !ships || !cargo) {
+    return res.status(400).json({ error: 'Invalid fleet mission payload.' });
+  }
+
+  if (!PHASE_ONE_MISSION_TYPES.has(missionType)) {
+    return res.status(400).json({ error: 'Mission type is not available in phase 1.' });
+  }
+
+  const originSystem = currentGalaxy.stars[origin.y]?.[origin.x];
+  const targetSystem = currentGalaxy.stars[target.y]?.[target.x];
+  const originPlanet = originSystem?.planets[origin.z];
+  const targetPlanet = targetSystem?.planets[target.z];
+
+  if (!originSystem || !originPlanet) {
+    return res.status(404).json({ error: 'Origin planet not found.' });
+  }
+
+  if (!targetSystem || !targetPlanet) {
+    return res.status(404).json({ error: 'Target planet not found.' });
+  }
+
+  if (originPlanet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Origin planet must be owned by you.' });
+  }
+
+  if (ships.length === 0) {
+    return res.status(400).json({ error: 'Select at least one ship.' });
+  }
+
+  const availableShipsByType = countPlanetShipsByType(originPlanet);
+  for (const ship of ships) {
+    const availableAmount = availableShipsByType.get(ship.type) ?? 0;
+    if (availableAmount < ship.amount) {
+      return res.status(400).json({ error: `${ship.type}: not enough ships on origin planet.` });
+    }
+  }
+
+  const totalCargoCapacity = calculateFleetCargoCapacity(ships);
+  const usedCargoCapacity = cargo.metal + cargo.crystal + cargo.deuterium;
+  if (usedCargoCapacity > totalCargoCapacity) {
+    return res.status(400).json({ error: 'Insufficient cargo space.' });
+  }
+
+  const travelDistance = calculateTravelDistance(origin, target);
+  const travelTurns = Math.max(1, travelDistance);
+  const fuelCost = calculateFuelCost(ships, travelDistance);
+
+  if (missionType === FleetMissionType.SPY) {
+    const spyProbeAmount = ships.find((entry) => entry.type === ShipType.SPY_PROBE)?.amount ?? 0;
+    if (spyProbeAmount <= 0) {
+      return res.status(400).json({ error: 'No espionage probes selected.' });
+    }
+
+    if (ships.some((entry) => entry.type !== ShipType.SPY_PROBE)) {
+      return res.status(400).json({ error: 'Spy mission accepts only Spy Probes in phase 1.' });
+    }
+
+    if (targetPlanet.info.ownerId === playerId) {
+      return res.status(400).json({ error: 'Target is your own planet.' });
+    }
+
+    if (usedCargoCapacity > 0) {
+      return res.status(400).json({ error: 'Spy mission cannot carry cargo.' });
+    }
+  }
+
+  if (missionType === FleetMissionType.COLONIZE) {
+    const colonizerAmount = ships.find((entry) => entry.type === ShipType.COLONIZER)?.amount ?? 0;
+    if (colonizerAmount <= 0) {
+      return res.status(400).json({ error: 'No colony ship selected.' });
+    }
+
+    if (targetPlanet.info.ownerId !== null) {
+      return res.status(400).json({ error: 'Target planet is already occupied.' });
+    }
+  }
+
+  if (missionType === FleetMissionType.MOVE) {
+    if (targetPlanet.info.ownerId !== playerId) {
+      return res.status(400).json({ error: 'Move mission target must be one of your planets.' });
+    }
+  }
+
+  if (missionType === FleetMissionType.TRANSPORT && usedCargoCapacity <= 0) {
+    return res.status(400).json({ error: 'Transport mission requires cargo.' });
+  }
+
+  const totalRequiredResources = {
+    metal: cargo.metal,
+    crystal: cargo.crystal,
+    deuterium: cargo.deuterium + fuelCost
+  } as ResourcesPack;
+  if (!originPlanet.rBDSFTQ.resources.isSufficient(totalRequiredResources)) {
+    return res.status(400).json({ error: 'Insufficient resources for cargo and fuel.' });
+  }
+
+  originPlanet.rBDSFTQ.resources.subtractResourcePack(totalRequiredResources);
+  removeShipsFromPlanet(originPlanet, ships);
+
+  const fleet = {
+    fleetId: currentGalaxy.nextFleetId,
+    ownerId: playerId,
+    missionType,
+    origin: { x: origin.x, y: origin.y, z: origin.z },
+    target: { x: target.x, y: target.y, z: target.z },
+    originPlanetName: originPlanet.basicInfo.name,
+    targetPlanetName: targetPlanet.basicInfo.name,
+    ships,
+    cargo: {
+      metal: cargo.metal,
+      crystal: cargo.crystal,
+      deuterium: cargo.deuterium
+    },
+    fuelCost,
+    totalCargoCapacity,
+    usedCargoCapacity,
+    travelTurns,
+    returnTurns: travelTurns,
+    status: 'Outbound',
+    createdAtTurn: INITIAL_TURN_NUMBER
+  } as Fleet;
+
+  currentGalaxy.nextFleetId += 1;
+  currentGalaxy.activeFleets.push(fleet);
+
+  const presentation = getPresentationData(currentGalaxy, playerId);
+  const response: CreateFleetMissionResponse = {
+    ownedPlanets: presentation.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet)),
+    activeFleets: currentGalaxy.activeFleets.filter((entry) => entry.ownerId === playerId)
+  };
+  return res.status(201).json(response);
+});
+
 app.get('/api/health', (_req, res) => {
   return res.status(200).json({ status: 'ok' });
 });
@@ -1326,6 +1523,14 @@ function normalizeShipType(value: unknown): ShipTypeType | null {
   return SHIP_TYPE_VALUES.has(value) ? (value as ShipTypeType) : null;
 }
 
+function normalizeFleetMissionType(value: unknown): FleetMissionTypeType | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return FLEET_MISSION_TYPE_VALUES.has(value) ? (value as FleetMissionTypeType) : null;
+}
+
 function normalizeTechnologyType(value: unknown): TechnologyTypeType | null {
   if (typeof value !== 'string') {
     return null;
@@ -1361,6 +1566,135 @@ function parseResearchHelperCoordinates(value: unknown): ClientCoordinates[] | n
   }
 
   return parsed;
+}
+
+function parseMissionCoordinates(value: unknown): ClientCoordinates | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as { x?: unknown; y?: unknown; z?: unknown };
+  const x = parseBodyNonNegativeInt(candidate.x);
+  const y = parseBodyNonNegativeInt(candidate.y);
+  const z = parseBodyNonNegativeInt(candidate.z);
+  if (x === null || y === null || z === null) {
+    return null;
+  }
+
+  return { x, y, z };
+}
+
+function parseResourcesPackPayload(value: unknown): ResourcesPack | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as { metal?: unknown; crystal?: unknown; deuterium?: unknown };
+  const metal = parseBodyNonNegativeInt(candidate.metal);
+  const crystal = parseBodyNonNegativeInt(candidate.crystal);
+  const deuterium = parseBodyNonNegativeInt(candidate.deuterium);
+  if (metal === null || crystal === null || deuterium === null) {
+    return null;
+  }
+
+  return {
+    metal,
+    crystal,
+    deuterium
+  } as ResourcesPack;
+}
+
+function parseFleetShipStacks(value: unknown): Array<{ type: ShipTypeType; amount: number }> | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const combined = new Map<ShipTypeType, number>();
+  for (const item of value) {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const candidate = item as { type?: unknown; amount?: unknown };
+    const shipType = normalizeShipType(candidate.type);
+    const amount = parseBodyIntInRange(candidate.amount, 1, 100000);
+    if (!shipType || amount === null) {
+      return null;
+    }
+
+    combined.set(shipType, (combined.get(shipType) ?? 0) + amount);
+  }
+
+  return Array.from(combined.entries()).map(([type, amount]) => ({ type, amount }));
+}
+
+function countPlanetShipsByType(planet: Planet): Map<ShipTypeType, number> {
+  const counts = new Map<ShipTypeType, number>();
+  for (const ship of planet.rBDSFTQ.ships) {
+    const shipType = ship.type.type;
+    counts.set(shipType, (counts.get(shipType) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function calculateFleetCargoCapacity(ships: Array<{ type: ShipTypeType; amount: number }>): number {
+  let capacity = 0;
+  for (const ship of ships) {
+    const blueprint = SHIP_BLUEPRINTS.shipsMap.get(ship.type);
+    if (!blueprint) {
+      continue;
+    }
+
+    capacity += blueprint.cargoCapacity * ship.amount;
+  }
+
+  return capacity;
+}
+
+function calculateTravelDistance(origin: ClientCoordinates, target: ClientCoordinates): number {
+  return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
+}
+
+function calculateFuelCost(
+  ships: Array<{ type: ShipTypeType; amount: number }>,
+  distance: number
+): number {
+  let totalWeight = 0;
+  for (const ship of ships) {
+    const blueprint = SHIP_BLUEPRINTS.shipsMap.get(ship.type);
+    if (!blueprint) {
+      continue;
+    }
+
+    totalWeight += Math.max(1, blueprint.size) * ship.amount;
+  }
+
+  return Math.max(0, totalWeight * Math.max(1, distance));
+}
+
+function removeShipsFromPlanet(
+  planet: Planet,
+  requestedShips: Array<{ type: ShipTypeType; amount: number }>
+): void {
+  const remainingByType = new Map<ShipTypeType, number>();
+  for (const ship of requestedShips) {
+    remainingByType.set(ship.type, ship.amount);
+  }
+
+  const remainingInstances = [];
+  for (const shipInstance of planet.rBDSFTQ.ships) {
+    const shipType = shipInstance.type.type;
+    const remainingToExtract = remainingByType.get(shipType) ?? 0;
+    if (remainingToExtract > 0) {
+      remainingByType.set(shipType, remainingToExtract - 1);
+      continue;
+    }
+
+    remainingInstances.push(shipInstance);
+  }
+
+  planet.rBDSFTQ.ships = remainingInstances;
 }
 
 function sameCoordinates(left: ClientCoordinates, right: ClientCoordinates): boolean {

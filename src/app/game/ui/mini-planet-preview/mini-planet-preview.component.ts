@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output } from '@angular/core';
 import { Router } from '@angular/router';
 import type { ClientPlanetDto, ClientReportDataDto } from '../../../models/game-api-types';
 import { PlayerType } from '../../../models/enums/player-type';
@@ -14,6 +14,11 @@ type MiniPlanetTagVm = {
 })
 export class MiniPlanetPreviewComponent implements OnChanges {
   @Input() planet: ClientPlanetDto | null = null;
+  @Input() showDefaultActions = true;
+  @Input() showSelectionActions = false;
+  @Input() isSelected = false;
+  @Output() chooseAsOrigin = new EventEmitter<ClientPlanetDto>();
+  @Output() chooseAsTarget = new EventEmitter<ClientPlanetDto>();
 
   protected tags: MiniPlanetTagVm[] = [];
 
@@ -113,6 +118,22 @@ export class MiniPlanetPreviewComponent implements OnChanges {
         }
       }
     );
+  }
+
+  protected emitChooseAsOrigin(): void {
+    if (!this.planet) {
+      return;
+    }
+
+    this.chooseAsOrigin.emit(this.planet);
+  }
+
+  protected emitChooseAsTarget(): void {
+    if (!this.planet) {
+      return;
+    }
+
+    this.chooseAsTarget.emit(this.planet);
   }
 
   private buildTags(): MiniPlanetTagVm[] {

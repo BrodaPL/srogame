@@ -15,7 +15,7 @@ import { PlanetViewComponent } from './game/planet-view/planet-view.component';
 import { ProductionViewComponent } from './game/production-view/production-view.component';
 import { ReportsViewComponent } from './game/reports-view/reports-view.component';
 import { ResearchesViewComponent } from './game/researches-view/researches-view.component';
-import { SendFleetViewComponent } from './game/send-fleet-view/send-fleet-view.component';
+import { MissionPlannerViewComponent } from './game/mission-planner-view/mission-planner-view.component';
 import { StarSystemViewComponent } from './game/star-system-view/star-system-view.component';
 import { HelpAboutComponent } from './help-about/help-about.component';
 import { LoadGameComponent } from './load-game/load-game.component';
@@ -50,7 +50,7 @@ export const routes: Routes = [
       { path: 'buildings', component: BuildingsViewComponent },
       { path: 'defence', component: DefenceViewComponent },
       { path: 'operations', component: OperationsViewComponent },
-      { path: 'send-fleet', component: SendFleetViewComponent }
+      { path: 'mission-planner', component: MissionPlannerViewComponent }
     ]
   },
   { path: '**', redirectTo: '' }

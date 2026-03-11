@@ -5,6 +5,7 @@
   [class.mini-planet-preview--neutral]="isNeutralOwnedPlanet()"
   [class.mini-planet-preview--human]="isHumanOwnedPlanet()"
   [class.mini-planet-preview--bot]="isBotOwnedPlanet()"
+  [class.mini-planet-preview--selected]="isSelected"
 >
   <h4 class="mini-planet-preview__name">{{ planetNameLabel() }}</h4>
 
@@ -23,31 +24,58 @@
     }
   </div>
 
-  <div class="mini-planet-preview__actions">
-    <button
-      type="button"
-      class="mini-planet-preview__button"
-      [disabled]="!canViewPlanet()"
-      [attr.title]="canViewPlanet() ? 'Open owned planet view' : 'Only your planets can be opened'"
-      (click)="openPlanetView()"
-    >
-      View Planet
-    </button>
-    <button
-      type="button"
-      class="mini-planet-preview__button"
-      disabled
-      title="Coming in future session"
-    >
-      Spy Planet
-    </button>
-    <button
-      type="button"
-      class="mini-planet-preview__button"
-      [attr.title]="'Copy: ' + coordinatesLabel()"
-      (click)="copyCoordinates()"
-    >
-      Copy coordinates
-    </button>
-  </div>
+  @if (showSelectionActions) {
+    <div class="mini-planet-preview__actions">
+      <button
+        type="button"
+        class="mini-planet-preview__button"
+        (click)="emitChooseAsOrigin()"
+      >
+        Set origin
+      </button>
+      <button
+        type="button"
+        class="mini-planet-preview__button"
+        (click)="emitChooseAsTarget()"
+      >
+        Set target
+      </button>
+      <button
+        type="button"
+        class="mini-planet-preview__button"
+        [attr.title]="'Copy: ' + coordinatesLabel()"
+        (click)="copyCoordinates()"
+      >
+        Copy coordinates
+      </button>
+    </div>
+  } @else if (showDefaultActions) {
+    <div class="mini-planet-preview__actions">
+      <button
+        type="button"
+        class="mini-planet-preview__button"
+        [disabled]="!canViewPlanet()"
+        [attr.title]="canViewPlanet() ? 'Open owned planet view' : 'Only your planets can be opened'"
+        (click)="openPlanetView()"
+      >
+        View Planet
+      </button>
+      <button
+        type="button"
+        class="mini-planet-preview__button"
+        disabled
+        title="Coming in future session"
+      >
+        Spy Planet
+      </button>
+      <button
+        type="button"
+        class="mini-planet-preview__button"
+        [attr.title]="'Copy: ' + coordinatesLabel()"
+        (click)="copyCoordinates()"
+      >
+        Copy coordinates
+      </button>
+    </div>
+  }
 </article>

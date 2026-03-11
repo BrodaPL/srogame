@@ -12,6 +12,7 @@ import type { BuildingQueue } from './reports/building-queue';
 import type { Fleet } from './fleets/fleet';
 import type { NoteBorderColor } from './enums/note-border-color';
 import type { PlayerType } from './enums/player-type';
+import type { FleetMissionType } from './enums/fleet-mission-type';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -219,6 +220,19 @@ export type StartTechnologyResearchRequest = {
   z: number;
   technologyType: TechnologyType;
   helperPlanets: ClientCoordinates[];
+};
+
+export type CreateFleetMissionRequest = {
+  missionType: FleetMissionType;
+  origin: ClientCoordinates;
+  target: ClientCoordinates;
+  ships: ShipAmountEntry[];
+  cargo: ResourcesPackDto;
+};
+
+export type CreateFleetMissionResponse = {
+  ownedPlanets: ClientPlanetDto[];
+  activeFleets: Fleet[];
 };
 
 export type SetBuildingPowerConsumptionRequest = {

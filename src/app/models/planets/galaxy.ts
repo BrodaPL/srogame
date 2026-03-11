@@ -8,6 +8,7 @@ import { ResourcesPack } from '../resources-pack';
 import { ClientGalaxy } from './client-galaxy';
 import { ClientPlanet } from './client-planet';
 import { ClientInfo, ClientStarSystem } from './client-star-system';
+import { Fleet } from '../fleets/fleet';
 
 export class Galaxy {
   public static buildSolarSystemNamePool(shuffle = true): string[] {
@@ -35,6 +36,8 @@ export class Galaxy {
     public name: string,
     public players: Player[],
     public stars: SolarSystem[][],
+    public activeFleets: Fleet[] = [],
+    public nextFleetId = 1,
     public humanPlayerMap: Map<number, Player> = new Map(),
     public botPlayerMap: Map<number, Player> = new Map(),
     public neutralPlayerMap: Map<number, Player> = new Map(),

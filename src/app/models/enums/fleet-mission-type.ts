@@ -1,5 +1,5 @@
-export enum FleetMissionType {
-  ATACK = 'Atack',
+export enum MissionType {
+  ATTACK = 'Attack',
   PLUNDER = 'Plunder',
   INVADE = 'Invade',
   MOVE = 'Move',
@@ -10,5 +10,8 @@ export enum FleetMissionType {
   COLONIZE = 'Colonize',
   SPY = 'Spy',
   STAR_SYSTEM_SPY = 'Star System Spy',
-  RECYCLE = 'Recycle'
+  RECYCLE = 'Recycle',
+  REPAIR = 'Repair'
 }
+
+export { MissionType as FleetMissionType };

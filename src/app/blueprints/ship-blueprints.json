@@ -15,6 +15,7 @@
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
       "jumpCost": 0,
       "cost": { "metal": 20, "crystal": 10, "deuterium": 0 },
       "buildingRequirements": [
@@ -40,6 +41,7 @@
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
       "jumpCost": 0,
       "cost": { "metal": 30, "crystal": 20, "deuterium": 10 },
       "buildingRequirements": [
@@ -66,6 +68,7 @@
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
       "jumpCost": 0,
       "cost": { "metal": 80, "crystal": 40, "deuterium": 10 },
       "buildingRequirements": [
@@ -92,6 +95,7 @@
       "weapons": [],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
+      "purposes": ["UTILITY"],
       "jumpCost": 0,
       "cost": { "metal": 0, "crystal": 20, "deuterium": 10 },
       "buildingRequirements": [
@@ -119,6 +123,7 @@
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
+      "purposes": ["UTILITY"],
       "jumpCost": 0,
       "cost": { "metal": 40, "crystal": 25, "deuterium": 5 },
       "buildingRequirements": [
@@ -142,6 +147,7 @@
       ],
       "cargoCapacity": 50,
       "hangarCapacity": 1,
+      "purposes": ["MILITARY"],
       "jumpCost": 1,
       "cost": { "metal": 120, "crystal": 60, "deuterium": 20 },
       "buildingRequirements": [
@@ -173,6 +179,7 @@
       ],
       "cargoCapacity": 120,
       "hangarCapacity": 4,
+      "purposes": ["MILITARY", "CARRIER"],
       "jumpCost": 2,
       "cost": { "metal": 250, "crystal": 100, "deuterium": 20 },
       "buildingRequirements": [
@@ -204,6 +211,7 @@
       ],
       "cargoCapacity": 50,
       "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
       "jumpCost": 1,
       "cost": { "metal": 300, "crystal": 80, "deuterium": 20 },
       "buildingRequirements": [
@@ -234,6 +242,7 @@
       ],
       "cargoCapacity": 600,
       "hangarCapacity": 0,
+      "purposes": ["CARGO"],
       "jumpCost": 1,
       "cost": { "metal": 150, "crystal": 30, "deuterium": 10 },
       "buildingRequirements": [
@@ -263,7 +272,8 @@
         { "type": "RAIL_GUN", "dmg": 10, "shots": 1 }
       ],
       "cargoCapacity": 200,
-      "hangarCapacity": 2,
+      "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
       "jumpCost": 2,
       "cost": { "metal": 550, "crystal": 250, "deuterium": 50 },
       "buildingRequirements": [
@@ -296,6 +306,7 @@
       ],
       "cargoCapacity": 200,
       "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
       "jumpCost": 2,
       "cost": { "metal": 450, "crystal": 250, "deuterium": 50 },
       "buildingRequirements": [
@@ -327,6 +338,7 @@
       ],
       "cargoCapacity": 200,
       "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
       "jumpCost": 2,
       "cost": { "metal": 250, "crystal": 300, "deuterium": 80 },
       "buildingRequirements": [
@@ -356,8 +368,9 @@
         { "type": "BEAM", "dmg": 10, "shots": 2 },
         { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 3 }
       ],
-      "cargoCapacity": 600,
+      "cargoCapacity": 400,
       "hangarCapacity": 15,
+      "purposes": ["MILITARY", "CARGO", "CARRIER"],
       "jumpCost": 3,
       "cost": { "metal": 300, "crystal": 150, "deuterium": 100 },
       "buildingRequirements": [
@@ -389,6 +402,7 @@
       ],
       "cargoCapacity": 1000,
       "hangarCapacity": 0,
+      "purposes": ["CARGO", "UTILITY"],
       "jumpCost": 2,
       "cost": { "metal": 300, "crystal": 100, "deuterium": 50 },
       "buildingRequirements": [
@@ -418,6 +432,7 @@
       ],
       "cargoCapacity": 2500,
       "hangarCapacity": 0,
+      "purposes": ["CARGO"],
       "jumpCost": 3,
       "cost": { "metal": 450, "crystal": 100, "deuterium": 30 },
       "buildingRequirements": [
@@ -446,8 +461,9 @@
         { "type": "BEAM", "dmg": 10, "shots": 1 },
         { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 2 }
       ],
-      "cargoCapacity": 1000,
+      "cargoCapacity": 500,
       "hangarCapacity": 6,
+      "purposes": ["UTILITY"],
       "jumpCost": 5,
       "cost": { "metal": 600, "crystal": 300, "deuterium": 100 },
       "buildingRequirements": [
@@ -484,6 +500,7 @@
       ],
       "cargoCapacity": 1000,
       "hangarCapacity": 12,
+      "purposes": ["MILITARY", "CARRIER"],
       "jumpCost": 9,
       "cost": { "metal": 1800, "crystal": 1200, "deuterium": 400 },
       "buildingRequirements": [
@@ -517,6 +534,7 @@
       ],
       "cargoCapacity": 1000,
       "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
       "jumpCost": 10,
       "cost": { "metal": 1400, "crystal": 1000, "deuterium": 800 },
       "buildingRequirements": [
@@ -548,8 +566,9 @@
         { "type": "MISSILE", "dmg": 30, "shots": 1 },
         { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 8 }
       ],
-      "cargoCapacity": 1200,
+      "cargoCapacity": 600,
       "hangarCapacity": 90,
+      "purposes": ["MILITARY", "UTILITY", "CARRIER"],
       "jumpCost": 8,
       "cost": { "metal": 1600, "crystal": 600, "deuterium": 400 },
       "buildingRequirements": [
@@ -585,8 +604,9 @@
         { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 20 },
         { "type": "REPAIR_EQIPMENT", "dmg": 400, "shots": 2 }
       ],
-      "cargoCapacity": 100000,
+      "cargoCapacity": 20000,
       "hangarCapacity": 100,
+      "purposes": ["MILITARY", "CARGO", "UTILITY", "CARRIER"],
       "jumpCost": 100,
       "cost": { "metal": 50000, "crystal": 50000, "deuterium": 20000 },
       "buildingRequirements": [

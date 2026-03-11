@@ -2,6 +2,7 @@ import shipBlueprintsData from '../blueprints/ship-blueprints.json';
 import { BuildingRequirement } from '../models/buildings/building-requirement';
 import { BuildingType } from '../models/enums/building-type';
 import { HullClass } from '../models/enums/hull-class';
+import { ShipPurpose } from '../models/enums/ship-purpose';
 import { ShipType } from '../models/enums/ship-type';
 import { ResourcesPack } from '../models/resources-pack';
 import { Ship } from '../models/fleets/ship';
@@ -28,6 +29,7 @@ interface ShipBlueprintJson {
   weapons: WeaponJson[];
   cargoCapacity: number;
   hangarCapacity: number;
+  purposes?: string[];
   jumpCost: number;
   cost: ResourcesPackJson;
   buildingRequirements: BuildingRequirementJson[];
@@ -119,6 +121,7 @@ export class ShipBlueprintsFactory {
       )),
       entry.cargoCapacity,
       entry.hangarCapacity,
+      new Set((entry.purposes ?? []).map((purpose) => this.parseEnumKey(ShipPurpose, purpose, 'ShipPurpose'))),
       entry.jumpCost,
       new ResourcesPack(entry.cost.metal, entry.cost.crystal, entry.cost.deuterium),
       buildingRequirements.map((requirement) => new BuildingRequirement(

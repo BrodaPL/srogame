@@ -1,4 +1,77 @@
 <app-top-menu></app-top-menu>
-<section class="game-view game-view--operations-view"></section>
+
+<section class="operations-view">
+  @if (isLoading) {
+    <section class="status status--info">
+      <h3>Loading Operations</h3>
+      <p>Active fleets are being read from the central game state.</p>
+    </section>
+  } @else if (loadError) {
+    <section class="status status--error">
+      <h3>Operations unavailable</h3>
+      <p>{{ loadError }}</p>
+    </section>
+  } @else {
+    <header class="overview-card operations-view__header">
+      <div>
+        <p class="eyebrow">Fleet Control</p>
+        <h1 class="operations-view__title">Operations</h1>
+        <p class="overview-muted">Active fleets and launched missions. No turn progression yet, so missions remain outbound.</p>
+      </div>
+      <a class="overview-nav__button" routerLink="/game/mission-planner">Open Mission Planner</a>
+    </header>
+
+    @if (activeFleets.length === 0) {
+      <section class="overview-card">
+        <h3>No active fleets</h3>
+        <p class="overview-muted">Launch a mission in Mission Planner to populate this screen.</p>
+      </section>
+    } @else {
+      <div class="operations-view__grid">
+        @for (fleet of activeFleets; track fleet.fleetId) {
+          <article class="overview-card operations-view__card">
+            <div class="operations-view__card-head">
+              <div>
+                <h3>Fleet #{{ fleet.fleetId }}</h3>
+                <p class="overview-muted">{{ fleet.missionType }} | {{ fleet.status }}</p>
+              </div>
+              <span class="badge badge--jump">{{ totalShips(fleet) }} ships</span>
+            </div>
+
+            <div class="overview-stats">
+              <div class="overview-stat">
+                <span class="overview-stat__label">Origin</span>
+                <span class="overview-stat__value">{{ fleet.originPlanetName }}</span>
+                <span class="overview-muted">{{ coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z) }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">Target</span>
+                <span class="overview-stat__value">{{ fleet.targetPlanetName }}</span>
+                <span class="overview-muted">{{ coordinatesLabel(fleet.target.x, fleet.target.y, fleet.target.z) }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">ETA</span>
+                <span class="overview-stat__value">{{ fleet.travelTurns }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">Fuel</span>
+                <span class="overview-stat__value">{{ fleet.fuelCost }}</span>
+              </div>
+              <div class="overview-stat">
+                <span class="overview-stat__label">Cargo</span>
+                <span class="overview-stat__value">{{ fleet.usedCargoCapacity }} / {{ fleet.totalCargoCapacity }}</span>
+              </div>
+            </div>
+
+            <p class="operations-view__ships">{{ shipSummary(fleet) }}</p>
+            <p class="overview-muted">
+              Cargo manifest: M {{ fleet.cargo.metal }}, C {{ fleet.cargo.crystal }}, D {{ fleet.cargo.deuterium }}
+            </p>
+          </article>
+        }
+      </div>
+    }
+  }
+</section>
 
 

@@ -189,7 +189,8 @@ export class EncyclopediaMechanicsComponent {
       summary: 'Fleet dispatch with mission selection is planned as a dedicated operational system.',
       details: [
         'Players will send fleets with mission intent such as transport, attack, reconnaissance, or support.',
-        'Mission validation will include coordinates, ownership constraints, and ship capability checks.'
+        'Mission validation will include coordinates, ownership constraints, and ship capability checks.',
+        'Mission Planner warnings should evolve from raw validation messages into human-readable guidance with suggested fixes for the player.'
       ]
     },
     {

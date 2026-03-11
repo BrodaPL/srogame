@@ -14,7 +14,9 @@ import {
   SetBuildingPowerConsumptionResponse,
   StartBuildingConstructionRequest,
   StartShipyardConstructionRequest,
-  StartTechnologyResearchRequest
+  StartTechnologyResearchRequest,
+  CreateFleetMissionRequest,
+  CreateFleetMissionResponse
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -128,6 +130,21 @@ export class GameApiService {
   public startTechnologyResearch(request: StartTechnologyResearchRequest, token: string) {
     return this.http.post<ClientPlanetDto[]>(
       `${API_BASE_URL}/game/technology-queue`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getActiveFleets(token: string) {
+    return this.http.get<CreateFleetMissionResponse['activeFleets']>(
+      `${API_BASE_URL}/game/active-fleets`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public createFleetMission(request: CreateFleetMissionRequest, token: string) {
+    return this.http.post<CreateFleetMissionResponse>(
+      `${API_BASE_URL}/game/active-fleets`,
       request,
       { headers: this.authHeaders(token) }
     );
