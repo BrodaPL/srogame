@@ -196,12 +196,12 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Space Battles',
       category: 'Core Loop',
-      status: 'Planned',
-      summary: 'Combat resolution between fleets and planetary defenses is planned.',
+      status: 'Partial',
+      summary: 'Fleet-vs-fleet combat exists in the battle domain, but full game-loop integration is still in progress.',
       details: [
-        'Battle rounds, targeting, and damage distribution will be processed in turn resolution.',
-        'Results will feed debris generation, losses, and report output.',
-        'Technology modifiers for weapon damage, shielding, and critical-threshold behavior are planned after the base combat loop is stabilized.'
+        'Current battle resolution supports 5 rounds, shuffled ship order, defender-first alternating fire, shield-to-hull damage flow, and post-round destruction checks.',
+        'Current technology modifiers support weapon damage bonuses, shield and hull capacity bonuses, armor scaling, critical-threshold reduction, and evasion chance scaling.',
+        'Planetary defenses, debris generation, repair handling, and full turn-resolution integration are still planned.'
       ]
     },
     {

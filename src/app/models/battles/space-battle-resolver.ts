@@ -1,4 +1,5 @@
 import { ShipType } from '../enums/ship-type';
+import { TechnologyType } from '../enums/technology-type';
 import { WeaponType } from '../enums/weapon-type';
 import { ShipInstance } from '../fleets/ship-instance';
 import { Player } from '../player';
@@ -39,6 +40,9 @@ export type BattleShotSummary = {
   shooterShipType: ShipType;
   targetShipType: ShipType;
   weaponType: WeaponType;
+  weaponDamage: number;
+  evaded: boolean;
+  targetEvasionChance: number;
   shieldBefore: number;
   shieldAfter: number;
   hullBefore: number;
@@ -105,6 +109,11 @@ export type SpaceBattleResult = {
 
 type BattleShipState = {
   ship: ShipInstance;
+  effectiveHullCapacity: number;
+  effectiveShieldCapacity: number;
+  effectiveArmor: number;
+  effectiveCriticalThreshold: number;
+  effectiveEvasionChance: number;
   queuedWeapons: BattleQueuedWeapon[];
   hullDamagedThisRound: boolean;
 };
@@ -118,7 +127,19 @@ type BattleSideState = {
   id: BattleSideId;
   label: string;
   player: Player;
+  techModifiers: BattleTechModifiers;
   ships: BattleShipState[];
+};
+
+type BattleTechModifiers = {
+  beamDamageMultiplier: number;
+  missileDamageMultiplier: number;
+  railGunDamageMultiplier: number;
+  shieldCapacityMultiplier: number;
+  hullCapacityMultiplier: number;
+  armorMultiplier: number;
+  criticalThresholdReduction: number;
+  evasionMultiplier: number;
 };
 
 const COMBAT_WEAPON_TYPES = new Set<WeaponType>([
@@ -200,26 +221,81 @@ export class SpaceBattleResolver {
   }
 
   private createSideState(id: BattleSideId, input: BattleSideInput): BattleSideState {
+    const techModifiers = this.resolveTechModifiers(input.player);
+
     return {
       id,
       label: input.label?.trim() || input.player.playerName,
       player: input.player,
-      ships: input.ships.map((ship) => ({
-        ship: this.cloneShipInstance(ship),
-        queuedWeapons: [],
-        hullDamagedThisRound: false
-      }))
+      techModifiers,
+      ships: input.ships.map((ship) => this.createBattleShipState(ship, techModifiers))
     };
   }
 
-  private cloneShipInstance(ship: ShipInstance): ShipInstance {
-    return new ShipInstance(
-      ship.type,
-      ship.hull,
-      ship.shield,
-      ship.cargo,
-      ship.hangar.map((nestedShip) => this.cloneShipInstance(nestedShip))
+  private createBattleShipState(
+    ship: ShipInstance,
+    techModifiers: BattleTechModifiers
+  ): BattleShipState {
+    const effectiveHullCapacity = ship.type.hullPointsCapacity * techModifiers.hullCapacityMultiplier;
+    const effectiveShieldCapacity = ship.type.shieldCapacity * techModifiers.shieldCapacityMultiplier;
+    const effectiveArmor = ship.type.armor * techModifiers.armorMultiplier;
+    const effectiveCriticalThreshold = Math.max(
+      0,
+      ship.type.criticalThreshold - techModifiers.criticalThresholdReduction
     );
+    const effectiveEvasionChance = Math.max(
+      0,
+      Math.min(1, ship.type.evasionChance * techModifiers.evasionMultiplier)
+    );
+
+    return {
+      ship: new ShipInstance(
+        ship.type,
+        this.scaleStatToEffectiveCapacity(ship.hull, ship.type.hullPointsCapacity, effectiveHullCapacity),
+        this.scaleStatToEffectiveCapacity(ship.shield, ship.type.shieldCapacity, effectiveShieldCapacity),
+        ship.cargo,
+        ship.hangar.map((nestedShip) => this.createBattleShipState(nestedShip, techModifiers).ship)
+      ),
+      effectiveHullCapacity,
+      effectiveShieldCapacity,
+      effectiveArmor,
+      effectiveCriticalThreshold,
+      effectiveEvasionChance,
+      queuedWeapons: [],
+      hullDamagedThisRound: false
+    };
+  }
+
+  private scaleStatToEffectiveCapacity(
+    currentValue: number,
+    baseCapacity: number,
+    effectiveCapacity: number
+  ): number {
+    if (!Number.isFinite(currentValue) || currentValue <= 0 || effectiveCapacity <= 0) {
+      return 0;
+    }
+
+    if (!Number.isFinite(baseCapacity) || baseCapacity <= 0) {
+      return Math.min(currentValue, effectiveCapacity);
+    }
+
+    const ratio = Math.max(0, Math.min(1, currentValue / baseCapacity));
+    return effectiveCapacity * ratio;
+  }
+
+  private resolveTechModifiers(player: Player): BattleTechModifiers {
+    return {
+      beamDamageMultiplier: 1 + (player.getTechLevel(TechnologyType.BEAMS_WEAPONS) * 10) / 100,
+      missileDamageMultiplier: 1 + (player.getTechLevel(TechnologyType.MISSILES_WEAPONS) * 10) / 100,
+      railGunDamageMultiplier: 1 + (player.getTechLevel(TechnologyType.RAILGUNS_WEAPONS) * 10) / 100,
+      shieldCapacityMultiplier: 1 + (player.getTechLevel(TechnologyType.SHIELDING_TECHNOLOGY) * 10) / 100,
+      hullCapacityMultiplier: 1 + (player.getTechLevel(TechnologyType.ARMOUR_TECHNOLOGY) * 10) / 100,
+      armorMultiplier: 1 + (player.getTechLevel(TechnologyType.MATERIAL_TECHNOLOGY) * 5) / 100,
+      criticalThresholdReduction: player.getTechLevel(TechnologyType.ARMOUR_TECHNOLOGY),
+      evasionMultiplier: 1
+        + (player.getTechLevel(TechnologyType.GRAVITON_TECHNOLOGY) * 5) / 100
+        + (player.getTechLevel(TechnologyType.FUSION_DRIVE) * 3) / 100
+    };
   }
 
   private normalizeMaxRounds(value: number | undefined): number {
@@ -227,10 +303,10 @@ export class SpaceBattleResolver {
       return SpaceBattleResolver.DEFAULT_MAX_ROUNDS;
     }
 
-    return Math.max(1, Math.min(
-      SpaceBattleResolver.DEFAULT_MAX_ROUNDS,
-      Math.floor(value as number)
-    ));
+    return Math.max(
+      1,
+      Math.min(SpaceBattleResolver.DEFAULT_MAX_ROUNDS, Math.floor(value as number))
+    );
   }
 
   private resolveRound(
@@ -287,7 +363,7 @@ export class SpaceBattleResolver {
 
     const targetIndex = this.randomIndex(aliveTargets.length, randomSource);
     const target = aliveTargets[targetIndex];
-    const shotSummary = this.applyWeaponDamage(side, shooter, target, weapon);
+    const shotSummary = this.applyWeaponDamage(side, shooter, target, weapon, randomSource);
     roundSummary.shots.push(shotSummary);
 
     if (side === 'attacker') {
@@ -303,26 +379,30 @@ export class SpaceBattleResolver {
     side: BattleSideId,
     shooter: BattleShipState,
     target: BattleShipState,
-    weapon: BattleQueuedWeapon
+    weapon: BattleQueuedWeapon,
+    randomSource: BattleRandomSource
   ): BattleShotSummary {
     const shieldBefore = target.ship.shield;
     const hullBefore = target.ship.hull;
+    const evaded = this.rollEvade(target.effectiveEvasionChance, randomSource);
     let shieldDamage = 0;
     let hullDamage = 0;
 
-    if (weapon.type === WeaponType.RAIL_GUN) {
-      hullDamage = Math.max(0, weapon.dmg);
-    } else {
-      shieldDamage = Math.min(Math.max(0, shieldBefore), Math.max(0, weapon.dmg));
-      const spilloverDamage = Math.max(0, weapon.dmg - shieldDamage) / 2;
-      const armourPenalty = target.ship.type.armor * (weapon.type === WeaponType.MISSILE ? 2 : 1);
-      hullDamage = Math.max(0, spilloverDamage - armourPenalty);
-      target.ship.shield = Math.max(0, shieldBefore - shieldDamage);
-    }
+    if (!evaded) {
+      if (weapon.type === WeaponType.RAIL_GUN) {
+        hullDamage = Math.max(0, weapon.dmg);
+      } else {
+        shieldDamage = Math.min(Math.max(0, shieldBefore), Math.max(0, weapon.dmg));
+        const spilloverDamage = Math.max(0, weapon.dmg - shieldDamage) / 2;
+        const armourPenalty = target.effectiveArmor * (weapon.type === WeaponType.MISSILE ? 2 : 1);
+        hullDamage = Math.max(0, spilloverDamage - armourPenalty);
+        target.ship.shield = Math.max(0, shieldBefore - shieldDamage);
+      }
 
-    target.ship.hull -= hullDamage;
-    if (hullDamage > 0) {
-      target.hullDamagedThisRound = true;
+      target.ship.hull -= hullDamage;
+      if (hullDamage > 0) {
+        target.hullDamagedThisRound = true;
+      }
     }
 
     if (weapon.type === WeaponType.RAIL_GUN) {
@@ -334,6 +414,9 @@ export class SpaceBattleResolver {
       shooterShipType: shooter.ship.type.type,
       targetShipType: target.ship.type.type,
       weaponType: weapon.type,
+      weaponDamage: weapon.dmg,
+      evaded,
+      targetEvasionChance: target.effectiveEvasionChance,
       shieldBefore,
       shieldAfter: target.ship.shield,
       hullBefore,
@@ -359,14 +442,14 @@ export class SpaceBattleResolver {
           shipType: shipState.ship.type.type,
           reason: 'zeroHull',
           hullBeforeCheck: shipState.ship.hull,
-          criticalHullThreshold: this.criticalHullThreshold(shipState.ship),
+          criticalHullThreshold: this.criticalHullThreshold(shipState),
           destructionChancePercent: 100
         });
         this.destroyShip(shipState);
         continue;
       }
 
-      const criticalHullThreshold = this.criticalHullThreshold(shipState.ship);
+      const criticalHullThreshold = this.criticalHullThreshold(shipState);
       if (criticalHullThreshold <= 0 || shipState.ship.hull > criticalHullThreshold) {
         continue;
       }
@@ -394,8 +477,8 @@ export class SpaceBattleResolver {
     shipState.queuedWeapons = [];
   }
 
-  private criticalHullThreshold(ship: ShipInstance): number {
-    return ship.type.hullPointsCapacity * (ship.type.criticalThreshold / 100);
+  private criticalHullThreshold(shipState: BattleShipState): number {
+    return shipState.effectiveHullCapacity * (shipState.effectiveCriticalThreshold / 100);
   }
 
   private destructionChancePercent(ship: ShipInstance, criticalHullThreshold: number): number {
@@ -422,6 +505,18 @@ export class SpaceBattleResolver {
     return this.nextRandomFloat(randomSource) < destructionChancePercent / 100;
   }
 
+  private rollEvade(evasionChance: number, randomSource: BattleRandomSource): boolean {
+    if (evasionChance <= 0) {
+      return false;
+    }
+
+    if (evasionChance >= 1) {
+      return true;
+    }
+
+    return this.nextRandomFloat(randomSource) < evasionChance;
+  }
+
   private refillRoundWeapons(side: BattleSideState): number {
     let weaponsCount = 0;
 
@@ -432,14 +527,17 @@ export class SpaceBattleResolver {
         continue;
       }
 
-      shipState.queuedWeapons = this.expandCombatWeapons(shipState.ship);
+      shipState.queuedWeapons = this.expandCombatWeapons(shipState.ship, side.techModifiers);
       weaponsCount += shipState.queuedWeapons.length;
     }
 
     return weaponsCount;
   }
 
-  private expandCombatWeapons(ship: ShipInstance): BattleQueuedWeapon[] {
+  private expandCombatWeapons(
+    ship: ShipInstance,
+    techModifiers: BattleTechModifiers
+  ): BattleQueuedWeapon[] {
     const weapons: BattleQueuedWeapon[] = [];
 
     for (const weapon of ship.type.weapons) {
@@ -451,12 +549,32 @@ export class SpaceBattleResolver {
       for (let shot = 0; shot < shots; shot += 1) {
         weapons.push({
           type: weapon.type,
-          dmg: weapon.dmg
+          dmg: this.modifiedWeaponDamage(weapon.type, weapon.dmg, techModifiers)
         });
       }
     }
 
     return weapons;
+  }
+
+  private modifiedWeaponDamage(
+    weaponType: WeaponType,
+    baseDamage: number,
+    techModifiers: BattleTechModifiers
+  ): number {
+    if (weaponType === WeaponType.BEAM) {
+      return baseDamage * techModifiers.beamDamageMultiplier;
+    }
+
+    if (weaponType === WeaponType.MISSILE) {
+      return baseDamage * techModifiers.missileDamageMultiplier;
+    }
+
+    if (weaponType === WeaponType.RAIL_GUN) {
+      return baseDamage * techModifiers.railGunDamageMultiplier;
+    }
+
+    return baseDamage;
   }
 
   private buildFleetSummary(side: BattleSideState, initialShips: ShipInstance[]): BattleFleetSummary {
@@ -597,11 +715,11 @@ export class SpaceBattleResolver {
 
     for (const round of result.roundSummaries) {
       lines.push(
-        `Round ${round.roundNumber}: ` +
-        `${result.attacker.label} shots ${round.attackerShots}, ` +
-        `${result.defender.label} shots ${round.defenderShots}, ` +
-        `${result.attacker.label} losses ${this.countDestroyedShips(round, 'attacker')}, ` +
-        `${result.defender.label} losses ${this.countDestroyedShips(round, 'defender')}.`
+        `Round ${round.roundNumber}: `
+        + `${result.attacker.label} shots ${round.attackerShots}, `
+        + `${result.defender.label} shots ${round.defenderShots}, `
+        + `${result.attacker.label} losses ${this.countDestroyedShips(round, 'attacker')}, `
+        + `${result.defender.label} losses ${this.countDestroyedShips(round, 'defender')}.`
       );
     }
 
