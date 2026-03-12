@@ -142,7 +142,7 @@
     {
       "type": "ARMOUR_TECHNOLOGY",
       "imagePath": "images/technologies/Armour_Technology.webp",
-      "description": "Give +10% to every hull durability, and decreses ship destruction chance by 5%.",
+      "description": "Give +10% to every hull durability, and decreases ship destruction chance by 1%.",
       "basicCost": { "metal": 20, "crystal": 10, "deuterium": 0 },
       "energyRequired": [0],
       "researchTime": [2],

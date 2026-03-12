@@ -15,6 +15,7 @@ export class Ship {
     public size: number,
     public evasionChance: number,
     public hullPointsCapacity: number,
+    public criticalThreshold: number,
     public shieldCapacity: number,
     public armor: number,
     public weapons: Weapon[],

@@ -24,6 +24,7 @@ interface ShipBlueprintJson {
   size: number;
   evasionChance: number;
   hullPointsCapacity: number;
+  criticalThreshold: number;
   shieldCapacity: number;
   armor: number;
   weapons: WeaponJson[];
@@ -112,6 +113,7 @@ export class ShipBlueprintsFactory {
       entry.size,
       entry.evasionChance ?? 0,
       entry.hullPointsCapacity,
+      entry.criticalThreshold,
       entry.shieldCapacity,
       entry.armor,
       weapons.map((weapon) => new Weapon(

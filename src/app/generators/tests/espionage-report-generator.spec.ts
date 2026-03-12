@@ -55,6 +55,7 @@ describe('EspionageReportGenerator', () => {
       1,
       0,
       10,
+      30,
       5,
       0,
       [],
