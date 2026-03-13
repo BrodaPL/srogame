@@ -12,9 +12,9 @@
       <p>{{ loadError }}</p>
     </section>
   } @else if (selectedPlanet(); as planet) {
-    <div class="buildings-view__layout">
+    <div class="game-dashboard__layout">
       <app-resources
-        class="buildings-view__resources"
+        class="game-dashboard__resources"
         [viewName]="'Buildings | ' + selectedPlanetLabel()"
         [metal]="metalDisplay"
         [crystal]="crystalDisplay"
@@ -23,14 +23,14 @@
         [powers]="powersDisplay"
       ></app-resources>
 
-      <div class="buildings-view__main">
-        <section class="overview-card buildings-view__categories-card">
-          <div class="buildings-view__toggle-row">
+      <div class="game-dashboard__main">
+        <section class="overview-card game-dashboard__categories-card">
+          <div class="game-dashboard__toggle-row">
             @for (mode of modeOptions; track mode.value) {
               <button
                 type="button"
-                class="buildings-view__toggle"
-                [class.buildings-view__toggle--active]="selectedMode === mode.value"
+                class="game-dashboard__toggle"
+                [class.game-dashboard__toggle--active]="selectedMode === mode.value"
                 (click)="selectedMode = mode.value"
               >
                 {{ mode.label }}
@@ -40,7 +40,7 @@
         </section>
 
         <section class="overview-card">
-          <div class="buildings-view__section-head">
+          <div class="game-dashboard__section-head">
             <div>
               <h3>Current Building Queue</h3>
               <p class="overview-muted">
@@ -85,7 +85,7 @@
         </section>
 
         <section class="overview-card">
-          <div class="buildings-view__section-head">
+          <div class="game-dashboard__section-head">
             <div>
               <h3>{{ selectedMode === 'resources' ? 'Resources Infrastructure' : 'Facilities' }}</h3>
               <p class="overview-muted">Compact construction rows with next-level costs and unmet requirements only.</p>
@@ -109,8 +109,8 @@
                 <div class="buildings-view__building-cost">
                   @for (cost of buildingCostRows(building); track cost.label) {
                     <span
-                      class="buildings-view__cost-chip"
-                      [class.buildings-view__cost-chip--insufficient]="!cost.isEnough"
+                      class="game-dashboard__cost-chip"
+                      [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough"
                     >
                       {{ cost.label }} {{ cost.amount }}
                     </span>
@@ -120,20 +120,20 @@
                 <div class="buildings-view__building-req">
                   @if (unmetRequirementsLabel(building); as unmetLabel) {
                     <span
-                      class="buildings-view__req-warning"
+                      class="game-dashboard__req-warning"
                       [attr.title]="unmetRequirementsTooltip(building)"
                     >
                       {{ unmetLabel }}
                     </span>
                   } @else {
-                    <span class="buildings-view__req-ok">Ready</span>
+                    <span class="game-dashboard__req-ok">Ready</span>
                   }
                 </div>
 
                 <div class="buildings-view__building-action">
                   <button
                     type="button"
-                    class="buildings-view__build-button"
+                    class="game-dashboard__action-button"
                     [disabled]="!canBuildBuilding(building)"
                     [attr.title]="buildingBuildTitle(building)"
                     (click)="onBuildBuilding(building)"
@@ -141,7 +141,7 @@
                     {{ buildingBuildLabel(building) }}
                   </button>
                   @if (buildingStartError(building); as error) {
-                    <p class="buildings-view__build-error">{{ error }}</p>
+                    <p class="game-dashboard__build-error">{{ error }}</p>
                   }
                 </div>
               </article>
@@ -150,27 +150,27 @@
         </section>
       </div>
 
-      <aside class="buildings-view__rail overview-card">
-        <div class="buildings-view__section-head">
+      <aside class="overview-card game-dashboard__rail">
+        <div class="game-dashboard__section-head">
           <div>
             <h3>Owned Planets</h3>
             <p class="overview-muted">Select the active construction planet.</p>
           </div>
         </div>
 
-        <div class="buildings-view__rail-list">
+        <div class="game-dashboard__rail-list">
           @for (ownedPlanet of ownedPlanets; track trackPlanet($index, ownedPlanet)) {
             <div
-              class="buildings-view__planet-option"
-              [class.buildings-view__planet-option--selected]="isSelectedPlanet(ownedPlanet)"
+              class="game-dashboard__planet-option"
+              [class.game-dashboard__planet-option--selected]="isSelectedPlanet(ownedPlanet)"
               (click)="selectPlanet(ownedPlanet)"
             >
-              <div class="buildings-view__planet-select-row">
+              <div class="game-dashboard__planet-select-row">
                 <span
-                  class="buildings-view__planet-radio"
-                  [class.buildings-view__planet-radio--selected]="isSelectedPlanet(ownedPlanet)"
+                  class="game-dashboard__planet-radio"
+                  [class.game-dashboard__planet-radio--selected]="isSelectedPlanet(ownedPlanet)"
                 ></span>
-                <span class="buildings-view__planet-select-label">
+                <span class="game-dashboard__planet-select-label">
                   {{ isSelectedPlanet(ownedPlanet) ? 'Selected' : 'Select' }}
                 </span>
               </div>

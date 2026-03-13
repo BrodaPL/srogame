@@ -12,9 +12,9 @@
       <p>{{ loadError }}</p>
     </section>
   } @else if (selectedPlanet(); as planet) {
-    <div class="production-view__layout">
+    <div class="game-dashboard__layout">
       <app-resources
-        class="production-view__resources"
+        class="game-dashboard__resources"
         [viewName]="'Production | ' + selectedPlanetLabel()"
         [metal]="metalDisplay"
         [crystal]="crystalDisplay"
@@ -23,14 +23,14 @@
         [powers]="powersDisplay"
       ></app-resources>
 
-      <div class="production-view__main">
-        <section class="overview-card production-view__categories-card">
-          <div class="production-view__toggle-row">
+      <div class="game-dashboard__main">
+        <section class="overview-card game-dashboard__categories-card">
+          <div class="game-dashboard__toggle-row">
             @for (mode of modeOptions; track mode.value) {
               <button
                 type="button"
-                class="production-view__toggle"
-                [class.production-view__toggle--active]="selectedMode === mode.value"
+                class="game-dashboard__toggle"
+                [class.game-dashboard__toggle--active]="selectedMode === mode.value"
                 (click)="selectedMode = mode.value"
               >
                 {{ mode.label }}
@@ -41,7 +41,7 @@
 
         <section class="production-view__queue-grid">
           <section class="overview-card">
-            <div class="production-view__section-head">
+            <div class="game-dashboard__section-head">
               <div>
                 <h3>Current Shipyard Queue</h3>
                 <p class="overview-muted">
@@ -86,7 +86,7 @@
           </section>
 
           <section class="overview-card">
-            <div class="production-view__section-head">
+            <div class="game-dashboard__section-head">
               <div>
                 <h3>Current Defences Queue</h3>
                 <p class="overview-muted">{{ selectedPlanetLabel() }}</p>
@@ -101,7 +101,7 @@
         </section>
 
         <section class="overview-card">
-          <div class="production-view__section-head">
+          <div class="game-dashboard__section-head">
             <div>
               <h3>{{ selectedMode === 'shipyard' ? 'Shipyard' : 'Defences' }}</h3>
               <p class="overview-muted">
@@ -144,8 +144,8 @@
                       <div class="production-view__cost-row">
                         @for (cost of shipSingleCostRows(ship); track 'single-' + cost.label) {
                           <span
-                            class="production-view__cost-chip"
-                            [class.production-view__cost-chip--insufficient]="!cost.isEnough"
+                            class="game-dashboard__cost-chip"
+                            [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough"
                           >
                             {{ cost.label }} {{ cost.amount }}
                           </span>
@@ -158,9 +158,9 @@
                       <div class="production-view__cost-row">
                         @for (cost of shipTotalCostRows(ship); track 'total-' + cost.label) {
                           <span
-                            class="production-view__cost-chip"
-                            [class.production-view__cost-chip--insufficient]="!cost.isEnough && !cost.isPlaceholder"
-                            [class.production-view__cost-chip--placeholder]="cost.isPlaceholder"
+                            class="game-dashboard__cost-chip"
+                            [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough && !cost.isPlaceholder"
+                            [class.game-dashboard__cost-chip--placeholder]="cost.isPlaceholder"
                           >
                             {{ cost.label }} {{ cost.amount === null ? '--' : cost.amount }}
                           </span>
@@ -171,18 +171,18 @@
 
                   <div class="production-view__ship-req">
                     @if (unmetRequirementsLabel(ship); as unmetLabel) {
-                      <span class="production-view__req-warning" [attr.title]="unmetRequirementsTooltip(ship)">
+                      <span class="game-dashboard__req-warning" [attr.title]="unmetRequirementsTooltip(ship)">
                         {{ unmetLabel }}
                       </span>
                     } @else {
-                      <span class="production-view__req-ok">Ready</span>
+                      <span class="game-dashboard__req-ok">Ready</span>
                     }
                   </div>
 
                   <div class="production-view__ship-action">
                     <button
                       type="button"
-                      class="production-view__build-button"
+                      class="game-dashboard__action-button"
                       [disabled]="!canBuildShip(ship)"
                       [attr.title]="shipBuildTitle(ship)"
                       (click)="onBuildShip(ship)"
@@ -190,7 +190,7 @@
                       {{ shipBuildLabel(ship) }}
                     </button>
                     @if (shipStartError(ship); as error) {
-                      <p class="production-view__build-error">{{ error }}</p>
+                      <p class="game-dashboard__build-error">{{ error }}</p>
                     }
                   </div>
                 </article>
@@ -205,27 +205,27 @@
         </section>
       </div>
 
-      <aside class="production-view__rail overview-card">
-        <div class="production-view__section-head">
+      <aside class="overview-card game-dashboard__rail">
+        <div class="game-dashboard__section-head">
           <div>
             <h3>Owned Planets</h3>
             <p class="overview-muted">Select the active production planet.</p>
           </div>
         </div>
 
-        <div class="production-view__rail-list">
+        <div class="game-dashboard__rail-list">
           @for (ownedPlanet of ownedPlanets; track trackPlanet($index, ownedPlanet)) {
             <div
-              class="production-view__planet-option"
-              [class.production-view__planet-option--selected]="isSelectedPlanet(ownedPlanet)"
+              class="game-dashboard__planet-option"
+              [class.game-dashboard__planet-option--selected]="isSelectedPlanet(ownedPlanet)"
               (click)="selectPlanet(ownedPlanet)"
             >
-              <div class="production-view__planet-select-row">
+              <div class="game-dashboard__planet-select-row">
                 <span
-                  class="production-view__planet-radio"
-                  [class.production-view__planet-radio--selected]="isSelectedPlanet(ownedPlanet)"
+                  class="game-dashboard__planet-radio"
+                  [class.game-dashboard__planet-radio--selected]="isSelectedPlanet(ownedPlanet)"
                 ></span>
-                <span class="production-view__planet-select-label">
+                <span class="game-dashboard__planet-select-label">
                   {{ isSelectedPlanet(ownedPlanet) ? 'Selected' : 'Select' }}
                 </span>
               </div>
