@@ -2458,6 +2458,13 @@ app-root {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.95fr);
   gap: 0.8rem;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+
+.planet-view__overview--highlighted {
+  border-radius: 18px;
+  box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.75), 0 0 28px rgba(255, 180, 76, 0.28);
+  animation: planet-view-highlight-pulse 1.2s ease-in-out 3;
 }
 
 .planet-view__parameters,
@@ -2466,6 +2473,20 @@ app-root {
   border: 1px solid var(--line);
   background: rgba(12, 16, 22, 0.85);
   padding: 0.75rem;
+}
+
+@keyframes planet-view-highlight-pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.006);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 .planet-view__parameters {

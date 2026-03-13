@@ -98,6 +98,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected planet: ClientPlanetDto | null = null;
   protected isLoading = false;
   protected loadError: string | null = null;
+  protected isAttentionHighlightActive = false;
   protected activeTab: PlanetTab = 'resources';
   protected coordinatesLabel = '--:--:--';
 
@@ -130,6 +131,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private loadingSafetyTimer: ReturnType<typeof setTimeout> | null = null;
   private queueTabRefreshTimer: ReturnType<typeof setInterval> | null = null;
   private queueTabRefreshInFlight = false;
+  private attentionHighlightTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -156,6 +158,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       const x = this.parseNonNegativeInt(params.get('x'));
       const y = this.parseNonNegativeInt(params.get('y'));
       const z = this.parseNonNegativeInt(params.get('z'));
+      this.updateAttentionHighlight(params.get('highlight') === 'attention');
 
       if (x === null || y === null || z === null) {
         this.stopQueueTabAutoRefresh();
@@ -175,6 +178,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   public ngOnDestroy(): void {
     this.stopQueueTabAutoRefresh();
     this.clearLoadingSafetyTimeout();
+    this.clearAttentionHighlightTimeout();
   }
 
   protected setTab(tab: PlanetTab): void {
@@ -1812,6 +1816,27 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     if (this.loadingSafetyTimer !== null) {
       clearTimeout(this.loadingSafetyTimer);
       this.loadingSafetyTimer = null;
+    }
+  }
+
+  private updateAttentionHighlight(shouldHighlight: boolean): void {
+    this.clearAttentionHighlightTimeout();
+    this.isAttentionHighlightActive = shouldHighlight;
+
+    if (!shouldHighlight) {
+      return;
+    }
+
+    this.attentionHighlightTimer = setTimeout(() => {
+      this.isAttentionHighlightActive = false;
+      this.cdr.markForCheck();
+    }, 4500);
+  }
+
+  private clearAttentionHighlightTimeout(): void {
+    if (this.attentionHighlightTimer !== null) {
+      clearTimeout(this.attentionHighlightTimer);
+      this.attentionHighlightTimer = null;
     }
   }
 }

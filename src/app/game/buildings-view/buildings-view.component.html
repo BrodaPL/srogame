@@ -1,4 +1,193 @@
 <app-top-menu></app-top-menu>
-<section class="game-view game-view--buildings-view"></section>
 
+<section class="buildings-view">
+  @if (isLoading) {
+    <section class="status status--info">
+      <h3>Loading Buildings</h3>
+      <p>Owned planets and building data are being prepared.</p>
+    </section>
+  } @else if (loadError) {
+    <section class="status status--error">
+      <h3>Buildings unavailable</h3>
+      <p>{{ loadError }}</p>
+    </section>
+  } @else if (selectedPlanet(); as planet) {
+    <div class="buildings-view__layout">
+      <div class="buildings-view__main">
+        <app-resources
+          [viewName]="'Buildings | ' + selectedPlanetLabel()"
+          [metal]="metalDisplay"
+          [crystal]="crystalDisplay"
+          [deuterium]="deuteriumDisplay"
+          [energy]="energyDisplay"
+          [powers]="powersDisplay"
+        ></app-resources>
 
+        <section class="overview-card buildings-view__categories-card">
+          <div class="buildings-view__toggle-row">
+            @for (mode of modeOptions; track mode.value) {
+              <button
+                type="button"
+                class="buildings-view__toggle"
+                [class.buildings-view__toggle--active]="selectedMode === mode.value"
+                (click)="selectedMode = mode.value"
+              >
+                {{ mode.label }}
+              </button>
+            }
+          </div>
+        </section>
+
+        <section class="overview-card">
+          <div class="buildings-view__section-head">
+            <div>
+              <h3>Current Building Queue</h3>
+              <p class="overview-muted">
+                {{ selectedPlanetLabel() }} | {{ currentBuildingQueueLength() }}/{{ maxBuildingQueueLength() }}
+              </p>
+            </div>
+          </div>
+
+          @if (hasBuildingQueueEntries()) {
+            <div class="overview-table-wrapper">
+              <table class="overview-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Building</th>
+                    <th>Upgrade</th>
+                    <th>Status</th>
+                    <th>Invested / base</th>
+                    <th>ETA (turns)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (queueRow of buildingQueueRows(); track trackQueueRow($index, queueRow)) {
+                    <tr>
+                      <td>{{ queueRow.position }}</td>
+                      <td>{{ queueRow.buildingType }}</td>
+                      <td>L{{ queueRow.fromLevel }} -> L{{ queueRow.toLevel }}</td>
+                      <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
+                      <td>{{ queueRow.investedIndustryPower }} / {{ queueRow.baseTotalConstructionTime }}</td>
+                      <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <article class="planet-queue-card">
+              <h4 class="planet-view__section-title">No buildings queued</h4>
+              <p class="overview-empty">This planet does not have any building construction queued right now.</p>
+            </article>
+          }
+        </section>
+
+        <section class="overview-card">
+          <div class="buildings-view__section-head">
+            <div>
+              <h3>{{ selectedMode === 'resources' ? 'Resources Infrastructure' : 'Facilities' }}</h3>
+              <p class="overview-muted">Compact construction rows with next-level costs and unmet requirements only.</p>
+            </div>
+          </div>
+
+          <div class="buildings-view__building-list">
+            @for (building of visibleBuildings(); track building.type) {
+              <article class="buildings-view__building-row">
+                <img
+                  class="buildings-view__building-image"
+                  [src]="building.imagePath"
+                  [alt]="building.type + ' image'"
+                />
+
+                <div class="buildings-view__building-main">
+                  <h4 class="buildings-view__building-title">{{ building.type }}</h4>
+                  <p class="buildings-view__building-meta">Level {{ buildingLevel(building.type) }}</p>
+                </div>
+
+                <div class="buildings-view__building-cost">
+                  @for (cost of buildingCostRows(building); track cost.label) {
+                    <span
+                      class="buildings-view__cost-chip"
+                      [class.buildings-view__cost-chip--insufficient]="!cost.isEnough"
+                    >
+                      {{ cost.label }} {{ cost.amount }}
+                    </span>
+                  }
+                </div>
+
+                <div class="buildings-view__building-req">
+                  @if (unmetRequirementsLabel(building); as unmetLabel) {
+                    <span
+                      class="buildings-view__req-warning"
+                      [attr.title]="unmetRequirementsTooltip(building)"
+                    >
+                      {{ unmetLabel }}
+                    </span>
+                  } @else {
+                    <span class="buildings-view__req-ok">Ready</span>
+                  }
+                </div>
+
+                <div class="buildings-view__building-action">
+                  <button
+                    type="button"
+                    class="buildings-view__build-button"
+                    [disabled]="!canBuildBuilding(building)"
+                    [attr.title]="buildingBuildTitle(building)"
+                    (click)="onBuildBuilding(building)"
+                  >
+                    {{ buildingBuildLabel(building) }}
+                  </button>
+                  @if (buildingStartError(building); as error) {
+                    <p class="buildings-view__build-error">{{ error }}</p>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      </div>
+
+      <aside class="buildings-view__rail overview-card">
+        <div class="buildings-view__section-head">
+          <div>
+            <h3>Owned Planets</h3>
+            <p class="overview-muted">Select the active construction planet.</p>
+          </div>
+        </div>
+
+        <div class="buildings-view__rail-list">
+          @for (ownedPlanet of ownedPlanets; track trackPlanet($index, ownedPlanet)) {
+            <div
+              class="buildings-view__planet-option"
+              [class.buildings-view__planet-option--selected]="isSelectedPlanet(ownedPlanet)"
+              (click)="selectPlanet(ownedPlanet)"
+            >
+              <div class="buildings-view__planet-select-row">
+                <span
+                  class="buildings-view__planet-radio"
+                  [class.buildings-view__planet-radio--selected]="isSelectedPlanet(ownedPlanet)"
+                ></span>
+                <span class="buildings-view__planet-select-label">
+                  {{ isSelectedPlanet(ownedPlanet) ? 'Selected' : 'Select' }}
+                </span>
+              </div>
+
+              <app-mini-planet-preview
+                [planet]="ownedPlanet"
+                [showDefaultActions]="false"
+                [isSelected]="isSelectedPlanet(ownedPlanet)"
+              ></app-mini-planet-preview>
+            </div>
+          }
+        </div>
+      </aside>
+    </div>
+  } @else {
+    <section class="overview-card">
+      <h3>No owned planets</h3>
+      <p class="overview-muted">Buildings View requires at least one owned planet.</p>
+    </section>
+  }
+</section>

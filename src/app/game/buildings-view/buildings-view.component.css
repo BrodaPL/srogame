@@ -1,0 +1,232 @@
+.buildings-view {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.buildings-view__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.buildings-view__main {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.buildings-view__rail {
+  display: grid;
+  gap: 0.7rem;
+  max-height: calc(100vh - 110px);
+  align-content: start;
+}
+
+.buildings-view__section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.buildings-view__categories-card {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+
+.buildings-view__toggle-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.buildings-view__toggle {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  padding: 0.82rem 1.2rem;
+  font-size: 0.96rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.buildings-view__toggle--active {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(246, 180, 76, 0.35), rgba(246, 180, 76, 0.12));
+  color: #11161e;
+}
+
+.buildings-view__building-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.buildings-view__building-row {
+  display: grid;
+  grid-template-columns: 100px minmax(180px, 1.1fr) minmax(200px, 1fr) minmax(130px, 0.75fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.buildings-view__building-image {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+}
+
+.buildings-view__building-main,
+.buildings-view__building-action {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.buildings-view__building-title {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.buildings-view__building-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.buildings-view__building-cost {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.buildings-view__cost-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #dbe5f6;
+  padding: 0.18rem 0.48rem;
+  font-size: 0.72rem;
+  font-family: var(--font-mono), serif;
+}
+
+.buildings-view__cost-chip--insufficient {
+  border-color: rgba(255, 120, 120, 0.4);
+  background: rgba(255, 120, 120, 0.1);
+  color: #ff9d9d;
+}
+
+.buildings-view__building-req {
+  display: flex;
+  align-items: center;
+}
+
+.buildings-view__req-warning,
+.buildings-view__req-ok {
+  border-radius: 999px;
+  padding: 0.2rem 0.52rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.buildings-view__req-warning {
+  border: 1px solid rgba(255, 120, 120, 0.45);
+  background: rgba(255, 120, 120, 0.12);
+  color: #ff9d9d;
+}
+
+.buildings-view__req-ok {
+  border: 1px solid rgba(70, 200, 140, 0.35);
+  background: rgba(70, 200, 140, 0.12);
+  color: #9ef0be;
+}
+
+.buildings-view__build-button {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  min-width: 120px;
+  cursor: pointer;
+}
+
+.buildings-view__build-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.buildings-view__build-error {
+  margin: 0;
+  color: #ff9d9d;
+  font-size: 0.72rem;
+}
+
+.buildings-view__rail-list {
+  display: grid;
+  gap: 0.55rem;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.buildings-view__planet-option {
+  display: grid;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.buildings-view__planet-option--selected {
+  transform: translateY(-1px);
+}
+
+.buildings-view__planet-select-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.buildings-view__planet-radio {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  background: transparent;
+}
+
+.buildings-view__planet-radio--selected {
+  border-color: rgba(246, 180, 76, 0.9);
+  background: radial-gradient(circle, rgba(246, 180, 76, 0.95) 0 45%, transparent 50% 100%);
+}
+
+.buildings-view__planet-select-label {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1100px) {
+  .buildings-view__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .buildings-view__rail {
+    max-height: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .buildings-view__toggle-row {
+    grid-template-columns: 1fr;
+  }
+
+  .buildings-view__building-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+}

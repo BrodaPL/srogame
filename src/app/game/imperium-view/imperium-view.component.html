@@ -1,4 +1,234 @@
 <app-top-menu></app-top-menu>
-<section class="game-view game-view--imperium-view"></section>
 
+<section class="imperium-view">
+  @if (isLoading) {
+    <section class="status status--info">
+      <h3>Loading Imperium</h3>
+      <p>Owned planets and empire statistics are being aggregated.</p>
+    </section>
+  } @else if (loadError) {
+    <section class="status status--error">
+      <h3>Imperium unavailable</h3>
+      <p>{{ loadError }}</p>
+    </section>
+  } @else {
+    <header class="overview-card imperium-view__hero">
+      <div>
+        <p class="eyebrow">Empire Overview</p>
+        <h1 class="imperium-view__title">Imperium</h1>
+        <p class="overview-muted">
+          A strategic summary of owned planets, queues, resource flow, and empire-wide production power.
+        </p>
+      </div>
+    </header>
 
+    <app-resources
+      viewName="Imperium Summary"
+      [metal]="metalDisplay"
+      [crystal]="crystalDisplay"
+      [deuterium]="deuteriumDisplay"
+      [energy]="energyDisplay"
+      [powers]="powersDisplay"
+    ></app-resources>
+
+    <section class="overview-card">
+      <div class="imperium-view__section-head">
+        <div>
+          <h3>Empire Totals</h3>
+          <p class="overview-muted">High-level counts for planets, ships, and active queues.</p>
+        </div>
+      </div>
+      <div class="overview-stats">
+        <div class="overview-stat">
+          <span class="overview-stat__label">Owned planets</span>
+          <span class="overview-stat__value">{{ totalPlanets }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Total ships</span>
+          <span class="overview-stat__value">{{ totalShips }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Building queues active</span>
+          <span class="overview-stat__value">{{ activeBuildingQueues }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Shipyard queues active</span>
+          <span class="overview-stat__value">{{ activeShipyardQueues }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Research roles active</span>
+          <span class="overview-stat__value">{{ activeResearchRoles }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="overview-card">
+      <div class="imperium-view__section-head">
+        <div>
+          <h3>Needs Attention</h3>
+          <p class="overview-muted">Planets that are idle, energy-starved, or operating below selected power.</p>
+        </div>
+      </div>
+
+      @if (attentionItems.length === 0) {
+        <p class="overview-muted">No attention items right now.</p>
+      } @else {
+        <div class="imperium-view__attention-grid">
+          @for (attention of attentionItems; track trackAttention($index, attention)) {
+            <article class="imperium-view__attention-card">
+              <div class="imperium-view__attention-head">
+                <h4>{{ attention.title }}</h4>
+                <span class="badge">{{ attention.planets.length }}</span>
+              </div>
+              <p class="overview-muted">{{ attention.description }}</p>
+              <div class="imperium-view__attention-planets">
+                @for (planet of attention.planets; track planet.label) {
+                  <a
+                    class="imperium-view__attention-link"
+                    [class.imperium-view__attention-link--low]="warningCountClass(planet.warningCount) === 'imperium-view__attention-link--low'"
+                    [class.imperium-view__attention-link--medium]="warningCountClass(planet.warningCount) === 'imperium-view__attention-link--medium'"
+                    [class.imperium-view__attention-link--high]="warningCountClass(planet.warningCount) === 'imperium-view__attention-link--high'"
+                    [class.imperium-view__attention-link--critical]="warningCountClass(planet.warningCount) === 'imperium-view__attention-link--critical'"
+                    routerLink="/game/planet"
+                    [queryParams]="{ x: planet.x, y: planet.y, z: planet.z, highlight: 'attention' }"
+                  >
+                    {{ planet.label }}
+                  </a>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="overview-card">
+      <div class="imperium-view__section-head">
+        <div>
+          <h3>Owned Planets</h3>
+          <p class="overview-muted">Compact planet cards with queue summaries and local production snapshots.</p>
+        </div>
+        <div class="imperium-view__controls">
+          <label class="imperium-view__control">
+            <span>Sort</span>
+            <select [(ngModel)]="selectedSort">
+              @for (sortOption of sortOptions; track sortOption.value) {
+                <option [ngValue]="sortOption.value">{{ sortOption.label }}</option>
+              }
+            </select>
+          </label>
+          <label class="imperium-view__control">
+            <span>Filter</span>
+            <select [(ngModel)]="selectedFilter">
+              @for (filterOption of filterOptions; track filterOption.value) {
+                <option [ngValue]="filterOption.value">{{ filterOption.label }}</option>
+              }
+            </select>
+          </label>
+        </div>
+      </div>
+
+      @if (visiblePlanets().length === 0) {
+        <p class="overview-muted">No planets match the current filter.</p>
+      } @else {
+        <div class="imperium-view__planet-grid">
+          @for (planetVm of visiblePlanets(); track trackPlanet($index, planetVm)) {
+            <article class="imperium-view__planet-card">
+              <app-mini-planet-preview [planet]="planetVm.planet"></app-mini-planet-preview>
+
+              <div class="imperium-view__planet-meta">
+                <span>M {{ formatNumber(planetVm.metalIncome) }}</span>
+                <span>C {{ formatNumber(planetVm.crystalIncome) }}</span>
+                <span>D {{ formatNumber(planetVm.deuteriumIncome) }}</span>
+                <span>E {{ formatNumber(planetVm.energy.used) }} / {{ formatNumber(planetVm.energy.available) }}</span>
+              </div>
+
+              <div class="imperium-view__planet-meta">
+                <span>I {{ planetVm.powers.industryPower }}</span>
+                <span>S {{ planetVm.powers.shipyardPower }}</span>
+                <span>R {{ planetVm.powers.researchPower }}</span>
+              </div>
+
+              @if (planetVm.attentionLabels.length > 0) {
+                <div class="imperium-view__planet-alerts">
+                  @for (attentionLabel of planetVm.attentionLabels; track attentionLabel) {
+                    <span class="imperium-view__planet-alert">{{ attentionLabel }}</span>
+                  }
+                </div>
+              }
+
+              <div class="imperium-view__queue-group">
+                <p class="imperium-view__queue-title">Buildings</p>
+                <p class="imperium-view__queue-body">
+                  {{ planetVm.buildingQueueSummary.length > 0 ? planetVm.buildingQueueSummary.join(', ') : 'Idle' }}
+                </p>
+              </div>
+
+              <div class="imperium-view__queue-group">
+                <p class="imperium-view__queue-title">Shipyard</p>
+                <p class="imperium-view__queue-body">
+                  {{ planetVm.shipyardQueueSummary.length > 0 ? planetVm.shipyardQueueSummary.join(', ') : 'Idle' }}
+                </p>
+              </div>
+
+              <div class="imperium-view__queue-group">
+                <p class="imperium-view__queue-title">Research</p>
+                <p class="imperium-view__queue-body">{{ planetVm.researchSummary }}</p>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="overview-card">
+      <div class="imperium-view__section-head">
+        <div>
+          <h3>Fleet Totals</h3>
+          <p class="overview-muted">Sum of owned ships by ship type across all planets.</p>
+        </div>
+      </div>
+
+      <div class="imperium-view__ship-grid">
+        @for (shipSummary of shipSummaries; track trackShipSummary($index, shipSummary)) {
+          <div class="imperium-view__ship-card" [class.imperium-view__ship-card--zero]="shipSummary.isZero">
+            <span class="imperium-view__ship-label">{{ shipSummary.shipType }}</span>
+            <span class="imperium-view__ship-value">{{ shipSummary.amount }}</span>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="overview-card">
+      <div class="imperium-view__section-head">
+        <div>
+          <h3>Building Statistics</h3>
+          <p class="overview-muted">Average, minimum, and maximum levels for all building types, including zeros.</p>
+        </div>
+      </div>
+
+      <div class="imperium-view__table-wrap">
+        <table class="imperium-view__table">
+          <thead>
+            <tr>
+              <th>Building</th>
+              <th>Average</th>
+              <th>Min</th>
+              <th>Max</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (stats of buildingStats; track trackBuildingStats($index, stats)) {
+              <tr [class.imperium-view__table-row--dim]="stats.allZero">
+                <td>{{ stats.buildingType }}</td>
+                <td [class.imperium-view__table-value--zero]="stats.averageLevel === 0">{{ formatNumber(stats.averageLevel) }}</td>
+                <td [class.imperium-view__table-value--zero]="stats.minLevel === 0">{{ stats.minLevel }}</td>
+                <td [class.imperium-view__table-value--zero]="stats.maxLevel === 0">{{ stats.maxLevel }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</section>

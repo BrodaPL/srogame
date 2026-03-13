@@ -1,0 +1,258 @@
+.imperium-view {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.imperium-view__hero,
+.imperium-view__section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.imperium-view__title {
+  margin: 0.2rem 0 0;
+}
+
+.imperium-view__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.imperium-view__control {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.imperium-view__control span {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.imperium-view__control select {
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  padding: 0.42rem 0.58rem;
+  font: inherit;
+}
+
+.imperium-view__attention-grid,
+.imperium-view__planet-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.imperium-view__attention-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.imperium-view__attention-card,
+.imperium-view__planet-card,
+.imperium-view__ship-card {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.imperium-view__attention-card,
+.imperium-view__planet-card {
+  padding: 0.7rem;
+}
+
+.imperium-view__attention-card {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.imperium-view__attention-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.imperium-view__attention-head h4 {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.imperium-view__attention-planets {
+  display: grid;
+  gap: 0.24rem;
+}
+
+.imperium-view__attention-link {
+  color: #dbe5f6;
+  font-size: 0.78rem;
+  font-family: var(--font-mono), serif;
+  text-decoration: none;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.imperium-view__attention-link:hover {
+  transform: translateX(2px);
+}
+
+.imperium-view__attention-link--low {
+  color: #dbe5f6;
+}
+
+.imperium-view__attention-link--medium {
+  color: #ffe082;
+}
+
+.imperium-view__attention-link--high {
+  color: #ffb86c;
+}
+
+.imperium-view__attention-link--critical {
+  color: #ff7d7d;
+}
+
+.imperium-view__planet-grid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.imperium-view__planet-card {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+}
+
+.imperium-view__planet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  color: #c7d3e6;
+  font-size: 0.74rem;
+  font-family: var(--font-mono), serif;
+}
+
+.imperium-view__planet-meta span {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.18rem 0.48rem;
+}
+
+.imperium-view__planet-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.imperium-view__planet-alert {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 214, 102, 0.4);
+  background: rgba(255, 214, 102, 0.1);
+  color: #f4deb0;
+  padding: 0.16rem 0.48rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.imperium-view__queue-group {
+  display: grid;
+  gap: 0.16rem;
+  padding-top: 0.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.imperium-view__queue-title {
+  margin: 0;
+  color: #93a4bf;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+.imperium-view__queue-body {
+  margin: 0;
+  color: #dbe5f6;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.imperium-view__ship-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.55rem;
+}
+
+.imperium-view__ship-card {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.62rem 0.7rem;
+}
+
+.imperium-view__ship-card--zero {
+  opacity: 0.58;
+}
+
+.imperium-view__ship-label {
+  color: #a9bad5;
+  font-size: 0.74rem;
+}
+
+.imperium-view__ship-value {
+  color: #fff;
+  font-family: var(--font-mono), serif;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.imperium-view__table-wrap {
+  overflow-x: auto;
+}
+
+.imperium-view__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono), serif;
+  font-size: 0.78rem;
+}
+
+.imperium-view__table th,
+.imperium-view__table td {
+  padding: 0.42rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.imperium-view__table th {
+  color: #a3bad8;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.imperium-view__table-row--dim {
+  opacity: 0.62;
+}
+
+.imperium-view__table-value--zero {
+  color: #8d9db5;
+}
+
+@media (max-width: 720px) {
+  .imperium-view__hero,
+  .imperium-view__section-head {
+    flex-direction: column;
+  }
+
+  .imperium-view__controls {
+    width: 100%;
+  }
+
+  .imperium-view__control {
+    width: 100%;
+  }
+}

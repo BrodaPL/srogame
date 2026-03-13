@@ -15,7 +15,7 @@
       [powers]="powersDisplay"
     ></app-resources>
 
-    <section class="planet-view__overview">
+    <section class="planet-view__overview" [class.planet-view__overview--highlighted]="isAttentionHighlightActive">
       <div class="planet-view__parameters">
         <h3 class="planet-view__section-title">Planet Parameters</h3>
         <div class="planet-parameters-grid">
