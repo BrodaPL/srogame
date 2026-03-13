@@ -13,16 +13,17 @@
     </section>
   } @else if (selectedPlanet(); as planet) {
     <div class="buildings-view__layout">
-      <div class="buildings-view__main">
-        <app-resources
-          [viewName]="'Buildings | ' + selectedPlanetLabel()"
-          [metal]="metalDisplay"
-          [crystal]="crystalDisplay"
-          [deuterium]="deuteriumDisplay"
-          [energy]="energyDisplay"
-          [powers]="powersDisplay"
-        ></app-resources>
+      <app-resources
+        class="buildings-view__resources"
+        [viewName]="'Buildings | ' + selectedPlanetLabel()"
+        [metal]="metalDisplay"
+        [crystal]="crystalDisplay"
+        [deuterium]="deuteriumDisplay"
+        [energy]="energyDisplay"
+        [powers]="powersDisplay"
+      ></app-resources>
 
+      <div class="buildings-view__main">
         <section class="overview-card buildings-view__categories-card">
           <div class="buildings-view__toggle-row">
             @for (mode of modeOptions; track mode.value) {

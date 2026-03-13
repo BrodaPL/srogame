@@ -1,4 +1,249 @@
 <app-top-menu></app-top-menu>
-<section class="game-view game-view--production-view"></section>
 
+<section class="production-view">
+  @if (isLoading) {
+    <section class="status status--info">
+      <h3>Loading Production</h3>
+      <p>Owned planets and shipyard data are being prepared.</p>
+    </section>
+  } @else if (loadError) {
+    <section class="status status--error">
+      <h3>Production unavailable</h3>
+      <p>{{ loadError }}</p>
+    </section>
+  } @else if (selectedPlanet(); as planet) {
+    <div class="production-view__layout">
+      <app-resources
+        class="production-view__resources"
+        [viewName]="'Production | ' + selectedPlanetLabel()"
+        [metal]="metalDisplay"
+        [crystal]="crystalDisplay"
+        [deuterium]="deuteriumDisplay"
+        [energy]="energyDisplay"
+        [powers]="powersDisplay"
+      ></app-resources>
 
+      <div class="production-view__main">
+        <section class="overview-card production-view__categories-card">
+          <div class="production-view__toggle-row">
+            @for (mode of modeOptions; track mode.value) {
+              <button
+                type="button"
+                class="production-view__toggle"
+                [class.production-view__toggle--active]="selectedMode === mode.value"
+                (click)="selectedMode = mode.value"
+              >
+                {{ mode.label }}
+              </button>
+            }
+          </div>
+        </section>
+
+        <section class="production-view__queue-grid">
+          <section class="overview-card">
+            <div class="production-view__section-head">
+              <div>
+                <h3>Current Shipyard Queue</h3>
+                <p class="overview-muted">
+                  {{ selectedPlanetLabel() }} | {{ currentShipQueueLength() }}/{{ maxShipQueueLength() }}
+                </p>
+              </div>
+            </div>
+
+            @if (hasShipQueueEntries()) {
+              <div class="overview-table-wrapper">
+                <table class="overview-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Ship</th>
+                      <th>Amount completed</th>
+                      <th>Status</th>
+                      <th>Invested / base</th>
+                      <th>ETA (turns)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (queueRow of shipQueueRows(); track trackShipQueueRow($index, queueRow)) {
+                      <tr>
+                        <td>{{ queueRow.position }}</td>
+                        <td>{{ queueRow.shipType }}</td>
+                        <td>{{ queueRow.amountCompleted }}/{{ queueRow.amountTotal }}</td>
+                        <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
+                        <td>{{ queueRow.currentShipInvestedShipyardPower }} / {{ queueRow.currentShipBaseConstructionTime }}</td>
+                        <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <article class="planet-queue-card">
+                <h4 class="planet-view__section-title">No ships queued</h4>
+                <p class="overview-empty">This planet does not have any shipyard production queued right now.</p>
+              </article>
+            }
+          </section>
+
+          <section class="overview-card">
+            <div class="production-view__section-head">
+              <div>
+                <h3>Current Defences Queue</h3>
+                <p class="overview-muted">{{ selectedPlanetLabel() }}</p>
+              </div>
+            </div>
+
+            <article class="planet-queue-card">
+              <h4 class="planet-view__section-title">No defences queued</h4>
+              <p class="overview-empty">Defence production is not implemented yet.</p>
+            </article>
+          </section>
+        </section>
+
+        <section class="overview-card">
+          <div class="production-view__section-head">
+            <div>
+              <h3>{{ selectedMode === 'shipyard' ? 'Shipyard' : 'Defences' }}</h3>
+              <p class="overview-muted">
+                {{ selectedMode === 'shipyard'
+                  ? 'Compact ship-production rows with amount input, costs, and unmet requirements only.'
+                  : 'Defence production will be added later in this view.' }}
+              </p>
+            </div>
+          </div>
+
+          @if (selectedMode === 'shipyard') {
+            <div class="production-view__ship-list">
+              @for (ship of shipBlueprints; track ship.type) {
+                <article class="production-view__ship-row">
+                  <img class="production-view__ship-image" [src]="ship.imagePath" [alt]="ship.type + ' image'" />
+
+                  <div class="production-view__ship-main">
+                    <h4 class="production-view__ship-title">{{ ship.type }}</h4>
+                    <p class="production-view__ship-meta">Hull class {{ ship.hullClass }}</p>
+                    <p class="production-view__ship-meta">Cargo {{ ship.cargoCapacity }}</p>
+
+                    <label class="production-view__amount-field">
+                      <span>Amount</span>
+                      <input
+                        class="production-view__amount-input"
+                        type="number"
+                        min="1"
+                        max="100000"
+                        step="1"
+                        [ngModel]="shipAmountInput(ship.type)"
+                        (ngModelChange)="onShipAmountInput(ship.type, $event)"
+                        placeholder="amount"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="production-view__ship-costs">
+                    <div class="production-view__cost-group">
+                      <p class="production-view__cost-title">Single</p>
+                      <div class="production-view__cost-row">
+                        @for (cost of shipSingleCostRows(ship); track 'single-' + cost.label) {
+                          <span
+                            class="production-view__cost-chip"
+                            [class.production-view__cost-chip--insufficient]="!cost.isEnough"
+                          >
+                            {{ cost.label }} {{ cost.amount }}
+                          </span>
+                        }
+                      </div>
+                    </div>
+
+                    <div class="production-view__cost-group">
+                      <p class="production-view__cost-title">Total</p>
+                      <div class="production-view__cost-row">
+                        @for (cost of shipTotalCostRows(ship); track 'total-' + cost.label) {
+                          <span
+                            class="production-view__cost-chip"
+                            [class.production-view__cost-chip--insufficient]="!cost.isEnough && !cost.isPlaceholder"
+                            [class.production-view__cost-chip--placeholder]="cost.isPlaceholder"
+                          >
+                            {{ cost.label }} {{ cost.amount === null ? '--' : cost.amount }}
+                          </span>
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="production-view__ship-req">
+                    @if (unmetRequirementsLabel(ship); as unmetLabel) {
+                      <span class="production-view__req-warning" [attr.title]="unmetRequirementsTooltip(ship)">
+                        {{ unmetLabel }}
+                      </span>
+                    } @else {
+                      <span class="production-view__req-ok">Ready</span>
+                    }
+                  </div>
+
+                  <div class="production-view__ship-action">
+                    <button
+                      type="button"
+                      class="production-view__build-button"
+                      [disabled]="!canBuildShip(ship)"
+                      [attr.title]="shipBuildTitle(ship)"
+                      (click)="onBuildShip(ship)"
+                    >
+                      {{ shipBuildLabel(ship) }}
+                    </button>
+                    @if (shipStartError(ship); as error) {
+                      <p class="production-view__build-error">{{ error }}</p>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          } @else {
+            <article class="planet-queue-card">
+              <h4 class="planet-view__section-title">Defences are not implemented yet</h4>
+              <p class="overview-empty">This tab will later handle planetary defence production.</p>
+            </article>
+          }
+        </section>
+      </div>
+
+      <aside class="production-view__rail overview-card">
+        <div class="production-view__section-head">
+          <div>
+            <h3>Owned Planets</h3>
+            <p class="overview-muted">Select the active production planet.</p>
+          </div>
+        </div>
+
+        <div class="production-view__rail-list">
+          @for (ownedPlanet of ownedPlanets; track trackPlanet($index, ownedPlanet)) {
+            <div
+              class="production-view__planet-option"
+              [class.production-view__planet-option--selected]="isSelectedPlanet(ownedPlanet)"
+              (click)="selectPlanet(ownedPlanet)"
+            >
+              <div class="production-view__planet-select-row">
+                <span
+                  class="production-view__planet-radio"
+                  [class.production-view__planet-radio--selected]="isSelectedPlanet(ownedPlanet)"
+                ></span>
+                <span class="production-view__planet-select-label">
+                  {{ isSelectedPlanet(ownedPlanet) ? 'Selected' : 'Select' }}
+                </span>
+              </div>
+
+              <app-mini-planet-preview
+                [planet]="ownedPlanet"
+                [showDefaultActions]="false"
+                [isSelected]="isSelectedPlanet(ownedPlanet)"
+              ></app-mini-planet-preview>
+            </div>
+          }
+        </div>
+      </aside>
+    </div>
+  } @else {
+    <section class="overview-card">
+      <h3>No owned planets</h3>
+      <p class="overview-muted">Production View requires at least one owned planet.</p>
+    </section>
+  }
+</section>
