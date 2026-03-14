@@ -3,6 +3,7 @@ import { RouterLink, RouterOutlet } from '@angular/router';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
+import { AuthStateService } from '../core/auth-state.service';
 import { GameType } from '../models/enums/game-type';
 import { GalaxySetup } from '../models/game-api-types';
 
@@ -19,7 +20,8 @@ export class GameComponent implements OnInit {
   constructor(
     private readonly gameState: GameStateService,
     private readonly gameApi: GameApiService,
-    private readonly playerSession: PlayerSessionService
+    private readonly playerSession: PlayerSessionService,
+    private readonly authState: AuthStateService
   ) {}
 
   public ngOnInit(): void {
@@ -38,6 +40,7 @@ export class GameComponent implements OnInit {
 
     this.gameApi.getGameState(session.token).subscribe({
       next: (response) => {
+        this.authState.setSession(response.player);
         this.gameState.setGalaxy(response.galaxy);
         this.isLoading = false;
       },
@@ -109,6 +112,7 @@ export class GameComponent implements OnInit {
       Number.isInteger(config.neutralBotsDifficulty) &&
       config.neutralBotsDifficulty >= -100 &&
       config.neutralBotsDifficulty <= 200 &&
+      (config.skipTutorial === undefined || typeof config.skipTutorial === 'boolean') &&
       Number.isFinite(config.startingResources?.metal) &&
       config.startingResources.metal >= 0 &&
       Number.isFinite(config.startingResources?.crystal) &&

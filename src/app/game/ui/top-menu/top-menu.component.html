@@ -2,6 +2,11 @@
   <button class="top-menu__button top-menu__button--back" type="button" (click)="goBack()">
     Go back
   </button>
+  @if (hasCurrentTutorial()) {
+    <button class="top-menu__button top-menu__button--help" type="button" (click)="openCurrentTutorial()">
+      ?
+    </button>
+  }
   <a class="top-menu__button" routerLink="/game/galactic" routerLinkActive="top-menu__button--active">
     Galactic
   </a>
@@ -27,3 +32,5 @@
     Mission Planner
   </a>
 </nav>
+
+<app-tutorial-overlay></app-tutorial-overlay>

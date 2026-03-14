@@ -14,6 +14,7 @@ import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { BuildingType } from '../enums/building-type';
 import { ResourcesPack } from '../resources-pack';
 import { ShipInstance } from '../fleets/ship-instance';
+import { createTutorialReadState } from '../../tutorial/tutorial-types';
 
 
 export class GalaxyCreator {
@@ -177,7 +178,8 @@ export class GalaxyCreator {
               [planet],
               tech,
               [],
-              PlayerType.NEUTRAL
+              PlayerType.NEUTRAL,
+              createTutorialReadState(true)
             );
 
             galaxy.players.push(player);
@@ -400,7 +402,8 @@ export class GalaxyCreator {
         [startingPlanet],
         new Map(),
         [],
-        PlayerType.PLAYER
+        PlayerType.PLAYER,
+        createTutorialReadState(this.setup.skipTutorial === true)
       );
 
       galaxy.players.push(player);

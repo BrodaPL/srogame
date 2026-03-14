@@ -14,6 +14,7 @@ import type { NoteBorderColor } from './enums/note-border-color';
 import type { PlayerType } from './enums/player-type';
 import type { FleetMissionType } from './enums/fleet-mission-type';
 import type { ReportType } from './enums/report-type';
+import type { TutorialReadState, TutorialViewKey } from '../tutorial/tutorial-types';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -30,6 +31,7 @@ export type GalaxySetup = {
   neutralBotsDifficulty: number;
   createRandomPlanets?: boolean;
   createStartingShips?: boolean;
+  skipTutorial?: boolean;
   startingResources: {
     metal: number;
     crystal: number;
@@ -41,6 +43,7 @@ export type PlayerSession = {
   id: number;
   playerName: string;
   token: string;
+  tutorialRead: TutorialReadState;
 };
 
 export type RegisterRequest = {
@@ -297,6 +300,11 @@ export type DeletePlayerReportsRequest = {
 
 export type DeletePlayerReportsResponse = {
   deletedCount: number;
+};
+
+export type MarkTutorialReadRequest = {
+  viewKey?: TutorialViewKey;
+  markAllRead?: boolean;
 };
 
 export type SetBuildingPowerConsumptionRequest = {

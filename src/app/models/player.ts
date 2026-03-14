@@ -3,6 +3,12 @@ import { TechnologyType } from './enums/technology-type';
 import { Fleet } from './fleets/fleet';
 import { PlayerType } from './enums/player-type';
 import { PlayerReport } from './reports/player-report';
+import {
+  TutorialReadState,
+  TutorialViewKey,
+  createTutorialReadState,
+  normalizeTutorialReadState
+} from '../tutorial/tutorial-types';
 
 export class Player {
   constructor(
@@ -12,6 +18,7 @@ export class Player {
     public tech: Map<TechnologyType, number>,
     public fleets: Fleet[],
     public type: PlayerType,
+    public tutorialRead: TutorialReadState = createTutorialReadState(false),
     public reports: PlayerReport[] = [],
     public nextReportId = 1
   ) {}
@@ -70,6 +77,18 @@ export class Player {
     return before - this.reports.length;
   }
 
+  public isTutorialRead(viewKey: TutorialViewKey): boolean {
+    return this.tutorialRead[viewKey];
+  }
+
+  public markTutorialRead(viewKey: TutorialViewKey): void {
+    this.tutorialRead[viewKey] = true;
+  }
+
+  public markAllTutorialsRead(): void {
+    this.tutorialRead = createTutorialReadState(true);
+  }
+
   public static techLevelsFromRecord(
     record: Record<string, number> | null | undefined
   ): Map<TechnologyType, number> {
@@ -112,5 +131,12 @@ export class Player {
     }
 
     return record;
+  }
+
+  public static tutorialReadStateFromRecord(
+    record: Partial<Record<string, unknown>> | null | undefined,
+    fallback = false
+  ): TutorialReadState {
+    return normalizeTutorialReadState(record, fallback);
   }
 }

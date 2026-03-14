@@ -35,6 +35,7 @@ import {
   ResourceHeaderIndicator,
   ResourcesComponent
 } from '../ui/resources/resources.component';
+import { TutorialService } from '../../tutorial/tutorial.service';
 
 type PlanetTab = 'resources' | 'facilities' | 'ships' | 'defences' | 'operations' | 'queues';
 
@@ -148,7 +149,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {
     const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
     const allBuildings = Array.from(buildingBlueprints.buildingsMap.values());
@@ -1102,6 +1104,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
             this.activeTab = 'resources';
             this.shipAmountInputs.clear();
             this.rebuildPlanetState();
+            this.tutorialService.autoOpenTutorial('planetView');
             this.cdr.markForCheck();
           } catch {
             this.loadError = 'Unable to process planet data.';

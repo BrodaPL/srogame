@@ -20,7 +20,9 @@ import {
   DeletePlayerReportsRequest,
   DeletePlayerReportsResponse,
   MarkPlayerReportReadRequest,
-  PlayerReportDto
+  MarkTutorialReadRequest,
+  PlayerReportDto,
+  PlayerSession
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -172,6 +174,14 @@ export class GameApiService {
   public deletePlayerReports(request: DeletePlayerReportsRequest, token: string) {
     return this.http.post<DeletePlayerReportsResponse>(
       `${API_BASE_URL}/game/reports/delete`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public markTutorialRead(request: MarkTutorialReadRequest, token: string) {
+    return this.http.post<PlayerSession>(
+      `${API_BASE_URL}/game/tutorial-read`,
       request,
       { headers: this.authHeaders(token) }
     );

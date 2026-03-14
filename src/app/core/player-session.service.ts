@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { PlayerSession } from '../models/game-api-types';
+import { normalizeTutorialReadState } from '../tutorial/tutorial-types';
 
 @Injectable({
   providedIn: 'root'
@@ -16,7 +17,13 @@ export class PlayerSessionService {
     try {
       const parsed = JSON.parse(stored) as PlayerSession;
       if (this.isValid(parsed)) {
-        return parsed;
+        return {
+          ...parsed,
+          tutorialRead: normalizeTutorialReadState(
+            (parsed as Partial<PlayerSession>).tutorialRead,
+            false
+          )
+        };
       }
     } catch {
       return null;
@@ -26,7 +33,10 @@ export class PlayerSessionService {
   }
 
   public save(session: PlayerSession): void {
-    localStorage.setItem(this.storageKey, JSON.stringify(session));
+    localStorage.setItem(this.storageKey, JSON.stringify({
+      ...session,
+      tutorialRead: normalizeTutorialReadState(session.tutorialRead, false)
+    }));
   }
 
   public clear(): void {

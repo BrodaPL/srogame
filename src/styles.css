@@ -860,6 +860,72 @@ app-root {
   color: #e8fffb;
 }
 
+.top-menu__button--help {
+  min-width: 2.6rem;
+  justify-content: center;
+  padding-inline: 0.85rem;
+  border-color: rgba(246, 180, 76, 0.5);
+  background: linear-gradient(135deg, rgba(246, 180, 76, 0.28), rgba(246, 180, 76, 0.08));
+  color: #fff2d5;
+}
+
+.tutorial-overlay__text p {
+  margin: 0 0 0.75rem;
+}
+
+.tutorial-overlay__text p:last-child {
+  margin-bottom: 0;
+}
+
+.tutorial-overlay__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tutorial-overlay__confirm-title,
+.tutorial-overlay__confirm-text {
+  margin: 0;
+}
+
+.tutorial-overlay__confirm-title {
+  color: #fff2d5;
+}
+
+.tutorial-overlay__confirm-text {
+  margin-top: 0.5rem;
+  color: #d6dfec;
+  line-height: 1.5;
+}
+
+.tutorial-overlay__bubble {
+  scrollbar-color: rgba(255, 255, 255, 0.22) rgba(8, 12, 18, 0.52);
+  scrollbar-width: thin;
+}
+
+.tutorial-overlay__bubble::-webkit-scrollbar {
+  width: 10px;
+}
+
+.tutorial-overlay__bubble::-webkit-scrollbar-track {
+  background: rgba(8, 12, 18, 0.52);
+  border-radius: 999px;
+}
+
+.tutorial-overlay__bubble::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  border: 2px solid rgba(8, 12, 18, 0.52);
+}
+
+.tutorial-overlay__bubble::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.tutorial-overlay__character-pane {
+  background: rgba(10, 13, 19, 0.26);
+  backdrop-filter: blur(4px);
+}
+
 .resources-bar {
   display: grid;
   gap: 0.6rem;

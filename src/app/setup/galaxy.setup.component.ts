@@ -25,6 +25,7 @@ type GalaxySetupForm = {
   neutralBotsDifficulty: string;
   createRandomPlanets: boolean;
   createStartingShips: boolean;
+  skipTutorial: boolean;
   startingMetal: string;
   startingCrystal: string;
   startingDeuterium: string;
@@ -139,6 +140,7 @@ export class GalaxySetupComponent {
       neutralBotsDifficulty: Number(this.form.neutralBotsDifficulty),
       createRandomPlanets: this.form.createRandomPlanets,
       createStartingShips: this.form.createStartingShips,
+      skipTutorial: this.form.skipTutorial,
       startingResources: new ResourcesPack(
         Number(this.form.startingMetal),
         Number(this.form.startingCrystal),
@@ -152,6 +154,7 @@ export class GalaxySetupComponent {
     this.gameApi.startGame({ setup: config }, session.token).subscribe({
       next: (response) => {
         localStorage.setItem('srogame:setup', JSON.stringify(config));
+        this.authState.setSession(response.player);
         this.gameState.setGalaxy(response.galaxy);
         this.savedConfig.set(config);
         this.isStarting = false;
@@ -181,6 +184,7 @@ export class GalaxySetupComponent {
       neutralBotsDifficulty: '0',
       createRandomPlanets: false,
       createStartingShips: false,
+      skipTutorial: false,
       startingMetal: '6',
       startingCrystal: '3',
       startingDeuterium: '1'
@@ -204,6 +208,7 @@ export class GalaxySetupComponent {
       neutralBotsDifficulty: String(config.neutralBotsDifficulty),
       createRandomPlanets: config.createRandomPlanets === true,
       createStartingShips: config.createStartingShips === true,
+      skipTutorial: config.skipTutorial === true,
       startingMetal: String(config.startingResources.metal),
       startingCrystal: String(config.startingResources.crystal),
       startingDeuterium: String(config.startingResources.deuterium)
@@ -277,6 +282,7 @@ export class GalaxySetupComponent {
       config.neutralBotsDifficulty <= 200 &&
       (config.createRandomPlanets === undefined || typeof config.createRandomPlanets === 'boolean') &&
       (config.createStartingShips === undefined || typeof config.createStartingShips === 'boolean') &&
+      (config.skipTutorial === undefined || typeof config.skipTutorial === 'boolean') &&
       Number.isFinite(config.startingResources?.metal) &&
       config.startingResources.metal >= 0 &&
       config.startingResources.metal <= 999999 &&

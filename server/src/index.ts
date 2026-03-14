@@ -15,6 +15,7 @@ import technologyTypeEnumModule from '../../src/app/models/enums/technology-type
 import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
 import fleetMissionTypeEnumModule from '../../src/app/models/enums/fleet-mission-type.js';
 import reportTypeEnumModule from '../../src/app/models/enums/report-type.js';
+import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
 import shipBlueprintsFactoryModule from '../../src/app/factories/ship-blueprints.factory.js';
 import technologyBlueprintsFactoryModule from '../../src/app/factories/technology-blueprints.factory.js';
@@ -122,6 +123,7 @@ const { FleetMissionType } = fleetMissionTypeEnumModule as {
 const { ReportType } = reportTypeEnumModule as {
   ReportType: typeof import('../../src/app/models/enums/report-type.js').ReportType;
 };
+const { TUTORIAL_VIEW_KEYS, createTutorialReadState } = tutorialTypesModule as typeof import('../../src/app/tutorial/tutorial-types.js');
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
 };
@@ -172,6 +174,7 @@ const BUILDING_TYPE_VALUES = new Set<string>(Array.from(BUILDING_BLUEPRINTS.buil
 const SHIP_TYPE_VALUES = new Set<string>(Object.values(ShipType));
 const FLEET_MISSION_TYPE_VALUES = new Set<string>(Object.values(FleetMissionType));
 const TECHNOLOGY_TYPE_VALUES = new Set<string>(Array.from(TECHNOLOGY_BLUEPRINTS.techByType.keys()));
+const TUTORIAL_VIEW_KEY_VALUES = new Set<string>(TUTORIAL_VIEW_KEYS);
 const BUILDING_TYPE_ROBOTICS_FACTORY = BuildingType.ROBOTICS_FACTORY as BuildingTypeType;
 const BUILDING_TYPE_SHIPYARD = BuildingType.SHIPYARD as BuildingTypeType;
 const BUILDING_TYPE_RESEARCH_LAB = BuildingType.RESEARCH_LAB as BuildingTypeType;
@@ -286,7 +289,7 @@ app.post('/api/game/start', (req, res) => {
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
 
   const response: StartGameResponse = {
-    player: toPlayerSession(auth.session),
+    player: toPlayerSession(auth.session, currentGalaxy),
     galaxy: buildGalaxySnapshot(currentGalaxy)
   };
 
@@ -308,7 +311,7 @@ app.get('/api/game/state', (req, res) => {
   }
 
   const response: GameStateResponse = {
-    player: toPlayerSession(auth.session),
+    player: toPlayerSession(auth.session, currentGalaxy),
     galaxy: buildGalaxySnapshot(currentGalaxy)
   };
 
@@ -1067,6 +1070,44 @@ app.post('/api/game/reports/delete', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.post('/api/game/tutorial-read', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as { viewKey?: string; markAllRead?: boolean } | undefined;
+  if (body?.markAllRead === true) {
+    player.markAllTutorialsRead();
+    return res.status(200).json(toPlayerSession(auth.session, currentGalaxy));
+  }
+
+  if (!body?.viewKey || !TUTORIAL_VIEW_KEY_VALUES.has(body.viewKey)) {
+    return res.status(400).json({ error: 'Invalid tutorial view key.' });
+  }
+
+  player.markTutorialRead(body.viewKey as keyof typeof player.tutorialRead);
+  return res.status(200).json(toPlayerSession(auth.session, currentGalaxy));
+});
+
 app.get('/api/game/active-fleets', (req, res) => {
   if (!currentGalaxy || currentGameOwnerId === null) {
     return res.status(404).json({ error: 'No active game.' });
@@ -1400,11 +1441,13 @@ function createSession(data: AuthData, account: AuthAccount, timestamp: string):
   return session;
 }
 
-function toPlayerSession(session: AuthSession): PlayerSession {
+function toPlayerSession(session: AuthSession, galaxy: Galaxy | null = currentGalaxy): PlayerSession {
+  const player = galaxy ? resolvePlayerFromSession(galaxy, session) : null;
   return {
     id: session.accountId,
     playerName: session.playerName,
-    token: session.token
+    token: session.token,
+    tutorialRead: player?.tutorialRead ?? createTutorialReadState(false)
   };
 }
 
@@ -1453,6 +1496,15 @@ function resolvePlayerById(galaxy: Galaxy, playerId: number): Player | null {
   }
 
   return null;
+}
+
+function resolvePlayerFromSession(galaxy: Galaxy, session: AuthSession): Player | null {
+  const playerId = resolvePlayerId(galaxy, session);
+  if (playerId === null) {
+    return null;
+  }
+
+  return resolvePlayerById(galaxy, playerId);
 }
 
 function calculateMaxBuildingQueueLength(planet: Planet, player: Player): number {
@@ -2322,6 +2374,7 @@ function isValidSetup(setup: GalaxySetup): boolean {
     setup.neutralBotsDifficulty <= 200 &&
     (setup.createRandomPlanets === undefined || typeof setup.createRandomPlanets === 'boolean') &&
     (setup.createStartingShips === undefined || typeof setup.createStartingShips === 'boolean') &&
+    (setup.skipTutorial === undefined || typeof setup.skipTutorial === 'boolean') &&
     Number.isFinite(setup.startingResources?.metal) &&
     setup.startingResources.metal >= 0 &&
     Number.isFinite(setup.startingResources?.crystal) &&
