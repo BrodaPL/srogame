@@ -20,6 +20,7 @@ import type {
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { Technology } from '../../models/tech/technology';
+import { researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 
@@ -513,8 +514,12 @@ export class ResearchesViewComponent implements OnInit {
   private researchPower(planet: ClientPlanetDto, researchLabLevel: number): number {
     const basePower = this.buildingProductionValue(planet, BuildingType.RESEARCH_LAB, researchLabLevel);
     const computerLevel = this.currentTechnologyLevel(TechnologyType.COMPUTER_TECHNOLOGY);
+    const adaptiveLevel = this.currentTechnologyLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const irnLevel = this.currentTechnologyLevel(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK);
     const scienceModifier = planet.info.planetaryParameters.scienceModifier;
-    const result = basePower * (1 + ((computerLevel * 5) / 100)) * scienceModifier;
+    const result = basePower
+      * researchPowerMultiplier(computerLevel, adaptiveLevel, irnLevel)
+      * scienceModifier;
     return Number.isFinite(result) ? Math.floor(result) : 0;
   }
 

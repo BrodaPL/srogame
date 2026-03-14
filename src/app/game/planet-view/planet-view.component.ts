@@ -24,6 +24,7 @@ import type {
 } from '../../models/game-api-types';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
+import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { Ship } from '../../models/fleets/ship';
 import { Technology } from '../../models/tech/technology';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -1496,6 +1497,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private currentIndustryPower(): number {
     const roboticsFactoryLevel = this.buildingLevel(BuildingType.ROBOTICS_FACTORY);
     const naniteFactoryLevel = this.buildingLevel(BuildingType.NANITE_FACTORY);
+    const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
 
     const roboticsPower = roboticsFactoryLevel <= 0
@@ -1505,7 +1507,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       ? 1
       : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
-    const industryPower = roboticsPower * naniteMultiplier * industryModifier;
+    const industryPower = roboticsPower
+      * naniteMultiplier
+      * industryModifier
+      * industryPowerMultiplier(adaptiveTechnologyLevel);
     if (!Number.isFinite(industryPower) || industryPower <= 0) {
       return 0;
     }
@@ -1516,6 +1521,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private currentShipyardPower(): number {
     const shipyardLevel = this.buildingLevel(BuildingType.SHIPYARD);
     const naniteFactoryLevel = this.buildingLevel(BuildingType.NANITE_FACTORY);
+    const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
 
     const shipyardBasePower = shipyardLevel <= 0
@@ -1525,7 +1531,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       ? 1
       : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
-    const shipyardPower = shipyardBasePower * naniteMultiplier * industryModifier;
+    const shipyardPower = shipyardBasePower
+      * naniteMultiplier
+      * industryModifier
+      * industryPowerMultiplier(adaptiveTechnologyLevel);
     if (!Number.isFinite(shipyardPower) || shipyardPower <= 0) {
       return 0;
     }
@@ -1536,11 +1545,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private currentResearchPower(): number {
     const researchLabLevel = this.buildingLevel(BuildingType.RESEARCH_LAB);
     const computerTechnologyLevel = this.techLevel(TechnologyType.COMPUTER_TECHNOLOGY);
+    const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const intergalacticResearchNetworkLevel = this.techLevel(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK);
     const scienceModifier = this.planet?.info.planetaryParameters.scienceModifier ?? 1;
     const researchLabProduction = this.getProductionAtLevelByType(BuildingType.RESEARCH_LAB, researchLabLevel);
-    const computerMultiplier = 1 + ((computerTechnologyLevel * 5) / 100);
+    const totalResearchMultiplier = researchPowerMultiplier(
+      computerTechnologyLevel,
+      adaptiveTechnologyLevel,
+      intergalacticResearchNetworkLevel
+    );
 
-    const researchPower = researchLabProduction * computerMultiplier * scienceModifier;
+    const researchPower = researchLabProduction * totalResearchMultiplier * scienceModifier;
     if (!Number.isFinite(researchPower) || researchPower <= 0) {
       return 0;
     }

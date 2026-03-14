@@ -100,7 +100,7 @@ export class EncyclopediaMechanicsComponent {
       ],
       formulas: [
         'maxLabsPerTechnology = max(1, floor(1.5 * sqrt(INTERGALACTIC_RESEARCH_NETWORK) + 1))',
-        'researchPower = floor(RESEARCH_LAB production1 * (1 + COMPUTER_TECHNOLOGY * 5 / 100) * scienceModifier)'
+        'researchPower = floor(RESEARCH_LAB production1 * (1 + (COMPUTER_TECHNOLOGY * 5 + ADAPTIVE_TECHNOLOGY + INTERGALACTIC_RESEARCH_NETWORK * 2) / 100) * scienceModifier)'
       ]
     },
     {
@@ -191,6 +191,9 @@ export class EncyclopediaMechanicsComponent {
         'Players will send fleets with mission intent such as transport, attack, reconnaissance, or support.',
         'Mission validation will include coordinates, ownership constraints, and ship capability checks.',
         'Mission Planner warnings should evolve from raw validation messages into human-readable guidance with suggested fixes for the player.'
+      ],
+      formulas: [
+        'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2'
       ]
     },
     {

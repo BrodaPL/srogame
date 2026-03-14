@@ -17,6 +17,7 @@ import type {
   ShipyardQueueEntryDto,
   TechnologyQueueEntryDto
 } from '../../models/game-api-types';
+import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -590,7 +591,9 @@ export class ImperiumViewComponent implements OnInit {
   ): PlanetPowerState {
     const industryModifier = planet.info.planetaryParameters.industryModifier;
     const scienceModifier = planet.info.planetaryParameters.scienceModifier;
+    const adaptiveTechnologyLevel = techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? 0;
     const computerTechnologyLevel = techLevels.get(TechnologyType.COMPUTER_TECHNOLOGY) ?? 0;
+    const intergalacticResearchNetworkLevel = techLevels.get(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK) ?? 0;
 
     const roboticsFactoryLevel = this.buildingLevel(planet, BuildingType.ROBOTICS_FACTORY);
     const shipyardLevel = this.buildingLevel(planet, BuildingType.SHIPYARD);
@@ -607,12 +610,17 @@ export class ImperiumViewComponent implements OnInit {
       ? 0
       : this.currentBuildingProduction(planet, BuildingType.SHIPYARD);
     const researchLabProduction = this.currentBuildingProduction(planet, BuildingType.RESEARCH_LAB);
-    const computerMultiplier = 1 + ((computerTechnologyLevel * 5) / 100);
+    const adaptiveIndustryMultiplier = industryPowerMultiplier(adaptiveTechnologyLevel);
+    const totalResearchMultiplier = researchPowerMultiplier(
+      computerTechnologyLevel,
+      adaptiveTechnologyLevel,
+      intergalacticResearchNetworkLevel
+    );
 
     return {
-      industryPower: Math.max(0, Math.floor(roboticsPower * naniteMultiplier * industryModifier)),
-      shipyardPower: Math.max(0, Math.floor(shipyardBasePower * naniteMultiplier * industryModifier)),
-      researchPower: Math.max(0, Math.floor(researchLabProduction * computerMultiplier * scienceModifier)),
+      industryPower: Math.max(0, Math.floor(roboticsPower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier)),
+      shipyardPower: Math.max(0, Math.floor(shipyardBasePower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier)),
+      researchPower: Math.max(0, Math.floor(researchLabProduction * totalResearchMultiplier * scienceModifier)),
       industryPowerLimited: this.isBuildingPowerLimited(planet, BuildingType.ROBOTICS_FACTORY)
         || this.isBuildingPowerLimited(planet, BuildingType.NANITE_FACTORY),
       shipyardPowerLimited: this.isBuildingPowerLimited(planet, BuildingType.SHIPYARD)

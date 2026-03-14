@@ -1,13 +1,15 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { ShipPurpose } from '../../models/enums/ship-purpose';
 import { ShipType } from '../../models/enums/ship-type';
+import { TechnologyType } from '../../models/enums/technology-type';
 import { WeaponType } from '../../models/enums/weapon-type';
+import { Fleet } from '../../models/fleets/fleet';
 import type {
   ClientCoordinates,
   ClientPlanetDto,
@@ -15,6 +17,7 @@ import type {
   ShipAmountEntry
 } from '../../models/game-api-types';
 import { Ship } from '../../models/fleets/ship';
+import { maxActiveFleets } from '../../models/tech/technology-effects';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 
@@ -79,6 +82,7 @@ export class MissionPlannerViewComponent implements OnInit {
   protected launchError: string | null = null;
   protected targetLookupError: string | null = null;
   protected ownedPlanets: ClientPlanetDto[] = [];
+  protected activeFleets: Fleet[] = [];
   protected selectedOriginPlanet: ClientPlanetDto | null = null;
   protected selectedTargetPlanet: ClientPlanetDto | null = null;
   protected originCoordinatesInput = '';
@@ -198,6 +202,13 @@ export class MissionPlannerViewComponent implements OnInit {
       warnings.push({ text: 'Insufficient cargo space.', severity: 'error' });
     }
 
+    if (this.activeFleets.length >= this.maxActiveFleetCount()) {
+      warnings.push({
+        text: `Active fleet limit reached (${this.activeFleets.length}/${this.maxActiveFleetCount()}). Upgrade COMPUTER_TECHNOLOGY to control more fleets.`,
+        severity: 'error'
+      });
+    }
+
     if (this.selectedMissionType === FleetMissionType.SPY) {
       const spyProbeAmount = this.selectedShipAmount(ShipType.SPY_PROBE);
       if (spyProbeAmount <= 0) {
@@ -266,6 +277,10 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected canLaunch(): boolean {
     return !this.isLaunching && this.warningRows().every((warning) => warning.severity !== 'error');
+  }
+
+  protected maxActiveFleetCount(): number {
+    return maxActiveFleets(this.techLevel(TechnologyType.COMPUTER_TECHNOLOGY));
   }
 
   protected totalCargoCapacity(): number {
@@ -485,6 +500,7 @@ export class MissionPlannerViewComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.ownedPlanets = this.sortPlanets(response.ownedPlanets);
+          this.activeFleets = [...response.activeFleets];
           this.selectedOriginPlanet = this.findOwnedPlanet(this.selectedOriginPlanet?.coordinates ?? null);
           this.selectedTargetPlanet = this.findOwnedPlanet(this.selectedTargetPlanet?.coordinates ?? null) ?? this.selectedTargetPlanet;
           this.clearAllShips();
@@ -508,14 +524,18 @@ export class MissionPlannerViewComponent implements OnInit {
     this.isLoading = true;
     this.loadError = null;
 
-    this.gameApi.getOwnedPlanets(session.token)
+    forkJoin({
+      ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
+      activeFleets: this.gameApi.getActiveFleets(session.token)
+    })
       .pipe(finalize(() => {
         this.isLoading = false;
         this.cdr.markForCheck();
       }))
       .subscribe({
-        next: (ownedPlanets) => {
+        next: ({ ownedPlanets, activeFleets }) => {
           this.ownedPlanets = this.sortPlanets(ownedPlanets);
+          this.activeFleets = [...activeFleets];
           const firstWithShips = this.planetsWithAvailableShips()[0] ?? this.ownedPlanets[0] ?? null;
           if (firstWithShips) {
             this.selectOriginPlanet(firstWithShips);
@@ -661,6 +681,14 @@ export class MissionPlannerViewComponent implements OnInit {
 
   private coordinatesLabel(coordinates: ClientCoordinates): string {
     return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+  }
+
+  private techLevel(technologyType: TechnologyType): number {
+    const techLevels = this.selectedOriginPlanet?.reportData?.techLevels
+      ?? this.ownedPlanets[0]?.reportData?.techLevels
+      ?? [];
+    const matchingEntry = techLevels.find((entry) => entry.type === technologyType);
+    return matchingEntry?.level ?? 0;
   }
 
   private isOwnedByPlayer(planet: ClientPlanetDto): boolean {

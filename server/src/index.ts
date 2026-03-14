@@ -22,6 +22,7 @@ import buildingQueueEntryModule from '../../src/app/models/buildings/building-qu
 import shipyardQueueEntryModule from '../../src/app/models/fleets/shipyard-queue-entry.js';
 import technologyQueueEntryModule from '../../src/app/models/tech/technology-queue-entry.js';
 import researchHelperForModule from '../../src/app/models/tech/research-helper-for.js';
+import technologyEffectsModule from '../../src/app/models/tech/technology-effects.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   GalaxySetup,
@@ -142,6 +143,7 @@ const { TechnologyQueueEntry } = technologyQueueEntryModule as {
 const { ResearchHelperFor } = researchHelperForModule as {
   ResearchHelperFor: typeof import('../../src/app/models/tech/research-helper-for.js').ResearchHelperFor;
 };
+const { maxActiveFleets } = technologyEffectsModule as typeof import('../../src/app/models/tech/technology-effects.js');
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -1137,6 +1139,17 @@ app.post('/api/game/active-fleets', (req, res) => {
 
   if (originPlanet.info.ownerId !== playerId) {
     return res.status(403).json({ error: 'Origin planet must be owned by you.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found.' });
+  }
+
+  const playerActiveFleetCount = currentGalaxy.activeFleets.filter((fleet) => fleet.ownerId === playerId).length;
+  const playerMaxActiveFleets = maxActiveFleets(player.getTechLevel(TECH_TYPE_COMPUTER_TECHNOLOGY));
+  if (playerActiveFleetCount >= playerMaxActiveFleets) {
+    return res.status(400).json({ error: 'Active fleet limit reached. Upgrade COMPUTER_TECHNOLOGY to control more fleets.' });
   }
 
   if (ships.length === 0) {
