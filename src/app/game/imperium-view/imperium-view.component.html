@@ -12,18 +12,8 @@
       <p>{{ loadError }}</p>
     </section>
   } @else {
-    <header class="overview-card imperium-view__hero">
-      <div>
-        <p class="eyebrow">Empire Overview</p>
-        <h1 class="imperium-view__title">Imperium</h1>
-        <p class="overview-muted">
-          A strategic summary of owned planets, queues, resource flow, and empire-wide production power.
-        </p>
-      </div>
-    </header>
-
     <app-resources
-      viewName="Imperium Summary"
+      [viewName]="playerName + ' Imperium Summary'"
       [metal]="metalDisplay"
       [crystal]="crystalDisplay"
       [deuterium]="deuteriumDisplay"
@@ -153,7 +143,15 @@
               @if (planetVm.attentionLabels.length > 0) {
                 <div class="imperium-view__planet-alerts">
                   @for (attentionLabel of planetVm.attentionLabels; track attentionLabel) {
-                    <span class="imperium-view__planet-alert">{{ attentionLabel }}</span>
+                    <span
+                      class="imperium-view__planet-alert"
+                      [class.imperium-view__attention-link--low]="planetAlertClass(planetVm.attentionLabels.length) === 'imperium-view__attention-link--low'"
+                      [class.imperium-view__attention-link--medium]="planetAlertClass(planetVm.attentionLabels.length) === 'imperium-view__attention-link--medium'"
+                      [class.imperium-view__attention-link--high]="planetAlertClass(planetVm.attentionLabels.length) === 'imperium-view__attention-link--high'"
+                      [class.imperium-view__attention-link--critical]="planetAlertClass(planetVm.attentionLabels.length) === 'imperium-view__attention-link--critical'"
+                    >
+                      {{ attentionLabel }}
+                    </span>
                   }
                 </div>
               }

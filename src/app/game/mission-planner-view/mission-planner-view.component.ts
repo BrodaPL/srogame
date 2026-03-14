@@ -1,5 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
@@ -101,8 +102,11 @@ export class MissionPlannerViewComponent implements OnInit {
 
   private readonly shipBlueprintsByType = new Map<ShipType, Ship>();
   private readonly shipSelectionByType = new Map<ShipType, number>();
+  private pendingTargetCoordinates: ClientCoordinates | null = null;
+  private pendingMissionType: FleetMissionType | null = null;
 
   constructor(
+    private readonly route: ActivatedRoute,
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef
@@ -115,6 +119,7 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   public ngOnInit(): void {
+    this.readRoutePrefill();
     this.loadPlannerData();
   }
 
@@ -540,6 +545,7 @@ export class MissionPlannerViewComponent implements OnInit {
           if (firstWithShips) {
             this.selectOriginPlanet(firstWithShips);
           }
+          this.applyRoutePrefill();
         },
         error: () => {
           this.loadError = 'Unable to load mission planner data.';
@@ -713,5 +719,49 @@ export class MissionPlannerViewComponent implements OnInit {
     }
 
     return this.ownedPlanets.find((planet) => this.sameCoordinates(planet.coordinates, coordinates)) ?? null;
+  }
+
+  private readRoutePrefill(): void {
+    const queryParamMap = this.route.snapshot.queryParamMap;
+    const mission = queryParamMap.get('mission');
+    const targetX = this.parseQueryCoordinate(queryParamMap.get('targetX'));
+    const targetY = this.parseQueryCoordinate(queryParamMap.get('targetY'));
+    const targetZ = this.parseQueryCoordinate(queryParamMap.get('targetZ'));
+
+    if (mission && this.missionOptions.some((option) => option.type === mission as FleetMissionType)) {
+      this.pendingMissionType = mission as FleetMissionType;
+      this.selectedMissionType = this.pendingMissionType;
+      this.onMissionTypeChange();
+    }
+
+    if (targetX !== null && targetY !== null && targetZ !== null) {
+      this.pendingTargetCoordinates = { x: targetX, y: targetY, z: targetZ };
+      this.targetCoordinatesInput = this.coordinatesLabel(this.pendingTargetCoordinates);
+    }
+  }
+
+  private applyRoutePrefill(): void {
+    if (this.pendingMissionType) {
+      this.selectedMissionType = this.pendingMissionType;
+      this.onMissionTypeChange();
+      this.pendingMissionType = null;
+    }
+
+    if (!this.pendingTargetCoordinates) {
+      return;
+    }
+
+    const targetCoordinates = this.pendingTargetCoordinates;
+    this.pendingTargetCoordinates = null;
+    this.resolveTargetPlanet(targetCoordinates, this.findOwnedPlanet(targetCoordinates));
+  }
+
+  private parseQueryCoordinate(value: string | null): number | null {
+    if (value === null) {
+      return null;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
   }
 }

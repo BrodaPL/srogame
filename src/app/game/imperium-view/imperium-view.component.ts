@@ -149,6 +149,7 @@ export class ImperiumViewComponent implements OnInit {
   protected activeBuildingQueues = 0;
   protected activeShipyardQueues = 0;
   protected activeResearchRoles = 0;
+  protected playerName = 'Player';
 
   private readonly buildings = Array.from(BuildingBlueprintsFactory.fromDefaultJson().buildingsMap.values());
   private readonly buildingByType = new Map<BuildingType, Building>(
@@ -211,6 +212,10 @@ export class ImperiumViewComponent implements OnInit {
     return 'imperium-view__attention-link--low';
   }
 
+  protected planetAlertClass(warningCount: number): string {
+    return this.warningCountClass(warningCount);
+  }
+
   private loadOwnedPlanets(): void {
     const session = this.playerSession.load();
     if (!session) {
@@ -218,6 +223,7 @@ export class ImperiumViewComponent implements OnInit {
       return;
     }
 
+    this.playerName = session.playerName;
     this.isLoading = true;
     this.loadError = null;
 
@@ -385,9 +391,15 @@ export class ImperiumViewComponent implements OnInit {
     return [
       this.createAttentionItem(
         'energyDeficit',
-        'Energy deficit',
+        'Energy insufficient',
         'Energy usage is above available output.',
         planetVms.filter((planetVm) => planetVm.energy.used > planetVm.energy.available)
+      ),
+      this.createAttentionItem(
+        'energyReduction',
+        'Energy reduction',
+        'At least one building is manually set below its maximum power usage.',
+        planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Energy reduction'))
       ),
       this.createAttentionItem(
         'idleBuildingQueue',
@@ -508,7 +520,11 @@ export class ImperiumViewComponent implements OnInit {
     const labels: string[] = [];
 
     if (energy.used > energy.available) {
-      labels.push('Energy deficit');
+      labels.push('Energy insufficient');
+    }
+
+    if (this.hasAnyManualPowerReduction(planet)) {
+      labels.push('Energy reduction');
     }
 
     if (planet.objects.buildingQueue.length === 0) {
@@ -716,6 +732,17 @@ export class ImperiumViewComponent implements OnInit {
     }
 
     return this.currentPowerConsumption(planet, buildingType) < maxConsumption;
+  }
+
+  private hasAnyManualPowerReduction(planet: ClientPlanetDto): boolean {
+    for (const entry of planet.objects.buildingsLevels) {
+      const buildingType = entry.type as BuildingType;
+      if (this.isBuildingPowerLimited(planet, buildingType)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private resourceCapacity(planet: ClientPlanetDto): { metal: number; crystal: number; deuterium: number } {

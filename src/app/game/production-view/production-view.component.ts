@@ -17,7 +17,12 @@ import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
-import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
+import {
+  PlanetPowersDisplay,
+  ResourceDisplay,
+  ResourcesComponent,
+  ResourceTitleLink
+} from '../ui/resources/resources.component';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
 type ProductionMode = 'shipyard' | 'defences';
@@ -109,6 +114,33 @@ export class ProductionViewComponent implements OnInit {
     }
 
     return `${planet.basicInfo.name} (${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z})`;
+  }
+
+  protected selectedPlanetName(): string {
+    return this.selectedPlanet()?.basicInfo.name ?? 'No planet selected';
+  }
+
+  protected selectedPlanetCoordinatesLabel(): string {
+    const planet = this.selectedPlanet();
+    return planet ? `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}` : '--:--:--';
+  }
+
+  protected selectedPlanetTitleLink(): ResourceTitleLink | null {
+    const planet = this.selectedPlanet();
+    if (!planet) {
+      return null;
+    }
+
+    return {
+      label: planet.basicInfo.name,
+      routerLink: '/game/planet',
+      queryParams: {
+        x: planet.coordinates.x,
+        y: planet.coordinates.y,
+        z: planet.coordinates.z
+      },
+      title: `Open ${planet.basicInfo.name} in Planet View`
+    };
   }
 
   protected selectPlanet(planet: ClientPlanetDto): void {
@@ -423,10 +455,19 @@ export class ProductionViewComponent implements OnInit {
       shipyardPower: this.currentShipyardPower(),
       researchPower: this.currentResearchPower(),
       industryPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
-        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY),
+        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+        || (energyEfficiency < 0.9999 && (
+          this.buildingLevel(BuildingType.ROBOTICS_FACTORY) > 0
+          || this.buildingLevel(BuildingType.NANITE_FACTORY) > 0
+        )),
       shipyardPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD)
-        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY),
+        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+        || (energyEfficiency < 0.9999 && (
+          this.buildingLevel(BuildingType.SHIPYARD) > 0
+          || this.buildingLevel(BuildingType.NANITE_FACTORY) > 0
+        )),
       researchPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.RESEARCH_LAB)
+        || (energyEfficiency < 0.9999 && this.buildingLevel(BuildingType.RESEARCH_LAB) > 0)
     };
   }
 

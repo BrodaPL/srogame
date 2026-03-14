@@ -63,8 +63,8 @@
       <button
         type="button"
         class="mini-planet-preview__button"
-        disabled
-        title="Coming in future session"
+        [attr.title]="'Open Mission Planner with target ' + coordinatesLabel()"
+        (click)="openSpyPlanet()"
       >
         Spy Planet
       </button>

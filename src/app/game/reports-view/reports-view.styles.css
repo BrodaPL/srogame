@@ -463,6 +463,7 @@
     justify-items: stretch;
   }
 
+
   .reports-view__stats-grid {
     grid-template-columns: minmax(0, 1fr);
   }

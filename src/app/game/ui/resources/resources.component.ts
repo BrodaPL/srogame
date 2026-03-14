@@ -1,4 +1,5 @@
 import { Component, Input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 export type ResourceDisplay = {
   current?: number | null;
@@ -17,12 +18,32 @@ export type PlanetPowersDisplay = {
   researchPowerLimited: boolean;
 };
 
+export type ResourceHeaderIndicator = {
+  label: string;
+  isCurrent: boolean;
+  tone: 'safe' | 'neutral' | 'danger';
+  queryParams: Record<string, string | number | boolean>;
+  title?: string;
+};
+
+export type ResourceTitleLink = {
+  label: string;
+  routerLink: string;
+  queryParams?: Record<string, string | number | boolean>;
+  title?: string;
+};
+
 @Component({
   selector: 'app-resources',
+  imports: [RouterLink],
   templateUrl: './resources.component.html'
 })
 export class ResourcesComponent {
   @Input() viewName = '';
+  @Input() titlePrefix = '';
+  @Input() titleLink: ResourceTitleLink | null = null;
+  @Input() titleSuffix = '';
+  @Input() headerIndicators: ResourceHeaderIndicator[] = [];
   @Input() metal: ResourceDisplay | null = null;
   @Input() crystal: ResourceDisplay | null = null;
   @Input() deuterium: ResourceDisplay | null = null;
@@ -102,7 +123,7 @@ export class ResourcesComponent {
   }
 
   protected energyOverloadLabel(resource: ResourceDisplay | null): string {
-    return this.isEnergyOverloaded(resource) ? ' ! ! ! ' : '';
+    return this.isEnergyOverloaded(resource) ? ' ! ' : '';
   }
 
   protected formatPower(value: number | null | undefined): string {

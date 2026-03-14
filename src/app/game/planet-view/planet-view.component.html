@@ -8,6 +8,7 @@
   } @else if (planet) {
     <app-resources
       [viewName]="'Planet View'"
+      [headerIndicators]="planetHeaderIndicators()"
       [metal]="metalDisplay"
       [crystal]="crystalDisplay"
       [deuterium]="deuteriumDisplay"
@@ -43,7 +44,7 @@
             @for (label of attentionLabels(); track label) {
               <p
                 class="planet-view__attention-item"
-                [class.planet-view__attention-item--danger]="label === 'Energy deficit'"
+                [class.planet-view__attention-item--danger]="label === 'Energy insufficient'"
               >
                 {{ label }}
               </p>
@@ -56,11 +57,29 @@
 
       <div class="planet-view__hero">
         <h2 class="planet-view__planet-name">{{ planet.basicInfo.name }}</h2>
-        <img
-          class="planet-view__planet-image"
-          [src]="planet.basicInfo.image"
-          [alt]="planet.basicInfo.name + ' image'"
-        />
+        <div class="planet-view__hero-image-row">
+          <button
+            type="button"
+            class="planet-view__switch-button"
+            [disabled]="ownedPlanets.length <= 1"
+            (click)="navigateToPreviousPlanet()"
+          >
+            &lt;
+          </button>
+          <img
+            class="planet-view__planet-image"
+            [src]="planet.basicInfo.image"
+            [alt]="planet.basicInfo.name + ' image'"
+          />
+          <button
+            type="button"
+            class="planet-view__switch-button"
+            [disabled]="ownedPlanets.length <= 1"
+            (click)="navigateToNextPlanet()"
+          >
+            &gt;
+          </button>
+        </div>
         <p class="planet-view__planet-meta">
           <button
             type="button"

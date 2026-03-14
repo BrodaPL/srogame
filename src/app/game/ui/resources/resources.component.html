@@ -1,5 +1,48 @@
 <section class="resources-bar">
-  <div class="resources-bar__title">{{ viewName }}</div>
+  <div class="resources-bar__title-row">
+    <div class="resources-bar__title">
+      @if (titleLink) {
+        {{ titlePrefix }}
+        <a
+          class="resources-bar__title-link"
+          [routerLink]="titleLink.routerLink"
+          [queryParams]="titleLink.queryParams ?? null"
+          [attr.title]="titleLink.title ?? null"
+        >
+          {{ titleLink.label }}
+        </a>
+        {{ titleSuffix }}
+      } @else {
+        {{ viewName }}
+      }
+    </div>
+    @if (headerIndicators.length > 0) {
+      <div class="resources-bar__indicators">
+        @for (indicator of headerIndicators; track indicator.label + indicator.queryParams['x'] + ':' + indicator.queryParams['y'] + ':' + indicator.queryParams['z']) {
+          <a
+            class="resources-bar__indicator-link"
+            [routerLink]="'/game/planet'"
+            [queryParams]="indicator.queryParams"
+            [attr.title]="indicator.title ?? null"
+          >
+            <span
+              class="resources-bar__indicator"
+              [class.resources-bar__indicator--current]="indicator.isCurrent"
+              [class.resources-bar__indicator--safe]="indicator.tone === 'safe'"
+              [class.resources-bar__indicator--neutral]="indicator.tone === 'neutral'"
+              [class.resources-bar__indicator--danger]="indicator.tone === 'danger'"
+            >
+              @if (indicator.isCurrent) {
+                [<span class="resources-bar__indicator-dot">{{ indicator.label }}</span>]
+              } @else {
+                <span class="resources-bar__indicator-dot">{{ indicator.label }}</span>
+              }
+            </span>
+          </a>
+        }
+      </div>
+    }
+  </div>
   <div class="resources-bar__items">
     <div class="resource">
       <span class="resource__label">Metal</span>

@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
-import { finalize, timeout } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { finalize, forkJoin, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
@@ -29,7 +29,12 @@ import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/t
 import { Ship } from '../../models/fleets/ship';
 import { Technology } from '../../models/tech/technology';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
-import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
+import {
+  PlanetPowersDisplay,
+  ResourceDisplay,
+  ResourceHeaderIndicator,
+  ResourcesComponent
+} from '../ui/resources/resources.component';
 
 type PlanetTab = 'resources' | 'facilities' | 'ships' | 'defences' | 'operations' | 'queues';
 
@@ -99,6 +104,7 @@ type ResearchQueueRowVm = {
 })
 export class PlanetViewComponent implements OnInit, OnDestroy {
   protected planet: ClientPlanetDto | null = null;
+  protected ownedPlanets: ClientPlanetDto[] = [];
   protected isLoading = false;
   protected loadError: string | null = null;
   protected isAttentionHighlightActive = false;
@@ -139,6 +145,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly route: ActivatedRoute,
+    private readonly router: Router,
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef
@@ -469,6 +476,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           }
 
           this.planet = updatedPlanet;
+          this.syncOwnedPlanet(updatedPlanet);
           this.rebuildPlanetState();
           this.cdr.markForCheck();
         },
@@ -709,6 +717,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           }
 
           this.planet = updatedPlanet;
+          this.syncOwnedPlanet(updatedPlanet);
           this.rebuildPlanetState();
           this.cdr.markForCheck();
         },
@@ -921,49 +930,54 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected attentionLabels(): string[] {
-    const planet = this.planet;
-    if (!planet) {
-      return [];
+    return this.currentPlanetAttentionLabels();
+  }
+
+  protected planetHeaderIndicators(): ResourceHeaderIndicator[] {
+    const currentPlanet = this.planet;
+    return this.ownedPlanets.map((planet) => ({
+      label: '•',
+      isCurrent: currentPlanet ? this.sameCoordinates(currentPlanet.coordinates, planet.coordinates) : false,
+      tone: currentPlanet && this.sameCoordinates(currentPlanet.coordinates, planet.coordinates)
+        ? this.headerIndicatorToneFromLabels(this.currentPlanetAttentionLabels())
+        : this.headerIndicatorToneForPlanet(planet),
+      queryParams: {
+        x: planet.coordinates.x,
+        y: planet.coordinates.y,
+        z: planet.coordinates.z
+      },
+      title: `${planet.basicInfo.name} (${this.coordinatesLabelForPlanet(planet)})`
+    }));
+  }
+
+  protected navigateToPreviousPlanet(): void {
+    const target = this.relativeOwnedPlanet(-1);
+    if (!target) {
+      return;
     }
 
-    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
-    const labels: string[] = [];
+    void this.router.navigate(['/game/planet'], {
+      queryParams: {
+        x: target.coordinates.x,
+        y: target.coordinates.y,
+        z: target.coordinates.z
+      }
+    });
+  }
 
-    if (energy.used > energy.available) {
-      labels.push('Energy deficit');
+  protected navigateToNextPlanet(): void {
+    const target = this.relativeOwnedPlanet(1);
+    if (!target) {
+      return;
     }
 
-    if (planet.objects.buildingQueue.length === 0) {
-      labels.push('Empty building queue');
-    }
-
-    if (planet.objects.shipyardQueue.length === 0) {
-      labels.push('Empty shipyard queue');
-    }
-
-    if (!planet.objects.currentResearchQueue && !planet.objects.researchHelperFor) {
-      labels.push('No active research role');
-    }
-
-    if (
-      this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
-      || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
-    ) {
-      labels.push('Reduced industry power');
-    }
-
-    if (
-      this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD)
-      || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
-    ) {
-      labels.push('Reduced shipyard power');
-    }
-
-    if (this.isBuildingNotUsingFullPower(BuildingType.RESEARCH_LAB)) {
-      labels.push('Reduced research power');
-    }
-
-    return labels;
+    void this.router.navigate(['/game/planet'], {
+      queryParams: {
+        x: target.coordinates.x,
+        y: target.coordinates.y,
+        z: target.coordinates.z
+      }
+    });
   }
 
   protected buildingCostHeader(building: Building): string {
@@ -1052,7 +1066,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
     this.armLoadingSafetyTimeout(requestKey);
 
-    this.gameApi.getClientPlanet(x, y, z, session.token)
+    forkJoin({
+      planet: this.gameApi.getClientPlanet(x, y, z, session.token),
+      ownedPlanets: this.gameApi.getOwnedPlanets(session.token)
+    })
       .pipe(
         timeout(10000),
         finalize(() => {
@@ -1066,7 +1083,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         })
       )
       .subscribe({
-        next: (planet) => {
+        next: ({ planet, ownedPlanets }) => {
           if (this.currentPlanetRequestKey !== requestKey) {
             return;
           }
@@ -1080,6 +1097,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
             }
 
             this.planet = planet;
+            this.ownedPlanets = this.sortOwnedPlanets(ownedPlanets);
             this.coordinatesLabel = `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`;
             this.activeTab = 'resources';
             this.shipAmountInputs.clear();
@@ -1618,6 +1636,248 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return energyDeficitEfficiencyMultiplier(energy.available, energy.used);
   }
 
+  private relativeOwnedPlanet(step: number): ClientPlanetDto | null {
+    const currentPlanet = this.planet;
+    if (!currentPlanet || this.ownedPlanets.length === 0) {
+      return null;
+    }
+
+    const currentIndex = this.ownedPlanets.findIndex((planet) => this.sameCoordinates(planet.coordinates, currentPlanet.coordinates));
+    if (currentIndex < 0) {
+      return null;
+    }
+
+    const targetIndex = (currentIndex + step + this.ownedPlanets.length) % this.ownedPlanets.length;
+    return this.ownedPlanets[targetIndex] ?? null;
+  }
+
+  private attentionLabelsForPlanet(planet: ClientPlanetDto): string[] {
+    const labels: string[] = [];
+    const energy = this.calculateEnergyStateForPlanet(planet);
+
+    if (energy.used > energy.available) {
+      labels.push('Energy insufficient');
+    }
+
+    if (this.hasAnyPlanetManualPowerReduction(planet)) {
+      labels.push('Energy reduction');
+    }
+
+    if (planet.objects.buildingQueue.length === 0) {
+      labels.push('Empty building queue');
+    }
+
+    if (planet.objects.shipyardQueue.length === 0) {
+      labels.push('Empty shipyard queue');
+    }
+
+    if (!planet.objects.currentResearchQueue && !planet.objects.researchHelperFor) {
+      labels.push('No active research role');
+    }
+
+    if (
+      this.isPlanetPowerLimited(planet, BuildingType.ROBOTICS_FACTORY)
+      || this.isPlanetPowerLimited(planet, BuildingType.NANITE_FACTORY)
+    ) {
+      labels.push('Reduced industry power');
+    }
+
+    if (
+      this.isPlanetPowerLimited(planet, BuildingType.SHIPYARD)
+      || this.isPlanetPowerLimited(planet, BuildingType.NANITE_FACTORY)
+    ) {
+      labels.push('Reduced shipyard power');
+    }
+
+    if (this.isPlanetPowerLimited(planet, BuildingType.RESEARCH_LAB)) {
+      labels.push('Reduced research power');
+    }
+
+    return labels;
+  }
+
+  private headerIndicatorToneForPlanet(planet: ClientPlanetDto): 'safe' | 'neutral' | 'danger' {
+    const labels = this.attentionLabelsForPlanet(planet);
+    return this.headerIndicatorToneFromLabels(labels);
+  }
+
+  private currentPlanetAttentionLabels(): string[] {
+    const planet = this.planet;
+    if (!planet) {
+      return [];
+    }
+
+    const labels: string[] = [];
+    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+
+    if (energy.used > energy.available) {
+      labels.push('Energy insufficient');
+    }
+
+    if (this.hasAnyCurrentPlanetManualPowerReduction()) {
+      labels.push('Energy reduction');
+    }
+
+    if (planet.objects.buildingQueue.length === 0) {
+      labels.push('Empty building queue');
+    }
+
+    if (planet.objects.shipyardQueue.length === 0) {
+      labels.push('Empty shipyard queue');
+    }
+
+    if (!planet.objects.currentResearchQueue && !planet.objects.researchHelperFor) {
+      labels.push('No active research role');
+    }
+
+    if (
+      this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
+      || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+    ) {
+      labels.push('Reduced industry power');
+    }
+
+    if (
+      this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD)
+      || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+    ) {
+      labels.push('Reduced shipyard power');
+    }
+
+    if (this.isBuildingNotUsingFullPower(BuildingType.RESEARCH_LAB)) {
+      labels.push('Reduced research power');
+    }
+
+    return labels;
+  }
+
+  private headerIndicatorToneFromLabels(labels: string[]): 'safe' | 'neutral' | 'danger' {
+    if (labels.includes('Energy insufficient')) {
+      return 'danger';
+    }
+
+    return labels.length > 0 ? 'neutral' : 'safe';
+  }
+
+  private calculateEnergyStateForPlanet(planet: ClientPlanetDto): EnergyState {
+    const energyTechLevel = this.techLevelForPlanet(planet, TechnologyType.ENERGY_TECHNOLOGY);
+    const solarProduction = this.productionAtPlanetBuildingLevel(planet, BuildingType.SOLAR_WIND_GEOTHERMAL);
+    const nuclearProduction = this.productionAtPlanetBuildingLevel(planet, BuildingType.NUCLEAR_PLANT);
+    const fusionProduction = this.productionAtPlanetBuildingLevel(planet, BuildingType.FUSION_REACTOR);
+    const parameters = planet.info.planetaryParameters;
+
+    const availableEnergy = (
+      (solarProduction * parameters.energyModifierRES)
+      + (nuclearProduction * parameters.energyModifierNuclear)
+      + fusionProduction
+    ) * (1 + ((energyTechLevel * 2) / 100));
+
+    let usedEnergy = 0;
+    for (const entry of planet.objects.buildingsLevels) {
+      const buildingType = entry.type as BuildingType;
+      if (entry.level <= 0) {
+        continue;
+      }
+
+      const blueprint = this.buildingBlueprintsByType.get(buildingType);
+      if (!blueprint) {
+        continue;
+      }
+
+      const maxConsumption = Math.max(0, entry.level * (blueprint.powerConsumption ?? 0));
+      const currentConsumption = this.currentPlanetBuildingPowerConsumption(planet, buildingType);
+      usedEnergy += currentConsumption === null
+        ? maxConsumption
+        : Math.min(maxConsumption, Math.max(0, currentConsumption));
+    }
+
+    return {
+      used: this.roundNumber(usedEnergy, 2),
+      available: this.roundNumber(availableEnergy, 2)
+    };
+  }
+
+  private isPlanetPowerLimited(planet: ClientPlanetDto, buildingType: BuildingType): boolean {
+    const maxConsumption = this.maxPlanetBuildingPowerConsumption(planet, buildingType);
+    if (maxConsumption <= 0) {
+      return false;
+    }
+
+    const currentConsumption = this.currentPlanetBuildingPowerConsumption(planet, buildingType);
+    return currentConsumption !== null && currentConsumption + 0.0001 < maxConsumption;
+  }
+
+  private hasAnyPlanetManualPowerReduction(planet: ClientPlanetDto): boolean {
+    for (const entry of planet.objects.buildingsLevels) {
+      const buildingType = entry.type as BuildingType;
+      if (this.isPlanetPowerLimited(planet, buildingType)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private maxPlanetBuildingPowerConsumption(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    const level = this.buildingLevelForPlanet(planet, buildingType);
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    return this.roundNumber(level * (blueprint?.powerConsumption ?? 0), 2);
+  }
+
+  private currentPlanetBuildingPowerConsumption(planet: ClientPlanetDto, buildingType: BuildingType): number | null {
+    const entry = planet.objects.buildingsCurrentPowerConsumption.find((item) => item.type === buildingType);
+    return entry ? this.roundNumber(entry.currentPowerConsumption, 2) : null;
+  }
+
+  private buildingLevelForPlanet(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    return planet.objects.buildingsLevels.find((entry) => entry.type === buildingType)?.level ?? 0;
+  }
+
+  private productionAtPlanetBuildingLevel(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    return this.getProductionAtLevel(blueprint, this.buildingLevelForPlanet(planet, buildingType));
+  }
+
+  private techLevelForPlanet(planet: ClientPlanetDto, technologyType: TechnologyType): number {
+    return planet.reportData?.techLevels.find((entry) => entry.type === technologyType)?.level ?? 0;
+  }
+
+  private sortOwnedPlanets(planets: ClientPlanetDto[]): ClientPlanetDto[] {
+    return [...planets].sort((left, right) =>
+      left.basicInfo.name.localeCompare(right.basicInfo.name)
+      || left.coordinates.y - right.coordinates.y
+      || left.coordinates.x - right.coordinates.x
+      || left.coordinates.z - right.coordinates.z
+    );
+  }
+
+  private syncOwnedPlanet(updatedPlanet: ClientPlanetDto): void {
+    const existingIndex = this.ownedPlanets.findIndex((planet) => this.sameCoordinates(planet.coordinates, updatedPlanet.coordinates));
+    if (existingIndex < 0) {
+      return;
+    }
+
+    this.ownedPlanets[existingIndex] = updatedPlanet;
+    this.ownedPlanets = this.sortOwnedPlanets(this.ownedPlanets);
+  }
+
+  private coordinatesLabelForPlanet(planet: ClientPlanetDto): string {
+    return `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`;
+  }
+
+  private sameCoordinates(
+    left: ClientPlanetDto['coordinates'],
+    right: ClientPlanetDto['coordinates']
+  ): boolean {
+    return left.x === right.x
+      && left.y === right.y
+      && left.z === right.z;
+  }
+
   private energyPenaltyTooltip(availableEnergy: number, usedEnergy: number): string {
     const penaltyPercent = this.roundNumber(energyDeficitPenaltyPercent(availableEnergy, usedEnergy), 2);
     return `Current energy penalty: ${penaltyPercent}%.`;
@@ -1631,6 +1891,16 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     const currentConsumption = this.buildingCurrentPowerByType.get(buildingType) ?? maxConsumption;
     return currentConsumption < maxConsumption;
+  }
+
+  private hasAnyCurrentPlanetManualPowerReduction(): boolean {
+    for (const buildingType of this.buildingLevelsByType.keys()) {
+      if (this.isBuildingNotUsingFullPower(buildingType)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private getProductionAtLevelByType(buildingType: BuildingType, level: number): number {
@@ -1859,6 +2129,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           }
 
           this.planet = updatedPlanet;
+          this.syncOwnedPlanet(updatedPlanet);
           this.rebuildPlanetState();
           this.cdr.markForCheck();
         },

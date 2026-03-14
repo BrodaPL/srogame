@@ -134,14 +134,38 @@
   padding: 0.18rem 0.48rem;
 }
 
+.imperium-view__planet-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .imperium-view__planet-alert {
   border-radius: 999px;
-  border: 1px solid rgba(255, 214, 102, 0.4);
-  background: rgba(255, 214, 102, 0.1);
-  color: #f4deb0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #dbe5f6;
   padding: 0.16rem 0.48rem;
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.imperium-view__planet-alert.imperium-view__attention-link--medium {
+  border-color: rgba(255, 224, 130, 0.4);
+  background: rgba(255, 224, 130, 0.12);
+  color: #ffe082;
+}
+
+.imperium-view__planet-alert.imperium-view__attention-link--high {
+  border-color: rgba(255, 184, 108, 0.4);
+  background: rgba(255, 184, 108, 0.12);
+  color: #ffb86c;
+}
+
+.imperium-view__planet-alert.imperium-view__attention-link--critical {
+  border-color: rgba(255, 125, 125, 0.4);
+  background: rgba(255, 125, 125, 0.12);
+  color: #ff7d7d;
 }
 
 .imperium-view__queue-group {

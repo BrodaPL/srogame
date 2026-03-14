@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, OnChanges, Output } from '@angular/core';
 import { Router } from '@angular/router';
 import type { ClientPlanetDto, ClientReportDataDto } from '../../../models/game-api-types';
+import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
 import { PlayerType } from '../../../models/enums/player-type';
 
 type MiniPlanetTagVm = {
@@ -115,6 +116,24 @@ export class MiniPlanetPreviewComponent implements OnChanges {
           x: this.planet.coordinates.x,
           y: this.planet.coordinates.y,
           z: this.planet.coordinates.z
+        }
+      }
+    );
+  }
+
+  protected openSpyPlanet(): void {
+    if (!this.planet) {
+      return;
+    }
+
+    void this.router.navigate(
+      ['/game/mission-planner'],
+      {
+        queryParams: {
+          mission: FleetMissionType.SPY,
+          targetX: this.planet.coordinates.x,
+          targetY: this.planet.coordinates.y,
+          targetZ: this.planet.coordinates.z
         }
       }
     );
