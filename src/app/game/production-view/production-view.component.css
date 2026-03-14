@@ -74,12 +74,6 @@
   text-transform: uppercase;
 }
 
-.production-view__cost-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
 .production-view__ship-req {
   display: flex;
   align-items: center;

@@ -92,7 +92,8 @@ type ResearchQueueRowVm = {
 @Component({
   selector: 'app-planet-view',
   imports: [TopMenuComponent, ResourcesComponent, FormsModule],
-  templateUrl: './planet-view.component.html'
+  templateUrl: './planet-view.component.html',
+  styleUrl: './planet-view.component.css'
 })
 export class PlanetViewComponent implements OnInit, OnDestroy {
   protected planet: ClientPlanetDto | null = null;

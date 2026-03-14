@@ -42,12 +42,6 @@
   font-size: 0.76rem;
 }
 
-.buildings-view__building-cost {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
 .buildings-view__building-req {
   display: flex;
   align-items: center;

@@ -1,8 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap');
+@import "./app/game/galactic-view/galactic-view.styles.css";
+@import "./app/game/mission-planner-view/mission-planner-view.styles.css";
+@import "./app/game/operations-view/operations-view.styles.css";
+@import "./app/game/researches-view/researches-view.styles.css";
+@import "./app/game/reports-view/reports-view.styles.css";
 
 :root {
   --font-sans: "Space Grotesk", "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
+  --ui-wrap-gap: 0.35rem;
+  --ui-section-gap: 0.8rem;
 }
 
 *,
@@ -1131,6 +1138,49 @@ app-root {
   font-size: 0.9rem;
 }
 
+.ui-wrap-row,
+.buildings-view__building-cost,
+.production-view__cost-row,
+.imperium-view__planet-alerts,
+.mini-planet-preview__tags,
+.mini-planet-preview__actions,
+.mission-planner__purpose-filters,
+.mission-planner__ship-tags,
+.reports-view__actions,
+.reports-view__tab-list,
+.reports-view__dossier-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-wrap-gap, 0.35rem);
+}
+
+.ui-section-head,
+.game-dashboard__section-head,
+.imperium-view__hero,
+.imperium-view__section-head,
+.mission-planner__section-head,
+.operations-view__header,
+.operations-view__card-head,
+.reports-view__list-head,
+.reports-view__detail-head,
+.reports-view__dossier-banner,
+.reports-view__dossier-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-section-gap, 0.8rem);
+}
+
+.ui-disabled-control:disabled,
+.game-dashboard__action-button:disabled,
+.mini-planet-preview__button:disabled,
+.mission-planner__small-button:disabled,
+.planet-building-card__action:disabled,
+.star-system-preview__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .game-dashboard__layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
@@ -1152,13 +1202,6 @@ app-root {
   gap: 0.7rem;
   max-height: calc(100vh - 110px);
   align-content: start;
-}
-
-.game-dashboard__section-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.8rem;
 }
 
 .game-dashboard__categories-card {
@@ -1241,11 +1284,6 @@ app-root {
   cursor: pointer;
 }
 
-.game-dashboard__action-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .game-dashboard__build-error {
   margin: 0;
   color: #ff9d9d;
@@ -1312,296 +1350,6 @@ app-root {
   }
 }
 
-.galaxy-preview {
-  display: grid;
-  gap: 1rem;
-  background: rgba(12, 16, 22, 0.7);
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  padding: 1.25rem;
-}
-
-.galactic-view-shell {
-  position: relative;
-}
-
-.star-system-preview {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: calc(-1 * var(--right-feature-space) + 0.5rem);
-  width: calc(var(--right-feature-space) - 0.75rem);
-  max-height: none;
-  overflow-y: auto;
-  display: grid;
-  gap: 0.75rem;
-  align-content: start;
-  padding: 0.85rem;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: rgba(12, 16, 22, 0.9);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35);
-}
-
-.star-system-preview__title {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.star-system-preview__summary {
-  display: grid;
-  gap: 0.2rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.star-system-preview__name {
-  margin: 0;
-  font-weight: 700;
-}
-
-.star-system-preview__meta-line {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.86rem;
-  font-family: var(--font-mono), serif;
-}
-
-.star-system-preview__actions {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.star-system-preview__button {
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 0.45rem 0.9rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.star-system-preview__button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.star-system-preview__button--danger {
-  border-color: rgba(255, 84, 84, 0.32);
-  color: #ffb4b4;
-}
-
-.note-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 35;
-}
-
-.note-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(520px, calc(100vw - 1.5rem));
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
-  display: grid;
-  gap: 0.55rem;
-  padding: 0.9rem;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(12, 16, 22, 0.97);
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
-  z-index: 40;
-}
-
-.note-modal__title {
-  margin: 0;
-}
-
-.note-modal__meta {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-.note-modal__label {
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
-.note-modal__select,
-.note-modal__textarea {
-  width: 100%;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: #000;
-  color: #fff;
-  font-family: var(--font-sans), serif;
-  font-size: 0.85rem;
-  padding: 0.5rem 0.6rem;
-}
-
-.note-modal__select option {
-  background: #000;
-}
-
-.note-modal__textarea {
-  resize: vertical;
-  min-height: 110px;
-}
-
-.note-modal__counter {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--muted);
-  justify-self: end;
-}
-
-.note-modal__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.45rem;
-}
-
-.star-system-preview__special {
-  margin: 0;
-  padding: 0.55rem 0.7rem;
-  border-radius: 10px;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.star-system-preview__note {
-  margin: 0;
-  border-radius: 10px;
-  border: 1px solid var(--note-border-color);
-  background: rgba(255, 255, 255, 0.03);
-  padding: 0.6rem 0.7rem;
-  white-space: pre-wrap;
-  font-size: 0.86rem;
-}
-
-.star-system-preview__planets {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.galaxy-preview__header {
-  display: block;
-}
-
-.galaxy-preview__header h3 {
-  margin: 0;
-}
-
-.galaxy-preview__meta {
-  margin-left: 0.55rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-  font-family: var(--font-mono), serif;
-}
-
-.galaxy-grid-top-scroll,
-.galaxy-grid-scroll {
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: #2f3640 #0d1117;
-}
-
-.galaxy-grid-top-scroll {
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0c1118;
-}
-
-.galaxy-grid-top-scroll__content {
-  height: 1px;
-}
-
-.galaxy-grid-scroll {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 7, 10, 0.85);
-}
-
-.galaxy-grid-top-scroll::-webkit-scrollbar,
-.galaxy-grid-scroll::-webkit-scrollbar {
-  height: 10px;
-}
-
-.galaxy-grid-top-scroll::-webkit-scrollbar-track,
-.galaxy-grid-scroll::-webkit-scrollbar-track {
-  background: #0d1117;
-  border-radius: 999px;
-}
-
-.galaxy-grid-top-scroll::-webkit-scrollbar-thumb,
-.galaxy-grid-scroll::-webkit-scrollbar-thumb {
-  background: #2f3640;
-  border-radius: 999px;
-  border: 2px solid #0d1117;
-}
-
-.galaxy-grid-top-scroll::-webkit-scrollbar-thumb:hover,
-.galaxy-grid-scroll::-webkit-scrollbar-thumb:hover {
-  background: #3a424d;
-}
-
-.galaxy-grid {
-  --cell-size: 22px;
-  display: grid;
-  gap: 2px;
-  width: max-content;
-  padding: 0.75rem;
-}
-
-.galaxy-cell {
-  width: var(--cell-size);
-  height: var(--cell-size);
-  background: #0e2242;
-  border-radius: 3px;
-  border: 1px solid transparent;
-  display: grid;
-  place-items: center;
-  position: relative;
-  color: #f0f4ff;
-  font-size: 0.55rem;
-  line-height: 1;
-  font-family: var(--font-mono), serif;
-  transform-origin: center;
-  transition: transform 0.12s ease;
-  cursor: pointer;
-}
-
-.galaxy-cell:hover {
-  transform: scale(1.4);
-  z-index: 2;
-  border-color: rgba(255, 255, 255, 0.8);
-}
-
-.galaxy-cell--with-note {
-  border-color: var(--note-border-color);
-}
-
-.galaxy-cell--with-note:hover {
-  border-color: var(--note-border-color);
-}
-
-.galaxy-cell--selected {
-  border-color: #f6b44c;
-  box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.4);
-}
-
 .mini-planet-preview {
   display: grid;
   gap: 0.35rem;
@@ -1658,12 +1406,6 @@ app-root {
   color: #e8effa;
 }
 
-.mini-planet-preview__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
 .mini-planet-preview__tag {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1672,12 +1414,6 @@ app-root {
   font-weight: 600;
   padding: 0.16rem 0.5rem;
   color: #dbe5f6;
-}
-
-.mini-planet-preview__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
 }
 
 .mini-planet-preview__button {
@@ -1691,990 +1427,19 @@ app-root {
   cursor: pointer;
 }
 
-.mini-planet-preview__button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .mini-planet-preview--selected {
   border-color: rgba(246, 180, 76, 0.8);
   box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.35);
 }
 
-.mission-planner,
-.reports-view,
-.operations-view {
+.reports-view {
   display: grid;
   gap: 0.85rem;
-}
-
-.mission-planner__header,
-.operations-view__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.mission-planner__title,
-.operations-view__title {
-  margin: 0.18rem 0 0;
-  font-size: 1.45rem;
-}
-
-.mission-planner__layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.82fr);
-  gap: 0.85rem;
-  align-items: start;
-}
-
-.mission-planner__main,
-.mission-planner__rail,
-.reports-view__layout,
-.operations-view__grid {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.reports-view__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.45rem;
-}
-
-.reports-view__tabs {
-  display: grid;
-  gap: 0.55rem;
-  padding: 0.95rem 1rem;
-}
-
-.reports-view__tab-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.reports-view__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.38rem;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
-  padding: 0.28rem 0.5rem;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.reports-view__tab--active {
-  border-color: var(--accent);
-  background: rgba(246, 180, 76, 0.12);
-}
-
-.reports-view__tabs-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 0.55rem;
-}
-
-.reports-view__compact-button {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
-  padding: 0.24rem 0.46rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.reports-view__compact-button--danger {
-  border-color: rgba(255, 120, 120, 0.35);
-}
-
-.reports-view__compact-button:disabled {
-  cursor: default;
-  opacity: 0.45;
 }
 
 .reports-view__layout {
-  grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.25fr);
-  align-items: stretch;
-  height: clamp(520px, calc(100vh - 240px), 760px);
-  min-height: 0;
-}
-
-.reports-view__list,
-.reports-view__detail {
-  min-height: 0;
-  height: 100%;
-}
-
-.reports-view__list {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
-  padding: 0.95rem 1rem;
-}
-
-.reports-view__detail {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  overflow: hidden;
-  gap: 0.32rem;
-  padding: 0.95rem 1rem;
-}
-
-.reports-view__list-head,
-.reports-view__detail-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.45rem;
-}
-
-.reports-view__items {
-  display: grid;
-  gap: 0.45rem;
-  overflow-y: auto;
-  min-height: 0;
-  padding-right: 0.2rem;
-  scrollbar-color: rgba(108, 120, 136, 0.9) rgba(10, 14, 20, 0.9);
-}
-
-.reports-view__item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.55rem;
-  padding: 0.55rem 0.65rem;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  cursor: pointer;
-}
-
-.reports-view__item:not(.reports-view__item--unread) {
-  background: rgba(255, 255, 255, 0.015);
-  border-color: rgba(255, 255, 255, 0.05);
-}
-
-.reports-view__item--active {
-  border-color: rgba(246, 180, 76, 0.55);
-  box-shadow: 0 14px 28px rgba(246, 180, 76, 0.12);
-}
-
-.reports-view__item--unread {
-  background: rgba(60, 201, 189, 0.08);
-}
-
-.reports-view__checkbox {
-  display: flex;
-  align-items: flex-start;
-  padding-top: 0.1rem;
-}
-
-.reports-view__checkbox input {
-  width: 0.88rem;
-  height: 0.88rem;
-}
-
-.reports-view__item-main {
-  display: grid;
-  gap: 0.18rem;
-}
-
-.reports-view__item-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.45rem;
-}
-
-.reports-view__item-head h4 {
-  margin: 0;
-  font-size: 0.96rem;
-  line-height: 1.1;
-}
-
-.reports-view__item:not(.reports-view__item--unread) .reports-view__item-head h4 {
-  color: #9ba7b7;
-  font-weight: 500;
-}
-
-.reports-view__item:not(.reports-view__item--unread) .overview-muted,
-.reports-view__item:not(.reports-view__item--unread) .reports-view__item-meta {
-  color: #7d8897;
-}
-
-.reports-view__item-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.1;
-}
-
-.reports-view__detail-scroll {
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 0.2rem;
-  scrollbar-color: rgba(108, 120, 136, 0.9) rgba(10, 14, 20, 0.9);
-}
-
-.reports-view__items::-webkit-scrollbar,
-.reports-view__detail-scroll::-webkit-scrollbar {
-  width: 10px;
-}
-
-.reports-view__items::-webkit-scrollbar-track,
-.reports-view__detail-scroll::-webkit-scrollbar-track {
-  background: rgba(10, 14, 20, 0.9);
-  border-radius: 999px;
-}
-
-.reports-view__items::-webkit-scrollbar-thumb,
-.reports-view__detail-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(116, 129, 146, 0.95), rgba(70, 79, 92, 0.95));
-  border-radius: 999px;
-  border: 2px solid rgba(10, 14, 20, 0.9);
-}
-
-.reports-view__items::-webkit-scrollbar-thumb:hover,
-.reports-view__detail-scroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(141, 156, 176, 0.98), rgba(89, 101, 117, 0.98));
-}
-
-.reports-view__detail-body {
-  margin: 0;
-  padding: 0.72rem 0.82rem;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 12, 18, 0.75);
-  color: #dce7f5;
-  white-space: pre-wrap;
-  font-family: var(--font-mono), serif;
-  font-size: 0.82rem;
-}
-
-.reports-view__dossier {
-  display: grid;
-  gap: 0.65rem;
-}
-
-.reports-view__dossier-banner,
-.reports-view__dossier-section,
-.reports-view__dossier-metric,
-.reports-view__dossier-resource {
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(12, 16, 22, 0.92), rgba(8, 12, 18, 0.88));
-}
-
-.reports-view__dossier-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.7rem;
-  padding: 0.72rem 0.8rem;
-  border-color: rgba(60, 201, 189, 0.22);
-  background:
-    radial-gradient(circle at top right, rgba(60, 201, 189, 0.12), transparent 42%),
-    linear-gradient(180deg, rgba(12, 16, 22, 0.96), rgba(8, 12, 18, 0.9));
-}
-
-.reports-view__dossier-kicker,
-.reports-view__dossier-section-kicker {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: #7fded4;
-}
-
-.reports-view__dossier-title {
-  margin: 0.18rem 0 0;
-  font-size: 1rem;
-  line-height: 1.1;
-}
-
-.reports-view__dossier-copy {
-  margin: 0.22rem 0 0;
-  color: #a4b3c7;
-  font-size: 0.78rem;
-  line-height: 1.35;
-  max-width: 64ch;
-}
-
-.reports-view__dossier-badges {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.35rem;
-}
-
-.reports-view__dossier-metrics,
-.reports-view__dossier-resources {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.reports-view__dossier-metrics {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.reports-view__dossier-metric {
-  display: grid;
-  gap: 0.18rem;
-  padding: 0.58rem 0.68rem;
-}
-
-.reports-view__dossier-metric-label,
-.reports-view__dossier-resource-label {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: #93a4bf;
-}
-
-.reports-view__dossier-metric-value,
-.reports-view__dossier-resource-value {
-  font-size: 1rem;
-  line-height: 1.05;
-  color: #f2f6fd;
-}
-
-.reports-view__dossier-section--resources {
-  padding: 0.68rem 0.75rem 0.75rem;
-}
-
-.reports-view__dossier-resources {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.reports-view__dossier-resource {
-  display: grid;
-  gap: 0.16rem;
-  padding: 0.58rem 0.68rem;
-}
-
-.reports-view__dossier-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-}
-
-.reports-view__dossier-section {
-  display: grid;
-  gap: 0.48rem;
-  padding: 0.68rem 0.75rem 0.75rem;
-}
-
-.reports-view__dossier-section--wide {
-  grid-column: 1 / -1;
-}
-
-.reports-view__dossier-section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.45rem;
-}
-
-.reports-view__dossier-section-title {
-  margin: 0.14rem 0 0;
-  font-size: 0.9rem;
-  line-height: 1.08;
-}
-
-.reports-view__dossier-list {
-  display: grid;
-  gap: 0.28rem;
-}
-
-.reports-view__dossier-list--parameters {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.35rem 0.6rem;
-}
-
-.reports-view__dossier-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.55rem;
-  align-items: baseline;
-  padding-bottom: 0.22rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.reports-view__dossier-row-label {
-  color: #c1ccdc;
-  font-size: 0.78rem;
-  line-height: 1.24;
-}
-
-.reports-view__dossier-row-value {
-  color: #f2f6fd;
-  font-family: var(--font-mono), serif;
-  font-size: 0.78rem;
-  line-height: 1.1;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.reports-view__dossier-row-value--positive {
-  color: #7de3a6;
-}
-
-.reports-view__dossier-row-value--negative {
-  color: #ff9a9a;
-}
-
-.reports-view__dossier-row-value--neutral {
-  color: #d8e1ef;
-}
-
-.reports-view__dossier-empty {
-  margin: 0;
-  min-height: 2.2rem;
-  display: grid;
-  place-items: center start;
-  border-radius: 10px;
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.025);
-  color: #8d9cb0;
-  font-size: 0.78rem;
-  padding: 0.42rem 0.55rem;
-}
-
-.reports-view__detail-preview {
-  display: grid;
-  gap: 0.25rem;
-  justify-items: end;
-}
-
-.reports-view__preview-error {
-  margin: 0;
-  color: #ffb0b0;
-  font-size: 0.78rem;
-  text-align: right;
-}
-
-.reports-view__stats-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.28rem;
-}
-
-.reports-view__detail .overview-stat {
-  padding: 0.16rem 0.34rem;
-  gap: 0;
-  min-height: 0;
-}
-
-.reports-view__detail .overview-stat__label {
-  font-size: 0.5rem;
-  line-height: 0.95;
-}
-
-.reports-view__detail .overview-stat__value {
-  font-size: 0.72rem;
-  line-height: 0.95;
-}
-
-.reports-view__detail-head h3 {
-  margin: 0.08rem 0 0;
-  line-height: 1.08;
-}
-
-.reports-view__detail-head .overview-muted {
-  margin-top: 0.08rem;
-  font-size: 0.78rem;
-  line-height: 1.08;
-}
-
-.reports-view__empty-detail {
-  display: grid;
-  gap: 0.5rem;
-  align-content: center;
-  min-height: 100%;
-}
-
-.mission-planner__section {
-  display: grid;
-  gap: 0.7rem;
-}
-
-.mission-planner__selectors,
-.mission-planner__details {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem;
-}
-
-.mission-planner__mission-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 0.65rem;
-}
-
-.mission-planner__mission-option {
-  display: grid;
-  gap: 0.22rem;
-  width: 100%;
-  padding: 0.65rem 0.72rem;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-  color: #fff;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-}
-
-.mission-planner__mission-option:hover {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.mission-planner__mission-option--active {
-  border-color: rgba(246, 180, 76, 0.75);
-  background: rgba(246, 180, 76, 0.12);
-}
-
-.mission-planner__mission-label {
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
-.mission-planner__mission-description {
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.mission-planner__microcopy {
-  font-size: 0.72rem;
-}
-
-.mission-planner__coordinate-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.45rem;
-  align-items: center;
-}
-
-.mission-planner__coordinate-input,
-.mission-planner__amount-input,
-.mission-planner__cargo-field input {
-  width: 100%;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
-  padding: 0.5rem 0.6rem;
-  font-family: var(--font-mono), serif;
-}
-
-.mission-planner__small-button {
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
-  font-size: 0.76rem;
-  font-weight: 700;
-  padding: 0.42rem 0.82rem;
-  cursor: pointer;
-}
-
-.mission-planner__small-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.mission-planner__section-head,
-.operations-view__card-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.8rem;
-  align-items: flex-start;
-}
-
-.mission-planner__ships {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.mission-planner__purpose-filters,
-.mission-planner__ship-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.42rem;
-}
-
-.mission-planner__purpose-filters {
-  margin-top: 0.6rem;
-}
-
-.mission-planner__purpose-filter,
-.mission-planner__ship-tag {
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--muted);
-  font-size: 0.72rem;
-  padding: 0.25rem 0.55rem;
-}
-
-.mission-planner__purpose-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  cursor: pointer;
-}
-
-.mission-planner__purpose-filter input {
-  margin: 0;
-}
-
-.mission-planner__ship-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.7rem;
-  align-items: center;
-  padding: 0.55rem 0.65rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.mission-planner__ship-row--relevant {
-  border-color: rgba(60, 201, 189, 0.45);
-  background: rgba(60, 201, 189, 0.08);
-}
-
-.mission-planner__ship-row--required {
-  border-color: rgba(246, 180, 76, 0.68);
-  background: rgba(246, 180, 76, 0.12);
-}
-
-.mission-planner__ship-main {
-  display: grid;
-  gap: 0.28rem;
-}
-
-.mission-planner__ship-title {
-  margin: 0;
-  font-size: 0.86rem;
-}
-
-.mission-planner__ship-meta,
-.operations-view__ships {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-family: var(--font-mono), serif;
-}
-
-.mission-planner__ship-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.38rem;
-}
-
-.mission-planner__amount-input {
-  max-width: 92px;
-}
-
-.mission-planner__cargo-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.55rem;
-}
-
-.mission-planner__cargo-field {
-  display: grid;
-  gap: 0.28rem;
-  font-size: 0.76rem;
-  color: var(--muted);
-}
-
-.mission-planner__details-card .mission-planner__cargo-field,
-.mission-planner__details-card .mission-planner__small-button,
-.mission-planner__details-card .mission-planner__coordinate-input,
-.mission-planner__details-card .mission-planner__amount-input,
-.mission-planner__details-card .mission-planner__cargo-field input {
-  font-size: 0.72rem;
-}
-
-.mission-planner__details-card .mission-planner__cargo-field input {
-  padding: 0.42rem 0.55rem;
-}
-
-.mission-planner__compact-copy {
-  font-size: 0.74rem;
-}
-
-.mission-planner__summary-stats {
-  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
-  gap: 0.55rem;
-}
-
-.mission-planner__summary-card .overview-stat {
-  padding: 0.5rem 0.55rem;
-  gap: 0.16rem;
-}
-
-.mission-planner__summary-card .overview-stat__label {
-  font-size: 0.63rem;
-}
-
-.mission-planner__summary-card .overview-stat__value {
-  font-size: 0.95rem;
-}
-
-.mission-planner__summary-stat--compact .overview-stat__value {
-  font-size: 0.78rem;
-}
-
-.mission-planner__disabled-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-top: 0.7rem;
-}
-
-.mission-planner__warnings {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.mission-planner__warning {
-  margin: 0;
-  padding: 0.5rem 0.6rem;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.8rem;
-}
-
-.mission-planner__warning--error {
-  border-color: rgba(255, 120, 120, 0.4);
-  background: rgba(255, 120, 120, 0.1);
-}
-
-.mission-planner__warning--note {
-  border-color: rgba(255, 214, 102, 0.35);
-  background: rgba(255, 214, 102, 0.08);
-  color: #f4deb0;
-}
-
-.mission-planner__rail-list {
-  display: grid;
-  gap: 0.5rem;
-  max-height: 720px;
-  overflow-y: auto;
-  padding-right: 0.15rem;
-}
-
-.operations-view__card {
-  display: grid;
-  gap: 0.7rem;
-}
-
-.researches-view {
   display: grid;
   gap: 0.85rem;
-}
-
-.researches-view__labs,
-.researches-view__body {
-  border-radius: 16px;
-  border: 1px solid var(--line);
-  background: rgba(12, 16, 22, 0.88);
-  padding: 0.75rem;
-}
-
-.researches-view__labs-meta {
-  margin: 0 0 0.6rem;
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-family: var(--font-mono), serif;
-}
-
-.researches-view__labs-grid {
-  display: grid;
-  gap: 0.55rem;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-}
-
-.researches-view__lab-item {
-  display: grid;
-  gap: 0.24rem;
-}
-
-.researches-view__lab-caption {
-  margin: 0;
-  color: #9fb0ca;
-  font-size: 0.74rem;
-  font-family: var(--font-mono), serif;
-}
-
-.research-tech-list {
-  display: grid;
-  gap: 0.55rem;
-}
-
-.research-tech-card {
-  display: grid;
-  grid-template-columns: 170px minmax(210px, 0.9fr) minmax(170px, 0.75fr) minmax(360px, 1.4fr) max-content;
-  align-items: start;
-  gap: 0.72rem;
-  padding: 0.52rem 0.6rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.research-tech-card__image {
-  width: 168px;
-  height: 168px;
-  object-fit: contain;
-}
-
-.research-tech-card__main {
-  display: grid;
-  gap: 0.12rem;
-}
-
-.research-tech-card__title {
-  margin: 0;
-  font-size: 0.86rem;
-}
-
-.research-tech-card__meta {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.research-tech-card__cost,
-.research-tech-card__requirements,
-.research-tech-card__labs {
-  display: grid;
-  align-content: start;
-  gap: 0.14rem;
-}
-
-.research-tech-card__lab-select {
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: #2f333b;
-  color: #f5f8ff;
-  font-size: 0.74rem;
-  padding: 0.14rem 0.38rem;
-  min-width: 0;
-  width: 100%;
-}
-
-.research-tech-card__lab-row {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  align-items: center;
-  gap: 0.38rem;
-}
-
-.research-tech-card__lab-label {
-  font-size: 0.74rem;
-  color: #a3bad8;
-  font-weight: 700;
-}
-
-.research-tech-card__cost-action {
-  grid-column: 5;
-  justify-self: end;
-  display: grid;
-  align-content: start;
-  justify-items: end;
-  gap: 0.55rem;
-  margin-left: 0.4rem;
-}
-
-.research-tech-card__lab-select option {
-  background: #2f333b;
-}
-
-.research-tech-card__action {
-  justify-self: end;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
-  font-size: 0.78rem;
-  font-weight: 700;
-  min-width: 128px;
-  min-height: 48px;
-  padding: 0.55rem 1rem;
-  cursor: pointer;
-}
-
-.research-tech-card__action--ready {
-  border-color: rgba(72, 191, 118, 0.75);
-  background: rgba(48, 146, 86, 0.78);
-}
-
-.research-tech-card__action:disabled {
-  opacity: 0.46;
-  cursor: not-allowed;
-}
-
-.planet-view {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.planet-view__overview {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.95fr);
-  gap: 0.8rem;
-  transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
-}
-
-.planet-view__overview--highlighted {
-  border-radius: 18px;
-  box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.75), 0 0 28px rgba(255, 180, 76, 0.28);
-  animation: planet-view-highlight-pulse 1.2s ease-in-out 3;
-}
-
-.planet-view__parameters,
-.planet-view__hero {
-  border-radius: 16px;
-  border: 1px solid var(--line);
-  background: rgba(12, 16, 22, 0.85);
-  padding: 0.75rem;
-}
-
-@keyframes planet-view-highlight-pulse {
-  0% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.006);
-  }
-
-  100% {
-    transform: scale(1);
-  }
-}
-
-.planet-view__parameters {
-  justify-self: start;
-  width: 100%;
-  max-width: 460px;
-  padding: 0.62rem;
 }
 
 .planet-view__section-title {
@@ -2683,122 +1448,6 @@ app-root {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--muted);
-}
-
-.planet-parameters-grid {
-  display: grid;
-  gap: 0.28rem;
-}
-
-.planet-parameters-grid__row {
-  display: grid;
-  grid-template-columns: max-content max-content;
-  justify-content: start;
-  align-items: baseline;
-  column-gap: 0.32rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  padding-bottom: 0.12rem;
-}
-
-.planet-parameters-grid__label {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.planet-parameters-grid__value {
-  font-family: var(--font-mono), serif;
-  font-size: 0.8rem;
-  white-space: nowrap;
-}
-
-.planet-parameters-grid__value--negative {
-  color: #ff7676;
-}
-
-.planet-parameters-grid__value--positive {
-  color: #6adf9e;
-}
-
-.planet-parameters-grid__value--neutral {
-  color: #dbe5f6;
-}
-
-.planet-view__hero {
-  display: grid;
-  justify-items: center;
-  gap: 0.4rem;
-  align-content: start;
-}
-
-.planet-view__planet-name {
-  margin: 0;
-  font-size: 1.1rem;
-  text-align: center;
-}
-
-.planet-view__planet-image {
-  width: min(280px, 100%);
-  height: auto;
-  object-fit: contain;
-}
-
-.planet-view__planet-meta {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-  text-align: center;
-  font-family: var(--font-mono), serif;
-}
-
-.planet-view__coordinates-button {
-  border: 0;
-  background: transparent;
-  color: #dbe5f6;
-  font: inherit;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-}
-
-.planet-view__coordinates-button:hover {
-  color: var(--accent);
-}
-
-.planet-tabs {
-  display: grid;
-  gap: 0.65rem;
-  padding: 0.75rem;
-  border-radius: 16px;
-  border: 1px solid var(--line);
-  background: rgba(12, 16, 22, 0.88);
-}
-
-.planet-tabs__header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.planet-tabs__tab {
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
-  padding: 0.42rem 0.85rem;
-  font-size: 0.79rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.planet-tabs__tab--active {
-  border-color: var(--accent);
-  background: linear-gradient(135deg, rgba(246, 180, 76, 0.35), rgba(246, 180, 76, 0.12));
-  color: #11161e;
-}
-
-.planet-tabs__content {
-  display: grid;
-  gap: 0.6rem;
 }
 
 .planet-building-list {
@@ -2940,22 +1589,6 @@ app-root {
   cursor: pointer;
 }
 
-.planet-building-card__action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.planet-tab-placeholder {
-  margin: 0;
-  font-size: 0.92rem;
-  color: var(--muted);
-}
-
-.planet-queues-grid {
-  display: grid;
-  gap: 0.6rem;
-}
-
 .planet-queue-card {
   display: grid;
   gap: 0.45rem;
@@ -3007,85 +1640,6 @@ app-root {
   font-size: 0.85rem;
 }
 
-.galaxy-cell--void {
-  background: #000;
-}
-
-.galaxy-cell--center {
-  background: #c1842e;
-  color: #101316;
-  font-weight: 700;
-}
-
-.galaxy-cell--no-data {
-  background: #121418;
-}
-
-.galaxy-cell--neutral-only {
-  background: #2f3238;
-}
-
-.galaxy-cell--player-only {
-  background: #23663a;
-}
-
-.galaxy-cell--bot-or-neutral {
-  background: #5b1f24;
-}
-
-.galaxy-cell--human-or-neutral {
-  background: #234d88;
-}
-
-.galaxy-cell--human-bot-any-neutral {
-  background: #70471d;
-}
-
-.galaxy-cell--player-and-enemy-any-neutral {
-  background: #4a2e6b;
-}
-
-.galaxy-cell__value {
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #d6dfef;
-}
-
-.galaxy-cell__value--with-owned-markers {
-  transform: translateY(-1px);
-}
-
-.galaxy-cell__owned-planets {
-  position: absolute;
-  right: 0px;
-  bottom: 0px;
-  font-size: 0.62rem;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.95);
-  letter-spacing: -0.05em;
-  pointer-events: none;
-}
-
-.galaxy-cell__hover-coords {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 0.45rem;
-  font-weight: 700;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.galaxy-cell:hover .galaxy-cell__hover-coords {
-  opacity: 1;
-}
-
-.galaxy-cell:hover .galaxy-cell__value,
-.galaxy-cell:hover .galaxy-cell__owned-planets {
-  opacity: 0;
-}
-
 .empty {
   display: grid;
   gap: 0.75rem;
@@ -3102,51 +1656,10 @@ app-root {
     padding: 0.5rem;
   }
 
-  .star-system-preview {
-    position: static;
-    width: auto;
-    max-height: none;
-    margin-top: 0.85rem;
-  }
-
   .resources-bar__items {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .planet-view__overview {
-    grid-template-columns: 1fr;
-  }
-
-  .planet-view__parameters {
-    max-width: none;
-  }
-
-  .research-tech-card {
-    grid-template-columns: 1fr;
-    justify-items: start;
-  }
-
-  .research-tech-card__cost-action {
-    grid-column: auto;
-    justify-self: start;
-    margin-left: 0;
-    justify-items: start;
-  }
-
-  .research-tech-card__action {
-    justify-self: start;
-  }
-
-  .research-tech-card__lab-select {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .mission-planner__layout,
-  .mission-planner__selectors,
-  .mission-planner__details {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 720px) {
@@ -3155,52 +1668,21 @@ app-root {
     align-items: flex-start;
   }
 
-  .mission-planner__header,
-  .reports-view__detail-head,
-  .reports-view__list-head,
-  .operations-view__header,
+  .ui-section-head--stack-sm,
+  .game-dashboard__section-head,
+  .imperium-view__hero,
+  .imperium-view__section-head,
   .mission-planner__section-head,
-  .operations-view__card-head {
-    flex-direction: column;
-  }
-
-  .reports-view__layout {
-      grid-template-columns: minmax(0, 1fr);
-      height: auto;
-    }
-
-  .reports-view__tabs-footer {
-    align-items: stretch;
-  }
-
-  .reports-view__item-head {
-    flex-direction: column;
-  }
-
-  .reports-view__detail-preview {
-    justify-items: stretch;
-  }
-
-  .reports-view__stats-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
+  .operations-view__header,
+  .operations-view__card-head,
+  .reports-view__list-head,
+  .reports-view__detail-head,
   .reports-view__dossier-banner,
   .reports-view__dossier-section-head {
     flex-direction: column;
   }
 
-  .reports-view__dossier-badges {
-    justify-content: flex-start;
-  }
-
-  .reports-view__dossier-metrics,
-  .reports-view__dossier-resources,
-  .reports-view__dossier-grid,
-  .reports-view__dossier-list--parameters {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  }
+}
 
 @media (max-width: 600px) {
   .panel {
@@ -3222,20 +1704,6 @@ app-root {
 
   .mechanics-grid {
     grid-template-columns: 1fr;
-  }
-
-  .mission-planner__mission-list,
-  .mission-planner__cargo-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .mission-planner__ship-row {
-    grid-template-columns: 1fr;
-  }
-
-  .mission-planner__ship-actions {
-    width: 100%;
-    flex-wrap: wrap;
   }
 
   .planet-building-card {
