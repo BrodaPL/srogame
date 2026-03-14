@@ -5,7 +5,7 @@
 
 .planet-view__overview {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.95fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr) minmax(280px, 0.95fr);
   gap: 0.8rem;
   transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
 }
@@ -17,6 +17,7 @@
 }
 
 .planet-view__parameters,
+.planet-view__attention,
 .planet-view__hero {
   border-radius: 16px;
   border: 1px solid var(--line);
@@ -43,6 +44,38 @@
   width: 100%;
   max-width: 460px;
   padding: 0.62rem;
+}
+
+.planet-view__attention {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.planet-view__attention-list {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.planet-view__attention-item,
+.planet-view__attention-empty {
+  margin: 0;
+}
+
+.planet-view__attention-item {
+  padding: 0.46rem 0.58rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 214, 102, 0.22);
+  background: rgba(255, 214, 102, 0.08);
+  color: #f4deb0;
+  font-size: 0.79rem;
+}
+
+.planet-view__attention-item--danger {
+  border-color: rgba(255, 118, 118, 0.34);
+  background: rgba(255, 118, 118, 0.12);
+  color: #ff9d9d;
 }
 
 .planet-parameters-grid {

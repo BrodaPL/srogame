@@ -27,6 +27,7 @@ export class ResourcesComponent {
   @Input() crystal: ResourceDisplay | null = null;
   @Input() deuterium: ResourceDisplay | null = null;
   @Input() energy: ResourceDisplay | null = null;
+  @Input() energyTooltip: string | null = null;
   @Input() powers: PlanetPowersDisplay | null = null;
 
   protected formatResource(resource: ResourceDisplay | null): string {

@@ -15,13 +15,14 @@
     <div class="game-dashboard__layout">
       <app-resources
         class="game-dashboard__resources"
-        [viewName]="'Buildings | ' + selectedPlanetLabel()"
-        [metal]="metalDisplay"
-        [crystal]="crystalDisplay"
-        [deuterium]="deuteriumDisplay"
-        [energy]="energyDisplay"
-        [powers]="powersDisplay"
-      ></app-resources>
+          [viewName]="'Buildings | ' + selectedPlanetLabel()"
+          [metal]="metalDisplay"
+          [crystal]="crystalDisplay"
+          [deuterium]="deuteriumDisplay"
+          [energy]="energyDisplay"
+          [energyTooltip]="energyTooltip"
+          [powers]="powersDisplay"
+        ></app-resources>
 
       <div class="game-dashboard__main">
         <section class="overview-card game-dashboard__categories-card">

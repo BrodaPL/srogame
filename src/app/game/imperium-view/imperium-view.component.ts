@@ -17,6 +17,7 @@ import type {
   ShipyardQueueEntryDto,
   TechnologyQueueEntryDto
 } from '../../models/game-api-types';
+import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
@@ -140,6 +141,7 @@ export class ImperiumViewComponent implements OnInit {
   protected crystalDisplay: ResourceDisplay | null = null;
   protected deuteriumDisplay: ResourceDisplay | null = null;
   protected energyDisplay: ResourceDisplay | null = null;
+  protected energyTooltip: string | null = null;
   protected powersDisplay: PlanetPowersDisplay | null = null;
 
   protected totalPlanets = 0;
@@ -262,6 +264,7 @@ export class ImperiumViewComponent implements OnInit {
     };
     let totalEnergyUsed = 0;
     let totalEnergyAvailable = 0;
+    let totalEnergyPenalty = 0;
     let totalIndustryPower = 0;
     let totalShipyardPower = 0;
     let totalResearchPower = 0;
@@ -291,6 +294,7 @@ export class ImperiumViewComponent implements OnInit {
 
       totalEnergyUsed += planetVm.energy.used;
       totalEnergyAvailable += planetVm.energy.available;
+      totalEnergyPenalty += energyDeficitPenaltyPercent(planetVm.energy.available, planetVm.energy.used);
       totalIndustryPower += planetVm.powers.industryPower;
       totalShipyardPower += planetVm.powers.shipyardPower;
       totalResearchPower += planetVm.powers.researchPower;
@@ -331,6 +335,10 @@ export class ImperiumViewComponent implements OnInit {
       used: this.roundNumber(totalEnergyUsed, 2),
       available: this.roundNumber(totalEnergyAvailable, 2)
     };
+    const averageEnergyPenalty = this.ownedPlanets.length <= 0
+      ? 0
+      : this.roundNumber(totalEnergyPenalty / this.ownedPlanets.length, 2);
+    this.energyTooltip = `Average energy penalty: ${averageEnergyPenalty}%.`;
     this.powersDisplay = {
       industryPower: this.roundNumber(totalIndustryPower, 2),
       shipyardPower: this.roundNumber(totalShipyardPower, 2),
@@ -537,21 +545,26 @@ export class ImperiumViewComponent implements OnInit {
     const adaptiveTechLevel = techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? 0;
     const adaptiveMultiplier = 1 + (adaptiveTechLevel / 100);
     const planetaryParameters = planet.info.planetaryParameters;
+    const energyState = this.energyState(planet, techLevels);
+    const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
 
     const metal = Math.floor(
       this.currentBuildingProduction(planet, BuildingType.METAL_MINE)
       * adaptiveMultiplier
       * planetaryParameters.metalModifier
+      * energyEfficiency
     );
     const crystal = Math.floor(
       this.currentBuildingProduction(planet, BuildingType.CRYSTAL_MINE)
       * adaptiveMultiplier
       * planetaryParameters.crystalModifier
+      * energyEfficiency
     );
     const deuterium = Math.floor(
       this.currentBuildingProduction(planet, BuildingType.DEUTERIUM_SYNTHESIZER)
       * adaptiveMultiplier
       * planetaryParameters.deuteriumModifier
+      * energyEfficiency
     );
 
     return { metal, crystal, deuterium };
@@ -616,11 +629,13 @@ export class ImperiumViewComponent implements OnInit {
       adaptiveTechnologyLevel,
       intergalacticResearchNetworkLevel
     );
+    const energyState = this.energyState(planet, techLevels);
+    const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
 
     return {
-      industryPower: Math.max(0, Math.floor(roboticsPower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier)),
-      shipyardPower: Math.max(0, Math.floor(shipyardBasePower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier)),
-      researchPower: Math.max(0, Math.floor(researchLabProduction * totalResearchMultiplier * scienceModifier)),
+      industryPower: Math.max(0, Math.floor(roboticsPower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency)),
+      shipyardPower: Math.max(0, Math.floor(shipyardBasePower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency)),
+      researchPower: Math.max(0, Math.floor(researchLabProduction * totalResearchMultiplier * scienceModifier * energyEfficiency)),
       industryPowerLimited: this.isBuildingPowerLimited(planet, BuildingType.ROBOTICS_FACTORY)
         || this.isBuildingPowerLimited(planet, BuildingType.NANITE_FACTORY),
       shipyardPowerLimited: this.isBuildingPowerLimited(planet, BuildingType.SHIPYARD)

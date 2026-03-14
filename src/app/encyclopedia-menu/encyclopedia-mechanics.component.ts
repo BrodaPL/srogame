@@ -270,11 +270,17 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Power Influence on Industry and Mining',
       category: 'Economy',
-      status: 'Planned',
-      summary: 'Additional power coupling is planned to affect broader industry and mining behavior.',
+      status: 'Live',
+      summary: 'Energy deficits now reduce mining and all production powers on the planet.',
       details: [
-        'Current production scaling by power is live; planned work extends this into deeper economic control.',
-        'Future logic may include stronger links between power allocation and queue throughput.'
+        'If available energy is below used energy, resource income, industry power, shipyard power, and research power are all reduced.',
+        'Penalty is linear from the energy deficit percentage, with a 95% maximum penalty cap.',
+        'Storage capacity is not affected by energy deficit.'
+      ],
+      formulas: [
+        'deficitPercent = ((usedEnergy - availableEnergy) / availableEnergy) * 100',
+        'penaltyPercent = min(95, deficitPercent * 1.5)',
+        'effectiveOutput = baseOutput * (1 - penaltyPercent / 100)'
       ]
     },
     {

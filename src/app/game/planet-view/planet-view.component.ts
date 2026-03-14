@@ -22,6 +22,7 @@ import type {
   StartShipyardConstructionRequest,
   TechnologyQueueEntryDto
 } from '../../models/game-api-types';
+import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
@@ -108,6 +109,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected crystalDisplay: ResourceDisplay | null = null;
   protected deuteriumDisplay: ResourceDisplay | null = null;
   protected energyDisplay: ResourceDisplay | null = null;
+  protected energyTooltip: string | null = null;
   protected powersDisplay: PlanetPowersDisplay | null = null;
 
   protected readonly resourceBuildings: Building[];
@@ -918,6 +920,52 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return used;
   }
 
+  protected attentionLabels(): string[] {
+    const planet = this.planet;
+    if (!planet) {
+      return [];
+    }
+
+    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+    const labels: string[] = [];
+
+    if (energy.used > energy.available) {
+      labels.push('Energy deficit');
+    }
+
+    if (planet.objects.buildingQueue.length === 0) {
+      labels.push('Empty building queue');
+    }
+
+    if (planet.objects.shipyardQueue.length === 0) {
+      labels.push('Empty shipyard queue');
+    }
+
+    if (!planet.objects.currentResearchQueue && !planet.objects.researchHelperFor) {
+      labels.push('No active research role');
+    }
+
+    if (
+      this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
+      || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+    ) {
+      labels.push('Reduced industry power');
+    }
+
+    if (
+      this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD)
+      || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+    ) {
+      labels.push('Reduced shipyard power');
+    }
+
+    if (this.isBuildingNotUsingFullPower(BuildingType.RESEARCH_LAB)) {
+      labels.push('Reduced research power');
+    }
+
+    return labels;
+  }
+
   protected buildingCostHeader(building: Building): string {
     return this.buildingLevel(building.type) <= 0
       ? 'Initial cost'
@@ -1100,12 +1148,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       this.crystalDisplay = null;
       this.deuteriumDisplay = null;
       this.energyDisplay = null;
+      this.energyTooltip = null;
       this.powersDisplay = null;
       return;
     }
 
     const adaptiveTechLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const resources = this.planet.objects.resources;
+    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+    const energyEfficiency = energyDeficitEfficiencyMultiplier(energy.available, energy.used);
 
     const metalCapacity = this.storageCapacity(BuildingType.METAL_STORAGE);
     const crystalCapacity = this.storageCapacity(BuildingType.CRYSTAL_STORAGE);
@@ -1113,27 +1164,26 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     this.metalDisplay = {
       current: resources.metal,
-      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.METAL_MINE, adaptiveTechLevel, this.planet.info.planetaryParameters.metalModifier), 2),
+      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.METAL_MINE, adaptiveTechLevel, this.planet.info.planetaryParameters.metalModifier) * energyEfficiency, 2),
       capacityPercent: this.capacityPercent(resources.metal, metalCapacity)
     };
 
     this.crystalDisplay = {
       current: resources.crystal,
-      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.CRYSTAL_MINE, adaptiveTechLevel, this.planet.info.planetaryParameters.crystalModifier), 2),
+      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.CRYSTAL_MINE, adaptiveTechLevel, this.planet.info.planetaryParameters.crystalModifier) * energyEfficiency, 2),
       capacityPercent: this.capacityPercent(resources.crystal, crystalCapacity)
     };
 
     this.deuteriumDisplay = {
       current: resources.deuterium,
-      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.DEUTERIUM_SYNTHESIZER, adaptiveTechLevel, this.planet.info.planetaryParameters.deuteriumModifier), 2),
+      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.DEUTERIUM_SYNTHESIZER, adaptiveTechLevel, this.planet.info.planetaryParameters.deuteriumModifier) * energyEfficiency, 2),
       capacityPercent: this.capacityPercent(resources.deuterium, deuteriumCapacity)
     };
-
-    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
     this.energyDisplay = {
       used: energy.used,
       available: energy.available
     };
+    this.energyTooltip = this.energyPenaltyTooltip(energy.available, energy.used);
 
     this.powersDisplay = {
       industryPower: this.currentIndustryPower(),
@@ -1515,7 +1565,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return 0;
     }
 
-    return Math.max(0, Math.floor(industryPower));
+    return Math.max(0, Math.floor(industryPower * this.currentEnergyEfficiency()));
   }
 
   private currentShipyardPower(): number {
@@ -1539,7 +1589,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return 0;
     }
 
-    return Math.max(0, Math.floor(shipyardPower));
+    return Math.max(0, Math.floor(shipyardPower * this.currentEnergyEfficiency()));
   }
 
   private currentResearchPower(): number {
@@ -1560,7 +1610,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return 0;
     }
 
-    return Math.max(0, Math.floor(researchPower));
+    return Math.max(0, Math.floor(researchPower * this.currentEnergyEfficiency()));
+  }
+
+  private currentEnergyEfficiency(): number {
+    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+    return energyDeficitEfficiencyMultiplier(energy.available, energy.used);
+  }
+
+  private energyPenaltyTooltip(availableEnergy: number, usedEnergy: number): string {
+    const penaltyPercent = this.roundNumber(energyDeficitPenaltyPercent(availableEnergy, usedEnergy), 2);
+    return `Current energy penalty: ${penaltyPercent}%.`;
   }
 
   private isBuildingNotUsingFullPower(buildingType: BuildingType): boolean {

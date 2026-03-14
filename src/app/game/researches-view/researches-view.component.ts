@@ -17,6 +17,7 @@ import type {
   StartTechnologyResearchRequest,
   TechnologyQueueEntryDto
 } from '../../models/game-api-types';
+import { energyDeficitEfficiencyMultiplier } from '../../models/planets/energy-deficit';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { Technology } from '../../models/tech/technology';
@@ -517,9 +518,11 @@ export class ResearchesViewComponent implements OnInit {
     const adaptiveLevel = this.currentTechnologyLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const irnLevel = this.currentTechnologyLevel(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK);
     const scienceModifier = planet.info.planetaryParameters.scienceModifier;
+    const energyState = this.calculateEnergyState(planet);
     const result = basePower
       * researchPowerMultiplier(computerLevel, adaptiveLevel, irnLevel)
-      * scienceModifier;
+      * scienceModifier
+      * energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
     return Number.isFinite(result) ? Math.floor(result) : 0;
   }
 

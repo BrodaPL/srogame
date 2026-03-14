@@ -12,6 +12,7 @@
       [crystal]="crystalDisplay"
       [deuterium]="deuteriumDisplay"
       [energy]="energyDisplay"
+      [energyTooltip]="energyTooltip"
       [powers]="powersDisplay"
     ></app-resources>
 
@@ -33,6 +34,24 @@
             </div>
           }
         </div>
+      </div>
+
+      <div class="planet-view__attention">
+        <h3 class="planet-view__section-title">Needs Attention</h3>
+        @if (attentionLabels().length > 0) {
+          <div class="planet-view__attention-list">
+            @for (label of attentionLabels(); track label) {
+              <p
+                class="planet-view__attention-item"
+                [class.planet-view__attention-item--danger]="label === 'Energy deficit'"
+              >
+                {{ label }}
+              </p>
+            }
+          </div>
+        } @else {
+          <p class="overview-muted planet-view__attention-empty">No warnings right now.</p>
+        }
       </div>
 
       <div class="planet-view__hero">
