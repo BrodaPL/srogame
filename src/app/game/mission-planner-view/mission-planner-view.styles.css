@@ -10,6 +10,10 @@
   align-items: start;
 }
 
+.mission-planner__section--full {
+  grid-column: 1 / -1;
+}
+
 .mission-planner__main,
 .mission-planner__rail {
   display: grid;
@@ -26,6 +30,28 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
+}
+
+.mission-planner__top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(360px, 1.14fr);
+  grid-template-areas:
+    "target details"
+    "summary details";
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.mission-planner__target-card {
+  grid-area: target;
+}
+
+.mission-planner__summary-card {
+  grid-area: summary;
+}
+
+.mission-planner__details-card--tall {
+  grid-area: details;
 }
 
 .mission-planner__mission-list {
@@ -163,6 +189,14 @@
   gap: 0.28rem;
 }
 
+.mission-planner__ship-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
 .mission-planner__ship-title {
   margin: 0;
   font-size: 0.86rem;
@@ -214,8 +248,63 @@
   font-size: 0.74rem;
 }
 
-.mission-planner__summary-stats {
-  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+.mission-planner__detail-line {
+  margin: 0;
+  color: #dbe5f6;
+  font-size: 0.78rem;
+  font-family: var(--font-mono), serif;
+}
+
+.mission-planner__detail-stat {
+  margin-top: 0.35rem;
+}
+
+.mission-planner__detail-stat .overview-stat__value {
+  font-family: var(--font-mono), serif;
+}
+
+.mission-planner__origin-field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.mission-planner__origin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.mission-planner__origin-input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.025);
+  color: #b8c5d9;
+  padding: 0.46rem 0.58rem;
+  font-family: var(--font-mono), serif;
+  font-size: 0.76rem;
+}
+
+.mission-planner__origin-input[readonly] {
+  cursor: text;
+  opacity: 0.78;
+}
+
+.mission-planner__details-card--tall {
+  display: grid;
+  align-content: start;
+  min-height: 100%;
+}
+
+.mission-planner__summary-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.mission-planner__summary-column {
+  display: grid;
   gap: 0.55rem;
 }
 
@@ -241,6 +330,10 @@
   flex-wrap: wrap;
   gap: 0.45rem;
   margin-top: 0.7rem;
+}
+
+.mission-planner__details-card--tall .mission-planner__disabled-row {
+  margin-top: auto;
 }
 
 .mission-planner__warnings {
@@ -277,15 +370,28 @@
 
 @media (max-width: 900px) {
   .mission-planner__layout,
+  .mission-planner__top-grid,
   .mission-planner__selectors,
   .mission-planner__details {
     grid-template-columns: 1fr;
+  }
+
+  .mission-planner__top-grid {
+    grid-template-areas:
+      "target"
+      "details"
+      "summary";
   }
 }
 
 @media (max-width: 600px) {
   .mission-planner__mission-list,
-  .mission-planner__cargo-grid {
+  .mission-planner__cargo-grid,
+  .mission-planner__summary-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .mission-planner__origin-row {
     grid-template-columns: 1fr;
   }
 

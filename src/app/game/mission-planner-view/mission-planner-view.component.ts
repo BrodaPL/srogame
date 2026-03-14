@@ -391,22 +391,6 @@ export class MissionPlannerViewComponent implements OnInit {
     this.onMissionTypeChange();
   }
 
-  protected applyOriginCoordinatesInput(): void {
-    const coordinates = this.parseCoordinates(this.originCoordinatesInput);
-    if (!coordinates) {
-      this.launchError = 'Origin coordinates must have format x:y:z.';
-      return;
-    }
-
-    const matchingPlanet = this.ownedPlanets.find((planet) => this.sameCoordinates(planet.coordinates, coordinates)) ?? null;
-    if (!matchingPlanet) {
-      this.launchError = 'Origin planet must be one of your owned planets.';
-      return;
-    }
-
-    this.selectOriginPlanet(matchingPlanet);
-  }
-
   protected applyTargetCoordinatesInput(): void {
     const coordinates = this.parseCoordinates(this.targetCoordinatesInput);
     if (!coordinates) {
