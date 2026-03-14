@@ -48,16 +48,17 @@ export class EncyclopediaMechanicsComponent {
       title: 'Planet Economy and Power',
       category: 'Economy',
       status: 'Live',
-      summary: 'Production is tied to current power usage and always floors to integers.',
+      summary: 'Production is tied to current power usage, energy availability, and planetary modifiers, with separate warnings for shortage and manual throttling.',
       details: [
         'Each powered building has max power equal to level multiplied by blueprint powerConsumption.',
         'Current power is configurable in whole level-steps and clamped to valid bounds.',
-        'Lower power does not hard-disable production. It scales output by utilization.'
+        'Lower manual power does not hard-disable production. It scales output by utilization.',
+        'Energy shortage is a separate mechanic from manual power reduction: Energy insufficient is a red warning, while Energy reduction is a regular warning.'
       ],
       formulas: [
         'utilization = clamp(currentPower / maxPower, 0, 1)',
         'effectiveProduction = floor(baseProduction * utilization)',
-        'resourceGain = floor(effectiveProduction * (1 + adaptiveTechnology / 100) * planetaryModifier)'
+        'resourceGain = floor(effectiveProduction * (1 + adaptiveTechnology / 100) * planetaryModifier * energyEfficiency)'
       ]
     },
     {
@@ -150,11 +151,12 @@ export class EncyclopediaMechanicsComponent {
       title: 'Intel, Discovery, and Notes',
       category: 'Intel',
       status: 'Live',
-      summary: 'Visibility is report-driven and star-system notes are player-specific.',
+      summary: 'Visibility is report-driven, reports can preview planets, and star-system notes are player-specific.',
       details: [
         'Galaxy ownership bytes are computed from espionage reports available to the current player.',
         'Unknown systems can be intentionally returned as null ownership bytes.',
-        'Star-system notes support create, edit, and delete with per-player storage.'
+        'Star-system notes support create, edit, and delete with per-player storage.',
+        'Reports can preview planet data through MiniPlanetPreview, including direct actions like View Planet, Spy Planet, and Copy coordinates when intel is available.'
       ]
     },
     {
@@ -185,12 +187,13 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Sending Fleets with Mission Types',
       category: 'Core Loop',
-      status: 'Planned',
-      summary: 'Fleet dispatch with mission selection is planned as a dedicated operational system.',
+      status: 'Partial',
+      summary: 'Fleet dispatch is live through Mission Planner for a focused subset of mission types, with more mission logic still planned.',
       details: [
-        'Players will send fleets with mission intent such as transport, attack, reconnaissance, or support.',
-        'Mission validation will include coordinates, ownership constraints, and ship capability checks.',
-        'Mission Planner warnings should evolve from raw validation messages into human-readable guidance with suggested fixes for the player.'
+        'Mission Planner currently supports Move, Transport, Spy, and Colonize.',
+        'Validation includes coordinates, ownership constraints, ship capability checks, cargo rules, and active-fleet-cap checks.',
+        'Mission Planner can now be prefilled from other screens, for example Spy Planet actions from report or galaxy previews.',
+        'Attack, plunder, invasion, recycle, repair, and other advanced mission types are still planned.'
       ],
       formulas: [
         'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2'
@@ -210,11 +213,13 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Reports and Messages',
       category: 'Intel',
-      status: 'Planned',
-      summary: 'A broader player-facing messaging/report inbox is planned.',
+      status: 'Partial',
+      summary: 'A player-facing report inbox is live, while broader event coverage and message depth are still expanding.',
       details: [
-        'Combat, espionage, transport, expedition, and system events will produce structured messages.',
-        'Report history and readability improvements are planned beyond current data snapshots.'
+        'Reports View supports tabs, unread/read state, selection with delete, inline detail view, and location preview.',
+        'Espionage reports render as structured dossiers with sectioned intel for resources, buildings, technologies, ships, defences, and planetary parameters.',
+        'Report-linked planet previews reuse MiniPlanetPreview and can route into Planet View or Mission Planner.',
+        'Combat, expedition, and other future system events are still planned to broaden report coverage.'
       ]
     },
     {
@@ -230,21 +235,23 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'New Views and Screens',
       category: 'Core Loop',
-      status: 'Planned',
-      summary: 'Additional dedicated game views are planned for strategic workflows.',
+      status: 'Partial',
+      summary: 'The game now has multiple dedicated management views, with more strategic screens still planned.',
       details: [
-        'Planned screens include deeper mission control, communication/report hubs, and management dashboards.',
-        'Views will be aligned with the current `/game/*` routed shell architecture.'
+        'Imperium, Buildings, Production, Researches, Reports, Operations, Mission Planner, Planet View, Galactic View, and Star System View are all live.',
+        'Buildings and Production provide compact multi-planet management flows using shared planet selection patterns.',
+        'Additional deeper strategy/control screens are still planned and will continue to follow the `/game/*` routed shell architecture.'
       ]
     },
     {
       title: 'Production Queue Management',
       category: 'Queues',
-      status: 'Planned',
-      summary: 'Advanced queue controls are planned for building, shipyard, and research flows.',
+      status: 'Partial',
+      summary: 'Queue management views and live queue displays exist, while advanced controls like reorder/cancel are still planned.',
       details: [
-        'Planned controls include reorder, cancel, and reprioritize actions.',
-        'Queue UX will expose clearer per-entry timing and throughput effects.'
+        'Planet View, Buildings View, Production View, and Researches View all expose live queue state and ETA-style previews.',
+        'Queue entries are started through real client-server flows with immediate resource payment and updated owned-planet data.',
+        'Planned controls still include reorder, cancel, and reprioritize actions.'
       ]
     },
     {
@@ -271,11 +278,12 @@ export class EncyclopediaMechanicsComponent {
       title: 'Power Influence on Industry and Mining',
       category: 'Economy',
       status: 'Live',
-      summary: 'Energy deficits now reduce mining and all production powers on the planet.',
+      summary: 'Energy deficits reduce mining and all production powers on the planet, but are tracked separately from manual building-power reduction.',
       details: [
         'If available energy is below used energy, resource income, industry power, shipyard power, and research power are all reduced.',
         'Penalty is linear from the energy deficit percentage, with a 95% maximum penalty cap.',
-        'Storage capacity is not affected by energy deficit.'
+        'Storage capacity is not affected by energy deficit.',
+        'Warnings are split: Energy insufficient marks planet-wide shortage, while Energy reduction marks manual per-building throttling.'
       ],
       formulas: [
         'deficitPercent = ((usedEnergy - availableEnergy) / availableEnergy) * 100',
