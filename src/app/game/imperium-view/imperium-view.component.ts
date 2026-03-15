@@ -22,6 +22,7 @@ import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/t
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
+import { TutorialService } from '../../tutorial/tutorial.service';
 
 type ImperiumSortOption =
   | 'coordinates'
@@ -160,7 +161,8 @@ export class ImperiumViewComponent implements OnInit {
   constructor(
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {}
 
   public ngOnInit(): void {
@@ -236,6 +238,7 @@ export class ImperiumViewComponent implements OnInit {
         next: (ownedPlanets) => {
           this.ownedPlanets = [...ownedPlanets];
           this.rebuildDashboardState();
+          this.tutorialService.autoOpenTutorial('imperiumView');
         },
         error: () => {
           this.loadError = 'Unable to load owned planets.';

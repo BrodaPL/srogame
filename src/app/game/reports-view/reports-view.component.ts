@@ -9,6 +9,7 @@ import { PlayerReport } from '../../models/reports/player-report';
 import { fromPlayerReportDto } from '../../models/reports/player-report-dto.mapper';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
+import { TutorialService } from '../../tutorial/tutorial.service';
 
 type ReportDossierMetric = {
   label: string;
@@ -44,7 +45,8 @@ export class ReportsViewComponent implements OnInit {
   constructor(
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {}
 
   public ngOnInit(): void {
@@ -395,6 +397,7 @@ export class ReportsViewComponent implements OnInit {
           this.selectedReportIds.clear();
           this.selectedReportId = null;
           this.resetPreview();
+          this.tutorialService.autoOpenTutorial('reportsView');
         },
         error: () => {
           this.loadError = 'Unable to load reports.';

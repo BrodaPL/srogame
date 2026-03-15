@@ -12,6 +12,7 @@ import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
+import { TutorialService } from '../../tutorial/tutorial.service';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import {
   PlanetPowersDisplay,
@@ -91,7 +92,8 @@ export class BuildingsViewComponent implements OnInit {
   constructor(
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {
     const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
     const allBuildings = Array.from(buildingBlueprints.buildingsMap.values());
@@ -408,6 +410,7 @@ export class BuildingsViewComponent implements OnInit {
           this.ownedPlanets = [...ownedPlanets];
           this.selectedPlanetId = ownedPlanets[0] ? this.planetId(ownedPlanets[0]) : null;
           this.rebuildSelectedPlanetState();
+          this.tutorialService.autoOpenTutorial('buildingsView');
         },
         error: () => {
           this.loadError = 'Unable to load owned planets.';

@@ -24,6 +24,7 @@ import { Technology } from '../../models/tech/technology';
 import { researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
+import { TutorialService } from '../../tutorial/tutorial.service';
 
 type EnergyState = {
   used: number;
@@ -90,7 +91,8 @@ export class ResearchesViewComponent implements OnInit {
   constructor(
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {
     const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
     this.buildingBlueprintsByType = new Map(buildingBlueprints.buildingsMap);
@@ -390,6 +392,7 @@ export class ResearchesViewComponent implements OnInit {
       .subscribe({
         next: (ownedPlanets) => {
           this.applyOwnedPlanets(ownedPlanets);
+          this.tutorialService.autoOpenTutorial('researchesView');
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {

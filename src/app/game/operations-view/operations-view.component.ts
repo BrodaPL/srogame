@@ -4,6 +4,7 @@ import { finalize } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { Fleet } from '../../models/fleets/fleet';
+import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
 @Component({
@@ -19,7 +20,8 @@ export class OperationsViewComponent implements OnInit {
   constructor(
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {}
 
   public ngOnInit(): void {
@@ -58,6 +60,7 @@ export class OperationsViewComponent implements OnInit {
       .subscribe({
         next: (activeFleets) => {
           this.activeFleets = [...activeFleets].sort((left, right) => left.fleetId - right.fleetId);
+          this.tutorialService.autoOpenTutorial('operationsView');
         },
         error: () => {
           this.loadError = 'Unable to load active fleets.';

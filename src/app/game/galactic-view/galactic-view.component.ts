@@ -23,6 +23,7 @@ import { finalize } from 'rxjs';
 import { GameStateService } from '../../core/game-state.service';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { NoteBorderColor } from '../../models/enums/note-border-color';
+import { TutorialService } from '../../tutorial/tutorial.service';
 
 type CellFillKind =
   | 'void'
@@ -105,7 +106,8 @@ export class GalacticViewComponent implements OnInit {
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly gameState: GameStateService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {}
 
   public ngOnInit(): void {
@@ -134,6 +136,7 @@ export class GalacticViewComponent implements OnInit {
           this.gridHeight = this.grid.length;
           this.gridWidth = this.grid[0]?.length ?? 0;
           this.syncScrollbars();
+          this.tutorialService.autoOpenTutorial('galacticView');
           this.cdr.markForCheck();
         },
         error: () => {

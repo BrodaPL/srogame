@@ -19,6 +19,7 @@ import type {
 } from '../../models/game-api-types';
 import { Ship } from '../../models/fleets/ship';
 import { maxActiveFleets } from '../../models/tech/technology-effects';
+import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 
@@ -109,7 +110,8 @@ export class MissionPlannerViewComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {
     const shipBlueprints = ShipBlueprintsFactory.fromDefaultJson();
     for (const [shipType, ship] of shipBlueprints.shipsMap.entries()) {
@@ -546,6 +548,7 @@ export class MissionPlannerViewComponent implements OnInit {
             this.selectOriginPlanet(firstWithShips);
           }
           this.applyRoutePrefill();
+          this.tutorialService.autoOpenTutorial('missionPlannerView');
         },
         error: () => {
           this.loadError = 'Unable to load mission planner data.';
