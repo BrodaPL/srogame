@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import {
+  EndTurnResponse,
   GameStateResponse,
   StartGameRequest,
   StartGameResponse,
@@ -43,6 +44,14 @@ export class GameApiService {
   public getGameState(token: string) {
     return this.http.get<GameStateResponse>(
       `${API_BASE_URL}/game/state`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public endTurn(token: string) {
+    return this.http.post<EndTurnResponse>(
+      `${API_BASE_URL}/game/end-turn`,
+      {},
       { headers: this.authHeaders(token) }
     );
   }

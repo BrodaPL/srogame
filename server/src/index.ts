@@ -24,8 +24,10 @@ import shipyardQueueEntryModule from '../../src/app/models/fleets/shipyard-queue
 import technologyQueueEntryModule from '../../src/app/models/tech/technology-queue-entry.js';
 import researchHelperForModule from '../../src/app/models/tech/research-helper-for.js';
 import technologyEffectsModule from '../../src/app/models/tech/technology-effects.js';
+import phaseOneTurnResolverModule from '../../src/app/models/turns/phase-one-turn-resolver.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
+  EndTurnResponse,
   GalaxySetup,
   PlayerSession,
   GalaxySnapshot,
@@ -146,6 +148,7 @@ const { ResearchHelperFor } = researchHelperForModule as {
   ResearchHelperFor: typeof import('../../src/app/models/tech/research-helper-for.js').ResearchHelperFor;
 };
 const { maxActiveFleets } = technologyEffectsModule as typeof import('../../src/app/models/tech/technology-effects.js');
+const { resolvePhaseOneTurn } = phaseOneTurnResolverModule as typeof import('../../src/app/models/turns/phase-one-turn-resolver.js');
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -165,7 +168,6 @@ const PLAYER_TYPE_PLAYER = 'PLAYER' as const;
 const SELF_REPORT_LEVEL = 999;
 const STARTING_SYSTEM_REPORT_LEVEL = 1;
 const STAR_SYSTEM_NOTE_TEXT_MAX_LENGTH = 500;
-const INITIAL_TURN_NUMBER = 1;
 const NOTE_BORDER_COLOR_VALUES = new Set<string>(Object.values(NoteBorderColor));
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
@@ -190,6 +192,7 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
 let currentGalaxy: Galaxy | null = null;
 let currentGameOwnerId: number | null = null;
 let currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
+let isTurnProcessing = false;
 
 app.post('/api/auth/register', (req, res) => {
   const body = req.body as RegisterRequest | undefined;
@@ -285,7 +288,7 @@ app.post('/api/game/start', (req, res) => {
 
   currentGalaxy = new GalaxyCreator(body.setup).createGalaxy([auth.session.playerName]);
   currentGameOwnerId = auth.session.accountId;
-  generateSelfReportsForHumanPlayers(currentGalaxy, INITIAL_TURN_NUMBER);
+  generateSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
 
   const response: StartGameResponse = {
@@ -316,6 +319,46 @@ app.get('/api/game/state', (req, res) => {
   };
 
   return res.status(200).json(response);
+});
+
+app.post('/api/game/end-turn', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  if (isTurnProcessing) {
+    return res.status(409).json({ error: 'Turn processing is already in progress.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  isTurnProcessing = true;
+
+  try {
+    resolvePhaseOneTurn(currentGalaxy);
+    currentGalaxy.currentTurn += 1;
+    refreshOwnedPlanetSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+
+    const response: EndTurnResponse = {
+      player: toPlayerSession(auth.session, currentGalaxy),
+      galaxy: buildGalaxySnapshot(currentGalaxy)
+    };
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error('End-turn processing failed.', error);
+    return res.status(500).json({ error: 'Turn processing failed.' });
+  } finally {
+    isTurnProcessing = false;
+  }
 });
 
 app.get('/api/game/galaxy-presentation-data', (req, res) => {
@@ -1287,7 +1330,7 @@ app.post('/api/game/active-fleets', (req, res) => {
     travelTurns,
     returnTurns: travelTurns,
     status: 'Outbound',
-    createdAtTurn: INITIAL_TURN_NUMBER
+    createdAtTurn: currentGalaxy.currentTurn
   } as Fleet;
 
   currentGalaxy.nextFleetId += 1;
@@ -2198,6 +2241,31 @@ function generateSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber: number):
   }
 }
 
+function refreshOwnedPlanetSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber: number): void {
+  const reportGenerator = new EspionageReportGenerator();
+
+  for (const player of galaxy.players) {
+    if (player.type !== PLAYER_TYPE_PLAYER) {
+      continue;
+    }
+
+    for (const planet of player.planets) {
+      const report = reportGenerator.createEspionageReport(
+        player,
+        player,
+        planet,
+        0,
+        {
+          reportId: player.createReportId(),
+          forcedReportLevel: SELF_REPORT_LEVEL,
+          createdTurn: turnNumber
+        }
+      );
+      planet.lastReportData.set(player.playerId, report.copy());
+    }
+  }
+}
+
 function toGalaxyByteCellDto(cell: GalaxyByteCell): GalaxyByteCellDto {
   return {
     planetsAndAsteroids: [cell.planetsAndAsteroids[0], cell.planetsAndAsteroids[1]]
@@ -2310,6 +2378,7 @@ function parseIncludePlanets(value: unknown): boolean {
 function buildGalaxySnapshot(galaxy: Galaxy): GalaxySnapshot {
   return {
     name: galaxy.name,
+    currentTurn: galaxy.currentTurn,
     stars: galaxy.stars.map((row) =>
       row.map((system) => ({
         isVoid: system.isVoid,

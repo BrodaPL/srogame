@@ -36,6 +36,7 @@ export class Galaxy {
     public name: string,
     public players: Player[],
     public stars: SolarSystem[][],
+    public currentTurn = 1,
     public activeFleets: Fleet[] = [],
     public nextFleetId = 1,
     public humanPlayerMap: Map<number, Player> = new Map(),

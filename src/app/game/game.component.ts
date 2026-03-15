@@ -51,6 +51,10 @@ export class GameComponent implements OnInit {
     });
   }
 
+  protected isUiLocked(): boolean {
+    return this.gameState.isProcessingTurn;
+  }
+
   private loadConfig(): GalaxySetup | null {
     const stored = localStorage.getItem('srogame:setup');
     if (!stored) {

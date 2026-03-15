@@ -67,6 +67,7 @@ This file captures session context for collaborators and future AI agents.
 - On this machine prefer `.cmd` shims in PowerShell: `codex.cmd`, `npm.cmd`, `npx.cmd`
 - Reason: PowerShell execution policy can block the `.ps1` shims for `npm`/`npx`
 - After adding the server, re-run `codex.cmd mcp list` to verify it is present before trying to use Chrome MCP
+- Important: MCP being configured in the local Codex CLI environment does not guarantee that the current agent/chat session exposes a callable Chrome MCP tool. If registration succeeds but no MCP tool is available in-session, fall back to another browser-testing method and note that limitation explicitly.
 - Historical note: Chrome MCP was successfully configured in this environment on 2026-03-08 and refreshed again on 2026-03-10
 
 ## Session Notes (most recent first)

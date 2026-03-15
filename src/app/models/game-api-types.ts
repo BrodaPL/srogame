@@ -67,6 +67,7 @@ export type GalaxySystemSnapshot = {
 
 export type GalaxySnapshot = {
   name: string;
+  currentTurn: number;
   stars: GalaxySystemSnapshot[][];
 };
 
@@ -80,6 +81,11 @@ export type StartGameResponse = {
 };
 
 export type GameStateResponse = {
+  player: PlayerSession;
+  galaxy: GalaxySnapshot;
+};
+
+export type EndTurnResponse = {
   player: PlayerSession;
   galaxy: GalaxySnapshot;
 };

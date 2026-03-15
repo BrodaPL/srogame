@@ -760,6 +760,7 @@ app-root {
     radial-gradient(circle at top right, rgba(246, 180, 76, 0.2), transparent 55%),
     radial-gradient(circle at 10% 15%, rgba(42, 161, 152, 0.2), transparent 40%),
     linear-gradient(140deg, #0b0f14, #11161e 45%, #0d1016);
+  position: relative;
 }
 
 .game__header {
@@ -847,6 +848,13 @@ app-root {
   outline-offset: 2px;
 }
 
+.top-menu__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .top-menu__button--active {
   border-color: var(--accent);
   background: linear-gradient(135deg, rgba(246, 180, 76, 0.35), rgba(246, 180, 76, 0.12));
@@ -867,6 +875,82 @@ app-root {
   border-color: rgba(246, 180, 76, 0.5);
   background: linear-gradient(135deg, rgba(246, 180, 76, 0.28), rgba(246, 180, 76, 0.08));
   color: #fff2d5;
+}
+
+.top-menu__button--end-turn {
+  border-color: rgba(255, 184, 77, 0.5);
+  background: linear-gradient(135deg, rgba(255, 184, 77, 0.34), rgba(168, 80, 34, 0.18));
+  color: #fff7ea;
+}
+
+.top-menu__spacer {
+  flex: 1 1 auto;
+}
+
+.top-menu__turn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.top-menu__error {
+  margin: 0.35rem 0 0;
+  color: #ff9d9d;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.game--locked {
+  overflow: hidden;
+}
+
+.game-lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(7, 10, 15, 0.62);
+  backdrop-filter: blur(5px);
+}
+
+.game-lock-overlay__card {
+  display: grid;
+  gap: 0.55rem;
+  width: min(420px, 100%);
+  padding: 1.4rem 1.5rem;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(160deg, rgba(18, 24, 33, 0.96), rgba(12, 17, 24, 0.98));
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
+.game-lock-overlay__card h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2vw, 1.8rem);
+}
+
+.game-lock-overlay__card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.game-lock-overlay__eyebrow {
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .tutorial-overlay__text p {

@@ -1,6 +1,15 @@
-<main class="game">
+<main class="game" [class.game--locked]="isUiLocked()">
   @if (config) {
     <router-outlet />
+    @if (isUiLocked()) {
+      <section class="game-lock-overlay" aria-live="polite" aria-busy="true">
+        <div class="game-lock-overlay__card">
+          <p class="game-lock-overlay__eyebrow">Turn Processing</p>
+          <h2>Processing turn...</h2>
+          <p>The server is resolving income, construction, and research.</p>
+        </div>
+      </section>
+    }
   } @else {
     <section class="empty">
       <h1>No setup found</h1>
