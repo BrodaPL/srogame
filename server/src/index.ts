@@ -342,8 +342,9 @@ app.post('/api/game/end-turn', (req, res) => {
   isTurnProcessing = true;
 
   try {
-    resolvePhaseOneTurn(currentGalaxy);
-    currentGalaxy.currentTurn += 1;
+    const resolvedTurnNumber = currentGalaxy.currentTurn + 1;
+    resolvePhaseOneTurn(currentGalaxy, resolvedTurnNumber);
+    currentGalaxy.currentTurn = resolvedTurnNumber;
     refreshOwnedPlanetSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
 
@@ -1292,6 +1293,10 @@ app.post('/api/game/active-fleets', (req, res) => {
     if (targetPlanet.info.ownerId !== playerId) {
       return res.status(400).json({ error: 'Move mission target must be one of your planets.' });
     }
+  }
+
+  if (missionType === FleetMissionType.TRANSPORT && targetPlanet.info.ownerId !== playerId) {
+    return res.status(400).json({ error: 'Transport mission target must be one of your planets.' });
   }
 
   if (missionType === FleetMissionType.TRANSPORT && usedCargoCapacity <= 0) {

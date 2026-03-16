@@ -63,7 +63,7 @@ export class MissionPlannerViewComponent implements OnInit {
     {
       type: FleetMissionType.TRANSPORT,
       label: 'Transport',
-      description: 'Send resources and ships to any known target planet.'
+      description: 'Send resources and ships to one of your own planets.'
     },
     {
       type: FleetMissionType.SPY,
@@ -254,6 +254,12 @@ export class MissionPlannerViewComponent implements OnInit {
 
     if (this.selectedMissionType === FleetMissionType.TRANSPORT && cargoUsed <= 0) {
       warnings.push({ text: 'Transport mission requires cargo.', severity: 'error' });
+    }
+
+    if (this.selectedMissionType === FleetMissionType.TRANSPORT) {
+      if (targetPlanet && !this.isOwnedByPlayer(targetPlanet)) {
+        warnings.push({ text: 'Transport mission target must be one of your planets.', severity: 'error' });
+      }
     }
 
     if (this.selectedMissionType !== FleetMissionType.SPY && !hasMilitaryShips) {

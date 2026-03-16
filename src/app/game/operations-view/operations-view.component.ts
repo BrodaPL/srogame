@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
+import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { Fleet } from '../../models/fleets/fleet';
 import { TutorialService } from '../../tutorial/tutorial.service';
@@ -19,6 +20,7 @@ export class OperationsViewComponent implements OnInit {
 
   constructor(
     private readonly gameApi: GameApiService,
+    private readonly gameState: GameStateService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
     private readonly tutorialService: TutorialService
@@ -40,6 +42,26 @@ export class OperationsViewComponent implements OnInit {
 
   protected coordinatesLabel(x: number, y: number, z: number): string {
     return `${x}:${y}:${z}`;
+  }
+
+  protected remainingEta(fleet: Fleet): number {
+    const currentTurn = this.gameState.currentTurn();
+    if (currentTurn === null) {
+      return fleet.travelTurns;
+    }
+
+    const elapsedTurns = Math.max(0, currentTurn - fleet.createdAtTurn);
+    return Math.max(0, fleet.travelTurns - elapsedTurns);
+  }
+
+  protected progressLabel(fleet: Fleet): string {
+    const currentTurn = this.gameState.currentTurn();
+    if (currentTurn === null) {
+      return `Travel time ${fleet.travelTurns}`;
+    }
+
+    const elapsedTurns = Math.max(0, Math.min(fleet.travelTurns, currentTurn - fleet.createdAtTurn));
+    return `${elapsedTurns}/${fleet.travelTurns} turns elapsed`;
   }
 
   private loadActiveFleets(): void {

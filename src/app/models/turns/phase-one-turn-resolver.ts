@@ -1,13 +1,21 @@
+import { EspionageReportGenerator } from '../../generators/espionage-report-generator';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
 import { BuildingType } from '../enums/building-type';
+import { FleetMissionType } from '../enums/fleet-mission-type';
+import { PlayerType } from '../enums/player-type';
+import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
+import { Fleet } from '../fleets/fleet';
 import { Ship } from '../fleets/ship';
 import { ShipInstance } from '../fleets/ship-instance';
 import { Galaxy } from '../planets/galaxy';
 import { Planet } from '../planets/planet';
 import { Player } from '../player';
+import { FleetReport } from '../reports/fleet-report';
+import { ResearchReport } from '../reports/research-report';
+import { ResourcesPack } from '../resources-pack';
 import { energyDeficitEfficiencyMultiplier } from '../planets/energy-deficit';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../tech/technology-effects';
 
@@ -44,7 +52,10 @@ const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
 const TECHNOLOGY_BLUEPRINTS = TechnologyBlueprintsFactory.fromDefaultJson();
 const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
 
-export function resolvePhaseOneTurn(galaxy: Galaxy): void {
+export function resolvePhaseOneTurn(
+  galaxy: Galaxy,
+  resolvedTurnNumber = galaxy.currentTurn + 1
+): void {
   const playersById = new Map<number, Player>();
   const techLevelsByPlayerId = new Map<number, Map<TechnologyType, number>>();
   const planetById = new Map<string, Planet>();
@@ -106,8 +117,21 @@ export function resolvePhaseOneTurn(galaxy: Galaxy): void {
       snapshot,
       snapshotsByPlanetId
     );
-    advanceResearchQueue(planet, owner, totalResearchPower, planetById);
+    advanceResearchQueue(
+      planet,
+      owner,
+      totalResearchPower,
+      planetById,
+      resolvedTurnNumber
+    );
   }
+
+  resolveActiveFleets(
+    galaxy,
+    playersById,
+    planetById,
+    resolvedTurnNumber
+  );
 }
 
 function createPlanetTurnSnapshot(
@@ -379,7 +403,8 @@ function advanceResearchQueue(
   planet: Planet,
   player: Player,
   researchPower: number,
-  planetById: Map<string, Planet>
+  planetById: Map<string, Planet>,
+  resolvedTurnNumber: number
 ): void {
   const queueEntry = planet.rBDSFTQ.currentResearchQueue;
   if (!queueEntry) {
@@ -400,6 +425,7 @@ function advanceResearchQueue(
     player.setTechLevel(queueEntry.technologyType, queueEntry.nextLevel);
     planet.rBDSFTQ.currentResearchQueue = null;
     clearResearchHelpers(planet, queueEntry.helperLabs, planetById);
+    addResearchCompletionReport(player, planet, queueEntry, resolvedTurnNumber);
     return;
   }
 
@@ -419,6 +445,265 @@ function advanceResearchQueue(
   player.setTechLevel(queueEntry.technologyType, queueEntry.nextLevel);
   planet.rBDSFTQ.currentResearchQueue = null;
   clearResearchHelpers(planet, queueEntry.helperLabs, planetById);
+  addResearchCompletionReport(player, planet, queueEntry, resolvedTurnNumber);
+}
+
+function addResearchCompletionReport(
+  player: Player,
+  planet: Planet,
+  queueEntry: { technologyType: TechnologyType; nextLevel: number },
+  resolvedTurnNumber: number
+): void {
+  if (player.type !== PlayerType.PLAYER) {
+    return;
+  }
+
+  const report = new ResearchReport(
+    {
+      reportId: player.createReportId(),
+      createdTurn: resolvedTurnNumber,
+      title: `Research Completed: ${queueEntry.technologyType} L${queueEntry.nextLevel}`,
+      sourceCoordinates: toPlanetReportCoordinates(planet),
+      sourcePlanetName: planet.basicInfo.name,
+      sourceSystemName: planet.basicInfo.solarSystem.name
+    },
+    `${queueEntry.technologyType} reached level ${queueEntry.nextLevel} on ${planet.basicInfo.name}.`
+  );
+  player.addReport(report);
+}
+
+function resolveActiveFleets(
+  galaxy: Galaxy,
+  playersById: Map<number, Player>,
+  planetById: Map<string, Planet>,
+  resolvedTurnNumber: number
+): void {
+  const espionageReportGenerator = new EspionageReportGenerator();
+  const remainingFleets: Fleet[] = [];
+
+  // TODO: Define a formal deterministic same-turn arrival order once simultaneous arrivals need dedicated rules.
+  for (const fleet of galaxy.activeFleets) {
+    if (!isFleetArrivingThisTurn(fleet, resolvedTurnNumber)) {
+      remainingFleets.push(fleet);
+      continue;
+    }
+
+    resolveArrivingFleet(
+      fleet,
+      playersById,
+      planetById,
+      espionageReportGenerator,
+      resolvedTurnNumber
+    );
+  }
+
+  galaxy.activeFleets = remainingFleets;
+}
+
+function isFleetArrivingThisTurn(fleet: Fleet, resolvedTurnNumber: number): boolean {
+  return Math.max(0, resolvedTurnNumber - fleet.createdAtTurn) >= fleet.travelTurns;
+}
+
+function resolveArrivingFleet(
+  fleet: Fleet,
+  playersById: Map<number, Player>,
+  planetById: Map<string, Planet>,
+  espionageReportGenerator: EspionageReportGenerator,
+  resolvedTurnNumber: number
+): void {
+  switch (fleet.missionType) {
+    case FleetMissionType.MOVE:
+      resolveOwnedDeliveryFleet(
+        fleet,
+        playersById,
+        planetById,
+        resolvedTurnNumber,
+        'Move'
+      );
+      return;
+    case FleetMissionType.TRANSPORT:
+      resolveOwnedDeliveryFleet(
+        fleet,
+        playersById,
+        planetById,
+        resolvedTurnNumber,
+        'Transport'
+      );
+      return;
+    case FleetMissionType.SPY:
+      resolveSpyFleet(
+        fleet,
+        playersById,
+        planetById,
+        espionageReportGenerator,
+        resolvedTurnNumber
+      );
+      return;
+    default:
+      return;
+  }
+}
+
+function resolveOwnedDeliveryFleet(
+  fleet: Fleet,
+  playersById: Map<number, Player>,
+  planetById: Map<string, Planet>,
+  resolvedTurnNumber: number,
+  missionLabel: 'Move' | 'Transport'
+): void {
+  const owner = playersById.get(fleet.ownerId);
+  if (!owner) {
+    return;
+  }
+
+  const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z));
+  if (!targetPlanet || targetPlanet.info.ownerId !== fleet.ownerId) {
+    // TODO: Phase 4 should replace hard fleet consumption on invalid arrival with richer salvage/return-flight handling.
+    addFleetFailureReport(
+      owner,
+      fleet,
+      resolvedTurnNumber,
+      `${missionLabel} mission failed because the target was no longer owned by you on arrival.`
+    );
+    return;
+  }
+
+  addFleetShipsToPlanet(targetPlanet, fleet.ships);
+  targetPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
+    fleet.cargo.metal,
+    fleet.cargo.crystal,
+    fleet.cargo.deuterium
+  ));
+
+  addFleetSuccessReport(
+    owner,
+    fleet,
+    resolvedTurnNumber,
+    `${missionLabel} mission completed successfully at ${targetPlanet.basicInfo.name}.`
+  );
+}
+
+function resolveSpyFleet(
+  fleet: Fleet,
+  playersById: Map<number, Player>,
+  planetById: Map<string, Planet>,
+  espionageReportGenerator: EspionageReportGenerator,
+  resolvedTurnNumber: number
+): void {
+  const owner = playersById.get(fleet.ownerId);
+  if (!owner) {
+    return;
+  }
+
+  const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z));
+  if (!targetPlanet || targetPlanet.info.ownerId === fleet.ownerId) {
+    // TODO: Phase 4 should replace hard fleet consumption on invalid arrival with richer salvage/return-flight handling.
+    addFleetFailureReport(
+      owner,
+      fleet,
+      resolvedTurnNumber,
+      'Spy mission failed because the target became invalid before arrival.'
+    );
+    return;
+  }
+
+  const probeAmount = fleet.ships.find((entry) => entry.type === ShipType.SPY_PROBE)?.amount ?? 0;
+  if (probeAmount <= 0) {
+    addFleetFailureReport(
+      owner,
+      fleet,
+      resolvedTurnNumber,
+      'Spy mission failed because no valid probes were available on arrival.'
+    );
+    return;
+  }
+
+  const targetOwner = targetPlanet.info.ownerId === null
+    ? null
+    : playersById.get(targetPlanet.info.ownerId) ?? null;
+  const report = espionageReportGenerator.createEspionageReport(
+    owner,
+    targetOwner,
+    targetPlanet,
+    probeAmount,
+    {
+      reportId: owner.createReportId(),
+      createdTurn: resolvedTurnNumber
+    }
+  );
+  owner.addReport(report.copy());
+  targetPlanet.lastReportData.set(owner.playerId, report.copy());
+}
+
+function addFleetShipsToPlanet(
+  planet: Planet,
+  ships: Array<{ type: ShipType; amount: number }>
+): void {
+  for (const shipStack of ships) {
+    const blueprint = SHIP_BLUEPRINTS.get(shipStack.type);
+    if (!blueprint) {
+      continue;
+    }
+
+    const normalizedAmount = Math.max(0, Math.floor(shipStack.amount));
+    for (let index = 0; index < normalizedAmount; index += 1) {
+      planet.rBDSFTQ.ships.push(new ShipInstance(
+        blueprint,
+        blueprint.hullPointsCapacity,
+        blueprint.shieldCapacity,
+        0,
+        []
+      ));
+    }
+  }
+}
+
+function addFleetSuccessReport(
+  player: Player,
+  fleet: Fleet,
+  resolvedTurnNumber: number,
+  body: string
+): void {
+  if (player.type !== PlayerType.PLAYER) {
+    return;
+  }
+
+  const report = new FleetReport(
+    {
+      reportId: player.createReportId(),
+      createdTurn: resolvedTurnNumber,
+      title: `Fleet Arrived: ${fleet.missionType} to ${fleet.targetPlanetName}`,
+      sourceCoordinates: { ...fleet.target },
+      sourcePlanetName: fleet.targetPlanetName,
+      senderPlayerName: player.playerName
+    },
+    body
+  );
+  player.addReport(report);
+}
+
+function addFleetFailureReport(
+  player: Player,
+  fleet: Fleet,
+  resolvedTurnNumber: number,
+  reason: string
+): void {
+  if (player.type !== PlayerType.PLAYER) {
+    return;
+  }
+
+  const report = new FleetReport(
+    {
+      reportId: player.createReportId(),
+      createdTurn: resolvedTurnNumber,
+      title: `Fleet Failed: ${fleet.missionType} to ${fleet.targetPlanetName}`,
+      sourceCoordinates: { ...fleet.target },
+      sourcePlanetName: fleet.targetPlanetName,
+      senderPlayerName: player.playerName
+    },
+    `${reason}\n\nFleet was consumed on arrival.`
+  );
+  player.addReport(report);
 }
 
 function clearResearchHelpers(
@@ -451,6 +736,14 @@ function toPlanetCoordinatesId(planet: Planet): string {
     planet.basicInfo.solarSystem.coordinates.y,
     Math.max(0, planet.basicInfo.order - 1)
   );
+}
+
+function toPlanetReportCoordinates(planet: Planet): { x: number; y: number; z: number } {
+  return {
+    x: planet.basicInfo.solarSystem.coordinates.x,
+    y: planet.basicInfo.solarSystem.coordinates.y,
+    z: Math.max(0, planet.basicInfo.order - 1)
+  };
 }
 
 function toCoordinatesId(x: number, y: number, z: number): string {

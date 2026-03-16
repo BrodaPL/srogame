@@ -16,7 +16,7 @@
       <div>
         <p class="eyebrow">Fleet Control</p>
         <h1 class="operations-view__title">Operations</h1>
-        <p class="overview-muted">Active fleets and launched missions. No turn progression yet, so missions remain outbound.</p>
+        <p class="overview-muted">Active fleets and launched missions with live turn-based ETA progress.</p>
       </div>
       <a class="overview-nav__button" routerLink="/game/mission-planner">Open Mission Planner</a>
     </header>
@@ -51,7 +51,8 @@
               </div>
               <div class="overview-stat">
                 <span class="overview-stat__label">ETA</span>
-                <span class="overview-stat__value">{{ fleet.travelTurns }}</span>
+                <span class="overview-stat__value">{{ remainingEta(fleet) }}</span>
+                <span class="overview-muted">{{ progressLabel(fleet) }}</span>
               </div>
               <div class="overview-stat">
                 <span class="overview-stat__label">Fuel</span>

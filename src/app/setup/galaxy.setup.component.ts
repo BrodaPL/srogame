@@ -184,7 +184,7 @@ export class GalaxySetupComponent {
       neutralBotsDifficulty: '0',
       createRandomPlanets: false,
       createStartingShips: false,
-      skipTutorial: false,
+      skipTutorial: true,
       startingMetal: '6',
       startingCrystal: '3',
       startingDeuterium: '1'
