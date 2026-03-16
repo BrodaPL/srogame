@@ -14,6 +14,7 @@ import buildingTypeEnumModule from '../../src/app/models/enums/building-type.js'
 import technologyTypeEnumModule from '../../src/app/models/enums/technology-type.js';
 import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
 import fleetMissionTypeEnumModule from '../../src/app/models/enums/fleet-mission-type.js';
+import fleetModelModule from '../../src/app/models/fleets/fleet.js';
 import reportTypeEnumModule from '../../src/app/models/enums/report-type.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
@@ -121,6 +122,9 @@ const { ShipType } = shipTypeEnumModule as {
 };
 const { FleetMissionType } = fleetMissionTypeEnumModule as {
   FleetMissionType: typeof import('../../src/app/models/enums/fleet-mission-type.js').FleetMissionType;
+};
+const { FleetState } = fleetModelModule as {
+  FleetState: typeof import('../../src/app/models/fleets/fleet.js').FleetState;
 };
 const { ReportType } = reportTypeEnumModule as {
   ReportType: typeof import('../../src/app/models/enums/report-type.js').ReportType;
@@ -1257,7 +1261,8 @@ app.post('/api/game/active-fleets', (req, res) => {
 
   const travelDistance = calculateTravelDistance(origin, target);
   const travelTurns = Math.max(1, travelDistance);
-  const fuelCost = calculateFuelCost(ships, travelDistance);
+  const fuelMultiplier = missionType === FleetMissionType.SPY ? 1 : 2;
+  const fuelCost = calculateFuelCost(ships, travelDistance, fuelMultiplier);
 
   if (missionType === FleetMissionType.SPY) {
     const spyProbeAmount = ships.find((entry) => entry.type === ShipType.SPY_PROBE)?.amount ?? 0;
@@ -1290,8 +1295,8 @@ app.post('/api/game/active-fleets', (req, res) => {
   }
 
   if (missionType === FleetMissionType.MOVE) {
-    if (targetPlanet.info.ownerId !== playerId) {
-      return res.status(400).json({ error: 'Move mission target must be one of your planets.' });
+    if (targetPlanet.info.ownerId !== null && targetPlanet.info.ownerId !== playerId) {
+      return res.status(400).json({ error: 'Move mission target must be one of your planets or an unowned planet.' });
     }
   }
 
@@ -1334,7 +1339,7 @@ app.post('/api/game/active-fleets', (req, res) => {
     usedCargoCapacity,
     travelTurns,
     returnTurns: travelTurns,
-    status: 'Outbound',
+    state: FleetState.MOVING_TO_TARGET,
     createdAtTurn: currentGalaxy.currentTurn
   } as Fleet;
 
@@ -1912,19 +1917,20 @@ function calculateTravelDistance(origin: ClientCoordinates, target: ClientCoordi
 
 function calculateFuelCost(
   ships: Array<{ type: ShipTypeType; amount: number }>,
-  distance: number
+  distance: number,
+  multiplier = 1
 ): number {
-  let totalWeight = 0;
+  let totalFuel = 0;
   for (const ship of ships) {
     const blueprint = SHIP_BLUEPRINTS.shipsMap.get(ship.type);
     if (!blueprint) {
       continue;
     }
 
-    totalWeight += Math.max(1, blueprint.size) * ship.amount;
+    totalFuel += blueprint.jumpCost * Math.max(1, distance) * ship.amount;
   }
 
-  return Math.max(0, totalWeight * Math.max(1, distance));
+  return Math.max(0, totalFuel * Math.max(1, multiplier));
 }
 
 function removeShipsFromPlanet(

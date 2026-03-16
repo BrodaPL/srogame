@@ -7,7 +7,7 @@ import { FleetMissionType } from '../enums/fleet-mission-type';
 import { PlayerType } from '../enums/player-type';
 import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
-import { Fleet } from '../fleets/fleet';
+import { Fleet, FleetState } from '../fleets/fleet';
 import { Ship } from '../fleets/ship';
 import { ShipInstance } from '../fleets/ship-instance';
 import { Galaxy } from '../planets/galaxy';
@@ -479,108 +479,200 @@ function resolveActiveFleets(
   resolvedTurnNumber: number
 ): void {
   const espionageReportGenerator = new EspionageReportGenerator();
-  const remainingFleets: Fleet[] = [];
+  const activeFleets: Fleet[] = [];
 
   // TODO: Define a formal deterministic same-turn arrival order once simultaneous arrivals need dedicated rules.
   for (const fleet of galaxy.activeFleets) {
-    if (!isFleetArrivingThisTurn(fleet, resolvedTurnNumber)) {
-      remainingFleets.push(fleet);
+    if (!isFleetResolvingThisTurn(fleet, resolvedTurnNumber)) {
+      activeFleets.push(fleet);
       continue;
     }
 
-    resolveArrivingFleet(
+    const nextFleetState = resolveFleetState(
       fleet,
       playersById,
       planetById,
       espionageReportGenerator,
       resolvedTurnNumber
     );
+    if (nextFleetState) {
+      activeFleets.push(nextFleetState);
+    }
   }
 
-  galaxy.activeFleets = remainingFleets;
+  galaxy.activeFleets = activeFleets;
 }
 
-function isFleetArrivingThisTurn(fleet: Fleet, resolvedTurnNumber: number): boolean {
-  return Math.max(0, resolvedTurnNumber - fleet.createdAtTurn) >= fleet.travelTurns;
+function isFleetResolvingThisTurn(fleet: Fleet, resolvedTurnNumber: number): boolean {
+  switch (fleet.state) {
+    case FleetState.MOVING_TO_TARGET:
+      return Math.max(0, resolvedTurnNumber - fleet.createdAtTurn) >= fleet.travelTurns;
+    case FleetState.RETURNING:
+    case FleetState.MISSION_FAILURE_RETURNING:
+      return Math.max(0, resolvedTurnNumber - fleet.createdAtTurn) >= fleet.returnTurns;
+    default:
+      return false;
+  }
 }
 
-function resolveArrivingFleet(
+function resolveFleetState(
   fleet: Fleet,
   playersById: Map<number, Player>,
   planetById: Map<string, Planet>,
   espionageReportGenerator: EspionageReportGenerator,
   resolvedTurnNumber: number
-): void {
-  switch (fleet.missionType) {
-    case FleetMissionType.MOVE:
-      resolveOwnedDeliveryFleet(
-        fleet,
-        playersById,
-        planetById,
-        resolvedTurnNumber,
-        'Move'
-      );
-      return;
-    case FleetMissionType.TRANSPORT:
-      resolveOwnedDeliveryFleet(
-        fleet,
-        playersById,
-        planetById,
-        resolvedTurnNumber,
-        'Transport'
-      );
-      return;
-    case FleetMissionType.SPY:
-      resolveSpyFleet(
+): Fleet | null {
+  switch (fleet.state) {
+    case FleetState.MOVING_TO_TARGET:
+      return resolveTargetArrival(
         fleet,
         playersById,
         planetById,
         espionageReportGenerator,
         resolvedTurnNumber
       );
-      return;
+    case FleetState.RETURNING:
+    case FleetState.MISSION_FAILURE_RETURNING:
+      return resolveReturnArrival(
+        fleet,
+        planetById,
+        resolvedTurnNumber,
+      );
+    case FleetState.IDLE:
+    case FleetState.MISSION_FAILURE_IDLE:
+      return fleet;
     default:
-      return;
+      return fleet;
   }
 }
 
-function resolveOwnedDeliveryFleet(
+function resolveTargetArrival(
   fleet: Fleet,
   playersById: Map<number, Player>,
   planetById: Map<string, Planet>,
-  resolvedTurnNumber: number,
-  missionLabel: 'Move' | 'Transport'
-): void {
+  espionageReportGenerator: EspionageReportGenerator,
+  resolvedTurnNumber: number
+): Fleet | null {
+  switch (fleet.missionType) {
+    case FleetMissionType.MOVE:
+      return resolveMoveTargetArrival(fleet, playersById, planetById, resolvedTurnNumber);
+    case FleetMissionType.TRANSPORT:
+      return resolveTransportTargetArrival(fleet, playersById, planetById, resolvedTurnNumber);
+    case FleetMissionType.SPY:
+      return resolveSpyFleet(
+        fleet,
+        playersById,
+        planetById,
+        espionageReportGenerator,
+        resolvedTurnNumber
+      );
+    default:
+      return null;
+  }
+}
+
+function resolveMoveTargetArrival(
+  fleet: Fleet,
+  playersById: Map<number, Player>,
+  planetById: Map<string, Planet>,
+  resolvedTurnNumber: number
+): Fleet | null {
   const owner = playersById.get(fleet.ownerId);
-  if (!owner) {
-    return;
+  const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z));
+  if (!owner || !targetPlanet) {
+    return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
   }
 
+  if (targetPlanet.info.ownerId === fleet.ownerId) {
+    addFleetShipsToPlanet(targetPlanet, fleet.ships);
+    targetPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
+      fleet.cargo.metal,
+      fleet.cargo.crystal,
+      fleet.cargo.deuterium
+    ));
+
+    addFleetSuccessReport(
+      owner,
+      fleet,
+      resolvedTurnNumber,
+      `${FleetMissionType.MOVE} mission completed successfully at ${targetPlanet.basicInfo.name}.`
+    );
+    return null;
+  }
+
+  if (targetPlanet.info.ownerId === null) {
+    fleet.state = FleetState.IDLE;
+    fleet.createdAtTurn = resolvedTurnNumber;
+    return fleet;
+  }
+
+  addFleetFailureReport(
+    owner,
+    fleet,
+    resolvedTurnNumber,
+    'Move mission failed because the destination became owned by another player before arrival.'
+  );
+  return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
+}
+
+function resolveTransportTargetArrival(
+  fleet: Fleet,
+  playersById: Map<number, Player>,
+  planetById: Map<string, Planet>,
+  resolvedTurnNumber: number
+): Fleet | null {
+  const owner = playersById.get(fleet.ownerId);
   const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z));
-  if (!targetPlanet || targetPlanet.info.ownerId !== fleet.ownerId) {
-    // TODO: Phase 4 should replace hard fleet consumption on invalid arrival with richer salvage/return-flight handling.
+  if (!owner || !targetPlanet) {
+    return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
+  }
+
+  if (targetPlanet.info.ownerId !== fleet.ownerId) {
     addFleetFailureReport(
       owner,
       fleet,
       resolvedTurnNumber,
-      `${missionLabel} mission failed because the target was no longer owned by you on arrival.`
+      'Transport mission failed because the target was no longer owned by you on arrival.'
     );
-    return;
+    return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
   }
 
-  addFleetShipsToPlanet(targetPlanet, fleet.ships);
   targetPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
     fleet.cargo.metal,
     fleet.cargo.crystal,
     fleet.cargo.deuterium
   ));
+  fleet.cargo = new ResourcesPack(0, 0, 0);
+  fleet.usedCargoCapacity = 0;
 
   addFleetSuccessReport(
     owner,
     fleet,
     resolvedTurnNumber,
-    `${missionLabel} mission completed successfully at ${targetPlanet.basicInfo.name}.`
+    `${FleetMissionType.TRANSPORT} mission completed successfully at ${targetPlanet.basicInfo.name}.`
   );
+  return createReturningFleet(fleet, resolvedTurnNumber);
+}
+
+function resolveReturnArrival(
+  fleet: Fleet,
+  planetById: Map<string, Planet>,
+  resolvedTurnNumber: number
+): Fleet | null {
+  const originPlanet = planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z));
+  if (!originPlanet || originPlanet.info.ownerId !== fleet.ownerId) {
+    fleet.state = FleetState.MISSION_FAILURE_IDLE;
+    fleet.createdAtTurn = resolvedTurnNumber;
+    return fleet;
+  }
+
+  addFleetShipsToPlanet(originPlanet, fleet.ships);
+  originPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
+    fleet.cargo.metal,
+    fleet.cargo.crystal,
+    fleet.cargo.deuterium
+  ));
+  return null;
 }
 
 function resolveSpyFleet(
@@ -589,33 +681,16 @@ function resolveSpyFleet(
   planetById: Map<string, Planet>,
   espionageReportGenerator: EspionageReportGenerator,
   resolvedTurnNumber: number
-): void {
+): Fleet | null {
   const owner = playersById.get(fleet.ownerId);
-  if (!owner) {
-    return;
-  }
-
   const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z));
-  if (!targetPlanet || targetPlanet.info.ownerId === fleet.ownerId) {
-    // TODO: Phase 4 should replace hard fleet consumption on invalid arrival with richer salvage/return-flight handling.
-    addFleetFailureReport(
-      owner,
-      fleet,
-      resolvedTurnNumber,
-      'Spy mission failed because the target became invalid before arrival.'
-    );
-    return;
+  if (!owner || !targetPlanet) {
+    return null;
   }
 
   const probeAmount = fleet.ships.find((entry) => entry.type === ShipType.SPY_PROBE)?.amount ?? 0;
   if (probeAmount <= 0) {
-    addFleetFailureReport(
-      owner,
-      fleet,
-      resolvedTurnNumber,
-      'Spy mission failed because no valid probes were available on arrival.'
-    );
-    return;
+    return null;
   }
 
   const targetOwner = targetPlanet.info.ownerId === null
@@ -633,6 +708,25 @@ function resolveSpyFleet(
   );
   owner.addReport(report.copy());
   targetPlanet.lastReportData.set(owner.playerId, report.copy());
+  return null;
+}
+
+function createReturningFleet(
+  fleet: Fleet,
+  resolvedTurnNumber: number
+): Fleet {
+  fleet.state = FleetState.RETURNING;
+  fleet.createdAtTurn = resolvedTurnNumber;
+  return fleet;
+}
+
+function createMissionFailureReturnFleet(
+  fleet: Fleet,
+  resolvedTurnNumber: number
+): Fleet {
+  fleet.state = FleetState.MISSION_FAILURE_RETURNING;
+  fleet.createdAtTurn = resolvedTurnNumber;
+  return fleet;
 }
 
 function addFleetShipsToPlanet(
@@ -701,7 +795,7 @@ function addFleetFailureReport(
       sourcePlanetName: fleet.targetPlanetName,
       senderPlayerName: player.playerName
     },
-    `${reason}\n\nFleet was consumed on arrival.`
+    `${reason}\n\nFleet turned around and started a failure return flight.`
   );
   player.addReport(report);
 }

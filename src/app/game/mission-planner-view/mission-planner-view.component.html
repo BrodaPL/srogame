@@ -116,7 +116,7 @@
                   <span class="overview-stat__value">{{ travelTurnsPreview() }}</span>
                 </div>
                 <div class="overview-stat">
-                  <span class="overview-stat__label">Fuel cost</span>
+                  <span class="overview-stat__label">Fuel reserve</span>
                   <span class="overview-stat__value">{{ fuelCostPreview() }}</span>
                 </div>
               </div>
@@ -150,7 +150,7 @@
               Mission: {{ selectedMissionType }} |
               Ships: {{ totalSelectedShips() }} |
               Cargo: {{ usedCargoCapacity() }} |
-              Fuel: {{ fuelCostPreview() }}
+              Fuel reserve: {{ fuelCostPreview() }}
             </p>
             @if (selectedOriginPlanet && selectedTargetPlanet) {
               <p class="overview-muted">

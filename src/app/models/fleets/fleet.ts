@@ -8,7 +8,13 @@ export type FleetShipStack = {
   amount: number;
 };
 
-export type FleetStatus = 'Outbound';
+export enum FleetState {
+  MOVING_TO_TARGET = 'MOVING_TO_TARGET',
+  IDLE = 'IDLE',
+  RETURNING = 'RETURNING',
+  MISSION_FAILURE_RETURNING = 'MISSION_FAILURE_RETURNING',
+  MISSION_FAILURE_IDLE = 'MISSION_FAILURE_IDLE'
+}
 
 export class Fleet {
   constructor(
@@ -26,7 +32,7 @@ export class Fleet {
     public usedCargoCapacity: number,
     public travelTurns: number,
     public returnTurns: number,
-    public status: FleetStatus,
+    public state: FleetState,
     public createdAtTurn: number
   ) {}
 }

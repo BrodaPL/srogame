@@ -69,7 +69,7 @@
         { "type": "BEAM", "dmg": 10, "shots": 1 },
         { "type": "MISSILE", "dmg": 20, "shots": 1 }
       ],
-      "cargoCapacity": 0,
+      "cargoCapacity": 10,
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 0,

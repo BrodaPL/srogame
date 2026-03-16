@@ -58,12 +58,12 @@ export class MissionPlannerViewComponent implements OnInit {
     {
       type: FleetMissionType.MOVE,
       label: 'Move',
-      description: 'Relocate ships between your own planets. Cargo is allowed.'
+      description: 'Relocate ships to your own planets or park them above unowned planets. Cargo is allowed.'
     },
     {
       type: FleetMissionType.TRANSPORT,
       label: 'Transport',
-      description: 'Send resources and ships to one of your own planets.'
+      description: 'Send resources and ships to one of your own planets, then return automatically.'
     },
     {
       type: FleetMissionType.SPY,
@@ -224,7 +224,7 @@ export class MissionPlannerViewComponent implements OnInit {
 
       const nonProbeSelection = selectedShips.some((entry) => entry.type !== ShipType.SPY_PROBE);
       if (nonProbeSelection) {
-        warnings.push({ text: 'Spy mission accepts only Spy Probes in phase 1.', severity: 'error' });
+        warnings.push({ text: 'Spy mission accepts only Spy Probes.', severity: 'error' });
       }
 
       if (targetPlanet && this.isOwnedByPlayer(targetPlanet)) {
@@ -247,8 +247,8 @@ export class MissionPlannerViewComponent implements OnInit {
     }
 
     if (this.selectedMissionType === FleetMissionType.MOVE) {
-      if (targetPlanet && !this.isOwnedByPlayer(targetPlanet)) {
-        warnings.push({ text: 'Move mission target must be one of your planets.', severity: 'error' });
+      if (targetPlanet && targetPlanet.info.ownerId !== null && !this.isOwnedByPlayer(targetPlanet)) {
+        warnings.push({ text: 'Move mission target must be one of your planets or an unowned planet.', severity: 'error' });
       }
     }
 
@@ -348,17 +348,18 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected fuelCostPreview(): number {
     const distance = this.distancePreview();
-    let weight = 0;
+    const fuelMultiplier = this.selectedMissionType === FleetMissionType.SPY ? 1 : 2;
+    let totalFuel = 0;
     for (const entry of this.selectedShipEntries()) {
       const blueprint = this.shipBlueprintsByType.get(entry.type);
       if (!blueprint) {
         continue;
       }
 
-      weight += Math.max(1, blueprint.size) * entry.amount;
+      totalFuel += blueprint.jumpCost * Math.max(1, distance) * entry.amount;
     }
 
-    return Math.max(0, weight * Math.max(1, distance));
+    return Math.max(0, totalFuel * fuelMultiplier);
   }
 
   protected totalRepairPower(): number {
@@ -707,7 +708,8 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   private isOwnedByPlayer(planet: ClientPlanetDto): boolean {
-    return planet.info.ownerId !== null;
+    const playerOwnerId = this.selectedOriginPlanet?.info.ownerId ?? this.ownedPlanets[0]?.info.ownerId ?? null;
+    return playerOwnerId !== null && planet.info.ownerId === playerOwnerId;
   }
 
   private sortPlanets(planets: ClientPlanetDto[]): ClientPlanetDto[] {

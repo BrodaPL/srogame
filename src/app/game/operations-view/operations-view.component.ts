@@ -4,7 +4,7 @@ import { finalize } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
-import { Fleet } from '../../models/fleets/fleet';
+import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
@@ -14,6 +14,7 @@ import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
   templateUrl: './operations-view.component.html'
 })
 export class OperationsViewComponent implements OnInit {
+  protected readonly fleetState = FleetState;
   protected isLoading = false;
   protected loadError: string | null = null;
   protected activeFleets: Fleet[] = [];
@@ -44,24 +45,79 @@ export class OperationsViewComponent implements OnInit {
     return `${x}:${y}:${z}`;
   }
 
+  protected currentLocationPlanetName(fleet: Fleet): string {
+    return this.usesOriginCoordinates(fleet.state) ? fleet.originPlanetName : fleet.targetPlanetName;
+  }
+
+  protected currentLocationCoordinates(fleet: Fleet): string {
+    const coordinates = this.usesOriginCoordinates(fleet.state) ? fleet.origin : fleet.target;
+    return this.coordinatesLabel(coordinates.x, coordinates.y, coordinates.z);
+  }
+
+  protected destinationPlanetName(fleet: Fleet): string {
+    switch (fleet.state) {
+      case FleetState.RETURNING:
+      case FleetState.MISSION_FAILURE_RETURNING:
+        return fleet.originPlanetName;
+      case FleetState.IDLE:
+      case FleetState.MISSION_FAILURE_IDLE:
+        return 'Holding position';
+      default:
+        return fleet.targetPlanetName;
+    }
+  }
+
+  protected destinationCoordinates(fleet: Fleet): string {
+    switch (fleet.state) {
+      case FleetState.RETURNING:
+      case FleetState.MISSION_FAILURE_RETURNING:
+        return this.coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z);
+      case FleetState.IDLE:
+      case FleetState.MISSION_FAILURE_IDLE:
+        return this.currentLocationCoordinates(fleet);
+      default:
+        return this.coordinatesLabel(fleet.target.x, fleet.target.y, fleet.target.z);
+    }
+  }
+
+  protected stateLabel(fleet: Fleet): string {
+    return fleet.state.replaceAll('_', ' ');
+  }
+
+  protected hasEta(fleet: Fleet): boolean {
+    return fleet.state === FleetState.MOVING_TO_TARGET
+      || fleet.state === FleetState.RETURNING
+      || fleet.state === FleetState.MISSION_FAILURE_RETURNING;
+  }
+
   protected remainingEta(fleet: Fleet): number {
+    if (!this.hasEta(fleet)) {
+      return 0;
+    }
+
     const currentTurn = this.gameState.currentTurn();
     if (currentTurn === null) {
-      return fleet.travelTurns;
+      return fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
     }
 
     const elapsedTurns = Math.max(0, currentTurn - fleet.createdAtTurn);
-    return Math.max(0, fleet.travelTurns - elapsedTurns);
+    const totalLegTurns = fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
+    return Math.max(0, totalLegTurns - elapsedTurns);
   }
 
   protected progressLabel(fleet: Fleet): string {
-    const currentTurn = this.gameState.currentTurn();
-    if (currentTurn === null) {
-      return `Travel time ${fleet.travelTurns}`;
+    if (!this.hasEta(fleet)) {
+      return 'No active travel ETA';
     }
 
-    const elapsedTurns = Math.max(0, Math.min(fleet.travelTurns, currentTurn - fleet.createdAtTurn));
-    return `${elapsedTurns}/${fleet.travelTurns} turns elapsed`;
+    const currentTurn = this.gameState.currentTurn();
+    if (currentTurn === null) {
+      return `Travel time ${fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns}`;
+    }
+
+    const totalLegTurns = fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
+    const elapsedTurns = Math.max(0, Math.min(totalLegTurns, currentTurn - fleet.createdAtTurn));
+    return `${elapsedTurns}/${totalLegTurns} turns elapsed`;
   }
 
   private loadActiveFleets(): void {
@@ -88,5 +144,9 @@ export class OperationsViewComponent implements OnInit {
           this.loadError = 'Unable to load active fleets.';
         }
       });
+  }
+
+  private usesOriginCoordinates(state: FleetState): boolean {
+    return state === FleetState.MOVING_TO_TARGET || state === FleetState.MISSION_FAILURE_IDLE;
   }
 }
