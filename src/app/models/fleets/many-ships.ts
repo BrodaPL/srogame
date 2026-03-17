@@ -7,6 +7,12 @@ export type DamagedShipEntry = {
   hull: number;
 };
 
+export type ShipSelectionEntry = {
+  type: ShipType;
+  undamagedAmount: number;
+  damagedAmount: number;
+};
+
 export type ManyShipsLike = {
   undamagedShipsCount: Partial<Record<ShipType, number>>;
   damagedShips: DamagedShipEntry[];
@@ -57,6 +63,14 @@ export class ManyShips implements ManyShipsLike {
 
   public countByType(): Map<ShipType, number> {
     return ManyShips.countByType(this);
+  }
+
+  public undamagedCountByType(): Map<ShipType, number> {
+    return ManyShips.undamagedCountByType(this);
+  }
+
+  public damagedCountByType(): Map<ShipType, number> {
+    return ManyShips.damagedCountByType(this);
   }
 
   public totalCargoCapacity(): number {
@@ -134,6 +148,56 @@ export class ManyShips implements ManyShipsLike {
     }
   }
 
+  public extractSelectedShips(requested: ShipSelectionEntry[]): ManyShips {
+    const extractedShips = ManyShips.empty();
+
+    for (const request of requested) {
+      const undamagedAmount = Math.max(0, Math.floor(request.undamagedAmount));
+      const damagedAmount = Math.max(0, Math.floor(request.damagedAmount));
+      if (undamagedAmount <= 0 && damagedAmount <= 0) {
+        continue;
+      }
+
+      const availableUndamaged = this.undamagedShipsCount[request.type] ?? 0;
+      if (availableUndamaged < undamagedAmount) {
+        throw new Error(`Not enough undamaged ships available for ${request.type}.`);
+      }
+
+      const availableDamaged = this.damagedShips.filter((entry) => entry.type === request.type).length;
+      if (availableDamaged < damagedAmount) {
+        throw new Error(`Not enough damaged ships available for ${request.type}.`);
+      }
+
+      if (undamagedAmount > 0) {
+        const nextAmount = availableUndamaged - undamagedAmount;
+        if (nextAmount > 0) {
+          this.undamagedShipsCount[request.type] = nextAmount;
+        } else {
+          delete this.undamagedShipsCount[request.type];
+        }
+        extractedShips.addUndamaged(request.type, undamagedAmount);
+      }
+
+      if (damagedAmount > 0) {
+        const remainingDamaged: DamagedShipEntry[] = [];
+        let toExtract = damagedAmount;
+        for (const entry of this.damagedShips) {
+          if (entry.type === request.type && toExtract > 0) {
+            extractedShips.addDamaged(entry.type, entry.hull);
+            toExtract -= 1;
+            continue;
+          }
+
+          remainingDamaged.push(entry);
+        }
+
+        this.damagedShips = remainingDamaged;
+      }
+    }
+
+    return extractedShips;
+  }
+
   public undamagedPercentage(): number {
     return ManyShips.undamagedPercentage(this);
   }
@@ -175,6 +239,28 @@ export class ManyShips implements ManyShipsLike {
 
     for (const damaged of normalized.damagedShips) {
       counts.set(damaged.type, (counts.get(damaged.type) ?? 0) + 1);
+    }
+
+    return counts;
+  }
+
+  public static undamagedCountByType(data: ManyShipsLike | null | undefined): Map<ShipType, number> {
+    const normalized = ManyShips.fromData(data);
+    const counts = new Map<ShipType, number>();
+
+    for (const [type, amount] of Object.entries(normalized.undamagedShipsCount) as Array<[ShipType, number]>) {
+      counts.set(type, Math.max(0, Math.floor(amount)));
+    }
+
+    return counts;
+  }
+
+  public static damagedCountByType(data: ManyShipsLike | null | undefined): Map<ShipType, number> {
+    const normalized = ManyShips.fromData(data);
+    const counts = new Map<ShipType, number>();
+
+    for (const entry of normalized.damagedShips) {
+      counts.set(entry.type, (counts.get(entry.type) ?? 0) + 1);
     }
 
     return counts;

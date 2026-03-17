@@ -222,27 +222,51 @@
                       @for (purpose of row.purposes; track purpose) {
                         <span class="mission-planner__ship-tag">{{ purpose }}</span>
                       }
+                      @if (!row.canJump) {
+                        <span class="mission-planner__ship-tag mission-planner__ship-tag--warning">No hyperspace drive.</span>
+                      }
                     </div>
                   </div>
                   <p class="mission-planner__ship-meta">
-                    Available: {{ row.available }} | Cargo: {{ row.cargoCapacity }} | Hangar: {{ row.hangarCapacity }}
+                    Available: {{ row.available }} (Damaged: {{ row.availableDamaged }}) | Cargo: {{ row.cargoCapacity }} | Hangar: {{ row.hangarCapacity }}
                   </p>
                 </div>
                 <div class="mission-planner__ship-actions">
-                  <button class="mission-planner__small-button" type="button" (click)="fillMax(row.type)" [disabled]="row.available <= 0">
-                    Max
-                  </button>
-                  <button class="mission-planner__small-button" type="button" (click)="clearShip(row.type)" [disabled]="row.selected <= 0">
-                    Clear
-                  </button>
-                  <input
-                    class="mission-planner__amount-input"
-                    type="number"
-                    min="0"
-                    [max]="row.available"
-                    [ngModel]="row.selected"
-                    (ngModelChange)="setShipAmount(row.type, $event)"
-                  />
+                  <div class="mission-planner__selection-group">
+                    <span class="mission-planner__selection-label">Ready</span>
+                    <button class="mission-planner__small-button" type="button" (click)="fillMaxUndamaged(row.type)" [disabled]="row.availableUndamaged <= 0">
+                      Max
+                    </button>
+                    <button class="mission-planner__small-button" type="button" (click)="clearUndamagedShip(row.type)" [disabled]="row.selectedUndamaged <= 0">
+                      Clear
+                    </button>
+                    <input
+                      class="mission-planner__amount-input"
+                      type="number"
+                      min="0"
+                      [max]="row.availableUndamaged"
+                      [ngModel]="row.selectedUndamaged"
+                      (ngModelChange)="setUndamagedShipAmount(row.type, $event)"
+                    />
+                  </div>
+                  <div class="mission-planner__selection-group mission-planner__selection-group--damaged">
+                    <span class="mission-planner__selection-label">Damaged</span>
+                    <button class="mission-planner__small-button mission-planner__small-button--compact" type="button" (click)="fillMaxDamaged(row.type)" [disabled]="row.availableDamaged <= 0">
+                      Max
+                    </button>
+                    <button class="mission-planner__small-button mission-planner__small-button--compact" type="button" (click)="clearDamagedShip(row.type)" [disabled]="row.availableDamaged <= 0 || row.selectedDamaged <= 0">
+                      Clear
+                    </button>
+                    <input
+                      class="mission-planner__amount-input mission-planner__amount-input--compact"
+                      type="number"
+                      min="0"
+                      [max]="row.availableDamaged"
+                      [disabled]="row.availableDamaged <= 0"
+                      [ngModel]="row.selectedDamaged"
+                      (ngModelChange)="setDamagedShipAmount(row.type, $event)"
+                    />
+                  </div>
                 </div>
               </article>
             }

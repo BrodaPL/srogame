@@ -51,6 +51,7 @@ import type {
   BuildingPowerConsumptionEntry,
   TechLevelEntry,
   ShipAmountEntry,
+  CreateFleetShipSelectionEntry,
   ClientInfoDto,
   PlayerNameEntry,
   LoginRequest,
@@ -93,7 +94,10 @@ import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
-import type { ManyShips as ManyShipsType } from '../../src/app/models/fleets/many-ships.ts';
+import type {
+  ManyShips as ManyShipsType,
+  ShipSelectionEntry as ShipSelectionEntryType
+} from '../../src/app/models/fleets/many-ships.ts';
 import type { PlayerReport } from '../../src/app/models/reports/player-report.ts';
 import type { MessageReport } from '../../src/app/models/reports/message-report.ts';
 import type { ReportType as ReportTypeType } from '../../src/app/models/enums/report-type.ts';
@@ -1207,7 +1211,7 @@ app.post('/api/game/active-fleets', (req, res) => {
   const missionType = normalizeFleetMissionType(body?.missionType);
   const origin = parseMissionCoordinates(body?.origin);
   const target = parseMissionCoordinates(body?.target);
-  const ships = parseFleetShipStacks(body?.ships);
+  const ships = parseFleetShipSelections(body?.ships);
   const cargo = parseResourcesPackPayload(body?.cargo);
 
   if (!missionType || !origin || !target || !ships || !cargo) {
@@ -1250,15 +1254,22 @@ app.post('/api/game/active-fleets', (req, res) => {
     return res.status(400).json({ error: 'Select at least one ship.' });
   }
 
-  const availableShipsByType = countPlanetShipsByType(originPlanet);
+  const availableUndamagedShipsByType = countPlanetUndamagedShipsByType(originPlanet);
+  const availableDamagedShipsByType = countPlanetDamagedShipsByType(originPlanet);
   for (const ship of ships) {
-    const availableAmount = availableShipsByType.get(ship.type) ?? 0;
-    if (availableAmount < ship.amount) {
-      return res.status(400).json({ error: `${ship.type}: not enough ships on origin planet.` });
+    const availableUndamagedAmount = availableUndamagedShipsByType.get(ship.type) ?? 0;
+    if (availableUndamagedAmount < ship.undamagedAmount) {
+      return res.status(400).json({ error: `${ship.type}: not enough ready ships on origin planet.` });
+    }
+
+    const availableDamagedAmount = availableDamagedShipsByType.get(ship.type) ?? 0;
+    if (availableDamagedAmount < ship.damagedAmount) {
+      return res.status(400).json({ error: `${ship.type}: not enough damaged ships on origin planet.` });
     }
   }
 
-  const totalCargoCapacity = calculateFleetCargoCapacity(ships);
+  const totalShipAmounts = toShipAmountEntriesFromSelections(ships);
+  const totalCargoCapacity = calculateFleetCargoCapacity(totalShipAmounts);
   const usedCargoCapacity = cargo.metal + cargo.crystal + cargo.deuterium;
   if (usedCargoCapacity > totalCargoCapacity) {
     return res.status(400).json({ error: 'Insufficient cargo space.' });
@@ -1267,15 +1278,15 @@ app.post('/api/game/active-fleets', (req, res) => {
   const travelDistance = calculateTravelDistance(origin, target);
   const travelTurns = Math.max(1, travelDistance);
   const fuelMultiplier = missionType === FleetMissionType.SPY ? 1 : 2;
-  const fuelCost = calculateFuelCost(ships, travelDistance, fuelMultiplier);
+  const fuelCost = calculateFuelCost(totalShipAmounts, travelDistance, fuelMultiplier);
 
   if (missionType === FleetMissionType.SPY) {
-    const spyProbeAmount = ships.find((entry) => entry.type === ShipType.SPY_PROBE)?.amount ?? 0;
+    const spyProbeAmount = totalShipAmounts.find((entry) => entry.type === ShipType.SPY_PROBE)?.amount ?? 0;
     if (spyProbeAmount <= 0) {
       return res.status(400).json({ error: 'No espionage probes selected.' });
     }
 
-    if (ships.some((entry) => entry.type !== ShipType.SPY_PROBE)) {
+    if (totalShipAmounts.some((entry) => entry.type !== ShipType.SPY_PROBE)) {
       return res.status(400).json({ error: 'Spy mission accepts only Spy Probes in phase 1.' });
     }
 
@@ -1289,7 +1300,7 @@ app.post('/api/game/active-fleets', (req, res) => {
   }
 
   if (missionType === FleetMissionType.COLONIZE) {
-    const colonizerAmount = ships.find((entry) => entry.type === ShipType.COLONIZER)?.amount ?? 0;
+    const colonizerAmount = totalShipAmounts.find((entry) => entry.type === ShipType.COLONIZER)?.amount ?? 0;
     if (colonizerAmount <= 0) {
       return res.status(400).json({ error: 'No colony ship selected.' });
     }
@@ -1322,13 +1333,15 @@ app.post('/api/game/active-fleets', (req, res) => {
     return res.status(400).json({ error: 'Insufficient resources for cargo and fuel.' });
   }
 
-  originPlanet.rBDSFTQ.resources.subtractResourcePack(totalRequiredResources);
-  removeShipsFromPlanet(originPlanet, ships);
-
-  const fleetShips = ManyShips.empty();
-  for (const ship of ships) {
-    fleetShips.addUndamaged(ship.type, ship.amount);
+  let fleetShips: ManyShipsType;
+  try {
+    fleetShips = originPlanet.rBDSFTQ.ships.extractSelectedShips(ships);
+  } catch (error) {
+    console.error('Fleet launch ship extraction failed.', error);
+    return res.status(400).json({ error: 'Requested ship selection is no longer available on origin planet.' });
   }
+
+  originPlanet.rBDSFTQ.resources.subtractResourcePack(totalRequiredResources);
 
   const fleet = {
     fleetId: currentGalaxy.nextFleetId,
@@ -1873,32 +1886,61 @@ function parseResourcesPackPayload(value: unknown): ResourcesPack | null {
   } as ResourcesPack;
 }
 
-function parseFleetShipStacks(value: unknown): Array<{ type: ShipTypeType; amount: number }> | null {
+function parseFleetShipSelections(value: unknown): CreateFleetShipSelectionEntry[] | null {
   if (!Array.isArray(value)) {
     return null;
   }
 
-  const combined = new Map<ShipTypeType, number>();
+  const combined = new Map<ShipTypeType, { undamagedAmount: number; damagedAmount: number }>();
   for (const item of value) {
     if (!item || typeof item !== 'object') {
       return null;
     }
 
-    const candidate = item as { type?: unknown; amount?: unknown };
+    const candidate = item as {
+      type?: unknown;
+      undamagedAmount?: unknown;
+      damagedAmount?: unknown;
+    };
     const shipType = normalizeShipType(candidate.type);
-    const amount = parseBodyIntInRange(candidate.amount, 1, 100000);
-    if (!shipType || amount === null) {
+    const undamagedAmount = parseBodyIntInRange(candidate.undamagedAmount ?? 0, 0, 100000);
+    const damagedAmount = parseBodyIntInRange(candidate.damagedAmount ?? 0, 0, 100000);
+    if (!shipType || undamagedAmount === null || damagedAmount === null) {
       return null;
     }
 
-    combined.set(shipType, (combined.get(shipType) ?? 0) + amount);
+    if (undamagedAmount <= 0 && damagedAmount <= 0) {
+      return null;
+    }
+
+    const current = combined.get(shipType) ?? { undamagedAmount: 0, damagedAmount: 0 };
+    current.undamagedAmount += undamagedAmount;
+    current.damagedAmount += damagedAmount;
+    combined.set(shipType, current);
   }
 
-  return Array.from(combined.entries()).map(([type, amount]) => ({ type, amount }));
+  return Array.from(combined.entries()).map(([type, amounts]) => ({
+    type,
+    undamagedAmount: amounts.undamagedAmount,
+    damagedAmount: amounts.damagedAmount
+  }));
 }
 
-function countPlanetShipsByType(planet: Planet): Map<ShipTypeType, number> {
-  return ManyShips.countByType(planet.rBDSFTQ.ships);
+function countPlanetUndamagedShipsByType(planet: Planet): Map<ShipTypeType, number> {
+  return ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
+}
+
+function countPlanetDamagedShipsByType(planet: Planet): Map<ShipTypeType, number> {
+  return ManyShips.damagedCountByType(planet.rBDSFTQ.ships);
+}
+
+function toShipAmountEntriesFromSelections(
+  ships: Array<Pick<ShipSelectionEntryType, 'type' | 'undamagedAmount' | 'damagedAmount'>>
+): Array<{ type: ShipTypeType; amount: number }> {
+  return ships.map((ship) => ({
+    type: ship.type,
+    amount: ship.undamagedAmount + ship.damagedAmount
+  }));
 }
 
 function calculateFleetCargoCapacity(ships: Array<{ type: ShipTypeType; amount: number }>): number {
@@ -1935,13 +1977,6 @@ function calculateFuelCost(
   }
 
   return Math.max(0, totalFuel * Math.max(1, multiplier));
-}
-
-function removeShipsFromPlanet(
-  planet: Planet,
-  requestedShips: Array<{ type: ShipTypeType; amount: number }>
-): void {
-  planet.rBDSFTQ.ships.removeShipsByType(requestedShips);
 }
 
 function sameCoordinates(left: ClientCoordinates, right: ClientCoordinates): boolean {

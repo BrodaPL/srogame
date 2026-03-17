@@ -32,13 +32,12 @@
     Mission Planner
   </a>
   <span class="top-menu__spacer" aria-hidden="true"></span>
-  <span class="top-menu__turn">{{ currentTurnLabel() }}</span>
   <button
     class="top-menu__button top-menu__button--end-turn"
     type="button"
     [disabled]="isProcessingTurn()"
     (click)="endTurn()">
-    End Turn
+    {{ endTurnLabel() }}
   </button>
 </nav>
 @if (endTurnError) {

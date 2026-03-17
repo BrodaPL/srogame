@@ -138,6 +138,12 @@
   --ui-wrap-gap: 0.42rem;
 }
 
+.mission-planner__ship-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .mission-planner__purpose-filters {
   margin-top: 0.6rem;
 }
@@ -210,13 +216,62 @@
 }
 
 .mission-planner__ship-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.38rem;
+  display: grid;
+  gap: 0.32rem;
+  justify-items: end;
 }
 
 .mission-planner__amount-input {
   max-width: 92px;
+}
+
+.mission-planner__selection-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.mission-planner__selection-group--damaged {
+  gap: 0.3rem;
+  padding: 0.18rem 0.28rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.mission-planner__selection-label {
+  min-width: 4.3rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mission-planner__selection-group--damaged .mission-planner__selection-label {
+  min-width: 3.9rem;
+  font-size: 0.64rem;
+}
+
+.mission-planner__small-button--compact {
+  font-size: 0.68rem;
+  padding: 0.28rem 0.62rem;
+}
+
+.mission-planner__amount-input--compact {
+  max-width: 78px;
+  padding: 0.38rem 0.48rem;
+  font-size: 0.74rem;
+}
+
+.mission-planner__ship-tag--warning {
+  border-color: rgba(246, 180, 76, 0.55);
+  background: rgba(246, 180, 76, 0.14);
+  color: #f6c76d;
+  font-size: 0.68rem;
+  padding: 0.2rem 0.48rem;
 }
 
 .mission-planner__cargo-grid {
@@ -401,6 +456,11 @@
 
   .mission-planner__ship-actions {
     width: 100%;
-    flex-wrap: wrap;
+    justify-items: stretch;
+  }
+
+  .mission-planner__selection-group {
+    width: 100%;
+    justify-content: space-between;
   }
 }

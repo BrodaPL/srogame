@@ -44,9 +44,9 @@ export class TopMenuComponent {
     this.tutorialService.openTutorial(viewKey);
   }
 
-  protected currentTurnLabel(): string {
+  protected endTurnLabel(): string {
     const currentTurn = this.gameState.currentTurn();
-    return currentTurn === null ? 'Turn --' : `Turn ${currentTurn}`;
+    return currentTurn === null ? 'End Turn --' : `End Turn ${currentTurn}`;
   }
 
   protected isProcessingTurn(): boolean {

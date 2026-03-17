@@ -140,6 +140,12 @@ export type ShipAmountEntry = {
   amount: number;
 };
 
+export type CreateFleetShipSelectionEntry = {
+  type: ShipType;
+  undamagedAmount: number;
+  damagedAmount: number;
+};
+
 export type ManyShipsDto = ManyShipsLike;
 
 export type ShipyardQueueEntryDto = {
@@ -289,7 +295,7 @@ export type CreateFleetMissionRequest = {
   missionType: FleetMissionType;
   origin: ClientCoordinates;
   target: ClientCoordinates;
-  ships: ShipAmountEntry[];
+  ships: CreateFleetShipSelectionEntry[];
   cargo: ResourcesPackDto;
 };
 

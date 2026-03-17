@@ -16,7 +16,7 @@ import type {
   ClientCoordinates,
   ClientPlanetDto,
   CreateFleetMissionRequest,
-  ShipAmountEntry
+  CreateFleetShipSelectionEntry
 } from '../../models/game-api-types';
 import { Ship } from '../../models/fleets/ship';
 import { maxActiveFleets } from '../../models/tech/technology-effects';
@@ -35,10 +35,15 @@ type ShipSelectionRowVm = {
   label: string;
   purposes: ShipPurpose[];
   available: number;
+  availableUndamaged: number;
+  availableDamaged: number;
   selected: number;
+  selectedUndamaged: number;
+  selectedDamaged: number;
   cargoCapacity: number;
   hangarCapacity: number;
   hasWeapons: boolean;
+  canJump: boolean;
   isRelevant: boolean;
   isRequired: boolean;
 };
@@ -103,7 +108,8 @@ export class MissionPlannerViewComponent implements OnInit {
   ]);
 
   private readonly shipBlueprintsByType = new Map<ShipType, Ship>();
-  private readonly shipSelectionByType = new Map<ShipType, number>();
+  private readonly undamagedShipSelectionByType = new Map<ShipType, number>();
+  private readonly damagedShipSelectionByType = new Map<ShipType, number>();
   private pendingTargetCoordinates: ClientCoordinates | null = null;
   private pendingMissionType: FleetMissionType | null = null;
 
@@ -117,7 +123,8 @@ export class MissionPlannerViewComponent implements OnInit {
     const shipBlueprints = ShipBlueprintsFactory.fromDefaultJson();
     for (const [shipType, ship] of shipBlueprints.shipsMap.entries()) {
       this.shipBlueprintsByType.set(shipType, ship);
-      this.shipSelectionByType.set(shipType, 0);
+      this.undamagedShipSelectionByType.set(shipType, 0);
+      this.damagedShipSelectionByType.set(shipType, 0);
     }
   }
 
@@ -146,7 +153,10 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected totalSelectedShips(): number {
     let total = 0;
-    for (const amount of this.shipSelectionByType.values()) {
+    for (const amount of this.undamagedShipSelectionByType.values()) {
+      total += amount;
+    }
+    for (const amount of this.damagedShipSelectionByType.values()) {
       total += amount;
     }
 
@@ -156,6 +166,8 @@ export class MissionPlannerViewComponent implements OnInit {
   protected selectedShipRows(): ShipSelectionRowVm[] {
     const originPlanet = this.selectedOriginPlanet;
     const availableByType = this.availableShipCounts(originPlanet);
+    const availableUndamagedByType = this.availableUndamagedShipCounts(originPlanet);
+    const availableDamagedByType = this.availableDamagedShipCounts(originPlanet);
     const rows: ShipSelectionRowVm[] = [];
 
     for (const [shipType, ship] of this.shipBlueprintsByType.entries()) {
@@ -165,15 +177,22 @@ export class MissionPlannerViewComponent implements OnInit {
       }
 
       const available = availableByType.get(shipType) ?? 0;
+      const availableUndamaged = availableUndamagedByType.get(shipType) ?? 0;
+      const availableDamaged = availableDamagedByType.get(shipType) ?? 0;
       rows.push({
         type: shipType,
         label: ship.getName(),
         purposes: Array.from(ship.purposes.values()),
         available,
+        availableUndamaged,
+        availableDamaged,
         selected,
+        selectedUndamaged: this.selectedUndamagedShipAmount(shipType),
+        selectedDamaged: this.selectedDamagedShipAmount(shipType),
         cargoCapacity: ship.cargoCapacity,
         hangarCapacity: ship.hangarCapacity,
         hasWeapons: ship.weapons.length > 0,
+        canJump: ship.canJump,
         isRelevant: this.isShipRelevantForMission(shipType, ship),
         isRequired: this.isShipRequiredForMission(shipType)
       });
@@ -302,7 +321,7 @@ export class MissionPlannerViewComponent implements OnInit {
     let total = 0;
     for (const entry of this.selectedShipEntries()) {
       const blueprint = this.shipBlueprintsByType.get(entry.type);
-      total += (blueprint?.cargoCapacity ?? 0) * entry.amount;
+      total += (blueprint?.cargoCapacity ?? 0) * this.selectedShipSelectionAmount(entry);
     }
 
     return total;
@@ -312,7 +331,7 @@ export class MissionPlannerViewComponent implements OnInit {
     let total = 0;
     for (const entry of this.selectedShipEntries()) {
       const blueprint = this.shipBlueprintsByType.get(entry.type);
-      total += (blueprint?.hangarCapacity ?? 0) * entry.amount;
+      total += (blueprint?.hangarCapacity ?? 0) * this.selectedShipSelectionAmount(entry);
     }
 
     return total;
@@ -358,7 +377,7 @@ export class MissionPlannerViewComponent implements OnInit {
         continue;
       }
 
-      totalFuel += blueprint.jumpCost * Math.max(1, distance) * entry.amount;
+      totalFuel += blueprint.jumpCost * Math.max(1, distance) * this.selectedShipSelectionAmount(entry);
     }
 
     return Math.max(0, totalFuel * fuelMultiplier);
@@ -377,7 +396,7 @@ export class MissionPlannerViewComponent implements OnInit {
           continue;
         }
 
-        total += weapon.dmg * weapon.shots * entry.amount;
+        total += weapon.dmg * weapon.shots * this.selectedShipSelectionAmount(entry);
       }
     }
 
@@ -397,7 +416,7 @@ export class MissionPlannerViewComponent implements OnInit {
           continue;
         }
 
-        total += weapon.shots * entry.amount;
+        total += weapon.shots * this.selectedShipSelectionAmount(entry);
       }
     }
 
@@ -452,33 +471,68 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected selectedShipAmount(shipType: ShipType): number {
-    return this.shipSelectionByType.get(shipType) ?? 0;
+    return this.selectedUndamagedShipAmount(shipType) + this.selectedDamagedShipAmount(shipType);
   }
 
-  protected maxShipAmount(shipType: ShipType): number {
-    return this.availableShipCounts(this.selectedOriginPlanet).get(shipType) ?? 0;
+  protected selectedUndamagedShipAmount(shipType: ShipType): number {
+    return this.undamagedShipSelectionByType.get(shipType) ?? 0;
   }
 
-  protected setShipAmount(shipType: ShipType, value: string | number): void {
+  protected selectedDamagedShipAmount(shipType: ShipType): number {
+    return this.damagedShipSelectionByType.get(shipType) ?? 0;
+  }
+
+  protected maxUndamagedShipAmount(shipType: ShipType): number {
+    return this.availableUndamagedShipCounts(this.selectedOriginPlanet).get(shipType) ?? 0;
+  }
+
+  protected maxDamagedShipAmount(shipType: ShipType): number {
+    return this.availableDamagedShipCounts(this.selectedOriginPlanet).get(shipType) ?? 0;
+  }
+
+  protected setUndamagedShipAmount(shipType: ShipType, value: string | number): void {
     const raw = typeof value === 'string' ? Number.parseInt(value, 10) : value;
     const normalized = Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
-    const capped = Math.min(normalized, this.maxShipAmount(shipType));
-    this.shipSelectionByType.set(shipType, capped);
+    const capped = Math.min(normalized, this.maxUndamagedShipAmount(shipType));
+    this.undamagedShipSelectionByType.set(shipType, capped);
     this.normalizeShipSelectionForMission();
   }
 
-  protected fillMax(shipType: ShipType): void {
-    this.shipSelectionByType.set(shipType, this.maxShipAmount(shipType));
+  protected setDamagedShipAmount(shipType: ShipType, value: string | number): void {
+    const raw = typeof value === 'string' ? Number.parseInt(value, 10) : value;
+    const normalized = Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+    const capped = Math.min(normalized, this.maxDamagedShipAmount(shipType));
+    this.damagedShipSelectionByType.set(shipType, capped);
     this.normalizeShipSelectionForMission();
+  }
+
+  protected fillMaxUndamaged(shipType: ShipType): void {
+    this.undamagedShipSelectionByType.set(shipType, this.maxUndamagedShipAmount(shipType));
+    this.normalizeShipSelectionForMission();
+  }
+
+  protected fillMaxDamaged(shipType: ShipType): void {
+    this.damagedShipSelectionByType.set(shipType, this.maxDamagedShipAmount(shipType));
+    this.normalizeShipSelectionForMission();
+  }
+
+  protected clearUndamagedShip(shipType: ShipType): void {
+    this.undamagedShipSelectionByType.set(shipType, 0);
+  }
+
+  protected clearDamagedShip(shipType: ShipType): void {
+    this.damagedShipSelectionByType.set(shipType, 0);
   }
 
   protected clearShip(shipType: ShipType): void {
-    this.shipSelectionByType.set(shipType, 0);
+    this.clearUndamagedShip(shipType);
+    this.clearDamagedShip(shipType);
   }
 
   protected clearAllShips(): void {
-    for (const shipType of this.shipSelectionByType.keys()) {
-      this.shipSelectionByType.set(shipType, 0);
+    for (const shipType of this.shipBlueprintsByType.keys()) {
+      this.undamagedShipSelectionByType.set(shipType, 0);
+      this.damagedShipSelectionByType.set(shipType, 0);
     }
   }
 
@@ -594,14 +648,16 @@ export class MissionPlannerViewComponent implements OnInit {
     });
   }
 
-  private selectedShipEntries(): ShipAmountEntry[] {
-    const entries: ShipAmountEntry[] = [];
-    for (const [type, amount] of this.shipSelectionByType.entries()) {
-      if (amount <= 0) {
+  private selectedShipEntries(): CreateFleetShipSelectionEntry[] {
+    const entries: CreateFleetShipSelectionEntry[] = [];
+    for (const [type] of this.shipBlueprintsByType.entries()) {
+      const undamagedAmount = this.selectedUndamagedShipAmount(type);
+      const damagedAmount = this.selectedDamagedShipAmount(type);
+      if (undamagedAmount <= 0 && damagedAmount <= 0) {
         continue;
       }
 
-      entries.push({ type, amount });
+      entries.push({ type, undamagedAmount, damagedAmount });
     }
 
     return entries;
@@ -616,19 +672,42 @@ export class MissionPlannerViewComponent implements OnInit {
     return ManyShips.countByType(planet.objects.ships);
   }
 
+  private availableUndamagedShipCounts(planet: ClientPlanetDto | null): Map<ShipType, number> {
+    if (!planet) {
+      return new Map<ShipType, number>();
+    }
+
+    return ManyShips.undamagedCountByType(planet.objects.ships);
+  }
+
+  private availableDamagedShipCounts(planet: ClientPlanetDto | null): Map<ShipType, number> {
+    if (!planet) {
+      return new Map<ShipType, number>();
+    }
+
+    return ManyShips.damagedCountByType(planet.objects.ships);
+  }
+
   private normalizeShipSelectionForMission(): void {
-    for (const shipType of this.shipSelectionByType.keys()) {
-      const maxAmount = this.maxShipAmount(shipType);
-      const current = this.selectedShipAmount(shipType);
-      if (current > maxAmount) {
-        this.shipSelectionByType.set(shipType, maxAmount);
+    for (const shipType of this.shipBlueprintsByType.keys()) {
+      const maxUndamagedAmount = this.maxUndamagedShipAmount(shipType);
+      const currentUndamagedAmount = this.selectedUndamagedShipAmount(shipType);
+      if (currentUndamagedAmount > maxUndamagedAmount) {
+        this.undamagedShipSelectionByType.set(shipType, maxUndamagedAmount);
+      }
+
+      const maxDamagedAmount = this.maxDamagedShipAmount(shipType);
+      const currentDamagedAmount = this.selectedDamagedShipAmount(shipType);
+      if (currentDamagedAmount > maxDamagedAmount) {
+        this.damagedShipSelectionByType.set(shipType, maxDamagedAmount);
       }
     }
 
     if (this.selectedMissionType === FleetMissionType.SPY) {
-      for (const shipType of this.shipSelectionByType.keys()) {
+      for (const shipType of this.shipBlueprintsByType.keys()) {
         if (shipType !== ShipType.SPY_PROBE) {
-          this.shipSelectionByType.set(shipType, 0);
+          this.undamagedShipSelectionByType.set(shipType, 0);
+          this.damagedShipSelectionByType.set(shipType, 0);
         }
       }
 
@@ -676,6 +755,10 @@ export class MissionPlannerViewComponent implements OnInit {
     }
 
     return false;
+  }
+
+  private selectedShipSelectionAmount(entry: CreateFleetShipSelectionEntry): number {
+    return entry.undamagedAmount + entry.damagedAmount;
   }
 
   private parseCoordinates(value: string): ClientCoordinates | null {
