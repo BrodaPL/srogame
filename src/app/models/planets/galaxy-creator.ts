@@ -12,6 +12,7 @@ import { RngShipsGenerator } from '../../generators/rng-ships-generator';
 import { RngResourceGenerator } from '../../generators/rng-resource-generator';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { BuildingType } from '../enums/building-type';
+import { ManyShips } from '../fleets/many-ships';
 import { ResourcesPack } from '../resources-pack';
 import { ShipInstance } from '../fleets/ship-instance';
 import { createTutorialReadState } from '../../tutorial/tutorial-types';
@@ -170,7 +171,7 @@ export class GalaxyCreator {
 
             planet.info.ownerId = nextPlayerId;
             this.applyBuildingLevelsToPlanet(planet, buildingGenerator.generate(level));
-            planet.rBDSFTQ.ships = ships;
+            planet.rBDSFTQ.ships = ManyShips.fromShipInstances(ships);
 
             const player = new Player(
               nextPlayerId,
@@ -282,7 +283,7 @@ export class GalaxyCreator {
         GalaxyCreator.TEST_RANDOM_PLANET_STARTING_RESOURCES,
         GalaxyCreator.TEST_RANDOM_PLANET_STARTING_RESOURCES
       );
-      slot.planet.rBDSFTQ.ships = [];
+      slot.planet.rBDSFTQ.ships = ManyShips.empty();
       player.planets.push(slot.planet);
     }
   }
@@ -331,7 +332,7 @@ export class GalaxyCreator {
         }
       }
 
-      planet.rBDSFTQ.ships = ships;
+      planet.rBDSFTQ.ships = ManyShips.fromShipInstances(ships);
     }
   }
 
@@ -392,7 +393,7 @@ export class GalaxyCreator {
       );
       this.applyBuildingLevelsToPlanet(startingPlanet, this.createStartingBuildings());
       startingPlanet.rBDSFTQ.resources = this.createStartingResources();
-      startingPlanet.rBDSFTQ.ships = [];
+      startingPlanet.rBDSFTQ.ships = ManyShips.empty();
 
       slot.system.planets[slot.index] = startingPlanet;
 

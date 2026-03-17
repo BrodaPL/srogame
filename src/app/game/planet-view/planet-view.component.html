@@ -276,6 +276,45 @@
         }
 
         @if (isActiveTab('ships')) {
+          <section class="planet-ships-status">
+            <div class="planet-ships-status__header">
+              <h4 class="planet-view__section-title">Ship Damage Status</h4>
+              @if (hasShipsOnPlanet()) {
+                <p class="planet-ships-status__meta">Total ships: {{ planetTotalShipsCount() }}</p>
+              }
+            </div>
+
+            @if (!hasShipsOnPlanet()) {
+              <p class="planet-tab-placeholder">No ships available.</p>
+            } @else {
+              <div class="planet-ships-status__grid">
+                <article
+                  class="planet-ships-status__card"
+                  [class.planet-ships-status__card--green]="planetShipDamageTone() === 'green'"
+                  [class.planet-ships-status__card--yellow]="planetShipDamageTone() === 'yellow'"
+                  [class.planet-ships-status__card--orange]="planetShipDamageTone() === 'orange'"
+                  [class.planet-ships-status__card--red]="planetShipDamageTone() === 'red'"
+                  [attr.title]="planetUndamagedShipsTooltip()"
+                >
+                  <span class="planet-ships-status__label">Undamaged ships %</span>
+                  <strong class="planet-ships-status__value">{{ planetUndamagedShipsPercent() }}%</strong>
+                </article>
+
+                <article
+                  class="planet-ships-status__card"
+                  [class.planet-ships-status__card--green]="planetShipDamageTone() === 'green'"
+                  [class.planet-ships-status__card--yellow]="planetShipDamageTone() === 'yellow'"
+                  [class.planet-ships-status__card--orange]="planetShipDamageTone() === 'orange'"
+                  [class.planet-ships-status__card--red]="planetShipDamageTone() === 'red'"
+                  [attr.title]="planetDamagedShipsTooltip()"
+                >
+                  <span class="planet-ships-status__label">Damaged ships %</span>
+                  <strong class="planet-ships-status__value">{{ planetDamagedShipsPercent() }}%</strong>
+                </article>
+              </div>
+            }
+          </section>
+
           <div class="planet-building-list">
             @for (ship of shipBlueprints; track ship.type) {
               <article class="planet-building-card planet-building-card--ship">

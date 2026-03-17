@@ -15,6 +15,7 @@ import technologyTypeEnumModule from '../../src/app/models/enums/technology-type
 import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
 import fleetMissionTypeEnumModule from '../../src/app/models/enums/fleet-mission-type.js';
 import fleetModelModule from '../../src/app/models/fleets/fleet.js';
+import manyShipsModule from '../../src/app/models/fleets/many-ships.js';
 import reportTypeEnumModule from '../../src/app/models/enums/report-type.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
@@ -92,6 +93,7 @@ import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
+import type { ManyShips as ManyShipsType } from '../../src/app/models/fleets/many-ships.ts';
 import type { PlayerReport } from '../../src/app/models/reports/player-report.ts';
 import type { MessageReport } from '../../src/app/models/reports/message-report.ts';
 import type { ReportType as ReportTypeType } from '../../src/app/models/enums/report-type.ts';
@@ -125,6 +127,9 @@ const { FleetMissionType } = fleetMissionTypeEnumModule as {
 };
 const { FleetState } = fleetModelModule as {
   FleetState: typeof import('../../src/app/models/fleets/fleet.js').FleetState;
+};
+const { ManyShips } = manyShipsModule as {
+  ManyShips: typeof import('../../src/app/models/fleets/many-ships.js').ManyShips;
 };
 const { ReportType } = reportTypeEnumModule as {
   ReportType: typeof import('../../src/app/models/enums/report-type.js').ReportType;
@@ -1320,6 +1325,11 @@ app.post('/api/game/active-fleets', (req, res) => {
   originPlanet.rBDSFTQ.resources.subtractResourcePack(totalRequiredResources);
   removeShipsFromPlanet(originPlanet, ships);
 
+  const fleetShips = ManyShips.empty();
+  for (const ship of ships) {
+    fleetShips.addUndamaged(ship.type, ship.amount);
+  }
+
   const fleet = {
     fleetId: currentGalaxy.nextFleetId,
     ownerId: playerId,
@@ -1328,7 +1338,7 @@ app.post('/api/game/active-fleets', (req, res) => {
     target: { x: target.x, y: target.y, z: target.z },
     originPlanetName: originPlanet.basicInfo.name,
     targetPlanetName: targetPlanet.basicInfo.name,
-    ships,
+    ships: fleetShips,
     cargo: {
       metal: cargo.metal,
       crystal: cargo.crystal,
@@ -1888,13 +1898,7 @@ function parseFleetShipStacks(value: unknown): Array<{ type: ShipTypeType; amoun
 }
 
 function countPlanetShipsByType(planet: Planet): Map<ShipTypeType, number> {
-  const counts = new Map<ShipTypeType, number>();
-  for (const ship of planet.rBDSFTQ.ships) {
-    const shipType = ship.type.type;
-    counts.set(shipType, (counts.get(shipType) ?? 0) + 1);
-  }
-
-  return counts;
+  return ManyShips.countByType(planet.rBDSFTQ.ships);
 }
 
 function calculateFleetCargoCapacity(ships: Array<{ type: ShipTypeType; amount: number }>): number {
@@ -1937,24 +1941,7 @@ function removeShipsFromPlanet(
   planet: Planet,
   requestedShips: Array<{ type: ShipTypeType; amount: number }>
 ): void {
-  const remainingByType = new Map<ShipTypeType, number>();
-  for (const ship of requestedShips) {
-    remainingByType.set(ship.type, ship.amount);
-  }
-
-  const remainingInstances = [];
-  for (const shipInstance of planet.rBDSFTQ.ships) {
-    const shipType = shipInstance.type.type;
-    const remainingToExtract = remainingByType.get(shipType) ?? 0;
-    if (remainingToExtract > 0) {
-      remainingByType.set(shipType, remainingToExtract - 1);
-      continue;
-    }
-
-    remainingInstances.push(shipInstance);
-  }
-
-  planet.rBDSFTQ.ships = remainingInstances;
+  planet.rBDSFTQ.ships.removeShipsByType(requestedShips);
 }
 
 function sameCoordinates(left: ClientCoordinates, right: ClientCoordinates): boolean {

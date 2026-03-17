@@ -9,12 +9,12 @@ import { PlayerType } from '../enums/player-type';
 import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
 import { Fleet, FleetState } from '../fleets/fleet';
+import { ManyShips, type ManyShipsLike } from '../fleets/many-ships';
 import { Ship } from '../fleets/ship';
 import { ShipInstance } from '../fleets/ship-instance';
 import { Galaxy } from '../planets/galaxy';
 import { Planet } from '../planets/planet';
 import { Player } from '../player';
-import { BattleReport } from '../reports/battle-report';
 import { FleetReport } from '../reports/fleet-report';
 import { ResearchReport } from '../reports/research-report';
 import { ResourcesPack } from '../resources-pack';
@@ -391,15 +391,7 @@ function addProducedShipsToPlanet(
   amount: number
 ): void {
   const normalizedAmount = Math.max(0, Math.floor(amount));
-  for (let index = 0; index < normalizedAmount; index += 1) {
-    planet.rBDSFTQ.ships.push(new ShipInstance(
-      blueprint,
-      blueprint.hullPointsCapacity,
-      blueprint.shieldCapacity,
-      0,
-      []
-    ));
-  }
+  planet.rBDSFTQ.ships.addUndamaged(blueprint.type, normalizedAmount);
 }
 
 function advanceResearchQueue(
@@ -729,7 +721,7 @@ function resolveSpyFleet(
     return null;
   }
 
-  const probeAmount = fleet.ships.find((entry) => entry.type === ShipType.SPY_PROBE)?.amount ?? 0;
+  const probeAmount = ManyShips.countByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
   if (probeAmount <= 0) {
     return null;
   }
@@ -772,25 +764,9 @@ function createMissionFailureReturnFleet(
 
 function addFleetShipsToPlanet(
   planet: Planet,
-  ships: Array<{ type: ShipType; amount: number }>
+  ships: ManyShipsLike
 ): void {
-  for (const shipStack of ships) {
-    const blueprint = SHIP_BLUEPRINTS.get(shipStack.type);
-    if (!blueprint) {
-      continue;
-    }
-
-    const normalizedAmount = Math.max(0, Math.floor(shipStack.amount));
-    for (let index = 0; index < normalizedAmount; index += 1) {
-      planet.rBDSFTQ.ships.push(new ShipInstance(
-        blueprint,
-        blueprint.hullPointsCapacity,
-        blueprint.shieldCapacity,
-        0,
-        []
-      ));
-    }
-  }
+  planet.rBDSFTQ.ships.addManyShips(ships);
 }
 
 function resolveHostilePlanetBattle(
@@ -804,7 +780,7 @@ function resolveHostilePlanetBattle(
     return 'no_battle';
   }
 
-  if (targetPlanet.rBDSFTQ.ships.length <= 0) {
+  if (ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships) <= 0) {
     return 'no_battle';
   }
 
@@ -821,8 +797,8 @@ function resolveHostilePlanetBattle(
     defender,
     resolvedTurnNumber
   );
-  const attackerSurvivors = countFleetShips(fleet.ships);
-  const defenderSurvivors = targetPlanet.rBDSFTQ.ships.length;
+  const attackerSurvivors = ManyShips.totalShipsCount(fleet.ships);
+  const defenderSurvivors = ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships);
   const battleIsUnresolved = attackerSurvivors > 0 && defenderSurvivors > 0;
 
   if (attackerSurvivors <= 0) {
@@ -847,8 +823,8 @@ function resolvePlanetBattle(
   defender: Player,
   resolvedTurnNumber: number
 ): SpaceBattleResult {
-  const attackerShips = toShipInstancesFromFleet(fleet);
-  const defenderShips = targetPlanet.rBDSFTQ.ships.map((ship) => cloneShipInstance(ship));
+  const attackerShips = ManyShips.toShipInstances(fleet.ships);
+  const defenderShips = ManyShips.toShipInstances(targetPlanet.rBDSFTQ.ships);
   const battleResult = SPACE_BATTLE_RESOLVER.resolve({
     attacker: {
       player: attacker,
@@ -868,85 +844,21 @@ function resolvePlanetBattle(
     }
   });
 
-  fleet.ships = toFleetShipStacks(battleResult.attacker.survivingShips);
-  targetPlanet.rBDSFTQ.ships = battleResult.defender.survivingShips.map((ship) => cloneShipInstance(ship));
+  fleet.ships = ManyShips.fromShipInstances(battleResult.attacker.survivingShips);
+  targetPlanet.rBDSFTQ.ships = ManyShips.fromShipInstances(battleResult.defender.survivingShips);
 
-  // TODO: Persist attacker survivor damage once active fleets stop collapsing back into type-count stacks.
-  addBattleReport(attacker, battleResult.reports.attacker);
-  addBattleReport(defender, battleResult.reports.defender);
+  addBattleFleetReport(attacker, battleResult.reports.attacker);
+  addBattleFleetReport(defender, battleResult.reports.defender);
 
   return battleResult;
 }
 
-function toShipInstancesFromFleet(fleet: Fleet): ShipInstance[] {
-  const instances: ShipInstance[] = [];
-
-  for (const shipStack of fleet.ships) {
-    const blueprint = SHIP_BLUEPRINTS.get(shipStack.type);
-    if (!blueprint) {
-      continue;
-    }
-
-    const normalizedAmount = Math.max(0, Math.floor(shipStack.amount));
-    for (let index = 0; index < normalizedAmount; index += 1) {
-      instances.push(new ShipInstance(
-        blueprint,
-        blueprint.hullPointsCapacity,
-        blueprint.shieldCapacity,
-        0,
-        []
-      ));
-    }
-  }
-
-  return instances;
-}
-
-function toFleetShipStacks(ships: ShipInstance[]): Array<{ type: ShipType; amount: number }> {
-  const amounts = new Map<ShipType, number>();
-
-  for (const ship of ships) {
-    if (ship.hull <= 0) {
-      continue;
-    }
-
-    amounts.set(ship.type.type, (amounts.get(ship.type.type) ?? 0) + 1);
-  }
-
-  return [...amounts.entries()].map(([type, amount]) => ({ type, amount }));
-}
-
-function cloneShipInstance(ship: ShipInstance): ShipInstance {
-  return new ShipInstance(
-    ship.type,
-    ship.hull,
-    ship.shield,
-    ship.cargo,
-    ship.hangar.map((nestedShip) => cloneShipInstance(nestedShip))
-  );
-}
-
-function countFleetShips(ships: Array<{ type: ShipType; amount: number }>): number {
-  return ships.reduce((total, entry) => total + Math.max(0, Math.floor(entry.amount)), 0);
-}
-
-function addBattleReport(player: Player, fleetReport: FleetReport): void {
+function addBattleFleetReport(player: Player, fleetReport: FleetReport): void {
   if (player.type !== PlayerType.PLAYER) {
     return;
   }
 
-  player.addReport(new BattleReport(
-    {
-      reportId: player.createReportId(),
-      createdTurn: fleetReport.createdTurn,
-      title: fleetReport.title,
-      sourceCoordinates: fleetReport.sourceCoordinates ? { ...fleetReport.sourceCoordinates } : null,
-      sourcePlanetName: fleetReport.sourcePlanetName,
-      sourceSystemName: fleetReport.sourceSystemName,
-      senderPlayerName: fleetReport.senderPlayerName
-    },
-    fleetReport.body
-  ));
+  player.addReport(fleetReport);
 }
 
 function addFleetSuccessReport(

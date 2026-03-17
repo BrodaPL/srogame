@@ -11,6 +11,7 @@ import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import { WeaponType } from '../../models/enums/weapon-type';
 import { Fleet } from '../../models/fleets/fleet';
+import { ManyShips } from '../../models/fleets/many-ships';
 import type {
   ClientCoordinates,
   ClientPlanetDto,
@@ -139,7 +140,8 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected totalAvailableShips(planet: ClientPlanetDto): number {
-    return planet.objects.ships.length;
+    // TODO: Distinguish damaged-vs-ready launch availability once fleet readiness is redesigned.
+    return ManyShips.totalShipsCount(planet.objects.ships);
   }
 
   protected totalSelectedShips(): number {
@@ -606,17 +608,12 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   private availableShipCounts(planet: ClientPlanetDto | null): Map<ShipType, number> {
-    const counts = new Map<ShipType, number>();
     if (!planet) {
-      return counts;
+      return new Map<ShipType, number>();
     }
 
-    for (const ship of planet.objects.ships) {
-      const shipType = ship.type.type as ShipType;
-      counts.set(shipType, (counts.get(shipType) ?? 0) + 1);
-    }
-
-    return counts;
+    // TODO: Damaged ships still count as fully available for launch in the current mission planner.
+    return ManyShips.countByType(planet.objects.ships);
   }
 
   private normalizeShipSelectionForMission(): void {

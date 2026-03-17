@@ -6,7 +6,6 @@ import type {
 } from '../game-api-types';
 import { ReportType } from '../enums/report-type';
 import { BuildingQueue } from './building-queue';
-import { BattleReport } from './battle-report';
 import { BuildingsReport } from './buildings-report';
 import { ColonizationReport } from './colonization-report';
 import { DefenseReport } from './defense-report';
@@ -43,8 +42,6 @@ function fromTextReportDto(report: TextPlayerReportDto): PlayerReport {
   switch (report.reportType) {
     case ReportType.DEFENSE_REPORT:
       return new DefenseReport(baseData, report.body);
-    case ReportType.BATTLE_REPORT:
-      return new BattleReport(baseData, report.body);
     case ReportType.RESEARCH_REPORT:
       return new ResearchReport(baseData, report.body);
     case ReportType.PRODUCTION_REPORT:

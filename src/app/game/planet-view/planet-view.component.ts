@@ -26,6 +26,7 @@ import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
+import { ManyShips } from '../../models/fleets/many-ships';
 import { Ship } from '../../models/fleets/ship';
 import { Technology } from '../../models/tech/technology';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -507,6 +508,63 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected shipAmountInput(shipType: ShipType): string {
     return this.shipAmountInputs.get(shipType) ?? '';
+  }
+
+  protected hasShipsOnPlanet(): boolean {
+    return ManyShips.totalShipsCount(this.planet?.objects.ships) > 0;
+  }
+
+  protected planetTotalShipsCount(): number {
+    return ManyShips.totalShipsCount(this.planet?.objects.ships);
+  }
+
+  protected planetUndamagedShipsPercent(): number {
+    return ManyShips.undamagedPercentage(this.planet?.objects.ships);
+  }
+
+  protected planetDamagedShipsPercent(): number {
+    return ManyShips.damagedPercentage(this.planet?.objects.ships);
+  }
+
+  protected planetUndamagedShipsTooltip(): string {
+    const entries = ManyShips.groupedUndamagedEntries(this.planet?.objects.ships);
+    if (entries.length <= 0) {
+      return 'No undamaged ships.';
+    }
+
+    return entries
+      .map((entry) => `${entry.type}: ${entry.amount}`)
+      .join('\n');
+  }
+
+  protected planetDamagedShipsTooltip(): string {
+    const entries = ManyShips.groupedDamagedEntries(this.planet?.objects.ships);
+    if (entries.length <= 0) {
+      return 'No damaged ships.';
+    }
+
+    return entries
+      .map((entry) =>
+        `${entry.type}: ${entry.amount}, missing HP ${entry.totalMissingHull} (${entry.averageDamagePercent}% avg)`
+      )
+      .join('\n');
+  }
+
+  protected planetShipDamageTone(): 'green' | 'yellow' | 'orange' | 'red' {
+    const undamagedPercent = this.planetUndamagedShipsPercent();
+    if (undamagedPercent >= 100) {
+      return 'green';
+    }
+
+    if (undamagedPercent >= 80) {
+      return 'yellow';
+    }
+
+    if (undamagedPercent >= 50) {
+      return 'orange';
+    }
+
+    return 'red';
   }
 
   protected onShipAmountInput(shipType: ShipType, rawValue: unknown): void {

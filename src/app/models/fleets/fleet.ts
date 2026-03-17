@@ -1,12 +1,7 @@
 import { Destination } from './destination';
 import { FleetMissionType } from '../enums/fleet-mission-type';
-import { ShipType } from '../enums/ship-type';
+import { ManyShips } from './many-ships';
 import { ResourcesPack } from '../resources-pack';
-
-export type FleetShipStack = {
-  type: ShipType;
-  amount: number;
-};
 
 export enum FleetState {
   MOVING_TO_TARGET = 'MOVING_TO_TARGET',
@@ -25,7 +20,7 @@ export class Fleet {
     public target: Destination,
     public originPlanetName: string,
     public targetPlanetName: string,
-    public ships: FleetShipStack[],
+    public ships: ManyShips,
     public cargo: ResourcesPack,
     public fuelCost: number,
     public totalCargoCapacity: number,

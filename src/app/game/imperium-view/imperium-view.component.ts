@@ -10,7 +10,7 @@ import { Building } from '../../models/buildings/building';
 import { BuildingType } from '../../models/enums/building-type';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
-import type { ShipInstance } from '../../models/fleets/ship-instance';
+import { ManyShips } from '../../models/fleets/many-ships';
 import type {
   BuildingQueueEntryDto,
   ClientPlanetDto,
@@ -475,8 +475,8 @@ export class ImperiumViewComponent implements OnInit {
     }
 
     for (const planet of planets) {
-      for (const shipInstance of planet.objects.ships) {
-        this.accumulateShipInstance(totals, shipInstance);
+      for (const [shipType, amount] of ManyShips.countByType(planet.objects.ships).entries()) {
+        totals.set(shipType, (totals.get(shipType) ?? 0) + amount);
       }
     }
 
@@ -503,15 +503,6 @@ export class ImperiumViewComponent implements OnInit {
         allZero: maxLevel === 0
       };
     });
-  }
-
-  private accumulateShipInstance(totals: Map<ShipType, number>, shipInstance: ShipInstance): void {
-    const shipType = shipInstance.type.type;
-    totals.set(shipType, (totals.get(shipType) ?? 0) + 1);
-
-    for (const nestedShip of shipInstance.hangar ?? []) {
-      this.accumulateShipInstance(totals, nestedShip);
-    }
   }
 
   private planetAttentionLabels(

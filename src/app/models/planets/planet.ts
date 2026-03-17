@@ -1,10 +1,10 @@
 import { BuildingType } from '../enums/building-type';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { Fleet } from '../fleets/fleet';
+import { ManyShips } from '../fleets/many-ships';
 import { PlanetType } from '../enums/planet-type';
 import { ResourcesPack } from '../resources-pack';
 import { SolarSystem } from './solar-system';
-import { ShipInstance } from '../fleets/ship-instance';
 import { PlanetaryParameters } from './planetary-parameters';
 import { PlanetImageHelper } from './planet-image-helper';
 import { DefenceBuildingInstances } from '../reports/defence-building-instances';
@@ -47,7 +47,7 @@ export class rBDSFTQ {
     public buildingsLevels: Map<BuildingType, number>,
     public buildingsCurrentPowerConsumption: Map<BuildingType, number>,
     public defences: DefenceBuildingInstances[],
-    public ships: ShipInstance[],
+    public ships: ManyShips,
     public currentResearchQueue: TechnologyQueueEntry | null,
     public researchHelperFor: ResearchHelperFor | null,
     public buildingQueue: BuildingQueueEntry[],
@@ -99,7 +99,7 @@ export class Planet {
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
         [],
-        [],
+        ManyShips.empty(),
         null,
         null,
         [],
@@ -153,7 +153,7 @@ export class Planet {
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
         [],
-        [],
+        ManyShips.empty(),
         null,
         null,
         [],

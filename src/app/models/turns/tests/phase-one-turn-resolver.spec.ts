@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
 import { PlayerType } from '../../enums/player-type';
-import { ReportType } from '../../enums/report-type';
 import { ShipType } from '../../enums/ship-type';
 import { Fleet, FleetState } from '../../fleets/fleet';
+import { ManyShips } from '../../fleets/many-ships';
 import { ShipInstance } from '../../fleets/ship-instance';
 import { Galaxy } from '../../planets/galaxy';
 import { SolarSystem } from '../../planets/solar-system';
@@ -25,6 +25,15 @@ function shipInstance(type: ShipType): ShipInstance {
   }
 
   return new ShipInstance(blueprint, blueprint.hullPointsCapacity, blueprint.shieldCapacity, 0, []);
+}
+
+function manyShips(...entries: Array<{ type: ShipType; amount: number }>): ManyShips {
+  const ships = ManyShips.empty();
+  for (const entry of entries) {
+    ships.addUndamaged(entry.type, entry.amount);
+  }
+
+  return ships;
 }
 
 function createPlayersAndGalaxy(activeFleet: Fleet, configure: (system: SolarSystem) => void) {
@@ -52,7 +61,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
       point(1, 1, 1),
       'Alpha Prime',
       'Beta Frontier',
-      [{ type: ShipType.TITAN, amount: 1 }],
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
       new ResourcesPack(40, 20, 10),
       0,
       0,
@@ -69,7 +78,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
       solarSystem.planets[2].info.ownerId = 1;
       solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
       solarSystem.planets[1].info.ownerId = 2;
-      solarSystem.planets[1].rBDSFTQ.ships.push(shipInstance(ShipType.SPY_PROBE));
+      solarSystem.planets[1].rBDSFTQ.ships = ManyShips.fromShipInstances([shipInstance(ShipType.SPY_PROBE)]);
       solarSystem.planets[3].info.ownerId = 2;
     });
 
@@ -77,17 +86,16 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     expect(galaxy.activeFleets).toHaveLength(1);
     expect(galaxy.activeFleets[0].state).toBe(FleetState.MISSION_FAILURE_RETURNING);
-    expect(galaxy.activeFleets[0].ships).toEqual([{ type: ShipType.TITAN, amount: 1 }]);
+    expect(ManyShips.countByType(galaxy.activeFleets[0].ships).get(ShipType.TITAN)).toBe(1);
     expect(galaxy.activeFleets[0].cargo.metal).toBe(40);
-    expect(system.planets[1].rBDSFTQ.ships).toHaveLength(0);
-    expect(attacker.reports.some((report) => report.reportType === ReportType.BATTLE_REPORT)).toBe(true);
+    expect(ManyShips.totalShipsCount(system.planets[1].rBDSFTQ.ships)).toBe(0);
     expect(attacker.reports.some((report) =>
-      report.reportType === ReportType.FLEET_REPORT && report.title.startsWith('Battle Report:')
+      report.title.startsWith('Battle Report:')
     )).toBe(true);
     expect(attacker.reports.some((report) =>
-      report.reportType === ReportType.FLEET_REPORT && report.title.startsWith('Fleet Failed: Move')
+      report.title.startsWith('Fleet Failed: Move')
     )).toBe(true);
-    expect(defender.reports.some((report) => report.reportType === ReportType.BATTLE_REPORT)).toBe(true);
+    expect(defender.reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
   });
 
   it('destroys a hostile transport that loses its arrival battle before cargo delivery', () => {
@@ -99,7 +107,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
       point(1, 1, 3),
       'Alpha Haul',
       'Beta Bastion',
-      [{ type: ShipType.TRANSPORTER, amount: 1 }],
+      manyShips({ type: ShipType.TRANSPORTER, amount: 1 }),
       new ResourcesPack(120, 80, 30),
       0,
       600,
@@ -116,7 +124,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
       solarSystem.planets[2].info.ownerId = 1;
       solarSystem.planets[3].basicInfo.name = 'Beta Bastion';
       solarSystem.planets[3].info.ownerId = 2;
-      solarSystem.planets[3].rBDSFTQ.ships.push(shipInstance(ShipType.MOTHER_SHIP));
+      solarSystem.planets[3].rBDSFTQ.ships = ManyShips.fromShipInstances([shipInstance(ShipType.MOTHER_SHIP)]);
       solarSystem.planets[1].info.ownerId = 2;
     });
 
@@ -132,11 +140,10 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[3].rBDSFTQ.resources.metal).toBe(defenderCargoBefore.metal);
     expect(system.planets[3].rBDSFTQ.resources.crystal).toBe(defenderCargoBefore.crystal);
     expect(system.planets[3].rBDSFTQ.resources.deuterium).toBe(defenderCargoBefore.deuterium);
-    expect(system.planets[3].rBDSFTQ.ships.length).toBeGreaterThan(0);
-    expect(attacker.reports.some((report) => report.reportType === ReportType.BATTLE_REPORT)).toBe(true);
+    expect(ManyShips.totalShipsCount(system.planets[3].rBDSFTQ.ships)).toBeGreaterThan(0);
     expect(attacker.reports.some((report) =>
-      report.reportType === ReportType.FLEET_REPORT && report.title.startsWith('Battle Report:')
+      report.title.startsWith('Battle Report:')
     )).toBe(true);
-    expect(defender.reports.some((report) => report.reportType === ReportType.BATTLE_REPORT)).toBe(true);
+    expect(defender.reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ import { ClientGalaxy } from './client-galaxy';
 import { ClientPlanet } from './client-planet';
 import { ClientInfo, ClientStarSystem } from './client-star-system';
 import { Fleet } from '../fleets/fleet';
+import { ManyShips } from '../fleets/many-ships';
 
 export class Galaxy {
   public static buildSolarSystemNamePool(shuffle = true): string[] {
@@ -73,7 +74,7 @@ export class Galaxy {
         new Map(),
         new Map(),
         [],
-        [],
+        ManyShips.empty(),
         null,
         null,
         [],

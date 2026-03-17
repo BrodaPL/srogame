@@ -10,7 +10,7 @@ import { ResearchQueue } from '../models/reports/research-queue';
 import { ShipyardQueue } from '../models/reports/shipyard-queue';
 import { BuildingQueue } from '../models/reports/building-queue';
 import { DefenceBuildingInstances } from '../models/reports/defence-building-instances';
-import { ShipInstance } from '../models/fleets/ship-instance';
+import { ManyShips } from '../models/fleets/many-ships';
 
 export type EspionageReportOptions = {
   forcedReportLevel?: number;
@@ -66,7 +66,7 @@ export class EspionageReportGenerator {
       : 0;
     const totalDefences = includeTotalDefences ? this.getDefencesAmount() : 0;
     const totalShips = includeTotalShips
-      ? planet.rBDSFTQ.ships.length
+      ? ManyShips.totalShipsCount(planet.rBDSFTQ.ships)
       : 0;
 
     const detailedBuildings = includeDetailedBuildings
@@ -121,14 +121,8 @@ export class EspionageReportGenerator {
     );
   }
 
-  private toShipAmountsMap(ships: ShipInstance[]): Map<ShipType, number> {
-    const shipAmounts = new Map<ShipType, number>();
-    for (const shipInstance of ships) {
-      const shipType = shipInstance.type.type;
-      shipAmounts.set(shipType, (shipAmounts.get(shipType) ?? 0) + 1);
-    }
-
-    return shipAmounts;
+  private toShipAmountsMap(ships: Planet['rBDSFTQ']['ships']): Map<ShipType, number> {
+    return ManyShips.countByType(ships);
   }
 
   private resolveReportLevel(

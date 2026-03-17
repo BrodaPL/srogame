@@ -5,6 +5,7 @@ import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { Fleet, FleetState } from '../../models/fleets/fleet';
+import { ManyShips } from '../../models/fleets/many-ships';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
@@ -32,12 +33,14 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected totalShips(fleet: Fleet): number {
-    return fleet.ships.reduce((sum, entry) => sum + entry.amount, 0);
+    // TODO: Distinguish mission-ready vs damaged ships when operations availability gets redesigned.
+    return ManyShips.totalShipsCount(fleet.ships);
   }
 
   protected shipSummary(fleet: Fleet): string {
-    return fleet.ships
-      .map((entry) => `${entry.type} x${entry.amount}`)
+    return [...ManyShips.countByType(fleet.ships).entries()]
+      .sort(([leftType], [rightType]) => leftType.localeCompare(rightType))
+      .map(([type, amount]) => `${type} x${amount}`)
       .join(', ');
   }
 
