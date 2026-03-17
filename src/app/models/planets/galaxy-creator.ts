@@ -21,6 +21,7 @@ import { createTutorialReadState } from '../../tutorial/tutorial-types';
 export class GalaxyCreator {
   private static readonly TEST_RANDOM_PLANETS_COUNT = 3;
   private static readonly TEST_STARTING_SHIPS_PER_TYPE = 10;
+  private static readonly HOME_SYSTEM_NEUTRAL_LEVEL = 3;
   private static readonly TEST_RANDOM_PLANET_LEVEL_MIN = 4;
   private static readonly TEST_RANDOM_PLANET_LEVEL_MAX = 12;
   private static readonly TEST_RANDOM_TECH_LEVEL_MIN = 4;
@@ -410,7 +411,94 @@ export class GalaxyCreator {
       galaxy.players.push(player);
       galaxy.humanPlayerMap.set(playerId, player);
       galaxy.playerNameMap.set(player.playerName, playerId);
+
+      this.ensureHomeSystemNeutralPlanet(galaxy, player);
     }
+  }
+
+  private ensureHomeSystemNeutralPlanet(galaxy: Galaxy, player: Player): void {
+    if (this.setup.neutralBotsAmount <= 0) {
+      return;
+    }
+
+    if (player.type !== PlayerType.PLAYER && player.type !== PlayerType.BOT) {
+      return;
+    }
+
+    const homePlanet = player.planets[0];
+    const homeSystem = homePlanet?.basicInfo.solarSystem;
+    if (!homePlanet || !homeSystem) {
+      return;
+    }
+
+    const neutralPlanet = this.findOrCreateSecondaryHomeSystemPlanet(homeSystem, homePlanet);
+    this.assignNeutralOwnerToPlanet(galaxy, neutralPlanet, GalaxyCreator.HOME_SYSTEM_NEUTRAL_LEVEL);
+  }
+
+  private findOrCreateSecondaryHomeSystemPlanet(system: SolarSystem, homePlanet: Planet): Planet {
+    const existingPlanet = system.planets.find((planet) =>
+      planet !== homePlanet
+      && planet.basicInfo.type !== PlanetType.ASTEROIDS
+      && planet.info.ownerId === null
+    );
+
+    if (existingPlanet) {
+      return existingPlanet;
+    }
+
+    const nextOrder = system.planets.length + 1;
+    let createdPlanet = Planet.createRandomEmpty('', nextOrder, system, null);
+    while (createdPlanet.basicInfo.type === PlanetType.ASTEROIDS) {
+      createdPlanet = Planet.createRandomEmpty('', nextOrder, system, null);
+    }
+
+    createdPlanet.basicInfo.name = this.buildPlanetName(
+      system.name,
+      nextOrder,
+      createdPlanet.basicInfo.type
+    );
+    system.planets.push(createdPlanet);
+    return createdPlanet;
+  }
+
+  private assignNeutralOwnerToPlanet(galaxy: Galaxy, planet: Planet, level: number): void {
+    const normalizedLevel = Math.max(1, Math.floor(level));
+    const buildingGenerator = new RngBuildingGenerator();
+    const techGenerator = new RngTechnologyGenerator();
+    const shipGenerator = new RngShipsGenerator();
+    const resourceGenerator = new RngResourceGenerator();
+    const targetShipsValue = resourceGenerator
+      .generateSimple(normalizedLevel)
+      .getTotalValuedResourceAmount();
+    const ships = shipGenerator.generate(normalizedLevel, targetShipsValue);
+    const playerId = this.nextAvailablePlayerId(galaxy);
+    const playerName = `N-${playerId}`;
+
+    planet.info.ownerId = playerId;
+    this.applyBuildingLevelsToPlanet(planet, buildingGenerator.generate(normalizedLevel));
+    planet.rBDSFTQ.resources = resourceGenerator.generateSimple(normalizedLevel);
+    planet.rBDSFTQ.ships = ManyShips.fromShipInstances(ships);
+
+    const player = new Player(
+      playerId,
+      playerName,
+      [planet],
+      techGenerator.generate(normalizedLevel),
+      [],
+      PlayerType.NEUTRAL,
+      createTutorialReadState(true)
+    );
+
+    galaxy.players.push(player);
+    galaxy.neutralPlayerMap.set(player.playerId, player);
+    galaxy.playerNameMap.set(player.playerName, player.playerId);
+  }
+
+  private nextAvailablePlayerId(galaxy: Galaxy): number {
+    return galaxy.players.reduce(
+      (maxId, player) => Math.max(maxId, player.playerId),
+      0
+    ) + 1;
   }
 
   private collectAvailablePlanets(
