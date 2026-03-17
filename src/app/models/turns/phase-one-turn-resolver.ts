@@ -846,11 +846,64 @@ function resolvePlanetBattle(
 
   fleet.ships = ManyShips.fromShipInstances(battleResult.attacker.survivingShips);
   targetPlanet.rBDSFTQ.ships = ManyShips.fromShipInstances(battleResult.defender.survivingShips);
+  targetPlanet.rBDSFTQ.spaceDebris.addResourcePack(calculateBattleDebris(battleResult, fleet));
 
   addBattleFleetReport(attacker, battleResult.reports.attacker);
   addBattleFleetReport(defender, battleResult.reports.defender);
 
   return battleResult;
+}
+
+function calculateBattleDebris(
+  battleResult: SpaceBattleResult,
+  fleet: Fleet
+): ResourcesPack {
+  const destroyedShipResources = new ResourcesPack(0, 0, 0);
+  addDestroyedShipResources(destroyedShipResources, battleResult.attacker.destroyedShips);
+  addDestroyedShipResources(destroyedShipResources, battleResult.defender.destroyedShips);
+
+  const lostCargoResources = battleResult.attacker.survivingShipCount <= 0
+    ? new ResourcesPack(fleet.cargo.metal, fleet.cargo.crystal, fleet.cargo.deuterium)
+    : new ResourcesPack(0, 0, 0);
+
+  const totalLostResources = new ResourcesPack(
+    destroyedShipResources.metal + lostCargoResources.metal,
+    destroyedShipResources.crystal + lostCargoResources.crystal,
+    destroyedShipResources.deuterium + lostCargoResources.deuterium
+  );
+
+  if (totalLostResources.getTotalResourceAmount() <= 0) {
+    return new ResourcesPack(0, 0, 0);
+  }
+
+  const metalRate = randomBetween(0.2, 0.3);
+  const crystalRate = randomBetween(0.2, 0.3);
+  const deuteriumRate = randomBetween(0.05, 0.1);
+
+  return new ResourcesPack(
+    Math.floor(totalLostResources.metal * metalRate),
+    Math.floor(totalLostResources.crystal * crystalRate),
+    Math.floor(totalLostResources.deuterium * deuteriumRate)
+  );
+}
+
+function addDestroyedShipResources(
+  target: ResourcesPack,
+  ships: ShipInstance[]
+): void {
+  for (const ship of ships) {
+    target.metal += ship.type.cost.metal;
+    target.crystal += ship.type.cost.crystal;
+    target.deuterium += ship.type.cost.deuterium;
+  }
+}
+
+function randomBetween(min: number, max: number): number {
+  if (max <= min) {
+    return min;
+  }
+
+  return min + Math.random() * (max - min);
 }
 
 function addBattleFleetReport(player: Player, fleetReport: FleetReport): void {
