@@ -2,6 +2,7 @@ import { EspionageReportGenerator } from '../../generators/espionage-report-gene
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
+import { SpaceBattleResolver, type SpaceBattleResult } from '../battles/space-battle-resolver';
 import { BuildingType } from '../enums/building-type';
 import { FleetMissionType } from '../enums/fleet-mission-type';
 import { PlayerType } from '../enums/player-type';
@@ -13,6 +14,7 @@ import { ShipInstance } from '../fleets/ship-instance';
 import { Galaxy } from '../planets/galaxy';
 import { Planet } from '../planets/planet';
 import { Player } from '../player';
+import { BattleReport } from '../reports/battle-report';
 import { FleetReport } from '../reports/fleet-report';
 import { ResearchReport } from '../reports/research-report';
 import { ResourcesPack } from '../resources-pack';
@@ -51,6 +53,7 @@ const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
 const TECHNOLOGY_BLUEPRINTS = TechnologyBlueprintsFactory.fromDefaultJson();
 const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
+const SPACE_BATTLE_RESOLVER = new SpaceBattleResolver();
 
 export function resolvePhaseOneTurn(
   galaxy: Galaxy,
@@ -583,6 +586,25 @@ function resolveMoveTargetArrival(
     return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
   }
 
+  const battleResolution = resolveHostilePlanetBattle(
+    fleet,
+    targetPlanet,
+    playersById,
+    resolvedTurnNumber
+  );
+  if (battleResolution === 'attacker_destroyed') {
+    return null;
+  }
+  if (battleResolution === 'attacker_retreating') {
+    addFleetFailureReport(
+      owner,
+      fleet,
+      resolvedTurnNumber,
+      'Move mission encountered hostile ships and was forced to retreat after the battle.'
+    );
+    return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
+  }
+
   if (targetPlanet.info.ownerId === fleet.ownerId) {
     addFleetShipsToPlanet(targetPlanet, fleet.ships);
     targetPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
@@ -624,6 +646,25 @@ function resolveTransportTargetArrival(
   const owner = playersById.get(fleet.ownerId);
   const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z));
   if (!owner || !targetPlanet) {
+    return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
+  }
+
+  const battleResolution = resolveHostilePlanetBattle(
+    fleet,
+    targetPlanet,
+    playersById,
+    resolvedTurnNumber
+  );
+  if (battleResolution === 'attacker_destroyed') {
+    return null;
+  }
+  if (battleResolution === 'attacker_retreating') {
+    addFleetFailureReport(
+      owner,
+      fleet,
+      resolvedTurnNumber,
+      'Transport mission encountered hostile ships, kept its undelivered cargo, and was forced to retreat after the battle.'
+    );
     return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
   }
 
@@ -750,6 +791,162 @@ function addFleetShipsToPlanet(
       ));
     }
   }
+}
+
+function resolveHostilePlanetBattle(
+  fleet: Fleet,
+  targetPlanet: Planet,
+  playersById: Map<number, Player>,
+  resolvedTurnNumber: number
+): 'no_battle' | 'attacker_destroyed' | 'attacker_retreating' | 'attacker_won' {
+  const defenderOwnerId = targetPlanet.info.ownerId;
+  if (defenderOwnerId === null || defenderOwnerId === fleet.ownerId) {
+    return 'no_battle';
+  }
+
+  if (targetPlanet.rBDSFTQ.ships.length <= 0) {
+    return 'no_battle';
+  }
+
+  const attacker = playersById.get(fleet.ownerId);
+  const defender = playersById.get(defenderOwnerId);
+  if (!attacker || !defender) {
+    return 'no_battle';
+  }
+
+  const battleResult = resolvePlanetBattle(
+    fleet,
+    targetPlanet,
+    attacker,
+    defender,
+    resolvedTurnNumber
+  );
+  const attackerSurvivors = countFleetShips(fleet.ships);
+  const defenderSurvivors = targetPlanet.rBDSFTQ.ships.length;
+  const battleIsUnresolved = attackerSurvivors > 0 && defenderSurvivors > 0;
+
+  if (attackerSurvivors <= 0) {
+    return 'attacker_destroyed';
+  }
+
+  if (battleIsUnresolved) {
+    return 'attacker_retreating';
+  }
+
+  if (battleResult.defender.survivingShipCount <= 0) {
+    return 'attacker_won';
+  }
+
+  return 'attacker_retreating';
+}
+
+function resolvePlanetBattle(
+  fleet: Fleet,
+  targetPlanet: Planet,
+  attacker: Player,
+  defender: Player,
+  resolvedTurnNumber: number
+): SpaceBattleResult {
+  const attackerShips = toShipInstancesFromFleet(fleet);
+  const defenderShips = targetPlanet.rBDSFTQ.ships.map((ship) => cloneShipInstance(ship));
+  const battleResult = SPACE_BATTLE_RESOLVER.resolve({
+    attacker: {
+      player: attacker,
+      ships: attackerShips,
+      label: attacker.playerName
+    },
+    defender: {
+      player: defender,
+      ships: defenderShips,
+      label: defender.playerName
+    },
+    reportContext: {
+      createdTurn: resolvedTurnNumber,
+      sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name
+    }
+  });
+
+  fleet.ships = toFleetShipStacks(battleResult.attacker.survivingShips);
+  targetPlanet.rBDSFTQ.ships = battleResult.defender.survivingShips.map((ship) => cloneShipInstance(ship));
+
+  // TODO: Persist attacker survivor damage once active fleets stop collapsing back into type-count stacks.
+  addBattleReport(attacker, battleResult.reports.attacker);
+  addBattleReport(defender, battleResult.reports.defender);
+
+  return battleResult;
+}
+
+function toShipInstancesFromFleet(fleet: Fleet): ShipInstance[] {
+  const instances: ShipInstance[] = [];
+
+  for (const shipStack of fleet.ships) {
+    const blueprint = SHIP_BLUEPRINTS.get(shipStack.type);
+    if (!blueprint) {
+      continue;
+    }
+
+    const normalizedAmount = Math.max(0, Math.floor(shipStack.amount));
+    for (let index = 0; index < normalizedAmount; index += 1) {
+      instances.push(new ShipInstance(
+        blueprint,
+        blueprint.hullPointsCapacity,
+        blueprint.shieldCapacity,
+        0,
+        []
+      ));
+    }
+  }
+
+  return instances;
+}
+
+function toFleetShipStacks(ships: ShipInstance[]): Array<{ type: ShipType; amount: number }> {
+  const amounts = new Map<ShipType, number>();
+
+  for (const ship of ships) {
+    if (ship.hull <= 0) {
+      continue;
+    }
+
+    amounts.set(ship.type.type, (amounts.get(ship.type.type) ?? 0) + 1);
+  }
+
+  return [...amounts.entries()].map(([type, amount]) => ({ type, amount }));
+}
+
+function cloneShipInstance(ship: ShipInstance): ShipInstance {
+  return new ShipInstance(
+    ship.type,
+    ship.hull,
+    ship.shield,
+    ship.cargo,
+    ship.hangar.map((nestedShip) => cloneShipInstance(nestedShip))
+  );
+}
+
+function countFleetShips(ships: Array<{ type: ShipType; amount: number }>): number {
+  return ships.reduce((total, entry) => total + Math.max(0, Math.floor(entry.amount)), 0);
+}
+
+function addBattleReport(player: Player, fleetReport: FleetReport): void {
+  if (player.type !== PlayerType.PLAYER) {
+    return;
+  }
+
+  player.addReport(new BattleReport(
+    {
+      reportId: player.createReportId(),
+      createdTurn: fleetReport.createdTurn,
+      title: fleetReport.title,
+      sourceCoordinates: fleetReport.sourceCoordinates ? { ...fleetReport.sourceCoordinates } : null,
+      sourcePlanetName: fleetReport.sourcePlanetName,
+      sourceSystemName: fleetReport.sourceSystemName,
+      senderPlayerName: fleetReport.senderPlayerName
+    },
+    fleetReport.body
+  ));
 }
 
 function addFleetSuccessReport(
