@@ -252,11 +252,7 @@ export class GalaxyCreator {
       }
     }
 
-    for (const player of galaxy.humanPlayerMap.values()) {
-      return player;
-    }
-
-    return null;
+    return galaxy.humanPlayerMap.values().next().value ?? null;
   }
 
   private assignRandomPlanetsToPlayer(galaxy: Galaxy, player: Player, amount: number): void {
