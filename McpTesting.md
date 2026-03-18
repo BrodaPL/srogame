@@ -7,6 +7,7 @@ Sources used for this summary:
 - `aiChat/39accYXBeklT47M5XiScfCCYz1Y.xml`
 - `.vscode/mcp.json`
 - local verification on 2026-03-18 with `codex.cmd mcp list`
+- local Playwright fallback verification on 2026-03-19
 - troubleshooting artifacts: `.tmp-chrome-mcp.log`, `.tmp-chrome-err.log`, `.tmp-chrome9333-err.log`, `.tmp-mcp-run2.log`, `.tmp-mcp-run3.log`, `.tmp-mcp-run4.log`
 
 ## Current State
@@ -224,6 +225,100 @@ Result:
 Conclusion:
 - treat profile isolation as a diagnostic step, not a final solution
 
+### Setup payload enum mismatch during API-assisted smoke tests
+
+Symptom:
+- `POST /api/game/start` returns `400 {"error":"Invalid setup payload."}` even though the payload shape looks correct
+
+Cause:
+- the game type enum is string-valued
+- the valid sandbox value is `Sandbox`
+- using `SANDBOX` fails server validation
+
+Fix:
+- when building payloads outside the Angular UI, copy the exact enum value from `src/app/models/enums/game-type.ts`
+- do not guess enum wire values from enum key names
+
+Practical rule:
+- for API-assisted smoke tests, prefer lifting literals directly from the shared client/server type source instead of recreating them manually
+
+### Duplicate local server launch causing `EADDRINUSE`
+
+Symptom:
+- server logs show `listen EADDRINUSE: address already in use :::3000`
+
+Cause:
+- the Express server was already running
+- a second local launch was started anyway
+
+Fix:
+- check whether `3000` is already listening before starting another server
+- treat this as a harness mistake, not an application failure
+
+Useful checks:
+
+```powershell
+Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq 3000 }
+Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' } | Select-Object ProcessId,CommandLine
+```
+
+### Angular dev server reachable on `localhost` but not `127.0.0.1`
+
+Symptom:
+- Angular reports a successful `ng serve`
+- `http://127.0.0.1:4200` may still fail
+- `http://localhost:4200` works
+
+Cause:
+- on this machine the dev server was listening on `::1:4200`
+- a quick probe against `127.0.0.1` can produce a false negative
+
+Fix:
+- check both `localhost` and `127.0.0.1` before concluding the dev server is down
+- if needed, inspect the real listener instead of trusting the banner text
+
+Useful checks:
+
+```powershell
+Invoke-WebRequest http://localhost:4200 -UseBasicParsing
+Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq 4200 }
+```
+
+### Dynamic browser smoke can be blocked by generated game state
+
+Symptom:
+- route smoke passes
+- a live mission-flow smoke does not
+- examples seen on 2026-03-19:
+  - no legal unowned `Move` target was available from the generated state
+  - no `Spy Probe` was available on owned planets in another run
+
+Cause:
+- the current generated sandbox state is not deterministic enough to guarantee every desired live mission scenario
+- API-assisted smoke setup depends on whatever ships and nearby targets the generated galaxy provides
+
+Fix:
+- split browser verification into two layers:
+  - route/render smoke that must always pass
+  - live mission-flow smoke only when generated state supports it
+- when generated state is unsuitable, fall back to deterministic model/spec coverage for logic verification instead of forcing a brittle browser scenario
+
+Practical rule:
+- treat `Planet View`, `Mission Planner`, `Reports`, and `Operations` route loads as the minimum browser smoke
+- treat live `Move`/`Transport`/`Spy` flows as opportunistic unless the setup is explicitly seeded to guarantee them
+
+### PowerShell quoting around `npm exec ... node -e`
+
+Symptom:
+- inline `node -e` checks routed through PowerShell and `npm exec` can break with parsing errors
+
+Cause:
+- PowerShell consumes parts of the JavaScript expression before `node` sees it
+
+Fix:
+- prefer a PowerShell here-string piped into `cmd /c "npm exec ... -- node"` for ad hoc Playwright scripts
+- this was more reliable than trying to inline JavaScript with nested quoting
+
 ## Manual Chrome Launch Notes
 
 Verified from logs:
@@ -286,6 +381,16 @@ Verified outcomes from prior sessions:
 - reports and operations screens updated as expected
 - no browser console errors or failed HTTP responses were observed in successful fallback runs
 
+Additional verified outcome from 2026-03-19:
+- route-level browser smoke passed cleanly with Playwright + installed Chrome
+- verified pages included main menu, `Planet View` with `Ship Damage Status`, `Mission Planner`, and `Reports`
+- no browser console errors, page errors, or failed HTTP responses occurred in that run
+- that run did not reproduce a live fleet lifecycle because generated state did not provide a suitable legal mission target and then did not provide a `Spy Probe`
+
+Conclusion:
+- Playwright fallback remains the right default for browser verification
+- however, live mission-flow smoke still depends on generated state unless the setup is more explicitly seeded
+
 ## Recommended Team Rule
 
 For this project, use this decision rule:
@@ -295,6 +400,7 @@ For this project, use this decision rule:
 3. If the chat session still does not expose stable browser-backed MCP, stop debugging the chat surface quickly.
 4. If MCP itself matters, use a dedicated local MCP client over stdio.
 5. If the real goal is application verification, use Playwright + installed Chrome and proceed.
+6. If generated game state blocks the exact live scenario you wanted, record that as a test-state limitation and switch to deterministic API/model/spec verification for the blocked feature.
 
 This is the fastest path with the least repeated confusion.
 
