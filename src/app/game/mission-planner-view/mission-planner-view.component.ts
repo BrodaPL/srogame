@@ -230,6 +230,10 @@ export class MissionPlannerViewComponent implements OnInit {
       warnings.push({ text: 'Insufficient cargo space.', severity: 'error' });
     }
 
+    if (this.usedHangarCapacity() > this.totalHangarCapacity()) {
+      warnings.push({ text: 'Insufficient hangar space for non-jump ships.', severity: 'error' });
+    }
+
     if (this.activeFleets.length >= this.maxActiveFleetCount()) {
       warnings.push({
         text: `Active fleet limit reached (${this.activeFleets.length}/${this.maxActiveFleetCount()}). Upgrade COMPUTER_TECHNOLOGY to control more fleets.`,
@@ -287,9 +291,9 @@ export class MissionPlannerViewComponent implements OnInit {
       warnings.push({ text: 'No military ships selected.', severity: 'note' });
     }
 
-    if (totalHangarCapacity > 0) {
+    if (totalHangarCapacity > 0 || this.usedHangarCapacity() > 0) {
       warnings.push({
-        text: `Hangar capacity remaining: ${totalHangarCapacity} (not used in phase 1).`,
+        text: `Hangar capacity remaining: ${Math.max(0, totalHangarCapacity - this.usedHangarCapacity())}.`,
         severity: 'note'
       });
     }
@@ -331,7 +335,11 @@ export class MissionPlannerViewComponent implements OnInit {
     let total = 0;
     for (const entry of this.selectedShipEntries()) {
       const blueprint = this.shipBlueprintsByType.get(entry.type);
-      total += (blueprint?.hangarCapacity ?? 0) * this.selectedShipSelectionAmount(entry);
+      if (!blueprint || !blueprint.canJump || blueprint.hangarCapacity <= 0) {
+        continue;
+      }
+
+      total += blueprint.hangarCapacity * this.selectedShipSelectionAmount(entry);
     }
 
     return total;
@@ -346,7 +354,17 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected usedHangarCapacity(): number {
-    return 0;
+    let total = 0;
+    for (const entry of this.selectedShipEntries()) {
+      const blueprint = this.shipBlueprintsByType.get(entry.type);
+      if (!blueprint || blueprint.canJump || blueprint.size <= 0) {
+        continue;
+      }
+
+      total += blueprint.size * this.selectedShipSelectionAmount(entry);
+    }
+
+    return total;
   }
 
   protected repairSummaryLabel(): string {
@@ -374,6 +392,10 @@ export class MissionPlannerViewComponent implements OnInit {
     for (const entry of this.selectedShipEntries()) {
       const blueprint = this.shipBlueprintsByType.get(entry.type);
       if (!blueprint) {
+        continue;
+      }
+
+      if (!blueprint.canJump) {
         continue;
       }
 

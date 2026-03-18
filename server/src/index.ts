@@ -1269,6 +1269,11 @@ app.post('/api/game/active-fleets', (req, res) => {
   }
 
   const totalShipAmounts = toShipAmountEntriesFromSelections(ships);
+  const selectedFleetShips = toManyShipsFromShipAmounts(totalShipAmounts);
+  if (!ManyShips.isTravelHangarValid(selectedFleetShips)) {
+    return res.status(400).json({ error: 'Insufficient hangar space for non-jump ships.' });
+  }
+
   const totalCargoCapacity = calculateFleetCargoCapacity(totalShipAmounts);
   const usedCargoCapacity = cargo.metal + cargo.crystal + cargo.deuterium;
   if (usedCargoCapacity > totalCargoCapacity) {
@@ -1943,6 +1948,17 @@ function toShipAmountEntriesFromSelections(
   }));
 }
 
+function toManyShipsFromShipAmounts(
+  ships: Array<{ type: ShipTypeType; amount: number }>
+): ManyShipsType {
+  const manyShips = ManyShips.empty();
+  for (const ship of ships) {
+    manyShips.addUndamaged(ship.type, ship.amount);
+  }
+
+  return manyShips;
+}
+
 function calculateFleetCargoCapacity(ships: Array<{ type: ShipTypeType; amount: number }>): number {
   let capacity = 0;
   for (const ship of ships) {
@@ -1969,7 +1985,7 @@ function calculateFuelCost(
   let totalFuel = 0;
   for (const ship of ships) {
     const blueprint = SHIP_BLUEPRINTS.shipsMap.get(ship.type);
-    if (!blueprint) {
+    if (!blueprint || !blueprint.canJump) {
       continue;
     }
 

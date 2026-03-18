@@ -81,6 +81,18 @@ export class ManyShips implements ManyShipsLike {
     return ManyShips.totalHangarCapacity(this);
   }
 
+  public totalTravelHangarCapacity(): number {
+    return ManyShips.totalTravelHangarCapacity(this);
+  }
+
+  public totalRequiredHangarCapacity(): number {
+    return ManyShips.totalRequiredHangarCapacity(this);
+  }
+
+  public isTravelHangarValid(): boolean {
+    return ManyShips.isTravelHangarValid(this);
+  }
+
   public addUndamaged(type: ShipType, amount = 1): void {
     const normalizedAmount = Math.max(0, Math.floor(amount));
     if (normalizedAmount <= 0) {
@@ -198,6 +210,101 @@ export class ManyShips implements ManyShipsLike {
     return extractedShips;
   }
 
+  public trimNonJumpShipsToTravelHangarCapacity(): ManyShips {
+    const removedShips = ManyShips.empty();
+    let overflow = this.totalRequiredHangarCapacity() - this.totalTravelHangarCapacity();
+    if (overflow <= 0) {
+      return removedShips;
+    }
+
+    const damagedIndicesToRemove = this.damagedShips
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => !ManyShips.canShipTravelIndependently(entry.type))
+      .sort((left, right) => {
+        const leftBlueprint = SHIP_BLUEPRINTS.get(left.entry.type);
+        const rightBlueprint = SHIP_BLUEPRINTS.get(right.entry.type);
+        const leftRatio = leftBlueprint && leftBlueprint.hullPointsCapacity > 0
+          ? left.entry.hull / leftBlueprint.hullPointsCapacity
+          : 0;
+        const rightRatio = rightBlueprint && rightBlueprint.hullPointsCapacity > 0
+          ? right.entry.hull / rightBlueprint.hullPointsCapacity
+          : 0;
+        if (leftRatio !== rightRatio) {
+          return leftRatio - rightRatio;
+        }
+
+        const rightSize = rightBlueprint?.size ?? 0;
+        const leftSize = leftBlueprint?.size ?? 0;
+        if (leftSize !== rightSize) {
+          return rightSize - leftSize;
+        }
+
+        return left.entry.type.localeCompare(right.entry.type);
+      });
+
+    const damagedRemovalIndices = new Set<number>();
+    for (const candidate of damagedIndicesToRemove) {
+      if (overflow <= 0) {
+        break;
+      }
+
+      const blueprint = SHIP_BLUEPRINTS.get(candidate.entry.type);
+      const shipSize = blueprint?.size ?? 0;
+      if (shipSize <= 0) {
+        continue;
+      }
+
+      damagedRemovalIndices.add(candidate.index);
+      removedShips.addDamaged(candidate.entry.type, candidate.entry.hull);
+      overflow -= shipSize;
+    }
+
+    if (damagedRemovalIndices.size > 0) {
+      this.damagedShips = this.damagedShips.filter((_, index) => !damagedRemovalIndices.has(index));
+    }
+
+    if (overflow <= 0) {
+      return removedShips;
+    }
+
+    const undamagedTypesByRemovalPriority = Object.entries(this.undamagedShipsCount)
+      .map(([type, amount]) => ({
+        type: type as ShipType,
+        amount: Math.max(0, Math.floor(amount ?? 0)),
+        size: SHIP_BLUEPRINTS.get(type as ShipType)?.size ?? 0
+      }))
+      .filter((entry) =>
+        entry.amount > 0
+        && entry.size > 0
+        && !ManyShips.canShipTravelIndependently(entry.type)
+      )
+      .sort((left, right) => {
+        if (left.size !== right.size) {
+          return right.size - left.size;
+        }
+
+        return left.type.localeCompare(right.type);
+      });
+
+    for (const entry of undamagedTypesByRemovalPriority) {
+      while (overflow > 0 && (this.undamagedShipsCount[entry.type] ?? 0) > 0) {
+        this.undamagedShipsCount[entry.type] = (this.undamagedShipsCount[entry.type] ?? 0) - 1;
+        if ((this.undamagedShipsCount[entry.type] ?? 0) <= 0) {
+          delete this.undamagedShipsCount[entry.type];
+        }
+
+        removedShips.addUndamaged(entry.type, 1);
+        overflow -= entry.size;
+      }
+
+      if (overflow <= 0) {
+        break;
+      }
+    }
+
+    return removedShips;
+  }
+
   public undamagedPercentage(): number {
     return ManyShips.undamagedPercentage(this);
   }
@@ -272,6 +379,40 @@ export class ManyShips implements ManyShipsLike {
 
   public static totalHangarCapacity(data: ManyShipsLike | null | undefined): number {
     return ManyShips.totalCapacity(data, 'hangarCapacity');
+  }
+
+  public static totalTravelHangarCapacity(data: ManyShipsLike | null | undefined): number {
+    const counts = ManyShips.countByType(data);
+    let total = 0;
+    for (const [type, amount] of counts.entries()) {
+      const blueprint = SHIP_BLUEPRINTS.get(type);
+      if (!blueprint || !blueprint.canJump || blueprint.hangarCapacity <= 0) {
+        continue;
+      }
+
+      total += blueprint.hangarCapacity * amount;
+    }
+
+    return total;
+  }
+
+  public static totalRequiredHangarCapacity(data: ManyShipsLike | null | undefined): number {
+    const counts = ManyShips.countByType(data);
+    let total = 0;
+    for (const [type, amount] of counts.entries()) {
+      const blueprint = SHIP_BLUEPRINTS.get(type);
+      if (!blueprint || blueprint.canJump || blueprint.size <= 0) {
+        continue;
+      }
+
+      total += blueprint.size * amount;
+    }
+
+    return total;
+  }
+
+  public static isTravelHangarValid(data: ManyShipsLike | null | undefined): boolean {
+    return ManyShips.totalRequiredHangarCapacity(data) <= ManyShips.totalTravelHangarCapacity(data);
   }
 
   public static toShipInstances(data: ManyShipsLike | null | undefined): ShipInstance[] {
@@ -405,5 +546,9 @@ export class ManyShips implements ManyShipsLike {
     }
 
     return total;
+  }
+
+  private static canShipTravelIndependently(type: ShipType): boolean {
+    return SHIP_BLUEPRINTS.get(type)?.canJump ?? false;
   }
 }

@@ -845,8 +845,10 @@ function resolvePlanetBattle(
   });
 
   fleet.ships = ManyShips.fromShipInstances(battleResult.attacker.survivingShips);
+  const overflowShips = fleet.ships.trimNonJumpShipsToTravelHangarCapacity();
   targetPlanet.rBDSFTQ.ships = ManyShips.fromShipInstances(battleResult.defender.survivingShips);
-  targetPlanet.rBDSFTQ.spaceDebris.addResourcePack(calculateBattleDebris(battleResult, fleet));
+  // TODO: Surface `spaceDebris` in the UI and add recycler/recovery gameplay once that layer is implemented.
+  targetPlanet.rBDSFTQ.spaceDebris.addResourcePack(calculateBattleDebris(battleResult, fleet, overflowShips));
 
   addBattleFleetReport(attacker, battleResult.reports.attacker);
   addBattleFleetReport(defender, battleResult.reports.defender);
@@ -856,13 +858,15 @@ function resolvePlanetBattle(
 
 function calculateBattleDebris(
   battleResult: SpaceBattleResult,
-  fleet: Fleet
+  fleet: Fleet,
+  overflowShips: ManyShipsLike
 ): ResourcesPack {
   const destroyedShipResources = new ResourcesPack(0, 0, 0);
   addDestroyedShipResources(destroyedShipResources, battleResult.attacker.destroyedShips);
   addDestroyedShipResources(destroyedShipResources, battleResult.defender.destroyedShips);
+  addDestroyedShipResources(destroyedShipResources, ManyShips.toShipInstances(overflowShips));
 
-  const lostCargoResources = battleResult.attacker.survivingShipCount <= 0
+  const lostCargoResources = ManyShips.totalShipsCount(fleet.ships) <= 0
     ? new ResourcesPack(fleet.cargo.metal, fleet.cargo.crystal, fleet.cargo.deuterium)
     : new ResourcesPack(0, 0, 0);
 

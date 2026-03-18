@@ -230,4 +230,62 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].rBDSFTQ.spaceDebris.crystal).toBe(debrisAfterFirstBattle.crystal * 2);
     expect(system.planets[1].rBDSFTQ.spaceDebris.deuterium).toBe(debrisAfterFirstBattle.deuterium * 2);
   });
+
+  it('destroys excess non-jump survivor ships after battle when carrier hangar space is insufficient', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const moveFleet = new Fleet(
+      12,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips(
+        { type: ShipType.CRUISER, amount: 1 },
+        { type: ShipType.FIGHTER, amount: 2 }
+      ),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, system } = createPlayersAndGalaxy(moveFleet, (solarSystem) => {
+      solarSystem.planets[0].info.ownerId = 1;
+      solarSystem.planets[2].info.ownerId = 1;
+      solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+      solarSystem.planets[1].info.ownerId = 2;
+      solarSystem.planets[1].rBDSFTQ.ships = ManyShips.fromShipInstances([shipInstance(ShipType.SPY_PROBE)]);
+      solarSystem.planets[3].info.ownerId = 2;
+    });
+
+    resolvePhaseOneTurn(galaxy);
+
+    const survivingFleet = galaxy.activeFleets[0];
+    const survivingFleetCounts = ManyShips.countByType(survivingFleet.ships);
+    const spyProbeCost = blueprints.get(ShipType.SPY_PROBE)!.cost;
+    const fighterCost = blueprints.get(ShipType.FIGHTER)!.cost;
+
+    expect(survivingFleet.state).toBe(FleetState.MISSION_FAILURE_RETURNING);
+    expect(survivingFleetCounts.get(ShipType.CRUISER)).toBe(1);
+    expect(survivingFleetCounts.get(ShipType.FIGHTER)).toBe(1);
+    expect(ManyShips.totalRequiredHangarCapacity(survivingFleet.ships)).toBeLessThanOrEqual(
+      ManyShips.totalTravelHangarCapacity(survivingFleet.ships)
+    );
+    expect(system.planets[1].rBDSFTQ.spaceDebris.metal).toBe(
+      Math.floor((spyProbeCost.metal + fighterCost.metal) * 0.2)
+    );
+    expect(system.planets[1].rBDSFTQ.spaceDebris.crystal).toBe(
+      Math.floor((spyProbeCost.crystal + fighterCost.crystal) * 0.2)
+    );
+    expect(system.planets[1].rBDSFTQ.spaceDebris.deuterium).toBe(
+      Math.floor((spyProbeCost.deuterium + fighterCost.deuterium) * 0.05)
+    );
+  });
 });
