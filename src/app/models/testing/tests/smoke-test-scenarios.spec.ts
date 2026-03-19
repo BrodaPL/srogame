@@ -93,7 +93,11 @@ describe('smoke test scenarios', () => {
     const activeFleet = galaxy.activeFleets[0];
     expect(activeFleet).toBeDefined();
 
-    const targetPlanet = galaxy.stars[activeFleet.target.y][activeFleet.target.x].planets[activeFleet.target.z];
+    const player = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER)!;
+    const targetPlanet = player.planets[0];
+    expect(activeFleet.target.x).toBe(targetPlanet.basicInfo.solarSystem.coordinates.x);
+    expect(activeFleet.target.y).toBe(targetPlanet.basicInfo.solarSystem.coordinates.y);
+    expect(activeFleet.target.z).toBe(targetPlanet.basicInfo.order - 1);
     expect(targetPlanet.rBDSFTQ.spaceDebris.getTotalResourceAmount()).toBe(0);
 
     resolvePhaseOneTurn(galaxy, galaxy.currentTurn + 1);

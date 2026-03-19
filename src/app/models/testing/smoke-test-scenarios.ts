@@ -133,30 +133,32 @@ function applyBattleDebrisScenario(galaxy: Galaxy): void {
   const homePlanet = getHomePlanet(player);
   configureOperationalPlanet(homePlanet, {
     resources: new ResourcesPack(1600, 1200, 1800),
-    undamagedShips: [{ type: ShipType.TRANSPORTER, amount: 4 }]
+    undamagedShips: [
+      { type: ShipType.TRANSPORTER, amount: 4 },
+      { type: ShipType.MOTHER_SHIP, amount: 1 }
+    ]
   });
 
-  const hostileTarget = ensureNeutralTargetPlanet(
+  const hostileOrigin = ensureNeutralTargetPlanet(
     galaxy,
-    homePlanet.basicInfo.solarSystem,
-    'Battle Target',
-    homePlanet
+    findNearestDifferentSystem(galaxy, homePlanet.basicInfo.solarSystem),
+    'Battle Origin'
   );
-  configureNeutralPlanet(hostileTarget.planet, {
+  configureNeutralPlanet(hostileOrigin.planet, {
     resources: new ResourcesPack(500, 300, 200),
-    undamagedShips: [{ type: ShipType.MOTHER_SHIP, amount: 1 }]
+    undamagedShips: [{ type: ShipType.TRANSPORTER, amount: 1 }]
   });
-  hostileTarget.planet.rBDSFTQ.spaceDebris = new ResourcesPack(0, 0, 0);
+  homePlanet.rBDSFTQ.spaceDebris = new ResourcesPack(0, 0, 0);
 
   galaxy.activeFleets = [
     new Fleet(
       1,
-      player.playerId,
+      hostileOrigin.owner.playerId,
       FleetMissionType.TRANSPORT,
+      destinationOf(hostileOrigin.planet),
       destinationOf(homePlanet),
-      destinationOf(hostileTarget.planet),
+      hostileOrigin.planet.basicInfo.name,
       homePlanet.basicInfo.name,
-      hostileTarget.planet.basicInfo.name,
       manyUndamagedShips({ type: ShipType.TRANSPORTER, amount: 1 }),
       new ResourcesPack(120, 80, 30),
       2,
@@ -207,35 +209,36 @@ function applySmokeSuiteScenario(galaxy: Galaxy): void {
     { type: ShipType.TRANSPORTER, hull: Math.max(1, shipHullCapacity(ShipType.TRANSPORTER) - 90) },
     { type: ShipType.CRUISER, hull: Math.max(1, shipHullCapacity(ShipType.CRUISER) - 35) }
   ]);
+  homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.MOTHER_SHIP, 1);
   seedNearCompletionTurnProgression(homePlanet);
 
-  const battleTarget = ensureNeutralTargetPlanet(
+  const hostileOrigin = ensureNeutralTargetPlanet(
     galaxy,
     findNearestDifferentSystem(galaxy, homePlanet.basicInfo.solarSystem),
-    'Debris Target'
+    'Debris Origin'
   );
-  configureNeutralPlanet(battleTarget.planet, {
+  configureNeutralPlanet(hostileOrigin.planet, {
     resources: new ResourcesPack(500, 300, 200),
-    undamagedShips: [{ type: ShipType.MOTHER_SHIP, amount: 1 }]
+    undamagedShips: [{ type: ShipType.TRANSPORTER, amount: 1 }]
   });
-  battleTarget.planet.rBDSFTQ.spaceDebris = new ResourcesPack(0, 0, 0);
+  homePlanet.rBDSFTQ.spaceDebris = new ResourcesPack(0, 0, 0);
 
   galaxy.activeFleets = [
     new Fleet(
       1,
-      player.playerId,
+      hostileOrigin.owner.playerId,
       FleetMissionType.TRANSPORT,
+      destinationOf(hostileOrigin.planet),
       destinationOf(homePlanet),
-      destinationOf(battleTarget.planet),
+      hostileOrigin.planet.basicInfo.name,
       homePlanet.basicInfo.name,
-      battleTarget.planet.basicInfo.name,
       manyUndamagedShips({ type: ShipType.TRANSPORTER, amount: 1 }),
       new ResourcesPack(120, 80, 30),
       2,
       600,
       230,
-      Math.max(1, distanceBetween(homePlanet, battleTarget.planet)),
-      Math.max(1, distanceBetween(homePlanet, battleTarget.planet)),
+      1,
+      1,
       FleetState.MOVING_TO_TARGET,
       galaxy.currentTurn
     )

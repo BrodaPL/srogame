@@ -333,6 +333,47 @@ Important:
 - the scenario is applied on the server immediately after galaxy creation and before self-reports/presentation data are generated
 - this keeps browser-visible state, reports, and API reads aligned from turn 1
 
+### Dedicated smoke runner now exists
+
+As of 2026-03-19, the project also has a repeatable browser smoke command:
+
+```powershell
+npm.cmd run smoke:test
+```
+
+Current implementation:
+- runner: `scripts/run-smoke-tests.js`
+- result artifact: `tmp/smoke-test-results.json`
+- browser path: Playwright with installed Chrome
+
+What it covers:
+- `routeSmoke`
+- `turnProgression`
+- `fleetLifecycle`
+- `battleDebris`
+- `damagedShipsUi`
+- `smokeSuite`
+
+What it records:
+- total duration
+- per-scenario duration
+- per-step timing for browser-backed scenarios
+- pass/fail with error text
+
+Current reference run from 2026-03-19:
+- total: `6964.16ms`
+- `routeSmoke`: `2085.28ms`
+- `turnProgression`: `321.76ms`
+- `fleetLifecycle`: `1272.48ms`
+- `battleDebris`: `280.16ms`
+- `damagedShipsUi`: `1384.43ms`
+- `smokeSuite`: `1424.74ms`
+
+Important runner notes:
+- `fleetLifecycle` must choose the owned origin planet by actual ship availability, not by `owned-planets[0]`
+- debris smoke must use a hostile seeded fleet attacking an owned planet, because `/api/game/active-fleets` only exposes the current player's fleets and `client-planet` hides non-owned debris without report data
+- if scenario edits are made under `src/app/models/testing/`, restart the API server; `tsx watch` running from `server/` may not always pick up cross-tree changes reliably
+
 ### PowerShell quoting around `npm exec ... node -e`
 
 Symptom:
