@@ -14,6 +14,7 @@ import type { NoteBorderColor } from './enums/note-border-color';
 import type { PlayerType } from './enums/player-type';
 import type { FleetMissionType } from './enums/fleet-mission-type';
 import type { ReportType } from './enums/report-type';
+import type { SmokeTestScenarioKey } from './testing/smoke-test-scenarios';
 import type { TutorialReadState, TutorialViewKey } from '../tutorial/tutorial-types';
 
 export type GalaxySetup = {
@@ -32,6 +33,7 @@ export type GalaxySetup = {
   createRandomPlanets?: boolean;
   createStartingShips?: boolean;
   skipTutorial?: boolean;
+  smokeTestScenario?: SmokeTestScenarioKey;
   startingResources: {
     metal: number;
     crystal: number;

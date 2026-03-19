@@ -27,6 +27,7 @@ import technologyQueueEntryModule from '../../src/app/models/tech/technology-que
 import researchHelperForModule from '../../src/app/models/tech/research-helper-for.js';
 import technologyEffectsModule from '../../src/app/models/tech/technology-effects.js';
 import phaseOneTurnResolverModule from '../../src/app/models/turns/phase-one-turn-resolver.js';
+import smokeTestScenariosModule from '../../src/app/models/testing/smoke-test-scenarios.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   EndTurnResponse,
@@ -162,6 +163,7 @@ const { ResearchHelperFor } = researchHelperForModule as {
 };
 const { maxActiveFleets } = technologyEffectsModule as typeof import('../../src/app/models/tech/technology-effects.js');
 const { resolvePhaseOneTurn } = phaseOneTurnResolverModule as typeof import('../../src/app/models/turns/phase-one-turn-resolver.js');
+const { applySmokeTestScenario, isSmokeTestScenarioKey } = smokeTestScenariosModule as typeof import('../../src/app/models/testing/smoke-test-scenarios.js');
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -300,6 +302,9 @@ app.post('/api/game/start', (req, res) => {
   }
 
   currentGalaxy = new GalaxyCreator(body.setup).createGalaxy([auth.session.playerName]);
+  if (body.setup.smokeTestScenario) {
+    applySmokeTestScenario(currentGalaxy, body.setup.smokeTestScenario);
+  }
   currentGameOwnerId = auth.session.accountId;
   generateSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
@@ -2493,6 +2498,7 @@ function isValidSetup(setup: GalaxySetup): boolean {
     (setup.createRandomPlanets === undefined || typeof setup.createRandomPlanets === 'boolean') &&
     (setup.createStartingShips === undefined || typeof setup.createStartingShips === 'boolean') &&
     (setup.skipTutorial === undefined || typeof setup.skipTutorial === 'boolean') &&
+    (setup.smokeTestScenario === undefined || isSmokeTestScenarioKey(setup.smokeTestScenario)) &&
     Number.isFinite(setup.startingResources?.metal) &&
     setup.startingResources.metal >= 0 &&
     Number.isFinite(setup.startingResources?.crystal) &&

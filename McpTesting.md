@@ -307,6 +307,32 @@ Practical rule:
 - treat `Planet View`, `Mission Planner`, `Reports`, and `Operations` route loads as the minimum browser smoke
 - treat live `Move`/`Transport`/`Spy` flows as opportunistic unless the setup is explicitly seeded to guarantee them
 
+### Deterministic smoke scenarios now exist
+
+As of 2026-03-19, the project has a built-in deterministic seeding hook:
+- `GalaxySetup.smokeTestScenario`
+- implementation: `src/app/models/testing/smoke-test-scenarios.ts`
+
+Current scenario keys:
+- `routeSmoke`
+- `turnProgression`
+- `fleetLifecycle`
+- `battleDebris`
+- `damagedShipsUi`
+- `smokeSuite`
+
+Practical use:
+- for API-assisted smoke tests, prefer setting `setup.smokeTestScenario` instead of relying on random sandbox generation
+- this is now the preferred solution for:
+  - guaranteed launchable fleet smoke
+  - guaranteed queue/research progression smoke
+  - guaranteed damaged-ship UI smoke
+  - guaranteed battle/debris smoke
+
+Important:
+- the scenario is applied on the server immediately after galaxy creation and before self-reports/presentation data are generated
+- this keeps browser-visible state, reports, and API reads aligned from turn 1
+
 ### PowerShell quoting around `npm exec ... node -e`
 
 Symptom:
