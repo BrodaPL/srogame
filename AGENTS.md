@@ -60,6 +60,15 @@ This file captures session context for collaborators and future AI agents.
 - Auth UI: `src/app/auth/auth.component.ts`, `src/app/auth/auth.component.html`
 - Server (Node + Express): `server/src/index.ts` (auth endpoints, in-memory galaxy, start + state endpoints)
 
+## Project Structure
+- Main frontend/game logic lives under `src/`, especially `src/app/`
+- Core game domain logic lives under `src/app/models/`
+- Angular UI views and components live under `src/app/game/`, `src/app/auth/`, `src/app/setup/`, and `src/app/encyclopedia-menu/`
+- Static public assets such as images live under `public/`
+- Utility and smoke-test scripts live under `scripts/`
+- Node/Express server logic lives under `server/src/`
+- Avoid spending time in generated or dependency folders unless the task explicitly requires it
+
 ## Dev Commands
 - `npm run start` (ng serve)
 - `npm run build`
@@ -72,6 +81,8 @@ This file captures session context for collaborators and future AI agents.
 - Always exclude: `**/node_modules/**`, `server/node_modules/**`, `dist/**`, `.angular/**`, `coverage/**`, `.git/**`
 - Also exclude temporary tooling folders when present, for example: `.tmp-mcp-*`
 - Only search inside excluded folders when the task explicitly targets dependency internals, generated output, or tool temp files.
+- `rg` (`ripgrep`) is installed on this machine and should be preferred for text search and file listing when possible.
+- Preferred examples: `rg "pattern" src server -g "!**/node_modules/**"` and `rg --files src server -g "!**/node_modules/**"`
 
 ## Chrome MCP
 - Purpose: Use Chrome DevTools MCP for browser inspection/debugging when terminal-only reasoning is insufficient.
