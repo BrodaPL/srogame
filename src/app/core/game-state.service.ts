@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { GalaxySnapshot } from '../models/game-api-types';
+import { DiplomacyResolver } from '../models/diplomacy/diplomacy-resolver';
 
 @Injectable({
   providedIn: 'root'
@@ -18,6 +19,10 @@ export class GameStateService {
 
   public currentTurn(): number | null {
     return this.galaxy?.currentTurn ?? null;
+  }
+
+  public diplomacyResolver(): DiplomacyResolver {
+    return new DiplomacyResolver(this.galaxy?.diplomaticRelations ?? []);
   }
 
   public clearGalaxy(): void {

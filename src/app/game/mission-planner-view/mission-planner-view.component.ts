@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
+import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
@@ -19,6 +20,8 @@ import type {
   CreateFleetShipSelectionEntry
 } from '../../models/game-api-types';
 import { Ship } from '../../models/fleets/ship';
+import { FleetMissionRegistry } from '../../models/missions/fleet-mission-registry';
+import type { MissionPlannerContext } from '../../models/missions/mission-context';
 import { maxActiveFleets } from '../../models/tech/technology-effects';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -53,6 +56,15 @@ type MissionWarningVm = {
   severity: 'error' | 'note';
 };
 
+const PHASE_ONE_MISSION_TYPES: FleetMissionType[] = [
+  FleetMissionType.MOVE,
+  FleetMissionType.TRANSPORT,
+  FleetMissionType.SPY,
+  FleetMissionType.COLONIZE
+];
+
+const MISSION_REGISTRY = FleetMissionRegistry.createDefault();
+
 @Component({
   selector: 'app-mission-planner-view',
   imports: [FormsModule, TopMenuComponent, MiniPlanetPreviewComponent],
@@ -60,28 +72,12 @@ type MissionWarningVm = {
 })
 export class MissionPlannerViewComponent implements OnInit {
   protected readonly shipPurpose = ShipPurpose;
-  protected readonly missionOptions: MissionOption[] = [
-    {
-      type: FleetMissionType.MOVE,
-      label: 'Move',
-      description: 'Relocate ships to your own planets or park them above unowned planets. Cargo is allowed.'
-    },
-    {
-      type: FleetMissionType.TRANSPORT,
-      label: 'Transport',
-      description: 'Send resources and ships to one of your own planets, then return automatically.'
-    },
-    {
-      type: FleetMissionType.SPY,
-      label: 'Spy',
-      description: 'Send only Spy Probes. No cargo is allowed.'
-    },
-    {
-      type: FleetMissionType.COLONIZE,
-      label: 'Colonize',
-      description: 'Send a Colonizer to an unowned planet.'
-    }
-  ];
+  protected readonly missionOptions: MissionOption[] = MISSION_REGISTRY.supportedMissions(PHASE_ONE_MISSION_TYPES)
+    .map((mission) => ({
+      type: mission.missionType,
+      label: mission.name,
+      description: mission.description
+    }));
 
   protected selectedMissionType = FleetMissionType.MOVE;
   protected isLoading = false;
@@ -116,6 +112,7 @@ export class MissionPlannerViewComponent implements OnInit {
   constructor(
     private readonly route: ActivatedRoute,
     private readonly gameApi: GameApiService,
+    private readonly gameState: GameStateService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
     private readonly tutorialService: TutorialService
@@ -134,8 +131,7 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected missionDescription(): string {
-    return this.missionOptions.find((option) => option.type === this.selectedMissionType)?.description
-      ?? '';
+    return this.currentMission().description;
   }
 
   protected planetsWithAvailableShips(): ClientPlanetDto[] {
@@ -193,8 +189,8 @@ export class MissionPlannerViewComponent implements OnInit {
         hangarCapacity: ship.hangarCapacity,
         hasWeapons: ship.weapons.length > 0,
         canJump: ship.canJump,
-        isRelevant: this.isShipRelevantForMission(shipType, ship),
-        isRequired: this.isShipRequiredForMission(shipType)
+        isRelevant: this.currentMission().isShipRelevant(shipType, ship),
+        isRequired: this.currentMission().isShipRequired(shipType)
       });
     }
 
@@ -202,112 +198,9 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected warningRows(): MissionWarningVm[] {
-    const warnings: MissionWarningVm[] = [];
-    const originPlanet = this.selectedOriginPlanet;
-    const targetPlanet = this.selectedTargetPlanet;
-    const cargoUsed = this.usedCargoCapacity();
-    const cargoCapacity = this.totalCargoCapacity();
-    const selectedShips = this.selectedShipEntries();
-    const hasMilitaryShips = selectedShips.some((entry) => {
-      const blueprint = this.shipBlueprintsByType.get(entry.type);
-      return blueprint ? blueprint.weapons.length > 0 : false;
-    });
-    const totalHangarCapacity = this.totalHangarCapacity();
-
-    if (!originPlanet) {
-      warnings.push({ text: 'Select origin planet.', severity: 'error' });
-    }
-
-    if (!targetPlanet) {
-      warnings.push({ text: 'Select or resolve target planet.', severity: 'error' });
-    }
-
-    if (this.totalSelectedShips() <= 0) {
-      warnings.push({ text: 'Select at least one ship.', severity: 'error' });
-    }
-
-    if (cargoUsed > cargoCapacity) {
-      warnings.push({ text: 'Insufficient cargo space.', severity: 'error' });
-    }
-
-    if (this.usedHangarCapacity() > this.totalHangarCapacity()) {
-      warnings.push({ text: 'Insufficient hangar space for non-jump ships.', severity: 'error' });
-    }
-
-    if (this.activeFleets.length >= this.maxActiveFleetCount()) {
-      warnings.push({
-        text: `Active fleet limit reached (${this.activeFleets.length}/${this.maxActiveFleetCount()}). Upgrade COMPUTER_TECHNOLOGY to control more fleets.`,
-        severity: 'error'
-      });
-    }
-
-    if (this.selectedMissionType === FleetMissionType.SPY) {
-      const spyProbeAmount = this.selectedShipAmount(ShipType.SPY_PROBE);
-      if (spyProbeAmount <= 0) {
-        warnings.push({ text: 'No espionage probes selected.', severity: 'error' });
-      }
-
-      const nonProbeSelection = selectedShips.some((entry) => entry.type !== ShipType.SPY_PROBE);
-      if (nonProbeSelection) {
-        warnings.push({ text: 'Spy mission accepts only Spy Probes.', severity: 'error' });
-      }
-
-      if (targetPlanet && this.isOwnedByPlayer(targetPlanet)) {
-        warnings.push({ text: 'Target is your own planet.', severity: 'error' });
-      }
-
-      if (cargoUsed > 0) {
-        warnings.push({ text: 'Spy mission cannot carry cargo.', severity: 'error' });
-      }
-    }
-
-    if (this.selectedMissionType === FleetMissionType.COLONIZE) {
-      if (this.selectedShipAmount(ShipType.COLONIZER) <= 0) {
-        warnings.push({ text: 'No colony ship selected.', severity: 'error' });
-      }
-
-      if (targetPlanet && targetPlanet.info.ownerId !== null) {
-        warnings.push({ text: 'Target planet is already occupied.', severity: 'error' });
-      }
-    }
-
-    if (this.selectedMissionType === FleetMissionType.MOVE) {
-      if (targetPlanet && targetPlanet.info.ownerId !== null && !this.isOwnedByPlayer(targetPlanet)) {
-        warnings.push({ text: 'Move mission target must be one of your planets or an unowned planet.', severity: 'error' });
-      }
-    }
-
-    if (this.selectedMissionType === FleetMissionType.TRANSPORT && cargoUsed <= 0) {
-      warnings.push({ text: 'Transport mission requires cargo.', severity: 'error' });
-    }
-
-    if (this.selectedMissionType === FleetMissionType.TRANSPORT) {
-      if (targetPlanet && !this.isOwnedByPlayer(targetPlanet)) {
-        warnings.push({ text: 'Transport mission target must be one of your planets.', severity: 'error' });
-      }
-    }
-
-    if (this.selectedMissionType !== FleetMissionType.SPY && !hasMilitaryShips) {
-      warnings.push({ text: 'No military ships selected.', severity: 'note' });
-    }
-
-    if (totalHangarCapacity > 0 || this.usedHangarCapacity() > 0) {
-      warnings.push({
-        text: `Hangar capacity remaining: ${Math.max(0, totalHangarCapacity - this.usedHangarCapacity())}.`,
-        severity: 'note'
-      });
-    }
-
+    const warnings = this.currentMission().getPlannerChecks(this.buildPlannerContext());
     if (this.selectedShipAmount(ShipType.REPAIR_DRONE) <= 0) {
       warnings.push({ text: 'No repair capacity selected.', severity: 'note' });
-    }
-
-    const fuelCost = this.fuelCostPreview();
-    if (originPlanet) {
-      const availableDeuterium = originPlanet.objects.resources.deuterium;
-      if (availableDeuterium < (this.cargoDeuterium + fuelCost)) {
-        warnings.push({ text: 'Insufficient deuterium for cargo and fuel.', severity: 'error' });
-      }
     }
 
     return warnings;
@@ -387,7 +280,7 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected fuelCostPreview(): number {
     const distance = this.distancePreview();
-    const fuelMultiplier = this.selectedMissionType === FleetMissionType.SPY ? 1 : 2;
+    const fuelMultiplier = this.currentMission().minimumFuelReserves;
     let totalFuel = 0;
     for (const entry of this.selectedShipEntries()) {
       const blueprint = this.shipBlueprintsByType.get(entry.type);
@@ -725,18 +618,16 @@ export class MissionPlannerViewComponent implements OnInit {
       }
     }
 
-    if (this.selectedMissionType === FleetMissionType.SPY) {
-      for (const shipType of this.shipBlueprintsByType.keys()) {
-        if (shipType !== ShipType.SPY_PROBE) {
-          this.undamagedShipSelectionByType.set(shipType, 0);
-          this.damagedShipSelectionByType.set(shipType, 0);
+    this.applyNormalizedSelection(this.currentMission().normalizeSelection({
+      selection: {
+        ships: this.selectedShipEntries(),
+        cargo: {
+          metal: this.cargoMetal,
+          crystal: this.cargoCrystal,
+          deuterium: this.cargoDeuterium
         }
       }
-
-      this.cargoMetal = 0;
-      this.cargoCrystal = 0;
-      this.cargoDeuterium = 0;
-    }
+    }));
   }
 
   private matchesPurposeFilter(ship: Ship): boolean {
@@ -749,34 +640,6 @@ export class MissionPlannerViewComponent implements OnInit {
     }
 
     return enabledPurposes.some((purpose) => ship.purposes.has(purpose));
-  }
-
-  private isShipRelevantForMission(shipType: ShipType, ship: Ship): boolean {
-    if (this.selectedMissionType === FleetMissionType.SPY) {
-      return shipType === ShipType.SPY_PROBE;
-    }
-
-    if (this.selectedMissionType === FleetMissionType.COLONIZE) {
-      return shipType === ShipType.COLONIZER || ship.cargoCapacity > 0;
-    }
-
-    if (this.selectedMissionType === FleetMissionType.TRANSPORT) {
-      return ship.cargoCapacity > 0;
-    }
-
-    return true;
-  }
-
-  private isShipRequiredForMission(shipType: ShipType): boolean {
-    if (this.selectedMissionType === FleetMissionType.SPY) {
-      return shipType === ShipType.SPY_PROBE;
-    }
-
-    if (this.selectedMissionType === FleetMissionType.COLONIZE) {
-      return shipType === ShipType.COLONIZER;
-    }
-
-    return false;
   }
 
   private selectedShipSelectionAmount(entry: CreateFleetShipSelectionEntry): number {
@@ -807,11 +670,6 @@ export class MissionPlannerViewComponent implements OnInit {
       ?? [];
     const matchingEntry = techLevels.find((entry) => entry.type === technologyType);
     return matchingEntry?.level ?? 0;
-  }
-
-  private isOwnedByPlayer(planet: ClientPlanetDto): boolean {
-    const playerOwnerId = this.selectedOriginPlanet?.info.ownerId ?? this.ownedPlanets[0]?.info.ownerId ?? null;
-    return playerOwnerId !== null && planet.info.ownerId === playerOwnerId;
   }
 
   private sortPlanets(planets: ClientPlanetDto[]): ClientPlanetDto[] {
@@ -876,5 +734,53 @@ export class MissionPlannerViewComponent implements OnInit {
 
     const parsed = Number.parseInt(value, 10);
     return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  }
+
+  private currentMission() {
+    return MISSION_REGISTRY.require(this.selectedMissionType);
+  }
+
+  private buildPlannerContext(): MissionPlannerContext {
+    const selection = {
+      ships: this.selectedShipEntries(),
+      cargo: {
+        metal: this.cargoMetal,
+        crystal: this.cargoCrystal,
+        deuterium: this.cargoDeuterium
+      }
+    };
+    const hasMilitaryShips = selection.ships.some((entry) => {
+      const blueprint = this.shipBlueprintsByType.get(entry.type);
+      return blueprint ? blueprint.weapons.length > 0 : false;
+    });
+
+    return {
+      selection,
+      selectedOriginPlanet: this.selectedOriginPlanet,
+      selectedTargetPlanet: this.selectedTargetPlanet,
+      activeFleetCount: this.activeFleets.length,
+      maxActiveFleetCount: this.maxActiveFleetCount(),
+      totalSelectedShips: this.totalSelectedShips(),
+      totalCargoCapacity: this.totalCargoCapacity(),
+      usedCargoCapacity: this.usedCargoCapacity(),
+      totalHangarCapacity: this.totalHangarCapacity(),
+      usedHangarCapacity: this.usedHangarCapacity(),
+      hasMilitaryShips,
+      availableDeuterium: this.selectedOriginPlanet?.objects.resources.deuterium ?? null,
+      fuelCost: this.fuelCostPreview(),
+      diplomacyResolver: this.gameState.diplomacyResolver()
+    };
+  }
+
+  private applyNormalizedSelection(selection: { ships: CreateFleetShipSelectionEntry[]; cargo: { metal: number; crystal: number; deuterium: number } }): void {
+    this.clearAllShips();
+    for (const entry of selection.ships) {
+      this.undamagedShipSelectionByType.set(entry.type, Math.max(0, entry.undamagedAmount));
+      this.damagedShipSelectionByType.set(entry.type, Math.max(0, entry.damagedAmount));
+    }
+
+    this.cargoMetal = Math.max(0, selection.cargo.metal);
+    this.cargoCrystal = Math.max(0, selection.cargo.crystal);
+    this.cargoDeuterium = Math.max(0, selection.cargo.deuterium);
   }
 }

@@ -16,6 +16,7 @@ import type { FleetMissionType } from './enums/fleet-mission-type';
 import type { ReportType } from './enums/report-type';
 import type { SmokeTestScenarioKey } from './testing/smoke-test-scenarios';
 import type { TutorialReadState, TutorialViewKey } from '../tutorial/tutorial-types';
+import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -70,7 +71,14 @@ export type GalaxySystemSnapshot = {
 export type GalaxySnapshot = {
   name: string;
   currentTurn: number;
+  diplomaticRelations: DiplomaticRelationDto[];
   stars: GalaxySystemSnapshot[][];
+};
+
+export type DiplomaticRelationDto = {
+  playerAId: number;
+  playerBId: number;
+  status: DiplomaticStatus;
 };
 
 export type StartGameRequest = {
@@ -90,6 +98,12 @@ export type GameStateResponse = {
 export type EndTurnResponse = {
   player: PlayerSession;
   galaxy: GalaxySnapshot;
+};
+
+export type SetDiplomaticRelationRequest = {
+  playerAId: number;
+  playerBId: number;
+  status: DiplomaticStatus;
 };
 
 export type ClientCoordinates = {

@@ -23,7 +23,9 @@ import {
   MarkPlayerReportReadRequest,
   MarkTutorialReadRequest,
   PlayerReportDto,
-  PlayerSession
+  PlayerSession,
+  DiplomaticRelationDto,
+  SetDiplomaticRelationRequest
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -191,6 +193,21 @@ export class GameApiService {
   public markTutorialRead(request: MarkTutorialReadRequest, token: string) {
     return this.http.post<PlayerSession>(
       `${API_BASE_URL}/game/tutorial-read`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getDiplomaticRelations(token: string) {
+    return this.http.get<DiplomaticRelationDto[]>(
+      `${API_BASE_URL}/game/diplomacy`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public setDiplomaticRelation(request: SetDiplomaticRelationRequest, token: string) {
+    return this.http.post<DiplomaticRelationDto[]>(
+      `${API_BASE_URL}/game/diplomacy`,
       request,
       { headers: this.authHeaders(token) }
     );

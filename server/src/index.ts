@@ -17,10 +17,13 @@ import fleetMissionTypeEnumModule from '../../src/app/models/enums/fleet-mission
 import fleetModelModule from '../../src/app/models/fleets/fleet.js';
 import manyShipsModule from '../../src/app/models/fleets/many-ships.js';
 import reportTypeEnumModule from '../../src/app/models/enums/report-type.js';
+import diplomaticStatusEnumModule from '../../src/app/models/diplomacy/diplomatic-status.js';
+import diplomacyResolverModule from '../../src/app/models/diplomacy/diplomacy-resolver.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
 import shipBlueprintsFactoryModule from '../../src/app/factories/ship-blueprints.factory.js';
 import technologyBlueprintsFactoryModule from '../../src/app/factories/technology-blueprints.factory.js';
+import fleetMissionRegistryModule from '../../src/app/models/missions/fleet-mission-registry.js';
 import buildingQueueEntryModule from '../../src/app/models/buildings/building-queue-entry.js';
 import shipyardQueueEntryModule from '../../src/app/models/fleets/shipyard-queue-entry.js';
 import technologyQueueEntryModule from '../../src/app/models/tech/technology-queue-entry.js';
@@ -72,7 +75,9 @@ import type {
   EspionagePlayerReportDto,
   MarkPlayerReportReadRequest,
   DeletePlayerReportsRequest,
-  DeletePlayerReportsResponse
+  DeletePlayerReportsResponse,
+  DiplomaticRelationDto,
+  SetDiplomaticRelationRequest
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -95,6 +100,9 @@ import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
+import type { MissionLaunchContext } from '../../src/app/models/missions/mission-context.ts';
+import type { DiplomaticStatus as DiplomaticStatusType } from '../../src/app/models/diplomacy/diplomatic-status.ts';
+import type { DiplomaticRelation } from '../../src/app/models/diplomacy/diplomatic-relation.ts';
 import type {
   ManyShips as ManyShipsType,
   ShipSelectionEntry as ShipSelectionEntryType
@@ -139,6 +147,12 @@ const { ManyShips } = manyShipsModule as {
 const { ReportType } = reportTypeEnumModule as {
   ReportType: typeof import('../../src/app/models/enums/report-type.js').ReportType;
 };
+const { DiplomaticStatus } = diplomaticStatusEnumModule as {
+  DiplomaticStatus: typeof import('../../src/app/models/diplomacy/diplomatic-status.js').DiplomaticStatus;
+};
+const { DiplomacyResolver } = diplomacyResolverModule as {
+  DiplomacyResolver: typeof import('../../src/app/models/diplomacy/diplomacy-resolver.js').DiplomacyResolver;
+};
 const { TUTORIAL_VIEW_KEYS, createTutorialReadState } = tutorialTypesModule as typeof import('../../src/app/tutorial/tutorial-types.js');
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
@@ -148,6 +162,9 @@ const { ShipBlueprintsFactory } = shipBlueprintsFactoryModule as {
 };
 const { TechnologyBlueprintsFactory } = technologyBlueprintsFactoryModule as {
   TechnologyBlueprintsFactory: typeof import('../../src/app/factories/technology-blueprints.factory.js').TechnologyBlueprintsFactory;
+};
+const { FleetMissionRegistry } = fleetMissionRegistryModule as {
+  FleetMissionRegistry: typeof import('../../src/app/models/missions/fleet-mission-registry.js').FleetMissionRegistry;
 };
 const { BuildingQueueEntry } = buildingQueueEntryModule as {
   BuildingQueueEntry: typeof import('../../src/app/models/buildings/building-queue-entry.js').BuildingQueueEntry;
@@ -187,10 +204,16 @@ const NOTE_BORDER_COLOR_VALUES = new Set<string>(Object.values(NoteBorderColor))
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
 const TECHNOLOGY_BLUEPRINTS = TechnologyBlueprintsFactory.fromDefaultJson();
+const FLEET_MISSION_REGISTRY = FleetMissionRegistry.createDefault();
 const BUILDING_TYPE_VALUES = new Set<string>(Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys()));
 const SHIP_TYPE_VALUES = new Set<string>(Object.values(ShipType));
 const FLEET_MISSION_TYPE_VALUES = new Set<string>(Object.values(FleetMissionType));
 const TECHNOLOGY_TYPE_VALUES = new Set<string>(Array.from(TECHNOLOGY_BLUEPRINTS.techByType.keys()));
+const DIPLOMATIC_STATUS_VALUES = new Set<string>([
+  DiplomaticStatus.ALLIED,
+  DiplomaticStatus.PEACE,
+  DiplomaticStatus.WAR
+]);
 const TUTORIAL_VIEW_KEY_VALUES = new Set<string>(TUTORIAL_VIEW_KEYS);
 const BUILDING_TYPE_ROBOTICS_FACTORY = BuildingType.ROBOTICS_FACTORY as BuildingTypeType;
 const BUILDING_TYPE_SHIPYARD = BuildingType.SHIPYARD as BuildingTypeType;
@@ -337,6 +360,59 @@ app.get('/api/game/state', (req, res) => {
   };
 
   return res.status(200).json(response);
+});
+
+app.get('/api/game/diplomacy', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  return res.status(200).json(toDiplomaticRelationDtos(currentGalaxy.diplomaticRelations));
+});
+
+app.post('/api/game/diplomacy', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const body = req.body as SetDiplomaticRelationRequest | undefined;
+  const playerAId = parseBodyPositiveInt(body?.playerAId);
+  const playerBId = parseBodyPositiveInt(body?.playerBId);
+  const status = normalizeDiplomaticStatus(body?.status);
+
+  if (playerAId === null || playerBId === null || !status) {
+    return res.status(400).json({ error: 'Invalid diplomacy payload.' });
+  }
+
+  if (playerAId === playerBId) {
+    return res.status(400).json({ error: 'Diplomacy relation must target two different players.' });
+  }
+
+  if (!resolvePlayerById(currentGalaxy, playerAId) || !resolvePlayerById(currentGalaxy, playerBId)) {
+    return res.status(404).json({ error: 'One or more diplomacy players were not found.' });
+  }
+
+  upsertDiplomaticRelation(currentGalaxy, playerAId, playerBId, status);
+
+  return res.status(200).json(toDiplomaticRelationDtos(currentGalaxy.diplomaticRelations));
 });
 
 app.post('/api/game/end-turn', (req, res) => {
@@ -1227,6 +1303,12 @@ app.post('/api/game/active-fleets', (req, res) => {
     return res.status(400).json({ error: 'Mission type is not available in phase 1.' });
   }
 
+  const mission = FLEET_MISSION_REGISTRY.get(missionType);
+  if (!mission) {
+    return res.status(400).json({ error: 'Mission definition not found.' });
+  }
+  const diplomacyResolver = createDiplomacyResolver(currentGalaxy);
+
   const originSystem = currentGalaxy.stars[origin.y]?.[origin.x];
   const targetSystem = currentGalaxy.stars[target.y]?.[target.x];
   const originPlanet = originSystem?.planets[origin.z];
@@ -1287,51 +1369,34 @@ app.post('/api/game/active-fleets', (req, res) => {
 
   const travelDistance = calculateTravelDistance(origin, target);
   const travelTurns = Math.max(1, travelDistance);
-  const fuelMultiplier = missionType === FleetMissionType.SPY ? 1 : 2;
+  const fuelMultiplier = mission.minimumFuelReserves;
   const fuelCost = calculateFuelCost(totalShipAmounts, travelDistance, fuelMultiplier);
 
-  if (missionType === FleetMissionType.SPY) {
-    const spyProbeAmount = totalShipAmounts.find((entry) => entry.type === ShipType.SPY_PROBE)?.amount ?? 0;
-    if (spyProbeAmount <= 0) {
-      return res.status(400).json({ error: 'No espionage probes selected.' });
-    }
-
-    if (totalShipAmounts.some((entry) => entry.type !== ShipType.SPY_PROBE)) {
-      return res.status(400).json({ error: 'Spy mission accepts only Spy Probes in phase 1.' });
-    }
-
-    if (targetPlanet.info.ownerId === playerId) {
-      return res.status(400).json({ error: 'Target is your own planet.' });
-    }
-
-    if (usedCargoCapacity > 0) {
-      return res.status(400).json({ error: 'Spy mission cannot carry cargo.' });
-    }
-  }
-
-  if (missionType === FleetMissionType.COLONIZE) {
-    const colonizerAmount = totalShipAmounts.find((entry) => entry.type === ShipType.COLONIZER)?.amount ?? 0;
-    if (colonizerAmount <= 0) {
-      return res.status(400).json({ error: 'No colony ship selected.' });
-    }
-
-    if (targetPlanet.info.ownerId !== null) {
-      return res.status(400).json({ error: 'Target planet is already occupied.' });
-    }
-  }
-
-  if (missionType === FleetMissionType.MOVE) {
-    if (targetPlanet.info.ownerId !== null && targetPlanet.info.ownerId !== playerId) {
-      return res.status(400).json({ error: 'Move mission target must be one of your planets or an unowned planet.' });
-    }
-  }
-
-  if (missionType === FleetMissionType.TRANSPORT && targetPlanet.info.ownerId !== playerId) {
-    return res.status(400).json({ error: 'Transport mission target must be one of your planets.' });
-  }
-
-  if (missionType === FleetMissionType.TRANSPORT && usedCargoCapacity <= 0) {
-    return res.status(400).json({ error: 'Transport mission requires cargo.' });
+  const hasMilitaryShips = totalShipAmounts.some((entry) => {
+    const blueprint = SHIP_BLUEPRINTS.shipsMap.get(entry.type);
+    return blueprint ? blueprint.weapons.length > 0 : false;
+  });
+  const missionLaunchContext: MissionLaunchContext = {
+    selection: {
+      ships,
+      cargo
+    },
+    playerId,
+    originPlanet,
+    targetPlanet,
+    activeFleetCount: playerActiveFleetCount,
+    maxActiveFleetCount: playerMaxActiveFleets,
+    totalCargoCapacity,
+    usedCargoCapacity,
+    totalHangarCapacity: ManyShips.totalTravelHangarCapacity(selectedFleetShips),
+    usedHangarCapacity: ManyShips.totalRequiredHangarCapacity(selectedFleetShips),
+    hasMilitaryShips,
+    fuelCost,
+    diplomacyResolver
+  };
+  const missionErrors = mission.validateLaunch(missionLaunchContext);
+  if (missionErrors.length > 0) {
+    return res.status(400).json({ error: missionErrors[0].text });
   }
 
   const totalRequiredResources = {
@@ -1584,6 +1649,46 @@ function resolvePlayerById(galaxy: Galaxy, playerId: number): Player | null {
   return null;
 }
 
+function upsertDiplomaticRelation(
+  galaxy: Galaxy,
+  leftPlayerId: number,
+  rightPlayerId: number,
+  status: DiplomaticStatusType
+): void {
+  const playerAId = Math.min(leftPlayerId, rightPlayerId);
+  const playerBId = Math.max(leftPlayerId, rightPlayerId);
+  const existingIndex = galaxy.diplomaticRelations.findIndex((relation) =>
+    relation.playerAId === playerAId && relation.playerBId === playerBId
+  );
+
+  if (status === DiplomaticStatus.WAR) {
+    if (existingIndex >= 0) {
+      galaxy.diplomaticRelations.splice(existingIndex, 1);
+    }
+    return;
+  }
+
+  const nextRelation: DiplomaticRelation = {
+    playerAId,
+    playerBId,
+    status
+  };
+
+  if (existingIndex >= 0) {
+    galaxy.diplomaticRelations[existingIndex] = nextRelation;
+  } else {
+    galaxy.diplomaticRelations.push(nextRelation);
+  }
+
+  galaxy.diplomaticRelations.sort((left, right) =>
+    left.playerAId - right.playerAId || left.playerBId - right.playerBId
+  );
+}
+
+function createDiplomacyResolver(galaxy: Galaxy) {
+  return new DiplomacyResolver(galaxy.diplomaticRelations);
+}
+
 function resolvePlayerFromSession(galaxy: Galaxy, session: AuthSession): Player | null {
   const playerId = resolvePlayerId(galaxy, session);
   if (playerId === null) {
@@ -1735,6 +1840,10 @@ function parseBodyNonNegativeInt(value: unknown): number | null {
   return parsed;
 }
 
+function parseBodyPositiveInt(value: unknown): number | null {
+  return parseBodyIntInRange(value, 1, Number.MAX_SAFE_INTEGER);
+}
+
 function parseBodyIntInRange(value: unknown, min: number, max: number): number | null {
   if (!Number.isInteger(value)) {
     return null;
@@ -1746,6 +1855,14 @@ function parseBodyIntInRange(value: unknown, min: number, max: number): number |
   }
 
   return parsed;
+}
+
+function normalizeDiplomaticStatus(value: unknown): DiplomaticStatusType | null {
+  if (typeof value !== 'string' || !DIPLOMATIC_STATUS_VALUES.has(value)) {
+    return null;
+  }
+
+  return value as DiplomaticStatusType;
 }
 
 function parseBodyReportIds(value: unknown): number[] | null {
@@ -2433,6 +2550,7 @@ function buildGalaxySnapshot(galaxy: Galaxy): GalaxySnapshot {
   return {
     name: galaxy.name,
     currentTurn: galaxy.currentTurn,
+    diplomaticRelations: toDiplomaticRelationDtos(galaxy.diplomaticRelations),
     stars: galaxy.stars.map((row) =>
       row.map((system) => ({
         isVoid: system.isVoid,
@@ -2444,6 +2562,14 @@ function buildGalaxySnapshot(galaxy: Galaxy): GalaxySnapshot {
       }))
     )
   };
+}
+
+function toDiplomaticRelationDtos(relations: DiplomaticRelation[]): DiplomaticRelationDto[] {
+  return relations.map((relation) => ({
+    playerAId: relation.playerAId,
+    playerBId: relation.playerBId,
+    status: relation.status
+  }));
 }
 
 function isValidSetup(setup: GalaxySetup): boolean {

@@ -153,7 +153,7 @@ const mathRandomSource: BattleRandomSource = {
 };
 
 export class SpaceBattleResolver {
-  public static readonly DEFAULT_MAX_ROUNDS = 5;
+  public static readonly DEFAULT_MAX_ROUNDS = 4;
 
   public resolve(input: SpaceBattleInput): SpaceBattleResult {
     const maxRounds = this.normalizeMaxRounds(input.maxRounds);

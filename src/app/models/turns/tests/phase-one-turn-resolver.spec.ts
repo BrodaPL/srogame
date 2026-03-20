@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
+import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
 import { PlayerType } from '../../enums/player-type';
 import { ShipType } from '../../enums/ship-type';
@@ -49,6 +50,19 @@ function createPlayersAndGalaxy(activeFleet: Fleet, configure: (system: SolarSys
   const galaxy = new Galaxy('Combat Galaxy', [attacker, defender], [[system]], 1, [activeFleet], 2);
 
   return { galaxy, attacker, defender, system };
+}
+
+function createGalaxyWithPlayers(
+  activeFleets: Fleet[],
+  configure: (system: SolarSystem) => void,
+  buildPlayers: (system: SolarSystem) => Player[]
+) {
+  const system = new SolarSystem('Combat Test', 4, false, false, { x: 1, y: 1 }, new Set<number>(), new Map());
+  configure(system);
+  const players = buildPlayers(system);
+  const galaxy = new Galaxy('Combat Galaxy', players, [[system]], 1, activeFleets, 2);
+
+  return { galaxy, players, system };
 }
 
 describe('resolvePhaseOneTurn battle integration', () => {
@@ -287,5 +301,359 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].rBDSFTQ.spaceDebris.deuterium).toBe(
       Math.floor((spyProbeCost.deuterium + fighterCost.deuterium) * 0.05)
     );
+  });
+
+  it('lets same-turn hostile arrivals meet fleets that already entered orbit earlier in the same encounter group', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const firstMoveFleet = new Fleet(
+      20,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Unowned Orbit',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+    const secondMoveFleet = new Fleet(
+      21,
+      2,
+      FleetMissionType.MOVE,
+      point(1, 1, 2),
+      point(1, 1, 1),
+      'Beta Prime',
+      'Unowned Orbit',
+      manyShips({ type: ShipType.SPY_PROBE, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [firstMoveFleet, secondMoveFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Unowned Orbit';
+        solarSystem.planets[1].info.ownerId = null;
+        solarSystem.planets[2].basicInfo.name = 'Beta Prime';
+        solarSystem.planets[2].info.ownerId = 2;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].ownerId).toBe(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(ManyShips.countByType(galaxy.activeFleets[0].ships).get(ShipType.TITAN)).toBe(1);
+    expect(players[0].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
+    expect(players[1].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
+  });
+
+  it('uses mission priority before fleet id when different hostile arrivals resolve on the same orbit', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const transportFleet = new Fleet(
+      30,
+      1,
+      FleetMissionType.TRANSPORT,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Haul',
+      'Gamma Bastion',
+      manyShips({ type: ShipType.TRANSPORTER, amount: 1 }),
+      new ResourcesPack(50, 0, 0),
+      0,
+      600,
+      50,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+    const moveFleet = new Fleet(
+      31,
+      2,
+      FleetMissionType.MOVE,
+      point(1, 1, 2),
+      point(1, 1, 1),
+      'Beta Spearhead',
+      'Gamma Bastion',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [transportFleet, moveFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Haul';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Gamma Bastion';
+        solarSystem.planets[1].info.ownerId = 3;
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.fromShipInstances([shipInstance(ShipType.SPY_PROBE)]);
+        solarSystem.planets[2].basicInfo.name = 'Beta Spearhead';
+        solarSystem.planets[2].info.ownerId = 2;
+        solarSystem.planets[3].info.ownerId = 3;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER),
+        new Player(3, 'Gamma', [solarSystem.planets[1], solarSystem.planets[3]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    const alphaBattleReports = players[0].reports.filter((report) => report.title.startsWith('Battle Report:'));
+    const betaBattleReports = players[1].reports.filter((report) => report.title.startsWith('Battle Report:'));
+
+    expect(betaBattleReports).toHaveLength(1);
+    expect(alphaBattleReports).toHaveLength(0);
+    expect(galaxy.activeFleets.some((fleet) => fleet.ownerId === 2 && fleet.state === FleetState.MISSION_FAILURE_RETURNING)).toBe(true);
+    expect(galaxy.activeFleets.some((fleet) => fleet.ownerId === 1 && fleet.state === FleetState.MISSION_FAILURE_RETURNING)).toBe(true);
+  });
+
+  it('lets move missions idle in allied orbit without merging into the allied planet', () => {
+    const moveFleet = new Fleet(
+      40,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Relay',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(25, 0, 0),
+      0,
+      100,
+      25,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [moveFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Relay';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[2].info.ownerId = 2;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1], solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED }
+    ];
+
+    const targetPlanetShipsBefore = ManyShips.totalShipsCount(system.planets[1].rBDSFTQ.ships);
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(galaxy.activeFleets[0].ownerId).toBe(1);
+    expect(galaxy.activeFleets[0].cargo.metal).toBe(25);
+    expect(ManyShips.totalShipsCount(system.planets[1].rBDSFTQ.ships)).toBe(targetPlanetShipsBefore);
+  });
+
+  it('delivers transport cargo to allied planets and returns home', () => {
+    const transportFleet = new Fleet(
+      41,
+      1,
+      FleetMissionType.TRANSPORT,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Depot',
+      manyShips({ type: ShipType.TRANSPORTER, amount: 1 }),
+      new ResourcesPack(120, 80, 30),
+      0,
+      600,
+      230,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [transportFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Depot';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[2].info.ownerId = 2;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1], solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED }
+    ];
+
+    const targetResourcesBefore = {
+      metal: system.planets[1].rBDSFTQ.resources.metal,
+      crystal: system.planets[1].rBDSFTQ.resources.crystal,
+      deuterium: system.planets[1].rBDSFTQ.resources.deuterium
+    };
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.RETURNING);
+    expect(galaxy.activeFleets[0].cargo.getTotalResourceAmount()).toBe(0);
+    expect(system.planets[1].rBDSFTQ.resources.metal).toBe(targetResourcesBefore.metal + 120);
+    expect(system.planets[1].rBDSFTQ.resources.crystal).toBe(targetResourcesBefore.crystal + 80);
+    expect(system.planets[1].rBDSFTQ.resources.deuterium).toBe(targetResourcesBefore.deuterium + 30);
+  });
+
+  it('prevents auto-combat against peace targets and leaves move fleets idling in orbit', () => {
+    const moveFleet = new Fleet(
+      42,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Peace',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [moveFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Peace';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.fromShipInstances([shipInstance(ShipType.MOTHER_SHIP)]);
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.PEACE }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(players[0].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(false);
+    expect(players[1].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(false);
+  });
+
+  it('lets allied idle fleets join orbit defense against hostile arrivals', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const alliedIdleFleet = new Fleet(
+      50,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Bastion',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.IDLE,
+      1
+    );
+    const hostileMoveFleet = new Fleet(
+      51,
+      3,
+      FleetMissionType.MOVE,
+      point(1, 1, 2),
+      point(1, 1, 1),
+      'Gamma Spearhead',
+      'Beta Bastion',
+      manyShips({ type: ShipType.SPY_PROBE, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy } = createGalaxyWithPlayers(
+      [alliedIdleFleet, hostileMoveFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Bastion';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+        solarSystem.planets[2].basicInfo.name = 'Gamma Spearhead';
+        solarSystem.planets[2].info.ownerId = 3;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER),
+        new Player(3, 'Gamma', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].ownerId).toBe(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(ManyShips.countByType(galaxy.activeFleets[0].ships).get(ShipType.TITAN)).toBe(1);
   });
 });

@@ -210,6 +210,47 @@ export class ManyShips implements ManyShipsLike {
     return extractedShips;
   }
 
+  public extractAnyShipsByType(requested: Array<{ type: ShipType; amount: number }>): ManyShips {
+    const extractedShips = ManyShips.empty();
+
+    for (const request of requested) {
+      let remaining = Math.max(0, Math.floor(request.amount));
+      if (remaining <= 0) {
+        continue;
+      }
+
+      const remainingDamaged: DamagedShipEntry[] = [];
+      for (const entry of this.damagedShips) {
+        if (entry.type === request.type && remaining > 0) {
+          extractedShips.addDamaged(entry.type, entry.hull);
+          remaining -= 1;
+          continue;
+        }
+
+        remainingDamaged.push(entry);
+      }
+      this.damagedShips = remainingDamaged;
+
+      if (remaining <= 0) {
+        continue;
+      }
+
+      const availableUndamaged = this.undamagedShipsCount[request.type] ?? 0;
+      const extractedUndamagedAmount = Math.min(availableUndamaged, remaining);
+      if (extractedUndamagedAmount > 0) {
+        extractedShips.addUndamaged(request.type, extractedUndamagedAmount);
+        const nextUndamagedAmount = availableUndamaged - extractedUndamagedAmount;
+        if (nextUndamagedAmount > 0) {
+          this.undamagedShipsCount[request.type] = nextUndamagedAmount;
+        } else {
+          delete this.undamagedShipsCount[request.type];
+        }
+      }
+    }
+
+    return extractedShips;
+  }
+
   public trimNonJumpShipsToTravelHangarCapacity(): ManyShips {
     const removedShips = ManyShips.empty();
     let overflow = this.totalRequiredHangarCapacity() - this.totalTravelHangarCapacity();

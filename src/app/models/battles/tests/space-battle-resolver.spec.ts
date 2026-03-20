@@ -556,7 +556,7 @@ describe('SpaceBattleResolver', () => {
     expect(attacker.reports[0].show()).toContain('Battle result: Attacker');
   });
 
-  it('simulates a full 5-round battle when armor prevents all hull damage', () => {
+  it('simulates a full 4-round battle when armor prevents all hull damage', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
@@ -578,10 +578,10 @@ describe('SpaceBattleResolver', () => {
       randomSource: new SequenceRandomSource([0.999, 0, 0.999, 0, 0.999, 0])
     });
 
-    logBattleResult('battle-test-full-five-rounds', result);
+    logBattleResult('battle-test-full-four-rounds', result);
 
-    expect(result.roundsFought).toBe(5);
-    expect(result.roundSummaries).toHaveLength(5);
+    expect(result.roundsFought).toBe(4);
+    expect(result.roundSummaries).toHaveLength(4);
     expect(result.roundSummaries.every((round) => round.attackerShots === 4)).toBe(true);
     expect(result.roundSummaries.every((round) => round.defenderShots === 4)).toBe(true);
     expect(result.attacker.survivingShipCount).toBe(2);
@@ -623,7 +623,7 @@ describe('SpaceBattleResolver', () => {
     expect(result.roundSummaries[1].destroyedShips.length).toBe(1);
   });
 
-  it('simulates a full 5-round multi-ship battle with technology modifiers and repeated evades', () => {
+  it('simulates a full 4-round multi-ship battle with technology modifiers and repeated evades', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker', {
       [TechnologyType.BEAMS_WEAPONS]: 1,
@@ -657,10 +657,10 @@ describe('SpaceBattleResolver', () => {
       randomSource: new SequenceRandomSource([0.05])
     });
 
-    logBattleResult('battle-test-tech-evasion-five-rounds', result);
+    logBattleResult('battle-test-tech-evasion-four-rounds', result);
 
-    expect(result.roundsFought).toBe(5);
-    expect(result.roundSummaries).toHaveLength(5);
+    expect(result.roundsFought).toBe(4);
+    expect(result.roundSummaries).toHaveLength(4);
     expect(result.attacker.survivingShipCount).toBe(2);
     expect(result.defender.survivingShipCount).toBe(2);
     expect(result.roundSummaries.every((round) => round.shots.length === 8)).toBe(true);
@@ -778,7 +778,7 @@ describe('SpaceBattleResolver', () => {
     expect(attackerFleet).toHaveLength(150);
     expect(defenderFleet).toHaveLength(250);
     expect(result.roundsFought).toBeGreaterThan(0);
-    expect(result.roundsFought).toBeLessThanOrEqual(5);
+    expect(result.roundsFought).toBeLessThanOrEqual(4);
     expect(result.attacker.initialShipCount).toBe(150);
     expect(result.defender.initialShipCount).toBe(250);
     expect(result.attacker.survivingShipCount + result.attacker.destroyedShipCount).toBe(150);

@@ -1,0 +1,76 @@
+{
+  "missions": [
+    {
+      "type": "MOVE",
+      "name": "Move",
+      "description": "Relocate ships to your own planets, friendly orbit, or an unowned planet. Cargo is allowed.",
+      "battleRoundsModifier": -1,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["SELF", "ALLIED", "PEACE"],
+        "allowUnowned": true
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": true,
+        "requiresCargo": false
+      }
+    },
+    {
+      "type": "TRANSPORT",
+      "name": "Transport",
+      "description": "Send resources and ships to your own or friendly planets, then return automatically.",
+      "battleRoundsModifier": -1,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["SELF", "ALLIED", "PEACE"],
+        "allowUnowned": false
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": true,
+        "requiresCargo": true
+      }
+    },
+    {
+      "type": "SPY",
+      "name": "Spy",
+      "description": "Send only Spy Probes. Cargo is disabled for this mission.",
+      "battleRoundsModifier": 0,
+      "minimumFuelReserves": 1,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["ALLIED", "PEACE", "WAR"],
+        "allowUnowned": true
+      },
+      "shipRules": {
+        "requiredShipTypes": ["SPY_PROBE"],
+        "exclusiveShipTypes": ["SPY_PROBE"],
+        "allowCargo": false,
+        "requiresCargo": false
+      }
+    },
+    {
+      "type": "COLONIZE",
+      "name": "Colonize",
+      "description": "Send a Colonizer to an unowned planet.",
+      "battleRoundsModifier": 0,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": [],
+        "allowUnowned": true
+      },
+      "shipRules": {
+        "requiredShipTypes": ["COLONIZER"],
+        "exclusiveShipTypes": [],
+        "allowCargo": true,
+        "requiresCargo": false
+      }
+    }
+  ]
+}
