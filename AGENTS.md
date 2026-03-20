@@ -67,6 +67,12 @@ This file captures session context for collaborators and future AI agents.
 - `npm run smoke:test`
 - `cd server && npm run dev` (Express server)
 
+## Search Exclusions
+- Exclude dependency and generated folders from search/grep-style commands by default.
+- Always exclude: `**/node_modules/**`, `server/node_modules/**`, `dist/**`, `.angular/**`, `coverage/**`, `.git/**`
+- Also exclude temporary tooling folders when present, for example: `.tmp-mcp-*`
+- Only search inside excluded folders when the task explicitly targets dependency internals, generated output, or tool temp files.
+
 ## Chrome MCP
 - Purpose: Use Chrome DevTools MCP for browser inspection/debugging when terminal-only reasoning is insufficient.
 - Before doing browser testing work here, read `McpTesting.md` first; it is the canonical project-specific workflow and failure-mode reference.
