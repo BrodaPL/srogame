@@ -212,6 +212,7 @@ const TECHNOLOGY_TYPE_VALUES = new Set<string>(Array.from(TECHNOLOGY_BLUEPRINTS.
 const DIPLOMATIC_STATUS_VALUES = new Set<string>([
   DiplomaticStatus.ALLIED,
   DiplomaticStatus.PEACE,
+  DiplomaticStatus.PASSIVE,
   DiplomaticStatus.WAR
 ]);
 const TUTORIAL_VIEW_KEY_VALUES = new Set<string>(TUTORIAL_VIEW_KEYS);

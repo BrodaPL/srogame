@@ -26,7 +26,9 @@ import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
+import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
+import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { Ship } from '../../models/fleets/ship';
 import { Technology } from '../../models/tech/technology';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -111,6 +113,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected loadError: string | null = null;
   protected isAttentionHighlightActive = false;
   protected activeTab: PlanetTab = 'resources';
+  protected activeFleets: Fleet[] = [];
   protected coordinatesLabel = '--:--:--';
 
   protected metalDisplay: ResourceDisplay | null = null;
@@ -1128,7 +1131,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     forkJoin({
       planet: this.gameApi.getClientPlanet(x, y, z, session.token),
-      ownedPlanets: this.gameApi.getOwnedPlanets(session.token)
+      ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
+      activeFleets: this.gameApi.getActiveFleets(session.token)
     })
       .pipe(
         timeout(10000),
@@ -1143,7 +1147,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         })
       )
       .subscribe({
-        next: ({ planet, ownedPlanets }) => {
+        next: ({ planet, ownedPlanets, activeFleets }) => {
           if (this.currentPlanetRequestKey !== requestKey) {
             return;
           }
@@ -1158,6 +1162,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
             this.planet = planet;
             this.ownedPlanets = this.sortOwnedPlanets(ownedPlanets);
+            this.activeFleets = [...activeFleets];
             this.coordinatesLabel = `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`;
             this.activeTab = 'resources';
             this.shipAmountInputs.clear();
@@ -1268,6 +1273,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       industryPower: this.currentIndustryPower(),
       shipyardPower: this.currentShipyardPower(),
       researchPower: this.currentResearchPower(),
+      shipRepair: this.currentShipRepairCapability(),
+      industryRepair: this.currentIndustryRepairCapability(),
+      droneRepair: this.currentDroneRepairCapability(),
       industryPowerLimited: (
         this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
         || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
@@ -1692,6 +1700,66 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return Math.max(0, Math.floor(researchPower * this.currentEnergyEfficiency()));
   }
 
+  private currentShipRepairCapability(): number {
+    const planet = this.planet;
+    if (!planet) {
+      return 0;
+    }
+
+    let total = calculateRepairCapabilityForManyShips(planet.objects.ships, {
+      shipyardPower: this.currentShipyardPower()
+    }).shipRepair;
+    for (const fleet of this.currentPlanetIdleRepairFleets()) {
+      total += calculateRepairCapabilityForManyShips(fleet.ships).shipRepair;
+    }
+
+    return total;
+  }
+
+  private currentIndustryRepairCapability(): number {
+    return this.currentIndustryPower();
+  }
+
+  private currentDroneRepairCapability(): number {
+    const planet = this.planet;
+    if (!planet) {
+      return 0;
+    }
+
+    let total = calculateRepairCapabilityForManyShips(planet.objects.ships).droneRepair;
+    for (const fleet of this.currentPlanetIdleRepairFleets()) {
+      total += calculateRepairCapabilityForManyShips(fleet.ships).droneRepair;
+    }
+
+    return total;
+  }
+
+  private shipyardPowerForPlanet(planet: ClientPlanetDto): number {
+    const shipyardLevel = this.buildingLevelForPlanet(planet, BuildingType.SHIPYARD);
+    const naniteFactoryLevel = this.buildingLevelForPlanet(planet, BuildingType.NANITE_FACTORY);
+    const adaptiveTechnologyLevel = this.techLevelForPlanet(planet, TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const industryModifier = planet.info.planetaryParameters.industryModifier;
+    const energyState = this.calculateEnergyStateForPlanet(planet);
+    const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
+
+    const shipyardBasePower = shipyardLevel <= 0
+      ? 0
+      : this.productionAtPlanetBuildingLevel(planet, BuildingType.SHIPYARD);
+    const naniteMultiplier = naniteFactoryLevel <= 0
+      ? 1
+      : this.productionAtPlanetBuildingLevel(planet, BuildingType.NANITE_FACTORY);
+
+    const shipyardPower = shipyardBasePower
+      * naniteMultiplier
+      * industryModifier
+      * industryPowerMultiplier(adaptiveTechnologyLevel);
+    if (!Number.isFinite(shipyardPower) || shipyardPower <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(shipyardPower * energyEfficiency));
+  }
+
   private currentEnergyEfficiency(): number {
     const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
     return energyDeficitEfficiencyMultiplier(energy.available, energy.used);
@@ -1754,6 +1822,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       labels.push('Reduced research power');
     }
 
+    if (this.hasDamagedShipsAtPlanet(planet)) {
+      labels.push('Damaged ships present');
+    }
+
+    if (
+      this.hasDamagedShipsAtPlanet(planet)
+      && this.shipRepairCapabilityForPlanet(planet) + this.droneRepairCapabilityForPlanet(planet) <= 0
+    ) {
+      labels.push('Damaged ships without repair capability');
+    }
+
     return labels;
   }
 
@@ -1809,7 +1888,81 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       labels.push('Reduced research power');
     }
 
+    if (this.hasDamagedShipsAtCurrentPlanet()) {
+      labels.push('Damaged ships present');
+    }
+
+    if (
+      this.hasDamagedShipsAtCurrentPlanet()
+      && this.currentShipRepairCapability() + this.currentDroneRepairCapability() <= 0
+    ) {
+      labels.push('Damaged ships without repair capability');
+    }
+
     return labels;
+  }
+
+  private hasDamagedShipsAtCurrentPlanet(): boolean {
+    const planet = this.planet;
+    if (!planet) {
+      return false;
+    }
+
+    if (ManyShips.hasDamagedShips(planet.objects.ships)) {
+      return true;
+    }
+
+    return this.currentPlanetIdleRepairFleets().some((fleet) => ManyShips.hasDamagedShips(fleet.ships));
+  }
+
+  private hasDamagedShipsAtPlanet(planet: ClientPlanetDto): boolean {
+    if (ManyShips.hasDamagedShips(planet.objects.ships)) {
+      return true;
+    }
+
+    return this.idleRepairFleetsForPlanet(planet).some((fleet) => ManyShips.hasDamagedShips(fleet.ships));
+  }
+
+  private shipRepairCapabilityForPlanet(planet: ClientPlanetDto): number {
+    let total = calculateRepairCapabilityForManyShips(planet.objects.ships, {
+      shipyardPower: this.shipyardPowerForPlanet(planet)
+    }).shipRepair;
+    for (const fleet of this.idleRepairFleetsForPlanet(planet)) {
+      total += calculateRepairCapabilityForManyShips(fleet.ships).shipRepair;
+    }
+
+    return total;
+  }
+
+  private droneRepairCapabilityForPlanet(planet: ClientPlanetDto): number {
+    let total = calculateRepairCapabilityForManyShips(planet.objects.ships).droneRepair;
+    for (const fleet of this.idleRepairFleetsForPlanet(planet)) {
+      total += calculateRepairCapabilityForManyShips(fleet.ships).droneRepair;
+    }
+
+    return total;
+  }
+
+  private currentPlanetIdleRepairFleets(): Fleet[] {
+    const planet = this.planet;
+    if (!planet) {
+      return [];
+    }
+
+    return this.idleRepairFleetsForPlanet(planet);
+  }
+
+  private idleRepairFleetsForPlanet(planet: ClientPlanetDto): Fleet[] {
+    return this.activeFleets.filter((fleet) => {
+      if (fleet.state !== FleetState.IDLE && fleet.state !== FleetState.MISSION_FAILURE_IDLE) {
+        return false;
+      }
+
+      const coordinates = fleet.state === FleetState.MISSION_FAILURE_IDLE
+        ? fleet.origin
+        : fleet.target;
+      return this.sameCoordinates(coordinates, planet.coordinates);
+    });
   }
 
   private headerIndicatorToneFromLabels(labels: string[]): 'safe' | 'neutral' | 'danger' {

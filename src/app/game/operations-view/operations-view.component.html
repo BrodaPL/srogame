@@ -66,6 +66,9 @@
 
             <p class="operations-view__ships">{{ shipSummary(fleet) }}</p>
             <p class="overview-muted">
+              Repair capability: Ship {{ shipRepairCapability(fleet) }} | Drone {{ droneRepairCapability(fleet) }}
+            </p>
+            <p class="overview-muted">
               Cargo manifest: M {{ fleet.cargo.metal }}, C {{ fleet.cargo.crystal }}, D {{ fleet.cargo.deuterium }}
             </p>
           </article>

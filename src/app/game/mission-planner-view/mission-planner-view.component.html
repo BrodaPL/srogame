@@ -67,8 +67,12 @@
               {{ selectedOriginPlanet ? selectedOriginPlanet.basicInfo.name + ' (' + originCoordinatesInput + ')' : 'No origin selected' }}
             </p>
             <div class="overview-stat mission-planner__detail-stat">
-              <span class="overview-stat__label">Repair</span>
-              <span class="overview-stat__value">{{ repairSummaryLabel() }}</span>
+              <span class="overview-stat__label">Ship repair capability</span>
+              <span class="overview-stat__value">{{ shipRepairCapabilityLabel() }}</span>
+            </div>
+            <div class="overview-stat mission-planner__detail-stat">
+              <span class="overview-stat__label">Drone repair capability</span>
+              <span class="overview-stat__value">{{ droneRepairCapabilityLabel() }}</span>
             </div>
             @if (selectedMissionType === 'Spy') {
               <p class="overview-muted mission-planner__compact-copy">Spy uses only Spy Probes. Cargo is disabled for this mission.</p>

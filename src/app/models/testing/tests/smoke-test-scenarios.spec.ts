@@ -118,4 +118,49 @@ describe('smoke test scenarios', () => {
     expect(shipCounts.get(ShipType.TRANSPORTER)).toBeGreaterThanOrEqual(5);
     expect(shipCounts.get(ShipType.CRUISER)).toBeGreaterThanOrEqual(2);
   });
+
+  it('seeds ship repair turn so damaged stationed ships are repaired after one turn', () => {
+    const galaxy = createGalaxy();
+    applySmokeTestScenario(galaxy, 'shipRepairTurn');
+
+    const player = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER)!;
+    const homePlanet = player.planets[0];
+    const missingHullBefore = ManyShips.totalMissingHull(homePlanet.rBDSFTQ.ships);
+
+    resolvePhaseOneTurn(galaxy, galaxy.currentTurn + 1);
+
+    expect(missingHullBefore).toBeGreaterThan(0);
+    expect(ManyShips.totalMissingHull(homePlanet.rBDSFTQ.ships)).toBe(0);
+    expect(ManyShips.hasDamagedShips(homePlanet.rBDSFTQ.ships)).toBe(false);
+  });
+
+  it('seeds orbit repair lifecycle so idle orbit fleets are repaired after planet ships', () => {
+    const galaxy = createGalaxy();
+    applySmokeTestScenario(galaxy, 'orbitRepairLifecycle');
+
+    const player = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER)!;
+    const homePlanet = player.planets[0];
+    const fleetBefore = galaxy.activeFleets[0];
+
+    expect(fleetBefore).toBeDefined();
+    expect(ManyShips.hasDamagedShips(homePlanet.rBDSFTQ.ships)).toBe(true);
+    expect(ManyShips.hasDamagedShips(fleetBefore.ships)).toBe(true);
+
+    resolvePhaseOneTurn(galaxy, galaxy.currentTurn + 1);
+
+    expect(ManyShips.hasDamagedShips(homePlanet.rBDSFTQ.ships)).toBe(false);
+    expect(ManyShips.hasDamagedShips(galaxy.activeFleets[0].ships)).toBe(false);
+  });
+
+  it('seeds repair warnings UI with damaged ships but no ship repair capability', () => {
+    const galaxy = createGalaxy();
+    applySmokeTestScenario(galaxy, 'repairWarningsUi');
+
+    const player = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER)!;
+    const homePlanet = player.planets[0];
+
+    expect(ManyShips.hasDamagedShips(homePlanet.rBDSFTQ.ships)).toBe(true);
+    expect(homePlanet.getBuildingLevel(BuildingType.SHIPYARD)).toBe(0);
+    expect(homePlanet.rBDSFTQ.ships.undamagedShipsCount[ShipType.REPAIR_DRONE] ?? 0).toBe(0);
+  });
 });

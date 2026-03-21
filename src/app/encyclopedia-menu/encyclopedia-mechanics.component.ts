@@ -162,15 +162,18 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Turn Progression State',
       category: 'Core Loop',
-      status: 'Partial',
-      summary: 'Queue enqueueing and UI ETA previews are implemented, but global turn processing is still limited.',
+      status: 'Live',
+      summary: 'End Turn now resolves the real phase-one game loop: economy, queues, research, fleet arrivals, reports, and debris updates.',
       details: [
-        'Building, shipyard, and research enqueue endpoints are active.',
-        'Planet and research queues expose invested/base progress fields for UI display.',
-        'A dedicated public endpoint for full turn advancement is not currently exposed.'
+        'The server exposes a real end-turn endpoint and increments the galaxy turn after successful processing.',
+        'Turn resolution currently applies income, advances building queues, advances shipyard queues, advances research queues, and then resolves active fleets and encounters.',
+        'Planet and research queues expose invested/base progress fields for UI display, while Operations and Reports reflect the fleet side of turn progression.'
+      ],
+      formulas: [
+        'turnOrder = income -> building queues -> shipyard queues -> research queues -> fleet movement/encounters'
       ],
       notes: [
-        'This section reflects current server routes and may evolve with future tick processing.'
+        'This is still phase-one turn logic: many advanced missions and deeper operation layers are not implemented yet.'
       ]
     },
     {
@@ -188,38 +191,65 @@ export class EncyclopediaMechanicsComponent {
       title: 'Sending Fleets with Mission Types',
       category: 'Core Loop',
       status: 'Partial',
-      summary: 'Fleet dispatch is live through Mission Planner for a focused subset of mission types, with more mission logic still planned.',
+      summary: 'Fleet dispatch is live through Mission Planner for a focused subset of mission types, with mission validation and resolution now driven by shared mission definitions.',
       details: [
         'Mission Planner currently supports Move, Transport, Spy, and Colonize.',
-        'Validation includes coordinates, ownership constraints, ship capability checks, cargo rules, and active-fleet-cap checks.',
+        'Validation includes coordinates, ownership/diplomacy constraints, ship capability checks, cargo rules, fuel reserves, and active-fleet-cap checks.',
+        'Fleet lifecycle states are now meaningful: fleets can be MOVING_TO_TARGET, IDLE, RETURNING, or mission-failure return/idle states instead of being consumed immediately.',
+        'Move to owned planets merges into the target planet, Move to unowned/friendly foreign orbit can stay idle, Transport delivers cargo then returns, and Spy creates structured espionage reports.',
         'Mission Planner can now be prefilled from other screens, for example Spy Planet actions from report or galaxy previews.',
         'Attack, plunder, invasion, recycle, repair, and other advanced mission types are still planned.'
       ],
       formulas: [
-        'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2'
+        'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2',
+        'fuelCost = sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves'
+      ]
+    },
+    {
+      title: 'Diplomacy and Friendly Orbit',
+      category: 'Core Loop',
+      status: 'Live',
+      summary: 'Basic diplomacy now exists as symmetric player-to-player relations and directly affects mission targeting and auto-combat.',
+      details: [
+        'Current diplomacy statuses are SELF, ALLIED, PEACE, and WAR.',
+        'Relations are stored centrally on the galaxy and treated as symmetric pairs rather than one-sided flags.',
+        'Move can target allied and peace planets but stays as an orbiting fleet instead of merging into foreign-friendly planet ships.',
+        'Transport can target allied and peace planets, delivers cargo on arrival, and then returns home.',
+        'PEACE prevents auto-combat, while allied idle fleets and orbiting ships join the same defensive side during encounters.'
+      ],
+      notes: [
+        'Current diplomacy mutation is admin/test-oriented in the server layer. Full player-facing diplomacy UI and treaty workflows are still planned.'
       ]
     },
     {
       title: 'Space Battles',
       category: 'Core Loop',
       status: 'Partial',
-      summary: 'Fleet-vs-fleet combat exists in the battle domain, but full game-loop integration is still in progress.',
+      summary: 'Space battles are integrated into phase-one fleet arrival resolution, but defenses, deeper mission outcomes, and broader combat content are still incomplete.',
       details: [
-        'Current battle resolution supports 5 rounds, shuffled ship order, defender-first alternating fire, shield-to-hull damage flow, and post-round destruction checks.',
-        'Current technology modifiers support weapon damage bonuses, shield and hull capacity bonuses, armor scaling, critical-threshold reduction, and evasion chance scaling.',
-        'Planetary defenses, debris generation, repair handling, and full turn-resolution integration are still planned.'
+        'Planet-orbit encounters now resolve during turn processing, including same-turn arrival grouping at the same orbit and deterministic resolution by mission priority then fleetId.',
+        'Battles use shuffled ship order, defender-first alternating fire, shield-to-hull damage flow, hangar trimming for non-jump survivors, and post-round destruction checks.',
+        'Default battle length is now 4 rounds, then missions modify that baseline: Move and Transport reduce it by 1, while future mission types can extend it.',
+        'Allied defenders merge into one side, and PEACE prevents automatic hostilities.',
+        'Planetary defenses as dedicated participants, true multi-faction combat, and more mission-specific post-battle actions are still planned.'
+      ],
+      formulas: [
+        'defaultBattleRounds = 4',
+        'moveBattleRounds = 3',
+        'transportBattleRounds = 3'
       ]
     },
     {
       title: 'Reports and Messages',
       category: 'Intel',
       status: 'Partial',
-      summary: 'A player-facing report inbox is live, while broader event coverage and message depth are still expanding.',
+      summary: 'A player-facing report inbox is live for espionage, fleet arrivals/failures, and battle reports, while broader event coverage is still expanding.',
       details: [
         'Reports View supports tabs, unread/read state, selection with delete, inline detail view, and location preview.',
         'Espionage reports render as structured dossiers with sectioned intel for resources, buildings, technologies, ships, defences, and planetary parameters.',
         'Report-linked planet previews reuse MiniPlanetPreview and can route into Planet View or Mission Planner.',
-        'Combat, expedition, and other future system events are still planned to broaden report coverage.'
+        'Battle reports and fleet mission reports are generated by the live turn-resolution flow.',
+        'Combat, expedition, diplomacy-event, and other future system events are still planned to broaden report coverage.'
       ]
     },
     {
@@ -267,11 +297,18 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Repair Mechanics (Fleet and Planets)',
       category: 'Core Loop',
-      status: 'Planned',
-      summary: 'Repair loops are planned for damaged ships and planetary infrastructure.',
+      status: 'Partial',
+      summary: 'Ship repair is now live during end-turn resolution, while planetary building repair remains planned until buildings can actually be damaged.',
       details: [
-        'Repair will consume resources/time and interact with queue priorities.',
-        'Both post-battle recovery and infrastructure restoration are in scope.'
+        'Damaged ships now repair automatically during end-turn resolution. Planet ships are repaired first, then owned/allied idle fleets in orbit.',
+        'Ship repair currently uses the host planet shipyard power plus ship repair capability from non-drone ships and repair drones. Strong repair equipment prefers non-small ships first.',
+        'Repair does not currently consume extra resources or energy, and shipyard/build queues continue independently of repair.',
+        'The UI now exposes split repair values in the shared powers panel, Mission Planner, Operations, Planet View, and Imperium. Damaged-ship warnings appear when repair capability is missing.',
+        'Future building repair is still planned and will use the same broad model: industry power plus a share of repair-drone capability once building damage exists.'
+      ],
+      formulas: [
+        'shipRepairPerTurn = currentShipyardPower + nonDroneRepairCapability + droneShareForShips',
+        'futureBuildingRepairPerTurn = currentIndustryPower + droneShareForBuildings'
       ]
     },
     {
@@ -294,11 +331,17 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Space Debris and Recycling',
       category: 'Economy',
-      status: 'Planned',
-      summary: 'Debris fields and recycler gameplay are planned.',
+      status: 'Partial',
+      summary: 'Debris fields now accumulate on planets after battles, while dedicated recycling gameplay is still planned.',
       details: [
-        'Combat and events will generate recoverable debris resources.',
-        'Recycling missions will convert debris into usable economy input.'
+        'Space battles now convert destroyed-ship value into a persistent spaceDebris resource pack on the target planet.',
+        'If the attacking fleet is wiped out, its carried cargo is also added into the destroyed-value pool before salvage rates are applied.',
+        'Recycling missions and player-facing debris recovery loops are still planned.'
+      ],
+      formulas: [
+        'debrisMetal = floor(totalLostMetal * random(0.2, 0.3))',
+        'debrisCrystal = floor(totalLostCrystal * random(0.2, 0.3))',
+        'debrisDeuterium = floor(totalLostDeuterium * random(0.05, 0.1))'
       ]
     },
     {
@@ -314,10 +357,12 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Bot Implementation',
       category: 'Core Loop',
-      status: 'Planned',
-      summary: 'Broader bot behavior is planned beyond current neutral sandbox spawning.',
+      status: 'Partial',
+      summary: 'Neutral and sandbox-side bot seeding already exists, but full strategic AI behavior is still planned.',
       details: [
-        'Bots will require strategy loops for expansion, economy, and combat actions.',
+        'Sandbox generation can already spawn neutral-owned planets with RNG-scaled buildings, ships, technology, and resources.',
+        'Human home systems can also get one guaranteed low-level neutral neighbor when neutral planets are enabled.',
+        'Bots still need strategy loops for expansion, economy, diplomacy, and combat actions.',
         'Difficulty scaling and predictable debugging behavior are design goals.'
       ]
     },
@@ -334,11 +379,12 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Saving and Loading Game',
       category: 'Core Loop',
-      status: 'Planned',
-      summary: 'Persistent save/load of active games is planned.',
+      status: 'Partial',
+      summary: 'Authentication and local client setup persist, but the active galaxy is still only stored in server memory.',
       details: [
-        'Current galaxy state is in memory; planned work adds durable game-state persistence.',
-        'Load flows will cover resumed turn state, queues, reports, and player sessions.'
+        'Player auth sessions are stored in server JSON, and localStorage keeps setup plus the current player session on the client.',
+        'The active galaxy, diplomacy relations, fleets, queues, and reports are still in-memory runtime state on the server.',
+        'Planned work adds durable game-state persistence and true load/resume flows for turns, queues, reports, and operations.'
       ]
     }
   ];

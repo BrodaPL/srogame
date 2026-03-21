@@ -103,6 +103,21 @@
       >
         Research: {{ formatPower(powers?.researchPower) }}
       </span>
+      @if (powers?.shipRepair !== null && powers?.shipRepair !== undefined) {
+        <span class="resource__power-line resource__power-line--detail">
+          Ship repair: {{ formatPower(powers?.shipRepair) }}
+        </span>
+      }
+      @if (powers?.industryRepair !== null && powers?.industryRepair !== undefined) {
+        <span class="resource__power-line resource__power-line--detail">
+          Industry repair: {{ formatPower(powers?.industryRepair) }}
+        </span>
+      }
+      @if (powers?.droneRepair !== null && powers?.droneRepair !== undefined) {
+        <span class="resource__power-line resource__power-line--detail">
+          Drone repair: {{ formatPower(powers?.droneRepair) }}
+        </span>
+      }
     </div>
   </div>
 </section>

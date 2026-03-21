@@ -354,6 +354,64 @@ export class ManyShips implements ManyShipsLike {
     return ManyShips.damagedPercentage(this);
   }
 
+  public hasDamagedShips(): boolean {
+    return ManyShips.hasDamagedShips(this);
+  }
+
+  public totalMissingHull(): number {
+    return ManyShips.totalMissingHull(this);
+  }
+
+  public repairDamagedShipAtIndex(index: number, repairAmount: number): number {
+    if (!Number.isInteger(index) || index < 0 || index >= this.damagedShips.length) {
+      return 0;
+    }
+
+    const normalizedRepairAmount = Math.max(0, Math.floor(repairAmount));
+    if (normalizedRepairAmount <= 0) {
+      return 0;
+    }
+
+    const damagedShip = this.damagedShips[index];
+    const blueprint = SHIP_BLUEPRINTS.get(damagedShip.type);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const missingHull = Math.max(0, blueprint.hullPointsCapacity - damagedShip.hull);
+    if (missingHull <= 0) {
+      return 0;
+    }
+
+    const usedRepair = Math.min(normalizedRepairAmount, missingHull);
+    damagedShip.hull = Math.min(blueprint.hullPointsCapacity, damagedShip.hull + usedRepair);
+    return usedRepair;
+  }
+
+  public normalizeFullyRepairedShips(): number {
+    let repairedToUndamaged = 0;
+    const remainingDamaged: DamagedShipEntry[] = [];
+
+    for (const entry of this.damagedShips) {
+      const blueprint = SHIP_BLUEPRINTS.get(entry.type);
+      if (!blueprint) {
+        remainingDamaged.push(entry);
+        continue;
+      }
+
+      if (entry.hull >= blueprint.hullPointsCapacity) {
+        this.addUndamaged(entry.type, 1);
+        repairedToUndamaged += 1;
+        continue;
+      }
+
+      remainingDamaged.push(entry);
+    }
+
+    this.damagedShips = remainingDamaged;
+    return repairedToUndamaged;
+  }
+
   public groupedUndamagedEntries(): Array<{ type: ShipType; amount: number }> {
     return ManyShips.groupedUndamagedEntries(this);
   }
@@ -514,6 +572,26 @@ export class ManyShips implements ManyShipsLike {
     }
 
     return Math.max(0, 100 - ManyShips.undamagedPercentage(data));
+  }
+
+  public static hasDamagedShips(data: ManyShipsLike | null | undefined): boolean {
+    return ManyShips.fromData(data).damagedShips.length > 0;
+  }
+
+  public static totalMissingHull(data: ManyShipsLike | null | undefined): number {
+    const normalized = ManyShips.fromData(data);
+    let total = 0;
+
+    for (const damaged of normalized.damagedShips) {
+      const blueprint = SHIP_BLUEPRINTS.get(damaged.type);
+      if (!blueprint) {
+        continue;
+      }
+
+      total += Math.max(0, blueprint.hullPointsCapacity - damaged.hull);
+    }
+
+    return total;
   }
 
   public static groupedUndamagedEntries(

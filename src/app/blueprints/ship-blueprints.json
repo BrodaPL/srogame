@@ -124,7 +124,7 @@
       "shieldCapacity": 0,
       "armor": 0,
       "weapons": [
-        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 1 }
+        { "type": "REPAIR_EQUIPMENT", "dmg": 20, "shots": 1 }
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
@@ -379,7 +379,7 @@
       "armor": 5,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 2 },
-        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 3 }
+        { "type": "REPAIR_EQUIPMENT", "dmg": 10, "shots": 4 }
       ],
       "cargoCapacity": 400,
       "hangarCapacity": 15,
@@ -412,7 +412,7 @@
       "armor": 5,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 2 },
-        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 2 }
+        { "type": "REPAIR_EQUIPMENT", "dmg": 40, "shots": 1 }
       ],
       "cargoCapacity": 1000,
       "hangarCapacity": 0,
@@ -475,7 +475,7 @@
       "armor": 2,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 },
-        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 2 }
+        { "type": "REPAIR_EQUIPMENT", "dmg": 50, "shots": 1 }
       ],
       "cargoCapacity": 500,
       "hangarCapacity": 6,
@@ -513,7 +513,8 @@
         { "type": "BEAM", "dmg": 30, "shots": 8 },
         { "type": "MISSILE", "dmg": 50, "shots": 4 },
         { "type": "RAIL_GUN", "dmg": 20, "shots": 4 },
-        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 4 }
+        { "type": "REPAIR_EQUIPMENT", "dmg": 100, "shots": 1 },
+        { "type": "REPAIR_EQUIPMENT", "dmg": 10, "shots": 4 }
       ],
       "cargoCapacity": 1000,
       "hangarCapacity": 12,
@@ -583,7 +584,7 @@
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 4 },
         { "type": "MISSILE", "dmg": 30, "shots": 1 },
-        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 8 }
+        { "type": "REPAIR_EQUIPMENT", "dmg": 20, "shots": 10 }
       ],
       "cargoCapacity": 600,
       "hangarCapacity": 90,
@@ -621,8 +622,8 @@
         { "type": "MISSILE", "dmg": 30, "shots": 16 },
         { "type": "MISSILE", "dmg": 50, "shots": 8 },
         { "type": "RAIL_GUN", "dmg": 10, "shots": 16 },
-        { "type": "REPAIR_EQIPMENT", "dmg": 40, "shots": 20 },
-        { "type": "REPAIR_EQIPMENT", "dmg": 400, "shots": 2 }
+        { "type": "REPAIR_EQUIPMENT", "dmg": 20, "shots": 10 },
+        { "type": "REPAIR_EQUIPMENT", "dmg": 400, "shots": 2 }
       ],
       "cargoCapacity": 20000,
       "hangarCapacity": 100,

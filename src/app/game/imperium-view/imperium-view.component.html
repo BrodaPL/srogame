@@ -140,6 +140,12 @@
                 <span>R {{ planetVm.powers.researchPower }}</span>
               </div>
 
+              <div class="imperium-view__planet-meta">
+                <span>Ship rep {{ planetVm.powers.shipRepair }}</span>
+                <span>Ind rep {{ planetVm.powers.industryRepair }}</span>
+                <span>Drone rep {{ planetVm.powers.droneRepair }}</span>
+              </div>
+
               @if (planetVm.attentionLabels.length > 0) {
                 <div class="imperium-view__planet-alerts">
                   @for (attentionLabel of planetVm.attentionLabels; track attentionLabel) {

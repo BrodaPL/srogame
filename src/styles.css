@@ -1153,6 +1153,11 @@ app-root {
   font-family: var(--font-mono), serif;
 }
 
+.resource__power-line--detail {
+  font-size: 0.66rem;
+  color: #9fe9bd;
+}
+
 .resource__power-line--limited {
   color: #ffd84d;
   font-weight: 700;

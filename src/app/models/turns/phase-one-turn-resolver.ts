@@ -7,6 +7,7 @@ import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
 import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
 import { BuildingType } from '../enums/building-type';
 import { FleetMissionType } from '../enums/fleet-mission-type';
+import { HullClass } from '../enums/hull-class';
 import { PlayerType } from '../enums/player-type';
 import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
@@ -26,6 +27,10 @@ import { Galaxy } from '../planets/galaxy';
 import { Planet } from '../planets/planet';
 import { Player } from '../player';
 import { FleetReport } from '../reports/fleet-report';
+import {
+  collectRepairEquipmentBurstGroupsForManyShips,
+  type RepairEquipmentBurstGroup
+} from '../repairs/ship-repair-capability';
 import { ResearchReport } from '../reports/research-report';
 import { ResourcesPack } from '../resources-pack';
 import { energyDeficitEfficiencyMultiplier } from '../planets/energy-deficit';
@@ -152,6 +157,7 @@ export function resolvePhaseOneTurn(
     diplomacyResolver,
     encounterResolver
   );
+  resolveShipRepairs(galaxy, planetById, snapshotsByPlanetId, diplomacyResolver);
 }
 
 function createPlanetTurnSnapshot(
@@ -732,6 +738,147 @@ function resolveTargetArrival(
   );
 }
 
+function resolveShipRepairs(
+  galaxy: Galaxy,
+  planetById: Map<string, Planet>,
+  snapshotsByPlanetId: Map<string, PlanetTurnSnapshot>,
+  diplomacyResolver: DiplomacyResolver
+): void {
+  for (const [coordinatesId, planet] of planetById.entries()) {
+    const snapshot = snapshotsByPlanetId.get(coordinatesId);
+    const planetOwnerId = snapshot?.ownerId ?? null;
+    if (!snapshot || planetOwnerId === null) {
+      continue;
+    }
+
+    let remainingSharedShipyardRepair = Math.max(0, Math.floor(snapshot.shipyardPower));
+    remainingSharedShipyardRepair = repairShipsWithLocalCapabilitiesAndSharedShipyard(
+      planet.rBDSFTQ.ships,
+      remainingSharedShipyardRepair
+    );
+
+    const eligibleOrbitFleets = shuffleCopy(
+      galaxy.activeFleets.filter((fleet) =>
+        isFleetEligibleForOrbitRepair(fleet, coordinatesId, planetOwnerId, diplomacyResolver)
+      )
+    );
+
+    for (const fleet of eligibleOrbitFleets) {
+      remainingSharedShipyardRepair = repairShipsWithLocalCapabilitiesAndSharedShipyard(
+        fleet.ships,
+        remainingSharedShipyardRepair
+      );
+
+      if (remainingSharedShipyardRepair <= 0) {
+        break;
+      }
+    }
+  }
+}
+
+function repairShipsWithLocalCapabilitiesAndSharedShipyard(
+  ships: ManyShips,
+  sharedShipyardRepair: number
+): number {
+  let remainingSharedShipyardRepair = Math.max(0, Math.floor(sharedShipyardRepair));
+  if (!ships.hasDamagedShips()) {
+    return remainingSharedShipyardRepair;
+  }
+
+  applyRepairEquipmentBursts(ships, collectRepairEquipmentBurstGroupsForManyShips(ships));
+  remainingSharedShipyardRepair = applyPooledShipRepair(ships, remainingSharedShipyardRepair);
+  ships.normalizeFullyRepairedShips();
+  return remainingSharedShipyardRepair;
+}
+
+function applyRepairEquipmentBursts(
+  ships: ManyShips,
+  burstGroups: RepairEquipmentBurstGroup[]
+): void {
+  for (const group of burstGroups) {
+    for (let shotIndex = 0; shotIndex < group.shots; shotIndex += 1) {
+      const targetIndex = selectRandomRepairTargetIndex(ships, group.preferNonSmallTargets);
+      if (targetIndex < 0) {
+        return;
+      }
+
+      ships.repairDamagedShipAtIndex(targetIndex, group.damage);
+    }
+  }
+}
+
+function applyPooledShipRepair(
+  ships: ManyShips,
+  pooledRepair: number
+): number {
+  let remainingRepair = Math.max(0, Math.floor(pooledRepair));
+  while (remainingRepair > 0) {
+    const targetIndex = selectRandomRepairTargetIndex(ships, false);
+    if (targetIndex < 0) {
+      break;
+    }
+
+    const usedRepair = ships.repairDamagedShipAtIndex(targetIndex, remainingRepair);
+    if (usedRepair <= 0) {
+      break;
+    }
+
+    remainingRepair -= usedRepair;
+  }
+
+  return remainingRepair;
+}
+
+function selectRandomRepairTargetIndex(
+  ships: ManyShips,
+  preferNonSmallTargets: boolean
+): number {
+  const allCandidates = ships.damagedShips
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => {
+      const blueprint = SHIP_BLUEPRINTS.get(entry.type);
+      if (!blueprint) {
+        return false;
+      }
+
+      return entry.hull < blueprint.hullPointsCapacity;
+    });
+  if (allCandidates.length <= 0) {
+    return -1;
+  }
+
+  const preferredCandidates = preferNonSmallTargets
+    ? allCandidates.filter(({ entry }) => {
+      const blueprint = SHIP_BLUEPRINTS.get(entry.type);
+      return blueprint && blueprint.hullClass !== HullClass.SMALL;
+    })
+    : [];
+  const candidates = preferredCandidates.length > 0 ? preferredCandidates : allCandidates;
+  const randomIndex = Math.max(0, Math.min(
+    candidates.length - 1,
+    Math.floor(Math.random() * candidates.length)
+  ));
+  return candidates[randomIndex]?.index ?? -1;
+}
+
+function isFleetEligibleForOrbitRepair(
+  fleet: Fleet,
+  planetCoordinatesId: string,
+  planetOwnerId: number,
+  diplomacyResolver: DiplomacyResolver
+): boolean {
+  if (fleet.state !== FleetState.IDLE && fleet.state !== FleetState.MISSION_FAILURE_IDLE) {
+    return false;
+  }
+
+  if (toPlanetOrbitLocationKeyForFleet(fleet) !== toPlanetOrbitLocationKeyForCoordinatesId(planetCoordinatesId)) {
+    return false;
+  }
+
+  const diplomaticStatus = diplomacyResolver.getStatus(planetOwnerId, fleet.ownerId);
+  return diplomaticStatus === DiplomaticStatus.SELF || diplomaticStatus === DiplomaticStatus.ALLIED;
+}
+
 function resolveEncounterArrival(
   resolvedArrival: PlanetOrbitEncounterResolvedArrival,
   espionageReportGenerator: EspionageReportGenerator,
@@ -1164,7 +1311,24 @@ function toEncounterLocationKey(location: { kind: 'planetOrbit'; x: number; y: n
 }
 
 function toPlanetOrbitLocationKeyForFleet(fleet: Fleet): string {
-  return `planetOrbit:${fleet.target.x}:${fleet.target.y}:${fleet.target.z}`;
+  const coordinates = fleet.state === FleetState.MISSION_FAILURE_IDLE
+    ? fleet.origin
+    : fleet.target;
+  return `planetOrbit:${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+}
+
+function toPlanetOrbitLocationKeyForCoordinatesId(coordinatesId: string): string {
+  return `planetOrbit:${coordinatesId}`;
+}
+
+function shuffleCopy<T>(values: T[]): T[] {
+  const copy = [...values];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+
+  return copy;
 }
 
 function compareEncounterArrivalPriority(

@@ -6,6 +6,7 @@ import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
+import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
@@ -121,6 +122,14 @@ export class OperationsViewComponent implements OnInit {
     const totalLegTurns = fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
     const elapsedTurns = Math.max(0, Math.min(totalLegTurns, currentTurn - fleet.createdAtTurn));
     return `${elapsedTurns}/${totalLegTurns} turns elapsed`;
+  }
+
+  protected shipRepairCapability(fleet: Fleet): number {
+    return calculateRepairCapabilityForManyShips(fleet.ships).shipRepair;
+  }
+
+  protected droneRepairCapability(fleet: Fleet): number {
+    return calculateRepairCapabilityForManyShips(fleet.ships).droneRepair;
   }
 
   private loadActiveFleets(): void {

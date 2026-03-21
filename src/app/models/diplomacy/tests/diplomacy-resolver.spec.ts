@@ -15,13 +15,13 @@ describe('DiplomacyResolver', () => {
       { playerAId: 5, playerBId: 2, status: DiplomaticStatus.ALLIED }
     ]);
 
-    resolver.setStatus(9, 4, DiplomaticStatus.PEACE);
+    resolver.setStatus(9, 4, DiplomaticStatus.PASSIVE);
 
     expect(resolver.getStatus(2, 5)).toBe(DiplomaticStatus.ALLIED);
-    expect(resolver.getStatus(4, 9)).toBe(DiplomaticStatus.PEACE);
+    expect(resolver.getStatus(4, 9)).toBe(DiplomaticStatus.PASSIVE);
     expect(resolver.toRelations()).toEqual([
       { playerAId: 2, playerBId: 5, status: DiplomaticStatus.ALLIED },
-      { playerAId: 4, playerBId: 9, status: DiplomaticStatus.PEACE }
+      { playerAId: 4, playerBId: 9, status: DiplomaticStatus.PASSIVE }
     ]);
   });
 

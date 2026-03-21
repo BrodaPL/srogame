@@ -18,6 +18,9 @@ const SCENARIOS = [
   'fleetLifecycle',
   'battleDebris',
   'damagedShipsUi',
+  'shipRepairTurn',
+  'orbitRepairLifecycle',
+  'repairWarningsUi',
   'smokeSuite'
 ];
 
@@ -140,6 +143,10 @@ function shipAmount(planet, shipType) {
     + (planet.objects.ships?.damagedShips ?? []).filter((entry) => entry.type === shipType).length;
 }
 
+function damagedShipCount(ships) {
+  return (ships?.damagedShips ?? []).length;
+}
+
 function techLevelFromReport(planet, technologyType) {
   return (planet.reportData?.techLevels ?? []).find((entry) => entry.type === technologyType)?.level ?? 0;
 }
@@ -225,6 +232,20 @@ async function waitForText(page, text, timeout = 20000) {
   await page.locator(`text=${text}`).first().waitFor({ state: 'visible', timeout });
 }
 
+async function dismissTutorialOverlay(page) {
+  const closeButton = page.getByRole('button', { name: 'Close tutorial' });
+  if (await closeButton.count() <= 0) {
+    return;
+  }
+
+  const isVisible = await closeButton.first().isVisible().catch(() => false);
+  if (!isVisible) {
+    return;
+  }
+
+  await closeButton.first().click();
+}
+
 async function timeStep(stepTimings, name, fn) {
   const startedAt = performance.now();
   const value = await fn();
@@ -256,6 +277,7 @@ async function runRouteSmoke(browser) {
       await browserSession.page.goto(`${BASE_UI_URL}/`, { waitUntil: 'domcontentloaded' });
       await waitForText(browserSession.page, 'Srogame');
       await waitForText(browserSession.page, `Logged in as ${playerName}`);
+      await dismissTutorialOverlay(browserSession.page);
     });
 
     await timeStep(stepTimings, 'planetView', async () => {
@@ -265,6 +287,7 @@ async function runRouteSmoke(browser) {
       );
       await waitForText(browserSession.page, 'Planet Parameters');
       await waitForText(browserSession.page, homePlanet.basicInfo.name);
+      await dismissTutorialOverlay(browserSession.page);
     });
 
     await timeStep(stepTimings, 'missionPlanner', async () => {
@@ -272,18 +295,21 @@ async function runRouteSmoke(browser) {
       await waitForText(browserSession.page, 'Mission type');
       await waitForText(browserSession.page, 'Launch Summary');
       await waitForText(browserSession.page, 'Fleet Composition');
+      await dismissTutorialOverlay(browserSession.page);
     });
 
     await timeStep(stepTimings, 'operations', async () => {
       await browserSession.page.goto(`${BASE_UI_URL}/game/operations`, { waitUntil: 'domcontentloaded' });
       await waitForText(browserSession.page, 'Operations');
       await waitForText(browserSession.page, 'No active fleets');
+      await dismissTutorialOverlay(browserSession.page);
     });
 
     await timeStep(stepTimings, 'reports', async () => {
       await browserSession.page.goto(`${BASE_UI_URL}/game/reports`, { waitUntil: 'domcontentloaded' });
       await waitForText(browserSession.page, 'Inbox');
       await waitForText(browserSession.page, 'Select all visible');
+      await dismissTutorialOverlay(browserSession.page);
     });
 
     browserSession.monitor.assertClean();
@@ -443,6 +469,7 @@ async function runFleetLifecycle(browser) {
       await waitForText(browserSession.page, 'Move | MOVING TO TARGET');
       await waitForText(browserSession.page, 'Transport | MOVING TO TARGET');
       await waitForText(browserSession.page, 'Spy | MOVING TO TARGET');
+      await dismissTutorialOverlay(browserSession.page);
     });
 
     await timeStep(stepTimings, 'turnResolution', async () => {
@@ -500,6 +527,7 @@ async function runFleetLifecycle(browser) {
       await browserSession.page.goto(`${BASE_UI_URL}/game/reports`, { waitUntil: 'domcontentloaded' });
       await waitForText(browserSession.page, 'Inbox');
       await waitForText(browserSession.page, 'Espionage Report');
+      await dismissTutorialOverlay(browserSession.page);
     });
 
     browserSession.monitor.assertClean();
@@ -608,6 +636,7 @@ async function runDamagedShipsUi(browser) {
         { waitUntil: 'domcontentloaded' }
       );
       await waitForText(browserSession.page, 'Planet Parameters');
+      await dismissTutorialOverlay(browserSession.page);
       await browserSession.page.getByRole('button', { name: 'Ships' }).click();
       await waitForText(browserSession.page, 'Ship Damage Status');
       await waitForText(browserSession.page, 'Undamaged ships %');
@@ -617,6 +646,7 @@ async function runDamagedShipsUi(browser) {
     await timeStep(stepTimings, 'missionPlanner', async () => {
       await browserSession.page.goto(`${BASE_UI_URL}/game/mission-planner`, { waitUntil: 'domcontentloaded' });
       await waitForText(browserSession.page, 'Fleet Composition');
+      await dismissTutorialOverlay(browserSession.page);
       const pageText = await browserSession.page.locator('body').textContent();
       assert(/\(Damaged:\s*[1-9]/.test(pageText), 'Mission Planner did not show damaged-ship availability');
     });
@@ -626,6 +656,136 @@ async function runDamagedShipsUi(browser) {
     return {
       homePlanet: toCoordString(homePlanet.coordinates),
       damagedShips: homePlanet.objects.ships.damagedShips.length,
+      stepTimings
+    };
+  } finally {
+    await browserSession.close();
+  }
+}
+
+async function runShipRepairTurn() {
+  const { session } = await registerAndStartGame('shipRepairTurn');
+  const ownedPlanets = await expectOkResponse(
+    await authed('/game/owned-planets', session.token),
+    'Unable to load owned planets for shipRepairTurn'
+  );
+  const homePlanetBefore = ownedPlanets[0];
+  assert(homePlanetBefore, 'shipRepairTurn did not produce a home planet');
+  assert(damagedShipCount(homePlanetBefore.objects.ships) > 0, 'shipRepairTurn did not seed damaged ships');
+
+  await expectOkResponse(
+    await authed('/game/end-turn', session.token, { method: 'POST', body: JSON.stringify({}) }),
+    'Unable to resolve end turn for shipRepairTurn'
+  );
+
+  const homePlanetAfter = await expectOkResponse(
+    await authed(
+      `/game/client-planet?x=${homePlanetBefore.coordinates.x}&y=${homePlanetBefore.coordinates.y}&z=${homePlanetBefore.coordinates.z}`,
+      session.token
+    ),
+    'Unable to load home planet after shipRepairTurn'
+  );
+
+  assert(damagedShipCount(homePlanetAfter.objects.ships) === 0, 'shipRepairTurn did not fully repair stationed ships');
+
+  return {
+    homePlanet: toCoordString(homePlanetBefore.coordinates),
+    damagedBefore: damagedShipCount(homePlanetBefore.objects.ships),
+    damagedAfter: damagedShipCount(homePlanetAfter.objects.ships)
+  };
+}
+
+async function runOrbitRepairLifecycle() {
+  const { session } = await registerAndStartGame('orbitRepairLifecycle');
+  const ownedPlanets = await expectOkResponse(
+    await authed('/game/owned-planets', session.token),
+    'Unable to load owned planets for orbitRepairLifecycle'
+  );
+  const homePlanetBefore = ownedPlanets[0];
+  assert(homePlanetBefore, 'orbitRepairLifecycle did not produce a home planet');
+
+  const activeFleetsBefore = await expectOkResponse(
+    await authed('/game/active-fleets', session.token),
+    'Unable to load active fleets for orbitRepairLifecycle'
+  );
+  assert(activeFleetsBefore.length === 1, 'orbitRepairLifecycle did not seed one idle orbit fleet');
+  assert(damagedShipCount(homePlanetBefore.objects.ships) > 0, 'orbitRepairLifecycle did not seed damaged planet ships');
+  assert(damagedShipCount(activeFleetsBefore[0].ships) > 0, 'orbitRepairLifecycle did not seed damaged orbit fleet ships');
+
+  await expectOkResponse(
+    await authed('/game/end-turn', session.token, { method: 'POST', body: JSON.stringify({}) }),
+    'Unable to resolve end turn for orbitRepairLifecycle'
+  );
+
+  const homePlanetAfter = await expectOkResponse(
+    await authed(
+      `/game/client-planet?x=${homePlanetBefore.coordinates.x}&y=${homePlanetBefore.coordinates.y}&z=${homePlanetBefore.coordinates.z}`,
+      session.token
+    ),
+    'Unable to load home planet after orbitRepairLifecycle'
+  );
+  const activeFleetsAfter = await expectOkResponse(
+    await authed('/game/active-fleets', session.token),
+    'Unable to load active fleets after orbitRepairLifecycle'
+  );
+
+  assert(damagedShipCount(homePlanetAfter.objects.ships) === 0, 'orbitRepairLifecycle did not repair planet ships first');
+  assert(activeFleetsAfter.length === 1, 'orbitRepairLifecycle lost the idle orbit fleet');
+  assert(damagedShipCount(activeFleetsAfter[0].ships) === 0, 'orbitRepairLifecycle did not spill repair into the idle orbit fleet');
+
+  return {
+    homePlanet: toCoordString(homePlanetBefore.coordinates),
+    planetDamagedBefore: damagedShipCount(homePlanetBefore.objects.ships),
+    planetDamagedAfter: damagedShipCount(homePlanetAfter.objects.ships),
+    fleetDamagedBefore: damagedShipCount(activeFleetsBefore[0].ships),
+    fleetDamagedAfter: damagedShipCount(activeFleetsAfter[0].ships)
+  };
+}
+
+async function runRepairWarningsUi(browser) {
+  const { session, setup } = await registerAndStartGame('repairWarningsUi');
+  const ownedPlanets = await expectOkResponse(
+    await authed('/game/owned-planets', session.token),
+    'Unable to load owned planets for repairWarningsUi'
+  );
+  const homePlanet = ownedPlanets[0];
+  assert(homePlanet, 'repairWarningsUi did not produce a home planet');
+  assert(damagedShipCount(homePlanet.objects.ships) > 0, 'repairWarningsUi did not seed damaged ships');
+
+  const browserSession = await createScenarioPage(browser, session, setup);
+  const stepTimings = [];
+
+  try {
+    await timeStep(stepTimings, 'planetWarnings', async () => {
+      await browserSession.page.goto(
+        `${BASE_UI_URL}/game/planet?x=${homePlanet.coordinates.x}&y=${homePlanet.coordinates.y}&z=${homePlanet.coordinates.z}`,
+        { waitUntil: 'domcontentloaded' }
+      );
+      await waitForText(browserSession.page, 'Needs Attention');
+      await waitForText(browserSession.page, 'Damaged ships present');
+      await waitForText(browserSession.page, 'Damaged ships without repair capability');
+      await waitForText(browserSession.page, 'Ship repair: 0');
+      await waitForText(browserSession.page, 'Industry repair:');
+      await waitForText(browserSession.page, 'Drone repair: 0');
+      await dismissTutorialOverlay(browserSession.page);
+    });
+
+    await timeStep(stepTimings, 'imperiumWarnings', async () => {
+      await browserSession.page.goto(`${BASE_UI_URL}/game/imperium`, { waitUntil: 'domcontentloaded' });
+      await waitForText(browserSession.page, 'Needs Attention');
+      await waitForText(browserSession.page, 'Damaged ships present');
+      await waitForText(browserSession.page, 'Damaged ships without repair capability');
+      await waitForText(browserSession.page, 'Ship repair:');
+      await waitForText(browserSession.page, 'Industry repair:');
+      await waitForText(browserSession.page, 'Drone repair:');
+      await dismissTutorialOverlay(browserSession.page);
+    });
+
+    browserSession.monitor.assertClean();
+
+    return {
+      homePlanet: toCoordString(homePlanet.coordinates),
+      damagedShips: damagedShipCount(homePlanet.objects.ships),
       stepTimings
     };
   } finally {
@@ -645,6 +805,7 @@ async function runSmokeSuite(browser) {
   const browserSession = await createScenarioPage(browser, session, setup);
   const stepTimings = [];
   let battleReportSeen = false;
+  const damagedShipsBefore = damagedShipCount(homePlanet.objects.ships);
 
   try {
     await timeStep(stepTimings, 'planetAndQueues', async () => {
@@ -653,6 +814,7 @@ async function runSmokeSuite(browser) {
         { waitUntil: 'domcontentloaded' }
       );
       await waitForText(browserSession.page, 'Planet Parameters');
+      await dismissTutorialOverlay(browserSession.page);
       await browserSession.page.getByRole('button', { name: 'Ships' }).click();
       await waitForText(browserSession.page, 'Ship Damage Status');
       await browserSession.page.getByRole('button', { name: /Queue/i }).click();
@@ -714,7 +876,10 @@ async function runSmokeSuite(browser) {
     assert(homeAfter.objects.buildingQueue.length === 0, 'smokeSuite building queue did not resolve');
     assert(homeAfter.objects.shipyardQueue.length === 0, 'smokeSuite shipyard queue did not resolve');
     assert(homeAfter.objects.currentResearchQueue === null, 'smokeSuite research queue did not resolve');
-    assert(homeAfter.objects.ships.damagedShips.length > 0, 'smokeSuite lost damaged ships');
+    assert(
+      damagedShipCount(homeAfter.objects.ships) <= damagedShipsBefore,
+      'smokeSuite increased damaged ships unexpectedly'
+    );
     assert(battleReportSeen, 'smokeSuite did not produce a battle report');
     assert(
       targetAfter.objects.spaceDebris.metal > 0
@@ -726,6 +891,7 @@ async function runSmokeSuite(browser) {
     await timeStep(stepTimings, 'reportsAfterTurn', async () => {
       await browserSession.page.goto(`${BASE_UI_URL}/game/reports`, { waitUntil: 'domcontentloaded' });
       await waitForText(browserSession.page, 'Inbox');
+      await dismissTutorialOverlay(browserSession.page);
     });
 
     browserSession.monitor.assertClean();
@@ -747,6 +913,9 @@ const scenarioRunners = {
   fleetLifecycle: runFleetLifecycle,
   battleDebris: runBattleDebris,
   damagedShipsUi: runDamagedShipsUi,
+  shipRepairTurn: runShipRepairTurn,
+  orbitRepairLifecycle: runOrbitRepairLifecycle,
+  repairWarningsUi: runRepairWarningsUi,
   smokeSuite: runSmokeSuite
 };
 

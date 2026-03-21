@@ -26,6 +26,9 @@ export const SMOKE_TEST_SCENARIO_KEYS = [
   'fleetLifecycle',
   'battleDebris',
   'damagedShipsUi',
+  'shipRepairTurn',
+  'orbitRepairLifecycle',
+  'repairWarningsUi',
   'smokeSuite'
 ] as const;
 
@@ -55,6 +58,15 @@ export function applySmokeTestScenario(galaxy: Galaxy, scenario: SmokeTestScenar
       return;
     case 'damagedShipsUi':
       applyDamagedShipsUiScenario(galaxy);
+      return;
+    case 'shipRepairTurn':
+      applyShipRepairTurnScenario(galaxy);
+      return;
+    case 'orbitRepairLifecycle':
+      applyOrbitRepairLifecycleScenario(galaxy);
+      return;
+    case 'repairWarningsUi':
+      applyRepairWarningsUiScenario(galaxy);
       return;
     case 'smokeSuite':
       applySmokeSuiteScenario(galaxy);
@@ -191,6 +203,69 @@ function applyDamagedShipsUiScenario(galaxy: Galaxy): void {
   galaxy.activeFleets = [];
 }
 
+function applyShipRepairTurnScenario(galaxy: Galaxy): void {
+  const player = getPrimaryHumanPlayer(galaxy);
+  const homePlanet = getHomePlanet(player);
+  configureRepairPlanet(homePlanet, {
+    resources: new ResourcesPack(700, 500, 400),
+    shipyardLevel: 1,
+    undamagedShips: [],
+    damagedShips: [
+      { type: ShipType.CRUISER, hull: Math.max(1, shipHullCapacity(ShipType.CRUISER) - 20) }
+    ]
+  });
+  galaxy.activeFleets = [];
+}
+
+function applyOrbitRepairLifecycleScenario(galaxy: Galaxy): void {
+  const player = getPrimaryHumanPlayer(galaxy);
+  const homePlanet = getHomePlanet(player);
+  configureRepairPlanet(homePlanet, {
+    resources: new ResourcesPack(900, 700, 500),
+    shipyardLevel: 1,
+    undamagedShips: [],
+    damagedShips: [
+      { type: ShipType.CRUISER, hull: Math.max(1, shipHullCapacity(ShipType.CRUISER) - 10) }
+    ]
+  });
+
+  galaxy.activeFleets = [
+    new Fleet(
+      1,
+      player.playerId,
+      FleetMissionType.MOVE,
+      destinationOf(homePlanet),
+      destinationOf(homePlanet),
+      homePlanet.basicInfo.name,
+      homePlanet.basicInfo.name,
+      manyDamagedShips([{ type: ShipType.CRUISER, hull: Math.max(1, shipHullCapacity(ShipType.CRUISER) - 20) }]),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.IDLE,
+      galaxy.currentTurn
+    )
+  ];
+  galaxy.nextFleetId = 2;
+}
+
+function applyRepairWarningsUiScenario(galaxy: Galaxy): void {
+  const player = getPrimaryHumanPlayer(galaxy);
+  const homePlanet = getHomePlanet(player);
+  configureRepairPlanet(homePlanet, {
+    resources: new ResourcesPack(600, 450, 300),
+    shipyardLevel: 0,
+    undamagedShips: [{ type: ShipType.TRANSPORTER, amount: 1 }],
+    damagedShips: [
+      { type: ShipType.TRANSPORTER, hull: Math.max(1, shipHullCapacity(ShipType.TRANSPORTER) - 30) }
+    ]
+  });
+  galaxy.activeFleets = [];
+}
+
 function applySmokeSuiteScenario(galaxy: Galaxy): void {
   applyFleetLifecycleScenario(galaxy);
 
@@ -285,6 +360,45 @@ function configureOperationalPlanet(
   }
 
   for (const entry of options.damagedShips ?? []) {
+    planet.rBDSFTQ.ships.addDamaged(entry.type, entry.hull);
+  }
+}
+
+function configureRepairPlanet(
+  planet: Planet,
+  options: {
+    resources: ResourcesPack;
+    shipyardLevel: number;
+    undamagedShips: Array<{ type: ShipType; amount: number }>;
+    damagedShips: Array<{ type: ShipType; hull: number }>;
+  }
+): void {
+  setBuildingLevels(planet, new Map([
+    [BuildingType.SOLAR_WIND_GEOTHERMAL, 3],
+    [BuildingType.SHIPYARD, Math.max(0, options.shipyardLevel)]
+  ]));
+
+  planet.info.planetaryParameters.industryModifier = 1;
+  planet.info.planetaryParameters.energyModifierRES = 1;
+  planet.info.planetaryParameters.energyModifierNuclear = 1;
+  planet.rBDSFTQ.resources = new ResourcesPack(
+    options.resources.metal,
+    options.resources.crystal,
+    options.resources.deuterium
+  );
+  planet.rBDSFTQ.buildingQueue = [];
+  planet.rBDSFTQ.shipyardQueue = [];
+  planet.rBDSFTQ.currentResearchQueue = null;
+  planet.rBDSFTQ.researchHelperFor = null;
+  planet.rBDSFTQ.fleets = [];
+  planet.rBDSFTQ.spaceDebris = new ResourcesPack(0, 0, 0);
+  planet.rBDSFTQ.ships = ManyShips.empty();
+
+  for (const entry of options.undamagedShips) {
+    planet.rBDSFTQ.ships.addUndamaged(entry.type, entry.amount);
+  }
+
+  for (const entry of options.damagedShips) {
     planet.rBDSFTQ.ships.addDamaged(entry.type, entry.hull);
   }
 }
@@ -584,5 +698,14 @@ function addDamagedShips(
 function manyUndamagedShips(entry: { type: ShipType; amount: number }): ManyShips {
   const ships = ManyShips.empty();
   ships.addUndamaged(entry.type, entry.amount);
+  return ships;
+}
+
+function manyDamagedShips(entries: Array<{ type: ShipType; hull: number }>): ManyShips {
+  const ships = ManyShips.empty();
+  for (const entry of entries) {
+    ships.addDamaged(entry.type, entry.hull);
+  }
+
   return ships;
 }

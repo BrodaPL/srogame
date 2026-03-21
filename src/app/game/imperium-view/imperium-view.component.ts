@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
@@ -10,6 +10,7 @@ import { Building } from '../../models/buildings/building';
 import { BuildingType } from '../../models/enums/building-type';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
+import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import type {
   BuildingQueueEntryDto,
@@ -18,6 +19,7 @@ import type {
   TechnologyQueueEntryDto
 } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
+import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
@@ -46,6 +48,9 @@ type PlanetPowerState = {
   industryPower: number;
   shipyardPower: number;
   researchPower: number;
+  shipRepair: number;
+  industryRepair: number;
+  droneRepair: number;
   industryPowerLimited: boolean;
   shipyardPowerLimited: boolean;
   researchPowerLimited: boolean;
@@ -130,6 +135,7 @@ export class ImperiumViewComponent implements OnInit {
   protected isLoading = false;
   protected loadError: string | null = null;
   protected ownedPlanets: ClientPlanetDto[] = [];
+  protected activeFleets: Fleet[] = [];
   protected planetVms: ImperiumPlanetVm[] = [];
   protected attentionItems: ImperiumAttentionVm[] = [];
   protected shipSummaries: ImperiumShipSummaryVm[] = [];
@@ -229,14 +235,18 @@ export class ImperiumViewComponent implements OnInit {
     this.isLoading = true;
     this.loadError = null;
 
-    this.gameApi.getOwnedPlanets(session.token)
+    forkJoin({
+      ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
+      activeFleets: this.gameApi.getActiveFleets(session.token)
+    })
       .pipe(finalize(() => {
         this.isLoading = false;
         this.cdr.markForCheck();
       }))
       .subscribe({
-        next: (ownedPlanets) => {
+        next: ({ ownedPlanets, activeFleets }) => {
           this.ownedPlanets = [...ownedPlanets];
+          this.activeFleets = [...activeFleets];
           this.rebuildDashboardState();
           this.tutorialService.autoOpenTutorial('imperiumView');
         },
@@ -277,6 +287,9 @@ export class ImperiumViewComponent implements OnInit {
     let totalIndustryPower = 0;
     let totalShipyardPower = 0;
     let totalResearchPower = 0;
+    let totalShipRepair = 0;
+    let totalIndustryRepair = 0;
+    let totalDroneRepair = 0;
     let hasIndustryLimit = false;
     let hasShipyardLimit = false;
     let hasResearchLimit = false;
@@ -307,6 +320,9 @@ export class ImperiumViewComponent implements OnInit {
       totalIndustryPower += planetVm.powers.industryPower;
       totalShipyardPower += planetVm.powers.shipyardPower;
       totalResearchPower += planetVm.powers.researchPower;
+      totalShipRepair += planetVm.powers.shipRepair;
+      totalIndustryRepair += planetVm.powers.industryRepair;
+      totalDroneRepair += planetVm.powers.droneRepair;
 
       hasIndustryLimit = hasIndustryLimit || planetVm.powers.industryPowerLimited;
       hasShipyardLimit = hasShipyardLimit || planetVm.powers.shipyardPowerLimited;
@@ -352,6 +368,9 @@ export class ImperiumViewComponent implements OnInit {
       industryPower: this.roundNumber(totalIndustryPower, 2),
       shipyardPower: this.roundNumber(totalShipyardPower, 2),
       researchPower: this.roundNumber(totalResearchPower, 2),
+      shipRepair: this.roundNumber(totalShipRepair, 2),
+      industryRepair: this.roundNumber(totalIndustryRepair, 2),
+      droneRepair: this.roundNumber(totalDroneRepair, 2),
       industryPowerLimited: hasIndustryLimit,
       shipyardPowerLimited: hasShipyardLimit,
       researchPowerLimited: hasResearchLimit
@@ -439,6 +458,18 @@ export class ImperiumViewComponent implements OnInit {
         'Reduced research power',
         'Research Lab power allocation is below the selected maximum.',
         planetVms.filter((planetVm) => planetVm.powers.researchPowerLimited)
+      ),
+      this.createAttentionItem(
+        'damagedShipsPresent',
+        'Damaged ships present',
+        'Stationed or idle orbit fleets above these planets still have hull damage.',
+        planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Damaged ships present'))
+      ),
+      this.createAttentionItem(
+        'damagedShipsNoRepair',
+        'Damaged ships without repair capability',
+        'Damaged ships are present but this location currently has no repair capability.',
+        planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Damaged ships without repair capability'))
       )
     ].filter((entry): entry is ImperiumAttentionVm => entry !== null);
   }
@@ -545,6 +576,17 @@ export class ImperiumViewComponent implements OnInit {
       labels.push('Reduced research power');
     }
 
+    if (this.hasDamagedShipsAtPlanet(planet)) {
+      labels.push('Damaged ships present');
+    }
+
+    if (
+      this.hasDamagedShipsAtPlanet(planet)
+      && powers.shipRepair + powers.droneRepair <= 0
+    ) {
+      labels.push('Damaged ships without repair capability');
+    }
+
     return labels;
   }
 
@@ -641,11 +683,30 @@ export class ImperiumViewComponent implements OnInit {
     );
     const energyState = this.energyState(planet, techLevels);
     const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
+    const industryPower = Math.max(0, Math.floor(
+      roboticsPower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency
+    ));
+    const shipyardPower = Math.max(0, Math.floor(
+      shipyardBasePower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency
+    ));
+    const researchPower = Math.max(0, Math.floor(
+      researchLabProduction * totalResearchMultiplier * scienceModifier * energyEfficiency
+    ));
+    let shipRepair = calculateRepairCapabilityForManyShips(planet.objects.ships, { shipyardPower }).shipRepair;
+    let droneRepair = calculateRepairCapabilityForManyShips(planet.objects.ships).droneRepair;
+    for (const fleet of this.idleRepairFleetsForPlanet(planet)) {
+      const fleetCapability = calculateRepairCapabilityForManyShips(fleet.ships);
+      shipRepair += fleetCapability.shipRepair;
+      droneRepair += fleetCapability.droneRepair;
+    }
 
     return {
-      industryPower: Math.max(0, Math.floor(roboticsPower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency)),
-      shipyardPower: Math.max(0, Math.floor(shipyardBasePower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency)),
-      researchPower: Math.max(0, Math.floor(researchLabProduction * totalResearchMultiplier * scienceModifier * energyEfficiency)),
+      industryPower,
+      shipyardPower,
+      researchPower,
+      shipRepair,
+      industryRepair: industryPower,
+      droneRepair,
       industryPowerLimited: this.isBuildingPowerLimited(planet, BuildingType.ROBOTICS_FACTORY)
         || this.isBuildingPowerLimited(planet, BuildingType.NANITE_FACTORY),
       shipyardPowerLimited: this.isBuildingPowerLimited(planet, BuildingType.SHIPYARD)
@@ -779,6 +840,29 @@ export class ImperiumViewComponent implements OnInit {
     }
 
     return techLevels;
+  }
+
+  private hasDamagedShipsAtPlanet(planet: ClientPlanetDto): boolean {
+    if (ManyShips.hasDamagedShips(planet.objects.ships)) {
+      return true;
+    }
+
+    return this.idleRepairFleetsForPlanet(planet).some((fleet) => ManyShips.hasDamagedShips(fleet.ships));
+  }
+
+  private idleRepairFleetsForPlanet(planet: ClientPlanetDto): Fleet[] {
+    return this.activeFleets.filter((fleet) => {
+      if (fleet.state !== FleetState.IDLE && fleet.state !== FleetState.MISSION_FAILURE_IDLE) {
+        return false;
+      }
+
+      const coordinates = fleet.state === FleetState.MISSION_FAILURE_IDLE
+        ? fleet.origin
+        : fleet.target;
+      return coordinates.x === planet.coordinates.x
+        && coordinates.y === planet.coordinates.y
+        && coordinates.z === planet.coordinates.z;
+    });
   }
 
   private buildingLevel(planet: ClientPlanetDto, buildingType: BuildingType): number {

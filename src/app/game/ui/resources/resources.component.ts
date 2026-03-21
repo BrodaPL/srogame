@@ -16,6 +16,9 @@ export type PlanetPowersDisplay = {
   industryPowerLimited: boolean;
   shipyardPowerLimited: boolean;
   researchPowerLimited: boolean;
+  shipRepair?: number | null;
+  industryRepair?: number | null;
+  droneRepair?: number | null;
 };
 
 export type ResourceHeaderIndicator = {

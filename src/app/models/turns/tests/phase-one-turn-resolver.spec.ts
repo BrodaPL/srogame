@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
+import { BuildingType } from '../../enums/building-type';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
 import { PlayerType } from '../../enums/player-type';
 import { ShipType } from '../../enums/ship-type';
@@ -32,6 +33,27 @@ function manyShips(...entries: Array<{ type: ShipType; amount: number }>): ManyS
   const ships = ManyShips.empty();
   for (const entry of entries) {
     ships.addUndamaged(entry.type, entry.amount);
+  }
+
+  return ships;
+}
+
+function mixedShips(options: {
+  undamaged?: Array<{ type: ShipType; amount: number }>;
+  damaged?: Array<{ type: ShipType; missingHull: number }>;
+}): ManyShips {
+  const ships = ManyShips.empty();
+  for (const entry of options.undamaged ?? []) {
+    ships.addUndamaged(entry.type, entry.amount);
+  }
+
+  for (const entry of options.damaged ?? []) {
+    const blueprint = blueprints.get(entry.type);
+    if (!blueprint) {
+      throw new Error(`Missing blueprint for ${entry.type}`);
+    }
+
+    ships.addDamaged(entry.type, blueprint.hullPointsCapacity - entry.missingHull);
   }
 
   return ships;
@@ -655,5 +677,131 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(galaxy.activeFleets[0].ownerId).toBe(1);
     expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
     expect(ManyShips.countByType(galaxy.activeFleets[0].ships).get(ShipType.TITAN)).toBe(1);
+  });
+
+  it('prioritizes non-small damaged ships for strong repair equipment', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[0].rBDSFTQ.ships = mixedShips({
+          undamaged: [{ type: ShipType.CARGO_SUPPORT, amount: 1 }],
+          damaged: [
+            { type: ShipType.FIGHTER, missingHull: 5 },
+            { type: ShipType.CRUISER, missingHull: 30 }
+          ]
+        });
+      },
+      (solarSystem) => ([new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER)])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    const damagedCounts = ManyShips.damagedCountByType(system.planets[0].rBDSFTQ.ships);
+    expect(damagedCounts.get(ShipType.CRUISER) ?? 0).toBe(0);
+    expect(damagedCounts.get(ShipType.FIGHTER) ?? 0).toBe(1);
+    expect(ManyShips.undamagedCountByType(system.planets[0].rBDSFTQ.ships).get(ShipType.CRUISER) ?? 0).toBe(1);
+  });
+
+  it('uses leftover shipyard repair on idle orbit fleets after repairing planet ships first', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const idleFleet = new Fleet(
+      200,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 0),
+      'Alpha Prime',
+      'Alpha Prime',
+      mixedShips({
+        damaged: [{ type: ShipType.CRUISER, missingHull: 20 }]
+      }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.IDLE,
+      1
+    );
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [idleFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[0].info.planetaryParameters.industryModifier = 1;
+        solarSystem.planets[0].info.planetaryParameters.energyModifierRES = 1;
+        solarSystem.planets[0].info.planetaryParameters.energyModifierNuclear = 1;
+        solarSystem.planets[0].setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 3);
+        solarSystem.planets[0].setBuildingLevel(BuildingType.SHIPYARD, 1);
+        solarSystem.planets[0].rBDSFTQ.ships = mixedShips({
+          damaged: [{ type: ShipType.CRUISER, missingHull: 10 }]
+        });
+      },
+      (solarSystem) => ([new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER)])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(ManyShips.hasDamagedShips(system.planets[0].rBDSFTQ.ships)).toBe(false);
+    expect(ManyShips.hasDamagedShips(galaxy.activeFleets[0].ships)).toBe(false);
+    expect(ManyShips.undamagedCountByType(galaxy.activeFleets[0].ships).get(ShipType.CRUISER) ?? 0).toBe(1);
+  });
+
+  it('repairs allied idle fleets in orbit with the host planet shipyard power', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const alliedIdleFleet = new Fleet(
+      201,
+      2,
+      FleetMissionType.MOVE,
+      point(1, 1, 2),
+      point(1, 1, 0),
+      'Beta Forward',
+      'Alpha Prime',
+      mixedShips({
+        damaged: [{ type: ShipType.CRUISER, missingHull: 20 }]
+      }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.IDLE,
+      1
+    );
+
+    const { galaxy } = createGalaxyWithPlayers(
+      [alliedIdleFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[0].info.planetaryParameters.industryModifier = 1;
+        solarSystem.planets[0].info.planetaryParameters.energyModifierRES = 1;
+        solarSystem.planets[0].info.planetaryParameters.energyModifierNuclear = 1;
+        solarSystem.planets[0].setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 3);
+        solarSystem.planets[0].setBuildingLevel(BuildingType.SHIPYARD, 1);
+        solarSystem.planets[2].basicInfo.name = 'Beta Forward';
+        solarSystem.planets[2].info.ownerId = 2;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(ManyShips.hasDamagedShips(galaxy.activeFleets[0].ships)).toBe(false);
+    expect(ManyShips.undamagedCountByType(galaxy.activeFleets[0].ships).get(ShipType.CRUISER) ?? 0).toBe(1);
   });
 });

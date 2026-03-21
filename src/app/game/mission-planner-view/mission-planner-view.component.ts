@@ -10,7 +10,6 @@ import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { ShipPurpose } from '../../models/enums/ship-purpose';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
-import { WeaponType } from '../../models/enums/weapon-type';
 import { Fleet } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import type {
@@ -22,6 +21,7 @@ import type {
 import { Ship } from '../../models/fleets/ship';
 import { FleetMissionRegistry } from '../../models/missions/fleet-mission-registry';
 import type { MissionPlannerContext } from '../../models/missions/mission-context';
+import { calculateRepairCapabilityFromEntries } from '../../models/repairs/ship-repair-capability';
 import { maxActiveFleets } from '../../models/tech/technology-effects';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -199,7 +199,7 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected warningRows(): MissionWarningVm[] {
     const warnings = this.currentMission().getPlannerChecks(this.buildPlannerContext());
-    if (this.selectedShipAmount(ShipType.REPAIR_DRONE) <= 0) {
+    if ((this.selectedRepairCapability().shipRepair + this.selectedRepairCapability().droneRepair) <= 0) {
       warnings.push({ text: 'No repair capacity selected.', severity: 'note' });
     }
 
@@ -260,8 +260,12 @@ export class MissionPlannerViewComponent implements OnInit {
     return total;
   }
 
-  protected repairSummaryLabel(): string {
-    return `${this.totalRepairPower()}|${this.totalRepairEquipmentCount()}x`;
+  protected shipRepairCapabilityLabel(): string {
+    return `${this.selectedRepairCapability().shipRepair}`;
+  }
+
+  protected droneRepairCapabilityLabel(): string {
+    return `${this.selectedRepairCapability().droneRepair}`;
   }
 
   protected distancePreview(): number {
@@ -296,46 +300,6 @@ export class MissionPlannerViewComponent implements OnInit {
     }
 
     return Math.max(0, totalFuel * fuelMultiplier);
-  }
-
-  protected totalRepairPower(): number {
-    let total = 0;
-    for (const entry of this.selectedShipEntries()) {
-      const blueprint = this.shipBlueprintsByType.get(entry.type);
-      if (!blueprint) {
-        continue;
-      }
-
-      for (const weapon of blueprint.weapons) {
-        if (weapon.type !== WeaponType.REPAIR_EQIPMENT) {
-          continue;
-        }
-
-        total += weapon.dmg * weapon.shots * this.selectedShipSelectionAmount(entry);
-      }
-    }
-
-    return total;
-  }
-
-  protected totalRepairEquipmentCount(): number {
-    let total = 0;
-    for (const entry of this.selectedShipEntries()) {
-      const blueprint = this.shipBlueprintsByType.get(entry.type);
-      if (!blueprint) {
-        continue;
-      }
-
-      for (const weapon of blueprint.weapons) {
-        if (weapon.type !== WeaponType.REPAIR_EQIPMENT) {
-          continue;
-        }
-
-        total += weapon.shots * this.selectedShipSelectionAmount(entry);
-      }
-    }
-
-    return total;
   }
 
   protected onMissionTypeChange(): void {
@@ -644,6 +608,12 @@ export class MissionPlannerViewComponent implements OnInit {
 
   private selectedShipSelectionAmount(entry: CreateFleetShipSelectionEntry): number {
     return entry.undamagedAmount + entry.damagedAmount;
+  }
+
+  private selectedRepairCapability() {
+    return calculateRepairCapabilityFromEntries(
+      this.selectedShipEntries().map((entry) => [entry.type, this.selectedShipSelectionAmount(entry)] as [ShipType, number])
+    );
   }
 
   private parseCoordinates(value: string): ClientCoordinates | null {
