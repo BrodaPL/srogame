@@ -1,157 +1,182 @@
+.tutorial-overlay {
+  --tutorial-bubble-min-height: 20rem;
+  --tutorial-bubble-max-height: 40rem;
+  --tutorial-character-width: 16.25rem;
+  --tutorial-character-height: 23.75rem;
+}
+
 .tutorial-overlay__backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(3, 6, 10, 0.14);
+  background: rgba(3, 6, 10, 0.18);
   z-index: 1400;
+}
+
+.tutorial-overlay__spotlight {
+  position: fixed;
+  z-index: 1401;
+  border-radius: 20px;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(7, 11, 18, 0.56);
+  transition:
+    box-shadow 140ms ease,
+    transform 140ms ease,
+    opacity 140ms ease;
+}
+
+.tutorial-overlay__spotlight--highlight {
+  box-shadow:
+    0 0 0 3px rgba(246, 180, 76, 0.96),
+    0 0 0 8px rgba(246, 180, 76, 0.22),
+    0 0 0 9999px rgba(7, 11, 18, 0.58);
 }
 
 .tutorial-overlay {
   position: fixed;
-  inset: auto 2rem 1.25rem 2rem;
-  z-index: 1401;
+  inset: 0;
+  z-index: 1402;
   pointer-events: none;
 }
 
 .tutorial-overlay__dock {
+  position: fixed;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-  pointer-events: auto;
-}
-
-.tutorial-overlay--right .tutorial-overlay__dock {
   align-items: flex-end;
+  gap: 0.625rem;
+  pointer-events: none;
 }
 
-.tutorial-overlay--bubble-top .tutorial-overlay__bubble {
-  order: 0;
-  margin-bottom: -1.1rem;
+.tutorial-overlay__dock--character-left {
+  flex-direction: row;
 }
 
-.tutorial-overlay--bubble-top .tutorial-overlay__character-pane {
-  order: 1;
-}
-
-.tutorial-overlay--bubble-bottom .tutorial-overlay__character-pane {
-  order: 0;
-}
-
-.tutorial-overlay--bubble-bottom .tutorial-overlay__bubble {
-  order: 1;
-  margin-top: -1.1rem;
+.tutorial-overlay__dock--character-right {
+  flex-direction: row-reverse;
 }
 
 .tutorial-overlay__bubble {
-  width: min(34rem, calc(100vw - 6rem));
-  max-height: min(20rem, 42vh);
+  width: min(36.25rem, calc(100vw - 24rem));
+  min-height: var(--tutorial-bubble-min-height, 20rem);
+  max-height: var(--tutorial-bubble-max-height, 40rem);
   display: grid;
-  gap: 0.75rem;
-  padding: 0.95rem 1.05rem;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  padding: 1.05rem 1.15rem 0;
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(14, 18, 26, 0.74);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+  background: rgba(14, 18, 26, 0.86);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
   overflow: auto;
+  pointer-events: auto;
 }
 
 .tutorial-overlay__bubble-topbar {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.tutorial-overlay__bubble-topbar-left {
+  display: flex;
+  align-items: center;
   gap: 0.7rem;
+  min-width: 0;
 }
 
 .tutorial-overlay__bubble-header {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.22rem;
 }
 
 .tutorial-overlay__eyebrow {
   margin: 0;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(246, 180, 76, 0.95);
 }
 
+.tutorial-overlay__eyebrow--topbar {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .tutorial-overlay__title {
   margin: 0;
-  font-size: clamp(1.15rem, 1.9vw, 1.55rem);
+  font-size: clamp(1.28rem, 1.55vw, 1.72rem);
+  line-height: 1.16;
   color: #fff8eb;
+}
+
+.tutorial-overlay__bubble-body {
+  min-height: 7rem;
+  overflow: auto;
+  padding-right: 0.15rem;
 }
 
 .tutorial-overlay__text {
   color: #eef4ff;
-  line-height: 1.58;
+  font-size: 1rem;
+  line-height: 1.68;
 }
 
 .tutorial-overlay__inline-image {
   width: 100%;
-  max-height: 220px;
+  max-height: 260px;
   object-fit: contain;
   border-radius: 14px;
+  margin-top: 0.8rem;
 }
 
 .tutorial-overlay__bubble-actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.7rem;
+  padding: 0.85rem 0 1rem;
+  background:
+    linear-gradient(180deg, rgba(14, 18, 26, 0), rgba(14, 18, 26, 0.94) 24%, rgba(14, 18, 26, 0.98) 100%);
 }
 
 .tutorial-overlay__character-pane {
-  width: clamp(250px, 23vw, 330px);
-  height: clamp(360px, 50vh, 520px);
+  width: var(--tutorial-character-width, 16.25rem);
+  height: var(--tutorial-character-height, 23.75rem);
   display: grid;
-  grid-template-rows: 1fr auto auto;
-  gap: 0.6rem;
-  padding: 0.7rem 0.7rem 0.85rem;
-  border-radius: 24px;
+  align-items: end;
+  justify-items: center;
+  align-self: end;
 }
 
 .tutorial-overlay__character-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  align-self: end;
-  justify-self: center;
-  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.24));
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.28));
 }
 
 .tutorial-overlay__character-image--mirrored {
   transform: scaleX(-1);
 }
 
-.tutorial-overlay__character-meta {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.tutorial-overlay__character-meta-spacer {
-  min-height: 0.1rem;
-}
-
 .tutorial-overlay__progress {
   margin: 0;
-  padding: 0.38rem 0.72rem;
+  padding: 0.42rem 0.76rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   color: #edf3fb;
   font-weight: 700;
 }
 
-.tutorial-overlay__character-actions {
-  display: grid;
-  gap: 0.55rem;
-}
-
 .tutorial-overlay__button {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  padding: 0.62rem 1rem;
+  padding: 0.66rem 1.06rem;
   background: rgba(255, 255, 255, 0.05);
   color: #f4f7fb;
   font-weight: 700;
@@ -164,18 +189,14 @@
   color: #16110a;
 }
 
-.tutorial-overlay__button--secondary {
-  background: rgba(255, 255, 255, 0.07);
-}
-
 .tutorial-overlay__button--danger {
   background: rgba(193, 51, 51, 0.12);
   border-color: rgba(193, 51, 51, 0.4);
 }
 
 .tutorial-overlay__button--bubble-utility {
-  padding: 0.34rem 0.72rem;
-  font-size: 0.76rem;
+  padding: 0.36rem 0.76rem;
+  font-size: 0.78rem;
   line-height: 1.1;
 }
 
@@ -189,22 +210,24 @@
 }
 
 .tutorial-overlay__confirm-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.12);
-  border-radius: 28px;
+  background: rgba(0, 0, 0, 0.16);
+  z-index: 1;
 }
 
 .tutorial-overlay__confirm {
-  position: absolute;
-  inset: auto 0 0 auto;
-  width: min(360px, calc(100vw - 4rem));
+  position: fixed;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  width: min(360px, calc(100vw - 2rem));
   padding: 1rem;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(12, 16, 24, 0.88);
+  background: rgba(12, 16, 24, 0.92);
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
-  z-index: 1;
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .tutorial-overlay__confirm-actions {
@@ -214,37 +237,8 @@
   margin-top: 1rem;
 }
 
-@media (max-width: 980px) {
-  .tutorial-overlay {
-    inset: auto 1rem 1rem 1rem;
-  }
-
-  .tutorial-overlay__bubble {
-    width: min(30rem, calc(100vw - 2rem));
-  }
-}
-
-@media (max-width: 640px) {
-  .tutorial-overlay {
-    inset: auto 0.6rem 0.6rem 0.6rem;
-  }
-
-  .tutorial-overlay__bubble {
-    width: min(100%, calc(100vw - 1.2rem));
-    max-height: 34vh;
-    padding: 0.85rem 0.9rem;
-  }
-
-  .tutorial-overlay__character-pane {
-    width: min(100%, 280px);
-    height: 390px;
-  }
-
-  .tutorial-overlay__bubble-actions {
-    gap: 0.5rem;
-  }
-
-  .tutorial-overlay__button {
-    padding-inline: 0.85rem;
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-overlay__spotlight {
+    transition: none;
   }
 }

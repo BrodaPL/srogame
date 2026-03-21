@@ -31,6 +31,7 @@
       <div
         #bottomScroll
         class="galaxy-grid-scroll"
+        data-tutorial-id="galactic-grid"
         (scroll)="onBottomScrollbarScroll()"
       >
         <div
@@ -43,6 +44,7 @@
             @for (cell of row; track $index) {
               <div
                 class="galaxy-cell"
+                [attr.data-tutorial-id]="isHomeSystemCell(cell) ? 'galactic-home-cell' : null"
                 [class.galaxy-cell--selected]="selectedCell?.x === cell.x && selectedCell?.y === cell.y"
                 [class.galaxy-cell--void]="cell.isVoid"
                 [class.galaxy-cell--center]="cell.isCenter"
@@ -88,7 +90,7 @@
     }
   </section>
 
-  <aside class="star-system-preview">
+  <aside class="star-system-preview" data-tutorial-id="galactic-system-preview">
     <h3 class="star-system-preview__title">Star System Preview</h3>
 
     @if (!selectedCell) {
@@ -101,7 +103,7 @@
         <p class="star-system-preview__meta-line">Asteroids: {{ selectedAsteroidsCountLabel() }}</p>
       </div>
 
-      <div class="star-system-preview__actions">
+      <div class="star-system-preview__actions" data-tutorial-id="galactic-note-action">
         <button type="button" class="star-system-preview__button" disabled title="Coming in future session">
           Send spy probes
         </button>
@@ -158,7 +160,7 @@
         <p class="overview-empty">{{ selectedSystemError }}</p>
       } @else if (selectedSystem) {
         @if (selectedSystemPlanets.length > 0) {
-          <div class="star-system-preview__planets">
+          <div class="star-system-preview__planets" data-tutorial-id="galactic-planet-mini-cards">
             @for (planet of selectedSystemPlanets; track planet.coordinates.z) {
               <app-mini-planet-preview [planet]="planet" />
             }

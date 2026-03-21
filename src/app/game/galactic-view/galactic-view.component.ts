@@ -51,6 +51,10 @@ type GalacticCellVm = {
   tooltip: string;
 };
 
+type SelectCellOptions = {
+  onSettled?: () => void;
+};
+
 @Component({
   selector: 'app-galactic-view',
   imports: [TopMenuComponent, MiniPlanetPreviewComponent, FormsModule],
@@ -79,6 +83,7 @@ export class GalacticViewComponent implements OnInit {
   protected gridWidth = 0;
   protected gridHeight = 0;
   protected galaxyName: string | null = null;
+  protected homeSystemCoordinates: { x: number; y: number } | null = null;
   protected topScrollContentWidth = 0;
   protected isLoading = false;
   protected loadError: string | null = null;
@@ -135,8 +140,11 @@ export class GalacticViewComponent implements OnInit {
           this.grid = this.buildGrid(response);
           this.gridHeight = this.grid.length;
           this.gridWidth = this.grid[0]?.length ?? 0;
+          this.homeSystemCoordinates = this.resolveHomeSystemCoordinates(response.ownedPlanets);
           this.syncScrollbars();
-          this.tutorialService.autoOpenTutorial('galacticView');
+          this.autoSelectHomeSystem(() => {
+            this.tutorialService.autoOpenTutorial('galacticView');
+          });
           this.cdr.markForCheck();
         },
         error: () => {
@@ -184,6 +192,14 @@ export class GalacticViewComponent implements OnInit {
   }
 
   protected onCellClick(cell: GalacticCellVm): void {
+    this.selectCell(cell);
+  }
+
+  protected isHomeSystemCell(cell: GalacticCellVm): boolean {
+    return this.homeSystemCoordinates?.x === cell.x && this.homeSystemCoordinates?.y === cell.y;
+  }
+
+  private selectCell(cell: GalacticCellVm, options: SelectCellOptions = {}): void {
     this.selectedCell = cell;
     this.selectedSystem = null;
     this.selectedSystemPlanets = [];
@@ -200,6 +216,7 @@ export class GalacticViewComponent implements OnInit {
     if (cached) {
       this.selectedSystem = cached;
       this.selectedSystemPlanets = this.sortPlanetsByOrder(cached.planets);
+      options.onSettled?.();
       this.cdr.markForCheck();
       return;
     }
@@ -207,6 +224,7 @@ export class GalacticViewComponent implements OnInit {
     const session = this.playerSession.load();
     if (!session) {
       this.selectedSystemError = 'No player session found. Start a new game.';
+      options.onSettled?.();
       this.cdr.markForCheck();
       return;
     }
@@ -221,6 +239,7 @@ export class GalacticViewComponent implements OnInit {
         }
 
         this.selectedSystemLoading = false;
+        options.onSettled?.();
         this.cdr.markForCheck();
       }))
       .subscribe({
@@ -479,6 +498,44 @@ export class GalacticViewComponent implements OnInit {
     } catch {
       return null;
     }
+  }
+
+  private autoSelectHomeSystem(onSettled: () => void): void {
+    if (this.selectedCell) {
+      onSettled();
+      return;
+    }
+
+    const homeCoordinates = this.homeSystemCoordinates;
+    if (!homeCoordinates) {
+      onSettled();
+      return;
+    }
+
+    const homeCell = this.grid[homeCoordinates.y]?.[homeCoordinates.x] ?? null;
+    if (!homeCell) {
+      onSettled();
+      return;
+    }
+
+    this.selectCell(homeCell, { onSettled });
+  }
+
+  private resolveHomeSystemCoordinates(
+    ownedPlanets: ClientPlanetDto[]
+  ): { x: number; y: number } | null {
+    if (ownedPlanets.length === 0) {
+      return null;
+    }
+
+    const homePlanet = [...ownedPlanets].sort(
+      (left, right) => left.basicInfo.order - right.basicInfo.order
+    )[0];
+
+    return {
+      x: homePlanet.coordinates.x,
+      y: homePlanet.coordinates.y
+    };
   }
 
   private buildGrid(data: GalaxyPresentationDataDto): GalacticCellVm[][] {

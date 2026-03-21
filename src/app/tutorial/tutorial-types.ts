@@ -25,6 +25,8 @@ export type TutorialStep = {
   mirrorCharacter?: boolean;
   imagePath?: string;
   imageAlt?: string;
+  targetId?: string;
+  targetPadding?: number;
 };
 
 export type TutorialEntry = {

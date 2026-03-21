@@ -372,46 +372,74 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
       {
         heading: 'Welcome to Galaxy View',
         bodyHtml: `
-          <p>This screen is your strategic map of the whole discovered galaxy.</p>
-          <p>You can scan systems, estimate occupancy, and decide where to inspect, spy, colonize, or expand next.</p>
+          <p>This grid is your strategic map of the discovered galaxy.</p>
+          <p>Use it to scan many star systems quickly, compare occupied areas, and decide where to inspect, expand, spy, or avoid.</p>
         `,
-        characterImages: [spaceOfficerImageA],
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
         characterSide: 'right',
-        bubblePosition: 'top',
-        mirrorCharacter: false
+        bubblePosition: 'bottom',
+        targetId: 'galactic-grid',
+        targetPadding: 18
       },
       {
-        heading: 'Reading the Galaxy Grid',
+        heading: 'Your Home System Is Preselected',
         bodyHtml: `
-          <p>Each cell represents one star system. The main number shows planets, while dots can indicate asteroids or your own owned planets.</p>
-          <p>Cell colors summarize what kind of ownership is present there, so you can spot your systems, enemy systems, or neutral territory quickly.</p>
+          <p>When this screen opens, your home system is selected automatically so the right-side preview already has useful data.</p>
+          <p>This gives you a reliable starting point before you inspect neighboring systems.</p>
         `,
-        characterImages: [spaceOfficerImageB],
-        characterSide: 'left',
-        bubblePosition: 'top',
-        mirrorCharacter: true
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'galactic-home-cell',
+        targetPadding: 10
+      },
+      {
+        heading: 'Reading Grid Meaning',
+        bodyHtml: `
+          <p>Each cell is one star system. The number shows planets, small dots can indicate asteroids, and filled ownership markers show your own presence.</p>
+          <p>Cell color helps you read the local situation fast: your territory, neutral systems, and hostile or mixed systems stand out visually.</p>
+        `,
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'galactic-grid',
+        targetPadding: 18
       },
       {
         heading: 'Star System Preview',
         bodyHtml: `
-          <p>Click any cell to open the system preview on the right.</p>
-          <p>There you can inspect planets in that system, view quick summaries, and use actions from each mini planet card when data is available.</p>
+          <p>The preview panel summarizes the selected system with coordinates, planet count, asteroid count, and local status.</p>
+          <p>Think of it as the detail pane for whatever cell you are currently evaluating on the map.</p>
         `,
-        characterImages: [spaceOfficerImageA],
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
         characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: false
+        targetId: 'galactic-system-preview',
+        targetPadding: 14
       },
       {
-        heading: 'Notes and Navigation',
+        heading: 'Planet Mini-Cards',
         bodyHtml: `
-          <p>You can also add colored notes to star systems. This is useful for marking future expansion targets, dangerous areas, or important enemy locations.</p>
-          <p>Use Galaxy View as your main exploration and planning screen before opening planet, mission, or report details.</p>
+          <p>When system data is available, each planet appears here as a compact mini-card.</p>
+          <p>These cards let you read ownership and local basics without leaving Galaxy View for a heavier full-screen inspection.</p>
         `,
-        characterImages: [spaceOfficerImageB],
-        characterSide: 'left',
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
+        characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: true
+        targetId: 'galactic-planet-mini-cards',
+        targetPadding: 12
+      },
+      {
+        heading: 'System Notes',
+        bodyHtml: `
+          <p>You can mark systems with notes to remember expansion targets, risky zones, or important enemy locations.</p>
+          <p>Use notes as lightweight map memory so you do not need to rely only on reports or recollection.</p>
+        `,
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'galactic-note-action',
+        targetPadding: 12
       }
     ]
   },

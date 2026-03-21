@@ -1,90 +1,105 @@
 @if (state().isOpen && currentStep(); as step) {
   <div class="tutorial-overlay__backdrop"></div>
+
+  @if (state().targetRect; as targetRect) {
+    <div
+      class="tutorial-overlay__spotlight"
+      [class.tutorial-overlay__spotlight--highlight]="isHighlightVisible()"
+      [style.left.px]="targetRect.left"
+      [style.top.px]="targetRect.top"
+      [style.width.px]="targetRect.width"
+      [style.height.px]="targetRect.height"
+    ></div>
+  }
+
   <section
     class="tutorial-overlay"
     role="dialog"
     aria-modal="true"
     aria-label="Tutorial"
-    [class.tutorial-overlay--left]="step.characterSide === 'left'"
-    [class.tutorial-overlay--right]="step.characterSide === 'right'"
-    [class.tutorial-overlay--bubble-top]="step.bubblePosition === 'top'"
-    [class.tutorial-overlay--bubble-bottom]="step.bubblePosition === 'bottom'"
   >
-    <div class="tutorial-overlay__dock">
-      <section class="tutorial-overlay__bubble">
+    @if (isBubbleVisible()) {
+      <section
+        class="tutorial-overlay__dock"
+        [ngStyle]="state().dockStyle"
+        [class.tutorial-overlay__dock--bubble-top]="state().resolvedBubblePosition === 'top'"
+        [class.tutorial-overlay__dock--bubble-bottom]="state().resolvedBubblePosition === 'bottom'"
+        [class.tutorial-overlay__dock--character-left]="state().resolvedCharacterSide === 'left'"
+        [class.tutorial-overlay__dock--character-right]="state().resolvedCharacterSide === 'right'"
+      >
+        <section class="tutorial-overlay__bubble" [ngStyle]="state().bubbleStyle">
         <div class="tutorial-overlay__bubble-topbar">
-          <button
-            type="button"
-            class="tutorial-overlay__button tutorial-overlay__button--bubble-utility tutorial-overlay__button--danger"
-            [disabled]="state().isSaving"
-            (click)="requestSkipAllTutorials()"
-          >
-            Skip all tutorials
-          </button>
+          <div class="tutorial-overlay__bubble-topbar-left">
+            <button
+              type="button"
+              class="tutorial-overlay__button tutorial-overlay__button--bubble-utility tutorial-overlay__button--danger"
+              [disabled]="state().isSaving"
+              (click)="requestSkipAllTutorials()"
+            >
+              Skip all tutorials
+            </button>
+            <p class="tutorial-overlay__eyebrow tutorial-overlay__eyebrow--topbar">{{ state().entry!.title }}</p>
+          </div>
           <button
             type="button"
             class="tutorial-overlay__button tutorial-overlay__button--close"
-            [disabled]="state().isSaving"
-            (click)="close()"
-            aria-label="Close tutorial"
-          >
-            [X]
-          </button>
-        </div>
+              [disabled]="state().isSaving"
+              (click)="close()"
+              aria-label="Close tutorial"
+            >
+              [X]
+            </button>
+          </div>
 
         <div class="tutorial-overlay__bubble-header">
-          <p class="tutorial-overlay__eyebrow">{{ state().entry!.title }}</p>
           <h2 class="tutorial-overlay__title">{{ step.heading }}</h2>
         </div>
 
-        <div class="tutorial-overlay__text" [innerHTML]="step.bodyHtml"></div>
+          <div class="tutorial-overlay__bubble-body">
+            <div class="tutorial-overlay__text" [innerHTML]="step.bodyHtml"></div>
 
-        @if (step.imagePath) {
-          <img
-            class="tutorial-overlay__inline-image"
-            [src]="step.imagePath"
-            [alt]="step.imageAlt ?? step.heading"
-          />
+            @if (step.imagePath) {
+              <img
+                class="tutorial-overlay__inline-image"
+                [src]="step.imagePath"
+                [alt]="step.imageAlt ?? step.heading"
+              />
+            }
+          </div>
+
+          <div class="tutorial-overlay__bubble-actions">
+            <button
+              type="button"
+              class="tutorial-overlay__button"
+              [disabled]="state().isSaving || state().stepIndex === 0"
+              (click)="previous()"
+            >
+              Back
+            </button>
+            <p class="tutorial-overlay__progress">{{ state().stepIndex + 1 }} / {{ state().entry!.steps.length }}</p>
+            <button
+              type="button"
+              class="tutorial-overlay__button tutorial-overlay__button--primary"
+              [disabled]="state().isSaving"
+              (click)="next()"
+            >
+              {{ state().stepIndex >= state().entry!.steps.length - 1 ? 'Finish' : 'Next' }}
+            </button>
+          </div>
+        </section>
+
+        @if (currentCharacterImage()) {
+          <section class="tutorial-overlay__character-pane">
+            <img
+              class="tutorial-overlay__character-image"
+              [class.tutorial-overlay__character-image--mirrored]="shouldMirrorCharacter()"
+              [src]="currentCharacterImage()"
+              [alt]="step.heading"
+            />
+          </section>
         }
-
-        <div class="tutorial-overlay__bubble-actions">
-          <button
-            type="button"
-            class="tutorial-overlay__button"
-            [disabled]="state().isSaving || state().stepIndex === 0"
-            (click)="previous()"
-          >
-            Back
-          </button>
-          <p class="tutorial-overlay__progress">{{ state().stepIndex + 1 }} / {{ state().entry!.steps.length }}</p>
-          <button
-            type="button"
-            class="tutorial-overlay__button tutorial-overlay__button--primary"
-            [disabled]="state().isSaving"
-            (click)="next()"
-          >
-            {{ state().stepIndex >= state().entry!.steps.length - 1 ? 'Finish' : 'Next' }}
-          </button>
-        </div>
       </section>
-
-      <section class="tutorial-overlay__character-pane">
-        <img
-          class="tutorial-overlay__character-image"
-          [class.tutorial-overlay__character-image--mirrored]="step.mirrorCharacter === true"
-          [src]="step.characterImages[0]"
-          [alt]="step.heading"
-        />
-
-        <div class="tutorial-overlay__character-meta">
-          <span class="tutorial-overlay__character-meta-spacer"></span>
-        </div>
-
-        <div class="tutorial-overlay__character-actions">
-          <span class="tutorial-overlay__character-meta-spacer"></span>
-        </div>
-      </section>
-    </div>
+    }
 
     @if (state().isSkipAllConfirmOpen) {
       <div class="tutorial-overlay__confirm-backdrop"></div>
