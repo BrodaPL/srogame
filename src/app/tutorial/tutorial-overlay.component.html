@@ -28,8 +28,7 @@
         [class.tutorial-overlay__dock--character-right]="state().resolvedCharacterSide === 'right'"
       >
         <section class="tutorial-overlay__bubble" [ngStyle]="state().bubbleStyle">
-        <div class="tutorial-overlay__bubble-topbar">
-          <div class="tutorial-overlay__bubble-topbar-left">
+          <div class="tutorial-overlay__bubble-topbar">
             <button
               type="button"
               class="tutorial-overlay__button tutorial-overlay__button--bubble-utility tutorial-overlay__button--danger"
@@ -38,11 +37,9 @@
             >
               Skip all tutorials
             </button>
-            <p class="tutorial-overlay__eyebrow tutorial-overlay__eyebrow--topbar">{{ state().entry!.title }}</p>
-          </div>
-          <button
-            type="button"
-            class="tutorial-overlay__button tutorial-overlay__button--close"
+            <button
+              type="button"
+              class="tutorial-overlay__button tutorial-overlay__button--close"
               [disabled]="state().isSaving"
               (click)="close()"
               aria-label="Close tutorial"
@@ -76,7 +73,10 @@
             >
               Back
             </button>
-            <p class="tutorial-overlay__progress">{{ state().stepIndex + 1 }} / {{ state().entry!.steps.length }}</p>
+            <div class="tutorial-overlay__progress-group">
+              <p class="tutorial-overlay__eyebrow tutorial-overlay__eyebrow--progress">{{ state().entry!.title }}</p>
+              <p class="tutorial-overlay__progress">{{ state().stepIndex + 1 }} / {{ state().entry!.steps.length }}</p>
+            </div>
             <button
               type="button"
               class="tutorial-overlay__button tutorial-overlay__button--primary"

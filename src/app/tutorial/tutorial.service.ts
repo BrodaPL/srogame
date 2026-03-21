@@ -71,7 +71,7 @@ export class TutorialService {
   private static readonly DESKTOP_BUBBLE_MAX_HEIGHT_PX = 640;
   private static readonly DESKTOP_CHARACTER_WIDTH_PX = 260;
   private static readonly DESKTOP_CHARACTER_HEIGHT_PX = 380;
-  private static readonly DESKTOP_DOCK_GAP_PX = 10;
+  private static readonly DOCK_BUBBLE_CHARACTER_OVERLAP_PX = 18;
   private static readonly SCROLL_KEYS = new Set([
     'ArrowUp',
     'ArrowDown',
@@ -518,7 +518,8 @@ export class TutorialService {
       '--tutorial-bubble-max-height': `${Math.min(
         TutorialService.DESKTOP_BUBBLE_MAX_HEIGHT_PX,
         Math.max(TutorialService.DESKTOP_BUBBLE_MIN_HEIGHT_PX, characterHeight + 80)
-      )}px`
+      )}px`,
+      '--tutorial-bubble-character-overlap': `${TutorialService.DOCK_BUBBLE_CHARACTER_OVERLAP_PX}px`
     };
 
     if (step.characterSide === 'right') {
@@ -552,7 +553,8 @@ export class TutorialService {
     const bubbleStyle: Record<string, string> = {
       width: `${bubbleWidth}px`,
       '--tutorial-bubble-min-height': '260px',
-      '--tutorial-bubble-max-height': `${Math.max(260, viewportHeight * 0.46)}px`
+      '--tutorial-bubble-max-height': `${Math.max(260, viewportHeight * 0.46)}px`,
+      '--tutorial-bubble-character-overlap': '14px'
     };
     const preferredSide: TutorialCharacterSide = targetRect.centerX > viewportWidth * 0.62
       ? 'left'
@@ -599,57 +601,53 @@ export class TutorialService {
       characterSide = 'right';
     }
 
-    const clusterWidth = bubbleWidth + characterWidth + TutorialService.DESKTOP_DOCK_GAP_PX;
-    const availableVerticalForBottom = viewportHeight
-      - targetRect.bottom
-      - TutorialService.TARGET_GAP_PX
-      - TutorialService.VIEWPORT_MARGIN_PX;
-    const availableVerticalForTop = targetRect.top
-      - TutorialService.TARGET_GAP_PX
-      - TutorialService.VIEWPORT_MARGIN_PX;
-    const availableVertical = bubblePosition === 'bottom'
-      ? availableVerticalForBottom
-      : availableVerticalForTop;
-    const dockLeft = this.clamp(
-      targetRect.centerX - (clusterWidth / 2),
-      TutorialService.VIEWPORT_MARGIN_PX,
-      viewportWidth - clusterWidth - TutorialService.VIEWPORT_MARGIN_PX
-    );
     const bubbleMinHeight = TutorialService.DESKTOP_BUBBLE_MIN_HEIGHT_PX;
     const bubbleMaxHeight = Math.min(
       TutorialService.DESKTOP_BUBBLE_MAX_HEIGHT_PX,
-      Math.max(bubbleMinHeight, availableVertical)
+      Math.max(
+        bubbleMinHeight,
+        viewportHeight
+        - (TutorialService.VIEWPORT_MARGIN_PX * 2)
+        - characterHeight
+        + TutorialService.DOCK_BUBBLE_CHARACTER_OVERLAP_PX
+      )
     );
-    const dockHeight = Math.max(characterHeight, bubbleMaxHeight);
+    const dockWidth = Math.max(bubbleWidth, characterWidth);
+    const dockHeight = characterHeight
+      + bubbleMaxHeight
+      - TutorialService.DOCK_BUBBLE_CHARACTER_OVERLAP_PX;
+    const dockLeftUnclamped = characterSide === 'right'
+      ? targetRect.right + TutorialService.TARGET_GAP_PX
+      : targetRect.left - dockWidth - TutorialService.TARGET_GAP_PX;
+    const dockLeft = this.clamp(
+      dockLeftUnclamped,
+      TutorialService.VIEWPORT_MARGIN_PX,
+      viewportWidth - dockWidth - TutorialService.VIEWPORT_MARGIN_PX
+    );
+    const preferredCharacterTop = this.clamp(
+      targetRect.centerY - (characterHeight / 2),
+      TutorialService.VIEWPORT_MARGIN_PX,
+      viewportHeight - characterHeight - TutorialService.VIEWPORT_MARGIN_PX
+    );
+    const dockTopUnclamped = bubblePosition === 'top'
+      ? preferredCharacterTop - (bubbleMaxHeight - TutorialService.DOCK_BUBBLE_CHARACTER_OVERLAP_PX)
+      : preferredCharacterTop;
     const dockStyle: Record<string, string> = {
       left: `${dockLeft}px`,
+      top: `${this.clamp(
+        dockTopUnclamped,
+        TutorialService.VIEWPORT_MARGIN_PX,
+        viewportHeight - dockHeight - TutorialService.VIEWPORT_MARGIN_PX
+      )}px`,
       '--tutorial-character-width': `${characterWidth}px`,
       '--tutorial-character-height': `${characterHeight}px`
     };
     const bubbleStyle: Record<string, string> = {
       width: `${bubbleWidth}px`,
       '--tutorial-bubble-min-height': `${bubbleMinHeight}px`,
-      '--tutorial-bubble-max-height': `${bubbleMaxHeight}px`
+      '--tutorial-bubble-max-height': `${bubbleMaxHeight}px`,
+      '--tutorial-bubble-character-overlap': `${TutorialService.DOCK_BUBBLE_CHARACTER_OVERLAP_PX}px`
     };
-
-    if (bubblePosition === 'bottom') {
-      const dockTop = Math.min(
-        targetRect.bottom + TutorialService.TARGET_GAP_PX,
-        viewportHeight - dockHeight - TutorialService.VIEWPORT_MARGIN_PX
-      );
-      dockStyle['top'] = `${this.clamp(
-        dockTop,
-        TutorialService.VIEWPORT_MARGIN_PX,
-        viewportHeight - dockHeight - TutorialService.VIEWPORT_MARGIN_PX
-      )}px`;
-    } else {
-      const dockTop = this.clamp(
-        targetRect.top - dockHeight - TutorialService.TARGET_GAP_PX,
-        TutorialService.VIEWPORT_MARGIN_PX,
-        viewportHeight - dockHeight - TutorialService.VIEWPORT_MARGIN_PX
-      );
-      dockStyle['top'] = `${dockTop}px`;
-    }
 
     return {
       dockStyle,

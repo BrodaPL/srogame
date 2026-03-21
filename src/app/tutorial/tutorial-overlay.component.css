@@ -3,6 +3,7 @@
   --tutorial-bubble-max-height: 40rem;
   --tutorial-character-width: 16.25rem;
   --tutorial-character-height: 23.75rem;
+  --tutorial-bubble-character-overlap: 1rem;
 }
 
 .tutorial-overlay__backdrop {
@@ -41,17 +42,35 @@
 .tutorial-overlay__dock {
   position: fixed;
   display: flex;
-  align-items: flex-end;
-  gap: 0.625rem;
+  flex-direction: column;
+  gap: 0;
   pointer-events: none;
 }
 
 .tutorial-overlay__dock--character-left {
-  flex-direction: row;
+  align-items: flex-start;
 }
 
 .tutorial-overlay__dock--character-right {
-  flex-direction: row-reverse;
+  align-items: flex-end;
+}
+
+.tutorial-overlay__dock--bubble-top .tutorial-overlay__bubble {
+  order: 0;
+  margin-bottom: calc(-1 * var(--tutorial-bubble-character-overlap, 1rem));
+}
+
+.tutorial-overlay__dock--bubble-top .tutorial-overlay__character-pane {
+  order: 1;
+}
+
+.tutorial-overlay__dock--bubble-bottom .tutorial-overlay__character-pane {
+  order: 0;
+}
+
+.tutorial-overlay__dock--bubble-bottom .tutorial-overlay__bubble {
+  order: 1;
+  margin-top: calc(-1 * var(--tutorial-bubble-character-overlap, 1rem));
 }
 
 .tutorial-overlay__bubble {
@@ -78,13 +97,6 @@
   gap: 0.75rem;
 }
 
-.tutorial-overlay__bubble-topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  min-width: 0;
-}
-
 .tutorial-overlay__bubble-header {
   display: grid;
   gap: 0.22rem;
@@ -97,12 +109,6 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(246, 180, 76, 0.95);
-}
-
-.tutorial-overlay__eyebrow--topbar {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .tutorial-overlay__title {
@@ -144,6 +150,19 @@
     linear-gradient(180deg, rgba(14, 18, 26, 0), rgba(14, 18, 26, 0.94) 24%, rgba(14, 18, 26, 0.98) 100%);
 }
 
+.tutorial-overlay__progress-group {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.tutorial-overlay__eyebrow--progress {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .tutorial-overlay__character-pane {
   width: var(--tutorial-character-width, 16.25rem);
   height: var(--tutorial-character-height, 23.75rem);
@@ -151,6 +170,14 @@
   align-items: end;
   justify-items: center;
   align-self: end;
+}
+
+.tutorial-overlay__dock--character-left .tutorial-overlay__character-pane {
+  align-self: flex-start;
+}
+
+.tutorial-overlay__dock--character-right .tutorial-overlay__character-pane {
+  align-self: flex-end;
 }
 
 .tutorial-overlay__character-image {
