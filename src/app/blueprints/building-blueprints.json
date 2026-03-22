@@ -1,1056 +1,1072 @@
 {
-    "buildings":  [
-                      {
-                          "type":  "METAL_MINE",
-                          "description":  "Mines basic metals resources.",
-                          "imagePath":  "images/buildings/Metal_Mine.webp",
-                          "basicCost":  {
-                                            "metal":  60,
-                                            "crystal":  20,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  1,
-                          "buildingRequirements":  [
+  "buildings":  [
+                {
+                    "type":  "METAL_MINE",
+                    "description":  "Mines basic metals resources.",
+                    "imagePath":  "images/buildings/Metal_Mine.webp",
+                    "basicCost":  {
+                                      "metal":  60,
+                                      "crystal":  20,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  1,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              60,
-                                              90,
-                                              140,
-                                              200,
-                                              300,
-                                              450,
-                                              650,
-                                              1000,
-                                              1500,
-                                              2400,
-                                              3600,
-                                              5400
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        60,
+                                        90,
+                                        140,
+                                        200,
+                                        300,
+                                        450,
+                                        650,
+                                        1000,
+                                        1500,
+                                        2400,
+                                        3600,
+                                        5400
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  false
-                      },
-                      {
-                          "type":  "CRYSTAL_MINE",
-                          "description":  "Mines rare materials.",
-                          "imagePath":  "images/buildings/CrystalMine.webp",
-                          "basicCost":  {
-                                            "metal":  40,
-                                            "crystal":  40,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  1,
-                          "buildingRequirements":  [
+                                    ],
+                    "armor":  20,
+                    "damageMultiplier":  1.25,
+                    "isFacility":  false
+                },
+                {
+                    "type":  "CRYSTAL_MINE",
+                    "description":  "Mines rare materials.",
+                    "imagePath":  "images/buildings/CrystalMine.webp",
+                    "basicCost":  {
+                                      "metal":  40,
+                                      "crystal":  40,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  1,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              40,
-                                              60,
-                                              90,
-                                              120,
-                                              180,
-                                              280,
-                                              440,
-                                              660,
-                                              1000,
-                                              1600,
-                                              2400,
-                                              3600
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        40,
+                                        60,
+                                        90,
+                                        120,
+                                        180,
+                                        280,
+                                        440,
+                                        660,
+                                        1000,
+                                        1600,
+                                        2400,
+                                        3600
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  false
-                      },
-                      {
-                          "type":  "DEUTERIUM_SYNTHESIZER",
-                          "description":  "Gathering deuterium.",
-                          "imagePath":  "images/buildings/Deuterium_Synthesizer.webp",
-                          "basicCost":  {
-                                            "metal":  40,
-                                            "crystal":  60,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  1,
-                          "buildingRequirements":  [
+                                    ],
+                    "armor":  10,
+                    "damageMultiplier":  0.75,
+                    "isFacility":  false
+                },
+                {
+                    "type":  "DEUTERIUM_SYNTHESIZER",
+                    "description":  "Gathering deuterium.",
+                    "imagePath":  "images/buildings/Deuterium_Synthesizer.webp",
+                    "basicCost":  {
+                                      "metal":  40,
+                                      "crystal":  60,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  1,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              20,
-                                              30,
-                                              40,
-                                              60,
-                                              90,
-                                              150,
-                                              210,
-                                              330,
-                                              500,
-                                              800,
-                                              1200,
-                                              1800
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        20,
+                                        30,
+                                        40,
+                                        60,
+                                        90,
+                                        150,
+                                        210,
+                                        330,
+                                        500,
+                                        800,
+                                        1200,
+                                        1800
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  false
-                      },
-                      {
-                          "type":  "SOLAR_WIND_GEOTHERMAL",
-                          "description":  "Using most efficient Renewable energy sorces on planet. Utilising mass energy storage devices.",
-                          "imagePath":  "images/buildings/Solar_Plant.webp",
-                          "basicCost":  {
-                                            "metal":  15,
-                                            "crystal":  20,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  0,
-                          "buildingRequirements":  [
+                                    ],
+                    "armor":  10,
+                    "damageMultiplier":  0.25,
+                    "isFacility":  false
+                },
+                {
+                    "type":  "SOLAR_WIND_GEOTHERMAL",
+                    "description":  "Using most efficient Renewable energy sorces on planet. Utilising mass energy storage devices.",
+                    "imagePath":  "images/buildings/Solar_Plant.webp",
+                    "basicCost":  {
+                                      "metal":  15,
+                                      "crystal":  20,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  0,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              1,
-                                              2,
-                                              3,
-                                              5,
-                                              7,
-                                              10,
-                                              13,
-                                              17,
-                                              21,
-                                              25,
-                                              29,
-                                              34,
-                                              40
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        1,
+                                        2,
+                                        3,
+                                        5,
+                                        7,
+                                        10,
+                                        13,
+                                        17,
+                                        21,
+                                        25,
+                                        29,
+                                        34,
+                                        40
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  false
-                      },
-                      {
-                          "type":  "NUCLEAR_PLANT",
-                          "description":  "Good old nuclear power technology. Safe, steady and reliable.",
-                          "imagePath":  "images/buildings/Fusion_Reactor.webp",
-                          "basicCost":  {
-                                            "metal":  30,
-                                            "crystal":  20,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  0,
-                          "buildingRequirements":  [
+                                    ],
+                    "armor":  5,
+                    "damageMultiplier":  0.75,
+                    "isFacility":  false
+                },
+                {
+                    "type":  "NUCLEAR_PLANT",
+                    "description":  "Good old nuclear power technology. Safe, steady and reliable.",
+                    "imagePath":  "images/buildings/Fusion_Reactor.webp",
+                    "basicCost":  {
+                                      "metal":  30,
+                                      "crystal":  20,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  0,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              2,
-                                              4,
-                                              8,
-                                              12,
-                                              16,
-                                              20,
-                                              25,
-                                              30,
-                                              40,
-                                              50,
-                                              60,
-                                              70,
-                                              80
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        2,
+                                        4,
+                                        8,
+                                        12,
+                                        16,
+                                        20,
+                                        25,
+                                        30,
+                                        40,
+                                        50,
+                                        60,
+                                        70,
+                                        80
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  false
-                      },
-                      {
-                          "type":  "FUSION_REACTOR",
-                          "description":  "Good old nuclear power technology. Safe, steady and reliable.",
-                          "imagePath":  "images/buildings/Fusion_Reactor.webp",
-                          "basicCost":  {
-                                            "metal":  60,
-                                            "crystal":  60,
-                                            "deuterium":  5
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  0,
-                          "buildingRequirements":  [
-                                                       {
-                                                           "building":  "NUCLEAR_PLANT",
-                                                           "level":  0.5
-                                                       },
-                                                       {
-                                                           "building":  "DEUTERIUM_SYNTHESIZER",
-                                                           "level":  0.25
-                                                       },
-                                                       {
-                                                           "building":  "DEUTERIUM_TANK",
-                                                           "level":  0.25
-                                                       }
-                                                   ],
-                          "techRequirements":  [
-                                                   {
-                                                       "tech":  "ENERGY_TECHNOLOGY",
-                                                       "level":  1
-                                                   }
-                                               ],
-                          "production1":  [
-                                              6,
-                                              10,
-                                              15,
-                                              20,
-                                              25,
-                                              32,
-                                              40,
-                                              50,
-                                              55,
-                                              70,
-                                              90,
-                                              120
-                                          ],
-                          "production2":  [
-                                              10,
-                                              20,
-                                              30,
-                                              40,
-                                              50,
-                                              60,
-                                              80,
-                                              100,
-                                              130,
-                                              160,
-                                              200,
-                                              250
-                                          ],
-                          "production3":  [
+                                    ],
+                    "armor":  0,
+                    "damageMultiplier":  1.5,
+                    "isFacility":  false
+                },
+                {
+                    "type":  "FUSION_REACTOR",
+                    "description":  "Good old nuclear power technology. Safe, steady and reliable.",
+                    "imagePath":  "images/buildings/Fusion_Reactor.webp",
+                    "basicCost":  {
+                                      "metal":  60,
+                                      "crystal":  60,
+                                      "deuterium":  5
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  0,
+                    "buildingRequirements":  [
+                                                 {
+                                                     "building":  "NUCLEAR_PLANT",
+                                                     "level":  0.5
+                                                 },
+                                                 {
+                                                     "building":  "DEUTERIUM_SYNTHESIZER",
+                                                     "level":  0.25
+                                                 },
+                                                 {
+                                                     "building":  "DEUTERIUM_TANK",
+                                                     "level":  0.25
+                                                 }
+                                             ],
+                    "techRequirements":  [
+                                             {
+                                                 "tech":  "ENERGY_TECHNOLOGY",
+                                                 "level":  1
+                                             }
+                                         ],
+                    "production1":  [
+                                        6,
+                                        10,
+                                        15,
+                                        20,
+                                        25,
+                                        32,
+                                        40,
+                                        50,
+                                        55,
+                                        70,
+                                        90,
+                                        120
+                                    ],
+                    "production2":  [
+                                        10,
+                                        20,
+                                        30,
+                                        40,
+                                        50,
+                                        60,
+                                        80,
+                                        100,
+                                        130,
+                                        160,
+                                        200,
+                                        250
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  false
-                      },
-                      {
-                          "type":  "METAL_STORAGE",
-                          "description":  "Planetary METAL storages.",
-                          "imagePath":  "images/buildings/Metal_Storage.webp",
-                          "basicCost":  {
-                                            "metal":  15,
-                                            "crystal":  5,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  0,
-                          "buildingRequirements":  [
+                                    ],
+                    "isFacility":  false
+                },
+                {
+                    "type":  "METAL_STORAGE",
+                    "description":  "Planetary METAL storages.",
+                    "imagePath":  "images/buildings/Metal_Storage.webp",
+                    "basicCost":  {
+                                      "metal":  15,
+                                      "crystal":  5,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  0,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              250,
-                                              500,
-                                              1000,
-                                              2000,
-                                              4000,
-                                              8000,
-                                              16000,
-                                              32000,
-                                              64000,
-                                              128000,
-                                              256000,
-                                              512000,
-                                              1000000,
-                                              2000000
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        250,
+                                        500,
+                                        1000,
+                                        2000,
+                                        4000,
+                                        8000,
+                                        16000,
+                                        32000,
+                                        64000,
+                                        128000,
+                                        256000,
+                                        512000,
+                                        1000000,
+                                        2000000
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  false
-                      },
-                      {
-                          "type":  "CRYSTAL_STORAGE",
-                          "description":  "Planetary CRYSTAL deposits.",
-                          "imagePath":  "images/buildings/Crystal_Storage.webp",
-                          "basicCost":  {
-                                            "metal":  10,
-                                            "crystal":  10,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  0,
-                          "buildingRequirements":  [
+                                    ],
+                    "isFacility":  false
+                },
+                {
+                    "type":  "CRYSTAL_STORAGE",
+                    "description":  "Planetary CRYSTAL deposits.",
+                    "imagePath":  "images/buildings/Crystal_Storage.webp",
+                    "basicCost":  {
+                                      "metal":  10,
+                                      "crystal":  10,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  0,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              200,
-                                              400,
-                                              800,
-                                              1600,
-                                              3200,
-                                              6400,
-                                              12800,
-                                              25600,
-                                              51200,
-                                              102400,
-                                              204800,
-                                              409600,
-                                              819200,
-                                              1600000
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        200,
+                                        400,
+                                        800,
+                                        1600,
+                                        3200,
+                                        6400,
+                                        12800,
+                                        25600,
+                                        51200,
+                                        102400,
+                                        204800,
+                                        409600,
+                                        819200,
+                                        1600000
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  false
-                      },
-                      {
-                          "type":  "DEUTERIUM_TANK",
-                          "description":  "Planetary DEUTERIUM tanks.",
-                          "imagePath":  "images/buildings/Deuterium_Tank.webp",
-                          "basicCost":  {
-                                            "metal":  5,
-                                            "crystal":  15,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  0,
-                          "buildingRequirements":  [
+                                    ],
+                    "isFacility":  false
+                },
+                {
+                    "type":  "DEUTERIUM_TANK",
+                    "description":  "Planetary DEUTERIUM tanks.",
+                    "imagePath":  "images/buildings/Deuterium_Tank.webp",
+                    "basicCost":  {
+                                      "metal":  5,
+                                      "crystal":  15,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  0,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              150,
-                                              300,
-                                              600,
-                                              1200,
-                                              2400,
-                                              4800,
-                                              9600,
-                                              19200,
-                                              38400,
-                                              76800,
-                                              153600,
-                                              307200,
-                                              614400,
-                                              1200000
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        150,
+                                        300,
+                                        600,
+                                        1200,
+                                        2400,
+                                        4800,
+                                        9600,
+                                        19200,
+                                        38400,
+                                        76800,
+                                        153600,
+                                        307200,
+                                        614400,
+                                        1200000
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  false
-                      },
-                      {
-                          "type":  "ROBOTICS_FACTORY",
-                          "description":  "Main industry power.",
-                          "imagePath":  "images/buildings/Robotics_Factory.webp",
-                          "basicCost":  {
-                                            "metal":  40,
-                                            "crystal":  20,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  1,
-                          "buildingRequirements":  [
+                                    ],
+                    "isFacility":  false
+                },
+                {
+                    "type":  "ROBOTICS_FACTORY",
+                    "description":  "Main industry power.",
+                    "imagePath":  "images/buildings/Robotics_Factory.webp",
+                    "basicCost":  {
+                                      "metal":  40,
+                                      "crystal":  20,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  1,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              30,
-                                              45,
-                                              60,
-                                              90,
-                                              130,
-                                              200,
-                                              300,
-                                              450,
-                                              700,
-                                              1000,
-                                              1500,
-                                              2000,
-                                              2500,
-                                              3000,
-                                              3500,
-                                              4000
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        30,
+                                        45,
+                                        60,
+                                        90,
+                                        130,
+                                        200,
+                                        300,
+                                        450,
+                                        700,
+                                        1000,
+                                        1500,
+                                        2000,
+                                        2500,
+                                        3000,
+                                        3500,
+                                        4000
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "SHIPYARD",
-                          "description":  "Produces ships. If not busy, repair ships with half production speed.",
-                          "imagePath":  "images/buildings/Shipyard.webp",
-                          "basicCost":  {
-                                            "metal":  60,
-                                            "crystal":  40,
-                                            "deuterium":  20
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  2,
-                          "buildingRequirements":  [
-                                                       {
-                                                           "building":  "ROBOTICS_FACTORY",
-                                                           "level":  0.5
-                                                       }
-                                                   ],
-                          "techRequirements":  [
-                                                   {
-                                                       "tech":  "ENERGY_TECHNOLOGY",
-                                                       "level":  0.5
-                                                   },
-                                                   {
-                                                       "tech":  "MATERIAL_TECHNOLOGY",
-                                                       "level":  0.5
-                                                   }
-                                               ],
-                          "production1":  [
-                                              30,
-                                              45,
-                                              60,
-                                              90,
-                                              130,
-                                              200,
-                                              300,
-                                              450,
-                                              700,
-                                              1000,
-                                              1500,
-                                              2000,
-                                              2500,
-                                              3000,
-                                              3500,
-                                              4000
-                                          ],
-                          "production2":  [
+                                    ],
+                    "armor":  10,
+                    "damageMultiplier":  0.5,
+                    "isFacility":  true
+                },
+                {
+                    "type":  "SHIPYARD",
+                    "description":  "Produces ships. If not busy, repair ships with half production speed.",
+                    "imagePath":  "images/buildings/Shipyard.webp",
+                    "basicCost":  {
+                                      "metal":  60,
+                                      "crystal":  40,
+                                      "deuterium":  20
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  2,
+                    "buildingRequirements":  [
+                                                 {
+                                                     "building":  "ROBOTICS_FACTORY",
+                                                     "level":  0.5
+                                                 }
+                                             ],
+                    "techRequirements":  [
+                                             {
+                                                 "tech":  "ENERGY_TECHNOLOGY",
+                                                 "level":  0.5
+                                             },
+                                             {
+                                                 "tech":  "MATERIAL_TECHNOLOGY",
+                                                 "level":  0.5
+                                             }
+                                         ],
+                    "production1":  [
+                                        30,
+                                        45,
+                                        60,
+                                        90,
+                                        130,
+                                        200,
+                                        300,
+                                        450,
+                                        700,
+                                        1000,
+                                        1500,
+                                        2000,
+                                        2500,
+                                        3000,
+                                        3500,
+                                        4000
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "NANITE_FACTORY",
-                          "description":  "Increases industry power.",
-                          "imagePath":  "images/buildings/Nanite_Factory.webp",
-                          "basicCost":  {
-                                            "metal":  400,
-                                            "crystal":  800,
-                                            "deuterium":  200
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  3,
-                          "buildingRequirements":  [
-                                                       {
-                                                           "building":  "ROBOTICS_FACTORY",
-                                                           "level":  1.5
-                                                       }
-                                                   ],
-                          "techRequirements":  [
-                                                   {
-                                                       "tech":  "ENERGY_TECHNOLOGY",
-                                                       "level":  1.5
-                                                   },
-                                                   {
-                                                       "tech":  "COMPUTER_TECHNOLOGY",
-                                                       "level":  2
-                                                   },
-                                                   {
-                                                       "tech":  "MATERIAL_TECHNOLOGY",
-                                                       "level":  1.5
-                                                   }
-                                               ],
-                          "production1":  [
-                                              1.5,
-                                              2.0,
-                                              3.0,
-                                              4.5,
-                                              6,
-                                              8.0,
-                                              10.0,
-                                              12.5,
-                                              15.0,
-                                              17.5,
-                                              20,
-                                              22.5,
-                                              25,
-                                              27.5,
-                                              30
-                                          ],
-                          "production2":  [
+                                    ],
+                    "armor":  0,
+                    "damageMultiplier":  1.5,
+                    "isFacility":  true
+                },
+                {
+                    "type":  "NANITE_FACTORY",
+                    "description":  "Increases industry power.",
+                    "imagePath":  "images/buildings/Nanite_Factory.webp",
+                    "basicCost":  {
+                                      "metal":  400,
+                                      "crystal":  800,
+                                      "deuterium":  200
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  3,
+                    "buildingRequirements":  [
+                                                 {
+                                                     "building":  "ROBOTICS_FACTORY",
+                                                     "level":  1.5
+                                                 }
+                                             ],
+                    "techRequirements":  [
+                                             {
+                                                 "tech":  "ENERGY_TECHNOLOGY",
+                                                 "level":  1.5
+                                             },
+                                             {
+                                                 "tech":  "COMPUTER_TECHNOLOGY",
+                                                 "level":  2
+                                             },
+                                             {
+                                                 "tech":  "MATERIAL_TECHNOLOGY",
+                                                 "level":  1.5
+                                             }
+                                         ],
+                    "production1":  [
+                                        1.5,
+                                        2.0,
+                                        3.0,
+                                        4.5,
+                                        6,
+                                        8.0,
+                                        10.0,
+                                        12.5,
+                                        15.0,
+                                        17.5,
+                                        20,
+                                        22.5,
+                                        25,
+                                        27.5,
+                                        30
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "RESEARCH_LAB",
-                          "description":  "Researches new technologies.",
-                          "imagePath":  "images/buildings/Research_Lab.webp",
-                          "basicCost":  {
-                                            "metal":  10,
-                                            "crystal":  30,
-                                            "deuterium":  30
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  1,
-                          "buildingRequirements":  [
-                                                       {
-                                                           "building":  "NUCLEAR_PLANT",
-                                                           "level":  0.25
-                                                       }
-                                                   ],
-                          "techRequirements":  [
+                                    ],
+                    "isFacility":  true
+                },
+                {
+                    "type":  "RESEARCH_LAB",
+                    "description":  "Researches new technologies.",
+                    "imagePath":  "images/buildings/Research_Lab.webp",
+                    "basicCost":  {
+                                      "metal":  10,
+                                      "crystal":  30,
+                                      "deuterium":  30
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  1,
+                    "buildingRequirements":  [
+                                                 {
+                                                     "building":  "NUCLEAR_PLANT",
+                                                     "level":  0.25
+                                                 }
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
-                                              20,
-                                              30,
-                                              40,
-                                              50,
-                                              70,
-                                              90,
-                                              125,
-                                              165,
-                                              220,
-                                              290,
-                                              390,
-                                              520,
-                                              690,
-                                              920,
-                                              1220,
-                                              1630,
-                                              2170,
-                                              2880,
-                                              3800,
-                                              5000
-                                          ],
-                          "production2":  [
+                                         ],
+                    "production1":  [
+                                        20,
+                                        30,
+                                        40,
+                                        50,
+                                        70,
+                                        90,
+                                        125,
+                                        165,
+                                        220,
+                                        290,
+                                        390,
+                                        520,
+                                        690,
+                                        920,
+                                        1220,
+                                        1630,
+                                        2170,
+                                        2880,
+                                        3800,
+                                        5000
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "ALLIANCE_DEPOT",
-                          "description":  "Repairs orbiting ships and provide deuterium supply for them.",
-                          "imagePath":  "images/buildings/Alliance_Depot.webp",
-                          "basicCost":  {
-                                            "metal":  0,
-                                            "crystal":  0,
-                                            "deuterium":  0
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  2,
-                          "buildingRequirements":  [
+                                    ],
+                    "isFacility":  true
+                },
+                {
+                    "type":  "ALLIANCE_DEPOT",
+                    "description":  "Repairs orbiting ships and provide deuterium supply for them.",
+                    "imagePath":  "images/buildings/Alliance_Depot.webp",
+                    "basicCost":  {
+                                      "metal":  0,
+                                      "crystal":  0,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  2,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
+                                             ],
+                    "techRequirements":  [
 
-                                               ],
-                          "production1":  [
+                                         ],
+                    "production1":  [
 
-                                          ],
-                          "production2":  [
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "MISSILE_SILO",
-                          "description":  "Stores anti missiles or ISBM (interstellar balistic missiles).",
-                          "imagePath":  "images/buildings/Missile_Silo.webp",
-                          "basicCost":  {
-                                            "metal":  80,
-                                            "crystal":  160,
-                                            "deuterium":  160
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  1,
-                          "buildingRequirements":  [
-                                                       {
-                                                           "building":  "BUNKER_NETWORK",
-                                                           "level":  0.25
-                                                       },
-                                                       {
-                                                           "building":  "DEUTERIUM_SYNTHESIZER",
-                                                           "level":  0.25
-                                                       },
-                                                       {
-                                                           "building":  "DEUTERIUM_TANK",
-                                                           "level":  0.25
-                                                       }
-                                                   ],
-                          "techRequirements":  [
-                                                   {
-                                                       "tech":  "FUSION_DRIVE",
-                                                       "level":  1
-                                                   },
-                                                   {
-                                                       "tech":  "HYPERSPACE_DRIVE",
-                                                       "level":  0.5
-                                                   },
-                                                   {
-                                                       "tech":  "ENERGY_TECHNOLOGY",
-                                                       "level":  1
-                                                   },
-                                                   {
-                                                       "tech":  "MISSILES_WEAPONS",
-                                                       "level":  1
-                                                   }
-                                               ],
-                          "production1":  [
-                                              3,
-                                              5,
-                                              8,
-                                              11,
-                                              14,
-                                              18,
-                                              22,
-                                              26,
-                                              30,
-                                              35,
-                                              40,
-                                              45,
-                                              50,
-                                              55,
-                                              61,
-                                              67,
-                                              73,
-                                              79
-                                          ],
-                          "production2":  [
+                                    ],
+                    "isFacility":  true
+                },
+                {
+                    "type":  "MISSILE_SILO",
+                    "description":  "Stores anti missiles or ISBM (interstellar balistic missiles).",
+                    "imagePath":  "images/buildings/Missile_Silo.webp",
+                    "basicCost":  {
+                                      "metal":  80,
+                                      "crystal":  160,
+                                      "deuterium":  160
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  1,
+                    "buildingRequirements":  [
+                                                 {
+                                                     "building":  "BUNKER_NETWORK",
+                                                     "level":  0.25
+                                                 },
+                                                 {
+                                                     "building":  "DEUTERIUM_SYNTHESIZER",
+                                                     "level":  0.25
+                                                 },
+                                                 {
+                                                     "building":  "DEUTERIUM_TANK",
+                                                     "level":  0.25
+                                                 }
+                                             ],
+                    "techRequirements":  [
+                                             {
+                                                 "tech":  "FUSION_DRIVE",
+                                                 "level":  1
+                                             },
+                                             {
+                                                 "tech":  "HYPERSPACE_DRIVE",
+                                                 "level":  0.5
+                                             },
+                                             {
+                                                 "tech":  "ENERGY_TECHNOLOGY",
+                                                 "level":  1
+                                             },
+                                             {
+                                                 "tech":  "MISSILES_WEAPONS",
+                                                 "level":  1
+                                             }
+                                         ],
+                    "production1":  [
+                                        3,
+                                        5,
+                                        8,
+                                        11,
+                                        14,
+                                        18,
+                                        22,
+                                        26,
+                                        30,
+                                        35,
+                                        40,
+                                        45,
+                                        50,
+                                        55,
+                                        61,
+                                        67,
+                                        73,
+                                        79
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "TERRAFORMER",
-                          "description":  "Creates new land.",
-                          "imagePath":  "images/buildings/Terraformer.webp",
-                          "basicCost":  {
-                                            "metal":  100,
-                                            "crystal":  100,
-                                            "deuterium":  200
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  3,
-                          "buildingRequirements":  [
-                                                       {
-                                                           "building":  "ROBOTICS_FACTORY",
-                                                           "level":  0.5
-                                                       },
-                                                       {
-                                                           "building":  "NUCLEAR_PLANT",
-                                                           "level":  0.25
-                                                       },
-                                                       {
-                                                           "building":  "FUSION_REACTOR",
-                                                           "level":  0.25
-                                                       }
-                                                   ],
-                          "techRequirements":  [
-                                                   {
-                                                       "tech":  "MATERIAL_TECHNOLOGY",
-                                                       "level":  1
-                                                   },
-                                                   {
-                                                       "tech":  "ENERGY_TECHNOLOGY",
-                                                       "level":  0.5
-                                                   },
-                                                   {
-                                                       "tech":  "ADAPTIVE_TECHNOLOGY",
-                                                       "level":  0.5
-                                                   }
-                                               ],
-                          "production1":  [
-                                              4,
-                                              8,
-                                              12,
-                                              16,
-                                              20,
-                                              24,
-                                              28,
-                                              32,
-                                              36,
-                                              40,
-                                              45,
-                                              50,
-                                              55,
-                                              60,
-                                              66,
-                                              72,
-                                              80,
-                                              90,
-                                              100
-                                          ],
-                          "production2":  [
+                                    ],
+                    "isFacility":  true
+                },
+                {
+                    "type":  "TERRAFORMER",
+                    "description":  "Creates new land.",
+                    "imagePath":  "images/buildings/Terraformer.webp",
+                    "basicCost":  {
+                                      "metal":  100,
+                                      "crystal":  100,
+                                      "deuterium":  200
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  3,
+                    "buildingRequirements":  [
+                                                 {
+                                                     "building":  "ROBOTICS_FACTORY",
+                                                     "level":  0.5
+                                                 },
+                                                 {
+                                                     "building":  "NUCLEAR_PLANT",
+                                                     "level":  0.25
+                                                 },
+                                                 {
+                                                     "building":  "FUSION_REACTOR",
+                                                     "level":  0.25
+                                                 }
+                                             ],
+                    "techRequirements":  [
+                                             {
+                                                 "tech":  "MATERIAL_TECHNOLOGY",
+                                                 "level":  1
+                                             },
+                                             {
+                                                 "tech":  "ENERGY_TECHNOLOGY",
+                                                 "level":  0.5
+                                             },
+                                             {
+                                                 "tech":  "ADAPTIVE_TECHNOLOGY",
+                                                 "level":  0.5
+                                             }
+                                         ],
+                    "production1":  [
+                                        4,
+                                        8,
+                                        12,
+                                        16,
+                                        20,
+                                        24,
+                                        28,
+                                        32,
+                                        36,
+                                        40,
+                                        45,
+                                        50,
+                                        55,
+                                        60,
+                                        66,
+                                        72,
+                                        80,
+                                        90,
+                                        100
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "SENSOR_PHALANX",
-                          "description":  "Detects all fleets in range. Detects incomming fleets in double range. Automatically scans all planets in half range.",
-                          "imagePath":  "images/buildings/Sensor_Phalanx.webp",
-                          "basicCost":  {
-                                            "metal":  160,
-                                            "crystal":  240,
-                                            "deuterium":  80
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  2,
-                          "buildingRequirements":  [
-                                                       {
-                                                           "building":  "SHIPYARD",
-                                                           "level":  1
-                                                       },
-                                                       {
-                                                           "building":  "ROBOTICS_FACTORY",
-                                                           "level":  1
-                                                       }
-                                                   ],
-                          "techRequirements":  [
-                                                   {
-                                                       "tech":  "ASTROPHYSICS_TECHNOLOGY",
-                                                       "level":  1.5
-                                                   },
-                                                   {
-                                                       "tech":  "ESPIONAGE_TECHNOLOGY",
-                                                       "level":  1.5
-                                                   },
-                                                   {
-                                                       "tech":  "COMPUTER_TECHNOLOGY",
-                                                       "level":  0.5
-                                                   }
-                                               ],
-                          "production1":  [
-                                              0.5,
-                                              1,
-                                              2,
-                                              3,
-                                              4,
-                                              5,
-                                              6,
-                                              7,
-                                              8,
-                                              9,
-                                              10,
-                                              11,
-                                              12,
-                                              13,
-                                              14,
-                                              15
-                                          ],
-                          "production2":  [
+                                    ],
+                    "isFacility":  true
+                },
+                {
+                    "type":  "SENSOR_PHALANX",
+                    "description":  "Detects all fleets in range. Detects incomming fleets in double range. Automatically scans all planets in half range.",
+                    "imagePath":  "images/buildings/Sensor_Phalanx.webp",
+                    "basicCost":  {
+                                      "metal":  160,
+                                      "crystal":  240,
+                                      "deuterium":  80
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  2,
+                    "buildingRequirements":  [
+                                                 {
+                                                     "building":  "SHIPYARD",
+                                                     "level":  1
+                                                 },
+                                                 {
+                                                     "building":  "ROBOTICS_FACTORY",
+                                                     "level":  1
+                                                 }
+                                             ],
+                    "techRequirements":  [
+                                             {
+                                                 "tech":  "ASTROPHYSICS_TECHNOLOGY",
+                                                 "level":  1.5
+                                             },
+                                             {
+                                                 "tech":  "ESPIONAGE_TECHNOLOGY",
+                                                 "level":  1.5
+                                             },
+                                             {
+                                                 "tech":  "COMPUTER_TECHNOLOGY",
+                                                 "level":  0.5
+                                             }
+                                         ],
+                    "production1":  [
+                                        0.5,
+                                        1,
+                                        2,
+                                        3,
+                                        4,
+                                        5,
+                                        6,
+                                        7,
+                                        8,
+                                        9,
+                                        10,
+                                        11,
+                                        12,
+                                        13,
+                                        14,
+                                        15
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "JUMP_GATE",
-                          "description":  "Makes possible to jump between systems. Every level increses Interstellar Trade Port by 50%",
-                          "imagePath":  "images/buildings/Jump_Gate.webp",
-                          "basicCost":  {
-                                            "metal":  10000,
-                                            "crystal":  10000,
-                                            "deuterium":  10000
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  5,
-                          "buildingRequirements":  [
-                                                       {
-                                                           "building":  "NUCLEAR_PLANT",
-                                                           "level":  1
-                                                       },
-                                                       {
-                                                           "building":  "FUSION_REACTOR",
-                                                           "level":  1
-                                                       },
-                                                       {
-                                                           "building":  "SHIPYARD",
-                                                           "level":  2
-                                                       },
-                                                       {
-                                                           "building":  "NANITE_FACTORY",
-                                                           "level":  1
-                                                       }
-                                                   ],
-                          "techRequirements":  [
-                                                   {
-                                                       "tech":  "FUSION_DRIVE",
-                                                       "level":  2
-                                                   },
-                                                   {
-                                                       "tech":  "MATERIAL_TECHNOLOGY",
-                                                       "level":  2
-                                                   },
-                                                   {
-                                                       "tech":  "SHIELDING_TECHNOLOGY",
-                                                       "level":  2
-                                                   },
-                                                   {
-                                                       "tech":  "HYPERSPACE_DRIVE",
-                                                       "level":  1
-                                                   },
-                                                   {
-                                                       "tech":  "HYPERSPACE_TECHNOLOGY",
-                                                       "level":  2
-                                                   },
-                                                   {
-                                                       "tech":  "ASTROPHYSICS_TECHNOLOGY",
-                                                       "level":  2
-                                                   }
-                                               ],
-                          "production1":  [
-                                              10,
-                                              25,
-                                              50,
-                                              100,
-                                              250,
-                                              500,
-                                              1000,
-                                              1500,
-                                              2000,
-                                              3000,
-                                              4000,
-                                              5000,
-                                              6000,
-                                              7000,
-                                              8000,
-                                              9000,
-                                              10000
-                                          ],
-                          "production2":  [
+                                    ],
+                    "isFacility":  true
+                },
+                {
+                    "type":  "JUMP_GATE",
+                    "description":  "Makes possible to jump between systems. Every level increses Interstellar Trade Port by 50%",
+                    "imagePath":  "images/buildings/Jump_Gate.webp",
+                    "basicCost":  {
+                                      "metal":  10000,
+                                      "crystal":  10000,
+                                      "deuterium":  10000
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  5,
+                    "buildingRequirements":  [
+                                                 {
+                                                     "building":  "NUCLEAR_PLANT",
+                                                     "level":  1
+                                                 },
+                                                 {
+                                                     "building":  "FUSION_REACTOR",
+                                                     "level":  1
+                                                 },
+                                                 {
+                                                     "building":  "SHIPYARD",
+                                                     "level":  2
+                                                 },
+                                                 {
+                                                     "building":  "NANITE_FACTORY",
+                                                     "level":  1
+                                                 }
+                                             ],
+                    "techRequirements":  [
+                                             {
+                                                 "tech":  "FUSION_DRIVE",
+                                                 "level":  2
+                                             },
+                                             {
+                                                 "tech":  "MATERIAL_TECHNOLOGY",
+                                                 "level":  2
+                                             },
+                                             {
+                                                 "tech":  "SHIELDING_TECHNOLOGY",
+                                                 "level":  2
+                                             },
+                                             {
+                                                 "tech":  "HYPERSPACE_DRIVE",
+                                                 "level":  1
+                                             },
+                                             {
+                                                 "tech":  "HYPERSPACE_TECHNOLOGY",
+                                                 "level":  2
+                                             },
+                                             {
+                                                 "tech":  "ASTROPHYSICS_TECHNOLOGY",
+                                                 "level":  2
+                                             }
+                                         ],
+                    "production1":  [
+                                        10,
+                                        25,
+                                        50,
+                                        100,
+                                        250,
+                                        500,
+                                        1000,
+                                        1500,
+                                        2000,
+                                        3000,
+                                        4000,
+                                        5000,
+                                        6000,
+                                        7000,
+                                        8000,
+                                        9000,
+                                        10000
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "INTERSTELLAR_TRADE_PORT",
-                          "description":  "Makes possible to exchange resources in ratio 3:2:1 with 20% operational cost. Every level above 1 decreases op. cost by 2%.",
-                          "imagePath":  "images/buildings/Shipyard.webp",
-                          "basicCost":  {
-                                            "metal":  1200,
-                                            "crystal":  600,
-                                            "deuterium":  400
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  2,
-                          "buildingRequirements":  [
-                                                       {
-                                                           "building":  "SHIPYARD",
-                                                           "level":  1
-                                                       },
-                                                       {
-                                                           "building":  "ROBOTICS_FACTORY",
-                                                           "level":  1
-                                                       }
-                                                   ],
-                          "techRequirements":  [
-                                                   {
-                                                       "tech":  "FUSION_DRIVE",
-                                                       "level":  1
-                                                   },
-                                                   {
-                                                       "tech":  "MATERIAL_TECHNOLOGY",
-                                                       "level":  1
-                                                   },
-                                                   {
-                                                       "tech":  "SHIELDING_TECHNOLOGY",
-                                                       "level":  1
-                                                   },
-                                                   {
-                                                       "tech":  "HYPERSPACE_DRIVE",
-                                                       "level":  1
-                                                   },
-                                                   {
-                                                       "tech":  "HYPERSPACE_TECHNOLOGY",
-                                                       "level":  2
-                                                   },
-                                                   {
-                                                       "tech":  "ASTROPHYSICS_TECHNOLOGY",
-                                                       "level":  2
-                                                   }
-                                               ],
-                          "production1":  [
-                                              200,
-                                              300,
-                                              500,
-                                              800,
-                                              1200,
-                                              1600,
-                                              2000,
-                                              2500,
-                                              3000,
-                                              4000,
-                                              5000,
-                                              6000,
-                                              7000,
-                                              8000,
-                                              9000,
-                                              10000
-                                          ],
-                          "production2":  [
+                                    ],
+                    "isFacility":  true
+                },
+                {
+                    "type":  "INTERSTELLAR_TRADE_PORT",
+                    "description":  "Makes possible to exchange resources in ratio 3:2:1 with 20% operational cost. Every level above 1 decreases op. cost by 2%.",
+                    "imagePath":  "images/buildings/Shipyard.webp",
+                    "basicCost":  {
+                                      "metal":  1200,
+                                      "crystal":  600,
+                                      "deuterium":  400
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  2,
+                    "buildingRequirements":  [
+                                                 {
+                                                     "building":  "SHIPYARD",
+                                                     "level":  1
+                                                 },
+                                                 {
+                                                     "building":  "ROBOTICS_FACTORY",
+                                                     "level":  1
+                                                 }
+                                             ],
+                    "techRequirements":  [
+                                             {
+                                                 "tech":  "FUSION_DRIVE",
+                                                 "level":  1
+                                             },
+                                             {
+                                                 "tech":  "MATERIAL_TECHNOLOGY",
+                                                 "level":  1
+                                             },
+                                             {
+                                                 "tech":  "SHIELDING_TECHNOLOGY",
+                                                 "level":  1
+                                             },
+                                             {
+                                                 "tech":  "HYPERSPACE_DRIVE",
+                                                 "level":  1
+                                             },
+                                             {
+                                                 "tech":  "HYPERSPACE_TECHNOLOGY",
+                                                 "level":  2
+                                             },
+                                             {
+                                                 "tech":  "ASTROPHYSICS_TECHNOLOGY",
+                                                 "level":  2
+                                             }
+                                         ],
+                    "production1":  [
+                                        200,
+                                        300,
+                                        500,
+                                        800,
+                                        1200,
+                                        1600,
+                                        2000,
+                                        2500,
+                                        3000,
+                                        4000,
+                                        5000,
+                                        6000,
+                                        7000,
+                                        8000,
+                                        9000,
+                                        10000
+                                    ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      },
-                      {
-                          "type":  "BUNKER_NETWORK",
-                          "description":  "Decreases resources that can be plunder by enemy attack by 4%. (Base is 90%)",
-                          "imagePath":  "images/buildings/Metal_Storage.webp",
-                          "basicCost":  {
-                                            "metal":  60,
-                                            "crystal":  30,
-                                            "deuterium":  10
-                                        },
-                          "level":  0,
-                          "currentPowerConsumption":  0,
-                          "powerConsumption":  1,
-                          "buildingRequirements":  [
+                                    ],
+                    "isFacility":  true
+                },
+                {
+                    "type":  "BUNKER_NETWORK",
+                    "description":  "Decreases resources that can be plunder by enemy attack by 4%. (Base is 90%)",
+                    "imagePath":  "images/buildings/Metal_Storage.webp",
+                    "basicCost":  {
+                                      "metal":  60,
+                                      "crystal":  30,
+                                      "deuterium":  10
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  1,
+                    "buildingRequirements":  [
 
-                                                   ],
-                          "techRequirements":  [
-                                                   {
-                                                       "tech":  "ESPIONAGE_TECHNOLOGY",
-                                                       "level":  0.5
-                                                   },
-                                                   {
-                                                       "tech":  "ARMOUR_TECHNOLOGY",
-                                                       "level":  0.5
-                                                   },
-                                                   {
-                                                       "tech":  "ADAPTIVE_TECHNOLOGY",
-                                                       "level":  0.5
-                                                   },
-                                                   {
-                                                       "tech":  "SHIELDING_TECHNOLOGY",
-                                                       "level":  0.5
-                                                   }
-                                               ],
-                        "production1":  [
-                          4,
-                          8,
-                          12,
-                          16,
-                          20,
-                          24,
-                          28,
-                          32,
-                          36,
-                          40,
-                          44,
-                          48,
-                          52,
-                          55,
-                          58,
-                          60,
-                           62,
-                          64,
-                          66,
-                          68,
-                          70
-                        ],
-                          "production2":  [
+                                             ],
+                    "techRequirements":  [
+                                             {
+                                                 "tech":  "ESPIONAGE_TECHNOLOGY",
+                                                 "level":  0.5
+                                             },
+                                             {
+                                                 "tech":  "ARMOUR_TECHNOLOGY",
+                                                 "level":  0.5
+                                             },
+                                             {
+                                                 "tech":  "ADAPTIVE_TECHNOLOGY",
+                                                 "level":  0.5
+                                             },
+                                             {
+                                                 "tech":  "SHIELDING_TECHNOLOGY",
+                                                 "level":  0.5
+                                             }
+                                         ],
+                  "production1":  [
+                    4,
+                    8,
+                    12,
+                    16,
+                    20,
+                    24,
+                    28,
+                    32,
+                    36,
+                    40,
+                    44,
+                    48,
+                    52,
+                    55,
+                    58,
+                    60,
+                     62,
+                    64,
+                    66,
+                    68,
+                    70
+                  ],
+                    "production2":  [
 
-                                          ],
-                          "production3":  [
+                                    ],
+                    "production3":  [
 
-                                          ],
-                          "isFacility":  true
-                      }
-                  ]
+                                    ],
+                    "armor":  20,
+                    "damageMultiplier":  0.5,
+                    "isFacility":  true
+                }
+            ]
 }

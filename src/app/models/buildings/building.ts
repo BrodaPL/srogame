@@ -18,7 +18,9 @@ export class Building {
     public techRequirements: TechRequirement[],
     public production1: number[],
     public production2: number[],
-    public production3: number[]
+    public production3: number[],
+    public armor: number,
+    public damageMultiplier: number
   ) {}
 
   getCostForLevel(levelParam: number): ResourcesPack {

@@ -142,6 +142,12 @@
                       Production: {{ buildingProductionAtCurrentLevel(building) }}
                     </p>
                     <p class="planet-building-card__meta">
+                      Structural points: {{ buildingCurrentStructuralPoints(building) }} / {{ buildingMaxStructuralPoints(building) }}
+                    </p>
+                    <p class="planet-building-card__meta">
+                      Structural efficiency: {{ buildingStructuralUtilizationPercent(building) }}% (Floor {{ buildingMinimumStructuralUtilizationPercent(building) }}%)
+                    </p>
+                    <p class="planet-building-card__meta">
                       Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
                     </p>
                   }
@@ -216,6 +222,12 @@
                   @if (buildingLevel(building.type) > 0) {
                     <p class="planet-building-card__meta">
                       Production: {{ buildingProductionAtCurrentLevel(building) }}
+                    </p>
+                    <p class="planet-building-card__meta">
+                      Structural points: {{ buildingCurrentStructuralPoints(building) }} / {{ buildingMaxStructuralPoints(building) }}
+                    </p>
+                    <p class="planet-building-card__meta">
+                      Structural efficiency: {{ buildingStructuralUtilizationPercent(building) }}% (Floor {{ buildingMinimumStructuralUtilizationPercent(building) }}%)
                     </p>
                     <p class="planet-building-card__meta">
                       Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}

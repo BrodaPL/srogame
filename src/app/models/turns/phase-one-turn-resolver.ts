@@ -2,6 +2,11 @@ import { EspionageReportGenerator } from '../../generators/espionage-report-gene
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
+import {
+  applyBuildingBombardment,
+  hasBombardmentWeapons,
+  hasDamagedBuildings
+} from '../bombardment/building-bombardment';
 import { SpaceBattleResolver, type SpaceBattleResult } from '../battles/space-battle-resolver';
 import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
 import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
@@ -28,6 +33,7 @@ import { Planet } from '../planets/planet';
 import { Player } from '../player';
 import { FleetReport } from '../reports/fleet-report';
 import {
+  calculateRepairCapabilityForManyShips,
   collectRepairEquipmentBurstGroupsForManyShips,
   type RepairEquipmentBurstGroup
 } from '../repairs/ship-repair-capability';
@@ -505,7 +511,11 @@ function resolveActiveFleets(
 
   // TODO: Define a formal deterministic same-turn arrival order once simultaneous arrivals need dedicated rules.
   for (const fleet of galaxy.activeFleets) {
-    if (!isFleetResolvingThisTurn(fleet, resolvedTurnNumber)) {
+    if (
+      fleet.state !== FleetState.IDLE
+      && fleet.state !== FleetState.MISSION_FAILURE_IDLE
+      && !isFleetResolvingThisTurn(fleet, resolvedTurnNumber)
+    ) {
       activeFleets.push(fleet);
       continue;
     }
@@ -660,10 +670,39 @@ function resolveFleetState(
       );
     case FleetState.IDLE:
     case FleetState.MISSION_FAILURE_IDLE:
-      return fleet;
+      return resolveIdleFleetState(
+        fleet,
+        planetById,
+        resolvedTurnNumber,
+        diplomacyResolver
+      );
     default:
       return fleet;
   }
+}
+
+function resolveIdleFleetState(
+  fleet: Fleet,
+  planetById: Map<string, Planet>,
+  resolvedTurnNumber: number,
+  diplomacyResolver: DiplomacyResolver
+): Fleet | null {
+  if (fleet.state !== FleetState.IDLE || fleet.missionType !== FleetMissionType.SIEGE) {
+    return fleet;
+  }
+
+  const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
+  if (!targetPlanet || targetPlanet.info.ownerId === null) {
+    return fleet;
+  }
+
+  const diplomaticStatus = diplomacyResolver.getStatus(fleet.ownerId, targetPlanet.info.ownerId);
+  if (diplomaticStatus !== DiplomaticStatus.WAR) {
+    return fleet;
+  }
+
+  applyPostArrivalBombardmentIfNeeded(fleet, targetPlanet, resolvedTurnNumber);
+  return fleet;
 }
 
 function resolveTargetArrival(
@@ -720,6 +759,7 @@ function resolveTargetArrival(
     }
 
     if (battleResolution === 'attacker_won') {
+      applyPostArrivalBombardmentIfNeeded(fleet, targetPlanet, resolvedTurnNumber);
       return applyMissionResolution(
         mission.resolveAfterEncounter(
           resolutionContext,
@@ -731,11 +771,39 @@ function resolveTargetArrival(
     }
   }
 
+  applyPostArrivalBombardmentIfNeeded(fleet, targetPlanet, resolvedTurnNumber);
   return applyMissionResolution(
     mission.resolveWithoutEncounter(resolutionContext),
     resolutionContext,
     espionageReportGenerator
   );
+}
+
+function applyPostArrivalBombardmentIfNeeded(
+  fleet: Fleet,
+  targetPlanet: Planet,
+  resolvedTurnNumber: number
+): void {
+  if (
+    fleet.missionType !== FleetMissionType.BOMBARD
+    && fleet.missionType !== FleetMissionType.SIEGE
+  ) {
+    return;
+  }
+
+  if (ManyShips.totalShipsCount(fleet.ships) <= 0 || !hasBombardmentWeapons(fleet.ships)) {
+    return;
+  }
+
+  const summary = applyBuildingBombardment(fleet.ships, targetPlanet);
+  if (summary.shots <= 0 || summary.hits <= 0 || summary.totalDamage <= 0) {
+    return;
+  }
+
+  // TODO: Add dedicated bombardment reports once infrastructure damage gets a dedicated report type/UI.
+  if (fleet.missionType === FleetMissionType.BOMBARD) {
+    fleet.createdAtTurn = resolvedTurnNumber;
+  }
 }
 
 function resolveShipRepairs(
@@ -751,16 +819,24 @@ function resolveShipRepairs(
       continue;
     }
 
-    let remainingSharedShipyardRepair = Math.max(0, Math.floor(snapshot.shipyardPower));
-    remainingSharedShipyardRepair = repairShipsWithLocalCapabilitiesAndSharedShipyard(
-      planet.rBDSFTQ.ships,
-      remainingSharedShipyardRepair
-    );
-
     const eligibleOrbitFleets = shuffleCopy(
       galaxy.activeFleets.filter((fleet) =>
         isFleetEligibleForOrbitRepair(fleet, coordinatesId, planetOwnerId, diplomacyResolver)
       )
+    );
+    const totalDroneRepair = totalDroneRepairCapabilityAtPlanet(planet, eligibleOrbitFleets);
+    const shipDamagePresent = hasShipDamageAtPlanet(planet, eligibleOrbitFleets);
+    const buildingDamagePresent = hasDamagedBuildings(planet);
+    const droneRepairSplit = splitDroneRepairBudget(
+      totalDroneRepair,
+      shipDamagePresent,
+      buildingDamagePresent
+    );
+
+    let remainingSharedShipyardRepair = Math.max(0, Math.floor(snapshot.shipyardPower)) + droneRepairSplit.shipRepair;
+    remainingSharedShipyardRepair = repairShipsWithLocalCapabilitiesAndSharedShipyard(
+      planet.rBDSFTQ.ships,
+      remainingSharedShipyardRepair
     );
 
     for (const fleet of eligibleOrbitFleets) {
@@ -773,6 +849,11 @@ function resolveShipRepairs(
         break;
       }
     }
+
+    repairBuildingsAtPlanet(
+      planet,
+      Math.max(0, Math.floor(snapshot.industryPower)) + droneRepairSplit.buildingRepair
+    );
   }
 }
 
@@ -785,7 +866,10 @@ function repairShipsWithLocalCapabilitiesAndSharedShipyard(
     return remainingSharedShipyardRepair;
   }
 
-  applyRepairEquipmentBursts(ships, collectRepairEquipmentBurstGroupsForManyShips(ships));
+  applyRepairEquipmentBursts(
+    ships,
+    collectRepairEquipmentBurstGroupsForManyShips(ships).filter((group) => !group.isDrone)
+  );
   remainingSharedShipyardRepair = applyPooledShipRepair(ships, remainingSharedShipyardRepair);
   ships.normalizeFullyRepairedShips();
   return remainingSharedShipyardRepair;
@@ -827,6 +911,97 @@ function applyPooledShipRepair(
   }
 
   return remainingRepair;
+}
+
+function repairBuildingsAtPlanet(
+  planet: Planet,
+  pooledRepair: number
+): number {
+  let remainingRepair = Math.max(0, Math.floor(pooledRepair));
+  while (remainingRepair > 0) {
+    const targetType = selectRandomDamagedBuildingType(planet);
+    if (!targetType) {
+      break;
+    }
+
+    const usedRepair = planet.repairBuildingStructuralPoints(targetType, remainingRepair);
+    if (usedRepair <= 0) {
+      break;
+    }
+
+    remainingRepair -= usedRepair;
+  }
+
+  return remainingRepair;
+}
+
+function selectRandomDamagedBuildingType(planet: Planet): BuildingType | null {
+  const candidates = [...planet.rBDSFTQ.buildingsLevels.entries()]
+    .filter(([type, level]) =>
+      level > 0 && planet.getCurrentBuildingStructuralPoints(type) < planet.getMaxBuildingStructuralPoints(type)
+    )
+    .map(([type]) => type);
+  if (candidates.length <= 0) {
+    return null;
+  }
+
+  const randomIndex = Math.max(0, Math.min(
+    candidates.length - 1,
+    Math.floor(Math.random() * candidates.length)
+  ));
+  return candidates[randomIndex] ?? null;
+}
+
+function totalDroneRepairCapabilityAtPlanet(
+  planet: Planet,
+  eligibleOrbitFleets: Fleet[]
+): number {
+  let total = calculateRepairCapabilityForManyShips(planet.rBDSFTQ.ships).droneRepair;
+  for (const fleet of eligibleOrbitFleets) {
+    total += calculateRepairCapabilityForManyShips(fleet.ships).droneRepair;
+  }
+
+  return total;
+}
+
+function hasShipDamageAtPlanet(
+  planet: Planet,
+  eligibleOrbitFleets: Fleet[]
+): boolean {
+  if (planet.rBDSFTQ.ships.hasDamagedShips()) {
+    return true;
+  }
+
+  return eligibleOrbitFleets.some((fleet) => fleet.ships.hasDamagedShips());
+}
+
+function splitDroneRepairBudget(
+  totalDroneRepair: number,
+  shipDamagePresent: boolean,
+  buildingDamagePresent: boolean
+): { shipRepair: number; buildingRepair: number } {
+  const normalized = Math.max(0, Math.floor(totalDroneRepair));
+  if (normalized <= 0) {
+    return { shipRepair: 0, buildingRepair: 0 };
+  }
+
+  if (shipDamagePresent && buildingDamagePresent) {
+    const buildingRepair = Math.floor(normalized / 2);
+    return {
+      shipRepair: normalized - buildingRepair,
+      buildingRepair
+    };
+  }
+
+  if (shipDamagePresent) {
+    return { shipRepair: normalized, buildingRepair: 0 };
+  }
+
+  if (buildingDamagePresent) {
+    return { shipRepair: 0, buildingRepair: normalized };
+  }
+
+  return { shipRepair: 0, buildingRepair: 0 };
 }
 
 function selectRandomRepairTargetIndex(
@@ -900,6 +1075,7 @@ function resolveEncounterArrival(
 
   switch (outcome.resolution) {
     case 'victory':
+      applyPostArrivalBombardmentIfNeeded(arrival.fleet, arrival.targetPlanet, arrival.resolvedTurnNumber);
       return applyMissionResolution(
         arrival.mission.resolveAfterEncounter(resolutionContext, outcome),
         resolutionContext,
@@ -916,6 +1092,7 @@ function resolveEncounterArrival(
       return null;
     case 'notInvolved':
     default:
+      applyPostArrivalBombardmentIfNeeded(arrival.fleet, arrival.targetPlanet, arrival.resolvedTurnNumber);
       return applyMissionResolution(
         arrival.mission.resolveWithoutEncounter(resolutionContext),
         resolutionContext,
@@ -1339,10 +1516,12 @@ function compareEncounterArrivalPriority(
     [FleetMissionType.DEFEND]: 0,
     [FleetMissionType.ATTACK]: 1,
     [FleetMissionType.PLUNDER]: 2,
-    [FleetMissionType.MOVE]: 3,
-    [FleetMissionType.TRANSPORT]: 4,
-    [FleetMissionType.SPY]: 5,
-    [FleetMissionType.COLONIZE]: 6
+    [FleetMissionType.BOMBARD]: 3,
+    [FleetMissionType.SIEGE]: 4,
+    [FleetMissionType.MOVE]: 5,
+    [FleetMissionType.TRANSPORT]: 6,
+    [FleetMissionType.SPY]: 7,
+    [FleetMissionType.COLONIZE]: 8
   };
   const leftPriority = priorityByMissionType[left.fleet.missionType] ?? 999;
   const rightPriority = priorityByMissionType[right.fleet.missionType] ?? 999;

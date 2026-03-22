@@ -55,6 +55,42 @@
       }
     },
     {
+      "type": "BOMBARD",
+      "name": "Bombard",
+      "description": "Fight through hostile orbit, strike buildings once with bombardment weapons, then return automatically.",
+      "battleRoundsModifier": 0,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["WAR"],
+        "allowUnowned": false
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": false,
+        "requiresCargo": false
+      }
+    },
+    {
+      "type": "SIEGE",
+      "name": "Siege",
+      "description": "Fight through hostile orbit, stay over the target, and continue bombardment every turn until the fleet leaves orbit.",
+      "battleRoundsModifier": 0,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["WAR"],
+        "allowUnowned": false
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": false,
+        "requiresCargo": false
+      }
+    },
+    {
       "type": "COLONIZE",
       "name": "Colonize",
       "description": "Send a Colonizer to an unowned planet.",

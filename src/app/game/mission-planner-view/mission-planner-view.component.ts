@@ -60,6 +60,8 @@ const PHASE_ONE_MISSION_TYPES: FleetMissionType[] = [
   FleetMissionType.MOVE,
   FleetMissionType.TRANSPORT,
   FleetMissionType.SPY,
+  FleetMissionType.BOMBARD,
+  FleetMissionType.SIEGE,
   FleetMissionType.COLONIZE
 ];
 
@@ -132,6 +134,10 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected missionDescription(): string {
     return this.currentMission().description;
+  }
+
+  protected missionAllowsCargo(): boolean {
+    return this.currentMission().blueprint.shipRules.allowCargo;
   }
 
   protected planetsWithAvailableShips(): ClientPlanetDto[] {

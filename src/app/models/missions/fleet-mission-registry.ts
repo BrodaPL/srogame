@@ -2,7 +2,9 @@ import { MissionBlueprintsFactory } from '../../factories/mission-blueprints.fac
 import { FleetMissionType } from '../enums/fleet-mission-type';
 import type { FleetMissionBlueprints } from './fleet-mission-blueprint';
 import { FleetMission } from './fleet-mission';
+import { BombardFleetMission } from './types/bombard-fleet-mission';
 import { MoveFleetMission } from './types/move-fleet-mission';
+import { SiegeFleetMission } from './types/siege-fleet-mission';
 import { SpyFleetMission } from './types/spy-fleet-mission';
 import { TransportFleetMission } from './types/transport-fleet-mission';
 
@@ -43,6 +45,8 @@ export class FleetMissionRegistry {
     const move = this.blueprints.get(FleetMissionType.MOVE);
     const transport = this.blueprints.get(FleetMissionType.TRANSPORT);
     const spy = this.blueprints.get(FleetMissionType.SPY);
+    const bombard = this.blueprints.get(FleetMissionType.BOMBARD);
+    const siege = this.blueprints.get(FleetMissionType.SIEGE);
     const colonize = this.blueprints.get(FleetMissionType.COLONIZE);
 
     if (move) {
@@ -55,6 +59,14 @@ export class FleetMissionRegistry {
 
     if (spy) {
       this.missionByType.set(spy.type, new SpyFleetMission(spy));
+    }
+
+    if (bombard) {
+      this.missionByType.set(bombard.type, new BombardFleetMission(bombard));
+    }
+
+    if (siege) {
+      this.missionByType.set(siege.type, new SiegeFleetMission(siege));
     }
 
     if (colonize) {

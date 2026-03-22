@@ -132,6 +132,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private readonly technologiesByType: Map<TechnologyType, Technology>;
   private readonly buildingLevelsByType = new Map<BuildingType, number>();
   private readonly buildingCurrentPowerByType = new Map<BuildingType, number>();
+  private readonly buildingCurrentStructuralPointsByType = new Map<BuildingType, number>();
   private readonly powerUpdateInFlightByType = new Set<BuildingType>();
   private readonly powerUpdateErrorByType = new Map<BuildingType, string>();
   private readonly techLevelsByType = new Map<TechnologyType, number>();
@@ -248,6 +249,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected buildingMaxPowerConsumption(building: Building): number {
     return this.maxBuildingPowerConsumption(building.type);
+  }
+
+  protected buildingCurrentStructuralPoints(building: Building): number {
+    return this.currentBuildingStructuralPoints(building.type);
+  }
+
+  protected buildingMaxStructuralPoints(building: Building): number {
+    return this.maxBuildingStructuralPoints(building.type, this.buildingLevel(building.type));
+  }
+
+  protected buildingStructuralUtilizationPercent(building: Building): number {
+    return Math.round(this.structuralUtilizationAtLevel(building.type, this.buildingLevel(building.type)) * 100);
+  }
+
+  protected buildingMinimumStructuralUtilizationPercent(building: Building): number {
+    return Math.round(this.minimumStructuralUtilization(building.type) * 100);
   }
 
   protected shouldShowPowerManagement(building: Building): boolean {
@@ -1197,6 +1214,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private rebuildPlanetState(): void {
     this.buildingLevelsByType.clear();
     this.buildingCurrentPowerByType.clear();
+    this.buildingCurrentStructuralPointsByType.clear();
     this.powerUpdateInFlightByType.clear();
     this.powerUpdateErrorByType.clear();
     this.buildingStartInFlightByType.clear();
@@ -1218,6 +1236,13 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       this.buildingCurrentPowerByType.set(
         entry.type as BuildingType,
         this.roundNumber(Math.max(0, entry.currentPowerConsumption), 2)
+      );
+    }
+
+    for (const entry of this.planet.objects.buildingsCurrentStructuralPoints ?? []) {
+      this.buildingCurrentStructuralPointsByType.set(
+        entry.type as BuildingType,
+        Math.max(0, Math.floor(entry.currentStructuralPoints))
       );
     }
 
@@ -1865,6 +1890,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       labels.push('Damaged ships without repair capability');
     }
 
+    if (this.hasDamagedBuildingsAtPlanet(planet)) {
+      labels.push('Damaged buildings present');
+    }
+
+    if (
+      this.hasDamagedBuildingsAtPlanet(planet)
+      && this.industryRepairCapabilityForPlanet(planet) + this.droneRepairCapabilityForPlanet(planet) <= 0
+    ) {
+      labels.push('Damaged buildings without repair capability');
+    }
+
     return labels;
   }
 
@@ -1931,6 +1967,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       labels.push('Damaged ships without repair capability');
     }
 
+    if (this.hasDamagedBuildingsAtCurrentPlanet()) {
+      labels.push('Damaged buildings present');
+    }
+
+    if (
+      this.hasDamagedBuildingsAtCurrentPlanet()
+      && this.currentIndustryRepairCapability() + this.currentDroneRepairCapability() <= 0
+    ) {
+      labels.push('Damaged buildings without repair capability');
+    }
+
     return labels;
   }
 
@@ -1955,6 +2002,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return this.idleRepairFleetsForPlanet(planet).some((fleet) => ManyShips.hasDamagedShips(fleet.ships));
   }
 
+  private hasDamagedBuildingsAtCurrentPlanet(): boolean {
+    const planet = this.planet;
+    if (!planet) {
+      return false;
+    }
+
+    return [...this.buildingLevelsByType.entries()].some(([type, level]) =>
+      level > 0 && this.currentBuildingStructuralPoints(type) < this.maxBuildingStructuralPoints(type, level)
+    );
+  }
+
+  private hasDamagedBuildingsAtPlanet(planet: ClientPlanetDto): boolean {
+    return planet.objects.buildingsLevels.some((entry) => {
+      const buildingType = entry.type as BuildingType;
+      const max = this.maxBuildingStructuralPoints(buildingType, entry.level);
+      return entry.level > 0 && this.currentPlanetBuildingStructuralPoints(planet, buildingType, max) < max;
+    });
+  }
+
   private shipRepairCapabilityForPlanet(planet: ClientPlanetDto): number {
     let total = calculateRepairCapabilityForManyShips(planet.objects.ships, {
       shipyardPower: this.shipyardPowerForPlanet(planet)
@@ -1973,6 +2039,31 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     return total;
+  }
+
+  private industryRepairCapabilityForPlanet(planet: ClientPlanetDto): number {
+    const roboticsFactoryLevel = this.buildingLevelForPlanet(planet, BuildingType.ROBOTICS_FACTORY);
+    const naniteFactoryLevel = this.buildingLevelForPlanet(planet, BuildingType.NANITE_FACTORY);
+    const adaptiveTechnologyLevel = this.techLevelForPlanet(planet, TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const industryModifier = planet.info.planetaryParameters.industryModifier;
+    const energyState = this.calculateEnergyStateForPlanet(planet);
+    const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
+
+    const roboticsPower = roboticsFactoryLevel <= 0
+      ? 5
+      : this.productionAtPlanetBuildingLevel(planet, BuildingType.ROBOTICS_FACTORY);
+    const naniteMultiplier = naniteFactoryLevel <= 0
+      ? 1
+      : this.productionAtPlanetBuildingLevel(planet, BuildingType.NANITE_FACTORY);
+    const industryPower = roboticsPower
+      * naniteMultiplier
+      * industryModifier
+      * industryPowerMultiplier(adaptiveTechnologyLevel);
+    if (!Number.isFinite(industryPower) || industryPower <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(industryPower * energyEfficiency));
   }
 
   private currentPlanetIdleRepairFleets(): Fleet[] {
@@ -2085,7 +2176,13 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return 0;
     }
 
-    return this.getProductionAtLevel(blueprint, this.buildingLevelForPlanet(planet, buildingType));
+    const level = this.buildingLevelForPlanet(planet, buildingType);
+    return this.getProductionAtLevel(
+      blueprint,
+      level,
+      this.currentPlanetBuildingPowerConsumption(planet, buildingType),
+      this.structuralUtilizationForPlanet(planet, buildingType)
+    );
   }
 
   private techLevelForPlanet(planet: ClientPlanetDto, technologyType: TechnologyType): number {
@@ -2158,7 +2255,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return this.getProductionAtLevel(blueprint, level);
   }
 
-  private getProductionAtLevel(building: Building, level: number): number {
+  private getProductionAtLevel(
+    building: Building,
+    level: number,
+    explicitPowerConsumption?: number | null,
+    explicitStructuralUtilization?: number | null
+  ): number {
     const baseProduction = this.getRawProductionAtLevel(building, level);
     if (baseProduction <= 0) {
       return 0;
@@ -2167,9 +2269,11 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const utilization = this.powerUtilizationAtLevel(
       building.type,
       level,
-      building.powerConsumption ?? 0
+      building.powerConsumption ?? 0,
+      explicitPowerConsumption
     );
-    return Math.floor(baseProduction * utilization);
+    const structuralUtilization = explicitStructuralUtilization ?? this.structuralUtilizationAtLevel(building.type, level);
+    return Math.floor(baseProduction * utilization * structuralUtilization);
   }
 
   private getRawProductionAtLevel(building: Building, level: number): number {
@@ -2189,7 +2293,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private powerUtilizationAtLevel(
     buildingType: BuildingType,
     level: number,
-    powerPerLevel: number
+    powerPerLevel: number,
+    explicitPowerConsumption?: number | null
   ): number {
     if (level <= 0) {
       return 0;
@@ -2204,11 +2309,109 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return 1;
     }
 
-    const selectedConsumption = this.buildingCurrentPowerByType.get(buildingType);
+    const selectedConsumption = explicitPowerConsumption ?? this.buildingCurrentPowerByType.get(buildingType);
     const normalizedConsumption = selectedConsumption === undefined
       ? maxConsumption
       : Math.min(maxConsumption, Math.max(0, selectedConsumption));
     return normalizedConsumption / maxConsumption;
+  }
+
+  private currentBuildingStructuralPoints(buildingType: BuildingType): number {
+    const level = this.buildingLevel(buildingType);
+    const max = this.maxBuildingStructuralPoints(buildingType, level);
+    if (max <= 0) {
+      return 0;
+    }
+
+    const current = this.buildingCurrentStructuralPointsByType.get(buildingType);
+    return current === undefined ? max : Math.min(max, Math.max(0, current));
+  }
+
+  private structuralUtilizationAtLevel(buildingType: BuildingType, level: number): number {
+    if (level <= 0) {
+      return 0;
+    }
+
+    if (buildingType === BuildingType.TERRAFORMER) {
+      return 1;
+    }
+
+    const max = this.maxBuildingStructuralPoints(buildingType, level);
+    if (max <= 0) {
+      return 1;
+    }
+
+    const ratio = this.currentBuildingStructuralPoints(buildingType) / max;
+    return Math.min(1, Math.max(this.minimumStructuralUtilization(buildingType), ratio));
+  }
+
+  private structuralUtilizationForPlanet(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    const level = this.buildingLevelForPlanet(planet, buildingType);
+    if (level <= 0) {
+      return 0;
+    }
+
+    if (buildingType === BuildingType.TERRAFORMER) {
+      return 1;
+    }
+
+    const max = this.maxBuildingStructuralPoints(buildingType, level);
+    if (max <= 0) {
+      return 1;
+    }
+
+    const current = this.currentPlanetBuildingStructuralPoints(planet, buildingType, max);
+    return Math.min(1, Math.max(this.minimumStructuralUtilizationForPlanet(planet, buildingType), current / max));
+  }
+
+  private currentPlanetBuildingStructuralPoints(
+    planet: ClientPlanetDto,
+    buildingType: BuildingType,
+    fallbackMax?: number
+  ): number {
+    const max = fallbackMax ?? this.maxBuildingStructuralPoints(buildingType, this.buildingLevelForPlanet(planet, buildingType));
+    if (max <= 0) {
+      return 0;
+    }
+
+    const entry = planet.objects.buildingsCurrentStructuralPoints.find((item) => item.type === buildingType);
+    return entry ? Math.min(max, Math.max(0, Math.floor(entry.currentStructuralPoints))) : max;
+  }
+
+  private maxBuildingStructuralPoints(buildingType: BuildingType, level: number): number {
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const cost = blueprint.getCostForLevel(level);
+    return Math.max(0, Math.floor((cost.metal * 2) + cost.crystal + Math.floor(cost.deuterium * 0.5)));
+  }
+
+  private minimumStructuralUtilization(buildingType: BuildingType): number {
+    if (this.isZeroFloorBuilding(buildingType)) {
+      return 0;
+    }
+
+    return Math.min(1, 0.02 + (this.buildingLevel(BuildingType.BUNKER_NETWORK) * 0.01));
+  }
+
+  private minimumStructuralUtilizationForPlanet(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    if (this.isZeroFloorBuilding(buildingType)) {
+      return 0;
+    }
+
+    return Math.min(1, 0.02 + (this.buildingLevelForPlanet(planet, BuildingType.BUNKER_NETWORK) * 0.01));
+  }
+
+  private isZeroFloorBuilding(buildingType: BuildingType): boolean {
+    return buildingType === BuildingType.JUMP_GATE
+      || buildingType === BuildingType.SENSOR_PHALANX
+      || buildingType === BuildingType.MISSILE_SILO;
   }
 
   private buildingNextLevel(building: Building): number {

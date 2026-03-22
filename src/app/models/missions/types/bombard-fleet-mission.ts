@@ -1,0 +1,119 @@
+import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
+import { FleetState } from '../../fleets/fleet';
+import type { Ship } from '../../fleets/ship';
+import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
+import { WeaponType } from '../../enums/weapon-type';
+import { FleetMission } from '../fleet-mission';
+import type { MissionCheck } from '../mission-check';
+import { resolveTargetDiplomaticStatus } from '../mission-context';
+import type { MissionLaunchContext, MissionPlannerContext, MissionResolutionContext } from '../mission-context';
+import type { MissionResolutionResult } from '../mission-effect';
+import { ShipType } from '../../enums/ship-type';
+
+const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
+
+export class BombardFleetMission extends FleetMission {
+  public override isShipRelevant(_shipType: ShipType, ship: Ship): boolean {
+    return ship.weapons.length > 0;
+  }
+
+  public override getPlannerChecks(context: MissionPlannerContext): MissionCheck[] {
+    const checks = super.getPlannerChecks(context);
+    this.addBombardChecks(
+      checks,
+      context.selectedOriginPlanet?.info.ownerId ?? null,
+      context.selectedTargetPlanet?.info.ownerId ?? null,
+      context.selection.ships,
+      context.diplomacyResolver ?? null
+    );
+    return checks;
+  }
+
+  public override validateLaunch(context: MissionLaunchContext): MissionCheck[] {
+    const checks = super.validateLaunch(context);
+    this.addBombardChecks(
+      checks,
+      context.playerId,
+      context.targetPlanet.info.ownerId,
+      context.selection.ships,
+      context.diplomacyResolver ?? null
+    );
+    return checks;
+  }
+
+  public override resolveWithoutEncounter(context: MissionResolutionContext): MissionResolutionResult {
+    if (!context.targetPlanet) {
+      return this.failedArrival('Bombard mission failed because the target was no longer available on arrival.');
+    }
+
+    const targetStatus = resolveTargetDiplomaticStatus(
+      context.fleet.ownerId,
+      context.targetPlanet.info.ownerId,
+      context.diplomacyResolver ?? null
+    );
+    if (targetStatus !== DiplomaticStatus.WAR) {
+      return this.failedArrival('Bombard mission failed because the target was no longer hostile on arrival.');
+    }
+
+    return {
+      fleetOutcome: 'keep',
+      nextState: FleetState.RETURNING,
+      resetCreatedAtTurn: true,
+      effects: [],
+      reports: [{
+        kind: 'success',
+        body: `Bombard mission struck ${context.targetPlanet.basicInfo.name} and started the return flight.`
+      }]
+    };
+  }
+
+  public override resolveAfterEncounter(context: MissionResolutionContext): MissionResolutionResult {
+    return this.resolveWithoutEncounter(context);
+  }
+
+  public override onBattleRetreat(_context: MissionResolutionContext): MissionResolutionResult {
+    return this.failedArrival('Bombard mission encountered hostile resistance and was forced to retreat.');
+  }
+
+  private addBombardChecks(
+    checks: MissionCheck[],
+    playerOwnerId: number | null,
+    targetOwnerId: number | null,
+    selection: MissionPlannerContext['selection']['ships'],
+    diplomacyResolver: MissionPlannerContext['diplomacyResolver'] | null
+  ): void {
+    const targetStatus = resolveTargetDiplomaticStatus(
+      playerOwnerId,
+      targetOwnerId,
+      diplomacyResolver ?? null
+    );
+    if (targetOwnerId === null || targetStatus !== DiplomaticStatus.WAR) {
+      checks.push({ text: 'Bombard mission target must be a hostile owned planet.', severity: 'error' });
+    }
+
+    if (!this.hasBombardmentWeapons(selection)) {
+      checks.push({ text: 'Select at least one ship with Bombardment weapons.', severity: 'error' });
+    }
+  }
+
+  private hasBombardmentWeapons(selection: MissionPlannerContext['selection']['ships']): boolean {
+    return selection.some((entry) => {
+      if (entry.undamagedAmount + entry.damagedAmount <= 0) {
+        return false;
+      }
+
+      const blueprint = SHIP_BLUEPRINTS.get(entry.type);
+      return blueprint?.weapons.some((weapon) => weapon.type === WeaponType.BOMBARDMENT_WEAPONS) ?? false;
+    });
+  }
+
+  private failedArrival(body: string): MissionResolutionResult {
+    return {
+      fleetOutcome: 'keep',
+      nextState: FleetState.MISSION_FAILURE_RETURNING,
+      resetCreatedAtTurn: true,
+      effects: [],
+      reports: [{ kind: 'failure', body }]
+    };
+  }
+}

@@ -1,6 +1,8 @@
 export enum MissionType {
   ATTACK = 'Attack',
   PLUNDER = 'Plunder',
+  BOMBARD = 'Bombard',
+  SIEGE = 'Siege',
   INVADE = 'Invade',
   MOVE = 'Move',
   DEFEND = 'Defend',

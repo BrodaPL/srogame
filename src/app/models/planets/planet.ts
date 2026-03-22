@@ -46,6 +46,7 @@ export class rBDSFTQ {
     public resources: ResourcesPack,
     public buildingsLevels: Map<BuildingType, number>,
     public buildingsCurrentPowerConsumption: Map<BuildingType, number>,
+    public buildingsCurrentStructuralPoints: Map<BuildingType, number>,
     public defences: DefenceBuildingInstances[],
     public ships: ManyShips,
     public currentResearchQueue: TechnologyQueueEntry | null,
@@ -96,6 +97,7 @@ export class Planet {
       ),
       new rBDSFTQ(
         new ResourcesPack(0, 0, 0),
+        new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
         [],
@@ -152,6 +154,7 @@ export class Planet {
         new ResourcesPack(0, 0, 0),
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
+        new Map<BuildingType, number>(),
         [],
         ManyShips.empty(),
         null,
@@ -189,15 +192,19 @@ export class Planet {
   }
 
   public setBuildingLevel(type: BuildingType, level: number): void {
+    const previousLevel = this.getBuildingLevel(type);
+    const previousMaxStructuralPoints = this.getMaxBuildingStructuralPoints(type);
     const normalized = Math.max(0, Math.floor(level));
     if (normalized === 0) {
       this.rBDSFTQ.buildingsLevels.delete(type);
       this.rBDSFTQ.buildingsCurrentPowerConsumption.delete(type);
+      this.rBDSFTQ.buildingsCurrentStructuralPoints.delete(type);
       return;
     }
 
     this.rBDSFTQ.buildingsLevels.set(type, normalized);
     this.normalizeCurrentPowerConsumption(type);
+    this.normalizeCurrentStructuralPoints(type, previousLevel, previousMaxStructuralPoints);
   }
 
   public addBuildingLevel(type: BuildingType, delta = 1): number {
@@ -259,7 +266,8 @@ export class Planet {
     }
 
     const utilization = this.getBuildingPowerUtilization(type);
-    return Math.floor(baseProduction * utilization);
+    const structuralUtilization = this.getBuildingStructuralUtilization(type);
+    return Math.floor(baseProduction * utilization * structuralUtilization);
   }
 
   public getBuildingPowerUtilization(type: BuildingType): number {
@@ -274,6 +282,128 @@ export class Planet {
     }
 
     return Math.min(1, Math.max(0, current / max));
+  }
+
+  public getBuildingStructuralUtilization(type: BuildingType): number {
+    const level = this.getBuildingLevel(type);
+    if (level <= 0) {
+      return 0;
+    }
+
+    if (type === BuildingType.TERRAFORMER) {
+      return 1;
+    }
+
+    const max = this.getMaxBuildingStructuralPoints(type);
+    if (max <= 0) {
+      return 1;
+    }
+
+    const current = this.getCurrentBuildingStructuralPoints(type);
+    const ratio = Number.isFinite(current) && current > 0 ? current / max : 0;
+    return Math.min(1, Math.max(this.getBuildingMinimumStructuralUtilization(type), ratio));
+  }
+
+  public getBuildingMinimumStructuralUtilization(type: BuildingType): number {
+    if (
+      type === BuildingType.JUMP_GATE
+      || type === BuildingType.SENSOR_PHALANX
+      || type === BuildingType.MISSILE_SILO
+    ) {
+      return 0;
+    }
+
+    return Math.min(1, 0.02 + (this.getBuildingLevel(BuildingType.BUNKER_NETWORK) * 0.01));
+  }
+
+  public getCurrentBuildingStructuralPoints(type: BuildingType): number {
+    const max = this.getMaxBuildingStructuralPoints(type);
+    if (max <= 0) {
+      return 0;
+    }
+
+    const stored = this.rBDSFTQ.buildingsCurrentStructuralPoints.get(type);
+    if (stored === undefined || !Number.isFinite(stored)) {
+      return max;
+    }
+
+    return Math.min(max, Math.max(0, stored));
+  }
+
+  public setCurrentBuildingStructuralPoints(type: BuildingType, value: number): number {
+    const max = this.getMaxBuildingStructuralPoints(type);
+    if (max <= 0) {
+      this.rBDSFTQ.buildingsCurrentStructuralPoints.delete(type);
+      return 0;
+    }
+
+    const normalizedValue = Number.isFinite(value) ? value : max;
+    const clamped = Math.min(max, Math.max(0, Math.floor(normalizedValue)));
+    this.rBDSFTQ.buildingsCurrentStructuralPoints.set(type, clamped);
+    return clamped;
+  }
+
+  public getMaxBuildingStructuralPoints(type: BuildingType): number {
+    const level = this.getBuildingLevel(type);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = Planet.buildingBlueprints.get(type);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const cost = blueprint.getCostForLevel(level);
+    return Math.max(
+      0,
+      Math.floor((cost.metal * 2) + cost.crystal + Math.floor(cost.deuterium * 0.5))
+    );
+  }
+
+  public applyBuildingStructuralDamage(type: BuildingType, rawDamage: number): number {
+    const level = this.getBuildingLevel(type);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = Planet.buildingBlueprints.get(type);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const normalizedRawDamage = Number.isFinite(rawDamage) ? rawDamage : 0;
+    const reducedDamage = Math.max(0, normalizedRawDamage - Math.max(0, blueprint.armor));
+    const appliedDamage = Math.max(0, Math.floor(reducedDamage * Math.max(0, blueprint.damageMultiplier)));
+    if (appliedDamage <= 0) {
+      return 0;
+    }
+
+    const current = this.getCurrentBuildingStructuralPoints(type);
+    const next = Math.max(0, current - appliedDamage);
+    this.setCurrentBuildingStructuralPoints(type, next);
+    return current - next;
+  }
+
+  public repairBuildingStructuralPoints(type: BuildingType, amount: number): number {
+    const max = this.getMaxBuildingStructuralPoints(type);
+    if (max <= 0) {
+      return 0;
+    }
+
+    const current = this.getCurrentBuildingStructuralPoints(type);
+    if (current >= max) {
+      return 0;
+    }
+
+    const normalizedAmount = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
+    if (normalizedAmount <= 0) {
+      return 0;
+    }
+
+    const next = Math.min(max, current + normalizedAmount);
+    this.setCurrentBuildingStructuralPoints(type, next);
+    return next - current;
   }
 
   public getMetalGain(adaptiveTechnologyLevel: number): number {
@@ -335,6 +465,32 @@ export class Planet {
     this.rBDSFTQ.buildingsCurrentPowerConsumption.set(type, Math.min(max, Math.max(0, existing)));
   }
 
+  private normalizeCurrentStructuralPoints(
+    type: BuildingType,
+    previousLevel: number,
+    previousMaxStructuralPoints: number
+  ): void {
+    const max = this.getMaxBuildingStructuralPoints(type);
+    if (max <= 0) {
+      this.rBDSFTQ.buildingsCurrentStructuralPoints.delete(type);
+      return;
+    }
+
+    if (previousLevel <= 0 || previousMaxStructuralPoints <= 0) {
+      this.rBDSFTQ.buildingsCurrentStructuralPoints.set(type, max);
+      return;
+    }
+
+    const existing = this.rBDSFTQ.buildingsCurrentStructuralPoints.get(type);
+    if (existing === undefined || !Number.isFinite(existing)) {
+      this.rBDSFTQ.buildingsCurrentStructuralPoints.set(type, max);
+      return;
+    }
+
+    const previousRatio = Math.min(1, Math.max(0, existing / previousMaxStructuralPoints));
+    this.rBDSFTQ.buildingsCurrentStructuralPoints.set(type, Math.floor(max * previousRatio));
+  }
+
   public static buildingLevelsFromRecord(
     record: Record<string, number> | null | undefined
   ): Map<BuildingType, number> {
@@ -373,6 +529,22 @@ export class Planet {
         continue;
       }
 
+      record[type] = normalized;
+    }
+
+    return record;
+  }
+
+  public static buildingStructuralPointsToRecord(
+    map: Map<BuildingType, number>
+  ): Record<string, number> {
+    const record: Record<string, number> = {};
+    for (const [type, points] of map.entries()) {
+      if (!Number.isFinite(points)) {
+        continue;
+      }
+
+      const normalized = Math.max(0, Math.floor(points));
       record[type] = normalized;
     }
 

@@ -140,6 +140,12 @@ export type BuildingPowerConsumptionEntry = {
   currentPowerConsumption: number;
 };
 
+export type BuildingStructuralPointsEntry = {
+  type: BuildingType;
+  currentStructuralPoints: number;
+  maxStructuralPoints: number;
+};
+
 export type BuildingQueueEntryDto = {
   buildingType: BuildingType;
   nextLevel: number;
@@ -272,6 +278,7 @@ export type ClientPlanetDto = {
     resources: ResourcesPackDto;
     buildingsLevels: BuildingLevelEntry[];
     buildingsCurrentPowerConsumption: BuildingPowerConsumptionEntry[];
+    buildingsCurrentStructuralPoints: BuildingStructuralPointsEntry[];
     defences: DefenceBuildingInstances[];
     ships: ManyShipsDto;
     currentResearchQueue: TechnologyQueueEntryDto | null;

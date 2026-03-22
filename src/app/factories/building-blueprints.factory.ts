@@ -25,6 +25,8 @@ interface BuildingBlueprintJson {
   production1: number[];
   production2: number[];
   production3: number[];
+  armor?: number;
+  damageMultiplier?: number;
 }
 
 interface ResourcesPackJson {
@@ -108,7 +110,9 @@ export class BuildingBlueprintsFactory {
       )),
       entry.production1 ?? [],
       entry.production2 ?? [],
-      entry.production3 ?? []
+      entry.production3 ?? [],
+      entry.armor ?? 0,
+      entry.damageMultiplier ?? 1
     );
   }
 

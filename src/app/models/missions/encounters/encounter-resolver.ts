@@ -50,16 +50,18 @@ const MISSION_PRIORITY: Record<FleetMissionType, number> = {
   [FleetMissionType.DEFEND]: 0,
   [FleetMissionType.ATTACK]: 1,
   [FleetMissionType.PLUNDER]: 2,
-  [FleetMissionType.MOVE]: 3,
-  [FleetMissionType.TRANSPORT]: 4,
-  [FleetMissionType.SPY]: 5,
-  [FleetMissionType.COLONIZE]: 6,
-  [FleetMissionType.INVADE]: 7,
-  [FleetMissionType.BLOCK]: 8,
-  [FleetMissionType.INTERCEPT]: 9,
-  [FleetMissionType.STAR_SYSTEM_SPY]: 10,
-  [FleetMissionType.RECYCLE]: 11,
-  [FleetMissionType.REPAIR]: 12
+  [FleetMissionType.BOMBARD]: 3,
+  [FleetMissionType.SIEGE]: 4,
+  [FleetMissionType.MOVE]: 5,
+  [FleetMissionType.TRANSPORT]: 6,
+  [FleetMissionType.SPY]: 7,
+  [FleetMissionType.COLONIZE]: 8,
+  [FleetMissionType.INVADE]: 9,
+  [FleetMissionType.BLOCK]: 10,
+  [FleetMissionType.INTERCEPT]: 11,
+  [FleetMissionType.STAR_SYSTEM_SPY]: 12,
+  [FleetMissionType.RECYCLE]: 13,
+  [FleetMissionType.REPAIR]: 14
 };
 
 export class EncounterResolver {

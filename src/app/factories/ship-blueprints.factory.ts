@@ -64,6 +64,8 @@ export class ShipBlueprintsFactory {
   private static readonly shipImageMap: Partial<Record<ShipType, string>> = {
     [ShipType.FIGHTER]: 'images/ships/Light_Fighter.webp',
     [ShipType.ASSAULT_FIGHTER]: 'images/ships/Heavy_Fighter.webp',
+    [ShipType.ATMOSPHERIC_FIGHTER]: 'images/ships/Light_Fighter.webp',
+    [ShipType.ATMOSPHERIC_BOMBER]: 'images/ships/Heavy_Fighter.webp',
     [ShipType.CORVETTE]: 'images/ships/Cruiser.webp',
     [ShipType.SPY_PROBE]: 'images/ships/Espionage_Probe.webp',
     [ShipType.REPAIR_DRONE]: 'images/ships/Light_Fighter.webp',
@@ -74,11 +76,13 @@ export class ShipBlueprintsFactory {
     [ShipType.BATTLE_CRUISER]: 'images/ships/Battlecruiser.webp',
     [ShipType.DESTROYER]: 'images/ships/Destroyer.webp',
     [ShipType.DREADNOUGHT]: 'images/ships/Death_Star.webp',
+    [ShipType.ORBITAL_BOMBER]: 'images/ships/Destroyer.webp',
     [ShipType.CARRIER]: 'images/ships/Reaper.webp',
     [ShipType.CARGO_SUPPORT]: 'images/ships/Large_Cargo.webp',
     [ShipType.MASS_HAULER]: 'images/ships/Large_Cargo.webp',
     [ShipType.COLONIZER]: 'images/ships/Colony_Ship.webp',
     [ShipType.TITAN]: 'images/ships/Death_Star.webp',
+    [ShipType.ARMAGEDDON_BOMBER]: 'images/ships/Death_Star.webp',
     [ShipType.BEHEMOTH]: 'images/ships/Death_Star.webp',
     [ShipType.FLEET_CARRIER]: 'images/ships/Pathfinder.webp',
     [ShipType.MOTHER_SHIP]: 'images/ships/Death_Star.webp'

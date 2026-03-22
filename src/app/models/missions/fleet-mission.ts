@@ -65,7 +65,9 @@ export class FleetMission {
   public normalizeSelection(context: MissionSelectionContext): MissionSelection {
     return {
       ships: context.selection.ships.map((entry) => ({ ...entry })),
-      cargo: { ...context.selection.cargo }
+      cargo: this.blueprint.shipRules.allowCargo
+        ? { ...context.selection.cargo }
+        : { metal: 0, crystal: 0, deuterium: 0 }
     };
   }
 

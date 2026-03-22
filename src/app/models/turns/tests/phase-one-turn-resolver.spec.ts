@@ -804,4 +804,111 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(ManyShips.hasDamagedShips(galaxy.activeFleets[0].ships)).toBe(false);
     expect(ManyShips.undamagedCountByType(galaxy.activeFleets[0].ships).get(ShipType.CRUISER) ?? 0).toBe(1);
   });
+
+  it('lets Bombard missions damage hostile buildings once and then return', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.6);
+
+    const bombardFleet = new Fleet(
+      300,
+      1,
+      FleetMissionType.BOMBARD,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Bastion',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, system } = createPlayersAndGalaxy(bombardFleet, (solarSystem) => {
+      solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+      solarSystem.planets[0].info.ownerId = 1;
+      solarSystem.planets[1].basicInfo.name = 'Beta Bastion';
+      solarSystem.planets[1].info.ownerId = 2;
+      solarSystem.planets[1].setBuildingLevel(BuildingType.METAL_MINE, 1);
+      solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+    });
+
+    const maxStructuralPoints = system.planets[1].getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.RETURNING);
+    expect(system.planets[1].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeLessThan(maxStructuralPoints);
+  });
+
+  it('lets idle Siege fleets keep bombarding hostile buildings each turn', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.6);
+
+    const siegeFleet = new Fleet(
+      301,
+      1,
+      FleetMissionType.SIEGE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Bastion',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.IDLE,
+      1
+    );
+
+    const { galaxy, system } = createPlayersAndGalaxy(siegeFleet, (solarSystem) => {
+      solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+      solarSystem.planets[0].info.ownerId = 1;
+      solarSystem.planets[1].basicInfo.name = 'Beta Bastion';
+      solarSystem.planets[1].info.ownerId = 2;
+      solarSystem.planets[1].setBuildingLevel(BuildingType.METAL_MINE, 1);
+      solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+    });
+
+    const maxStructuralPoints = system.planets[1].getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(system.planets[1].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeLessThan(maxStructuralPoints);
+  });
+
+  it('splits drone repair between damaged ships and damaged buildings', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[0].setBuildingLevel(BuildingType.METAL_MINE, 1);
+        const maxStructuralPoints = solarSystem.planets[0].getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
+        solarSystem.planets[0].setCurrentBuildingStructuralPoints(BuildingType.METAL_MINE, maxStructuralPoints - 10);
+        solarSystem.planets[0].rBDSFTQ.ships = mixedShips({
+          undamaged: [{ type: ShipType.REPAIR_DRONE, amount: 1 }],
+          damaged: [{ type: ShipType.CRUISER, missingHull: 10 }]
+        });
+      },
+      (solarSystem) => ([new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER)])
+    );
+
+    const initialStructuralPoints = system.planets[0].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE);
+    const initialMissingHull = system.planets[0].rBDSFTQ.ships.totalMissingHull();
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(system.planets[0].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeGreaterThan(initialStructuralPoints);
+    expect(system.planets[0].rBDSFTQ.ships.totalMissingHull()).toBeLessThan(initialMissingHull);
+  });
 });

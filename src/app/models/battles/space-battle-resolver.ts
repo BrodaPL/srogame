@@ -145,7 +145,8 @@ type BattleTechModifiers = {
 const COMBAT_WEAPON_TYPES = new Set<WeaponType>([
   WeaponType.BEAM,
   WeaponType.MISSILE,
-  WeaponType.RAIL_GUN
+  WeaponType.RAIL_GUN,
+  WeaponType.BOMBARDMENT_WEAPONS
 ]);
 
 const mathRandomSource: BattleRandomSource = {
@@ -384,7 +385,9 @@ export class SpaceBattleResolver {
   ): BattleShotSummary {
     const shieldBefore = target.ship.shield;
     const hullBefore = target.ship.hull;
-    const evaded = this.rollEvade(target.effectiveEvasionChance, randomSource);
+    const evaded = weapon.type === WeaponType.BOMBARDMENT_WEAPONS
+      ? this.rollBombardmentMiss(randomSource)
+      : this.rollEvade(target.effectiveEvasionChance, randomSource);
     let shieldDamage = 0;
     let hullDamage = 0;
 
@@ -416,7 +419,7 @@ export class SpaceBattleResolver {
       weaponType: weapon.type,
       weaponDamage: weapon.dmg,
       evaded,
-      targetEvasionChance: target.effectiveEvasionChance,
+      targetEvasionChance: weapon.type === WeaponType.BOMBARDMENT_WEAPONS ? 0.5 : target.effectiveEvasionChance,
       shieldBefore,
       shieldAfter: target.ship.shield,
       hullBefore,
@@ -517,6 +520,10 @@ export class SpaceBattleResolver {
     return this.nextRandomFloat(randomSource) < evasionChance;
   }
 
+  private rollBombardmentMiss(randomSource: BattleRandomSource): boolean {
+    return this.nextRandomFloat(randomSource) < 0.5;
+  }
+
   private refillRoundWeapons(side: BattleSideState): number {
     let weaponsCount = 0;
 
@@ -539,6 +546,7 @@ export class SpaceBattleResolver {
     techModifiers: BattleTechModifiers
   ): BattleQueuedWeapon[] {
     const weapons: BattleQueuedWeapon[] = [];
+    const delayedBombardmentWeapons: BattleQueuedWeapon[] = [];
 
     for (const weapon of ship.type.weapons) {
       if (!COMBAT_WEAPON_TYPES.has(weapon.type)) {
@@ -547,14 +555,17 @@ export class SpaceBattleResolver {
 
       const shots = Math.max(0, Math.floor(weapon.shots));
       for (let shot = 0; shot < shots; shot += 1) {
-        weapons.push({
+        const target = weapon.type === WeaponType.BOMBARDMENT_WEAPONS
+          ? delayedBombardmentWeapons
+          : weapons;
+        target.push({
           type: weapon.type,
           dmg: this.modifiedWeaponDamage(weapon.type, weapon.dmg, techModifiers)
         });
       }
     }
 
-    return weapons;
+    return [...weapons, ...delayedBombardmentWeapons];
   }
 
   private modifiedWeaponDamage(

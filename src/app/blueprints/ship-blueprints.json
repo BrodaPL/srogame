@@ -55,6 +55,63 @@
       ]
     },
     {
+      "type": "ATMOSPHERIC_FIGHTER",
+      "imagePath": "images/ships/Light_Fighter.webp",
+      "hullClass": "SMALL",
+      "canJump": false,
+      "size": 1,
+      "evasionChance": 0.22,
+      "hullPointsCapacity": 30,
+      "criticalThreshold": 55,
+      "shieldCapacity": 0,
+      "armor": 1,
+      "weapons": [
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 20, "shots": 1 }
+      ],
+      "cargoCapacity": 0,
+      "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
+      "jumpCost": 0,
+      "cost": { "metal": 40, "crystal": 10, "deuterium": 20 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 2 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 1 },
+        { "tech": "BEAMS_WEAPONS", "level": 1 },
+        { "tech": "MISSILES_WEAPONS", "level": 1 }
+      ]
+    },
+    {
+      "type": "ATMOSPHERIC_BOMBER",
+      "imagePath": "images/ships/Heavy_Fighter.webp",
+      "hullClass": "SMALL",
+      "canJump": false,
+      "size": 3,
+      "evasionChance": 0.12,
+      "hullPointsCapacity": 90,
+      "criticalThreshold": 50,
+      "shieldCapacity": 30,
+      "armor": 2,
+      "weapons": [
+        { "type": "MISSILE", "dmg": 20, "shots": 1 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 2 }
+      ],
+      "cargoCapacity": 20,
+      "hangarCapacity": 0,
+      "purposes": ["MILITARY"],
+      "jumpCost": 0,
+      "cost": { "metal": 70, "crystal": 30, "deuterium": 20 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 3 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 2 },
+        { "tech": "MISSILES_WEAPONS", "level": 2 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 1 }
+      ]
+    },
+    {
       "type": "CORVETTE",
       "imagePath": "images/ships/Cruiser.webp",
       "hullClass": "SMALL",
@@ -279,7 +336,8 @@
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 4 },
         { "type": "MISSILE", "dmg": 30, "shots": 1 },
-        { "type": "RAIL_GUN", "dmg": 10, "shots": 1 }
+        { "type": "RAIL_GUN", "dmg": 10, "shots": 1 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 1 }
       ],
       "cargoCapacity": 200,
       "hangarCapacity": 0,
@@ -346,7 +404,8 @@
       "armor": 6,
       "weapons": [
         { "type": "BEAM", "dmg": 30, "shots": 1 },
-        { "type": "MISSILE", "dmg": 50, "shots": 3 }
+        { "type": "MISSILE", "dmg": 50, "shots": 3 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 50, "shots": 1 }
       ],
       "cargoCapacity": 200,
       "hangarCapacity": 0,
@@ -364,6 +423,39 @@
         { "tech": "SHIELDING_TECHNOLOGY", "level": 4 },
         { "tech": "MISSILES_WEAPONS", "level": 4 },
         { "tech": "BEAMS_WEAPONS", "level": 3 }
+      ]
+    },
+    {
+      "type": "ORBITAL_BOMBER",
+      "imagePath": "images/ships/Destroyer.webp",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 220,
+      "criticalThreshold": 35,
+      "shieldCapacity": 200,
+      "armor": 5,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 3 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 4 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 100, "shots": 2 }
+      ],
+      "cargoCapacity": 50,
+      "hangarCapacity": 4,
+      "purposes": ["MILITARY"],
+      "jumpCost": 5,
+      "cost": { "metal": 400, "crystal": 150, "deuterium": 120 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 7 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 4 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 3 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 4 },
+        { "tech": "MISSILES_WEAPONS", "level": 4 },
+        { "tech": "RAILGUNS_WEAPONS", "level": 3 }
       ]
     },
     {
@@ -513,6 +605,7 @@
         { "type": "BEAM", "dmg": 30, "shots": 8 },
         { "type": "MISSILE", "dmg": 50, "shots": 4 },
         { "type": "RAIL_GUN", "dmg": 20, "shots": 4 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 100, "shots": 1 },
         { "type": "REPAIR_EQUIPMENT", "dmg": 100, "shots": 1 },
         { "type": "REPAIR_EQUIPMENT", "dmg": 10, "shots": 4 }
       ],
@@ -532,6 +625,43 @@
         { "tech": "SHIELDING_TECHNOLOGY", "level": 7 },
         { "tech": "BEAMS_WEAPONS", "level": 4 },
         { "tech": "MISSILES_WEAPONS", "level": 4 },
+        { "tech": "RAILGUNS_WEAPONS", "level": 4 }
+      ]
+    },
+    {
+      "type": "ARMAGEDDON_BOMBER",
+      "imagePath": "images/ships/Death_Star.webp",
+      "hullClass": "TITAN",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 700,
+      "criticalThreshold": 30,
+      "shieldCapacity": 700,
+      "armor": 8,
+      "weapons": [
+        { "type": "BEAM", "dmg": 20, "shots": 4 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 10 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 100, "shots": 4 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 250, "shots": 1 }
+
+      ],
+      "cargoCapacity": 1000,
+      "hangarCapacity": 8,
+      "purposes": ["MILITARY"],
+      "jumpCost": 8,
+      "cost": { "metal": 1500, "crystal": 800, "deuterium": 1000 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 8 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 6 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 5 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 7 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 6 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 6 },
+        { "tech": "BEAMS_WEAPONS", "level": 4 },
+        { "tech": "MISSILES_WEAPONS", "level": 5 },
         { "tech": "RAILGUNS_WEAPONS", "level": 4 }
       ]
     },
@@ -587,7 +717,7 @@
         { "type": "REPAIR_EQUIPMENT", "dmg": 20, "shots": 10 }
       ],
       "cargoCapacity": 600,
-      "hangarCapacity": 90,
+      "hangarCapacity": 80,
       "purposes": ["MILITARY", "UTILITY", "CARRIER"],
       "jumpCost": 8,
       "cost": { "metal": 1600, "crystal": 600, "deuterium": 400 },
@@ -622,10 +752,12 @@
         { "type": "MISSILE", "dmg": 30, "shots": 16 },
         { "type": "MISSILE", "dmg": 50, "shots": 8 },
         { "type": "RAIL_GUN", "dmg": 10, "shots": 16 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 50, "shots": 10 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 500, "shots": 4 },
         { "type": "REPAIR_EQUIPMENT", "dmg": 20, "shots": 10 },
         { "type": "REPAIR_EQUIPMENT", "dmg": 400, "shots": 2 }
       ],
-      "cargoCapacity": 20000,
+      "cargoCapacity": 25000,
       "hangarCapacity": 100,
       "purposes": ["MILITARY", "CARGO", "UTILITY", "CARRIER"],
       "jumpCost": 100,

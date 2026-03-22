@@ -1,9 +1,11 @@
+import { describe, expect, it } from 'vitest';
 import { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ } from '../planet';
 import { PlanetType } from '../../enums/planet-type';
 import { SolarSystem } from '../solar-system';
 import { ResourcesPack } from '../../resources-pack';
 import { PlanetaryParameters } from '../planetary-parameters';
 import { BuildingType } from '../../enums/building-type';
+import { ManyShips } from '../../fleets/many-ships';
 
 describe('Planet', () => {
   const createSystem = (): SolarSystem => new SolarSystem(
@@ -41,8 +43,9 @@ describe('Planet', () => {
         new ResourcesPack(0, 0, 0),
         new Map(),
         new Map(),
+        new Map(),
         [],
-        [],
+        ManyShips.empty(),
         null,
         null,
         [],
@@ -111,6 +114,30 @@ describe('Planet', () => {
     expect(planet.getBuildingPowerUtilization(BuildingType.METAL_MINE)).toBeCloseTo(0.6, 8);
     expect(planet.getBuildingProductionValue1(BuildingType.METAL_MINE)).toBe(180);
     expect(planet.getMetalGain(0)).toBe(180);
+  });
+
+  it('applies the bunker-backed structural productivity floor to damaged buildings', () => {
+    const planet = createPlanet();
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 1);
+
+    planet.setCurrentBuildingStructuralPoints(BuildingType.METAL_MINE, 0);
+    expect(planet.getBuildingProductionValue1(BuildingType.METAL_MINE)).toBe(1);
+
+    planet.setBuildingLevel(BuildingType.BUNKER_NETWORK, 3);
+    expect(planet.getBuildingProductionValue1(BuildingType.METAL_MINE)).toBe(3);
+  });
+
+  it('preserves structural health percentage when a damaged building levels up', () => {
+    const planet = createPlanet();
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 1);
+
+    const levelOneMax = planet.getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
+    planet.setCurrentBuildingStructuralPoints(BuildingType.METAL_MINE, Math.floor(levelOneMax / 2));
+
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 2);
+
+    const levelTwoMax = planet.getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
+    expect(planet.getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBe(Math.floor(levelTwoMax * 0.5));
   });
 
   it('creates starting planets with neutral multiplier parameters set to 1', () => {

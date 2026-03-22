@@ -53,6 +53,7 @@ import type {
   PlanetaryParametersDto,
   BuildingLevelEntry,
   BuildingPowerConsumptionEntry,
+  BuildingStructuralPointsEntry,
   TechLevelEntry,
   ShipAmountEntry,
   CreateFleetShipSelectionEntry,
@@ -225,6 +226,8 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
   FleetMissionType.MOVE as FleetMissionTypeType,
   FleetMissionType.TRANSPORT as FleetMissionTypeType,
   FleetMissionType.SPY as FleetMissionTypeType,
+  FleetMissionType.BOMBARD as FleetMissionTypeType,
+  FleetMissionType.SIEGE as FleetMissionTypeType,
   FleetMissionType.COLONIZE as FleetMissionTypeType
 ]);
 
@@ -2176,6 +2179,19 @@ function toBuildingPowerConsumptionEntries(clientPlanet: ClientPlanet): Building
   return entries;
 }
 
+function toBuildingStructuralPointsEntries(clientPlanet: ClientPlanet): BuildingStructuralPointsEntry[] {
+  const entries: BuildingStructuralPointsEntry[] = [];
+  for (const [type] of clientPlanet.rBDSFTQ.buildingsLevels.entries()) {
+    entries.push({
+      type: type as BuildingTypeType,
+      currentStructuralPoints: clientPlanet.getCurrentBuildingStructuralPoints(type as BuildingTypeType),
+      maxStructuralPoints: clientPlanet.getMaxBuildingStructuralPoints(type as BuildingTypeType)
+    });
+  }
+
+  return entries;
+}
+
 function toTechLevelEntries(map: Map<string, number>): TechLevelEntry[] {
   const entries: TechLevelEntry[] = [];
   for (const [type, level] of map.entries()) {
@@ -2301,6 +2317,7 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       resources: toResourcesPackDto(clientPlanet.rBDSFTQ.resources),
       buildingsLevels: toBuildingLevelEntries(clientPlanet.rBDSFTQ.buildingsLevels),
       buildingsCurrentPowerConsumption: toBuildingPowerConsumptionEntries(clientPlanet),
+      buildingsCurrentStructuralPoints: toBuildingStructuralPointsEntries(clientPlanet),
       defences: clientPlanet.rBDSFTQ.defences,
       ships: clientPlanet.rBDSFTQ.ships,
       currentResearchQueue: clientPlanet.rBDSFTQ.currentResearchQueue,

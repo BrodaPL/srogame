@@ -75,6 +75,7 @@ export class Galaxy {
         new ResourcesPack(0, 0, 0),
         new Map(),
         new Map(),
+        new Map(),
         [],
         ManyShips.empty(),
         null,

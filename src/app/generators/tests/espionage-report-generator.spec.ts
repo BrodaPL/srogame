@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { EspionageReportGenerator } from '../espionage-report-generator';
 import { Player } from '../../models/player';
 import { PlayerType } from '../../models/enums/player-type';
@@ -13,6 +14,7 @@ import { ShipInstance } from '../../models/fleets/ship-instance';
 import { ShipType } from '../../models/enums/ship-type';
 import { ShipPurpose } from '../../models/enums/ship-purpose';
 import { HullClass } from '../../models/enums/hull-class';
+import { ManyShips } from '../../models/fleets/many-ships';
 
 describe('EspionageReportGenerator', () => {
   const createPlayer = (
@@ -32,8 +34,9 @@ describe('EspionageReportGenerator', () => {
         [BuildingType.SHIPYARD, 2]
       ]),
       new Map<BuildingType, number>(),
+      new Map<BuildingType, number>(),
       [],
-      ships,
+      ManyShips.fromShipInstances(ships),
       null,
       null,
       [],
