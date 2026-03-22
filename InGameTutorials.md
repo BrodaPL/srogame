@@ -101,6 +101,7 @@ Details:
 Notes:
 
 - `targetId` activates target-aware spotlight and placement.
+- `targetId` is optional. A whole-view intro step can intentionally omit it and show only the bubble/character dock without spotlighting one concrete element.
 - `targetPadding` expands the measured highlighted rectangle.
 - `characterImages` should usually contain 2 images for polished steps, so same-side alternation can work.
 - Static `characterSide` / `bubblePosition` are still part of content, but for target-aware steps the runtime may resolve smarter placement around the target.
@@ -117,9 +118,16 @@ Use explicit template anchors:
 
 This is the preferred and most stable approach.
 
+Important layout rule:
+
+- Prefer adding `data-tutorial-id` to the existing layout element instead of introducing a new neutral wrapper.
+- If a wrapper is necessary, preserve any layout classes that the original element relied on.
+- Otherwise grid/flex placement can break, as happened in `Buildings View` and `Production View` when the summary-bar wrapper stopped carrying `.game-dashboard__resources`.
+
 ### Target selection rules
 
 - Prefer stable container-level anchors over brittle child selectors.
+- Do not force a target onto a pure intro step. If the step is only explaining the purpose of the whole view, leave it untargeted.
 - Spotlight one meaningful area, not a whole screen, unless the section itself is the feature being taught.
 - For repeated rows/lists, prefer one representative item when possible.
 - Use names that are view-specific and semantic, for example:

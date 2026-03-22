@@ -20,16 +20,14 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Mission Planner View Tutorial',
     steps: [
       {
-        heading: 'Mission Type Comes First',
+        heading: 'Welcome to Mission Planner',
         bodyHtml: `
           <p>This screen is your launch deck for fleet missions.</p>
-          <p>Start by choosing the mission type. The planner will then adapt ship relevance, cargo rules, fuel preview, and validation around that choice.</p>
+          <p>It brings mission choice, target resolution, fleet assembly, travel math, and launch validation into one flow so you can send fleets without jumping through multiple screens.</p>
         `,
         characterImages: [pilotImageA, pilotImageB],
         characterSide: 'right',
-        bubblePosition: 'top',
-        targetId: 'mission-planner-mission-types',
-        targetPadding: 12
+        bubblePosition: 'top'
       },
       {
         heading: 'Resolve The Target',
@@ -110,16 +108,14 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Operations View Tutorial',
     steps: [
       {
-        heading: 'Operations Header',
+        heading: 'Welcome to Operations View',
         bodyHtml: `
           <p>This screen is your fleet activity board.</p>
-          <p>Use it to monitor launched missions in one place, and jump back to <strong>Mission Planner</strong> when you need to send another fleet.</p>
+          <p>Use it to monitor launched missions in one place, check where fleets are right now, and judge whether you need to send reinforcements or just wait for returns.</p>
         `,
         characterImages: [spaceOfficerImageA, spaceOfficerImageB],
         characterSide: 'right',
-        bubblePosition: 'top',
-        targetId: 'operations-header',
-        targetPadding: 12
+        bubblePosition: 'top'
       },
       {
         heading: 'Operations List',
@@ -152,16 +148,14 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Buildings View Tutorial',
     steps: [
       {
-        heading: 'Selected Planet Summary',
+        heading: 'Welcome to Buildings View',
         bodyHtml: `
-          <p>This top summary keeps the active construction planet visible while you work.</p>
-          <p>It combines the selected colony name, coordinates, resources, energy, and production powers so you can judge build readiness at a glance.</p>
+          <p>This screen is the fast construction planner for your empire.</p>
+          <p>It keeps the active planet, current queue, and compact building list close together so you can queue infrastructure without dropping back into full Planet View every time.</p>
         `,
         characterImages: [builderImageA, builderImageB],
         characterSide: 'right',
-        bubblePosition: 'top',
-        targetId: 'buildings-summary-bar',
-        targetPadding: 12
+        bubblePosition: 'top'
       },
       {
         heading: 'Building Categories',
@@ -230,16 +224,14 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Production View Tutorial',
     steps: [
       {
-        heading: 'Selected Planet Summary',
+        heading: 'Welcome to Production View',
         bodyHtml: `
-          <p>This top summary keeps the active production planet visible while you work.</p>
-          <p>It combines the selected colony name, coordinates, resources, energy, and production powers so you can judge whether the planet is ready for more ship orders.</p>
+          <p>This screen is the compact ship-production planner for your empire.</p>
+          <p>It keeps the active planet, shipyard queue, and production catalog in one place so you can line up new ships quickly across multiple colonies.</p>
         `,
         characterImages: [engineerImageA, engineerImageB],
         characterSide: 'right',
-        bubblePosition: 'top',
-        targetId: 'production-summary-bar',
-        targetPadding: 12
+        bubblePosition: 'top'
       },
       {
         heading: 'Production Categories',
@@ -320,16 +312,14 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Reports View Tutorial',
     steps: [
       {
-        heading: 'Report Filters',
+        heading: 'Welcome to Reports View',
         bodyHtml: `
-          <p>This top bar is the inbox filter panel for your empire.</p>
-          <p>Use the tabs to narrow the list by report type or switch back to <strong>All</strong> when you want the full timeline in one place.</p>
+          <p>This screen is your empire inbox.</p>
+          <p>It keeps the report list and the selected dossier side by side, so you can scan what happened, filter it by type, and read the details without leaving the view.</p>
         `,
         characterImages: [secretaryImageA, secretaryImageB],
         characterSide: 'right',
-        bubblePosition: 'top',
-        targetId: 'reports-tabs',
-        targetPadding: 12
+        bubblePosition: 'top'
       },
       {
         heading: 'Selection And Cleanup',
@@ -398,16 +388,14 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Imperium View Tutorial',
     steps: [
       {
-        heading: 'Empire Summary Bar',
+        heading: 'Welcome to Imperium View',
         bodyHtml: `
-          <p>This top summary turns all owned planets into one combined empire snapshot.</p>
-          <p>It keeps total resources, income, energy, and production powers visible so you can judge your whole economy without opening planets one by one.</p>
+          <p>This screen is the strategic dashboard for your whole empire.</p>
+          <p>It aggregates economy, warnings, colonies, fleets, and infrastructure into one place so you can decide what needs attention before diving into individual planets.</p>
         `,
         characterImages: [commanderImageA],
         characterSide: 'right',
-        bubblePosition: 'top',
-        targetId: 'imperium-summary-bar',
-        targetPadding: 12
+        bubblePosition: 'top'
       },
       {
         heading: 'Empire Totals',
@@ -620,16 +608,14 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Planet View Tutorial',
     steps: [
       {
-        heading: 'Planet Summary At The Top',
+        heading: 'Welcome to Planet View',
         bodyHtml: `
           <p>This screen is the main control room for a single colony.</p>
-          <p>The top summary keeps your current resources, income, energy balance, and planet power values visible while you manage the rest of the page.</p>
+          <p>It combines local economy, buildings, ships, warnings, and queues into one place so you can manage a planet in detail without hopping between separate screens.</p>
         `,
         characterImages: [secretaryImageA, secretaryImageB],
         characterSide: 'right',
-        bubblePosition: 'top',
-        targetId: 'planet-summary',
-        targetPadding: 12
+        bubblePosition: 'top'
       },
       {
         heading: 'Overview, Parameters, And Warnings',

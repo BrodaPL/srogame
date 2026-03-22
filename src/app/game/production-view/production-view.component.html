@@ -13,9 +13,8 @@
     </section>
   } @else if (selectedPlanet(); as planet) {
     <div class="game-dashboard__layout">
-      <div data-tutorial-id="production-summary-bar">
+      <div class="game-dashboard__resources" data-tutorial-id="production-summary-bar">
         <app-resources
-          class="game-dashboard__resources"
           [titlePrefix]="'Production | '"
           [titleLink]="selectedPlanetTitleLink()"
           [titleSuffix]="' (' + selectedPlanetCoordinatesLabel() + ')'"
