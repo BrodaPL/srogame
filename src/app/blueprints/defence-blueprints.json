@@ -113,7 +113,7 @@
     },
     {
       "type": "HEAVY_ORBITAL_MISSILE_LAUNCHER",
-      "imagePath": "images/ships/Anti-Ballistic_Missile.webp",
+      "imagePath": "images/defence/Anti-Ballistic_Missile.webp",
       "hullClass": "BIG",
       "canShootToOrbit": true,
       "size": 3,

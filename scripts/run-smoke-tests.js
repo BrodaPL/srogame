@@ -819,7 +819,8 @@ async function runSmokeSuite(browser) {
       await waitForText(browserSession.page, 'Ship Damage Status');
       await browserSession.page.getByRole('button', { name: /Queue/i }).click();
       await waitForText(browserSession.page, 'Queued Buildings');
-      await waitForText(browserSession.page, 'Queued Ships');
+      await waitForText(browserSession.page, 'Queued Shipyard');
+      await waitForText(browserSession.page, 'Queued Defences');
       await waitForText(browserSession.page, 'Research');
     });
 

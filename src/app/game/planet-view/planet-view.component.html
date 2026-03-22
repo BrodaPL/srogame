@@ -445,6 +445,75 @@
               </div>
             }
           </section>
+
+          <div class="planet-building-list">
+            @for (defence of defenceBlueprints; track defence.type) {
+              <article class="planet-building-card planet-building-card--ship">
+                <img class="planet-building-card__image" [src]="defence.imagePath" [alt]="defence.type + ' image'" />
+                <div class="planet-building-card__main">
+                  <h4 class="planet-building-card__title">{{ defence.type }}</h4>
+                  <p class="planet-building-card__meta">Hull class: {{ defence.hullClass }}</p>
+                  <p class="planet-building-card__meta">Can shoot to orbit: {{ defence.canShootToOrbit ? 'Yes' : 'No' }}</p>
+                  <label class="planet-building-card__amount">
+                    <span>Amount:</span>
+                    <input
+                      class="planet-building-card__amount-input"
+                      type="number"
+                      min="1"
+                      max="100000"
+                      step="1"
+                      [ngModel]="defenceAmountInput(defence.type)"
+                      (ngModelChange)="onDefenceAmountInput(defence.type, $event)"
+                      placeholder="amount"
+                    />
+                  </label>
+                </div>
+                <div class="planet-building-card__cost">
+                  <p class="planet-building-card__section-title">Single defence cost</p>
+                  @for (cost of defenceSingleCostRows(defence); track cost.label) {
+                    <p class="planet-building-card__line" [class.planet-building-card__line--insufficient]="!cost.isEnough">
+                      {{ cost.label }}: {{ cost.amount }}
+                    </p>
+                  }
+                  <p class="planet-building-card__section-title planet-building-card__section-title--spaced">Total cost</p>
+                  @for (cost of defenceTotalCostRows(defence); track cost.label) {
+                    <p
+                      class="planet-building-card__line"
+                      [class.planet-building-card__line--insufficient]="!cost.isEnough && !cost.isPlaceholder"
+                      [class.planet-building-card__line--placeholder]="cost.isPlaceholder"
+                    >
+                      {{ cost.label }}: {{ cost.amount === null ? '--' : cost.amount }}
+                    </p>
+                  }
+                </div>
+                <div class="planet-building-card__requirements">
+                  <p class="planet-building-card__section-title">Requirements</p>
+                  @for (requirement of defenceRequirementRows(defence); track requirement.label) {
+                    <p
+                      class="planet-building-card__line"
+                      [class.planet-building-card__line--met]="requirement.isMet && !requirement.isPlaceholder"
+                      [class.planet-building-card__line--not-met]="!requirement.isMet"
+                      [class.planet-building-card__line--placeholder]="requirement.isPlaceholder"
+                    >
+                      {{ requirement.label }}
+                    </p>
+                  }
+                </div>
+                <button
+                  type="button"
+                  class="planet-building-card__action"
+                  [disabled]="!canBuildDefence(defence)"
+                  [attr.title]="defenceBuildTitle(defence)"
+                  (click)="onBuildDefence(defence)"
+                >
+                  {{ defenceBuildLabel(defence) }}
+                </button>
+                @if (defenceStartError(defence); as error) {
+                  <p class="planet-building-card__power-error">{{ error }}</p>
+                }
+              </article>
+            }
+          </div>
         }
 
         @if (isActiveTab('operations')) {
@@ -489,7 +558,7 @@
 
             <article class="planet-queue-card">
               <h4 class="planet-view__section-title">
-                Queued Ships ({{ currentShipQueueLength() }}/{{ maxShipQueueLength() }})
+                Queued Shipyard ({{ currentShipQueueLength() }}/{{ maxShipQueueLength() }})
               </h4>
               @if (hasShipQueueEntries()) {
                 <div class="overview-table-wrapper">
@@ -525,7 +594,36 @@
 
             <article class="planet-queue-card">
               <h4 class="planet-view__section-title">Queued Defences</h4>
-              <p class="overview-empty">No defences queued.</p>
+              @if (hasDefenceQueueEntries()) {
+                <div class="overview-table-wrapper">
+                  <table class="overview-table">
+                    <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Type</th>
+                      <th>Amount completed</th>
+                      <th>Status</th>
+                      <th>Invested / base</th>
+                      <th>ETA (turns)</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @for (queuedDefence of defenceQueueRows(); track queuedDefence.position) {
+                      <tr>
+                        <td>{{ queuedDefence.position }}</td>
+                        <td>{{ queuedDefence.defenceType }}</td>
+                        <td>{{ queuedDefence.amountCompleted }}/{{ queuedDefence.amountTotal }}</td>
+                        <td>{{ queuedDefence.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
+                        <td>{{ queuedDefence.currentDefenceInvestedShipyardPower }} / {{ queuedDefence.currentDefenceBaseConstructionTime }}</td>
+                        <td>{{ queuedDefence.estimatedTurnsForCompletion ?? '--' }}</td>
+                      </tr>
+                    }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="overview-empty">No defences queued.</p>
+              }
             </article>
 
             <article class="planet-queue-card">

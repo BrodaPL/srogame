@@ -1,5 +1,6 @@
 import { EspionageReportGenerator } from '../../generators/espionage-report-generator';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
+import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
 import {
@@ -10,6 +11,7 @@ import {
 import { SpaceBattleResolver, type SpaceBattleResult } from '../battles/space-battle-resolver';
 import { DefenceInstance } from '../defences/defence-instance';
 import { ManyDefences } from '../defences/many-defences';
+import { Defence } from '../defences/defence';
 import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
 import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
 import { BuildingType } from '../enums/building-type';
@@ -74,6 +76,7 @@ type PlanetTurnSnapshot = {
 };
 
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
+const DEFENCE_BLUEPRINTS = DefenceBlueprintsFactory.fromDefaultJson();
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
 const TECHNOLOGY_BLUEPRINTS = TechnologyBlueprintsFactory.fromDefaultJson();
 const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
@@ -166,7 +169,7 @@ export function resolvePhaseOneTurn(
     diplomacyResolver,
     encounterResolver
   );
-  resolveShipRepairs(galaxy, planetById, snapshotsByPlanetId, diplomacyResolver, resolvedTurnNumber);
+  resolveShipRepairs(galaxy, playersById, planetById, snapshotsByPlanetId, diplomacyResolver, resolvedTurnNumber);
 }
 
 function createPlanetTurnSnapshot(
@@ -385,16 +388,18 @@ function advanceShipyardQueue(planet: Planet, shipyardPower: number): void {
   let remainingShipyardPower = Math.max(0, Math.floor(shipyardPower));
   while (planet.rBDSFTQ.shipyardQueue.length > 0) {
     const queueEntry = planet.rBDSFTQ.shipyardQueue[0];
-    const blueprint = SHIP_BLUEPRINTS.get(queueEntry.shipType);
+    const blueprint = queueEntry.itemKind === 'defence'
+      ? (queueEntry.defenceType ? DEFENCE_BLUEPRINTS.get(queueEntry.defenceType) : undefined)
+      : (queueEntry.shipType ? SHIP_BLUEPRINTS.get(queueEntry.shipType) : undefined);
     if (!blueprint) {
       planet.rBDSFTQ.shipyardQueue.shift();
       continue;
     }
 
-    const singleShipCost = Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount()));
-    const totalRequiredPower = singleShipCost * Math.max(0, Math.floor(queueEntry.amount));
+    const singleConstructionCost = Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount()));
+    const totalRequiredPower = singleConstructionCost * Math.max(0, Math.floor(queueEntry.amount));
     if (totalRequiredPower <= 0) {
-      addProducedShipsToPlanet(planet, blueprint, queueEntry.amount);
+      addProducedShipyardUnitsToPlanet(planet, blueprint, queueEntry.itemKind, queueEntry.amount);
       planet.rBDSFTQ.shipyardQueue.shift();
       continue;
     }
@@ -412,18 +417,24 @@ function advanceShipyardQueue(planet: Planet, shipyardPower: number): void {
       break;
     }
 
-    addProducedShipsToPlanet(planet, blueprint, queueEntry.amount);
+    addProducedShipyardUnitsToPlanet(planet, blueprint, queueEntry.itemKind, queueEntry.amount);
     planet.rBDSFTQ.shipyardQueue.shift();
   }
 }
 
-function addProducedShipsToPlanet(
+function addProducedShipyardUnitsToPlanet(
   planet: Planet,
-  blueprint: Ship,
+  blueprint: Ship | Defence,
+  itemKind: 'ship' | 'defence',
   amount: number
 ): void {
   const normalizedAmount = Math.max(0, Math.floor(amount));
-  planet.rBDSFTQ.ships.addUndamaged(blueprint.type, normalizedAmount);
+  if (itemKind === 'defence') {
+    planet.rBDSFTQ.defences.addUndamaged((blueprint as Defence).type, normalizedAmount);
+    return;
+  }
+
+  planet.rBDSFTQ.ships.addUndamaged((blueprint as Ship).type, normalizedAmount);
 }
 
 function advanceResearchQueue(
@@ -834,6 +845,7 @@ function applyPostArrivalBombardmentIfNeeded(
 
 function resolveShipRepairs(
   galaxy: Galaxy,
+  playersById: Map<number, Player>,
   planetById: Map<string, Planet>,
   snapshotsByPlanetId: Map<string, PlanetTurnSnapshot>,
   diplomacyResolver: DiplomacyResolver,
@@ -901,6 +913,7 @@ function resolveShipRepairs(
 
         fleet.state = FleetState.RETURNING;
         fleet.createdAtTurn = resolvedTurnNumber;
+        addRepairReturnSummaryReport(playersById.get(fleet.ownerId) ?? null, fleet, planet, resolvedTurnNumber);
       }
     }
   }
@@ -1567,7 +1580,7 @@ function addBombardmentReport(
     minimumStructuralUtilization: number;
     floorApplied: boolean;
   }>();
-  for (const target of summary.targets) {
+  for (const target of summary.buildingTargets) {
     const current = groupedDamage.get(target.type) ?? {
       hits: 0,
       damage: 0,
@@ -1595,6 +1608,20 @@ function addBombardmentReport(
         : '';
       return `${type}: hits ${entry.hits}, damage ${entry.damage}${zeroSuffix}${floorSuffix}`;
     });
+  const groupedDefenceDamage = new Map<string, { hits: number; damage: number; destroyed: number }>();
+  for (const target of summary.defenceTargets) {
+    const current = groupedDefenceDamage.get(target.type) ?? {
+      hits: 0,
+      damage: 0,
+      destroyed: 0
+    };
+    current.hits += 1;
+    current.damage += target.damage;
+    current.destroyed += target.destroyed ? 1 : 0;
+    groupedDefenceDamage.set(target.type, current);
+  }
+  const defenceDetailLines = [...groupedDefenceDamage.entries()]
+    .map(([type, entry]) => `${type}: hits ${entry.hits}, damage ${entry.damage}${entry.destroyed > 0 ? `, destroyed x${entry.destroyed}` : ''}`);
 
   const report = new BuildingsReport(
     {
@@ -1612,9 +1639,41 @@ function addBombardmentReport(
       `Shots: ${summary.shots}`,
       `Hits: ${summary.hits}`,
       `Total structural damage: ${summary.totalDamage}`,
-      `Buildings engaged: ${summary.targetCount}`,
-      'Damage summary:',
-      ...(detailLines.length > 0 ? detailLines : ['No lasting structural damage recorded.'])
+      `Buildings engaged: ${summary.buildingTargetCount}`,
+      `Defences engaged: ${summary.defenceTargetCount}`,
+      'Building damage summary:',
+      ...(detailLines.length > 0 ? detailLines : ['No lasting building damage recorded.']),
+      'Defence damage summary:',
+      ...(defenceDetailLines.length > 0 ? defenceDetailLines : ['No lasting defence damage recorded.'])
+    ].join('\n')
+  );
+  player.addReport(report);
+}
+
+function addRepairReturnSummaryReport(
+  player: Player | null,
+  fleet: Fleet,
+  targetPlanet: Planet,
+  resolvedTurnNumber: number
+): void {
+  if (!player || player.type !== PlayerType.PLAYER) {
+    return;
+  }
+
+  const report = new FleetReport(
+    {
+      reportId: player.createReportId(),
+      createdTurn: resolvedTurnNumber,
+      title: `Repair Report: ${targetPlanet.basicInfo.name} stabilized`,
+      sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      senderPlayerName: player.playerName
+    },
+    [
+      `Repair mission completed at ${targetPlanet.basicInfo.name}.`,
+      'No non-hostile damaged ships, buildings, or defences remained at the target.',
+      `Fleet ${fleet.fleetId} is returning to ${fleet.originPlanetName}.`
     ].join('\n')
   );
   player.addReport(report);

@@ -11,6 +11,7 @@ import espionageReportGeneratorModule from '../../src/app/generators/espionage-r
 import starSystemNoteModule from '../../src/app/models/planets/star-system-note.js';
 import noteBorderColorModule from '../../src/app/models/enums/note-border-color.js';
 import buildingTypeEnumModule from '../../src/app/models/enums/building-type.js';
+import defenceTypeEnumModule from '../../src/app/models/enums/defence-type.js';
 import technologyTypeEnumModule from '../../src/app/models/enums/technology-type.js';
 import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
 import fleetMissionTypeEnumModule from '../../src/app/models/enums/fleet-mission-type.js';
@@ -21,6 +22,7 @@ import diplomaticStatusEnumModule from '../../src/app/models/diplomacy/diplomati
 import diplomacyResolverModule from '../../src/app/models/diplomacy/diplomacy-resolver.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
+import defenceBlueprintsFactoryModule from '../../src/app/factories/defence-blueprints.factory.js';
 import shipBlueprintsFactoryModule from '../../src/app/factories/ship-blueprints.factory.js';
 import technologyBlueprintsFactoryModule from '../../src/app/factories/technology-blueprints.factory.js';
 import fleetMissionRegistryModule from '../../src/app/models/missions/fleet-mission-registry.js';
@@ -93,10 +95,12 @@ import type { OwnershipByteCell } from '../../src/app/models/planets/ownership-b
 import type { StarSystemNote as StarSystemNoteType } from '../../src/app/models/planets/star-system-note.ts';
 import type { NoteBorderColor as NoteBorderColorType } from '../../src/app/models/enums/note-border-color.ts';
 import type { BuildingType as BuildingTypeType } from '../../src/app/models/enums/building-type.ts';
+import type { DefenceType as DefenceTypeType } from '../../src/app/models/enums/defence-type.ts';
 import type { TechnologyType as TechnologyTypeType } from '../../src/app/models/enums/technology-type.ts';
 import type { ShipType as ShipTypeType } from '../../src/app/models/enums/ship-type.ts';
 import type { FleetMissionType as FleetMissionTypeType } from '../../src/app/models/enums/fleet-mission-type.ts';
 import type { Building } from '../../src/app/models/buildings/building.ts';
+import type { Defence } from '../../src/app/models/defences/defence.ts';
 import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
@@ -130,6 +134,9 @@ const { NoteBorderColor } = noteBorderColorModule as {
 const { BuildingType } = buildingTypeEnumModule as {
   BuildingType: typeof import('../../src/app/models/enums/building-type.js').BuildingType;
 };
+const { DefenceType } = defenceTypeEnumModule as {
+  DefenceType: typeof import('../../src/app/models/enums/defence-type.js').DefenceType;
+};
 const { TechnologyType } = technologyTypeEnumModule as {
   TechnologyType: typeof import('../../src/app/models/enums/technology-type.js').TechnologyType;
 };
@@ -157,6 +164,9 @@ const { DiplomacyResolver } = diplomacyResolverModule as {
 const { TUTORIAL_VIEW_KEYS, createTutorialReadState } = tutorialTypesModule as typeof import('../../src/app/tutorial/tutorial-types.js');
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
+};
+const { DefenceBlueprintsFactory } = defenceBlueprintsFactoryModule as {
+  DefenceBlueprintsFactory: typeof import('../../src/app/factories/defence-blueprints.factory.js').DefenceBlueprintsFactory;
 };
 const { ShipBlueprintsFactory } = shipBlueprintsFactoryModule as {
   ShipBlueprintsFactory: typeof import('../../src/app/factories/ship-blueprints.factory.js').ShipBlueprintsFactory;
@@ -203,10 +213,12 @@ const STARTING_SYSTEM_REPORT_LEVEL = 1;
 const STAR_SYSTEM_NOTE_TEXT_MAX_LENGTH = 500;
 const NOTE_BORDER_COLOR_VALUES = new Set<string>(Object.values(NoteBorderColor));
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
+const DEFENCE_BLUEPRINTS = DefenceBlueprintsFactory.fromDefaultJson();
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
 const TECHNOLOGY_BLUEPRINTS = TechnologyBlueprintsFactory.fromDefaultJson();
 const FLEET_MISSION_REGISTRY = FleetMissionRegistry.createDefault();
 const BUILDING_TYPE_VALUES = new Set<string>(Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys()));
+const DEFENCE_TYPE_VALUES = new Set<string>(Array.from(DEFENCE_BLUEPRINTS.defencesMap.keys()));
 const SHIP_TYPE_VALUES = new Set<string>(Object.values(ShipType));
 const FLEET_MISSION_TYPE_VALUES = new Set<string>(Object.values(FleetMissionType));
 const TECHNOLOGY_TYPE_VALUES = new Set<string>(Array.from(TECHNOLOGY_BLUEPRINTS.techByType.keys()));
@@ -795,9 +807,19 @@ app.post('/api/game/shipyard-queue', (req, res) => {
   const x = parseBodyNonNegativeInt(body?.x);
   const y = parseBodyNonNegativeInt(body?.y);
   const z = parseBodyNonNegativeInt(body?.z);
+  const itemKind = body?.itemKind === 'defence' ? 'defence' : body?.itemKind === 'ship' ? 'ship' : null;
   const shipType = normalizeShipType(body?.shipType);
+  const defenceType = normalizeDefenceType(body?.defenceType);
   const amount = parseBodyIntInRange(body?.amount, 1, 100000);
-  if (x === null || y === null || z === null || !shipType || amount === null) {
+  if (
+    x === null
+    || y === null
+    || z === null
+    || !itemKind
+    || amount === null
+    || (itemKind === 'ship' && !shipType)
+    || (itemKind === 'defence' && !defenceType)
+  ) {
     return res.status(400).json({ error: 'Invalid shipyard queue payload.' });
   }
 
@@ -825,26 +847,38 @@ app.post('/api/game/shipyard-queue', (req, res) => {
     return res.status(400).json({ error: 'Queue full.' });
   }
 
-  const ship = SHIP_BLUEPRINTS.get(shipType);
-  if (!ship) {
-    return res.status(400).json({ error: 'Unknown ship type.' });
+  const ship = itemKind === 'ship' && shipType ? SHIP_BLUEPRINTS.get(shipType) : null;
+  const defence = itemKind === 'defence' && defenceType ? DEFENCE_BLUEPRINTS.get(defenceType) : null;
+  const blueprint = ship ?? defence;
+  if (!blueprint) {
+    return res.status(400).json({ error: itemKind === 'ship' ? 'Unknown ship type.' : 'Unknown defence type.' });
   }
 
-  if (!hasShipBuildingRequirements(planet, ship)) {
+  const hasBuildingReqs = itemKind === 'ship'
+    ? hasShipBuildingRequirements(planet, ship!)
+    : hasDefenceBuildingRequirements(planet, defence!);
+  if (!hasBuildingReqs) {
     return res.status(400).json({ error: 'Building requirements are not met.' });
   }
 
-  if (!hasShipTechnologyRequirements(player, ship)) {
+  const hasTechReqs = itemKind === 'ship'
+    ? hasShipTechnologyRequirements(player, ship!)
+    : hasDefenceTechnologyRequirements(player, defence!);
+  if (!hasTechReqs) {
     return res.status(400).json({ error: 'Technology requirements are not met.' });
   }
 
-  const totalCost = multiplyResourcePack(ship.cost, amount);
+  const totalCost = multiplyResourcePack(blueprint.cost, amount);
   if (!planet.rBDSFTQ.resources.isSufficient(totalCost)) {
     return res.status(400).json({ error: 'Insufficient resources.' });
   }
 
   planet.rBDSFTQ.resources.subtractResourcePack(totalCost);
-  planet.rBDSFTQ.shipyardQueue.push(new ShipyardQueueEntry(shipType, amount, 0));
+  planet.rBDSFTQ.shipyardQueue.push(
+    itemKind === 'ship'
+      ? ShipyardQueueEntry.ship(shipType as ShipTypeType, amount, 0)
+      : ShipyardQueueEntry.defence(defenceType as DefenceTypeType, amount, 0)
+  );
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -1775,6 +1809,30 @@ function hasShipTechnologyRequirements(player: Player, ship: Ship): boolean {
   return true;
 }
 
+function hasDefenceBuildingRequirements(planet: Planet, defence: Defence): boolean {
+  for (const requirement of defence.buildingRequirements) {
+    const requiredLevel = Math.ceil(requirement.level);
+    const currentLevel = planet.getBuildingLevel(requirement.building as BuildingTypeType);
+    if (currentLevel < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasDefenceTechnologyRequirements(player: Player, defence: Defence): boolean {
+  for (const requirement of defence.techRequirements) {
+    const requiredLevel = Math.ceil(requirement.level);
+    const currentLevel = player.getTechLevel(requirement.tech as TechnologyTypeType);
+    if (currentLevel < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function hasResearchBuildingRequirements(
   planet: Planet,
   technology: Technology,
@@ -1935,6 +1993,14 @@ function normalizeShipType(value: unknown): ShipTypeType | null {
   }
 
   return SHIP_TYPE_VALUES.has(value) ? (value as ShipTypeType) : null;
+}
+
+function normalizeDefenceType(value: unknown): DefenceTypeType | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return DEFENCE_TYPE_VALUES.has(value) ? (value as DefenceTypeType) : null;
 }
 
 function normalizeFleetMissionType(value: unknown): FleetMissionTypeType | null {

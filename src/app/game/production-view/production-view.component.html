@@ -1,4 +1,6 @@
-<app-top-menu></app-top-menu>
+@if (!hideTopMenu) {
+  <app-top-menu></app-top-menu>
+}
 
 <section class="production-view">
   @if (isLoading) {
@@ -28,20 +30,22 @@
       </div>
 
       <div class="game-dashboard__main">
-        <section class="overview-card game-dashboard__categories-card" data-tutorial-id="production-mode-toggle">
-          <div class="game-dashboard__toggle-row">
-            @for (mode of modeOptions; track mode.value) {
-              <button
-                type="button"
-                class="game-dashboard__toggle"
-                [class.game-dashboard__toggle--active]="selectedMode === mode.value"
-                (click)="selectedMode = mode.value"
-              >
-                {{ mode.label }}
-              </button>
-            }
-          </div>
-        </section>
+        @if (!forcedMode) {
+          <section class="overview-card game-dashboard__categories-card" data-tutorial-id="production-mode-toggle">
+            <div class="game-dashboard__toggle-row">
+              @for (mode of modeOptions; track mode.value) {
+                <button
+                  type="button"
+                  class="game-dashboard__toggle"
+                  [class.game-dashboard__toggle--active]="currentMode() === mode.value"
+                  (click)="selectedMode = mode.value"
+                >
+                  {{ mode.label }}
+                </button>
+              }
+            </div>
+          </section>
+        }
 
         <section class="production-view__queue-grid" data-tutorial-id="production-queue-grid">
           <section class="overview-card" data-tutorial-id="production-shipyard-queue">
@@ -97,27 +101,56 @@
               </div>
             </div>
 
-            <article class="planet-queue-card">
-              <h4 class="planet-view__section-title">No defences queued</h4>
-              <p class="overview-empty">Defence production is not implemented yet.</p>
-              <p class="overview-muted">{{ selectedPlanetDefenceSummary() }}</p>
-            </article>
+            @if (hasDefenceQueueEntries()) {
+              <div class="overview-table-wrapper">
+                <table class="overview-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Defence</th>
+                      <th>Amount completed</th>
+                      <th>Status</th>
+                      <th>Invested / base</th>
+                      <th>ETA (turns)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (queueRow of defenceQueueRows(); track trackDefenceQueueRow($index, queueRow)) {
+                      <tr>
+                        <td>{{ queueRow.position }}</td>
+                        <td>{{ queueRow.defenceType }}</td>
+                        <td>{{ queueRow.amountCompleted }}/{{ queueRow.amountTotal }}</td>
+                        <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
+                        <td>{{ queueRow.currentDefenceInvestedShipyardPower }} / {{ queueRow.currentDefenceBaseConstructionTime }}</td>
+                        <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <article class="planet-queue-card">
+                <h4 class="planet-view__section-title">No defences queued</h4>
+                <p class="overview-empty">This planet does not have any defence production queued right now.</p>
+                <p class="overview-muted">{{ selectedPlanetDefenceSummary() }}</p>
+              </article>
+            }
           </section>
         </section>
 
         <section class="overview-card" data-tutorial-id="production-list">
           <div class="game-dashboard__section-head">
             <div>
-              <h3>{{ selectedMode === 'shipyard' ? 'Shipyard' : 'Defences' }}</h3>
+              <h3>{{ currentMode() === 'shipyard' ? 'Shipyard' : 'Defences' }}</h3>
               <p class="overview-muted">
-                {{ selectedMode === 'shipyard'
+                {{ currentMode() === 'shipyard'
                   ? 'Compact ship-production rows with amount input, costs, and unmet requirements only.'
-                  : 'Defence production will be added later in this view.' }}
+                  : 'Compact defence-production rows with amount input, costs, and unmet requirements only.' }}
               </p>
             </div>
           </div>
 
-          @if (selectedMode === 'shipyard') {
+          @if (currentMode() === 'shipyard') {
             <div class="production-view__ship-list">
               @for (ship of shipBlueprints; track ship.type; let isFirst = $first) {
                 <article class="production-view__ship-row" [attr.data-tutorial-id]="isFirst ? 'production-primary-row' : null">
@@ -202,14 +235,94 @@
               }
             </div>
           } @else {
-            <article class="planet-queue-card">
-              <h4 class="planet-view__section-title">Defences are not implemented yet</h4>
-              <p class="overview-empty">This tab will later handle planetary defence production.</p>
-              <p class="overview-muted">{{ selectedPlanetDefenceSummary() }}</p>
-              @if (selectedPlanetHasDamagedDefences()) {
-                <p class="game-dashboard__build-error">Damaged defences are present on this planet.</p>
+            <div class="production-view__ship-list">
+              @for (defence of defenceBlueprints; track defence.type) {
+                <article class="production-view__ship-row">
+                  <img class="production-view__ship-image" [src]="defence.imagePath" [alt]="defence.type + ' image'" />
+
+                  <div class="production-view__ship-main">
+                    <h4 class="production-view__ship-title">{{ defence.type }}</h4>
+                    <p class="production-view__ship-meta">Hull class {{ defence.hullClass }}</p>
+                    <p class="production-view__ship-meta">
+                      {{ defence.canShootToOrbit ? 'Can engage orbit targets' : 'Atmosphere guard only' }}
+                    </p>
+
+                    <label class="production-view__amount-field">
+                      <span>Amount</span>
+                      <input
+                        class="production-view__amount-input"
+                        type="number"
+                        min="1"
+                        max="100000"
+                        step="1"
+                        [ngModel]="defenceAmountInput(defence.type)"
+                        (ngModelChange)="onDefenceAmountInput(defence.type, $event)"
+                        placeholder="amount"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="production-view__ship-costs">
+                    <div class="production-view__cost-group">
+                      <p class="production-view__cost-title">Single</p>
+                      <div class="production-view__cost-row">
+                        @for (cost of defenceSingleCostRows(defence); track 'single-' + cost.label) {
+                          <span
+                            class="game-dashboard__cost-chip"
+                            [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough"
+                          >
+                            {{ cost.label }} {{ cost.amount }}
+                          </span>
+                        }
+                      </div>
+                    </div>
+
+                    <div class="production-view__cost-group">
+                      <p class="production-view__cost-title">Total</p>
+                      <div class="production-view__cost-row">
+                        @for (cost of defenceTotalCostRows(defence); track 'total-' + cost.label) {
+                          <span
+                            class="game-dashboard__cost-chip"
+                            [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough && !cost.isPlaceholder"
+                            [class.game-dashboard__cost-chip--placeholder]="cost.isPlaceholder"
+                          >
+                            {{ cost.label }} {{ cost.amount === null ? '--' : cost.amount }}
+                          </span>
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="production-view__ship-req">
+                    @if (unmetDefenceRequirementsLabel(defence); as unmetLabel) {
+                      <span class="game-dashboard__req-warning" [attr.title]="unmetDefenceRequirementsTooltip(defence)">
+                        {{ unmetLabel }}
+                      </span>
+                    } @else {
+                      <span class="game-dashboard__req-ok">Ready</span>
+                    }
+                  </div>
+
+                  <div class="production-view__ship-action">
+                    <button
+                      type="button"
+                      class="game-dashboard__action-button"
+                      [disabled]="!canBuildDefence(defence)"
+                      [attr.title]="defenceBuildTitle(defence)"
+                      (click)="onBuildDefence(defence)"
+                    >
+                      {{ defenceBuildLabel(defence) }}
+                    </button>
+                    @if (defenceStartError(defence); as error) {
+                      <p class="game-dashboard__build-error">{{ error }}</p>
+                    }
+                    @if (selectedPlanetHasDamagedDefences()) {
+                      <p class="overview-muted">{{ selectedPlanetDefenceSummary() }}</p>
+                    }
+                  </div>
+                </article>
               }
-            </article>
+            </div>
           }
         </section>
       </div>

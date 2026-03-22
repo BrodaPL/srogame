@@ -1,16 +1,19 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
+import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { Building } from '../../models/buildings/building';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
+import { DefenceType } from '../../models/enums/defence-type';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import { Ship } from '../../models/fleets/ship';
+import { Defence } from '../../models/defences/defence';
 import { ManyDefences } from '../../models/defences/many-defences';
 import type { ClientPlanetDto, ShipyardQueueEntryDto, StartShipyardConstructionRequest } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
@@ -33,11 +36,23 @@ type ShipCostRowVm = { label: string; amount: number | null; isEnough: boolean; 
 type ShipRequirementRowVm = { label: string; isMet: boolean };
 type ShipQueueRowVm = {
   position: number;
+  itemKind: 'ship' | 'defence';
   shipType: ShipType;
+  defenceType: DefenceType | null;
   amountCompleted: number;
   amountTotal: number;
   currentShipInvestedShipyardPower: number;
   currentShipBaseConstructionTime: number;
+  estimatedTurnsForCompletion: number | null;
+  isHeadOfQueue: boolean;
+};
+type DefenceQueueRowVm = {
+  position: number;
+  defenceType: DefenceType;
+  amountCompleted: number;
+  amountTotal: number;
+  currentDefenceInvestedShipyardPower: number;
+  currentDefenceBaseConstructionTime: number;
   estimatedTurnsForCompletion: number | null;
   isHeadOfQueue: boolean;
 };
@@ -49,11 +64,15 @@ type ShipQueueRowVm = {
   styleUrl: './production-view.component.css'
 })
 export class ProductionViewComponent implements OnInit {
+  @Input() public hideTopMenu = false;
+  @Input() public forcedMode: ProductionMode | null = null;
+
   protected readonly modeOptions: Array<{ value: ProductionMode; label: string }> = [
     { value: 'shipyard', label: 'Shipyard' },
     { value: 'defences', label: 'Defences' }
   ];
   protected readonly shipBlueprints: Ship[];
+  protected readonly defenceBlueprints: Defence[];
 
   protected isLoading = false;
   protected loadError: string | null = null;
@@ -68,6 +87,7 @@ export class ProductionViewComponent implements OnInit {
   protected powersDisplay: PlanetPowersDisplay | null = null;
 
   private readonly buildingBlueprintsByType: Map<BuildingType, Building>;
+  private readonly defenceBlueprintsByType: Map<DefenceType, Defence>;
   private readonly shipBlueprintsByType: Map<ShipType, Ship>;
   private readonly buildingLevelsByType = new Map<BuildingType, number>();
   private readonly buildingCurrentPowerByType = new Map<BuildingType, number>();
@@ -75,6 +95,9 @@ export class ProductionViewComponent implements OnInit {
   private readonly shipStartInFlightByType = new Set<ShipType>();
   private readonly shipStartErrorByType = new Map<ShipType, string>();
   private readonly shipAmountInputs = new Map<ShipType, string>();
+  private readonly defenceStartInFlightByType = new Set<DefenceType>();
+  private readonly defenceStartErrorByType = new Map<DefenceType, string>();
+  private readonly defenceAmountInputs = new Map<DefenceType, string>();
 
   constructor(
     private readonly gameApi: GameApiService,
@@ -85,13 +108,24 @@ export class ProductionViewComponent implements OnInit {
     const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
     this.buildingBlueprintsByType = new Map(buildingBlueprints.buildingsMap);
 
+    const defences = DefenceBlueprintsFactory.fromDefaultJson();
+    this.defenceBlueprints = Array.from(defences.defencesMap.values());
+    this.defenceBlueprintsByType = new Map(defences.defencesMap);
+
     const shipBlueprints = ShipBlueprintsFactory.fromDefaultJson();
     this.shipBlueprints = Array.from(shipBlueprints.shipsMap.values());
     this.shipBlueprintsByType = new Map(shipBlueprints.shipsMap);
   }
 
   public ngOnInit(): void {
+    if (this.forcedMode) {
+      this.selectedMode = this.forcedMode;
+    }
     this.loadOwnedPlanets();
+  }
+
+  protected currentMode(): ProductionMode {
+    return this.forcedMode ?? this.selectedMode;
   }
 
   protected selectedPlanet(): ClientPlanetDto | null {
@@ -108,6 +142,10 @@ export class ProductionViewComponent implements OnInit {
 
   protected trackShipQueueRow(_index: number, row: ShipQueueRowVm): string {
     return `${row.position}:${row.shipType}:${row.amountTotal}`;
+  }
+
+  protected trackDefenceQueueRow(_index: number, row: DefenceQueueRowVm): string {
+    return `${row.position}:${row.defenceType}:${row.amountTotal}`;
   }
 
   protected selectedPlanetLabel(): string {
@@ -150,6 +188,7 @@ export class ProductionViewComponent implements OnInit {
     const nextPlanetId = this.planetId(planet);
     if (nextPlanetId !== this.selectedPlanetId) {
       this.shipAmountInputs.clear();
+      this.defenceAmountInputs.clear();
     }
 
     this.selectedPlanetId = nextPlanetId;
@@ -164,9 +203,18 @@ export class ProductionViewComponent implements OnInit {
     return this.shipAmountInputs.get(shipType) ?? '';
   }
 
+  protected defenceAmountInput(defenceType: DefenceType): string {
+    return this.defenceAmountInputs.get(defenceType) ?? '';
+  }
+
   protected onShipAmountInput(shipType: ShipType, rawValue: unknown): void {
     const normalized = typeof rawValue === 'number' ? String(rawValue) : typeof rawValue === 'string' ? rawValue : '';
     this.shipAmountInputs.set(shipType, normalized);
+  }
+
+  protected onDefenceAmountInput(defenceType: DefenceType, rawValue: unknown): void {
+    const normalized = typeof rawValue === 'number' ? String(rawValue) : typeof rawValue === 'string' ? rawValue : '';
+    this.defenceAmountInputs.set(defenceType, normalized);
   }
 
   protected shipSingleCostRows(ship: Ship): ShipCostRowVm[] {
@@ -197,8 +245,58 @@ export class ProductionViewComponent implements OnInit {
     ];
   }
 
+  protected defenceSingleCostRows(defence: Defence): ShipCostRowVm[] {
+    const currentResources = this.selectedPlanet()?.objects.resources;
+    return [
+      { label: 'M', amount: defence.cost.metal, isEnough: (currentResources?.metal ?? 0) >= defence.cost.metal, isPlaceholder: false },
+      { label: 'C', amount: defence.cost.crystal, isEnough: (currentResources?.crystal ?? 0) >= defence.cost.crystal, isPlaceholder: false },
+      { label: 'D', amount: defence.cost.deuterium, isEnough: (currentResources?.deuterium ?? 0) >= defence.cost.deuterium, isPlaceholder: false }
+    ];
+  }
+
+  protected defenceTotalCostRows(defence: Defence): ShipCostRowVm[] {
+    const amount = this.defenceAmount(defence.type);
+    if (amount === null) {
+      return [
+        { label: 'M', amount: null, isEnough: true, isPlaceholder: true },
+        { label: 'C', amount: null, isEnough: true, isPlaceholder: true },
+        { label: 'D', amount: null, isEnough: true, isPlaceholder: true }
+      ];
+    }
+
+    const total = this.multiplyCost(defence.cost, amount);
+    const currentResources = this.selectedPlanet()?.objects.resources;
+    return [
+      { label: 'M', amount: total.metal, isEnough: (currentResources?.metal ?? 0) >= total.metal, isPlaceholder: false },
+      { label: 'C', amount: total.crystal, isEnough: (currentResources?.crystal ?? 0) >= total.crystal, isPlaceholder: false },
+      { label: 'D', amount: total.deuterium, isEnough: (currentResources?.deuterium ?? 0) >= total.deuterium, isPlaceholder: false }
+    ];
+  }
+
   protected unmetRequirementRows(ship: Ship): ShipRequirementRowVm[] {
     return this.shipRequirementRows(ship).filter((row) => !row.isMet);
+  }
+
+  protected unmetDefenceRequirementRows(defence: Defence): ShipRequirementRowVm[] {
+    return this.defenceRequirementRows(defence).filter((row) => !row.isMet);
+  }
+
+  protected unmetDefenceRequirementsLabel(defence: Defence): string | null {
+    const unmetRows = this.unmetDefenceRequirementRows(defence);
+    if (unmetRows.length === 0) {
+      return null;
+    }
+
+    return `Requirements ${unmetRows.length}/${this.defenceRequirementRows(defence).length}`;
+  }
+
+  protected unmetDefenceRequirementsTooltip(defence: Defence): string | null {
+    const unmetRows = this.unmetDefenceRequirementRows(defence);
+    if (unmetRows.length === 0) {
+      return null;
+    }
+
+    return unmetRows.map((row) => row.label).join('\n');
   }
 
   protected unmetRequirementsLabel(ship: Ship): string | null {
@@ -260,6 +358,44 @@ export class ProductionViewComponent implements OnInit {
     return true;
   }
 
+  protected defenceRequirementRows(defence: Defence): ShipRequirementRowVm[] {
+    const rows: ShipRequirementRowVm[] = [];
+
+    for (const requirement of defence.buildingRequirements) {
+      const requiredLevel = Math.ceil(requirement.level);
+      const currentLevel = this.buildingLevel(requirement.building);
+      rows.push({ label: `B ${requirement.building} ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
+    }
+
+    for (const requirement of defence.techRequirements) {
+      const requiredLevel = Math.ceil(requirement.level);
+      const currentLevel = this.techLevel(requirement.tech);
+      rows.push({ label: `T ${requirement.tech} ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
+    }
+
+    return rows;
+  }
+
+  protected canBuildDefence(defence: Defence): boolean {
+    const planet = this.selectedPlanet();
+    if (!planet || planet.info.ownerId === null || this.buildingLevel(BuildingType.SHIPYARD) <= 0) {
+      return false;
+    }
+    if (this.defenceStartInFlightByType.has(defence.type) || this.isShipQueueFull()) {
+      return false;
+    }
+
+    const amount = this.defenceAmount(defence.type);
+    if (amount === null || !this.hasEnoughResources(this.multiplyCost(defence.cost, amount))) {
+      return false;
+    }
+    if (!this.hasBuildingRequirements(defence.buildingRequirements, 1) || !this.hasTechRequirements(defence.techRequirements, 1)) {
+      return false;
+    }
+
+    return true;
+  }
+
   protected onBuildShip(ship: Ship): void {
     if (!this.canBuildShip(ship)) {
       return;
@@ -280,6 +416,7 @@ export class ProductionViewComponent implements OnInit {
       x: planet.coordinates.x,
       y: planet.coordinates.y,
       z: planet.coordinates.z,
+      itemKind: 'ship',
       shipType: ship.type,
       amount
     };
@@ -308,12 +445,86 @@ export class ProductionViewComponent implements OnInit {
       });
   }
 
+  protected defenceBuildLabel(defence: Defence): string {
+    return this.isHeadDefenceQueueType(defence.type) ? 'Order more' : 'Build';
+  }
+
+  protected defenceBuildTitle(defence: Defence): string {
+    if (this.buildingLevel(BuildingType.SHIPYARD) <= 0) {
+      return 'Build Shipyard first.';
+    }
+    if (this.isShipQueueFull()) {
+      return 'Queue full. Upgrade COMPUTER_TECHNOLOGY and SHIPYARD to increase queue limit.';
+    }
+    if (this.defenceStartInFlightByType.has(defence.type)) {
+      return 'Adding to queue...';
+    }
+    if (!this.canBuildDefence(defence)) {
+      return 'Requirements not met or insufficient resources.';
+    }
+
+    return 'Add defence order to queue.';
+  }
+
+  protected onBuildDefence(defence: Defence): void {
+    if (!this.canBuildDefence(defence)) {
+      return;
+    }
+
+    const planet = this.selectedPlanet();
+    const session = this.playerSession.load();
+    const amount = this.defenceAmount(defence.type);
+    if (!planet || !session || amount === null) {
+      return;
+    }
+
+    this.defenceStartInFlightByType.add(defence.type);
+    this.defenceStartErrorByType.delete(defence.type);
+    this.cdr.markForCheck();
+
+    const request: StartShipyardConstructionRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      itemKind: 'defence',
+      defenceType: defence.type,
+      amount
+    };
+
+    this.gameApi.startShipyardConstruction(request, session.token)
+      .pipe(
+        timeout(10000),
+        finalize(() => {
+          this.defenceStartInFlightByType.delete(defence.type);
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe({
+        next: (updatedPlanet) => {
+          this.ownedPlanets = this.ownedPlanets.map((entry) =>
+            this.planetId(entry) === this.planetId(updatedPlanet) ? updatedPlanet : entry
+          );
+          this.selectedPlanetId = this.planetId(updatedPlanet);
+          this.rebuildSelectedPlanetState();
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.defenceStartErrorByType.set(defence.type, error?.error?.error ?? 'Unable to add defence order to queue.');
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected defenceStartError(defence: Defence): string | null {
+    return this.defenceStartErrorByType.get(defence.type) ?? null;
+  }
+
   protected shipStartError(ship: Ship): string | null {
     return this.shipStartErrorByType.get(ship.type) ?? null;
   }
 
   protected hasShipQueueEntries(): boolean {
-    return (this.selectedPlanet()?.objects.shipyardQueue?.length ?? 0) > 0;
+    return (this.selectedPlanet()?.objects.shipyardQueue ?? []).some((entry) => this.queueEntryItemKind(entry) === 'ship');
   }
 
   protected selectedPlanetHasDamagedDefences(): boolean {
@@ -349,8 +560,16 @@ export class ProductionViewComponent implements OnInit {
     const queueEntries = this.selectedPlanet()?.objects.shipyardQueue ?? [];
     const shipyardPower = this.currentShipyardPower();
     let cumulativeRemaining = 0;
+    const rows: ShipQueueRowVm[] = [];
 
-    return queueEntries.map((entry, index) => {
+    queueEntries.forEach((entry, index) => {
+      const baseTotalConstructionTime = this.queueEntryBaseConstructionTime(entry);
+      const remaining = Math.max(0, baseTotalConstructionTime - this.queueEntryInvestedShipyardPower(entry));
+      cumulativeRemaining += remaining;
+      if (this.queueEntryItemKind(entry) !== 'ship') {
+        return;
+      }
+
       const shipType = this.queueEntryShipType(entry);
       const amountTotal = this.queueEntryShipAmount(entry);
       const investedShipyardPower = this.queueEntryInvestedShipyardPower(entry);
@@ -362,21 +581,67 @@ export class ProductionViewComponent implements OnInit {
         investedShipyardPower,
         singleShipBaseConstructionTime
       );
-      const baseTotalConstructionTime = this.baseShipConstructionTime(shipType, amountTotal);
-      const remaining = Math.max(0, baseTotalConstructionTime - investedShipyardPower);
-      cumulativeRemaining += remaining;
 
-      return {
+      rows.push({
         position: index + 1,
+        itemKind: 'ship',
         shipType,
+        defenceType: null,
         amountCompleted,
         amountTotal,
         currentShipInvestedShipyardPower,
         currentShipBaseConstructionTime: singleShipBaseConstructionTime,
         estimatedTurnsForCompletion: shipyardPower > 0 ? Math.ceil(cumulativeRemaining / shipyardPower) : null,
         isHeadOfQueue: index === 0
-      };
+      });
     });
+
+    return rows;
+  }
+
+  protected hasDefenceQueueEntries(): boolean {
+    return (this.selectedPlanet()?.objects.shipyardQueue ?? []).some((entry) => this.queueEntryItemKind(entry) === 'defence');
+  }
+
+  protected defenceQueueRows(): DefenceQueueRowVm[] {
+    const queueEntries = this.selectedPlanet()?.objects.shipyardQueue ?? [];
+    const shipyardPower = this.currentShipyardPower();
+    let cumulativeRemaining = 0;
+    const rows: DefenceQueueRowVm[] = [];
+
+    queueEntries.forEach((entry, index) => {
+      const baseTotalConstructionTime = this.queueEntryBaseConstructionTime(entry);
+      const remaining = Math.max(0, baseTotalConstructionTime - this.queueEntryInvestedShipyardPower(entry));
+      cumulativeRemaining += remaining;
+      if (this.queueEntryItemKind(entry) !== 'defence') {
+        return;
+      }
+
+      const defenceType = this.queueEntryDefenceType(entry);
+      const amountTotal = this.queueEntryShipAmount(entry);
+      const investedShipyardPower = this.queueEntryInvestedShipyardPower(entry);
+      const singleDefenceBaseConstructionTime = this.baseDefenceConstructionTime(defenceType, 1);
+      const amountCompleted = this.defenceAmountCompleted(defenceType, amountTotal, investedShipyardPower);
+      const currentDefenceInvestedShipyardPower = this.currentShipInvestedPower(
+        amountCompleted,
+        amountTotal,
+        investedShipyardPower,
+        singleDefenceBaseConstructionTime
+      );
+
+      rows.push({
+        position: index + 1,
+        defenceType,
+        amountCompleted,
+        amountTotal,
+        currentDefenceInvestedShipyardPower,
+        currentDefenceBaseConstructionTime: singleDefenceBaseConstructionTime,
+        estimatedTurnsForCompletion: shipyardPower > 0 ? Math.ceil(cumulativeRemaining / shipyardPower) : null,
+        isHeadOfQueue: index === 0
+      });
+    });
+
+    return rows;
   }
 
   private loadOwnedPlanets(): void {
@@ -399,7 +664,9 @@ export class ProductionViewComponent implements OnInit {
           this.ownedPlanets = [...ownedPlanets];
           this.selectedPlanetId = ownedPlanets[0] ? this.planetId(ownedPlanets[0]) : null;
           this.rebuildSelectedPlanetState();
-          this.tutorialService.autoOpenTutorial('productionView');
+          if (!this.forcedMode) {
+            this.tutorialService.autoOpenTutorial('productionView');
+          }
         },
         error: () => {
           this.loadError = 'Unable to load owned planets.';
@@ -413,6 +680,8 @@ export class ProductionViewComponent implements OnInit {
     this.techLevelsByType.clear();
     this.shipStartInFlightByType.clear();
     this.shipStartErrorByType.clear();
+    this.defenceStartInFlightByType.clear();
+    this.defenceStartErrorByType.clear();
 
     const planet = this.selectedPlanet();
     if (!planet) {
@@ -639,6 +908,16 @@ export class ProductionViewComponent implements OnInit {
     return Number.isInteger(parsed) && parsed > 0 && parsed <= 100000 ? parsed : null;
   }
 
+  private defenceAmount(defenceType: DefenceType): number | null {
+    const raw = (this.defenceAmountInputs.get(defenceType) ?? '').trim();
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = Number(raw);
+    return Number.isInteger(parsed) && parsed > 0 && parsed <= 100000 ? parsed : null;
+  }
+
   private multiplyCost(baseCost: ResourcesPack, amount: number): ResourcesPack {
     return new ResourcesPack(baseCost.metal * amount, baseCost.crystal * amount, baseCost.deuterium * amount);
   }
@@ -657,7 +936,16 @@ export class ProductionViewComponent implements OnInit {
 
   private isHeadShipQueueType(shipType: ShipType): boolean {
     const firstQueueEntry = this.selectedPlanet()?.objects.shipyardQueue?.[0];
-    return !!firstQueueEntry && this.queueEntryShipType(firstQueueEntry) === shipType;
+    return !!firstQueueEntry
+      && this.queueEntryItemKind(firstQueueEntry) === 'ship'
+      && this.queueEntryShipType(firstQueueEntry) === shipType;
+  }
+
+  private isHeadDefenceQueueType(defenceType: DefenceType): boolean {
+    const firstQueueEntry = this.selectedPlanet()?.objects.shipyardQueue?.[0];
+    return !!firstQueueEntry
+      && this.queueEntryItemKind(firstQueueEntry) === 'defence'
+      && this.queueEntryDefenceType(firstQueueEntry) === defenceType;
   }
 
   private queueEntryShipType(entry: ShipyardQueueEntryDto): ShipType {
@@ -666,6 +954,18 @@ export class ProductionViewComponent implements OnInit {
     }
 
     return (entry as unknown as { type: ShipType }).type;
+  }
+
+  private queueEntryItemKind(entry: ShipyardQueueEntryDto): 'ship' | 'defence' {
+    return entry.itemKind === 'defence' ? 'defence' : 'ship';
+  }
+
+  private queueEntryDefenceType(entry: ShipyardQueueEntryDto): DefenceType {
+    if ((entry as { defenceType?: unknown }).defenceType) {
+      return (entry as { defenceType: DefenceType }).defenceType;
+    }
+
+    return (entry as unknown as { type: DefenceType }).type;
   }
 
   private queueEntryShipAmount(entry: ShipyardQueueEntryDto): number {
@@ -678,6 +978,15 @@ export class ProductionViewComponent implements OnInit {
     return !Number.isFinite(invested) || invested < 0 ? 0 : Math.floor(invested);
   }
 
+  private queueEntryBaseConstructionTime(entry: ShipyardQueueEntryDto): number {
+    const amount = this.queueEntryShipAmount(entry);
+    if (this.queueEntryItemKind(entry) === 'defence') {
+      return this.baseDefenceConstructionTime(this.queueEntryDefenceType(entry), amount);
+    }
+
+    return this.baseShipConstructionTime(this.queueEntryShipType(entry), amount);
+  }
+
   private baseShipConstructionTime(shipType: ShipType, amount: number): number {
     const blueprint = this.shipBlueprintsByType.get(shipType);
     if (!blueprint || amount < 1) {
@@ -687,8 +996,31 @@ export class ProductionViewComponent implements OnInit {
     return Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount()) * amount);
   }
 
+  private baseDefenceConstructionTime(defenceType: DefenceType, amount: number): number {
+    const blueprint = this.defenceBlueprintsByType.get(defenceType);
+    if (!blueprint || amount < 1) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount()) * amount);
+  }
+
   private shipAmountCompleted(shipType: ShipType, amount: number, investedShipyardPower: number): number {
     const blueprint = this.shipBlueprintsByType.get(shipType);
+    if (!blueprint || amount <= 0) {
+      return 0;
+    }
+
+    const singleCostTotal = Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount()));
+    if (singleCostTotal <= 0) {
+      return amount;
+    }
+
+    return Math.max(0, Math.min(amount, Math.floor(investedShipyardPower / singleCostTotal)));
+  }
+
+  private defenceAmountCompleted(defenceType: DefenceType, amount: number, investedShipyardPower: number): number {
+    const blueprint = this.defenceBlueprintsByType.get(defenceType);
     if (!blueprint || amount <= 0) {
       return 0;
     }

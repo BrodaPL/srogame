@@ -857,7 +857,12 @@ export class ImperiumViewComponent implements OnInit {
   }
 
   private shipyardQueueSummary(shipyardQueue: ShipyardQueueEntryDto[]): string[] {
-    return shipyardQueue.map((entry) => `${entry.shipType} x${entry.amount}`);
+    return shipyardQueue.map((entry) => {
+      const itemLabel = entry.itemKind === 'defence'
+        ? (entry.defenceType ?? 'Unknown defence')
+        : (entry.shipType ?? 'Unknown ship');
+      return `${itemLabel} x${entry.amount}`;
+    });
   }
 
   private researchSummary(planet: ClientPlanetDto): string {

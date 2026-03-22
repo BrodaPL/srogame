@@ -179,7 +179,9 @@ export type ManyShipsDto = ManyShipsLike;
 export type ManyDefencesDto = ManyDefencesLike;
 
 export type ShipyardQueueEntryDto = {
-  shipType: ShipType;
+  itemKind: 'ship' | 'defence';
+  shipType: ShipType | null;
+  defenceType: DefenceType | null;
   amount: number;
   investedShipyardPower: number;
 };
@@ -310,7 +312,9 @@ export type StartShipyardConstructionRequest = {
   x: number;
   y: number;
   z: number;
-  shipType: ShipType;
+  itemKind: 'ship' | 'defence';
+  shipType?: ShipType | null;
+  defenceType?: DefenceType | null;
   amount: number;
 };
 

@@ -174,6 +174,7 @@ const COMBAT_WEAPON_TYPES = new Set<WeaponType>([
   WeaponType.RAIL_GUN,
   WeaponType.BOMBARDMENT_WEAPONS
 ]);
+const BOMBARDMENT_SPACE_MISS_CHANCE = 2 / 3;
 
 const mathRandomSource: BattleRandomSource = {
   nextFloat: () => Math.random()
@@ -484,7 +485,7 @@ export class SpaceBattleResolver {
       weaponType: weapon.type,
       weaponDamage: weapon.dmg,
       evaded,
-      targetEvasionChance: weapon.type === WeaponType.BOMBARDMENT_WEAPONS ? 0.5 : target.effectiveEvasionChance,
+      targetEvasionChance: weapon.type === WeaponType.BOMBARDMENT_WEAPONS ? BOMBARDMENT_SPACE_MISS_CHANCE : target.effectiveEvasionChance,
       shieldBefore,
       shieldAfter: target.combatant.shield,
       hullBefore,
@@ -591,7 +592,7 @@ export class SpaceBattleResolver {
   }
 
   private rollBombardmentMiss(randomSource: BattleRandomSource): boolean {
-    return this.nextRandomFloat(randomSource) < 0.5;
+    return this.nextRandomFloat(randomSource) < BOMBARDMENT_SPACE_MISS_CHANCE;
   }
 
   private refillRoundWeapons(side: BattleSideState): number {
