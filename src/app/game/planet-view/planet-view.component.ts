@@ -28,6 +28,7 @@ import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
+import { ManyDefences } from '../../models/defences/many-defences';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { Ship } from '../../models/fleets/ship';
 import { Technology } from '../../models/tech/technology';
@@ -579,6 +580,77 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected planetShipDamageTone(): 'green' | 'yellow' | 'orange' | 'red' {
     const undamagedPercent = this.planetUndamagedShipsPercent();
+    if (undamagedPercent >= 100) {
+      return 'green';
+    }
+
+    if (undamagedPercent >= 80) {
+      return 'yellow';
+    }
+
+    if (undamagedPercent >= 50) {
+      return 'orange';
+    }
+
+    return 'red';
+  }
+
+  protected hasDefencesOnPlanet(): boolean {
+    return ManyDefences.totalDefencesCount(this.planet?.objects.defences) > 0;
+  }
+
+  protected planetTotalDefencesCount(): number {
+    return ManyDefences.totalDefencesCount(this.planet?.objects.defences);
+  }
+
+  protected planetUndamagedDefencesPercent(): number {
+    const total = this.planetTotalDefencesCount();
+    if (total <= 0) {
+      return 100;
+    }
+
+    const undamaged = [...ManyDefences.undamagedCountByType(this.planet?.objects.defences).values()]
+      .reduce((sum, amount) => sum + amount, 0);
+    return Math.round((undamaged / total) * 100);
+  }
+
+  protected planetDamagedDefencesPercent(): number {
+    const total = this.planetTotalDefencesCount();
+    if (total <= 0) {
+      return 0;
+    }
+
+    const damaged = [...ManyDefences.damagedCountByType(this.planet?.objects.defences).values()]
+      .reduce((sum, amount) => sum + amount, 0);
+    return Math.round((damaged / total) * 100);
+  }
+
+  protected planetUndamagedDefencesTooltip(): string {
+    const entries = ManyDefences.groupedUndamagedEntries(this.planet?.objects.defences);
+    if (entries.length <= 0) {
+      return 'No undamaged defences.';
+    }
+
+    return entries
+      .map((entry) => `${entry.type}: ${entry.amount}`)
+      .join('\n');
+  }
+
+  protected planetDamagedDefencesTooltip(): string {
+    const entries = ManyDefences.groupedDamagedEntries(this.planet?.objects.defences);
+    if (entries.length <= 0) {
+      return 'No damaged defences.';
+    }
+
+    return entries
+      .map((entry) =>
+        `${entry.type}: ${entry.amount}, missing HP ${entry.totalMissingHull} (${entry.averageDamagePercent}% avg)`
+      )
+      .join('\n');
+  }
+
+  protected planetDefenceDamageTone(): 'green' | 'yellow' | 'orange' | 'red' {
+    const undamagedPercent = this.planetUndamagedDefencesPercent();
     if (undamagedPercent >= 100) {
       return 'green';
     }
@@ -1901,6 +1973,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       labels.push('Damaged buildings without repair capability');
     }
 
+    if (this.hasDamagedDefencesAtPlanet(planet)) {
+      labels.push('Damaged defences present');
+    }
+
+    if (
+      this.hasDamagedDefencesAtPlanet(planet)
+      && this.industryRepairCapabilityForPlanet(planet) + this.droneRepairCapabilityForPlanet(planet) <= 0
+    ) {
+      labels.push('Damaged defences without repair capability');
+    }
+
     return labels;
   }
 
@@ -1978,6 +2061,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       labels.push('Damaged buildings without repair capability');
     }
 
+    if (this.hasDamagedDefencesAtCurrentPlanet()) {
+      labels.push('Damaged defences present');
+    }
+
+    if (
+      this.hasDamagedDefencesAtCurrentPlanet()
+      && this.currentIndustryRepairCapability() + this.currentDroneRepairCapability() <= 0
+    ) {
+      labels.push('Damaged defences without repair capability');
+    }
+
     return labels;
   }
 
@@ -2019,6 +2113,19 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       const max = this.maxBuildingStructuralPoints(buildingType, entry.level);
       return entry.level > 0 && this.currentPlanetBuildingStructuralPoints(planet, buildingType, max) < max;
     });
+  }
+
+  private hasDamagedDefencesAtCurrentPlanet(): boolean {
+    const planet = this.planet;
+    if (!planet) {
+      return false;
+    }
+
+    return ManyDefences.hasDamagedDefences(planet.objects.defences);
+  }
+
+  private hasDamagedDefencesAtPlanet(planet: ClientPlanetDto): boolean {
+    return ManyDefences.hasDamagedDefences(planet.objects.defences);
   }
 
   private shipRepairCapabilityForPlanet(planet: ClientPlanetDto): number {

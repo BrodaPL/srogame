@@ -3,7 +3,9 @@ import type { PlanetType } from './enums/planet-type';
 import type { BuildingType } from './enums/building-type';
 import type { TechnologyType } from './enums/technology-type';
 import type { ShipType } from './enums/ship-type';
+import type { DefenceType } from './enums/defence-type';
 import type { ManyShipsLike } from './fleets/many-ships';
+import type { ManyDefencesLike } from './defences/many-defences';
 import type { DefenceBuildingInstances } from './reports/defence-building-instances';
 import type { ShipyardQueue } from './reports/shipyard-queue';
 import type { DefencesQueue } from './reports/defences-queue';
@@ -162,6 +164,11 @@ export type ShipAmountEntry = {
   amount: number;
 };
 
+export type DefenceAmountEntry = {
+  type: DefenceType;
+  amount: number;
+};
+
 export type CreateFleetShipSelectionEntry = {
   type: ShipType;
   undamagedAmount: number;
@@ -169,6 +176,7 @@ export type CreateFleetShipSelectionEntry = {
 };
 
 export type ManyShipsDto = ManyShipsLike;
+export type ManyDefencesDto = ManyDefencesLike;
 
 export type ShipyardQueueEntryDto = {
   shipType: ShipType;
@@ -279,7 +287,7 @@ export type ClientPlanetDto = {
     buildingsLevels: BuildingLevelEntry[];
     buildingsCurrentPowerConsumption: BuildingPowerConsumptionEntry[];
     buildingsCurrentStructuralPoints: BuildingStructuralPointsEntry[];
-    defences: DefenceBuildingInstances[];
+    defences: ManyDefencesDto;
     ships: ManyShipsDto;
     currentResearchQueue: TechnologyQueueEntryDto | null;
     researchHelperFor: ResearchHelperForDto | null;

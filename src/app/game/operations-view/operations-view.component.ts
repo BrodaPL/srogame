@@ -4,6 +4,9 @@ import { finalize } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
+import { FleetMissionType } from '../../models/enums/fleet-mission-type';
+import { WeaponType } from '../../models/enums/weapon-type';
 import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
@@ -18,9 +21,12 @@ import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 })
 export class OperationsViewComponent implements OnInit {
   protected readonly fleetState = FleetState;
+  protected readonly fleetMissionType = FleetMissionType;
   protected isLoading = false;
   protected loadError: string | null = null;
   protected activeFleets: Fleet[] = [];
+
+  private readonly shipBlueprints = ShipBlueprintsFactory.fromDefaultJson();
 
   constructor(
     private readonly gameApi: GameApiService,
@@ -135,6 +141,49 @@ export class OperationsViewComponent implements OnInit {
 
   protected droneRepairCapability(fleet: Fleet): number {
     return calculateRepairCapabilityForManyShips(fleet.ships).droneRepair;
+  }
+
+  protected bombardmentCapability(fleet: Fleet): string {
+    let shots = 0;
+    let damage = 0;
+
+    for (const [shipType, amount] of ManyShips.countByType(fleet.ships).entries()) {
+      const blueprint = this.shipBlueprints.get(shipType);
+      if (!blueprint) {
+        continue;
+      }
+
+      for (const weapon of blueprint.weapons) {
+        if (weapon.type !== WeaponType.BOMBARDMENT_WEAPONS) {
+          continue;
+        }
+
+        shots += Math.max(0, weapon.shots) * amount;
+        damage += Math.max(0, weapon.dmg) * Math.max(0, weapon.shots) * amount;
+      }
+    }
+
+    if (shots <= 0) {
+      return 'No bombardment weapons';
+    }
+
+    return `${shots} shots / ${damage} raw damage`;
+  }
+
+  protected operationDetail(fleet: Fleet): string | null {
+    if (fleet.missionType === FleetMissionType.SIEGE) {
+      return `Siege orbit: ${this.bombardmentCapability(fleet)}`;
+    }
+
+    if (fleet.missionType === FleetMissionType.BOMBARD) {
+      return `Bombardment pass: ${this.bombardmentCapability(fleet)}`;
+    }
+
+    if (fleet.missionType === FleetMissionType.REPAIR) {
+      return `Repair support: Ship ${this.shipRepairCapability(fleet)} | Drone ${this.droneRepairCapability(fleet)}`;
+    }
+
+    return null;
   }
 
   private loadActiveFleets(): void {

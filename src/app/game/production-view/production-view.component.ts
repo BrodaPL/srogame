@@ -11,6 +11,7 @@ import { BuildingType } from '../../models/enums/building-type';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import { Ship } from '../../models/fleets/ship';
+import { ManyDefences } from '../../models/defences/many-defences';
 import type { ClientPlanetDto, ShipyardQueueEntryDto, StartShipyardConstructionRequest } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
 import { ResourcesPack } from '../../models/resources-pack';
@@ -313,6 +314,26 @@ export class ProductionViewComponent implements OnInit {
 
   protected hasShipQueueEntries(): boolean {
     return (this.selectedPlanet()?.objects.shipyardQueue?.length ?? 0) > 0;
+  }
+
+  protected selectedPlanetHasDamagedDefences(): boolean {
+    return ManyDefences.hasDamagedDefences(this.selectedPlanet()?.objects.defences);
+  }
+
+  protected selectedPlanetDefenceSummary(): string {
+    const planet = this.selectedPlanet();
+    if (!planet) {
+      return 'No planet selected.';
+    }
+
+    const total = ManyDefences.totalDefencesCount(planet.objects.defences);
+    const damaged = ManyDefences.groupedDamagedEntries(planet.objects.defences)
+      .reduce((sum, entry) => sum + entry.amount, 0);
+    if (total <= 0) {
+      return 'No deployed defences.';
+    }
+
+    return `Deployed ${total} | Damaged ${damaged}`;
   }
 
   protected currentShipQueueLength(): number {

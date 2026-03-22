@@ -1,6 +1,9 @@
+import { DefenceType } from '../enums/defence-type';
+import { HullClass } from '../enums/hull-class';
 import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
 import { WeaponType } from '../enums/weapon-type';
+import { DefenceInstance } from '../defences/defence-instance';
 import { ShipInstance } from '../fleets/ship-instance';
 import { Player } from '../player';
 import { FleetReport } from '../reports/fleet-report';
@@ -9,10 +12,13 @@ import type { ReportCoordinates } from '../reports/report-coordinates';
 export type BattleSideId = 'attacker' | 'defender';
 export type BattleWinner = 'Attacker' | 'Defender' | 'Draw';
 export type BattleDestructionReason = 'zeroHull' | 'criticalExplosion';
+export type BattleUnitType = ShipType | DefenceType;
+export type BattleUnitKind = 'ship' | 'defence';
 
 export type BattleSideInput = {
   player: Player;
   ships: ShipInstance[];
+  defences?: DefenceInstance[];
   label?: string;
 };
 
@@ -37,8 +43,10 @@ export type BattleRandomSource = {
 
 export type BattleShotSummary = {
   side: BattleSideId;
-  shooterShipType: ShipType;
-  targetShipType: ShipType;
+  shooterShipType: BattleUnitType;
+  shooterUnitKind: BattleUnitKind;
+  targetShipType: BattleUnitType;
+  targetUnitKind: BattleUnitKind;
   weaponType: WeaponType;
   weaponDamage: number;
   evaded: boolean;
@@ -53,7 +61,8 @@ export type BattleShotSummary = {
 
 export type BattleDestroyedShipSummary = {
   side: BattleSideId;
-  shipType: ShipType;
+  shipType: BattleUnitType;
+  unitKind: BattleUnitKind;
   reason: BattleDestructionReason;
   hullBeforeCheck: number;
   criticalHullThreshold: number;
@@ -81,15 +90,31 @@ export type BattleShipTypeSummary = {
   survivingShield: number;
 };
 
+export type BattleDefenceTypeSummary = {
+  defenceType: DefenceType;
+  initial: number;
+  surviving: number;
+  destroyed: number;
+  survivingHull: number;
+  survivingShield: number;
+};
+
 export type BattleFleetSummary = {
   label: string;
   initialShipCount: number;
+  initialDefenceCount: number;
   survivingShipCount: number;
+  survivingDefenceCount: number;
   destroyedShipCount: number;
+  destroyedDefenceCount: number;
   ships: ShipInstance[];
+  defences: DefenceInstance[];
   survivingShips: ShipInstance[];
+  survivingDefences: DefenceInstance[];
   destroyedShips: ShipInstance[];
+  destroyedDefences: DefenceInstance[];
   byType: BattleShipTypeSummary[];
+  defencesByType: BattleDefenceTypeSummary[];
 };
 
 export type SpaceBattleReports = {
@@ -107,8 +132,9 @@ export type SpaceBattleResult = {
   reports: SpaceBattleReports;
 };
 
-type BattleShipState = {
-  ship: ShipInstance;
+type BattleCombatantState = {
+  kind: BattleUnitKind;
+  combatant: ShipInstance | DefenceInstance;
   effectiveHullCapacity: number;
   effectiveShieldCapacity: number;
   effectiveArmor: number;
@@ -128,7 +154,7 @@ type BattleSideState = {
   label: string;
   player: Player;
   techModifiers: BattleTechModifiers;
-  ships: BattleShipState[];
+  combatants: BattleCombatantState[];
 };
 
 type BattleTechModifiers = {
@@ -168,8 +194,8 @@ export class SpaceBattleResolver {
         break;
       }
 
-      this.shuffle(attacker.ships, randomSource);
-      this.shuffle(defender.ships, randomSource);
+      this.shuffle(attacker.combatants, randomSource);
+      this.shuffle(defender.combatants, randomSource);
 
       const roundSummary: BattleRoundSummary = {
         roundNumber,
@@ -194,8 +220,8 @@ export class SpaceBattleResolver {
       }
     }
 
-    const attackerSummary = this.buildFleetSummary(attacker, input.attacker.ships);
-    const defenderSummary = this.buildFleetSummary(defender, input.defender.ships);
+    const attackerSummary = this.buildFleetSummary(attacker, input.attacker.ships, input.attacker.defences ?? []);
+    const defenderSummary = this.buildFleetSummary(defender, input.defender.ships, input.defender.defences ?? []);
     const winner = this.resolveWinner(attackerSummary, defenderSummary);
     const resultWithoutReports = {
       winner,
@@ -229,14 +255,17 @@ export class SpaceBattleResolver {
       label: input.label?.trim() || input.player.playerName,
       player: input.player,
       techModifiers,
-      ships: input.ships.map((ship) => this.createBattleShipState(ship, techModifiers))
+      combatants: [
+        ...input.ships.map((ship) => this.createBattleShipState(ship, techModifiers)),
+        ...(input.defences ?? []).map((defence) => this.createBattleDefenceState(defence, techModifiers))
+      ]
     };
   }
 
   private createBattleShipState(
     ship: ShipInstance,
     techModifiers: BattleTechModifiers
-  ): BattleShipState {
+  ): BattleCombatantState {
     const effectiveHullCapacity = ship.type.hullPointsCapacity * techModifiers.hullCapacityMultiplier;
     const effectiveShieldCapacity = ship.type.shieldCapacity * techModifiers.shieldCapacityMultiplier;
     const effectiveArmor = ship.type.armor * techModifiers.armorMultiplier;
@@ -250,18 +279,48 @@ export class SpaceBattleResolver {
     );
 
     return {
-      ship: new ShipInstance(
+      kind: 'ship',
+      combatant: new ShipInstance(
         ship.type,
         this.scaleStatToEffectiveCapacity(ship.hull, ship.type.hullPointsCapacity, effectiveHullCapacity),
         this.scaleStatToEffectiveCapacity(ship.shield, ship.type.shieldCapacity, effectiveShieldCapacity),
         ship.cargo,
-        ship.hangar.map((nestedShip) => this.createBattleShipState(nestedShip, techModifiers).ship)
+        ship.hangar.map((nestedShip) => this.createBattleShipState(nestedShip, techModifiers).combatant as ShipInstance)
       ),
       effectiveHullCapacity,
       effectiveShieldCapacity,
       effectiveArmor,
       effectiveCriticalThreshold,
       effectiveEvasionChance,
+      queuedWeapons: [],
+      hullDamagedThisRound: false
+    };
+  }
+
+  private createBattleDefenceState(
+    defence: DefenceInstance,
+    techModifiers: BattleTechModifiers
+  ): BattleCombatantState {
+    const effectiveHullCapacity = defence.type.hullPointsCapacity * techModifiers.hullCapacityMultiplier;
+    const effectiveShieldCapacity = defence.type.shieldCapacity * techModifiers.shieldCapacityMultiplier;
+    const effectiveArmor = defence.type.armor * techModifiers.armorMultiplier;
+    const effectiveCriticalThreshold = Math.max(
+      0,
+      defence.type.criticalThreshold - techModifiers.criticalThresholdReduction
+    );
+
+    return {
+      kind: 'defence',
+      combatant: new DefenceInstance(
+        defence.type,
+        this.scaleStatToEffectiveCapacity(defence.hull, defence.type.hullPointsCapacity, effectiveHullCapacity),
+        this.scaleStatToEffectiveCapacity(defence.shield, defence.type.shieldCapacity, effectiveShieldCapacity)
+      ),
+      effectiveHullCapacity,
+      effectiveShieldCapacity,
+      effectiveArmor,
+      effectiveCriticalThreshold,
+      effectiveEvasionChance: 0,
       queuedWeapons: [],
       hullDamagedThisRound: false
     };
@@ -347,18 +406,22 @@ export class SpaceBattleResolver {
     roundSummary: BattleRoundSummary,
     randomSource: BattleRandomSource
   ): boolean {
-    const shooter = shootingSide.ships.find((ship) => ship.ship.hull > 0 && ship.queuedWeapons.length > 0);
+    const shooter = shootingSide.combatants.find((combatant) =>
+      combatant.combatant.hull > 0 && combatant.queuedWeapons.length > 0
+    );
     if (!shooter) {
-      return false;
-    }
-
-    const aliveTargets = targetSide.ships.filter((ship) => ship.ship.hull > 0);
-    if (aliveTargets.length === 0) {
       return false;
     }
 
     const weapon = shooter.queuedWeapons.shift();
     if (!weapon) {
+      return false;
+    }
+
+    const aliveTargets = targetSide.combatants.filter((combatant) =>
+      combatant.combatant.hull > 0 && this.canTargetCombatant(shooter, combatant, weapon.type)
+    );
+    if (aliveTargets.length === 0) {
       return false;
     }
 
@@ -378,13 +441,13 @@ export class SpaceBattleResolver {
 
   private applyWeaponDamage(
     side: BattleSideId,
-    shooter: BattleShipState,
-    target: BattleShipState,
+    shooter: BattleCombatantState,
+    target: BattleCombatantState,
     weapon: BattleQueuedWeapon,
     randomSource: BattleRandomSource
   ): BattleShotSummary {
-    const shieldBefore = target.ship.shield;
-    const hullBefore = target.ship.hull;
+    const shieldBefore = target.combatant.shield;
+    const hullBefore = target.combatant.hull;
     const evaded = weapon.type === WeaponType.BOMBARDMENT_WEAPONS
       ? this.rollBombardmentMiss(randomSource)
       : this.rollEvade(target.effectiveEvasionChance, randomSource);
@@ -399,31 +462,33 @@ export class SpaceBattleResolver {
         const spilloverDamage = Math.max(0, weapon.dmg - shieldDamage) / 2;
         const armourPenalty = target.effectiveArmor * (weapon.type === WeaponType.MISSILE ? 2 : 1);
         hullDamage = Math.max(0, spilloverDamage - armourPenalty);
-        target.ship.shield = Math.max(0, shieldBefore - shieldDamage);
+        target.combatant.shield = Math.max(0, shieldBefore - shieldDamage);
       }
 
-      target.ship.hull -= hullDamage;
+      target.combatant.hull -= hullDamage;
       if (hullDamage > 0) {
         target.hullDamagedThisRound = true;
       }
     }
 
     if (weapon.type === WeaponType.RAIL_GUN) {
-      target.ship.shield = shieldBefore;
+      target.combatant.shield = shieldBefore;
     }
 
     return {
       side,
-      shooterShipType: shooter.ship.type.type,
-      targetShipType: target.ship.type.type,
+      shooterShipType: shooter.combatant.type.type,
+      shooterUnitKind: shooter.kind,
+      targetShipType: target.combatant.type.type,
+      targetUnitKind: target.kind,
       weaponType: weapon.type,
       weaponDamage: weapon.dmg,
       evaded,
       targetEvasionChance: weapon.type === WeaponType.BOMBARDMENT_WEAPONS ? 0.5 : target.effectiveEvasionChance,
       shieldBefore,
-      shieldAfter: target.ship.shield,
+      shieldAfter: target.combatant.shield,
       hullBefore,
-      hullAfter: target.ship.hull,
+      hullAfter: target.combatant.hull,
       shieldDamage,
       hullDamage
     };
@@ -434,62 +499,67 @@ export class SpaceBattleResolver {
     roundSummary: BattleRoundSummary,
     randomSource: BattleRandomSource
   ): void {
-    for (const shipState of side.ships) {
-      if (!shipState.hullDamagedThisRound) {
+    for (const combatantState of side.combatants) {
+      if (!combatantState.hullDamagedThisRound) {
         continue;
       }
 
-      if (shipState.ship.hull <= 0) {
+      if (combatantState.combatant.hull <= 0) {
         roundSummary.destroyedShips.push({
           side: side.id,
-          shipType: shipState.ship.type.type,
+          shipType: combatantState.combatant.type.type,
+          unitKind: combatantState.kind,
           reason: 'zeroHull',
-          hullBeforeCheck: shipState.ship.hull,
-          criticalHullThreshold: this.criticalHullThreshold(shipState),
+          hullBeforeCheck: combatantState.combatant.hull,
+          criticalHullThreshold: this.criticalHullThreshold(combatantState),
           destructionChancePercent: 100
         });
-        this.destroyShip(shipState);
+        this.destroyShip(combatantState);
         continue;
       }
 
-      const criticalHullThreshold = this.criticalHullThreshold(shipState);
-      if (criticalHullThreshold <= 0 || shipState.ship.hull > criticalHullThreshold) {
+      const criticalHullThreshold = this.criticalHullThreshold(combatantState);
+      if (criticalHullThreshold <= 0 || combatantState.combatant.hull > criticalHullThreshold) {
         continue;
       }
 
-      const destructionChancePercent = this.destructionChancePercent(shipState.ship, criticalHullThreshold);
+      const destructionChancePercent = this.destructionChancePercent(combatantState.combatant, criticalHullThreshold);
       if (!this.rollCriticalDestruction(destructionChancePercent, randomSource)) {
         continue;
       }
 
       roundSummary.destroyedShips.push({
         side: side.id,
-        shipType: shipState.ship.type.type,
+        shipType: combatantState.combatant.type.type,
+        unitKind: combatantState.kind,
         reason: 'criticalExplosion',
-        hullBeforeCheck: shipState.ship.hull,
+        hullBeforeCheck: combatantState.combatant.hull,
         criticalHullThreshold,
         destructionChancePercent
       });
-      this.destroyShip(shipState);
+      this.destroyShip(combatantState);
     }
   }
 
-  private destroyShip(shipState: BattleShipState): void {
-    shipState.ship.hull = 0;
-    shipState.ship.shield = 0;
-    shipState.queuedWeapons = [];
+  private destroyShip(combatantState: BattleCombatantState): void {
+    combatantState.combatant.hull = 0;
+    combatantState.combatant.shield = 0;
+    combatantState.queuedWeapons = [];
   }
 
-  private criticalHullThreshold(shipState: BattleShipState): number {
-    return shipState.effectiveHullCapacity * (shipState.effectiveCriticalThreshold / 100);
+  private criticalHullThreshold(combatantState: BattleCombatantState): number {
+    return combatantState.effectiveHullCapacity * (combatantState.effectiveCriticalThreshold / 100);
   }
 
-  private destructionChancePercent(ship: ShipInstance, criticalHullThreshold: number): number {
-    if (criticalHullThreshold <= 0 || ship.hull >= criticalHullThreshold) {
+  private destructionChancePercent(
+    combatant: ShipInstance | DefenceInstance,
+    criticalHullThreshold: number
+  ): number {
+    if (criticalHullThreshold <= 0 || combatant.hull >= criticalHullThreshold) {
       return 0;
     }
 
-    const rawChance = ((criticalHullThreshold - ship.hull) / criticalHullThreshold) * 100;
+    const rawChance = ((criticalHullThreshold - combatant.hull) / criticalHullThreshold) * 100;
     return Math.max(0, Math.min(100, Math.round(rawChance)));
   }
 
@@ -527,28 +597,28 @@ export class SpaceBattleResolver {
   private refillRoundWeapons(side: BattleSideState): number {
     let weaponsCount = 0;
 
-    for (const shipState of side.ships) {
-      shipState.hullDamagedThisRound = false;
-      if (shipState.ship.hull <= 0) {
-        shipState.queuedWeapons = [];
+    for (const combatantState of side.combatants) {
+      combatantState.hullDamagedThisRound = false;
+      if (combatantState.combatant.hull <= 0) {
+        combatantState.queuedWeapons = [];
         continue;
       }
 
-      shipState.queuedWeapons = this.expandCombatWeapons(shipState.ship, side.techModifiers);
-      weaponsCount += shipState.queuedWeapons.length;
+      combatantState.queuedWeapons = this.expandCombatWeapons(combatantState.combatant, side.techModifiers);
+      weaponsCount += combatantState.queuedWeapons.length;
     }
 
     return weaponsCount;
   }
 
   private expandCombatWeapons(
-    ship: ShipInstance,
+    combatant: ShipInstance | DefenceInstance,
     techModifiers: BattleTechModifiers
   ): BattleQueuedWeapon[] {
     const weapons: BattleQueuedWeapon[] = [];
     const delayedBombardmentWeapons: BattleQueuedWeapon[] = [];
 
-    for (const weapon of ship.type.weapons) {
+    for (const weapon of combatant.type.weapons) {
       if (!COMBAT_WEAPON_TYPES.has(weapon.type)) {
         continue;
       }
@@ -588,20 +658,66 @@ export class SpaceBattleResolver {
     return baseDamage;
   }
 
-  private buildFleetSummary(side: BattleSideState, initialShips: ShipInstance[]): BattleFleetSummary {
-    const ships = side.ships.map((shipState) => shipState.ship);
+  private canTargetCombatant(
+    shooter: BattleCombatantState,
+    target: BattleCombatantState,
+    weaponType: WeaponType
+  ): boolean {
+    if (shooter.kind === 'defence') {
+      if (target.kind !== 'ship') {
+        return false;
+      }
+
+      const shooterDefence = shooter.combatant as DefenceInstance;
+      const targetShip = target.combatant as ShipInstance;
+
+      if (shooterDefence.type.canShootToOrbit) {
+        return true;
+      }
+
+      return targetShip.type.hullClass === HullClass.SMALL
+        && targetShip.type.weapons.some((weapon) => weapon.type === WeaponType.BOMBARDMENT_WEAPONS);
+    }
+
+    if (target.kind === 'defence') {
+      return weaponType === WeaponType.BOMBARDMENT_WEAPONS;
+    }
+
+    return true;
+  }
+
+  private buildFleetSummary(
+    side: BattleSideState,
+    initialShips: ShipInstance[],
+    initialDefences: DefenceInstance[]
+  ): BattleFleetSummary {
+    const ships = side.combatants
+      .filter((combatant) => combatant.kind === 'ship')
+      .map((combatant) => combatant.combatant as ShipInstance);
+    const defences = side.combatants
+      .filter((combatant) => combatant.kind === 'defence')
+      .map((combatant) => combatant.combatant as DefenceInstance);
     const survivingShips = ships.filter((ship) => ship.hull > 0);
+    const survivingDefences = defences.filter((defence) => defence.hull > 0);
     const destroyedShips = ships.filter((ship) => ship.hull <= 0);
+    const destroyedDefences = defences.filter((defence) => defence.hull <= 0);
 
     return {
       label: side.label,
       initialShipCount: initialShips.length,
+      initialDefenceCount: initialDefences.length,
       survivingShipCount: survivingShips.length,
+      survivingDefenceCount: survivingDefences.length,
       destroyedShipCount: destroyedShips.length,
+      destroyedDefenceCount: destroyedDefences.length,
       ships,
+      defences,
       survivingShips,
+      survivingDefences,
       destroyedShips,
-      byType: this.buildShipTypeSummary(initialShips, ships)
+      destroyedDefences,
+      byType: this.buildShipTypeSummary(initialShips, ships),
+      defencesByType: this.buildDefenceTypeSummary(initialDefences, defences)
     };
   }
 
@@ -653,20 +769,71 @@ export class SpaceBattleResolver {
     });
   }
 
+  private buildDefenceTypeSummary(
+    initialDefences: DefenceInstance[],
+    finalDefences: DefenceInstance[]
+  ): BattleDefenceTypeSummary[] {
+    const order = new Map<DefenceType, number>();
+    initialDefences.forEach((defence, index) => {
+      if (!order.has(defence.type.type)) {
+        order.set(defence.type.type, index);
+      }
+    });
+
+    const stats = new Map<DefenceType, BattleDefenceTypeSummary>();
+    for (const defence of initialDefences) {
+      const current = stats.get(defence.type.type) ?? {
+        defenceType: defence.type.type,
+        initial: 0,
+        surviving: 0,
+        destroyed: 0,
+        survivingHull: 0,
+        survivingShield: 0
+      };
+
+      current.initial += 1;
+      stats.set(defence.type.type, current);
+    }
+
+    for (const defence of finalDefences) {
+      const current = stats.get(defence.type.type);
+      if (!current) {
+        continue;
+      }
+
+      if (defence.hull > 0) {
+        current.surviving += 1;
+        current.survivingHull += defence.hull;
+        current.survivingShield += defence.shield;
+      } else {
+        current.destroyed += 1;
+      }
+    }
+
+    return [...stats.values()].sort((left, right) => {
+      const leftOrder = order.get(left.defenceType) ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = order.get(right.defenceType) ?? Number.MAX_SAFE_INTEGER;
+      return leftOrder - rightOrder;
+    });
+  }
+
   private resolveWinner(attacker: BattleFleetSummary, defender: BattleFleetSummary): BattleWinner {
-    if (attacker.survivingShipCount > 0 && defender.survivingShipCount === 0) {
+    const attackerSurvivors = attacker.survivingShipCount + attacker.survivingDefenceCount;
+    const defenderSurvivors = defender.survivingShipCount + defender.survivingDefenceCount;
+
+    if (attackerSurvivors > 0 && defenderSurvivors === 0) {
       return 'Attacker';
     }
 
-    if (defender.survivingShipCount > 0 && attacker.survivingShipCount === 0) {
+    if (defenderSurvivors > 0 && attackerSurvivors === 0) {
       return 'Defender';
     }
 
-    if (attacker.survivingShipCount > defender.survivingShipCount) {
+    if (attackerSurvivors > defenderSurvivors) {
       return 'Attacker';
     }
 
-    if (defender.survivingShipCount > attacker.survivingShipCount) {
+    if (defenderSurvivors > attackerSurvivors) {
       return 'Defender';
     }
 
@@ -717,10 +884,14 @@ export class SpaceBattleResolver {
       `Battle result: ${result.winner}`,
       `Perspective: ${ownSide.label}`,
       `Rounds fought: ${result.roundsFought} / ${result.maxRounds}`,
-      `Own fleet (${ownSide.label}): ${ownSide.survivingShipCount}/${ownSide.initialShipCount} survived, ${ownSide.destroyedShipCount} lost.`,
-      `Enemy fleet (${enemySide.label}): ${enemySide.survivingShipCount}/${enemySide.initialShipCount} survived, ${enemySide.destroyedShipCount} lost.`,
+      `Own ships (${ownSide.label}): ${ownSide.survivingShipCount}/${ownSide.initialShipCount} survived, ${ownSide.destroyedShipCount} lost.`,
+      `Own defenses (${ownSide.label}): ${ownSide.survivingDefenceCount}/${ownSide.initialDefenceCount} survived, ${ownSide.destroyedDefenceCount} lost.`,
+      `Enemy ships (${enemySide.label}): ${enemySide.survivingShipCount}/${enemySide.initialShipCount} survived, ${enemySide.destroyedShipCount} lost.`,
+      `Enemy defenses (${enemySide.label}): ${enemySide.survivingDefenceCount}/${enemySide.initialDefenceCount} survived, ${enemySide.destroyedDefenceCount} lost.`,
       `Own survivors by type: ${this.formatTypeSummary(ownSide.byType, 'surviving')}`,
+      `Own defense survivors by type: ${this.formatDefenceTypeSummary(ownSide.defencesByType, 'surviving')}`,
       `Enemy survivors by type: ${this.formatTypeSummary(enemySide.byType, 'surviving')}`,
+      `Enemy defense survivors by type: ${this.formatDefenceTypeSummary(enemySide.defencesByType, 'surviving')}`,
       'Round summaries:'
     ];
 
@@ -763,16 +934,27 @@ export class SpaceBattleResolver {
     return filtered.length > 0 ? filtered.join(', ') : 'none';
   }
 
+  private formatDefenceTypeSummary(
+    summaries: BattleDefenceTypeSummary[],
+    key: 'surviving' | 'destroyed'
+  ): string {
+    const filtered = summaries
+      .filter((summary) => summary[key] > 0)
+      .map((summary) => `${summary.defenceType} x${summary[key]}`);
+
+    return filtered.length > 0 ? filtered.join(', ') : 'none';
+  }
+
   private countDestroyedShips(round: BattleRoundSummary, side: BattleSideId): number {
     return round.destroyedShips.filter((entry) => entry.side === side).length;
   }
 
   private hasAliveShips(side: BattleSideState): boolean {
-    return side.ships.some((ship) => ship.ship.hull > 0);
+    return side.combatants.some((combatant) => combatant.combatant.hull > 0);
   }
 
   private countAliveShips(side: BattleSideState): number {
-    return side.ships.filter((ship) => ship.ship.hull > 0).length;
+    return side.combatants.filter((combatant) => combatant.combatant.hull > 0).length;
   }
 
   private shuffle<T>(items: T[], randomSource: BattleRandomSource): void {

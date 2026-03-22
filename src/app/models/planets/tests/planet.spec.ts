@@ -6,6 +6,7 @@ import { ResourcesPack } from '../../resources-pack';
 import { PlanetaryParameters } from '../planetary-parameters';
 import { BuildingType } from '../../enums/building-type';
 import { ManyShips } from '../../fleets/many-ships';
+import { ManyDefences } from '../../defences/many-defences';
 
 describe('Planet', () => {
   const createSystem = (): SolarSystem => new SolarSystem(
@@ -44,7 +45,7 @@ describe('Planet', () => {
         new Map(),
         new Map(),
         new Map(),
-        [],
+        ManyDefences.empty(),
         ManyShips.empty(),
         null,
         null,

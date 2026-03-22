@@ -10,6 +10,7 @@ import { ClientPlanet } from './client-planet';
 import { ClientInfo, ClientStarSystem } from './client-star-system';
 import { Fleet } from '../fleets/fleet';
 import { ManyShips } from '../fleets/many-ships';
+import { ManyDefences } from '../defences/many-defences';
 import type { DiplomaticRelation } from '../diplomacy/diplomatic-relation';
 
 export class Galaxy {
@@ -76,7 +77,7 @@ export class Galaxy {
         new Map(),
         new Map(),
         new Map(),
-        [],
+        ManyDefences.empty(),
         ManyShips.empty(),
         null,
         null,

@@ -11,6 +11,14 @@ export type BuildingBombardmentSummary = {
   hits: number;
   totalDamage: number;
   targetCount: number;
+  targets: Array<{
+    type: BuildingType;
+    damage: number;
+    remainingStructuralPoints: number;
+    reducedToZero: boolean;
+    structuralUtilization: number;
+    minimumStructuralUtilization: number;
+  }>;
 };
 
 export function hasBombardmentWeapons(ships: ManyShipsLike | null | undefined): boolean {
@@ -42,13 +50,15 @@ export function applyBuildingBombardment(
       shots: 0,
       hits: 0,
       totalDamage: 0,
-      targetCount: 0
+      targetCount: 0,
+      targets: []
     };
   }
 
   let shots = 0;
   let hits = 0;
   let totalDamage = 0;
+  const targets: BuildingBombardmentSummary['targets'] = [];
 
   for (const [shipType, amount] of ManyShips.countByType(ships).entries()) {
     const normalizedAmount = Math.max(0, Math.floor(amount));
@@ -79,9 +89,18 @@ export function applyBuildingBombardment(
         }
 
         const targetType = targetTypes[Math.floor(Math.random() * targetTypes.length)];
+        const structuralPointsBefore = planet.getCurrentBuildingStructuralPoints(targetType);
         const appliedDamage = planet.applyBuildingStructuralDamage(targetType, weapon.dmg);
         hits += 1;
         totalDamage += appliedDamage;
+        targets.push({
+          type: targetType,
+          damage: appliedDamage,
+          remainingStructuralPoints: planet.getCurrentBuildingStructuralPoints(targetType),
+          reducedToZero: structuralPointsBefore > 0 && planet.getCurrentBuildingStructuralPoints(targetType) <= 0,
+          structuralUtilization: planet.getBuildingStructuralUtilization(targetType),
+          minimumStructuralUtilization: planet.getBuildingMinimumStructuralUtilization(targetType)
+        });
       }
     }
   }
@@ -90,7 +109,8 @@ export function applyBuildingBombardment(
     shots,
     hits,
     totalDamage,
-    targetCount: availableTargets.length
+    targetCount: availableTargets.length,
+    targets
   };
 }
 

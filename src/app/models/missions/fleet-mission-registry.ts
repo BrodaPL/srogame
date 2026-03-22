@@ -4,6 +4,7 @@ import type { FleetMissionBlueprints } from './fleet-mission-blueprint';
 import { FleetMission } from './fleet-mission';
 import { BombardFleetMission } from './types/bombard-fleet-mission';
 import { MoveFleetMission } from './types/move-fleet-mission';
+import { RepairFleetMission } from './types/repair-fleet-mission';
 import { SiegeFleetMission } from './types/siege-fleet-mission';
 import { SpyFleetMission } from './types/spy-fleet-mission';
 import { TransportFleetMission } from './types/transport-fleet-mission';
@@ -47,6 +48,7 @@ export class FleetMissionRegistry {
     const spy = this.blueprints.get(FleetMissionType.SPY);
     const bombard = this.blueprints.get(FleetMissionType.BOMBARD);
     const siege = this.blueprints.get(FleetMissionType.SIEGE);
+    const repair = this.blueprints.get(FleetMissionType.REPAIR);
     const colonize = this.blueprints.get(FleetMissionType.COLONIZE);
 
     if (move) {
@@ -67,6 +69,10 @@ export class FleetMissionRegistry {
 
     if (siege) {
       this.missionByType.set(siege.type, new SiegeFleetMission(siege));
+    }
+
+    if (repair) {
+      this.missionByType.set(repair.type, new RepairFleetMission(repair));
     }
 
     if (colonize) {

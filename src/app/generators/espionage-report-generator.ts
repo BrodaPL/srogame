@@ -11,6 +11,7 @@ import { ShipyardQueue } from '../models/reports/shipyard-queue';
 import { BuildingQueue } from '../models/reports/building-queue';
 import { DefenceBuildingInstances } from '../models/reports/defence-building-instances';
 import { ManyShips } from '../models/fleets/many-ships';
+import { ManyDefences } from '../models/defences/many-defences';
 
 export type EspionageReportOptions = {
   forcedReportLevel?: number;
@@ -187,14 +188,12 @@ export class EspionageReportGenerator {
   }
 
   private getDefencesAmount(planet: Planet): number {
-    return planet.rBDSFTQ.defences.reduce(
-      (sum, entry) => sum + Math.max(0, Math.floor(entry.amount)),
-      0
-    );
+    return ManyDefences.totalDefencesCount(planet.rBDSFTQ.defences);
   }
 
   private getDefenceInstances(planet: Planet): DefenceBuildingInstances[] {
-    return planet.rBDSFTQ.defences.map((entry) => entry.copy());
+    return [...ManyDefences.countByType(planet.rBDSFTQ.defences).entries()]
+      .map(([type, amount]) => new DefenceBuildingInstances(type, amount));
   }
 }
 

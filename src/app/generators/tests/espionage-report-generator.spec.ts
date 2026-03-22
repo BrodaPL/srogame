@@ -17,6 +17,7 @@ import { HullClass } from '../../models/enums/hull-class';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { DefenceBuildingInstances } from '../../models/reports/defence-building-instances';
 import { DefenceType } from '../../models/enums/defence-type';
+import { ManyDefences } from '../../models/defences/many-defences';
 
 describe('EspionageReportGenerator', () => {
   const createPlayer = (
@@ -37,10 +38,13 @@ describe('EspionageReportGenerator', () => {
       ]),
       new Map<BuildingType, number>(),
       new Map<BuildingType, number>(),
-      [
-        new DefenceBuildingInstances(DefenceType.LIGHT_BEAM_CANNON, 3),
-        new DefenceBuildingInstances(DefenceType.SAM_SITE, 2)
-      ],
+      ManyDefences.fromData({
+        undamagedDefencesCount: {
+          [DefenceType.LIGHT_BEAM_CANNON]: 3,
+          [DefenceType.SAM_SITE]: 2
+        },
+        damagedDefences: []
+      }),
       ManyShips.fromShipInstances(ships),
       null,
       null,

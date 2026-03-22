@@ -7,7 +7,7 @@ import { ResourcesPack } from '../resources-pack';
 import { SolarSystem } from './solar-system';
 import { PlanetaryParameters } from './planetary-parameters';
 import { PlanetImageHelper } from './planet-image-helper';
-import { DefenceBuildingInstances } from '../reports/defence-building-instances';
+import { ManyDefences } from '../defences/many-defences';
 import { EspionageReportData } from '../reports/espionage-report-data';
 import { BuildingQueueEntry } from '../buildings/building-queue-entry';
 import { ShipyardQueueEntry } from '../fleets/shipyard-queue-entry';
@@ -47,7 +47,7 @@ export class rBDSFTQ {
     public buildingsLevels: Map<BuildingType, number>,
     public buildingsCurrentPowerConsumption: Map<BuildingType, number>,
     public buildingsCurrentStructuralPoints: Map<BuildingType, number>,
-    public defences: DefenceBuildingInstances[],
+    public defences: ManyDefences,
     public ships: ManyShips,
     public currentResearchQueue: TechnologyQueueEntry | null,
     public researchHelperFor: ResearchHelperFor | null,
@@ -100,7 +100,7 @@ export class Planet {
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
-        [],
+        ManyDefences.empty(),
         ManyShips.empty(),
         null,
         null,
@@ -155,7 +155,7 @@ export class Planet {
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
-        [],
+        ManyDefences.empty(),
         ManyShips.empty(),
         null,
         null,

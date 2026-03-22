@@ -407,7 +407,44 @@
         }
 
         @if (isActiveTab('defences')) {
-          <p class="planet-tab-placeholder">Go away. Defences are not implemented yet.</p>
+          <section class="planet-ships-status">
+            <div class="planet-ships-status__header">
+              <h4 class="planet-view__section-title">Defence Damage Status</h4>
+              @if (hasDefencesOnPlanet()) {
+                <p class="planet-ships-status__meta">Total defences: {{ planetTotalDefencesCount() }}</p>
+              }
+            </div>
+
+            @if (!hasDefencesOnPlanet()) {
+              <p class="planet-tab-placeholder">No planetary defences deployed.</p>
+            } @else {
+              <div class="planet-ships-status__grid">
+                <article
+                  class="planet-ships-status__card"
+                  [class.planet-ships-status__card--green]="planetDefenceDamageTone() === 'green'"
+                  [class.planet-ships-status__card--yellow]="planetDefenceDamageTone() === 'yellow'"
+                  [class.planet-ships-status__card--orange]="planetDefenceDamageTone() === 'orange'"
+                  [class.planet-ships-status__card--red]="planetDefenceDamageTone() === 'red'"
+                  [attr.title]="planetUndamagedDefencesTooltip()"
+                >
+                  <span class="planet-ships-status__label">Undamaged defences %</span>
+                  <strong class="planet-ships-status__value">{{ planetUndamagedDefencesPercent() }}%</strong>
+                </article>
+
+                <article
+                  class="planet-ships-status__card"
+                  [class.planet-ships-status__card--green]="planetDefenceDamageTone() === 'green'"
+                  [class.planet-ships-status__card--yellow]="planetDefenceDamageTone() === 'yellow'"
+                  [class.planet-ships-status__card--orange]="planetDefenceDamageTone() === 'orange'"
+                  [class.planet-ships-status__card--red]="planetDefenceDamageTone() === 'red'"
+                  [attr.title]="planetDamagedDefencesTooltip()"
+                >
+                  <span class="planet-ships-status__label">Damaged defences %</span>
+                  <strong class="planet-ships-status__value">{{ planetDamagedDefencesPercent() }}%</strong>
+                </article>
+              </div>
+            }
+          </section>
         }
 
         @if (isActiveTab('operations')) {

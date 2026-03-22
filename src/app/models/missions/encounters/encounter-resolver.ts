@@ -1,4 +1,5 @@
 import { SpaceBattleResolver, type SpaceBattleResult } from '../../battles/space-battle-resolver';
+import { ManyDefences, type DefenceAmountRequest } from '../../defences/many-defences';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { DiplomacyResolver } from '../../diplomacy/diplomacy-resolver';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
@@ -30,21 +31,15 @@ export type PlanetOrbitEncounterResolvedArrival = {
   outcome: FleetEncounterOutcome;
 };
 
-type OrbitForceRecord =
-  | {
-    kind: 'orbitingShips';
-    owner: Player | null;
-    planet: Planet;
-    ships: ManyShips;
-    orderKey: number;
-  }
-  | {
-    kind: 'fleet';
-    owner: Player | null;
-    fleet: Fleet;
-    ships: ManyShips;
-    orderKey: number;
-  };
+type OrbitForceRecord = {
+  kind: 'orbitingShips' | 'planetDefences' | 'fleet';
+  owner: Player | null;
+  planet: Planet | null;
+  fleet: Fleet | null;
+  ships: ManyShips;
+  defences: ManyDefences;
+  orderKey: number;
+};
 
 const MISSION_PRIORITY: Record<FleetMissionType, number> = {
   [FleetMissionType.DEFEND]: 0,
@@ -111,7 +106,7 @@ export class EncounterResolver {
       }
 
       const hostileDefenderCoalition = this.selectHostileDefenderCoalition(currentOwnerId, targetPlanet, orbitForces);
-      if (!hostileDefenderCoalition || this.totalForceShips(hostileDefenderCoalition) <= 0) {
+      if (!hostileDefenderCoalition || this.totalForceCombatants(hostileDefenderCoalition) <= 0) {
         for (const member of coalition) {
           resolvedArrivals.push({
             arrival: member,
@@ -133,7 +128,7 @@ export class EncounterResolver {
       const hostileDefendersStillPresent = this.selectHostileDefenderCoalition(currentOwnerId, targetPlanet, orbitForces);
       const coalitionHasSurvivors = coalition.some((entry) => ManyShips.totalShipsCount(entry.fleet.ships) > 0);
       const coalitionWon = coalitionHasSurvivors
-        && (!hostileDefendersStillPresent || this.totalForceShips(hostileDefendersStillPresent) <= 0);
+        && (!hostileDefendersStillPresent || this.totalForceCombatants(hostileDefendersStillPresent) <= 0);
 
       for (const member of coalition) {
         const survivingShips = ManyShips.totalShipsCount(member.fleet.ships);
@@ -165,8 +160,22 @@ export class EncounterResolver {
         kind: 'orbitingShips',
         owner: null,
         planet: targetPlanet,
+        fleet: null,
         ships: targetPlanet.rBDSFTQ.ships,
+        defences: ManyDefences.empty(),
         orderKey: -1
+      });
+    }
+
+    if (targetPlanet.info.ownerId !== null && ManyDefences.totalDefencesCount(targetPlanet.rBDSFTQ.defences) > 0) {
+      orbitForces.push({
+        kind: 'planetDefences',
+        owner: null,
+        planet: targetPlanet,
+        fleet: null,
+        ships: ManyShips.empty(),
+        defences: targetPlanet.rBDSFTQ.defences,
+        orderKey: -2
       });
     }
 
@@ -178,8 +187,10 @@ export class EncounterResolver {
       orbitForces.push({
         kind: 'fleet',
         owner: occupant.owner,
+        planet: null,
         fleet: occupant.fleet,
         ships: occupant.fleet.ships,
+        defences: ManyDefences.empty(),
         orderKey: occupant.fleet.fleetId
       });
     }
@@ -282,9 +293,11 @@ export class EncounterResolver {
       fleetId: arrival.fleet.fleetId,
       ships: ManyShips.fromData(arrival.fleet.ships)
     }));
-    const defenderInitialShipCounts = defenders.map((force) => ({
+    const defenderInitialForces = defenders.map((force) => ({
       force,
       ships: ManyShips.fromData(force.ships)
+      ,
+      defences: ManyDefences.fromData(force.defences)
     }));
 
     const battleResult = this.battleResolver.resolve({
@@ -296,6 +309,7 @@ export class EncounterResolver {
       defender: {
         player: defender,
         ships: ManyShips.toShipInstances(this.mergeForceShips(defenders)),
+        defences: ManyDefences.toDefenceInstances(this.mergeForceDefences(defenders)),
         label: defender.playerName
       },
       reportContext: {
@@ -314,13 +328,18 @@ export class EncounterResolver {
     const coalitionSurvivors = ManyShips.fromShipInstances(battleResult.attacker.survivingShips);
     const overflowShips = coalitionSurvivors.trimNonJumpShipsToTravelHangarCapacity();
     const defenderSurvivorPool = ManyShips.fromShipInstances(battleResult.defender.survivingShips);
+    const defenderDefenceSurvivorPool = ManyDefences.fromDefenceInstances(battleResult.defender.survivingDefences);
 
-    for (const defenderEntry of defenderInitialShipCounts) {
+    for (const defenderEntry of defenderInitialForces) {
       const requested = this.toShipAmountRequests(defenderEntry.ships);
       const allocated = defenderSurvivorPool.extractAnyShipsByType(requested);
-      if (defenderEntry.force.kind === 'orbitingShips') {
+      const requestedDefences = this.toDefenceAmountRequests(defenderEntry.defences);
+      const allocatedDefences = defenderDefenceSurvivorPool.extractAnyDefencesByType(requestedDefences);
+      if (defenderEntry.force.kind === 'orbitingShips' && defenderEntry.force.planet) {
         defenderEntry.force.planet.rBDSFTQ.ships = allocated;
-      } else {
+      } else if (defenderEntry.force.kind === 'planetDefences' && defenderEntry.force.planet) {
+        defenderEntry.force.planet.rBDSFTQ.defences = allocatedDefences;
+      } else if (defenderEntry.force.fleet) {
         defenderEntry.force.fleet.ships = allocated;
       }
     }
@@ -341,6 +360,7 @@ export class EncounterResolver {
     targetPlanet.rBDSFTQ.spaceDebris.addResourcePack(
       this.calculateBattleDebris(battleResult, overflowShips, lostAttackerCargo)
     );
+    targetPlanet.rBDSFTQ.resources.addResourcePack(this.calculateDefenceDebris(battleResult));
 
     return coalitionSurvivors;
   }
@@ -365,8 +385,23 @@ export class EncounterResolver {
     return mergedShips;
   }
 
-  private totalForceShips(defenders: OrbitForceRecord[]): number {
-    return defenders.reduce((total, defender) => total + ManyShips.totalShipsCount(defender.ships), 0);
+  private mergeForceDefences(defenders: OrbitForceRecord[]): ManyDefences {
+    const mergedDefences = ManyDefences.empty();
+    for (const defender of defenders) {
+      mergedDefences.addManyDefences(defender.defences);
+    }
+
+    return mergedDefences;
+  }
+
+  private totalForceCombatants(defenders: OrbitForceRecord[]): number {
+    return defenders.reduce(
+      (total, defender) =>
+        total
+        + ManyShips.totalShipsCount(defender.ships)
+        + ManyDefences.totalDefencesCount(defender.defences),
+      0
+    );
   }
 
   private resolveDefenderPlayer(
@@ -381,13 +416,20 @@ export class EncounterResolver {
   }
 
   private resolveForceOwnerId(force: OrbitForceRecord, targetPlanet: Planet): number | null {
-    return force.kind === 'orbitingShips'
+    return force.kind === 'orbitingShips' || force.kind === 'planetDefences'
       ? targetPlanet.info.ownerId
-      : force.owner?.playerId ?? force.fleet.ownerId;
+      : force.owner?.playerId ?? force.fleet?.ownerId ?? null;
   }
 
   private toShipAmountRequests(ships: ManyShips): Array<{ type: import('../../enums/ship-type').ShipType; amount: number }> {
     return [...ManyShips.countByType(ships).entries()].map(([type, amount]) => ({
+      type,
+      amount
+    }));
+  }
+
+  private toDefenceAmountRequests(defences: ManyDefences): DefenceAmountRequest[] {
+    return [...ManyDefences.countByType(defences).entries()].map(([type, amount]) => ({
       type,
       amount
     }));
@@ -432,6 +474,33 @@ export class EncounterResolver {
       target.metal += ship.type.cost.metal;
       target.crystal += ship.type.cost.crystal;
       target.deuterium += ship.type.cost.deuterium;
+    }
+  }
+
+  private calculateDefenceDebris(battleResult: SpaceBattleResult): ResourcesPack {
+    const destroyedDefenceResources = new ResourcesPack(0, 0, 0);
+    this.addDestroyedDefenceResources(destroyedDefenceResources, battleResult.attacker.destroyedDefences);
+    this.addDestroyedDefenceResources(destroyedDefenceResources, battleResult.defender.destroyedDefences);
+
+    if (destroyedDefenceResources.getTotalResourceAmount() <= 0) {
+      return destroyedDefenceResources;
+    }
+
+    return new ResourcesPack(
+      Math.floor(destroyedDefenceResources.metal),
+      Math.floor(destroyedDefenceResources.crystal),
+      Math.floor(destroyedDefenceResources.deuterium)
+    );
+  }
+
+  private addDestroyedDefenceResources(
+    target: ResourcesPack,
+    defences: import('../../defences/defence-instance').DefenceInstance[]
+  ): void {
+    for (const defence of defences) {
+      target.metal += defence.type.cost.metal;
+      target.crystal += defence.type.cost.crystal;
+      target.deuterium += defence.type.cost.deuterium;
     }
   }
 

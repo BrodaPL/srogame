@@ -94,7 +94,6 @@
       "shieldCapacity": 30,
       "armor": 2,
       "weapons": [
-        { "type": "MISSILE", "dmg": 20, "shots": 1 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 2 }
       ],
       "cargoCapacity": 20,

@@ -91,6 +91,24 @@
       }
     },
     {
+      "type": "REPAIR",
+      "name": "Repair",
+      "description": "Move to a non-hostile planet or orbit and stay there until all friendly damage is repaired, then return automatically.",
+      "battleRoundsModifier": -1,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["SELF", "ALLIED", "PEACE"],
+        "allowUnowned": true
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": false,
+        "requiresCargo": false
+      }
+    },
+    {
       "type": "COLONIZE",
       "name": "Colonize",
       "description": "Send a Colonizer to an unowned planet.",

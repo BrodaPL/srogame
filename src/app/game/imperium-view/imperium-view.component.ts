@@ -12,6 +12,7 @@ import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
+import { ManyDefences } from '../../models/defences/many-defences';
 import type {
   BuildingQueueEntryDto,
   ClientPlanetDto,
@@ -470,6 +471,27 @@ export class ImperiumViewComponent implements OnInit {
         'Damaged ships without repair capability',
         'Damaged ships are present but this location currently has no repair capability.',
         planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Damaged ships without repair capability'))
+      ),
+      this.createAttentionItem(
+        'damagedBuildingsPresent',
+        'Damaged buildings present',
+        'Planetary infrastructure is damaged and working below full efficiency.',
+        planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Damaged buildings present'))
+      ),
+      this.createAttentionItem(
+        'damagedDefencesPresent',
+        'Damaged defences present',
+        'Planetary defences survived combat but still need repairs.',
+        planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Damaged defences present'))
+      ),
+      this.createAttentionItem(
+        'damagedGroundNoRepair',
+        'Damaged structures without repair capability',
+        'Buildings or defences are damaged but the location currently has no effective industry or drone repair.',
+        planetVms.filter((planetVm) =>
+          planetVm.attentionLabels.includes('Damaged buildings without repair capability')
+          || planetVm.attentionLabels.includes('Damaged defences without repair capability')
+        )
       )
     ].filter((entry): entry is ImperiumAttentionVm => entry !== null);
   }
@@ -585,6 +607,28 @@ export class ImperiumViewComponent implements OnInit {
       && powers.shipRepair + powers.droneRepair <= 0
     ) {
       labels.push('Damaged ships without repair capability');
+    }
+
+    if (this.hasDamagedBuildingsAtPlanet(planet)) {
+      labels.push('Damaged buildings present');
+    }
+
+    if (
+      this.hasDamagedBuildingsAtPlanet(planet)
+      && powers.industryRepair + powers.droneRepair <= 0
+    ) {
+      labels.push('Damaged buildings without repair capability');
+    }
+
+    if (this.hasDamagedDefencesAtPlanet(planet)) {
+      labels.push('Damaged defences present');
+    }
+
+    if (
+      this.hasDamagedDefencesAtPlanet(planet)
+      && powers.industryRepair + powers.droneRepair <= 0
+    ) {
+      labels.push('Damaged defences without repair capability');
     }
 
     return labels;
@@ -848,6 +892,34 @@ export class ImperiumViewComponent implements OnInit {
     }
 
     return this.idleRepairFleetsForPlanet(planet).some((fleet) => ManyShips.hasDamagedShips(fleet.ships));
+  }
+
+  private hasDamagedBuildingsAtPlanet(planet: ClientPlanetDto): boolean {
+    return planet.objects.buildingsLevels.some((entry) => {
+      const structuralEntry = planet.objects.buildingsCurrentStructuralPoints.find((candidate) => candidate.type === entry.type);
+      const currentStructuralPoints = structuralEntry?.currentStructuralPoints;
+      return entry.level > 0 && currentStructuralPoints !== undefined && currentStructuralPoints > 0
+        ? currentStructuralPoints < this.buildingMaxStructuralPoints(planet, entry.type, entry.level)
+        : entry.level > 0 && currentStructuralPoints === 0;
+    });
+  }
+
+  private hasDamagedDefencesAtPlanet(planet: ClientPlanetDto): boolean {
+    return ManyDefences.hasDamagedDefences(planet.objects.defences);
+  }
+
+  private buildingMaxStructuralPoints(
+    planet: ClientPlanetDto,
+    buildingType: BuildingType,
+    level: number
+  ): number {
+    const blueprint = this.buildingByType.get(buildingType);
+    if (!blueprint || level <= 0) {
+      return 0;
+    }
+
+    const cost = blueprint.getCostForLevel(level);
+    return Math.max(0, (cost.metal * 2) + cost.crystal + Math.floor(cost.deuterium * 0.5));
   }
 
   private idleRepairFleetsForPlanet(planet: ClientPlanetDto): Fleet[] {
