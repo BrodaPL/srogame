@@ -282,19 +282,10 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected espionageDefenceRows(report: EspionageReportData): ReportDossierRow[] {
-    return report.defences
-      .map((entry, index) => {
-        const typedEntry = entry as Record<string, unknown>;
-        const label = typeof typedEntry['type'] === 'string'
-          ? typedEntry['type']
-          : `Defense entry ${index + 1}`;
-        const amountValue = typedEntry['amount'];
-        const amount = typeof amountValue === 'number'
-          ? this.formatMetricValue(amountValue)
-          : 'Detected';
-
-        return { label, value: amount };
-      });
+    return report.defences.map((entry) => ({
+      label: entry.type,
+      value: this.formatMetricValue(entry.amount)
+    }));
   }
 
   protected espionageParameterRows(report: EspionageReportData): ReportDossierRow[] {

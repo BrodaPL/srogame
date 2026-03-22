@@ -22,6 +22,7 @@ import { ResourcesPack } from '../resources-pack';
 import { SensorPhalanxReport } from './sensor-phalanx-report';
 import { ShipyardQueue } from './shipyard-queue';
 import { StarSystemEspionageReport } from './star-system-espionage-report';
+import { DefenceBuildingInstances } from './defence-building-instances';
 
 function toBaseData(report: PlayerReportDto) {
   return {
@@ -91,7 +92,7 @@ function fromEspionageReportDto(report: EspionagePlayerReportDto): EspionageRepo
       report.resourcesAmount.deuterium
     ),
     new Map(report.techLevels.map((entry) => [entry.type, entry.level])),
-    [...report.defences],
+    report.defences.map((entry) => new DefenceBuildingInstances(entry.type, entry.amount)),
     new Map(report.ships.map((entry) => [entry.type, entry.amount])),
     Object.assign(new ShipyardQueue(), report.shipyardProduction),
     Object.assign(new DefencesQueue(), report.defencesProduction),

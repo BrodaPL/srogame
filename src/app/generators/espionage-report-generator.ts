@@ -64,7 +64,7 @@ export class EspionageReportGenerator {
     const techAverage = includeAverageTech
       ? this.averageMapValue(planetOwner?.tech ?? new Map())
       : 0;
-    const totalDefences = includeTotalDefences ? this.getDefencesAmount() : 0;
+    const totalDefences = includeTotalDefences ? this.getDefencesAmount(planet) : 0;
     const totalShips = includeTotalShips
       ? ManyShips.totalShipsCount(planet.rBDSFTQ.ships)
       : 0;
@@ -82,7 +82,7 @@ export class EspionageReportGenerator {
     const detailedTech = includeDetailedTech
       ? new Map(planetOwner?.tech ?? new Map())
       : new Map();
-    const detailedDefences = includeDetailedDefences ? this.getDefenceInstances() : [];
+    const detailedDefences = includeDetailedDefences ? this.getDefenceInstances(planet) : [];
     const detailedShips = includeDetailedShips
       ? this.toShipAmountsMap(planet.rBDSFTQ.ships)
       : new Map<ShipType, number>();
@@ -186,14 +186,15 @@ export class EspionageReportGenerator {
     return count === 0 ? 0 : sum / count;
   }
 
-  private getDefencesAmount(): number {
-    // Defence instances are not modeled yet.
-    return 0;
+  private getDefencesAmount(planet: Planet): number {
+    return planet.rBDSFTQ.defences.reduce(
+      (sum, entry) => sum + Math.max(0, Math.floor(entry.amount)),
+      0
+    );
   }
 
-  private getDefenceInstances(): DefenceBuildingInstances[] {
-    // Defence instances are not modeled yet.
-    return [];
+  private getDefenceInstances(planet: Planet): DefenceBuildingInstances[] {
+    return planet.rBDSFTQ.defences.map((entry) => entry.copy());
   }
 }
 

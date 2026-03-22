@@ -1,0 +1,162 @@
+{
+  "defences": [
+    {
+      "type": "LIGHT_BEAM_CANNON",
+      "imagePath": "images/defence/Light_Laser (1).webp",
+      "hullClass": "SMALL",
+      "canShootToOrbit": true,
+      "size": 1,
+      "hullPointsCapacity": 30,
+      "criticalThreshold": 25,
+      "shieldCapacity": 0,
+      "armor": 1,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 1 }
+      ],
+      "cost": { "metal": 10, "crystal": 10, "deuterium": 0 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "BEAMS_WEAPONS", "level": 1 }
+      ]
+    },
+    {
+      "type": "BEAM_CANNON",
+      "imagePath": "images/defence/Ion_Cannon.webp",
+      "hullClass": "MEDIUM",
+      "canShootToOrbit": true,
+      "size": 2,
+      "hullPointsCapacity": 65,
+      "criticalThreshold": 22,
+      "shieldCapacity": 5,
+      "armor": 2,
+      "weapons": [
+        { "type": "BEAM", "dmg": 20, "shots": 1 }
+      ],
+      "cost": { "metal": 50, "crystal": 30, "deuterium": 0 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 2 }
+      ],
+      "techRequirements": [
+        { "tech": "BEAMS_WEAPONS", "level": 2 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 }
+      ]
+    },
+    {
+      "type": "HEAVY_BEAM_CANNON",
+      "imagePath": "images/defence/Plasma_Turret.webp",
+      "hullClass": "BIG",
+      "canShootToOrbit": true,
+      "size": 3,
+      "hullPointsCapacity": 150,
+      "criticalThreshold": 18,
+      "shieldCapacity": 20,
+      "armor": 4,
+      "weapons": [
+        { "type": "BEAM", "dmg": 40, "shots": 1 }
+      ],
+      "cost": { "metal": 150, "crystal": 100, "deuterium": 0 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 4 }
+      ],
+      "techRequirements": [
+        { "tech": "BEAMS_WEAPONS", "level": 4 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 2 }
+      ]
+    },
+    {
+      "type": "SAM_SITE",
+      "imagePath": "images/defence/Rocket_Launcher.webp",
+      "hullClass": "SMALL",
+      "canShootToOrbit": false,
+      "size": 1,
+      "hullPointsCapacity": 25,
+      "criticalThreshold": 30,
+      "shieldCapacity": 0,
+      "armor": 1,
+      "weapons": [
+        { "type": "MISSILE", "dmg": 20, "shots": 1 }
+      ],
+      "cost": { "metal": 20, "crystal": 0, "deuterium": 0 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 1 },
+        { "building": "MISSILE_SILO", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "MISSILES_WEAPONS", "level": 1 }
+      ]
+    },
+    {
+      "type": "ORBITAL_MISSILE_LAUNCHER",
+      "imagePath": "images/defence/ABM.webp",
+      "hullClass": "MEDIUM",
+      "canShootToOrbit": true,
+      "size": 2,
+      "hullPointsCapacity": 60,
+      "criticalThreshold": 24,
+      "shieldCapacity": 0,
+      "armor": 2,
+      "weapons": [
+        { "type": "MISSILE", "dmg": 30, "shots": 1 }
+      ],
+      "cost": { "metal": 60, "crystal": 30, "deuterium": 10 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 2 },
+        { "building": "MISSILE_SILO", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "MISSILES_WEAPONS", "level": 2 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 1 }
+      ]
+    },
+    {
+      "type": "HEAVY_ORBITAL_MISSILE_LAUNCHER",
+      "imagePath": "images/ships/Anti-Ballistic_Missile.webp",
+      "hullClass": "BIG",
+      "canShootToOrbit": true,
+      "size": 3,
+      "hullPointsCapacity": 170,
+      "criticalThreshold": 18,
+      "shieldCapacity": 0,
+      "armor": 4,
+      "weapons": [
+        { "type": "MISSILE", "dmg": 100, "shots": 1 }
+      ],
+      "cost": { "metal": 200, "crystal": 60, "deuterium": 40 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 4 },
+        { "building": "MISSILE_SILO", "level": 2 }
+      ],
+      "techRequirements": [
+        { "tech": "MISSILES_WEAPONS", "level": 4 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 2 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 2 }
+      ]
+    },
+    {
+      "type": "RAIL_GUN_CANNON",
+      "imagePath": "images/defence/Rail_gun_cannon.webp",
+      "hullClass": "BIG",
+      "canShootToOrbit": true,
+      "size": 3,
+      "hullPointsCapacity": 190,
+      "criticalThreshold": 16,
+      "shieldCapacity": 20,
+      "armor": 5,
+      "weapons": [
+        { "type": "RAIL_GUN", "dmg": 30, "shots": 1 }
+      ],
+      "cost": { "metal": 100, "crystal": 80, "deuterium": 10 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 5 }
+      ],
+      "techRequirements": [
+        { "tech": "RAILGUNS_WEAPONS", "level": 3 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 2 }
+      ]
+    }
+  ]
+}

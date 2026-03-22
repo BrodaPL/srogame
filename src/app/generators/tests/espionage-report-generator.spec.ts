@@ -15,6 +15,8 @@ import { ShipType } from '../../models/enums/ship-type';
 import { ShipPurpose } from '../../models/enums/ship-purpose';
 import { HullClass } from '../../models/enums/hull-class';
 import { ManyShips } from '../../models/fleets/many-ships';
+import { DefenceBuildingInstances } from '../../models/reports/defence-building-instances';
+import { DefenceType } from '../../models/enums/defence-type';
 
 describe('EspionageReportGenerator', () => {
   const createPlayer = (
@@ -35,7 +37,10 @@ describe('EspionageReportGenerator', () => {
       ]),
       new Map<BuildingType, number>(),
       new Map<BuildingType, number>(),
-      [],
+      [
+        new DefenceBuildingInstances(DefenceType.LIGHT_BEAM_CANNON, 3),
+        new DefenceBuildingInstances(DefenceType.SAM_SITE, 2)
+      ],
       ManyShips.fromShipInstances(ships),
       null,
       null,
@@ -106,10 +111,15 @@ describe('EspionageReportGenerator', () => {
     expect(report.averageBuildingLevel).toBeCloseTo((4 + 9 + 2) / 3, 6);
     expect(report.averageTotalResources).toBe(600);
     expect(report.averageTechLevel).toBeCloseTo((4 + 2) / 2, 6);
+    expect(report.totalDefencesAmount).toBe(5);
     expect(report.totalShipsAmount).toBe(2);
     expect(report.buildingsLevels.size).toBe(3);
     expect(report.resourcesAmount.getTotalResourceAmount()).toBe(600);
     expect(report.techLevels.get(TechnologyType.ENERGY_TECHNOLOGY)).toBe(2);
+    expect(report.defences.map((entry) => [entry.type, entry.amount])).toEqual([
+      [DefenceType.LIGHT_BEAM_CANNON, 3],
+      [DefenceType.SAM_SITE, 2]
+    ]);
     expect(report.ships.get(ShipType.FIGHTER)).toBe(2);
   });
 

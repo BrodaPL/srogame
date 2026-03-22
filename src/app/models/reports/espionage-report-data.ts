@@ -86,7 +86,7 @@ export class EspionageReportData extends PlayerReport {
         this.resourcesAmount.deuterium
       ),
       new Map(this.techLevels),
-      [...this.defences],
+      this.defences.map((entry) => entry.copy()),
       new Map(this.ships),
       new ShipyardQueue(),
       new DefencesQueue(),
