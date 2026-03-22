@@ -19,7 +19,7 @@
       </section>
     }
 
-    <section class="overview-card reports-view__tabs">
+    <section class="overview-card reports-view__tabs" data-tutorial-id="reports-tabs">
       <div class="reports-view__tab-list">
         <button
           class="reports-view__tab"
@@ -42,7 +42,7 @@
         }
       </div>
 
-      <div class="reports-view__tabs-footer">
+      <div class="reports-view__tabs-footer" data-tutorial-id="reports-actions">
         <p class="overview-muted">{{ visibleReports().length }} visible report(s) | {{ selectedReportIds.size }} selected</p>
 
         <div class="reports-view__actions">
@@ -61,7 +61,7 @@
     </section>
 
     <section class="reports-view__layout">
-      <section class="overview-card reports-view__list">
+      <section class="overview-card reports-view__list" data-tutorial-id="reports-inbox-list">
         <div class="reports-view__list-head">
           <div>
             <h3>Inbox</h3>
@@ -106,7 +106,7 @@
 
       <section class="overview-card reports-view__detail">
         @if (selectedReport(); as report) {
-          <div class="reports-view__detail-head">
+          <div class="reports-view__detail-head" data-tutorial-id="reports-detail-head">
             <div>
               <p class="eyebrow">Report Detail</p>
               <h3>{{ report.title }}</h3>
@@ -135,7 +135,7 @@
             </div>
           </div>
 
-          <div class="overview-stats reports-view__stats-grid">
+          <div class="overview-stats reports-view__stats-grid" data-tutorial-id="reports-detail-stats">
             <div class="overview-stat">
               <span class="overview-stat__label">Status</span>
               <span class="overview-stat__value">{{ report.isRead ? 'Read' : 'Unread' }}</span>
@@ -154,7 +154,7 @@
             </div>
           </div>
 
-          <section class="reports-view__detail-scroll">
+          <section class="reports-view__detail-scroll" data-tutorial-id="reports-detail-body">
             @if (asEspionageReport(report); as espionageReport) {
               <div class="reports-view__dossier">
                 <section class="reports-view__dossier-banner">

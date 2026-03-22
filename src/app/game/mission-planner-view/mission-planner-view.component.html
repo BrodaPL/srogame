@@ -13,7 +13,10 @@
     </section>
   } @else {
     <div class="mission-planner__layout">
-      <section class="mission-planner__section mission-planner__section--full overview-card">
+      <section
+        class="mission-planner__section mission-planner__section--full overview-card"
+        data-tutorial-id="mission-planner-mission-types"
+      >
         <h3>Mission type</h3>
         <div class="mission-planner__mission-list">
           @for (option of missionOptions; track option.type) {
@@ -32,7 +35,10 @@
 
       <div class="mission-planner__main">
         <section class="mission-planner__section mission-planner__top-grid">
-          <article class="overview-card mission-planner__target-card">
+          <article
+            class="overview-card mission-planner__target-card"
+            data-tutorial-id="mission-planner-target-card"
+          >
             <h3>Target</h3>
             <p class="overview-muted mission-planner__microcopy">Paste coordinates like <code>32:22:7</code> or use the planet rail.</p>
             <div class="mission-planner__coordinate-row">
@@ -59,7 +65,10 @@
             }
           </article>
 
-          <article class="overview-card mission-planner__details-card mission-planner__details-card--tall">
+          <article
+            class="overview-card mission-planner__details-card mission-planner__details-card--tall"
+            data-tutorial-id="mission-planner-details-card"
+          >
             <h3>Mission Details</h3>
             <p class="overview-muted mission-planner__microcopy">Origin must be one of your planets. Planets with ships are preferred.</p>
             <p class="mission-planner__detail-line">
@@ -103,7 +112,10 @@
             </div>
           </article>
 
-          <article class="overview-card mission-planner__summary-card">
+          <article
+            class="overview-card mission-planner__summary-card"
+            data-tutorial-id="mission-planner-travel-summary"
+          >
             <h3>Travel Summary</h3>
             <div class="mission-planner__summary-columns">
               <div class="mission-planner__summary-column">
@@ -147,7 +159,10 @@
           </article>
         </section>
 
-        <section class="mission-planner__section mission-planner__details">
+        <section
+          class="mission-planner__section mission-planner__details"
+          data-tutorial-id="mission-planner-launch-readiness"
+        >
           <article class="overview-card">
             <h3>Launch Summary</h3>
             <p class="overview-muted">
@@ -191,7 +206,10 @@
           </article>
         </section>
 
-        <section class="mission-planner__section overview-card">
+        <section
+          class="mission-planner__section overview-card"
+          data-tutorial-id="mission-planner-fleet-composition"
+        >
           <div class="mission-planner__section-head">
             <div>
               <h3>Fleet Composition</h3>
@@ -282,7 +300,7 @@
       </div>
 
       <aside class="mission-planner__rail">
-        <section class="overview-card">
+        <section class="overview-card" data-tutorial-id="mission-planner-origin-rail">
           <h3>Origin</h3>
           <label class="mission-planner__origin-field">
             <span class="overview-muted mission-planner__microcopy">Coordinates</span>

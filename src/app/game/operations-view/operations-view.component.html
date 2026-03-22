@@ -12,7 +12,7 @@
       <p>{{ loadError }}</p>
     </section>
   } @else {
-    <header class="overview-card operations-view__header">
+    <header class="overview-card operations-view__header" data-tutorial-id="operations-header">
       <div>
         <p class="eyebrow">Fleet Control</p>
         <h1 class="operations-view__title">Operations</h1>
@@ -22,14 +22,16 @@
     </header>
 
     @if (activeFleets.length === 0) {
-      <section class="overview-card">
+      <section class="overview-card" data-tutorial-id="operations-main-state">
         <h3>No active fleets</h3>
         <p class="overview-muted">Launch a mission in Mission Planner to populate this screen.</p>
       </section>
     } @else {
-      <div class="operations-view__grid">
-        @for (fleet of activeFleets; track fleet.fleetId) {
-          <article class="overview-card operations-view__card">
+      <div class="operations-view__grid" data-tutorial-id="operations-main-state">
+        @for (fleet of activeFleets; track fleet.fleetId; let isFirst = $first) {
+          <article
+            class="overview-card operations-view__card"
+            [attr.data-tutorial-id]="isFirst ? 'operations-primary-card' : null">
             <div class="operations-view__card-head">
               <div>
                 <h3>Fleet #{{ fleet.fleetId }}</h3>

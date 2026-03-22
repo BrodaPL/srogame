@@ -6,18 +6,24 @@
   } @else if (loadError) {
     <p class="overview-empty">{{ loadError }}</p>
   } @else if (planet) {
-    <app-resources
-      [viewName]="'Planet View'"
-      [headerIndicators]="planetHeaderIndicators()"
-      [metal]="metalDisplay"
-      [crystal]="crystalDisplay"
-      [deuterium]="deuteriumDisplay"
-      [energy]="energyDisplay"
-      [energyTooltip]="energyTooltip"
-      [powers]="powersDisplay"
-    ></app-resources>
+    <div data-tutorial-id="planet-summary">
+      <app-resources
+        [viewName]="'Planet View'"
+        [headerIndicators]="planetHeaderIndicators()"
+        [metal]="metalDisplay"
+        [crystal]="crystalDisplay"
+        [deuterium]="deuteriumDisplay"
+        [energy]="energyDisplay"
+        [energyTooltip]="energyTooltip"
+        [powers]="powersDisplay"
+      ></app-resources>
+    </div>
 
-    <section class="planet-view__overview" [class.planet-view__overview--highlighted]="isAttentionHighlightActive">
+    <section
+      class="planet-view__overview"
+      [class.planet-view__overview--highlighted]="isAttentionHighlightActive"
+      data-tutorial-id="planet-overview"
+    >
       <div class="planet-view__parameters">
         <h3 class="planet-view__section-title">Planet Parameters</h3>
         <div class="planet-parameters-grid">
@@ -57,7 +63,7 @@
 
       <div class="planet-view__hero">
         <h2 class="planet-view__planet-name">{{ planet.basicInfo.name }}</h2>
-        <div class="planet-view__hero-image-row">
+        <div class="planet-view__hero-image-row" data-tutorial-id="planet-navigation">
           <button
             type="button"
             class="planet-view__switch-button"
@@ -95,7 +101,7 @@
     </section>
 
     <section class="planet-tabs">
-      <div class="planet-tabs__header">
+      <div class="planet-tabs__header" data-tutorial-id="planet-tab-bar">
         <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('resources')" (click)="setTab('resources')">
           Resources
         </button>
@@ -125,8 +131,8 @@
       <div class="planet-tabs__content">
         @if (isActiveTab('resources')) {
           <div class="planet-building-list">
-            @for (building of resourceBuildings; track building.type) {
-              <article class="planet-building-card">
+            @for (building of resourceBuildings; track building.type; let isFirst = $first) {
+              <article class="planet-building-card" [attr.data-tutorial-id]="isFirst ? 'planet-resource-card' : null">
                 <img class="planet-building-card__image" [src]="building.imagePath" [alt]="building.type + ' image'" />
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ building.type }}</h4>
@@ -397,7 +403,7 @@
         }
 
         @if (isActiveTab('queues')) {
-          <div class="planet-queues-grid">
+          <div class="planet-queues-grid" data-tutorial-id="planet-queues-grid">
             <article class="planet-queue-card">
               <h4 class="planet-view__section-title">Queued Buildings</h4>
               @if (hasBuildingQueueEntries()) {

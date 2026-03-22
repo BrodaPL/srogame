@@ -13,7 +13,8 @@ import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 @Component({
   selector: 'app-operations-view',
   imports: [TopMenuComponent, RouterLink],
-  templateUrl: './operations-view.component.html'
+  templateUrl: './operations-view.component.html',
+  styleUrl: './operations-view.styles.css'
 })
 export class OperationsViewComponent implements OnInit {
   protected readonly fleetState = FleetState;
@@ -36,6 +37,10 @@ export class OperationsViewComponent implements OnInit {
   protected totalShips(fleet: Fleet): number {
     // TODO: Distinguish mission-ready vs damaged ships when operations availability gets redesigned.
     return ManyShips.totalShipsCount(fleet.ships);
+  }
+
+  protected primaryFleet(): Fleet | null {
+    return this.activeFleets[0] ?? null;
   }
 
   protected shipSummary(fleet: Fleet): string {
@@ -150,7 +155,9 @@ export class OperationsViewComponent implements OnInit {
       .subscribe({
         next: (activeFleets) => {
           this.activeFleets = [...activeFleets].sort((left, right) => left.fleetId - right.fleetId);
-          this.tutorialService.autoOpenTutorial('operationsView');
+          if (this.activeFleets.length > 0) {
+            this.tutorialService.autoOpenTutorial('operationsView');
+          }
         },
         error: () => {
           this.loadError = 'Unable to load active fleets.';

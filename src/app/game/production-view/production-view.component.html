@@ -13,21 +13,23 @@
     </section>
   } @else if (selectedPlanet(); as planet) {
     <div class="game-dashboard__layout">
-      <app-resources
-        class="game-dashboard__resources"
-        [titlePrefix]="'Production | '"
-        [titleLink]="selectedPlanetTitleLink()"
-        [titleSuffix]="' (' + selectedPlanetCoordinatesLabel() + ')'"
-        [metal]="metalDisplay"
-        [crystal]="crystalDisplay"
-        [deuterium]="deuteriumDisplay"
-        [energy]="energyDisplay"
-        [energyTooltip]="energyTooltip"
-        [powers]="powersDisplay"
-      ></app-resources>
+      <div data-tutorial-id="production-summary-bar">
+        <app-resources
+          class="game-dashboard__resources"
+          [titlePrefix]="'Production | '"
+          [titleLink]="selectedPlanetTitleLink()"
+          [titleSuffix]="' (' + selectedPlanetCoordinatesLabel() + ')'"
+          [metal]="metalDisplay"
+          [crystal]="crystalDisplay"
+          [deuterium]="deuteriumDisplay"
+          [energy]="energyDisplay"
+          [energyTooltip]="energyTooltip"
+          [powers]="powersDisplay"
+        ></app-resources>
+      </div>
 
       <div class="game-dashboard__main">
-        <section class="overview-card game-dashboard__categories-card">
+        <section class="overview-card game-dashboard__categories-card" data-tutorial-id="production-mode-toggle">
           <div class="game-dashboard__toggle-row">
             @for (mode of modeOptions; track mode.value) {
               <button
@@ -42,8 +44,8 @@
           </div>
         </section>
 
-        <section class="production-view__queue-grid">
-          <section class="overview-card">
+        <section class="production-view__queue-grid" data-tutorial-id="production-queue-grid">
+          <section class="overview-card" data-tutorial-id="production-shipyard-queue">
             <div class="game-dashboard__section-head">
               <div>
                 <h3>Current Shipyard Queue</h3>
@@ -103,7 +105,7 @@
           </section>
         </section>
 
-        <section class="overview-card">
+        <section class="overview-card" data-tutorial-id="production-list">
           <div class="game-dashboard__section-head">
             <div>
               <h3>{{ selectedMode === 'shipyard' ? 'Shipyard' : 'Defences' }}</h3>
@@ -117,8 +119,8 @@
 
           @if (selectedMode === 'shipyard') {
             <div class="production-view__ship-list">
-              @for (ship of shipBlueprints; track ship.type) {
-                <article class="production-view__ship-row">
+              @for (ship of shipBlueprints; track ship.type; let isFirst = $first) {
+                <article class="production-view__ship-row" [attr.data-tutorial-id]="isFirst ? 'production-primary-row' : null">
                   <img class="production-view__ship-image" [src]="ship.imagePath" [alt]="ship.type + ' image'" />
 
                   <div class="production-view__ship-main">
@@ -208,7 +210,7 @@
         </section>
       </div>
 
-      <aside class="overview-card game-dashboard__rail">
+      <aside class="overview-card game-dashboard__rail" data-tutorial-id="production-planet-rail">
         <div class="game-dashboard__section-head">
           <div>
             <h3>Owned Planets</h3>

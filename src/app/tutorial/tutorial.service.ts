@@ -57,6 +57,8 @@ type TutorialOverlayState = {
   characterImageIndex: number;
 };
 
+type TutorialStepPreparer = (step: TutorialStep, stepIndex: number) => void;
+
 @Injectable({
   providedIn: 'root'
 })
@@ -85,6 +87,7 @@ export class TutorialService {
   ]);
 
   private readonly document = inject(DOCUMENT);
+  private readonly stepPreparers = new Map<TutorialViewKey, TutorialStepPreparer>();
   private readonly stateSignal = signal<TutorialOverlayState>({
     entry: null,
     stepIndex: 0,
@@ -346,6 +349,19 @@ export class TutorialService {
     return null;
   }
 
+  public registerStepPreparer(
+    viewKey: TutorialViewKey,
+    preparer: TutorialStepPreparer
+  ): () => void {
+    this.stepPreparers.set(viewKey, preparer);
+
+    return () => {
+      if (this.stepPreparers.get(viewKey) === preparer) {
+        this.stepPreparers.delete(viewKey);
+      }
+    };
+  }
+
   private beginCurrentStepSequence(): void {
     this.clearStepTimers();
 
@@ -358,6 +374,8 @@ export class TutorialService {
     if (!step) {
       return;
     }
+
+    this.stepPreparers.get(current.entry.key)?.(step, current.stepIndex);
 
     const element = this.findTargetElement(step.targetId);
     if (element) {

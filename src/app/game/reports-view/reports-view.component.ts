@@ -124,10 +124,17 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected openReport(report: PlayerReport): void {
+    this.selectReport(report);
+    this.markReportAsRead(report);
+  }
+
+  private selectReport(report: PlayerReport): void {
     this.selectedReportId = report.reportId;
     this.actionError = null;
     this.resetPreview();
+  }
 
+  private markReportAsRead(report: PlayerReport): void {
     if (report.isRead) {
       return;
     }
@@ -395,7 +402,7 @@ export class ReportsViewComponent implements OnInit {
         next: (reports) => {
           this.reports = reports.map((report) => fromPlayerReportDto(report));
           this.selectedReportIds.clear();
-          this.selectedReportId = null;
+          this.selectedReportId = this.visibleReports()[0]?.reportId ?? null;
           this.resetPreview();
           this.tutorialService.autoOpenTutorial('reportsView');
         },

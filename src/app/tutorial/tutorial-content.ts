@@ -20,48 +20,88 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Mission Planner View Tutorial',
     steps: [
       {
-        heading: 'Welcome to Mission Planner View',
+        heading: 'Mission Type Comes First',
         bodyHtml: `
           <p>This screen is your launch deck for fleet missions.</p>
-          <p>Here you choose a mission type, assemble ships, define origin and target, and validate whether the operation can actually begin.</p>
+          <p>Start by choosing the mission type. The planner will then adapt ship relevance, cargo rules, fuel preview, and validation around that choice.</p>
         `,
-        characterImages: [pilotImageA],
+        characterImages: [pilotImageA, pilotImageB],
         characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: false
+        targetId: 'mission-planner-mission-types',
+        targetPadding: 12
       },
       {
-        heading: 'Mission Type, Origin, and Target',
+        heading: 'Resolve The Target',
         bodyHtml: `
-          <p>Start by selecting the mission type, then choose an origin planet from the rail and resolve the target coordinates or target planet.</p>
-          <p>The planner adapts its requirements and warnings depending on whether you are moving, transporting, spying, or colonizing.</p>
+          <p>The target card is where you resolve the destination. You can paste coordinates manually or reuse planets already visible in the planner.</p>
+          <p>When a target is known, the preview card gives you immediate context before you commit ships.</p>
         `,
-        characterImages: [pilotImageB],
-        characterSide: 'left',
+        characterImages: [pilotImageA, pilotImageB],
+        characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: true
+        targetId: 'mission-planner-target-card',
+        targetPadding: 12
       },
       {
-        heading: 'Fleet Composition and Cargo',
+        heading: 'Origin Rail',
         bodyHtml: `
-          <p>The fleet panel lets you pick ship amounts and filter them by purpose, while the summary panels track cargo, hangar capacity, distance, ETA, and fuel.</p>
-          <p>This gives you a compact operational preview before you commit the mission.</p>
+          <p>The origin rail on the right chooses which of your planets launches the fleet.</p>
+          <p>On first open the planner prefers a planet that already has ships, so you can start assembling a mission immediately.</p>
         `,
-        characterImages: [pilotImageA],
+        characterImages: [pilotImageA, pilotImageB],
         characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: false
+        targetId: 'mission-planner-origin-rail',
+        targetPadding: 12
       },
       {
-        heading: 'Warnings and Launch Readiness',
+        heading: 'Mission Details And Cargo',
         bodyHtml: `
-          <p>The warning list is your final mission checklist. It blocks invalid launches and still shows softer notes for things that are possible but not ideal.</p>
-          <p>Use Mission Planner whenever you want to confirm that ships, cargo, fuel, and mission rules all line up correctly.</p>
+          <p>This card reflects the currently selected origin and shows repair capability plus cargo inputs for non-spy missions.</p>
+          <p>It is the main place where you tune what the fleet is carrying before launch.</p>
         `,
-        characterImages: [pilotImageB],
-        characterSide: 'left',
+        characterImages: [pilotImageA, pilotImageB],
+        characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: true
+        targetId: 'mission-planner-details-card',
+        targetPadding: 12
+      },
+      {
+        heading: 'Travel Summary',
+        bodyHtml: `
+          <p>The travel summary turns your current setup into numbers: distance, ETA, return time, fuel reserve, cargo usage, and hangar usage.</p>
+          <p>Use it to sanity-check the trip before you spend ships and fuel on a bad route.</p>
+        `,
+        characterImages: [pilotImageA, pilotImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'mission-planner-travel-summary',
+        targetPadding: 12
+      },
+      {
+        heading: 'Fleet Composition',
+        bodyHtml: `
+          <p>This section is where you assemble the actual task force.</p>
+          <p>Mission relevance, purpose filters, ready versus damaged ship counts, cargo, and hangar capacity all come together here.</p>
+        `,
+        characterImages: [pilotImageA, pilotImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'mission-planner-fleet-composition',
+        targetPadding: 12
+      },
+      {
+        heading: 'Warnings And Launch Readiness',
+        bodyHtml: `
+          <p>The launch summary and warning list are your final checklist.</p>
+          <p>Errors block launch, softer notes still point out weaker choices, and the launch button only becomes useful when the whole mission setup is coherent.</p>
+        `,
+        characterImages: [pilotImageA, pilotImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'mission-planner-launch-readiness',
+        targetPadding: 12
       }
     ]
   },
@@ -70,48 +110,40 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Operations View Tutorial',
     steps: [
       {
-        heading: 'Welcome to Operations View',
+        heading: 'Operations Header',
         bodyHtml: `
-          <p>This screen lists your active outbound fleets in one place.</p>
-          <p>Use it to track what missions are already in flight without returning to every origin planet.</p>
+          <p>This screen is your fleet activity board.</p>
+          <p>Use it to monitor launched missions in one place, and jump back to <strong>Mission Planner</strong> when you need to send another fleet.</p>
         `,
-        characterImages: [spaceOfficerImageA],
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
         characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: false
+        targetId: 'operations-header',
+        targetPadding: 12
       },
       {
-        heading: 'Reading Fleet Rows',
+        heading: 'Operations List',
         bodyHtml: `
-          <p>Each operation shows mission type, origin, target, cargo, ETA, and the current ship composition.</p>
-          <p>This gives you a quick operational picture of what is moving across space right now.</p>
+          <p>This area is where your active fleets appear after launch.</p>
+          <p>If it is empty, the screen tells you clearly that nothing is currently in flight. Once fleets exist, each mission is shown here as its own operation card.</p>
         `,
-        characterImages: [spaceOfficerImageB],
-        characterSide: 'left',
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
+        characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: true
+        targetId: 'operations-main-state',
+        targetPadding: 12
       },
       {
-        heading: 'Mission Awareness',
+        heading: 'Reading An Operation Card',
         bodyHtml: `
-          <p>Operations View is especially useful after sending several fleets from Mission Planner.</p>
-          <p>Instead of checking each planet manually, you can verify where your transports, spies, and colonizers are headed.</p>
+          <p>A single operation card gives you the mission type, current state, current position, destination, ETA, fuel, cargo load, ship summary, and repair capability.</p>
+          <p>This is the fast way to confirm where a fleet is, what it is carrying, and how much of your mobile force is still tied up in space.</p>
         `,
-        characterImages: [spaceOfficerImageA],
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
         characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: false
-      },
-      {
-        heading: 'Using Operations Strategically',
-        bodyHtml: `
-          <p>Think of this screen as your command ledger for active missions.</p>
-          <p>It helps you avoid sending duplicate fleets, confirm expected arrivals, and understand how much of your mobile force is already committed.</p>
-        `,
-        characterImages: [spaceOfficerImageB],
-        characterSide: 'left',
-        bubblePosition: 'bottom',
-        mirrorCharacter: true
+        targetId: 'operations-primary-card',
+        targetPadding: 12
       }
     ]
   },
@@ -120,48 +152,76 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Buildings View Tutorial',
     steps: [
       {
-        heading: 'Welcome to Buildings View',
+        heading: 'Selected Planet Summary',
         bodyHtml: `
-          <p>This screen is your compact construction center for planetary infrastructure.</p>
-          <p>It gathers building management into one place, so you can develop colonies faster than switching through individual Planet Views.</p>
+          <p>This top summary keeps the active construction planet visible while you work.</p>
+          <p>It combines the selected colony name, coordinates, resources, energy, and production powers so you can judge build readiness at a glance.</p>
         `,
-        characterImages: [builderImageA],
+        characterImages: [builderImageA, builderImageB],
         characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: false
+        targetId: 'buildings-summary-bar',
+        targetPadding: 12
       },
       {
-        heading: 'Choosing Planets and Categories',
+        heading: 'Building Categories',
         bodyHtml: `
-          <p>The rail on the right lets you switch the active planet, while the category buttons change between <strong>Resources infrastructure</strong> and <strong>Facilities</strong>.</p>
-          <p>This helps you compare colonies and focus on the exact type of development you want to manage.</p>
+          <p>The category toggle switches between <strong>Resources infrastructure</strong> and <strong>Facilities</strong>.</p>
+          <p>That lets you stay on the same planet while narrowing the list to the kind of development you want to queue next.</p>
         `,
-        characterImages: [builderImageB],
-        characterSide: 'left',
+        characterImages: [builderImageA, builderImageB],
+        characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: true
+        targetId: 'buildings-mode-toggle',
+        targetPadding: 12
       },
       {
-        heading: 'Queues and Planet Status',
+        heading: 'Current Building Queue',
         bodyHtml: `
-          <p>The top summary bar reflects the selected planet, including resources, income, energy, and production power.</p>
-          <p>Below it, the building queue card shows what is already scheduled, or warns you when a planet has nothing under construction.</p>
+          <p>This queue card shows what the active planet is already building, how far the head order has progressed, and the estimated turns remaining.</p>
+          <p>If nothing is queued, the empty state tells you immediately that the planet is idle.</p>
         `,
-        characterImages: [builderImageA],
+        characterImages: [builderImageA, builderImageB],
         characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: false
+        targetId: 'buildings-queue-card',
+        targetPadding: 12
       },
       {
-        heading: 'Compact Build Rows',
+        heading: 'Construction List',
         bodyHtml: `
-          <p>Each building row shows current level, next-level costs, unmet requirements, and the action to queue construction.</p>
-          <p>Use Buildings View when you want fast empire-wide infrastructure planning without the heavier Planet View layout.</p>
+          <p>This section is the compact building catalog for the active planet.</p>
+          <p>It is designed for faster empire management than full Planet View, while still keeping costs, requirements, and queue actions close together.</p>
         `,
-        characterImages: [builderImageB],
-        characterSide: 'left',
+        characterImages: [builderImageA, builderImageB],
+        characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: true
+        targetId: 'buildings-list',
+        targetPadding: 12
+      },
+      {
+        heading: 'A Single Building Row',
+        bodyHtml: `
+          <p>Each row shows the current level, next-level cost chips, unmet requirements, and the build action.</p>
+          <p>This is the exact decision point for queueing the next upgrade on the selected colony.</p>
+        `,
+        characterImages: [builderImageA, builderImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'buildings-primary-row',
+        targetPadding: 12
+      },
+      {
+        heading: 'Owned Planets Rail',
+        bodyHtml: `
+          <p>The rail on the right changes the active construction planet.</p>
+          <p>Use it to compare colonies quickly and queue infrastructure without bouncing back and forth through separate planet pages.</p>
+        `,
+        characterImages: [builderImageA, builderImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'buildings-planet-rail',
+        targetPadding: 12
       }
     ]
   },
@@ -170,48 +230,88 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Production View Tutorial',
     steps: [
       {
-        heading: 'Welcome to Production View',
+        heading: 'Selected Planet Summary',
         bodyHtml: `
-          <p>This screen is your centralized ship-production hub.</p>
-          <p>It lets you manage shipyard queues across owned planets without returning to each individual Planet View.</p>
+          <p>This top summary keeps the active production planet visible while you work.</p>
+          <p>It combines the selected colony name, coordinates, resources, energy, and production powers so you can judge whether the planet is ready for more ship orders.</p>
         `,
-        characterImages: [engineerImageA],
+        characterImages: [engineerImageA, engineerImageB],
         characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: false
+        targetId: 'production-summary-bar',
+        targetPadding: 12
       },
       {
-        heading: 'Selecting Planets and Categories',
+        heading: 'Production Categories',
         bodyHtml: `
-          <p>The planet rail on the right switches the active production planet, while the top category buttons swap between <strong>Shipyard</strong> and future <strong>Defences</strong>.</p>
-          <p>This makes it easy to review several colonies quickly and compare their current production state.</p>
+          <p>The category toggle switches between <strong>Shipyard</strong> and the future <strong>Defences</strong> mode.</p>
+          <p>Right now the important path is Shipyard, which keeps ship production focused and compact on the selected planet.</p>
         `,
-        characterImages: [engineerImageB],
-        characterSide: 'left',
+        characterImages: [engineerImageA, engineerImageB],
+        characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: true
+        targetId: 'production-mode-toggle',
+        targetPadding: 12
       },
       {
-        heading: 'Queue and Resource Awareness',
+        heading: 'Production Queues',
         bodyHtml: `
-          <p>The top resource bar reflects the selected planet, including income, energy, and power values that affect production planning.</p>
-          <p>Below it, the queue panels show current shipyard progress and leave space for future defence production.</p>
+          <p>This queue area shows what the active planet is already producing.</p>
+          <p>The shipyard table tracks queue order, completed amount, current progress, and ETA, while the defence side is reserved for later implementation.</p>
         `,
-        characterImages: [engineerImageA],
+        characterImages: [engineerImageA, engineerImageB],
         characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: false
+        targetId: 'production-queue-grid',
+        targetPadding: 12
       },
       {
-        heading: 'Ordering Ships Efficiently',
+        heading: 'Shipyard Queue Card',
         bodyHtml: `
-          <p>Each ship row shows amount input, single and total costs, unmet requirements, and the action to add another order to the queue.</p>
-          <p>Use Production View when you want a compact overview of what each colony can build right now.</p>
+          <p>This card is the live shipyard queue for the selected planet.</p>
+          <p>Use it to see whether production is already active, how full the queue is, and how long the current order still needs.</p>
         `,
-        characterImages: [engineerImageB],
-        characterSide: 'left',
+        characterImages: [engineerImageA, engineerImageB],
+        characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: true
+        targetId: 'production-shipyard-queue',
+        targetPadding: 12
+      },
+      {
+        heading: 'Production List',
+        bodyHtml: `
+          <p>This section is the compact production catalog for the active planet.</p>
+          <p>It is meant for quickly evaluating what the colony can build now without opening the heavier Planet View shipyard tab.</p>
+        `,
+        characterImages: [engineerImageA, engineerImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'production-list',
+        targetPadding: 12
+      },
+      {
+        heading: 'A Single Ship Row',
+        bodyHtml: `
+          <p>Each ship row combines amount input, single and total costs, unmet requirements, and the build action.</p>
+          <p>This is the exact decision point for adding another ship order to the selected planet's queue.</p>
+        `,
+        characterImages: [engineerImageA, engineerImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'production-primary-row',
+        targetPadding: 12
+      },
+      {
+        heading: 'Owned Planets Rail',
+        bodyHtml: `
+          <p>The rail on the right changes the active production planet.</p>
+          <p>Use it to compare colonies quickly and queue ships across your empire without jumping in and out of separate planet screens.</p>
+        `,
+        characterImages: [engineerImageA, engineerImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'production-planet-rail',
+        targetPadding: 12
       }
     ]
   },
@@ -220,48 +320,76 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Reports View Tutorial',
     steps: [
       {
-        heading: 'Welcome to Reports View',
+        heading: 'Report Filters',
         bodyHtml: `
-          <p>This screen is your inbox for intelligence, battle results, system messages, and other important updates.</p>
-          <p>Use it to track what happened across your empire without checking every planet manually.</p>
+          <p>This top bar is the inbox filter panel for your empire.</p>
+          <p>Use the tabs to narrow the list by report type or switch back to <strong>All</strong> when you want the full timeline in one place.</p>
         `,
-        characterImages: [secretaryImageA],
+        characterImages: [secretaryImageA, secretaryImageB],
         characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: false
+        targetId: 'reports-tabs',
+        targetPadding: 12
       },
       {
-        heading: 'Filtering and Reading Reports',
+        heading: 'Selection And Cleanup',
         bodyHtml: `
-          <p>You can filter reports by type or show them all together.</p>
-          <p>Opening a report marks it as read, and the detail pane on the right shows the full message or structured dossier data.</p>
+          <p>The footer under the tabs keeps track of how many reports are visible and how many are selected.</p>
+          <p>Use <strong>Select all visible</strong> and <strong>Delete selected</strong> to clean the inbox without opening each entry one by one.</p>
         `,
-        characterImages: [secretaryImageB],
-        characterSide: 'left',
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: true
+        targetId: 'reports-actions',
+        targetPadding: 12
       },
       {
-        heading: 'Previewing Locations',
+        heading: 'Inbox List',
         bodyHtml: `
-          <p>Some reports include source coordinates. In those cases you can preview the related planet directly from the report.</p>
-          <p>This helps you jump from intelligence to action without leaving the inbox flow.</p>
+          <p>The left column is the actual inbox. Unread reports stand out more strongly, and clicking one opens it in the detail pane.</p>
+          <p>Checkboxes are only for bulk actions, while opening a report is what marks unread entries as read.</p>
         `,
-        characterImages: [secretaryImageA],
+        characterImages: [secretaryImageA, secretaryImageB],
         characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: false
+        targetId: 'reports-inbox-list',
+        targetPadding: 12
       },
       {
-        heading: 'Inbox Management',
+        heading: 'Selected Report Header',
         bodyHtml: `
-          <p>You can select visible reports, delete them, and keep your inbox organized.</p>
-          <p>Reports View is especially useful for espionage summaries, because the right-side dossier layout groups known resources, buildings, ships, and other discovered data.</p>
+          <p>The top of the detail pane shows the selected report title, type, and turn.</p>
+          <p>If the report has usable coordinates, the same header area also lets you preview the related location without leaving the inbox flow.</p>
         `,
-        characterImages: [secretaryImageB],
-        characterSide: 'left',
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: true
+        targetId: 'reports-detail-head',
+        targetPadding: 12
+      },
+      {
+        heading: 'Quick Detail Stats',
+        bodyHtml: `
+          <p>This stat row summarizes the currently selected report: read state, source, coordinates, and sender.</p>
+          <p>It gives you the basic context before you dive into the full message body or dossier.</p>
+        `,
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'reports-detail-stats',
+        targetPadding: 12
+      },
+      {
+        heading: 'Full Report Body',
+        bodyHtml: `
+          <p>This scroll area holds the full content of the selected report.</p>
+          <p>Plain reports show their text directly, while espionage reports expand into a structured dossier with resources, buildings, ships, defences, and planetary parameters.</p>
+        `,
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'reports-detail-body',
+        targetPadding: 12
       }
     ]
   },
@@ -270,48 +398,88 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Imperium View Tutorial',
     steps: [
       {
-        heading: 'Welcome to Imperium View',
+        heading: 'Empire Summary Bar',
         bodyHtml: `
-          <p>This is your empire-wide strategic dashboard.</p>
-          <p>Instead of focusing on one planet, Imperium summarizes resources, queues, production power, and warnings across everything you own.</p>
+          <p>This top summary turns all owned planets into one combined empire snapshot.</p>
+          <p>It keeps total resources, income, energy, and production powers visible so you can judge your whole economy without opening planets one by one.</p>
         `,
         characterImages: [commanderImageA],
         characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: false
+        targetId: 'imperium-summary-bar',
+        targetPadding: 12
       },
       {
-        heading: 'Empire Summary',
+        heading: 'Empire Totals',
         bodyHtml: `
-          <p>The top summary bar combines your stored resources, global income, energy state, and total production powers.</p>
-          <p>Use it to understand the overall condition of your empire without opening each planet separately.</p>
+          <p>This block gives the most compact empire totals: number of planets, total ships, and how many building, shipyard, and research queues are currently active.</p>
+          <p>Use it to answer quickly whether your empire is growing or sitting idle.</p>
         `,
         characterImages: [commanderImageA],
-        characterSide: 'left',
+        characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: true
+        targetId: 'imperium-empire-totals',
+        targetPadding: 12
       },
       {
-        heading: 'Needs Attention and Owned Planets',
+        heading: 'Needs Attention',
         bodyHtml: `
-          <p>The attention panel groups planets with important problems like energy shortage, empty queues, or reduced production power.</p>
-          <p>The owned-planets section lets you compare queue state and warning state across your whole empire in one place.</p>
+          <p>The attention panel groups planets by problem type, such as energy shortage, empty queues, or reduced production power.</p>
+          <p>Each entry acts like a prioritized to-do list, and the planet links let you jump straight to the affected colony.</p>
         `,
         characterImages: [commanderImageA],
         characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: false
+        targetId: 'imperium-attention-panel',
+        targetPadding: 12
       },
       {
-        heading: 'Fleet and Building Statistics',
+        heading: 'Owned Planets Overview',
         bodyHtml: `
-          <p>Imperium also aggregates ship counts by type and shows average, minimum, and maximum building levels.</p>
-          <p>Use these statistics to find weak infrastructure, track military growth, and decide where to invest next.</p>
+          <p>This section is the heart of Imperium. It lets you sort and filter all colonies, then compare them as compact management cards.</p>
+          <p>It is the fastest way to scan queue state, production output, power values, and local warning state across your empire.</p>
         `,
         characterImages: [commanderImageA],
-        characterSide: 'left',
+        characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: true
+        targetId: 'imperium-owned-planets',
+        targetPadding: 12
+      },
+      {
+        heading: 'A Single Planet Card',
+        bodyHtml: `
+          <p>Each planet card condenses one colony into practical numbers: resource income, energy, power, repair capability, local warnings, and queue summaries.</p>
+          <p>This is where you compare colonies quickly and decide which one needs your next action.</p>
+        `,
+        characterImages: [commanderImageA],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'imperium-primary-planet-card',
+        targetPadding: 12
+      },
+      {
+        heading: 'Fleet Totals',
+        bodyHtml: `
+          <p>This block aggregates owned ships by type across all planets.</p>
+          <p>Use it to estimate military scale, transport capacity, and whether your empire can support another wave of missions or combat.</p>
+        `,
+        characterImages: [commanderImageA],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'imperium-fleet-totals',
+        targetPadding: 12
+      },
+      {
+        heading: 'Building Statistics',
+        bodyHtml: `
+          <p>The building table summarizes average, minimum, and maximum levels for every building type across your empire.</p>
+          <p>It helps you spot weak infrastructure, uneven development, and the next obvious upgrade targets at a strategic level.</p>
+        `,
+        characterImages: [commanderImageA],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'imperium-building-stats',
+        targetPadding: 12
       }
     ]
   },
@@ -320,48 +488,52 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Research View Tutorial',
     steps: [
       {
-        heading: 'Welcome to Research View',
+        heading: 'Research Labs Overview',
         bodyHtml: `
-          <p>This screen controls your empire-wide technology progress.</p>
-          <p>Here you assign Research Labs, start new technologies, and monitor how much research power your planets can contribute.</p>
+          <p>This panel shows every owned planet that currently has a Research Lab.</p>
+          <p>It tells you which labs are free, which are already researching or helping, and how much research power each one can contribute.</p>
         `,
-        characterImages: [scientistImageA],
+        characterImages: [scientistImageA, scientistImageB],
         characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: false
+        targetId: 'researches-labs-panel',
+        targetPadding: 12
       },
       {
-        heading: 'Assigning Labs',
+        heading: 'Queued Technologies',
         bodyHtml: `
-          <p>Each technology needs one main lab to start research.</p>
-          <p>If you have more advanced research support, helper labs from other planets can also assist the same technology.</p>
+          <p>This queue section summarizes active research across the empire.</p>
+          <p>It shows the researching planet, target level, helper-lab count, invested power, and estimated turns remaining.</p>
         `,
-        characterImages: [scientistImageB],
-        characterSide: 'left',
+        characterImages: [scientistImageA, scientistImageB],
+        characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: true
+        targetId: 'researches-queue-card',
+        targetPadding: 12
       },
       {
-        heading: 'Requirements and Costs',
+        heading: 'Technology Catalog',
         bodyHtml: `
-          <p>Every technology row shows the next-level cost, energy requirement, and unmet building or technology requirements.</p>
-          <p>Use this view to decide which research is affordable and which prerequisites must be prepared first.</p>
+          <p>This list is the empire-wide research catalog.</p>
+          <p>Each technology card lets you review the next level and prepare a valid lab assignment before you try to start research.</p>
         `,
-        characterImages: [scientistImageA],
+        characterImages: [scientistImageA, scientistImageB],
         characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: false
+        targetId: 'researches-tech-list',
+        targetPadding: 12
       },
       {
-        heading: 'Research Queue Overview',
+        heading: 'A Single Technology Card',
         bodyHtml: `
-          <p>The queue section summarizes active research, helper-lab participation, invested power, and estimated completion time.</p>
-          <p>Research View is the best place to coordinate multiple labs and keep technology development efficient.</p>
+          <p>A technology card combines current level, energy requirement, research time, lab assignment, requirements, cost, and the start action.</p>
+          <p>This is the full decision point for choosing the next technology and proving that your empire can actually research it now.</p>
         `,
-        characterImages: [scientistImageB],
-        characterSide: 'left',
+        characterImages: [scientistImageA, scientistImageB],
+        characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: true
+        targetId: 'researches-primary-tech-card',
+        targetPadding: 12
       }
     ]
   },
@@ -448,48 +620,76 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
     title: 'Planet View Tutorial',
     steps: [
       {
-        heading: 'Welcome to Planet View',
+        heading: 'Planet Summary At The Top',
         bodyHtml: `
-          <p>This screen is the main control room for one planet.</p>
-          <p>You can monitor resources, energy, queues, buildings, ships, and the local situation without leaving this page.</p>
+          <p>This screen is the main control room for a single colony.</p>
+          <p>The top summary keeps your current resources, income, energy balance, and planet power values visible while you manage the rest of the page.</p>
         `,
-        characterImages: [secretaryImageA],
+        characterImages: [secretaryImageA, secretaryImageB],
         characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: false
+        targetId: 'planet-summary',
+        targetPadding: 12
       },
       {
-        heading: 'Top Summary and Warnings',
+        heading: 'Overview, Parameters, And Warnings',
         bodyHtml: `
-          <p>The top bar shows your planet resources, income, energy, and production powers.</p>
-          <p>The <strong>Needs Attention</strong> box warns about issues like <strong>Energy insufficient</strong>, <strong>Energy reduction</strong>, empty queues, and inactive research.</p>
+          <p>This overview block combines the planet portrait with practical status panels.</p>
+          <p><strong>Planet Parameters</strong> show local production modifiers, while <strong>Needs Attention</strong> warns about issues like bad energy balance, empty queues, or idle research capacity.</p>
         `,
-        characterImages: [secretaryImageB],
-        characterSide: 'left',
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
         bubblePosition: 'top',
-        mirrorCharacter: true
+        targetId: 'planet-overview',
+        targetPadding: 12
       },
       {
         heading: 'Planet Navigation',
         bodyHtml: `
-          <p>The buttons near the planet image move to the previous or next owned planet.</p>
-          <p>The dots in the top resource bar show where this planet sits in your ordered planet list. Their color reflects warning severity.</p>
+          <p>The arrow buttons beside the planet image move through your owned planets without leaving Planet View.</p>
+          <p>Use them when you want to review several colonies quickly while keeping the same management layout.</p>
         `,
-        characterImages: [secretaryImageA],
+        characterImages: [secretaryImageA, secretaryImageB],
         characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: false
+        targetId: 'planet-navigation',
+        targetPadding: 12
       },
       {
-        heading: 'Tabs and Production Control',
+        heading: 'Management Tabs',
         bodyHtml: `
-          <p>Use the tabs to switch between resource buildings, facilities, ships, defences, operations, and queues.</p>
-          <p>On this screen you can also change building power usage, queue construction, and review progress for active production.</p>
+          <p>The tab bar splits the planet into focused work areas: economy, facilities, ships, and queues.</p>
+          <p>You do not need separate screens for most local management. Switch tabs here when you want to stay on the same planet and go deeper.</p>
         `,
-        characterImages: [secretaryImageB],
-        characterSide: 'left',
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
         bubblePosition: 'bottom',
-        mirrorCharacter: true
+        targetId: 'planet-tab-bar',
+        targetPadding: 10
+      },
+      {
+        heading: 'Resource Building Cards',
+        bodyHtml: `
+          <p>Each building card shows level, output, power usage, next costs, and requirement checks in one place.</p>
+          <p>This is where you inspect the local economy and queue the next upgrade when the planet is ready.</p>
+        `,
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'planet-resource-card',
+        targetPadding: 12
+      },
+      {
+        heading: 'Queues For This Planet',
+        bodyHtml: `
+          <p>The queues tab gathers current construction, shipyard work, and research activity for this colony.</p>
+          <p>Use it to see what is already in progress, what is waiting next, and where the planet may need your attention.</p>
+        `,
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
+        bubblePosition: 'top',
+        targetId: 'planet-queues-grid',
+        targetPadding: 12
       }
     ]
   }

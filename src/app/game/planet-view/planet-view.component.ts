@@ -147,6 +147,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private queueTabRefreshTimer: ReturnType<typeof setInterval> | null = null;
   private queueTabRefreshInFlight = false;
   private attentionHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+  private unregisterTutorialStepPreparer: (() => void) | null = null;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -168,6 +169,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     const technologies = TechnologyBlueprintsFactory.fromDefaultJson();
     this.technologiesByType = new Map(technologies.techByType);
+    this.unregisterTutorialStepPreparer = this.tutorialService.registerStepPreparer(
+      'planetView',
+      (step) => this.prepareTutorialStep(step.targetId)
+    );
   }
 
   public ngOnInit(): void {
@@ -196,6 +201,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.stopQueueTabAutoRefresh();
     this.clearLoadingSafetyTimeout();
     this.clearAttentionHighlightTimeout();
+    this.unregisterTutorialStepPreparer?.();
+    this.unregisterTutorialStepPreparer = null;
   }
 
   protected setTab(tab: PlanetTab): void {
@@ -1224,6 +1231,31 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     this.initializeBuildingCurrentPowerConsumption();
     this.updateResourceDisplays();
+  }
+
+  private prepareTutorialStep(targetId: string | undefined): void {
+    const targetTab = this.tabForTutorialTarget(targetId);
+    if (!targetTab || this.activeTab === targetTab) {
+      return;
+    }
+
+    this.setTab(targetTab);
+    this.cdr.detectChanges();
+  }
+
+  private tabForTutorialTarget(targetId: string | undefined): PlanetTab | null {
+    switch (targetId) {
+      case 'planet-queues-grid':
+        return 'queues';
+      case 'planet-summary':
+      case 'planet-overview':
+      case 'planet-navigation':
+      case 'planet-tab-bar':
+      case 'planet-resource-card':
+        return 'resources';
+      default:
+        return null;
+    }
   }
 
   private updateResourceDisplays(): void {

@@ -6,7 +6,7 @@
   } @else if (loadError) {
     <p class="overview-empty">{{ loadError }}</p>
   } @else {
-    <section class="researches-view__labs">
+    <section class="researches-view__labs" data-tutorial-id="researches-labs-panel">
       <h3 class="planet-view__section-title">Research Labs</h3>
       <p class="researches-view__labs-meta">
         Free labs: {{ freeResearchLabs.length }} / {{ allOwnedPlanetsWithResearchLab.length }}
@@ -28,52 +28,54 @@
     </section>
 
     <section class="researches-view__body">
-      <h3 class="planet-view__section-title">Queued Technologies</h3>
-      @if (hasResearchQueueEntries()) {
-        <article class="planet-queue-card">
-          <div class="planet-queue-table-wrap">
-            <table class="planet-queue-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Planet</th>
-                  <th>Technology</th>
-                  <th>Level</th>
-                  <th>Helpers</th>
-                  <th>Status</th>
-                  <th>Invested / base</th>
-                  <th>ETA (turns)</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (queuedResearch of researchQueueRows(); track queuedResearch.position) {
+      <div data-tutorial-id="researches-queue-card">
+        <h3 class="planet-view__section-title">Queued Technologies</h3>
+        @if (hasResearchQueueEntries()) {
+          <article class="planet-queue-card">
+            <div class="planet-queue-table-wrap">
+              <table class="planet-queue-table">
+                <thead>
                   <tr>
-                    <td>{{ queuedResearch.position }}</td>
-                    <td>{{ queuedResearch.planetLabel }}</td>
-                    <td>{{ queuedResearch.technologyType }}</td>
-                    <td>L{{ queuedResearch.fromLevel }} -> L{{ queuedResearch.toLevel }}</td>
-                    <td>{{ queuedResearch.helperLabsCount }}</td>
-                    <td>{{ queuedResearch.status }}</td>
-                    <td>{{ queuedResearch.investedResearchPower }} / {{ queuedResearch.baseTotalResearchTime }}</td>
-                    <td>{{ queuedResearch.estimatedTurnsForCompletion ?? '--' }}</td>
+                    <th>#</th>
+                    <th>Planet</th>
+                    <th>Technology</th>
+                    <th>Level</th>
+                    <th>Helpers</th>
+                    <th>Status</th>
+                    <th>Invested / base</th>
+                    <th>ETA (turns)</th>
                   </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </article>
-      } @else {
-        <p class="overview-empty">No technologies queued.</p>
-      }
+                </thead>
+                <tbody>
+                  @for (queuedResearch of researchQueueRows(); track queuedResearch.position) {
+                    <tr>
+                      <td>{{ queuedResearch.position }}</td>
+                      <td>{{ queuedResearch.planetLabel }}</td>
+                      <td>{{ queuedResearch.technologyType }}</td>
+                      <td>L{{ queuedResearch.fromLevel }} -> L{{ queuedResearch.toLevel }}</td>
+                      <td>{{ queuedResearch.helperLabsCount }}</td>
+                      <td>{{ queuedResearch.status }}</td>
+                      <td>{{ queuedResearch.investedResearchPower }} / {{ queuedResearch.baseTotalResearchTime }}</td>
+                      <td>{{ queuedResearch.estimatedTurnsForCompletion ?? '--' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </article>
+        } @else {
+          <p class="overview-empty">No technologies queued.</p>
+        }
+      </div>
 
       @if (startResearchError) {
         <p class="planet-building-card__power-error">{{ startResearchError }}</p>
       }
 
       <h3 class="planet-view__section-title">Technologies</h3>
-      <div class="research-tech-list">
-        @for (technology of technologies; track technology.type) {
-          <article class="research-tech-card">
+      <div class="research-tech-list" data-tutorial-id="researches-tech-list">
+        @for (technology of technologies; track technology.type; let isFirst = $first) {
+          <article class="research-tech-card" [attr.data-tutorial-id]="isFirst ? 'researches-primary-tech-card' : null">
             <img class="research-tech-card__image" [src]="technology.imagePath" [alt]="technology.type + ' image'" />
 
             <div class="research-tech-card__main">

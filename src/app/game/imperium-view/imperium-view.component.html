@@ -12,17 +12,19 @@
       <p>{{ loadError }}</p>
     </section>
   } @else {
-    <app-resources
-      [viewName]="playerName + ' Imperium Summary'"
-      [metal]="metalDisplay"
-      [crystal]="crystalDisplay"
-      [deuterium]="deuteriumDisplay"
-      [energy]="energyDisplay"
-      [energyTooltip]="energyTooltip"
-      [powers]="powersDisplay"
-    ></app-resources>
+    <div data-tutorial-id="imperium-summary-bar">
+      <app-resources
+        [viewName]="playerName + ' Imperium Summary'"
+        [metal]="metalDisplay"
+        [crystal]="crystalDisplay"
+        [deuterium]="deuteriumDisplay"
+        [energy]="energyDisplay"
+        [energyTooltip]="energyTooltip"
+        [powers]="powersDisplay"
+      ></app-resources>
+    </div>
 
-    <section class="overview-card">
+    <section class="overview-card" data-tutorial-id="imperium-empire-totals">
       <div class="imperium-view__section-head">
         <div>
           <h3>Empire Totals</h3>
@@ -53,7 +55,7 @@
       </div>
     </section>
 
-    <section class="overview-card">
+    <section class="overview-card" data-tutorial-id="imperium-attention-panel">
       <div class="imperium-view__section-head">
         <div>
           <h3>Needs Attention</h3>
@@ -93,7 +95,7 @@
       }
     </section>
 
-    <section class="overview-card">
+    <section class="overview-card" data-tutorial-id="imperium-owned-planets">
       <div class="imperium-view__section-head">
         <div>
           <h3>Owned Planets</h3>
@@ -123,8 +125,8 @@
         <p class="overview-muted">No planets match the current filter.</p>
       } @else {
         <div class="imperium-view__planet-grid">
-          @for (planetVm of visiblePlanets(); track trackPlanet($index, planetVm)) {
-            <article class="imperium-view__planet-card">
+          @for (planetVm of visiblePlanets(); track trackPlanet($index, planetVm); let isFirst = $first) {
+            <article class="imperium-view__planet-card" [attr.data-tutorial-id]="isFirst ? 'imperium-primary-planet-card' : null">
               <app-mini-planet-preview [planet]="planetVm.planet"></app-mini-planet-preview>
 
               <div class="imperium-view__planet-meta">
@@ -186,7 +188,7 @@
       }
     </section>
 
-    <section class="overview-card">
+    <section class="overview-card" data-tutorial-id="imperium-fleet-totals">
       <div class="imperium-view__section-head">
         <div>
           <h3>Fleet Totals</h3>
@@ -204,7 +206,7 @@
       </div>
     </section>
 
-    <section class="overview-card">
+    <section class="overview-card" data-tutorial-id="imperium-building-stats">
       <div class="imperium-view__section-head">
         <div>
           <h3>Building Statistics</h3>

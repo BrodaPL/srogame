@@ -13,21 +13,23 @@
     </section>
   } @else if (selectedPlanet(); as planet) {
     <div class="game-dashboard__layout">
-      <app-resources
-        class="game-dashboard__resources"
-        [titlePrefix]="'Buildings | '"
-        [titleLink]="selectedPlanetTitleLink()"
-        [titleSuffix]="' (' + selectedPlanetCoordinatesLabel() + ')'"
-        [metal]="metalDisplay"
-        [crystal]="crystalDisplay"
-        [deuterium]="deuteriumDisplay"
-        [energy]="energyDisplay"
-        [energyTooltip]="energyTooltip"
-        [powers]="powersDisplay"
-      ></app-resources>
+      <div data-tutorial-id="buildings-summary-bar">
+        <app-resources
+          class="game-dashboard__resources"
+          [titlePrefix]="'Buildings | '"
+          [titleLink]="selectedPlanetTitleLink()"
+          [titleSuffix]="' (' + selectedPlanetCoordinatesLabel() + ')'"
+          [metal]="metalDisplay"
+          [crystal]="crystalDisplay"
+          [deuterium]="deuteriumDisplay"
+          [energy]="energyDisplay"
+          [energyTooltip]="energyTooltip"
+          [powers]="powersDisplay"
+        ></app-resources>
+      </div>
 
       <div class="game-dashboard__main">
-        <section class="overview-card game-dashboard__categories-card">
+        <section class="overview-card game-dashboard__categories-card" data-tutorial-id="buildings-mode-toggle">
           <div class="game-dashboard__toggle-row">
             @for (mode of modeOptions; track mode.value) {
               <button
@@ -42,7 +44,7 @@
           </div>
         </section>
 
-        <section class="overview-card">
+        <section class="overview-card" data-tutorial-id="buildings-queue-card">
           <div class="game-dashboard__section-head">
             <div>
               <h3>Current Building Queue</h3>
@@ -87,7 +89,7 @@
           }
         </section>
 
-        <section class="overview-card">
+        <section class="overview-card" data-tutorial-id="buildings-list">
           <div class="game-dashboard__section-head">
             <div>
               <h3>{{ selectedMode === 'resources' ? 'Resources Infrastructure' : 'Facilities' }}</h3>
@@ -96,8 +98,8 @@
           </div>
 
           <div class="buildings-view__building-list">
-            @for (building of visibleBuildings(); track building.type) {
-              <article class="buildings-view__building-row">
+            @for (building of visibleBuildings(); track building.type; let isFirst = $first) {
+              <article class="buildings-view__building-row" [attr.data-tutorial-id]="isFirst ? 'buildings-primary-row' : null">
                 <img
                   class="buildings-view__building-image"
                   [src]="building.imagePath"
@@ -153,7 +155,7 @@
         </section>
       </div>
 
-      <aside class="overview-card game-dashboard__rail">
+      <aside class="overview-card game-dashboard__rail" data-tutorial-id="buildings-planet-rail">
         <div class="game-dashboard__section-head">
           <div>
             <h3>Owned Planets</h3>

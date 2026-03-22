@@ -490,6 +490,7 @@ export class MissionPlannerViewComponent implements OnInit {
             this.selectOriginPlanet(firstWithShips);
           }
           this.applyRoutePrefill();
+          this.applyDefaultTargetPlanet();
           this.tutorialService.autoOpenTutorial('missionPlannerView');
         },
         error: () => {
@@ -695,6 +696,23 @@ export class MissionPlannerViewComponent implements OnInit {
     const targetCoordinates = this.pendingTargetCoordinates;
     this.pendingTargetCoordinates = null;
     this.resolveTargetPlanet(targetCoordinates, this.findOwnedPlanet(targetCoordinates));
+  }
+
+  private applyDefaultTargetPlanet(): void {
+    if (this.selectedTargetPlanet || !this.selectedOriginPlanet) {
+      return;
+    }
+
+    const originCoordinates = this.selectedOriginPlanet.coordinates;
+    const defaultTarget = this.ownedPlanets.find((planet) =>
+      !this.sameCoordinates(planet.coordinates, originCoordinates)
+    ) ?? null;
+
+    if (!defaultTarget) {
+      return;
+    }
+
+    this.chooseTargetPlanet(defaultTarget);
   }
 
   private parseQueryCoordinate(value: string | null): number | null {

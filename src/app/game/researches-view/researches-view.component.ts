@@ -392,7 +392,7 @@ export class ResearchesViewComponent implements OnInit {
       .subscribe({
         next: (ownedPlanets) => {
           this.applyOwnedPlanets(ownedPlanets);
-          this.tutorialService.autoOpenTutorial('researchesView');
+          this.openTutorialAfterRender();
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {
@@ -463,6 +463,7 @@ export class ResearchesViewComponent implements OnInit {
       .subscribe({
         next: (ownedPlanets) => {
           this.applyOwnedPlanets(ownedPlanets);
+          this.openTutorialAfterRender();
           this.cdr.markForCheck();
         },
         error: () => {
@@ -1049,6 +1050,13 @@ export class ResearchesViewComponent implements OnInit {
 
   private planetId(planet: ClientPlanetDto): string {
     return `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`;
+  }
+
+  private openTutorialAfterRender(): void {
+    setTimeout(() => {
+      this.cdr.detectChanges();
+      this.tutorialService.autoOpenTutorial('researchesView');
+    });
   }
 
   private comparePlanetCoordinates(left: ClientPlanetDto, right: ClientPlanetDto): number {
