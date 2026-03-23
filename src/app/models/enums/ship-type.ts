@@ -6,6 +6,7 @@ export enum ShipType {
   CORVETTE = 'Corvette',
   SPY_PROBE = 'Spy Probe',
   REPAIR_DRONE = 'Repair Drone',
+  RECYCLER = 'Recycler',
   CRUISER = 'Cruiser',
   BATTLE_SHIP = 'Battle Ship',
   FRIGATE = 'Frigate',

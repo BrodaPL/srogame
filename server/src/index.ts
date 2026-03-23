@@ -240,6 +240,7 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
   FleetMissionType.SPY as FleetMissionTypeType,
   FleetMissionType.BOMBARD as FleetMissionTypeType,
   FleetMissionType.SIEGE as FleetMissionTypeType,
+  FleetMissionType.RECYCLE as FleetMissionTypeType,
   FleetMissionType.REPAIR as FleetMissionTypeType,
   FleetMissionType.COLONIZE as FleetMissionTypeType
 ]);

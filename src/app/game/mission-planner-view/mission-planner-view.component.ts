@@ -62,6 +62,7 @@ const PHASE_ONE_MISSION_TYPES: FleetMissionType[] = [
   FleetMissionType.SPY,
   FleetMissionType.BOMBARD,
   FleetMissionType.SIEGE,
+  FleetMissionType.RECYCLE,
   FleetMissionType.REPAIR,
   FleetMissionType.COLONIZE
 ];
@@ -103,7 +104,8 @@ export class MissionPlannerViewComponent implements OnInit {
     [ShipPurpose.MILITARY, true],
     [ShipPurpose.CARGO, true],
     [ShipPurpose.UTILITY, true],
-    [ShipPurpose.CARRIER, true]
+    [ShipPurpose.CARRIER, true],
+    [ShipPurpose.RECYCLING, true]
   ]);
 
   private readonly shipBlueprintsByType = new Map<ShipType, Ship>();
@@ -206,7 +208,10 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected warningRows(): MissionWarningVm[] {
     const warnings = this.currentMission().getPlannerChecks(this.buildPlannerContext());
-    if ((this.selectedRepairCapability().shipRepair + this.selectedRepairCapability().droneRepair) <= 0) {
+    if (
+      this.selectedMissionType === FleetMissionType.REPAIR
+      && (this.selectedRepairCapability().shipRepair + this.selectedRepairCapability().droneRepair) <= 0
+    ) {
       warnings.push({ text: 'No repair capacity selected.', severity: 'note' });
     }
 

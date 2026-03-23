@@ -16,6 +16,7 @@ export class LevelMappings {
     [ShipType.CORVETTE]: { availableFromLevel: 2, weight: 2 },
     [ShipType.SPY_PROBE]: { availableFromLevel: 1, weight: 1 },
     [ShipType.REPAIR_DRONE]: { availableFromLevel: 2, weight: 1 },
+    [ShipType.RECYCLER]: { availableFromLevel: 5, weight: 4 },
     [ShipType.CRUISER]: { availableFromLevel: 3, weight: 3 },
     [ShipType.BATTLE_SHIP]: { availableFromLevel: 4, weight: 4 },
     [ShipType.FRIGATE]: { availableFromLevel: 4, weight: 4 },

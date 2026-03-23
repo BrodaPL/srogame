@@ -185,6 +185,10 @@ export class FleetMission {
     return this.resolveWithoutEncounter(context);
   }
 
+  public resolveIdleTurn(_context: MissionResolutionContext): MissionResolutionResult | null {
+    return null;
+  }
+
   public onBattleRetreat(_context: MissionResolutionContext): MissionResolutionResult {
     return {
       fleetOutcome: 'keep',

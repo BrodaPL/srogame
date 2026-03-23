@@ -10,6 +10,7 @@ import { WeaponType } from '../../models/enums/weapon-type';
 import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
+import { calculateRecycleCapabilityForManyShips } from '../../models/recycling/recycling-capability';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
@@ -181,6 +182,10 @@ export class OperationsViewComponent implements OnInit {
 
     if (fleet.missionType === FleetMissionType.REPAIR) {
       return `Repair support: Ship ${this.shipRepairCapability(fleet)} | Drone ${this.droneRepairCapability(fleet)}`;
+    }
+
+    if (fleet.missionType === FleetMissionType.RECYCLE) {
+      return `Recycling rate: ${calculateRecycleCapabilityForManyShips(fleet.ships)} / turn`;
     }
 
     return null;

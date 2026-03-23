@@ -4,6 +4,7 @@ import type { FleetMissionBlueprints } from './fleet-mission-blueprint';
 import { FleetMission } from './fleet-mission';
 import { BombardFleetMission } from './types/bombard-fleet-mission';
 import { MoveFleetMission } from './types/move-fleet-mission';
+import { RecycleFleetMission } from './types/recycle-fleet-mission';
 import { RepairFleetMission } from './types/repair-fleet-mission';
 import { SiegeFleetMission } from './types/siege-fleet-mission';
 import { SpyFleetMission } from './types/spy-fleet-mission';
@@ -48,6 +49,7 @@ export class FleetMissionRegistry {
     const spy = this.blueprints.get(FleetMissionType.SPY);
     const bombard = this.blueprints.get(FleetMissionType.BOMBARD);
     const siege = this.blueprints.get(FleetMissionType.SIEGE);
+    const recycle = this.blueprints.get(FleetMissionType.RECYCLE);
     const repair = this.blueprints.get(FleetMissionType.REPAIR);
     const colonize = this.blueprints.get(FleetMissionType.COLONIZE);
 
@@ -69,6 +71,10 @@ export class FleetMissionRegistry {
 
     if (siege) {
       this.missionByType.set(siege.type, new SiegeFleetMission(siege));
+    }
+
+    if (recycle) {
+      this.missionByType.set(recycle.type, new RecycleFleetMission(recycle));
     }
 
     if (repair) {

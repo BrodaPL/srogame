@@ -69,6 +69,7 @@ export class ShipBlueprintsFactory {
     [ShipType.CORVETTE]: 'images/ships/Cruiser.webp',
     [ShipType.SPY_PROBE]: 'images/ships/Espionage_Probe.webp',
     [ShipType.REPAIR_DRONE]: 'images/ships/Light_Fighter.webp',
+    [ShipType.RECYCLER]: 'images/ships/Large_Cargo.webp',
     [ShipType.CRUISER]: 'images/ships/Cruiser.webp',
     [ShipType.BATTLE_SHIP]: 'images/ships/Battleship.webp',
     [ShipType.FRIGATE]: 'images/ships/Battlecruiser.webp',

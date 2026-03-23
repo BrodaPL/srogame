@@ -19,6 +19,14 @@ export type MissionEffect =
   }
   | {
     type: 'generateEspionageReport';
+  }
+  | {
+    type: 'collectPlanetDebrisToFleetCargo';
+    resources: {
+      metal: number;
+      crystal: number;
+      deuterium: number;
+    };
   };
 
 export type MissionReportKind = 'success' | 'failure' | 'draw';

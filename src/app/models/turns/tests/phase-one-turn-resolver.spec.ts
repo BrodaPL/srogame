@@ -885,6 +885,137 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeLessThan(maxStructuralPoints);
   });
 
+  it('lets Recycle missions establish orbit over hostile debris fields when no defenders remain', () => {
+    const recycleFleet = new Fleet(
+      400,
+      1,
+      FleetMissionType.RECYCLE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Debris',
+      manyShips({ type: ShipType.RECYCLER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      1200,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [recycleFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Debris';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+        solarSystem.planets[1].rBDSFTQ.spaceDebris = new ResourcesPack(120, 60, 60);
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+
+    resolvePhaseOneTurn(galaxy, 2);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(galaxy.activeFleets[0].createdAtTurn).toBe(2);
+    expect(galaxy.activeFleets[0].cargo.getTotalResourceAmount()).toBe(0);
+    expect(system.planets[1].rBDSFTQ.spaceDebris.metal).toBe(120);
+    expect(system.planets[1].rBDSFTQ.spaceDebris.crystal).toBe(60);
+    expect(system.planets[1].rBDSFTQ.spaceDebris.deuterium).toBe(60);
+  });
+
+  it('returns Recycle missions immediately when no debris exists on arrival', () => {
+    const recycleFleet = new Fleet(
+      401,
+      1,
+      FleetMissionType.RECYCLE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Alpha Orbit',
+      manyShips({ type: ShipType.RECYCLER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      1200,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy } = createGalaxyWithPlayers(
+      [recycleFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Alpha Orbit';
+        solarSystem.planets[1].info.ownerId = 1;
+        solarSystem.planets[1].rBDSFTQ.spaceDebris = new ResourcesPack(0, 0, 0);
+      },
+      (solarSystem) => ([new Player(1, 'Alpha', [solarSystem.planets[0], solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER)])
+    );
+
+    resolvePhaseOneTurn(galaxy, 2);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.RETURNING);
+    expect(galaxy.activeFleets[0].createdAtTurn).toBe(2);
+    expect(galaxy.activeFleets[0].cargo.getTotalResourceAmount()).toBe(0);
+  });
+
+  it('lets idle Recycle missions collect debris proportionally and return when the field is empty', () => {
+    const recycleFleet = new Fleet(
+      402,
+      1,
+      FleetMissionType.RECYCLE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Alpha Orbit',
+      manyShips({ type: ShipType.RECYCLER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      240,
+      0,
+      1,
+      1,
+      FleetState.IDLE,
+      2
+    );
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [recycleFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Alpha Orbit';
+        solarSystem.planets[1].info.ownerId = 1;
+        solarSystem.planets[1].rBDSFTQ.spaceDebris = new ResourcesPack(120, 60, 60);
+      },
+      (solarSystem) => ([new Player(1, 'Alpha', [solarSystem.planets[0], solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER)])
+    );
+
+    resolvePhaseOneTurn(galaxy, 3);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.RETURNING);
+    expect(galaxy.activeFleets[0].createdAtTurn).toBe(3);
+    expect(galaxy.activeFleets[0].cargo.metal).toBe(120);
+    expect(galaxy.activeFleets[0].cargo.crystal).toBe(60);
+    expect(galaxy.activeFleets[0].cargo.deuterium).toBe(60);
+    expect(galaxy.activeFleets[0].usedCargoCapacity).toBe(240);
+    expect(system.planets[1].rBDSFTQ.spaceDebris.getTotalResourceAmount()).toBe(0);
+  });
+
   it('splits drone repair between damaged ships and damaged buildings', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
 

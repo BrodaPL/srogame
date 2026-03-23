@@ -688,6 +688,7 @@ function resolveFleetState(
         fleet,
         playersById,
         planetById,
+        espionageReportGenerator,
         resolvedTurnNumber,
         diplomacyResolver
       );
@@ -700,6 +701,7 @@ function resolveIdleFleetState(
   fleet: Fleet,
   playersById: Map<number, Player>,
   planetById: Map<string, Planet>,
+  espionageReportGenerator: EspionageReportGenerator,
   resolvedTurnNumber: number,
   diplomacyResolver: DiplomacyResolver
 ): Fleet | null {
@@ -738,7 +740,41 @@ function resolveIdleFleetState(
     }
   }
 
-  return fleet;
+  const mission = FLEET_MISSION_REGISTRY.get(fleet.missionType);
+  if (!mission) {
+    return fleet;
+  }
+
+  const owner = playersById.get(fleet.ownerId) ?? null;
+  const originPlanet = planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z)) ?? null;
+  const targetOwner = targetPlanet.info.ownerId === null
+    ? null
+    : playersById.get(targetPlanet.info.ownerId) ?? null;
+  const resolution = mission.resolveIdleTurn({
+    fleet,
+    owner,
+    targetOwner,
+    originPlanet,
+    targetPlanet,
+    resolvedTurnNumber,
+    diplomacyResolver
+  });
+  if (!resolution) {
+    return fleet;
+  }
+
+  return applyMissionResolution(
+    resolution,
+    {
+      fleet,
+      owner,
+      targetOwner,
+      originPlanet,
+      targetPlanet,
+      resolvedTurnNumber
+    },
+    espionageReportGenerator
+  );
 }
 
 function resolveTargetArrival(
@@ -1868,7 +1904,13 @@ function compareEncounterArrivalPriority(
     [FleetMissionType.MOVE]: 5,
     [FleetMissionType.TRANSPORT]: 6,
     [FleetMissionType.SPY]: 7,
-    [FleetMissionType.COLONIZE]: 8
+    [FleetMissionType.COLONIZE]: 8,
+    [FleetMissionType.INVADE]: 9,
+    [FleetMissionType.BLOCK]: 10,
+    [FleetMissionType.INTERCEPT]: 11,
+    [FleetMissionType.STAR_SYSTEM_SPY]: 12,
+    [FleetMissionType.RECYCLE]: 13,
+    [FleetMissionType.REPAIR]: 14
   };
   const leftPriority = priorityByMissionType[left.fleet.missionType] ?? 999;
   const rightPriority = priorityByMissionType[right.fleet.missionType] ?? 999;

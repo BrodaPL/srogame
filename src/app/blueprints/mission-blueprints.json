@@ -109,6 +109,24 @@
       }
     },
     {
+      "type": "RECYCLE",
+      "name": "Recycle",
+      "description": "Move to orbit, gather debris with recycle equipment each turn, and return once the fleet is full or the debris field is empty.",
+      "battleRoundsModifier": -1,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["SELF", "ALLIED", "PEACE", "PASSIVE", "WAR"],
+        "allowUnowned": true
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": false,
+        "requiresCargo": false
+      }
+    },
+    {
       "type": "COLONIZE",
       "name": "Colonize",
       "description": "Send a Colonizer to an unowned planet.",

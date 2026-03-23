@@ -61,6 +61,9 @@ export class MissionEffectExecutor {
       case 'generateEspionageReport':
         this.generateEspionageReport(context);
         break;
+      case 'collectPlanetDebrisToFleetCargo':
+        this.collectPlanetDebrisToFleetCargo(context, effect.resources);
+        break;
       default:
         break;
     }
@@ -95,5 +98,34 @@ export class MissionEffectExecutor {
     );
     context.owner.addReport(report.copy());
     context.targetPlanet.lastReportData.set(context.owner.playerId, report.copy());
+  }
+
+  private collectPlanetDebrisToFleetCargo(
+    context: MissionEffectExecutionContext,
+    resources: {
+      metal: number;
+      crystal: number;
+      deuterium: number;
+    }
+  ): void {
+    if (!context.targetPlanet) {
+      return;
+    }
+
+    const collected = new ResourcesPack(
+      Math.max(0, Math.floor(resources.metal)),
+      Math.max(0, Math.floor(resources.crystal)),
+      Math.max(0, Math.floor(resources.deuterium))
+    );
+    if (collected.getTotalResourceAmount() <= 0) {
+      return;
+    }
+
+    context.targetPlanet.rBDSFTQ.spaceDebris.subtractResourcePack(collected);
+    context.fleet.cargo.addResourcePack(collected);
+    context.fleet.usedCargoCapacity = Math.min(
+      context.fleet.totalCargoCapacity,
+      context.fleet.usedCargoCapacity + collected.getTotalResourceAmount()
+    );
   }
 }

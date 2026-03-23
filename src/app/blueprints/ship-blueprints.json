@@ -192,6 +192,35 @@
       ]
     },
     {
+      "type": "RECYCLER",
+      "imagePath": "images/ships/Large_Cargo.webp",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 180,
+      "criticalThreshold": 40,
+      "shieldCapacity": 120,
+      "armor": 4,
+      "weapons": [
+        { "type": "RECYCLE_EQUIPMENT", "dmg": 60, "shots": 4 }
+      ],
+      "cargoCapacity": 1200,
+      "hangarCapacity": 0,
+      "purposes": ["CARGO", "UTILITY", "RECYCLING"],
+      "jumpCost": 3,
+      "cost": { "metal": 500, "crystal": 180, "deuterium": 90 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 5 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 3 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 2 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
+        { "tech": "ENERGY_TECHNOLOGY", "level": 2 }
+      ]
+    },
+    {
       "type": "CRUISER",
       "imagePath": "images/ships/Cruiser.webp",
       "hullClass": "MEDIUM",
