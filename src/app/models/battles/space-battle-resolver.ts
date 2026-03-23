@@ -33,6 +33,7 @@ export type SpaceBattleReportContext = {
 export type SpaceBattleInput = {
   attacker: BattleSideInput;
   defender: BattleSideInput;
+  attackerPlanetaryBombs?: DefenceInstance[];
   reportContext: SpaceBattleReportContext;
   maxRounds?: number;
   randomSource?: BattleRandomSource;
@@ -70,6 +71,18 @@ export type BattleDestroyedShipSummary = {
   destructionChancePercent: number;
 };
 
+export type BattlePlanetaryBombActionSummary = {
+  bombType: DefenceType;
+  activated: boolean;
+  intercepted: boolean;
+  interceptorDefenceType: DefenceType | null;
+  targetDefenceType: DefenceType | null;
+  damage: number;
+  bombHullBefore: number;
+  bombHullAfter: number;
+  targetDestroyed: boolean;
+};
+
 export type BattleRoundSummary = {
   roundNumber: number;
   attackerActiveShips: number;
@@ -80,6 +93,7 @@ export type BattleRoundSummary = {
   defenderShots: number;
   shots: BattleShotSummary[];
   destroyedShips: BattleDestroyedShipSummary[];
+  planetaryBombActions: BattlePlanetaryBombActionSummary[];
 };
 
 export type BattleShipTypeSummary = {
@@ -208,10 +222,17 @@ export class SpaceBattleResolver {
         attackerShots: 0,
         defenderShots: 0,
         shots: [],
-        destroyedShips: []
+        destroyedShips: [],
+        planetaryBombActions: []
       };
 
       this.resolveRound(attacker, defender, roundSummary, randomSource);
+      this.resolvePlanetaryBombStep(
+        input.attackerPlanetaryBombs ?? [],
+        defender,
+        roundSummary,
+        randomSource
+      );
       this.resolveDestroyedShips(attacker, roundSummary, randomSource);
       this.resolveDestroyedShips(defender, roundSummary, randomSource);
 
@@ -400,6 +421,88 @@ export class SpaceBattleResolver {
       }
 
       activeSide = activeSide === 'attacker' ? 'defender' : 'attacker';
+    }
+  }
+
+  private resolvePlanetaryBombStep(
+    attackingBombs: DefenceInstance[],
+    defender: BattleSideState,
+    roundSummary: BattleRoundSummary,
+    randomSource: BattleRandomSource
+  ): void {
+    const eligibleBombs = attackingBombs.filter((bomb) => bomb.hull > 0 && bomb.type.size === 1);
+    if (eligibleBombs.length <= 0) {
+      return;
+    }
+
+    const actionByBomb = new Map<DefenceInstance, BattlePlanetaryBombActionSummary>();
+    for (const bomb of eligibleBombs) {
+      if (!this.hasAliveDefences(defender)) {
+        break;
+      }
+
+      const action: BattlePlanetaryBombActionSummary = {
+        bombType: bomb.type.type,
+        activated: false,
+        intercepted: false,
+        interceptorDefenceType: null,
+        targetDefenceType: null,
+        damage: 0,
+        bombHullBefore: bomb.hull,
+        bombHullAfter: bomb.hull,
+        targetDestroyed: false
+      };
+      actionByBomb.set(bomb, action);
+      roundSummary.planetaryBombActions.push(action);
+
+      if (this.nextRandomFloat(randomSource) < 0.5) {
+        continue;
+      }
+
+      const target = this.selectRandomAliveDefenceCombatant(defender, randomSource);
+      if (!target) {
+        continue;
+      }
+
+      action.activated = true;
+      action.targetDefenceType = (target.combatant as DefenceInstance).type.type;
+      const hitResult = this.applyPlanetaryBombDamageToCombatant(
+        target,
+        this.totalPlanetaryBombPayload(bomb),
+        randomSource
+      );
+      action.damage = hitResult.damage;
+      action.targetDestroyed = hitResult.destroyed;
+      bomb.hull = 0;
+      bomb.shield = 0;
+      action.bombHullAfter = 0;
+    }
+
+    for (const interceptor of defender.combatants) {
+      if (interceptor.kind !== 'defence' || interceptor.combatant.hull <= 0) {
+        continue;
+      }
+
+      const interceptWeapons = this.expandPlanetaryBombInterceptionWeapons(
+        interceptor.combatant as DefenceInstance,
+        defender.techModifiers
+      );
+      for (const weapon of interceptWeapons) {
+        const targetBomb = this.selectRandomAliveBomb(eligibleBombs, randomSource);
+        if (!targetBomb) {
+          return;
+        }
+
+        const action = actionByBomb.get(targetBomb);
+        const hitResult = this.applyWeaponDamageToBomb(targetBomb, weapon.type, weapon.dmg);
+        if (!action || hitResult.damage <= 0) {
+          continue;
+        }
+
+        action.intercepted = true;
+        action.interceptorDefenceType = (interceptor.combatant as DefenceInstance).type.type;
+        action.bombHullAfter = targetBomb.hull;
+      }
     }
   }
 
@@ -662,6 +765,122 @@ export class SpaceBattleResolver {
     return baseDamage;
   }
 
+  private expandPlanetaryBombInterceptionWeapons(
+    defence: DefenceInstance,
+    techModifiers: BattleTechModifiers
+  ): BattleQueuedWeapon[] {
+    const weapons: BattleQueuedWeapon[] = [];
+
+    for (const weapon of defence.type.weapons) {
+      if (
+        weapon.type !== WeaponType.BEAM
+        && weapon.type !== WeaponType.MISSILE
+        && weapon.type !== WeaponType.RAIL_GUN
+      ) {
+        continue;
+      }
+
+      const shots = Math.max(0, Math.floor(weapon.shots));
+      for (let shot = 0; shot < shots; shot += 1) {
+        weapons.push({
+          type: weapon.type,
+          dmg: this.modifiedWeaponDamage(weapon.type, weapon.dmg, techModifiers)
+        });
+      }
+    }
+
+    return weapons;
+  }
+
+  private selectRandomAliveDefenceCombatant(
+    side: BattleSideState,
+    randomSource: BattleRandomSource
+  ): BattleCombatantState | null {
+    const aliveDefences = side.combatants.filter((combatant) =>
+      combatant.kind === 'defence' && combatant.combatant.hull > 0
+    );
+    if (aliveDefences.length <= 0) {
+      return null;
+    }
+
+    return aliveDefences[this.randomIndex(aliveDefences.length, randomSource)] ?? null;
+  }
+
+  private selectRandomAliveBomb(
+    bombs: DefenceInstance[],
+    randomSource: BattleRandomSource
+  ): DefenceInstance | null {
+    const aliveBombs = bombs.filter((bomb) => bomb.hull > 0);
+    if (aliveBombs.length <= 0) {
+      return null;
+    }
+
+    return aliveBombs[this.randomIndex(aliveBombs.length, randomSource)] ?? null;
+  }
+
+  private totalPlanetaryBombPayload(bomb: DefenceInstance): number {
+    return bomb.type.weapons
+      .filter((weapon) => weapon.type === WeaponType.ORBIT_TO_SURFACE_BOMB)
+      .reduce((sum, weapon) => sum + (Math.max(0, weapon.dmg) * Math.max(0, Math.floor(weapon.shots))), 0);
+  }
+
+  private applyPlanetaryBombDamageToCombatant(
+    target: BattleCombatantState,
+    weaponDamage: number,
+    _randomSource: BattleRandomSource
+  ): { damage: number; destroyed: boolean } {
+    const shieldBefore = target.combatant.shield;
+    const hullBefore = target.combatant.hull;
+    const shieldDamage = Math.min(Math.max(0, shieldBefore), Math.max(0, weaponDamage));
+    const spilloverDamage = Math.max(0, weaponDamage - shieldDamage) / 2;
+    const hullDamage = Math.max(0, spilloverDamage - target.effectiveArmor);
+    target.combatant.shield = Math.max(0, shieldBefore - shieldDamage);
+    target.combatant.hull = Math.max(0, target.combatant.hull - hullDamage);
+    if (hullDamage > 0) {
+      target.hullDamagedThisRound = true;
+    }
+
+    return {
+      damage: Math.max(0, hullBefore - target.combatant.hull),
+      destroyed: target.combatant.hull <= 0
+    };
+  }
+
+  private applyWeaponDamageToBomb(
+    bomb: DefenceInstance,
+    weaponType: WeaponType,
+    weaponDamage: number
+  ): { damage: number; destroyed: boolean } {
+    const shieldBefore = bomb.shield;
+    const hullBefore = bomb.hull;
+    let shieldDamage = 0;
+    let hullDamage = 0;
+
+    if (weaponType === WeaponType.RAIL_GUN) {
+      hullDamage = Math.max(0, weaponDamage);
+    } else {
+      shieldDamage = Math.min(Math.max(0, shieldBefore), Math.max(0, weaponDamage));
+      const spilloverDamage = Math.max(0, weaponDamage - shieldDamage) / 2;
+      const armourPenalty = bomb.type.armor * (weaponType === WeaponType.MISSILE ? 2 : 1);
+      hullDamage = Math.max(0, spilloverDamage - armourPenalty);
+      bomb.shield = Math.max(0, shieldBefore - shieldDamage);
+    }
+
+    bomb.hull = Math.max(0, bomb.hull - hullDamage);
+    if (weaponType === WeaponType.RAIL_GUN) {
+      bomb.shield = shieldBefore;
+    }
+
+    return {
+      damage: Math.max(0, hullBefore - bomb.hull),
+      destroyed: bomb.hull <= 0
+    };
+  }
+
+  private hasAliveDefences(side: BattleSideState): boolean {
+    return side.combatants.some((combatant) => combatant.kind === 'defence' && combatant.combatant.hull > 0);
+  }
+
   private canTargetCombatant(
     shooter: BattleCombatantState,
     target: BattleCombatantState,
@@ -900,13 +1119,16 @@ export class SpaceBattleResolver {
     ];
 
     for (const round of result.roundSummaries) {
-      lines.push(
+      const roundLine =
         `Round ${round.roundNumber}: `
         + `${result.attacker.label} shots ${round.attackerShots}, `
         + `${result.defender.label} shots ${round.defenderShots}, `
         + `${result.attacker.label} losses ${this.countDestroyedShips(round, 'attacker')}, `
-        + `${result.defender.label} losses ${this.countDestroyedShips(round, 'defender')}.`
-      );
+        + `${result.defender.label} losses ${this.countDestroyedShips(round, 'defender')}.`;
+      lines.push(roundLine);
+      if (round.planetaryBombActions.length > 0) {
+        lines.push(`  Planetary bombs: ${this.formatPlanetaryBombRoundSummary(round.planetaryBombActions)}`);
+      }
     }
 
     if (result.roundSummaries.length === 0) {
@@ -951,6 +1173,15 @@ export class SpaceBattleResolver {
 
   private countDestroyedShips(round: BattleRoundSummary, side: BattleSideId): number {
     return round.destroyedShips.filter((entry) => entry.side === side).length;
+  }
+
+  private formatPlanetaryBombRoundSummary(actions: BattlePlanetaryBombActionSummary[]): string {
+    const launched = actions.length;
+    const activated = actions.filter((action) => action.activated).length;
+    const intercepted = actions.filter((action) => action.intercepted).length;
+    const lost = actions.filter((action) => action.bombHullAfter <= 0).length;
+    const totalDamage = actions.reduce((sum, action) => sum + action.damage, 0);
+    return `launched ${launched}, activated ${activated}, intercepted ${intercepted}, lost ${lost}, damage ${totalDamage}`;
   }
 
   private hasAliveShips(side: BattleSideState): boolean {

@@ -71,6 +71,7 @@ import type {
   StartShipyardConstructionRequest,
   StartTechnologyResearchRequest,
   CreateFleetMissionRequest,
+  CreateFleetBombSelectionEntry,
   CreateFleetMissionResponse,
   PlayerReportDto,
   PlayerReportDtoBase,
@@ -1353,9 +1354,10 @@ app.post('/api/game/active-fleets', (req, res) => {
   const origin = parseMissionCoordinates(body?.origin);
   const target = parseMissionCoordinates(body?.target);
   const ships = parseFleetShipSelections(body?.ships);
+  const carriedBombs = parseFleetBombSelections(body?.carriedBombs);
   const cargo = parseResourcesPackPayload(body?.cargo);
 
-  if (!missionType || !origin || !target || !ships || !cargo) {
+  if (!missionType || !origin || !target || !ships || !carriedBombs || !cargo) {
     return res.status(400).json({ error: 'Invalid fleet mission payload.' });
   }
 
@@ -1415,10 +1417,25 @@ app.post('/api/game/active-fleets', (req, res) => {
     }
   }
 
+  const availableBombsByType = countPlanetBombsByType(originPlanet);
+  for (const bomb of carriedBombs) {
+    const availableAmount = availableBombsByType.get(bomb.type) ?? 0;
+    if (availableAmount < bomb.amount) {
+      return res.status(400).json({ error: `${bomb.type}: not enough bombs in BOMB_DEPOT.` });
+    }
+  }
+
   const totalShipAmounts = toShipAmountEntriesFromSelections(ships);
   const selectedFleetShips = toManyShipsFromShipAmounts(totalShipAmounts);
-  if (!ManyShips.isTravelHangarValid(selectedFleetShips)) {
-    return res.status(400).json({ error: 'Insufficient hangar space for non-jump ships.' });
+  const totalHangarCapacity = ManyShips.totalTravelHangarCapacity(selectedFleetShips);
+  const totalBomberHangarCapacity = ManyShips.totalBomberHangarCapacity(selectedFleetShips);
+  const usedBombHangarCapacity = calculateBombHangarUsage(carriedBombs);
+  const usedHangarCapacity = ManyShips.totalRequiredHangarCapacity(selectedFleetShips) + usedBombHangarCapacity;
+  if (usedHangarCapacity > totalHangarCapacity) {
+    return res.status(400).json({ error: 'Insufficient hangar space for carried ships and bombs.' });
+  }
+  if (usedBombHangarCapacity > totalBomberHangarCapacity) {
+    return res.status(400).json({ error: 'Insufficient bomber hangar space for carried bombs.' });
   }
 
   const totalCargoCapacity = calculateFleetCargoCapacity(totalShipAmounts);
@@ -1439,6 +1456,7 @@ app.post('/api/game/active-fleets', (req, res) => {
   const missionLaunchContext: MissionLaunchContext = {
     selection: {
       ships,
+      carriedBombs,
       cargo
     },
     playerId,
@@ -1448,8 +1466,8 @@ app.post('/api/game/active-fleets', (req, res) => {
     maxActiveFleetCount: playerMaxActiveFleets,
     totalCargoCapacity,
     usedCargoCapacity,
-    totalHangarCapacity: ManyShips.totalTravelHangarCapacity(selectedFleetShips),
-    usedHangarCapacity: ManyShips.totalRequiredHangarCapacity(selectedFleetShips),
+    totalHangarCapacity,
+    usedHangarCapacity,
     hasMilitaryShips,
     fuelCost,
     diplomacyResolver
@@ -1475,6 +1493,7 @@ app.post('/api/game/active-fleets', (req, res) => {
     console.error('Fleet launch ship extraction failed.', error);
     return res.status(400).json({ error: 'Requested ship selection is no longer available on origin planet.' });
   }
+  const fleetBombs = originPlanet.rBDSFTQ.defences.extractAnyDefencesByType(carriedBombs);
 
   originPlanet.rBDSFTQ.resources.subtractResourcePack(totalRequiredResources);
 
@@ -1487,6 +1506,7 @@ app.post('/api/game/active-fleets', (req, res) => {
     originPlanetName: originPlanet.basicInfo.name,
     targetPlanetName: targetPlanet.basicInfo.name,
     ships: fleetShips,
+    carriedBombs: fleetBombs,
     cargo: {
       metal: cargo.metal,
       crystal: cargo.crystal,
@@ -2145,12 +2165,56 @@ function parseFleetShipSelections(value: unknown): CreateFleetShipSelectionEntry
   }));
 }
 
+function parseFleetBombSelections(value: unknown): CreateFleetBombSelectionEntry[] | null {
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const combined = new Map<DefenceTypeType, number>();
+  for (const item of value) {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const candidate = item as {
+      type?: unknown;
+      amount?: unknown;
+    };
+    const defenceType = normalizeDefenceType(candidate.type);
+    const amount = parseBodyIntInRange(candidate.amount, 1, 100000);
+    if (!defenceType || amount === null || !isPlanetaryBombDefenceType(defenceType)) {
+      return null;
+    }
+
+    combined.set(defenceType, (combined.get(defenceType) ?? 0) + amount);
+  }
+
+  return Array.from(combined.entries()).map(([type, amount]) => ({ type, amount }));
+}
+
 function countPlanetUndamagedShipsByType(planet: Planet): Map<ShipTypeType, number> {
   return ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
 }
 
 function countPlanetDamagedShipsByType(planet: Planet): Map<ShipTypeType, number> {
   return ManyShips.damagedCountByType(planet.rBDSFTQ.ships);
+}
+
+function countPlanetBombsByType(planet: Planet): Map<DefenceTypeType, number> {
+  const counts = new Map<DefenceTypeType, number>();
+  for (const [type, amount] of planet.rBDSFTQ.defences.countByType().entries()) {
+    if (!isPlanetaryBombDefenceType(type)) {
+      continue;
+    }
+
+    counts.set(type, amount);
+  }
+
+  return counts;
 }
 
 function toShipAmountEntriesFromSelections(
@@ -2171,6 +2235,20 @@ function toManyShipsFromShipAmounts(
   }
 
   return manyShips;
+}
+
+function calculateBombHangarUsage(bombs: Array<{ type: DefenceTypeType; amount: number }>): number {
+  let total = 0;
+  for (const bomb of bombs) {
+    const blueprint = DEFENCE_BLUEPRINTS.defencesMap.get(bomb.type);
+    if (!blueprint) {
+      continue;
+    }
+
+    total += Math.max(0, blueprint.size) * Math.max(0, bomb.amount);
+  }
+
+  return total;
 }
 
 function calculateFleetCargoCapacity(ships: Array<{ type: ShipTypeType; amount: number }>): number {

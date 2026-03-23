@@ -1,7 +1,7 @@
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
-import { ManyDefences } from '../defences/many-defences';
+import { ManyDefences, type ManyDefencesLike } from '../defences/many-defences';
 import { DefenceInstance } from '../defences/defence-instance';
-import { splitPlanetaryBombDefences } from '../defences/planetary-bomb';
+import { splitPlanetaryBombDefences, totalOrbitToSurfaceBombPayload } from '../defences/planetary-bomb';
 import { DefenceType } from '../enums/defence-type';
 import { WeaponType } from '../enums/weapon-type';
 import { ManyShips, type ManyShipsLike } from '../fleets/many-ships';
@@ -14,8 +14,13 @@ export type BuildingBombardmentSummary = {
   shots: number;
   hits: number;
   totalDamage: number;
+  bombsLaunched: number;
+  bombsActivated: number;
+  bombsIntercepted: number;
+  bombsLost: number;
   buildingTargetCount: number;
   defenceTargetCount: number;
+  remainingBombs: ManyDefences;
   buildingTargets: Array<{
     type: BuildingType;
     damage: number;
@@ -52,20 +57,34 @@ export function hasBombardmentWeapons(ships: ManyShipsLike | null | undefined): 
   return false;
 }
 
+export function hasBombardmentCapability(
+  ships: ManyShipsLike | null | undefined,
+  carriedBombs: ManyDefencesLike | null | undefined = null
+): boolean {
+  return hasBombardmentWeapons(ships) || ManyDefences.totalDefencesCount(carriedBombs) > 0;
+}
+
 export function applyBuildingBombardment(
   ships: ManyShipsLike | null | undefined,
-  planet: Planet
+  planet: Planet,
+  carriedBombs: ManyDefencesLike | null | undefined = null
 ): BuildingBombardmentSummary {
   const availableBuildingTargets = bombardableBuildingTypes(planet);
   const { activeDefences, planetaryBombs } = splitPlanetaryBombDefences(planet.rBDSFTQ.defences);
   const defenceInstances = ManyDefences.toDefenceInstances(activeDefences);
+  const bombInstances = ManyDefences.toDefenceInstances(carriedBombs);
   if (availableBuildingTargets.length <= 0 && defenceInstances.length <= 0) {
     return {
       shots: 0,
       hits: 0,
       totalDamage: 0,
+      bombsLaunched: 0,
+      bombsActivated: 0,
+      bombsIntercepted: 0,
+      bombsLost: 0,
       buildingTargetCount: 0,
       defenceTargetCount: 0,
+      remainingBombs: ManyDefences.fromDefenceInstances(bombInstances),
       buildingTargets: [],
       defenceTargets: []
     };
@@ -74,6 +93,9 @@ export function applyBuildingBombardment(
   let shots = 0;
   let hits = 0;
   let totalDamage = 0;
+  let bombsLaunched = 0;
+  let bombsActivated = 0;
+  let bombsIntercepted = 0;
   const buildingTargets: BuildingBombardmentSummary['buildingTargets'] = [];
   const defenceTargets: BuildingBombardmentSummary['defenceTargets'] = [];
 
@@ -157,15 +179,120 @@ export function applyBuildingBombardment(
     }
   }
 
+  for (const bomb of bombInstances) {
+    if (bomb.hull <= 0) {
+      continue;
+    }
+
+    const targetTypes = bombardableBuildingTypes(planet);
+    const preferredCategory = bomb.type.size === 1 ? 'defence' : 'building';
+    const targetCategory = selectPreferredGroundTargetCategory(
+      targetTypes.length > 0,
+      defenceInstances.some((instance) => instance.hull > 0),
+      preferredCategory
+    );
+    if (!targetCategory) {
+      break;
+    }
+
+    bombsLaunched += 1;
+    shots += 1;
+    if (Math.random() < 0.5) {
+      continue;
+    }
+
+    const bombPayload = totalOrbitToSurfaceBombPayload(bomb);
+    if (bombPayload <= 0) {
+      continue;
+    }
+
+    bombsActivated += 1;
+    if (targetCategory === 'defence') {
+      const targetIndex = selectRandomAliveDefenceIndex(defenceInstances);
+      if (targetIndex >= 0) {
+        const target = defenceInstances[targetIndex];
+        const targetResult = applyBombardmentDamageToDefence(target, bombPayload);
+        if (targetResult.damage > 0) {
+          hits += 1;
+          totalDamage += targetResult.damage;
+          defenceTargets.push({
+            type: target.type.type,
+            damage: targetResult.damage,
+            hullBefore: targetResult.hullBefore,
+            hullAfter: targetResult.hullAfter,
+            destroyed: targetResult.destroyed
+          });
+          if (targetResult.destroyed) {
+            defenceInstances.splice(targetIndex, 1);
+          }
+        }
+      }
+    } else {
+      const targetType = targetTypes[Math.floor(Math.random() * targetTypes.length)];
+      const structuralPointsBefore = planet.getCurrentBuildingStructuralPoints(targetType);
+      const appliedDamage = planet.applyBuildingStructuralDamage(targetType, bombPayload);
+      if (appliedDamage > 0) {
+        hits += 1;
+        totalDamage += appliedDamage;
+        buildingTargets.push({
+          type: targetType,
+          damage: appliedDamage,
+          remainingStructuralPoints: planet.getCurrentBuildingStructuralPoints(targetType),
+          reducedToZero: structuralPointsBefore > 0 && planet.getCurrentBuildingStructuralPoints(targetType) <= 0,
+          structuralUtilization: planet.getBuildingStructuralUtilization(targetType),
+          minimumStructuralUtilization: planet.getBuildingMinimumStructuralUtilization(targetType)
+        });
+      }
+    }
+
+    bomb.hull = 0;
+    bomb.shield = 0;
+  }
+
+  const aliveDefenceInterceptors = defenceInstances.filter((instance) => instance.hull > 0);
+  for (const interceptor of aliveDefenceInterceptors) {
+    for (const weapon of interceptor.type.weapons) {
+      if (
+        weapon.type !== WeaponType.BEAM
+        && weapon.type !== WeaponType.MISSILE
+        && weapon.type !== WeaponType.RAIL_GUN
+      ) {
+        continue;
+      }
+
+      const shotsToFire = Math.max(0, Math.floor(weapon.shots));
+      for (let shotIndex = 0; shotIndex < shotsToFire; shotIndex += 1) {
+        const bombTargetIndex = selectRandomAliveDefenceIndex(bombInstances);
+        if (bombTargetIndex < 0) {
+          break;
+        }
+
+        const bombTarget = bombInstances[bombTargetIndex];
+        const interceptResult = applyWeaponDamageToBomb(bombTarget, weapon.type, weapon.dmg);
+        if (interceptResult.damage <= 0) {
+          continue;
+        }
+
+        bombsIntercepted += 1;
+      }
+    }
+  }
+
   planet.rBDSFTQ.defences = ManyDefences.fromDefenceInstances(defenceInstances);
   planet.rBDSFTQ.defences.addManyDefences(planetaryBombs);
+  const remainingBombs = ManyDefences.fromDefenceInstances(bombInstances);
 
   return {
     shots,
     hits,
     totalDamage,
+    bombsLaunched,
+    bombsActivated,
+    bombsIntercepted,
+    bombsLost: bombInstances.filter((bomb) => bomb.hull <= 0).length,
     buildingTargetCount: availableBuildingTargets.length,
-    defenceTargetCount: defenceInstances.length,
+    defenceTargetCount: defenceInstances.filter((instance) => instance.hull > 0).length,
+    remainingBombs,
     buildingTargets,
     defenceTargets
   };
@@ -195,6 +322,22 @@ function selectGroundTargetCategory(
   return canHitDefences ? 'defence' : 'building';
 }
 
+function selectPreferredGroundTargetCategory(
+  canHitBuildings: boolean,
+  canHitDefences: boolean,
+  preferredCategory: 'building' | 'defence'
+): 'building' | 'defence' | null {
+  if (!canHitBuildings && !canHitDefences) {
+    return null;
+  }
+
+  if (preferredCategory === 'defence') {
+    return canHitDefences ? 'defence' : 'building';
+  }
+
+  return canHitBuildings ? 'building' : 'defence';
+}
+
 function selectRandomAliveDefenceIndex(defences: DefenceInstance[]): number {
   const candidates = defences
     .map((defence, index) => ({ defence, index }))
@@ -207,7 +350,7 @@ function selectRandomAliveDefenceIndex(defences: DefenceInstance[]): number {
   return selected?.index ?? -1;
 }
 
-function applyBombardmentDamageToDefence(
+export function applyBombardmentDamageToDefence(
   target: DefenceInstance,
   weaponDamage: number
 ): { damage: number; hullBefore: number; hullAfter: number; destroyed: boolean } {
@@ -239,6 +382,39 @@ function applyBombardmentDamageToDefence(
     hullBefore,
     hullAfter: target.hull,
     destroyed
+  };
+}
+
+function applyWeaponDamageToBomb(
+  target: DefenceInstance,
+  weaponType: WeaponType,
+  weaponDamage: number
+): { damage: number; hullBefore: number; hullAfter: number; destroyed: boolean } {
+  const hullBefore = target.hull;
+  const shieldBefore = target.shield;
+  let shieldDamage = 0;
+  let hullDamage = 0;
+
+  if (weaponType === WeaponType.RAIL_GUN) {
+    hullDamage = Math.max(0, weaponDamage);
+  } else {
+    shieldDamage = Math.min(Math.max(0, shieldBefore), Math.max(0, weaponDamage));
+    const spilloverDamage = Math.max(0, weaponDamage - shieldDamage) / 2;
+    const armourPenalty = target.type.armor * (weaponType === WeaponType.MISSILE ? 2 : 1);
+    hullDamage = Math.max(0, spilloverDamage - armourPenalty);
+    target.shield = Math.max(0, shieldBefore - shieldDamage);
+  }
+
+  target.hull = Math.max(0, target.hull - hullDamage);
+  if (weaponType === WeaponType.RAIL_GUN) {
+    target.shield = shieldBefore;
+  }
+
+  return {
+    damage: Math.max(0, hullBefore - target.hull),
+    hullBefore,
+    hullAfter: target.hull,
+    destroyed: target.hull <= 0
   };
 }
 

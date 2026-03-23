@@ -5,6 +5,7 @@ import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
 import {
   applyBuildingBombardment,
+  hasBombardmentCapability,
   hasBombardmentWeapons,
   hasDamagedBuildings
 } from '../bombardment/building-bombardment';
@@ -874,12 +875,16 @@ function applyPostArrivalBombardmentIfNeeded(
     return;
   }
 
-  if (ManyShips.totalShipsCount(fleet.ships) <= 0 || !hasBombardmentWeapons(fleet.ships)) {
+  if (
+    ManyShips.totalShipsCount(fleet.ships) <= 0
+    || !hasBombardmentCapability(fleet.ships, fleet.carriedBombs)
+  ) {
     return;
   }
 
-  const summary = applyBuildingBombardment(fleet.ships, targetPlanet);
-  if (summary.shots <= 0 || summary.hits <= 0 || summary.totalDamage <= 0) {
+  const summary = applyBuildingBombardment(fleet.ships, targetPlanet, fleet.carriedBombs);
+  fleet.carriedBombs = summary.remainingBombs;
+  if (summary.shots <= 0) {
     return;
   }
 
@@ -1361,6 +1366,7 @@ function resolveReturnArrival(
   }
 
   addFleetShipsToPlanet(originPlanet, fleet.ships);
+  addFleetBombsToPlanet(originPlanet, fleet.carriedBombs);
   originPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
     fleet.cargo.metal,
     fleet.cargo.crystal,
@@ -1392,6 +1398,13 @@ function addFleetShipsToPlanet(
   ships: ManyShipsLike
 ): void {
   planet.rBDSFTQ.ships.addManyShips(ships);
+}
+
+function addFleetBombsToPlanet(
+  planet: Planet,
+  bombs: ManyDefences
+): void {
+  planet.rBDSFTQ.defences.addManyDefences(bombs);
 }
 
 function applyMissionResolution(
@@ -1498,6 +1511,7 @@ function resolvePlanetBattle(
   maxRounds = SpaceBattleResolver.DEFAULT_MAX_ROUNDS
 ): SpaceBattleResult {
   const attackerShips = ManyShips.toShipInstances(fleet.ships);
+  const attackerBombs = ManyDefences.toDefenceInstances(fleet.carriedBombs);
   const defenderShips = ManyShips.toShipInstances(targetPlanet.rBDSFTQ.ships);
   const splitDefences = splitPlanetaryBombDefences(targetPlanet.rBDSFTQ.defences);
   const defenderDefences = ManyDefences.toDefenceInstances(splitDefences.activeDefences);
@@ -1513,6 +1527,7 @@ function resolvePlanetBattle(
       defences: defenderDefences,
       label: defender.playerName
     },
+    attackerPlanetaryBombs: attackerBombs,
     reportContext: {
       createdTurn: resolvedTurnNumber,
       sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
@@ -1523,6 +1538,7 @@ function resolvePlanetBattle(
   });
 
   fleet.ships = ManyShips.fromShipInstances(battleResult.attacker.survivingShips);
+  fleet.carriedBombs = ManyDefences.fromDefenceInstances(attackerBombs);
   const overflowShips = fleet.ships.trimNonJumpShipsToTravelHangarCapacity();
   targetPlanet.rBDSFTQ.ships = ManyShips.fromShipInstances(battleResult.defender.survivingShips);
   targetPlanet.rBDSFTQ.defences = ManyDefences.fromDefenceInstances(battleResult.defender.survivingDefences);
@@ -1688,6 +1704,10 @@ function addBombardmentReport(
       `Shots: ${summary.shots}`,
       `Hits: ${summary.hits}`,
       `Total structural damage: ${summary.totalDamage}`,
+      `Planetary bombs launched: ${summary.bombsLaunched}`,
+      `Planetary bombs activated: ${summary.bombsActivated}`,
+      `Planetary bombs intercepted: ${summary.bombsIntercepted}`,
+      `Planetary bombs lost: ${summary.bombsLost}`,
       `Buildings engaged: ${summary.buildingTargetCount}`,
       `Defences engaged: ${summary.defenceTargetCount}`,
       'Building damage summary:',

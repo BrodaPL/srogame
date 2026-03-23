@@ -43,6 +43,7 @@ export class MissionEffectExecutor {
     switch (effect.type) {
       case 'mergeFleetToPlanet':
         this.resolvePlanet(effect.planetRef, context)?.rBDSFTQ.ships.addManyShips(context.fleet.ships);
+        this.resolvePlanet(effect.planetRef, context)?.rBDSFTQ.defences.addManyDefences(context.fleet.carriedBombs);
         break;
       case 'transferFleetCargoToPlanet':
         this.resolvePlanet(effect.planetRef, context)?.rBDSFTQ.resources.addResourcePack(new ResourcesPack(

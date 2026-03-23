@@ -1,4 +1,5 @@
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
+import { ShipPurpose } from '../enums/ship-purpose';
 import { ShipType } from '../enums/ship-type';
 import { ShipInstance } from './ship-instance';
 
@@ -486,6 +487,26 @@ export class ManyShips implements ManyShipsLike {
     for (const [type, amount] of counts.entries()) {
       const blueprint = SHIP_BLUEPRINTS.get(type);
       if (!blueprint || !blueprint.canJump || blueprint.hangarCapacity <= 0) {
+        continue;
+      }
+
+      total += blueprint.hangarCapacity * amount;
+    }
+
+    return total;
+  }
+
+  public static totalBomberHangarCapacity(data: ManyShipsLike | null | undefined): number {
+    const counts = ManyShips.countByType(data);
+    let total = 0;
+    for (const [type, amount] of counts.entries()) {
+      const blueprint = SHIP_BLUEPRINTS.get(type);
+      if (
+        !blueprint
+        || !blueprint.canJump
+        || blueprint.hangarCapacity <= 0
+        || !blueprint.purposes.has(ShipPurpose.BOMBER)
+      ) {
         continue;
       }
 

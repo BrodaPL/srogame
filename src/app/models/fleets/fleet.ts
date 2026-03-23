@@ -2,6 +2,7 @@ import { Destination } from './destination';
 import { FleetMissionType } from '../enums/fleet-mission-type';
 import { ManyShips } from './many-ships';
 import { ResourcesPack } from '../resources-pack';
+import { ManyDefences } from '../defences/many-defences';
 
 export enum FleetState {
   MOVING_TO_TARGET = 'MOVING_TO_TARGET',
@@ -28,6 +29,7 @@ export class Fleet {
     public travelTurns: number,
     public returnTurns: number,
     public state: FleetState,
-    public createdAtTurn: number
+    public createdAtTurn: number,
+    public carriedBombs: ManyDefences = ManyDefences.empty()
   ) {}
 }

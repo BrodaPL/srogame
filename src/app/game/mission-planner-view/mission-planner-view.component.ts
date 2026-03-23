@@ -5,14 +5,20 @@ import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
+import { DefenceType } from '../../models/enums/defence-type';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { ShipPurpose } from '../../models/enums/ship-purpose';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
+import { Defence } from '../../models/defences/defence';
+import { countPlanetaryBombs, isPlanetaryBombDefenceType } from '../../models/defences/planetary-bomb';
 import { Fleet } from '../../models/fleets/fleet';
+import { ManyDefences } from '../../models/defences/many-defences';
 import { ManyShips } from '../../models/fleets/many-ships';
 import type {
+  CreateFleetBombSelectionEntry,
   ClientCoordinates,
   ClientPlanetDto,
   CreateFleetMissionRequest,
@@ -54,6 +60,17 @@ type ShipSelectionRowVm = {
 type MissionWarningVm = {
   text: string;
   severity: 'error' | 'note';
+};
+
+type BombSelectionRowVm = {
+  type: DefenceType;
+  label: string;
+  available: number;
+  selected: number;
+  size: number;
+  hull: number;
+  shots: number;
+  damage: number;
 };
 
 const PHASE_ONE_MISSION_TYPES: FleetMissionType[] = [
@@ -110,8 +127,10 @@ export class MissionPlannerViewComponent implements OnInit {
   ]);
 
   private readonly shipBlueprintsByType = new Map<ShipType, Ship>();
+  private readonly bombBlueprintsByType = new Map<DefenceType, Defence>();
   private readonly undamagedShipSelectionByType = new Map<ShipType, number>();
   private readonly damagedShipSelectionByType = new Map<ShipType, number>();
+  private readonly bombSelectionByType = new Map<DefenceType, number>();
   private pendingTargetCoordinates: ClientCoordinates | null = null;
   private pendingMissionType: FleetMissionType | null = null;
 
@@ -128,6 +147,16 @@ export class MissionPlannerViewComponent implements OnInit {
       this.shipBlueprintsByType.set(shipType, ship);
       this.undamagedShipSelectionByType.set(shipType, 0);
       this.damagedShipSelectionByType.set(shipType, 0);
+    }
+
+    const defenceBlueprints = DefenceBlueprintsFactory.fromDefaultJson();
+    for (const [defenceType, defence] of defenceBlueprints.defencesMap.entries()) {
+      if (!isPlanetaryBombDefenceType(defenceType)) {
+        continue;
+      }
+
+      this.bombBlueprintsByType.set(defenceType, defence);
+      this.bombSelectionByType.set(defenceType, 0);
     }
   }
 
@@ -209,6 +238,9 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected warningRows(): MissionWarningVm[] {
     const warnings = this.currentMission().getPlannerChecks(this.buildPlannerContext());
+    if (this.usedBombHangarCapacity() > this.totalBomberHangarCapacity()) {
+      warnings.push({ text: 'Insufficient bomber hangar space for carried bombs.', severity: 'error' });
+    }
     if (
       this.selectedMissionType === FleetMissionType.REPAIR
       && (this.selectedRepairCapability().shipRepair + this.selectedRepairCapability().droneRepair) <= 0
@@ -251,6 +283,25 @@ export class MissionPlannerViewComponent implements OnInit {
     return total;
   }
 
+  protected totalBomberHangarCapacity(): number {
+    let total = 0;
+    for (const entry of this.selectedShipEntries()) {
+      const blueprint = this.shipBlueprintsByType.get(entry.type);
+      if (
+        !blueprint
+        || !blueprint.canJump
+        || blueprint.hangarCapacity <= 0
+        || !blueprint.purposes.has(ShipPurpose.BOMBER)
+      ) {
+        continue;
+      }
+
+      total += blueprint.hangarCapacity * this.selectedShipSelectionAmount(entry);
+    }
+
+    return total;
+  }
+
   protected usedCargoCapacity(): number {
     return this.cargoMetal + this.cargoCrystal + this.cargoDeuterium;
   }
@@ -270,7 +321,61 @@ export class MissionPlannerViewComponent implements OnInit {
       total += blueprint.size * this.selectedShipSelectionAmount(entry);
     }
 
+    for (const entry of this.selectedBombEntries()) {
+      const blueprint = this.bombBlueprintsByType.get(entry.type);
+      if (!blueprint) {
+        continue;
+      }
+
+      total += blueprint.size * entry.amount;
+    }
+
     return total;
+  }
+
+  protected usedBombHangarCapacity(): number {
+    let total = 0;
+    for (const entry of this.selectedBombEntries()) {
+      const blueprint = this.bombBlueprintsByType.get(entry.type);
+      if (!blueprint) {
+        continue;
+      }
+
+      total += blueprint.size * entry.amount;
+    }
+
+    return total;
+  }
+
+  protected totalSelectedBombs(): number {
+    return this.selectedBombEntries().reduce((sum, entry) => sum + entry.amount, 0);
+  }
+
+  protected selectedBombRows(): BombSelectionRowVm[] {
+    const availableByType = this.availableBombCounts(this.selectedOriginPlanet);
+    const rows: BombSelectionRowVm[] = [];
+
+    for (const [type, blueprint] of this.bombBlueprintsByType.entries()) {
+      const available = availableByType.get(type) ?? 0;
+      const selected = this.selectedBombAmount(type);
+      if (available <= 0 && selected <= 0) {
+        continue;
+      }
+
+      const bombWeapon = blueprint.weapons[0];
+      rows.push({
+        type,
+        label: blueprint.getName(),
+        available,
+        selected,
+        size: blueprint.size,
+        hull: blueprint.hullPointsCapacity,
+        shots: bombWeapon?.shots ?? 0,
+        damage: bombWeapon?.dmg ?? 0
+      });
+    }
+
+    return rows;
   }
 
   protected shipRepairCapabilityLabel(): string {
@@ -428,6 +533,49 @@ export class MissionPlannerViewComponent implements OnInit {
     }
   }
 
+  protected selectedBombAmount(defenceType: DefenceType): number {
+    return this.bombSelectionByType.get(defenceType) ?? 0;
+  }
+
+  protected maxBombAmount(defenceType: DefenceType): number {
+    const available = this.availableBombCounts(this.selectedOriginPlanet).get(defenceType) ?? 0;
+    const blueprint = this.bombBlueprintsByType.get(defenceType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const usedWithoutThisType = this.usedBombHangarCapacity() - (this.selectedBombAmount(defenceType) * blueprint.size);
+    const remainingBomberHangar = Math.max(0, this.totalBomberHangarCapacity() - usedWithoutThisType);
+    const hangarLimitedAmount = blueprint.size <= 0
+      ? available
+      : Math.floor(remainingBomberHangar / blueprint.size);
+    return Math.max(0, Math.min(available, hangarLimitedAmount));
+  }
+
+  protected setBombAmount(defenceType: DefenceType, value: string | number): void {
+    const raw = typeof value === 'string' ? Number.parseInt(value, 10) : value;
+    const normalized = Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+    const capped = Math.min(normalized, this.maxBombAmount(defenceType));
+    this.bombSelectionByType.set(defenceType, capped);
+    this.normalizeShipSelectionForMission();
+  }
+
+  protected fillMaxBomb(defenceType: DefenceType): void {
+    this.bombSelectionByType.set(defenceType, this.maxBombAmount(defenceType));
+    this.normalizeShipSelectionForMission();
+  }
+
+  protected clearBomb(defenceType: DefenceType): void {
+    this.bombSelectionByType.set(defenceType, 0);
+    this.normalizeShipSelectionForMission();
+  }
+
+  protected clearAllBombs(): void {
+    for (const defenceType of this.bombBlueprintsByType.keys()) {
+      this.bombSelectionByType.set(defenceType, 0);
+    }
+  }
+
   protected launchMission(): void {
     if (!this.canLaunch() || !this.selectedOriginPlanet || !this.selectedTargetPlanet) {
       return;
@@ -444,6 +592,7 @@ export class MissionPlannerViewComponent implements OnInit {
       origin: this.selectedOriginPlanet.coordinates,
       target: this.selectedTargetPlanet.coordinates,
       ships: this.selectedShipEntries(),
+      carriedBombs: this.selectedBombEntries(),
       cargo: {
         metal: this.cargoMetal,
         crystal: this.cargoCrystal,
@@ -466,6 +615,7 @@ export class MissionPlannerViewComponent implements OnInit {
           this.selectedOriginPlanet = this.findOwnedPlanet(this.selectedOriginPlanet?.coordinates ?? null);
           this.selectedTargetPlanet = this.findOwnedPlanet(this.selectedTargetPlanet?.coordinates ?? null) ?? this.selectedTargetPlanet;
           this.clearAllShips();
+          this.clearAllBombs();
           this.cargoMetal = 0;
           this.cargoCrystal = 0;
           this.cargoDeuterium = 0;
@@ -556,6 +706,20 @@ export class MissionPlannerViewComponent implements OnInit {
     return entries;
   }
 
+  private selectedBombEntries(): CreateFleetBombSelectionEntry[] {
+    const entries: CreateFleetBombSelectionEntry[] = [];
+    for (const [type] of this.bombBlueprintsByType.entries()) {
+      const amount = this.selectedBombAmount(type);
+      if (amount <= 0) {
+        continue;
+      }
+
+      entries.push({ type, amount });
+    }
+
+    return entries;
+  }
+
   private availableShipCounts(planet: ClientPlanetDto | null): Map<ShipType, number> {
     if (!planet) {
       return new Map<ShipType, number>();
@@ -596,9 +760,18 @@ export class MissionPlannerViewComponent implements OnInit {
       }
     }
 
+    for (const defenceType of this.bombBlueprintsByType.keys()) {
+      const maxAmount = this.maxBombAmount(defenceType);
+      const currentAmount = this.selectedBombAmount(defenceType);
+      if (currentAmount > maxAmount) {
+        this.bombSelectionByType.set(defenceType, maxAmount);
+      }
+    }
+
     this.applyNormalizedSelection(this.currentMission().normalizeSelection({
       selection: {
         ships: this.selectedShipEntries(),
+        carriedBombs: this.selectedBombEntries(),
         cargo: {
           metal: this.cargoMetal,
           crystal: this.cargoCrystal,
@@ -622,6 +795,23 @@ export class MissionPlannerViewComponent implements OnInit {
 
   private selectedShipSelectionAmount(entry: CreateFleetShipSelectionEntry): number {
     return entry.undamagedAmount + entry.damagedAmount;
+  }
+
+  private availableBombCounts(planet: ClientPlanetDto | null): Map<DefenceType, number> {
+    if (!planet) {
+      return new Map<DefenceType, number>();
+    }
+
+    const counts = new Map<DefenceType, number>();
+    for (const [type, amount] of ManyDefences.countByType(planet.objects.defences).entries()) {
+      if (!isPlanetaryBombDefenceType(type)) {
+        continue;
+      }
+
+      counts.set(type, amount);
+    }
+
+    return counts;
   }
 
   private selectedRepairCapability() {
@@ -744,6 +934,7 @@ export class MissionPlannerViewComponent implements OnInit {
   private buildPlannerContext(): MissionPlannerContext {
     const selection = {
       ships: this.selectedShipEntries(),
+      carriedBombs: this.selectedBombEntries(),
       cargo: {
         metal: this.cargoMetal,
         crystal: this.cargoCrystal,
@@ -773,11 +964,19 @@ export class MissionPlannerViewComponent implements OnInit {
     };
   }
 
-  private applyNormalizedSelection(selection: { ships: CreateFleetShipSelectionEntry[]; cargo: { metal: number; crystal: number; deuterium: number } }): void {
+  private applyNormalizedSelection(selection: {
+    ships: CreateFleetShipSelectionEntry[];
+    carriedBombs: CreateFleetBombSelectionEntry[];
+    cargo: { metal: number; crystal: number; deuterium: number };
+  }): void {
     this.clearAllShips();
+    this.clearAllBombs();
     for (const entry of selection.ships) {
       this.undamagedShipSelectionByType.set(entry.type, Math.max(0, entry.undamagedAmount));
       this.damagedShipSelectionByType.set(entry.type, Math.max(0, entry.damagedAmount));
+    }
+    for (const entry of selection.carriedBombs ?? []) {
+      this.bombSelectionByType.set(entry.type, Math.max(0, entry.amount));
     }
 
     this.cargoMetal = Math.max(0, selection.cargo.metal);

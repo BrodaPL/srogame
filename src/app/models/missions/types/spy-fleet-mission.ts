@@ -21,6 +21,7 @@ export class SpyFleetMission extends FleetMission {
       ships: context.selection.ships
         .filter((entry) => entry.type === ShipType.SPY_PROBE)
         .map((entry) => ({ ...entry })),
+      carriedBombs: [],
       cargo: {
         metal: 0,
         crystal: 0,

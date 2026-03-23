@@ -175,6 +175,11 @@ export type CreateFleetShipSelectionEntry = {
   damagedAmount: number;
 };
 
+export type CreateFleetBombSelectionEntry = {
+  type: DefenceType;
+  amount: number;
+};
+
 export type ManyShipsDto = ManyShipsLike;
 export type ManyDefencesDto = ManyDefencesLike;
 
@@ -331,6 +336,7 @@ export type CreateFleetMissionRequest = {
   origin: ClientCoordinates;
   target: ClientCoordinates;
   ships: CreateFleetShipSelectionEntry[];
+  carriedBombs: CreateFleetBombSelectionEntry[];
   cargo: ResourcesPackDto;
 };
 

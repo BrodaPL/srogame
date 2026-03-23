@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { Defence } from '../../defences/defence';
+import { DefenceInstance } from '../../defences/defence-instance';
+import { DefenceType } from '../../enums/defence-type';
 import { HullClass } from '../../enums/hull-class';
 import { PlayerType } from '../../enums/player-type';
 import { ShipType } from '../../enums/ship-type';
@@ -88,6 +91,47 @@ describe('SpaceBattleResolver', () => {
     hull = ship.hullPointsCapacity,
     shield = ship.shieldCapacity
   ): ShipInstance => new ShipInstance(ship, hull, shield, 0, []);
+
+  const createDefence = (
+    type: DefenceType,
+    hullClass: HullClass,
+    weapons: Weapon[],
+    {
+      canShootToOrbit = true,
+      size = 1,
+      hullPointsCapacity = 50,
+      criticalThreshold = 25,
+      shieldCapacity = 0,
+      armor = 0
+    }: {
+      canShootToOrbit?: boolean;
+      size?: number;
+      hullPointsCapacity?: number;
+      criticalThreshold?: number;
+      shieldCapacity?: number;
+      armor?: number;
+    } = {}
+  ): Defence => new Defence(
+    type,
+    '',
+    hullClass,
+    canShootToOrbit,
+    size,
+    hullPointsCapacity,
+    criticalThreshold,
+    shieldCapacity,
+    armor,
+    weapons,
+    new ResourcesPack(0, 0, 0),
+    [],
+    []
+  );
+
+  const createDefenceInstance = (
+    defence: Defence,
+    hull = defence.hullPointsCapacity,
+    shield = defence.shieldCapacity
+  ): DefenceInstance => new DefenceInstance(defence, hull, shield);
 
   const createFleet = (
     ship: Ship,
@@ -554,6 +598,45 @@ describe('SpaceBattleResolver', () => {
     expect(attacker.reports[0].show()).toContain('Perspective: Attacker');
     expect(defender.reports[0].show()).toContain('Perspective: Defender');
     expect(attacker.reports[0].show()).toContain('Battle result: Attacker');
+  });
+
+  it('resolves carried size-1 planetary bombs after the normal round fire against planetary defences', () => {
+    const resolver = new SpaceBattleResolver();
+    const attacker = createPlayer(1, 'Attacker');
+    const defender = createPlayer(2, 'Defender');
+    const carrierShip = createShip(
+      ShipType.CARRIER,
+      [],
+      { hullPointsCapacity: 200, shieldCapacity: 100 }
+    );
+    const interceptorDefence = createDefence(
+      DefenceType.LIGHT_BEAM_CANNON,
+      HullClass.SMALL,
+      [new Weapon(WeaponType.BEAM, 10, 1)],
+      { hullPointsCapacity: 30, armor: 1 }
+    );
+    const bombDefence = createDefence(
+      DefenceType.SMALL_BOMB,
+      HullClass.PLANETARY_BOMB,
+      [new Weapon(WeaponType.ORBIT_TO_SURFACE_BOMB, 100, 1)],
+      { canShootToOrbit: false, size: 1, hullPointsCapacity: 10 }
+    );
+
+    const result = resolver.resolve({
+      attacker: { player: attacker, ships: [createShipInstance(carrierShip)] },
+      defender: { player: defender, ships: [], defences: [createDefenceInstance(interceptorDefence)] },
+      attackerPlanetaryBombs: [createDefenceInstance(bombDefence)],
+      reportContext: { createdTurn: 9 },
+      maxRounds: 1,
+      randomSource: new SequenceRandomSource([0.6, 0.6, 0.6, 0.6, 0.6, 0.6])
+    });
+
+    expect(result.roundSummaries).toHaveLength(1);
+    expect(result.roundSummaries[0].planetaryBombActions).toHaveLength(1);
+    expect(result.roundSummaries[0].planetaryBombActions[0].activated).toBe(true);
+    expect(result.roundSummaries[0].planetaryBombActions[0].bombHullAfter).toBe(0);
+    expect(result.roundSummaries[0].planetaryBombActions[0].damage).toBeGreaterThan(0);
+    expect(result.defender.survivingDefenceCount).toBe(0);
   });
 
   it('simulates a full 4-round battle when armor prevents all hull damage', () => {

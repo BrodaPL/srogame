@@ -1,4 +1,9 @@
-import type { ClientPlanetDto, CreateFleetShipSelectionEntry, ResourcesPackDto } from '../game-api-types';
+import type {
+  ClientPlanetDto,
+  CreateFleetBombSelectionEntry,
+  CreateFleetShipSelectionEntry,
+  ResourcesPackDto
+} from '../game-api-types';
 import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
 import type { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
 import type { Ship } from '../fleets/ship';
@@ -8,6 +13,7 @@ import type { Player } from '../player';
 
 export type MissionSelection = {
   ships: CreateFleetShipSelectionEntry[];
+  carriedBombs: CreateFleetBombSelectionEntry[];
   cargo: ResourcesPackDto;
 };
 

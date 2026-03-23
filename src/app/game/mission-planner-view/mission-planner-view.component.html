@@ -102,6 +102,17 @@
               </div>
             }
 
+            <div class="mission-planner__cargo-grid">
+              <div class="overview-stat mission-planner__detail-stat">
+                <span class="overview-stat__label">Carried bombs</span>
+                <span class="overview-stat__value">{{ totalSelectedBombs() }}</span>
+              </div>
+              <div class="overview-stat mission-planner__detail-stat">
+                <span class="overview-stat__label">Bomber hangars</span>
+                <span class="overview-stat__value">{{ usedBombHangarCapacity() }} / {{ totalBomberHangarCapacity() }}</span>
+              </div>
+            </div>
+
             <div class="mission-planner__disabled-row">
               <button class="mission-planner__small-button" type="button" [disabled]="!speedSelectorEnabled">
                 Speed selector (later)
@@ -153,6 +164,10 @@
                 <div class="overview-stat">
                   <span class="overview-stat__label">Hangar total</span>
                   <span class="overview-stat__value">{{ totalHangarCapacity() }}</span>
+                </div>
+                <div class="overview-stat">
+                  <span class="overview-stat__label">Bomber hangars</span>
+                  <span class="overview-stat__value">{{ usedBombHangarCapacity() }} / {{ totalBomberHangarCapacity() }}</span>
                 </div>
               </div>
             </div>
@@ -294,6 +309,56 @@
             }
             @if (selectedShipRows().length === 0) {
               <p class="overview-empty">No ships match the current purpose filters.</p>
+            }
+          </div>
+        </section>
+
+        <section class="mission-planner__section overview-card">
+          <div class="mission-planner__section-head">
+            <div>
+              <h3>Bomb Loadout</h3>
+              <p class="overview-muted">Bomber hangars can carry PLANETARY_BOMB units from the origin planet.</p>
+            </div>
+            <button class="mission-planner__small-button" type="button" (click)="clearAllBombs()">Clear bombs</button>
+          </div>
+
+          <div class="mission-planner__ships">
+            @for (row of selectedBombRows(); track row.type) {
+              <article class="mission-planner__ship-row">
+                <div class="mission-planner__ship-main">
+                  <div class="mission-planner__ship-head">
+                    <h4 class="mission-planner__ship-title">{{ row.label }}</h4>
+                    <div class="mission-planner__ship-tags">
+                      <span class="mission-planner__ship-tag">Planetary bomb</span>
+                    </div>
+                  </div>
+                  <p class="mission-planner__ship-meta">
+                    Available: {{ row.available }} | Size: {{ row.size }} | Hull: {{ row.hull }} | Payload: {{ row.damage }} x {{ row.shots }}
+                  </p>
+                </div>
+                <div class="mission-planner__ship-actions">
+                  <div class="mission-planner__selection-group">
+                    <span class="mission-planner__selection-label">Loaded</span>
+                    <button class="mission-planner__small-button" type="button" (click)="fillMaxBomb(row.type)" [disabled]="row.available <= 0">
+                      Max
+                    </button>
+                    <button class="mission-planner__small-button" type="button" (click)="clearBomb(row.type)" [disabled]="row.selected <= 0">
+                      Clear
+                    </button>
+                    <input
+                      class="mission-planner__amount-input"
+                      type="number"
+                      min="0"
+                      [max]="row.available"
+                      [ngModel]="row.selected"
+                      (ngModelChange)="setBombAmount(row.type, $event)"
+                    />
+                  </div>
+                </div>
+              </article>
+            }
+            @if (selectedBombRows().length === 0) {
+              <p class="overview-empty">No PLANETARY_BOMB units are available on the selected origin planet.</p>
             }
           </div>
         </section>

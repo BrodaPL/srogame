@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
+import { DefenceType } from '../../enums/defence-type';
 import { BuildingType } from '../../enums/building-type';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
 import { PlayerType } from '../../enums/player-type';
 import { ShipType } from '../../enums/ship-type';
+import { ManyDefences } from '../../defences/many-defences';
 import { Fleet, FleetState } from '../../fleets/fleet';
 import { ManyShips } from '../../fleets/many-ships';
 import { ShipInstance } from '../../fleets/ship-instance';
@@ -57,6 +59,15 @@ function mixedShips(options: {
   }
 
   return ships;
+}
+
+function manyDefences(...entries: Array<{ type: DefenceType; amount: number }>): ManyDefences {
+  const defences = ManyDefences.empty();
+  for (const entry of entries) {
+    defences.addUndamaged(entry.type, entry.amount);
+  }
+
+  return defences;
 }
 
 function createPlayersAndGalaxy(activeFleet: Fleet, configure: (system: SolarSystem) => void) {
@@ -843,6 +854,49 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(galaxy.activeFleets).toHaveLength(1);
     expect(galaxy.activeFleets[0].state).toBe(FleetState.RETURNING);
     expect(system.planets[1].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeLessThan(maxStructuralPoints);
+  });
+
+  it('lets carried planetary bombs drive Bombard missions even without ship bombardment weapons', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.6);
+
+    const bombardFleet = new Fleet(
+      302,
+      1,
+      FleetMissionType.BOMBARD,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Bastion',
+      manyShips({ type: ShipType.CARRIER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1,
+      manyDefences({ type: DefenceType.MEDIUM_BOMB, amount: 1 })
+    );
+
+    const { galaxy, system } = createPlayersAndGalaxy(bombardFleet, (solarSystem) => {
+      solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+      solarSystem.planets[0].info.ownerId = 1;
+      solarSystem.planets[1].basicInfo.name = 'Beta Bastion';
+      solarSystem.planets[1].info.ownerId = 2;
+      solarSystem.planets[1].setBuildingLevel(BuildingType.METAL_MINE, 1);
+      solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+      solarSystem.planets[1].rBDSFTQ.defences = ManyDefences.empty();
+    });
+
+    const maxStructuralPoints = system.planets[1].getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.RETURNING);
+    expect(system.planets[1].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeLessThan(maxStructuralPoints);
+    expect(ManyDefences.totalDefencesCount(galaxy.activeFleets[0].carriedBombs)).toBe(0);
   });
 
   it('lets idle Siege fleets keep bombarding hostile buildings each turn', () => {

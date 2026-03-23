@@ -1,6 +1,9 @@
 import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { DefenceType } from '../enums/defence-type';
 import { HullClass } from '../enums/hull-class';
+import { WeaponType } from '../enums/weapon-type';
+import { Defence } from './defence';
+import { DefenceInstance } from './defence-instance';
 import { ManyDefences, type ManyDefencesLike } from './many-defences';
 
 const DEFENCE_BLUEPRINTS = DefenceBlueprintsFactory.fromDefaultJson();
@@ -48,4 +51,11 @@ export function splitPlanetaryBombDefences(
   }
 
   return { activeDefences, planetaryBombs };
+}
+
+export function totalOrbitToSurfaceBombPayload(defence: Defence | DefenceInstance): number {
+  const blueprint = defence instanceof DefenceInstance ? defence.type : defence;
+  return blueprint.weapons
+    .filter((weapon) => weapon.type === WeaponType.ORBIT_TO_SURFACE_BOMB)
+    .reduce((sum, weapon) => sum + (Math.max(0, weapon.dmg) * Math.max(0, Math.floor(weapon.shots))), 0);
 }

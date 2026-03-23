@@ -65,6 +65,7 @@ export class FleetMission {
   public normalizeSelection(context: MissionSelectionContext): MissionSelection {
     return {
       ships: context.selection.ships.map((entry) => ({ ...entry })),
+      carriedBombs: context.selection.carriedBombs.map((entry) => ({ ...entry })),
       cargo: this.blueprint.shipRules.allowCargo
         ? { ...context.selection.cargo }
         : { metal: 0, crystal: 0, deuterium: 0 }
@@ -261,7 +262,7 @@ export class FleetMission {
     }
 
     if (context.usedHangarCapacity > context.totalHangarCapacity) {
-      checks.push({ text: 'Insufficient hangar space for non-jump ships.', severity: 'error' });
+      checks.push({ text: 'Insufficient hangar space.', severity: 'error' });
     }
 
     if (context.activeFleetCount >= context.maxActiveFleetCount) {
