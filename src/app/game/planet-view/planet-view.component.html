@@ -413,6 +413,9 @@
               @if (hasDefencesOnPlanet()) {
                 <p class="planet-ships-status__meta">Total defences: {{ planetTotalDefencesCount() }}</p>
               }
+              @if (bombDepotStorageSummary(); as bombDepotSummary) {
+                <p class="planet-ships-status__meta">{{ bombDepotSummary }}</p>
+              }
             </div>
 
             @if (!hasDefencesOnPlanet()) {
@@ -453,7 +456,12 @@
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ defence.type }}</h4>
                   <p class="planet-building-card__meta">Hull class: {{ defence.hullClass }}</p>
-                  <p class="planet-building-card__meta">Can shoot to orbit: {{ defence.canShootToOrbit ? 'Yes' : 'No' }}</p>
+                  @if (defence.hullClass === HullClass.PLANETARY_BOMB) {
+                    <p class="planet-building-card__meta">Stored in Bomb Depot. Not active in combat yet.</p>
+                    <p class="planet-building-card__meta">{{ currentPlanetaryBombCount() }}/{{ bombDepotCapacity() }} stored</p>
+                  } @else {
+                    <p class="planet-building-card__meta">Can shoot to orbit: {{ defence.canShootToOrbit ? 'Yes' : 'No' }}</p>
+                  }
                   <label class="planet-building-card__amount">
                     <span>Amount:</span>
                     <input

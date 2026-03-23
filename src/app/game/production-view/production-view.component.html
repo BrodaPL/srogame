@@ -98,6 +98,9 @@
               <div>
                 <h3>Current Defences Queue</h3>
                 <p class="overview-muted">{{ selectedPlanetLabel() }}</p>
+                @if (bombDepotStorageSummary(); as bombDepotSummary) {
+                  <p class="overview-muted">{{ bombDepotSummary }}</p>
+                }
               </div>
             </div>
 
@@ -243,9 +246,14 @@
                   <div class="production-view__ship-main">
                     <h4 class="production-view__ship-title">{{ defence.type }}</h4>
                     <p class="production-view__ship-meta">Hull class {{ defence.hullClass }}</p>
-                    <p class="production-view__ship-meta">
-                      {{ defence.canShootToOrbit ? 'Can engage orbit targets' : 'Atmosphere guard only' }}
-                    </p>
+                    @if (defence.hullClass === HullClass.PLANETARY_BOMB) {
+                      <p class="production-view__ship-meta">Stored in Bomb Depot. Not active in combat yet.</p>
+                      <p class="production-view__ship-meta">{{ currentPlanetaryBombCount() }}/{{ bombDepotCapacity() }} stored</p>
+                    } @else {
+                      <p class="production-view__ship-meta">
+                        {{ defence.canShootToOrbit ? 'Can engage orbit targets' : 'Atmosphere guard only' }}
+                      </p>
+                    }
 
                     <label class="production-view__amount-field">
                       <span>Amount</span>

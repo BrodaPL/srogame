@@ -12,6 +12,7 @@ import { Building } from '../../models/buildings/building';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
 import { DefenceType } from '../../models/enums/defence-type';
+import { HullClass } from '../../models/enums/hull-class';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import type {
@@ -31,6 +32,7 @@ import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/t
 import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { ManyDefences } from '../../models/defences/many-defences';
+import { countPlanetaryBombs, isPlanetaryBombDefenceType } from '../../models/defences/planetary-bomb';
 import { Defence } from '../../models/defences/defence';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { Ship } from '../../models/fleets/ship';
@@ -122,6 +124,7 @@ type ResearchQueueRowVm = {
   styleUrl: './planet-view.component.css'
 })
 export class PlanetViewComponent implements OnInit, OnDestroy {
+  protected readonly HullClass = HullClass;
   protected planet: ClientPlanetDto | null = null;
   protected ownedPlanets: ClientPlanetDto[] = [];
   protected isLoading = false;
@@ -630,6 +633,32 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return ManyDefences.totalDefencesCount(this.planet?.objects.defences);
   }
 
+  protected bombDepotCapacity(): number {
+    return Math.max(0, Math.floor(this.getProductionAtLevelByType(BuildingType.BOMB_DEPOT, this.buildingLevel(BuildingType.BOMB_DEPOT))));
+  }
+
+  protected currentPlanetaryBombCount(): number {
+    return countPlanetaryBombs(this.planet?.objects.defences);
+  }
+
+  protected queuedPlanetaryBombCount(): number {
+    return (this.planet?.objects.shipyardQueue ?? [])
+      .filter((entry) => this.queueEntryItemKind(entry) === 'defence')
+      .filter((entry) => isPlanetaryBombDefenceType(this.queueEntryDefenceType(entry)))
+      .reduce((sum, entry) => sum + this.queueEntryShipAmount(entry), 0);
+  }
+
+  protected bombDepotStorageSummary(): string | null {
+    const capacity = this.bombDepotCapacity();
+    const current = this.currentPlanetaryBombCount();
+    const queued = this.queuedPlanetaryBombCount();
+    if (capacity <= 0 && current <= 0 && queued <= 0) {
+      return null;
+    }
+
+    return `Bomb depot storage: ${current}/${capacity}${queued > 0 ? ` (+${queued} queued)` : ''}`;
+  }
+
   protected planetUndamagedDefencesPercent(): number {
     const total = this.planetTotalDefencesCount();
     if (total <= 0) {
@@ -945,6 +974,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return false;
     }
 
+    if (this.wouldExceedBombDepotCapacity(defence.type, amount)) {
+      return false;
+    }
+
     return true;
   }
 
@@ -995,6 +1028,11 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     if (this.defenceStartInFlightByType.has(defence.type)) {
       return 'Adding to queue...';
+    }
+
+    const amount = this.defenceAmount(defence.type);
+    if (amount !== null && this.wouldExceedBombDepotCapacity(defence.type, amount)) {
+      return 'Bomb Depot capacity reached. Increase BOMB_DEPOT production or free bomb storage first.';
     }
 
     if (!this.canBuildDefence(defence)) {
@@ -2888,7 +2926,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private isZeroFloorBuilding(buildingType: BuildingType): boolean {
     return buildingType === BuildingType.JUMP_GATE
       || buildingType === BuildingType.SENSOR_PHALANX
-      || buildingType === BuildingType.MISSILE_SILO;
+      || buildingType === BuildingType.BOMB_DEPOT;
+  }
+
+  private wouldExceedBombDepotCapacity(defenceType: DefenceType, requestedAmount: number): boolean {
+    if (!isPlanetaryBombDefenceType(defenceType)) {
+      return false;
+    }
+
+    return this.currentPlanetaryBombCount() + this.queuedPlanetaryBombCount() + requestedAmount > this.bombDepotCapacity();
   }
 
   private buildingNextLevel(building: Building): number {

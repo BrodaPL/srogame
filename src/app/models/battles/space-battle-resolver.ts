@@ -4,6 +4,7 @@ import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
 import { WeaponType } from '../enums/weapon-type';
 import { DefenceInstance } from '../defences/defence-instance';
+import { isPlanetaryBombDefenceType } from '../defences/planetary-bomb';
 import { ShipInstance } from '../fleets/ship-instance';
 import { Player } from '../player';
 import { FleetReport } from '../reports/fleet-report';
@@ -258,7 +259,9 @@ export class SpaceBattleResolver {
       techModifiers,
       combatants: [
         ...input.ships.map((ship) => this.createBattleShipState(ship, techModifiers)),
-        ...(input.defences ?? []).map((defence) => this.createBattleDefenceState(defence, techModifiers))
+        ...(input.defences ?? [])
+          .filter((defence) => !isPlanetaryBombDefenceType(defence.type.type))
+          .map((defence) => this.createBattleDefenceState(defence, techModifiers))
       ]
     };
   }

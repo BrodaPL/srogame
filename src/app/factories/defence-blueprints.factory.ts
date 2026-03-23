@@ -62,7 +62,11 @@ export class DefenceBlueprintsFactory {
     [DefenceType.SAM_SITE]: 'images/ships/Heavy_Fighter.webp',
     [DefenceType.ORBITAL_MISSILE_LAUNCHER]: 'images/ships/Destroyer.webp',
     [DefenceType.HEAVY_ORBITAL_MISSILE_LAUNCHER]: 'images/ships/Battleship.webp',
-    [DefenceType.RAIL_GUN_CANNON]: 'images/ships/Death_Star.webp'
+    [DefenceType.RAIL_GUN_CANNON]: 'images/ships/Death_Star.webp',
+    [DefenceType.SMALL_BOMB]: 'images/ships/Bomber.webp',
+    [DefenceType.CLUSTER_BOMB]: 'images/ships/Bomber.webp',
+    [DefenceType.MEDIUM_BOMB]: 'images/ships/Bomber (1).webp',
+    [DefenceType.HEAVY_BOMB]: 'images/ships/Bomber (1).webp'
   };
 
   static fromDefaultJson(): DefenceBlueprints {

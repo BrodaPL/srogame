@@ -308,7 +308,7 @@ export class Planet {
     if (
       type === BuildingType.JUMP_GATE
       || type === BuildingType.SENSOR_PHALANX
-      || type === BuildingType.MISSILE_SILO
+      || type === BuildingType.BOMB_DEPOT
     ) {
       return 0;
     }

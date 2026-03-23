@@ -25,7 +25,11 @@
           <div>
             <h2 class="ship-card__title">{{ defence.getName() }}</h2>
             <p class="ship-card__subtitle ship-card__subtitle--wide">
-              {{ defence.canShootToOrbit ? 'Can engage orbiting ships.' : 'Can engage only small bombardment ships entering the atmosphere.' }}
+              {{ defence.hullClass === HullClass.PLANETARY_BOMB
+                ? 'Stored in Bomb Depot inventory. Phase 1 adds storage and production only; combat use comes later.'
+                : defence.canShootToOrbit
+                  ? 'Can engage orbiting ships.'
+                  : 'Can engage only small bombardment ships entering the atmosphere.' }}
             </p>
           </div>
           <span class="badge">{{ defence.hullClass }}</span>
@@ -54,7 +58,7 @@
           </div>
           <div class="ship-stat">
             <span class="ship-stat__label">Orbit fire</span>
-            <span class="ship-stat__value">{{ defence.canShootToOrbit ? 'Yes' : 'No' }}</span>
+            <span class="ship-stat__value">{{ defence.hullClass === HullClass.PLANETARY_BOMB ? 'No (inactive)' : defence.canShootToOrbit ? 'Yes' : 'No' }}</span>
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 import { SpaceBattleResolver, type SpaceBattleResult } from '../../battles/space-battle-resolver';
 import { ManyDefences, type DefenceAmountRequest } from '../../defences/many-defences';
+import { splitPlanetaryBombDefences } from '../../defences/planetary-bomb';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { DiplomacyResolver } from '../../diplomacy/diplomacy-resolver';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
@@ -154,6 +155,7 @@ export class EncounterResolver {
     stationaryOccupants: PlanetOrbitEncounterOccupantFleet[]
   ): OrbitForceRecord[] {
     const orbitForces: OrbitForceRecord[] = [];
+    const splitTargetDefences = splitPlanetaryBombDefences(targetPlanet.rBDSFTQ.defences);
 
     if (targetPlanet.info.ownerId !== null && ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships) > 0) {
       orbitForces.push({
@@ -167,14 +169,14 @@ export class EncounterResolver {
       });
     }
 
-    if (targetPlanet.info.ownerId !== null && ManyDefences.totalDefencesCount(targetPlanet.rBDSFTQ.defences) > 0) {
+    if (targetPlanet.info.ownerId !== null && ManyDefences.totalDefencesCount(splitTargetDefences.activeDefences) > 0) {
       orbitForces.push({
         kind: 'planetDefences',
         owner: null,
         planet: targetPlanet,
         fleet: null,
         ships: ManyShips.empty(),
-        defences: targetPlanet.rBDSFTQ.defences,
+        defences: splitTargetDefences.activeDefences,
         orderKey: -2
       });
     }
@@ -293,12 +295,15 @@ export class EncounterResolver {
       fleetId: arrival.fleet.fleetId,
       ships: ManyShips.fromData(arrival.fleet.ships)
     }));
-    const defenderInitialForces = defenders.map((force) => ({
-      force,
-      ships: ManyShips.fromData(force.ships)
-      ,
-      defences: ManyDefences.fromData(force.defences)
-    }));
+    const defenderInitialForces = defenders.map((force) => {
+      const splitDefences = splitPlanetaryBombDefences(force.defences);
+      return {
+        force,
+        ships: ManyShips.fromData(force.ships),
+        defences: splitDefences.activeDefences,
+        inactiveDefences: splitDefences.planetaryBombs
+      };
+    });
 
     const battleResult = this.battleResolver.resolve({
       attacker: {
@@ -335,6 +340,7 @@ export class EncounterResolver {
       const allocated = defenderSurvivorPool.extractAnyShipsByType(requested);
       const requestedDefences = this.toDefenceAmountRequests(defenderEntry.defences);
       const allocatedDefences = defenderDefenceSurvivorPool.extractAnyDefencesByType(requestedDefences);
+      allocatedDefences.addManyDefences(defenderEntry.inactiveDefences);
       if (defenderEntry.force.kind === 'orbitingShips' && defenderEntry.force.planet) {
         defenderEntry.force.planet.rBDSFTQ.ships = allocated;
       } else if (defenderEntry.force.kind === 'planetDefences' && defenderEntry.force.planet) {

@@ -12,7 +12,7 @@ export enum BuildingType {
   SHIPYARD = 'Shipyard',
   RESEARCH_LAB = 'Research Lab',
   ALLIANCE_DEPOT = 'Alliance Depot',
-  MISSILE_SILO = 'Missile Silo',
+  BOMB_DEPOT = 'Bomb Depot',
   NANITE_FACTORY = 'Nanite Factory',
   TERRAFORMER = 'Terraformer',
   SPACEPORT = 'Spaceport',

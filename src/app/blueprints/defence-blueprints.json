@@ -82,7 +82,7 @@
       "cost": { "metal": 20, "crystal": 0, "deuterium": 0 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 1 },
-        { "building": "MISSILE_SILO", "level": 1 }
+        { "building": "BOMB_DEPOT", "level": 1 }
       ],
       "techRequirements": [
         { "tech": "MISSILES_WEAPONS", "level": 1 }
@@ -104,7 +104,7 @@
       "cost": { "metal": 60, "crystal": 30, "deuterium": 10 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 2 },
-        { "building": "MISSILE_SILO", "level": 1 }
+        { "building": "BOMB_DEPOT", "level": 1 }
       ],
       "techRequirements": [
         { "tech": "MISSILES_WEAPONS", "level": 2 },
@@ -127,7 +127,7 @@
       "cost": { "metal": 200, "crystal": 60, "deuterium": 40 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 4 },
-        { "building": "MISSILE_SILO", "level": 2 }
+        { "building": "BOMB_DEPOT", "level": 2 }
       ],
       "techRequirements": [
         { "tech": "MISSILES_WEAPONS", "level": 4 },
@@ -155,6 +155,95 @@
       "techRequirements": [
         { "tech": "RAILGUNS_WEAPONS", "level": 3 },
         { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 2 }
+      ]
+    },
+    {
+      "type": "SMALL_BOMB",
+      "imagePath": "images/defence/Rocket_Launcher.webp",
+      "hullClass": "PLANETARY_BOMB",
+      "canShootToOrbit": false,
+      "size": 1,
+      "hullPointsCapacity": 10,
+      "criticalThreshold": 100,
+      "shieldCapacity": 0,
+      "armor": 0,
+      "weapons": [
+        { "type": "ORBIT_TO_SURFACE_BOMB", "dmg": 100, "shots": 1 }
+      ],
+      "cost": { "metal": 10, "crystal": 0, "deuterium": 0 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 1 },
+        { "building": "BOMB_DEPOT", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "MISSILES_WEAPONS", "level": 1 }
+      ]
+    },
+    {
+      "type": "CLUSTER_BOMB",
+      "imagePath": "images/defence/Interplanetary_Missile.webp",
+      "hullClass": "PLANETARY_BOMB",
+      "canShootToOrbit": false,
+      "size": 1,
+      "hullPointsCapacity": 10,
+      "criticalThreshold": 100,
+      "shieldCapacity": 0,
+      "armor": 0,
+      "weapons": [
+        { "type": "ORBIT_TO_SURFACE_BOMB", "dmg": 20, "shots": 10 }
+      ],
+      "cost": { "metal": 20, "crystal": 10, "deuterium": 0 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 1 },
+        { "building": "BOMB_DEPOT", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "MISSILES_WEAPONS", "level": 1 }
+      ]
+    },
+    {
+      "type": "MEDIUM_BOMB",
+      "imagePath": "images/defence/ABM.webp",
+      "hullClass": "PLANETARY_BOMB",
+      "canShootToOrbit": false,
+      "size": 2,
+      "hullPointsCapacity": 10,
+      "criticalThreshold": 100,
+      "shieldCapacity": 0,
+      "armor": 0,
+      "weapons": [
+        { "type": "ORBIT_TO_SURFACE_BOMB", "dmg": 600, "shots": 1 }
+      ],
+      "cost": { "metal": 100, "crystal": 10, "deuterium": 10 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 2 },
+        { "building": "BOMB_DEPOT", "level": 1 }
+      ],
+      "techRequirements": [
+        { "tech": "MISSILES_WEAPONS", "level": 2 }
+      ]
+    },
+    {
+      "type": "HEAVY_BOMB",
+      "imagePath": "images/defence/Anti-Ballistic_Missile.webp",
+      "hullClass": "PLANETARY_BOMB",
+      "canShootToOrbit": false,
+      "size": 3,
+      "hullPointsCapacity": 20,
+      "criticalThreshold": 100,
+      "shieldCapacity": 0,
+      "armor": 0,
+      "weapons": [
+        { "type": "ORBIT_TO_SURFACE_BOMB", "dmg": 2500, "shots": 1 }
+      ],
+      "cost": { "metal": 500, "crystal": 100, "deuterium": 100 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 4 },
+        { "building": "BOMB_DEPOT", "level": 2 }
+      ],
+      "techRequirements": [
+        { "tech": "MISSILES_WEAPONS", "level": 4 },
         { "tech": "MATERIAL_TECHNOLOGY", "level": 2 }
       ]
     }

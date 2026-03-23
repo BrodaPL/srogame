@@ -10,11 +10,13 @@ import { Building } from '../../models/buildings/building';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
 import { DefenceType } from '../../models/enums/defence-type';
+import { HullClass } from '../../models/enums/hull-class';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import { Ship } from '../../models/fleets/ship';
 import { Defence } from '../../models/defences/defence';
 import { ManyDefences } from '../../models/defences/many-defences';
+import { countPlanetaryBombs, isPlanetaryBombDefenceType } from '../../models/defences/planetary-bomb';
 import type { ClientPlanetDto, ShipyardQueueEntryDto, StartShipyardConstructionRequest } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
 import { ResourcesPack } from '../../models/resources-pack';
@@ -64,6 +66,7 @@ type DefenceQueueRowVm = {
   styleUrl: './production-view.component.css'
 })
 export class ProductionViewComponent implements OnInit {
+  protected readonly HullClass = HullClass;
   @Input() public hideTopMenu = false;
   @Input() public forcedMode: ProductionMode | null = null;
 
@@ -91,6 +94,7 @@ export class ProductionViewComponent implements OnInit {
   private readonly shipBlueprintsByType: Map<ShipType, Ship>;
   private readonly buildingLevelsByType = new Map<BuildingType, number>();
   private readonly buildingCurrentPowerByType = new Map<BuildingType, number>();
+  private readonly buildingCurrentStructuralPointsByType = new Map<BuildingType, number>();
   private readonly techLevelsByType = new Map<TechnologyType, number>();
   private readonly shipStartInFlightByType = new Set<ShipType>();
   private readonly shipStartErrorByType = new Map<ShipType, string>();
@@ -393,6 +397,10 @@ export class ProductionViewComponent implements OnInit {
       return false;
     }
 
+    if (this.wouldExceedBombDepotCapacity(defence.type, amount)) {
+      return false;
+    }
+
     return true;
   }
 
@@ -458,6 +466,10 @@ export class ProductionViewComponent implements OnInit {
     }
     if (this.defenceStartInFlightByType.has(defence.type)) {
       return 'Adding to queue...';
+    }
+    const amount = this.defenceAmount(defence.type);
+    if (amount !== null && this.wouldExceedBombDepotCapacity(defence.type, amount)) {
+      return 'Bomb Depot capacity reached. Increase BOMB_DEPOT production or free bomb storage first.';
     }
     if (!this.canBuildDefence(defence)) {
       return 'Requirements not met or insufficient resources.';
@@ -545,6 +557,32 @@ export class ProductionViewComponent implements OnInit {
     }
 
     return `Deployed ${total} | Damaged ${damaged}`;
+  }
+
+  protected bombDepotCapacity(): number {
+    return Math.max(0, Math.floor(this.currentBuildingProduction(BuildingType.BOMB_DEPOT)));
+  }
+
+  protected currentPlanetaryBombCount(): number {
+    return countPlanetaryBombs(this.selectedPlanet()?.objects.defences);
+  }
+
+  protected queuedPlanetaryBombCount(): number {
+    return (this.selectedPlanet()?.objects.shipyardQueue ?? [])
+      .filter((entry) => this.queueEntryItemKind(entry) === 'defence')
+      .filter((entry) => isPlanetaryBombDefenceType(this.queueEntryDefenceType(entry)))
+      .reduce((sum, entry) => sum + this.queueEntryShipAmount(entry), 0);
+  }
+
+  protected bombDepotStorageSummary(): string | null {
+    const capacity = this.bombDepotCapacity();
+    const current = this.currentPlanetaryBombCount();
+    const queued = this.queuedPlanetaryBombCount();
+    if (capacity <= 0 && current <= 0 && queued <= 0) {
+      return null;
+    }
+
+    return `Bomb depot storage ${current}/${capacity}${queued > 0 ? ` (+${queued} queued)` : ''}`;
   }
 
   protected currentShipQueueLength(): number {
@@ -677,6 +715,7 @@ export class ProductionViewComponent implements OnInit {
   private rebuildSelectedPlanetState(): void {
     this.buildingLevelsByType.clear();
     this.buildingCurrentPowerByType.clear();
+    this.buildingCurrentStructuralPointsByType.clear();
     this.techLevelsByType.clear();
     this.shipStartInFlightByType.clear();
     this.shipStartErrorByType.clear();
@@ -699,6 +738,9 @@ export class ProductionViewComponent implements OnInit {
     }
     for (const entry of planet.objects.buildingsCurrentPowerConsumption ?? []) {
       this.buildingCurrentPowerByType.set(entry.type as BuildingType, this.roundNumber(Math.max(0, entry.currentPowerConsumption), 2));
+    }
+    for (const entry of planet.objects.buildingsCurrentStructuralPoints ?? []) {
+      this.buildingCurrentStructuralPointsByType.set(entry.type as BuildingType, Math.max(0, Math.floor(entry.currentStructuralPoints)));
     }
     for (const techEntry of planet.reportData?.techLevels ?? []) {
       this.techLevelsByType.set(techEntry.type as TechnologyType, techEntry.level);
@@ -1072,7 +1114,11 @@ export class ProductionViewComponent implements OnInit {
       return 0;
     }
 
-    return Math.floor(baseProduction * this.powerUtilizationAtLevel(building.type, level, building.powerConsumption ?? 0));
+    return Math.floor(
+      baseProduction
+      * this.powerUtilizationAtLevel(building.type, level, building.powerConsumption ?? 0)
+      * this.structuralUtilizationAtLevel(building.type, level)
+    );
   }
 
   private getRawProductionAtLevel(building: Building, level: number): number {
@@ -1102,6 +1148,72 @@ export class ProductionViewComponent implements OnInit {
       ? maxConsumption
       : Math.min(maxConsumption, Math.max(0, selectedConsumption));
     return normalizedConsumption / maxConsumption;
+  }
+
+  private currentBuildingStructuralPoints(buildingType: BuildingType): number {
+    const level = this.buildingLevel(buildingType);
+    const max = this.maxBuildingStructuralPoints(buildingType, level);
+    if (max <= 0) {
+      return 0;
+    }
+
+    const current = this.buildingCurrentStructuralPointsByType.get(buildingType);
+    return current === undefined ? max : Math.min(max, Math.max(0, current));
+  }
+
+  private structuralUtilizationAtLevel(buildingType: BuildingType, level: number): number {
+    if (level <= 0) {
+      return 0;
+    }
+
+    if (buildingType === BuildingType.TERRAFORMER) {
+      return 1;
+    }
+
+    const max = this.maxBuildingStructuralPoints(buildingType, level);
+    if (max <= 0) {
+      return 1;
+    }
+
+    const ratio = this.currentBuildingStructuralPoints(buildingType) / max;
+    return Math.min(1, Math.max(this.minimumStructuralUtilization(buildingType), ratio));
+  }
+
+  private maxBuildingStructuralPoints(buildingType: BuildingType, level: number): number {
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const multiplier = 2 ** Math.max(0, level - 1);
+    const metalCost = blueprint.basicCost.metal * multiplier;
+    const crystalCost = blueprint.basicCost.crystal * multiplier;
+    const deuteriumCost = blueprint.basicCost.deuterium * multiplier;
+    return Math.max(0, Math.floor((metalCost * 2) + crystalCost + Math.floor(deuteriumCost * 0.5)));
+  }
+
+  private minimumStructuralUtilization(buildingType: BuildingType): number {
+    if (
+      buildingType === BuildingType.JUMP_GATE
+      || buildingType === BuildingType.SENSOR_PHALANX
+      || buildingType === BuildingType.BOMB_DEPOT
+    ) {
+      return 0;
+    }
+
+    return Math.min(1, 0.02 + (this.buildingLevel(BuildingType.BUNKER_NETWORK) * 0.01));
+  }
+
+  private wouldExceedBombDepotCapacity(defenceType: DefenceType, requestedAmount: number): boolean {
+    if (!isPlanetaryBombDefenceType(defenceType)) {
+      return false;
+    }
+
+    return this.currentPlanetaryBombCount() + this.queuedPlanetaryBombCount() + requestedAmount > this.bombDepotCapacity();
   }
 
   private isBuildingNotUsingFullPower(buildingType: BuildingType): boolean {

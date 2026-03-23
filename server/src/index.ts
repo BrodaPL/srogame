@@ -20,6 +20,7 @@ import manyShipsModule from '../../src/app/models/fleets/many-ships.js';
 import reportTypeEnumModule from '../../src/app/models/enums/report-type.js';
 import diplomaticStatusEnumModule from '../../src/app/models/diplomacy/diplomatic-status.js';
 import diplomacyResolverModule from '../../src/app/models/diplomacy/diplomacy-resolver.js';
+import planetaryBombModule from '../../src/app/models/defences/planetary-bomb.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
 import defenceBlueprintsFactoryModule from '../../src/app/factories/defence-blueprints.factory.js';
@@ -161,6 +162,10 @@ const { DiplomaticStatus } = diplomaticStatusEnumModule as {
 const { DiplomacyResolver } = diplomacyResolverModule as {
   DiplomacyResolver: typeof import('../../src/app/models/diplomacy/diplomacy-resolver.js').DiplomacyResolver;
 };
+const {
+  countPlanetaryBombs,
+  isPlanetaryBombDefenceType
+} = planetaryBombModule as typeof import('../../src/app/models/defences/planetary-bomb.js');
 const { TUTORIAL_VIEW_KEYS, createTutorialReadState } = tutorialTypesModule as typeof import('../../src/app/tutorial/tutorial-types.js');
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
@@ -867,6 +872,21 @@ app.post('/api/game/shipyard-queue', (req, res) => {
     : hasDefenceTechnologyRequirements(player, defence!);
   if (!hasTechReqs) {
     return res.status(400).json({ error: 'Technology requirements are not met.' });
+  }
+
+  if (
+    itemKind === 'defence'
+    && defenceType
+    && isPlanetaryBombDefenceType(defenceType as DefenceTypeType)
+  ) {
+    const bombDepotCapacity = Math.max(0, Math.floor(planet.getBuildingProductionValue1(BuildingType.BOMB_DEPOT as BuildingTypeType)));
+    const queuedBombs = planet.rBDSFTQ.shipyardQueue
+      .filter((entry) => entry.itemKind === 'defence' && isPlanetaryBombDefenceType(entry.defenceType as DefenceTypeType))
+      .reduce((sum, entry) => sum + Math.max(0, Math.floor(entry.amount)), 0);
+    const totalBombsAfterQueue = countPlanetaryBombs(planet.rBDSFTQ.defences) + queuedBombs + amount;
+    if (totalBombsAfterQueue > bombDepotCapacity) {
+      return res.status(400).json({ error: 'Bomb Depot capacity reached.' });
+    }
   }
 
   const totalCost = multiplyResourcePack(blueprint.cost, amount);

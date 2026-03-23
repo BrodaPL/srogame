@@ -50,7 +50,7 @@ export class LevelMappings {
     [BuildingType.SHIPYARD]: { availableFromLevel: 2, weight: 1.25 },
     [BuildingType.RESEARCH_LAB]: { availableFromLevel: 1, weight: 1 },
     [BuildingType.ALLIANCE_DEPOT]: { availableFromLevel: 5, weight: 1.5 },
-    [BuildingType.MISSILE_SILO]: { availableFromLevel: 3, weight: 1 },
+    [BuildingType.BOMB_DEPOT]: { availableFromLevel: 3, weight: 1 },
     [BuildingType.NANITE_FACTORY]: { availableFromLevel: 6, weight: 2 },
     [BuildingType.TERRAFORMER]: { availableFromLevel: 6, weight: 2 },
     [BuildingType.SPACEPORT]: { availableFromLevel: 3, weight: 1 },

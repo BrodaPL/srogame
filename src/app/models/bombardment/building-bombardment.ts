@@ -1,6 +1,7 @@
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { ManyDefences } from '../defences/many-defences';
 import { DefenceInstance } from '../defences/defence-instance';
+import { splitPlanetaryBombDefences } from '../defences/planetary-bomb';
 import { DefenceType } from '../enums/defence-type';
 import { WeaponType } from '../enums/weapon-type';
 import { ManyShips, type ManyShipsLike } from '../fleets/many-ships';
@@ -56,7 +57,8 @@ export function applyBuildingBombardment(
   planet: Planet
 ): BuildingBombardmentSummary {
   const availableBuildingTargets = bombardableBuildingTypes(planet);
-  const defenceInstances = ManyDefences.toDefenceInstances(planet.rBDSFTQ.defences);
+  const { activeDefences, planetaryBombs } = splitPlanetaryBombDefences(planet.rBDSFTQ.defences);
+  const defenceInstances = ManyDefences.toDefenceInstances(activeDefences);
   if (availableBuildingTargets.length <= 0 && defenceInstances.length <= 0) {
     return {
       shots: 0,
@@ -156,6 +158,7 @@ export function applyBuildingBombardment(
   }
 
   planet.rBDSFTQ.defences = ManyDefences.fromDefenceInstances(defenceInstances);
+  planet.rBDSFTQ.defences.addManyDefences(planetaryBombs);
 
   return {
     shots,

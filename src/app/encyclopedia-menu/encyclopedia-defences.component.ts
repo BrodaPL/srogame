@@ -3,6 +3,7 @@ import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DefenceBlueprintsFactory } from '../factories/defence-blueprints.factory';
 import { Defence } from '../models/defences/defence';
+import { HullClass } from '../models/enums/hull-class';
 
 @Component({
   selector: 'app-encyclopedia-defences',
@@ -10,6 +11,7 @@ import { Defence } from '../models/defences/defence';
   templateUrl: './encyclopedia-defences.component.html'
 })
 export class EncyclopediaDefencesComponent {
+  readonly HullClass = HullClass;
   readonly defences = this.loadDefences();
 
   private loadDefences(): Defence[] {

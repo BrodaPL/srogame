@@ -264,7 +264,7 @@ export class EncyclopediaMechanicsComponent {
       details: [
         'Buildings use Structural Points derived from current level cost and never disappear when reduced to 0 SP.',
         'Lower structural integrity reduces output through structural utilization, then combines with power utilization.',
-        'Bunker Network provides a minimum structural floor for most buildings, while Jump Gate, Sensor Phalanx, and Missile Silo can still fall to 0%.',
+        'Bunker Network provides a minimum structural floor for most buildings, while Jump Gate, Sensor Phalanx, and Bomb Depot can still fall to 0%.',
         'Terraformer can take damage and be repaired, but its effect does not scale down from structural loss.'
       ],
       formulas: [

@@ -643,8 +643,8 @@
                     "isFacility":  true
                 },
                 {
-                    "type":  "MISSILE_SILO",
-                    "description":  "Stores anti missiles or ISBM (interstellar balistic missiles).",
+                    "type":  "BOMB_DEPOT",
+                    "description":  "Stores planetary bombs for future bombardment missions.",
                     "imagePath":  "images/buildings/Missile_Silo.webp",
                     "basicCost":  {
                                       "metal":  80,

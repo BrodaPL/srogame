@@ -6,4 +6,5 @@ export enum HullClass {
   STATION = 'Station',
   SMALL_DEFENCE = 'Small planetary defence',
   BIG_DEFENCE = 'Big planetary defence',
+  PLANETARY_BOMB = 'Planetary bomb',
 }

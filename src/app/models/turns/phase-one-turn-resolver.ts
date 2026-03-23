@@ -12,6 +12,7 @@ import { SpaceBattleResolver, type SpaceBattleResult } from '../battles/space-ba
 import { DefenceInstance } from '../defences/defence-instance';
 import { ManyDefences } from '../defences/many-defences';
 import { Defence } from '../defences/defence';
+import { countPlanetaryBombs, isPlanetaryBombDefenceType, splitPlanetaryBombDefences } from '../defences/planetary-bomb';
 import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
 import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
 import { BuildingType } from '../enums/building-type';
@@ -388,6 +389,15 @@ function advanceShipyardQueue(planet: Planet, shipyardPower: number): void {
   let remainingShipyardPower = Math.max(0, Math.floor(shipyardPower));
   while (planet.rBDSFTQ.shipyardQueue.length > 0) {
     const queueEntry = planet.rBDSFTQ.shipyardQueue[0];
+    if (
+      queueEntry.itemKind === 'defence'
+      && queueEntry.defenceType
+      && isPlanetaryBombDefenceType(queueEntry.defenceType)
+      && countPlanetaryBombs(planet.rBDSFTQ.defences) >= planet.getBuildingProductionValue1(BuildingType.BOMB_DEPOT)
+    ) {
+      break;
+    }
+
     const blueprint = queueEntry.itemKind === 'defence'
       ? (queueEntry.defenceType ? DEFENCE_BLUEPRINTS.get(queueEntry.defenceType) : undefined)
       : (queueEntry.shipType ? SHIP_BLUEPRINTS.get(queueEntry.shipType) : undefined);
@@ -1426,6 +1436,7 @@ function resolveHostilePlanetBattle(
   maxRounds = SpaceBattleResolver.DEFAULT_MAX_ROUNDS,
   diplomacyResolver: DiplomacyResolver
 ): 'no_battle' | 'attacker_destroyed' | 'attacker_retreating' | 'attacker_won' {
+  const activeDefences = splitPlanetaryBombDefences(targetPlanet.rBDSFTQ.defences).activeDefences;
   const defenderOwnerId = targetPlanet.info.ownerId;
   if (defenderOwnerId === null) {
     return 'no_battle';
@@ -1438,7 +1449,7 @@ function resolveHostilePlanetBattle(
 
   if (
     ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships) <= 0
-    && ManyDefences.totalDefencesCount(targetPlanet.rBDSFTQ.defences) <= 0
+    && ManyDefences.totalDefencesCount(activeDefences) <= 0
   ) {
     return 'no_battle';
   }
@@ -1460,7 +1471,7 @@ function resolveHostilePlanetBattle(
   const attackerSurvivors = ManyShips.totalShipsCount(fleet.ships);
   const defenderSurvivors =
     ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships)
-    + ManyDefences.totalDefencesCount(targetPlanet.rBDSFTQ.defences);
+    + ManyDefences.totalDefencesCount(splitPlanetaryBombDefences(targetPlanet.rBDSFTQ.defences).activeDefences);
   const battleIsUnresolved = attackerSurvivors > 0 && defenderSurvivors > 0;
 
   if (attackerSurvivors <= 0) {
@@ -1488,7 +1499,8 @@ function resolvePlanetBattle(
 ): SpaceBattleResult {
   const attackerShips = ManyShips.toShipInstances(fleet.ships);
   const defenderShips = ManyShips.toShipInstances(targetPlanet.rBDSFTQ.ships);
-  const defenderDefences = ManyDefences.toDefenceInstances(targetPlanet.rBDSFTQ.defences);
+  const splitDefences = splitPlanetaryBombDefences(targetPlanet.rBDSFTQ.defences);
+  const defenderDefences = ManyDefences.toDefenceInstances(splitDefences.activeDefences);
   const battleResult = SPACE_BATTLE_RESOLVER.resolve({
     attacker: {
       player: attacker,
@@ -1514,6 +1526,7 @@ function resolvePlanetBattle(
   const overflowShips = fleet.ships.trimNonJumpShipsToTravelHangarCapacity();
   targetPlanet.rBDSFTQ.ships = ManyShips.fromShipInstances(battleResult.defender.survivingShips);
   targetPlanet.rBDSFTQ.defences = ManyDefences.fromDefenceInstances(battleResult.defender.survivingDefences);
+  targetPlanet.rBDSFTQ.defences.addManyDefences(splitDefences.planetaryBombs);
   // TODO: Surface `spaceDebris` in the UI and add recycler/recovery gameplay once that layer is implemented.
   targetPlanet.rBDSFTQ.spaceDebris.addResourcePack(calculateBattleDebris(battleResult, fleet, overflowShips));
   targetPlanet.rBDSFTQ.resources.addResourcePack(calculateDefenceBattleRecovery(battleResult));

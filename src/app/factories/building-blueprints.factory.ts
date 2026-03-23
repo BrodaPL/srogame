@@ -61,7 +61,7 @@ export class BuildingBlueprintsFactory {
     SHIPYARD: 'images/buildings/Shipyard.webp',
     RESEARCH_LAB: 'images/buildings/Research_Lab.webp',
     ALLIANCE_DEPOT: 'images/buildings/Alliance_Depot.webp',
-    MISSILE_SILO: 'images/buildings/Missile_Silo.webp',
+    BOMB_DEPOT: 'images/buildings/Missile_Silo.webp',
     NANITE_FACTORY: 'images/buildings/Nanite_Factory.webp',
     TERRAFORMER: 'images/buildings/Terraformer.webp',
     SPACEPORT: 'images/buildings/Space_Dock.webp',
