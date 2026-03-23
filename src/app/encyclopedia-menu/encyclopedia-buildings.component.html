@@ -37,6 +37,14 @@
             <span class="ship-stat__label">Power</span>
             <span class="ship-stat__value">{{ building.powerConsumption }}</span>
           </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Armor</span>
+            <span class="ship-stat__value">{{ building.armor }}</span>
+          </div>
+          <div class="ship-stat">
+            <span class="ship-stat__label">Damage x</span>
+            <span class="ship-stat__value">{{ building.damageMultiplier }}</span>
+          </div>
         </div>
 
         <div class="ship-section">
@@ -86,6 +94,9 @@
           <p class="ship-section__title">Production</p>
           <p class="ship-card__subtitle ship-card__subtitle--wide">
             Base output: {{ building.production1[0] }}
+          </p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">
+            Structural Points use current level cost and integrity now reduces live building effectiveness.
           </p>
         </div>
         <ng-template #noProduction>

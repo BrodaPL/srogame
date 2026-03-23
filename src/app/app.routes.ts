@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { EncyclopediaBuildingsComponent } from './encyclopedia-menu/encyclopedia-buildings.component';
+import { EncyclopediaDefencesComponent } from './encyclopedia-menu/encyclopedia-defences.component';
 import { EncyclopediaMechanicsComponent } from './encyclopedia-menu/encyclopedia-mechanics.component';
 import { EncyclopediaMenuComponent } from './encyclopedia-menu/encyclopedia-menu.component';
 import { EncyclopediaShipsComponent } from './encyclopedia-menu/encyclopedia-ships.component';
@@ -32,6 +33,7 @@ export const routes: Routes = [
   { path: 'help', component: HelpAboutComponent },
   { path: 'encyclopedia', component: EncyclopediaMenuComponent },
   { path: 'encyclopedia/ships', component: EncyclopediaShipsComponent },
+  { path: 'encyclopedia/defences', component: EncyclopediaDefencesComponent },
   { path: 'encyclopedia/buildings', component: EncyclopediaBuildingsComponent },
   { path: 'encyclopedia/technologies', component: EncyclopediaTechnologiesComponent },
   { path: 'encyclopedia/mechanics', component: EncyclopediaMechanicsComponent },

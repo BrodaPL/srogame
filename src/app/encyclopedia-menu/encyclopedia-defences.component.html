@@ -2,86 +2,66 @@
   <section class="panel">
     <header class="panel__header">
       <p class="eyebrow">Encyclopedia</p>
-      <h1>Ships</h1>
-      <p class="subtitle">Detailed hull data sourced from the ship blueprints.</p>
+      <h1>Defences</h1>
+      <p class="subtitle">Planetary defense emplacements, target rules, and construction requirements.</p>
     </header>
 
     <div class="encyclopedia-toolbar">
-      <p class="encyclopedia-meta">{{ ships.length }} ships cataloged</p>
+      <p class="encyclopedia-meta">{{ defences.length }} defence units cataloged</p>
       <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
     </div>
 
     <div class="encyclopedia-grid">
-      <article class="ship-card" *ngFor="let ship of ships; let isFirst = first">
+      <article class="ship-card" *ngFor="let defence of defences; let isFirst = first">
         <div class="ship-media">
           <img
             class="ship-image"
-            [src]="ship.imagePath"
-            [alt]="ship.getName() + ' image'"
+            [src]="defence.imagePath"
+            [alt]="defence.getName() + ' image'"
             [attr.loading]="isFirst ? 'eager' : 'lazy'"
           />
         </div>
         <header class="ship-card__header">
           <div>
-            <h2 class="ship-card__title">{{ ship.getName() }}</h2>
-            <div class="ship-card__tags">
-              <span class="weapon-chip" *ngFor="let purpose of purposeLabels(ship)">{{ purpose }}</span>
-            </div>
+            <h2 class="ship-card__title">{{ defence.getName() }}</h2>
+            <p class="ship-card__subtitle ship-card__subtitle--wide">
+              {{ defence.canShootToOrbit ? 'Can engage orbiting ships.' : 'Can engage only small bombardment ships entering the atmosphere.' }}
+            </p>
           </div>
-          <span class="badge" [class.badge--jump]="ship.canJump">
-            {{ ship.hullClass }}
-          </span>
+          <span class="badge">{{ defence.hullClass }}</span>
         </header>
 
         <div class="ship-stats">
           <div class="ship-stat">
             <span class="ship-stat__label">Size</span>
-            <span class="ship-stat__value">{{ ship.size }}</span>
-          </div>
-          <div class="ship-stat">
-            <span class="ship-stat__label">Evasion</span>
-            <span class="ship-stat__value">{{ ship.evasionChance * 100 }}%</span>
+            <span class="ship-stat__value">{{ defence.size }}</span>
           </div>
           <div class="ship-stat">
             <span class="ship-stat__label">Hull</span>
-            <span class="ship-stat__value">{{ ship.hullPointsCapacity }}</span>
+            <span class="ship-stat__value">{{ defence.hullPointsCapacity }}</span>
           </div>
           <div class="ship-stat">
             <span class="ship-stat__label">Critical</span>
-            <span class="ship-stat__value">{{ ship.criticalThreshold }}%</span>
+            <span class="ship-stat__value">{{ defence.criticalThreshold }}%</span>
           </div>
           <div class="ship-stat">
             <span class="ship-stat__label">Shield</span>
-            <span class="ship-stat__value">{{ ship.shieldCapacity }}</span>
+            <span class="ship-stat__value">{{ defence.shieldCapacity }}</span>
           </div>
           <div class="ship-stat">
             <span class="ship-stat__label">Armor</span>
-            <span class="ship-stat__value">{{ ship.armor }}</span>
+            <span class="ship-stat__value">{{ defence.armor }}</span>
           </div>
           <div class="ship-stat">
-            <span class="ship-stat__label">Cargo</span>
-            <span class="ship-stat__value">{{ ship.cargoCapacity }}</span>
+            <span class="ship-stat__label">Orbit fire</span>
+            <span class="ship-stat__value">{{ defence.canShootToOrbit ? 'Yes' : 'No' }}</span>
           </div>
-          <div class="ship-stat">
-            <span class="ship-stat__label">Hangar</span>
-            <span class="ship-stat__value">{{ ship.hangarCapacity }}</span>
-          </div>
-          <div class="ship-stat" *ngIf="ship.canJump; else noJump">
-            <span class="ship-stat__label">Jump cost</span>
-            <span class="ship-stat__value">{{ ship.jumpCost }}</span>
-          </div>
-          <ng-template #noJump>
-            <div class="ship-stat">
-              <span class="ship-stat__label">Jump</span>
-              <span class="ship-stat__value">No Hyper Jump Ability</span>
-            </div>
-          </ng-template>
         </div>
 
         <div class="ship-section">
           <p class="ship-section__title">Weapons</p>
-          <ul class="weapon-list" *ngIf="ship.weapons.length > 0; else noWeapons">
-            <li class="weapon-item" *ngFor="let weapon of ship.weapons">
+          <ul class="weapon-list" *ngIf="defence.weapons.length > 0; else noWeapons">
+            <li class="weapon-item" *ngFor="let weapon of defence.weapons">
               <span class="weapon-chip">{{ weapon.type }}</span>
               <span class="weapon-meta">{{ weapon.dmg }} dmg</span>
               <span class="weapon-meta">{{ weapon.shots }} shots</span>
@@ -95,8 +75,8 @@
         <div class="ship-section">
           <p class="ship-section__title">Requirements</p>
           <p class="ship-card__subtitle ship-card__subtitle--wide">Buildings</p>
-          <ul class="weapon-list" *ngIf="ship.buildingRequirements.length > 0; else noBuildingReq">
-            <li class="weapon-item" *ngFor="let requirement of ship.buildingRequirements">
+          <ul class="weapon-list" *ngIf="defence.buildingRequirements.length > 0; else noBuildingReq">
+            <li class="weapon-item" *ngFor="let requirement of defence.buildingRequirements">
               <span class="weapon-chip">{{ requirement.building }}</span>
               <span class="weapon-meta">Level {{ requirement.level }}</span>
             </li>
@@ -106,8 +86,8 @@
           </ng-template>
 
           <p class="ship-card__subtitle ship-card__subtitle--wide">Technologies</p>
-          <ul class="weapon-list" *ngIf="ship.techRequirements.length > 0; else noTechReq">
-            <li class="weapon-item" *ngFor="let requirement of ship.techRequirements">
+          <ul class="weapon-list" *ngIf="defence.techRequirements.length > 0; else noTechReq">
+            <li class="weapon-item" *ngFor="let requirement of defence.techRequirements">
               <span class="weapon-chip">{{ requirement.tech }}</span>
               <span class="weapon-meta">Level {{ requirement.level }}</span>
             </li>
@@ -122,15 +102,15 @@
           <div class="cost-row">
             <span class="cost-chip">
               <img class="cost-icon" src="images/icons/Metal.PNG.webp" alt="Metal" />
-              {{ ship.cost.metal }}
+              {{ defence.cost.metal }}
             </span>
             <span class="cost-chip cost-chip--crystal">
               <img class="cost-icon" src="images/icons/Crystal.PNG.webp" alt="Crystal" />
-              {{ ship.cost.crystal }}
+              {{ defence.cost.crystal }}
             </span>
             <span class="cost-chip cost-chip--deuterium">
               <img class="cost-icon" src="images/icons/Deutrium.PNG.webp" alt="Deuterium" />
-              {{ ship.cost.deuterium }}
+              {{ defence.cost.deuterium }}
             </span>
           </div>
         </div>
