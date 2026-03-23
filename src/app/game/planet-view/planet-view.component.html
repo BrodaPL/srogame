@@ -537,28 +537,62 @@
                   <table class="overview-table">
                     <thead>
                     <tr>
+                      <th>Drag</th>
                       <th>#</th>
                       <th>Type</th>
                       <th>Upgrade</th>
                       <th>Status</th>
                       <th>Invested / base</th>
                       <th>ETA (turns)</th>
+                      <th>Action</th>
                     </tr>
                     </thead>
-                    <tbody>
+                    <tbody
+                      cdkDropList
+                      [cdkDropListData]="buildingQueueRows()"
+                      [id]="buildingQueueDropListId()"
+                      [cdkDropListDisabled]="isBuildingQueueInteractionDisabled()"
+                      cdkDropListLockAxis="y"
+                      (cdkDropListDropped)="onBuildingQueueDrop($event)"
+                    >
                     @for (queuedBuilding of buildingQueueRows(); track queuedBuilding.position) {
-                      <tr>
+                      <tr cdkDrag>
+                        <td class="queue-management__drag-cell">
+                          <button
+                            type="button"
+                            class="queue-management__drag-handle"
+                            cdkDragHandle
+                            [disabled]="isBuildingQueueInteractionDisabled()"
+                            [attr.aria-label]="'Drag ' + queuedBuilding.buildingType"
+                          >
+                            Drag
+                          </button>
+                        </td>
                         <td>{{ queuedBuilding.position }}</td>
                         <td>{{ queuedBuilding.buildingType }}</td>
                         <td>L{{ queuedBuilding.fromLevel }} -> L{{ queuedBuilding.toLevel }}</td>
                         <td>{{ queuedBuilding.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
                         <td>{{ queuedBuilding.investedIndustryPower }} / {{ queuedBuilding.baseTotalConstructionTime }}</td>
                         <td>{{ queuedBuilding.estimatedTurnsForCompletion ?? '--' }}</td>
+                        <td>
+                          <button
+                            type="button"
+                            class="queue-management__cancel-button"
+                            [disabled]="isBuildingQueueInteractionDisabled()"
+                            [attr.title]="buildingQueueCancelTitle(queuedBuilding)"
+                            (click)="onCancelBuildingQueue(queuedBuilding)"
+                          >
+                            Cancel
+                          </button>
+                        </td>
                       </tr>
                     }
                     </tbody>
                   </table>
                 </div>
+                @if (buildingQueueActionError) {
+                  <p class="game-dashboard__build-error">{{ buildingQueueActionError }}</p>
+                }
               } @else {
                 <p class="overview-empty">No buildings queued.</p>
               }
@@ -568,69 +602,71 @@
               <h4 class="planet-view__section-title">
                 Queued Shipyard ({{ currentShipQueueLength() }}/{{ maxShipQueueLength() }})
               </h4>
-              @if (hasShipQueueEntries()) {
+              @if (hasShipyardQueueEntries()) {
                 <div class="overview-table-wrapper">
                   <table class="overview-table">
                     <thead>
                     <tr>
+                      <th>Drag</th>
                       <th>#</th>
-                      <th>Type</th>
+                      <th>Kind</th>
+                      <th>Name</th>
                       <th>Amount completed</th>
                       <th>Status</th>
-                      <th>Invested / base</th>
+                      <th>Invested / unit base</th>
                       <th>ETA (turns)</th>
+                      <th>Action</th>
                     </tr>
                     </thead>
-                    <tbody>
-                    @for (queuedShip of shipQueueRows(); track queuedShip.position) {
-                      <tr>
-                        <td>{{ queuedShip.position }}</td>
-                        <td>{{ queuedShip.shipType }}</td>
-                        <td>{{ queuedShip.amountCompleted }}/{{ queuedShip.amountTotal }}</td>
-                        <td>{{ queuedShip.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
-                        <td>{{ queuedShip.currentShipInvestedShipyardPower }} / {{ queuedShip.currentShipBaseConstructionTime }}</td>
-                        <td>{{ queuedShip.estimatedTurnsForCompletion ?? '--' }}</td>
+                    <tbody
+                      cdkDropList
+                      [cdkDropListData]="shipyardQueueRows()"
+                      [id]="shipyardQueueDropListId()"
+                      [cdkDropListDisabled]="isShipyardQueueInteractionDisabled()"
+                      cdkDropListLockAxis="y"
+                      (cdkDropListDropped)="onShipyardQueueDrop($event)"
+                    >
+                    @for (queueRow of shipyardQueueRows(); track queueRow.queueIndex) {
+                      <tr cdkDrag>
+                        <td class="queue-management__drag-cell">
+                          <button
+                            type="button"
+                            class="queue-management__drag-handle"
+                            cdkDragHandle
+                            [disabled]="isShipyardQueueInteractionDisabled()"
+                            [attr.aria-label]="'Drag ' + shipyardQueueItemLabel(queueRow)"
+                          >
+                            Drag
+                          </button>
+                        </td>
+                        <td>{{ queueRow.position }}</td>
+                        <td>{{ shipyardQueueItemTypeLabel(queueRow) }}</td>
+                        <td>{{ shipyardQueueItemLabel(queueRow) }}</td>
+                        <td>{{ queueRow.amountCompleted }}/{{ queueRow.amountTotal }}</td>
+                        <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
+                        <td>{{ queueRow.currentUnitInvestedShipyardPower }} / {{ queueRow.currentUnitBaseConstructionTime }}</td>
+                        <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
+                        <td>
+                          <button
+                            type="button"
+                            class="queue-management__cancel-button"
+                            [disabled]="isShipyardQueueInteractionDisabled()"
+                            [attr.title]="shipyardQueueCancelTitle(queueRow)"
+                            (click)="onCancelShipyardQueue(queueRow)"
+                          >
+                            Cancel
+                          </button>
+                        </td>
                       </tr>
                     }
                     </tbody>
                   </table>
                 </div>
+                @if (shipyardQueueActionError) {
+                  <p class="game-dashboard__build-error">{{ shipyardQueueActionError }}</p>
+                }
               } @else {
-                <p class="overview-empty">No ships queued.</p>
-              }
-            </article>
-
-            <article class="planet-queue-card">
-              <h4 class="planet-view__section-title">Queued Defences</h4>
-              @if (hasDefenceQueueEntries()) {
-                <div class="overview-table-wrapper">
-                  <table class="overview-table">
-                    <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Type</th>
-                      <th>Amount completed</th>
-                      <th>Status</th>
-                      <th>Invested / base</th>
-                      <th>ETA (turns)</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    @for (queuedDefence of defenceQueueRows(); track queuedDefence.position) {
-                      <tr>
-                        <td>{{ queuedDefence.position }}</td>
-                        <td>{{ queuedDefence.defenceType }}</td>
-                        <td>{{ queuedDefence.amountCompleted }}/{{ queuedDefence.amountTotal }}</td>
-                        <td>{{ queuedDefence.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
-                        <td>{{ queuedDefence.currentDefenceInvestedShipyardPower }} / {{ queuedDefence.currentDefenceBaseConstructionTime }}</td>
-                        <td>{{ queuedDefence.estimatedTurnsForCompletion ?? '--' }}</td>
-                      </tr>
-                    }
-                    </tbody>
-                  </table>
-                </div>
-              } @else {
-                <p class="overview-empty">No defences queued.</p>
+                <p class="overview-empty">No shipyard or defence items queued.</p>
               }
             </article>
 

@@ -313,6 +313,21 @@ export type StartBuildingConstructionRequest = {
   buildingType: BuildingType;
 };
 
+export type ReorderBuildingQueueRequest = {
+  x: number;
+  y: number;
+  z: number;
+  fromIndex: number;
+  toIndex: number;
+};
+
+export type CancelBuildingQueueEntryRequest = {
+  x: number;
+  y: number;
+  z: number;
+  index: number;
+};
+
 export type StartShipyardConstructionRequest = {
   x: number;
   y: number;
@@ -321,6 +336,21 @@ export type StartShipyardConstructionRequest = {
   shipType?: ShipType | null;
   defenceType?: DefenceType | null;
   amount: number;
+};
+
+export type ReorderShipyardQueueRequest = {
+  x: number;
+  y: number;
+  z: number;
+  fromIndex: number;
+  toIndex: number;
+};
+
+export type CancelShipyardQueueEntryRequest = {
+  x: number;
+  y: number;
+  z: number;
+  index: number;
 };
 
 export type StartTechnologyResearchRequest = {

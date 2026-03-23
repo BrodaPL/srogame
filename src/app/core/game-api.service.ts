@@ -14,7 +14,11 @@ import {
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
   StartBuildingConstructionRequest,
+  ReorderBuildingQueueRequest,
+  CancelBuildingQueueEntryRequest,
   StartShipyardConstructionRequest,
+  ReorderShipyardQueueRequest,
+  CancelShipyardQueueEntryRequest,
   StartTechnologyResearchRequest,
   CreateFleetMissionRequest,
   CreateFleetMissionResponse,
@@ -136,9 +140,41 @@ export class GameApiService {
     );
   }
 
+  public reorderBuildingQueue(request: ReorderBuildingQueueRequest, token: string) {
+    return this.http.post<ClientPlanetDto>(
+      `${API_BASE_URL}/game/building-queue/reorder`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public cancelBuildingQueueEntry(request: CancelBuildingQueueEntryRequest, token: string) {
+    return this.http.post<ClientPlanetDto>(
+      `${API_BASE_URL}/game/building-queue/cancel`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
   public startShipyardConstruction(request: StartShipyardConstructionRequest, token: string) {
     return this.http.post<ClientPlanetDto>(
       `${API_BASE_URL}/game/shipyard-queue`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public reorderShipyardQueue(request: ReorderShipyardQueueRequest, token: string) {
+    return this.http.post<ClientPlanetDto>(
+      `${API_BASE_URL}/game/shipyard-queue/reorder`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public cancelShipyardQueueEntry(request: CancelShipyardQueueEntryRequest, token: string) {
+    return this.http.post<ClientPlanetDto>(
+      `${API_BASE_URL}/game/shipyard-queue/cancel`,
       request,
       { headers: this.authHeaders(token) }
     );

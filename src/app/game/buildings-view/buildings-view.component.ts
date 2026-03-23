@@ -1,3 +1,4 @@
+import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { finalize, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
@@ -7,7 +8,12 @@ import { Building } from '../../models/buildings/building';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
 import { TechnologyType } from '../../models/enums/technology-type';
-import type { ClientPlanetDto, StartBuildingConstructionRequest } from '../../models/game-api-types';
+import type {
+  CancelBuildingQueueEntryRequest,
+  ClientPlanetDto,
+  ReorderBuildingQueueRequest,
+  StartBuildingConstructionRequest
+} from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
@@ -41,6 +47,7 @@ type BuildingRequirementRowVm = {
 };
 
 type BuildingQueueRowVm = {
+  queueIndex: number;
   position: number;
   buildingType: BuildingType;
   fromLevel: number;
@@ -56,7 +63,10 @@ type BuildingQueueRowVm = {
   imports: [
     TopMenuComponent,
     ResourcesComponent,
-    MiniPlanetPreviewComponent
+    MiniPlanetPreviewComponent,
+    CdkDropList,
+    CdkDrag,
+    CdkDragHandle
   ],
   templateUrl: './buildings-view.component.html',
   styleUrl: './buildings-view.component.css'
@@ -78,6 +88,8 @@ export class BuildingsViewComponent implements OnInit {
   protected energyDisplay: ResourceDisplay | null = null;
   protected energyTooltip: string | null = null;
   protected powersDisplay: PlanetPowersDisplay | null = null;
+  protected buildingQueueActionError: string | null = null;
+  protected buildingQueueMutationInFlight = false;
 
   private readonly resourceBuildings: Building[];
   private readonly facilityBuildings: Building[];
@@ -378,6 +390,7 @@ export class BuildingsViewComponent implements OnInit {
         : null;
 
       return {
+        queueIndex: index,
         position: index + 1,
         buildingType,
         fromLevel,
@@ -388,6 +401,102 @@ export class BuildingsViewComponent implements OnInit {
         isHeadOfQueue: index === 0
       };
     });
+  }
+
+  protected buildingQueueDropListId(): string {
+    return `buildings-queue:${this.selectedPlanetId ?? 'none'}`;
+  }
+
+  protected isBuildingQueueInteractionDisabled(): boolean {
+    return this.buildingQueueMutationInFlight;
+  }
+
+  protected buildingQueueCancelTitle(row: BuildingQueueRowVm): string {
+    if (row.investedIndustryPower <= 0) {
+      return 'Cancel and refund 100% of this queued building.';
+    }
+
+    return 'Cancel and refund 75% of this started building.';
+  }
+
+  protected onBuildingQueueDrop(event: CdkDragDrop<BuildingQueueRowVm[]>): void {
+    if (event.previousIndex === event.currentIndex || this.buildingQueueMutationInFlight) {
+      return;
+    }
+
+    const rows = this.buildingQueueRows();
+    const movedRow = rows[event.previousIndex];
+    const targetRow = rows[event.currentIndex];
+    const planet = this.selectedPlanet();
+    const session = this.playerSession.load();
+    if (!movedRow || !targetRow || !planet || !session) {
+      return;
+    }
+
+    const request: ReorderBuildingQueueRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      fromIndex: movedRow.queueIndex,
+      toIndex: targetRow.queueIndex
+    };
+
+    this.buildingQueueMutationInFlight = true;
+    this.buildingQueueActionError = null;
+    this.cdr.markForCheck();
+
+    this.gameApi.reorderBuildingQueue(request, session.token)
+      .pipe(finalize(() => {
+        this.buildingQueueMutationInFlight = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (updatedPlanet) => {
+          this.applyUpdatedPlanet(updatedPlanet);
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.buildingQueueActionError = error?.error?.error ?? 'Unable to reorder building queue.';
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected onCancelBuildingQueue(row: BuildingQueueRowVm): void {
+    if (this.buildingQueueMutationInFlight) {
+      return;
+    }
+
+    const planet = this.selectedPlanet();
+    const session = this.playerSession.load();
+    if (!planet || !session) {
+      return;
+    }
+
+    const request: CancelBuildingQueueEntryRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      index: row.queueIndex
+    };
+
+    this.buildingQueueMutationInFlight = true;
+    this.buildingQueueActionError = null;
+    this.cdr.markForCheck();
+
+    this.gameApi.cancelBuildingQueueEntry(request, session.token)
+      .pipe(finalize(() => {
+        this.buildingQueueMutationInFlight = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (updatedPlanet) => {
+          this.applyUpdatedPlanet(updatedPlanet);
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.buildingQueueActionError = error?.error?.error ?? 'Unable to cancel building queue entry.';
+          this.cdr.markForCheck();
+        }
+      });
   }
 
   private loadOwnedPlanets(): void {
@@ -425,6 +534,8 @@ export class BuildingsViewComponent implements OnInit {
     this.techLevelsByType.clear();
     this.buildingStartInFlightByType.clear();
     this.buildingStartErrorByType.clear();
+    this.buildingQueueActionError = null;
+    this.buildingQueueMutationInFlight = false;
 
     const planet = this.selectedPlanet();
     if (!planet) {
@@ -896,6 +1007,15 @@ export class BuildingsViewComponent implements OnInit {
 
   private planetId(planet: ClientPlanetDto): string {
     return `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`;
+  }
+
+  private applyUpdatedPlanet(updatedPlanet: ClientPlanetDto): void {
+    this.ownedPlanets = this.ownedPlanets.map((entry) =>
+      this.planetId(entry) === this.planetId(updatedPlanet) ? updatedPlanet : entry
+    );
+    this.selectedPlanetId = this.planetId(updatedPlanet);
+    this.rebuildSelectedPlanetState();
+    this.cdr.markForCheck();
   }
 
   private roundNumber(value: number, precision: number): number {

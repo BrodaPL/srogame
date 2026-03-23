@@ -55,86 +55,79 @@
                 <p class="overview-muted">
                   {{ selectedPlanetLabel() }} | {{ currentShipQueueLength() }}/{{ maxShipQueueLength() }}
                 </p>
-              </div>
-            </div>
-
-            @if (hasShipQueueEntries()) {
-              <div class="overview-table-wrapper">
-                <table class="overview-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Ship</th>
-                      <th>Amount completed</th>
-                      <th>Status</th>
-                      <th>Invested / base</th>
-                      <th>ETA (turns)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (queueRow of shipQueueRows(); track trackShipQueueRow($index, queueRow)) {
-                      <tr>
-                        <td>{{ queueRow.position }}</td>
-                        <td>{{ queueRow.shipType }}</td>
-                        <td>{{ queueRow.amountCompleted }}/{{ queueRow.amountTotal }}</td>
-                        <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
-                        <td>{{ queueRow.currentShipInvestedShipyardPower }} / {{ queueRow.currentShipBaseConstructionTime }}</td>
-                        <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            } @else {
-              <article class="planet-queue-card">
-                <h4 class="planet-view__section-title">No ships queued</h4>
-                <p class="overview-empty">This planet does not have any shipyard production queued right now.</p>
-              </article>
-            }
-          </section>
-
-          <section class="overview-card">
-            <div class="game-dashboard__section-head">
-              <div>
-                <h3>Current Defences Queue</h3>
-                <p class="overview-muted">{{ selectedPlanetLabel() }}</p>
                 @if (bombDepotStorageSummary(); as bombDepotSummary) {
                   <p class="overview-muted">{{ bombDepotSummary }}</p>
                 }
               </div>
             </div>
 
-            @if (hasDefenceQueueEntries()) {
+            @if (hasShipyardQueueEntries()) {
               <div class="overview-table-wrapper">
                 <table class="overview-table">
                   <thead>
                     <tr>
+                      <th>Drag</th>
                       <th>#</th>
-                      <th>Defence</th>
+                      <th>Type</th>
+                      <th>Name</th>
                       <th>Amount completed</th>
                       <th>Status</th>
-                      <th>Invested / base</th>
+                      <th>Invested / unit base</th>
                       <th>ETA (turns)</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    @for (queueRow of defenceQueueRows(); track trackDefenceQueueRow($index, queueRow)) {
-                      <tr>
+                  <tbody
+                    cdkDropList
+                    [cdkDropListData]="shipyardQueueRows()"
+                    [id]="shipyardQueueDropListId()"
+                    [cdkDropListDisabled]="isShipyardQueueInteractionDisabled()"
+                    cdkDropListLockAxis="y"
+                    (cdkDropListDropped)="onShipyardQueueDrop($event)"
+                  >
+                    @for (queueRow of shipyardQueueRows(); track trackShipyardQueueRow($index, queueRow)) {
+                      <tr cdkDrag>
+                        <td class="queue-management__drag-cell">
+                          <button
+                            type="button"
+                            class="queue-management__drag-handle"
+                            cdkDragHandle
+                            [disabled]="isShipyardQueueInteractionDisabled()"
+                            [attr.aria-label]="'Drag ' + shipyardQueueItemLabel(queueRow)"
+                          >
+                            Drag
+                          </button>
+                        </td>
                         <td>{{ queueRow.position }}</td>
-                        <td>{{ queueRow.defenceType }}</td>
+                        <td>{{ shipyardQueueItemTypeLabel(queueRow) }}</td>
+                        <td>{{ shipyardQueueItemLabel(queueRow) }}</td>
                         <td>{{ queueRow.amountCompleted }}/{{ queueRow.amountTotal }}</td>
                         <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
-                        <td>{{ queueRow.currentDefenceInvestedShipyardPower }} / {{ queueRow.currentDefenceBaseConstructionTime }}</td>
+                        <td>{{ queueRow.currentUnitInvestedShipyardPower }} / {{ queueRow.currentUnitBaseConstructionTime }}</td>
                         <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
+                        <td>
+                          <button
+                            type="button"
+                            class="queue-management__cancel-button"
+                            [disabled]="isShipyardQueueInteractionDisabled()"
+                            [attr.title]="shipyardQueueCancelTitle(queueRow)"
+                            (click)="onCancelShipyardQueue(queueRow)"
+                          >
+                            Cancel
+                          </button>
+                        </td>
                       </tr>
                     }
                   </tbody>
                 </table>
               </div>
+              @if (shipyardQueueActionError) {
+                <p class="game-dashboard__build-error">{{ shipyardQueueActionError }}</p>
+              }
             } @else {
               <article class="planet-queue-card">
-                <h4 class="planet-view__section-title">No defences queued</h4>
-                <p class="overview-empty">This planet does not have any defence production queued right now.</p>
+                <h4 class="planet-view__section-title">No shipyard items queued</h4>
+                <p class="overview-empty">This planet does not have any shipyard or defence production queued right now.</p>
                 <p class="overview-muted">{{ selectedPlanetDefenceSummary() }}</p>
               </article>
             }

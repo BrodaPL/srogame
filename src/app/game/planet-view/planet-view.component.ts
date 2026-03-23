@@ -1,3 +1,4 @@
+import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -16,9 +17,13 @@ import { HullClass } from '../../models/enums/hull-class';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import type {
+  CancelBuildingQueueEntryRequest,
+  CancelShipyardQueueEntryRequest,
   BuildingQueueEntryDto,
   ClientCoordinates,
   ClientPlanetDto,
+  ReorderBuildingQueueRequest,
+  ReorderShipyardQueueRequest,
   SetBuildingPowerConsumptionRequest,
   ShipyardQueueEntryDto,
   StartBuildingConstructionRequest,
@@ -73,6 +78,7 @@ type ShipCostRowVm = {
 };
 
 type BuildingQueueRowVm = {
+  queueIndex: number;
   position: number;
   buildingType: BuildingType;
   fromLevel: number;
@@ -83,24 +89,16 @@ type BuildingQueueRowVm = {
   isHeadOfQueue: boolean;
 };
 
-type ShipQueueRowVm = {
+type ShipyardQueueRowVm = {
+  queueIndex: number;
   position: number;
-  shipType: ShipType;
+  itemKind: 'ship' | 'defence';
+  shipType: ShipType | null;
+  defenceType: DefenceType | null;
   amountCompleted: number;
   amountTotal: number;
-  currentShipInvestedShipyardPower: number;
-  currentShipBaseConstructionTime: number;
-  estimatedTurnsForCompletion: number | null;
-  isHeadOfQueue: boolean;
-};
-
-type DefenceQueueRowVm = {
-  position: number;
-  defenceType: DefenceType;
-  amountCompleted: number;
-  amountTotal: number;
-  currentDefenceInvestedShipyardPower: number;
-  currentDefenceBaseConstructionTime: number;
+  currentUnitInvestedShipyardPower: number;
+  currentUnitBaseConstructionTime: number;
   estimatedTurnsForCompletion: number | null;
   isHeadOfQueue: boolean;
 };
@@ -119,7 +117,14 @@ type ResearchQueueRowVm = {
 
 @Component({
   selector: 'app-planet-view',
-  imports: [TopMenuComponent, ResourcesComponent, FormsModule],
+  imports: [
+    TopMenuComponent,
+    ResourcesComponent,
+    FormsModule,
+    CdkDropList,
+    CdkDrag,
+    CdkDragHandle
+  ],
   templateUrl: './planet-view.component.html',
   styleUrl: './planet-view.component.css'
 })
@@ -140,6 +145,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected energyDisplay: ResourceDisplay | null = null;
   protected energyTooltip: string | null = null;
   protected powersDisplay: PlanetPowersDisplay | null = null;
+  protected buildingQueueActionError: string | null = null;
+  protected shipyardQueueActionError: string | null = null;
+  protected buildingQueueMutationInFlight = false;
+  protected shipyardQueueMutationInFlight = false;
 
   protected readonly resourceBuildings: Building[];
   protected readonly facilityBuildings: Building[];
@@ -1238,6 +1247,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         : null;
 
       return {
+        queueIndex: index,
         position: index + 1,
         buildingType,
         fromLevel,
@@ -1250,97 +1260,291 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected hasShipQueueEntries(): boolean {
-    return (this.planet?.objects.shipyardQueue ?? []).some((entry) => this.queueEntryItemKind(entry) === 'ship');
+  protected hasShipyardQueueEntries(): boolean {
+    return (this.planet?.objects.shipyardQueue?.length ?? 0) > 0;
   }
 
-  protected shipQueueRows(): ShipQueueRowVm[] {
+  protected shipyardQueueRows(): ShipyardQueueRowVm[] {
     const queueEntries = this.planet?.objects.shipyardQueue ?? [];
     const shipyardPower = this.currentShipyardPower();
     let cumulativeRemaining = 0;
-    const rows: ShipQueueRowVm[] = [];
+    const rows: ShipyardQueueRowVm[] = [];
 
     queueEntries.forEach((entry, index) => {
       const baseTotalConstructionTime = this.queueEntryBaseConstructionTime(entry);
       const remaining = Math.max(0, baseTotalConstructionTime - this.queueEntryInvestedShipyardPower(entry));
       cumulativeRemaining += remaining;
-      if (this.queueEntryItemKind(entry) !== 'ship') {
-        return;
-      }
-
-      const shipType = this.queueEntryShipType(entry);
+      const itemKind = this.queueEntryItemKind(entry);
       const amountTotal = this.queueEntryShipAmount(entry);
       const investedShipyardPower = this.queueEntryInvestedShipyardPower(entry);
-      const singleShipBaseConstructionTime = this.baseShipConstructionTime(shipType, 1);
-      const estimatedTurnsForCompletion = shipyardPower > 0
-        ? Math.ceil(cumulativeRemaining / shipyardPower)
-        : null;
-      const amountCompleted = this.shipAmountCompleted(shipType, amountTotal, investedShipyardPower);
-      const currentShipInvestedShipyardPower = this.currentShipInvestedPower(
-        amountCompleted,
-        amountTotal,
-        investedShipyardPower,
-        singleShipBaseConstructionTime
-      );
-
-      rows.push({
-        position: index + 1,
-        shipType,
-        amountCompleted,
-        amountTotal,
-        currentShipInvestedShipyardPower,
-        currentShipBaseConstructionTime: singleShipBaseConstructionTime,
-        estimatedTurnsForCompletion,
-        isHeadOfQueue: index === 0
-      });
-    });
-
-    return rows;
-  }
-
-  protected hasDefenceQueueEntries(): boolean {
-    return (this.planet?.objects.shipyardQueue ?? []).some((entry) => this.queueEntryItemKind(entry) === 'defence');
-  }
-
-  protected defenceQueueRows(): DefenceQueueRowVm[] {
-    const queueEntries = this.planet?.objects.shipyardQueue ?? [];
-    const shipyardPower = this.currentShipyardPower();
-    let cumulativeRemaining = 0;
-    const rows: DefenceQueueRowVm[] = [];
-
-    queueEntries.forEach((entry, index) => {
-      const baseTotalConstructionTime = this.queueEntryBaseConstructionTime(entry);
-      const remaining = Math.max(0, baseTotalConstructionTime - this.queueEntryInvestedShipyardPower(entry));
-      cumulativeRemaining += remaining;
-      if (this.queueEntryItemKind(entry) !== 'defence') {
+      if (itemKind === 'ship') {
+        const shipType = this.queueEntryShipType(entry);
+        const singleShipBaseConstructionTime = this.baseShipConstructionTime(shipType, 1);
+        const estimatedTurnsForCompletion = shipyardPower > 0
+          ? Math.ceil(cumulativeRemaining / shipyardPower)
+          : null;
+        const amountCompleted = this.shipAmountCompleted(shipType, amountTotal, investedShipyardPower);
+        rows.push({
+          queueIndex: index,
+          position: index + 1,
+          itemKind,
+          shipType,
+          defenceType: null,
+          amountCompleted,
+          amountTotal,
+          currentUnitInvestedShipyardPower: this.currentShipInvestedPower(
+            amountCompleted,
+            amountTotal,
+            investedShipyardPower,
+            singleShipBaseConstructionTime
+          ),
+          currentUnitBaseConstructionTime: singleShipBaseConstructionTime,
+          estimatedTurnsForCompletion,
+          isHeadOfQueue: index === 0
+        });
         return;
       }
 
       const defenceType = this.queueEntryDefenceType(entry);
-      const amountTotal = this.queueEntryShipAmount(entry);
-      const investedShipyardPower = this.queueEntryInvestedShipyardPower(entry);
       const singleDefenceBaseConstructionTime = this.baseDefenceConstructionTime(defenceType, 1);
       const amountCompleted = this.defenceAmountCompleted(defenceType, amountTotal, investedShipyardPower);
-      const currentDefenceInvestedShipyardPower = this.currentShipInvestedPower(
-        amountCompleted,
-        amountTotal,
-        investedShipyardPower,
-        singleDefenceBaseConstructionTime
-      );
-
       rows.push({
+        queueIndex: index,
         position: index + 1,
+        itemKind,
+        shipType: null,
         defenceType,
         amountCompleted,
         amountTotal,
-        currentDefenceInvestedShipyardPower,
-        currentDefenceBaseConstructionTime: singleDefenceBaseConstructionTime,
+        currentUnitInvestedShipyardPower: this.currentShipInvestedPower(
+          amountCompleted,
+          amountTotal,
+          investedShipyardPower,
+          singleDefenceBaseConstructionTime
+        ),
+        currentUnitBaseConstructionTime: singleDefenceBaseConstructionTime,
         estimatedTurnsForCompletion: shipyardPower > 0 ? Math.ceil(cumulativeRemaining / shipyardPower) : null,
         isHeadOfQueue: index === 0
       });
     });
 
     return rows;
+  }
+
+  protected buildingQueueDropListId(): string {
+    return `planet-building-queue:${this.coordinatesLabel}`;
+  }
+
+  protected shipyardQueueDropListId(): string {
+    return `planet-shipyard-queue:${this.coordinatesLabel}`;
+  }
+
+  protected isBuildingQueueInteractionDisabled(): boolean {
+    return this.buildingQueueMutationInFlight;
+  }
+
+  protected isShipyardQueueInteractionDisabled(): boolean {
+    return this.shipyardQueueMutationInFlight;
+  }
+
+  protected buildingQueueCancelTitle(row: BuildingQueueRowVm): string {
+    if (row.investedIndustryPower <= 0) {
+      return 'Cancel and refund 100% of this queued building.';
+    }
+
+    return 'Cancel and refund 75% of this started building.';
+  }
+
+  protected shipyardQueueItemLabel(row: ShipyardQueueRowVm): string {
+    return row.itemKind === 'defence' ? (row.defenceType ?? 'Unknown defence') : (row.shipType ?? 'Unknown ship');
+  }
+
+  protected shipyardQueueItemTypeLabel(row: ShipyardQueueRowVm): string {
+    return row.itemKind === 'defence' ? 'Defence' : 'Ship';
+  }
+
+  protected shipyardQueueCancelTitle(row: ShipyardQueueRowVm): string {
+    if (row.amountCompleted > 0) {
+      return 'Cancel: completed units are delivered and unfinished remainder is refunded at 75%.';
+    }
+
+    if (row.currentUnitInvestedShipyardPower <= 0) {
+      return 'Cancel and refund 100% of this queued stack.';
+    }
+
+    return 'Cancel and refund 75% of the unfinished remainder.';
+  }
+
+  protected onBuildingQueueDrop(event: CdkDragDrop<BuildingQueueRowVm[]>): void {
+    if (event.previousIndex === event.currentIndex || this.buildingQueueMutationInFlight) {
+      return;
+    }
+
+    const rows = this.buildingQueueRows();
+    const movedRow = rows[event.previousIndex];
+    const targetRow = rows[event.currentIndex];
+    const planet = this.planet;
+    const session = this.playerSession.load();
+    if (!movedRow || !targetRow || !planet || !session) {
+      return;
+    }
+
+    const request: ReorderBuildingQueueRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      fromIndex: movedRow.queueIndex,
+      toIndex: targetRow.queueIndex
+    };
+
+    this.buildingQueueMutationInFlight = true;
+    this.buildingQueueActionError = null;
+    this.cdr.markForCheck();
+
+    this.gameApi.reorderBuildingQueue(request, session.token)
+      .pipe(finalize(() => {
+        this.buildingQueueMutationInFlight = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (updatedPlanet) => {
+          this.planet = updatedPlanet;
+          this.syncOwnedPlanet(updatedPlanet);
+          this.rebuildPlanetState();
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.buildingQueueActionError = error?.error?.error ?? 'Unable to reorder building queue.';
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected onCancelBuildingQueue(row: BuildingQueueRowVm): void {
+    if (this.buildingQueueMutationInFlight) {
+      return;
+    }
+
+    const planet = this.planet;
+    const session = this.playerSession.load();
+    if (!planet || !session) {
+      return;
+    }
+
+    const request: CancelBuildingQueueEntryRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      index: row.queueIndex
+    };
+
+    this.buildingQueueMutationInFlight = true;
+    this.buildingQueueActionError = null;
+    this.cdr.markForCheck();
+
+    this.gameApi.cancelBuildingQueueEntry(request, session.token)
+      .pipe(finalize(() => {
+        this.buildingQueueMutationInFlight = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (updatedPlanet) => {
+          this.planet = updatedPlanet;
+          this.syncOwnedPlanet(updatedPlanet);
+          this.rebuildPlanetState();
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.buildingQueueActionError = error?.error?.error ?? 'Unable to cancel building queue entry.';
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected onShipyardQueueDrop(event: CdkDragDrop<ShipyardQueueRowVm[]>): void {
+    if (event.previousIndex === event.currentIndex || this.shipyardQueueMutationInFlight) {
+      return;
+    }
+
+    const rows = this.shipyardQueueRows();
+    const movedRow = rows[event.previousIndex];
+    const targetRow = rows[event.currentIndex];
+    const planet = this.planet;
+    const session = this.playerSession.load();
+    if (!movedRow || !targetRow || !planet || !session) {
+      return;
+    }
+
+    const request: ReorderShipyardQueueRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      fromIndex: movedRow.queueIndex,
+      toIndex: targetRow.queueIndex
+    };
+
+    this.shipyardQueueMutationInFlight = true;
+    this.shipyardQueueActionError = null;
+    this.cdr.markForCheck();
+
+    this.gameApi.reorderShipyardQueue(request, session.token)
+      .pipe(finalize(() => {
+        this.shipyardQueueMutationInFlight = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (updatedPlanet) => {
+          this.planet = updatedPlanet;
+          this.syncOwnedPlanet(updatedPlanet);
+          this.rebuildPlanetState();
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.shipyardQueueActionError = error?.error?.error ?? 'Unable to reorder shipyard queue.';
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected onCancelShipyardQueue(row: ShipyardQueueRowVm): void {
+    if (this.shipyardQueueMutationInFlight) {
+      return;
+    }
+
+    const planet = this.planet;
+    const session = this.playerSession.load();
+    if (!planet || !session) {
+      return;
+    }
+
+    const request: CancelShipyardQueueEntryRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      index: row.queueIndex
+    };
+
+    this.shipyardQueueMutationInFlight = true;
+    this.shipyardQueueActionError = null;
+    this.cdr.markForCheck();
+
+    this.gameApi.cancelShipyardQueueEntry(request, session.token)
+      .pipe(finalize(() => {
+        this.shipyardQueueMutationInFlight = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (updatedPlanet) => {
+          this.planet = updatedPlanet;
+          this.syncOwnedPlanet(updatedPlanet);
+          this.rebuildPlanetState();
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.shipyardQueueActionError = error?.error?.error ?? 'Unable to cancel shipyard queue entry.';
+          this.cdr.markForCheck();
+        }
+      });
   }
 
   protected hasResearchQueueEntries(): boolean {
@@ -1630,6 +1834,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.shipStartErrorByType.clear();
     this.defenceStartInFlightByType.clear();
     this.defenceStartErrorByType.clear();
+    this.buildingQueueActionError = null;
+    this.shipyardQueueActionError = null;
+    this.buildingQueueMutationInFlight = false;
+    this.shipyardQueueMutationInFlight = false;
     this.techLevelsByType.clear();
     this.buildingQueueTypes.clear();
 
@@ -3067,7 +3275,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.queueTabRefreshInFlight || this.isLoading) {
+    if (
+      this.queueTabRefreshInFlight
+      || this.isLoading
+      || this.buildingQueueMutationInFlight
+      || this.shipyardQueueMutationInFlight
+    ) {
       return;
     }
 

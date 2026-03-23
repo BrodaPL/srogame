@@ -34,6 +34,7 @@ import researchHelperForModule from '../../src/app/models/tech/research-helper-f
 import technologyEffectsModule from '../../src/app/models/tech/technology-effects.js';
 import phaseOneTurnResolverModule from '../../src/app/models/turns/phase-one-turn-resolver.js';
 import smokeTestScenariosModule from '../../src/app/models/testing/smoke-test-scenarios.js';
+import queueManagementModule from '../../src/app/models/queues/queue-management.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   EndTurnResponse,
@@ -68,7 +69,11 @@ import type {
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
   StartBuildingConstructionRequest,
+  ReorderBuildingQueueRequest,
+  CancelBuildingQueueEntryRequest,
   StartShipyardConstructionRequest,
+  ReorderShipyardQueueRequest,
+  CancelShipyardQueueEntryRequest,
   StartTechnologyResearchRequest,
   CreateFleetMissionRequest,
   CreateFleetBombSelectionEntry,
@@ -198,6 +203,11 @@ const { ResearchHelperFor } = researchHelperForModule as {
 const { maxActiveFleets } = technologyEffectsModule as typeof import('../../src/app/models/tech/technology-effects.js');
 const { resolvePhaseOneTurn } = phaseOneTurnResolverModule as typeof import('../../src/app/models/turns/phase-one-turn-resolver.js');
 const { applySmokeTestScenario, isSmokeTestScenarioKey } = smokeTestScenariosModule as typeof import('../../src/app/models/testing/smoke-test-scenarios.js');
+const {
+  moveQueueEntry,
+  calculateBuildingCancellationRefund,
+  calculateShipyardCancellation
+} = queueManagementModule as typeof import('../../src/app/models/queues/queue-management.js');
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -786,6 +796,124 @@ app.post('/api/game/building-queue', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.post('/api/game/building-queue/reorder', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as ReorderBuildingQueueRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const fromIndex = parseBodyNonNegativeInt(body?.fromIndex);
+  const toIndex = parseBodyNonNegativeInt(body?.toIndex);
+  if (x === null || y === null || z === null || fromIndex === null || toIndex === null) {
+    return res.status(400).json({ error: 'Invalid building queue reorder payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be modified.' });
+  }
+
+  const queueLength = planet.rBDSFTQ.buildingQueue.length;
+  if (fromIndex >= queueLength || toIndex >= queueLength) {
+    return res.status(400).json({ error: 'Queue index out of range.' });
+  }
+
+  if (fromIndex !== toIndex) {
+    moveQueueEntry(planet.rBDSFTQ.buildingQueue, fromIndex, toIndex);
+  }
+
+  const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/building-queue/cancel', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as CancelBuildingQueueEntryRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const index = parseBodyNonNegativeInt(body?.index);
+  if (x === null || y === null || z === null || index === null) {
+    return res.status(400).json({ error: 'Invalid building queue cancel payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be modified.' });
+  }
+
+  const queueEntry = planet.rBDSFTQ.buildingQueue[index];
+  if (!queueEntry) {
+    return res.status(400).json({ error: 'Queue index out of range.' });
+  }
+
+  const building = BUILDING_BLUEPRINTS.get(queueEntry.buildingType);
+  if (!building) {
+    return res.status(400).json({ error: 'Unknown queued building type.' });
+  }
+
+  const refund = calculateBuildingCancellationRefund(building, queueEntry);
+  planet.rBDSFTQ.resources.addResourcePack(refund);
+  planet.rBDSFTQ.buildingQueue.splice(index, 1);
+
+  const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
+  return res.status(200).json(response);
+});
+
 app.post('/api/game/shipyard-queue', (req, res) => {
   if (!currentGalaxy || currentGameOwnerId === null) {
     return res.status(404).json({ error: 'No active game.' });
@@ -901,6 +1029,129 @@ app.post('/api/game/shipyard-queue', (req, res) => {
       ? ShipyardQueueEntry.ship(shipType as ShipTypeType, amount, 0)
       : ShipyardQueueEntry.defence(defenceType as DefenceTypeType, amount, 0)
   );
+
+  const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/shipyard-queue/reorder', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as ReorderShipyardQueueRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const fromIndex = parseBodyNonNegativeInt(body?.fromIndex);
+  const toIndex = parseBodyNonNegativeInt(body?.toIndex);
+  if (x === null || y === null || z === null || fromIndex === null || toIndex === null) {
+    return res.status(400).json({ error: 'Invalid shipyard queue reorder payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be modified.' });
+  }
+
+  const queueLength = planet.rBDSFTQ.shipyardQueue.length;
+  if (fromIndex >= queueLength || toIndex >= queueLength) {
+    return res.status(400).json({ error: 'Queue index out of range.' });
+  }
+
+  if (fromIndex !== toIndex) {
+    moveQueueEntry(planet.rBDSFTQ.shipyardQueue, fromIndex, toIndex);
+  }
+
+  const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/shipyard-queue/cancel', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as CancelShipyardQueueEntryRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const index = parseBodyNonNegativeInt(body?.index);
+  if (x === null || y === null || z === null || index === null) {
+    return res.status(400).json({ error: 'Invalid shipyard queue cancel payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be modified.' });
+  }
+
+  const queueEntry = planet.rBDSFTQ.shipyardQueue[index];
+  if (!queueEntry) {
+    return res.status(400).json({ error: 'Queue index out of range.' });
+  }
+
+  const blueprint = queueEntry.itemKind === 'defence'
+    ? (queueEntry.defenceType ? DEFENCE_BLUEPRINTS.get(queueEntry.defenceType) : null)
+    : (queueEntry.shipType ? SHIP_BLUEPRINTS.get(queueEntry.shipType) : null);
+  if (!blueprint) {
+    return res.status(400).json({ error: 'Unknown queued shipyard item type.' });
+  }
+
+  const cancellation = calculateShipyardCancellation(blueprint, queueEntry);
+  if (cancellation.deliveredAmount > 0) {
+    addProducedShipyardUnitsToPlanet(planet, blueprint, queueEntry.itemKind, cancellation.deliveredAmount);
+  }
+  planet.rBDSFTQ.resources.addResourcePack(cancellation.refund);
+  planet.rBDSFTQ.shipyardQueue.splice(index, 1);
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -2301,6 +2552,25 @@ function multiplyResourcePack(base: ResourcesPack, amount: number): ResourcesPac
     crystal: base.crystal * amount,
     deuterium: base.deuterium * amount
   } as ResourcesPack;
+}
+
+function addProducedShipyardUnitsToPlanet(
+  planet: Planet,
+  blueprint: Ship | Defence,
+  itemKind: 'ship' | 'defence',
+  amount: number
+): void {
+  const normalizedAmount = Math.max(0, Math.floor(amount));
+  if (normalizedAmount <= 0) {
+    return;
+  }
+
+  if (itemKind === 'defence') {
+    planet.rBDSFTQ.defences.addUndamaged((blueprint as Defence).type, normalizedAmount);
+    return;
+  }
+
+  planet.rBDSFTQ.ships.addUndamaged((blueprint as Ship).type, normalizedAmount);
 }
 
 function toResourcesPackDto(pack: ResourcesPack): ResourcesPackDto {

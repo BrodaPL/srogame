@@ -58,28 +58,62 @@
               <table class="overview-table">
                 <thead>
                   <tr>
+                    <th>Drag</th>
                     <th>#</th>
                     <th>Building</th>
                     <th>Upgrade</th>
                     <th>Status</th>
                     <th>Invested / base</th>
                     <th>ETA (turns)</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody
+                  cdkDropList
+                  [cdkDropListData]="buildingQueueRows()"
+                  [id]="buildingQueueDropListId()"
+                  [cdkDropListDisabled]="isBuildingQueueInteractionDisabled()"
+                  cdkDropListLockAxis="y"
+                  (cdkDropListDropped)="onBuildingQueueDrop($event)"
+                >
                   @for (queueRow of buildingQueueRows(); track trackQueueRow($index, queueRow)) {
-                    <tr>
+                    <tr cdkDrag>
+                      <td class="queue-management__drag-cell">
+                        <button
+                          type="button"
+                          class="queue-management__drag-handle"
+                          cdkDragHandle
+                          [disabled]="isBuildingQueueInteractionDisabled()"
+                          [attr.aria-label]="'Drag ' + queueRow.buildingType"
+                        >
+                          Drag
+                        </button>
+                      </td>
                       <td>{{ queueRow.position }}</td>
                       <td>{{ queueRow.buildingType }}</td>
                       <td>L{{ queueRow.fromLevel }} -> L{{ queueRow.toLevel }}</td>
                       <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
                       <td>{{ queueRow.investedIndustryPower }} / {{ queueRow.baseTotalConstructionTime }}</td>
                       <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
+                      <td>
+                        <button
+                          type="button"
+                          class="queue-management__cancel-button"
+                          [disabled]="isBuildingQueueInteractionDisabled()"
+                          [attr.title]="buildingQueueCancelTitle(queueRow)"
+                          (click)="onCancelBuildingQueue(queueRow)"
+                        >
+                          Cancel
+                        </button>
+                      </td>
                     </tr>
                   }
                 </tbody>
               </table>
             </div>
+            @if (buildingQueueActionError) {
+              <p class="game-dashboard__build-error">{{ buildingQueueActionError }}</p>
+            }
           } @else {
             <article class="planet-queue-card">
               <h4 class="planet-view__section-title">No buildings queued</h4>
