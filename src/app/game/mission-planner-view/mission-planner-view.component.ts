@@ -102,6 +102,7 @@ export class MissionPlannerViewComponent implements OnInit {
   protected fleetTemplatesEnabled = false;
   protected readonly purposeFilters = new Map<ShipPurpose, boolean>([
     [ShipPurpose.MILITARY, true],
+    [ShipPurpose.BOMBER, true],
     [ShipPurpose.CARGO, true],
     [ShipPurpose.UTILITY, true],
     [ShipPurpose.CARRIER, true],

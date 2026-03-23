@@ -2,7 +2,7 @@ import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { FleetState } from '../../fleets/fleet';
 import type { Ship } from '../../fleets/ship';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
-import { WeaponType } from '../../enums/weapon-type';
+import { ShipPurpose } from '../../enums/ship-purpose';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
@@ -91,19 +91,19 @@ export class SiegeFleetMission extends FleetMission {
       checks.push({ text: 'Siege mission target must be a hostile owned planet.', severity: 'error' });
     }
 
-    if (!this.hasBombardmentWeapons(selection)) {
-      checks.push({ text: 'Select at least one ship with Bombardment weapons.', severity: 'error' });
+    if (!this.hasBomberShips(selection)) {
+      checks.push({ text: 'SIEGE requires at least one Bomber ship.', severity: 'error' });
     }
   }
 
-  private hasBombardmentWeapons(selection: MissionPlannerContext['selection']['ships']): boolean {
+  private hasBomberShips(selection: MissionPlannerContext['selection']['ships']): boolean {
     return selection.some((entry) => {
       if (entry.undamagedAmount + entry.damagedAmount <= 0) {
         return false;
       }
 
       const blueprint = SHIP_BLUEPRINTS.get(entry.type);
-      return blueprint?.weapons.some((weapon) => weapon.type === WeaponType.BOMBARDMENT_WEAPONS) ?? false;
+      return blueprint?.purposes.has(ShipPurpose.BOMBER) ?? false;
     });
   }
 

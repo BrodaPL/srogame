@@ -10,6 +10,7 @@ This file captures session context for collaborators and future AI agents.
 - Persistence (current): Uses browser localStorage key `srogame:setup` and `srogame:player` (auth session). Galaxy is held in server memory and fetched via API. Accounts + sessions are stored in `server/data/auth.json`.
 - Conventions: Use camelCase for variable names.
 - Collaboration preference: Use planning mode by default for regular development tasks.
+- Planning-question preference: When clarifying design decisions in planning mode, ask numbered questions with options and place the recommendation directly under each question (`Recommended: ...`) instead of collecting all recommendations in one block at the end.
 
 ## Current Behavior
 - Route `/` shows main menu (load, singleplayer, multiplayer, encyclopedia, help/about).

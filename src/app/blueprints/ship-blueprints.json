@@ -16,7 +16,7 @@
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
-      "purposes": ["MILITARY"],
+      "purposes": ["MILITARY", "BOMBER"],
       "jumpCost": 0,
       "cost": { "metal": 20, "crystal": 10, "deuterium": 0 },
       "buildingRequirements": [
@@ -43,7 +43,7 @@
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
-      "purposes": ["MILITARY"],
+      "purposes": ["MILITARY", "BOMBER"],
       "jumpCost": 0,
       "cost": { "metal": 30, "crystal": 20, "deuterium": 10 },
       "buildingRequirements": [
@@ -70,7 +70,7 @@
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
-      "purposes": ["MILITARY"],
+      "purposes": ["MILITARY", "BOMBER"],
       "jumpCost": 0,
       "cost": { "metal": 40, "crystal": 10, "deuterium": 20 },
       "buildingRequirements": [
@@ -98,7 +98,7 @@
       ],
       "cargoCapacity": 20,
       "hangarCapacity": 0,
-      "purposes": ["MILITARY"],
+      "purposes": ["MILITARY", "BOMBER"],
       "jumpCost": 0,
       "cost": { "metal": 70, "crystal": 30, "deuterium": 20 },
       "buildingRequirements": [
@@ -787,7 +787,7 @@
       ],
       "cargoCapacity": 25000,
       "hangarCapacity": 100,
-      "purposes": ["MILITARY", "CARGO", "UTILITY", "CARRIER"],
+      "purposes": ["MILITARY", "BOMBER", "CARGO", "UTILITY", "CARRIER"],
       "jumpCost": 100,
       "cost": { "metal": 50000, "crystal": 50000, "deuterium": 20000 },
       "buildingRequirements": [
