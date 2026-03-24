@@ -22,7 +22,8 @@ import { HullClass } from '../enums/hull-class';
 import { PlayerType } from '../enums/player-type';
 import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
-import { Fleet, FleetState } from '../fleets/fleet';
+import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../fleets/fleet';
+import { Destination } from '../fleets/destination';
 import { ManyShips, type ManyShipsLike } from '../fleets/many-ships';
 import { Ship } from '../fleets/ship';
 import { ShipInstance } from '../fleets/ship-instance';
@@ -537,8 +538,7 @@ function resolveActiveFleets(
   // TODO: Define a formal deterministic same-turn arrival order once simultaneous arrivals need dedicated rules.
   for (const fleet of galaxy.activeFleets) {
     if (
-      fleet.state !== FleetState.IDLE
-      && fleet.state !== FleetState.MISSION_FAILURE_IDLE
+      fleet.state !== FleetState.ORBITING
       && !isFleetResolvingThisTurn(fleet, resolvedTurnNumber)
     ) {
       activeFleets.push(fleet);
@@ -612,7 +612,7 @@ function resolveActiveFleets(
 
       const stationaryOccupants = activeFleets
         .filter((fleet) =>
-          (fleet.state === FleetState.IDLE || fleet.state === FleetState.MISSION_FAILURE_IDLE)
+          fleet.state === FleetState.ORBITING
           && toPlanetOrbitLocationKeyForFleet(fleet) === locationKey
         )
         .map((fleet) => ({
@@ -649,8 +649,7 @@ function resolveActiveFleets(
   }
 
   galaxy.activeFleets = activeFleets.filter((fleet) =>
-    fleet.state !== FleetState.IDLE
-    && fleet.state !== FleetState.MISSION_FAILURE_IDLE
+    fleet.state !== FleetState.ORBITING
       ? true
       : ManyShips.totalShipsCount(fleet.ships) > 0
   );
@@ -693,8 +692,7 @@ function resolveFleetState(
         planetById,
         resolvedTurnNumber,
       );
-    case FleetState.IDLE:
-    case FleetState.MISSION_FAILURE_IDLE:
+    case FleetState.ORBITING:
       return resolveIdleFleetState(
         fleet,
         playersById,
@@ -716,7 +714,11 @@ function resolveIdleFleetState(
   resolvedTurnNumber: number,
   diplomacyResolver: DiplomacyResolver
 ): Fleet | null {
-  if (fleet.state !== FleetState.IDLE) {
+  if (fleet.state !== FleetState.ORBITING) {
+    return fleet;
+  }
+
+  if (fleet.orbitActivity !== FleetOrbitActivity.MISSION_IN_PROGRESS) {
     return fleet;
   }
 
@@ -958,11 +960,16 @@ function resolveShipRepairs(
 
     if (!hasRepairableDamageAtPlanet(planet, eligibleOrbitFleets)) {
       for (const fleet of eligibleOrbitFleets) {
-        if (fleet.missionType !== FleetMissionType.REPAIR || fleet.state !== FleetState.IDLE) {
+        if (
+          fleet.missionType !== FleetMissionType.REPAIR
+          || fleet.state !== FleetState.ORBITING
+          || fleet.orbitActivity !== FleetOrbitActivity.MISSION_IN_PROGRESS
+        ) {
           continue;
         }
 
         fleet.state = FleetState.RETURNING;
+        fleet.orbitActivity = FleetOrbitActivity.IDLE;
         fleet.createdAtTurn = resolvedTurnNumber;
         addRepairReturnSummaryReport(playersById.get(fleet.ownerId) ?? null, fleet, planet, resolvedTurnNumber);
       }
@@ -1263,7 +1270,7 @@ function isFleetEligibleForOrbitRepair(
   planetOwnerId: number,
   diplomacyResolver: DiplomacyResolver
 ): boolean {
-  if (fleet.state !== FleetState.IDLE && fleet.state !== FleetState.MISSION_FAILURE_IDLE) {
+  if (fleet.state !== FleetState.ORBITING) {
     return false;
   }
 
@@ -1360,8 +1367,14 @@ function resolveReturnArrival(
 ): Fleet | null {
   const originPlanet = planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z));
   if (!originPlanet || originPlanet.info.ownerId !== fleet.ownerId) {
-    fleet.state = FleetState.MISSION_FAILURE_IDLE;
+    fleet.state = FleetState.ORBITING;
+    fleet.missionType = FleetMissionType.HOLD;
+    fleet.orbitActivity = FleetOrbitActivity.HOLD;
+    fleet.suspendedMissionType = null;
+    fleet.target = new Destination(fleet.origin.x, fleet.origin.y, fleet.origin.z);
+    fleet.targetPlanetName = fleet.originPlanetName;
     fleet.createdAtTurn = resolvedTurnNumber;
+    fleet.returnReason = FleetReturnReason.NORMAL;
     return fleet;
   }
 
@@ -1380,6 +1393,8 @@ function createReturningFleet(
   resolvedTurnNumber: number
 ): Fleet {
   fleet.state = FleetState.RETURNING;
+  fleet.orbitActivity = FleetOrbitActivity.IDLE;
+  fleet.returnReason = FleetReturnReason.NORMAL;
   fleet.createdAtTurn = resolvedTurnNumber;
   return fleet;
 }
@@ -1389,6 +1404,8 @@ function createMissionFailureReturnFleet(
   resolvedTurnNumber: number
 ): Fleet {
   fleet.state = FleetState.MISSION_FAILURE_RETURNING;
+  fleet.orbitActivity = FleetOrbitActivity.IDLE;
+  fleet.returnReason = FleetReturnReason.MISSION_FAILURE;
   fleet.createdAtTurn = resolvedTurnNumber;
   return fleet;
 }
@@ -1904,9 +1921,7 @@ function toEncounterLocationKey(location: { kind: 'planetOrbit'; x: number; y: n
 }
 
 function toPlanetOrbitLocationKeyForFleet(fleet: Fleet): string {
-  const coordinates = fleet.state === FleetState.MISSION_FAILURE_IDLE
-    ? fleet.origin
-    : fleet.target;
+  const coordinates = fleet.target;
   return `planetOrbit:${coordinates.x}:${coordinates.y}:${coordinates.z}`;
 }
 

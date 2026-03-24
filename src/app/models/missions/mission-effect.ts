@@ -1,4 +1,5 @@
-import { FleetState } from '../fleets/fleet';
+import { FleetOrbitActivity, FleetState } from '../fleets/fleet';
+import { FleetMissionType } from '../enums/fleet-mission-type';
 
 export type MissionPlanetReference = 'origin' | 'target';
 
@@ -15,7 +16,11 @@ export type MissionEffect =
     type: 'clearFleetCargo';
   }
   | {
-    type: 'setFleetIdleAtTarget';
+    type: 'setFleetOrbitState';
+    state: FleetState;
+    orbitActivity: FleetOrbitActivity;
+    missionType?: FleetMissionType;
+    suspendedMissionType?: FleetMissionType | null;
   }
   | {
     type: 'generateEspionageReport';

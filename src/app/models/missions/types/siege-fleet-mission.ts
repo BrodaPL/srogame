@@ -1,5 +1,5 @@
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
-import { FleetState } from '../../fleets/fleet';
+import { FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import type { Ship } from '../../fleets/ship';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
 import { ShipPurpose } from '../../enums/ship-purpose';
@@ -57,9 +57,12 @@ export class SiegeFleetMission extends FleetMission {
 
     return {
       fleetOutcome: 'keep',
-      nextState: FleetState.IDLE,
       resetCreatedAtTurn: true,
-      effects: [{ type: 'setFleetIdleAtTarget' }],
+      effects: [{
+        type: 'setFleetOrbitState',
+        state: FleetState.ORBITING,
+        orbitActivity: FleetOrbitActivity.MISSION_IN_PROGRESS
+      }],
       reports: [{
         kind: 'success',
         body: `Siege mission established orbit over ${context.targetPlanet.basicInfo.name}.`

@@ -1,4 +1,4 @@
-import { FleetState } from '../../fleets/fleet';
+import { FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import type { Ship } from '../../fleets/ship';
 import type { MissionCheck } from '../mission-check';
 import type {
@@ -110,7 +110,7 @@ export class RecycleFleetMission extends FleetMission {
 
     return {
       fleetOutcome: 'keep',
-      nextState: missionFinished ? FleetState.RETURNING : FleetState.IDLE,
+      nextState: missionFinished ? FleetState.RETURNING : FleetState.ORBITING,
       resetCreatedAtTurn: missionFinished,
       effects: [{
         type: 'collectPlanetDebrisToFleetCargo',
@@ -155,9 +155,12 @@ export class RecycleFleetMission extends FleetMission {
 
     return {
       fleetOutcome: 'keep',
-      nextState: FleetState.IDLE,
       resetCreatedAtTurn: true,
-      effects: [{ type: 'setFleetIdleAtTarget' }],
+      effects: [{
+        type: 'setFleetOrbitState',
+        state: FleetState.ORBITING,
+        orbitActivity: FleetOrbitActivity.MISSION_IN_PROGRESS
+      }],
       reports: [{
         kind: 'success',
         body: `Recycle mission established salvage orbit over ${context.targetPlanet.basicInfo.name}.`

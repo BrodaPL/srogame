@@ -143,6 +143,24 @@
         "allowCargo": true,
         "requiresCargo": false
       }
+    },
+    {
+      "type": "HOLD",
+      "name": "Hold",
+      "description": "Keep a fleet parked in orbit without running mission logic until a new order is issued.",
+      "battleRoundsModifier": 0,
+      "minimumFuelReserves": 0,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["SELF", "ALLIED", "PEACE"],
+        "allowUnowned": true
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": true,
+        "requiresCargo": false
+      }
     }
   ]
 }

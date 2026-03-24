@@ -1,5 +1,4 @@
 import { EspionageReportGenerator } from '../../generators/espionage-report-generator';
-import { FleetState } from '../fleets/fleet';
 import { ShipType } from '../enums/ship-type';
 import { ManyShips } from '../fleets/many-ships';
 import { ResourcesPack } from '../resources-pack';
@@ -56,8 +55,15 @@ export class MissionEffectExecutor {
         context.fleet.cargo = new ResourcesPack(0, 0, 0);
         context.fleet.usedCargoCapacity = 0;
         break;
-      case 'setFleetIdleAtTarget':
-        context.fleet.state = FleetState.IDLE;
+      case 'setFleetOrbitState':
+        context.fleet.state = effect.state;
+        context.fleet.orbitActivity = effect.orbitActivity;
+        if (effect.missionType) {
+          context.fleet.missionType = effect.missionType;
+        }
+        if (effect.suspendedMissionType !== undefined) {
+          context.fleet.suspendedMissionType = effect.suspendedMissionType;
+        }
         break;
       case 'generateEspionageReport':
         this.generateEspionageReport(context);

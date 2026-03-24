@@ -153,7 +153,9 @@ const { ShipType } = shipTypeEnumModule as {
 const { FleetMissionType } = fleetMissionTypeEnumModule as {
   FleetMissionType: typeof import('../../src/app/models/enums/fleet-mission-type.js').FleetMissionType;
 };
-const { FleetState } = fleetModelModule as {
+const { FleetOrbitActivity, FleetReturnReason, FleetState } = fleetModelModule as {
+  FleetOrbitActivity: typeof import('../../src/app/models/fleets/fleet.js').FleetOrbitActivity;
+  FleetReturnReason: typeof import('../../src/app/models/fleets/fleet.js').FleetReturnReason;
   FleetState: typeof import('../../src/app/models/fleets/fleet.js').FleetState;
 };
 const { ManyShips } = manyShipsModule as {
@@ -1581,6 +1583,99 @@ app.get('/api/game/active-fleets', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.post('/api/game/active-fleets/:fleetId/return', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const fleetId = Number.parseInt(req.params.fleetId, 10);
+  if (!Number.isInteger(fleetId) || fleetId <= 0) {
+    return res.status(400).json({ error: 'Invalid fleet id.' });
+  }
+
+  const fleet = currentGalaxy.activeFleets.find((entry) => entry.fleetId === fleetId && entry.ownerId === playerId);
+  if (!fleet) {
+    return res.status(404).json({ error: 'Fleet not found.' });
+  }
+
+  if (fleet.state === FleetState.RETURNING || fleet.state === FleetState.MISSION_FAILURE_RETURNING) {
+    return res.status(200).json(currentGalaxy.activeFleets.filter((entry) => entry.ownerId === playerId));
+  }
+
+  if (fleet.state !== FleetState.MOVING_TO_TARGET && fleet.state !== FleetState.ORBITING) {
+    return res.status(400).json({ error: 'Fleet cannot return from its current state.' });
+  }
+
+  if (fleet.state === FleetState.MOVING_TO_TARGET) {
+    const elapsedTravelTurns = Math.max(
+      0,
+      Math.min(fleet.travelTurns, currentGalaxy.currentTurn - fleet.createdAtTurn)
+    );
+    fleet.returnTurns = Math.max(1, elapsedTravelTurns);
+  }
+
+  fleet.state = FleetState.RETURNING;
+  fleet.orbitActivity = FleetOrbitActivity.IDLE;
+  fleet.suspendedMissionType = null;
+  fleet.returnReason = FleetReturnReason.MANUAL_RECALL;
+  fleet.createdAtTurn = currentGalaxy.currentTurn;
+
+  return res.status(200).json(currentGalaxy.activeFleets.filter((entry) => entry.ownerId === playerId));
+});
+
+app.post('/api/game/active-fleets/:fleetId/delay', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (auth.session.accountId !== currentGameOwnerId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const fleetId = Number.parseInt(req.params.fleetId, 10);
+  if (!Number.isInteger(fleetId) || fleetId <= 0) {
+    return res.status(400).json({ error: 'Invalid fleet id.' });
+  }
+
+  const fleet = currentGalaxy.activeFleets.find((entry) => entry.fleetId === fleetId && entry.ownerId === playerId);
+  if (!fleet) {
+    return res.status(404).json({ error: 'Fleet not found.' });
+  }
+
+  if (fleet.state !== FleetState.MOVING_TO_TARGET) {
+    return res.status(400).json({ error: 'Delay is available only for outbound fleets.' });
+  }
+
+  // TODO: Support adding delay to RETURNING fleets once the first slice settles.
+  fleet.travelTurns += 1;
+
+  return res.status(200).json(currentGalaxy.activeFleets.filter((entry) => entry.ownerId === playerId));
+});
+
 app.post('/api/game/active-fleets', (req, res) => {
   if (!currentGalaxy || currentGameOwnerId === null) {
     return res.status(404).json({ error: 'No active game.' });
@@ -1769,7 +1864,10 @@ app.post('/api/game/active-fleets', (req, res) => {
     travelTurns,
     returnTurns: travelTurns,
     state: FleetState.MOVING_TO_TARGET,
-    createdAtTurn: currentGalaxy.currentTurn
+    createdAtTurn: currentGalaxy.currentTurn,
+    orbitActivity: FleetOrbitActivity.IDLE,
+    suspendedMissionType: null,
+    returnReason: FleetReturnReason.NORMAL
   } as Fleet;
 
   currentGalaxy.nextFleetId += 1;

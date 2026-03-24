@@ -12,6 +12,13 @@
       <p>{{ loadError }}</p>
     </section>
   } @else {
+    @if (actionError) {
+      <section class="status status--error">
+        <h3>Fleet command failed</h3>
+        <p>{{ actionError }}</p>
+      </section>
+    }
+
     <header class="overview-card operations-view__header" data-tutorial-id="operations-header">
       <div>
         <p class="eyebrow">Fleet Control</p>
@@ -76,6 +83,28 @@
             <p class="overview-muted">
               Cargo manifest: M {{ fleet.cargo.metal }}, C {{ fleet.cargo.crystal }}, D {{ fleet.cargo.deuterium }}
             </p>
+
+            <div class="operations-view__actions">
+              @if (canReturn(fleet)) {
+                <button
+                  type="button"
+                  class="operations-view__action"
+                  [disabled]="isActionPending(fleet)"
+                  (click)="returnFleet(fleet)">
+                  Return now
+                </button>
+              }
+
+              @if (canDelay(fleet)) {
+                <button
+                  type="button"
+                  class="operations-view__action"
+                  [disabled]="isActionPending(fleet)"
+                  (click)="delayFleet(fleet)">
+                  Delay +1
+                </button>
+              }
+            </div>
           </article>
         }
       </div>

@@ -7,7 +7,7 @@ import { PlayerSessionService } from '../../core/player-session.service';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { WeaponType } from '../../models/enums/weapon-type';
-import { Fleet, FleetState } from '../../models/fleets/fleet';
+import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { calculateRecycleCapabilityForManyShips } from '../../models/recycling/recycling-capability';
@@ -22,10 +22,14 @@ import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 })
 export class OperationsViewComponent implements OnInit {
   protected readonly fleetState = FleetState;
+  protected readonly fleetOrbitActivity = FleetOrbitActivity;
+  protected readonly fleetReturnReason = FleetReturnReason;
   protected readonly fleetMissionType = FleetMissionType;
   protected isLoading = false;
   protected loadError: string | null = null;
+  protected actionError: string | null = null;
   protected activeFleets: Fleet[] = [];
+  protected activeActionFleetId: number | null = null;
 
   private readonly shipBlueprints = ShipBlueprintsFactory.fromDefaultJson();
 
@@ -62,10 +66,18 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected currentLocationPlanetName(fleet: Fleet): string {
+    if (this.isRecalledInTransit(fleet)) {
+      return 'Recalled in transit';
+    }
+
     return this.usesOriginCoordinates(fleet.state) ? fleet.originPlanetName : fleet.targetPlanetName;
   }
 
   protected currentLocationCoordinates(fleet: Fleet): string {
+    if (this.isRecalledInTransit(fleet)) {
+      return `${this.coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z)} -> ${this.coordinatesLabel(fleet.target.x, fleet.target.y, fleet.target.z)}`;
+    }
+
     const coordinates = this.usesOriginCoordinates(fleet.state) ? fleet.origin : fleet.target;
     return this.coordinatesLabel(coordinates.x, coordinates.y, coordinates.z);
   }
@@ -75,8 +87,7 @@ export class OperationsViewComponent implements OnInit {
       case FleetState.RETURNING:
       case FleetState.MISSION_FAILURE_RETURNING:
         return fleet.originPlanetName;
-      case FleetState.IDLE:
-      case FleetState.MISSION_FAILURE_IDLE:
+      case FleetState.ORBITING:
         return 'Holding position';
       default:
         return fleet.targetPlanetName;
@@ -88,8 +99,7 @@ export class OperationsViewComponent implements OnInit {
       case FleetState.RETURNING:
       case FleetState.MISSION_FAILURE_RETURNING:
         return this.coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z);
-      case FleetState.IDLE:
-      case FleetState.MISSION_FAILURE_IDLE:
+      case FleetState.ORBITING:
         return this.currentLocationCoordinates(fleet);
       default:
         return this.coordinatesLabel(fleet.target.x, fleet.target.y, fleet.target.z);
@@ -97,7 +107,31 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected stateLabel(fleet: Fleet): string {
+    if (fleet.state === FleetState.ORBITING) {
+      return `ORBITING | ${fleet.orbitActivity.replaceAll('_', ' ')}`;
+    }
+
+    if (fleet.returnReason === FleetReturnReason.MANUAL_RECALL && fleet.state === FleetState.RETURNING) {
+      return 'RETURNING | MANUAL RECALL';
+    }
+
+    if (fleet.returnReason === FleetReturnReason.MISSION_FAILURE && fleet.state === FleetState.MISSION_FAILURE_RETURNING) {
+      return 'MISSION FAILURE RETURNING';
+    }
+
     return fleet.state.replaceAll('_', ' ');
+  }
+
+  protected canReturn(fleet: Fleet): boolean {
+    return fleet.state === FleetState.MOVING_TO_TARGET || fleet.state === FleetState.ORBITING;
+  }
+
+  protected canDelay(fleet: Fleet): boolean {
+    return fleet.state === FleetState.MOVING_TO_TARGET;
+  }
+
+  protected isActionPending(fleet: Fleet): boolean {
+    return this.activeActionFleetId === fleet.fleetId;
   }
 
   protected hasEta(fleet: Fleet): boolean {
@@ -191,6 +225,30 @@ export class OperationsViewComponent implements OnInit {
     return null;
   }
 
+  protected returnFleet(fleet: Fleet): void {
+    if (!this.canReturn(fleet)) {
+      return;
+    }
+
+    this.runFleetAction(
+      fleet.fleetId,
+      (token) => this.gameApi.returnFleet(fleet.fleetId, token),
+      'Unable to return fleet.'
+    );
+  }
+
+  protected delayFleet(fleet: Fleet): void {
+    if (!this.canDelay(fleet)) {
+      return;
+    }
+
+    this.runFleetAction(
+      fleet.fleetId,
+      (token) => this.gameApi.delayFleet(fleet.fleetId, token),
+      'Unable to delay fleet.'
+    );
+  }
+
   private loadActiveFleets(): void {
     const session = this.playerSession.load();
     if (!session) {
@@ -200,6 +258,7 @@ export class OperationsViewComponent implements OnInit {
 
     this.isLoading = true;
     this.loadError = null;
+    this.actionError = null;
 
     this.gameApi.getActiveFleets(session.token)
       .pipe(finalize(() => {
@@ -208,7 +267,7 @@ export class OperationsViewComponent implements OnInit {
       }))
       .subscribe({
         next: (activeFleets) => {
-          this.activeFleets = [...activeFleets].sort((left, right) => left.fleetId - right.fleetId);
+          this.applyActiveFleetUpdate(activeFleets);
           if (this.activeFleets.length > 0) {
             this.tutorialService.autoOpenTutorial('operationsView');
           }
@@ -220,6 +279,44 @@ export class OperationsViewComponent implements OnInit {
   }
 
   private usesOriginCoordinates(state: FleetState): boolean {
-    return state === FleetState.MOVING_TO_TARGET || state === FleetState.MISSION_FAILURE_IDLE;
+    return state === FleetState.MOVING_TO_TARGET;
+  }
+
+  private isRecalledInTransit(fleet: Fleet): boolean {
+    return fleet.state === FleetState.RETURNING
+      && fleet.returnReason === FleetReturnReason.MANUAL_RECALL
+      && fleet.returnTurns < fleet.travelTurns;
+  }
+
+  private applyActiveFleetUpdate(activeFleets: Fleet[]): void {
+    this.activeFleets = [...activeFleets].sort((left, right) => left.fleetId - right.fleetId);
+  }
+
+  private runFleetAction(
+    fleetId: number,
+    action: (token: string) => ReturnType<GameApiService['getActiveFleets']>,
+    fallbackError: string
+  ): void {
+    const session = this.playerSession.load();
+    if (!session || this.activeActionFleetId !== null) {
+      return;
+    }
+
+    this.activeActionFleetId = fleetId;
+    this.actionError = null;
+
+    action(session.token)
+      .pipe(finalize(() => {
+        this.activeActionFleetId = null;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (activeFleets) => {
+          this.applyActiveFleetUpdate(activeFleets);
+        },
+        error: (error) => {
+          this.actionError = error?.error?.error ?? fallbackError;
+        }
+      });
   }
 }

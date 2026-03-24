@@ -13,7 +13,8 @@ export enum MissionType {
   SPY = 'Spy',
   STAR_SYSTEM_SPY = 'Star System Spy',
   RECYCLE = 'Recycle',
-  REPAIR = 'Repair'
+  REPAIR = 'Repair',
+  HOLD = 'Hold'
 }
 
 export { MissionType as FleetMissionType };

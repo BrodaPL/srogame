@@ -6,10 +6,21 @@ import { ManyDefences } from '../defences/many-defences';
 
 export enum FleetState {
   MOVING_TO_TARGET = 'MOVING_TO_TARGET',
-  IDLE = 'IDLE',
+  ORBITING = 'ORBITING',
   RETURNING = 'RETURNING',
-  MISSION_FAILURE_RETURNING = 'MISSION_FAILURE_RETURNING',
-  MISSION_FAILURE_IDLE = 'MISSION_FAILURE_IDLE'
+  MISSION_FAILURE_RETURNING = 'MISSION_FAILURE_RETURNING'
+}
+
+export enum FleetOrbitActivity {
+  IDLE = 'IDLE',
+  MISSION_IN_PROGRESS = 'MISSION_IN_PROGRESS',
+  HOLD = 'HOLD'
+}
+
+export enum FleetReturnReason {
+  NORMAL = 'NORMAL',
+  MANUAL_RECALL = 'MANUAL_RECALL',
+  MISSION_FAILURE = 'MISSION_FAILURE'
 }
 
 export class Fleet {
@@ -30,6 +41,9 @@ export class Fleet {
     public returnTurns: number,
     public state: FleetState,
     public createdAtTurn: number,
-    public carriedBombs: ManyDefences = ManyDefences.empty()
+    public carriedBombs: ManyDefences = ManyDefences.empty(),
+    public orbitActivity: FleetOrbitActivity = FleetOrbitActivity.IDLE,
+    public suspendedMissionType: FleetMissionType | null = null,
+    public returnReason: FleetReturnReason = FleetReturnReason.NORMAL
   ) {}
 }

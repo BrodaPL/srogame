@@ -929,13 +929,11 @@ export class ImperiumViewComponent implements OnInit {
 
   private idleRepairFleetsForPlanet(planet: ClientPlanetDto): Fleet[] {
     return this.activeFleets.filter((fleet) => {
-      if (fleet.state !== FleetState.IDLE && fleet.state !== FleetState.MISSION_FAILURE_IDLE) {
+      if (fleet.state !== FleetState.ORBITING) {
         return false;
       }
 
-      const coordinates = fleet.state === FleetState.MISSION_FAILURE_IDLE
-        ? fleet.origin
-        : fleet.target;
+      const coordinates = fleet.target;
       return coordinates.x === planet.coordinates.x
         && coordinates.y === planet.coordinates.y
         && coordinates.z === planet.coordinates.z;

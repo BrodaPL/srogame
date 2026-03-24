@@ -37,3 +37,25 @@
   gap: 0.7rem;
   align-content: start;
 }
+
+.operations-view__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.operations-view__action {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.42rem 0.82rem;
+  cursor: pointer;
+}
+
+.operations-view__action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

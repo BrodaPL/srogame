@@ -3,6 +3,7 @@ import { FleetMissionType } from '../enums/fleet-mission-type';
 import type { FleetMissionBlueprints } from './fleet-mission-blueprint';
 import { FleetMission } from './fleet-mission';
 import { BombardFleetMission } from './types/bombard-fleet-mission';
+import { HoldFleetMission } from './types/hold-fleet-mission';
 import { MoveFleetMission } from './types/move-fleet-mission';
 import { RecycleFleetMission } from './types/recycle-fleet-mission';
 import { RepairFleetMission } from './types/repair-fleet-mission';
@@ -52,6 +53,7 @@ export class FleetMissionRegistry {
     const recycle = this.blueprints.get(FleetMissionType.RECYCLE);
     const repair = this.blueprints.get(FleetMissionType.REPAIR);
     const colonize = this.blueprints.get(FleetMissionType.COLONIZE);
+    const hold = this.blueprints.get(FleetMissionType.HOLD);
 
     if (move) {
       this.missionByType.set(move.type, new MoveFleetMission(move));
@@ -83,6 +85,10 @@ export class FleetMissionRegistry {
 
     if (colonize) {
       this.missionByType.set(colonize.type, new FleetMission(colonize));
+    }
+
+    if (hold) {
+      this.missionByType.set(hold.type, new HoldFleetMission(hold));
     }
   }
 }

@@ -7,7 +7,7 @@ import { FleetMissionType } from '../../enums/fleet-mission-type';
 import { PlayerType } from '../../enums/player-type';
 import { ShipType } from '../../enums/ship-type';
 import { ManyDefences } from '../../defences/many-defences';
-import { Fleet, FleetState } from '../../fleets/fleet';
+import { Fleet, FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import { ManyShips } from '../../fleets/many-ships';
 import { ShipInstance } from '../../fleets/ship-instance';
 import { Galaxy } from '../../planets/galaxy';
@@ -396,7 +396,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     expect(galaxy.activeFleets).toHaveLength(1);
     expect(galaxy.activeFleets[0].ownerId).toBe(1);
-    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
     expect(ManyShips.countByType(galaxy.activeFleets[0].ships).get(ShipType.TITAN)).toBe(1);
     expect(players[0].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
     expect(players[1].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
@@ -515,7 +515,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
     resolvePhaseOneTurn(galaxy);
 
     expect(galaxy.activeFleets).toHaveLength(1);
-    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
     expect(galaxy.activeFleets[0].ownerId).toBe(1);
     expect(galaxy.activeFleets[0].cargo.metal).toBe(25);
     expect(ManyShips.totalShipsCount(system.planets[1].rBDSFTQ.ships)).toBe(targetPlanetShipsBefore);
@@ -616,7 +616,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
     resolvePhaseOneTurn(galaxy);
 
     expect(galaxy.activeFleets).toHaveLength(1);
-    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
     expect(players[0].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(false);
     expect(players[1].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(false);
   });
@@ -639,8 +639,10 @@ describe('resolvePhaseOneTurn battle integration', () => {
       0,
       1,
       1,
-      FleetState.IDLE,
-      1
+      FleetState.ORBITING,
+      1,
+      ManyDefences.empty(),
+      FleetOrbitActivity.MISSION_IN_PROGRESS
     );
     const hostileMoveFleet = new Fleet(
       51,
@@ -686,7 +688,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     expect(galaxy.activeFleets).toHaveLength(1);
     expect(galaxy.activeFleets[0].ownerId).toBe(1);
-    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
     expect(ManyShips.countByType(galaxy.activeFleets[0].ships).get(ShipType.TITAN)).toBe(1);
   });
 
@@ -736,8 +738,10 @@ describe('resolvePhaseOneTurn battle integration', () => {
       0,
       1,
       1,
-      FleetState.IDLE,
-      1
+      FleetState.ORBITING,
+      1,
+      ManyDefences.empty(),
+      FleetOrbitActivity.MISSION_IN_PROGRESS
     );
 
     const { galaxy, system } = createGalaxyWithPlayers(
@@ -784,8 +788,10 @@ describe('resolvePhaseOneTurn battle integration', () => {
       0,
       1,
       1,
-      FleetState.IDLE,
-      1
+      FleetState.ORBITING,
+      1,
+      ManyDefences.empty(),
+      FleetOrbitActivity.MISSION_IN_PROGRESS
     );
 
     const { galaxy } = createGalaxyWithPlayers(
@@ -917,8 +923,10 @@ describe('resolvePhaseOneTurn battle integration', () => {
       0,
       1,
       1,
-      FleetState.IDLE,
-      1
+      FleetState.ORBITING,
+      1,
+      ManyDefences.empty(),
+      FleetOrbitActivity.MISSION_IN_PROGRESS
     );
 
     const { galaxy, system } = createPlayersAndGalaxy(siegeFleet, (solarSystem) => {
@@ -935,7 +943,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
     resolvePhaseOneTurn(galaxy);
 
     expect(galaxy.activeFleets).toHaveLength(1);
-    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
     expect(system.planets[1].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeLessThan(maxStructuralPoints);
   });
 
@@ -978,7 +986,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
     resolvePhaseOneTurn(galaxy, 2);
 
     expect(galaxy.activeFleets).toHaveLength(1);
-    expect(galaxy.activeFleets[0].state).toBe(FleetState.IDLE);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
     expect(galaxy.activeFleets[0].createdAtTurn).toBe(2);
     expect(galaxy.activeFleets[0].cargo.getTotalResourceAmount()).toBe(0);
     expect(system.planets[1].rBDSFTQ.spaceDebris.metal).toBe(120);
@@ -1042,8 +1050,10 @@ describe('resolvePhaseOneTurn battle integration', () => {
       0,
       1,
       1,
-      FleetState.IDLE,
-      2
+      FleetState.ORBITING,
+      2,
+      ManyDefences.empty(),
+      FleetOrbitActivity.MISSION_IN_PROGRESS
     );
 
     const { galaxy, system } = createGalaxyWithPlayers(

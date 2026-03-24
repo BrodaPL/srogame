@@ -57,7 +57,8 @@ const MISSION_PRIORITY: Record<FleetMissionType, number> = {
   [FleetMissionType.INTERCEPT]: 11,
   [FleetMissionType.STAR_SYSTEM_SPY]: 12,
   [FleetMissionType.RECYCLE]: 13,
-  [FleetMissionType.REPAIR]: 14
+  [FleetMissionType.REPAIR]: 14,
+  [FleetMissionType.HOLD]: 15
 };
 
 export class EncounterResolver {

@@ -1,10 +1,11 @@
-import { FleetState } from '../../fleets/fleet';
+import { FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
 import type { MissionPlannerContext, MissionLaunchContext, MissionResolutionContext } from '../mission-context';
 import type { MissionResolutionResult } from '../mission-effect';
+import { FleetMissionType } from '../../enums/fleet-mission-type';
 
 export class MoveFleetMission extends FleetMission {
   public override getPlannerChecks(context: MissionPlannerContext): MissionCheck[] {
@@ -88,9 +89,14 @@ export class MoveFleetMission extends FleetMission {
     ) {
       return {
         fleetOutcome: 'keep',
-        nextState: FleetState.IDLE,
         resetCreatedAtTurn: true,
-        effects: [{ type: 'setFleetIdleAtTarget' }],
+        effects: [{
+          type: 'setFleetOrbitState',
+          state: FleetState.ORBITING,
+          orbitActivity: FleetOrbitActivity.HOLD,
+          missionType: FleetMissionType.HOLD,
+          suspendedMissionType: null
+        }],
         reports: targetStatus === DiplomaticStatus.ALLIED || targetStatus === DiplomaticStatus.PEACE
           ? [{
             kind: 'success',

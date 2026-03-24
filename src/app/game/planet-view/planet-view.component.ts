@@ -2800,13 +2800,11 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   private idleRepairFleetsForPlanet(planet: ClientPlanetDto): Fleet[] {
     return this.activeFleets.filter((fleet) => {
-      if (fleet.state !== FleetState.IDLE && fleet.state !== FleetState.MISSION_FAILURE_IDLE) {
+      if (fleet.state !== FleetState.ORBITING) {
         return false;
       }
 
-      const coordinates = fleet.state === FleetState.MISSION_FAILURE_IDLE
-        ? fleet.origin
-        : fleet.target;
+      const coordinates = fleet.target;
       return this.sameCoordinates(coordinates, planet.coordinates);
     });
   }

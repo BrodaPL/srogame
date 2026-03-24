@@ -1,5 +1,5 @@
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
-import { FleetState } from '../../fleets/fleet';
+import { FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import { ShipType } from '../../enums/ship-type';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
@@ -52,9 +52,12 @@ export class RepairFleetMission extends FleetMission {
 
     return {
       fleetOutcome: 'keep',
-      nextState: FleetState.IDLE,
       resetCreatedAtTurn: true,
-      effects: [{ type: 'setFleetIdleAtTarget' }],
+      effects: [{
+        type: 'setFleetOrbitState',
+        state: FleetState.ORBITING,
+        orbitActivity: FleetOrbitActivity.MISSION_IN_PROGRESS
+      }],
       reports: [{
         kind: 'success',
         body: `Repair mission established orbit over ${context.targetPlanet.basicInfo.name}.`

@@ -203,6 +203,22 @@ export class GameApiService {
     );
   }
 
+  public returnFleet(fleetId: number, token: string) {
+    return this.http.post<CreateFleetMissionResponse['activeFleets']>(
+      `${API_BASE_URL}/game/active-fleets/${fleetId}/return`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public delayFleet(fleetId: number, token: string) {
+    return this.http.post<CreateFleetMissionResponse['activeFleets']>(
+      `${API_BASE_URL}/game/active-fleets/${fleetId}/delay`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
   public getPlayerReports(token: string) {
     return this.http.get<PlayerReportDto[]>(
       `${API_BASE_URL}/game/reports`,

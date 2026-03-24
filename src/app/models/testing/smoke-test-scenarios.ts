@@ -245,7 +245,7 @@ function applyOrbitRepairLifecycleScenario(galaxy: Galaxy): void {
       0,
       1,
       1,
-      FleetState.IDLE,
+      FleetState.ORBITING,
       galaxy.currentTurn
     )
   ];
