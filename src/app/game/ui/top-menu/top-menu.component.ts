@@ -49,6 +49,10 @@ export class TopMenuComponent {
     return currentTurn === null ? 'End Turn --' : `End Turn ${currentTurn}`;
   }
 
+  protected unreadReportsCount(): number {
+    return this.authState.session()?.unreadReportCount ?? 0;
+  }
+
   protected isProcessingTurn(): boolean {
     return this.gameState.isProcessingTurn;
   }

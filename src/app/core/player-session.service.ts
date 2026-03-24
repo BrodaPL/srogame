@@ -19,6 +19,9 @@ export class PlayerSessionService {
       if (this.isValid(parsed)) {
         return {
           ...parsed,
+          unreadReportCount: this.normalizeUnreadReportCount(
+            (parsed as Partial<PlayerSession>).unreadReportCount
+          ),
           tutorialRead: normalizeTutorialReadState(
             (parsed as Partial<PlayerSession>).tutorialRead,
             false
@@ -35,6 +38,7 @@ export class PlayerSessionService {
   public save(session: PlayerSession): void {
     localStorage.setItem(this.storageKey, JSON.stringify({
       ...session,
+      unreadReportCount: this.normalizeUnreadReportCount(session.unreadReportCount),
       tutorialRead: normalizeTutorialReadState(session.tutorialRead, false)
     }));
   }
@@ -53,5 +57,13 @@ export class PlayerSessionService {
       typeof session.token === 'string' &&
       session.token.trim().length > 0
     );
+  }
+
+  private normalizeUnreadReportCount(value: number | undefined): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(value));
   }
 }

@@ -818,12 +818,12 @@ app-root {
 }
 
 .top-menu__button {
-  border-radius: 999px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
   color: #fff;
-  padding: 0.5rem 1.1rem;
-  font-size: 0.9rem;
+  padding: 0.48rem 1rem;
+  font-size: 0.84rem;
   font-weight: 600;
   text-decoration: none;
   display: inline-flex;
@@ -878,6 +878,7 @@ app-root {
 }
 
 .top-menu__button--end-turn {
+  border-radius: 999px;
   border-color: rgba(255, 184, 77, 0.5);
   background: linear-gradient(135deg, rgba(255, 184, 77, 0.34), rgba(168, 80, 34, 0.18));
   color: #fff7ea;

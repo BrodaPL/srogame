@@ -2027,7 +2027,8 @@ function toPlayerSession(session: AuthSession, galaxy: Galaxy | null = currentGa
     id: session.accountId,
     playerName: session.playerName,
     token: session.token,
-    tutorialRead: player?.tutorialRead ?? createTutorialReadState(false)
+    tutorialRead: player?.tutorialRead ?? createTutorialReadState(false),
+    unreadReportCount: player?.reports.filter((report) => !report.isRead).length ?? 0
   };
 }
 

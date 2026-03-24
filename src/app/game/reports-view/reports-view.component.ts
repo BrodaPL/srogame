@@ -10,6 +10,7 @@ import { fromPlayerReportDto } from '../../models/reports/player-report-dto.mapp
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { TutorialService } from '../../tutorial/tutorial.service';
+import { AuthStateService } from '../../core/auth-state.service';
 
 type ReportDossierMetric = {
   label: string;
@@ -46,7 +47,8 @@ export class ReportsViewComponent implements OnInit {
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly tutorialService: TutorialService
+    private readonly tutorialService: TutorialService,
+    private readonly authState: AuthStateService
   ) {}
 
   public ngOnInit(): void {
@@ -149,6 +151,7 @@ export class ReportsViewComponent implements OnInit {
       .subscribe({
         next: () => {
           report.markAsRead();
+          this.syncUnreadReportCount();
           this.cdr.markForCheck();
         },
         error: () => {
@@ -225,11 +228,17 @@ export class ReportsViewComponent implements OnInit {
       }))
       .subscribe({
         next: () => {
+          const deletedUnreadCount = this.reports.filter((report) =>
+            this.selectedReportIds.has(report.reportId) && !report.isRead
+          ).length;
           this.reports = this.reports.filter((report) => !this.selectedReportIds.has(report.reportId));
           if (this.selectedReportId !== null && !this.reports.some((report) => report.reportId === this.selectedReportId)) {
             this.selectedReportId = null;
           }
           this.selectedReportIds.clear();
+          if (deletedUnreadCount > 0) {
+            this.syncUnreadReportCount();
+          }
         },
         error: () => {
           this.actionError = 'Unable to delete selected reports.';
@@ -392,6 +401,7 @@ export class ReportsViewComponent implements OnInit {
       .subscribe({
         next: (reports) => {
           this.reports = reports.map((report) => fromPlayerReportDto(report));
+          this.syncUnreadReportCount();
           this.selectedReportIds.clear();
           this.selectedReportId = this.visibleReports()[0]?.reportId ?? null;
           this.resetPreview();
@@ -401,5 +411,17 @@ export class ReportsViewComponent implements OnInit {
           this.loadError = 'Unable to load reports.';
         }
       });
+  }
+
+  private syncUnreadReportCount(): void {
+    const session = this.authState.session();
+    if (!session) {
+      return;
+    }
+
+    this.authState.setSession({
+      ...session,
+      unreadReportCount: this.reports.filter((report) => !report.isRead).length
+    });
   }
 }

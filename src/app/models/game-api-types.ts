@@ -49,6 +49,7 @@ export type PlayerSession = {
   playerName: string;
   token: string;
   tutorialRead: TutorialReadState;
+  unreadReportCount: number;
 };
 
 export type RegisterRequest = {
