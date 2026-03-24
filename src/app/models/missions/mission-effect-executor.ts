@@ -2,12 +2,15 @@ import { EspionageReportGenerator } from '../../generators/espionage-report-gene
 import { ShipType } from '../enums/ship-type';
 import { ManyShips } from '../fleets/many-ships';
 import { ResourcesPack } from '../resources-pack';
+import type { Galaxy } from '../planets/galaxy';
+import { claimPlanetForPlayer } from '../planets/planet-ownership';
 import type { Planet } from '../planets/planet';
 import type { Player } from '../player';
 import type { Fleet } from '../fleets/fleet';
 import type { MissionEffect, MissionResolutionResult } from './mission-effect';
 
 export type MissionEffectExecutionContext = {
+  galaxy: Galaxy;
   fleet: Fleet;
   owner: Player | null;
   targetOwner: Player | null;
@@ -40,6 +43,11 @@ export class MissionEffectExecutor {
     effect: MissionEffect
   ): void {
     switch (effect.type) {
+      case 'colonizeTargetPlanet':
+        if (context.owner && context.targetPlanet) {
+          claimPlanetForPlayer(context.galaxy, context.targetPlanet, context.owner);
+        }
+        break;
       case 'mergeFleetToPlanet':
         this.resolvePlanet(effect.planetRef, context)?.rBDSFTQ.ships.addManyShips(context.fleet.ships);
         this.resolvePlanet(effect.planetRef, context)?.rBDSFTQ.defences.addManyDefences(context.fleet.carriedBombs);

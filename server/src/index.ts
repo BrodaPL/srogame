@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import galaxyCreatorModule from '../../src/app/models/planets/galaxy-creator.js';
+import planetAbandonmentModule from '../../src/app/models/planets/planet-abandonment.js';
 import galaxyPresentationDataModule from '../../src/app/models/planets/galaxy-presentation-data.js';
 import espionageReportGeneratorModule from '../../src/app/generators/espionage-report-generator.js';
 import starSystemNoteModule from '../../src/app/models/planets/star-system-note.js';
@@ -96,7 +97,9 @@ import type {
   DiplomaticProposalDto,
   CreateDiplomaticProposalRequest,
   SendPlayerMessageRequest,
-  SendPlayerMessageResponse
+  SendPlayerMessageResponse,
+  AbandonPlanetRequest,
+  AbandonPlanetResponse
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -137,6 +140,7 @@ import type { PlayerType as PlayerTypeType } from '../../src/app/models/enums/pl
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
 };
+const { abandonPlanetToNewNeutralOwner } = planetAbandonmentModule as typeof import('../../src/app/models/planets/planet-abandonment.js');
 const { GalaxyPresentationData } = galaxyPresentationDataModule as {
   GalaxyPresentationData: typeof import('../../src/app/models/planets/galaxy-presentation-data.js').GalaxyPresentationData;
 };
@@ -940,6 +944,60 @@ app.get('/api/game/client-planet', (req, res) => {
     y,
     z
   });
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/abandon-planet', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const body = req.body as AbandonPlanetRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  if (x === null || y === null || z === null) {
+    return res.status(400).json({ error: 'Invalid abandon-planet payload.' });
+  }
+
+  const system = authPlayer.galaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be abandoned.' });
+  }
+
+  if (authPlayer.player.planets.length <= 1) {
+    return res.status(400).json({ error: 'Your last owned planet cannot be abandoned.' });
+  }
+
+  const neutralOwner = abandonPlanetToNewNeutralOwner(authPlayer.galaxy, authPlayer.player, planet);
+  upsertDiplomaticRelation(
+    authPlayer.galaxy,
+    authPlayer.player.playerId,
+    neutralOwner.playerId,
+    DiplomaticStatus.PASSIVE
+  );
+  refreshPlanetIntelForPlayer(
+    authPlayer.player,
+    neutralOwner,
+    planet,
+    authPlayer.galaxy.currentTurn
+  );
+  currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(authPlayer.galaxy);
+
+  const presentation = getPresentationData(authPlayer.galaxy, authPlayer.player.playerId);
+  const response: AbandonPlanetResponse = {
+    ownedPlanets: presentation.ownedPlanets.map((entry) => toClientPlanetDtoFromClientPlanet(entry))
+  };
   return res.status(200).json(response);
 });
 
@@ -2039,6 +2097,9 @@ app.post('/api/game/active-fleets', (req, res) => {
     playerId,
     originPlanet,
     targetPlanet,
+    targetOwner: targetPlanet.info.ownerId === null
+      ? null
+      : resolvePlayerById(currentGalaxy, targetPlanet.info.ownerId),
     activeFleetCount: playerActiveFleetCount,
     maxActiveFleetCount: playerMaxActiveFleets,
     totalCargoCapacity,
@@ -3296,6 +3357,27 @@ function refreshOwnedPlanetSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber
       planet.lastReportData.set(player.playerId, report.copy());
     }
   }
+}
+
+function refreshPlanetIntelForPlayer(
+  viewer: Player,
+  planetOwner: Player | null,
+  planet: Planet,
+  turnNumber: number
+): void {
+  const reportGenerator = new EspionageReportGenerator();
+  const report = reportGenerator.createEspionageReport(
+    viewer,
+    planetOwner,
+    planet,
+    0,
+    {
+      reportId: viewer.createReportId(),
+      forcedReportLevel: SELF_REPORT_LEVEL,
+      createdTurn: turnNumber
+    }
+  );
+  planet.lastReportData.set(viewer.playerId, report.copy());
 }
 
 function toGalaxyByteCellDto(cell: GalaxyByteCell): GalaxyByteCellDto {

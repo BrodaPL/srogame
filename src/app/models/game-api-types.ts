@@ -125,6 +125,12 @@ export type SendPlayerMessageResponse = {
   delivered: boolean;
 };
 
+export type AbandonPlanetRequest = {
+  x: number;
+  y: number;
+  z: number;
+};
+
 export type ClientCoordinates = {
   x: number;
   y: number;
@@ -321,6 +327,10 @@ export type ClientPlanetDto = {
     spaceDebris: ResourcesPackDto;
   };
   reportData: ClientReportDataDto | null;
+};
+
+export type AbandonPlanetResponse = {
+  ownedPlanets: ClientPlanetDto[];
 };
 
 export type DiplomaticProposalDto = {

@@ -3,6 +3,7 @@ import { FleetMissionType } from '../enums/fleet-mission-type';
 import type { FleetMissionBlueprints } from './fleet-mission-blueprint';
 import { FleetMission } from './fleet-mission';
 import { BombardFleetMission } from './types/bombard-fleet-mission';
+import { ColonizeFleetMission } from './types/colonize-fleet-mission';
 import { HoldFleetMission } from './types/hold-fleet-mission';
 import { MoveFleetMission } from './types/move-fleet-mission';
 import { RecycleFleetMission } from './types/recycle-fleet-mission';
@@ -84,7 +85,7 @@ export class FleetMissionRegistry {
     }
 
     if (colonize) {
-      this.missionByType.set(colonize.type, new FleetMission(colonize));
+      this.missionByType.set(colonize.type, new ColonizeFleetMission(colonize));
     }
 
     if (hold) {

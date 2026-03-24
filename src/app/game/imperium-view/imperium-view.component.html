@@ -121,6 +121,10 @@
         </div>
       </div>
 
+      @if (planetActionError) {
+        <p class="status status--error imperium-view__action-status">{{ planetActionError }}</p>
+      }
+
       @if (visiblePlanets().length === 0) {
         <p class="overview-muted">No planets match the current filter.</p>
       } @else {
@@ -181,6 +185,55 @@
               <div class="imperium-view__queue-group">
                 <p class="imperium-view__queue-title">Research</p>
                 <p class="imperium-view__queue-body">{{ planetVm.researchSummary }}</p>
+              </div>
+
+              <div class="imperium-view__queue-group imperium-view__queue-group--actions">
+                <p class="imperium-view__queue-title">Planet Action</p>
+                <div class="imperium-view__planet-actions">
+                  <button
+                    type="button"
+                    class="imperium-view__danger-button"
+                    [disabled]="!canAbandonPlanet(planetVm) || activeAbandonPlanetId !== null"
+                    [title]="canAbandonPlanet(planetVm) ? 'Turn this planet into a passive neutral world.' : abandonBlockedCopy()"
+                    (click)="beginAbandonPlanet(planetVm)"
+                  >
+                    {{ isAbandonPending(planetVm) ? 'Abandoning...' : 'Abandon planet' }}
+                  </button>
+                  <p class="imperium-view__action-hint">
+                    Queues and research are canceled. Resources, stationed ships, and defences stay behind.
+                  </p>
+                  @if (!canAbandonPlanet(planetVm)) {
+                    <p class="imperium-view__action-warning">{{ abandonBlockedCopy() }}</p>
+                  }
+                  @if (isAbandonConfirmOpen(planetVm)) {
+                    <div class="imperium-view__confirm-panel">
+                      <p>
+                        This planet leaves your empire, gets a fresh neutral owner, and becomes PASSIVE toward you.
+                      </p>
+                      <p>
+                        Active fleets stay with their current owners. You keep intel and can recolonize this world later with a Colonizer.
+                      </p>
+                      <div class="imperium-view__confirm-actions">
+                        <button
+                          type="button"
+                          class="imperium-view__danger-button imperium-view__danger-button--confirm"
+                          [disabled]="activeAbandonPlanetId !== null"
+                          (click)="confirmAbandonPlanet(planetVm)"
+                        >
+                          Confirm: lose planet, cancel queues, leave assets
+                        </button>
+                        <button
+                          type="button"
+                          class="imperium-view__secondary-button"
+                          [disabled]="activeAbandonPlanetId !== null"
+                          (click)="cancelAbandonPlanet()"
+                        >
+                          Keep planet
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
               </div>
             </article>
           }

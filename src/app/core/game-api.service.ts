@@ -33,7 +33,9 @@ import {
   DiplomacyViewResponse,
   CreateDiplomaticProposalRequest,
   SendPlayerMessageRequest,
-  SendPlayerMessageResponse
+  SendPlayerMessageResponse,
+  AbandonPlanetRequest,
+  AbandonPlanetResponse
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -311,6 +313,14 @@ export class GameApiService {
   public sendPlayerMessage(request: SendPlayerMessageRequest, token: string) {
     return this.http.post<SendPlayerMessageResponse>(
       `${API_BASE_URL}/game/messages/send`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public abandonPlanet(request: AbandonPlanetRequest, token: string) {
+    return this.http.post<AbandonPlanetResponse>(
+      `${API_BASE_URL}/game/abandon-planet`,
       request,
       { headers: this.authHeaders(token) }
     );

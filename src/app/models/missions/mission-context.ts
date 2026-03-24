@@ -41,6 +41,7 @@ export type MissionLaunchContext = MissionSelectionContext & {
   playerId: number;
   originPlanet: Planet;
   targetPlanet: Planet;
+  targetOwner?: Player | null;
   activeFleetCount: number;
   maxActiveFleetCount: number;
   totalCargoCapacity: number;

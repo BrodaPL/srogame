@@ -5,6 +5,9 @@ export type MissionPlanetReference = 'origin' | 'target';
 
 export type MissionEffect =
   | {
+    type: 'colonizeTargetPlanet';
+  }
+  | {
     type: 'mergeFleetToPlanet';
     planetRef: MissionPlanetReference;
   }

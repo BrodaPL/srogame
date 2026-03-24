@@ -14,6 +14,7 @@ import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { ManyDefences } from '../../models/defences/many-defences';
 import type {
+  AbandonPlanetResponse,
   BuildingQueueEntryDto,
   ClientPlanetDto,
   ShipyardQueueEntryDto,
@@ -144,6 +145,9 @@ export class ImperiumViewComponent implements OnInit {
 
   protected selectedSort: ImperiumSortOption = 'coordinates';
   protected selectedFilter: ImperiumFilterOption = 'all';
+  protected planetActionError: string | null = null;
+  protected confirmingAbandonPlanetId: string | null = null;
+  protected activeAbandonPlanetId: string | null = null;
 
   protected metalDisplay: ResourceDisplay | null = null;
   protected crystalDisplay: ResourceDisplay | null = null;
@@ -225,6 +229,68 @@ export class ImperiumViewComponent implements OnInit {
     return this.warningCountClass(warningCount);
   }
 
+  protected canAbandonPlanet(_planetVm: ImperiumPlanetVm): boolean {
+    return this.ownedPlanets.length > 1;
+  }
+
+  protected isAbandonConfirmOpen(planetVm: ImperiumPlanetVm): boolean {
+    return this.confirmingAbandonPlanetId === planetVm.id;
+  }
+
+  protected isAbandonPending(planetVm: ImperiumPlanetVm): boolean {
+    return this.activeAbandonPlanetId === planetVm.id;
+  }
+
+  protected abandonBlockedCopy(): string {
+    return 'Your last owned planet cannot be abandoned.';
+  }
+
+  protected beginAbandonPlanet(planetVm: ImperiumPlanetVm): void {
+    if (!this.canAbandonPlanet(planetVm) || this.activeAbandonPlanetId !== null) {
+      return;
+    }
+
+    this.planetActionError = null;
+    this.confirmingAbandonPlanetId = planetVm.id;
+  }
+
+  protected cancelAbandonPlanet(): void {
+    if (this.activeAbandonPlanetId !== null) {
+      return;
+    }
+
+    this.confirmingAbandonPlanetId = null;
+  }
+
+  protected confirmAbandonPlanet(planetVm: ImperiumPlanetVm): void {
+    if (!this.canAbandonPlanet(planetVm) || this.activeAbandonPlanetId !== null) {
+      return;
+    }
+
+    const session = this.playerSession.load();
+    if (!session) {
+      this.planetActionError = 'No player session found.';
+      return;
+    }
+
+    this.activeAbandonPlanetId = planetVm.id;
+    this.planetActionError = null;
+
+    this.gameApi.abandonPlanet(planetVm.planet.coordinates, session.token)
+      .pipe(finalize(() => {
+        this.activeAbandonPlanetId = null;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (response) => {
+          this.applyAbandonPlanetResponse(response);
+        },
+        error: (error) => {
+          this.planetActionError = error?.error?.error ?? 'Unable to abandon planet.';
+        }
+      });
+  }
+
   private loadOwnedPlanets(): void {
     const session = this.playerSession.load();
     if (!session) {
@@ -235,6 +301,7 @@ export class ImperiumViewComponent implements OnInit {
     this.playerName = session.playerName;
     this.isLoading = true;
     this.loadError = null;
+    this.planetActionError = null;
 
     forkJoin({
       ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
@@ -264,6 +331,12 @@ export class ImperiumViewComponent implements OnInit {
     this.shipSummaries = this.createShipSummaries(this.ownedPlanets);
     this.buildingStats = this.createBuildingStats(this.ownedPlanets);
     this.rebuildSummaryDisplays(this.planetVms);
+  }
+
+  private applyAbandonPlanetResponse(response: AbandonPlanetResponse): void {
+    this.confirmingAbandonPlanetId = null;
+    this.ownedPlanets = [...response.ownedPlanets];
+    this.rebuildDashboardState();
   }
 
   private rebuildSummaryDisplays(planetVms: ImperiumPlanetVm[]): void {

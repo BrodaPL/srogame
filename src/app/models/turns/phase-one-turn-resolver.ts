@@ -576,6 +576,7 @@ function resolveActiveFleets(
     }
 
     const nextFleetState = resolveFleetState(
+      galaxy,
       fleet,
       playersById,
       planetById,
@@ -623,6 +624,7 @@ function resolveActiveFleets(
 
       for (const resolvedArrival of resolvedArrivals) {
         const nextFleetState = resolveEncounterArrival(
+          galaxy,
           resolvedArrival,
           espionageReportGenerator,
           diplomacyResolver
@@ -636,6 +638,7 @@ function resolveActiveFleets(
 
   for (const fleet of deferredMovingFleets) {
     const nextFleetState = resolveFleetState(
+      galaxy,
       fleet,
       playersById,
       planetById,
@@ -668,6 +671,7 @@ function isFleetResolvingThisTurn(fleet: Fleet, resolvedTurnNumber: number): boo
 }
 
 function resolveFleetState(
+  galaxy: Galaxy,
   fleet: Fleet,
   playersById: Map<number, Player>,
   planetById: Map<string, Planet>,
@@ -678,6 +682,7 @@ function resolveFleetState(
   switch (fleet.state) {
     case FleetState.MOVING_TO_TARGET:
       return resolveTargetArrival(
+        galaxy,
         fleet,
         playersById,
         planetById,
@@ -694,6 +699,7 @@ function resolveFleetState(
       );
     case FleetState.ORBITING:
       return resolveIdleFleetState(
+        galaxy,
         fleet,
         playersById,
         planetById,
@@ -707,6 +713,7 @@ function resolveFleetState(
 }
 
 function resolveIdleFleetState(
+  galaxy: Galaxy,
   fleet: Fleet,
   playersById: Map<number, Player>,
   planetById: Map<string, Planet>,
@@ -778,6 +785,7 @@ function resolveIdleFleetState(
 
   return applyMissionResolution(
     resolution,
+    galaxy,
     {
       fleet,
       owner,
@@ -791,6 +799,7 @@ function resolveIdleFleetState(
 }
 
 function resolveTargetArrival(
+  galaxy: Galaxy,
   fleet: Fleet,
   playersById: Map<number, Player>,
   planetById: Map<string, Planet>,
@@ -838,6 +847,7 @@ function resolveTargetArrival(
     if (battleResolution === 'attacker_retreating') {
       return applyMissionResolution(
         mission.onBattleRetreat(resolutionContext),
+        galaxy,
         resolutionContext,
         espionageReportGenerator
       );
@@ -850,6 +860,7 @@ function resolveTargetArrival(
           resolutionContext,
           { fleetId: fleet.fleetId, resolution: 'victory' }
         ),
+        galaxy,
         resolutionContext,
         espionageReportGenerator
       );
@@ -859,6 +870,7 @@ function resolveTargetArrival(
   applyPostArrivalBombardmentIfNeeded(fleet, targetPlanet, resolvedTurnNumber, owner);
   return applyMissionResolution(
     mission.resolveWithoutEncounter(resolutionContext),
+    galaxy,
     resolutionContext,
     espionageReportGenerator
   );
@@ -1304,6 +1316,7 @@ function hasRepairableDamageAtPlanet(
 }
 
 function resolveEncounterArrival(
+  galaxy: Galaxy,
   resolvedArrival: PlanetOrbitEncounterResolvedArrival,
   espionageReportGenerator: EspionageReportGenerator,
   diplomacyResolver: DiplomacyResolver
@@ -1332,6 +1345,7 @@ function resolveEncounterArrival(
       );
       return applyMissionResolution(
         arrival.mission.resolveAfterEncounter(resolutionContext, outcome),
+        galaxy,
         resolutionContext,
         espionageReportGenerator
       );
@@ -1339,6 +1353,7 @@ function resolveEncounterArrival(
     case 'stalemate':
       return applyMissionResolution(
         arrival.mission.onBattleRetreat(resolutionContext),
+        galaxy,
         resolutionContext,
         espionageReportGenerator
       );
@@ -1354,6 +1369,7 @@ function resolveEncounterArrival(
       );
       return applyMissionResolution(
         arrival.mission.resolveWithoutEncounter(resolutionContext),
+        galaxy,
         resolutionContext,
         espionageReportGenerator
       );
@@ -1426,6 +1442,7 @@ function addFleetBombsToPlanet(
 
 function applyMissionResolution(
   resolution: import('../missions/mission-effect').MissionResolutionResult,
+  galaxy: Galaxy,
   context: {
     fleet: Fleet;
     owner: Player | null;
@@ -1437,6 +1454,7 @@ function applyMissionResolution(
   espionageReportGenerator: EspionageReportGenerator
 ): Fleet | null {
   MISSION_EFFECT_EXECUTOR.execute({
+    galaxy,
     fleet: context.fleet,
     owner: context.owner,
     targetOwner: context.targetOwner,
