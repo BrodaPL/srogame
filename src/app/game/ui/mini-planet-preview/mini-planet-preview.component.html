@@ -55,7 +55,7 @@
         type="button"
         class="mini-planet-preview__button"
         [disabled]="!canViewPlanet()"
-        [attr.title]="canViewPlanet() ? 'Open owned planet view' : 'Only your planets can be opened'"
+        [attr.title]="canViewPlanet() ? 'Open planet intel view' : 'Planet intel is unavailable'"
         (click)="openPlanetView()"
       >
         View Planet

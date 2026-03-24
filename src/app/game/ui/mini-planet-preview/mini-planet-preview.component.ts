@@ -55,7 +55,7 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   }
 
   protected canViewPlanet(): boolean {
-    return this.planet?.info.ownerId !== null;
+    return this.planet?.reportData !== null;
   }
 
   protected ownershipLabel(): string {

@@ -29,7 +29,11 @@ import {
   PlayerReportDto,
   PlayerSession,
   DiplomaticRelationDto,
-  SetDiplomaticRelationRequest
+  SetDiplomaticRelationRequest,
+  DiplomacyViewResponse,
+  CreateDiplomaticProposalRequest,
+  SendPlayerMessageRequest,
+  SendPlayerMessageResponse
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -260,6 +264,53 @@ export class GameApiService {
   public setDiplomaticRelation(request: SetDiplomaticRelationRequest, token: string) {
     return this.http.post<DiplomaticRelationDto[]>(
       `${API_BASE_URL}/game/diplomacy`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getDiplomacyView(token: string) {
+    return this.http.get<DiplomacyViewResponse>(
+      `${API_BASE_URL}/game/diplomacy-view`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public createDiplomaticProposal(request: CreateDiplomaticProposalRequest, token: string) {
+    return this.http.post<DiplomacyViewResponse>(
+      `${API_BASE_URL}/game/diplomacy/proposals`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public acceptDiplomaticProposal(proposalId: number, token: string) {
+    return this.http.post<DiplomacyViewResponse>(
+      `${API_BASE_URL}/game/diplomacy/proposals/${proposalId}/accept`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public rejectDiplomaticProposal(proposalId: number, token: string) {
+    return this.http.post<DiplomacyViewResponse>(
+      `${API_BASE_URL}/game/diplomacy/proposals/${proposalId}/reject`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public cancelDiplomaticProposal(proposalId: number, token: string) {
+    return this.http.post<DiplomacyViewResponse>(
+      `${API_BASE_URL}/game/diplomacy/proposals/${proposalId}/cancel`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public sendPlayerMessage(request: SendPlayerMessageRequest, token: string) {
+    return this.http.post<SendPlayerMessageResponse>(
+      `${API_BASE_URL}/game/messages/send`,
       request,
       { headers: this.authHeaders(token) }
     );

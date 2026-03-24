@@ -1,0 +1,265 @@
+<app-top-menu></app-top-menu>
+
+<section class="diplomacy-view">
+  @if (isLoading) {
+    <section class="status status--info">
+      <h3>Loading Diplomacy</h3>
+      <p>Discovered factions, treaty proposals, and known intel are being synchronized.</p>
+    </section>
+  } @else if (loadError) {
+    <section class="status status--error">
+      <h3>Diplomacy unavailable</h3>
+      <p>{{ loadError }}</p>
+    </section>
+  } @else {
+    @if (actionError) {
+      <section class="status status--error">
+        <h3>Diplomacy action failed</h3>
+        <p>{{ actionError }}</p>
+      </section>
+    }
+
+    @if (messageError) {
+      <section class="status status--error">
+        <h3>Message not sent</h3>
+        <p>{{ messageError }}</p>
+      </section>
+    }
+
+    @if (messageSuccess) {
+      <section class="status status--success">
+        <h3>Message sent</h3>
+        <p>{{ messageSuccess }}</p>
+      </section>
+    }
+
+    <header class="overview-card diplomacy-view__header">
+      <div>
+        <p class="eyebrow">Interstellar Relations</p>
+        <h1 class="diplomacy-view__title">Diplomacy</h1>
+        <p class="overview-muted">
+          Review discovered factions, negotiate status changes, and message known powers directly.
+        </p>
+      </div>
+      <div class="overview-stats diplomacy-view__summary">
+        <div class="overview-stat">
+          <span class="overview-stat__label">Current turn</span>
+          <span class="overview-stat__value">{{ currentTurn ?? '--' }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Discovered contacts</span>
+          <span class="overview-stat__value">{{ contacts.length }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Pending proposals</span>
+          <span class="overview-stat__value">{{ activeProposals.length }}</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="diplomacy-view__layout">
+      <section class="overview-card diplomacy-view__contacts">
+        <div class="diplomacy-view__panel-head">
+          <div>
+            <h3>Discovered Contacts</h3>
+            <p class="overview-muted">Only players with active espionage intel on at least one owned planet appear here.</p>
+          </div>
+          <span class="badge" [class.badge--jump]="outgoingProposalSentThisTurn">
+            {{ outgoingProposalSentThisTurn ? 'Proposal used this turn' : 'Proposal available' }}
+          </span>
+        </div>
+
+        @if (contacts.length === 0) {
+          <p class="overview-muted">No discovered diplomatic contacts yet.</p>
+        } @else {
+          <div class="diplomacy-view__contact-list">
+            @for (contact of contacts; track contact.playerId) {
+              <button
+                type="button"
+                class="diplomacy-view__contact-row"
+                [class.diplomacy-view__contact-row--selected]="selectedPlayerId === contact.playerId"
+                (click)="selectContact(contact)">
+                <div>
+                  <h4>{{ contact.playerName }}</h4>
+                  <p class="overview-muted">{{ contactStatusLabel(contact) }}</p>
+                  <p class="overview-muted">{{ contactMetaLabel(contact) }}</p>
+                </div>
+                <div class="diplomacy-view__contact-flags">
+                  <span class="badge">{{ contact.currentStatus }}</span>
+                  @if (!contact.canSendProposal && contact.proposalBlockedReason) {
+                    <span class="diplomacy-view__contact-note">{{ contact.proposalBlockedReason }}</span>
+                  }
+                </div>
+              </button>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="overview-card diplomacy-view__detail">
+        @if (selectedContact(); as contact) {
+          <div class="diplomacy-view__panel-head">
+            <div>
+              <h3>{{ contact.playerName }}</h3>
+              <p class="overview-muted">{{ contact.playerType }} contact</p>
+            </div>
+            <span class="badge badge--jump">{{ contact.currentStatus }}</span>
+          </div>
+
+          <div class="overview-stats diplomacy-view__detail-stats">
+            <div class="overview-stat">
+              <span class="overview-stat__label">Player type</span>
+              <span class="overview-stat__value">{{ contact.playerType }}</span>
+            </div>
+            <div class="overview-stat">
+              <span class="overview-stat__label">Current status</span>
+              <span class="overview-stat__value">{{ contact.currentStatus }}</span>
+            </div>
+            <div class="overview-stat">
+              <span class="overview-stat__label">Known planets</span>
+              <span class="overview-stat__value">{{ contact.knownPlanets.length }}</span>
+            </div>
+            <div class="overview-stat">
+              <span class="overview-stat__label">Treaty controls</span>
+              <span class="overview-stat__value">{{ contact.canSendProposal ? 'Available' : 'Blocked' }}</span>
+            </div>
+          </div>
+
+          <div class="diplomacy-view__action-grid">
+            <section class="diplomacy-view__action-card">
+              <h4>Treaty Proposal</h4>
+              <p class="overview-muted">{{ proposalAvailabilityCopy(contact) }}</p>
+              <div class="diplomacy-view__proposal-controls">
+                <select
+                  class="diplomacy-view__select"
+                  [disabled]="!contact.canSendProposal || isContactActionPending(contact)"
+                  [ngModel]="selectedProposalStatus(contact)"
+                  (ngModelChange)="setSelectedProposalStatus(contact, $event)">
+                  @for (status of availableProposalStatuses(contact); track status) {
+                    <option [value]="status">{{ status }}</option>
+                  }
+                </select>
+                <button
+                  type="button"
+                  class="diplomacy-view__action-button"
+                  [disabled]="!contact.canSendProposal || isContactActionPending(contact)"
+                  (click)="sendProposal(contact)">
+                  {{ isContactActionPending(contact) ? 'Sending...' : 'Send proposal' }}
+                </button>
+              </div>
+            </section>
+
+            <section class="diplomacy-view__action-card">
+              <h4>Direct Message</h4>
+              <p class="overview-muted">Messages reuse the Reports inbox and respect the current discovery filter.</p>
+              <label class="diplomacy-view__field">
+                <span>Title</span>
+                <input
+                  class="diplomacy-view__input"
+                  type="text"
+                  maxlength="50"
+                  [(ngModel)]="messageTitle" />
+              </label>
+              <p class="overview-muted">{{ titleCharactersRemaining() }} characters remaining.</p>
+              <label class="diplomacy-view__field">
+                <span>Body</span>
+                <textarea
+                  class="diplomacy-view__textarea"
+                  rows="5"
+                  maxlength="1000"
+                  [(ngModel)]="messageBody"></textarea>
+              </label>
+              <p class="overview-muted">{{ bodyCharactersRemaining() }} characters remaining.</p>
+              <button
+                type="button"
+                class="diplomacy-view__action-button"
+                [disabled]="!canSendMessage(contact)"
+                (click)="sendMessage(contact)">
+                {{ isSendingMessage ? 'Sending...' : 'Send message' }}
+              </button>
+            </section>
+          </div>
+
+          <section class="diplomacy-view__known-planets">
+            <div class="diplomacy-view__panel-head">
+              <div>
+                <h4>Known Planets</h4>
+                <p class="overview-muted">Only planets currently owned by this contact and covered by your espionage intel appear here.</p>
+              </div>
+            </div>
+
+            @if (contact.knownPlanets.length === 0) {
+              <p class="overview-muted">No current planetary intel is available for this contact.</p>
+            } @else {
+              <div class="diplomacy-view__planet-grid">
+                @for (planet of contact.knownPlanets; track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z) {
+                  <app-mini-planet-preview [planet]="planet"></app-mini-planet-preview>
+                }
+              </div>
+            }
+          </section>
+        } @else {
+          <p class="overview-muted">Select a contact to inspect known planets, send a message, or prepare a treaty proposal.</p>
+        }
+      </section>
+    </section>
+
+    <section class="overview-card diplomacy-view__proposals">
+      <div class="diplomacy-view__panel-head">
+        <div>
+          <h3>Active Proposals</h3>
+          <p class="overview-muted">Incoming proposals are listed first, followed by your outgoing proposals.</p>
+        </div>
+      </div>
+
+      @if (activeProposals.length === 0) {
+        <p class="overview-muted">No active diplomacy proposals.</p>
+      } @else {
+        <div class="diplomacy-view__proposal-list">
+          @for (proposal of activeProposals; track proposal.proposalId) {
+            <article class="diplomacy-view__proposal-card">
+              <div class="diplomacy-view__proposal-copy">
+                <div class="diplomacy-view__proposal-head">
+                  <h4>{{ proposal.direction === 'incoming' ? 'Incoming proposal' : 'Outgoing proposal' }}</h4>
+                  <span class="badge">{{ proposal.requestedStatus }}</span>
+                </div>
+                <p class="overview-muted">{{ proposalCounterpartyLabel(proposal) }}</p>
+                <p class="overview-muted">Created on turn {{ proposal.createdTurn }} | Expires on turn {{ proposal.expiresOnTurn }}</p>
+              </div>
+
+              <div class="diplomacy-view__proposal-actions">
+                @if (canAcceptProposal(proposal)) {
+                  <button
+                    type="button"
+                    class="diplomacy-view__action-button"
+                    [disabled]="isProposalActionPending(proposal)"
+                    (click)="acceptProposal(proposal)">
+                    Accept
+                  </button>
+                }
+                @if (canRejectProposal(proposal)) {
+                  <button
+                    type="button"
+                    class="diplomacy-view__action-button diplomacy-view__action-button--danger"
+                    [disabled]="isProposalActionPending(proposal)"
+                    (click)="rejectProposal(proposal)">
+                    Reject
+                  </button>
+                }
+                @if (canCancelProposal(proposal)) {
+                  <button
+                    type="button"
+                    class="diplomacy-view__action-button diplomacy-view__action-button--danger"
+                    [disabled]="isProposalActionPending(proposal)"
+                    (click)="cancelProposal(proposal)">
+                    Cancel
+                  </button>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  }
+</section>

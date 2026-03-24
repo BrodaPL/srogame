@@ -19,6 +19,7 @@ import type { ReportType } from './enums/report-type';
 import type { SmokeTestScenarioKey } from './testing/smoke-test-scenarios';
 import type { TutorialReadState, TutorialViewKey } from '../tutorial/tutorial-types';
 import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
+import type { DiplomaticProposalState } from './diplomacy/diplomatic-proposal-state';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -107,6 +108,21 @@ export type SetDiplomaticRelationRequest = {
   playerAId: number;
   playerBId: number;
   status: DiplomaticStatus;
+};
+
+export type CreateDiplomaticProposalRequest = {
+  targetPlayerId: number;
+  requestedStatus: DiplomaticStatus;
+};
+
+export type SendPlayerMessageRequest = {
+  targetPlayerId: number;
+  title: string;
+  body: string;
+};
+
+export type SendPlayerMessageResponse = {
+  delivered: boolean;
 };
 
 export type ClientCoordinates = {
@@ -305,6 +321,39 @@ export type ClientPlanetDto = {
     spaceDebris: ResourcesPackDto;
   };
   reportData: ClientReportDataDto | null;
+};
+
+export type DiplomaticProposalDto = {
+  proposalId: number;
+  fromPlayerId: number;
+  fromPlayerName: string;
+  toPlayerId: number;
+  toPlayerName: string;
+  requestedStatus: DiplomaticStatus;
+  createdTurn: number;
+  expiresOnTurn: number;
+  state: DiplomaticProposalState;
+  direction: 'incoming' | 'outgoing';
+};
+
+export type DiplomacyContactDto = {
+  playerId: number;
+  playerName: string;
+  playerType: PlayerType;
+  currentStatus: DiplomaticStatus;
+  isReadOnly: boolean;
+  canSendMessage: boolean;
+  canSendProposal: boolean;
+  proposalBlockedReason: string | null;
+  knownPlanets: ClientPlanetDto[];
+};
+
+export type DiplomacyViewResponse = {
+  currentTurn: number;
+  currentPlayerId: number;
+  outgoingProposalSentThisTurn: boolean;
+  contacts: DiplomacyContactDto[];
+  activeProposals: DiplomaticProposalDto[];
 };
 
 export type StartBuildingConstructionRequest = {

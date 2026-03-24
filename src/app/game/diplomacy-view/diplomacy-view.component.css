@@ -1,0 +1,164 @@
+.diplomacy-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.diplomacy-view__header,
+.diplomacy-view__summary,
+.diplomacy-view__layout,
+.diplomacy-view__detail-stats,
+.diplomacy-view__action-grid,
+.diplomacy-view__planet-grid,
+.diplomacy-view__proposal-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.diplomacy-view__layout {
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.diplomacy-view__contacts,
+.diplomacy-view__detail,
+.diplomacy-view__proposals,
+.diplomacy-view__action-card {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.diplomacy-view__panel-head,
+.diplomacy-view__contact-row,
+.diplomacy-view__proposal-card,
+.diplomacy-view__proposal-head,
+.diplomacy-view__proposal-controls,
+.diplomacy-view__proposal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.diplomacy-view__contact-list {
+  display: grid;
+  gap: 0.65rem;
+  max-height: 700px;
+  overflow-y: auto;
+}
+
+.diplomacy-view__contact-row {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.9rem 1rem;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.diplomacy-view__contact-row--selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.25);
+  background: rgba(246, 180, 76, 0.08);
+}
+
+.diplomacy-view__contact-row h4,
+.diplomacy-view__proposal-card h4 {
+  margin: 0;
+}
+
+.diplomacy-view__contact-flags {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: end;
+}
+
+.diplomacy-view__contact-note {
+  max-width: 220px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.diplomacy-view__action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.diplomacy-view__field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.diplomacy-view__field span {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.diplomacy-view__input,
+.diplomacy-view__textarea,
+.diplomacy-view__select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(10, 14, 20, 0.82);
+  color: #fff;
+  padding: 0.72rem 0.85rem;
+  font: inherit;
+}
+
+.diplomacy-view__textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.diplomacy-view__action-button {
+  border: 1px solid rgba(246, 180, 76, 0.45);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(246, 180, 76, 0.3), rgba(246, 180, 76, 0.12));
+  color: #fff4de;
+  padding: 0.72rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.diplomacy-view__action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.diplomacy-view__action-button--danger {
+  border-color: rgba(220, 96, 96, 0.45);
+  background: linear-gradient(135deg, rgba(220, 96, 96, 0.24), rgba(220, 96, 96, 0.1));
+  color: #ffdede;
+}
+
+.diplomacy-view__planet-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.diplomacy-view__proposal-list {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.diplomacy-view__proposal-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 0.95rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.diplomacy-view__proposal-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+@media (max-width: 1024px) {
+  .diplomacy-view__layout,
+  .diplomacy-view__action-grid {
+    grid-template-columns: 1fr;
+  }
+}
