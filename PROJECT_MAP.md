@@ -1,0 +1,447 @@
+# PROJECT_MAP.md
+
+This file is the architecture-first project map for `srogame`.
+
+Use it to answer:
+- where a feature lives
+- which files own a workflow
+- what client/server/domain layers are involved
+- where a structural change should be documented
+
+Do not use this file for session history. Session history belongs in `AGENTS.md`.
+
+## Maintenance Rule
+
+Update this file after structural changes, especially when any of the following change:
+- routes or top-level screens
+- API endpoints or DTO shape families
+- domain ownership boundaries
+- new major feature modules
+- major refactors that move responsibilities between files
+- smoke-test entry points or core testing workflow
+
+Usually do not update this file for:
+- isolated bugfixes inside one existing module
+- styling-only tweaks
+- copy/text changes
+- small validation changes that do not change architecture or ownership
+
+## Document Roles
+
+- `AGENTS.md`: session handoff, current behavior, working notes, recent history
+- `PROJECT_MAP.md`: stable architecture map and "where to change" guide
+- `McpTesting.md`: project-specific Chrome MCP and browser-testing workflow
+- `InGameTutorials.md`: tutorial-authoring and maintenance guide
+
+## System Shape
+
+High-level layers:
+
+1. Angular shell and screens
+2. Client services and local session/state
+3. Shared domain model under `src/app/models`
+4. Node/Express server reusing shared domain modules
+5. Browser-based verification via smoke tests and browser automation
+
+Core design choice:
+- most game rules live in shared TypeScript domain modules under `src/app/models`
+- the server imports and executes those domain modules directly
+- the client mostly renders data, validates user intent, and calls API endpoints
+
+## Entry Points
+
+Frontend bootstrap:
+- `src/main.ts`
+- `src/app/app.config.ts`
+- `src/app/app.routes.ts`
+
+Main shell:
+- `src/app/app.ts`
+- `src/app/game/game.component.ts`
+
+Server bootstrap:
+- `server/src/index.ts`
+
+Smoke runner:
+- `scripts/run-smoke-tests.js`
+
+## Frontend Route Map
+
+Top-level routes:
+
+- `/` -> `src/app/main-menu/`
+- `/login` -> `src/app/auth/`
+- `/setup` -> `src/app/setup/`
+- `/load` -> `src/app/load-game/`
+- `/multiplayer` -> `src/app/multiplayer/`
+- `/help` -> `src/app/help-about/`
+- `/encyclopedia/*` -> `src/app/encyclopedia-menu/`
+- `/game/*` -> `src/app/game/`
+
+Game child routes:
+
+- `/game/galactic` -> `src/app/game/galactic-view/`
+- `/game/imperium` -> `src/app/game/imperium-view/`
+- `/game/star-system` -> `src/app/game/star-system-view/`
+- `/game/planet` -> `src/app/game/planet-view/`
+- `/game/reports` -> `src/app/game/reports-view/`
+- `/game/diplomacy` -> `src/app/game/diplomacy-view/`
+- `/game/researches` -> `src/app/game/researches-view/`
+- `/game/production` -> `src/app/game/production-view/`
+- `/game/buildings` -> `src/app/game/buildings-view/`
+- `/game/defence` -> `src/app/game/defence-view/`
+- `/game/operations` -> `src/app/game/operations-view/`
+- `/game/mission-planner` -> `src/app/game/mission-planner-view/`
+
+Shared game UI components:
+- `src/app/game/ui/`
+
+## Client State Ownership
+
+Auth/session:
+- `src/app/core/auth-api.service.ts`: auth HTTP calls
+- `src/app/core/auth-state.service.ts`: current authenticated session signal
+- `src/app/core/player-session.service.ts`: localStorage owner for `srogame:player`
+
+Game snapshot/state:
+- `src/app/core/game-api.service.ts`: game HTTP calls
+- `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` owner on the client
+
+Tutorial state:
+- `src/app/tutorial/tutorial.service.ts`: overlay control, auto-open rules, step preparation
+- `src/app/tutorial/tutorial-content.ts`: per-view tutorial content
+- `src/app/tutorial/tutorial-types.ts`: tutorial contracts and normalization helpers
+
+Local persistence:
+- `srogame:player` -> auth session + tutorial state + unread report count
+- `srogame:setup` -> last game setup
+
+## API Ownership Map
+
+Auth endpoints:
+- `/api/auth/register`
+- `/api/auth/login`
+- `/api/auth/me`
+- `/api/auth/logout`
+
+Game lifecycle:
+- `/api/game/start`
+- `/api/game/state`
+- `/api/game/end-turn`
+
+Galaxy and planet reads:
+- `/api/game/client-galaxy`
+- `/api/game/galaxy-presentation-data`
+- `/api/game/client-star-system`
+- `/api/game/client-planet`
+- `/api/game/owned-planets`
+
+Planet/system mutations:
+- `/api/game/star-system-note`
+- `/api/game/power-consumption`
+- `/api/game/abandon-planet`
+
+Queues and production:
+- `/api/game/building-queue`
+- `/api/game/building-queue/reorder`
+- `/api/game/building-queue/cancel`
+- `/api/game/shipyard-queue`
+- `/api/game/shipyard-queue/reorder`
+- `/api/game/shipyard-queue/cancel`
+- `/api/game/technology-queue`
+
+Fleet operations:
+- `/api/game/active-fleets`
+- `/api/game/active-fleets/:fleetId/return`
+- `/api/game/active-fleets/:fleetId/delay`
+
+Reports and tutorials:
+- `/api/game/reports`
+- `/api/game/reports/read`
+- `/api/game/reports/delete`
+- `/api/game/tutorial-read`
+
+Diplomacy and messages:
+- `/api/game/diplomacy`
+- `/api/game/diplomacy-view`
+- `/api/game/diplomacy/proposals`
+- `/api/game/diplomacy/proposals/:proposalId/accept`
+- `/api/game/diplomacy/proposals/:proposalId/reject`
+- `/api/game/diplomacy/proposals/:proposalId/cancel`
+- `/api/game/messages/send`
+
+Primary API contracts:
+- `src/app/models/game-api-types.ts`
+
+## Domain Ownership Map
+
+### Planets and galaxy
+
+Primary files:
+- `src/app/models/planets/planet.ts`
+- `src/app/models/planets/solar-system.ts`
+- `src/app/models/planets/galaxy.ts`
+- `src/app/models/planets/galaxy-creator.ts`
+- `src/app/models/planets/galaxy-presentation-data.ts`
+- `src/app/models/planets/planet-abandonment.ts`
+- `src/app/models/planets/planet-ownership.ts`
+
+Owns:
+- galaxy generation
+- planet/system structure
+- abandonment and ownership transitions
+- galaxy-view presentation data
+
+### Fleets, ships, and mission payload state
+
+Primary files:
+- `src/app/models/fleets/fleet.ts`
+- `src/app/models/fleets/many-ships.ts`
+- `src/app/models/fleets/ship.ts`
+- `src/app/models/fleets/ship-instance.ts`
+- `src/app/models/fleets/shipyard-queue-entry.ts`
+
+Owns:
+- fleet lifecycle state
+- ship storage model
+- per-ship damaged hull state
+- shipyard queue payload shape
+
+### Missions
+
+Primary files:
+- `src/app/models/missions/fleet-mission-registry.ts`
+- `src/app/models/missions/fleet-mission.ts`
+- `src/app/models/missions/mission-effect-executor.ts`
+- `src/app/models/missions/mission-context.ts`
+- `src/app/models/missions/types/`
+- `src/app/models/missions/encounters/`
+
+Owns:
+- mission rules
+- mission validation and warnings
+- launch behavior contracts
+- target-arrival behavior dispatch
+- encounter integration points
+
+### Turns and resolution
+
+Primary files:
+- `src/app/models/turns/phase-one-turn-resolver.ts`
+- `src/app/models/turns/tests/`
+
+Owns:
+- end-turn progression
+- mission arrival resolution
+- orbit processing
+- queue progress
+- repair pass
+- battle/debris/recycling integration
+
+### Battles, bombardment, recycling, repairs
+
+Primary files:
+- `src/app/models/battles/space-battle-resolver.ts`
+- `src/app/models/bombardment/`
+- `src/app/models/recycling/`
+- `src/app/models/repairs/`
+
+Owns:
+- ship combat resolution
+- bombard/siege side effects
+- debris collection logic
+- repair capability and repair flow helpers
+
+### Diplomacy
+
+Primary files:
+- `src/app/models/diplomacy/diplomatic-status.ts`
+- `src/app/models/diplomacy/diplomatic-relation.ts`
+- `src/app/models/diplomacy/diplomacy-resolver.ts`
+- `src/app/models/diplomacy/diplomatic-proposal.ts`
+- `src/app/models/diplomacy/diplomatic-proposal-state.ts`
+
+Owns:
+- diplomatic relation rules
+- proposal lifecycle
+- friendly/hostile mission resolution context
+- contact/discovery semantics used by diplomacy UI
+
+### Reports
+
+Primary files:
+- `src/app/models/reports/`
+- `src/app/generators/espionage-report-generator.ts`
+
+Owns:
+- inbox model hierarchy
+- message reports
+- espionage report content
+- report serialization boundaries
+
+### Queues
+
+Primary files:
+- `src/app/models/queues/queue-management.ts`
+- `src/app/models/buildings/building-queue-entry.ts`
+- `src/app/models/fleets/shipyard-queue-entry.ts`
+- `src/app/models/tech/technology-queue-entry.ts`
+
+Owns:
+- reorder/cancel helper logic
+- refund logic
+- queue entry movement rules
+
+### Technology and blueprints
+
+Primary files:
+- `src/app/models/tech/`
+- `src/app/models/tech/technology-effects.ts`
+- `src/app/blueprints/`
+- `src/app/factories/*blueprints.factory.ts`
+
+Owns:
+- tech state and requirements
+- derived tech effects
+- blueprint hydration from JSON
+
+## Server Ownership
+
+Main server file:
+- `server/src/index.ts`
+
+Server responsibilities:
+- auth/session persistence in `server/data/auth.json`
+- current in-memory galaxy owner
+- API validation and DTO translation
+- invoking shared domain rules
+- snapshot and report serialization
+
+Important constraint:
+- the server is large and central, but many rules should still stay in shared domain modules under `src/app/models`
+- prefer pushing reusable game logic out of `server/src/index.ts` when a rule becomes complex
+
+## Testing and Verification Map
+
+Unit/spec focus:
+- domain tests live mostly under `src/app/models/**/tests`
+
+Browser smoke entry point:
+- `scripts/run-smoke-tests.js`
+
+Smoke scenario definitions:
+- `src/app/models/testing/smoke-test-scenarios.ts`
+
+Browser/MCP workflow:
+- `McpTesting.md`
+
+Tutorial maintenance:
+- `InGameTutorials.md`
+
+## Where To Change
+
+Add or change a game route:
+- `src/app/app.routes.ts`
+- target component under `src/app/game/` or another top-level feature folder
+- possibly top menu/navigation UI under `src/app/game/ui/`
+
+Change mission rules or add a mission:
+- `src/app/models/missions/types/`
+- `src/app/models/missions/fleet-mission-registry.ts`
+- `src/app/models/missions/mission-effect-executor.ts`
+- `src/app/game/mission-planner-view/`
+- `server/src/index.ts` for launch endpoint validation if needed
+- `src/app/models/turns/phase-one-turn-resolver.ts` if end-turn behavior changes
+
+Change turn resolution:
+- `src/app/models/turns/phase-one-turn-resolver.ts`
+- supporting helpers in `battles/`, `repairs/`, `recycling/`, `missions/encounters/`
+- tests in `src/app/models/turns/tests/`
+
+Change battles:
+- `src/app/models/battles/space-battle-resolver.ts`
+- `src/app/models/turns/phase-one-turn-resolver.ts`
+- `src/app/models/battles/tests/space-battle-resolver.spec.ts`
+
+Change diplomacy behavior:
+- `src/app/models/diplomacy/`
+- `src/app/game/diplomacy-view/`
+- `src/app/core/game-api.service.ts`
+- `server/src/index.ts`
+
+Change reports/inbox behavior:
+- `src/app/models/reports/`
+- `src/app/generators/espionage-report-generator.ts`
+- `src/app/game/reports-view/`
+- `server/src/index.ts`
+
+Change tutorials:
+- `src/app/tutorial/tutorial-content.ts`
+- `src/app/tutorial/tutorial.service.ts`
+- target view template for `data-tutorial-id` anchors
+- target view component if step preparation is needed
+- `InGameTutorials.md`
+
+Change smoke/browser verification:
+- `scripts/run-smoke-tests.js`
+- `src/app/models/testing/smoke-test-scenarios.ts`
+- `McpTesting.md` if the workflow itself changes
+
+Change auth/session behavior:
+- `src/app/core/auth-api.service.ts`
+- `src/app/core/auth-state.service.ts`
+- `src/app/core/player-session.service.ts`
+- `server/src/index.ts`
+
+Change setup/start-game flow:
+- `src/app/setup/`
+- `src/app/models/game-api-types.ts`
+- `server/src/index.ts`
+- `src/app/models/planets/galaxy-creator.ts`
+
+## Danger Zones
+
+These are common cross-cutting areas where one change usually affects multiple files.
+
+Mission changes:
+- often touch UI validation, DTOs, server launch validation, mission registry, turn resolver, and browser smoke tests
+
+Fleet/ship storage changes:
+- often touch `ManyShips`, mission planner, operations, reports, battle resolution, serialization, and server launch/removal logic
+
+Turn-resolution changes:
+- often touch battles, mission effects, repairs, recycling, reports, and end-turn browser scenarios
+
+Diplomacy changes:
+- often touch mission legality, encounter behavior, reports/messages, diplomacy UI, and server serialization
+
+Tutorial changes:
+- often touch tutorial content, overlay layout, target anchors in templates, and sometimes view preload/auto-selection logic
+
+DTO changes:
+- almost always require matching edits in:
+  - `src/app/models/game-api-types.ts`
+  - `src/app/core/game-api.service.ts`
+  - `server/src/index.ts`
+  - affected client mappers/components
+
+Smoke-test changes:
+- can be caused by visible text changes, tutorial overlays blocking clicks, route changes, or renamed UI sections
+
+## Recommended Update Pattern
+
+When structural work is completed:
+
+1. Update `PROJECT_MAP.md` if ownership, routes, modules, or verification entry points changed.
+2. Update `AGENTS.md` with the current behavior/session note if the user-facing behavior changed.
+3. Update `McpTesting.md` only if browser/MCP workflow changed.
+4. Update `InGameTutorials.md` only if tutorial authoring or overlay maintenance rules changed.
+
+## Future Extension
+
+If this map becomes too large, split it by stable concern:
+- `PROJECT_MAP.md` for top-level architecture
+- `PROJECT_TASK_GUIDE.md` for "where to change" workflows
+- `PROJECT_API_MAP.md` for endpoint/DTO detail
+
+Do not split until this file becomes hard to scan in one pass.
