@@ -4,6 +4,7 @@ import { GameType } from '../../enums/game-type';
 import { PlayerType } from '../../enums/player-type';
 import { ShipType } from '../../enums/ship-type';
 import { TechnologyType } from '../../enums/technology-type';
+import { FleetOrbitActivity } from '../../fleets/fleet';
 import type { GalaxySetup } from '../../game-api-types';
 import { ManyShips } from '../../fleets/many-ships';
 import { GalaxyCreator } from '../../planets/galaxy-creator';
@@ -162,5 +163,16 @@ describe('smoke test scenarios', () => {
     expect(ManyShips.hasDamagedShips(homePlanet.rBDSFTQ.ships)).toBe(true);
     expect(homePlanet.getBuildingLevel(BuildingType.SHIPYARD)).toBe(0);
     expect(homePlanet.rBDSFTQ.ships.undamagedShipsCount[ShipType.REPAIR_DRONE] ?? 0).toBe(0);
+  });
+
+  it('seeds guard orbit status with separate guarding and passive orbit fleets', () => {
+    const galaxy = createGalaxy();
+    applySmokeTestScenario(galaxy, 'guardOrbitStatus');
+
+    expect(galaxy.activeFleets).toHaveLength(2);
+    expect(galaxy.activeFleets[0].missionType).toBe('Defend');
+    expect(galaxy.activeFleets[0].orbitActivity).toBe(FleetOrbitActivity.GUARDING);
+    expect(galaxy.activeFleets[1].missionType).toBe('Hold');
+    expect(galaxy.activeFleets[1].orbitActivity).toBe(FleetOrbitActivity.PASSIVE_HOLD);
   });
 });

@@ -208,6 +208,7 @@ Primary files:
 
 Owns:
 - fleet lifecycle state
+- orbit stance state (`PASSIVE_HOLD`, `GUARDING`, mission-in-progress orbit)
 - ship storage model
 - per-ship damaged hull state
 - shipyard queue payload shape
@@ -228,6 +229,7 @@ Owns:
 - launch behavior contracts
 - target-arrival behavior dispatch
 - encounter integration points
+- player-facing mission set such as `Move`, `Guard`, `Bombard`, `Siege`, `Repair`, and `Recycle`
 
 ### Turns and resolution
 
@@ -239,6 +241,7 @@ Owns:
 - end-turn progression
 - mission arrival resolution
 - orbit processing
+- orbit downgrade/parking rules after diplomacy or failed return conditions
 - queue progress
 - repair pass
 - battle/debris/recycling integration
@@ -349,6 +352,9 @@ Browser smoke entry point:
 Smoke scenario definitions:
 - `src/app/models/testing/smoke-test-scenarios.ts`
 
+Notable smoke coverage:
+- `guardOrbitStatus` seeds one `Guarding Orbit` fleet and one `Passive Orbit` fleet so the Operations/UI and orbit-state serialization stay visible in browser verification
+
 Browser/MCP workflow:
 - `McpTesting.md`
 
@@ -365,8 +371,11 @@ Add or change a game route:
 Change mission rules or add a mission:
 - `src/app/models/missions/types/`
 - `src/app/models/missions/fleet-mission-registry.ts`
+- `src/app/blueprints/mission-blueprints.json`
 - `src/app/models/missions/mission-effect-executor.ts`
+- `src/app/models/missions/encounters/` for orbit participation and coalition behavior
 - `src/app/game/mission-planner-view/`
+- `src/app/game/operations-view/`
 - `server/src/index.ts` for launch endpoint validation if needed
 - `src/app/models/turns/phase-one-turn-resolver.ts` if end-turn behavior changes
 
@@ -429,7 +438,10 @@ Change setup/start-game flow:
 These are common cross-cutting areas where one change usually affects multiple files.
 
 Mission changes:
-- often touch UI validation, DTOs, server launch validation, mission registry, turn resolver, and browser smoke tests
+- often touch UI validation, DTOs, server launch validation, mission registry, mission blueprints, encounter rules, turn resolver, Operations labels, and browser smoke tests
+
+Orbit-behavior changes:
+- usually touch `src/app/models/fleets/fleet.ts`, `src/app/models/missions/encounters/encounter-resolver.ts`, `src/app/models/turns/phase-one-turn-resolver.ts`, `src/app/game/operations-view/`, and at least one smoke scenario
 
 Fleet/ship storage changes:
 - often touch `ManyShips`, mission planner, operations, reports, battle resolution, serialization, and server launch/removal logic

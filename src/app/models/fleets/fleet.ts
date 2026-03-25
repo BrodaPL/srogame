@@ -14,7 +14,8 @@ export enum FleetState {
 export enum FleetOrbitActivity {
   IDLE = 'IDLE',
   MISSION_IN_PROGRESS = 'MISSION_IN_PROGRESS',
-  HOLD = 'HOLD'
+  PASSIVE_HOLD = 'PASSIVE_HOLD',
+  GUARDING = 'GUARDING'
 }
 
 export enum FleetReturnReason {

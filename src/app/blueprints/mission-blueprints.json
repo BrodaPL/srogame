@@ -19,6 +19,24 @@
       }
     },
     {
+      "type": "DEFEND",
+      "name": "Guard",
+      "description": "Send a military fleet to non-hostile orbit. It stays there and joins the local defense when that orbit is attacked.",
+      "battleRoundsModifier": -1,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["SELF", "ALLIED", "PEACE"],
+        "allowUnowned": true
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": true,
+        "requiresCargo": false
+      }
+    },
+    {
       "type": "TRANSPORT",
       "name": "Transport",
       "description": "Send resources and ships to your own or friendly planets, then return automatically.",

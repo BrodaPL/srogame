@@ -4,7 +4,7 @@ import { splitPlanetaryBombDefences } from '../../defences/planetary-bomb';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { DiplomacyResolver } from '../../diplomacy/diplomacy-resolver';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
-import { Fleet } from '../../fleets/fleet';
+import { Fleet, FleetOrbitActivity } from '../../fleets/fleet';
 import { ManyShips } from '../../fleets/many-ships';
 import { Planet } from '../../planets/planet';
 import { Player } from '../../player';
@@ -79,7 +79,6 @@ export class EncounterResolver {
     const pendingArrivals = [...sortedArrivals];
     const resolvedArrivals: PlanetOrbitEncounterResolvedArrival[] = [];
     const targetPlanet = arrivals[0].targetPlanet;
-    const orbitForces = this.createInitialOrbitForces(targetPlanet, stationaryOccupants);
 
     while (pendingArrivals.length > 0) {
       const current = pendingArrivals.shift()!;
@@ -106,6 +105,8 @@ export class EncounterResolver {
           pendingArrivals.splice(memberIndex, 1);
         }
       }
+
+      const orbitForces = this.createInitialOrbitForces(targetPlanet, stationaryOccupants, coalition);
 
       const hostileDefenderCoalition = this.selectHostileDefenderCoalition(currentOwnerId, targetPlanet, orbitForces);
       if (!hostileDefenderCoalition || this.totalForceCombatants(hostileDefenderCoalition) <= 0) {
@@ -153,12 +154,22 @@ export class EncounterResolver {
 
   private createInitialOrbitForces(
     targetPlanet: Planet,
-    stationaryOccupants: PlanetOrbitEncounterOccupantFleet[]
+    stationaryOccupants: PlanetOrbitEncounterOccupantFleet[],
+    arrivals: PlanetOrbitEncounterArrival[]
   ): OrbitForceRecord[] {
     const orbitForces: OrbitForceRecord[] = [];
     const splitTargetDefences = splitPlanetaryBombDefences(targetPlanet.rBDSFTQ.defences);
+    const coalitionOwnerId = arrivals[0]?.owner?.playerId ?? arrivals[0]?.fleet.ownerId ?? null;
+    const coalitionThreatensPlanetOwner = coalitionOwnerId !== null
+      && targetPlanet.info.ownerId !== null
+      && this.diplomacyResolver.getStatus(coalitionOwnerId, targetPlanet.info.ownerId) === DiplomaticStatus.WAR;
+    const coalitionContainsOrbitStayingMission = arrivals.some((entry) => this.isOrbitStayingMission(entry.fleet.missionType));
 
-    if (targetPlanet.info.ownerId !== null && ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships) > 0) {
+    if (
+      coalitionThreatensPlanetOwner
+      && targetPlanet.info.ownerId !== null
+      && ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships) > 0
+    ) {
       orbitForces.push({
         kind: 'orbitingShips',
         owner: null,
@@ -170,7 +181,11 @@ export class EncounterResolver {
       });
     }
 
-    if (targetPlanet.info.ownerId !== null && ManyDefences.totalDefencesCount(splitTargetDefences.activeDefences) > 0) {
+    if (
+      coalitionThreatensPlanetOwner
+      && targetPlanet.info.ownerId !== null
+      && ManyDefences.totalDefencesCount(splitTargetDefences.activeDefences) > 0
+    ) {
       orbitForces.push({
         kind: 'planetDefences',
         owner: null,
@@ -184,6 +199,15 @@ export class EncounterResolver {
 
     for (const occupant of stationaryOccupants) {
       if (ManyShips.totalShipsCount(occupant.fleet.ships) <= 0) {
+        continue;
+      }
+      if (!this.shouldIncludeStationaryOccupant(
+        occupant.fleet,
+        coalitionOwnerId,
+        targetPlanet,
+        coalitionThreatensPlanetOwner,
+        coalitionContainsOrbitStayingMission
+      )) {
         continue;
       }
 
@@ -423,9 +447,52 @@ export class EncounterResolver {
   }
 
   private resolveForceOwnerId(force: OrbitForceRecord, targetPlanet: Planet): number | null {
+    if (
+      force.kind === 'fleet'
+      && force.fleet?.orbitActivity === FleetOrbitActivity.GUARDING
+      && targetPlanet.info.ownerId !== null
+    ) {
+      return targetPlanet.info.ownerId;
+    }
+
     return force.kind === 'orbitingShips' || force.kind === 'planetDefences'
       ? targetPlanet.info.ownerId
       : force.owner?.playerId ?? force.fleet?.ownerId ?? null;
+  }
+
+  private shouldIncludeStationaryOccupant(
+    fleet: Fleet,
+    coalitionOwnerId: number | null,
+    targetPlanet: Planet,
+    coalitionThreatensPlanetOwner: boolean,
+    coalitionContainsOrbitStayingMission: boolean
+  ): boolean {
+    if (coalitionOwnerId === null) {
+      return false;
+    }
+
+    switch (fleet.orbitActivity) {
+      case FleetOrbitActivity.PASSIVE_HOLD:
+        return coalitionContainsOrbitStayingMission
+          && this.diplomacyResolver.getStatus(coalitionOwnerId, fleet.ownerId) === DiplomaticStatus.WAR;
+      case FleetOrbitActivity.GUARDING:
+        if (targetPlanet.info.ownerId !== null) {
+          return coalitionThreatensPlanetOwner;
+        }
+
+        return this.diplomacyResolver.getStatus(coalitionOwnerId, fleet.ownerId) === DiplomaticStatus.WAR;
+      default:
+        return this.diplomacyResolver.getStatus(coalitionOwnerId, fleet.ownerId) === DiplomaticStatus.WAR;
+    }
+  }
+
+  private isOrbitStayingMission(missionType: FleetMissionType): boolean {
+    return missionType === FleetMissionType.MOVE
+      || missionType === FleetMissionType.DEFEND
+      || missionType === FleetMissionType.REPAIR
+      || missionType === FleetMissionType.RECYCLE
+      || missionType === FleetMissionType.SIEGE
+      || missionType === FleetMissionType.HOLD;
   }
 
   private toShipAmountRequests(ships: ManyShips): Array<{ type: import('../../enums/ship-type').ShipType; amount: number }> {

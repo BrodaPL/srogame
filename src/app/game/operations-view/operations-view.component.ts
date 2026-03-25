@@ -106,9 +106,13 @@ export class OperationsViewComponent implements OnInit {
     }
   }
 
+  protected missionLabel(fleet: Fleet): string {
+    return fleet.missionType === FleetMissionType.DEFEND ? 'Guard' : fleet.missionType;
+  }
+
   protected stateLabel(fleet: Fleet): string {
     if (fleet.state === FleetState.ORBITING) {
-      return `ORBITING | ${fleet.orbitActivity.replaceAll('_', ' ')}`;
+      return `ORBITING | ${this.orbitActivityLabel(fleet.orbitActivity)}`;
     }
 
     if (fleet.returnReason === FleetReturnReason.MANUAL_RECALL && fleet.state === FleetState.RETURNING) {
@@ -120,6 +124,17 @@ export class OperationsViewComponent implements OnInit {
     }
 
     return fleet.state.replaceAll('_', ' ');
+  }
+
+  protected orbitActivityLabel(activity: FleetOrbitActivity): string {
+    switch (activity) {
+      case FleetOrbitActivity.PASSIVE_HOLD:
+        return 'PASSIVE ORBIT';
+      case FleetOrbitActivity.GUARDING:
+        return 'GUARDING ORBIT';
+      default:
+        return activity.replaceAll('_', ' ');
+    }
   }
 
   protected canReturn(fleet: Fleet): boolean {

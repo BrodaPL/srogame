@@ -20,6 +20,7 @@ const SCENARIOS = [
   'damagedShipsUi',
   'shipRepairTurn',
   'orbitRepairLifecycle',
+  'guardOrbitStatus',
   'repairWarningsUi',
   'smokeSuite'
 ];
@@ -793,6 +794,30 @@ async function runRepairWarningsUi(browser) {
   }
 }
 
+async function runGuardOrbitStatus(browser) {
+  const { session, setup } = await registerAndStartGame('guardOrbitStatus');
+  const browserSession = await createScenarioPage(browser, session, setup);
+  const stepTimings = [];
+
+  try {
+    await timeStep(stepTimings, 'operationsOrbitLabels', async () => {
+      await browserSession.page.goto(`${BASE_UI_URL}/game/operations`, { waitUntil: 'domcontentloaded' });
+      await waitForText(browserSession.page, 'Operations');
+      await waitForText(browserSession.page, 'Guard | ORBITING | GUARDING ORBIT');
+      await waitForText(browserSession.page, 'Hold | ORBITING | PASSIVE ORBIT');
+      await dismissTutorialOverlay(browserSession.page);
+    });
+
+    browserSession.monitor.assertClean();
+
+    return {
+      stepTimings
+    };
+  } finally {
+    await browserSession.close();
+  }
+}
+
 async function runSmokeSuite(browser) {
   const { session, setup } = await registerAndStartGame('smokeSuite');
   const ownedPlanets = await expectOkResponse(
@@ -916,6 +941,7 @@ const scenarioRunners = {
   damagedShipsUi: runDamagedShipsUi,
   shipRepairTurn: runShipRepairTurn,
   orbitRepairLifecycle: runOrbitRepairLifecycle,
+  guardOrbitStatus: runGuardOrbitStatus,
   repairWarningsUi: runRepairWarningsUi,
   smokeSuite: runSmokeSuite
 };

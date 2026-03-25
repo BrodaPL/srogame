@@ -75,6 +75,7 @@ type BombSelectionRowVm = {
 
 const PHASE_ONE_MISSION_TYPES: FleetMissionType[] = [
   FleetMissionType.MOVE,
+  FleetMissionType.DEFEND,
   FleetMissionType.TRANSPORT,
   FleetMissionType.SPY,
   FleetMissionType.BOMBARD,

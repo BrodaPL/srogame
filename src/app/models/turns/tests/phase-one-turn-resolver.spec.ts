@@ -516,6 +516,8 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     expect(galaxy.activeFleets).toHaveLength(1);
     expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
+    expect(galaxy.activeFleets[0].missionType).toBe(FleetMissionType.HOLD);
+    expect(galaxy.activeFleets[0].orbitActivity).toBe(FleetOrbitActivity.PASSIVE_HOLD);
     expect(galaxy.activeFleets[0].ownerId).toBe(1);
     expect(galaxy.activeFleets[0].cargo.metal).toBe(25);
     expect(ManyShips.totalShipsCount(system.planets[1].rBDSFTQ.ships)).toBe(targetPlanetShipsBefore);
@@ -621,7 +623,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(players[1].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(false);
   });
 
-  it('lets allied idle fleets join orbit defense against hostile arrivals', () => {
+  it('lets passive move-orbit fleets intercept hostile orbit-staying arrivals', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
 
     const alliedIdleFleet = new Fleet(
@@ -642,7 +644,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
       FleetState.ORBITING,
       1,
       ManyDefences.empty(),
-      FleetOrbitActivity.MISSION_IN_PROGRESS
+      FleetOrbitActivity.PASSIVE_HOLD
     );
     const hostileMoveFleet = new Fleet(
       51,
@@ -690,6 +692,148 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(galaxy.activeFleets[0].ownerId).toBe(1);
     expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
     expect(ManyShips.countByType(galaxy.activeFleets[0].ships).get(ShipType.TITAN)).toBe(1);
+  });
+
+  it('does not let passive move-orbit fleets defend a planet against direct assault missions', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const passiveOrbitFleet = new Fleet(
+      52,
+      1,
+      FleetMissionType.HOLD,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Bastion',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.ORBITING,
+      1,
+      ManyDefences.empty(),
+      FleetOrbitActivity.PASSIVE_HOLD
+    );
+    const hostileBombardFleet = new Fleet(
+      53,
+      3,
+      FleetMissionType.BOMBARD,
+      point(1, 1, 2),
+      point(1, 1, 1),
+      'Gamma Spearhead',
+      'Beta Bastion',
+      manyShips({ type: ShipType.SPY_PROBE, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [passiveOrbitFleet, hostileBombardFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Bastion';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+        solarSystem.planets[2].basicInfo.name = 'Gamma Spearhead';
+        solarSystem.planets[2].info.ownerId = 3;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER),
+        new Player(3, 'Gamma', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.WAR },
+      { playerAId: 1, playerBId: 3, status: DiplomaticStatus.WAR }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets.some((fleet) => fleet.ownerId === 1 && fleet.state === FleetState.ORBITING)).toBe(true);
+    expect(players[0].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(false);
+  });
+
+  it('lets guard fleets join planet defense against direct assault missions', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const guardFleet = new Fleet(
+      54,
+      1,
+      FleetMissionType.DEFEND,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Bastion',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.ORBITING,
+      1,
+      ManyDefences.empty(),
+      FleetOrbitActivity.GUARDING
+    );
+    const hostileBombardFleet = new Fleet(
+      55,
+      3,
+      FleetMissionType.BOMBARD,
+      point(1, 1, 2),
+      point(1, 1, 1),
+      'Gamma Spearhead',
+      'Beta Bastion',
+      manyShips({ type: ShipType.SPY_PROBE, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy } = createGalaxyWithPlayers(
+      [guardFleet, hostileBombardFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Bastion';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+        solarSystem.planets[2].basicInfo.name = 'Gamma Spearhead';
+        solarSystem.planets[2].info.ownerId = 3;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER),
+        new Player(3, 'Gamma', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.WAR }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].ownerId).toBe(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
   });
 
   it('prioritizes non-small damaged ships for strong repair equipment', () => {

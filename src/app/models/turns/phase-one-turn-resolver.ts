@@ -725,12 +725,23 @@ function resolveIdleFleetState(
     return fleet;
   }
 
-  if (fleet.orbitActivity !== FleetOrbitActivity.MISSION_IN_PROGRESS) {
+  const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
+  if (!targetPlanet) {
     return fleet;
   }
 
-  const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
-  if (!targetPlanet) {
+  if (
+    fleet.orbitActivity === FleetOrbitActivity.GUARDING
+    && targetPlanet.info.ownerId !== null
+    && !isNonHostileDiplomaticStatus(diplomacyResolver.getStatus(fleet.ownerId, targetPlanet.info.ownerId))
+  ) {
+    fleet.missionType = FleetMissionType.HOLD;
+    fleet.orbitActivity = FleetOrbitActivity.PASSIVE_HOLD;
+    fleet.suspendedMissionType = FleetMissionType.DEFEND;
+    return fleet;
+  }
+
+  if (fleet.orbitActivity !== FleetOrbitActivity.MISSION_IN_PROGRESS) {
     return fleet;
   }
 
@@ -1385,7 +1396,7 @@ function resolveReturnArrival(
   if (!originPlanet || originPlanet.info.ownerId !== fleet.ownerId) {
     fleet.state = FleetState.ORBITING;
     fleet.missionType = FleetMissionType.HOLD;
-    fleet.orbitActivity = FleetOrbitActivity.HOLD;
+    fleet.orbitActivity = FleetOrbitActivity.PASSIVE_HOLD;
     fleet.suspendedMissionType = null;
     fleet.target = new Destination(fleet.origin.x, fleet.origin.y, fleet.origin.z);
     fleet.targetPlanetName = fleet.originPlanetName;
@@ -1424,6 +1435,12 @@ function createMissionFailureReturnFleet(
   fleet.returnReason = FleetReturnReason.MISSION_FAILURE;
   fleet.createdAtTurn = resolvedTurnNumber;
   return fleet;
+}
+
+function isNonHostileDiplomaticStatus(status: DiplomaticStatus): boolean {
+  return status === DiplomaticStatus.SELF
+    || status === DiplomaticStatus.ALLIED
+    || status === DiplomaticStatus.PEACE;
 }
 
 function addFleetShipsToPlanet(

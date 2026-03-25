@@ -42,7 +42,7 @@
             <div class="operations-view__card-head">
               <div>
                 <h3>Fleet #{{ fleet.fleetId }}</h3>
-                <p class="overview-muted">{{ fleet.missionType }} | {{ stateLabel(fleet) }}</p>
+                <p class="overview-muted">{{ missionLabel(fleet) }} | {{ stateLabel(fleet) }}</p>
               </div>
               <span class="badge badge--jump">{{ totalShips(fleet) }} ships</span>
             </div>

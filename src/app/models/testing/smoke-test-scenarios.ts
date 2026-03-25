@@ -7,7 +7,7 @@ import { FleetMissionType } from '../enums/fleet-mission-type';
 import { PlayerType } from '../enums/player-type';
 import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
-import { Fleet, FleetState } from '../fleets/fleet';
+import { Fleet, FleetOrbitActivity, FleetState } from '../fleets/fleet';
 import { Destination } from '../fleets/destination';
 import { ManyShips } from '../fleets/many-ships';
 import { ShipyardQueueEntry } from '../fleets/shipyard-queue-entry';
@@ -28,6 +28,7 @@ export const SMOKE_TEST_SCENARIO_KEYS = [
   'damagedShipsUi',
   'shipRepairTurn',
   'orbitRepairLifecycle',
+  'guardOrbitStatus',
   'repairWarningsUi',
   'smokeSuite'
 ] as const;
@@ -64,6 +65,9 @@ export function applySmokeTestScenario(galaxy: Galaxy, scenario: SmokeTestScenar
       return;
     case 'orbitRepairLifecycle':
       applyOrbitRepairLifecycleScenario(galaxy);
+      return;
+    case 'guardOrbitStatus':
+      applyGuardOrbitStatusScenario(galaxy);
       return;
     case 'repairWarningsUi':
       applyRepairWarningsUiScenario(galaxy);
@@ -264,6 +268,61 @@ function applyRepairWarningsUiScenario(galaxy: Galaxy): void {
     ]
   });
   galaxy.activeFleets = [];
+}
+
+function applyGuardOrbitStatusScenario(galaxy: Galaxy): void {
+  const player = getPrimaryHumanPlayer(galaxy);
+  const homePlanet = getHomePlanet(player);
+  configureOperationalPlanet(homePlanet, {
+    resources: new ResourcesPack(800, 600, 500),
+    undamagedShips: [
+      { type: ShipType.CRUISER, amount: 2 }
+    ]
+  });
+
+  galaxy.activeFleets = [
+    new Fleet(
+      1,
+      player.playerId,
+      FleetMissionType.DEFEND,
+      destinationOf(homePlanet),
+      destinationOf(homePlanet),
+      homePlanet.basicInfo.name,
+      homePlanet.basicInfo.name,
+      manyUndamagedShips({ type: ShipType.CRUISER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.ORBITING,
+      galaxy.currentTurn,
+      undefined,
+      FleetOrbitActivity.GUARDING
+    ),
+    new Fleet(
+      2,
+      player.playerId,
+      FleetMissionType.HOLD,
+      destinationOf(homePlanet),
+      destinationOf(homePlanet),
+      homePlanet.basicInfo.name,
+      homePlanet.basicInfo.name,
+      manyUndamagedShips({ type: ShipType.CRUISER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.ORBITING,
+      galaxy.currentTurn,
+      undefined,
+      FleetOrbitActivity.PASSIVE_HOLD
+    )
+  ];
+  galaxy.nextFleetId = 3;
 }
 
 function applySmokeSuiteScenario(galaxy: Galaxy): void {

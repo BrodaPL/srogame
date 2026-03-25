@@ -290,6 +290,7 @@ const TECH_TYPE_COMPUTER_TECHNOLOGY = TechnologyType.COMPUTER_TECHNOLOGY as Tech
 const TECH_TYPE_INTERGALACTIC_RESEARCH_NETWORK = TechnologyType.INTERGALACTIC_RESEARCH_NETWORK as TechnologyTypeType;
 const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
   FleetMissionType.MOVE as FleetMissionTypeType,
+  FleetMissionType.DEFEND as FleetMissionTypeType,
   FleetMissionType.TRANSPORT as FleetMissionTypeType,
   FleetMissionType.SPY as FleetMissionTypeType,
   FleetMissionType.BOMBARD as FleetMissionTypeType,

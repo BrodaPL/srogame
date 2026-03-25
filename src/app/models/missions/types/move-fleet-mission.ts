@@ -93,7 +93,7 @@ export class MoveFleetMission extends FleetMission {
         effects: [{
           type: 'setFleetOrbitState',
           state: FleetState.ORBITING,
-          orbitActivity: FleetOrbitActivity.HOLD,
+          orbitActivity: FleetOrbitActivity.PASSIVE_HOLD,
           missionType: FleetMissionType.HOLD,
           suspendedMissionType: null
         }],
