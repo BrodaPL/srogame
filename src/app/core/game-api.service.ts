@@ -25,6 +25,11 @@ import {
   DeletePlayerReportsRequest,
   DeletePlayerReportsResponse,
   MarkPlayerReportReadRequest,
+  MarkMailMessageReadRequest,
+  DeleteMailMessagesRequest,
+  DeleteMailMessagesResponse,
+  DeleteMailRequestsRequest,
+  DeleteMailRequestsResponse,
   MarkTutorialReadRequest,
   PlayerReportDto,
   PlayerSession,
@@ -32,8 +37,9 @@ import {
   SetDiplomaticRelationRequest,
   DiplomacyViewResponse,
   CreateDiplomaticProposalRequest,
-  SendPlayerMessageRequest,
-  SendPlayerMessageResponse,
+  MailViewResponse,
+  SendMailMessageRequest,
+  SendMailMessageResponse,
   AbandonPlanetRequest,
   AbandonPlanetResponse
 } from '../models/game-api-types';
@@ -232,6 +238,37 @@ export class GameApiService {
     );
   }
 
+  public getMailView(token: string) {
+    return this.http.get<MailViewResponse>(
+      `${API_BASE_URL}/game/mail`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public markMailMessageAsRead(request: MarkMailMessageReadRequest, token: string) {
+    return this.http.post<void>(
+      `${API_BASE_URL}/game/mail/messages/read`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public deleteMailMessages(request: DeleteMailMessagesRequest, token: string) {
+    return this.http.post<DeleteMailMessagesResponse>(
+      `${API_BASE_URL}/game/mail/messages/delete`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public deleteMailRequests(request: DeleteMailRequestsRequest, token: string) {
+    return this.http.post<DeleteMailRequestsResponse>(
+      `${API_BASE_URL}/game/mail/requests/delete`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
   public markPlayerReportAsRead(request: MarkPlayerReportReadRequest, token: string) {
     return this.http.post<PlayerReportDto>(
       `${API_BASE_URL}/game/reports/read`,
@@ -310,9 +347,9 @@ export class GameApiService {
     );
   }
 
-  public sendPlayerMessage(request: SendPlayerMessageRequest, token: string) {
-    return this.http.post<SendPlayerMessageResponse>(
-      `${API_BASE_URL}/game/messages/send`,
+  public sendMailMessage(request: SendMailMessageRequest, token: string) {
+    return this.http.post<SendMailMessageResponse>(
+      `${API_BASE_URL}/game/mail/messages/send`,
       request,
       { headers: this.authHeaders(token) }
     );

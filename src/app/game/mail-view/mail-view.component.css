@@ -1,0 +1,121 @@
+.mail-view,
+.mail-view__layout,
+.mail-view__summary,
+.mail-view__card-list,
+.mail-view__actions {
+  display: grid;
+  gap: 1rem;
+}
+
+.mail-view {
+  margin-top: 1rem;
+}
+
+.mail-view__header,
+.mail-view__requests,
+.mail-view__messages,
+.mail-view__card,
+.mail-view__message-detail {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.mail-view__header,
+.mail-view__panel-head,
+.mail-view__card-head,
+.mail-view__group-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.mail-view__layout {
+  grid-template-columns: minmax(300px, 0.95fr) minmax(340px, 1.05fr);
+  align-items: start;
+}
+
+.mail-view__panel-head--spaced {
+  margin-top: 1rem;
+}
+
+.mail-view__card {
+  padding: 1rem 1.05rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mail-view__button--danger {
+  border-color: rgba(233, 95, 95, 0.4);
+  color: #ffd6d6;
+}
+
+.mail-view__message-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(280px, 1.1fr);
+}
+
+.mail-view__message-groups,
+.mail-view__message-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.mail-view__message-row {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mail-view__message-row strong,
+.mail-view__group-head h4,
+.mail-view__card-head h4 {
+  margin: 0;
+}
+
+.mail-view__message-row span,
+.mail-view__message-row small {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.mail-view__message-row--read {
+  opacity: 0.72;
+}
+
+.mail-view__message-row--selected {
+  border-color: var(--accent);
+  box-shadow: 0 14px 28px rgba(246, 180, 76, 0.16);
+}
+
+.mail-view__message-detail {
+  min-height: 20rem;
+  padding: 1rem 1.05rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mail-view__message-body {
+  min-height: 12rem;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  background: rgba(7, 10, 15, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 960px) {
+  .mail-view__layout,
+  .mail-view__message-layout {
+    grid-template-columns: 1fr;
+  }
+}

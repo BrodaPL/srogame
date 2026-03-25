@@ -19,17 +19,10 @@
       </section>
     }
 
-    @if (messageError) {
-      <section class="status status--error">
-        <h3>Message not sent</h3>
-        <p>{{ messageError }}</p>
-      </section>
-    }
-
-    @if (messageSuccess) {
+    @if (actionSuccess) {
       <section class="status status--success">
-        <h3>Message sent</h3>
-        <p>{{ messageSuccess }}</p>
+        <h3>Diplomacy updated</h3>
+        <p>{{ actionSuccess }}</p>
       </section>
     }
 
@@ -151,31 +144,13 @@
 
             <section class="diplomacy-view__action-card">
               <h4>Direct Message</h4>
-              <p class="overview-muted">Messages reuse the Reports inbox and respect the current discovery filter.</p>
-              <label class="diplomacy-view__field">
-                <span>Title</span>
-                <input
-                  class="diplomacy-view__input"
-                  type="text"
-                  maxlength="50"
-                  [(ngModel)]="messageTitle" />
-              </label>
-              <p class="overview-muted">{{ titleCharactersRemaining() }} characters remaining.</p>
-              <label class="diplomacy-view__field">
-                <span>Body</span>
-                <textarea
-                  class="diplomacy-view__textarea"
-                  rows="5"
-                  maxlength="1000"
-                  [(ngModel)]="messageBody"></textarea>
-              </label>
-              <p class="overview-muted">{{ bodyCharactersRemaining() }} characters remaining.</p>
+              <p class="overview-muted">Messages are now handled through Mail and the shared compose popup.</p>
               <button
                 type="button"
                 class="diplomacy-view__action-button"
-                [disabled]="!canSendMessage(contact)"
-                (click)="sendMessage(contact)">
-                {{ isSendingMessage ? 'Sending...' : 'Send message' }}
+                [disabled]="!contact.canSendMessage"
+                (click)="openMessageComposer(contact)">
+                Send message
               </button>
             </section>
           </div>
@@ -228,33 +203,9 @@
               </div>
 
               <div class="diplomacy-view__proposal-actions">
-                @if (canAcceptProposal(proposal)) {
-                  <button
-                    type="button"
-                    class="diplomacy-view__action-button"
-                    [disabled]="isProposalActionPending(proposal)"
-                    (click)="acceptProposal(proposal)">
-                    Accept
-                  </button>
-                }
-                @if (canRejectProposal(proposal)) {
-                  <button
-                    type="button"
-                    class="diplomacy-view__action-button diplomacy-view__action-button--danger"
-                    [disabled]="isProposalActionPending(proposal)"
-                    (click)="rejectProposal(proposal)">
-                    Reject
-                  </button>
-                }
-                @if (canCancelProposal(proposal)) {
-                  <button
-                    type="button"
-                    class="diplomacy-view__action-button diplomacy-view__action-button--danger"
-                    [disabled]="isProposalActionPending(proposal)"
-                    (click)="cancelProposal(proposal)">
-                    Cancel
-                  </button>
-                }
+                <a class="diplomacy-view__action-button" routerLink="/game/mail">
+                  {{ proposalMailActionLabel(proposal) }}
+                </a>
               </div>
             </article>
           }
@@ -263,3 +214,16 @@
     </section>
   }
 </section>
+
+<app-message-compose-dialog
+  [isOpen]="composerOpen"
+  [recipients]="mailRecipients()"
+  [allianceRecipientCount]="0"
+  [lockedTargetPlayerId]="composerLockedTargetPlayerId"
+  [lockedTargetPlayerName]="composerLockedTargetPlayerName"
+  [allowAlliance]="false"
+  [titleText]="'Compose Message'"
+  [submitLabel]="'Send message'"
+  (closed)="closeComposer()"
+  (sent)="handleComposerSent($event)">
+</app-message-compose-dialog>

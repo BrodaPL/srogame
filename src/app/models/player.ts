@@ -3,6 +3,7 @@ import { TechnologyType } from './enums/technology-type';
 import { Fleet } from './fleets/fleet';
 import { PlayerType } from './enums/player-type';
 import { PlayerReport } from './reports/player-report';
+import { PlayerMessage } from './mail/player-message';
 import {
   TutorialReadState,
   TutorialViewKey,
@@ -20,7 +21,9 @@ export class Player {
     public type: PlayerType,
     public tutorialRead: TutorialReadState = createTutorialReadState(false),
     public reports: PlayerReport[] = [],
-    public nextReportId = 1
+    public nextReportId = 1,
+    public messages: PlayerMessage[] = [],
+    public nextMessageId = 1
   ) {}
 
   public getTechLevel(type: TechnologyType): number {
@@ -49,10 +52,23 @@ export class Player {
     return reportId;
   }
 
+  public createMessageId(): number {
+    const messageId = this.nextMessageId;
+    this.nextMessageId += 1;
+    return messageId;
+  }
+
   public addReport(report: PlayerReport): void {
     this.reports.push(report);
     if (report.reportId >= this.nextReportId) {
       this.nextReportId = report.reportId + 1;
+    }
+  }
+
+  public addMessage(message: PlayerMessage): void {
+    this.messages.push(message);
+    if (message.messageId >= this.nextMessageId) {
+      this.nextMessageId = message.messageId + 1;
     }
   }
 
@@ -75,6 +91,27 @@ export class Player {
     const before = this.reports.length;
     this.reports = this.reports.filter((report) => !selected.has(report.reportId));
     return before - this.reports.length;
+  }
+
+  public markMessageAsRead(messageId: number): boolean {
+    const message = this.messages.find((entry) => entry.messageId === messageId);
+    if (!message) {
+      return false;
+    }
+
+    message.markAsRead();
+    return true;
+  }
+
+  public deleteMessages(messageIds: number[]): number {
+    const selected = new Set(messageIds);
+    if (selected.size === 0) {
+      return 0;
+    }
+
+    const before = this.messages.length;
+    this.messages = this.messages.filter((message) => !selected.has(message.messageId));
+    return before - this.messages.length;
   }
 
   public isTutorialRead(viewKey: TutorialViewKey): boolean {

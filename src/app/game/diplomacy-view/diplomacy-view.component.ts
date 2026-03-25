@@ -1,21 +1,24 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import {
   DiplomacyContactDto,
   DiplomaticProposalDto,
-  DiplomacyViewResponse
+  DiplomacyViewResponse,
+  MailRecipientDto
 } from '../../models/game-api-types';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { PlayerType } from '../../models/enums/player-type';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
+import { MessageComposeDialogComponent } from '../ui/message-compose-dialog/message-compose-dialog.component';
 
 @Component({
   selector: 'app-diplomacy-view',
-  imports: [FormsModule, TopMenuComponent, MiniPlanetPreviewComponent],
+  imports: [FormsModule, RouterLink, TopMenuComponent, MiniPlanetPreviewComponent, MessageComposeDialogComponent],
   templateUrl: './diplomacy-view.component.html',
   styleUrl: './diplomacy-view.component.css'
 })
@@ -28,11 +31,9 @@ export class DiplomacyViewComponent implements OnInit {
   ];
 
   protected isLoading = false;
-  protected isSendingMessage = false;
   protected loadError: string | null = null;
   protected actionError: string | null = null;
-  protected messageError: string | null = null;
-  protected messageSuccess: string | null = null;
+  protected actionSuccess: string | null = null;
   protected contacts: DiplomacyContactDto[] = [];
   protected activeProposals: DiplomaticProposalDto[] = [];
   protected selectedPlayerId: number | null = null;
@@ -40,9 +41,9 @@ export class DiplomacyViewComponent implements OnInit {
   protected currentTurn: number | null = null;
   protected outgoingProposalSentThisTurn = false;
   protected activeContactActionPlayerId: number | null = null;
-  protected activeProposalActionId: number | null = null;
-  protected messageTitle = '';
-  protected messageBody = '';
+  protected composerOpen = false;
+  protected composerLockedTargetPlayerId: number | null = null;
+  protected composerLockedTargetPlayerName: string | null = null;
 
   private proposalSelectionByPlayerId = new Map<number, DiplomaticStatus>();
 
@@ -66,10 +67,7 @@ export class DiplomacyViewComponent implements OnInit {
 
   protected selectContact(contact: DiplomacyContactDto): void {
     this.selectedPlayerId = contact.playerId;
-    this.messageTitle = '';
-    this.messageBody = '';
-    this.messageError = null;
-    this.messageSuccess = null;
+    this.actionSuccess = null;
   }
 
   protected selectedProposalStatus(contact: DiplomacyContactDto): DiplomaticStatus {
@@ -103,22 +101,16 @@ export class DiplomacyViewComponent implements OnInit {
     return contact.proposalBlockedReason ?? 'Treaty proposals are unavailable for this contact.';
   }
 
-  protected canSendMessage(contact: DiplomacyContactDto | null): boolean {
-    return !!contact
-      && contact.canSendMessage
-      && !this.isSendingMessage
-      && this.messageTitle.trim().length > 0
-      && this.messageTitle.trim().length <= 50
-      && this.messageBody.trim().length > 0
-      && this.messageBody.trim().length <= 1000;
-  }
-
-  protected titleCharactersRemaining(): number {
-    return 50 - this.messageTitle.length;
-  }
-
-  protected bodyCharactersRemaining(): number {
-    return 1000 - this.messageBody.length;
+  protected mailRecipients(): MailRecipientDto[] {
+    return this.contacts
+      .filter((contact) => contact.canSendMessage)
+      .map((contact) => ({
+        playerId: contact.playerId,
+        playerName: contact.playerName,
+        playerType: contact.playerType,
+        currentStatus: contact.currentStatus,
+        isAllianceMember: contact.currentStatus === DiplomaticStatus.ALLIED
+      }));
   }
 
   protected contactStatusLabel(contact: DiplomacyContactDto): string {
@@ -135,24 +127,14 @@ export class DiplomacyViewComponent implements OnInit {
       : `To ${proposal.toPlayerName}`;
   }
 
-  protected canAcceptProposal(proposal: DiplomaticProposalDto): boolean {
-    return proposal.direction === 'incoming' && !this.isProposalActionPending(proposal);
-  }
-
-  protected canRejectProposal(proposal: DiplomaticProposalDto): boolean {
-    return proposal.direction === 'incoming' && !this.isProposalActionPending(proposal);
-  }
-
-  protected canCancelProposal(proposal: DiplomaticProposalDto): boolean {
-    return proposal.direction === 'outgoing' && !this.isProposalActionPending(proposal);
-  }
-
   protected isContactActionPending(contact: DiplomacyContactDto): boolean {
     return this.activeContactActionPlayerId === contact.playerId;
   }
 
-  protected isProposalActionPending(proposal: DiplomaticProposalDto): boolean {
-    return this.activeProposalActionId === proposal.proposalId;
+  protected proposalMailActionLabel(proposal: DiplomaticProposalDto): string {
+    return proposal.direction === 'incoming'
+      ? 'Open Mail to answer'
+      : 'Open Mail to review';
   }
 
   protected sendProposal(contact: DiplomacyContactDto): void {
@@ -169,8 +151,7 @@ export class DiplomacyViewComponent implements OnInit {
     const requestedStatus = this.selectedProposalStatus(contact);
     this.activeContactActionPlayerId = contact.playerId;
     this.actionError = null;
-    this.messageError = null;
-    this.messageSuccess = null;
+    this.actionSuccess = null;
 
     this.gameApi.createDiplomaticProposal(
       {
@@ -193,68 +174,26 @@ export class DiplomacyViewComponent implements OnInit {
       });
   }
 
-  protected acceptProposal(proposal: DiplomaticProposalDto): void {
-    this.runProposalAction(
-      proposal,
-      (token) => this.gameApi.acceptDiplomaticProposal(proposal.proposalId, token),
-      'Unable to accept diplomacy proposal.'
-    );
-  }
-
-  protected rejectProposal(proposal: DiplomaticProposalDto): void {
-    this.runProposalAction(
-      proposal,
-      (token) => this.gameApi.rejectDiplomaticProposal(proposal.proposalId, token),
-      'Unable to reject diplomacy proposal.'
-    );
-  }
-
-  protected cancelProposal(proposal: DiplomaticProposalDto): void {
-    this.runProposalAction(
-      proposal,
-      (token) => this.gameApi.cancelDiplomaticProposal(proposal.proposalId, token),
-      'Unable to cancel diplomacy proposal.'
-    );
-  }
-
-  protected sendMessage(contact: DiplomacyContactDto | null): void {
-    if (!this.canSendMessage(contact)) {
+  protected openMessageComposer(contact: DiplomacyContactDto | null): void {
+    if (!contact?.canSendMessage) {
       return;
     }
 
-    const session = this.playerSession.load();
-    if (!session || !contact) {
-      this.messageError = 'No player session found.';
-      return;
-    }
-
-    this.isSendingMessage = true;
-    this.messageError = null;
-    this.messageSuccess = null;
     this.actionError = null;
+    this.actionSuccess = null;
+    this.composerLockedTargetPlayerId = contact.playerId;
+    this.composerLockedTargetPlayerName = contact.playerName;
+    this.composerOpen = true;
+  }
 
-    this.gameApi.sendPlayerMessage(
-      {
-        targetPlayerId: contact.playerId,
-        title: this.messageTitle.trim(),
-        body: this.messageBody.trim()
-      },
-      session.token
-    )
-      .pipe(finalize(() => {
-        this.isSendingMessage = false;
-        this.cdr.markForCheck();
-      }))
-      .subscribe({
-        next: () => {
-          this.messageTitle = '';
-          this.messageBody = '';
-          this.messageSuccess = `Message sent to ${contact.playerName}.`;
-        },
-        error: (error) => {
-          this.messageError = error?.error?.error ?? 'Unable to send message.';
-        }
-      });
+  protected closeComposer(): void {
+    this.composerOpen = false;
+  }
+
+  protected handleComposerSent(event: { deliveredCount: number }): void {
+    this.actionSuccess = event.deliveredCount === 1
+      ? `Message sent to ${this.composerLockedTargetPlayerName ?? 'recipient'}.`
+      : `Message sent to ${event.deliveredCount} recipients.`;
   }
 
   private loadDiplomacyView(): void {
@@ -323,33 +262,4 @@ export class DiplomacyViewComponent implements OnInit {
     }
   }
 
-  private runProposalAction(
-    proposal: DiplomaticProposalDto,
-    action: (token: string) => ReturnType<GameApiService['getDiplomacyView']>,
-    fallbackError: string
-  ): void {
-    const session = this.playerSession.load();
-    if (!session || this.activeProposalActionId !== null) {
-      return;
-    }
-
-    this.activeProposalActionId = proposal.proposalId;
-    this.actionError = null;
-    this.messageError = null;
-    this.messageSuccess = null;
-
-    action(session.token)
-      .pipe(finalize(() => {
-        this.activeProposalActionId = null;
-        this.cdr.markForCheck();
-      }))
-      .subscribe({
-        next: (response) => {
-          this.applyViewResponse(response);
-        },
-        error: (error) => {
-          this.actionError = error?.error?.error ?? fallbackError;
-        }
-      });
-  }
 }

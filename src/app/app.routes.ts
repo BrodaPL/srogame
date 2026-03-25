@@ -12,6 +12,7 @@ import { DefenceViewComponent } from './game/defence-view/defence-view.component
 import { DiplomacyViewComponent } from './game/diplomacy-view/diplomacy-view.component';
 import { GalacticViewComponent } from './game/galactic-view/galactic-view.component';
 import { ImperiumViewComponent } from './game/imperium-view/imperium-view.component';
+import { MailViewComponent } from './game/mail-view/mail-view.component';
 import { OperationsViewComponent } from './game/operations-view/operations-view.component';
 import { PlanetViewComponent } from './game/planet-view/planet-view.component';
 import { ProductionViewComponent } from './game/production-view/production-view.component';
@@ -48,6 +49,7 @@ export const routes: Routes = [
       { path: 'star-system', component: StarSystemViewComponent },
       { path: 'planet', component: PlanetViewComponent },
       { path: 'reports', component: ReportsViewComponent },
+      { path: 'mail', component: MailViewComponent },
       { path: 'diplomacy', component: DiplomacyViewComponent },
       { path: 'researches', component: ResearchesViewComponent },
       { path: 'production', component: ProductionViewComponent },

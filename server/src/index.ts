@@ -38,7 +38,7 @@ import technologyEffectsModule from '../../src/app/models/tech/technology-effect
 import phaseOneTurnResolverModule from '../../src/app/models/turns/phase-one-turn-resolver.js';
 import smokeTestScenariosModule from '../../src/app/models/testing/smoke-test-scenarios.js';
 import queueManagementModule from '../../src/app/models/queues/queue-management.js';
-import messageReportModule from '../../src/app/models/reports/message-report.js';
+import playerMessageModule from '../../src/app/models/mail/player-message.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   EndTurnResponse,
@@ -84,7 +84,6 @@ import type {
   CreateFleetMissionResponse,
   PlayerReportDto,
   PlayerReportDtoBase,
-  MessageReportDto,
   TextPlayerReportDto,
   EspionagePlayerReportDto,
   MarkPlayerReportReadRequest,
@@ -96,8 +95,17 @@ import type {
   DiplomacyContactDto,
   DiplomaticProposalDto,
   CreateDiplomaticProposalRequest,
-  SendPlayerMessageRequest,
-  SendPlayerMessageResponse,
+  MailViewResponse,
+  MailRequestDto,
+  MailRecipientDto,
+  PlayerMailMessageDto,
+  MarkMailMessageReadRequest,
+  DeleteMailMessagesRequest,
+  DeleteMailMessagesResponse,
+  DeleteMailRequestsRequest,
+  DeleteMailRequestsResponse,
+  SendMailMessageRequest,
+  SendMailMessageResponse,
   AbandonPlanetRequest,
   AbandonPlanetResponse
 } from '../../src/app/models/game-api-types.ts';
@@ -123,6 +131,7 @@ import type { Defence } from '../../src/app/models/defences/defence.ts';
 import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
+import type { PlayerMessage } from '../../src/app/models/mail/player-message.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
 import type { MissionLaunchContext } from '../../src/app/models/missions/mission-context.ts';
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../src/app/models/diplomacy/diplomatic-status.ts';
@@ -232,8 +241,8 @@ const {
   calculateBuildingCancellationRefund,
   calculateShipyardCancellation
 } = queueManagementModule as typeof import('../../src/app/models/queues/queue-management.js');
-const { MessageReport } = messageReportModule as {
-  MessageReport: typeof import('../../src/app/models/reports/message-report.js').MessageReport;
+const { PlayerMessage: PlayerMessageModel } = playerMessageModule as {
+  PlayerMessage: typeof import('../../src/app/models/mail/player-message.js').PlayerMessage;
 };
 
 const app = express();
@@ -525,18 +534,6 @@ app.post('/api/game/diplomacy/proposals', (req, res) => {
   );
   authPlayer.galaxy.nextDiplomaticProposalId += 1;
   authPlayer.galaxy.diplomaticProposals.push(proposal);
-  addPlayerMessage(
-    targetPlayer,
-    authPlayer.galaxy.currentTurn,
-    `Diplomacy Proposal: ${requestedStatus}`,
-    [
-      `${authPlayer.player.playerName} proposed a diplomacy change to ${requestedStatus}.`,
-      `Current status: ${resolveDiplomaticStatusLabel(authPlayer.galaxy, authPlayer.player.playerId, targetPlayer.playerId)}.`,
-      `Open Diplomacy View to accept or reject this proposal.`,
-      `Proposal expires on turn ${proposal.expiresOnTurn}.`
-    ].join('\n'),
-    authPlayer.player.playerName
-  );
 
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
 });
@@ -564,17 +561,6 @@ app.post('/api/game/diplomacy/proposals/:proposalId/accept', (req, res) => {
   proposal.state = DiplomaticProposalState.ACCEPTED;
   upsertDiplomaticRelation(authPlayer.galaxy, proposal.fromPlayerId, proposal.toPlayerId, proposal.requestedStatus);
 
-  const sourcePlayer = resolvePlayerById(authPlayer.galaxy, proposal.fromPlayerId);
-  if (sourcePlayer) {
-    addPlayerMessage(
-      sourcePlayer,
-      authPlayer.galaxy.currentTurn,
-      `Diplomacy Accepted: ${proposal.requestedStatus}`,
-      `${authPlayer.player.playerName} accepted your diplomacy proposal. Current status is now ${proposal.requestedStatus}.`,
-      authPlayer.player.playerName
-    );
-  }
-
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
@@ -599,17 +585,6 @@ app.post('/api/game/diplomacy/proposals/:proposalId/reject', (req, res) => {
   }
 
   proposal.state = DiplomaticProposalState.REJECTED;
-
-  const sourcePlayer = resolvePlayerById(authPlayer.galaxy, proposal.fromPlayerId);
-  if (sourcePlayer) {
-    addPlayerMessage(
-      sourcePlayer,
-      authPlayer.galaxy.currentTurn,
-      `Diplomacy Rejected: ${proposal.requestedStatus}`,
-      `${authPlayer.player.playerName} rejected your diplomacy proposal.`,
-      authPlayer.player.playerName
-    );
-  }
 
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
 });
@@ -636,52 +611,146 @@ app.post('/api/game/diplomacy/proposals/:proposalId/cancel', (req, res) => {
 
   proposal.state = DiplomaticProposalState.CANCELLED;
 
-  const targetPlayer = resolvePlayerById(authPlayer.galaxy, proposal.toPlayerId);
-  if (targetPlayer) {
-    addPlayerMessage(
-      targetPlayer,
-      authPlayer.galaxy.currentTurn,
-      `Diplomacy Cancelled: ${proposal.requestedStatus}`,
-      `${authPlayer.player.playerName} cancelled a pending diplomacy proposal.`,
-      authPlayer.player.playerName
-    );
-  }
-
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
-app.post('/api/game/messages/send', (req, res) => {
+app.get('/api/game/mail', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
     return res.status(authPlayer.status).json({ error: authPlayer.error });
   }
 
-  const body = req.body as SendPlayerMessageRequest | undefined;
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
+app.post('/api/game/mail/messages/read', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const body = req.body as MarkMailMessageReadRequest | undefined;
+  const messageId = parseBodyNonNegativeInt(body?.messageId);
+  if (messageId === null) {
+    return res.status(400).json({ error: 'Invalid message id.' });
+  }
+
+  if (!authPlayer.player.markMessageAsRead(messageId)) {
+    return res.status(404).json({ error: 'Message not found.' });
+  }
+
+  return res.status(204).send();
+});
+
+app.post('/api/game/mail/messages/delete', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const body = req.body as DeleteMailMessagesRequest | undefined;
+  const messageIds = parseBodyReportIds(body?.messageIds);
+  if (!messageIds) {
+    return res.status(400).json({ error: 'Invalid message ids.' });
+  }
+
+  const deletedCount = authPlayer.player.deleteMessages(messageIds);
+  const response: DeleteMailMessagesResponse = { deletedCount };
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/mail/requests/delete', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const body = req.body as DeleteMailRequestsRequest | undefined;
+  const requestIds = parseBodyReportIds(body?.requestIds);
+  if (!requestIds) {
+    return res.status(400).json({ error: 'Invalid request ids.' });
+  }
+
+  const requestIdSet = new Set(requestIds);
+  const deletableIds = new Set(
+    authPlayer.galaxy.diplomaticProposals
+      .filter((proposal) =>
+        requestIdSet.has(proposal.proposalId)
+        && proposal.state !== DiplomaticProposalState.PENDING
+        && (proposal.fromPlayerId === authPlayer.player.playerId || proposal.toPlayerId === authPlayer.player.playerId)
+      )
+      .map((proposal) => proposal.proposalId)
+  );
+  const before = authPlayer.galaxy.diplomaticProposals.length;
+  authPlayer.galaxy.diplomaticProposals = authPlayer.galaxy.diplomaticProposals.filter((proposal) =>
+    !deletableIds.has(proposal.proposalId)
+  );
+
+  const response: DeleteMailRequestsResponse = {
+    deletedCount: before - authPlayer.galaxy.diplomaticProposals.length
+  };
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/mail/messages/send', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const body = req.body as SendMailMessageRequest | undefined;
+  const recipientMode = normalizeMailRecipientMode(body?.recipientMode);
   const targetPlayerId = parseBodyPositiveInt(body?.targetPlayerId);
   const title = normalizePlayerMessageTitle(body?.title);
   const messageBody = normalizePlayerMessageBody(body?.body);
-  if (targetPlayerId === null || title === null || messageBody === null) {
-    return res.status(400).json({ error: 'Invalid player message payload.' });
+  if (recipientMode === null || title === null || messageBody === null) {
+    return res.status(400).json({ error: 'Invalid mail message payload.' });
   }
 
-  const targetPlayer = resolvePlayerById(authPlayer.galaxy, targetPlayerId);
-  if (!targetPlayer || targetPlayer.playerId === authPlayer.player.playerId) {
-    return res.status(404).json({ error: 'Message target not found.' });
+  if (recipientMode === 'player') {
+    if (targetPlayerId === null) {
+      return res.status(400).json({ error: 'Select a message target.' });
+    }
+
+    const targetPlayer = resolvePlayerById(authPlayer.galaxy, targetPlayerId);
+    if (!targetPlayer || targetPlayer.playerId === authPlayer.player.playerId) {
+      return res.status(404).json({ error: 'Message target not found.' });
+    }
+
+    if (!canSendDirectMailToPlayer(authPlayer.galaxy, authPlayer.player.playerId, targetPlayer.playerId)) {
+      return res.status(403).json({ error: 'Target player is not available for direct mail.' });
+    }
+
+    addPlayerMessage(
+      targetPlayer,
+      authPlayer.galaxy.currentTurn,
+      title,
+      messageBody,
+      authPlayer.player.playerId,
+      authPlayer.player.playerName
+    );
+
+    const response: SendMailMessageResponse = { deliveredCount: 1 };
+    return res.status(200).json(response);
   }
 
-  if (!isPlayerVisibleInDiplomacy(authPlayer.galaxy, authPlayer.player.playerId, targetPlayer.playerId)) {
-    return res.status(403).json({ error: 'Target player is not visible in Diplomacy View.' });
+  const allianceRecipients = resolveAllianceMailRecipients(authPlayer.galaxy, authPlayer.player.playerId);
+  if (allianceRecipients.length === 0) {
+    return res.status(409).json({ error: 'No allied human players are currently available for alliance mail.' });
   }
 
-  addPlayerMessage(
-    targetPlayer,
-    authPlayer.galaxy.currentTurn,
-    title,
-    messageBody,
-    authPlayer.player.playerName
-  );
+  for (const recipient of allianceRecipients) {
+    addPlayerMessage(
+      recipient,
+      authPlayer.galaxy.currentTurn,
+      title,
+      messageBody,
+      authPlayer.player.playerId,
+      authPlayer.player.playerName
+    );
+  }
 
-  const response: SendPlayerMessageResponse = { delivered: true };
+  const response: SendMailMessageResponse = { deliveredCount: allianceRecipients.length };
   return res.status(200).json(response);
 });
 
@@ -701,6 +770,19 @@ app.post('/api/game/end-turn', (req, res) => {
 
   if (auth.session.accountId !== currentGameOwnerId) {
     return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const pendingRequestCount = countPendingMailRequestsForPlayer(currentGalaxy, playerId);
+  const unreadMailCount = countUnreadMailMessagesForPlayer(currentGalaxy, playerId);
+  if (pendingRequestCount > 0 || unreadMailCount > 0) {
+    return res.status(409).json({
+      error: buildEndTurnMailBlockMessage(unreadMailCount, pendingRequestCount)
+    });
   }
 
   isTurnProcessing = true;
@@ -1728,6 +1810,7 @@ app.get('/api/game/reports', (req, res) => {
   }
 
   const response = [...player.reports]
+    .filter((report) => report.reportType !== ReportType.MESSAGE)
     .sort((left, right) => right.createdTurn - left.createdTurn || right.reportId - left.reportId)
     .map((report) => toPlayerReportDto(report));
   return res.status(200).json(response);
@@ -2320,7 +2403,9 @@ function toPlayerSession(session: AuthSession, galaxy: Galaxy | null = currentGa
     playerName: session.playerName,
     token: session.token,
     tutorialRead: player?.tutorialRead ?? createTutorialReadState(false),
-    unreadReportCount: player?.reports.filter((report) => !report.isRead).length ?? 0
+    unreadReportCount: player?.reports.filter((report) => !report.isRead && report.reportType !== ReportType.MESSAGE).length ?? 0,
+    unreadMailCount: player?.messages.filter((message) => !message.isRead).length ?? 0,
+    pendingRequestCount: player && galaxy ? countPendingMailRequestsForPlayer(galaxy, player.playerId) : 0
   };
 }
 
@@ -3154,13 +3239,6 @@ function toClientReportDataDto(reportData: EspionageReportData): ClientReportDat
   };
 }
 
-function toMessageReportDto(report: PlayerReport & { messageBody: string }): MessageReportDto {
-  return {
-    ...toPlayerReportBaseDto(report),
-    messageBody: report.messageBody
-  };
-}
-
 function toTextPlayerReportDto(report: PlayerReport & { body: string }): TextPlayerReportDto {
   return {
     ...toPlayerReportBaseDto(report),
@@ -3191,8 +3269,6 @@ function toEspionagePlayerReportDto(report: EspionageReportData): EspionagePlaye
 
 function toPlayerReportDto(report: PlayerReport): PlayerReportDto {
   switch (report.reportType) {
-    case ReportType.MESSAGE:
-      return toMessageReportDto(report as PlayerReport & { messageBody: string });
     case ReportType.ESPIONAGE_REPORT:
       return toEspionagePlayerReportDto(report as EspionageReportData);
     default:
@@ -3525,6 +3601,25 @@ function buildDiplomacyViewResponse(galaxy: Galaxy, viewer: Player): DiplomacyVi
   };
 }
 
+function buildMailViewResponse(galaxy: Galaxy, viewer: Player): MailViewResponse {
+  const messages = [...viewer.messages]
+    .sort((left, right) => right.createdTurn - left.createdTurn || right.messageId - left.messageId)
+    .map((message) => toPlayerMailMessageDto(message));
+  const requests = buildMailRequestDtos(galaxy, viewer.playerId);
+  const recipients = buildMailRecipientDtos(galaxy, viewer.playerId);
+
+  return {
+    currentTurn: galaxy.currentTurn,
+    currentPlayerId: viewer.playerId,
+    unreadMessageCount: countUnreadMailMessagesForPlayer(galaxy, viewer.playerId),
+    pendingRequestCount: countPendingMailRequestsForPlayer(galaxy, viewer.playerId),
+    messages,
+    requests,
+    recipients,
+    allianceRecipientCount: resolveAllianceMailRecipients(galaxy, viewer.playerId).length
+  };
+}
+
 function buildDiplomacyContactDtos(galaxy: Galaxy, viewer: Player): DiplomacyContactDto[] {
   const diplomacyResolver = new DiplomacyResolver(galaxy.diplomaticRelations);
   const outgoingProposalSentThisTurn = hasOutgoingProposalSentThisTurn(galaxy, viewer.playerId, galaxy.currentTurn);
@@ -3608,6 +3703,21 @@ function buildActiveDiplomaticProposalDtos(
     );
 }
 
+function buildMailRequestDtos(
+  galaxy: Galaxy,
+  viewerPlayerId: number
+): MailRequestDto[] {
+  return galaxy.diplomaticProposals
+    .filter((proposal) => proposal.fromPlayerId === viewerPlayerId || proposal.toPlayerId === viewerPlayerId)
+    .map((proposal) => toMailRequestDto(galaxy, proposal, viewerPlayerId))
+    .sort((left, right) =>
+      mailRequestGroupOrder(left.state) - mailRequestGroupOrder(right.state)
+      || proposalDirectionOrder(left.direction) - proposalDirectionOrder(right.direction)
+      || right.createdTurn - left.createdTurn
+      || right.requestId - left.requestId
+    );
+}
+
 function toDiplomaticProposalDto(
   galaxy: Galaxy,
   proposal: DiplomaticProposal,
@@ -3630,6 +3740,52 @@ function toDiplomaticProposalDto(
   };
 }
 
+function toMailRequestDto(
+  galaxy: Galaxy,
+  proposal: DiplomaticProposal,
+  viewerPlayerId: number
+): MailRequestDto {
+  const dto = toDiplomaticProposalDto(galaxy, proposal, viewerPlayerId);
+  const counterpartyPlayerId = dto.direction === 'incoming' ? dto.fromPlayerId : dto.toPlayerId;
+  const counterpartyPlayerName = dto.direction === 'incoming' ? dto.fromPlayerName : dto.toPlayerName;
+
+  return {
+    requestId: dto.proposalId,
+    requestType: 'DIPLOMACY_PROPOSAL',
+    createdTurn: dto.createdTurn,
+    expiresOnTurn: dto.expiresOnTurn,
+    state: dto.state,
+    direction: dto.direction,
+    counterpartyPlayerId,
+    counterpartyPlayerName,
+    requestedStatus: dto.requestedStatus
+  };
+}
+
+function buildMailRecipientDtos(
+  galaxy: Galaxy,
+  viewerPlayerId: number
+): MailRecipientDto[] {
+  return galaxy.players
+    .filter((candidate) => candidate.playerId !== viewerPlayerId)
+    .filter((candidate) => candidate.type === PLAYER_TYPE_PLAYER)
+    .filter((candidate) => canSendDirectMailToPlayer(galaxy, viewerPlayerId, candidate.playerId))
+    .map((candidate) => {
+      const currentStatus = resolveDiplomaticStatus(galaxy, viewerPlayerId, candidate.playerId);
+      return {
+        playerId: candidate.playerId,
+        playerName: candidate.playerName,
+        playerType: candidate.type as PlayerTypeType,
+        currentStatus,
+        isAllianceMember: currentStatus === DiplomaticStatus.ALLIED
+      } satisfies MailRecipientDto;
+    })
+    .sort((left, right) =>
+      Number(right.isAllianceMember) - Number(left.isAllianceMember)
+      || left.playerName.localeCompare(right.playerName)
+    );
+}
+
 function compareDiplomacyContacts(left: DiplomacyContactDto, right: DiplomacyContactDto): number {
   return diplomacyPlayerTypeOrder(left.playerType) - diplomacyPlayerTypeOrder(right.playerType)
     || left.playerName.localeCompare(right.playerName);
@@ -3650,6 +3806,10 @@ function diplomacyPlayerTypeOrder(playerType: PlayerTypeType): number {
 
 function proposalDirectionOrder(direction: 'incoming' | 'outgoing'): number {
   return direction === 'incoming' ? 0 : 1;
+}
+
+function mailRequestGroupOrder(state: DiplomaticProposalStateType): number {
+  return state === DiplomaticProposalState.PENDING ? 0 : 1;
 }
 
 function validateDiplomaticProposalCreation(
@@ -3691,6 +3851,18 @@ function hasOutgoingProposalSentThisTurn(
   return galaxy.diplomaticProposals.some((proposal) =>
     proposal.fromPlayerId === playerId && proposal.createdTurn === turnNumber
   );
+}
+
+function countPendingMailRequestsForPlayer(galaxy: Galaxy, playerId: number): number {
+  return galaxy.diplomaticProposals.filter((proposal) =>
+    proposal.state === DiplomaticProposalState.PENDING
+    && proposal.toPlayerId === playerId
+  ).length;
+}
+
+function countUnreadMailMessagesForPlayer(galaxy: Galaxy, playerId: number): number {
+  const player = resolvePlayerById(galaxy, playerId);
+  return player?.messages.filter((message) => !message.isRead).length ?? 0;
 }
 
 function isPlayerVisibleInDiplomacy(
@@ -3741,12 +3913,15 @@ function resolveDiplomaticStatus(
   return new DiplomacyResolver(galaxy.diplomaticRelations).getStatus(leftPlayerId, rightPlayerId);
 }
 
-function resolveDiplomaticStatusLabel(
+function canSendDirectMailToPlayer(
   galaxy: Galaxy,
-  leftPlayerId: number,
-  rightPlayerId: number
-): string {
-  return resolveDiplomaticStatus(galaxy, leftPlayerId, rightPlayerId);
+  senderPlayerId: number,
+  targetPlayerId: number
+): boolean {
+  const targetPlayer = resolvePlayerById(galaxy, targetPlayerId);
+  return !!targetPlayer
+    && targetPlayer.type === PLAYER_TYPE_PLAYER
+    && isPlayerVisibleInDiplomacy(galaxy, senderPlayerId, targetPlayerId);
 }
 
 function addPlayerMessage(
@@ -3754,17 +3929,56 @@ function addPlayerMessage(
   createdTurn: number,
   title: string,
   body: string,
+  senderPlayerId: number | null,
   senderPlayerName: string | null
 ): void {
-  recipient.addReport(new MessageReport(
-    {
-      reportId: recipient.createReportId(),
-      createdTurn,
-      title,
-      senderPlayerName
-    },
-    body
-  ));
+  recipient.addMessage(new PlayerMessageModel({
+    messageId: recipient.createMessageId(),
+    createdTurn,
+    title,
+    body,
+    senderPlayerId,
+    senderPlayerName
+  }));
+}
+
+function resolveAllianceMailRecipients(galaxy: Galaxy, senderPlayerId: number): Player[] {
+  return galaxy.players
+    .filter((candidate) => candidate.playerId !== senderPlayerId)
+    .filter((candidate) => candidate.type === PLAYER_TYPE_PLAYER)
+    .filter((candidate) => resolveDiplomaticStatus(galaxy, senderPlayerId, candidate.playerId) === DiplomaticStatus.ALLIED);
+}
+
+function normalizeMailRecipientMode(value: unknown): 'player' | 'alliance' | null {
+  if (value === 'player' || value === 'alliance') {
+    return value;
+  }
+
+  return null;
+}
+
+function buildEndTurnMailBlockMessage(unreadMailCount: number, pendingRequestCount: number): string {
+  const parts: string[] = [];
+  if (pendingRequestCount > 0) {
+    parts.push(`resolve ${pendingRequestCount} pending request${pendingRequestCount === 1 ? '' : 's'}`);
+  }
+  if (unreadMailCount > 0) {
+    parts.push(`read ${unreadMailCount} unread message${unreadMailCount === 1 ? '' : 's'}`);
+  }
+
+  return `Open Mail and ${parts.join(' and ')} before ending the turn.`;
+}
+
+function toPlayerMailMessageDto(message: PlayerMessage): PlayerMailMessageDto {
+  return {
+    messageId: message.messageId,
+    createdTurn: message.createdTurn,
+    title: message.title,
+    body: message.body,
+    isRead: message.isRead,
+    senderPlayerId: message.senderPlayerId,
+    senderPlayerName: message.senderPlayerName
+  };
 }
 
 function expirePendingDiplomaticProposals(galaxy: Galaxy, resolvedTurnNumber: number): void {
@@ -3777,27 +3991,6 @@ function expirePendingDiplomaticProposals(galaxy: Galaxy, resolvedTurnNumber: nu
     }
 
     proposal.state = DiplomaticProposalState.EXPIRED;
-    const sourcePlayer = resolvePlayerById(galaxy, proposal.fromPlayerId);
-    const targetPlayer = resolvePlayerById(galaxy, proposal.toPlayerId);
-    if (sourcePlayer) {
-      addPlayerMessage(
-        sourcePlayer,
-        resolvedTurnNumber,
-        `Diplomacy Expired: ${proposal.requestedStatus}`,
-        `Your diplomacy proposal to ${targetPlayer?.playerName ?? `Player ${proposal.toPlayerId}`} expired without a response.`,
-        targetPlayer?.playerName ?? null
-      );
-    }
-
-    if (targetPlayer) {
-      addPlayerMessage(
-        targetPlayer,
-        resolvedTurnNumber,
-        `Diplomacy Expired: ${proposal.requestedStatus}`,
-        `A diplomacy proposal from ${sourcePlayer?.playerName ?? `Player ${proposal.fromPlayerId}`} expired before it was answered.`,
-        sourcePlayer?.playerName ?? null
-      );
-    }
   }
 }
 

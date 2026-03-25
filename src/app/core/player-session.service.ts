@@ -22,6 +22,12 @@ export class PlayerSessionService {
           unreadReportCount: this.normalizeUnreadReportCount(
             (parsed as Partial<PlayerSession>).unreadReportCount
           ),
+          unreadMailCount: this.normalizeUnreadReportCount(
+            (parsed as Partial<PlayerSession>).unreadMailCount
+          ),
+          pendingRequestCount: this.normalizeUnreadReportCount(
+            (parsed as Partial<PlayerSession>).pendingRequestCount
+          ),
           tutorialRead: normalizeTutorialReadState(
             (parsed as Partial<PlayerSession>).tutorialRead,
             false
@@ -39,6 +45,8 @@ export class PlayerSessionService {
     localStorage.setItem(this.storageKey, JSON.stringify({
       ...session,
       unreadReportCount: this.normalizeUnreadReportCount(session.unreadReportCount),
+      unreadMailCount: this.normalizeUnreadReportCount(session.unreadMailCount),
+      pendingRequestCount: this.normalizeUnreadReportCount(session.pendingRequestCount),
       tutorialRead: normalizeTutorialReadState(session.tutorialRead, false)
     }));
   }

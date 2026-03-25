@@ -884,6 +884,12 @@ app-root {
   color: #fff7ea;
 }
 
+.top-menu__button--mail-alert {
+  border-color: rgba(255, 218, 99, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 218, 99, 0.15), 0 0 20px rgba(255, 218, 99, 0.28);
+  animation: top-menu-mail-pulse 1.7s ease-in-out infinite;
+}
+
 .top-menu__spacer {
   flex: 1 1 auto;
 }
@@ -907,6 +913,43 @@ app-root {
   color: #ff9d9d;
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+.top-menu__error--mail-lock {
+  color: #ffd98d;
+}
+
+.top-menu__mail-sticky {
+  position: fixed;
+  top: 0.7rem;
+  left: 50%;
+  z-index: 1190;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.72rem 1.3rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 218, 99, 0.78);
+  background: linear-gradient(135deg, rgba(255, 218, 99, 0.92), rgba(246, 180, 76, 0.86));
+  color: #141922;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.4);
+  animation: top-menu-mail-pulse 1.7s ease-in-out infinite;
+}
+
+@keyframes top-menu-mail-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 218, 99, 0.08), 0 0 18px rgba(255, 218, 99, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 218, 99, 0), 0 0 28px rgba(255, 218, 99, 0.34);
+  }
 }
 
 .game--locked {

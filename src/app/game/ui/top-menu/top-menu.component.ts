@@ -53,12 +53,51 @@ export class TopMenuComponent {
     return this.authState.session()?.unreadReportCount ?? 0;
   }
 
+  protected unreadMailCount(): number {
+    return this.authState.session()?.unreadMailCount ?? 0;
+  }
+
+  protected pendingRequestCount(): number {
+    return this.authState.session()?.pendingRequestCount ?? 0;
+  }
+
+  protected mailAttentionCount(): number {
+    return this.unreadMailCount() + this.pendingRequestCount();
+  }
+
+  protected isEndTurnBlockedByMail(): boolean {
+    return this.unreadMailCount() > 0 || this.pendingRequestCount() > 0;
+  }
+
+  protected endTurnBlockedMessage(): string {
+    const parts: string[] = [];
+    if (this.pendingRequestCount() > 0) {
+      parts.push(`resolve ${this.pendingRequestCount()} pending request${this.pendingRequestCount() === 1 ? '' : 's'}`);
+    }
+    if (this.unreadMailCount() > 0) {
+      parts.push(`read ${this.unreadMailCount()} unread message${this.unreadMailCount() === 1 ? '' : 's'}`);
+    }
+
+    return `Open Mail and ${parts.join(' and ')} before ending the turn.`;
+  }
+
+  protected isMailRoute(): boolean {
+    return this.router.url.includes('/game/mail');
+  }
+
+  protected showStickyMailButton(): boolean {
+    return this.isEndTurnBlockedByMail() && !this.isMailRoute();
+  }
+
   protected isProcessingTurn(): boolean {
     return this.gameState.isProcessingTurn;
   }
 
   protected endTurn(): void {
-    if (this.gameState.isProcessingTurn) {
+    if (this.gameState.isProcessingTurn || this.isEndTurnBlockedByMail()) {
+      if (this.isEndTurnBlockedByMail()) {
+        this.endTurnError = this.endTurnBlockedMessage();
+      }
       return;
     }
 

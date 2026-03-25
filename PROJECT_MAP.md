@@ -85,6 +85,7 @@ Game child routes:
 - `/game/star-system` -> `src/app/game/star-system-view/`
 - `/game/planet` -> `src/app/game/planet-view/`
 - `/game/reports` -> `src/app/game/reports-view/`
+- `/game/mail` -> `src/app/game/mail-view/`
 - `/game/diplomacy` -> `src/app/game/diplomacy-view/`
 - `/game/researches` -> `src/app/game/researches-view/`
 - `/game/production` -> `src/app/game/production-view/`
@@ -113,7 +114,7 @@ Tutorial state:
 - `src/app/tutorial/tutorial-types.ts`: tutorial contracts and normalization helpers
 
 Local persistence:
-- `srogame:player` -> auth session + tutorial state + unread report count
+- `srogame:player` -> auth session + tutorial state + unread report/mail counts + pending incoming request count
 - `srogame:setup` -> last game setup
 
 ## API Ownership Map
@@ -159,6 +160,11 @@ Reports and tutorials:
 - `/api/game/reports`
 - `/api/game/reports/read`
 - `/api/game/reports/delete`
+- `/api/game/mail`
+- `/api/game/mail/messages/read`
+- `/api/game/mail/messages/delete`
+- `/api/game/mail/requests/delete`
+- `/api/game/mail/messages/send`
 - `/api/game/tutorial-read`
 
 Diplomacy and messages:
@@ -168,7 +174,6 @@ Diplomacy and messages:
 - `/api/game/diplomacy/proposals/:proposalId/accept`
 - `/api/game/diplomacy/proposals/:proposalId/reject`
 - `/api/game/diplomacy/proposals/:proposalId/cancel`
-- `/api/game/messages/send`
 
 Primary API contracts:
 - `src/app/models/game-api-types.ts`
@@ -274,10 +279,22 @@ Primary files:
 - `src/app/generators/espionage-report-generator.ts`
 
 Owns:
-- inbox model hierarchy
-- message reports
+- informational/data report model hierarchy
 - espionage report content
 - report serialization boundaries
+
+### Mail
+
+Primary files:
+- `src/app/models/mail/`
+- `src/app/game/mail-view/`
+- `src/app/game/ui/message-compose-dialog/`
+
+Owns:
+- player-to-player message model hierarchy
+- mail request projection from diplomacy proposals
+- reusable compose/reply popup
+- mail attention counts used by top menu and end-turn lock
 
 ### Queues
 
@@ -373,6 +390,14 @@ Change reports/inbox behavior:
 - `src/app/models/reports/`
 - `src/app/generators/espionage-report-generator.ts`
 - `src/app/game/reports-view/`
+- `server/src/index.ts`
+
+Change mail/messages/request inbox behavior:
+- `src/app/models/mail/`
+- `src/app/game/mail-view/`
+- `src/app/game/ui/message-compose-dialog/`
+- `src/app/game/ui/top-menu/`
+- `src/app/core/game-api.service.ts`
 - `server/src/index.ts`
 
 Change tutorials:

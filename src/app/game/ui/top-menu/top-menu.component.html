@@ -16,6 +16,13 @@
   <a class="top-menu__button" routerLink="/game/reports" routerLinkActive="top-menu__button--active">
     Reports{{ unreadReportsCount() > 0 ? ' (' + unreadReportsCount() + ')' : '' }}
   </a>
+  <a
+    class="top-menu__button"
+    [class.top-menu__button--mail-alert]="mailAttentionCount() > 0"
+    routerLink="/game/mail"
+    routerLinkActive="top-menu__button--active">
+    Mail{{ mailAttentionCount() > 0 ? ' (' + mailAttentionCount() + ')' : '' }}
+  </a>
   <a class="top-menu__button" routerLink="/game/diplomacy" routerLinkActive="top-menu__button--active">
     Diplomacy
   </a>
@@ -38,11 +45,19 @@
   <button
     class="top-menu__button top-menu__button--end-turn"
     type="button"
-    [disabled]="isProcessingTurn()"
+    [disabled]="isProcessingTurn() || isEndTurnBlockedByMail()"
     (click)="endTurn()">
     {{ endTurnLabel() }}
   </button>
 </nav>
+@if (showStickyMailButton()) {
+  <a class="top-menu__mail-sticky" routerLink="/game/mail">
+    Mail requires attention{{ mailAttentionCount() > 0 ? ' (' + mailAttentionCount() + ')' : '' }}
+  </a>
+}
+@if (isEndTurnBlockedByMail()) {
+  <p class="top-menu__error top-menu__error--mail-lock">{{ endTurnBlockedMessage() }}</p>
+}
 @if (endTurnError) {
   <p class="top-menu__error">{{ endTurnError }}</p>
 }

@@ -1,0 +1,107 @@
+.mail-compose__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(7, 10, 15, 0.7);
+  backdrop-filter: blur(6px);
+}
+
+.mail-compose {
+  position: fixed;
+  top: 5rem;
+  left: 50%;
+  z-index: 1301;
+  width: min(680px, calc(100vw - 2rem));
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 1rem;
+  padding: 1.35rem 1.4rem;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(160deg, rgba(18, 24, 33, 0.98), rgba(12, 17, 24, 0.99));
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45);
+}
+
+.mail-compose__header,
+.mail-compose__row,
+.mail-compose__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.mail-compose__header h3 {
+  margin: 0.2rem 0 0;
+}
+
+.mail-compose__close {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  cursor: pointer;
+}
+
+.mail-compose__body {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.mail-compose__field {
+  display: grid;
+  gap: 0.35rem;
+  flex: 1 1 0;
+}
+
+.mail-compose__field span,
+.mail-compose__label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.mail-compose__field input,
+.mail-compose__field textarea,
+.mail-compose__field select {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 12, 18, 0.82);
+  color: #fff;
+  padding: 0.78rem 0.9rem;
+  font: inherit;
+}
+
+.mail-compose__field textarea {
+  resize: vertical;
+  min-height: 8rem;
+}
+
+.mail-compose__meta {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+@media (max-width: 720px) {
+  .mail-compose {
+    top: 1rem;
+    width: calc(100vw - 1rem);
+    max-height: calc(100vh - 2rem);
+  }
+
+  .mail-compose__header,
+  .mail-compose__row,
+  .mail-compose__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

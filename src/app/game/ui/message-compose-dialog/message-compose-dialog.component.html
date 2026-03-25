@@ -1,0 +1,81 @@
+@if (isOpen) {
+  <div class="mail-compose__backdrop" (click)="close()"></div>
+  <section
+    class="mail-compose"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="titleText"
+    (click)="$event.stopPropagation()">
+    <div class="mail-compose__header">
+      <div>
+        <p class="eyebrow">Mail</p>
+        <h3>{{ titleText }}</h3>
+      </div>
+      <button type="button" class="mail-compose__close" (click)="close()">Close</button>
+    </div>
+
+    @if (error) {
+      <section class="status status--error">
+        <h3>Message not sent</h3>
+        <p>{{ error }}</p>
+      </section>
+    }
+
+    <div class="mail-compose__body">
+      @if (lockedTargetPlayerId !== null) {
+        <div class="mail-compose__meta">
+          <span class="mail-compose__label">Recipient</span>
+          <strong>{{ lockedTargetLabel() }}</strong>
+        </div>
+      } @else {
+        <div class="mail-compose__row">
+          <label class="mail-compose__field">
+            <span>Recipient type</span>
+            <select [(ngModel)]="recipientMode">
+              <option value="player">Single player</option>
+              @if (showAllianceOption()) {
+                <option value="alliance" [disabled]="allianceRecipientCount === 0">
+                  Whole alliance{{ allianceRecipientCount > 0 ? ' (' + allianceRecipientCount + ')' : '' }}
+                </option>
+              }
+            </select>
+          </label>
+
+          @if (recipientMode === 'player') {
+            <label class="mail-compose__field">
+              <span>Player</span>
+              <select [(ngModel)]="targetPlayerId">
+                @for (recipient of recipients; track recipient.playerId) {
+                  <option [ngValue]="recipient.playerId">{{ recipient.playerName }} | {{ recipient.currentStatus }}</option>
+                }
+              </select>
+            </label>
+          }
+        </div>
+      }
+
+      <label class="mail-compose__field">
+        <span>Title</span>
+        <input type="text" maxlength="50" [(ngModel)]="title" />
+      </label>
+      <p class="overview-muted">{{ titleCharactersRemaining() }} characters remaining.</p>
+
+      <label class="mail-compose__field">
+        <span>Body</span>
+        <textarea rows="8" maxlength="1000" [(ngModel)]="body"></textarea>
+      </label>
+      <p class="overview-muted">{{ bodyCharactersRemaining() }} characters remaining.</p>
+    </div>
+
+    <div class="mail-compose__actions">
+      <button type="button" class="top-menu__button" (click)="close()">Cancel</button>
+      <button
+        type="button"
+        class="top-menu__button top-menu__button--end-turn"
+        [disabled]="!canSend()"
+        (click)="send()">
+        {{ isSending ? 'Sending...' : submitLabel }}
+      </button>
+    </div>
+  </section>
+}

@@ -1,6 +1,5 @@
 import type {
   EspionagePlayerReportDto,
-  MessageReportDto,
   PlayerReportDto,
   TextPlayerReportDto
 } from '../game-api-types';
@@ -12,7 +11,6 @@ import { DefenseReport } from './defense-report';
 import { DefencesQueue } from './defences-queue';
 import { EspionageReportData } from './espionage-report-data';
 import { FleetReport } from './fleet-report';
-import { MessageReport } from './message-report';
 import { PlanetaryParameters } from '../planets/planetary-parameters';
 import { PlayerReport } from './player-report';
 import { ProductionReport } from './production-report';
@@ -62,10 +60,6 @@ function fromTextReportDto(report: TextPlayerReportDto): PlayerReport {
   }
 }
 
-function fromMessageReportDto(report: MessageReportDto): MessageReport {
-  return new MessageReport(toBaseData(report), report.messageBody);
-}
-
 function fromEspionageReportDto(report: EspionagePlayerReportDto): EspionageReportData {
   return new EspionageReportData(
     toBaseData(report),
@@ -103,8 +97,6 @@ function fromEspionageReportDto(report: EspionagePlayerReportDto): EspionageRepo
 
 export function fromPlayerReportDto(report: PlayerReportDto): PlayerReport {
   switch (report.reportType) {
-    case ReportType.MESSAGE:
-      return fromMessageReportDto(report as MessageReportDto);
     case ReportType.ESPIONAGE_REPORT:
       return fromEspionageReportDto(report as EspionagePlayerReportDto);
     default:

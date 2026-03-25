@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Player } from '../../player';
 import { PlayerType } from '../../enums/player-type';
-import { MessageReport } from '../message-report';
 import { EspionageReportData } from '../espionage-report-data';
 import { PlanetaryParameters } from '../../planets/planetary-parameters';
 import { ResourcesPack } from '../../resources-pack';
@@ -10,23 +9,24 @@ import { DefencesQueue } from '../defences-queue';
 import { ResearchQueue } from '../research-queue';
 import { BuildingQueue } from '../building-queue';
 import { BuildingType } from '../../enums/building-type';
+import { ProductionReport } from '../production-report';
 
 describe('PlayerReport domain', () => {
   it('marks reports as read and deletes selected reports', () => {
     const player = new Player(1, 'Tester', [], new Map(), [], PlayerType.PLAYER);
-    const firstReport = new MessageReport(
+    const firstReport = new ProductionReport(
       {
         reportId: player.createReportId(),
         createdTurn: 5,
-        title: 'First message'
+        title: 'First report'
       },
       'Alpha'
     );
-    const secondReport = new MessageReport(
+    const secondReport = new ProductionReport(
       {
         reportId: player.createReportId(),
         createdTurn: 6,
-        title: 'Second message'
+        title: 'Second report'
       },
       'Beta'
     );

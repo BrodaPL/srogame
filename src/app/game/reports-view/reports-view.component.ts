@@ -29,7 +29,7 @@ type ReportDossierRow = {
   templateUrl: './reports-view.component.html'
 })
 export class ReportsViewComponent implements OnInit {
-  protected readonly reportTypes = Object.values(ReportType);
+  protected readonly reportTypes = Object.values(ReportType).filter((reportType) => reportType !== ReportType.MESSAGE);
   protected readonly allTab = 'All';
   protected activeTab: ReportType | 'All' = 'All';
   protected isLoading = false;

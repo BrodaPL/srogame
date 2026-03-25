@@ -1,0 +1,255 @@
+<app-top-menu></app-top-menu>
+
+<section class="mail-view">
+  @if (isLoading) {
+    <section class="status status--info">
+      <h3>Loading Mail</h3>
+      <p>Messages and request queues are being synchronized.</p>
+    </section>
+  } @else if (loadError) {
+    <section class="status status--error">
+      <h3>Mail unavailable</h3>
+      <p>{{ loadError }}</p>
+    </section>
+  } @else {
+    @if (actionError) {
+      <section class="status status--error">
+        <h3>Mail action failed</h3>
+        <p>{{ actionError }}</p>
+      </section>
+    }
+
+    @if (actionSuccess) {
+      <section class="status status--success">
+        <h3>Mail updated</h3>
+        <p>{{ actionSuccess }}</p>
+      </section>
+    }
+
+    <header class="overview-card mail-view__header">
+      <div>
+        <p class="eyebrow">Communications</p>
+        <h1>Mail</h1>
+        <p class="overview-muted">Manage requests, read player messages, and compose new outgoing mail.</p>
+      </div>
+      <div class="overview-stats mail-view__summary">
+        <div class="overview-stat">
+          <span class="overview-stat__label">Current turn</span>
+          <span class="overview-stat__value">{{ currentTurn ?? '--' }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Unread messages</span>
+          <span class="overview-stat__value">{{ unreadMessages().length }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Pending requests</span>
+          <span class="overview-stat__value">{{ pendingRequests().length }}</span>
+        </div>
+      </div>
+      <button type="button" class="top-menu__button top-menu__button--help" (click)="openNewMessageComposer()">
+        Send message
+      </button>
+    </header>
+
+    <section class="mail-view__layout">
+      <section class="overview-card mail-view__requests">
+        <div class="mail-view__panel-head">
+          <div>
+            <h3>Pending Requests</h3>
+            <p class="overview-muted">Incoming requests must be resolved before End Turn becomes available.</p>
+          </div>
+          <span class="badge badge--jump">{{ pendingRequests().length }}</span>
+        </div>
+
+        @if (pendingRequests().length === 0) {
+          <p class="overview-muted">No pending requests.</p>
+        } @else {
+          <div class="mail-view__card-list">
+            @for (request of pendingRequests(); track request.requestId) {
+              <article class="mail-view__card">
+                <div class="mail-view__card-head">
+                  <h4>{{ requestCardTitle(request) }}</h4>
+                  <span class="badge">{{ request.requestedStatus }}</span>
+                </div>
+                <p class="overview-muted">{{ requestSummary(request) }}</p>
+                <p class="overview-muted">Created on turn {{ request.createdTurn }} | Expires on turn {{ request.expiresOnTurn }}</p>
+                <div class="mail-view__actions">
+                  @if (canAccept(request)) {
+                    <button
+                      type="button"
+                      class="top-menu__button"
+                      [disabled]="isRequestActionPending(request)"
+                      (click)="acceptRequest(request)">
+                      Accept
+                    </button>
+                  }
+                  @if (canReject(request)) {
+                    <button
+                      type="button"
+                      class="top-menu__button mail-view__button--danger"
+                      [disabled]="isRequestActionPending(request)"
+                      (click)="rejectRequest(request)">
+                      Reject
+                    </button>
+                  }
+                  @if (canCancel(request)) {
+                    <button
+                      type="button"
+                      class="top-menu__button mail-view__button--danger"
+                      [disabled]="isRequestActionPending(request)"
+                      (click)="cancelRequest(request)">
+                      Cancel
+                    </button>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        }
+
+        <div class="mail-view__panel-head mail-view__panel-head--spaced">
+          <div>
+            <h3>Resolved Requests</h3>
+            <p class="overview-muted">Resolved requests stay here until you delete them manually.</p>
+          </div>
+          <span class="badge">{{ resolvedRequests().length }}</span>
+        </div>
+
+        @if (resolvedRequests().length === 0) {
+          <p class="overview-muted">No resolved request history yet.</p>
+        } @else {
+          <div class="mail-view__card-list">
+            @for (request of resolvedRequests(); track request.requestId) {
+              <article class="mail-view__card">
+                <div class="mail-view__card-head">
+                  <h4>{{ requestCardTitle(request) }}</h4>
+                  <span class="badge">{{ request.state }}</span>
+                </div>
+                <p class="overview-muted">{{ requestSummary(request) }}</p>
+                <p class="overview-muted">Created on turn {{ request.createdTurn }} | Requested status {{ request.requestedStatus }}</p>
+                <div class="mail-view__actions">
+                  <button
+                    type="button"
+                    class="top-menu__button"
+                    [disabled]="!canDeleteResolvedRequest(request)"
+                    (click)="deleteResolvedRequest(request)">
+                    Delete
+                  </button>
+                </div>
+              </article>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="overview-card mail-view__messages">
+        <div class="mail-view__panel-head">
+          <div>
+            <h3>Messages</h3>
+            <p class="overview-muted">Opening a message marks it as read immediately.</p>
+          </div>
+        </div>
+
+        @if (messages.length === 0) {
+          <p class="overview-muted">No messages yet.</p>
+        } @else {
+          <div class="mail-view__message-layout">
+            <div class="mail-view__message-groups">
+              <section>
+                <div class="mail-view__group-head">
+                  <h4>Unread</h4>
+                  <span class="badge badge--jump">{{ unreadMessages().length }}</span>
+                </div>
+                @if (unreadMessages().length === 0) {
+                  <p class="overview-muted">No unread messages.</p>
+                } @else {
+                  <div class="mail-view__message-list">
+                    @for (message of unreadMessages(); track message.messageId) {
+                      <button
+                        type="button"
+                        class="mail-view__message-row"
+                        [class.mail-view__message-row--selected]="selectedMessageId === message.messageId"
+                        (click)="openMessage(message)">
+                        <strong>{{ message.title }}</strong>
+                        <span>{{ message.senderPlayerName ?? 'Unknown sender' }}</span>
+                        <small>Turn {{ message.createdTurn }}</small>
+                      </button>
+                    }
+                  </div>
+                }
+              </section>
+
+              <section>
+                <div class="mail-view__group-head">
+                  <h4>Read</h4>
+                  <span class="badge">{{ readMessages().length }}</span>
+                </div>
+                @if (readMessages().length === 0) {
+                  <p class="overview-muted">No read messages.</p>
+                } @else {
+                  <div class="mail-view__message-list">
+                    @for (message of readMessages(); track message.messageId) {
+                      <button
+                        type="button"
+                        class="mail-view__message-row mail-view__message-row--read"
+                        [class.mail-view__message-row--selected]="selectedMessageId === message.messageId"
+                        (click)="openMessage(message)">
+                        <strong>{{ message.title }}</strong>
+                        <span>{{ message.senderPlayerName ?? 'Unknown sender' }}</span>
+                        <small>Turn {{ message.createdTurn }}</small>
+                      </button>
+                    }
+                  </div>
+                }
+              </section>
+            </div>
+
+            <div class="mail-view__message-detail">
+              @if (selectedMessage(); as message) {
+                <div class="mail-view__card-head">
+                  <h4>{{ message.title }}</h4>
+                  <span class="badge">{{ message.isRead ? 'Read' : 'Unread' }}</span>
+                </div>
+                <p class="overview-muted">From {{ message.senderPlayerName ?? 'Unknown sender' }} | Turn {{ message.createdTurn }}</p>
+                <div class="mail-view__message-body">{{ message.body }}</div>
+                <div class="mail-view__actions">
+                  <button
+                    type="button"
+                    class="top-menu__button"
+                    [disabled]="!canReply(message)"
+                    (click)="openReplyComposer(message)">
+                    Reply
+                  </button>
+                  <button
+                    type="button"
+                    class="top-menu__button"
+                    [disabled]="activeMessageDeleteId === message.messageId"
+                    (click)="deleteMessage(message)">
+                    Delete
+                  </button>
+                </div>
+              } @else {
+                <p class="overview-muted">Select a message to read it and open reply controls.</p>
+              }
+            </div>
+          </div>
+        }
+      </section>
+    </section>
+  }
+</section>
+
+<app-message-compose-dialog
+  [isOpen]="composerOpen"
+  [recipients]="recipients"
+  [allianceRecipientCount]="allianceRecipientCount"
+  [lockedTargetPlayerId]="composerLockedTargetPlayerId"
+  [lockedTargetPlayerName]="composerLockedTargetPlayerName"
+  [initialTitle]="composerInitialTitle"
+  [initialBody]="composerInitialBody"
+  [allowAlliance]="composerAllowAlliance"
+  [titleText]="composerTitleText"
+  [submitLabel]="composerSubmitLabel"
+  (closed)="closeComposer()"
+  (sent)="handleComposerSent($event)">
+</app-message-compose-dialog>

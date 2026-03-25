@@ -51,6 +51,8 @@ export type PlayerSession = {
   token: string;
   tutorialRead: TutorialReadState;
   unreadReportCount: number;
+  unreadMailCount: number;
+  pendingRequestCount: number;
 };
 
 export type RegisterRequest = {
@@ -115,14 +117,17 @@ export type CreateDiplomaticProposalRequest = {
   requestedStatus: DiplomaticStatus;
 };
 
-export type SendPlayerMessageRequest = {
-  targetPlayerId: number;
+export type MailRecipientMode = 'player' | 'alliance';
+
+export type SendMailMessageRequest = {
+  recipientMode: MailRecipientMode;
+  targetPlayerId: number | null;
   title: string;
   body: string;
 };
 
-export type SendPlayerMessageResponse = {
-  delivered: boolean;
+export type SendMailMessageResponse = {
+  deliveredCount: number;
 };
 
 export type AbandonPlanetRequest = {
@@ -265,11 +270,6 @@ export type PlayerReportDtoBase = {
   senderPlayerName: string | null;
 };
 
-export type MessageReportDto = PlayerReportDtoBase & {
-  reportType: ReportType;
-  messageBody: string;
-};
-
 export type TextPlayerReportDto = PlayerReportDtoBase & {
   reportType: ReportType;
   body: string;
@@ -294,7 +294,17 @@ export type EspionagePlayerReportDto = PlayerReportDtoBase & {
   buildingProduction: BuildingQueue;
 };
 
-export type PlayerReportDto = MessageReportDto | TextPlayerReportDto | EspionagePlayerReportDto;
+export type PlayerReportDto = TextPlayerReportDto | EspionagePlayerReportDto;
+
+export type PlayerMailMessageDto = {
+  messageId: number;
+  createdTurn: number;
+  title: string;
+  body: string;
+  isRead: boolean;
+  senderPlayerId: number | null;
+  senderPlayerName: string | null;
+};
 
 export type ClientPlanetDto = {
   coordinates: ClientCoordinates;
@@ -344,6 +354,37 @@ export type DiplomaticProposalDto = {
   expiresOnTurn: number;
   state: DiplomaticProposalState;
   direction: 'incoming' | 'outgoing';
+};
+
+export type MailRequestDto = {
+  requestId: number;
+  requestType: 'DIPLOMACY_PROPOSAL';
+  createdTurn: number;
+  expiresOnTurn: number;
+  state: DiplomaticProposalState;
+  direction: 'incoming' | 'outgoing';
+  counterpartyPlayerId: number;
+  counterpartyPlayerName: string;
+  requestedStatus: DiplomaticStatus;
+};
+
+export type MailRecipientDto = {
+  playerId: number;
+  playerName: string;
+  playerType: PlayerType;
+  currentStatus: DiplomaticStatus;
+  isAllianceMember: boolean;
+};
+
+export type MailViewResponse = {
+  currentTurn: number;
+  currentPlayerId: number;
+  unreadMessageCount: number;
+  pendingRequestCount: number;
+  messages: PlayerMailMessageDto[];
+  requests: MailRequestDto[];
+  recipients: MailRecipientDto[];
+  allianceRecipientCount: number;
 };
 
 export type DiplomacyContactDto = {
@@ -444,6 +485,26 @@ export type DeletePlayerReportsRequest = {
 };
 
 export type DeletePlayerReportsResponse = {
+  deletedCount: number;
+};
+
+export type MarkMailMessageReadRequest = {
+  messageId: number;
+};
+
+export type DeleteMailMessagesRequest = {
+  messageIds: number[];
+};
+
+export type DeleteMailMessagesResponse = {
+  deletedCount: number;
+};
+
+export type DeleteMailRequestsRequest = {
+  requestIds: number[];
+};
+
+export type DeleteMailRequestsResponse = {
   deletedCount: number;
 };
 
