@@ -15,7 +15,9 @@
 .mail-view__requests,
 .mail-view__messages,
 .mail-view__card,
-.mail-view__message-detail {
+.mail-view__message-detail,
+.mail-view__partial-approval,
+.mail-view__partial-group {
   display: grid;
   gap: 0.9rem;
 }
@@ -111,6 +113,30 @@
   border-radius: 16px;
   background: rgba(7, 10, 15, 0.42);
   border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mail-view__partial-approval {
+  padding: 0.9rem;
+  border-radius: 16px;
+  background: rgba(7, 10, 15, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mail-view__partial-group h5 {
+  margin: 0;
+}
+
+.mail-view__partial-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.mail-view__partial-field input {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  padding: 0.52rem 0.65rem;
 }
 
 @media (max-width: 960px) {

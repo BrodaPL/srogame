@@ -69,10 +69,11 @@
               <article class="mail-view__card">
                 <div class="mail-view__card-head">
                   <h4>{{ requestCardTitle(request) }}</h4>
-                  <span class="badge">{{ request.requestedStatus }}</span>
+                  <span class="badge">{{ requestBadge(request) }}</span>
                 </div>
                 <p class="overview-muted">{{ requestSummary(request) }}</p>
                 <p class="overview-muted">Created on turn {{ request.createdTurn }} | Expires on turn {{ request.expiresOnTurn }}</p>
+                <p class="overview-muted">{{ requestDetailLine(request) }}</p>
                 <div class="mail-view__actions">
                   @if (canAccept(request)) {
                     <button
@@ -81,6 +82,15 @@
                       [disabled]="isRequestActionPending(request)"
                       (click)="acceptRequest(request)">
                       Accept
+                    </button>
+                  }
+                  @if (canPartialApprove(request)) {
+                    <button
+                      type="button"
+                      class="top-menu__button"
+                      [disabled]="isRequestActionPending(request)"
+                      (click)="isPartialApprovalOpen(request) ? closePartialApproval() : openPartialApproval(request)">
+                      {{ isPartialApprovalOpen(request) ? 'Close partial' : 'Partial approve' }}
                     </button>
                   }
                   @if (canReject(request)) {
@@ -102,6 +112,65 @@
                     </button>
                   }
                 </div>
+                @if (isPartialApprovalOpen(request)) {
+                  @if (maintenanceRequest(request); as maintenance) {
+                    <section class="mail-view__partial-approval">
+                      <label class="mail-view__partial-field">
+                        <span>Fuel (deuterium)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          [max]="maintenance.requested.fuel"
+                          [ngModel]="partialApprovalFuel"
+                          (ngModelChange)="updatePartialApprovalFuel($event)" />
+                      </label>
+
+                      @if (maintenance.requested.ships.length > 0) {
+                        <div class="mail-view__partial-group">
+                          <h5>Ships</h5>
+                          @for (entry of maintenance.requested.ships; track entry.type) {
+                            <label class="mail-view__partial-field">
+                              <span>{{ entry.type }} (max {{ entry.amount }})</span>
+                              <input
+                                type="number"
+                                min="0"
+                                [max]="entry.amount"
+                                [ngModel]="partialApprovalShipAmounts[entry.type] ?? 0"
+                                (ngModelChange)="updatePartialShipAmount(entry.type, $event)" />
+                            </label>
+                          }
+                        </div>
+                      }
+
+                      @if (maintenance.requested.bombs.length > 0) {
+                        <div class="mail-view__partial-group">
+                          <h5>Bombs</h5>
+                          @for (entry of maintenance.requested.bombs; track entry.type) {
+                            <label class="mail-view__partial-field">
+                              <span>{{ entry.type }} (max {{ entry.amount }})</span>
+                              <input
+                                type="number"
+                                min="0"
+                                [max]="entry.amount"
+                                [ngModel]="partialApprovalBombAmounts[entry.type] ?? 0"
+                                (ngModelChange)="updatePartialBombAmount(entry.type, $event)" />
+                            </label>
+                          }
+                        </div>
+                      }
+
+                      <div class="mail-view__actions">
+                        <button
+                          type="button"
+                          class="top-menu__button"
+                          [disabled]="isRequestActionPending(request)"
+                          (click)="submitPartialApproval(maintenance)">
+                          Send partial approval
+                        </button>
+                      </div>
+                    </section>
+                  }
+                }
               </article>
             }
           </div>
@@ -123,10 +192,10 @@
               <article class="mail-view__card">
                 <div class="mail-view__card-head">
                   <h4>{{ requestCardTitle(request) }}</h4>
-                  <span class="badge">{{ request.state }}</span>
+                  <span class="badge">{{ requestBadge(request) }}</span>
                 </div>
                 <p class="overview-muted">{{ requestSummary(request) }}</p>
-                <p class="overview-muted">Created on turn {{ request.createdTurn }} | Requested status {{ request.requestedStatus }}</p>
+                <p class="overview-muted">Created on turn {{ request.createdTurn }} | {{ requestDetailLine(request) }}</p>
                 <div class="mail-view__actions">
                   <button
                     type="button"

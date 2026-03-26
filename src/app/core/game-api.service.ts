@@ -22,8 +22,11 @@ import {
   StartTechnologyResearchRequest,
   CreateFleetMissionRequest,
   CreateFleetMissionResponse,
+  CreateMaintenanceRequestRequest,
+  CreateMaintenanceRequestResponse,
   DeletePlayerReportsRequest,
   DeletePlayerReportsResponse,
+  FleetMaintenanceOptionsDto,
   MarkPlayerReportReadRequest,
   MarkMailMessageReadRequest,
   DeleteMailMessagesRequest,
@@ -38,6 +41,7 @@ import {
   DiplomacyViewResponse,
   CreateDiplomaticProposalRequest,
   MailViewResponse,
+  ResolveMaintenanceRequestRequest,
   SendMailMessageRequest,
   SendMailMessageResponse,
   AbandonPlanetRequest,
@@ -226,6 +230,53 @@ export class GameApiService {
   public delayFleet(fleetId: number, token: string) {
     return this.http.post<CreateFleetMissionResponse['activeFleets']>(
       `${API_BASE_URL}/game/active-fleets/${fleetId}/delay`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getFleetMaintenanceOptions(fleetId: number, token: string) {
+    return this.http.get<FleetMaintenanceOptionsDto>(
+      `${API_BASE_URL}/game/active-fleets/${fleetId}/maintenance-options`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public createMaintenanceRequest(
+    fleetId: number,
+    request: CreateMaintenanceRequestRequest,
+    token: string
+  ) {
+    return this.http.post<CreateMaintenanceRequestResponse>(
+      `${API_BASE_URL}/game/active-fleets/${fleetId}/maintenance-request`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public approveMaintenanceRequest(
+    requestId: number,
+    request: ResolveMaintenanceRequestRequest | null,
+    token: string
+  ) {
+    return this.http.post<MailViewResponse>(
+      `${API_BASE_URL}/game/mail/maintenance-requests/${requestId}/approve`,
+      request ?? {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public rejectMaintenanceRequest(requestId: number, token: string) {
+    return this.http.post<MailViewResponse>(
+      `${API_BASE_URL}/game/mail/maintenance-requests/${requestId}/reject`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public cancelMaintenanceRequest(requestId: number, token: string) {
+    return this.http.post<MailViewResponse>(
+      `${API_BASE_URL}/game/mail/maintenance-requests/${requestId}/cancel`,
       {},
       { headers: this.authHeaders(token) }
     );

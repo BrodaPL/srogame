@@ -16,14 +16,17 @@ import defenceTypeEnumModule from '../../src/app/models/enums/defence-type.js';
 import technologyTypeEnumModule from '../../src/app/models/enums/technology-type.js';
 import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
 import fleetMissionTypeEnumModule from '../../src/app/models/enums/fleet-mission-type.js';
+import hullClassEnumModule from '../../src/app/models/enums/hull-class.js';
 import fleetModelModule from '../../src/app/models/fleets/fleet.js';
 import manyShipsModule from '../../src/app/models/fleets/many-ships.js';
+import manyDefencesModule from '../../src/app/models/defences/many-defences.js';
 import reportTypeEnumModule from '../../src/app/models/enums/report-type.js';
 import diplomaticStatusEnumModule from '../../src/app/models/diplomacy/diplomatic-status.js';
 import diplomacyResolverModule from '../../src/app/models/diplomacy/diplomacy-resolver.js';
 import diplomaticProposalStateModule from '../../src/app/models/diplomacy/diplomatic-proposal-state.js';
 import diplomaticProposalModule from '../../src/app/models/diplomacy/diplomatic-proposal.js';
 import planetaryBombModule from '../../src/app/models/defences/planetary-bomb.js';
+import maintenanceRequestModule from '../../src/app/models/requests/maintenance-request.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
 import defenceBlueprintsFactoryModule from '../../src/app/factories/defence-blueprints.factory.js';
@@ -39,6 +42,7 @@ import phaseOneTurnResolverModule from '../../src/app/models/turns/phase-one-tur
 import smokeTestScenariosModule from '../../src/app/models/testing/smoke-test-scenarios.js';
 import queueManagementModule from '../../src/app/models/queues/queue-management.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
+import fleetReportModule from '../../src/app/models/reports/fleet-report.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   EndTurnResponse,
@@ -104,6 +108,13 @@ import type {
   DeleteMailMessagesResponse,
   DeleteMailRequestsRequest,
   DeleteMailRequestsResponse,
+  CreateMaintenanceRequestRequest,
+  CreateMaintenanceRequestResponse,
+  FleetMaintenanceBombOptionDto,
+  ResolveMaintenanceRequestRequest,
+  FleetMaintenanceShipOptionDto,
+  FleetMaintenanceOptionsDto,
+  MaintenanceTransferPayloadDto,
   SendMailMessageRequest,
   SendMailMessageResponse,
   AbandonPlanetRequest,
@@ -126,6 +137,7 @@ import type { DefenceType as DefenceTypeType } from '../../src/app/models/enums/
 import type { TechnologyType as TechnologyTypeType } from '../../src/app/models/enums/technology-type.ts';
 import type { ShipType as ShipTypeType } from '../../src/app/models/enums/ship-type.ts';
 import type { FleetMissionType as FleetMissionTypeType } from '../../src/app/models/enums/fleet-mission-type.ts';
+import type { HullClass as HullClassType } from '../../src/app/models/enums/hull-class.ts';
 import type { Building } from '../../src/app/models/buildings/building.ts';
 import type { Defence } from '../../src/app/models/defences/defence.ts';
 import type { Ship } from '../../src/app/models/fleets/ship.ts';
@@ -133,6 +145,7 @@ import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
 import type { PlayerMessage } from '../../src/app/models/mail/player-message.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
+import type { MaintenanceRequest } from '../../src/app/models/requests/maintenance-request.ts';
 import type { MissionLaunchContext } from '../../src/app/models/missions/mission-context.ts';
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { DiplomaticRelation } from '../../src/app/models/diplomacy/diplomatic-relation.ts';
@@ -177,6 +190,9 @@ const { ShipType } = shipTypeEnumModule as {
 const { FleetMissionType } = fleetMissionTypeEnumModule as {
   FleetMissionType: typeof import('../../src/app/models/enums/fleet-mission-type.js').FleetMissionType;
 };
+const { HullClass } = hullClassEnumModule as {
+  HullClass: typeof import('../../src/app/models/enums/hull-class.js').HullClass;
+};
 const { FleetOrbitActivity, FleetReturnReason, FleetState } = fleetModelModule as {
   FleetOrbitActivity: typeof import('../../src/app/models/fleets/fleet.js').FleetOrbitActivity;
   FleetReturnReason: typeof import('../../src/app/models/fleets/fleet.js').FleetReturnReason;
@@ -184,6 +200,9 @@ const { FleetOrbitActivity, FleetReturnReason, FleetState } = fleetModelModule a
 };
 const { ManyShips } = manyShipsModule as {
   ManyShips: typeof import('../../src/app/models/fleets/many-ships.js').ManyShips;
+};
+const { ManyDefences } = manyDefencesModule as {
+  ManyDefences: typeof import('../../src/app/models/defences/many-defences.js').ManyDefences;
 };
 const { ReportType } = reportTypeEnumModule as {
   ReportType: typeof import('../../src/app/models/enums/report-type.js').ReportType;
@@ -205,6 +224,10 @@ const {
   countPlanetaryBombs,
   isPlanetaryBombDefenceType
 } = planetaryBombModule as typeof import('../../src/app/models/defences/planetary-bomb.js');
+const {
+  createMaintenanceRequest,
+  normalizeMaintenanceTransferPayload
+} = maintenanceRequestModule as typeof import('../../src/app/models/requests/maintenance-request.js');
 const { TUTORIAL_VIEW_KEYS, createTutorialReadState } = tutorialTypesModule as typeof import('../../src/app/tutorial/tutorial-types.js');
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
@@ -243,6 +266,9 @@ const {
 } = queueManagementModule as typeof import('../../src/app/models/queues/queue-management.js');
 const { PlayerMessage: PlayerMessageModel } = playerMessageModule as {
   PlayerMessage: typeof import('../../src/app/models/mail/player-message.js').PlayerMessage;
+};
+const { FleetReport } = fleetReportModule as {
+  FleetReport: typeof import('../../src/app/models/reports/fleet-report.js').FleetReport;
 };
 
 const app = express();
@@ -667,30 +693,161 @@ app.post('/api/game/mail/requests/delete', (req, res) => {
   }
 
   const body = req.body as DeleteMailRequestsRequest | undefined;
-  const requestIds = parseBodyReportIds(body?.requestIds);
-  if (!requestIds) {
-    return res.status(400).json({ error: 'Invalid request ids.' });
+  const requestRefs = parseDeleteMailRequestRefs(body?.requests);
+  if (!requestRefs) {
+    return res.status(400).json({ error: 'Invalid request references.' });
   }
 
-  const requestIdSet = new Set(requestIds);
-  const deletableIds = new Set(
+  let deletedCount = 0;
+  const diplomacyRequestIds = new Set(
+    requestRefs
+      .filter((entry) => entry.requestType === 'DIPLOMACY_PROPOSAL')
+      .map((entry) => entry.requestId)
+  );
+  const maintenanceRequestIds = new Set(
+    requestRefs
+      .filter((entry) => entry.requestType === 'MAINTENANCE')
+      .map((entry) => entry.requestId)
+  );
+
+  const deletableDiplomacyIds = new Set(
     authPlayer.galaxy.diplomaticProposals
       .filter((proposal) =>
-        requestIdSet.has(proposal.proposalId)
+        diplomacyRequestIds.has(proposal.proposalId)
         && proposal.state !== DiplomaticProposalState.PENDING
         && (proposal.fromPlayerId === authPlayer.player.playerId || proposal.toPlayerId === authPlayer.player.playerId)
       )
       .map((proposal) => proposal.proposalId)
   );
-  const before = authPlayer.galaxy.diplomaticProposals.length;
+  const diplomacyBefore = authPlayer.galaxy.diplomaticProposals.length;
   authPlayer.galaxy.diplomaticProposals = authPlayer.galaxy.diplomaticProposals.filter((proposal) =>
-    !deletableIds.has(proposal.proposalId)
+    !deletableDiplomacyIds.has(proposal.proposalId)
   );
+  deletedCount += diplomacyBefore - authPlayer.galaxy.diplomaticProposals.length;
+
+  const deletableMaintenanceIds = new Set(
+    authPlayer.galaxy.maintenanceRequests
+      .filter((request) =>
+        maintenanceRequestIds.has(request.requestId)
+        && request.state !== DiplomaticProposalState.PENDING
+        && (request.fromPlayerId === authPlayer.player.playerId || request.toPlayerId === authPlayer.player.playerId)
+      )
+      .map((request) => request.requestId)
+  );
+  const maintenanceBefore = authPlayer.galaxy.maintenanceRequests.length;
+  authPlayer.galaxy.maintenanceRequests = authPlayer.galaxy.maintenanceRequests.filter((request) =>
+    !deletableMaintenanceIds.has(request.requestId)
+  );
+  deletedCount += maintenanceBefore - authPlayer.galaxy.maintenanceRequests.length;
 
   const response: DeleteMailRequestsResponse = {
-    deletedCount: before - authPlayer.galaxy.diplomaticProposals.length
+    deletedCount
   };
   return res.status(200).json(response);
+});
+
+app.post('/api/game/mail/maintenance-requests/:requestId/approve', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const requestId = Number.parseInt(req.params.requestId, 10);
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return res.status(400).json({ error: 'Invalid maintenance request id.' });
+  }
+
+  const request = authPlayer.galaxy.maintenanceRequests.find((entry) => entry.requestId === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Maintenance request not found.' });
+  }
+
+  if (request.toPlayerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Only the target player can approve this request.' });
+  }
+
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return res.status(409).json({ error: 'Maintenance request is no longer pending.' });
+  }
+
+  const body = req.body as ResolveMaintenanceRequestRequest | undefined;
+  const requestedApproval = normalizeMaintenanceTransferPayload(body);
+  const result = approveMaintenanceRequestForFleet(
+    authPlayer.galaxy,
+    request,
+    isExplicitMaintenancePayload(body) ? requestedApproval : null
+  );
+  if ('error' in result) {
+    return res.status(result.status).json({ error: result.error });
+  }
+
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
+app.post('/api/game/mail/maintenance-requests/:requestId/reject', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const requestId = Number.parseInt(req.params.requestId, 10);
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return res.status(400).json({ error: 'Invalid maintenance request id.' });
+  }
+
+  const request = authPlayer.galaxy.maintenanceRequests.find((entry) => entry.requestId === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Maintenance request not found.' });
+  }
+
+  if (request.toPlayerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Only the target player can reject this request.' });
+  }
+
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return res.status(409).json({ error: 'Maintenance request is no longer pending.' });
+  }
+
+  rejectMaintenanceRequest(
+    authPlayer.galaxy,
+    request,
+    'Maintenance request rejected.',
+    'Your maintenance request was rejected.'
+  );
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
+app.post('/api/game/mail/maintenance-requests/:requestId/cancel', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const requestId = Number.parseInt(req.params.requestId, 10);
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return res.status(400).json({ error: 'Invalid maintenance request id.' });
+  }
+
+  const request = authPlayer.galaxy.maintenanceRequests.find((entry) => entry.requestId === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Maintenance request not found.' });
+  }
+
+  if (request.fromPlayerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Only the requesting player can cancel this request.' });
+  }
+
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return res.status(409).json({ error: 'Maintenance request is no longer pending.' });
+  }
+
+  cancelMaintenanceRequest(
+    authPlayer.galaxy,
+    request,
+    'You cancelled the maintenance request.',
+    'The requesting fleet cancelled its maintenance request.'
+  );
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
 app.post('/api/game/mail/messages/send', (req, res) => {
@@ -778,6 +935,7 @@ app.post('/api/game/end-turn', (req, res) => {
     return res.status(404).json({ error: 'Player not found in galaxy.' });
   }
 
+  synchronizeMaintenanceRequests(currentGalaxy);
   const pendingRequestCount = countPendingMailRequestsForPlayer(currentGalaxy, playerId);
   const unreadMailCount = countUnreadMailMessagesForPlayer(currentGalaxy, playerId);
   if (pendingRequestCount > 0 || unreadMailCount > 0) {
@@ -793,6 +951,7 @@ app.post('/api/game/end-turn', (req, res) => {
     resolvePhaseOneTurn(currentGalaxy, resolvedTurnNumber);
     currentGalaxy.currentTurn = resolvedTurnNumber;
     expirePendingDiplomaticProposals(currentGalaxy, currentGalaxy.currentTurn);
+    synchronizeMaintenanceRequests(currentGalaxy);
     refreshOwnedPlanetSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
 
@@ -1952,7 +2111,52 @@ app.get('/api/game/active-fleets', (req, res) => {
     return res.status(404).json({ error: 'Player not found in galaxy.' });
   }
 
-  const response = currentGalaxy.activeFleets.filter((fleet) => fleet.ownerId === playerId);
+  const response = buildOwnedActiveFleetsResponse(currentGalaxy, playerId);
+  return res.status(200).json(response);
+});
+
+app.get('/api/game/active-fleets/:fleetId/maintenance-options', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const fleetId = Number.parseInt(req.params.fleetId, 10);
+  if (!Number.isInteger(fleetId) || fleetId <= 0) {
+    return res.status(400).json({ error: 'Invalid fleet id.' });
+  }
+
+  const result = resolveMaintenanceOptionsForFleet(authPlayer.galaxy, authPlayer.player.playerId, fleetId);
+  if ('error' in result) {
+    return res.status(result.status).json({ error: result.error });
+  }
+
+  return res.status(200).json(result.options);
+});
+
+app.post('/api/game/active-fleets/:fleetId/maintenance-request', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const fleetId = Number.parseInt(req.params.fleetId, 10);
+  if (!Number.isInteger(fleetId) || fleetId <= 0) {
+    return res.status(400).json({ error: 'Invalid fleet id.' });
+  }
+
+  const body = req.body as CreateMaintenanceRequestRequest | undefined;
+  const payload = normalizeMaintenanceTransferPayload(body);
+  const result = createMaintenanceRequestForFleet(authPlayer.galaxy, authPlayer.player.playerId, fleetId, payload);
+  if ('error' in result) {
+    return res.status(result.status).json({ error: result.error });
+  }
+
+  const response: CreateMaintenanceRequestResponse = {
+    activeFleets: buildOwnedActiveFleetsResponse(authPlayer.galaxy, authPlayer.player.playerId),
+    mode: result.mode,
+    message: result.message
+  };
   return res.status(200).json(response);
 });
 
@@ -2007,7 +2211,8 @@ app.post('/api/game/active-fleets/:fleetId/return', (req, res) => {
   fleet.returnReason = FleetReturnReason.MANUAL_RECALL;
   fleet.createdAtTurn = currentGalaxy.currentTurn;
 
-  return res.status(200).json(currentGalaxy.activeFleets.filter((entry) => entry.ownerId === playerId));
+  synchronizeMaintenanceRequests(currentGalaxy);
+  return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
 });
 
 app.post('/api/game/active-fleets/:fleetId/delay', (req, res) => {
@@ -2046,7 +2251,7 @@ app.post('/api/game/active-fleets/:fleetId/delay', (req, res) => {
   // TODO: Support adding delay to RETURNING fleets once the first slice settles.
   fleet.travelTurns += 1;
 
-  return res.status(200).json(currentGalaxy.activeFleets.filter((entry) => entry.ownerId === playerId));
+  return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
 });
 
 app.post('/api/game/active-fleets', (req, res) => {
@@ -2252,7 +2457,7 @@ app.post('/api/game/active-fleets', (req, res) => {
   const presentation = getPresentationData(currentGalaxy, playerId);
   const response: CreateFleetMissionResponse = {
     ownedPlanets: presentation.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet)),
-    activeFleets: currentGalaxy.activeFleets.filter((entry) => entry.ownerId === playerId)
+    activeFleets: buildOwnedActiveFleetsResponse(currentGalaxy, playerId)
   };
   return res.status(201).json(response);
 });
@@ -2483,6 +2688,7 @@ function resolveAuthenticatedGamePlayer(req: Request):
     return { status: 404, error: 'Player not found in galaxy.' };
   }
 
+  synchronizeMaintenanceRequests(currentGalaxy);
   return {
     galaxy: currentGalaxy,
     player,
@@ -2764,6 +2970,41 @@ function parseBodyReportIds(value: unknown): number[] | null {
   }
 
   return reportIds;
+}
+
+function parseDeleteMailRequestRefs(
+  value: unknown
+): Array<{ requestId: number; requestType: MailRequestDto['requestType'] }> | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const refs: Array<{ requestId: number; requestType: MailRequestDto['requestType'] }> = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const candidate = item as {
+      requestId?: unknown;
+      requestType?: unknown;
+    };
+    const requestId = parseBodyPositiveInt(candidate.requestId);
+    const requestType = candidate.requestType;
+    if (
+      requestId === null
+      || (requestType !== 'DIPLOMACY_PROPOSAL' && requestType !== 'MAINTENANCE')
+    ) {
+      return null;
+    }
+
+    refs.push({
+      requestId,
+      requestType
+    });
+  }
+
+  return refs;
 }
 
 function parseBodyNonNegativeNumber(value: unknown): number | null {
@@ -3708,9 +3949,14 @@ function buildMailRequestDtos(
   galaxy: Galaxy,
   viewerPlayerId: number
 ): MailRequestDto[] {
-  return galaxy.diplomaticProposals
+  const diplomacyRequests = galaxy.diplomaticProposals
     .filter((proposal) => proposal.fromPlayerId === viewerPlayerId || proposal.toPlayerId === viewerPlayerId)
-    .map((proposal) => toMailRequestDto(galaxy, proposal, viewerPlayerId))
+    .map((proposal) => toDiplomacyMailRequestDto(galaxy, proposal, viewerPlayerId));
+  const maintenanceRequests = galaxy.maintenanceRequests
+    .filter((request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId)
+    .map((request) => toMaintenanceMailRequestDto(galaxy, request, viewerPlayerId));
+
+  return [...diplomacyRequests, ...maintenanceRequests]
     .sort((left, right) =>
       mailRequestGroupOrder(left.state) - mailRequestGroupOrder(right.state)
       || proposalDirectionOrder(left.direction) - proposalDirectionOrder(right.direction)
@@ -3741,7 +3987,7 @@ function toDiplomaticProposalDto(
   };
 }
 
-function toMailRequestDto(
+function toDiplomacyMailRequestDto(
   galaxy: Galaxy,
   proposal: DiplomaticProposal,
   viewerPlayerId: number
@@ -3760,6 +4006,31 @@ function toMailRequestDto(
     counterpartyPlayerId,
     counterpartyPlayerName,
     requestedStatus: dto.requestedStatus
+  };
+}
+
+function toMaintenanceMailRequestDto(
+  galaxy: Galaxy,
+  request: MaintenanceRequest,
+  viewerPlayerId: number
+): MailRequestDto {
+  const direction = request.toPlayerId === viewerPlayerId ? 'incoming' : 'outgoing';
+  const counterpartyPlayerId = direction === 'incoming' ? request.fromPlayerId : request.toPlayerId;
+  const counterpartyPlayerName = resolvePlayerById(galaxy, counterpartyPlayerId)?.playerName ?? `Player ${counterpartyPlayerId}`;
+
+  return {
+    requestId: request.requestId,
+    requestType: 'MAINTENANCE',
+    createdTurn: request.createdTurn,
+    expiresOnTurn: request.expiresOnTurn,
+    state: request.state,
+    direction,
+    counterpartyPlayerId,
+    counterpartyPlayerName,
+    fleetId: request.fleetId,
+    targetPlanetName: request.targetPlanetName,
+    requested: toMaintenanceTransferPayloadDto(request.requested),
+    approved: request.approved ? toMaintenanceTransferPayloadDto(request.approved) : null
   };
 }
 
@@ -3855,10 +4126,16 @@ function hasOutgoingProposalSentThisTurn(
 }
 
 function countPendingMailRequestsForPlayer(galaxy: Galaxy, playerId: number): number {
-  return galaxy.diplomaticProposals.filter((proposal) =>
+  const diplomacyPending = galaxy.diplomaticProposals.filter((proposal) =>
     proposal.state === DiplomaticProposalState.PENDING
     && proposal.toPlayerId === playerId
   ).length;
+  const maintenancePending = galaxy.maintenanceRequests.filter((request) =>
+    request.state === DiplomaticProposalState.PENDING
+    && request.toPlayerId === playerId
+  ).length;
+
+  return diplomacyPending + maintenancePending;
 }
 
 function countUnreadMailMessagesForPlayer(galaxy: Galaxy, playerId: number): number {
@@ -3980,6 +4257,828 @@ function toPlayerMailMessageDto(message: PlayerMessage): PlayerMailMessageDto {
     senderPlayerId: message.senderPlayerId,
     senderPlayerName: message.senderPlayerName
   };
+}
+
+function toMaintenanceTransferPayloadDto(
+  payload: MaintenanceRequest['requested'] | MaintenanceRequest['approved']
+): MaintenanceTransferPayloadDto {
+  const normalized = normalizeMaintenanceTransferPayload(payload);
+  return {
+    fuel: normalized.fuel,
+    ships: normalized.ships.map((entry) => ({
+      type: entry.type,
+      amount: entry.amount
+    })),
+    bombs: normalized.bombs.map((entry) => ({
+      type: entry.type,
+      amount: entry.amount
+    }))
+  };
+}
+
+function isExplicitMaintenancePayload(value: unknown): value is ResolveMaintenanceRequestRequest {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  return Object.prototype.hasOwnProperty.call(value, 'fuel')
+    || Object.prototype.hasOwnProperty.call(value, 'ships')
+    || Object.prototype.hasOwnProperty.call(value, 'bombs');
+}
+
+function buildOwnedActiveFleetsResponse(galaxy: Galaxy, playerId: number): Fleet[] {
+  synchronizeMaintenanceRequests(galaxy);
+
+  return galaxy.activeFleets
+    .filter((fleet) => fleet.ownerId === playerId)
+    .map((fleet) => annotateFleetMaintenanceMetadata(galaxy, fleet));
+}
+
+function annotateFleetMaintenanceMetadata(galaxy: Galaxy, fleet: Fleet): Fleet {
+  const pendingRequest = findPendingMaintenanceRequestForFleet(galaxy, fleet.ownerId, fleet.fleetId);
+  fleet.pendingMaintenanceRequestId = pendingRequest?.requestId ?? null;
+  fleet.maintenanceRequestAvailable = canFleetRequestMaintenance(galaxy, fleet);
+  return fleet;
+}
+
+function canFleetRequestMaintenance(galaxy: Galaxy, fleet: Fleet): boolean {
+  if (fleet.state !== FleetState.ORBITING) {
+    return false;
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, fleet.target);
+  if (!targetPlanet || targetPlanet.info.ownerId === null) {
+    return false;
+  }
+
+  const status = resolveDiplomaticStatus(galaxy, fleet.ownerId, targetPlanet.info.ownerId);
+  if (!isMaintenanceStatusAllowed(status)) {
+    return false;
+  }
+
+  if (findPendingMaintenanceRequestForFleet(galaxy, fleet.ownerId, fleet.fleetId)) {
+    return false;
+  }
+
+  if (fleet.lastMaintenanceRequestTurn === galaxy.currentTurn) {
+    return false;
+  }
+
+  const fuelCap = Math.max(0, Math.floor(targetPlanet.getBuildingProductionValue1(BuildingType.ALLIANCE_DEPOT as BuildingTypeType)));
+  const supportCap = Math.max(0, Math.floor(targetPlanet.getBuildingProductionValue2(BuildingType.ALLIANCE_DEPOT as BuildingTypeType)));
+  return fuelCap > 0 || supportCap > 0;
+}
+
+function resolveMaintenanceOptionsForFleet(
+  galaxy: Galaxy,
+  requesterPlayerId: number,
+  fleetId: number
+):
+  | { options: FleetMaintenanceOptionsDto }
+  | { status: number; error: string } {
+  const context = resolveMaintenanceContextForFleet(galaxy, requesterPlayerId, fleetId);
+  if ('error' in context) {
+    return context;
+  }
+
+  return {
+    options: buildMaintenanceOptionsDto(context)
+  };
+}
+
+function resolveMaintenanceContextForFleet(
+  galaxy: Galaxy,
+  requesterPlayerId: number,
+  fleetId: number
+):
+  | {
+    fleet: Fleet;
+    targetPlanet: Planet;
+    targetOwner: Player;
+    status: DiplomaticStatusType;
+    autoApprove: boolean;
+    fuelCap: number;
+    supportCap: number;
+  }
+  | { status: number; error: string } {
+  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === fleetId && entry.ownerId === requesterPlayerId);
+  if (!fleet) {
+    return { status: 404, error: 'Fleet not found.' };
+  }
+
+  if (fleet.state !== FleetState.ORBITING) {
+    return { status: 409, error: 'Maintenance can be requested only by orbiting fleets.' };
+  }
+
+  if (findPendingMaintenanceRequestForFleet(galaxy, requesterPlayerId, fleetId)) {
+    return { status: 409, error: 'This fleet already has a pending maintenance request.' };
+  }
+
+  if (fleet.lastMaintenanceRequestTurn === galaxy.currentTurn) {
+    return { status: 409, error: 'This fleet has already requested maintenance this turn.' };
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, fleet.target);
+  if (!targetPlanet) {
+    return { status: 404, error: 'Maintenance target planet not found.' };
+  }
+
+  if (targetPlanet.info.ownerId === null) {
+    return { status: 409, error: 'Maintenance requires a planet owner with an Alliance Depot.' };
+  }
+
+  const targetOwner = resolvePlayerById(galaxy, targetPlanet.info.ownerId);
+  if (!targetOwner) {
+    return { status: 404, error: 'Maintenance target owner not found.' };
+  }
+
+  const status = resolveDiplomaticStatus(galaxy, requesterPlayerId, targetOwner.playerId);
+  if (!isMaintenanceStatusAllowed(status)) {
+    return { status: 403, error: 'Maintenance is allowed only on non-hostile planets.' };
+  }
+
+  const fuelCap = Math.max(0, Math.floor(targetPlanet.getBuildingProductionValue1(BuildingType.ALLIANCE_DEPOT as BuildingTypeType)));
+  const supportCap = Math.max(0, Math.floor(targetPlanet.getBuildingProductionValue2(BuildingType.ALLIANCE_DEPOT as BuildingTypeType)));
+  if (fuelCap <= 0 && supportCap <= 0) {
+    return { status: 409, error: 'Alliance Depot is not operational on this planet.' };
+  }
+
+  return {
+    fleet,
+    targetPlanet,
+    targetOwner,
+    status,
+    autoApprove: status === DiplomaticStatus.SELF || status === DiplomaticStatus.PASSIVE,
+    fuelCap,
+    supportCap
+  };
+}
+
+function createMaintenanceRequestForFleet(
+  galaxy: Galaxy,
+  requesterPlayerId: number,
+  fleetId: number,
+  payload: MaintenanceTransferPayloadDto
+):
+  | { mode: CreateMaintenanceRequestResponse['mode']; message: string }
+  | { status: number; error: string } {
+  const context = resolveMaintenanceContextForFleet(galaxy, requesterPlayerId, fleetId);
+  if ('error' in context) {
+    return context;
+  }
+
+  const requested = normalizeMaintenanceTransferPayload(payload);
+  if (!maintenancePayloadHasAnySelection(requested)) {
+    return { status: 400, error: 'Select fuel, bombs, or small ships to request.' };
+  }
+
+  const requestValidation = validateRequestedMaintenancePayload(context, requested);
+  if (requestValidation) {
+    return requestValidation;
+  }
+
+  context.fleet.lastMaintenanceRequestTurn = galaxy.currentTurn;
+
+  if (context.autoApprove) {
+    const approved = applyMaintenanceTransfer(context.fleet, context.targetPlanet, requested);
+    const summary = summarizeMaintenanceTransfer(approved);
+    addMaintenanceResolutionReports(
+      galaxy,
+      context.fleet,
+      context.targetPlanet,
+      context.targetOwner,
+      'Maintenance delivered',
+      `Alliance Depot delivered ${summary}.`,
+      `Alliance Depot delivered ${summary} to Fleet #${context.fleet.fleetId}.`
+    );
+    return {
+      mode: 'AUTO_APPROVED',
+      message: `Maintenance delivered immediately: ${summary}.`
+    };
+  }
+
+  const maintenanceRequest = createMaintenanceRequest(
+    galaxy.nextMaintenanceRequestId,
+    context.fleet.fleetId,
+    requesterPlayerId,
+    context.targetOwner.playerId,
+    context.targetPlanet.basicInfo.name,
+    context.fleet.target,
+    galaxy.currentTurn,
+    galaxy.currentTurn + 1,
+    requested
+  );
+  galaxy.nextMaintenanceRequestId += 1;
+  galaxy.maintenanceRequests.push(maintenanceRequest);
+  context.fleet.pendingMaintenanceRequestId = maintenanceRequest.requestId;
+
+  return {
+    mode: 'PENDING',
+    message: 'Maintenance request sent.'
+  };
+}
+
+function approveMaintenanceRequestForFleet(
+  galaxy: Galaxy,
+  request: MaintenanceRequest,
+  requestedApprovalOverride: ResolveMaintenanceRequestRequest | null
+): { ok: true } | { status: number; error: string } {
+  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  if (!fleet) {
+    return { status: 404, error: 'Requesting fleet is no longer available.' };
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+  if (!targetPlanet || targetPlanet.info.ownerId !== request.toPlayerId) {
+    return { status: 409, error: 'Maintenance target is no longer valid.' };
+  }
+
+  const desiredApproval = requestedApprovalOverride
+    ? clampMaintenancePayloadToRequested(requestedApprovalOverride, request.requested)
+    : request.requested;
+  const approved = applyMaintenanceTransfer(fleet, targetPlanet, desiredApproval);
+  request.approved = approved;
+  request.state = DiplomaticProposalState.ACCEPTED;
+  fleet.pendingMaintenanceRequestId = null;
+
+  const targetOwner = resolvePlayerById(galaxy, request.toPlayerId);
+  if (targetOwner) {
+    const summary = summarizeMaintenanceTransfer(approved);
+    addMaintenanceResolutionReports(
+      galaxy,
+      fleet,
+      targetPlanet,
+      targetOwner,
+      'Maintenance approved',
+      `Your maintenance request was approved. Delivered: ${summary}.`,
+      `You approved maintenance for Fleet #${fleet.fleetId}. Delivered: ${summary}.`
+    );
+  }
+
+  return { ok: true };
+}
+
+function rejectMaintenanceRequest(
+  galaxy: Galaxy,
+  request: MaintenanceRequest,
+  requesterBody: string,
+  ownerBody: string
+): void {
+  request.state = DiplomaticProposalState.REJECTED;
+  request.approved = normalizeMaintenanceTransferPayload(null);
+  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  if (fleet) {
+    fleet.pendingMaintenanceRequestId = null;
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+  const targetOwner = resolvePlayerById(galaxy, request.toPlayerId);
+  if (!targetPlanet || !targetOwner || !fleet) {
+    return;
+  }
+
+  addMaintenanceResolutionReports(
+    galaxy,
+    fleet,
+    targetPlanet,
+    targetOwner,
+    'Maintenance rejected',
+    requesterBody,
+    ownerBody
+  );
+}
+
+function cancelMaintenanceRequest(
+  galaxy: Galaxy,
+  request: MaintenanceRequest,
+  requesterBody: string,
+  ownerBody: string
+): void {
+  request.state = DiplomaticProposalState.CANCELLED;
+  request.approved = normalizeMaintenanceTransferPayload(null);
+  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  if (fleet) {
+    fleet.pendingMaintenanceRequestId = null;
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+  const targetOwner = resolvePlayerById(galaxy, request.toPlayerId);
+  if (!targetPlanet || !targetOwner || !fleet) {
+    return;
+  }
+
+  addMaintenanceResolutionReports(
+    galaxy,
+    fleet,
+    targetPlanet,
+    targetOwner,
+    'Maintenance cancelled',
+    requesterBody,
+    ownerBody
+  );
+}
+
+function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
+  for (const request of galaxy.maintenanceRequests) {
+    if (request.state !== DiplomaticProposalState.PENDING) {
+      continue;
+    }
+
+    const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+    const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+    if (
+      !fleet
+      || fleet.state !== FleetState.ORBITING
+      || !sameCoordinates(fleet.target, request.targetCoordinates)
+      || !targetPlanet
+      || targetPlanet.info.ownerId !== request.toPlayerId
+    ) {
+      request.state = DiplomaticProposalState.CANCELLED;
+      request.approved = normalizeMaintenanceTransferPayload(null);
+      if (fleet) {
+        fleet.pendingMaintenanceRequestId = null;
+      }
+      const targetOwner = resolvePlayerById(galaxy, request.toPlayerId);
+      if (fleet && targetPlanet && targetOwner) {
+        addMaintenanceResolutionReports(
+          galaxy,
+          fleet,
+          targetPlanet,
+          targetOwner,
+          'Maintenance auto-cancelled',
+          'Your maintenance request was cancelled because the fleet left orbit or the target changed.',
+          `Fleet #${fleet.fleetId} left orbit or changed target before maintenance could be resolved.`
+        );
+      }
+      continue;
+    }
+
+    if (request.expiresOnTurn <= galaxy.currentTurn) {
+      request.state = DiplomaticProposalState.EXPIRED;
+      request.approved = normalizeMaintenanceTransferPayload(null);
+      fleet.pendingMaintenanceRequestId = null;
+      const targetOwner = resolvePlayerById(galaxy, request.toPlayerId);
+      if (!targetOwner) {
+        continue;
+      }
+
+      addMaintenanceResolutionReports(
+        galaxy,
+        fleet,
+        targetPlanet,
+        targetOwner,
+        'Maintenance expired',
+        'Your maintenance request expired before it was answered.',
+        `Maintenance request for Fleet #${fleet.fleetId} expired.`
+      );
+    }
+  }
+}
+
+function addMaintenanceResolutionReports(
+  galaxy: Galaxy,
+  fleet: Fleet,
+  targetPlanet: Planet,
+  targetOwner: Player,
+  title: string,
+  requesterBody: string,
+  ownerBody: string
+): void {
+  const requester = resolvePlayerById(galaxy, fleet.ownerId);
+  if (requester) {
+    requester.addReport(new FleetReport({
+      reportId: requester.createReportId(),
+      createdTurn: galaxy.currentTurn,
+      title,
+      sourceCoordinates: { ...fleet.target },
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      senderPlayerName: targetOwner.playerName
+    }, requesterBody));
+  }
+
+  if (targetOwner.playerId === fleet.ownerId) {
+    return;
+  }
+
+  targetOwner.addReport(new FleetReport({
+    reportId: targetOwner.createReportId(),
+    createdTurn: galaxy.currentTurn,
+    title,
+    sourceCoordinates: { ...fleet.target },
+    sourcePlanetName: targetPlanet.basicInfo.name,
+    sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+    senderPlayerName: requester?.playerName ?? null
+  }, ownerBody));
+}
+
+function resolvePlanetAtCoordinates(galaxy: Galaxy, coordinates: ClientCoordinates): Planet | null {
+  return galaxy.stars[coordinates.y]?.[coordinates.x]?.planets[coordinates.z] ?? null;
+}
+
+function findPendingMaintenanceRequestForFleet(
+  galaxy: Galaxy,
+  ownerId: number,
+  fleetId: number
+): MaintenanceRequest | null {
+  return galaxy.maintenanceRequests.find((request) =>
+    request.state === DiplomaticProposalState.PENDING
+    && request.fromPlayerId === ownerId
+    && request.fleetId === fleetId
+  ) ?? null;
+}
+
+function isMaintenanceStatusAllowed(status: DiplomaticStatusType): boolean {
+  return status === DiplomaticStatus.SELF
+    || status === DiplomaticStatus.ALLIED
+    || status === DiplomaticStatus.PEACE
+    || status === DiplomaticStatus.PASSIVE;
+}
+
+function buildMaintenanceOptionsDto(context: {
+  fleet: Fleet;
+  targetPlanet: Planet;
+  autoApprove: boolean;
+  fuelCap: number;
+  supportCap: number;
+}): FleetMaintenanceOptionsDto {
+  const remainingCargoCapacity = Math.max(0, context.fleet.totalCargoCapacity - context.fleet.usedCargoCapacity);
+  const currentBombHangarUsage = calculateBombHangarUsageForManyDefences(context.fleet.carriedBombs);
+  const remainingHangarCapacity = Math.max(
+    0,
+    ManyShips.totalTravelHangarCapacity(context.fleet.ships)
+    - ManyShips.totalRequiredHangarCapacity(context.fleet.ships)
+    - currentBombHangarUsage
+  );
+  const remainingBomberHangarCapacity = Math.max(
+    0,
+    ManyShips.totalBomberHangarCapacity(context.fleet.ships) - currentBombHangarUsage
+  );
+
+  return {
+    fleetId: context.fleet.fleetId,
+    targetPlanetName: context.targetPlanet.basicInfo.name,
+    autoApprove: context.autoApprove,
+    fuelCap: context.fuelCap,
+    supportCap: context.supportCap,
+    availableFuel: Math.max(0, Math.floor(context.targetPlanet.rBDSFTQ.resources.deuterium)),
+    remainingCargoCapacity,
+    remainingHangarCapacity,
+    remainingBomberHangarCapacity,
+    availableShips: buildMaintenanceShipOptions(context.targetPlanet),
+    availableBombs: buildMaintenanceBombOptions(context.targetPlanet)
+  };
+}
+
+function buildMaintenanceShipOptions(planet: Planet): FleetMaintenanceShipOptionDto[] {
+  const totalCounts = ManyShips.countByType(planet.rBDSFTQ.ships);
+  const undamagedCounts = ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
+  const damagedCounts = ManyShips.damagedCountByType(planet.rBDSFTQ.ships);
+
+  return [...totalCounts.entries()]
+    .map(([type, available]) => {
+      const blueprint = SHIP_BLUEPRINTS.get(type);
+      if (!blueprint || blueprint.hullClass !== HullClass.SMALL) {
+        return null;
+      }
+
+      return {
+        type,
+        available,
+        undamagedAvailable: undamagedCounts.get(type) ?? 0,
+        damagedAvailable: damagedCounts.get(type) ?? 0,
+        size: blueprint.size
+      } satisfies FleetMaintenanceShipOptionDto;
+    })
+    .filter((entry): entry is FleetMaintenanceShipOptionDto => !!entry && entry.available > 0)
+    .sort((left, right) => left.type.localeCompare(right.type));
+}
+
+function buildMaintenanceBombOptions(planet: Planet): FleetMaintenanceBombOptionDto[] {
+  const totalCounts = ManyDefences.countByType(planet.rBDSFTQ.defences);
+  const undamagedCounts = ManyDefences.undamagedCountByType(planet.rBDSFTQ.defences);
+  const damagedCounts = ManyDefences.damagedCountByType(planet.rBDSFTQ.defences);
+
+  return [...totalCounts.entries()]
+    .map(([type, available]) => {
+      if (!isPlanetaryBombDefenceType(type)) {
+        return null;
+      }
+
+      const blueprint = DEFENCE_BLUEPRINTS.get(type);
+      if (!blueprint) {
+        return null;
+      }
+
+      return {
+        type,
+        available,
+        undamagedAvailable: undamagedCounts.get(type) ?? 0,
+        damagedAvailable: damagedCounts.get(type) ?? 0,
+        size: blueprint.size
+      } satisfies FleetMaintenanceBombOptionDto;
+    })
+    .filter((entry): entry is FleetMaintenanceBombOptionDto => !!entry && entry.available > 0)
+    .sort((left, right) => left.type.localeCompare(right.type));
+}
+
+function validateRequestedMaintenancePayload(
+  context: {
+    fleet: Fleet;
+    targetPlanet: Planet;
+    fuelCap: number;
+    supportCap: number;
+  },
+  payload: MaintenanceRequest['requested']
+): { status: number; error: string } | null {
+  const options = buildMaintenanceOptionsDto({
+    fleet: context.fleet,
+    targetPlanet: context.targetPlanet,
+    autoApprove: false,
+    fuelCap: context.fuelCap,
+    supportCap: context.supportCap
+  });
+
+  if (payload.fuel > Math.min(options.fuelCap, options.availableFuel, options.remainingCargoCapacity)) {
+    return { status: 400, error: 'Requested fuel exceeds depot or fleet capacity.' };
+  }
+
+  const shipOptions = new Map(options.availableShips.map((entry) => [entry.type, entry]));
+  const bombOptions = new Map(options.availableBombs.map((entry) => [entry.type, entry]));
+  let supportSize = 0;
+  let requiredHangar = 0;
+  let requiredBomberHangar = 0;
+
+  for (const shipRequest of payload.ships) {
+    const option = shipOptions.get(shipRequest.type);
+    const blueprint = SHIP_BLUEPRINTS.get(shipRequest.type);
+    if (!option || !blueprint || blueprint.hullClass !== HullClass.SMALL) {
+      return { status: 400, error: `${shipRequest.type}: maintenance can request only small ships stored on the target planet.` };
+    }
+    if (shipRequest.amount > option.available) {
+      return { status: 400, error: `${shipRequest.type}: requested amount exceeds local depot stock.` };
+    }
+
+    supportSize += blueprint.size * shipRequest.amount;
+    if (!blueprint.canJump) {
+      requiredHangar += blueprint.size * shipRequest.amount;
+    }
+  }
+
+  for (const bombRequest of payload.bombs) {
+    const option = bombOptions.get(bombRequest.type);
+    const blueprint = DEFENCE_BLUEPRINTS.get(bombRequest.type);
+    if (!option || !blueprint || !isPlanetaryBombDefenceType(bombRequest.type)) {
+      return { status: 400, error: `${bombRequest.type}: requested bombs are not available in the target depot.` };
+    }
+    if (bombRequest.amount > option.available) {
+      return { status: 400, error: `${bombRequest.type}: requested amount exceeds local depot stock.` };
+    }
+
+    supportSize += blueprint.size * bombRequest.amount;
+    requiredHangar += blueprint.size * bombRequest.amount;
+    requiredBomberHangar += blueprint.size * bombRequest.amount;
+  }
+
+  if (supportSize > options.supportCap) {
+    return { status: 400, error: 'Requested ships and bombs exceed Alliance Depot support capacity.' };
+  }
+
+  if (requiredHangar > options.remainingHangarCapacity) {
+    return { status: 400, error: 'Requested ships and bombs do not fit into the fleet hangar capacity.' };
+  }
+
+  if (requiredBomberHangar > options.remainingBomberHangarCapacity) {
+    return { status: 400, error: 'Requested bombs do not fit into bomber hangar capacity.' };
+  }
+
+  return null;
+}
+
+function maintenancePayloadHasAnySelection(payload: MaintenanceRequest['requested']): boolean {
+  return payload.fuel > 0 || payload.ships.length > 0 || payload.bombs.length > 0;
+}
+
+function clampMaintenancePayloadToRequested(
+  desired: MaintenanceTransferPayloadDto,
+  requested: MaintenanceRequest['requested']
+): MaintenanceRequest['requested'] {
+  const normalizedDesired = normalizeMaintenanceTransferPayload(desired);
+  const requestedShips = new Map(requested.ships.map((entry) => [entry.type, entry.amount]));
+  const requestedBombs = new Map(requested.bombs.map((entry) => [entry.type, entry.amount]));
+
+  return {
+    fuel: Math.min(normalizedDesired.fuel, requested.fuel),
+    ships: normalizedDesired.ships.map((entry) => ({
+      type: entry.type,
+      amount: Math.min(entry.amount, requestedShips.get(entry.type) ?? 0)
+    })).filter((entry) => entry.amount > 0),
+    bombs: normalizedDesired.bombs.map((entry) => ({
+      type: entry.type,
+      amount: Math.min(entry.amount, requestedBombs.get(entry.type) ?? 0)
+    })).filter((entry) => entry.amount > 0)
+  };
+}
+
+function applyMaintenanceTransfer(
+  fleet: Fleet,
+  targetPlanet: Planet,
+  requested: MaintenanceRequest['requested']
+): MaintenanceRequest['approved'] {
+  const normalized = normalizeMaintenanceTransferPayload(requested);
+  const approvedFuel = Math.min(
+    normalized.fuel,
+    Math.max(0, targetPlanet.rBDSFTQ.resources.deuterium),
+    Math.max(0, fleet.totalCargoCapacity - fleet.usedCargoCapacity)
+  );
+  if (approvedFuel > 0) {
+    targetPlanet.rBDSFTQ.resources.deuterium -= approvedFuel;
+    fleet.cargo.deuterium += approvedFuel;
+    fleet.usedCargoCapacity = fleet.cargo.metal + fleet.cargo.crystal + fleet.cargo.deuterium;
+  }
+
+  const approvedShips = extractMaintenanceShips(targetPlanet, fleet, normalized.ships);
+  const approvedBombs = extractMaintenanceBombs(targetPlanet, fleet, normalized.bombs);
+  if (approvedShips.totalShipsCount() > 0) {
+    fleet.ships.addManyShips(approvedShips);
+    fleet.totalCargoCapacity = ManyShips.totalCargoCapacity(fleet.ships);
+  }
+  if (approvedBombs.totalDefencesCount() > 0) {
+    fleet.carriedBombs.addManyDefences(approvedBombs);
+  }
+
+  return {
+    fuel: approvedFuel,
+    ships: [...ManyShips.countByType(approvedShips).entries()].map(([type, amount]) => ({ type, amount })),
+    bombs: [...ManyDefences.countByType(approvedBombs).entries()].map(([type, amount]) => ({ type, amount }))
+  };
+}
+
+function extractMaintenanceShips(
+  targetPlanet: Planet,
+  fleet: Fleet,
+  requestedShips: MaintenanceRequest['requested']['ships']
+): ManyShipsType {
+  const extracted = ManyShips.empty();
+  let remainingHangarCapacity = Math.max(
+    0,
+    ManyShips.totalTravelHangarCapacity(fleet.ships)
+    - ManyShips.totalRequiredHangarCapacity(fleet.ships)
+    - calculateBombHangarUsageForManyDefences(fleet.carriedBombs)
+  );
+
+  for (const request of requestedShips) {
+    const blueprint = SHIP_BLUEPRINTS.get(request.type);
+    if (!blueprint || blueprint.hullClass !== HullClass.SMALL) {
+      continue;
+    }
+
+    const hangarCost = blueprint.canJump ? 0 : blueprint.size;
+    let remaining = request.amount;
+    const availableUndamaged = targetPlanet.rBDSFTQ.ships.undamagedShipsCount[request.type] ?? 0;
+    const takeUndamaged = Math.min(availableUndamaged, remaining, hangarCost <= 0 ? remaining : Math.floor(remainingHangarCapacity / hangarCost));
+    if (takeUndamaged > 0) {
+      extracted.addUndamaged(request.type, takeUndamaged);
+      remaining -= takeUndamaged;
+      remainingHangarCapacity = Math.max(0, remainingHangarCapacity - (takeUndamaged * hangarCost));
+      const nextUndamaged = availableUndamaged - takeUndamaged;
+      if (nextUndamaged > 0) {
+        targetPlanet.rBDSFTQ.ships.undamagedShipsCount[request.type] = nextUndamaged;
+      } else {
+        delete targetPlanet.rBDSFTQ.ships.undamagedShipsCount[request.type];
+      }
+    }
+
+    if (remaining <= 0) {
+      continue;
+    }
+
+    const updatedDamaged: typeof targetPlanet.rBDSFTQ.ships.damagedShips = [];
+    for (const damagedShip of targetPlanet.rBDSFTQ.ships.damagedShips) {
+      if (
+        damagedShip.type === request.type
+        && remaining > 0
+        && (hangarCost <= 0 || remainingHangarCapacity >= hangarCost)
+      ) {
+        extracted.addDamaged(damagedShip.type, damagedShip.hull);
+        remaining -= 1;
+        remainingHangarCapacity = Math.max(0, remainingHangarCapacity - hangarCost);
+        continue;
+      }
+
+      updatedDamaged.push(damagedShip);
+    }
+    targetPlanet.rBDSFTQ.ships.damagedShips = updatedDamaged;
+  }
+
+  return extracted;
+}
+
+function extractMaintenanceBombs(
+  targetPlanet: Planet,
+  fleet: Fleet,
+  requestedBombs: MaintenanceRequest['requested']['bombs']
+): InstanceType<typeof ManyDefences> {
+  const extracted = ManyDefences.empty();
+  let remainingTotalHangar = Math.max(
+    0,
+    ManyShips.totalTravelHangarCapacity(fleet.ships)
+    - ManyShips.totalRequiredHangarCapacity(fleet.ships)
+    - calculateBombHangarUsageForManyDefences(fleet.carriedBombs)
+  );
+  let remainingBomberHangar = Math.max(
+    0,
+    ManyShips.totalBomberHangarCapacity(fleet.ships) - calculateBombHangarUsageForManyDefences(fleet.carriedBombs)
+  );
+
+  for (const request of requestedBombs) {
+    if (!isPlanetaryBombDefenceType(request.type)) {
+      continue;
+    }
+
+    const blueprint = DEFENCE_BLUEPRINTS.get(request.type);
+    if (!blueprint) {
+      continue;
+    }
+
+    let remaining = request.amount;
+    const size = Math.max(0, blueprint.size);
+    const availableUndamaged = targetPlanet.rBDSFTQ.defences.undamagedDefencesCount[request.type] ?? 0;
+    const hangarLimitedAmount = size <= 0
+      ? remaining
+      : Math.min(
+        remaining,
+        Math.floor(remainingTotalHangar / size),
+        Math.floor(remainingBomberHangar / size)
+      );
+    const takeUndamaged = Math.min(availableUndamaged, hangarLimitedAmount);
+    if (takeUndamaged > 0) {
+      extracted.addUndamaged(request.type, takeUndamaged);
+      remaining -= takeUndamaged;
+      remainingTotalHangar = Math.max(0, remainingTotalHangar - (takeUndamaged * size));
+      remainingBomberHangar = Math.max(0, remainingBomberHangar - (takeUndamaged * size));
+      const nextUndamaged = availableUndamaged - takeUndamaged;
+      if (nextUndamaged > 0) {
+        targetPlanet.rBDSFTQ.defences.undamagedDefencesCount[request.type] = nextUndamaged;
+      } else {
+        delete targetPlanet.rBDSFTQ.defences.undamagedDefencesCount[request.type];
+      }
+    }
+
+    if (remaining <= 0) {
+      continue;
+    }
+
+    const updatedDamaged: typeof targetPlanet.rBDSFTQ.defences.damagedDefences = [];
+    for (const damagedBomb of targetPlanet.rBDSFTQ.defences.damagedDefences) {
+      if (
+        damagedBomb.type === request.type
+        && remaining > 0
+        && (size <= 0 || (remainingTotalHangar >= size && remainingBomberHangar >= size))
+      ) {
+        extracted.addDamaged(damagedBomb.type, damagedBomb.hull);
+        remaining -= 1;
+        remainingTotalHangar = Math.max(0, remainingTotalHangar - size);
+        remainingBomberHangar = Math.max(0, remainingBomberHangar - size);
+        continue;
+      }
+
+      updatedDamaged.push(damagedBomb);
+    }
+    targetPlanet.rBDSFTQ.defences.damagedDefences = updatedDamaged;
+  }
+
+  return extracted;
+}
+
+function calculateBombHangarUsageForManyDefences(defences: InstanceType<typeof ManyDefences>): number {
+  let total = 0;
+  for (const [type, amount] of ManyDefences.countByType(defences).entries()) {
+    const blueprint = DEFENCE_BLUEPRINTS.get(type);
+    if (!blueprint) {
+      continue;
+    }
+
+    total += Math.max(0, blueprint.size) * amount;
+  }
+
+  return total;
+}
+
+function summarizeMaintenanceTransfer(payload: MaintenanceRequest['approved'] | MaintenanceRequest['requested']): string {
+  const normalized = normalizeMaintenanceTransferPayload(payload);
+  const parts: string[] = [];
+  if (normalized.fuel > 0) {
+    parts.push(`${normalized.fuel} deuterium`);
+  }
+  if (normalized.ships.length > 0) {
+    parts.push(normalized.ships.map((entry) => `${entry.type} x${entry.amount}`).join(', '));
+  }
+  if (normalized.bombs.length > 0) {
+    parts.push(normalized.bombs.map((entry) => `${entry.type} x${entry.amount}`).join(', '));
+  }
+
+  return parts.length > 0 ? parts.join(' | ') : 'nothing';
 }
 
 function expirePendingDiplomaticProposals(galaxy: Galaxy, resolvedTurnNumber: number): void {

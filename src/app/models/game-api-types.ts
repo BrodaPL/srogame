@@ -208,6 +208,52 @@ export type CreateFleetBombSelectionEntry = {
   amount: number;
 };
 
+export type MaintenanceShipTransferEntry = {
+  type: ShipType;
+  amount: number;
+};
+
+export type MaintenanceBombTransferEntry = {
+  type: DefenceType;
+  amount: number;
+};
+
+export type MaintenanceTransferPayloadDto = {
+  fuel: number;
+  ships: MaintenanceShipTransferEntry[];
+  bombs: MaintenanceBombTransferEntry[];
+};
+
+export type FleetMaintenanceShipOptionDto = {
+  type: ShipType;
+  available: number;
+  undamagedAvailable: number;
+  damagedAvailable: number;
+  size: number;
+};
+
+export type FleetMaintenanceBombOptionDto = {
+  type: DefenceType;
+  available: number;
+  undamagedAvailable: number;
+  damagedAvailable: number;
+  size: number;
+};
+
+export type FleetMaintenanceOptionsDto = {
+  fleetId: number;
+  targetPlanetName: string;
+  autoApprove: boolean;
+  fuelCap: number;
+  supportCap: number;
+  availableFuel: number;
+  remainingCargoCapacity: number;
+  remainingHangarCapacity: number;
+  remainingBomberHangarCapacity: number;
+  availableShips: FleetMaintenanceShipOptionDto[];
+  availableBombs: FleetMaintenanceBombOptionDto[];
+};
+
 export type ManyShipsDto = ManyShipsLike;
 export type ManyDefencesDto = ManyDefencesLike;
 
@@ -356,7 +402,7 @@ export type DiplomaticProposalDto = {
   direction: 'incoming' | 'outgoing';
 };
 
-export type MailRequestDto = {
+export type DiplomacyMailRequestDto = {
   requestId: number;
   requestType: 'DIPLOMACY_PROPOSAL';
   createdTurn: number;
@@ -367,6 +413,23 @@ export type MailRequestDto = {
   counterpartyPlayerName: string;
   requestedStatus: DiplomaticStatus;
 };
+
+export type MaintenanceMailRequestDto = {
+  requestId: number;
+  requestType: 'MAINTENANCE';
+  createdTurn: number;
+  expiresOnTurn: number;
+  state: DiplomaticProposalState;
+  direction: 'incoming' | 'outgoing';
+  counterpartyPlayerId: number;
+  counterpartyPlayerName: string;
+  fleetId: number;
+  targetPlanetName: string;
+  requested: MaintenanceTransferPayloadDto;
+  approved: MaintenanceTransferPayloadDto | null;
+};
+
+export type MailRequestDto = DiplomacyMailRequestDto | MaintenanceMailRequestDto;
 
 export type MailRecipientDto = {
   playerId: number;
@@ -476,6 +539,16 @@ export type CreateFleetMissionResponse = {
   activeFleets: Fleet[];
 };
 
+export type CreateMaintenanceRequestRequest = MaintenanceTransferPayloadDto;
+
+export type CreateMaintenanceRequestResponse = {
+  activeFleets: Fleet[];
+  mode: 'AUTO_APPROVED' | 'PENDING';
+  message: string;
+};
+
+export type ResolveMaintenanceRequestRequest = MaintenanceTransferPayloadDto;
+
 export type MarkPlayerReportReadRequest = {
   reportId: number;
 };
@@ -500,8 +573,13 @@ export type DeleteMailMessagesResponse = {
   deletedCount: number;
 };
 
+export type DeleteMailRequestRefDto = {
+  requestId: number;
+  requestType: MailRequestDto['requestType'];
+};
+
 export type DeleteMailRequestsRequest = {
-  requestIds: number[];
+  requests: DeleteMailRequestRefDto[];
 };
 
 export type DeleteMailRequestsResponse = {

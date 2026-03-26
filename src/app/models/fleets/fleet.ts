@@ -45,6 +45,9 @@ export class Fleet {
     public carriedBombs: ManyDefences = ManyDefences.empty(),
     public orbitActivity: FleetOrbitActivity = FleetOrbitActivity.IDLE,
     public suspendedMissionType: FleetMissionType | null = null,
-    public returnReason: FleetReturnReason = FleetReturnReason.NORMAL
+    public returnReason: FleetReturnReason = FleetReturnReason.NORMAL,
+    public maintenanceRequestAvailable: boolean = false,
+    public pendingMaintenanceRequestId: number | null = null,
+    public lastMaintenanceRequestTurn: number | null = null
   ) {}
 }

@@ -13,6 +13,7 @@ import { ManyShips } from '../fleets/many-ships';
 import { ManyDefences } from '../defences/many-defences';
 import type { DiplomaticRelation } from '../diplomacy/diplomatic-relation';
 import type { DiplomaticProposal } from '../diplomacy/diplomatic-proposal';
+import type { MaintenanceRequest } from '../requests/maintenance-request';
 
 export class Galaxy {
   public static buildSolarSystemNamePool(shuffle = true): string[] {
@@ -49,7 +50,9 @@ export class Galaxy {
     public playerNameMap: Map<string, number> = new Map(),
     public diplomaticRelations: DiplomaticRelation[] = [],
     public diplomaticProposals: DiplomaticProposal[] = [],
-    public nextDiplomaticProposalId = 1
+    public nextDiplomaticProposalId = 1,
+    public maintenanceRequests: MaintenanceRequest[] = [],
+    public nextMaintenanceRequestId = 1
   ) {}
 
   public createClientPlanet(

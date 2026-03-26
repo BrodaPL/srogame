@@ -270,6 +270,28 @@ export class Planet {
     return Math.floor(baseProduction * utilization * structuralUtilization);
   }
 
+  public getBuildingProductionValue2(type: BuildingType): number {
+    const baseProduction = this.getRawBuildingProductionValue2(type);
+    if (baseProduction <= 0) {
+      return 0;
+    }
+
+    const utilization = this.getBuildingPowerUtilization(type);
+    const structuralUtilization = this.getBuildingStructuralUtilization(type);
+    return Math.floor(baseProduction * utilization * structuralUtilization);
+  }
+
+  public getBuildingProductionValue3(type: BuildingType): number {
+    const baseProduction = this.getRawBuildingProductionValue3(type);
+    if (baseProduction <= 0) {
+      return 0;
+    }
+
+    const utilization = this.getBuildingPowerUtilization(type);
+    const structuralUtilization = this.getBuildingStructuralUtilization(type);
+    return Math.floor(baseProduction * utilization * structuralUtilization);
+  }
+
   public getBuildingPowerUtilization(type: BuildingType): number {
     const max = this.getMaxBuildingPowerConsumption(type);
     if (max <= 0) {
@@ -440,6 +462,36 @@ export class Planet {
 
     const value = blueprint.production1[level - 1];
     return Number.isFinite(value) ? value : 0;
+  }
+
+  private getRawBuildingProductionValue2(type: BuildingType): number {
+    const level = this.getBuildingLevel(type);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = Planet.buildingBlueprints.get(type);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const production = blueprint.production2[level - 1];
+    return Number.isFinite(production) ? production : 0;
+  }
+
+  private getRawBuildingProductionValue3(type: BuildingType): number {
+    const level = this.getBuildingLevel(type);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = Planet.buildingBlueprints.get(type);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const production = blueprint.production3[level - 1];
+    return Number.isFinite(production) ? production : 0;
   }
 
   private static adaptiveTechnologyMultiplier(adaptiveTechnologyLevel: number): number {

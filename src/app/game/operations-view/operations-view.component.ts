@@ -1,10 +1,18 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
+import {
+  CreateMaintenanceRequestResponse,
+  FleetMaintenanceBombOptionDto,
+  FleetMaintenanceOptionsDto,
+  FleetMaintenanceShipOptionDto,
+  MaintenanceTransferPayloadDto
+} from '../../models/game-api-types';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { WeaponType } from '../../models/enums/weapon-type';
 import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../models/fleets/fleet';
@@ -16,7 +24,7 @@ import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
 @Component({
   selector: 'app-operations-view',
-  imports: [TopMenuComponent, RouterLink],
+  imports: [TopMenuComponent, RouterLink, FormsModule],
   templateUrl: './operations-view.component.html',
   styleUrl: './operations-view.styles.css'
 })
@@ -28,8 +36,17 @@ export class OperationsViewComponent implements OnInit {
   protected isLoading = false;
   protected loadError: string | null = null;
   protected actionError: string | null = null;
+  protected actionSuccess: string | null = null;
   protected activeFleets: Fleet[] = [];
   protected activeActionFleetId: number | null = null;
+  protected maintenanceDialogFleetId: number | null = null;
+  protected maintenanceOptions: FleetMaintenanceOptionsDto | null = null;
+  protected maintenanceDialogError: string | null = null;
+  protected maintenanceDialogLoading = false;
+  protected maintenanceSubmitting = false;
+  protected requestedFuel = 0;
+  protected requestedShipAmounts: Partial<Record<string, number>> = {};
+  protected requestedBombAmounts: Partial<Record<string, number>> = {};
 
   private readonly shipBlueprints = ShipBlueprintsFactory.fromDefaultJson();
 
@@ -46,7 +63,6 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected totalShips(fleet: Fleet): number {
-    // TODO: Distinguish mission-ready vs damaged ships when operations availability gets redesigned.
     return ManyShips.totalShipsCount(fleet.ships);
   }
 
@@ -145,6 +161,10 @@ export class OperationsViewComponent implements OnInit {
     return fleet.state === FleetState.MOVING_TO_TARGET;
   }
 
+  protected canRequestMaintenance(fleet: Fleet): boolean {
+    return fleet.state === FleetState.ORBITING && fleet.maintenanceRequestAvailable;
+  }
+
   protected isActionPending(fleet: Fleet): boolean {
     return this.activeActionFleetId === fleet.fleetId;
   }
@@ -240,6 +260,141 @@ export class OperationsViewComponent implements OnInit {
     return null;
   }
 
+  protected maintenanceDialogOpen(): boolean {
+    return this.maintenanceDialogFleetId !== null;
+  }
+
+  protected maintenanceShipOptions(): FleetMaintenanceShipOptionDto[] {
+    return this.maintenanceOptions?.availableShips ?? [];
+  }
+
+  protected maintenanceBombOptions(): FleetMaintenanceBombOptionDto[] {
+    return this.maintenanceOptions?.availableBombs ?? [];
+  }
+
+  protected selectedSupportUsage(): number {
+    return this.maintenanceShipOptions().reduce((sum, option) =>
+      sum + ((this.requestedShipAmounts[option.type] ?? 0) * option.size), 0)
+      + this.maintenanceBombOptions().reduce((sum, option) =>
+        sum + ((this.requestedBombAmounts[option.type] ?? 0) * option.size), 0);
+  }
+
+  protected hasMaintenanceSelection(): boolean {
+    return this.requestedFuel > 0
+      || this.maintenanceShipOptions().some((option) => (this.requestedShipAmounts[option.type] ?? 0) > 0)
+      || this.maintenanceBombOptions().some((option) => (this.requestedBombAmounts[option.type] ?? 0) > 0);
+  }
+
+  protected canSubmitMaintenanceRequest(): boolean {
+    if (this.maintenanceSubmitting || !this.maintenanceOptions || !this.hasMaintenanceSelection()) {
+      return false;
+    }
+
+    if (this.requestedFuel > Math.min(this.maintenanceOptions.fuelCap, this.maintenanceOptions.availableFuel, this.maintenanceOptions.remainingCargoCapacity)) {
+      return false;
+    }
+
+    if (this.selectedSupportUsage() > this.maintenanceOptions.supportCap) {
+      return false;
+    }
+
+    return true;
+  }
+
+  protected updateRequestedFuel(value: number | string): void {
+    this.requestedFuel = this.normalizeAmount(value);
+  }
+
+  protected updateRequestedShipAmount(type: string, value: number | string): void {
+    this.requestedShipAmounts[type] = this.normalizeAmount(value);
+  }
+
+  protected updateRequestedBombAmount(type: string, value: number | string): void {
+    this.requestedBombAmounts[type] = this.normalizeAmount(value);
+  }
+
+  protected openMaintenanceRequest(fleet: Fleet): void {
+    if (!this.canRequestMaintenance(fleet)) {
+      return;
+    }
+
+    const session = this.playerSession.load();
+    if (!session) {
+      this.actionError = 'No player session found.';
+      return;
+    }
+
+    this.maintenanceDialogFleetId = fleet.fleetId;
+    this.maintenanceDialogLoading = true;
+    this.maintenanceDialogError = null;
+    this.maintenanceOptions = null;
+    this.requestedFuel = 0;
+    this.requestedShipAmounts = {};
+    this.requestedBombAmounts = {};
+
+    this.gameApi.getFleetMaintenanceOptions(fleet.fleetId, session.token)
+      .pipe(finalize(() => {
+        this.maintenanceDialogLoading = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (options) => {
+          this.maintenanceOptions = options;
+        },
+        error: (error) => {
+          this.maintenanceDialogError = error?.error?.error ?? 'Unable to load maintenance options.';
+        }
+      });
+  }
+
+  protected closeMaintenanceRequest(): void {
+    if (this.maintenanceSubmitting) {
+      return;
+    }
+
+    this.maintenanceDialogFleetId = null;
+    this.maintenanceOptions = null;
+    this.maintenanceDialogError = null;
+    this.requestedFuel = 0;
+    this.requestedShipAmounts = {};
+    this.requestedBombAmounts = {};
+  }
+
+  protected submitMaintenanceRequest(): void {
+    if (!this.canSubmitMaintenanceRequest() || this.maintenanceDialogFleetId === null) {
+      return;
+    }
+
+    const session = this.playerSession.load();
+    if (!session) {
+      this.maintenanceDialogError = 'No player session found.';
+      return;
+    }
+
+    this.maintenanceSubmitting = true;
+    this.maintenanceDialogError = null;
+    this.actionError = null;
+    this.actionSuccess = null;
+
+    this.gameApi.createMaintenanceRequest(
+      this.maintenanceDialogFleetId,
+      this.buildMaintenancePayload(),
+      session.token
+    )
+      .pipe(finalize(() => {
+        this.maintenanceSubmitting = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (response) => {
+          this.handleMaintenanceResponse(response);
+        },
+        error: (error) => {
+          this.maintenanceDialogError = error?.error?.error ?? 'Unable to submit maintenance request.';
+        }
+      });
+  }
+
   protected returnFleet(fleet: Fleet): void {
     if (!this.canReturn(fleet)) {
       return;
@@ -319,6 +474,7 @@ export class OperationsViewComponent implements OnInit {
 
     this.activeActionFleetId = fleetId;
     this.actionError = null;
+    this.actionSuccess = null;
 
     action(session.token)
       .pipe(finalize(() => {
@@ -328,10 +484,46 @@ export class OperationsViewComponent implements OnInit {
       .subscribe({
         next: (activeFleets) => {
           this.applyActiveFleetUpdate(activeFleets);
+          if (this.maintenanceDialogFleetId === fleetId) {
+            this.closeMaintenanceRequest();
+          }
         },
         error: (error) => {
           this.actionError = error?.error?.error ?? fallbackError;
         }
       });
+  }
+
+  private buildMaintenancePayload(): MaintenanceTransferPayloadDto {
+    return {
+      fuel: this.requestedFuel,
+      ships: this.maintenanceShipOptions()
+        .map((option) => ({
+          type: option.type,
+          amount: Math.min(this.requestedShipAmounts[option.type] ?? 0, option.available)
+        }))
+        .filter((entry) => entry.amount > 0),
+      bombs: this.maintenanceBombOptions()
+        .map((option) => ({
+          type: option.type,
+          amount: Math.min(this.requestedBombAmounts[option.type] ?? 0, option.available)
+        }))
+        .filter((entry) => entry.amount > 0)
+    };
+  }
+
+  private handleMaintenanceResponse(response: CreateMaintenanceRequestResponse): void {
+    this.applyActiveFleetUpdate(response.activeFleets);
+    this.actionSuccess = response.message;
+    this.closeMaintenanceRequest();
+  }
+
+  private normalizeAmount(value: number | string): number {
+    const numericValue = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(numericValue));
   }
 }

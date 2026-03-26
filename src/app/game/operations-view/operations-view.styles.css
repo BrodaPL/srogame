@@ -38,6 +38,14 @@
   align-content: start;
 }
 
+.operations-view__modal,
+.operations-view__modal-body,
+.operations-view__request-group,
+.operations-view__field {
+  display: grid;
+  gap: 0.8rem;
+}
+
 .operations-view__actions {
   display: flex;
   flex-wrap: wrap;
@@ -58,4 +66,50 @@
 .operations-view__action:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.operations-view__modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 60;
+}
+
+.operations-view__modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(46rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1.1rem;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(9, 13, 20, 0.96);
+  z-index: 61;
+}
+
+.operations-view__modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+
+.operations-view__request-group h4 {
+  margin: 0;
+}
+
+.operations-view__field input {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  padding: 0.52rem 0.65rem;
+}
+
+.operations-view__field small {
+  color: rgba(255, 255, 255, 0.65);
 }

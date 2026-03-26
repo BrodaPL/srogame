@@ -19,6 +19,13 @@
       </section>
     }
 
+    @if (actionSuccess) {
+      <section class="status status--success">
+        <h3>Operations updated</h3>
+        <p>{{ actionSuccess }}</p>
+      </section>
+    }
+
     <header class="overview-card operations-view__header" data-tutorial-id="operations-header">
       <div>
         <p class="eyebrow">Fleet Control</p>
@@ -104,6 +111,16 @@
                   Delay +1
                 </button>
               }
+
+              @if (canRequestMaintenance(fleet)) {
+                <button
+                  type="button"
+                  class="operations-view__action"
+                  [disabled]="isActionPending(fleet)"
+                  (click)="openMaintenanceRequest(fleet)">
+                  Request maintenance
+                </button>
+              }
             </div>
           </article>
         }
@@ -112,4 +129,97 @@
   }
 </section>
 
+@if (maintenanceDialogOpen()) {
+  <div class="operations-view__modal-backdrop" (click)="closeMaintenanceRequest()"></div>
+  <section class="operations-view__modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <div class="operations-view__modal-head">
+      <div>
+        <p class="eyebrow">Alliance Depot</p>
+        <h3>Request maintenance</h3>
+      </div>
+      <button type="button" class="operations-view__action" (click)="closeMaintenanceRequest()">Close</button>
+    </div>
+
+    @if (maintenanceDialogLoading) {
+      <p class="overview-muted">Loading depot maintenance options.</p>
+    } @else if (maintenanceDialogError) {
+      <section class="status status--error">
+        <h3>Maintenance unavailable</h3>
+        <p>{{ maintenanceDialogError }}</p>
+      </section>
+    } @else if (maintenanceOptions) {
+      <p class="overview-muted">
+        Target: {{ maintenanceOptions.targetPlanetName }}
+        | Fuel cap {{ maintenanceOptions.fuelCap }}
+        | Support cap {{ maintenanceOptions.supportCap }}
+        | {{ maintenanceOptions.autoApprove ? 'Auto-approval' : 'Manual approval required' }}
+      </p>
+      <p class="overview-muted">
+        Fleet free capacity: Cargo {{ maintenanceOptions.remainingCargoCapacity }}
+        | Hangar {{ maintenanceOptions.remainingHangarCapacity }}
+        | Bomber hangar {{ maintenanceOptions.remainingBomberHangarCapacity }}
+      </p>
+
+      <div class="operations-view__modal-body">
+        <label class="operations-view__field">
+          <span>Fuel (deuterium)</span>
+          <input
+            type="number"
+            min="0"
+            [max]="maintenanceOptions.fuelCap"
+            [ngModel]="requestedFuel"
+            (ngModelChange)="updateRequestedFuel($event)" />
+          <small>Planet has {{ maintenanceOptions.availableFuel }} deuterium available.</small>
+        </label>
+
+        @if (maintenanceShipOptions().length > 0) {
+          <section class="operations-view__request-group">
+            <h4>Small ships</h4>
+            @for (option of maintenanceShipOptions(); track option.type) {
+              <label class="operations-view__field">
+                <span>{{ option.type }} | available {{ option.available }} (ready {{ option.undamagedAvailable }}, damaged {{ option.damagedAvailable }})</span>
+                <input
+                  type="number"
+                  min="0"
+                  [max]="option.available"
+                  [ngModel]="requestedShipAmounts[option.type] ?? 0"
+                  (ngModelChange)="updateRequestedShipAmount(option.type, $event)" />
+              </label>
+            }
+          </section>
+        }
+
+        @if (maintenanceBombOptions().length > 0) {
+          <section class="operations-view__request-group">
+            <h4>PLANETARY_BOMB</h4>
+            @for (option of maintenanceBombOptions(); track option.type) {
+              <label class="operations-view__field">
+                <span>{{ option.type }} | available {{ option.available }} (ready {{ option.undamagedAvailable }}, damaged {{ option.damagedAvailable }})</span>
+                <input
+                  type="number"
+                  min="0"
+                  [max]="option.available"
+                  [ngModel]="requestedBombAmounts[option.type] ?? 0"
+                  (ngModelChange)="updateRequestedBombAmount(option.type, $event)" />
+              </label>
+            }
+          </section>
+        }
+
+        <p class="overview-muted">Selected support size: {{ selectedSupportUsage() }} / {{ maintenanceOptions.supportCap }}</p>
+      </div>
+
+      <div class="operations-view__actions">
+        <button type="button" class="operations-view__action" (click)="closeMaintenanceRequest()">Cancel</button>
+        <button
+          type="button"
+          class="operations-view__action"
+          [disabled]="!canSubmitMaintenanceRequest()"
+          (click)="submitMaintenanceRequest()">
+          {{ maintenanceSubmitting ? 'Submitting...' : 'Send request' }}
+        </button>
+      </div>
+    }
+  </section>
+}
 

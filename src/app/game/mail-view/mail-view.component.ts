@@ -1,5 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
-import { finalize } from 'rxjs';
+import { FormsModule } from '@angular/forms';
+import { finalize, Observable } from 'rxjs';
 import { AuthStateService } from '../../core/auth-state.service';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
@@ -7,6 +8,8 @@ import {
   MailRecipientDto,
   MailRequestDto,
   MailViewResponse,
+  MaintenanceMailRequestDto,
+  MaintenanceTransferPayloadDto,
   PlayerMailMessageDto
 } from '../../models/game-api-types';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -14,7 +17,7 @@ import { MessageComposeDialogComponent } from '../ui/message-compose-dialog/mess
 
 @Component({
   selector: 'app-mail-view',
-  imports: [TopMenuComponent, MessageComposeDialogComponent],
+  imports: [TopMenuComponent, MessageComposeDialogComponent, FormsModule],
   templateUrl: './mail-view.component.html',
   styleUrl: './mail-view.component.css'
 })
@@ -30,9 +33,13 @@ export class MailViewComponent implements OnInit {
   protected recipients: MailRecipientDto[] = [];
   protected allianceRecipientCount = 0;
   protected selectedMessageId: number | null = null;
-  protected activeRequestActionId: number | null = null;
+  protected activeRequestActionKey: string | null = null;
   protected activeMessageDeleteId: number | null = null;
-  protected activeRequestDeleteId: number | null = null;
+  protected activeRequestDeleteKey: string | null = null;
+  protected partialApprovalRequestKey: string | null = null;
+  protected partialApprovalFuel = 0;
+  protected partialApprovalShipAmounts: Partial<Record<string, number>> = {};
+  protected partialApprovalBombAmounts: Partial<Record<string, number>> = {};
   protected composerOpen = false;
   protected composerLockedTargetPlayerId: number | null = null;
   protected composerLockedTargetPlayerName: string | null = null;
@@ -148,15 +155,49 @@ export class MailViewComponent implements OnInit {
   }
 
   protected requestCardTitle(request: MailRequestDto): string {
+    if (request.requestType === 'MAINTENANCE') {
+      return request.direction === 'incoming' ? 'Incoming Maintenance Request' : 'Outgoing Maintenance Request';
+    }
+
     return request.direction === 'incoming' ? 'Incoming Request' : 'Outgoing Request';
   }
 
+  protected requestBadge(request: MailRequestDto): string {
+    if (request.requestType === 'MAINTENANCE') {
+      return request.state === 'PENDING' ? 'MAINTENANCE' : request.state;
+    }
+
+    return request.state === 'PENDING' ? request.requestedStatus : request.state;
+  }
+
   protected requestSummary(request: MailRequestDto): string {
+    if (request.requestType === 'MAINTENANCE') {
+      if (request.direction === 'incoming') {
+        return `${request.counterpartyPlayerName} requests maintenance for Fleet #${request.fleetId} at ${request.targetPlanetName}.`;
+      }
+
+      return `Fleet #${request.fleetId} requested maintenance from ${request.counterpartyPlayerName} at ${request.targetPlanetName}.`;
+    }
+
     if (request.direction === 'incoming') {
       return `${request.counterpartyPlayerName} requested ${request.requestedStatus}.`;
     }
 
     return `You requested ${request.requestedStatus} with ${request.counterpartyPlayerName}.`;
+  }
+
+  protected requestDetailLine(request: MailRequestDto): string {
+    if (request.requestType === 'MAINTENANCE') {
+      const requestedSummary = this.maintenancePayloadSummary(request.requested);
+      const approvedSummary = request.approved ? this.maintenancePayloadSummary(request.approved) : null;
+      if (approvedSummary) {
+        return `Requested: ${requestedSummary} | Approved: ${approvedSummary}`;
+      }
+
+      return `Requested: ${requestedSummary}`;
+    }
+
+    return `Requested status ${request.requestedStatus}`;
   }
 
   protected canAccept(request: MailRequestDto): boolean {
@@ -171,16 +212,69 @@ export class MailViewComponent implements OnInit {
     return request.state === 'PENDING' && request.direction === 'outgoing' && !this.isRequestActionPending(request);
   }
 
+  protected canPartialApprove(request: MailRequestDto): request is MaintenanceMailRequestDto {
+    return request.requestType === 'MAINTENANCE'
+      && request.state === 'PENDING'
+      && request.direction === 'incoming'
+      && !this.isRequestActionPending(request);
+  }
+
   protected canDeleteResolvedRequest(request: MailRequestDto): boolean {
     return request.state !== 'PENDING' && !this.isDeletingRequest(request);
   }
 
   protected isRequestActionPending(request: MailRequestDto): boolean {
-    return this.activeRequestActionId === request.requestId;
+    return this.activeRequestActionKey === this.requestKey(request);
   }
 
   protected isDeletingRequest(request: MailRequestDto): boolean {
-    return this.activeRequestDeleteId === request.requestId;
+    return this.activeRequestDeleteKey === this.requestKey(request);
+  }
+
+  protected isPartialApprovalOpen(request: MailRequestDto): request is MaintenanceMailRequestDto {
+    return this.canPartialApprove(request) && this.partialApprovalRequestKey === this.requestKey(request);
+  }
+
+  protected maintenanceRequest(request: MailRequestDto): MaintenanceMailRequestDto | null {
+    return request.requestType === 'MAINTENANCE' ? request : null;
+  }
+
+  protected openPartialApproval(request: MaintenanceMailRequestDto): void {
+    this.partialApprovalRequestKey = this.requestKey(request);
+    this.partialApprovalFuel = request.requested.fuel;
+    this.partialApprovalShipAmounts = Object.fromEntries(
+      request.requested.ships.map((entry) => [entry.type, entry.amount])
+    );
+    this.partialApprovalBombAmounts = Object.fromEntries(
+      request.requested.bombs.map((entry) => [entry.type, entry.amount])
+    );
+  }
+
+  protected closePartialApproval(): void {
+    this.partialApprovalRequestKey = null;
+    this.partialApprovalFuel = 0;
+    this.partialApprovalShipAmounts = {};
+    this.partialApprovalBombAmounts = {};
+  }
+
+  protected updatePartialApprovalFuel(value: number | string): void {
+    this.partialApprovalFuel = this.normalizeAmount(value);
+  }
+
+  protected updatePartialShipAmount(type: string, value: number | string): void {
+    this.partialApprovalShipAmounts[type] = this.normalizeAmount(value);
+  }
+
+  protected updatePartialBombAmount(type: string, value: number | string): void {
+    this.partialApprovalBombAmounts[type] = this.normalizeAmount(value);
+  }
+
+  protected submitPartialApproval(request: MaintenanceMailRequestDto): void {
+    this.runRequestAction(
+      request,
+      (token) => this.gameApi.approveMaintenanceRequest(request.requestId, this.buildPartialApprovalPayload(request), token),
+      'Unable to partially approve request.'
+    );
   }
 
   protected deleteMessage(message: PlayerMailMessageDto): void {
@@ -219,18 +313,20 @@ export class MailViewComponent implements OnInit {
       return;
     }
 
-    this.activeRequestDeleteId = request.requestId;
+    this.activeRequestDeleteKey = this.requestKey(request);
     this.actionError = null;
     this.actionSuccess = null;
 
-    this.gameApi.deleteMailRequests({ requestIds: [request.requestId] }, session.token)
+    this.gameApi.deleteMailRequests({
+      requests: [{ requestId: request.requestId, requestType: request.requestType }]
+    }, session.token)
       .pipe(finalize(() => {
-        this.activeRequestDeleteId = null;
+        this.activeRequestDeleteKey = null;
         this.cdr.markForCheck();
       }))
       .subscribe({
         next: () => {
-          this.requests = this.requests.filter((entry) => entry.requestId !== request.requestId);
+          this.requests = this.requests.filter((entry) => this.requestKey(entry) !== this.requestKey(request));
           this.syncMailCounts();
           this.actionSuccess = 'Request deleted.';
         },
@@ -241,6 +337,15 @@ export class MailViewComponent implements OnInit {
   }
 
   protected acceptRequest(request: MailRequestDto): void {
+    if (request.requestType === 'MAINTENANCE') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.approveMaintenanceRequest(request.requestId, null, token),
+        'Unable to approve request.'
+      );
+      return;
+    }
+
     this.runRequestAction(
       request,
       (token) => this.gameApi.acceptDiplomaticProposal(request.requestId, token),
@@ -249,6 +354,15 @@ export class MailViewComponent implements OnInit {
   }
 
   protected rejectRequest(request: MailRequestDto): void {
+    if (request.requestType === 'MAINTENANCE') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.rejectMaintenanceRequest(request.requestId, token),
+        'Unable to reject request.'
+      );
+      return;
+    }
+
     this.runRequestAction(
       request,
       (token) => this.gameApi.rejectDiplomaticProposal(request.requestId, token),
@@ -257,6 +371,15 @@ export class MailViewComponent implements OnInit {
   }
 
   protected cancelRequest(request: MailRequestDto): void {
+    if (request.requestType === 'MAINTENANCE') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.cancelMaintenanceRequest(request.requestId, token),
+        'Unable to cancel request.'
+      );
+      return;
+    }
+
     this.runRequestAction(
       request,
       (token) => this.gameApi.cancelDiplomaticProposal(request.requestId, token),
@@ -301,26 +424,27 @@ export class MailViewComponent implements OnInit {
     this.selectedMessageId = previousSelectedId !== null && this.messages.some((entry) => entry.messageId === previousSelectedId)
       ? previousSelectedId
       : this.messages[0]?.messageId ?? null;
+    this.closePartialApproval();
     this.syncMailCounts();
   }
 
   private runRequestAction(
     request: MailRequestDto,
-    action: (token: string) => ReturnType<GameApiService['acceptDiplomaticProposal']>,
+    action: (token: string) => Observable<unknown>,
     fallbackError: string
   ): void {
     const session = this.playerSession.load();
-    if (!session || this.activeRequestActionId !== null) {
+    if (!session || this.activeRequestActionKey !== null) {
       return;
     }
 
-    this.activeRequestActionId = request.requestId;
+    this.activeRequestActionKey = this.requestKey(request);
     this.actionError = null;
     this.actionSuccess = null;
 
     action(session.token)
       .pipe(finalize(() => {
-        this.activeRequestActionId = null;
+        this.activeRequestActionKey = null;
         this.cdr.markForCheck();
       }))
       .subscribe({
@@ -344,5 +468,51 @@ export class MailViewComponent implements OnInit {
       unreadMailCount: this.messages.filter((message) => !message.isRead).length,
       pendingRequestCount: this.requests.filter((request) => request.state === 'PENDING' && request.direction === 'incoming').length
     });
+  }
+
+  private requestKey(request: MailRequestDto): string {
+    return `${request.requestType}:${request.requestId}`;
+  }
+
+  private maintenancePayloadSummary(payload: MaintenanceTransferPayloadDto): string {
+    const parts: string[] = [];
+    if (payload.fuel > 0) {
+      parts.push(`${payload.fuel} deuterium`);
+    }
+    if (payload.ships.length > 0) {
+      parts.push(payload.ships.map((entry) => `${entry.type} x${entry.amount}`).join(', '));
+    }
+    if (payload.bombs.length > 0) {
+      parts.push(payload.bombs.map((entry) => `${entry.type} x${entry.amount}`).join(', '));
+    }
+
+    return parts.length > 0 ? parts.join(' | ') : 'nothing';
+  }
+
+  private buildPartialApprovalPayload(request: MaintenanceMailRequestDto): MaintenanceTransferPayloadDto {
+    return {
+      fuel: Math.min(this.partialApprovalFuel, request.requested.fuel),
+      ships: request.requested.ships
+        .map((entry) => ({
+          type: entry.type,
+          amount: Math.min(this.partialApprovalShipAmounts[entry.type] ?? 0, entry.amount)
+        }))
+        .filter((entry) => entry.amount > 0),
+      bombs: request.requested.bombs
+        .map((entry) => ({
+          type: entry.type,
+          amount: Math.min(this.partialApprovalBombAmounts[entry.type] ?? 0, entry.amount)
+        }))
+        .filter((entry) => entry.amount > 0)
+    };
+  }
+
+  private normalizeAmount(value: number | string): number {
+    const numericValue = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(numericValue));
   }
 }

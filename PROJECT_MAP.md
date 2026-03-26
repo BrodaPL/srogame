@@ -153,6 +153,8 @@ Queues and production:
 
 Fleet operations:
 - `/api/game/active-fleets`
+- `/api/game/active-fleets/:fleetId/maintenance-options`
+- `/api/game/active-fleets/:fleetId/maintenance-request`
 - `/api/game/active-fleets/:fleetId/return`
 - `/api/game/active-fleets/:fleetId/delay`
 
@@ -164,6 +166,9 @@ Reports and tutorials:
 - `/api/game/mail/messages/read`
 - `/api/game/mail/messages/delete`
 - `/api/game/mail/requests/delete`
+- `/api/game/mail/maintenance-requests/:requestId/approve`
+- `/api/game/mail/maintenance-requests/:requestId/reject`
+- `/api/game/mail/maintenance-requests/:requestId/cancel`
 - `/api/game/mail/messages/send`
 - `/api/game/tutorial-read`
 
@@ -210,6 +215,7 @@ Owns:
 - fleet lifecycle state
 - orbit stance state (`PASSIVE_HOLD`, `GUARDING`, mission-in-progress orbit)
 - ship storage model
+- carried bomb storage and maintenance-request metadata
 - per-ship damaged hull state
 - shipyard queue payload shape
 
@@ -290,14 +296,28 @@ Owns:
 
 Primary files:
 - `src/app/models/mail/`
+- `src/app/models/requests/maintenance-request.ts`
 - `src/app/game/mail-view/`
 - `src/app/game/ui/message-compose-dialog/`
 
 Owns:
 - player-to-player message model hierarchy
-- mail request projection from diplomacy proposals
+- mixed mail request projection from diplomacy proposals and maintenance requests
 - reusable compose/reply popup
 - mail attention counts used by top menu and end-turn lock
+
+### Logistics requests
+
+Primary files:
+- `src/app/models/requests/maintenance-request.ts`
+- `src/app/game/operations-view/`
+- `server/src/index.ts`
+
+Owns:
+- `ALLIANCE_DEPOT` maintenance request domain model
+- request creation, approval, rejection, cancellation, expiry, and auto-cancel rules
+- orbit-fleet maintenance availability metadata
+- depot transfer rules for fuel, `PLANETARY_BOMB`s, and `HullClass.SMALL` ships
 
 ### Queues
 
@@ -354,6 +374,7 @@ Smoke scenario definitions:
 
 Notable smoke coverage:
 - `guardOrbitStatus` seeds one `Guarding Orbit` fleet and one `Passive Orbit` fleet so the Operations/UI and orbit-state serialization stay visible in browser verification
+- no dedicated maintenance-request smoke scenario yet; current maintenance coverage is TypeScript build + shared resolver/spec suites only
 
 Browser/MCP workflow:
 - `McpTesting.md`
@@ -378,6 +399,15 @@ Change mission rules or add a mission:
 - `src/app/game/operations-view/`
 - `server/src/index.ts` for launch endpoint validation if needed
 - `src/app/models/turns/phase-one-turn-resolver.ts` if end-turn behavior changes
+
+Change maintenance-request / `ALLIANCE_DEPOT` logistics:
+- `src/app/models/requests/maintenance-request.ts`
+- `src/app/models/game-api-types.ts`
+- `src/app/core/game-api.service.ts`
+- `src/app/game/operations-view/`
+- `src/app/game/mail-view/`
+- `server/src/index.ts`
+- `src/app/models/planets/planet.ts` if depot cap formulas change
 
 Change turn resolution:
 - `src/app/models/turns/phase-one-turn-resolver.ts`
