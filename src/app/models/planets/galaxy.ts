@@ -69,12 +69,13 @@ export class Galaxy {
       planet.basicInfo.order,
       planet.basicInfo.solarSystem,
       planet.basicInfo.image,
-      planet.basicInfo.size
+      planet.basicInfo.baseSize,
+      planet.basicInfo.terraformerSizeBonus
     );
 
     const isOwnedByPlayer = planet.info.ownerId === playerId;
     const info = isOwnedByPlayer
-      ? planet.info
+      ? new PlanetInfo(planet.info.ownerId, planet.getEffectivePlanetaryParameters())
       : new PlanetInfo(null, new PlanetaryParameters(0, 0, 0, 0, 0, 0, 0, 0, 0));
     const rBDSFTQ = isOwnedByPlayer
       ? planet.rBDSFTQ

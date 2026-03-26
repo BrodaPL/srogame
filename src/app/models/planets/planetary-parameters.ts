@@ -12,4 +12,18 @@ export class PlanetaryParameters {
     // -80%..50%. Affects Jumpgate + Interstellar Trade Port capacity base level. 5% steps.
     public hyperspaceParameters: number
   ) {}
+
+  public copy(): PlanetaryParameters {
+    return new PlanetaryParameters(
+      this.metalModifier,
+      this.crystalModifier,
+      this.deuteriumModifier,
+      this.energyModifierRES,
+      this.energyModifierNuclear,
+      this.scienceModifier,
+      this.industryModifier,
+      this.anomaliesAndNoise,
+      this.hyperspaceParameters
+    );
+  }
 }

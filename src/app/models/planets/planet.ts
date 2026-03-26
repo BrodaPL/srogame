@@ -14,7 +14,7 @@ import { ShipyardQueueEntry } from '../fleets/shipyard-queue-entry';
 import { TechnologyQueueEntry } from '../tech/technology-queue-entry';
 import { ResearchHelperFor } from '../tech/research-helper-for';
 
-type ModifierKey = keyof PlanetaryParameters;
+type ModifierKey = keyof Omit<PlanetaryParameters, 'copy'>;
 
 type ModifierRange = {
   min: number;
@@ -29,8 +29,13 @@ export class PlanetBasicInfo {
     public order: number,
     public solarSystem: SolarSystem,
     public image: string,
-    public size: number
+    public baseSize: number,
+    public terraformerSizeBonus = 0
   ) {}
+
+  public get size(): number {
+    return this.baseSize + this.terraformerSizeBonus;
+  }
 }
 
 export class PlanetInfo {
@@ -60,6 +65,22 @@ export class rBDSFTQ {
 
 export class Planet {
   private static buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
+  private static readonly TERRAFORMER_AFFECTED_PARAMETER_KEYS: Array<
+    keyof Pick<
+      PlanetaryParameters,
+      'metalModifier'
+      | 'crystalModifier'
+      | 'deuteriumModifier'
+      | 'scienceModifier'
+      | 'industryModifier'
+    >
+  > = [
+    'metalModifier',
+    'crystalModifier',
+    'deuteriumModifier',
+    'scienceModifier',
+    'industryModifier'
+  ];
 
   public static createStartingPlanet(
     name: string,
@@ -194,17 +215,22 @@ export class Planet {
   public setBuildingLevel(type: BuildingType, level: number): void {
     const previousLevel = this.getBuildingLevel(type);
     const previousMaxStructuralPoints = this.getMaxBuildingStructuralPoints(type);
+    const previousTerraformerSizeBonus = type === BuildingType.TERRAFORMER
+      ? this.basicInfo.terraformerSizeBonus
+      : 0;
     const normalized = Math.max(0, Math.floor(level));
     if (normalized === 0) {
       this.rBDSFTQ.buildingsLevels.delete(type);
       this.rBDSFTQ.buildingsCurrentPowerConsumption.delete(type);
       this.rBDSFTQ.buildingsCurrentStructuralPoints.delete(type);
+      this.normalizeTerraformerSizeBonus(type, previousTerraformerSizeBonus, normalized);
       return;
     }
 
     this.rBDSFTQ.buildingsLevels.set(type, normalized);
     this.normalizeCurrentPowerConsumption(type);
     this.normalizeCurrentStructuralPoints(type, previousLevel, previousMaxStructuralPoints);
+    this.normalizeTerraformerSizeBonus(type, previousTerraformerSizeBonus, normalized);
   }
 
   public addBuildingLevel(type: BuildingType, delta = 1): number {
@@ -310,10 +336,6 @@ export class Planet {
     const level = this.getBuildingLevel(type);
     if (level <= 0) {
       return 0;
-    }
-
-    if (type === BuildingType.TERRAFORMER) {
-      return 1;
     }
 
     const max = this.getMaxBuildingStructuralPoints(type);
@@ -429,24 +451,55 @@ export class Planet {
   }
 
   public getMetalGain(adaptiveTechnologyLevel: number): number {
+    const parameters = this.getEffectivePlanetaryParameters();
     const gain = this.getBuildingProductionValue1(BuildingType.METAL_MINE)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.info.planetaryParameters.metalModifier;
+      * parameters.metalModifier;
     return Number.isFinite(gain) ? Math.floor(gain) : 0;
   }
 
   public getCrystalGain(adaptiveTechnologyLevel: number): number {
+    const parameters = this.getEffectivePlanetaryParameters();
     const gain = this.getBuildingProductionValue1(BuildingType.CRYSTAL_MINE)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.info.planetaryParameters.crystalModifier;
+      * parameters.crystalModifier;
     return Number.isFinite(gain) ? Math.floor(gain) : 0;
   }
 
   public getDeuteriumGain(adaptiveTechnologyLevel: number): number {
+    const parameters = this.getEffectivePlanetaryParameters();
     const gain = this.getBuildingProductionValue1(BuildingType.DEUTERIUM_SYNTHESIZER)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
-      * this.info.planetaryParameters.deuteriumModifier;
+      * parameters.deuteriumModifier;
     return Number.isFinite(gain) ? Math.floor(gain) : 0;
+  }
+
+  public getEffectivePlanetaryParameters(): PlanetaryParameters {
+    const effective = this.info.planetaryParameters.copy();
+    const terraformerPenaltyReduction = this.getTerraformerPenaltyReduction();
+    if (terraformerPenaltyReduction <= 0) {
+      return effective;
+    }
+
+    for (const key of Planet.TERRAFORMER_AFFECTED_PARAMETER_KEYS) {
+      const currentValue = effective[key];
+      effective[key] = currentValue >= 1
+        ? currentValue
+        : Math.min(1, currentValue + terraformerPenaltyReduction);
+    }
+
+    return effective;
+  }
+
+  public getTerraformerPenaltyReduction(): number {
+    const terraformerLevel = this.getBuildingLevel(BuildingType.TERRAFORMER);
+    if (terraformerLevel <= 0) {
+      return 0;
+    }
+
+    const buildingEffectiveness = this.getBuildingPowerUtilization(BuildingType.TERRAFORMER)
+      * this.getBuildingStructuralUtilization(BuildingType.TERRAFORMER);
+    return Math.max(0, (terraformerLevel * buildingEffectiveness) / 100);
   }
 
   private getRawBuildingProductionValue1(type: BuildingType): number {
@@ -541,6 +594,35 @@ export class Planet {
 
     const previousRatio = Math.min(1, Math.max(0, existing / previousMaxStructuralPoints));
     this.rBDSFTQ.buildingsCurrentStructuralPoints.set(type, Math.floor(max * previousRatio));
+  }
+
+  private normalizeTerraformerSizeBonus(
+    type: BuildingType,
+    previousTerraformerSizeBonus: number,
+    currentLevel: number
+  ): void {
+    if (type !== BuildingType.TERRAFORMER) {
+      return;
+    }
+
+    this.basicInfo.terraformerSizeBonus = Math.max(
+      previousTerraformerSizeBonus,
+      Planet.terraformerSizeBonusForLevel(currentLevel)
+    );
+  }
+
+  private static terraformerSizeBonusForLevel(level: number): number {
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = Planet.buildingBlueprints.get(BuildingType.TERRAFORMER);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const sizeBonus = blueprint.production1[level - 1];
+    return Number.isFinite(sizeBonus) ? Math.max(0, Math.floor(sizeBonus)) : 0;
   }
 
   public static buildingLevelsFromRecord(

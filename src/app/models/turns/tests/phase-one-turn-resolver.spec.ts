@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
+import { BuildingQueueEntry } from '../../buildings/building-queue-entry';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { DefenceType } from '../../enums/defence-type';
 import { BuildingType } from '../../enums/building-type';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
 import { PlayerType } from '../../enums/player-type';
 import { ShipType } from '../../enums/ship-type';
+import { TechnologyType } from '../../enums/technology-type';
 import { ManyDefences } from '../../defences/many-defences';
 import { Fleet, FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import { ManyShips } from '../../fleets/many-ships';
@@ -14,6 +16,7 @@ import { Galaxy } from '../../planets/galaxy';
 import { SolarSystem } from '../../planets/solar-system';
 import { Player } from '../../player';
 import { ResourcesPack } from '../../resources-pack';
+import { TechnologyQueueEntry } from '../../tech/technology-queue-entry';
 import { resolvePhaseOneTurn } from '../phase-one-turn-resolver';
 
 const blueprints = ShipBlueprintsFactory.fromDefaultJson();
@@ -834,6 +837,40 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(galaxy.activeFleets).toHaveLength(1);
     expect(galaxy.activeFleets[0].ownerId).toBe(1);
     expect(galaxy.activeFleets[0].state).toBe(FleetState.ORBITING);
+  });
+
+  it('uses terraformer-adjusted industry and science modifiers during turn-resolution queue progress', () => {
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        const homePlanet = solarSystem.planets[0];
+        homePlanet.basicInfo.name = 'Alpha Prime';
+        homePlanet.info.ownerId = 1;
+        homePlanet.info.planetaryParameters.industryModifier = 0.8;
+        homePlanet.info.planetaryParameters.scienceModifier = 0.95;
+        homePlanet.info.planetaryParameters.energyModifierRES = 1;
+        homePlanet.info.planetaryParameters.energyModifierNuclear = 1;
+        homePlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 13);
+        homePlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+        homePlanet.setBuildingLevel(BuildingType.RESEARCH_LAB, 1);
+        homePlanet.setBuildingLevel(BuildingType.TERRAFORMER, 10);
+        homePlanet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(BuildingType.METAL_MINE, 1, 0));
+        homePlanet.rBDSFTQ.currentResearchQueue = new TechnologyQueueEntry(
+          TechnologyType.ENERGY_TECHNOLOGY,
+          1,
+          0,
+          []
+        );
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(27);
+    expect(system.planets[0].rBDSFTQ.currentResearchQueue?.investedResearchPower).toBe(20);
   });
 
   it('prioritizes non-small damaged ships for strong repair equipment', () => {

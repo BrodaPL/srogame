@@ -73,7 +73,7 @@ export class EspionageReportData extends PlayerReport {
         sourceSystemName: this.sourceSystemName,
         senderPlayerName: this.senderPlayerName
       },
-      this.planetaryParameters,
+      this.planetaryParameters.copy(),
       this.averageBuildingLevel,
       this.averageTotalResources,
       this.averageTechLevel,

@@ -23,6 +23,10 @@ describe('Planet', () => {
     metalModifier?: number;
     crystalModifier?: number;
     deuteriumModifier?: number;
+    scienceModifier?: number;
+    industryModifier?: number;
+    anomaliesAndNoise?: number;
+    hyperspaceParameters?: number;
   }): Planet => {
     const system = createSystem();
     const modifiers = new PlanetaryParameters(
@@ -31,10 +35,10 @@ describe('Planet', () => {
       overrides?.deuteriumModifier ?? 1,
       1,
       1,
-      1,
-      1,
-      0,
-      0
+      overrides?.scienceModifier ?? 1,
+      overrides?.industryModifier ?? 1,
+      overrides?.anomaliesAndNoise ?? 0,
+      overrides?.hyperspaceParameters ?? 0
     );
 
     return new Planet(
@@ -139,6 +143,61 @@ describe('Planet', () => {
 
     const levelTwoMax = planet.getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
     expect(planet.getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBe(Math.floor(levelTwoMax * 0.5));
+  });
+
+  it('applies terraformer penalty reduction only to penalized planetary parameters and caps them at 1', () => {
+    const planet = createPlanet({
+      metalModifier: 0.8,
+      crystalModifier: 0.95,
+      deuteriumModifier: 1.1,
+      scienceModifier: 0.92,
+      industryModifier: 0.4,
+      anomaliesAndNoise: 0.35,
+      hyperspaceParameters: 0.55
+    });
+
+    planet.setBuildingLevel(BuildingType.TERRAFORMER, 10);
+
+    const effective = planet.getEffectivePlanetaryParameters();
+
+    expect(effective.metalModifier).toBeCloseTo(0.9, 8);
+    expect(effective.crystalModifier).toBe(1);
+    expect(effective.deuteriumModifier).toBe(1.1);
+    expect(effective.scienceModifier).toBe(1);
+    expect(effective.industryModifier).toBeCloseTo(0.5, 8);
+    expect(effective.anomaliesAndNoise).toBeCloseTo(0.35, 8);
+    expect(effective.hyperspaceParameters).toBeCloseTo(0.55, 8);
+  });
+
+  it('scales terraformer penalty reduction with power and structural utilization', () => {
+    const planet = createPlanet({ metalModifier: 0.8 });
+    planet.setBuildingLevel(BuildingType.TERRAFORMER, 10);
+
+    const maxStructuralPoints = planet.getMaxBuildingStructuralPoints(BuildingType.TERRAFORMER);
+    planet.setCurrentBuildingPowerConsumption(BuildingType.TERRAFORMER, 15);
+    planet.setCurrentBuildingStructuralPoints(BuildingType.TERRAFORMER, Math.floor(maxStructuralPoints / 2));
+
+    expect(planet.getTerraformerPenaltyReduction()).toBeCloseTo(0.025, 8);
+    expect(planet.getEffectivePlanetaryParameters().metalModifier).toBeCloseTo(0.825, 8);
+  });
+
+  it('keeps terraformer planet size increases permanently after completion', () => {
+    const planet = createPlanet();
+
+    expect(planet.basicInfo.size).toBe(100);
+
+    planet.setBuildingLevel(BuildingType.TERRAFORMER, 1);
+    expect(planet.basicInfo.size).toBe(104);
+
+    planet.setCurrentBuildingPowerConsumption(BuildingType.TERRAFORMER, 0);
+    planet.setCurrentBuildingStructuralPoints(BuildingType.TERRAFORMER, 0);
+    expect(planet.basicInfo.size).toBe(104);
+
+    planet.setBuildingLevel(BuildingType.TERRAFORMER, 10);
+    expect(planet.basicInfo.size).toBe(140);
+
+    planet.setBuildingLevel(BuildingType.TERRAFORMER, 0);
+    expect(planet.basicInfo.size).toBe(140);
   });
 
   it('creates starting planets with neutral multiplier parameters set to 1', () => {

@@ -265,12 +265,15 @@ export class EncyclopediaMechanicsComponent {
         'Buildings use Structural Points derived from current level cost and never disappear when reduced to 0 SP.',
         'Lower structural integrity reduces output through structural utilization, then combines with power utilization.',
         'Bunker Network provides a minimum structural floor for most buildings, while Jump Gate, Sensor Phalanx, and Bomb Depot can still fall to 0%.',
-        'Terraformer can take damage and be repaired, but its effect does not scale down from structural loss.'
+        'Terraformer size gain is permanent once a level completes, but its live parameter-penalty reduction still scales with current power and structural effectiveness.',
+        'Terraformer only improves penalized metal, crystal, deuterium, science, and industry modifiers up to 1.0; it does not change anomalies/noise or hyperspace parameters.'
       ],
       formulas: [
         'maxBuildingSP = metalCost * 2 + crystalCost + floor(deuteriumCost * 0.5)',
         'finalBuildingEffectiveness = powerUtilization * structuralUtilization',
-        'minimumStructuralUtilization = 0.02 + 0.01 * BUNKER_NETWORK'
+        'minimumStructuralUtilization = 0.02 + 0.01 * BUNKER_NETWORK',
+        'terraformerPenaltyReduction = TERRAFORMER level * finalBuildingEffectiveness * 1%',
+        'effectivePlanetModifier = min(1.0, baseModifier + terraformerPenaltyReduction) for modifiers below 1.0'
       ]
     },
     {

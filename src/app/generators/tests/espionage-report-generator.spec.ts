@@ -111,7 +111,9 @@ describe('EspionageReportGenerator', () => {
       ships: Array.from(report.ships.entries())
     });
 
-    expect(report.planetaryParameters).toBe(planet.info.planetaryParameters);
+    expect(report.planetaryParameters).not.toBe(planet.info.planetaryParameters);
+    expect(report.planetaryParameters.metalModifier).toBe(0);
+    expect(report.planetaryParameters.anomaliesAndNoise).toBe(0);
     expect(report.averageBuildingLevel).toBeCloseTo((4 + 9 + 2) / 3, 6);
     expect(report.averageTotalResources).toBe(600);
     expect(report.averageTechLevel).toBeCloseTo((4 + 2) / 2, 6);
@@ -139,6 +141,14 @@ describe('EspionageReportGenerator', () => {
     ]);
     const attacker = createPlayer(1, 'Attacker', attackerTech);
     const defender = createPlayer(2, 'Defender', defenderTech);
+    planet.info.planetaryParameters.metalModifier = 0.8;
+    planet.info.planetaryParameters.crystalModifier = 0.95;
+    planet.info.planetaryParameters.deuteriumModifier = 1.1;
+    planet.info.planetaryParameters.scienceModifier = 0.92;
+    planet.info.planetaryParameters.industryModifier = 0.4;
+    planet.info.planetaryParameters.anomaliesAndNoise = 0.35;
+    planet.info.planetaryParameters.hyperspaceParameters = 0.55;
+    planet.setBuildingLevel(BuildingType.TERRAFORMER, 10);
 
     const report = generator.createEspionageReport(attacker, defender, planet, 1);
 
@@ -157,7 +167,14 @@ describe('EspionageReportGenerator', () => {
       ships: Array.from(report.ships.entries())
     });
 
-    expect(report.planetaryParameters).toBe(planet.info.planetaryParameters);
+    expect(report.planetaryParameters).not.toBe(planet.info.planetaryParameters);
+    expect(report.planetaryParameters.metalModifier).toBeCloseTo(0.9, 8);
+    expect(report.planetaryParameters.crystalModifier).toBe(1);
+    expect(report.planetaryParameters.deuteriumModifier).toBe(1.1);
+    expect(report.planetaryParameters.scienceModifier).toBe(1);
+    expect(report.planetaryParameters.industryModifier).toBeCloseTo(0.5, 8);
+    expect(report.planetaryParameters.anomaliesAndNoise).toBeCloseTo(0.35, 8);
+    expect(report.planetaryParameters.hyperspaceParameters).toBeCloseTo(0.55, 8);
     expect(report.averageBuildingLevel).toBe(0);
     expect(report.averageTotalResources).toBe(0);
     expect(report.averageTechLevel).toBe(0);

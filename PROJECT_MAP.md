@@ -199,6 +199,7 @@ Primary files:
 Owns:
 - galaxy generation
 - planet/system structure
+- effective planetary parameter derivation and permanent terraformer size bonus handling
 - abandonment and ownership transitions
 - galaxy-view presentation data
 

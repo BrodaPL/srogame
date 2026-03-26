@@ -186,6 +186,7 @@ function createPlanetTurnSnapshot(
   const intergalacticResearchNetworkLevel = techLevels?.get(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK) ?? 0;
   const energyState = calculateEnergyState(planet, energyTechnologyLevel);
   const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
+  const effectiveParameters = planet.getEffectivePlanetaryParameters();
   const naniteMultiplier = planet.getBuildingLevel(BuildingType.NANITE_FACTORY) <= 0
     ? 1
     : planet.getBuildingProductionValue1(BuildingType.NANITE_FACTORY);
@@ -196,8 +197,8 @@ function createPlanetTurnSnapshot(
     ? 0
     : planet.getBuildingProductionValue1(BuildingType.SHIPYARD);
   const researchLabBasePower = planet.getBuildingProductionValue1(BuildingType.RESEARCH_LAB);
-  const industryModifier = planet.info.planetaryParameters.industryModifier;
-  const scienceModifier = planet.info.planetaryParameters.scienceModifier;
+  const industryModifier = effectiveParameters.industryModifier;
+  const scienceModifier = effectiveParameters.scienceModifier;
   const adaptiveIndustryMultiplier = industryPowerMultiplier(adaptiveTechnologyLevel);
   const totalResearchMultiplier = researchPowerMultiplier(
     computerTechnologyLevel,

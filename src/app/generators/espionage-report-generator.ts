@@ -92,6 +92,7 @@ export class EspionageReportGenerator {
     const defencesProduction = includeQueues ? new DefencesQueue() : new DefencesQueue();
     const researchProduction = includeQueues ? new ResearchQueue() : new ResearchQueue();
     const buildingProduction = includeQueues ? new BuildingQueue() : new BuildingQueue();
+    const planetaryParameters = planet.getEffectivePlanetaryParameters();
 
     return new EspionageReportData(
       {
@@ -104,7 +105,7 @@ export class EspionageReportGenerator {
         sourceSystemName,
         senderPlayerName: options?.senderPlayerName ?? planetOwner?.playerName ?? null
       },
-      planet.info.planetaryParameters,
+      planetaryParameters,
       buildingsAverage,
       totalResources,
       techAverage,
