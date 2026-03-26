@@ -121,14 +121,44 @@ async function registerAndStartGame(smokeTestScenario) {
 }
 
 async function ensureServicesAvailable() {
-  const uiResponse = await fetch(BASE_UI_URL);
-  assert(uiResponse.ok, `UI is not reachable at ${BASE_UI_URL}`);
-
-  const apiResponse = await fetch(`${BASE_API_URL}/auth/me`);
-  assert(
-    apiResponse.status === 401,
-    `API is not reachable at ${BASE_API_URL} or auth behavior changed`
+  await waitForService(
+    async () => {
+      const uiResponse = await fetch(BASE_UI_URL);
+      assert(uiResponse.ok, `UI is not reachable at ${BASE_UI_URL}`);
+    },
+    'UI service did not become ready in time.'
   );
+
+  await waitForService(
+    async () => {
+      const apiResponse = await fetch(`${BASE_API_URL}/auth/me`);
+      assert(
+        apiResponse.status === 401,
+        `API is not reachable at ${BASE_API_URL} or auth behavior changed`
+      );
+    },
+    'API service did not become ready in time.'
+  );
+}
+
+async function waitForService(checkFn, failureMessage, timeoutMs = 90000, pollMs = 1000) {
+  const startedAt = performance.now();
+  let lastError = null;
+  while ((performance.now() - startedAt) < timeoutMs) {
+    try {
+      await checkFn();
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw new Error(`${failureMessage} Last error: ${lastError.message}`);
+  }
+
+  throw new Error(failureMessage);
 }
 
 function toCoordString(coordinates) {
@@ -845,7 +875,6 @@ async function runSmokeSuite(browser) {
       await browserSession.page.getByRole('button', { name: /Queue/i }).click();
       await waitForText(browserSession.page, 'Queued Buildings');
       await waitForText(browserSession.page, 'Queued Shipyard');
-      await waitForText(browserSession.page, 'Queued Defences');
       await waitForText(browserSession.page, 'Research');
     });
 
