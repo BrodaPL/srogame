@@ -1128,6 +1128,54 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeLessThan(maxStructuralPoints);
   });
 
+  it('returns Siege fleets when only return fuel reserve remains', () => {
+    const siegeFleet = new Fleet(
+      305,
+      1,
+      FleetMissionType.SIEGE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Bastion',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      10,
+      0,
+      0,
+      2,
+      2,
+      FleetState.ORBITING,
+      1,
+      ManyDefences.empty(),
+      FleetOrbitActivity.MISSION_IN_PROGRESS,
+      null,
+      undefined,
+      false,
+      null,
+      null,
+      null,
+      5
+    );
+
+    const { galaxy, system } = createPlayersAndGalaxy(siegeFleet, (solarSystem) => {
+      solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+      solarSystem.planets[0].info.ownerId = 1;
+      solarSystem.planets[1].basicInfo.name = 'Beta Bastion';
+      solarSystem.planets[1].info.ownerId = 2;
+      solarSystem.planets[1].setBuildingLevel(BuildingType.METAL_MINE, 1);
+      solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+    });
+
+    const maxStructuralPoints = system.planets[1].getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.RETURNING);
+    expect(galaxy.activeFleets[0].remainingFuelReserve).toBe(5);
+    expect(system.planets[1].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBe(maxStructuralPoints);
+  });
+
   it('lets Recycle missions establish orbit over hostile debris fields when no defenders remain', () => {
     const recycleFleet = new Fleet(
       400,

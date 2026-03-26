@@ -123,6 +123,80 @@
             </div>
           </article>
 
+          @if (supportsBombardmentPriorities()) {
+            <article class="overview-card mission-planner__details-card">
+              <h3>Bombard Priorities</h3>
+              <p class="overview-muted mission-planner__compact-copy">
+                Empty priorities keep current random targeting. Used options are disabled in the other dropdowns.
+              </p>
+              <div class="mission-planner__cargo-grid">
+                <label class="mission-planner__cargo-field">
+                  <span>Main</span>
+                  <select
+                    [ngModel]="bombardmentPriorityValue('main')"
+                    (ngModelChange)="setBombardmentPriority('main', $event)"
+                  >
+                    <option value="">Random</option>
+                    @for (group of bombardmentPriorityGroups; track group.label) {
+                      <optgroup [label]="group.label">
+                        @for (option of group.options; track option.value) {
+                          <option
+                            [value]="option.value"
+                            [disabled]="isBombardmentPriorityOptionDisabled('main', option.value)"
+                          >
+                            {{ option.label }}
+                          </option>
+                        }
+                      </optgroup>
+                    }
+                  </select>
+                </label>
+                <label class="mission-planner__cargo-field">
+                  <span>Secondary</span>
+                  <select
+                    [ngModel]="bombardmentPriorityValue('secondary')"
+                    (ngModelChange)="setBombardmentPriority('secondary', $event)"
+                  >
+                    <option value="">Random</option>
+                    @for (group of bombardmentPriorityGroups; track group.label) {
+                      <optgroup [label]="group.label">
+                        @for (option of group.options; track option.value) {
+                          <option
+                            [value]="option.value"
+                            [disabled]="isBombardmentPriorityOptionDisabled('secondary', option.value)"
+                          >
+                            {{ option.label }}
+                          </option>
+                        }
+                      </optgroup>
+                    }
+                  </select>
+                </label>
+                <label class="mission-planner__cargo-field">
+                  <span>Tertiary</span>
+                  <select
+                    [ngModel]="bombardmentPriorityValue('tertiary')"
+                    (ngModelChange)="setBombardmentPriority('tertiary', $event)"
+                  >
+                    <option value="">Random</option>
+                    @for (group of bombardmentPriorityGroups; track group.label) {
+                      <optgroup [label]="group.label">
+                        @for (option of group.options; track option.value) {
+                          <option
+                            [value]="option.value"
+                            [disabled]="isBombardmentPriorityOptionDisabled('tertiary', option.value)"
+                          >
+                            {{ option.label }}
+                          </option>
+                        }
+                      </optgroup>
+                    }
+                  </select>
+                </label>
+              </div>
+            </article>
+          }
+
           <article
             class="overview-card mission-planner__summary-card"
             data-tutorial-id="mission-planner-travel-summary"

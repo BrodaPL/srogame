@@ -20,6 +20,7 @@ import type { SmokeTestScenarioKey } from './testing/smoke-test-scenarios';
 import type { TutorialReadState, TutorialViewKey } from '../tutorial/tutorial-types';
 import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
 import type { DiplomaticProposalState } from './diplomacy/diplomatic-proposal-state';
+import type { BombardmentPriorities } from './bombardment/bombardment-priority';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -532,6 +533,7 @@ export type CreateFleetMissionRequest = {
   ships: CreateFleetShipSelectionEntry[];
   carriedBombs: CreateFleetBombSelectionEntry[];
   cargo: ResourcesPackDto;
+  bombardmentPriorities?: BombardmentPriorities | null;
 };
 
 export type CreateFleetMissionResponse = {

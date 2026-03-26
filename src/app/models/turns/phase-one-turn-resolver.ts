@@ -9,6 +9,10 @@ import {
   hasBombardmentWeapons,
   hasDamagedBuildings
 } from '../bombardment/building-bombardment';
+import {
+  bombardmentPriorityLabel,
+  hasAnyBombardmentPriority
+} from '../bombardment/bombardment-priority';
 import { SpaceBattleResolver, type SpaceBattleResult } from '../battles/space-battle-resolver';
 import { DefenceInstance } from '../defences/defence-instance';
 import { ManyDefences } from '../defences/many-defences';
@@ -756,6 +760,10 @@ function resolveIdleFleetState(
       return fleet;
     }
 
+    if (!consumeFuelForSiegeTurn(fleet, resolvedTurnNumber)) {
+      return fleet;
+    }
+
     applyPostArrivalBombardmentIfNeeded(
       fleet,
       targetPlanet,
@@ -908,7 +916,10 @@ function applyPostArrivalBombardmentIfNeeded(
     return;
   }
 
-  const summary = applyBuildingBombardment(fleet.ships, targetPlanet, fleet.carriedBombs);
+  const summary = applyBuildingBombardment(fleet.ships, targetPlanet, fleet.carriedBombs, {
+    missionType: fleet.missionType,
+    priorities: fleet.bombardmentPriorities
+  });
   fleet.carriedBombs = summary.remainingBombs;
   if (summary.shots <= 0) {
     return;
@@ -1427,6 +1438,37 @@ function createReturningFleet(
   return fleet;
 }
 
+function calculateSiegeFuelUpkeep(fleet: Fleet): number {
+  return Math.max(1, Math.ceil(fleet.fuelCost / Math.max(1, fleet.travelTurns)));
+}
+
+function calculateRequiredReturnFuelReserve(fleet: Fleet): number {
+  return Math.max(0, Math.ceil(fleet.fuelCost / 2));
+}
+
+function consumeFuelForSiegeTurn(
+  fleet: Fleet,
+  resolvedTurnNumber: number
+): boolean {
+  if (fleet.fuelCost <= 0) {
+    fleet.remainingFuelReserve = Math.max(0, fleet.remainingFuelReserve);
+    return true;
+  }
+
+  const upkeep = calculateSiegeFuelUpkeep(fleet);
+  const requiredReturnReserve = calculateRequiredReturnFuelReserve(fleet);
+  const availableReserve = Number.isFinite(fleet.remainingFuelReserve)
+    ? Math.max(0, fleet.remainingFuelReserve)
+    : Math.max(0, fleet.fuelCost);
+  if (availableReserve <= requiredReturnReserve || (availableReserve - upkeep) < requiredReturnReserve) {
+    createReturningFleet(fleet, resolvedTurnNumber);
+    return false;
+  }
+
+  fleet.remainingFuelReserve = Math.max(0, availableReserve - upkeep);
+  return true;
+}
+
 function createMissionFailureReturnFleet(
   fleet: Fleet,
   resolvedTurnNumber: number
@@ -1740,6 +1782,13 @@ function addBombardmentReport(
   }
   const defenceDetailLines = [...groupedDefenceDamage.entries()]
     .map(([type, entry]) => `${type}: hits ${entry.hits}, damage ${entry.damage}${entry.destroyed > 0 ? `, destroyed x${entry.destroyed}` : ''}`);
+  const priorityLines = hasAnyBombardmentPriority(fleet.bombardmentPriorities)
+    ? [
+      `Priorities: Main ${bombardmentPriorityLabel(fleet.bombardmentPriorities?.main)}, `
+      + `Secondary ${bombardmentPriorityLabel(fleet.bombardmentPriorities?.secondary)}, `
+      + `Tertiary ${bombardmentPriorityLabel(fleet.bombardmentPriorities?.tertiary)}`
+    ]
+    : ['Priorities: random'];
 
   const report = new BuildingsReport(
     {
@@ -1761,6 +1810,7 @@ function addBombardmentReport(
       `Planetary bombs activated: ${summary.bombsActivated}`,
       `Planetary bombs intercepted: ${summary.bombsIntercepted}`,
       `Planetary bombs lost: ${summary.bombsLost}`,
+      ...priorityLines,
       `Buildings engaged: ${summary.buildingTargetCount}`,
       `Defences engaged: ${summary.defenceTargetCount}`,
       'Building damage summary:',

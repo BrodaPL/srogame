@@ -26,6 +26,7 @@ import diplomacyResolverModule from '../../src/app/models/diplomacy/diplomacy-re
 import diplomaticProposalStateModule from '../../src/app/models/diplomacy/diplomatic-proposal-state.js';
 import diplomaticProposalModule from '../../src/app/models/diplomacy/diplomatic-proposal.js';
 import planetaryBombModule from '../../src/app/models/defences/planetary-bomb.js';
+import bombardmentPriorityModule from '../../src/app/models/bombardment/bombardment-priority.js';
 import maintenanceRequestModule from '../../src/app/models/requests/maintenance-request.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
@@ -145,6 +146,10 @@ import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
 import type { PlayerMessage } from '../../src/app/models/mail/player-message.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
+import type {
+  BombardmentPriorities as BombardmentPrioritiesType,
+  BombardmentPrioritySelection as BombardmentPrioritySelectionType
+} from '../../src/app/models/bombardment/bombardment-priority.ts';
 import type { MaintenanceRequest } from '../../src/app/models/requests/maintenance-request.ts';
 import type { MissionLaunchContext } from '../../src/app/models/missions/mission-context.ts';
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../src/app/models/diplomacy/diplomatic-status.ts';
@@ -224,6 +229,10 @@ const {
   countPlanetaryBombs,
   isPlanetaryBombDefenceType
 } = planetaryBombModule as typeof import('../../src/app/models/defences/planetary-bomb.js');
+const {
+  normalizeBombardmentPriorities,
+  isBombardmentPrioritySelection
+} = bombardmentPriorityModule as typeof import('../../src/app/models/bombardment/bombardment-priority.js');
 const {
   createMaintenanceRequest,
   normalizeMaintenanceTransferPayload
@@ -2280,8 +2289,9 @@ app.post('/api/game/active-fleets', (req, res) => {
   const ships = parseFleetShipSelections(body?.ships);
   const carriedBombs = parseFleetBombSelections(body?.carriedBombs);
   const cargo = parseResourcesPackPayload(body?.cargo);
+  const bombardmentPriorities = parseBombardmentPriorities(body?.bombardmentPriorities);
 
-  if (!missionType || !origin || !target || !ships || !carriedBombs || !cargo) {
+  if (!missionType || !origin || !target || !ships || !carriedBombs || !cargo || body?.bombardmentPriorities !== undefined && bombardmentPriorities === null) {
     return res.status(400).json({ error: 'Invalid fleet mission payload.' });
   }
 
@@ -2448,7 +2458,9 @@ app.post('/api/game/active-fleets', (req, res) => {
     createdAtTurn: currentGalaxy.currentTurn,
     orbitActivity: FleetOrbitActivity.IDLE,
     suspendedMissionType: null,
-    returnReason: FleetReturnReason.NORMAL
+    returnReason: FleetReturnReason.NORMAL,
+    bombardmentPriorities,
+    remainingFuelReserve: fuelCost
   } as Fleet;
 
   currentGalaxy.nextFleetId += 1;
@@ -3240,6 +3252,39 @@ function parseFleetBombSelections(value: unknown): CreateFleetBombSelectionEntry
   }
 
   return Array.from(combined.entries()).map(([type, amount]) => ({ type, amount }));
+}
+
+function parseBombardmentPriorities(value: unknown): BombardmentPrioritiesType | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as {
+    main?: unknown;
+    secondary?: unknown;
+    tertiary?: unknown;
+  };
+
+  const raw = {
+    main: candidate.main ?? null,
+    secondary: candidate.secondary ?? null,
+    tertiary: candidate.tertiary ?? null
+  };
+
+  const slots = [raw.main, raw.secondary, raw.tertiary];
+  if (slots.some((entry) => entry !== null && !isBombardmentPrioritySelection(entry))) {
+    return null;
+  }
+
+  return normalizeBombardmentPriorities({
+    main: raw.main as BombardmentPrioritySelectionType | null,
+    secondary: raw.secondary as BombardmentPrioritySelectionType | null,
+    tertiary: raw.tertiary as BombardmentPrioritySelectionType | null
+  });
 }
 
 function countPlanetUndamagedShipsByType(planet: Planet): Map<ShipTypeType, number> {

@@ -216,9 +216,22 @@ Owns:
 - fleet lifecycle state
 - orbit stance state (`PASSIVE_HOLD`, `GUARDING`, mission-in-progress orbit)
 - ship storage model
-- carried bomb storage and maintenance-request metadata
+- carried bomb storage, bombardment-priority state, remaining siege fuel reserve, and maintenance-request metadata
 - per-ship damaged hull state
 - shipyard queue payload shape
+
+### Bombardment
+
+Primary files:
+- `src/app/models/bombardment/building-bombardment.ts`
+- `src/app/models/bombardment/bombardment-priority.ts`
+
+Owns:
+- `Bombard` / `Siege` bombardment target selection
+- bombardment-priority catalog and labels
+- fallback targeting behavior for bombardment weapons and carried planetary bombs
+- bombardment-vs-defence/building damage application
+- siege-only per-shot efficiency penalty inputs
 
 ### Missions
 
@@ -396,6 +409,7 @@ Change mission rules or add a mission:
 - `src/app/blueprints/mission-blueprints.json`
 - `src/app/models/missions/mission-effect-executor.ts`
 - `src/app/models/missions/encounters/` for orbit participation and coalition behavior
+- `src/app/models/bombardment/` for `Bombard` / `Siege` targeting logic and priority categories
 - `src/app/game/mission-planner-view/`
 - `src/app/game/operations-view/`
 - `server/src/index.ts` for launch endpoint validation if needed

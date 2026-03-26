@@ -5,8 +5,17 @@ import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
+import {
+  bombardmentPriorityLabel,
+  BombardmentPriorities,
+  BombardmentPrioritySelection,
+  BombardmentPriorityTarget,
+  emptyBombardmentPriorities,
+  normalizeBombardmentPriorities
+} from '../../models/bombardment/bombardment-priority';
 import { DefenceType } from '../../models/enums/defence-type';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { ShipPurpose } from '../../models/enums/ship-purpose';
@@ -73,6 +82,16 @@ type BombSelectionRowVm = {
   damage: number;
 };
 
+type BombardmentPriorityOptionVm = {
+  value: BombardmentPrioritySelection;
+  label: string;
+};
+
+type BombardmentPriorityGroupVm = {
+  label: string;
+  options: BombardmentPriorityOptionVm[];
+};
+
 const PHASE_ONE_MISSION_TYPES: FleetMissionType[] = [
   FleetMissionType.MOVE,
   FleetMissionType.DEFEND,
@@ -94,6 +113,7 @@ const MISSION_REGISTRY = FleetMissionRegistry.createDefault();
 })
 export class MissionPlannerViewComponent implements OnInit {
   protected readonly shipPurpose = ShipPurpose;
+  protected readonly bombardmentPriorityTarget = BombardmentPriorityTarget;
   protected readonly missionOptions: MissionOption[] = MISSION_REGISTRY.supportedMissions(PHASE_ONE_MISSION_TYPES)
     .map((mission) => ({
       type: mission.missionType,
@@ -118,6 +138,8 @@ export class MissionPlannerViewComponent implements OnInit {
   protected cargoDeuterium = 0;
   protected speedSelectorEnabled = false;
   protected fleetTemplatesEnabled = false;
+  protected bombardmentPriorities: BombardmentPriorities = emptyBombardmentPriorities();
+  protected readonly bombardmentPriorityGroups: BombardmentPriorityGroupVm[];
   protected readonly purposeFilters = new Map<ShipPurpose, boolean>([
     [ShipPurpose.MILITARY, true],
     [ShipPurpose.BOMBER, true],
@@ -159,6 +181,54 @@ export class MissionPlannerViewComponent implements OnInit {
       this.bombBlueprintsByType.set(defenceType, defence);
       this.bombSelectionByType.set(defenceType, 0);
     }
+
+    const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
+    const resourceOptions: BombardmentPriorityOptionVm[] = [];
+    const facilityOptions: BombardmentPriorityOptionVm[] = [];
+    for (const [buildingType, building] of buildingBlueprints.buildingsMap.entries()) {
+      const option = {
+        value: buildingType,
+        label: buildingType
+      } satisfies BombardmentPriorityOptionVm;
+      if (building.isFacility) {
+        facilityOptions.push(option);
+      } else {
+        resourceOptions.push(option);
+      }
+    }
+
+    this.bombardmentPriorityGroups = [
+      {
+        label: 'Categories',
+        options: [
+          { value: BombardmentPriorityTarget.DEFENCES, label: bombardmentPriorityLabel(BombardmentPriorityTarget.DEFENCES) },
+          {
+            value: BombardmentPriorityTarget.DEFENCES_CAN_SHOOT_TO_ORBIT,
+            label: bombardmentPriorityLabel(BombardmentPriorityTarget.DEFENCES_CAN_SHOOT_TO_ORBIT)
+          },
+          {
+            value: BombardmentPriorityTarget.DEFENCES_CANNOT_SHOOT_TO_ORBIT,
+            label: bombardmentPriorityLabel(BombardmentPriorityTarget.DEFENCES_CANNOT_SHOOT_TO_ORBIT)
+          },
+          {
+            value: BombardmentPriorityTarget.RESOURCE_BUILDINGS,
+            label: bombardmentPriorityLabel(BombardmentPriorityTarget.RESOURCE_BUILDINGS)
+          },
+          {
+            value: BombardmentPriorityTarget.FACILITIES,
+            label: bombardmentPriorityLabel(BombardmentPriorityTarget.FACILITIES)
+          }
+        ]
+      },
+      {
+        label: 'Resource buildings',
+        options: resourceOptions.sort((left, right) => left.label.localeCompare(right.label))
+      },
+      {
+        label: 'Facilities',
+        options: facilityOptions.sort((left, right) => left.label.localeCompare(right.label))
+      }
+    ];
   }
 
   public ngOnInit(): void {
@@ -350,6 +420,32 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected totalSelectedBombs(): number {
     return this.selectedBombEntries().reduce((sum, entry) => sum + entry.amount, 0);
+  }
+
+  protected supportsBombardmentPriorities(): boolean {
+    return this.selectedMissionType === FleetMissionType.BOMBARD || this.selectedMissionType === FleetMissionType.SIEGE;
+  }
+
+  protected bombardmentPriorityValue(slot: keyof BombardmentPriorities): BombardmentPrioritySelection | '' {
+    return this.bombardmentPriorities[slot] ?? '';
+  }
+
+  protected setBombardmentPriority(slot: keyof BombardmentPriorities, value: string): void {
+    const normalizedValue = value.trim();
+    const nextPriorities = normalizeBombardmentPriorities({
+      ...this.bombardmentPriorities,
+      [slot]: normalizedValue.length > 0 ? normalizedValue as BombardmentPrioritySelection : null
+    });
+    this.bombardmentPriorities = nextPriorities;
+  }
+
+  protected isBombardmentPriorityOptionDisabled(
+    slot: keyof BombardmentPriorities,
+    option: BombardmentPrioritySelection
+  ): boolean {
+    return (['main', 'secondary', 'tertiary'] as const).some((otherSlot) =>
+      otherSlot !== slot && this.bombardmentPriorities[otherSlot] === option
+    );
   }
 
   protected selectedBombRows(): BombSelectionRowVm[] {
@@ -598,7 +694,10 @@ export class MissionPlannerViewComponent implements OnInit {
         metal: this.cargoMetal,
         crystal: this.cargoCrystal,
         deuterium: this.cargoDeuterium
-      }
+      },
+      bombardmentPriorities: this.supportsBombardmentPriorities()
+        ? normalizeBombardmentPriorities(this.bombardmentPriorities)
+        : null
     };
 
     this.isLaunching = true;
