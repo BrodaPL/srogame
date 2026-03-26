@@ -5,6 +5,7 @@ import { AuthStateService } from '../../core/auth-state.service';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import {
+  JumpGateMailRequestDto,
   MailRecipientDto,
   MailRequestDto,
   MailViewResponse,
@@ -155,6 +156,10 @@ export class MailViewComponent implements OnInit {
   }
 
   protected requestCardTitle(request: MailRequestDto): string {
+    if (request.requestType === 'JUMP_GATE') {
+      return request.direction === 'incoming' ? 'Incoming Jump Gate Request' : 'Outgoing Jump Gate Request';
+    }
+
     if (request.requestType === 'MAINTENANCE') {
       return request.direction === 'incoming' ? 'Incoming Maintenance Request' : 'Outgoing Maintenance Request';
     }
@@ -163,6 +168,10 @@ export class MailViewComponent implements OnInit {
   }
 
   protected requestBadge(request: MailRequestDto): string {
+    if (request.requestType === 'JUMP_GATE') {
+      return request.state === 'PENDING' ? 'JUMP GATE' : request.state;
+    }
+
     if (request.requestType === 'MAINTENANCE') {
       return request.state === 'PENDING' ? 'MAINTENANCE' : request.state;
     }
@@ -171,6 +180,14 @@ export class MailViewComponent implements OnInit {
   }
 
   protected requestSummary(request: MailRequestDto): string {
+    if (request.requestType === 'JUMP_GATE') {
+      if (request.direction === 'incoming') {
+        return `${request.counterpartyPlayerName} requests Jump Gate access for Fleet #${request.fleetId} to ${request.targetPlanetName}.`;
+      }
+
+      return `Fleet #${request.fleetId} is waiting for Jump Gate access from ${request.counterpartyPlayerName}.`;
+    }
+
     if (request.requestType === 'MAINTENANCE') {
       if (request.direction === 'incoming') {
         return `${request.counterpartyPlayerName} requests maintenance for Fleet #${request.fleetId} at ${request.targetPlanetName}.`;
@@ -187,6 +204,10 @@ export class MailViewComponent implements OnInit {
   }
 
   protected requestDetailLine(request: MailRequestDto): string {
+    if (request.requestType === 'JUMP_GATE') {
+      return `Mission ${request.missionType} | ${request.originPlanetName} -> ${request.targetPlanetName} | Ships: ${request.totalShips}`;
+    }
+
     if (request.requestType === 'MAINTENANCE') {
       const requestedSummary = this.maintenancePayloadSummary(request.requested);
       const approvedSummary = request.approved ? this.maintenancePayloadSummary(request.approved) : null;
@@ -198,6 +219,14 @@ export class MailViewComponent implements OnInit {
     }
 
     return `Requested status ${request.requestedStatus}`;
+  }
+
+  protected requestTimingLine(request: MailRequestDto): string {
+    if (request.requestType === 'JUMP_GATE' && request.state === 'PENDING') {
+      return `Created on turn ${request.createdTurn} | Awaiting response`;
+    }
+
+    return `Created on turn ${request.createdTurn} | Expires on turn ${request.expiresOnTurn}`;
   }
 
   protected canAccept(request: MailRequestDto): boolean {
@@ -237,6 +266,10 @@ export class MailViewComponent implements OnInit {
 
   protected maintenanceRequest(request: MailRequestDto): MaintenanceMailRequestDto | null {
     return request.requestType === 'MAINTENANCE' ? request : null;
+  }
+
+  protected jumpGateRequest(request: MailRequestDto): JumpGateMailRequestDto | null {
+    return request.requestType === 'JUMP_GATE' ? request : null;
   }
 
   protected openPartialApproval(request: MaintenanceMailRequestDto): void {
@@ -337,6 +370,15 @@ export class MailViewComponent implements OnInit {
   }
 
   protected acceptRequest(request: MailRequestDto): void {
+    if (request.requestType === 'JUMP_GATE') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.approveJumpGateRequest(request.requestId, token),
+        'Unable to approve Jump Gate request.'
+      );
+      return;
+    }
+
     if (request.requestType === 'MAINTENANCE') {
       this.runRequestAction(
         request,
@@ -354,6 +396,15 @@ export class MailViewComponent implements OnInit {
   }
 
   protected rejectRequest(request: MailRequestDto): void {
+    if (request.requestType === 'JUMP_GATE') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.rejectJumpGateRequest(request.requestId, token),
+        'Unable to reject Jump Gate request.'
+      );
+      return;
+    }
+
     if (request.requestType === 'MAINTENANCE') {
       this.runRequestAction(
         request,
@@ -371,6 +422,15 @@ export class MailViewComponent implements OnInit {
   }
 
   protected cancelRequest(request: MailRequestDto): void {
+    if (request.requestType === 'JUMP_GATE') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.cancelJumpGateRequest(request.requestId, token),
+        'Unable to cancel Jump Gate request.'
+      );
+      return;
+    }
+
     if (request.requestType === 'MAINTENANCE') {
       this.runRequestAction(
         request,

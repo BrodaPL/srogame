@@ -27,6 +27,8 @@ import diplomaticProposalStateModule from '../../src/app/models/diplomacy/diplom
 import diplomaticProposalModule from '../../src/app/models/diplomacy/diplomatic-proposal.js';
 import planetaryBombModule from '../../src/app/models/defences/planetary-bomb.js';
 import bombardmentPriorityModule from '../../src/app/models/bombardment/bombardment-priority.js';
+import jumpGateCapacityModule from '../../src/app/models/jump-gates/jump-gate-capacity.js';
+import jumpGateRequestModule from '../../src/app/models/requests/jump-gate-request.js';
 import maintenanceRequestModule from '../../src/app/models/requests/maintenance-request.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
@@ -44,6 +46,7 @@ import smokeTestScenariosModule from '../../src/app/models/testing/smoke-test-sc
 import queueManagementModule from '../../src/app/models/queues/queue-management.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
 import fleetReportModule from '../../src/app/models/reports/fleet-report.js';
+import resourcesPackModule from '../../src/app/models/resources-pack.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   EndTurnResponse,
@@ -113,6 +116,7 @@ import type {
   CreateMaintenanceRequestResponse,
   FleetMaintenanceBombOptionDto,
   ResolveMaintenanceRequestRequest,
+  JumpGateMailRequestDto,
   FleetMaintenanceShipOptionDto,
   FleetMaintenanceOptionsDto,
   MaintenanceTransferPayloadDto,
@@ -126,7 +130,7 @@ import type { ClientStarSystem } from '../../src/app/models/planets/client-star-
 import type { ClientPlanet } from '../../src/app/models/planets/client-planet.ts';
 import type { Planet } from '../../src/app/models/planets/planet.ts';
 import type { PlanetaryParameters } from '../../src/app/models/planets/planetary-parameters.ts';
-import type { ResourcesPack } from '../../src/app/models/resources-pack.ts';
+import type { ResourcesPack as ResourcesPackType } from '../../src/app/models/resources-pack.ts';
 import type { EspionageReportData } from '../../src/app/models/reports/espionage-report-data.ts';
 import type { GalaxyPresentationData as GalaxyPresentationDataType } from '../../src/app/models/planets/galaxy-presentation-data.ts';
 import type { GalaxyByteCell } from '../../src/app/models/planets/galaxy-byte-cell.ts';
@@ -151,6 +155,7 @@ import type {
   BombardmentPrioritySelection as BombardmentPrioritySelectionType
 } from '../../src/app/models/bombardment/bombardment-priority.ts';
 import type { MaintenanceRequest } from '../../src/app/models/requests/maintenance-request.ts';
+import type { JumpGateRequest } from '../../src/app/models/requests/jump-gate-request.ts';
 import type { MissionLaunchContext } from '../../src/app/models/missions/mission-context.ts';
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { DiplomaticRelation } from '../../src/app/models/diplomacy/diplomatic-relation.ts';
@@ -233,6 +238,8 @@ const {
   normalizeBombardmentPriorities,
   isBombardmentPrioritySelection
 } = bombardmentPriorityModule as typeof import('../../src/app/models/bombardment/bombardment-priority.js');
+const { calculateJumpGateCapacity } = jumpGateCapacityModule as typeof import('../../src/app/models/jump-gates/jump-gate-capacity.js');
+const { createJumpGateRequest } = jumpGateRequestModule as typeof import('../../src/app/models/requests/jump-gate-request.js');
 const {
   createMaintenanceRequest,
   normalizeMaintenanceTransferPayload
@@ -278,6 +285,9 @@ const { PlayerMessage: PlayerMessageModel } = playerMessageModule as {
 };
 const { FleetReport } = fleetReportModule as {
   FleetReport: typeof import('../../src/app/models/reports/fleet-report.js').FleetReport;
+};
+const { ResourcesPack } = resourcesPackModule as {
+  ResourcesPack: typeof import('../../src/app/models/resources-pack.js').ResourcesPack;
 };
 
 const app = express();
@@ -718,6 +728,11 @@ app.post('/api/game/mail/requests/delete', (req, res) => {
       .filter((entry) => entry.requestType === 'MAINTENANCE')
       .map((entry) => entry.requestId)
   );
+  const jumpGateRequestIds = new Set(
+    requestRefs
+      .filter((entry) => entry.requestType === 'JUMP_GATE')
+      .map((entry) => entry.requestId)
+  );
 
   const deletableDiplomacyIds = new Set(
     authPlayer.galaxy.diplomaticProposals
@@ -748,6 +763,21 @@ app.post('/api/game/mail/requests/delete', (req, res) => {
     !deletableMaintenanceIds.has(request.requestId)
   );
   deletedCount += maintenanceBefore - authPlayer.galaxy.maintenanceRequests.length;
+
+  const deletableJumpGateIds = new Set(
+    authPlayer.galaxy.jumpGateRequests
+      .filter((request) =>
+        jumpGateRequestIds.has(request.requestId)
+        && request.state !== DiplomaticProposalState.PENDING
+        && (request.fromPlayerId === authPlayer.player.playerId || request.toPlayerId === authPlayer.player.playerId)
+      )
+      .map((request) => request.requestId)
+  );
+  const jumpGateBefore = authPlayer.galaxy.jumpGateRequests.length;
+  authPlayer.galaxy.jumpGateRequests = authPlayer.galaxy.jumpGateRequests.filter((request) =>
+    !deletableJumpGateIds.has(request.requestId)
+  );
+  deletedCount += jumpGateBefore - authPlayer.galaxy.jumpGateRequests.length;
 
   const response: DeleteMailRequestsResponse = {
     deletedCount
@@ -859,6 +889,94 @@ app.post('/api/game/mail/maintenance-requests/:requestId/cancel', (req, res) => 
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
+app.post('/api/game/mail/jump-gate-requests/:requestId/approve', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const requestId = Number.parseInt(req.params.requestId, 10);
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return res.status(400).json({ error: 'Invalid Jump Gate request id.' });
+  }
+
+  const request = authPlayer.galaxy.jumpGateRequests.find((entry) => entry.requestId === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Jump Gate request not found.' });
+  }
+
+  if (request.toPlayerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'You cannot approve this Jump Gate request.' });
+  }
+
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return res.status(409).json({ error: 'Jump Gate request is no longer pending.' });
+  }
+
+  const result = approveJumpGateRequest(authPlayer.galaxy, request);
+  if ('error' in result) {
+    return res.status(result.status).json({ error: result.error });
+  }
+
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
+app.post('/api/game/mail/jump-gate-requests/:requestId/reject', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const requestId = Number.parseInt(req.params.requestId, 10);
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return res.status(400).json({ error: 'Invalid Jump Gate request id.' });
+  }
+
+  const request = authPlayer.galaxy.jumpGateRequests.find((entry) => entry.requestId === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Jump Gate request not found.' });
+  }
+
+  if (request.toPlayerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'You cannot reject this Jump Gate request.' });
+  }
+
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return res.status(409).json({ error: 'Jump Gate request is no longer pending.' });
+  }
+
+  rejectJumpGateRequest(authPlayer.galaxy, request, DiplomaticProposalState.REJECTED);
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
+app.post('/api/game/mail/jump-gate-requests/:requestId/cancel', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const requestId = Number.parseInt(req.params.requestId, 10);
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return res.status(400).json({ error: 'Invalid Jump Gate request id.' });
+  }
+
+  const request = authPlayer.galaxy.jumpGateRequests.find((entry) => entry.requestId === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Jump Gate request not found.' });
+  }
+
+  if (request.fromPlayerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'You cannot cancel this Jump Gate request.' });
+  }
+
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return res.status(409).json({ error: 'Jump Gate request is no longer pending.' });
+  }
+
+  rejectJumpGateRequest(authPlayer.galaxy, request, DiplomaticProposalState.CANCELLED);
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
 app.post('/api/game/mail/messages/send', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
@@ -944,6 +1062,7 @@ app.post('/api/game/end-turn', (req, res) => {
     return res.status(404).json({ error: 'Player not found in galaxy.' });
   }
 
+  synchronizeJumpGateRequests(currentGalaxy);
   synchronizeMaintenanceRequests(currentGalaxy);
   const pendingRequestCount = countPendingMailRequestsForPlayer(currentGalaxy, playerId);
   const unreadMailCount = countUnreadMailMessagesForPlayer(currentGalaxy, playerId);
@@ -960,6 +1079,7 @@ app.post('/api/game/end-turn', (req, res) => {
     resolvePhaseOneTurn(currentGalaxy, resolvedTurnNumber);
     currentGalaxy.currentTurn = resolvedTurnNumber;
     expirePendingDiplomaticProposals(currentGalaxy, currentGalaxy.currentTurn);
+    synchronizeJumpGateRequests(currentGalaxy);
     synchronizeMaintenanceRequests(currentGalaxy);
     refreshOwnedPlanetSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
@@ -2198,8 +2318,17 @@ app.post('/api/game/active-fleets/:fleetId/return', (req, res) => {
     return res.status(404).json({ error: 'Fleet not found.' });
   }
 
+  if (fleet.state === FleetState.PENDING_JUMP_GATE) {
+    const pendingRequest = findPendingJumpGateRequestForFleet(currentGalaxy, playerId, fleetId);
+    if (pendingRequest) {
+      pendingRequest.state = DiplomaticProposalState.CANCELLED;
+    }
+    restorePendingJumpGateFleetToOrigin(currentGalaxy, fleet, true);
+    return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
+  }
+
   if (fleet.state === FleetState.RETURNING || fleet.state === FleetState.MISSION_FAILURE_RETURNING) {
-    return res.status(200).json(currentGalaxy.activeFleets.filter((entry) => entry.ownerId === playerId));
+    return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
   }
 
   if (fleet.state !== FleetState.MOVING_TO_TARGET && fleet.state !== FleetState.ORBITING) {
@@ -2220,6 +2349,7 @@ app.post('/api/game/active-fleets/:fleetId/return', (req, res) => {
   fleet.returnReason = FleetReturnReason.MANUAL_RECALL;
   fleet.createdAtTurn = currentGalaxy.currentTurn;
 
+  synchronizeJumpGateRequests(currentGalaxy);
   synchronizeMaintenanceRequests(currentGalaxy);
   return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
 });
@@ -2289,9 +2419,19 @@ app.post('/api/game/active-fleets', (req, res) => {
   const ships = parseFleetShipSelections(body?.ships);
   const carriedBombs = parseFleetBombSelections(body?.carriedBombs);
   const cargo = parseResourcesPackPayload(body?.cargo);
+  const useJumpGate = body?.useJumpGate === true;
   const bombardmentPriorities = parseBombardmentPriorities(body?.bombardmentPriorities);
 
-  if (!missionType || !origin || !target || !ships || !carriedBombs || !cargo || body?.bombardmentPriorities !== undefined && bombardmentPriorities === null) {
+  if (
+    !missionType
+    || !origin
+    || !target
+    || !ships
+    || !carriedBombs
+    || !cargo
+    || body?.bombardmentPriorities !== undefined && bombardmentPriorities === null
+    || body?.useJumpGate !== undefined && typeof body.useJumpGate !== 'boolean'
+  ) {
     return res.status(400).json({ error: 'Invalid fleet mission payload.' });
   }
 
@@ -2379,7 +2519,7 @@ app.post('/api/game/active-fleets', (req, res) => {
   }
 
   const travelDistance = calculateTravelDistance(origin, target);
-  const travelTurns = Math.max(1, travelDistance);
+  const travelTurns = useJumpGate ? 1 : Math.max(1, travelDistance);
   const fuelMultiplier = mission.minimumFuelReserves;
   const fuelCost = calculateFuelCost(totalShipAmounts, travelDistance, fuelMultiplier);
 
@@ -2418,9 +2558,32 @@ app.post('/api/game/active-fleets', (req, res) => {
     metal: cargo.metal,
     crystal: cargo.crystal,
     deuterium: cargo.deuterium + fuelCost
-  } as ResourcesPack;
+  } as ResourcesPackType;
   if (!originPlanet.rBDSFTQ.resources.isSufficient(totalRequiredResources)) {
     return res.status(400).json({ error: 'Insufficient resources for cargo and fuel.' });
+  }
+
+  let jumpGateLaunchStatus: DiplomaticStatusType | null = null;
+  let jumpGateTargetOwner: Player | null = null;
+  if (useJumpGate) {
+    const jumpGateAccess = validateJumpGateLaunchAccess(
+      currentGalaxy,
+      playerId,
+      missionType,
+      originPlanet,
+      targetPlanet,
+      selectedFleetShips.totalShipsCount()
+    );
+    if ('error' in jumpGateAccess) {
+      return res.status(jumpGateAccess.status).json({ error: jumpGateAccess.error });
+    }
+
+    if (targetPlanet.info.ownerId === null) {
+      return res.status(409).json({ error: 'Jump Gate requires an owned target planet.' });
+    }
+
+    jumpGateLaunchStatus = jumpGateAccess.status;
+    jumpGateTargetOwner = jumpGateAccess.targetOwner;
   }
 
   let fleetShips: ManyShipsType;
@@ -2454,11 +2617,15 @@ app.post('/api/game/active-fleets', (req, res) => {
     usedCargoCapacity,
     travelTurns,
     returnTurns: travelTurns,
-    state: FleetState.MOVING_TO_TARGET,
+    state: useJumpGate && jumpGateLaunchStatus !== null && jumpGateTargetOwner && !isJumpGateAutoApprovedStatus(jumpGateLaunchStatus)
+      ? FleetState.PENDING_JUMP_GATE
+      : FleetState.MOVING_TO_TARGET,
     createdAtTurn: currentGalaxy.currentTurn,
     orbitActivity: FleetOrbitActivity.IDLE,
     suspendedMissionType: null,
     returnReason: FleetReturnReason.NORMAL,
+    usesJumpGate: useJumpGate,
+    pendingJumpGateRequestId: null,
     bombardmentPriorities,
     remainingFuelReserve: fuelCost
   } as Fleet;
@@ -2466,10 +2633,30 @@ app.post('/api/game/active-fleets', (req, res) => {
   currentGalaxy.nextFleetId += 1;
   currentGalaxy.activeFleets.push(fleet);
 
+  let responseMode: CreateFleetMissionResponse['mode'] = 'LAUNCHED';
+  let responseMessage: string | null = null;
+  if (useJumpGate) {
+    if (jumpGateLaunchStatus !== null && jumpGateTargetOwner && !isJumpGateAutoApprovedStatus(jumpGateLaunchStatus)) {
+      createJumpGatePendingRequest(
+        currentGalaxy,
+        fleet,
+        jumpGateTargetOwner,
+        selectedFleetShips.totalShipsCount()
+      );
+      responseMode = 'PENDING_JUMP_GATE';
+      responseMessage = 'Jump Gate request sent. Fleet is waiting at the origin planet.';
+    } else {
+      dispatchJumpGateFleet(currentGalaxy, fleet);
+      responseMessage = 'Jump Gate launch approved. Fleet is en route.';
+    }
+  }
+
   const presentation = getPresentationData(currentGalaxy, playerId);
   const response: CreateFleetMissionResponse = {
     ownedPlanets: presentation.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet)),
-    activeFleets: buildOwnedActiveFleetsResponse(currentGalaxy, playerId)
+    activeFleets: buildOwnedActiveFleetsResponse(currentGalaxy, playerId),
+    mode: responseMode,
+    message: responseMessage
   };
   return res.status(201).json(response);
 });
@@ -2700,6 +2887,7 @@ function resolveAuthenticatedGamePlayer(req: Request):
     return { status: 404, error: 'Player not found in galaxy.' };
   }
 
+  synchronizeJumpGateRequests(currentGalaxy);
   synchronizeMaintenanceRequests(currentGalaxy);
   return {
     galaxy: currentGalaxy,
@@ -3005,7 +3193,7 @@ function parseDeleteMailRequestRefs(
     const requestType = candidate.requestType;
     if (
       requestId === null
-      || (requestType !== 'DIPLOMACY_PROPOSAL' && requestType !== 'MAINTENANCE')
+      || (requestType !== 'DIPLOMACY_PROPOSAL' && requestType !== 'MAINTENANCE' && requestType !== 'JUMP_GATE')
     ) {
       return null;
     }
@@ -3163,7 +3351,7 @@ function parseMissionCoordinates(value: unknown): ClientCoordinates | null {
   return { x, y, z };
 }
 
-function parseResourcesPackPayload(value: unknown): ResourcesPack | null {
+function parseResourcesPackPayload(value: unknown): ResourcesPackType | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
@@ -3180,7 +3368,7 @@ function parseResourcesPackPayload(value: unknown): ResourcesPack | null {
     metal,
     crystal,
     deuterium
-  } as ResourcesPack;
+  } as ResourcesPackType;
 }
 
 function parseFleetShipSelections(value: unknown): CreateFleetShipSelectionEntry[] | null {
@@ -3386,12 +3574,12 @@ function toCoordinatesId(coordinates: ClientCoordinates): string {
   return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
 }
 
-function multiplyResourcePack(base: ResourcesPack, amount: number): ResourcesPack {
+function multiplyResourcePack(base: ResourcesPackType, amount: number): ResourcesPackType {
   return {
     metal: base.metal * amount,
     crystal: base.crystal * amount,
     deuterium: base.deuterium * amount
-  } as ResourcesPack;
+  } as ResourcesPackType;
 }
 
 function addProducedShipyardUnitsToPlanet(
@@ -3413,7 +3601,7 @@ function addProducedShipyardUnitsToPlanet(
   planet.rBDSFTQ.ships.addUndamaged((blueprint as Ship).type, normalizedAmount);
 }
 
-function toResourcesPackDto(pack: ResourcesPack): ResourcesPackDto {
+function toResourcesPackDto(pack: ResourcesPackType): ResourcesPackDto {
   return {
     metal: pack.metal,
     crystal: pack.crystal,
@@ -3889,6 +4077,8 @@ function buildDiplomacyViewResponse(galaxy: Galaxy, viewer: Player): DiplomacyVi
 }
 
 function buildMailViewResponse(galaxy: Galaxy, viewer: Player): MailViewResponse {
+  synchronizeJumpGateRequests(galaxy);
+  synchronizeMaintenanceRequests(galaxy);
   const messages = [...viewer.messages]
     .sort((left, right) => right.createdTurn - left.createdTurn || right.messageId - left.messageId)
     .map((message) => toPlayerMailMessageDto(message));
@@ -3997,11 +4187,14 @@ function buildMailRequestDtos(
   const diplomacyRequests = galaxy.diplomaticProposals
     .filter((proposal) => proposal.fromPlayerId === viewerPlayerId || proposal.toPlayerId === viewerPlayerId)
     .map((proposal) => toDiplomacyMailRequestDto(galaxy, proposal, viewerPlayerId));
+  const jumpGateRequests = galaxy.jumpGateRequests
+    .filter((request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId)
+    .map((request) => toJumpGateMailRequestDto(galaxy, request, viewerPlayerId));
   const maintenanceRequests = galaxy.maintenanceRequests
     .filter((request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId)
     .map((request) => toMaintenanceMailRequestDto(galaxy, request, viewerPlayerId));
 
-  return [...diplomacyRequests, ...maintenanceRequests]
+  return [...diplomacyRequests, ...jumpGateRequests, ...maintenanceRequests]
     .sort((left, right) =>
       mailRequestGroupOrder(left.state) - mailRequestGroupOrder(right.state)
       || proposalDirectionOrder(left.direction) - proposalDirectionOrder(right.direction)
@@ -4076,6 +4269,32 @@ function toMaintenanceMailRequestDto(
     targetPlanetName: request.targetPlanetName,
     requested: toMaintenanceTransferPayloadDto(request.requested),
     approved: request.approved ? toMaintenanceTransferPayloadDto(request.approved) : null
+  };
+}
+
+function toJumpGateMailRequestDto(
+  galaxy: Galaxy,
+  request: JumpGateRequest,
+  viewerPlayerId: number
+): JumpGateMailRequestDto {
+  const direction = request.toPlayerId === viewerPlayerId ? 'incoming' : 'outgoing';
+  const counterpartyPlayerId = direction === 'incoming' ? request.fromPlayerId : request.toPlayerId;
+  const counterpartyPlayerName = resolvePlayerById(galaxy, counterpartyPlayerId)?.playerName ?? `Player ${counterpartyPlayerId}`;
+
+  return {
+    requestId: request.requestId,
+    requestType: 'JUMP_GATE',
+    createdTurn: request.createdTurn,
+    expiresOnTurn: request.expiresOnTurn,
+    state: request.state,
+    direction,
+    counterpartyPlayerId,
+    counterpartyPlayerName,
+    fleetId: request.fleetId,
+    missionType: request.missionType,
+    originPlanetName: request.originPlanetName,
+    targetPlanetName: request.targetPlanetName,
+    totalShips: request.totalShips
   };
 }
 
@@ -4175,12 +4394,16 @@ function countPendingMailRequestsForPlayer(galaxy: Galaxy, playerId: number): nu
     proposal.state === DiplomaticProposalState.PENDING
     && proposal.toPlayerId === playerId
   ).length;
+  const jumpGatePending = galaxy.jumpGateRequests.filter((request) =>
+    request.state === DiplomaticProposalState.PENDING
+    && request.toPlayerId === playerId
+  ).length;
   const maintenancePending = galaxy.maintenanceRequests.filter((request) =>
     request.state === DiplomaticProposalState.PENDING
     && request.toPlayerId === playerId
   ).length;
 
-  return diplomacyPending + maintenancePending;
+  return diplomacyPending + jumpGatePending + maintenancePending;
 }
 
 function countUnreadMailMessagesForPlayer(galaxy: Galaxy, playerId: number): number {
@@ -4332,18 +4555,263 @@ function isExplicitMaintenancePayload(value: unknown): value is ResolveMaintenan
 }
 
 function buildOwnedActiveFleetsResponse(galaxy: Galaxy, playerId: number): Fleet[] {
+  synchronizeJumpGateRequests(galaxy);
   synchronizeMaintenanceRequests(galaxy);
 
   return galaxy.activeFleets
     .filter((fleet) => fleet.ownerId === playerId)
-    .map((fleet) => annotateFleetMaintenanceMetadata(galaxy, fleet));
+    .map((fleet) => annotateFleetRequestMetadata(galaxy, fleet));
 }
 
-function annotateFleetMaintenanceMetadata(galaxy: Galaxy, fleet: Fleet): Fleet {
-  const pendingRequest = findPendingMaintenanceRequestForFleet(galaxy, fleet.ownerId, fleet.fleetId);
-  fleet.pendingMaintenanceRequestId = pendingRequest?.requestId ?? null;
+function annotateFleetRequestMetadata(galaxy: Galaxy, fleet: Fleet): Fleet {
+  const pendingMaintenanceRequest = findPendingMaintenanceRequestForFleet(galaxy, fleet.ownerId, fleet.fleetId);
+  const pendingJumpGateRequest = findPendingJumpGateRequestForFleet(galaxy, fleet.ownerId, fleet.fleetId);
+  fleet.pendingMaintenanceRequestId = pendingMaintenanceRequest?.requestId ?? null;
+  fleet.pendingJumpGateRequestId = pendingJumpGateRequest?.requestId ?? null;
   fleet.maintenanceRequestAvailable = canFleetRequestMaintenance(galaxy, fleet);
   return fleet;
+}
+
+function findPendingJumpGateRequestForFleet(
+  galaxy: Galaxy,
+  ownerId: number,
+  fleetId: number
+): JumpGateRequest | null {
+  return galaxy.jumpGateRequests.find((request) =>
+    request.state === DiplomaticProposalState.PENDING
+    && request.fromPlayerId === ownerId
+    && request.fleetId === fleetId
+  ) ?? null;
+}
+
+function isJumpGateMissionAllowed(missionType: FleetMissionTypeType): boolean {
+  return missionType === FleetMissionType.MOVE
+    || missionType === FleetMissionType.DEFEND
+    || missionType === FleetMissionType.TRANSPORT;
+}
+
+function isJumpGateAutoApprovedStatus(status: DiplomaticStatusType): boolean {
+  return status === DiplomaticStatus.SELF || status === DiplomaticStatus.PASSIVE;
+}
+
+function resolveJumpGateCapacityForPlanet(planet: Planet, owner: Player | null): number {
+  const hyperspaceTechnologyLevel = owner?.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY as TechnologyTypeType) ?? 0;
+  return calculateJumpGateCapacity(
+    planet.getBuildingLevel(BuildingType.JUMP_GATE as BuildingTypeType),
+    planet.info.planetaryParameters.hyperspaceParameters,
+    hyperspaceTechnologyLevel,
+    planet.getBuildingEffectiveness(BuildingType.JUMP_GATE as BuildingTypeType)
+  );
+}
+
+function knownJumpGateLevelForViewer(planet: Planet, viewerPlayerId: number): number {
+  if (planet.info.ownerId === viewerPlayerId) {
+    return planet.getBuildingLevel(BuildingType.JUMP_GATE as BuildingTypeType);
+  }
+
+  const report = planet.lastReportData.get(viewerPlayerId);
+  return report?.buildingsLevels.get(BuildingType.JUMP_GATE as BuildingTypeType) ?? 0;
+}
+
+function validateJumpGateLaunchAccess(
+  galaxy: Galaxy,
+  playerId: number,
+  missionType: FleetMissionTypeType,
+  originPlanet: Planet,
+  targetPlanet: Planet,
+  totalSelectedShips: number
+): { status: DiplomaticStatusType; targetOwner: Player | null } | { status: number; error: string } {
+  if (!isJumpGateMissionAllowed(missionType)) {
+    return { status: 400, error: 'Jump Gate is available only for Move, Guard, and Transport.' };
+  }
+
+  if (totalSelectedShips <= 0) {
+    return { status: 400, error: 'Select at least one ship for Jump Gate travel.' };
+  }
+
+  if (originPlanet.getBuildingLevel(BuildingType.JUMP_GATE as BuildingTypeType) <= 0) {
+    return { status: 409, error: 'Origin planet has no Jump Gate.' };
+  }
+
+  const knownTargetJumpGateLevel = knownJumpGateLevelForViewer(targetPlanet, playerId);
+  if (knownTargetJumpGateLevel <= 0) {
+    return { status: 409, error: 'Target Jump Gate is not known or not available.' };
+  }
+
+  if (targetPlanet.getBuildingLevel(BuildingType.JUMP_GATE as BuildingTypeType) <= 0) {
+    return { status: 409, error: 'Target Jump Gate is not operational.' };
+  }
+
+  const originOwner = resolvePlayerById(galaxy, originPlanet.info.ownerId ?? playerId);
+  const originCapacity = resolveJumpGateCapacityForPlanet(originPlanet, originOwner);
+  if (originCapacity < totalSelectedShips) {
+    return { status: 409, error: `Origin Jump Gate capacity is too low for ${totalSelectedShips} ships.` };
+  }
+
+  const targetOwner = targetPlanet.info.ownerId === null
+    ? null
+    : resolvePlayerById(galaxy, targetPlanet.info.ownerId);
+  const targetStatus = targetOwner
+    ? resolveDiplomaticStatus(galaxy, playerId, targetOwner.playerId)
+    : DiplomaticStatus.SELF;
+  const targetCapacity = resolveJumpGateCapacityForPlanet(targetPlanet, targetOwner);
+  if (targetCapacity < totalSelectedShips) {
+    return { status: 409, error: `Target Jump Gate capacity is too low for ${totalSelectedShips} ships.` };
+  }
+
+  return {
+    status: targetStatus,
+    targetOwner
+  };
+}
+
+function createJumpGatePendingRequest(
+  galaxy: Galaxy,
+  fleet: Fleet,
+  targetOwner: Player,
+  totalShips: number
+): JumpGateRequest {
+  const request = createJumpGateRequest(
+    galaxy.nextJumpGateRequestId,
+    fleet.fleetId,
+    fleet.ownerId,
+    targetOwner.playerId,
+    fleet.originPlanetName,
+    fleet.origin,
+    fleet.targetPlanetName,
+    fleet.target,
+    fleet.missionType,
+    totalShips,
+    galaxy.currentTurn,
+    galaxy.currentTurn
+  );
+  galaxy.nextJumpGateRequestId += 1;
+  galaxy.jumpGateRequests.push(request);
+  fleet.pendingJumpGateRequestId = request.requestId;
+  return request;
+}
+
+function dispatchJumpGateFleet(
+  galaxy: Galaxy,
+  fleet: Fleet
+): void {
+  fleet.state = FleetState.MOVING_TO_TARGET;
+  fleet.createdAtTurn = galaxy.currentTurn;
+  fleet.travelTurns = 1;
+  fleet.returnTurns = 1;
+  fleet.pendingJumpGateRequestId = null;
+  fleet.usesJumpGate = true;
+}
+
+function restorePendingJumpGateFleetToOrigin(
+  galaxy: Galaxy,
+  fleet: Fleet,
+  restoreFuelReserve: boolean
+): void {
+  fleet.pendingJumpGateRequestId = null;
+  fleet.usesJumpGate = false;
+
+  const originPlanet = resolvePlanetAtCoordinates(galaxy, fleet.origin);
+  if (!originPlanet || originPlanet.info.ownerId !== fleet.ownerId) {
+    fleet.state = FleetState.ORBITING;
+    fleet.missionType = FleetMissionType.HOLD;
+    fleet.orbitActivity = FleetOrbitActivity.PASSIVE_HOLD;
+    fleet.suspendedMissionType = null;
+    fleet.target = fleet.origin;
+    fleet.targetPlanetName = fleet.originPlanetName;
+    fleet.createdAtTurn = galaxy.currentTurn;
+    fleet.returnReason = FleetReturnReason.NORMAL;
+    return;
+  }
+
+  originPlanet.rBDSFTQ.ships.addManyShips(fleet.ships);
+  originPlanet.rBDSFTQ.defences.addManyDefences(fleet.carriedBombs);
+  originPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
+    fleet.cargo.metal,
+    fleet.cargo.crystal,
+    fleet.cargo.deuterium + (restoreFuelReserve ? fleet.fuelCost : 0)
+  ));
+  galaxy.activeFleets = galaxy.activeFleets.filter((entry) => entry.fleetId !== fleet.fleetId);
+}
+
+function approveJumpGateRequest(
+  galaxy: Galaxy,
+  request: JumpGateRequest
+): { ok: true } | { status: number; error: string } {
+  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  if (!fleet) {
+    return { status: 404, error: 'Requesting fleet is no longer available.' };
+  }
+
+  if (fleet.state !== FleetState.PENDING_JUMP_GATE) {
+    return { status: 409, error: 'Fleet is no longer waiting for Jump Gate approval.' };
+  }
+
+  const originPlanet = resolvePlanetAtCoordinates(galaxy, fleet.origin);
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+  if (!originPlanet || originPlanet.info.ownerId !== request.fromPlayerId) {
+    return { status: 409, error: 'Origin planet is no longer valid for this Jump Gate request.' };
+  }
+
+  if (!targetPlanet || targetPlanet.info.ownerId !== request.toPlayerId) {
+    return { status: 409, error: 'Target planet is no longer valid for this Jump Gate request.' };
+  }
+
+  const access = validateJumpGateLaunchAccess(
+    galaxy,
+    request.fromPlayerId,
+    fleet.missionType,
+    originPlanet,
+    targetPlanet,
+    request.totalShips
+  );
+  if ('error' in access) {
+    return access;
+  }
+
+  request.state = DiplomaticProposalState.ACCEPTED;
+  dispatchJumpGateFleet(galaxy, fleet);
+  return { ok: true };
+}
+
+function rejectJumpGateRequest(
+  galaxy: Galaxy,
+  request: JumpGateRequest,
+  state: DiplomaticProposalStateType
+): void {
+  request.state = state;
+  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  if (!fleet) {
+    return;
+  }
+
+  restorePendingJumpGateFleetToOrigin(galaxy, fleet, true);
+}
+
+function synchronizeJumpGateRequests(galaxy: Galaxy): void {
+  for (const request of galaxy.jumpGateRequests) {
+    if (request.state !== DiplomaticProposalState.PENDING) {
+      continue;
+    }
+
+    const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+    const originPlanet = resolvePlanetAtCoordinates(galaxy, request.originCoordinates);
+    const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+    if (
+      !fleet
+      || fleet.state !== FleetState.PENDING_JUMP_GATE
+      || fleet.pendingJumpGateRequestId !== request.requestId
+      || !originPlanet
+      || originPlanet.info.ownerId !== request.fromPlayerId
+      || !targetPlanet
+      || targetPlanet.info.ownerId !== request.toPlayerId
+    ) {
+      request.state = DiplomaticProposalState.CANCELLED;
+      if (fleet) {
+        restorePendingJumpGateFleetToOrigin(galaxy, fleet, true);
+      }
+    }
+  }
 }
 
 function canFleetRequestMaintenance(galaxy: Galaxy, fleet: Fleet): boolean {

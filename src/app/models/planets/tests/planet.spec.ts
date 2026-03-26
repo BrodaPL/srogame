@@ -200,6 +200,17 @@ describe('Planet', () => {
     expect(planet.basicInfo.size).toBe(140);
   });
 
+  it('calculates live jump gate capacity from level, power, damage, hyperspace parameters, and tech', () => {
+    const planet = createPlanet({ hyperspaceParameters: 1.2 });
+    planet.setBuildingLevel(BuildingType.JUMP_GATE, 4);
+
+    const maxStructuralPoints = planet.getMaxBuildingStructuralPoints(BuildingType.JUMP_GATE);
+    planet.setCurrentBuildingPowerConsumption(BuildingType.JUMP_GATE, 10);
+    planet.setCurrentBuildingStructuralPoints(BuildingType.JUMP_GATE, Math.floor(maxStructuralPoints / 2));
+
+    expect(planet.getJumpGateCapacity(3)).toBe(34);
+  });
+
   it('creates starting planets with neutral multiplier parameters set to 1', () => {
     const system = createSystem();
     const startingPlanet = Planet.createStartingPlanet('Home', 1, system, 1);

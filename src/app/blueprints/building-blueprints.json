@@ -900,7 +900,7 @@
                 },
                 {
                     "type":  "JUMP_GATE",
-                    "description":  "Makes possible to jump between systems. Every level increses Interstellar Trade Port by 50%",
+                    "description":  "Makes possible to jump between systems. Every level increases Interstellar Trade Port capacity by 50%",
                     "imagePath":  "images/buildings/Jump_Gate.webp",
                     "basicCost":  {
                                       "metal":  10000,
@@ -983,7 +983,7 @@
                 },
                 {
                     "type":  "INTERSTELLAR_TRADE_PORT",
-                    "description":  "Makes possible to exchange resources in ratio 3:2:1 with 20% operational cost. Every level above 1 decreases op. cost by 2%.",
+                    "description":  "Makes possible to exchange resources in ratio 3:2:1 with 20-40% operational cost. Every level above 1 decreases op. cost by 1%.",
                     "imagePath":  "images/buildings/Shipyard.webp",
                     "basicCost":  {
                                       "metal":  1200,

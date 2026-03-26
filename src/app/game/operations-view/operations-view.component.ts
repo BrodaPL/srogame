@@ -82,6 +82,10 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected currentLocationPlanetName(fleet: Fleet): string {
+    if (fleet.state === FleetState.PENDING_JUMP_GATE) {
+      return fleet.originPlanetName;
+    }
+
     if (this.isRecalledInTransit(fleet)) {
       return 'Recalled in transit';
     }
@@ -90,6 +94,10 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected currentLocationCoordinates(fleet: Fleet): string {
+    if (fleet.state === FleetState.PENDING_JUMP_GATE) {
+      return this.coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z);
+    }
+
     if (this.isRecalledInTransit(fleet)) {
       return `${this.coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z)} -> ${this.coordinatesLabel(fleet.target.x, fleet.target.y, fleet.target.z)}`;
     }
@@ -100,6 +108,8 @@ export class OperationsViewComponent implements OnInit {
 
   protected destinationPlanetName(fleet: Fleet): string {
     switch (fleet.state) {
+      case FleetState.PENDING_JUMP_GATE:
+        return fleet.targetPlanetName;
       case FleetState.RETURNING:
       case FleetState.MISSION_FAILURE_RETURNING:
         return fleet.originPlanetName;
@@ -112,6 +122,8 @@ export class OperationsViewComponent implements OnInit {
 
   protected destinationCoordinates(fleet: Fleet): string {
     switch (fleet.state) {
+      case FleetState.PENDING_JUMP_GATE:
+        return this.coordinatesLabel(fleet.target.x, fleet.target.y, fleet.target.z);
       case FleetState.RETURNING:
       case FleetState.MISSION_FAILURE_RETURNING:
         return this.coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z);
@@ -127,6 +139,10 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected stateLabel(fleet: Fleet): string {
+    if (fleet.state === FleetState.PENDING_JUMP_GATE) {
+      return 'PENDING JUMP GATE APPROVAL';
+    }
+
     if (fleet.state === FleetState.ORBITING) {
       return `ORBITING | ${this.orbitActivityLabel(fleet.orbitActivity)}`;
     }
@@ -154,7 +170,9 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected canReturn(fleet: Fleet): boolean {
-    return fleet.state === FleetState.MOVING_TO_TARGET || fleet.state === FleetState.ORBITING;
+    return fleet.state === FleetState.PENDING_JUMP_GATE
+      || fleet.state === FleetState.MOVING_TO_TARGET
+      || fleet.state === FleetState.ORBITING;
   }
 
   protected canDelay(fleet: Fleet): boolean {
@@ -241,6 +259,12 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected operationDetail(fleet: Fleet): string | null {
+    if (fleet.state === FleetState.PENDING_JUMP_GATE) {
+      return fleet.pendingJumpGateRequestId
+        ? `Waiting for Jump Gate request #${fleet.pendingJumpGateRequestId}.`
+        : 'Waiting for Jump Gate approval.';
+    }
+
     if (fleet.missionType === FleetMissionType.SIEGE) {
       return `Siege orbit: ${this.bombardmentCapability(fleet)}`;
     }

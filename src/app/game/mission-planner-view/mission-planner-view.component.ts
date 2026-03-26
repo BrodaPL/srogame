@@ -16,6 +16,7 @@ import {
   emptyBombardmentPriorities,
   normalizeBombardmentPriorities
 } from '../../models/bombardment/bombardment-priority';
+import { BuildingType } from '../../models/enums/building-type';
 import { DefenceType } from '../../models/enums/defence-type';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { ShipPurpose } from '../../models/enums/ship-purpose';
@@ -27,6 +28,7 @@ import { Fleet } from '../../models/fleets/fleet';
 import { ManyDefences } from '../../models/defences/many-defences';
 import { ManyShips } from '../../models/fleets/many-ships';
 import type {
+  ClientReportDataDto,
   CreateFleetBombSelectionEntry,
   ClientCoordinates,
   ClientPlanetDto,
@@ -34,6 +36,7 @@ import type {
   CreateFleetShipSelectionEntry
 } from '../../models/game-api-types';
 import { Ship } from '../../models/fleets/ship';
+import { calculateJumpGateCapacity } from '../../models/jump-gates/jump-gate-capacity';
 import { FleetMissionRegistry } from '../../models/missions/fleet-mission-registry';
 import type { MissionPlannerContext } from '../../models/missions/mission-context';
 import { calculateRepairCapabilityFromEntries } from '../../models/repairs/ship-repair-capability';
@@ -126,6 +129,7 @@ export class MissionPlannerViewComponent implements OnInit {
   protected isLaunching = false;
   protected loadError: string | null = null;
   protected launchError: string | null = null;
+  protected launchNotice: string | null = null;
   protected targetLookupError: string | null = null;
   protected ownedPlanets: ClientPlanetDto[] = [];
   protected activeFleets: Fleet[] = [];
@@ -136,6 +140,7 @@ export class MissionPlannerViewComponent implements OnInit {
   protected cargoMetal = 0;
   protected cargoCrystal = 0;
   protected cargoDeuterium = 0;
+  protected useJumpGate = false;
   protected speedSelectorEnabled = false;
   protected fleetTemplatesEnabled = false;
   protected bombardmentPriorities: BombardmentPriorities = emptyBombardmentPriorities();
@@ -151,6 +156,7 @@ export class MissionPlannerViewComponent implements OnInit {
 
   private readonly shipBlueprintsByType = new Map<ShipType, Ship>();
   private readonly bombBlueprintsByType = new Map<DefenceType, Defence>();
+  private readonly buildingBlueprintsByType = BuildingBlueprintsFactory.fromDefaultJson().buildingsMap;
   private readonly undamagedShipSelectionByType = new Map<ShipType, number>();
   private readonly damagedShipSelectionByType = new Map<ShipType, number>();
   private readonly bombSelectionByType = new Map<DefenceType, number>();
@@ -309,6 +315,9 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected warningRows(): MissionWarningVm[] {
     const warnings = this.currentMission().getPlannerChecks(this.buildPlannerContext());
+    if (this.useJumpGate) {
+      warnings.push(...this.jumpGateWarningRows());
+    }
     if (this.usedBombHangarCapacity() > this.totalBomberHangarCapacity()) {
       warnings.push({ text: 'Insufficient bomber hangar space for carried bombs.', severity: 'error' });
     }
@@ -426,6 +435,50 @@ export class MissionPlannerViewComponent implements OnInit {
     return this.selectedMissionType === FleetMissionType.BOMBARD || this.selectedMissionType === FleetMissionType.SIEGE;
   }
 
+  protected supportsJumpGate(): boolean {
+    return this.selectedMissionType === FleetMissionType.MOVE
+      || this.selectedMissionType === FleetMissionType.DEFEND
+      || this.selectedMissionType === FleetMissionType.TRANSPORT;
+  }
+
+  protected canToggleJumpGate(): boolean {
+    return this.supportsJumpGate() && this.targetHasKnownJumpGate();
+  }
+
+  protected jumpGateHint(): string {
+    if (!this.supportsJumpGate()) {
+      return 'Jump Gate is available only for Move, Guard, and Transport.';
+    }
+
+    if (!this.selectedTargetPlanet) {
+      return 'Select a target planet to check Jump Gate availability.';
+    }
+
+    if (!this.targetHasKnownJumpGate()) {
+      return 'Target planet has no known Jump Gate.';
+    }
+
+    if (!this.selectedOriginPlanet) {
+      return 'Select an origin planet to use Jump Gate travel.';
+    }
+
+    if (this.jumpGateLevelForOwnedPlanet(this.selectedOriginPlanet) <= 0) {
+      return 'Origin planet has no Jump Gate.';
+    }
+
+    if (this.isForeignJumpGateTarget()) {
+      return 'Foreign-owned targets require approval unless diplomacy auto-approves it.';
+    }
+
+    return 'Jump Gate travel uses 1 turn. Capacity is checked on both endpoints.';
+  }
+
+  protected setUseJumpGate(enabled: boolean): void {
+    this.useJumpGate = enabled && this.canToggleJumpGate();
+    this.launchError = null;
+    this.launchNotice = null;
+  }
+
   protected bombardmentPriorityValue(slot: keyof BombardmentPriorities): BombardmentPrioritySelection | '' {
     return this.bombardmentPriorities[slot] ?? '';
   }
@@ -494,7 +547,7 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected travelTurnsPreview(): number {
-    return Math.max(1, this.distancePreview());
+    return this.useJumpGate ? 1 : Math.max(1, this.distancePreview());
   }
 
   protected fuelCostPreview(): number {
@@ -519,6 +572,10 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected onMissionTypeChange(): void {
     this.launchError = null;
+    this.launchNotice = null;
+    if (!this.supportsJumpGate()) {
+      this.useJumpGate = false;
+    }
     this.normalizeShipSelectionForMission();
   }
 
@@ -549,6 +606,10 @@ export class MissionPlannerViewComponent implements OnInit {
     this.selectedOriginPlanet = planet;
     this.originCoordinatesInput = this.coordinatesLabel(planet.coordinates);
     this.launchError = null;
+    this.launchNotice = null;
+    if (!this.canToggleJumpGate()) {
+      this.useJumpGate = false;
+    }
     this.normalizeShipSelectionForMission();
   }
 
@@ -695,6 +756,7 @@ export class MissionPlannerViewComponent implements OnInit {
         crystal: this.cargoCrystal,
         deuterium: this.cargoDeuterium
       },
+      useJumpGate: this.useJumpGate,
       bombardmentPriorities: this.supportsBombardmentPriorities()
         ? normalizeBombardmentPriorities(this.bombardmentPriorities)
         : null
@@ -702,6 +764,7 @@ export class MissionPlannerViewComponent implements OnInit {
 
     this.isLaunching = true;
     this.launchError = null;
+    this.launchNotice = null;
 
     this.gameApi.createFleetMission(request, session.token)
       .pipe(finalize(() => {
@@ -712,6 +775,7 @@ export class MissionPlannerViewComponent implements OnInit {
         next: (response) => {
           this.ownedPlanets = this.sortPlanets(response.ownedPlanets);
           this.activeFleets = [...response.activeFleets];
+          this.launchNotice = response.message ?? null;
           this.selectedOriginPlanet = this.findOwnedPlanet(this.selectedOriginPlanet?.coordinates ?? null);
           this.selectedTargetPlanet = this.findOwnedPlanet(this.selectedTargetPlanet?.coordinates ?? null) ?? this.selectedTargetPlanet;
           this.clearAllShips();
@@ -719,6 +783,7 @@ export class MissionPlannerViewComponent implements OnInit {
           this.cargoMetal = 0;
           this.cargoCrystal = 0;
           this.cargoDeuterium = 0;
+          this.useJumpGate = false;
         },
         error: (error) => {
           this.launchError = error?.error?.error ?? 'Unable to create fleet mission.';
@@ -767,6 +832,10 @@ export class MissionPlannerViewComponent implements OnInit {
       this.selectedTargetPlanet = knownPlanet;
       this.targetCoordinatesInput = this.coordinatesLabel(coordinates);
       this.targetLookupError = null;
+      this.launchNotice = null;
+      if (!this.canToggleJumpGate()) {
+        this.useJumpGate = false;
+      }
       return;
     }
 
@@ -781,11 +850,16 @@ export class MissionPlannerViewComponent implements OnInit {
       next: (planet) => {
         this.selectedTargetPlanet = planet;
         this.targetCoordinatesInput = this.coordinatesLabel(coordinates);
+        this.launchNotice = null;
+        if (!this.canToggleJumpGate()) {
+          this.useJumpGate = false;
+        }
         this.cdr.markForCheck();
       },
       error: (error) => {
         this.targetLookupError = error?.error?.error ?? 'Target planet could not be resolved.';
         this.selectedTargetPlanet = null;
+        this.useJumpGate = false;
         this.cdr.markForCheck();
       }
     });
@@ -944,6 +1018,134 @@ export class MissionPlannerViewComponent implements OnInit {
       ?? [];
     const matchingEntry = techLevels.find((entry) => entry.type === technologyType);
     return matchingEntry?.level ?? 0;
+  }
+
+  private targetHasKnownJumpGate(): boolean {
+    if (!this.selectedTargetPlanet) {
+      return false;
+    }
+
+    if (this.selectedTargetPlanet.info.ownerId !== null) {
+      return this.jumpGateLevelForOwnedPlanet(this.selectedTargetPlanet) > 0;
+    }
+
+    return this.jumpGateLevelFromReport(this.selectedTargetPlanet.reportData) > 0;
+  }
+
+  private isForeignJumpGateTarget(): boolean {
+    return !!this.selectedTargetPlanet && this.selectedTargetPlanet.info.ownerId === null;
+  }
+
+  private jumpGateWarningRows(): MissionWarningVm[] {
+    const warnings: MissionWarningVm[] = [];
+    if (!this.supportsJumpGate()) {
+      warnings.push({ text: 'Jump Gate is available only for Move, Guard, and Transport.', severity: 'error' });
+      return warnings;
+    }
+
+    if (!this.selectedOriginPlanet || !this.selectedTargetPlanet) {
+      return warnings;
+    }
+
+    if (this.jumpGateLevelForOwnedPlanet(this.selectedOriginPlanet) <= 0) {
+      warnings.push({ text: 'Origin planet has no Jump Gate.', severity: 'error' });
+    }
+
+    if (!this.targetHasKnownJumpGate()) {
+      warnings.push({ text: 'Target planet has no known Jump Gate.', severity: 'error' });
+      return warnings;
+    }
+
+    const selectedShips = this.totalSelectedShips();
+    if (selectedShips <= 0) {
+      return warnings;
+    }
+
+    const originCapacity = this.jumpGateCapacityForOwnedPlanet(this.selectedOriginPlanet);
+    if (originCapacity < selectedShips) {
+      warnings.push({
+        text: `Origin Jump Gate capacity is ${originCapacity}, but ${selectedShips} ships are selected.`,
+        severity: 'error'
+      });
+    }
+
+    if (this.selectedTargetPlanet.info.ownerId !== null) {
+      const targetCapacity = this.jumpGateCapacityForOwnedPlanet(this.selectedTargetPlanet);
+      if (targetCapacity < selectedShips) {
+        warnings.push({
+          text: `Target Jump Gate capacity is ${targetCapacity}, but ${selectedShips} ships are selected.`,
+          severity: 'error'
+        });
+      }
+      return warnings;
+    }
+
+    const estimatedTargetCapacity = this.jumpGateCapacityEstimateFromReport(this.selectedTargetPlanet.reportData);
+    if (estimatedTargetCapacity < selectedShips) {
+      warnings.push({
+        text: `Known target Jump Gate capacity is at most ${estimatedTargetCapacity}, but ${selectedShips} ships are selected.`,
+        severity: 'error'
+      });
+    } else {
+      warnings.push({
+        text: 'Foreign target Jump Gate approval and live capacity are checked again on the server.',
+        severity: 'note'
+      });
+    }
+
+    return warnings;
+  }
+
+  private jumpGateLevelForOwnedPlanet(planet: ClientPlanetDto): number {
+    return planet.objects.buildingsLevels.find((entry) => entry.type === BuildingType.JUMP_GATE)?.level ?? 0;
+  }
+
+  private jumpGateLevelFromReport(reportData: ClientReportDataDto | null): number {
+    return reportData?.buildingsLevels.find((entry) => entry.type === BuildingType.JUMP_GATE)?.level ?? 0;
+  }
+
+  private techLevelFromReport(reportData: ClientReportDataDto | null, technologyType: TechnologyType): number {
+    return reportData?.techLevels.find((entry) => entry.type === technologyType)?.level ?? 0;
+  }
+
+  private jumpGateCapacityForOwnedPlanet(planet: ClientPlanetDto): number {
+    const level = this.jumpGateLevelForOwnedPlanet(planet);
+    const buildingEffectiveness = this.ownedPlanetBuildingEffectiveness(planet, BuildingType.JUMP_GATE);
+    return calculateJumpGateCapacity(
+      level,
+      planet.info.planetaryParameters.hyperspaceParameters,
+      this.techLevel(TechnologyType.HYPERSPACE_TECHNOLOGY),
+      buildingEffectiveness
+    );
+  }
+
+  private jumpGateCapacityEstimateFromReport(reportData: ClientReportDataDto | null): number {
+    return calculateJumpGateCapacity(
+      this.jumpGateLevelFromReport(reportData),
+      reportData?.planetaryParameters.hyperspaceParameters ?? 0,
+      this.techLevelFromReport(reportData, TechnologyType.HYPERSPACE_TECHNOLOGY),
+      1
+    );
+  }
+
+  private ownedPlanetBuildingEffectiveness(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    const level = planet.objects.buildingsLevels.find((entry) => entry.type === buildingType)?.level ?? 0;
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    const maxPowerConsumption = Math.max(0, (blueprint?.powerConsumption ?? 0) * level);
+    const currentPowerConsumption = planet.objects.buildingsCurrentPowerConsumption
+      .find((entry) => entry.type === buildingType)?.currentPowerConsumption ?? maxPowerConsumption;
+    const powerUtilization = maxPowerConsumption <= 0
+      ? 1
+      : Math.min(1, Math.max(0, currentPowerConsumption / maxPowerConsumption));
+    const structuralEntry = planet.objects.buildingsCurrentStructuralPoints.find((entry) => entry.type === buildingType);
+    const structuralUtilization = !structuralEntry || structuralEntry.maxStructuralPoints <= 0
+      ? 1
+      : Math.min(1, Math.max(0, structuralEntry.currentStructuralPoints / structuralEntry.maxStructuralPoints));
+    return powerUtilization * structuralUtilization;
   }
 
   private sortPlanets(planets: ClientPlanetDto[]): ClientPlanetDto[] {

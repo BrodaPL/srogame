@@ -199,8 +199,10 @@ export class EncyclopediaMechanicsComponent {
       details: [
         'Mission Planner currently supports Move, Guard, Transport, Spy, Bombard, Siege, Recycle, Repair, and Colonize.',
         'Validation includes coordinates, ownership/diplomacy constraints, ship capability checks, cargo rules, fuel reserves, and active-fleet-cap checks.',
-        'Fleet lifecycle states are meaningful: fleets can be MOVING_TO_TARGET, ORBITING, RETURNING, MISSION_FAILURE_RETURNING, or MISSION_FAILURE_IDLE.',
+        'Fleet lifecycle states are meaningful: fleets can be PENDING_JUMP_GATE, MOVING_TO_TARGET, ORBITING, RETURNING, MISSION_FAILURE_RETURNING, or MISSION_FAILURE_IDLE.',
         'Move to owned planets merges into the target planet, Move to non-hostile foreign or unowned orbit can stay in orbit, Transport delivers cargo then returns, and Spy creates structured espionage reports.',
+        'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn.',
+        'Foreign Jump Gate targets require known gate intel from the latest espionage report and create a Mail request for the target owner unless diplomacy auto-approves it.',
         'Mission Planner can also be prefilled from other screens, for example Spy Planet actions from reports or planet previews.'
       ],
       formulas: [
@@ -232,6 +234,7 @@ export class EncyclopediaMechanicsComponent {
         'Orbiting non-hostile fleets now distinguish between passive orbit and active guarding orbit.',
         'Guard uses the internal defend mission path and joins friendly defense coalitions, while passive orbit mainly intercepts hostile orbit-staying missions.',
         'Siege can keep bombarding while hostile, Recycle can keep harvesting debris in idle orbit, and Repair has non-hostile orbit constraints.',
+        'Pending Jump Gate fleets stay parked at the origin planet until the target owner resolves the request in Mail.',
         'Alliance Depot maintenance requests can deliver fuel, planetary bombs, and small ships from the target planet and are managed through Mail.'
       ]
     },
@@ -262,7 +265,7 @@ export class EncyclopediaMechanicsComponent {
       summary: 'Reports and Mail are now separate communication flows, and End Turn is blocked until critical incoming communication is cleared.',
       details: [
         'Reports is a data-report inbox for espionage, battles, arrivals, bombardment, repair, and other generated reports.',
-        'Mail is the player communication center for direct messages, diplomacy requests, and Alliance Depot maintenance requests.',
+        'Mail is the player communication center for direct messages, diplomacy requests, Jump Gate requests, and Alliance Depot maintenance requests.',
         'Unread report count is separate from unread mail and pending incoming requests.',
         'End Turn is blocked while unread mail or pending incoming requests exist, and a sticky Mail CTA appears until the blocker is cleared.'
       ]

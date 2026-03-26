@@ -197,6 +197,22 @@
             </article>
           }
 
+          @if (supportsJumpGate()) {
+            <article class="overview-card mission-planner__details-card">
+              <h3>Jump Gate</h3>
+              <label class="mission-planner__purpose-filter">
+                <input
+                  type="checkbox"
+                  [ngModel]="useJumpGate"
+                  [disabled]="!canToggleJumpGate()"
+                  (ngModelChange)="setUseJumpGate($event)"
+                />
+                <span>Use Jump Gate</span>
+              </label>
+              <p class="overview-muted mission-planner__compact-copy">{{ jumpGateHint() }}</p>
+            </article>
+          }
+
           <article
             class="overview-card mission-planner__summary-card"
             data-tutorial-id="mission-planner-travel-summary"
@@ -268,6 +284,9 @@
             }
             @if (launchError) {
               <p class="form-error">{{ launchError }}</p>
+            }
+            @if (launchNotice) {
+              <p class="overview-muted">{{ launchNotice }}</p>
             }
             <button
               class="start-button"

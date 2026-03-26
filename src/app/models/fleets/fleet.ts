@@ -6,6 +6,7 @@ import { ManyDefences } from '../defences/many-defences';
 import type { BombardmentPriorities } from '../bombardment/bombardment-priority';
 
 export enum FleetState {
+  PENDING_JUMP_GATE = 'PENDING_JUMP_GATE',
   MOVING_TO_TARGET = 'MOVING_TO_TARGET',
   ORBITING = 'ORBITING',
   RETURNING = 'RETURNING',
@@ -49,6 +50,8 @@ export class Fleet {
     public returnReason: FleetReturnReason = FleetReturnReason.NORMAL,
     public maintenanceRequestAvailable: boolean = false,
     public pendingMaintenanceRequestId: number | null = null,
+    public usesJumpGate: boolean = false,
+    public pendingJumpGateRequestId: number | null = null,
     public lastMaintenanceRequestTurn: number | null = null,
     public bombardmentPriorities: BombardmentPriorities | null = null,
     public remainingFuelReserve: number = fuelCost

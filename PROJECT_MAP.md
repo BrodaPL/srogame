@@ -166,6 +166,9 @@ Reports and tutorials:
 - `/api/game/mail/messages/read`
 - `/api/game/mail/messages/delete`
 - `/api/game/mail/requests/delete`
+- `/api/game/mail/jump-gate-requests/:requestId/approve`
+- `/api/game/mail/jump-gate-requests/:requestId/reject`
+- `/api/game/mail/jump-gate-requests/:requestId/cancel`
 - `/api/game/mail/maintenance-requests/:requestId/approve`
 - `/api/game/mail/maintenance-requests/:requestId/reject`
 - `/api/game/mail/maintenance-requests/:requestId/cancel`
@@ -211,12 +214,13 @@ Primary files:
 - `src/app/models/fleets/ship.ts`
 - `src/app/models/fleets/ship-instance.ts`
 - `src/app/models/fleets/shipyard-queue-entry.ts`
+- `src/app/models/jump-gates/jump-gate-capacity.ts`
 
 Owns:
 - fleet lifecycle state
 - orbit stance state (`PASSIVE_HOLD`, `GUARDING`, mission-in-progress orbit)
 - ship storage model
-- carried bomb storage, bombardment-priority state, remaining siege fuel reserve, and maintenance-request metadata
+- carried bomb storage, bombardment-priority state, remaining siege fuel reserve, Jump Gate metadata, and maintenance-request metadata
 - per-ship damaged hull state
 - shipyard queue payload shape
 
@@ -250,6 +254,21 @@ Owns:
 - target-arrival behavior dispatch
 - encounter integration points
 - player-facing mission set such as `Move`, `Guard`, `Bombard`, `Siege`, `Repair`, and `Recycle`
+- optional Jump Gate launch mode for `Move`, `Guard`, and `Transport`, including one-turn approved travel
+
+### Requests and mail actions
+
+Primary files:
+- `src/app/models/requests/jump-gate-request.ts`
+- `src/app/models/requests/maintenance-request.ts`
+- `src/app/game/mail-view/`
+- `server/src/index.ts`
+
+Owns:
+- Mail request DTO projection
+- diplomacy proposal actions in Mail
+- Jump Gate approval/reject/cancel flow
+- Alliance Depot maintenance request flow
 
 ### Turns and resolution
 
@@ -410,6 +429,7 @@ Change mission rules or add a mission:
 - `src/app/models/missions/mission-effect-executor.ts`
 - `src/app/models/missions/encounters/` for orbit participation and coalition behavior
 - `src/app/models/bombardment/` for `Bombard` / `Siege` targeting logic and priority categories
+- `src/app/models/jump-gates/jump-gate-capacity.ts` for Jump Gate capacity math
 - `src/app/game/mission-planner-view/`
 - `src/app/game/operations-view/`
 - `server/src/index.ts` for launch endpoint validation if needed
@@ -423,6 +443,18 @@ Change maintenance-request / `ALLIANCE_DEPOT` logistics:
 - `src/app/game/mail-view/`
 - `server/src/index.ts`
 - `src/app/models/planets/planet.ts` if depot cap formulas change
+
+Change Jump Gate travel and approval flow:
+- `src/app/models/requests/jump-gate-request.ts`
+- `src/app/models/jump-gates/jump-gate-capacity.ts`
+- `src/app/models/fleets/fleet.ts`
+- `src/app/models/game-api-types.ts`
+- `src/app/core/game-api.service.ts`
+- `src/app/game/mission-planner-view/`
+- `src/app/game/mail-view/`
+- `src/app/game/operations-view/`
+- `server/src/index.ts`
+- `src/app/models/planets/planet.ts` if endpoint capacity math changes
 
 Change turn resolution:
 - `src/app/models/turns/phase-one-turn-resolver.ts`

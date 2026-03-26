@@ -430,7 +430,23 @@ export type MaintenanceMailRequestDto = {
   approved: MaintenanceTransferPayloadDto | null;
 };
 
-export type MailRequestDto = DiplomacyMailRequestDto | MaintenanceMailRequestDto;
+export type JumpGateMailRequestDto = {
+  requestId: number;
+  requestType: 'JUMP_GATE';
+  createdTurn: number;
+  expiresOnTurn: number;
+  state: DiplomaticProposalState;
+  direction: 'incoming' | 'outgoing';
+  counterpartyPlayerId: number;
+  counterpartyPlayerName: string;
+  fleetId: number;
+  missionType: FleetMissionType;
+  originPlanetName: string;
+  targetPlanetName: string;
+  totalShips: number;
+};
+
+export type MailRequestDto = DiplomacyMailRequestDto | MaintenanceMailRequestDto | JumpGateMailRequestDto;
 
 export type MailRecipientDto = {
   playerId: number;
@@ -533,12 +549,15 @@ export type CreateFleetMissionRequest = {
   ships: CreateFleetShipSelectionEntry[];
   carriedBombs: CreateFleetBombSelectionEntry[];
   cargo: ResourcesPackDto;
+  useJumpGate?: boolean;
   bombardmentPriorities?: BombardmentPriorities | null;
 };
 
 export type CreateFleetMissionResponse = {
   ownedPlanets: ClientPlanetDto[];
   activeFleets: Fleet[];
+  mode?: 'LAUNCHED' | 'PENDING_JUMP_GATE';
+  message?: string | null;
 };
 
 export type CreateMaintenanceRequestRequest = MaintenanceTransferPayloadDto;

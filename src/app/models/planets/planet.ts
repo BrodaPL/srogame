@@ -13,6 +13,7 @@ import { BuildingQueueEntry } from '../buildings/building-queue-entry';
 import { ShipyardQueueEntry } from '../fleets/shipyard-queue-entry';
 import { TechnologyQueueEntry } from '../tech/technology-queue-entry';
 import { ResearchHelperFor } from '../tech/research-helper-for';
+import { calculateJumpGateCapacity } from '../jump-gates/jump-gate-capacity';
 
 type ModifierKey = keyof Omit<PlanetaryParameters, 'copy'>;
 
@@ -291,9 +292,7 @@ export class Planet {
       return 0;
     }
 
-    const utilization = this.getBuildingPowerUtilization(type);
-    const structuralUtilization = this.getBuildingStructuralUtilization(type);
-    return Math.floor(baseProduction * utilization * structuralUtilization);
+    return Math.floor(baseProduction * this.getBuildingEffectiveness(type));
   }
 
   public getBuildingProductionValue2(type: BuildingType): number {
@@ -302,9 +301,7 @@ export class Planet {
       return 0;
     }
 
-    const utilization = this.getBuildingPowerUtilization(type);
-    const structuralUtilization = this.getBuildingStructuralUtilization(type);
-    return Math.floor(baseProduction * utilization * structuralUtilization);
+    return Math.floor(baseProduction * this.getBuildingEffectiveness(type));
   }
 
   public getBuildingProductionValue3(type: BuildingType): number {
@@ -313,9 +310,20 @@ export class Planet {
       return 0;
     }
 
-    const utilization = this.getBuildingPowerUtilization(type);
-    const structuralUtilization = this.getBuildingStructuralUtilization(type);
-    return Math.floor(baseProduction * utilization * structuralUtilization);
+    return Math.floor(baseProduction * this.getBuildingEffectiveness(type));
+  }
+
+  public getBuildingEffectiveness(type: BuildingType): number {
+    return this.getBuildingPowerUtilization(type) * this.getBuildingStructuralUtilization(type);
+  }
+
+  public getJumpGateCapacity(hyperspaceTechnologyLevel: number): number {
+    return calculateJumpGateCapacity(
+      this.getBuildingLevel(BuildingType.JUMP_GATE),
+      this.info.planetaryParameters.hyperspaceParameters,
+      hyperspaceTechnologyLevel,
+      this.getBuildingEffectiveness(BuildingType.JUMP_GATE)
+    );
   }
 
   public getBuildingPowerUtilization(type: BuildingType): number {

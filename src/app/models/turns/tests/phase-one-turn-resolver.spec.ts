@@ -158,6 +158,44 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(defender.reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
   });
 
+  it('keeps pending jump gate fleets waiting at origin through end turn resolution', () => {
+    const waitingFleet = new Fleet(
+      90,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.TRANSPORTER, amount: 3 }),
+      new ResourcesPack(15, 0, 5),
+      20,
+      600,
+      20,
+      1,
+      1,
+      FleetState.PENDING_JUMP_GATE,
+      1
+    );
+    waitingFleet.pendingJumpGateRequestId = 7;
+    waitingFleet.usesJumpGate = true;
+
+    const { galaxy, system } = createPlayersAndGalaxy(waitingFleet, (solarSystem) => {
+      solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+      solarSystem.planets[0].info.ownerId = 1;
+      solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+      solarSystem.planets[1].info.ownerId = 2;
+    });
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.PENDING_JUMP_GATE);
+    expect(galaxy.activeFleets[0].pendingJumpGateRequestId).toBe(7);
+    expect(galaxy.activeFleets[0].originPlanetName).toBe('Alpha Prime');
+    expect(system.planets[0].rBDSFTQ.resources.metal).toBe(0);
+  });
+
   it('destroys a hostile transport that loses its arrival battle before cargo delivery', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
 

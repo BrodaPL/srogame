@@ -13,6 +13,7 @@ import { ManyShips } from '../fleets/many-ships';
 import { ManyDefences } from '../defences/many-defences';
 import type { DiplomaticRelation } from '../diplomacy/diplomatic-relation';
 import type { DiplomaticProposal } from '../diplomacy/diplomatic-proposal';
+import type { JumpGateRequest } from '../requests/jump-gate-request';
 import type { MaintenanceRequest } from '../requests/maintenance-request';
 
 export class Galaxy {
@@ -51,6 +52,8 @@ export class Galaxy {
     public diplomaticRelations: DiplomaticRelation[] = [],
     public diplomaticProposals: DiplomaticProposal[] = [],
     public nextDiplomaticProposalId = 1,
+    public jumpGateRequests: JumpGateRequest[] = [],
+    public nextJumpGateRequestId = 1,
     public maintenanceRequests: MaintenanceRequest[] = [],
     public nextMaintenanceRequestId = 1
   ) {}

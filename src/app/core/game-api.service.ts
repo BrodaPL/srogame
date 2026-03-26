@@ -282,6 +282,30 @@ export class GameApiService {
     );
   }
 
+  public approveJumpGateRequest(requestId: number, token: string) {
+    return this.http.post<MailViewResponse>(
+      `${API_BASE_URL}/game/mail/jump-gate-requests/${requestId}/approve`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public rejectJumpGateRequest(requestId: number, token: string) {
+    return this.http.post<MailViewResponse>(
+      `${API_BASE_URL}/game/mail/jump-gate-requests/${requestId}/reject`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public cancelJumpGateRequest(requestId: number, token: string) {
+    return this.http.post<MailViewResponse>(
+      `${API_BASE_URL}/game/mail/jump-gate-requests/${requestId}/cancel`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
   public getPlayerReports(token: string) {
     return this.http.get<PlayerReportDto[]>(
       `${API_BASE_URL}/game/reports`,

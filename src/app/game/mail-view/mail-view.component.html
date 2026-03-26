@@ -72,7 +72,7 @@
                   <span class="badge">{{ requestBadge(request) }}</span>
                 </div>
                 <p class="overview-muted">{{ requestSummary(request) }}</p>
-                <p class="overview-muted">Created on turn {{ request.createdTurn }} | Expires on turn {{ request.expiresOnTurn }}</p>
+                <p class="overview-muted">{{ requestTimingLine(request) }}</p>
                 <p class="overview-muted">{{ requestDetailLine(request) }}</p>
                 <div class="mail-view__actions">
                   @if (canAccept(request)) {
