@@ -8,7 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "smoke:test": "node scripts/run-smoke-tests.js",
-    "ships:descr": "node scripts/generate-ships-descr.ts"
+    "ships:descr": "node scripts/generate-ships-descr.ts",
+    "defences:descr": "node scripts/generate-defences-descr.ts"
   },
   "prettier": {
     "printWidth": 100,

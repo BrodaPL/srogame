@@ -1076,7 +1076,7 @@
                 },
                 {
                     "type":  "INTERSTELLAR_TRADE_PORT",
-                    "description":  "Makes possible to exchange resources in ratio 3:2:1 with 20-40% operational cost. Every level above 1 decreases op. cost by 1%.",
+                    "description":  "Makes possible to exchange resources in ratio 3:2:1 with 5-40% operational cost. Every level above 1 decreases op. cost by 1%.",
                     "imagePath":  "images/buildings/Shipyard.webp",
                     "basicCost":  {
                                       "metal":  1200,
