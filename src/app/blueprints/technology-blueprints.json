@@ -6,7 +6,7 @@
       "description": "Give +2% bonus to energy generation.",
       "basicCost": { "metal": 10, "crystal": 10, "deuterium": 20 },
       "energyRequired": [0],
-      "researchTime": [2],
+      "researchTime": [1.5],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 0.25 }
       ],
@@ -30,7 +30,7 @@
       "description": "Gives +2% bonus to Sensor Phlanx range, increses Jump Gate and Interstellar Trade Port capacity by 5%.",
       "basicCost": { "metal": 0, "crystal": 20, "deuterium": 30 },
       "energyRequired": [10],
-      "researchTime": [1],
+      "researchTime": [1.5],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 0.25 }
       ],
@@ -57,7 +57,7 @@
       "type": "COMPUTER_TECHNOLOGY",
       "imagePath": "images/technologies/Computer_Technology.webp",
       "description": "Every level give +2 to maximum fleet amount, also gives +5% to research power.",
-      "basicCost": { "metal": 0, "crystal": 20, "deuterium": 0 },
+      "basicCost": { "metal": 0, "crystal": 40, "deuterium": 0 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
@@ -73,7 +73,7 @@
       "description": "Give +5% to expeditions income, and decreases bad expedition outcomes by 2%, also increases Sensor Phlanx range by 1%.",
       "basicCost": { "metal": 10, "crystal": 10, "deuterium": 10 },
       "energyRequired": [0],
-      "researchTime": [3],
+      "researchTime": [2.5],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 0.25 }
       ],
@@ -85,7 +85,7 @@
       "description": "Make possible to colonise more types of planets. Increases all resources income, research and industry by +1%.",
       "basicCost": { "metal": 60, "crystal": 40, "deuterium": 20 },
       "energyRequired": [0],
-      "researchTime": [3],
+      "researchTime": [2.5],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 0.5 }
       ],
