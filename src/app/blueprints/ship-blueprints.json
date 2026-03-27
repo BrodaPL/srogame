@@ -198,9 +198,9 @@
       "canJump": true,
       "size": 0,
       "evasionChance": 0,
-      "hullPointsCapacity": 180,
+      "hullPointsCapacity": 120,
       "criticalThreshold": 40,
-      "shieldCapacity": 120,
+      "shieldCapacity": 80,
       "armor": 4,
       "weapons": [
         { "type": "RECYCLE_EQUIPMENT", "dmg": 60, "shots": 4 }
@@ -209,9 +209,9 @@
       "hangarCapacity": 0,
       "purposes": ["CARGO", "UTILITY", "RECYCLING"],
       "jumpCost": 3,
-      "cost": { "metal": 500, "crystal": 180, "deuterium": 90 },
+      "cost": { "metal": 300, "crystal": 140, "deuterium": 80 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 5 }
+        { "building": "SHIPYARD", "level": 4 }
       ],
       "techRequirements": [
         { "tech": "FUSION_DRIVE", "level": 3 },
@@ -273,7 +273,7 @@
       "hangarCapacity": 4,
       "purposes": ["MILITARY", "CARRIER"],
       "jumpCost": 2,
-      "cost": { "metal": 250, "crystal": 100, "deuterium": 20 },
+      "cost": { "metal": 280, "crystal": 100, "deuterium": 20 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 4 }
       ],
@@ -295,14 +295,14 @@
       "evasionChance": 0,
       "hullPointsCapacity": 160,
       "criticalThreshold": 40,
-      "shieldCapacity": 80,
+      "shieldCapacity": 70,
       "armor": 4,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 },
-        { "type": "MISSILE", "dmg": 40, "shots": 1 },
+        { "type": "MISSILE", "dmg": 30, "shots": 1 },
         { "type": "RAIL_GUN", "dmg": 10, "shots": 2 }
       ],
-      "cargoCapacity": 50,
+      "cargoCapacity": 40,
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 1,
@@ -401,7 +401,7 @@
         { "type": "MISSILE", "dmg": 40, "shots": 1 },
         { "type": "RAIL_GUN", "dmg": 30, "shots": 2 }
       ],
-      "cargoCapacity": 200,
+      "cargoCapacity": 150,
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 2,
@@ -426,26 +426,26 @@
       "canJump": true,
       "size": 0,
       "evasionChance": 0,
-      "hullPointsCapacity": 200,
+      "hullPointsCapacity": 220,
       "criticalThreshold": 40,
-      "shieldCapacity": 200,
+      "shieldCapacity": 220,
       "armor": 6,
       "weapons": [
         { "type": "BEAM", "dmg": 30, "shots": 1 },
         { "type": "MISSILE", "dmg": 50, "shots": 3 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 50, "shots": 1 }
       ],
-      "cargoCapacity": 200,
+      "cargoCapacity": 100,
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
-      "jumpCost": 2,
-      "cost": { "metal": 250, "crystal": 300, "deuterium": 80 },
+      "jumpCost": 3,
+      "cost": { "metal": 450, "crystal": 300, "deuterium": 180 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 6 }
       ],
       "techRequirements": [
         { "tech": "FUSION_DRIVE", "level": 4 },
-        { "tech": "HYPERSPACE_DRIVE", "level": 3 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 4 },
         { "tech": "ARMOUR_TECHNOLOGY", "level": 5 },
         { "tech": "MATERIAL_TECHNOLOGY", "level": 4 },
         { "tech": "SHIELDING_TECHNOLOGY", "level": 4 },
@@ -462,20 +462,20 @@
       "evasionChance": 0,
       "hullPointsCapacity": 220,
       "criticalThreshold": 35,
-      "shieldCapacity": 200,
+      "shieldCapacity": 180,
       "armor": 5,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 3 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 4 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 100, "shots": 2 }
       ],
-      "cargoCapacity": 50,
+      "cargoCapacity": 60,
       "hangarCapacity": 4,
       "purposes": ["MILITARY"],
-      "jumpCost": 5,
-      "cost": { "metal": 400, "crystal": 150, "deuterium": 120 },
+      "jumpCost": 6,
+      "cost": { "metal": 400, "crystal": 160, "deuterium": 180 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 7 }
+        { "building": "SHIPYARD", "level": 6 }
       ],
       "techRequirements": [
         { "tech": "FUSION_DRIVE", "level": 4 },
@@ -493,9 +493,9 @@
       "canJump": true,
       "size": 0,
       "evasionChance": 0,
-      "hullPointsCapacity": 200,
+      "hullPointsCapacity": 220,
       "criticalThreshold": 35,
-      "shieldCapacity": 150,
+      "shieldCapacity": 180,
       "armor": 5,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 2 },
@@ -628,7 +628,7 @@
       "hullPointsCapacity": 800,
       "criticalThreshold": 30,
       "shieldCapacity": 1000,
-      "armor": 8,
+      "armor": 7,
       "weapons": [
         { "type": "BEAM", "dmg": 30, "shots": 8 },
         { "type": "MISSILE", "dmg": 50, "shots": 4 },
@@ -666,7 +666,7 @@
       "hullPointsCapacity": 700,
       "criticalThreshold": 30,
       "shieldCapacity": 700,
-      "armor": 8,
+      "armor": 7,
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 4 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 10 },
@@ -703,7 +703,7 @@
       "hullPointsCapacity": 800,
       "criticalThreshold": 30,
       "shieldCapacity": 800,
-      "armor": 8,
+      "armor": 7,
       "weapons": [
         { "type": "BEAM", "dmg": 300, "shots": 1 },
         { "type": "MISSILE", "dmg": 250, "shots": 2 },
@@ -713,9 +713,9 @@
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 10,
-      "cost": { "metal": 1400, "crystal": 1000, "deuterium": 800 },
+      "cost": { "metal": 1600, "crystal": 1000, "deuterium": 900 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 7 }
+        { "building": "SHIPYARD", "level": 8 }
       ],
       "techRequirements": [
         { "tech": "FUSION_DRIVE", "level": 5 },
@@ -738,7 +738,7 @@
       "hullPointsCapacity": 800,
       "criticalThreshold": 30,
       "shieldCapacity": 1000,
-      "armor": 7,
+      "armor": 6,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 4 },
         { "type": "MISSILE", "dmg": 30, "shots": 1 },
@@ -773,7 +773,7 @@
       "hullPointsCapacity": 10000,
       "criticalThreshold": 25,
       "shieldCapacity": 20000,
-      "armor": 9,
+      "armor": 8,
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 40 },
         { "type": "BEAM", "dmg": 300, "shots": 8 },
@@ -785,11 +785,11 @@
         { "type": "REPAIR_EQUIPMENT", "dmg": 20, "shots": 10 },
         { "type": "REPAIR_EQUIPMENT", "dmg": 400, "shots": 2 }
       ],
-      "cargoCapacity": 25000,
+      "cargoCapacity": 10000,
       "hangarCapacity": 100,
       "purposes": ["MILITARY", "BOMBER", "CARGO", "UTILITY", "CARRIER"],
       "jumpCost": 100,
-      "cost": { "metal": 50000, "crystal": 50000, "deuterium": 20000 },
+      "cost": { "metal": 20000, "crystal": 16000, "deuterium": 10000 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 10 }
       ],
