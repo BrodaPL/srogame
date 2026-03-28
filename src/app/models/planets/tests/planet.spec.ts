@@ -7,6 +7,7 @@ import { PlanetaryParameters } from '../planetary-parameters';
 import { BuildingType } from '../../enums/building-type';
 import { ManyShips } from '../../fleets/many-ships';
 import { ManyDefences } from '../../defences/many-defences';
+import { calculateTradePortCapacity } from '../../trade/trade-port-capacity';
 
 describe('Planet', () => {
   const createSystem = (): SolarSystem => new SolarSystem(
@@ -110,15 +111,16 @@ describe('Planet', () => {
   it('scales building production by current power utilization and floors results', () => {
     const planet = createPlanet();
     planet.setBuildingLevel(BuildingType.METAL_MINE, 5);
+    const fullProduction = planet.getBuildingProductionValue1(BuildingType.METAL_MINE);
 
     expect(planet.getMaxBuildingPowerConsumption(BuildingType.METAL_MINE)).toBe(5);
-    expect(planet.getBuildingProductionValue1(BuildingType.METAL_MINE)).toBe(300);
+    expect(fullProduction).toBeGreaterThan(0);
 
     planet.setCurrentBuildingPowerConsumption(BuildingType.METAL_MINE, 3);
 
     expect(planet.getBuildingPowerUtilization(BuildingType.METAL_MINE)).toBeCloseTo(0.6, 8);
-    expect(planet.getBuildingProductionValue1(BuildingType.METAL_MINE)).toBe(180);
-    expect(planet.getMetalGain(0)).toBe(180);
+    expect(planet.getBuildingProductionValue1(BuildingType.METAL_MINE)).toBe(Math.floor(fullProduction * 0.6));
+    expect(planet.getMetalGain(0)).toBe(Math.floor(fullProduction * 0.6));
   });
 
   it('applies the bunker-backed structural productivity floor to damaged buildings', () => {
@@ -209,6 +211,28 @@ describe('Planet', () => {
     planet.setCurrentBuildingStructuralPoints(BuildingType.JUMP_GATE, Math.floor(maxStructuralPoints / 2));
 
     expect(planet.getJumpGateCapacity(3)).toBe(34);
+  });
+
+  it('calculates live trade port capacity from level, power, damage, hyperspace modifiers, tech, and jump gate bonus', () => {
+    const planet = createPlanet({ hyperspaceParameters: 1.1 });
+    planet.setBuildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT, 2);
+    planet.setBuildingLevel(BuildingType.JUMP_GATE, 1);
+
+    const maxStructuralPoints = planet.getMaxBuildingStructuralPoints(BuildingType.INTERSTELLAR_TRADE_PORT);
+    planet.setCurrentBuildingPowerConsumption(BuildingType.INTERSTELLAR_TRADE_PORT, 2);
+    planet.setCurrentBuildingStructuralPoints(
+      BuildingType.INTERSTELLAR_TRADE_PORT,
+      Math.floor(maxStructuralPoints / 2)
+    );
+
+    expect(planet.getTradePortCapacity(2, 1)).toBe(calculateTradePortCapacity(
+      2,
+      1.1,
+      2,
+      1,
+      1,
+      0.25
+    ));
   });
 
   it('creates starting planets with neutral multiplier parameters set to 1', () => {

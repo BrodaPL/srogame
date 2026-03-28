@@ -97,6 +97,15 @@
           </button>
           <span> | {{ planet.basicInfo.type }} | Size {{ usedPlanetSize() }} / {{ planet.basicInfo.size }}</span>
         </p>
+        <button
+          type="button"
+          class="planet-view__trade-port-button"
+          [disabled]="!hasTradePort()"
+          [attr.title]="hasTradePort() ? 'Open local Trade Port offers.' : 'Build Interstellar Trade Port to unlock trade offers.'"
+          (click)="openTradePortDialog()"
+        >
+          Trade Port
+        </button>
       </div>
     </section>
 
@@ -717,3 +726,52 @@
     <p class="overview-empty">Planet data not loaded yet.</p>
   }
 </section>
+
+@if (planet && isTradePortDialogOpen) {
+  <div class="planet-view__modal-backdrop" (click)="closeTradePortDialog()"></div>
+  <section class="planet-view__modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <div class="planet-view__modal-head">
+      <div>
+        <h3 class="planet-view__section-title">Trade Port Offers</h3>
+        <p class="planet-view__modal-meta">
+          {{ planet.basicInfo.name }} | Level {{ buildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT) }}
+        </p>
+      </div>
+      <button type="button" class="planet-view__modal-close" (click)="closeTradePortDialog()">Close</button>
+    </div>
+
+    <div class="planet-view__modal-body">
+      @if (tradePortActionError) {
+        <p class="planet-view__trade-port-error">{{ tradePortActionError }}</p>
+      }
+
+      @if (tradePortOffers().length === 0) {
+        <p class="planet-tab-placeholder">No trade offers are available on this planet this turn.</p>
+      } @else {
+        <div class="planet-view__trade-port-list">
+          @for (offer of tradePortOffers(); track offer.offerId) {
+            <article class="planet-view__trade-port-card" [class.planet-view__trade-port-card--used]="offer.used">
+              <div class="planet-view__trade-port-main">
+                <p class="planet-view__trade-port-summary">
+                  {{ tradePortOfferGetLabel(offer) }}
+                </p>
+                <p class="planet-view__trade-port-cost">
+                  Cost: {{ tradePortOfferCostLabel(offer) }} {{ tradePortOfferModifierLabel(offer) }}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="planet-view__trade-port-action"
+                [disabled]="!canUseTradePortOffer(offer)"
+                [attr.title]="tradePortOfferActionTitle(offer)"
+                (click)="useTradePortOffer(offer)"
+              >
+                {{ offer.used ? 'Used' : tradePortActionOfferId === offer.offerId ? 'Trading...' : 'Use offer' }}
+              </button>
+            </article>
+          }
+        </div>
+      }
+    </div>
+  </section>
+}

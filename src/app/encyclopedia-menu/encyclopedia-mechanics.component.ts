@@ -78,6 +78,30 @@ export class EncyclopediaMechanicsComponent {
       ]
     },
     {
+      title: 'Trade Port Exchanges',
+      category: 'Economy',
+      status: 'Live',
+      summary: 'Interstellar Trade Port generates planet-local exchange offers each turn, and each offer can be used once for an instant local resource trade.',
+      details: [
+        'Offer count equals current Interstellar Trade Port level on that planet.',
+        'Offers are local to the planet and refresh on every global turn advance.',
+        'Each offer exchanges one resource into a different resource type and spends or grants resources immediately on that same planet.',
+        'The Trade Port button in Planet View is enabled once the building exists and opens the local offer popup.',
+        'Offers stay fixed for the turn once rolled, even if current power or damage later changes.'
+      ],
+      formulas: [
+        'tradePortCapacity = floor(baseCap * tradePortEffectiveness * hyperspaceParameters * (1 + HYPERSPACE_TECHNOLOGY * 0.05) * (1 + GRAVITON_TECHNOLOGY * 0.25) * (1 + JUMP_GATE level * 0.2))',
+        'offerCount = INTERSTELLAR_TRADE_PORT level',
+        'offerAmount = floor(tradePortCapacity * step), where step is one of 20%, 40%, 60%, 80%, 100%',
+        'value ratio = 3 metal = 2 crystal = 1 deuterium',
+        'totalCost = ceil(baseCost * (1 + rolledModifier - levelDiscount))',
+        'rolledModifier = 5%..40%, levelDiscount = 1% per Trade Port level + 1% per Jump Gate level'
+      ],
+      notes: [
+        'High Trade Port and Jump Gate levels can fully offset the rolled surcharge and produce zero-cost offers, but the final cost never goes below zero.'
+      ]
+    },
+    {
       title: 'Shipyard Queue Rules',
       category: 'Queues',
       status: 'Live',

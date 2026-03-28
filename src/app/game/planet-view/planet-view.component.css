@@ -188,6 +188,27 @@
   color: var(--accent);
 }
 
+.planet-view__trade-port-button {
+  border-radius: 999px;
+  border: 1px solid rgba(98, 208, 188, 0.42);
+  background: linear-gradient(135deg, rgba(26, 102, 94, 0.88), rgba(10, 41, 38, 0.92));
+  color: #dffaf4;
+  padding: 0.48rem 0.95rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.planet-view__trade-port-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.planet-view__trade-port-button:hover:not(:disabled) {
+  border-color: rgba(117, 233, 211, 0.66);
+  box-shadow: 0 0 18px rgba(58, 168, 149, 0.2);
+}
+
 .planet-tabs {
   display: grid;
   gap: 0.65rem;
@@ -236,6 +257,128 @@
   gap: 0.6rem;
 }
 
+.planet-view__modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 14, 0.72);
+  backdrop-filter: blur(4px);
+  z-index: 30;
+}
+
+.planet-view__modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(720px, calc(100vw - 1.5rem));
+  max-height: min(78vh, 840px);
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(98, 208, 188, 0.28);
+  background: linear-gradient(180deg, rgba(10, 17, 24, 0.97), rgba(7, 12, 18, 0.98));
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.4);
+  z-index: 31;
+}
+
+.planet-view__modal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: start;
+}
+
+.planet-view__modal-meta {
+  margin: 0.16rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-family: var(--font-mono), serif;
+}
+
+.planet-view__modal-close {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  padding: 0.42rem 0.85rem;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.planet-view__modal-body {
+  display: grid;
+  gap: 0.7rem;
+  overflow: auto;
+}
+
+.planet-view__trade-port-error {
+  margin: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 118, 118, 0.34);
+  background: rgba(255, 118, 118, 0.12);
+  color: #ffb2b2;
+  padding: 0.58rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.planet-view__trade-port-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.planet-view__trade-port-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.82rem 0.88rem;
+  border-radius: 14px;
+  border: 1px solid rgba(98, 208, 188, 0.16);
+  background: rgba(12, 20, 27, 0.86);
+}
+
+.planet-view__trade-port-card--used {
+  opacity: 0.6;
+}
+
+.planet-view__trade-port-main {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.planet-view__trade-port-summary,
+.planet-view__trade-port-cost {
+  margin: 0;
+}
+
+.planet-view__trade-port-summary {
+  color: #eef8ff;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.planet-view__trade-port-cost {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.planet-view__trade-port-action {
+  border-radius: 999px;
+  border: 1px solid rgba(98, 208, 188, 0.36);
+  background: rgba(20, 96, 88, 0.28);
+  color: #dffaf4;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.planet-view__trade-port-action:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
 @media (max-width: 1100px) {
   .planet-view__overview {
     grid-template-columns: 1fr;
@@ -254,5 +397,9 @@
   .planet-view__switch-button {
     width: 100%;
     min-height: 2.9rem;
+  }
+
+  .planet-view__trade-port-card {
+    grid-template-columns: 1fr;
   }
 }

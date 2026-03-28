@@ -45,7 +45,8 @@ import {
   SendMailMessageRequest,
   SendMailMessageResponse,
   AbandonPlanetRequest,
-  AbandonPlanetResponse
+  AbandonPlanetResponse,
+  UseTradePortOfferRequest
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -433,6 +434,14 @@ export class GameApiService {
   public abandonPlanet(request: AbandonPlanetRequest, token: string) {
     return this.http.post<AbandonPlanetResponse>(
       `${API_BASE_URL}/game/abandon-planet`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public useTradePortOffer(request: UseTradePortOfferRequest, token: string) {
+    return this.http.post<ClientPlanetDto>(
+      `${API_BASE_URL}/game/trade-port/use-offer`,
       request,
       { headers: this.authHeaders(token) }
     );

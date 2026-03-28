@@ -141,6 +141,7 @@ Planet/system mutations:
 - `/api/game/star-system-note`
 - `/api/game/power-consumption`
 - `/api/game/abandon-planet`
+- `/api/game/trade-port/use-offer`
 
 Queues and production:
 - `/api/game/building-queue`
@@ -269,6 +270,22 @@ Owns:
 - diplomacy proposal actions in Mail
 - Jump Gate approval/reject/cancel flow
 - Alliance Depot maintenance request flow
+
+### Trade and local exchange
+
+Primary files:
+- `src/app/models/trade/trade-port-capacity.ts`
+- `src/app/models/trade/trade-port-offer.ts`
+- `src/app/models/trade/trade-port-offers.ts`
+- `src/app/game/planet-view/`
+- `server/src/index.ts`
+
+Owns:
+- Interstellar Trade Port capacity math
+- per-planet per-turn offer generation and refresh rules
+- resource valuation and offer price math
+- local offer-use validation and planet-resource mutation flow
+- Trade Port popup projection in Planet View
 
 ### Turns and resolution
 
@@ -443,6 +460,17 @@ Change maintenance-request / `ALLIANCE_DEPOT` logistics:
 - `src/app/game/mail-view/`
 - `server/src/index.ts`
 - `src/app/models/planets/planet.ts` if depot cap formulas change
+
+Change Trade Port offers and local exchange flow:
+- `src/app/models/trade/trade-port-capacity.ts`
+- `src/app/models/trade/trade-port-offer.ts`
+- `src/app/models/trade/trade-port-offers.ts`
+- `src/app/models/planets/planet.ts`
+- `src/app/models/game-api-types.ts`
+- `src/app/core/game-api.service.ts`
+- `src/app/game/planet-view/`
+- `server/src/index.ts`
+- `src/app/encyclopedia-menu/encyclopedia-mechanics.component.ts`
 
 Change Jump Gate travel and approval flow:
 - `src/app/models/requests/jump-gate-request.ts`

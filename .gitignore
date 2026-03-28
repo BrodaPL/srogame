@@ -2902,3 +2902,7 @@ Thumbs.db
 /aiChat/tempComm.txt
 /aiChat/tempComp.txt
 /server/data/auth.json
+/.tmp-app.err
+/.tmp-app.log
+/.tmp-server.err
+/.tmp-server.log

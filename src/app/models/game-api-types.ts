@@ -21,6 +21,7 @@ import type { TutorialReadState, TutorialViewKey } from '../tutorial/tutorial-ty
 import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
 import type { DiplomaticProposalState } from './diplomacy/diplomatic-proposal-state';
 import type { BombardmentPriorities } from './bombardment/bombardment-priority';
+import type { TradeResourceType } from './trade/trade-resource-type';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -219,6 +220,20 @@ export type MaintenanceBombTransferEntry = {
   amount: number;
 };
 
+export type TradePortOfferDto = {
+  offerId: number;
+  turn: number;
+  getResourceType: TradeResourceType;
+  getAmount: number;
+  costResourceType: TradeResourceType;
+  baseCost: number;
+  totalCost: number;
+  rolledModifierPercent: number;
+  levelDiscountPercent: number;
+  costModifierPercent: number;
+  used: boolean;
+};
+
 export type MaintenanceTransferPayloadDto = {
   fuel: number;
   ships: MaintenanceShipTransferEntry[];
@@ -382,6 +397,7 @@ export type ClientPlanetDto = {
     shipyardQueue: ShipyardQueueEntryDto[];
     fleets: Fleet[];
     spaceDebris: ResourcesPackDto;
+    tradePortOffers: TradePortOfferDto[];
   };
   reportData: ClientReportDataDto | null;
 };
@@ -623,6 +639,13 @@ export type SetBuildingPowerConsumptionRequest = {
 export type SetBuildingPowerConsumptionResponse = {
   buildingType: BuildingType;
   currentPowerConsumption: number;
+};
+
+export type UseTradePortOfferRequest = {
+  x: number;
+  y: number;
+  z: number;
+  offerId: number;
 };
 
 export type ClientInfoDto = {

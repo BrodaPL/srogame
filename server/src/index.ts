@@ -30,6 +30,7 @@ import bombardmentPriorityModule from '../../src/app/models/bombardment/bombardm
 import jumpGateCapacityModule from '../../src/app/models/jump-gates/jump-gate-capacity.js';
 import jumpGateRequestModule from '../../src/app/models/requests/jump-gate-request.js';
 import maintenanceRequestModule from '../../src/app/models/requests/maintenance-request.js';
+import tradePortOffersModule from '../../src/app/models/trade/trade-port-offers.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
 import defenceBlueprintsFactoryModule from '../../src/app/factories/defence-blueprints.factory.js';
@@ -123,7 +124,9 @@ import type {
   SendMailMessageRequest,
   SendMailMessageResponse,
   AbandonPlanetRequest,
-  AbandonPlanetResponse
+  AbandonPlanetResponse,
+  UseTradePortOfferRequest,
+  TradePortOfferDto
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -168,6 +171,7 @@ import type {
 import type { PlayerReport } from '../../src/app/models/reports/player-report.ts';
 import type { ReportType as ReportTypeType } from '../../src/app/models/enums/report-type.ts';
 import type { PlayerType as PlayerTypeType } from '../../src/app/models/enums/player-type.ts';
+import type { TradePortOffer } from '../../src/app/models/trade/trade-port-offer.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -244,6 +248,7 @@ const {
   createMaintenanceRequest,
   normalizeMaintenanceTransferPayload
 } = maintenanceRequestModule as typeof import('../../src/app/models/requests/maintenance-request.js');
+const { synchronizeTradePortOffers } = tradePortOffersModule as typeof import('../../src/app/models/trade/trade-port-offers.js');
 const { TUTORIAL_VIEW_KEYS, createTutorialReadState } = tutorialTypesModule as typeof import('../../src/app/tutorial/tutorial-types.js');
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
@@ -447,6 +452,7 @@ app.post('/api/game/start', (req, res) => {
     applySmokeTestScenario(currentGalaxy, body.setup.smokeTestScenario);
   }
   currentGameOwnerId = auth.session.accountId;
+  synchronizeTradePortState(currentGalaxy);
   generateSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
 
@@ -1081,6 +1087,7 @@ app.post('/api/game/end-turn', (req, res) => {
     expirePendingDiplomaticProposals(currentGalaxy, currentGalaxy.currentTurn);
     synchronizeJumpGateRequests(currentGalaxy);
     synchronizeMaintenanceRequests(currentGalaxy);
+    synchronizeTradePortState(currentGalaxy);
     refreshOwnedPlanetSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
 
@@ -1309,6 +1316,9 @@ app.get('/api/game/client-planet', (req, res) => {
     return res.status(404).json({ error: 'Player not found in galaxy.' });
   }
 
+  if (synchronizeTradePortState(currentGalaxy)) {
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+  }
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, {
     x,
@@ -1369,6 +1379,63 @@ app.post('/api/game/abandon-planet', (req, res) => {
   const response: AbandonPlanetResponse = {
     ownedPlanets: presentation.ownedPlanets.map((entry) => toClientPlanetDtoFromClientPlanet(entry))
   };
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/trade-port/use-offer', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const body = req.body as UseTradePortOfferRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const offerId = parseBodyNonNegativeInt(body?.offerId);
+  if (x === null || y === null || z === null || offerId === null) {
+    return res.status(400).json({ error: 'Invalid trade offer payload.' });
+  }
+
+  const planet = authPlayer.galaxy.stars[y]?.[x]?.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Trade offers can be used only on your own planet.' });
+  }
+
+  if (synchronizeTradePortState(authPlayer.galaxy)) {
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(authPlayer.galaxy);
+  }
+
+  const tradePortLevel = planet.getBuildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT);
+  if (tradePortLevel <= 0) {
+    return res.status(400).json({ error: 'Interstellar Trade Port is not built on this planet.' });
+  }
+
+  const offer = planet.rBDSFTQ.tradePortOffers.find((entry) => entry.offerId === offerId);
+  if (!offer || offer.turn !== authPlayer.galaxy.currentTurn) {
+    return res.status(404).json({ error: 'Trade offer not found for the current turn.' });
+  }
+
+  if (offer.used) {
+    return res.status(409).json({ error: 'This trade offer was already used this turn.' });
+  }
+
+  const currentResourceAmount = resourceAmountForType(planet.rBDSFTQ.resources, offer.costResourceType);
+  if (currentResourceAmount < offer.totalCost) {
+    return res.status(409).json({ error: 'Not enough local resources to use this trade offer.' });
+  }
+
+  subtractResourceAmountByType(planet.rBDSFTQ.resources, offer.costResourceType, offer.totalCost);
+  addResourceAmountByType(planet.rBDSFTQ.resources, offer.getResourceType, offer.getAmount);
+  offer.used = true;
+
+  currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(authPlayer.galaxy);
+  const clientPlanet = authPlayer.galaxy.createClientPlanet(planet, authPlayer.player.playerId);
+  const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
   return res.status(200).json(response);
 });
 
@@ -2069,6 +2136,9 @@ app.get('/api/game/owned-planets', (req, res) => {
     return res.status(404).json({ error: 'Player not found in galaxy.' });
   }
 
+  if (synchronizeTradePortState(currentGalaxy)) {
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+  }
   const presentation = getPresentationData(currentGalaxy, playerId);
   const response = presentation.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet));
   return res.status(200).json(response);
@@ -2889,6 +2959,9 @@ function resolveAuthenticatedGamePlayer(req: Request):
 
   synchronizeJumpGateRequests(currentGalaxy);
   synchronizeMaintenanceRequests(currentGalaxy);
+  if (synchronizeTradePortState(currentGalaxy)) {
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+  }
   return {
     galaxy: currentGalaxy,
     player,
@@ -3780,7 +3853,8 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       buildingQueue: clientPlanet.rBDSFTQ.buildingQueue,
       shipyardQueue: clientPlanet.rBDSFTQ.shipyardQueue,
       fleets: clientPlanet.rBDSFTQ.fleets,
-      spaceDebris: toResourcesPackDto(clientPlanet.rBDSFTQ.spaceDebris)
+      spaceDebris: toResourcesPackDto(clientPlanet.rBDSFTQ.spaceDebris),
+      tradePortOffers: toTradePortOfferDtos(clientPlanet.rBDSFTQ.tradePortOffers)
     },
     reportData: clientPlanet.reportData ? toClientReportDataDto(clientPlanet.reportData) : null
   };
@@ -3794,6 +3868,22 @@ function toClientPlanetDtoFromClientPlanet(clientPlanet: ClientPlanet): ClientPl
     y: systemCoordinates.y,
     z
   });
+}
+
+function toTradePortOfferDtos(offers: TradePortOffer[]): TradePortOfferDto[] {
+  return offers.map((offer) => ({
+    offerId: offer.offerId,
+    turn: offer.turn,
+    getResourceType: offer.getResourceType,
+    getAmount: offer.getAmount,
+    costResourceType: offer.costResourceType,
+    baseCost: offer.baseCost,
+    totalCost: offer.totalCost,
+    rolledModifierPercent: offer.rolledModifierPercent,
+    levelDiscountPercent: offer.levelDiscountPercent,
+    costModifierPercent: offer.costModifierPercent,
+    used: offer.used
+  }));
 }
 
 function buildPresentationDataByPlayer(galaxy: Galaxy): Map<number, GalaxyPresentationDataType> {
@@ -5146,6 +5236,76 @@ function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
       );
     }
   }
+}
+
+function synchronizeTradePortState(galaxy: Galaxy): boolean {
+  let changed = false;
+
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        const ownerId = planet.info.ownerId;
+        if (ownerId === null) {
+          if (planet.rBDSFTQ.tradePortOffers.length > 0) {
+            planet.rBDSFTQ.tradePortOffers = [];
+            changed = true;
+          }
+          continue;
+        }
+
+        const owner = resolvePlayerById(galaxy, ownerId);
+        if (!owner) {
+          if (planet.rBDSFTQ.tradePortOffers.length > 0) {
+            planet.rBDSFTQ.tradePortOffers = [];
+            changed = true;
+          }
+          continue;
+        }
+
+        const syncResult = synchronizeTradePortOffers({
+          existingOffers: planet.rBDSFTQ.tradePortOffers,
+          currentTurn: galaxy.currentTurn,
+          tradePortLevel: planet.getBuildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT),
+          jumpGateLevel: planet.getBuildingLevel(BuildingType.JUMP_GATE),
+          tradePortCapacity: planet.getTradePortCapacity(
+            owner.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY),
+            owner.getTechLevel(TechnologyType.GRAVITON_TECHNOLOGY)
+          )
+        });
+        if (!syncResult.changed) {
+          continue;
+        }
+
+        planet.rBDSFTQ.tradePortOffers = syncResult.offers;
+        changed = true;
+      }
+    }
+  }
+
+  return changed;
+}
+
+function resourceAmountForType(
+  resources: ResourcesPackType,
+  resourceType: TradePortOffer['costResourceType']
+): number {
+  return resources[resourceType];
+}
+
+function addResourceAmountByType(
+  resources: ResourcesPackType,
+  resourceType: TradePortOffer['getResourceType'],
+  amount: number
+): void {
+  resources[resourceType] += Math.max(0, Math.floor(amount));
+}
+
+function subtractResourceAmountByType(
+  resources: ResourcesPackType,
+  resourceType: TradePortOffer['costResourceType'],
+  amount: number
+): void {
+  resources[resourceType] -= Math.max(0, Math.floor(amount));
 }
 
 function addMaintenanceResolutionReports(

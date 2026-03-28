@@ -14,6 +14,8 @@ import { ShipyardQueueEntry } from '../fleets/shipyard-queue-entry';
 import { TechnologyQueueEntry } from '../tech/technology-queue-entry';
 import { ResearchHelperFor } from '../tech/research-helper-for';
 import { calculateJumpGateCapacity } from '../jump-gates/jump-gate-capacity';
+import { calculateTradePortCapacity } from '../trade/trade-port-capacity';
+import type { TradePortOffer } from '../trade/trade-port-offer';
 
 type ModifierKey = keyof Omit<PlanetaryParameters, 'copy'>;
 
@@ -60,7 +62,8 @@ export class rBDSFTQ {
     public buildingQueue: BuildingQueueEntry[],
     public shipyardQueue: ShipyardQueueEntry[],
     public fleets: Fleet[],
-    public spaceDebris: ResourcesPack
+    public spaceDebris: ResourcesPack,
+    public tradePortOffers: TradePortOffer[] = []
   ) {}
 }
 
@@ -129,7 +132,8 @@ export class Planet {
         [],
         [],
         [],
-        new ResourcesPack(0, 0, 0)
+        new ResourcesPack(0, 0, 0),
+        []
       ),
       new Map<number, EspionageReportData>()
     );
@@ -184,7 +188,8 @@ export class Planet {
         [],
         [],
         [],
-        new ResourcesPack(0, 0, 0)
+        new ResourcesPack(0, 0, 0),
+        []
       ),
       new Map<number, EspionageReportData>()
     );
@@ -323,6 +328,20 @@ export class Planet {
       this.info.planetaryParameters.hyperspaceParameters,
       hyperspaceTechnologyLevel,
       this.getBuildingEffectiveness(BuildingType.JUMP_GATE)
+    );
+  }
+
+  public getTradePortCapacity(
+    hyperspaceTechnologyLevel: number,
+    gravitonTechnologyLevel: number
+  ): number {
+    return calculateTradePortCapacity(
+      this.getBuildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT),
+      this.info.planetaryParameters.hyperspaceParameters,
+      hyperspaceTechnologyLevel,
+      gravitonTechnologyLevel,
+      this.getBuildingLevel(BuildingType.JUMP_GATE),
+      this.getBuildingEffectiveness(BuildingType.INTERSTELLAR_TRADE_PORT)
     );
   }
 

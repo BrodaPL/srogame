@@ -28,7 +28,9 @@ import type {
   ShipyardQueueEntryDto,
   StartBuildingConstructionRequest,
   StartShipyardConstructionRequest,
-  TechnologyQueueEntryDto
+  TechnologyQueueEntryDto,
+  TradePortOfferDto,
+  UseTradePortOfferRequest
 } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
 import { ResourcesPack } from '../../models/resources-pack';
@@ -50,6 +52,7 @@ import {
   ResourcesComponent
 } from '../ui/resources/resources.component';
 import { TutorialService } from '../../tutorial/tutorial.service';
+import { tradeResourceLabel } from '../../models/trade/trade-resource-type';
 
 type PlanetTab = 'resources' | 'facilities' | 'ships' | 'defences' | 'operations' | 'queues';
 
@@ -130,6 +133,7 @@ type ResearchQueueRowVm = {
 })
 export class PlanetViewComponent implements OnInit, OnDestroy {
   protected readonly HullClass = HullClass;
+  protected readonly BuildingType = BuildingType;
   protected planet: ClientPlanetDto | null = null;
   protected ownedPlanets: ClientPlanetDto[] = [];
   protected isLoading = false;
@@ -147,6 +151,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected powersDisplay: PlanetPowersDisplay | null = null;
   protected buildingQueueActionError: string | null = null;
   protected shipyardQueueActionError: string | null = null;
+  protected isTradePortDialogOpen = false;
+  protected tradePortActionError: string | null = null;
+  protected tradePortActionOfferId: number | null = null;
   protected buildingQueueMutationInFlight = false;
   protected shipyardQueueMutationInFlight = false;
 
@@ -1627,6 +1634,126 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return used;
   }
 
+  protected hasTradePort(): boolean {
+    return this.buildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT) > 0;
+  }
+
+  protected tradePortOffers(): TradePortOfferDto[] {
+    return this.planet?.objects.tradePortOffers ?? [];
+  }
+
+  protected openTradePortDialog(): void {
+    if (!this.hasTradePort()) {
+      return;
+    }
+
+    this.tradePortActionError = null;
+    this.isTradePortDialogOpen = true;
+  }
+
+  protected closeTradePortDialog(): void {
+    this.isTradePortDialogOpen = false;
+    this.tradePortActionError = null;
+    this.tradePortActionOfferId = null;
+  }
+
+  protected tradePortOfferGetLabel(offer: TradePortOfferDto): string {
+    return `Get ${offer.getAmount} ${tradeResourceLabel(offer.getResourceType)}`;
+  }
+
+  protected tradePortOfferCostLabel(offer: TradePortOfferDto): string {
+    return `${offer.totalCost} ${tradeResourceLabel(offer.costResourceType)}`;
+  }
+
+  protected tradePortOfferModifierLabel(offer: TradePortOfferDto): string {
+    return `(${offer.costModifierPercent >= 0 ? '+' : ''}${offer.costModifierPercent}%)`;
+  }
+
+  protected canUseTradePortOffer(offer: TradePortOfferDto): boolean {
+    if (!this.planet || offer.used || this.tradePortActionOfferId !== null) {
+      return false;
+    }
+
+    if (offer.totalCost === 0) {
+      return true;
+    }
+
+    return (this.planet.objects.resources[offer.costResourceType] ?? 0) >= offer.totalCost;
+  }
+
+  protected tradePortOfferActionTitle(offer: TradePortOfferDto): string {
+    if (offer.used) {
+      return 'This offer was already used this turn.';
+    }
+
+    if (this.tradePortActionOfferId !== null) {
+      return 'Processing trade offer...';
+    }
+
+    if (!this.planet) {
+      return 'Planet data not loaded.';
+    }
+
+    if (offer.totalCost === 0) {
+      return 'This offer is free.';
+    }
+
+    if ((this.planet.objects.resources[offer.costResourceType] ?? 0) < offer.totalCost) {
+      return 'Not enough local resources for this offer.';
+    }
+
+    return 'Exchange resources instantly on this planet.';
+  }
+
+  protected useTradePortOffer(offer: TradePortOfferDto): void {
+    const planet = this.planet;
+    const session = this.playerSession.load();
+    if (!planet || !session || !this.canUseTradePortOffer(offer)) {
+      return;
+    }
+
+    this.tradePortActionOfferId = offer.offerId;
+    this.tradePortActionError = null;
+    this.cdr.markForCheck();
+
+    const request: UseTradePortOfferRequest = {
+      x: planet.coordinates.x,
+      y: planet.coordinates.y,
+      z: planet.coordinates.z,
+      offerId: offer.offerId
+    };
+
+    this.gameApi.useTradePortOffer(request, session.token)
+      .pipe(
+        timeout(10000),
+        finalize(() => {
+          this.tradePortActionOfferId = null;
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe({
+        next: (updatedPlanet) => {
+          if (
+            !this.planet
+            || this.planet.coordinates.x !== request.x
+            || this.planet.coordinates.y !== request.y
+            || this.planet.coordinates.z !== request.z
+          ) {
+            return;
+          }
+
+          this.planet = updatedPlanet;
+          this.syncOwnedPlanet(updatedPlanet);
+          this.rebuildPlanetState();
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.tradePortActionError = error?.error?.error ?? 'Unable to use trade offer.';
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
   protected attentionLabels(): string[] {
     return this.currentPlanetAttentionLabels();
   }
@@ -1748,6 +1875,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.stopQueueTabAutoRefresh();
     this.currentPlanetRequestKey += 1;
     const requestKey = this.currentPlanetRequestKey;
+    this.isTradePortDialogOpen = false;
+    this.tradePortActionError = null;
+    this.tradePortActionOfferId = null;
 
     const session = this.playerSession.load();
     if (!session) {
