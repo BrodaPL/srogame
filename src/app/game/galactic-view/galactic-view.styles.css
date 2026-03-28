@@ -175,12 +175,72 @@
   gap: 0.5rem;
 }
 
+.star-system-preview__fleet-section {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.star-system-preview__fleet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.star-system-preview__fleet-head h4 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.star-system-preview__fleet-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.star-system-preview__fleet-card {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(93, 201, 126, 0.18);
+  background: rgba(31, 77, 48, 0.16);
+}
+
+.star-system-preview__fleet-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.star-system-preview__fleet-line {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 .galaxy-preview__header {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .galaxy-preview__header h3 {
   margin: 0;
+}
+
+.galaxy-preview__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.galaxy-preview__toggle input {
+  accent-color: #53d76f;
 }
 
 .galaxy-preview__meta {
@@ -244,6 +304,57 @@
   gap: 2px;
   width: max-content;
   padding: 0.75rem;
+  position: relative;
+  z-index: 1;
+}
+
+.galaxy-grid-stage {
+  position: relative;
+  width: max-content;
+}
+
+.galaxy-grid-routes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+
+.galaxy-grid-routes__line {
+  stroke: #53d76f;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.92;
+}
+
+.galaxy-grid-routes__line--returning {
+  stroke: #1f7a34;
+}
+
+.galaxy-grid-routes__arrowhead {
+  fill: #53d76f;
+}
+
+.galaxy-grid-routes__arrowhead--returning {
+  fill: #1f7a34;
+}
+
+.galaxy-grid-routes__badge-circle {
+  fill: rgba(12, 22, 17, 0.92);
+  stroke: #53d76f;
+  stroke-width: 1;
+}
+
+.galaxy-grid-routes__badge-circle--returning {
+  stroke: #1f7a34;
+}
+
+.galaxy-grid-routes__badge-text {
+  fill: #e9fff0;
+  font-size: 0.42rem;
+  font-weight: 700;
+  text-anchor: middle;
 }
 
 .galaxy-cell {
@@ -325,6 +436,11 @@
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #d6dfef;
+}
+
+.galaxy-cell__value--fleet-present {
+  color: #67ea7f;
+  font-weight: 800;
 }
 
 .galaxy-cell__value--with-owned-markers {

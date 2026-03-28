@@ -3,13 +3,33 @@ import type { Galaxy } from './galaxy';
 import { GalaxyByteCell } from './galaxy-byte-cell';
 import { OwnershipByteCell } from './ownership-byte-cell';
 import { PlayerType } from '../enums/player-type';
+import { FleetState } from '../fleets/fleet';
+import { ManyShips } from '../fleets/many-ships';
+import type { FleetMissionType } from '../enums/fleet-mission-type';
 import type { StarSystemNote } from './star-system-note';
+
+export type FleetRouteKind = 'OUTBOUND' | 'RETURNING';
+
+export type FleetMovementSummary = {
+  fleetId: number;
+  missionType: FleetMissionType;
+  state: FleetState;
+  routeKind: FleetRouteKind;
+  originSystemCoordinates: { x: number; y: number };
+  targetSystemCoordinates: { x: number; y: number };
+  currentSystemCoordinates: { x: number; y: number } | null;
+  shipCount: number;
+  etaTurns: number | null;
+  originPlanetName: string;
+  targetPlanetName: string;
+};
 
 export class GalaxyPresentationData {
   constructor(
     public galaxyBytes: GalaxyByteCell[][],
     public ownershipBytes: Array<Array<OwnershipByteCell | null>>,
     public ownedPlanets: ClientPlanet[],
+    public ownFleetMovements: FleetMovementSummary[] = [],
     public starSystemNotes: StarSystemNote[] = []
   ) {}
 
@@ -40,7 +60,41 @@ export class GalaxyPresentationData {
       ownershipBytes.push(ownershipRow);
     }
 
-    return new GalaxyPresentationData(galaxyBytes, ownershipBytes, ownedPlanets, []);
+    const ownFleetMovements = galaxy.activeFleets
+      .filter((fleet) => fleet.ownerId === playerId)
+      .map((fleet) => {
+        const isReturning = fleet.state === FleetState.RETURNING
+          || fleet.state === FleetState.MISSION_FAILURE_RETURNING;
+        const currentSystemCoordinates = fleet.state === FleetState.PENDING_JUMP_GATE
+          || fleet.state === FleetState.MOVING_TO_TARGET
+          ? { x: fleet.origin.x, y: fleet.origin.y }
+          : fleet.state === FleetState.ORBITING
+            ? { x: fleet.target.x, y: fleet.target.y }
+            : null;
+        const etaTurns = fleet.state === FleetState.PENDING_JUMP_GATE
+          ? fleet.travelTurns
+          : fleet.state === FleetState.MOVING_TO_TARGET
+            ? fleet.travelTurns
+            : fleet.state === FleetState.RETURNING || fleet.state === FleetState.MISSION_FAILURE_RETURNING
+              ? fleet.returnTurns
+              : null;
+
+        return {
+          fleetId: fleet.fleetId,
+          missionType: fleet.missionType,
+          state: fleet.state,
+          routeKind: isReturning ? 'RETURNING' : 'OUTBOUND',
+          originSystemCoordinates: { x: fleet.origin.x, y: fleet.origin.y },
+          targetSystemCoordinates: { x: fleet.target.x, y: fleet.target.y },
+          currentSystemCoordinates,
+          shipCount: ManyShips.totalShipsCount(fleet.ships),
+          etaTurns,
+          originPlanetName: fleet.originPlanetName,
+          targetPlanetName: fleet.targetPlanetName
+        } satisfies FleetMovementSummary;
+      });
+
+    return new GalaxyPresentationData(galaxyBytes, ownershipBytes, ownedPlanets, ownFleetMovements, []);
   }
 
   public static collectStarSystemNotes(galaxy: Galaxy, playerId: number): StarSystemNote[] {

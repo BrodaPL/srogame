@@ -234,6 +234,38 @@ export type TradePortOfferDto = {
   used: boolean;
 };
 
+export type SensorPhalanxCapabilitiesDto = {
+  origin: ClientCoordinates;
+  level: number;
+  normalRange: number;
+  activeScanRange: number;
+  scanCostDeuterium: number;
+  scansPerTurn: number;
+  scansUsedThisTurn: number;
+  remainingScans: number;
+};
+
+export type SensorPhalanxFleetContactDirection = 'INCOMING' | 'OUTGOING';
+
+export type SensorPhalanxFleetContactDto = {
+  direction: SensorPhalanxFleetContactDirection;
+  fleetSize: number;
+  etaTurns: number;
+  isAllied: boolean;
+};
+
+export type SensorPhalanxScanRequest = {
+  origin: ClientCoordinates;
+  target: ClientCoordinates;
+};
+
+export type SensorPhalanxScanResponse = {
+  capabilities: SensorPhalanxCapabilitiesDto;
+  target: ClientCoordinates;
+  targetPlanetName: string;
+  contacts: SensorPhalanxFleetContactDto[];
+};
+
 export type MaintenanceTransferPayloadDto = {
   fuel: number;
   ships: MaintenanceShipTransferEntry[];
@@ -705,5 +737,31 @@ export type GalaxyPresentationDataDto = {
   galaxyBytes: GalaxyByteCellDto[][];
   ownershipBytes: Array<Array<OwnershipByteCellDto | null>>;
   ownedPlanets: ClientPlanetDto[];
+  ownFleetMovements: GalaxyOwnFleetMovementDto[];
   starSystemNotes: StarSystemNoteDto[];
+};
+
+export type GalaxyFleetRouteKind = 'OUTBOUND' | 'RETURNING';
+
+export type GalaxyOwnFleetMovementDto = {
+  fleetId: number;
+  missionType: FleetMissionType;
+  state: Fleet['state'];
+  routeKind: GalaxyFleetRouteKind;
+  originSystemCoordinates: {
+    x: number;
+    y: number;
+  };
+  targetSystemCoordinates: {
+    x: number;
+    y: number;
+  };
+  currentSystemCoordinates: {
+    x: number;
+    y: number;
+  } | null;
+  shipCount: number;
+  etaTurns: number | null;
+  originPlanetName: string;
+  targetPlanetName: string;
 };

@@ -178,6 +178,18 @@ export class EncyclopediaMechanicsComponent {
       ]
     },
     {
+      title: 'Galaxy View Fleet Presence and Routes',
+      category: 'Galaxy',
+      status: 'Live',
+      summary: 'Galaxy View now projects your active fleets directly onto the strategic map with route overlays and in-system presence highlights.',
+      details: [
+        'Own active fleets are serialized into the shared galaxy presentation payload instead of being reconstructed only in the view.',
+        'Outbound routes render as green origin-to-target arrows, while returning routes render as darker green target-to-origin arrows.',
+        'Multiple fleets on the same route are aggregated into one overlay with a route count badge.',
+        'Selected systems list your own fleets currently stationed there, and own-system cell labels turn green and bold when one of your fleets is present.'
+      ]
+    },
+    {
       title: 'Intel, Discovery, and Notes',
       category: 'Intel',
       status: 'Live',
@@ -190,6 +202,24 @@ export class EncyclopediaMechanicsComponent {
       ]
     },
     {
+      title: 'Sensor Phalanx Scans',
+      category: 'Intel',
+      status: 'Partial',
+      summary: 'Sensor Phalanx backend mechanics are live in phase 1, but they currently feed reports and APIs without a dedicated player-facing screen.',
+      details: [
+        'Planets with Sensor Phalanx expose live capability data for range, scan cost, scans-per-turn, and already-used scans.',
+        'Active scans consume deuterium from the origin planet and reveal only minimal fleet-contact data: direction, fleet size, ETA, and allied status.',
+        'Passive detection runs during turn processing and creates Sensor Phalanx reports only for newly visible incoming fleets.',
+        'Current coverage is intentionally narrow: there is no dedicated scan view yet, and the system does not reveal full fleet composition.'
+      ],
+      formulas: [
+        'normalRange = floor(baseRange * anomaliesAndNoise * finalBuildingEffectiveness)',
+        'activeScanRange = max(1, floor(normalRange / 2))',
+        'scansPerTurn = floor(sqrt(SENSOR_PHALANX level) * finalBuildingEffectiveness)',
+        'scanCost = SENSOR_PHALANX production2 deuterium'
+      ]
+    },
+    {
       title: 'Turn Progression State',
       category: 'Core Loop',
       status: 'Live',
@@ -197,7 +227,8 @@ export class EncyclopediaMechanicsComponent {
       details: [
         'The server exposes a real end-turn endpoint and increments the galaxy turn after successful processing.',
         'Turn resolution applies income, advances building queues, shipyard queues, and research queues, resolves fleets and encounters, then performs repair passes.',
-        'Planet, shipyard, and research queues expose invested/base progress fields in the UI, while Operations, Reports, and Mail reflect the fleet and communication side of turn progression.'
+        'Planet, shipyard, and research queues expose invested/base progress fields in the UI, while Operations, Reports, and Mail reflect the fleet and communication side of turn progression.',
+        'Turn-generated side effects also include system reports such as passive Sensor Phalanx detection and orbit-resolution outcomes.'
       ],
       formulas: [
         'turnOrder = income -> building queues -> shipyard queues -> research queues -> fleet movement/encounters -> repair passes'
@@ -223,8 +254,10 @@ export class EncyclopediaMechanicsComponent {
       details: [
         'Mission Planner currently supports Move, Guard, Transport, Spy, Bombard, Siege, Recycle, Repair, and Colonize.',
         'Validation includes coordinates, ownership/diplomacy constraints, ship capability checks, cargo rules, fuel reserves, and active-fleet-cap checks.',
+        'Fleet composition splits launch selection into Ready and Damaged counters, and damaged hull entries can still be launched for now.',
         'Fleet lifecycle states are meaningful: fleets can be PENDING_JUMP_GATE, MOVING_TO_TARGET, ORBITING, RETURNING, MISSION_FAILURE_RETURNING, or MISSION_FAILURE_IDLE.',
         'Move to owned planets merges into the target planet, Move to non-hostile foreign or unowned orbit can stay in orbit, Transport delivers cargo then returns, and Spy creates structured espionage reports.',
+        'Bombard and Siege can store optional Main, Secondary, and Tertiary bombard priorities, which persist on the fleet for later siege turns.',
         'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn.',
         'Foreign Jump Gate targets require known gate intel from the latest espionage report and create a Mail request for the target owner unless diplomacy auto-approves it.',
         'Mission Planner can also be prefilled from other screens, for example Spy Planet actions from reports or planet previews.'
@@ -270,6 +303,7 @@ export class EncyclopediaMechanicsComponent {
       details: [
         'Planet-orbit encounters now resolve during turn processing, including same-turn arrival grouping at the same orbit and deterministic resolution by mission priority then fleetId.',
         'Battles use shuffled ship order, defender-first alternating fire, shield-to-hull damage flow, hangar trimming for non-jump survivors, and post-round destruction checks.',
+        'Battle-side stats already respond to player technology, including weapon-family damage boosts, shielding and armour scaling, material-tech armor scaling, and graviton or fusion evasion bonuses.',
         'Default battle length is now 4 rounds, then missions modify that baseline: Move and Transport reduce it by 1, while future mission types can extend it.',
         'Allied defenders merge into one side, PEACE prevents automatic hostilities, and guarding orbit contributes differently than passive orbit.',
         'Planetary defences join the same defender side as orbit fleets, persist hull damage between turns, and can be repaired later.',
@@ -304,7 +338,7 @@ export class EncyclopediaMechanicsComponent {
         'Lower structural integrity reduces output through structural utilization, then combines with power utilization.',
         'Bunker Network provides a minimum structural floor for most buildings, while Jump Gate, Sensor Phalanx, and Bomb Depot can still fall to 0%.',
         'Terraformer size gain is permanent once a level completes, but its live parameter-penalty reduction still scales with current power and structural effectiveness.',
-        'Terraformer only improves penalized metal, crystal, deuterium, science, and industry modifiers up to 1.0; it does not change anomalies/noise or hyperspace parameters.'
+        'Terraformer only improves penalized metal, crystal, deuterium, research, and industry modifiers up to 1.0; it does not change anomalies/noise or hyperspace parameters.'
       ],
       formulas: [
         'maxBuildingSP = metalCost * 2 + crystalCost + floor(deuteriumCost * 0.5)',
@@ -338,6 +372,19 @@ export class EncyclopediaMechanicsComponent {
       ]
     },
     {
+      title: 'In-Game Tutorials',
+      category: 'Core Loop',
+      status: 'Partial',
+      summary: 'The guided tutorial framework is live for several major desktop views, but coverage is still selective and mobile-specific layouts are not planned yet.',
+      details: [
+        'Tutorials now exist for Galaxy View, Planet View, Mission Planner, Reports, Operations, Imperium, Buildings, Production, and Researches.',
+        'The overlay uses staged focus, highlight, and bubble presentation with spotlight dimming, scroll locking, and target-aware placement via data-tutorial-id anchors.',
+        'Whole-view intro steps can omit a target, and views can register preparation hooks so hidden UI is revealed safely before measurement.',
+        'Auto-open behavior is view-specific and tries to land on meaningful data, for example requiring active fleets before opening the Operations tutorial.',
+        'Current polish is desktop-focused; unsupported views and mobile-specific tutorial layouts remain outside the implemented scope.'
+      ]
+    },
+    {
       title: 'Production Queue Management',
       category: 'Queues',
       status: 'Partial',
@@ -347,6 +394,18 @@ export class EncyclopediaMechanicsComponent {
         'Shipyard queues use one mixed queue for ships and defences so visible order matches real execution order.',
         'Cancel rules differ by queue state: unstarted entries fully refund, while started entries refund only the unfinished portion at 75%.',
         'Research queues still expose live state and progress but currently have no cancel or reorder management.'
+      ]
+    },
+    {
+      title: 'Persistent Ship Damage',
+      category: 'Core Loop',
+      status: 'Live',
+      summary: 'Ship hull damage now persists between turns for both planets and fleets instead of collapsing everything into fresh full-health counts.',
+      details: [
+        'Ship storage now uses ManyShips, which keeps undamaged ship counts plus explicit damaged-hull entries.',
+        'Battle damage persists on surviving ships, while shields reset after each battle as separate combat state.',
+        'Mission Planner and ship-status UI distinguish Ready and Damaged ship availability, and Planet View exposes a dedicated Ship Damage Status panel.',
+        'Damaged ships still count as usable for launch selection for now, so the current restriction is informational rather than a hard mission blocker.'
       ]
     },
     {

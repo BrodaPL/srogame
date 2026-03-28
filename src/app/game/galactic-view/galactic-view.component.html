@@ -15,6 +15,11 @@
           <span class="galaxy-preview__meta">{{ galaxyName }}</span>
         }
       </h3>
+
+      <label class="galaxy-preview__toggle">
+        <input type="checkbox" [(ngModel)]="showFleetRoutes" />
+        <span>Show fleet routes</span>
+      </label>
     </div>
 
     @if (gridHeight > 0 && gridWidth > 0) {
@@ -34,51 +39,104 @@
         data-tutorial-id="galactic-grid"
         (scroll)="onBottomScrollbarScroll()"
       >
-        <div
-          class="galaxy-grid"
-          [style.grid-template-columns]="
-            'repeat(' + gridWidth + ', ' + gridCellSize + 'px)'
-          "
-        >
-          @for (row of grid; track $index) {
-            @for (cell of row; track $index) {
-              <div
-                class="galaxy-cell"
-                [attr.data-tutorial-id]="isHomeSystemCell(cell) ? 'galactic-home-cell' : null"
-                [class.galaxy-cell--selected]="selectedCell?.x === cell.x && selectedCell?.y === cell.y"
-                [class.galaxy-cell--void]="cell.isVoid"
-                [class.galaxy-cell--center]="cell.isCenter"
-                [class.galaxy-cell--no-data]="cell.fillKind === 'noData'"
-                [class.galaxy-cell--neutral-only]="cell.fillKind === 'neutralOnly'"
-                [class.galaxy-cell--player-only]="cell.fillKind === 'playerOnly'"
-                [class.galaxy-cell--bot-or-neutral]="cell.fillKind === 'botOrNeutral'"
-                [class.galaxy-cell--human-or-neutral]="cell.fillKind === 'humanOrNeutral'"
-                [class.galaxy-cell--human-bot-any-neutral]="cell.fillKind === 'humanBotAnyNeutral'"
-                [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
-                [class.galaxy-cell--with-note]="cell.noteBorderColor"
-                [style.--note-border-color]="cell.noteBorderColor"
-                [attr.title]="cell.tooltip"
-                (click)="onCellClick(cell)"
-              >
-                @if (cell.valueLabel) {
-                  <span
-                    class="galaxy-cell__value"
-                    [class.galaxy-cell__value--with-owned-markers]="cell.ownedPlanetsDotsLabel"
-                  >
-                    {{ cell.valueLabel }}
-                  </span>
+        <div class="galaxy-grid-stage" [style.width.px]="gridCanvasWidth()" [style.height.px]="gridCanvasHeight()">
+          <svg
+            class="galaxy-grid-routes"
+            [attr.width]="gridCanvasWidth()"
+            [attr.height]="gridCanvasHeight()"
+            [attr.viewBox]="'0 0 ' + gridCanvasWidth() + ' ' + gridCanvasHeight()"
+            aria-hidden="true"
+          >
+            <defs>
+              <marker id="galaxy-route-arrowhead-outbound" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                <polygon points="0 0, 7 3.5, 0 7" class="galaxy-grid-routes__arrowhead galaxy-grid-routes__arrowhead--outbound"></polygon>
+              </marker>
+              <marker id="galaxy-route-arrowhead-returning" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                <polygon points="0 0, 7 3.5, 0 7" class="galaxy-grid-routes__arrowhead galaxy-grid-routes__arrowhead--returning"></polygon>
+              </marker>
+            </defs>
+
+            @for (route of visibleOwnFleetRoutes(); track route.key) {
+              <g class="galaxy-grid-routes__route">
+                <line
+                  class="galaxy-grid-routes__line"
+                  [class.galaxy-grid-routes__line--returning]="route.routeKind === 'RETURNING'"
+                  [attr.x1]="route.startX"
+                  [attr.y1]="route.startY"
+                  [attr.x2]="route.endX"
+                  [attr.y2]="route.endY"
+                  [attr.marker-end]="route.routeKind === 'RETURNING' ? 'url(#galaxy-route-arrowhead-returning)' : 'url(#galaxy-route-arrowhead-outbound)'"
+                />
+
+                @if (route.count > 1) {
+                  <g class="galaxy-grid-routes__badge">
+                    <circle
+                      class="galaxy-grid-routes__badge-circle"
+                      [class.galaxy-grid-routes__badge-circle--returning]="route.routeKind === 'RETURNING'"
+                      [attr.cx]="route.badgeX"
+                      [attr.cy]="route.badgeY"
+                      r="6.5"
+                    />
+                    <text
+                      class="galaxy-grid-routes__badge-text"
+                      [attr.x]="route.badgeX"
+                      [attr.y]="route.badgeY + 2"
+                    >
+                      {{ route.count }}
+                    </text>
+                  </g>
                 }
-                @if (cell.ownedPlanetsDotsLabel) {
-                  <span class="galaxy-cell__owned-planets">
-                    {{ cell.ownedPlanetsDotsLabel }}
-                  </span>
-                }
-                <span class="galaxy-cell__hover-coords">
-                  {{ cell.coordsLabel }}
-                </span>
-              </div>
+              </g>
             }
-          }
+          </svg>
+
+          <div
+            class="galaxy-grid"
+            [style.grid-template-columns]="
+              'repeat(' + gridWidth + ', ' + gridCellSize + 'px)'
+            "
+          >
+            @for (row of grid; track $index) {
+              @for (cell of row; track $index) {
+                <div
+                  class="galaxy-cell"
+                  [attr.data-tutorial-id]="isHomeSystemCell(cell) ? 'galactic-home-cell' : null"
+                  [class.galaxy-cell--selected]="selectedCell?.x === cell.x && selectedCell?.y === cell.y"
+                  [class.galaxy-cell--void]="cell.isVoid"
+                  [class.galaxy-cell--center]="cell.isCenter"
+                  [class.galaxy-cell--no-data]="cell.fillKind === 'noData'"
+                  [class.galaxy-cell--neutral-only]="cell.fillKind === 'neutralOnly'"
+                  [class.galaxy-cell--player-only]="cell.fillKind === 'playerOnly'"
+                  [class.galaxy-cell--bot-or-neutral]="cell.fillKind === 'botOrNeutral'"
+                  [class.galaxy-cell--human-or-neutral]="cell.fillKind === 'humanOrNeutral'"
+                  [class.galaxy-cell--human-bot-any-neutral]="cell.fillKind === 'humanBotAnyNeutral'"
+                  [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
+                  [class.galaxy-cell--with-note]="cell.noteBorderColor"
+                  [style.--note-border-color]="cell.noteBorderColor"
+                  [attr.title]="cell.tooltip"
+                  (click)="onCellClick(cell)"
+                >
+                  @if (cell.valueLabel) {
+                    <span
+                      class="galaxy-cell__value"
+                      [class.galaxy-cell__value--with-owned-markers]="cell.ownedPlanetsDotsLabel"
+                      [class.galaxy-cell__value--fleet-present]="cell.hasOwnFleetPresence"
+                    >
+                      {{ cell.valueLabel }}
+                    </span>
+                  }
+                  @if (cell.ownedPlanetsDotsLabel) {
+                    <span class="galaxy-cell__owned-planets">
+                      {{ cell.ownedPlanetsDotsLabel }}
+                    </span>
+                  }
+                  <span class="galaxy-cell__hover-coords">
+                    {{ cell.coordsLabel }}
+                  </span>
+                </div>
+              }
+            }
+          </div>
         </div>
       </div>
     } @else if (isLoading) {
@@ -168,6 +226,31 @@
         } @else {
           <p class="overview-empty">No planets in this star system.</p>
         }
+
+        <section class="star-system-preview__fleet-section">
+          <div class="star-system-preview__fleet-head">
+            <h4>Own Fleets In System</h4>
+            <span class="badge">{{ selectedSystemOwnFleets.length }}</span>
+          </div>
+
+          @if (selectedSystemOwnFleets.length > 0) {
+            <div class="star-system-preview__fleet-list">
+              @for (fleet of selectedSystemOwnFleets; track fleet.fleetId) {
+                <article class="star-system-preview__fleet-card">
+                  <div class="star-system-preview__fleet-card-head">
+                    <strong>Fleet #{{ fleet.fleetId }}</strong>
+                    <span class="badge">{{ ownFleetMissionLabel(fleet) }}</span>
+                  </div>
+                  <p class="star-system-preview__fleet-line">{{ ownFleetStatusLabel(fleet) }} | {{ ownFleetEtaLabel(fleet) }}</p>
+                  <p class="star-system-preview__fleet-line">Ships: {{ fleet.shipCount }}</p>
+                  <p class="star-system-preview__fleet-line">{{ ownFleetRouteLabel(fleet) }}</p>
+                </article>
+              }
+            </div>
+          } @else {
+            <p class="overview-empty">No own fleets currently stationed in this system.</p>
+          }
+        </section>
       }
     }
   </aside>

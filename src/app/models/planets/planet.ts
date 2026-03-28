@@ -15,6 +15,11 @@ import { TechnologyQueueEntry } from '../tech/technology-queue-entry';
 import { ResearchHelperFor } from '../tech/research-helper-for';
 import { calculateJumpGateCapacity } from '../jump-gates/jump-gate-capacity';
 import { calculateTradePortCapacity } from '../trade/trade-port-capacity';
+import {
+  calculateSensorPhalanxActiveScanRange,
+  calculateSensorPhalanxNormalRange,
+  calculateSensorPhalanxScansPerTurn
+} from '../sensor-phalanx/sensor-phalanx';
 import type { TradePortOffer } from '../trade/trade-port-offer';
 
 type ModifierKey = keyof Omit<PlanetaryParameters, 'copy'>;
@@ -63,7 +68,10 @@ export class rBDSFTQ {
     public shipyardQueue: ShipyardQueueEntry[],
     public fleets: Fleet[],
     public spaceDebris: ResourcesPack,
-    public tradePortOffers: TradePortOffer[] = []
+    public tradePortOffers: TradePortOffer[] = [],
+    public sensorPhalanxScansUsedTurn: number | null = null,
+    public sensorPhalanxScansUsed = 0,
+    public sensorPhalanxKnownIncomingFleetIds: number[] = []
   ) {}
 }
 
@@ -343,6 +351,54 @@ export class Planet {
       this.getBuildingLevel(BuildingType.JUMP_GATE),
       this.getBuildingEffectiveness(BuildingType.INTERSTELLAR_TRADE_PORT)
     );
+  }
+
+  public getSensorPhalanxNormalRange(): number {
+    return calculateSensorPhalanxNormalRange(
+      this.getRawBuildingProductionValue1(BuildingType.SENSOR_PHALANX),
+      this.info.planetaryParameters.anomaliesAndNoise,
+      this.getBuildingEffectiveness(BuildingType.SENSOR_PHALANX)
+    );
+  }
+
+  public getSensorPhalanxActiveScanRange(): number {
+    return calculateSensorPhalanxActiveScanRange(this.getSensorPhalanxNormalRange());
+  }
+
+  public getSensorPhalanxScanCost(): number {
+    return this.getRawBuildingProductionValue2(BuildingType.SENSOR_PHALANX);
+  }
+
+  public getSensorPhalanxScansPerTurn(): number {
+    return calculateSensorPhalanxScansPerTurn(
+      this.getBuildingLevel(BuildingType.SENSOR_PHALANX),
+      this.getBuildingEffectiveness(BuildingType.SENSOR_PHALANX)
+    );
+  }
+
+  public synchronizeSensorPhalanxTurn(currentTurn: number): void {
+    const normalizedTurn = Number.isFinite(currentTurn) ? Math.floor(currentTurn) : 0;
+    if (this.rBDSFTQ.sensorPhalanxScansUsedTurn === normalizedTurn) {
+      return;
+    }
+
+    this.rBDSFTQ.sensorPhalanxScansUsedTurn = normalizedTurn;
+    this.rBDSFTQ.sensorPhalanxScansUsed = 0;
+  }
+
+  public getRemainingSensorPhalanxScans(currentTurn: number): number {
+    this.synchronizeSensorPhalanxTurn(currentTurn);
+    return Math.max(0, this.getSensorPhalanxScansPerTurn() - this.rBDSFTQ.sensorPhalanxScansUsed);
+  }
+
+  public consumeSensorPhalanxScan(currentTurn: number): boolean {
+    this.synchronizeSensorPhalanxTurn(currentTurn);
+    if (this.getRemainingSensorPhalanxScans(currentTurn) <= 0) {
+      return false;
+    }
+
+    this.rBDSFTQ.sensorPhalanxScansUsed += 1;
+    return true;
   }
 
   public getBuildingPowerUtilization(type: BuildingType): number {

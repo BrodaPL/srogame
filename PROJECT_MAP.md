@@ -141,6 +141,8 @@ Planet/system mutations:
 - `/api/game/star-system-note`
 - `/api/game/power-consumption`
 - `/api/game/abandon-planet`
+- `/api/game/sensor-phalanx/capabilities`
+- `/api/game/sensor-phalanx/scan`
 - `/api/game/trade-port/use-offer`
 
 Queues and production:
@@ -205,7 +207,7 @@ Owns:
 - planet/system structure
 - effective planetary parameter derivation and permanent terraformer size bonus handling
 - abandonment and ownership transitions
-- galaxy-view presentation data
+- galaxy-view presentation data, including own-fleet route and presence summaries
 
 ### Fleets, ships, and mission payload state
 
@@ -237,6 +239,21 @@ Owns:
 - fallback targeting behavior for bombardment weapons and carried planetary bombs
 - bombardment-vs-defence/building damage application
 - siege-only per-shot efficiency penalty inputs
+
+### Sensor Phalanx
+
+Primary files:
+- `src/app/models/sensor-phalanx/sensor-phalanx.ts`
+- `src/app/models/reports/sensor-phalanx-report.ts`
+- `src/app/models/planets/planet.ts`
+- `server/src/index.ts`
+
+Owns:
+- Sensor Phalanx range and scan-count math
+- per-planet scan-usage and known-contact state
+- passive incoming-fleet detection at turn start
+- active target-planet scan API and DTOs
+- minimal fleet-contact visibility payloads
 
 ### Missions
 

@@ -931,12 +931,12 @@
                 },
                 {
                     "type":  "SENSOR_PHALANX",
-                    "description":  "Detects all fleets in range. Detects incomming fleets in double range. Automatically scans all planets in half range.",
+                    "description":  "Automatically detects incoming fleets in normal range. Detects incoming fleets to scanned planet in half range. Amount of scans per turn is sqrt(current level).",
                     "imagePath":  "images/buildings/Sensor_Phalanx.webp",
                     "basicCost":  {
-                                      "metal":  160,
-                                      "crystal":  240,
-                                      "deuterium":  80
+                                      "metal":  300,
+                                      "crystal":  760,
+                                      "deuterium":  180
                                   },
                     "level":  0,
                     "currentPowerConsumption":  0,
@@ -966,7 +966,6 @@
                                              }
                                          ],
                     "production1":  [
-                                        0.5,
                                         1,
                                         2,
                                         3,
@@ -981,10 +980,26 @@
                                         12,
                                         13,
                                         14,
-                                        15
+                                        15,
+                                        16
                                     ],
                     "production2":  [
-
+                                        10,
+                                        20,
+                                        40,
+                                        80,
+                                        120,
+                                        180,
+                                        300,
+                                        500,
+                                        800,
+                                        1200,
+                                        1600,
+                                        2000,
+                                        2500,
+                                        3000,
+                                        3500,
+                                        4000
                                     ],
                     "production3":  [
 

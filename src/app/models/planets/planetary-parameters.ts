@@ -7,9 +7,9 @@ export class PlanetaryParameters {
     public energyModifierNuclear: number,
     public scienceModifier: number,
     public industryModifier: number,
-    // Affects Sensor Phalanx range and espionage level. -60%..60%. 5% steps.
+    // Direct multiplier affecting Sensor Phalanx range and espionage level.
     public anomaliesAndNoise: number,
-    // -80%..50%. Affects Jumpgate + Interstellar Trade Port capacity base level. 5% steps.
+    // Direct multiplier affecting Jump Gate and Interstellar Trade Port capacity.
     public hyperspaceParameters: number
   ) {}
 

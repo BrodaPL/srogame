@@ -235,6 +235,33 @@ describe('Planet', () => {
     ));
   });
 
+  it('calculates sensor phalanx range, half-range scan distance, and scan count from live effectiveness', () => {
+    const planet = createPlanet({ anomaliesAndNoise: 1.5 });
+    planet.setBuildingLevel(BuildingType.SENSOR_PHALANX, 4);
+
+    const maxStructuralPoints = planet.getMaxBuildingStructuralPoints(BuildingType.SENSOR_PHALANX);
+    planet.setCurrentBuildingPowerConsumption(BuildingType.SENSOR_PHALANX, 8);
+    planet.setCurrentBuildingStructuralPoints(BuildingType.SENSOR_PHALANX, Math.floor(maxStructuralPoints / 2));
+
+    expect(planet.getSensorPhalanxNormalRange()).toBe(3);
+    expect(planet.getSensorPhalanxActiveScanRange()).toBe(1);
+    expect(planet.getSensorPhalanxScansPerTurn()).toBe(1);
+    expect(planet.getSensorPhalanxScanCost()).toBe(80);
+  });
+
+  it('tracks sensor phalanx scans per turn and resets on a new turn', () => {
+    const planet = createPlanet({ anomaliesAndNoise: 1 });
+    planet.setBuildingLevel(BuildingType.SENSOR_PHALANX, 9);
+
+    expect(planet.getRemainingSensorPhalanxScans(5)).toBe(3);
+    expect(planet.consumeSensorPhalanxScan(5)).toBe(true);
+    expect(planet.getRemainingSensorPhalanxScans(5)).toBe(2);
+    expect(planet.consumeSensorPhalanxScan(5)).toBe(true);
+    expect(planet.consumeSensorPhalanxScan(5)).toBe(true);
+    expect(planet.consumeSensorPhalanxScan(5)).toBe(false);
+    expect(planet.getRemainingSensorPhalanxScans(6)).toBe(3);
+  });
+
   it('creates starting planets with neutral multiplier parameters set to 1', () => {
     const system = createSystem();
     const startingPlanet = Planet.createStartingPlanet('Home', 1, system, 1);

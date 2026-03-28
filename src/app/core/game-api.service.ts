@@ -46,7 +46,10 @@ import {
   SendMailMessageResponse,
   AbandonPlanetRequest,
   AbandonPlanetResponse,
-  UseTradePortOfferRequest
+  UseTradePortOfferRequest,
+  SensorPhalanxCapabilitiesDto,
+  SensorPhalanxScanRequest,
+  SensorPhalanxScanResponse
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -113,6 +116,24 @@ export class GameApiService {
         headers: this.authHeaders(token),
         params: { x, y, z }
       }
+    );
+  }
+
+  public getSensorPhalanxCapabilities(x: number, y: number, z: number, token: string) {
+    return this.http.get<SensorPhalanxCapabilitiesDto>(
+      `${API_BASE_URL}/game/sensor-phalanx/capabilities`,
+      {
+        headers: this.authHeaders(token),
+        params: { x, y, z }
+      }
+    );
+  }
+
+  public scanSensorPhalanx(request: SensorPhalanxScanRequest, token: string) {
+    return this.http.post<SensorPhalanxScanResponse>(
+      `${API_BASE_URL}/game/sensor-phalanx/scan`,
+      request,
+      { headers: this.authHeaders(token) }
     );
   }
 

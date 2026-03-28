@@ -11,7 +11,9 @@ import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import type {
+  GalaxyFleetRouteKind,
   GalaxyByteCellDto,
+  GalaxyOwnFleetMovementDto,
   GalaxyPresentationDataDto,
   OwnershipByteCellDto,
   StarSystemNoteDto,
@@ -46,9 +48,22 @@ type GalacticCellVm = {
   fillKind: CellFillKind;
   valueLabel: string;
   ownedPlanetsDotsLabel: string;
+  hasOwnFleetPresence: boolean;
   noteBorderColor: string | null;
   coordsLabel: string;
   tooltip: string;
+};
+
+type GalacticRouteVm = {
+  key: string;
+  routeKind: GalaxyFleetRouteKind;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  badgeX: number;
+  badgeY: number;
+  count: number;
 };
 
 type SelectCellOptions = {
@@ -58,11 +73,15 @@ type SelectCellOptions = {
 @Component({
   selector: 'app-galactic-view',
   imports: [TopMenuComponent, MiniPlanetPreviewComponent, FormsModule],
-  templateUrl: './galactic-view.component.html'
+  templateUrl: './galactic-view.component.html',
+  styleUrl: './galactic-view.styles.css'
 })
 export class GalacticViewComponent implements OnInit {
   protected readonly gridCellSize = 22;
+  protected readonly gridCellGap = 2;
+  protected readonly gridPadding = 12;
   protected readonly maxNoteLength = 500;
+  protected showFleetRoutes = true;
   protected readonly noteColorOptions: Array<{ label: string; value: NoteBorderColor }> = [
     { label: 'White', value: NoteBorderColor.WHITE },
     { label: 'Light Gray', value: NoteBorderColor.LIGHT_GRAY },
@@ -92,6 +111,8 @@ export class GalacticViewComponent implements OnInit {
   protected selectedSystemLoading = false;
   protected selectedSystemError: string | null = null;
   protected selectedSystemPlanets: ClientPlanetDto[] = [];
+  protected selectedSystemOwnFleets: GalaxyOwnFleetMovementDto[] = [];
+  protected ownFleetRoutes: GalacticRouteVm[] = [];
   protected noteActionError: string | null = null;
   protected isNoteActionLoading = false;
   protected isNoteEditorOpen = false;
@@ -105,6 +126,7 @@ export class GalacticViewComponent implements OnInit {
   private isSyncingScroll = false;
   private starSystemNotesByCoordinates = new Map<string, StarSystemNoteDto>();
   private starSystemCache = new Map<string, ClientStarSystemDto>();
+  private ownFleetPresenceBySystemKey = new Set<string>();
   private selectedSystemRequestKey: string | null = null;
 
   constructor(
@@ -136,6 +158,8 @@ export class GalacticViewComponent implements OnInit {
         next: (response) => {
           this.galaxyPresentation = response;
           this.starSystemNotesByCoordinates = this.buildStarSystemNotesMap(response.starSystemNotes);
+          this.ownFleetPresenceBySystemKey = this.buildOwnFleetPresenceBySystemKey(response);
+          this.ownFleetRoutes = this.buildOwnFleetRoutes(response.ownFleetMovements);
           this.starSystemCache.clear();
           this.grid = this.buildGrid(response);
           this.gridHeight = this.grid.length;
@@ -210,6 +234,7 @@ export class GalacticViewComponent implements OnInit {
     this.isDeleteNoteConfirmOpen = false;
     this.selectedSystemLoading = false;
     this.selectedSystemRequestKey = null;
+    this.selectedSystemOwnFleets = this.listOwnFleetsForSystem(cell.x, cell.y);
 
     const key = this.buildCoordinatesKey(cell.x, cell.y);
     const cached = this.starSystemCache.get(key);
@@ -293,6 +318,67 @@ export class GalacticViewComponent implements OnInit {
 
   protected selectedAsteroidsCountLabel(): number {
     return this.selectedCell?.asteroidsCount ?? 0;
+  }
+
+  protected gridCanvasWidth(): number {
+    if (this.gridWidth <= 0) {
+      return 0;
+    }
+
+    return (this.gridWidth * this.gridCellSize)
+      + (Math.max(0, this.gridWidth - 1) * this.gridCellGap)
+      + (this.gridPadding * 2);
+  }
+
+  protected gridCanvasHeight(): number {
+    if (this.gridHeight <= 0) {
+      return 0;
+    }
+
+    return (this.gridHeight * this.gridCellSize)
+      + (Math.max(0, this.gridHeight - 1) * this.gridCellGap)
+      + (this.gridPadding * 2);
+  }
+
+  protected ownFleetMissionLabel(fleet: GalaxyOwnFleetMovementDto): string {
+    return fleet.missionType === 'Defend' ? 'Guard' : fleet.missionType;
+  }
+
+  protected ownFleetStatusLabel(fleet: GalaxyOwnFleetMovementDto): string {
+    switch (fleet.state) {
+      case 'PENDING_JUMP_GATE':
+        return 'Pending Jump Gate';
+      case 'MOVING_TO_TARGET':
+        return 'En route';
+      case 'ORBITING':
+        return 'On station';
+      case 'RETURNING':
+        return 'Returning';
+      case 'MISSION_FAILURE_RETURNING':
+        return 'Failure return';
+      default:
+        return fleet.state;
+    }
+  }
+
+  protected ownFleetRouteLabel(fleet: GalaxyOwnFleetMovementDto): string {
+    if (fleet.routeKind === 'RETURNING') {
+      return `${fleet.targetPlanetName} -> ${fleet.originPlanetName}`;
+    }
+
+    return `${fleet.originPlanetName} -> ${fleet.targetPlanetName}`;
+  }
+
+  protected ownFleetEtaLabel(fleet: GalaxyOwnFleetMovementDto): string {
+    if (fleet.etaTurns === null) {
+      return 'No active ETA';
+    }
+
+    return `${fleet.etaTurns} turn${fleet.etaTurns === 1 ? '' : 's'}`;
+  }
+
+  protected visibleOwnFleetRoutes(): GalacticRouteVm[] {
+    return this.showFleetRoutes ? this.ownFleetRoutes : [];
   }
 
   protected selectedStarSystemNote(): StarSystemNoteDto | null {
@@ -565,6 +651,7 @@ export class GalacticViewComponent implements OnInit {
     const fillKind = this.resolveFillKind(ownership, isVoid, isCenter);
     const valueLabel = this.buildValueLabel(planets, asteroids, isVoid, isCenter);
     const ownedPlanetsDotsLabel = this.buildOwnedPlanetsDotsLabel(ownership, isVoid, isCenter);
+    const hasOwnFleetPresence = this.ownFleetPresenceBySystemKey.has(this.buildCoordinatesKey(x, y));
     const noteBorderColor = note?.borderColor ?? null;
     const noteText = note?.text?.trim() ? note.text.trim() : null;
 
@@ -578,6 +665,7 @@ export class GalacticViewComponent implements OnInit {
       fillKind,
       valueLabel,
       ownedPlanetsDotsLabel,
+      hasOwnFleetPresence,
       noteBorderColor,
       coordsLabel: `${x}:${y}`,
       tooltip: this.buildTooltip(
@@ -695,6 +783,87 @@ export class GalacticViewComponent implements OnInit {
 
   private buildCoordinatesKey(x: number, y: number): string {
     return `${x}:${y}`;
+  }
+
+  private buildOwnFleetPresenceBySystemKey(data: GalaxyPresentationDataDto): Set<string> {
+    const ownedSystemKeys = new Set<string>();
+    for (const planet of data.ownedPlanets) {
+      ownedSystemKeys.add(this.buildCoordinatesKey(planet.coordinates.x, planet.coordinates.y));
+    }
+
+    const presenceKeys = new Set<string>();
+    for (const fleet of data.ownFleetMovements) {
+      const coordinates = fleet.currentSystemCoordinates;
+      if (!coordinates) {
+        continue;
+      }
+
+      const key = this.buildCoordinatesKey(coordinates.x, coordinates.y);
+      if (ownedSystemKeys.has(key)) {
+        presenceKeys.add(key);
+      }
+    }
+
+    return presenceKeys;
+  }
+
+  private buildOwnFleetRoutes(fleets: GalaxyOwnFleetMovementDto[]): GalacticRouteVm[] {
+    const routesByKey = new Map<string, GalacticRouteVm>();
+
+    for (const fleet of fleets) {
+      const start = fleet.routeKind === 'RETURNING'
+        ? fleet.targetSystemCoordinates
+        : fleet.originSystemCoordinates;
+      const end = fleet.routeKind === 'RETURNING'
+        ? fleet.originSystemCoordinates
+        : fleet.targetSystemCoordinates;
+      if (start.x === end.x && start.y === end.y) {
+        continue;
+      }
+
+      const routeKey = `${fleet.routeKind}:${start.x}:${start.y}:${end.x}:${end.y}`;
+      const existing = routesByKey.get(routeKey);
+      if (existing) {
+        existing.count += 1;
+        continue;
+      }
+
+      const startCenter = this.cellCenter(start.x, start.y);
+      const endCenter = this.cellCenter(end.x, end.y);
+      routesByKey.set(routeKey, {
+        key: routeKey,
+        routeKind: fleet.routeKind,
+        startX: startCenter.x,
+        startY: startCenter.y,
+        endX: endCenter.x,
+        endY: endCenter.y,
+        badgeX: (startCenter.x + endCenter.x) / 2,
+        badgeY: (startCenter.y + endCenter.y) / 2,
+        count: 1
+      });
+    }
+
+    return Array.from(routesByKey.values()).sort((left, right) =>
+      left.routeKind.localeCompare(right.routeKind)
+        || left.key.localeCompare(right.key)
+    );
+  }
+
+  private cellCenter(x: number, y: number): { x: number; y: number } {
+    return {
+      x: this.gridPadding + (x * (this.gridCellSize + this.gridCellGap)) + (this.gridCellSize / 2),
+      y: this.gridPadding + (y * (this.gridCellSize + this.gridCellGap)) + (this.gridCellSize / 2)
+    };
+  }
+
+  private listOwnFleetsForSystem(x: number, y: number): GalaxyOwnFleetMovementDto[] {
+    const fleets = this.galaxyPresentation?.ownFleetMovements ?? [];
+    return fleets
+      .filter((fleet) => {
+        const current = fleet.currentSystemCoordinates;
+        return current?.x === x && current.y === y;
+      })
+      .sort((left, right) => left.fleetId - right.fleetId);
   }
 
   private buildStarSystemNotesMap(starSystemNotes: StarSystemNoteDto[]): Map<string, StarSystemNoteDto> {

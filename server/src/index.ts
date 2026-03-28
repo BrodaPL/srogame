@@ -47,6 +47,7 @@ import smokeTestScenariosModule from '../../src/app/models/testing/smoke-test-sc
 import queueManagementModule from '../../src/app/models/queues/queue-management.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
 import fleetReportModule from '../../src/app/models/reports/fleet-report.js';
+import sensorPhalanxReportModule from '../../src/app/models/reports/sensor-phalanx-report.js';
 import resourcesPackModule from '../../src/app/models/resources-pack.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
@@ -126,7 +127,11 @@ import type {
   AbandonPlanetRequest,
   AbandonPlanetResponse,
   UseTradePortOfferRequest,
-  TradePortOfferDto
+  TradePortOfferDto,
+  SensorPhalanxCapabilitiesDto,
+  SensorPhalanxFleetContactDto,
+  SensorPhalanxScanRequest,
+  SensorPhalanxScanResponse
 } from '../../src/app/models/game-api-types.ts';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
@@ -135,7 +140,10 @@ import type { Planet } from '../../src/app/models/planets/planet.ts';
 import type { PlanetaryParameters } from '../../src/app/models/planets/planetary-parameters.ts';
 import type { ResourcesPack as ResourcesPackType } from '../../src/app/models/resources-pack.ts';
 import type { EspionageReportData } from '../../src/app/models/reports/espionage-report-data.ts';
-import type { GalaxyPresentationData as GalaxyPresentationDataType } from '../../src/app/models/planets/galaxy-presentation-data.ts';
+import type {
+  FleetMovementSummary,
+  GalaxyPresentationData as GalaxyPresentationDataType
+} from '../../src/app/models/planets/galaxy-presentation-data.ts';
 import type { GalaxyByteCell } from '../../src/app/models/planets/galaxy-byte-cell.ts';
 import type { OwnershipByteCell } from '../../src/app/models/planets/ownership-byte-cell.ts';
 import type { StarSystemNote as StarSystemNoteType } from '../../src/app/models/planets/star-system-note.ts';
@@ -172,6 +180,7 @@ import type { PlayerReport } from '../../src/app/models/reports/player-report.ts
 import type { ReportType as ReportTypeType } from '../../src/app/models/enums/report-type.ts';
 import type { PlayerType as PlayerTypeType } from '../../src/app/models/enums/player-type.ts';
 import type { TradePortOffer } from '../../src/app/models/trade/trade-port-offer.ts';
+import type { SensorPhalanxReport } from '../../src/app/models/reports/sensor-phalanx-report.ts';
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
@@ -290,6 +299,9 @@ const { PlayerMessage: PlayerMessageModel } = playerMessageModule as {
 };
 const { FleetReport } = fleetReportModule as {
   FleetReport: typeof import('../../src/app/models/reports/fleet-report.js').FleetReport;
+};
+const { SensorPhalanxReport: SensorPhalanxReportModel } = sensorPhalanxReportModule as {
+  SensorPhalanxReport: typeof import('../../src/app/models/reports/sensor-phalanx-report.js').SensorPhalanxReport;
 };
 const { ResourcesPack } = resourcesPackModule as {
   ResourcesPack: typeof import('../../src/app/models/resources-pack.js').ResourcesPack;
@@ -1084,6 +1096,7 @@ app.post('/api/game/end-turn', (req, res) => {
     const resolvedTurnNumber = currentGalaxy.currentTurn + 1;
     resolvePhaseOneTurn(currentGalaxy, resolvedTurnNumber);
     currentGalaxy.currentTurn = resolvedTurnNumber;
+    processSensorPhalanxTurnStart(currentGalaxy, currentGalaxy.currentTurn);
     expirePendingDiplomaticProposals(currentGalaxy, currentGalaxy.currentTurn);
     synchronizeJumpGateRequests(currentGalaxy);
     synchronizeMaintenanceRequests(currentGalaxy);
@@ -1325,6 +1338,96 @@ app.get('/api/game/client-planet', (req, res) => {
     y,
     z
   });
+  return res.status(200).json(response);
+});
+
+app.get('/api/game/sensor-phalanx/capabilities', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const x = parseNonNegativeInt(req.query.x);
+  const y = parseNonNegativeInt(req.query.y);
+  const z = parseNonNegativeInt(req.query.z);
+  if (x === null || y === null || z === null) {
+    return res.status(400).json({ error: 'Invalid coordinates.' });
+  }
+
+  const planet = authPlayer.galaxy.stars[y]?.[x]?.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Sensor Phalanx can be used only on your own planet.' });
+  }
+
+  const origin = { x, y, z };
+  planet.synchronizeSensorPhalanxTurn(authPlayer.galaxy.currentTurn);
+  const response = toSensorPhalanxCapabilitiesDto(planet, origin, authPlayer.galaxy.currentTurn);
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/sensor-phalanx/scan', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
+  }
+
+  const body = req.body as SensorPhalanxScanRequest | undefined;
+  const origin = parseBodyCoordinates(body?.origin);
+  const target = parseBodyCoordinates(body?.target);
+  if (!origin || !target) {
+    return res.status(400).json({ error: 'Invalid sensor phalanx scan payload.' });
+  }
+
+  const originPlanet = resolvePlanetAtCoordinates(authPlayer.galaxy, origin);
+  if (!originPlanet) {
+    return res.status(404).json({ error: 'Origin planet not found.' });
+  }
+
+  if (originPlanet.info.ownerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Sensor Phalanx can be used only on your own planet.' });
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(authPlayer.galaxy, target);
+  if (!targetPlanet) {
+    return res.status(404).json({ error: 'Target planet not found.' });
+  }
+
+  originPlanet.synchronizeSensorPhalanxTurn(authPlayer.galaxy.currentTurn);
+  const phalanxLevel = originPlanet.getBuildingLevel(BuildingType.SENSOR_PHALANX as BuildingTypeType);
+  if (phalanxLevel <= 0 || originPlanet.getSensorPhalanxNormalRange() <= 0) {
+    return res.status(409).json({ error: 'Sensor Phalanx is not operational on the origin planet.' });
+  }
+
+  const activeScanRange = originPlanet.getSensorPhalanxActiveScanRange();
+  const distance = calculateTravelDistance(origin, target);
+  if (distance > activeScanRange) {
+    return res.status(409).json({ error: `Target planet is outside Sensor Phalanx scan range (${activeScanRange}).` });
+  }
+
+  const scanCost = originPlanet.getSensorPhalanxScanCost();
+  if (originPlanet.rBDSFTQ.resources.deuterium < scanCost) {
+    return res.status(409).json({ error: 'Not enough deuterium on the origin planet for a Sensor Phalanx scan.' });
+  }
+
+  if (!originPlanet.consumeSensorPhalanxScan(authPlayer.galaxy.currentTurn)) {
+    return res.status(409).json({ error: 'No Sensor Phalanx scans remain on this planet for the current turn.' });
+  }
+
+  originPlanet.rBDSFTQ.resources.deuterium -= scanCost;
+  const response = buildSensorPhalanxScanResponse(
+    authPlayer.galaxy,
+    authPlayer.player.playerId,
+    originPlanet,
+    origin,
+    targetPlanet,
+    target
+  );
+
+  currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(authPlayer.galaxy);
   return res.status(200).json(response);
 });
 
@@ -3184,6 +3287,22 @@ function parseBodyNonNegativeInt(value: unknown): number | null {
   return parsed;
 }
 
+function parseBodyCoordinates(value: unknown): ClientCoordinates | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as Record<'x' | 'y' | 'z', unknown>;
+  const x = parseBodyNonNegativeInt(candidate.x);
+  const y = parseBodyNonNegativeInt(candidate.y);
+  const z = parseBodyNonNegativeInt(candidate.z);
+  if (x === null || y === null || z === null) {
+    return null;
+  }
+
+  return { x, y, z };
+}
+
 function parseBodyPositiveInt(value: unknown): number | null {
   return parseBodyIntInRange(value, 1, Number.MAX_SAFE_INTEGER);
 }
@@ -3619,6 +3738,229 @@ function calculateFleetCargoCapacity(ships: Array<{ type: ShipTypeType; amount: 
 
 function calculateTravelDistance(origin: ClientCoordinates, target: ClientCoordinates): number {
   return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
+}
+
+function toPlanetCoordinates(planet: Planet): ClientCoordinates {
+  return {
+    x: planet.basicInfo.solarSystem.coordinates.x,
+    y: planet.basicInfo.solarSystem.coordinates.y,
+    z: Math.max(0, planet.basicInfo.order - 1)
+  };
+}
+
+function remainingTravelTurnsForFleet(fleet: Fleet, currentTurn: number): number {
+  if (fleet.state !== FleetState.MOVING_TO_TARGET) {
+    return 0;
+  }
+
+  const elapsedTurns = Math.max(0, currentTurn - fleet.createdAtTurn);
+  return Math.max(0, fleet.travelTurns - elapsedTurns);
+}
+
+function isAlliedSensorPhalanxContact(
+  diplomacyResolver: InstanceType<typeof DiplomacyResolver>,
+  viewerPlayerId: number,
+  fleetOwnerId: number
+): boolean {
+  const status = diplomacyResolver.getStatus(viewerPlayerId, fleetOwnerId);
+  return status === DiplomaticStatus.SELF || status === DiplomaticStatus.ALLIED;
+}
+
+function toSensorPhalanxCapabilitiesDto(
+  planet: Planet,
+  origin: ClientCoordinates,
+  currentTurn: number
+): SensorPhalanxCapabilitiesDto {
+  planet.synchronizeSensorPhalanxTurn(currentTurn);
+
+  return {
+    origin,
+    level: planet.getBuildingLevel(BuildingType.SENSOR_PHALANX as BuildingTypeType),
+    normalRange: planet.getSensorPhalanxNormalRange(),
+    activeScanRange: planet.getSensorPhalanxActiveScanRange(),
+    scanCostDeuterium: planet.getSensorPhalanxScanCost(),
+    scansPerTurn: planet.getSensorPhalanxScansPerTurn(),
+    scansUsedThisTurn: planet.rBDSFTQ.sensorPhalanxScansUsed,
+    remainingScans: planet.getRemainingSensorPhalanxScans(currentTurn)
+  };
+}
+
+function compareSensorPhalanxContacts(
+  left: SensorPhalanxFleetContactDto,
+  right: SensorPhalanxFleetContactDto
+): number {
+  const directionWeight = (contact: SensorPhalanxFleetContactDto) => contact.direction === 'INCOMING' ? 0 : 1;
+  return directionWeight(left) - directionWeight(right)
+    || left.etaTurns - right.etaTurns
+    || right.fleetSize - left.fleetSize
+    || Number(left.isAllied) - Number(right.isAllied);
+}
+
+function toSensorPhalanxFleetContactDto(
+  fleet: Fleet,
+  direction: 'INCOMING' | 'OUTGOING',
+  currentTurn: number,
+  isAllied: boolean
+): SensorPhalanxFleetContactDto {
+  return {
+    direction,
+    fleetSize: ManyShips.totalShipsCount(fleet.ships),
+    etaTurns: remainingTravelTurnsForFleet(fleet, currentTurn),
+    isAllied
+  };
+}
+
+function buildSensorPhalanxScanResponse(
+  galaxy: Galaxy,
+  viewerPlayerId: number,
+  originPlanet: Planet,
+  origin: ClientCoordinates,
+  targetPlanet: Planet,
+  target: ClientCoordinates
+): SensorPhalanxScanResponse {
+  const diplomacyResolver = createDiplomacyResolver(galaxy);
+  const contacts: SensorPhalanxFleetContactDto[] = [];
+
+  for (const fleet of galaxy.activeFleets) {
+    if (fleet.state !== FleetState.MOVING_TO_TARGET) {
+      continue;
+    }
+
+    const isAllied = isAlliedSensorPhalanxContact(diplomacyResolver, viewerPlayerId, fleet.ownerId);
+    if (sameCoordinates(fleet.target, target)) {
+      contacts.push(toSensorPhalanxFleetContactDto(fleet, 'INCOMING', galaxy.currentTurn, isAllied));
+      continue;
+    }
+
+    if (sameCoordinates(fleet.origin, target)) {
+      contacts.push(toSensorPhalanxFleetContactDto(fleet, 'OUTGOING', galaxy.currentTurn, isAllied));
+    }
+  }
+
+  contacts.sort(compareSensorPhalanxContacts);
+
+  return {
+    capabilities: toSensorPhalanxCapabilitiesDto(originPlanet, origin, galaxy.currentTurn),
+    target,
+    targetPlanetName: targetPlanet.basicInfo.name,
+    contacts
+  };
+}
+
+type SensorPhalanxPassiveDetection = {
+  fleetId: number;
+  targetCoordinates: ClientCoordinates;
+  targetPlanetName: string;
+  contact: SensorPhalanxFleetContactDto;
+};
+
+function processSensorPhalanxTurnStart(galaxy: Galaxy, currentTurn: number): void {
+  const diplomacyResolver = createDiplomacyResolver(galaxy);
+
+  for (const player of galaxy.players) {
+    if (player.type !== PLAYER_TYPE_PLAYER) {
+      continue;
+    }
+
+    for (const planet of player.planets) {
+      planet.synchronizeSensorPhalanxTurn(currentTurn);
+      const normalRange = planet.getSensorPhalanxNormalRange();
+      if (
+        planet.getBuildingLevel(BuildingType.SENSOR_PHALANX as BuildingTypeType) <= 0
+        || normalRange <= 0
+      ) {
+        planet.rBDSFTQ.sensorPhalanxKnownIncomingFleetIds = [];
+        continue;
+      }
+
+      const detections = collectSensorPhalanxPassiveDetections(
+        galaxy,
+        player.playerId,
+        toPlanetCoordinates(planet),
+        normalRange,
+        diplomacyResolver
+      );
+      const knownFleetIds = new Set(planet.rBDSFTQ.sensorPhalanxKnownIncomingFleetIds);
+      const newDetections = detections.filter((entry) => !knownFleetIds.has(entry.fleetId));
+
+      if (newDetections.length > 0) {
+        player.addReport(createSensorPhalanxPassiveReport(player, planet, newDetections, currentTurn));
+      }
+
+      planet.rBDSFTQ.sensorPhalanxKnownIncomingFleetIds = detections.map((entry) => entry.fleetId);
+    }
+  }
+}
+
+function collectSensorPhalanxPassiveDetections(
+  galaxy: Galaxy,
+  viewerPlayerId: number,
+  detectorCoordinates: ClientCoordinates,
+  normalRange: number,
+  diplomacyResolver: InstanceType<typeof DiplomacyResolver>
+): SensorPhalanxPassiveDetection[] {
+  const detections: SensorPhalanxPassiveDetection[] = [];
+
+  for (const fleet of galaxy.activeFleets) {
+    if (fleet.state !== FleetState.MOVING_TO_TARGET) {
+      continue;
+    }
+
+    const targetPlanet = resolvePlanetAtCoordinates(galaxy, fleet.target);
+    if (!targetPlanet) {
+      continue;
+    }
+
+    if (calculateTravelDistance(detectorCoordinates, fleet.target) > normalRange) {
+      continue;
+    }
+
+    detections.push({
+      fleetId: fleet.fleetId,
+      targetCoordinates: { ...fleet.target },
+      targetPlanetName: targetPlanet.basicInfo.name,
+      contact: toSensorPhalanxFleetContactDto(
+        fleet,
+        'INCOMING',
+        galaxy.currentTurn,
+        isAlliedSensorPhalanxContact(diplomacyResolver, viewerPlayerId, fleet.ownerId)
+      )
+    });
+  }
+
+  detections.sort((left, right) =>
+    compareSensorPhalanxContacts(left.contact, right.contact)
+      || left.targetCoordinates.x - right.targetCoordinates.x
+      || left.targetCoordinates.y - right.targetCoordinates.y
+      || left.targetCoordinates.z - right.targetCoordinates.z
+      || left.fleetId - right.fleetId
+  );
+
+  return detections;
+}
+
+function createSensorPhalanxPassiveReport(
+  player: Player,
+  detectorPlanet: Planet,
+  detections: SensorPhalanxPassiveDetection[],
+  currentTurn: number
+): SensorPhalanxReport {
+  const sourceCoordinates = toPlanetCoordinates(detectorPlanet);
+  const body = detections.map((entry) =>
+    `Incoming fleet detected for ${entry.targetPlanetName} (${entry.targetCoordinates.x}:${entry.targetCoordinates.y}:${entry.targetCoordinates.z}) | Size: ${entry.contact.fleetSize} | ETA: ${entry.contact.etaTurns} | Allied: ${entry.contact.isAllied ? 'Yes' : 'No'}`
+  ).join('\n');
+
+  return new SensorPhalanxReportModel(
+    {
+      reportId: player.createReportId(),
+      createdTurn: currentTurn,
+      title: `Sensor Phalanx Alert: ${detectorPlanet.basicInfo.name} (${sourceCoordinates.x}:${sourceCoordinates.y}:${sourceCoordinates.z})`,
+      sourceCoordinates,
+      sourcePlanetName: detectorPlanet.basicInfo.name,
+      sourceSystemName: detectorPlanet.basicInfo.solarSystem.name
+    },
+    body
+  );
 }
 
 function calculateFuelCost(
@@ -4058,7 +4400,26 @@ function toGalaxyPresentationDataDto(
       row.map((cell) => toOwnershipByteCellDto(cell))
     ),
     ownedPlanets: data.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet)),
+    ownFleetMovements: data.ownFleetMovements.map((movement) => toGalaxyOwnFleetMovementDto(movement)),
     starSystemNotes: starSystemNotes.map((note) => toStarSystemNoteDto(note))
+  };
+}
+
+function toGalaxyOwnFleetMovementDto(movement: FleetMovementSummary): GalaxyPresentationDataDto['ownFleetMovements'][number] {
+  return {
+    fleetId: movement.fleetId,
+    missionType: movement.missionType,
+    state: movement.state,
+    routeKind: movement.routeKind,
+    originSystemCoordinates: { ...movement.originSystemCoordinates },
+    targetSystemCoordinates: { ...movement.targetSystemCoordinates },
+    currentSystemCoordinates: movement.currentSystemCoordinates
+      ? { ...movement.currentSystemCoordinates }
+      : null,
+    shipCount: movement.shipCount,
+    etaTurns: movement.etaTurns,
+    originPlanetName: movement.originPlanetName,
+    targetPlanetName: movement.targetPlanetName
   };
 }
 
