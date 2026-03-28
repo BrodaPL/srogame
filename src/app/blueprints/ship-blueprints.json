@@ -189,7 +189,12 @@
       "cost": { "metal": 40, "crystal": 25, "deuterium": 5 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 2 }
-      ]
+      ],
+      "techRequirements": [
+      { "tech": "COMPUTER_TECHNOLOGY", "level": 2 },
+      { "tech": "MATERIAL_TECHNOLOGY", "level": 3 },
+      { "tech": "ENERGY_TECHNOLOGY", "level": 2 }
+    ]
     },
     {
       "type": "RECYCLER",

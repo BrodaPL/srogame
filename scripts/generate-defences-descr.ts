@@ -67,11 +67,6 @@ type ShipBlueprintFile = {
   ships: ShipBlueprint[];
 };
 
-type BucketDefinition = {
-  name: string;
-  defences: string[];
-};
-
 type DefenceMetrics = {
   defence: DefenceBlueprint;
   buildCost: number;
@@ -95,26 +90,18 @@ const defenceBlueprintPath = join(blueprintsDir, 'defence-blueprints.json');
 const shipBlueprintPath = join(blueprintsDir, 'ship-blueprints.json');
 const defencesDescrPath = join(blueprintsDir, 'DEFENCES_DESCR.md');
 
-const bucketDefinitions: BucketDefinition[] = [
-  {
-    name: 'Orbit-Capable Planetary Defences',
-    defences: [
-      'LIGHT_BEAM_CANNON',
-      'BEAM_CANNON',
-      'HEAVY_BEAM_CANNON',
-      'ORBITAL_MISSILE_LAUNCHER',
-      'HEAVY_ORBITAL_MISSILE_LAUNCHER',
-      'RAIL_GUN_CANNON'
-    ]
-  },
-  {
-    name: 'Surface-Only Defences',
-    defences: ['SAM_SITE']
-  },
-  {
-    name: 'Planetary Bomb Stockpile',
-    defences: ['SMALL_BOMB', 'CLUSTER_BOMB', 'MEDIUM_BOMB', 'HEAVY_BOMB']
-  }
+const defenceOrder = [
+  'LIGHT_BEAM_CANNON',
+  'BEAM_CANNON',
+  'HEAVY_BEAM_CANNON',
+  'SAM_SITE',
+  'ORBITAL_MISSILE_LAUNCHER',
+  'HEAVY_ORBITAL_MISSILE_LAUNCHER',
+  'RAIL_GUN_CANNON',
+  'SMALL_BOMB',
+  'CLUSTER_BOMB',
+  'MEDIUM_BOMB',
+  'HEAVY_BOMB'
 ];
 
 function sumWeaponDamage<TWeaponType extends string>(
@@ -227,19 +214,14 @@ function calculateShipBenchmarks(blueprints: ShipBlueprintFile): ShipHullBenchma
   });
 }
 
-function createTable(bucket: BucketDefinition, metricsByType: Map<string, DefenceMetrics>): string {
+function createTable(title: string, defences: DefenceMetrics[]): string {
   const lines: string[] = [];
-  lines.push(`### ${bucket.name}`);
+  lines.push(`### ${title}`);
   lines.push('');
   lines.push('| Defence | Hull | Orbit Fire | Build | Space Alpha | Bomb Alpha | Durability | SpaceA/Cost | Bomb/Cost | Dur/Cost | Notes |');
   lines.push('| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
 
-  for (const defenceType of bucket.defences) {
-    const metrics = metricsByType.get(defenceType);
-    if (!metrics) {
-      continue;
-    }
-
+  for (const metrics of defences) {
     const notes: string[] = [];
     if (metrics.defence.canShootToOrbit) {
       notes.push('anti-orbit');
@@ -287,6 +269,18 @@ function buildMarkdown(defences: DefenceBlueprintFile, ships: ShipBlueprintFile)
     defences.defences.map((defence) => [defence.type, calculateDefenceMetrics(defence)])
   );
   const shipBenchmarks = calculateShipBenchmarks(ships);
+  const orderedMetrics = defenceOrder
+    .map((type) => metricsByType.get(type))
+    .filter((metrics): metrics is DefenceMetrics => Boolean(metrics));
+  const orbitCapableDefences = orderedMetrics.filter(
+    (metrics) => metrics.defence.hullClass !== 'PLANETARY_BOMB' && metrics.defence.canShootToOrbit
+  );
+  const surfaceOnlyDefences = orderedMetrics.filter(
+    (metrics) => metrics.defence.hullClass !== 'PLANETARY_BOMB' && !metrics.defence.canShootToOrbit
+  );
+  const bombStockpile = orderedMetrics.filter(
+    (metrics) => metrics.defence.hullClass === 'PLANETARY_BOMB'
+  );
 
   const sections: string[] = [
     '# Planetary Defence Balance Comparison Template',
@@ -336,9 +330,9 @@ function buildMarkdown(defences: DefenceBlueprintFile, ships: ShipBlueprintFile)
     ''
   ];
 
-  for (const bucket of bucketDefinitions) {
-    sections.push(createTable(bucket, metricsByType));
-  }
+  sections.push(createTable('Orbit-Capable Planetary Defences', orbitCapableDefences));
+  sections.push(createTable('Surface-Only Defences', surfaceOnlyDefences));
+  sections.push(createTable('Planetary Bomb Stockpile', bombStockpile));
 
   return `${sections.join('\n')}\n`;
 }

@@ -59,18 +59,18 @@ They use the same weighted-cost and durability formulas and serve only as compar
 
 | Defence | Hull | Orbit Fire | Build | Space Alpha | Bomb Alpha | Durability | SpaceA/Cost | Bomb/Cost | Dur/Cost | Notes |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| LIGHT_BEAM_CANNON | SMALL | Yes | 30 | 10 | 0 | 42 | 0.33 | 0 | 1.4 | anti-orbit |
 | BEAM_CANNON | MEDIUM | Yes | 110 | 20 | 0 | 107.14 | 0.18 | 0 | 0.97 | anti-orbit |
-| HEAVY_BEAM_CANNON | BIG | Yes | 350 | 40 | 0 | 312.58 | 0.11 | 0 | 0.89 | anti-orbit |
+| HEAVY_BEAM_CANNON | BIG | Yes | 380 | 40 | 0 | 341.88 | 0.11 | 0 | 0.9 | anti-orbit |
 | ORBITAL_MISSILE_LAUNCHER | MEDIUM | Yes | 150 | 30 | 0 | 93.74 | 0.2 | 0 | 0.62 | anti-orbit |
-| HEAVY_ORBITAL_MISSILE_LAUNCHER | BIG | Yes | 440 | 100 | 0 | 332.11 | 0.23 | 0 | 0.75 | anti-orbit |
-| RAIL_GUN_CANNON | BIG | Yes | 290 | 42 | 0 | 428.8 | 0.14 | 0 | 1.48 | anti-orbit |
+| HEAVY_ORBITAL_MISSILE_LAUNCHER | BIG | Yes | 540 | 100 | 0 | 293.04 | 0.19 | 0 | 0.54 | anti-orbit |
 
 ### Surface-Only Defences
 
 | Defence | Hull | Orbit Fire | Build | Space Alpha | Bomb Alpha | Durability | SpaceA/Cost | Bomb/Cost | Dur/Cost | Notes |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| SAM_SITE | SMALL | No | 20 | 20 | 0 | 33.6 | 1 | 0 | 1.68 | surface/local only |
+| LIGHT_BEAM_CANNON | SMALL | No | 35 | 10 | 0 | 35 | 0.29 | 0 | 1 | surface/local only |
+| SAM_SITE | SMALL | No | 25 | 20 | 0 | 26.88 | 0.8 | 0 | 1.08 | surface/local only |
+| RAIL_GUN_CANNON | BIG | No | 310 | 42 | 0 | 364.48 | 0.14 | 0 | 1.18 | surface/local only |
 
 ### Planetary Bomb Stockpile
 

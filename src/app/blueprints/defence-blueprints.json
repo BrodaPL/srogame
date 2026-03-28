@@ -4,16 +4,16 @@
       "type": "LIGHT_BEAM_CANNON",
       "imagePath": "images/defence/Light_Laser (1).webp",
       "hullClass": "SMALL",
-      "canShootToOrbit": true,
+      "canShootToOrbit": false,
       "size": 1,
-      "hullPointsCapacity": 30,
+      "hullPointsCapacity": 25,
       "criticalThreshold": 25,
       "shieldCapacity": 0,
       "armor": 1,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 }
       ],
-      "cost": { "metal": 10, "crystal": 10, "deuterium": 0 },
+      "cost": { "metal": 15, "crystal": 10, "deuterium": 0 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 1 }
       ],
@@ -27,9 +27,9 @@
       "hullClass": "MEDIUM",
       "canShootToOrbit": true,
       "size": 2,
-      "hullPointsCapacity": 65,
+      "hullPointsCapacity": 60,
       "criticalThreshold": 22,
-      "shieldCapacity": 5,
+      "shieldCapacity": 10,
       "armor": 2,
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 1 }
@@ -40,7 +40,8 @@
       ],
       "techRequirements": [
         { "tech": "BEAMS_WEAPONS", "level": 2 },
-        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 }
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 1 }
       ]
     },
     {
@@ -51,19 +52,19 @@
       "size": 3,
       "hullPointsCapacity": 150,
       "criticalThreshold": 18,
-      "shieldCapacity": 20,
+      "shieldCapacity": 50,
       "armor": 4,
       "weapons": [
         { "type": "BEAM", "dmg": 40, "shots": 1 }
       ],
-      "cost": { "metal": 150, "crystal": 100, "deuterium": 0 },
+      "cost": { "metal": 180, "crystal": 100, "deuterium": 0 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 4 }
       ],
       "techRequirements": [
         { "tech": "BEAMS_WEAPONS", "level": 4 },
         { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
-        { "tech": "ARMOUR_TECHNOLOGY", "level": 2 }
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 }
       ]
     },
     {
@@ -72,14 +73,14 @@
       "hullClass": "SMALL",
       "canShootToOrbit": false,
       "size": 1,
-      "hullPointsCapacity": 25,
+      "hullPointsCapacity": 20,
       "criticalThreshold": 30,
       "shieldCapacity": 0,
       "armor": 1,
       "weapons": [
         { "type": "MISSILE", "dmg": 20, "shots": 1 }
       ],
-      "cost": { "metal": 20, "crystal": 0, "deuterium": 0 },
+      "cost": { "metal": 30, "crystal": 0, "deuterium": 0 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 1 },
         { "building": "BOMB_DEPOT", "level": 1 }
@@ -117,14 +118,14 @@
       "hullClass": "BIG",
       "canShootToOrbit": true,
       "size": 3,
-      "hullPointsCapacity": 170,
+      "hullPointsCapacity": 120,
       "criticalThreshold": 18,
-      "shieldCapacity": 0,
+      "shieldCapacity": 60,
       "armor": 4,
       "weapons": [
         { "type": "MISSILE", "dmg": 100, "shots": 1 }
       ],
-      "cost": { "metal": 200, "crystal": 60, "deuterium": 40 },
+      "cost": { "metal": 200, "crystal": 80, "deuterium": 60 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 4 },
         { "building": "BOMB_DEPOT", "level": 2 }
@@ -132,30 +133,31 @@
       "techRequirements": [
         { "tech": "MISSILES_WEAPONS", "level": 4 },
         { "tech": "MATERIAL_TECHNOLOGY", "level": 2 },
-        { "tech": "ARMOUR_TECHNOLOGY", "level": 2 }
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 2 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 3 }
       ]
     },
     {
       "type": "RAIL_GUN_CANNON",
       "imagePath": "images/defence/Rail_gun_cannon.webp",
       "hullClass": "BIG",
-      "canShootToOrbit": true,
+      "canShootToOrbit": false,
       "size": 3,
-      "hullPointsCapacity": 190,
+      "hullPointsCapacity": 160,
       "criticalThreshold": 16,
-      "shieldCapacity": 20,
+      "shieldCapacity": 40,
       "armor": 5,
       "weapons": [
         { "type": "RAIL_GUN", "dmg": 30, "shots": 1 }
       ],
-      "cost": { "metal": 100, "crystal": 80, "deuterium": 10 },
+      "cost": { "metal": 140, "crystal": 80, "deuterium": 10 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 5 }
       ],
       "techRequirements": [
         { "tech": "RAILGUNS_WEAPONS", "level": 3 },
         { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 2 }
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 3 }
       ]
     },
     {
@@ -177,7 +179,7 @@
         { "building": "BOMB_DEPOT", "level": 1 }
       ],
       "techRequirements": [
-        { "tech": "MISSILES_WEAPONS", "level": 1 }
+        { "tech": "MISSILES_WEAPONS", "level": 2 }
       ]
     },
     {
@@ -195,11 +197,12 @@
       ],
       "cost": { "metal": 20, "crystal": 10, "deuterium": 0 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 1 },
-        { "building": "BOMB_DEPOT", "level": 1 }
+        { "building": "SHIPYARD", "level": 2 },
+        { "building": "BOMB_DEPOT", "level": 2 }
       ],
       "techRequirements": [
-        { "tech": "MISSILES_WEAPONS", "level": 1 }
+        { "tech": "MISSILES_WEAPONS", "level": 3 },
+        { "tech": "COMPUTER_TECHNOLOGY", "level": 3 }
       ]
     },
     {
@@ -217,11 +220,12 @@
       ],
       "cost": { "metal": 100, "crystal": 10, "deuterium": 10 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 2 },
-        { "building": "BOMB_DEPOT", "level": 1 }
+        { "building": "SHIPYARD", "level": 3 },
+        { "building": "BOMB_DEPOT", "level": 3 }
       ],
       "techRequirements": [
-        { "tech": "MISSILES_WEAPONS", "level": 2 }
+        { "tech": "MISSILES_WEAPONS", "level": 4 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 4 }
       ]
     },
     {
@@ -239,12 +243,12 @@
       ],
       "cost": { "metal": 500, "crystal": 100, "deuterium": 100 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 4 },
-        { "building": "BOMB_DEPOT", "level": 2 }
+        { "building": "SHIPYARD", "level": 5 },
+        { "building": "BOMB_DEPOT", "level": 4 }
       ],
       "techRequirements": [
-        { "tech": "MISSILES_WEAPONS", "level": 4 },
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 2 }
+        { "tech": "MISSILES_WEAPONS", "level": 6 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 6 }
       ]
     }
   ]

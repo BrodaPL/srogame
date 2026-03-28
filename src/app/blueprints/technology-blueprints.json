@@ -209,7 +209,6 @@
       ],
       "techRequirements": [
         { "tech": "MATERIAL_TECHNOLOGY", "level": 1 },
-        { "tech": "HYPERSPACE_DRIVE", "level": 1 },
         { "tech": "ENERGY_TECHNOLOGY", "level": 1 }
       ]
     },
