@@ -2,7 +2,7 @@
   "technologies": [
     {
       "type": "ENERGY_TECHNOLOGY",
-      "imagePath": "images/technologies/Energy_Technology.webp",
+      "imagePath": "images/technologies/ENERGY_TECHNOLOGY.jpg",
       "description": "Give +2% bonus to energy generation.",
       "basicCost": { "metal": 10, "crystal": 10, "deuterium": 20 },
       "energyRequired": [0],
@@ -14,7 +14,7 @@
     },
     {
       "type": "MATERIAL_TECHNOLOGY",
-      "imagePath": "images/technologies/Weapons_Technology.webp",
+      "imagePath": "images/technologies/MATERIAL_TECHNOLOGY.jpg",
       "description": "Incrase every defense value by 5%. Increase REPAIR EQIPMENT efficiency by 5%.",
       "basicCost": { "metal": 30, "crystal": 20, "deuterium": 10 },
       "energyRequired": [0],
@@ -26,7 +26,7 @@
     },
     {
       "type": "HYPERSPACE_TECHNOLOGY",
-      "imagePath": "images/technologies/Hyperspace_Technology.webp",
+      "imagePath": "images/technologies/HYPERSPACE_TECHNOLOGY.jpg",
       "description": "Gives +2% bonus to Sensor Phlanx range, increses Jump Gate and Interstellar Trade Port capacity by 5%.",
       "basicCost": { "metal": 0, "crystal": 20, "deuterium": 30 },
       "energyRequired": [10],
@@ -41,7 +41,7 @@
     },
     {
       "type": "ESPIONAGE_TECHNOLOGY",
-      "imagePath": "images/technologies/Espionage_Technology.webp",
+      "imagePath": "images/technologies/ESPIONAGE_TECHNOLOGY.jpg",
       "description": "Gives more information from spy missions. Gives +2% bonus to Sensor Phlanx range for detecting incoming fleets.",
       "basicCost": { "metal": 10, "crystal": 10, "deuterium": 10 },
       "energyRequired": [0],
@@ -55,7 +55,7 @@
     },
     {
       "type": "COMPUTER_TECHNOLOGY",
-      "imagePath": "images/technologies/Computer_Technology.webp",
+      "imagePath": "images/technologies/COMPUTER_TECHNOLOGY.jpg",
       "description": "Every level give +2 to maximum fleet amount, also gives +5% to research power.",
       "basicCost": { "metal": 0, "crystal": 40, "deuterium": 0 },
       "energyRequired": [0],
@@ -69,7 +69,7 @@
     },
     {
       "type": "ASTROPHYSICS_TECHNOLOGY",
-      "imagePath": "images/technologies/Astrophysics_and_Expedition_Technologies.webp",
+      "imagePath": "images/technologies/ASTROPHYSICS_TECHNOLOGY.jpg",
       "description": "Give +5% to expeditions income, and decreases bad expedition outcomes by 2%, also increases Sensor Phlanx range by 1%.",
       "basicCost": { "metal": 10, "crystal": 10, "deuterium": 10 },
       "energyRequired": [0],
@@ -81,7 +81,7 @@
     },
     {
       "type": "ADAPTIVE_TECHNOLOGY",
-      "imagePath": "images/technologies/Astrophysics_and_Expedition_Technologies.webp",
+      "imagePath": "images/technologies/ADAPTIVE_TECHNOLOGY.jpg",
       "description": "Make possible to colonise more types of planets. Increases all resources income, research and industry by +1%.",
       "basicCost": { "metal": 60, "crystal": 40, "deuterium": 20 },
       "energyRequired": [0],
@@ -98,7 +98,7 @@
     },
     {
       "type": "INTERGALACTIC_RESEARCH_NETWORK",
-      "imagePath": "images/technologies/Intergalactic_Research_Network.webp",
+      "imagePath": "images/technologies/INTERGALACTIC_RESEARCH_NETWORK.jpg",
       "description": "Makes possible for different Research Labs to work on one technology. And gives +2% for total research power.",
       "basicCost": { "metal": 10, "crystal": 120, "deuterium": 50 },
       "energyRequired": [0],
@@ -113,7 +113,7 @@
     },
     {
       "type": "GRAVITON_TECHNOLOGY",
-      "imagePath": "images/technologies/Graviton_Technology.webp",
+      "imagePath": "images/technologies/GRAVITON_TECHNOLOGY.jpg",
       "description": "Gives 5% ship bonus evasion bonus. Increases jump range by 1. Increses Jump Gate and Interstellar Trade Port capacity by 25%. Increase Sensor Phlanx base range by 0.5",
       "basicCost": { "metal": 0, "crystal": 5000, "deuterium": 5000 },
       "energyRequired": [110],
@@ -127,7 +127,7 @@
     },
     {
       "type": "SHIELDING_TECHNOLOGY",
-      "imagePath": "images/technologies/Shielding_Technology.webp",
+      "imagePath": "images/technologies/SHIELDING_TECHNOLOGY.jpg",
       "description": "Give +10% to every shield durability.",
       "basicCost": { "metal": 0, "crystal": 10, "deuterium": 20 },
       "energyRequired": [0],
@@ -141,7 +141,7 @@
     },
     {
       "type": "ARMOUR_TECHNOLOGY",
-      "imagePath": "images/technologies/Armour_Technology.webp",
+      "imagePath": "images/technologies/ARMOUR_TECHNOLOGY.jpg",
       "description": "Give +10% to every hull durability, and decreases ship destruction chance by 1%.",
       "basicCost": { "metal": 20, "crystal": 10, "deuterium": 0 },
       "energyRequired": [0],
@@ -155,7 +155,7 @@
     },
     {
       "type": "RAILGUNS_WEAPONS",
-      "imagePath": "images/technologies/Ion_Technology.webp",
+      "imagePath": "images/technologies/RAILGUNS_WEAPONS.jpg",
       "description": "Give +10% to every RAILGUNS weapon damage.",
       "basicCost": { "metal": 10, "crystal": 10, "deuterium":10 },
       "energyRequired": [0],
@@ -170,7 +170,7 @@
     },
     {
       "type": "BEAMS_WEAPONS",
-      "imagePath": "images/technologies/Laser_Technology.webp",
+      "imagePath": "images/technologies/BEAMS_WEAPONS.jpg",
       "description": "Give +10% to every BEAM weapon damage.",
       "basicCost": { "metal": 10, "crystal": 10, "deuterium": 20 },
       "energyRequired": [0],
@@ -184,7 +184,7 @@
     },
     {
       "type": "MISSILES_WEAPONS",
-      "imagePath": "images/technologies/Plasma_Technology.webp",
+      "imagePath": "images/technologies/MISSILES_WEAPONS.jpg",
       "description": "Give +10% to every MISSILE weapon damage.",
       "basicCost": { "metal": 10, "crystal": 0, "deuterium": 10 },
       "energyRequired": [0],
@@ -199,7 +199,7 @@
     },
     {
       "type": "FUSION_DRIVE",
-      "imagePath": "images/technologies/Combustion_Drive.webp",
+      "imagePath": "images/technologies/FUSION_DRIVE.jpg",
       "description": "Increases in star system, ship speed by 1, and increses evasion chance by 3%.",
       "basicCost": { "metal": 20, "crystal": 40, "deuterium": 40 },
       "energyRequired": [0],
@@ -214,7 +214,7 @@
     },
     {
       "type": "HYPERSPACE_DRIVE",
-      "imagePath": "images/technologies/Hyperspace_Drive.webp",
+      "imagePath": "images/technologies/HYPERSPACE_DRIVE.jpg",
       "description": "Increases jump range by 1.",
       "basicCost": { "metal": 50, "crystal": 250, "deuterium": 250 },
       "energyRequired": [0],

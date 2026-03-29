@@ -3,7 +3,7 @@
                 {
                     "type":  "METAL_MINE",
                     "description":  "Mines basic metals resources.",
-                    "imagePath":  "images/buildings/Metal_Mine.webp",
+                    "imagePath":  "images/buildings/METAL_MINE.jpg",
                     "basicCost":  {
                                       "metal":  60,
                                       "crystal":  20,
@@ -58,7 +58,7 @@
                 {
                     "type":  "CRYSTAL_MINE",
                     "description":  "Mines rare materials.",
-                    "imagePath":  "images/buildings/CrystalMine.webp",
+                    "imagePath":  "images/buildings/CRYSTAL_MINE.jpg",
                     "basicCost":  {
                                       "metal":  40,
                                       "crystal":  40,
@@ -113,7 +113,7 @@
                 {
                     "type":  "DEUTERIUM_SYNTHESIZER",
                     "description":  "Gathering deuterium.",
-                    "imagePath":  "images/buildings/Deuterium_Synthesizer.webp",
+                    "imagePath":  "images/buildings/DEUTERIUM_SYNTHESIZER.jpg",
                     "basicCost":  {
                                       "metal":  40,
                                       "crystal":  60,
@@ -168,7 +168,7 @@
                 {
                     "type":  "SOLAR_WIND_GEOTHERMAL",
                     "description":  "Using most efficient Renewable energy sorces on planet. Utilising mass energy storage devices.",
-                    "imagePath":  "images/buildings/Solar_Plant.webp",
+                    "imagePath":  "images/buildings/SOLAR_WIND_GEOTHERMAL.jpg",
                     "basicCost":  {
                                       "metal":  15,
                                       "crystal":  20,
@@ -218,7 +218,7 @@
                 {
                     "type":  "NUCLEAR_PLANT",
                     "description":  "Good old nuclear power technology. Safe, steady and reliable.",
-                    "imagePath":  "images/buildings/Fusion_Reactor.webp",
+                    "imagePath":  "images/buildings/NUCLEAR_PLANT.jpg",
                     "basicCost":  {
                                       "metal":  30,
                                       "crystal":  20,
@@ -268,7 +268,7 @@
                 {
                     "type":  "FUSION_REACTOR",
                     "description":  "Good old nuclear power technology. Safe, steady and reliable.",
-                    "imagePath":  "images/buildings/Fusion_Reactor.webp",
+                    "imagePath":  "images/buildings/FUSION_REACTOR.jpg",
                     "basicCost":  {
                                       "metal":  60,
                                       "crystal":  60,
@@ -339,7 +339,7 @@
                 {
                     "type":  "METAL_STORAGE",
                     "description":  "Planetary METAL storages.",
-                    "imagePath":  "images/buildings/Metal_Storage.webp",
+                    "imagePath":  "images/buildings/METAL_STORAGE.jpg",
                     "basicCost":  {
                                       "metal":  15,
                                       "crystal":  5,
@@ -387,7 +387,7 @@
                 {
                     "type":  "CRYSTAL_STORAGE",
                     "description":  "Planetary CRYSTAL deposits.",
-                    "imagePath":  "images/buildings/Crystal_Storage.webp",
+                    "imagePath":  "images/buildings/CRYSTAL_STORAGE.jpg",
                     "basicCost":  {
                                       "metal":  10,
                                       "crystal":  10,
@@ -435,7 +435,7 @@
                 {
                     "type":  "DEUTERIUM_TANK",
                     "description":  "Planetary DEUTERIUM tanks.",
-                    "imagePath":  "images/buildings/Deuterium_Tank.webp",
+                    "imagePath":  "images/buildings/DEUTERIUM_TANK.jpg",
                     "basicCost":  {
                                       "metal":  5,
                                       "crystal":  15,
@@ -483,7 +483,7 @@
                 {
                     "type":  "ROBOTICS_FACTORY",
                     "description":  "Main industry power.",
-                    "imagePath":  "images/buildings/Robotics_Factory.webp",
+                    "imagePath":  "images/buildings/ROBOTICS_FACTORY.jpg",
                     "basicCost":  {
                                       "metal":  60,
                                       "crystal":  30,
@@ -538,7 +538,7 @@
                 {
                     "type":  "SHIPYARD",
                     "description":  "Produces ships. If not busy, repair ships with half production speed.",
-                    "imagePath":  "images/buildings/Shipyard.webp",
+                    "imagePath":  "images/buildings/SHIPYARD.jpg",
                     "basicCost":  {
                                       "metal":  60,
                                       "crystal":  40,
@@ -603,7 +603,7 @@
                 {
                     "type":  "NANITE_FACTORY",
                     "description":  "Increases industry power.",
-                    "imagePath":  "images/buildings/Nanite_Factory.webp",
+                    "imagePath":  "images/buildings/NANITE_FACTORY.jpg",
                     "basicCost":  {
                                       "metal":  400,
                                       "crystal":  800,
@@ -660,7 +660,7 @@
                 {
                     "type":  "RESEARCH_LAB",
                     "description":  "Researches new technologies.",
-                    "imagePath":  "images/buildings/Research_Lab.webp",
+                    "imagePath":  "images/buildings/RESEARCH_LAB.jpg",
                     "basicCost":  {
                                       "metal":  10,
                                       "crystal":  30,
@@ -716,7 +716,7 @@
                 {
                     "type":  "ALLIANCE_DEPOT",
                     "description":  "Repairs orbiting ships and provide deuterium supply for them.",
-                    "imagePath":  "images/buildings/Alliance_Depot.webp",
+                    "imagePath":  "images/buildings/ALLIANCE_DEPOT.jpg",
                     "basicCost":  {
                                       "metal":  100,
                                       "crystal":  50,
@@ -798,7 +798,7 @@
                 {
                     "type":  "BOMB_DEPOT",
                     "description":  "Stores planetary bombs for future bombardment missions.",
-                    "imagePath":  "images/buildings/Missile_Silo.webp",
+                    "imagePath":  "images/buildings/BOMB_DEPOT.jpg",
                     "basicCost":  {
                                       "metal":  80,
                                       "crystal":  160,
@@ -862,7 +862,7 @@
                 {
                     "type":  "TERRAFORMER",
                     "description":  "Creates new land.",
-                    "imagePath":  "images/buildings/Terraformer.webp",
+                    "imagePath":  "images/buildings/TERRAFORMER.jpg",
                     "basicCost":  {
                                       "metal":  100,
                                       "crystal":  100,
@@ -932,7 +932,7 @@
                 {
                     "type":  "SENSOR_PHALANX",
                     "description":  "Automatically detects incoming fleets in normal range. Detects incoming fleets to scanned planet in half range. Amount of scans per turn is sqrt(current level).",
-                    "imagePath":  "images/buildings/Sensor_Phalanx.webp",
+                    "imagePath":  "images/buildings/SENSOR_PHALANX.jpg",
                     "basicCost":  {
                                       "metal":  300,
                                       "crystal":  760,
@@ -1009,7 +1009,7 @@
                 {
                     "type":  "JUMP_GATE",
                     "description":  "Makes possible to jump between systems. Every level increases Interstellar Trade Port capacity by 20%, and decreases its trade cost by 1%.",
-                    "imagePath":  "images/buildings/Jump_Gate.webp",
+                    "imagePath":  "images/buildings/JUMP_GATE.jpg",
                     "basicCost":  {
                                       "metal":  1000,
                                       "crystal":  1000,
@@ -1092,7 +1092,7 @@
                 {
                     "type":  "INTERSTELLAR_TRADE_PORT",
                     "description":  "Makes possible to exchange resources in ratio 3:2:1 with 5-40% operational cost. Every level above 1 decreases op. cost by 1%.",
-                    "imagePath":  "images/buildings/Shipyard.webp",
+                    "imagePath":  "images/buildings/INTERSTELLAR_TRADE_PORT.jpg",
                     "basicCost":  {
                                       "metal":  1200,
                                       "crystal":  600,
@@ -1165,7 +1165,7 @@
                 {
                     "type":  "BUNKER_NETWORK",
                     "description":  "Decreases resources that can be plunder by enemy attack by 4%. (Base is 90%)",
-                    "imagePath":  "images/buildings/Metal_Storage.webp",
+                    "imagePath":  "images/buildings/BUNKER_NETWORK.jpg",
                     "basicCost":  {
                                       "metal":  80,
                                       "crystal":  40,

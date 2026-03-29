@@ -2,7 +2,7 @@
   "ships": [
     {
       "type": "FIGHTER",
-      "imagePath": "images/ships/Light_Fighter.webp",
+      "imagePath": "images/ships/FIGHTER.jpg",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 1,
@@ -16,7 +16,7 @@
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
-      "purposes": ["MILITARY", "BOMBER"],
+      "purposes": ["MILITARY"],
       "jumpCost": 0,
       "cost": { "metal": 20, "crystal": 10, "deuterium": 0 },
       "buildingRequirements": [
@@ -29,7 +29,7 @@
     },
     {
       "type": "ASSAULT_FIGHTER",
-      "imagePath": "images/ships/Heavy_Fighter.webp",
+      "imagePath": "images/ships/ASSAULT_FIGHTER.jpg",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 2,
@@ -43,7 +43,7 @@
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
-      "purposes": ["MILITARY", "BOMBER"],
+      "purposes": ["MILITARY"],
       "jumpCost": 0,
       "cost": { "metal": 30, "crystal": 20, "deuterium": 10 },
       "buildingRequirements": [
@@ -56,7 +56,7 @@
     },
     {
       "type": "ATMOSPHERIC_FIGHTER",
-      "imagePath": "images/ships/Light_Fighter.webp",
+      "imagePath": "images/ships/ATMOSPHERIC_FIGHTER.jpg",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 1,
@@ -84,7 +84,7 @@
     },
     {
       "type": "ATMOSPHERIC_BOMBER",
-      "imagePath": "images/ships/Heavy_Fighter.webp",
+      "imagePath": "images/ships/ATMOSPHERIC_BOMBER.jpg",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 3,
@@ -112,7 +112,7 @@
     },
     {
       "type": "CORVETTE",
-      "imagePath": "images/ships/Cruiser.webp",
+      "imagePath": "images/ships/CORVETE.jpg",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 3,
@@ -143,7 +143,7 @@
     },
     {
       "type": "SPY_PROBE",
-      "imagePath": "images/ships/Espionage_Probe.webp",
+      "imagePath": "images/ships/SPY_PROBE.jpg",
       "hullClass": "SMALL",
       "canJump": true,
       "size": 0,
@@ -170,7 +170,7 @@
     },
     {
       "type": "REPAIR_DRONE",
-      "imagePath": "images/ships/Light_Fighter.webp",
+      "imagePath": "images/ships/REPAIR_DRONE.jpg",
       "hullClass": "SMALL",
       "canJump": false,
       "size": 2,
@@ -198,7 +198,7 @@
     },
     {
       "type": "RECYCLER",
-      "imagePath": "images/ships/Large_Cargo.webp",
+      "imagePath": "images/ships/RECYCLER.jpg",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -227,7 +227,7 @@
     },
     {
       "type": "CRUISER",
-      "imagePath": "images/ships/Cruiser.webp",
+      "imagePath": "images/ships/CRUISER.jpg",
       "hullClass": "MEDIUM",
       "canJump": true,
       "size": 0,
@@ -261,7 +261,7 @@
     },
     {
       "type": "BATTLE_SHIP",
-      "imagePath": "images/ships/Battleship.webp",
+      "imagePath": "images/ships/BATTLE_SHIP.jpg",
       "hullClass": "MEDIUM",
       "canJump": true,
       "size": 0,
@@ -293,7 +293,7 @@
     },
     {
       "type": "FRIGATE",
-      "imagePath": "images/ships/Battlecruiser.webp",
+      "imagePath": "images/ships/FRIGATE.jpg",
       "hullClass": "MEDIUM",
       "canJump": true,
       "size": 0,
@@ -327,7 +327,7 @@
     },
     {
       "type": "TRANSPORTER",
-      "imagePath": "images/ships/Small_Cargo.webp",
+      "imagePath": "images/ships/TRANSPORTER.jpg",
       "hullClass": "MEDIUM",
       "canJump": true,
       "size": 0,
@@ -357,7 +357,7 @@
     },
     {
       "type": "BATTLE_CRUISER",
-      "imagePath": "images/ships/Battlecruiser.webp",
+      "imagePath": "images/ships/BATTLE_CRUISER.jpg",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -372,7 +372,7 @@
         { "type": "RAIL_GUN", "dmg": 10, "shots": 1 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 1 }
       ],
-      "cargoCapacity": 200,
+      "cargoCapacity": 150,
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 2,
@@ -393,7 +393,7 @@
     },
     {
       "type": "DESTROYER",
-      "imagePath": "images/ships/Destroyer.webp",
+      "imagePath": "images/ships/DESTROYER.jpg",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -406,7 +406,7 @@
         { "type": "MISSILE", "dmg": 40, "shots": 1 },
         { "type": "RAIL_GUN", "dmg": 30, "shots": 2 }
       ],
-      "cargoCapacity": 150,
+      "cargoCapacity": 100,
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 2,
@@ -426,7 +426,7 @@
     },
     {
       "type": "DREADNOUGHT",
-      "imagePath": "images/ships/Death_Star.webp",
+      "imagePath": "images/ships/DREADNOUGHT.jpg",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -460,7 +460,7 @@
     },
     {
       "type": "ORBITAL_BOMBER",
-      "imagePath": "images/ships/Destroyer.webp",
+      "imagePath": "images/ships/ORBITAL_BOMBER.jpg",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -470,13 +470,13 @@
       "shieldCapacity": 180,
       "armor": 5,
       "weapons": [
-        { "type": "BEAM", "dmg": 10, "shots": 3 },
+        { "type": "BEAM", "dmg": 10, "shots": 2 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 4 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 100, "shots": 2 }
       ],
       "cargoCapacity": 60,
       "hangarCapacity": 4,
-      "purposes": ["MILITARY"],
+      "purposes": ["MILITARY", "BOMBER"],
       "jumpCost": 6,
       "cost": { "metal": 400, "crystal": 160, "deuterium": 180 },
       "buildingRequirements": [
@@ -493,7 +493,7 @@
     },
     {
       "type": "CARRIER",
-      "imagePath": "images/ships/Reaper.webp",
+      "imagePath": "images/ships/CARRIER.jpg",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -526,7 +526,7 @@
     },
     {
       "type": "CARGO_SUPPORT",
-      "imagePath": "images/ships/Large_Cargo.webp",
+      "imagePath": "images/ships/CARGO_SUPPORT.jpg",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -558,7 +558,7 @@
     },
     {
       "type": "MASS_HAULER",
-      "imagePath": "images/ships/Large_Cargo.webp",
+      "imagePath": "images/ships/MASS_HAULER.jpg",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -589,7 +589,7 @@
     },
     {
       "type": "COLONIZER",
-      "imagePath": "images/ships/Colony_Ship.webp",
+      "imagePath": "images/ships/COLONIZER.jpg",
       "hullClass": "BIG",
       "canJump": true,
       "size": 0,
@@ -603,7 +603,7 @@
         { "type": "REPAIR_EQUIPMENT", "dmg": 50, "shots": 1 }
       ],
       "cargoCapacity": 500,
-      "hangarCapacity": 6,
+      "hangarCapacity": 4,
       "purposes": ["UTILITY"],
       "jumpCost": 5,
       "cost": { "metal": 600, "crystal": 300, "deuterium": 100 },
@@ -625,7 +625,7 @@
     },
     {
       "type": "TITAN",
-      "imagePath": "images/ships/Death_Star.webp",
+      "imagePath": "images/ships/TITAN.jpg",
       "hullClass": "TITAN",
       "canJump": true,
       "size": 0,
@@ -663,7 +663,7 @@
     },
     {
       "type": "ARMAGEDDON_BOMBER",
-      "imagePath": "images/ships/Death_Star.webp",
+      "imagePath": "images/ships/ARMAGEDDON_BOMBER.jpg",
       "hullClass": "TITAN",
       "canJump": true,
       "size": 0,
@@ -673,7 +673,7 @@
       "shieldCapacity": 700,
       "armor": 7,
       "weapons": [
-        { "type": "BEAM", "dmg": 20, "shots": 4 },
+        { "type": "BEAM", "dmg": 10, "shots": 2 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 10 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 100, "shots": 4 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 250, "shots": 1 }
@@ -681,7 +681,7 @@
       ],
       "cargoCapacity": 1000,
       "hangarCapacity": 8,
-      "purposes": ["MILITARY"],
+      "purposes": ["MILITARY", "BOMBER"],
       "jumpCost": 8,
       "cost": { "metal": 1500, "crystal": 800, "deuterium": 1000 },
       "buildingRequirements": [
@@ -700,7 +700,7 @@
     },
     {
       "type": "BEHEMOTH",
-      "imagePath": "images/ships/Death_Star.webp",
+      "imagePath": "images/ships/BEHEMOTH.jpg",
       "hullClass": "TITAN",
       "canJump": true,
       "size": 0,
@@ -735,7 +735,7 @@
     },
     {
       "type": "FLEET_CARRIER",
-      "imagePath": "images/ships/Pathfinder.webp",
+      "imagePath": "images/ships/FLEET_CARRIER.jpg",
       "hullClass": "TITAN",
       "canJump": true,
       "size": 0,
@@ -770,7 +770,7 @@
     },
     {
       "type": "MOTHER_SHIP",
-      "imagePath": "images/ships/Death_Star.webp",
+      "imagePath": "images/ships/MOTHER_SHIP.jpg",
       "hullClass": "STATION",
       "canJump": true,
       "size": 0,
