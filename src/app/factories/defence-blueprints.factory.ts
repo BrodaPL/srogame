@@ -90,7 +90,7 @@ export class DefenceBlueprintsFactory {
       type,
       this.resolveImagePath(entry, type),
       this.parseEnumKey(HullClass, entry.hullClass, 'HullClass'),
-      !!entry.canShootToOrbit,
+      entry.canShootToOrbit,
       entry.size,
       entry.hullPointsCapacity,
       entry.criticalThreshold,
