@@ -54,19 +54,19 @@ interface TechRequirementJson {
 }
 
 export class DefenceBlueprintsFactory {
-  private static readonly defaultImagePath = 'images/ships/Destroyer.webp';
+  private static readonly defaultImagePath = 'images/defence/LIGHT_BEAM_CANNON.jpg';
   private static readonly defenceImageMap: Partial<Record<DefenceType, string>> = {
-    [DefenceType.LIGHT_BEAM_CANNON]: 'images/ships/Destroyer.webp',
-    [DefenceType.BEAM_CANNON]: 'images/ships/Destroyer.webp',
-    [DefenceType.HEAVY_BEAM_CANNON]: 'images/ships/Battleship.webp',
-    [DefenceType.SAM_SITE]: 'images/ships/Heavy_Fighter.webp',
-    [DefenceType.ORBITAL_MISSILE_LAUNCHER]: 'images/ships/Destroyer.webp',
-    [DefenceType.HEAVY_ORBITAL_MISSILE_LAUNCHER]: 'images/ships/Battleship.webp',
-    [DefenceType.RAIL_GUN_CANNON]: 'images/ships/Death_Star.webp',
-    [DefenceType.SMALL_BOMB]: 'images/ships/Bomber.webp',
-    [DefenceType.CLUSTER_BOMB]: 'images/ships/Bomber.webp',
-    [DefenceType.MEDIUM_BOMB]: 'images/ships/Bomber (1).webp',
-    [DefenceType.HEAVY_BOMB]: 'images/ships/Bomber (1).webp'
+    [DefenceType.LIGHT_BEAM_CANNON]: 'images/defence/LIGHT_BEAM_CANNON.jpg',
+    [DefenceType.BEAM_CANNON]: 'images/defence/BEAM_CANNON.jpg',
+    [DefenceType.HEAVY_BEAM_CANNON]: 'images/defence/HEAVY_BEAM_CANNON.jpg',
+    [DefenceType.SAM_SITE]: 'images/defence/SAM_SITE.jpg',
+    [DefenceType.ORBITAL_MISSILE_LAUNCHER]: 'images/defence/ORBITAL_MISSILE_LAUNCHER.jpg',
+    [DefenceType.HEAVY_ORBITAL_MISSILE_LAUNCHER]: 'images/defence/HEAVY_ORBITAL_MISSILE_LAUNCHER.jpg',
+    [DefenceType.RAIL_GUN_CANNON]: 'images/defence/RAIL_GUN_CANNON.jpg',
+    [DefenceType.SMALL_BOMB]: 'images/defence/SMALL_BOMB.jpg',
+    [DefenceType.CLUSTER_BOMB]: 'images/defence/CLUSTER_BOMB.jpg',
+    [DefenceType.MEDIUM_BOMB]: 'images/defence/MEDIUM_BOMB.jpg',
+    [DefenceType.HEAVY_BOMB]: 'images/defence/HEAVY_BOMB.jpg'
   };
 
   static fromDefaultJson(): DefenceBlueprints {

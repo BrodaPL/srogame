@@ -2,7 +2,7 @@
   "defences": [
     {
       "type": "LIGHT_BEAM_CANNON",
-      "imagePath": "images/defence/Light_Laser (1).webp",
+      "imagePath": "images/defence/LIGHT_BEAM_CANNON.jpg",
       "hullClass": "SMALL",
       "canShootToOrbit": false,
       "size": 1,
@@ -23,7 +23,7 @@
     },
     {
       "type": "BEAM_CANNON",
-      "imagePath": "images/defence/Ion_Cannon.webp",
+      "imagePath": "images/defence/BEAM_CANNON.jpg",
       "hullClass": "MEDIUM",
       "canShootToOrbit": true,
       "size": 2,
@@ -46,7 +46,7 @@
     },
     {
       "type": "HEAVY_BEAM_CANNON",
-      "imagePath": "images/defence/Plasma_Turret.webp",
+      "imagePath": "images/defence/HEAVY_BEAM_CANNON.jpg",
       "hullClass": "BIG",
       "canShootToOrbit": true,
       "size": 3,
@@ -69,7 +69,7 @@
     },
     {
       "type": "SAM_SITE",
-      "imagePath": "images/defence/Rocket_Launcher.webp",
+      "imagePath": "images/defence/SAM_SITE.jpg",
       "hullClass": "SMALL",
       "canShootToOrbit": false,
       "size": 1,
@@ -91,7 +91,7 @@
     },
     {
       "type": "ORBITAL_MISSILE_LAUNCHER",
-      "imagePath": "images/defence/ABM.webp",
+      "imagePath": "images/defence/ORBITAL_MISSILE_LAUNCHER.jpg",
       "hullClass": "MEDIUM",
       "canShootToOrbit": true,
       "size": 2,
@@ -114,7 +114,7 @@
     },
     {
       "type": "HEAVY_ORBITAL_MISSILE_LAUNCHER",
-      "imagePath": "images/defence/Anti-Ballistic_Missile.webp",
+      "imagePath": "images/defence/HEAVY_ORBITAL_MISSILE_LAUNCHER.jpg",
       "hullClass": "BIG",
       "canShootToOrbit": true,
       "size": 3,
@@ -139,7 +139,7 @@
     },
     {
       "type": "RAIL_GUN_CANNON",
-      "imagePath": "images/defence/Rail_gun_cannon.webp",
+      "imagePath": "images/defence/RAIL_GUN_CANNON.jpg",
       "hullClass": "BIG",
       "canShootToOrbit": false,
       "size": 3,
@@ -162,7 +162,7 @@
     },
     {
       "type": "SMALL_BOMB",
-      "imagePath": "images/defence/Rocket_Launcher.webp",
+      "imagePath": "images/defence/SMALL_BOMB.jpg",
       "hullClass": "PLANETARY_BOMB",
       "canShootToOrbit": false,
       "size": 1,
@@ -184,7 +184,7 @@
     },
     {
       "type": "CLUSTER_BOMB",
-      "imagePath": "images/defence/Interplanetary_Missile.webp",
+      "imagePath": "images/defence/CLUSTER_BOMB.jpg",
       "hullClass": "PLANETARY_BOMB",
       "canShootToOrbit": false,
       "size": 1,
@@ -207,7 +207,7 @@
     },
     {
       "type": "MEDIUM_BOMB",
-      "imagePath": "images/defence/ABM.webp",
+      "imagePath": "images/defence/MEDIUM_BOMB.jpg",
       "hullClass": "PLANETARY_BOMB",
       "canShootToOrbit": false,
       "size": 2,
@@ -230,7 +230,7 @@
     },
     {
       "type": "HEAVY_BOMB",
-      "imagePath": "images/defence/Anti-Ballistic_Missile.webp",
+      "imagePath": "images/defence/HEAVY_BOMB.jpg",
       "hullClass": "PLANETARY_BOMB",
       "canShootToOrbit": false,
       "size": 3,
