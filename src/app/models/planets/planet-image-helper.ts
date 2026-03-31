@@ -1,7 +1,7 @@
 import { PlanetType } from '../enums/planet-type';
 
 export class PlanetImageHelper {
-  private static readonly basePath = 'images/planet_blank';
+  private static readonly basePath = 'images/planet_blank/small';
 
   static getPlanetImage(type: PlanetType, planetSize: number): string {
     const sizeCode = PlanetImageHelper.resolveSizeCode(planetSize);
