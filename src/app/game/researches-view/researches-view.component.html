@@ -76,7 +76,13 @@
       <div class="research-tech-list" data-tutorial-id="researches-tech-list">
         @for (technology of technologies; track technology.type; let isFirst = $first) {
           <article class="research-tech-card" [attr.data-tutorial-id]="isFirst ? 'researches-primary-tech-card' : null">
-            <img class="research-tech-card__image" [src]="technology.imagePath" [alt]="technology.type + ' image'" />
+            <button
+              type="button"
+              class="research-tech-card__image-button"
+              [attr.title]="'Open details for ' + technology.type"
+              (click)="openTechnologyDetails(technology)">
+              <img class="research-tech-card__image" [src]="technology.imagePath" [alt]="technology.type + ' image'" />
+            </button>
 
             <div class="research-tech-card__main">
               <h4 class="research-tech-card__title">{{ technology.type }}</h4>
@@ -169,4 +175,9 @@
   }
 </section>
 
+<app-planet-object-dialog
+  [isOpen]="selectedTechnologyDetails !== null"
+  [details]="selectedTechnologyDetails"
+  (closed)="closeTechnologyDetails()"
+></app-planet-object-dialog>
 

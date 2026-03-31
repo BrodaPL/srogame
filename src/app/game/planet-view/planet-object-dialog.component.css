@@ -1,0 +1,247 @@
+.planet-object-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 14, 0.76);
+  backdrop-filter: blur(4px);
+  z-index: 34;
+}
+
+.planet-object-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(1320px, calc(100vw - 1.5rem));
+  max-height: min(88vh, 980px);
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(98, 208, 188, 0.22);
+  background: linear-gradient(180deg, rgba(10, 17, 24, 0.985), rgba(7, 12, 18, 0.992));
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.5);
+  z-index: 35;
+}
+
+.planet-object-dialog__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+
+.planet-object-dialog__title-block {
+  display: grid;
+  gap: 0.14rem;
+}
+
+.planet-object-dialog__kind,
+.planet-object-dialog__title,
+.planet-object-dialog__subtitle,
+.planet-object-dialog__description,
+.planet-object-dialog__image-status {
+  margin: 0;
+}
+
+.planet-object-dialog__kind {
+  color: #7bdcca;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.planet-object-dialog__title {
+  color: #f3f8ff;
+  font-size: 1.28rem;
+}
+
+.planet-object-dialog__subtitle {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-family: var(--font-mono), serif;
+}
+
+.planet-object-dialog__close {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  padding: 0.46rem 0.92rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.planet-object-dialog__body {
+  display: grid;
+  grid-template-columns: minmax(320px, 432px) minmax(0, 1fr);
+  gap: 1rem;
+  overflow: auto;
+  padding-right: 0.16rem;
+}
+
+.planet-object-dialog__media {
+  display: grid;
+  align-content: start;
+  gap: 0.42rem;
+}
+
+.planet-object-dialog__image-frame {
+  border-radius: 18px;
+  border: 1px solid rgba(98, 208, 188, 0.18);
+  background: radial-gradient(circle at top, rgba(34, 56, 73, 0.42), rgba(10, 15, 20, 0.94));
+  padding: 0.7rem;
+}
+
+.planet-object-dialog__image {
+  width: 100%;
+  max-height: min(74vh, 820px);
+  object-fit: contain;
+  display: block;
+}
+
+.planet-object-dialog__image-status {
+  color: #9fb3cf;
+  font-size: 0.78rem;
+}
+
+.planet-object-dialog__image-status--warn {
+  color: #ffb684;
+}
+
+.planet-object-dialog__content {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+}
+
+.planet-object-dialog__description {
+  color: #eef5ff;
+  font-size: 0.9rem;
+  line-height: 1.48;
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  border: 1px solid rgba(98, 208, 188, 0.12);
+  background: rgba(13, 21, 29, 0.74);
+}
+
+.planet-object-dialog__sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+
+.planet-object-dialog__section {
+  display: grid;
+  align-content: start;
+  gap: 0.42rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 16px;
+  border: 1px solid rgba(98, 208, 188, 0.12);
+  background: rgba(12, 20, 27, 0.86);
+}
+
+.planet-object-dialog__section-title {
+  margin: 0;
+  color: #95a9c7;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.planet-object-dialog__rows {
+  display: grid;
+  gap: 0.34rem;
+}
+
+.planet-object-dialog__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 0.7rem;
+  align-items: start;
+  padding-bottom: 0.26rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.planet-object-dialog__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.planet-object-dialog__row-label {
+  color: #d8e3f6;
+  font-size: 0.8rem;
+}
+
+.planet-object-dialog__row-value {
+  color: #f3f8ff;
+  font-size: 0.79rem;
+  text-align: right;
+  font-family: var(--font-mono), serif;
+}
+
+.planet-object-dialog__row-value--good {
+  color: #7de3a6;
+}
+
+.planet-object-dialog__row-value--warn {
+  color: #ffcf7f;
+}
+
+.planet-object-dialog__row-value--bad {
+  color: #ff9d9d;
+}
+
+.planet-object-dialog__row-value--muted {
+  color: #91a5c2;
+}
+
+.planet-object-dialog__body::-webkit-scrollbar {
+  width: 12px;
+}
+
+.planet-object-dialog__body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.planet-object-dialog__body::-webkit-scrollbar-thumb {
+  background: rgba(123, 220, 202, 0.34);
+  border-radius: 999px;
+  border: 2px solid rgba(10, 17, 24, 0.96);
+}
+
+.planet-object-dialog__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(123, 220, 202, 0.5);
+}
+
+@media (max-width: 900px) {
+  .planet-object-dialog__body {
+    grid-template-columns: 1fr;
+  }
+
+  .planet-object-dialog__image {
+    max-height: min(42vh, 440px);
+  }
+}
+
+@media (max-width: 640px) {
+  .planet-object-dialog {
+    width: min(100vw - 1rem, 100%);
+    max-height: calc(100vh - 1rem);
+    padding: 0.9rem;
+  }
+
+  .planet-object-dialog__head {
+    grid-template-columns: 1fr;
+  }
+
+  .planet-object-dialog__close {
+    justify-self: start;
+  }
+
+  .planet-object-dialog__sections {
+    grid-template-columns: 1fr;
+  }
+}

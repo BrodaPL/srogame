@@ -1,0 +1,59 @@
+@if (isOpen && details) {
+  <div class="planet-object-dialog__backdrop" (click)="close()"></div>
+  <section class="planet-object-dialog" role="dialog" aria-modal="true" [attr.aria-label]="details.title + ' details'" (click)="$event.stopPropagation()">
+    <div class="planet-object-dialog__head">
+      <div class="planet-object-dialog__title-block">
+        <p class="planet-object-dialog__kind">{{ details.kindLabel }}</p>
+        <h3 class="planet-object-dialog__title">{{ details.title }}</h3>
+        <p class="planet-object-dialog__subtitle">{{ details.subtitle }}</p>
+      </div>
+      <button type="button" class="planet-object-dialog__close" (click)="close()">Close</button>
+    </div>
+
+    <div class="planet-object-dialog__body">
+      <div class="planet-object-dialog__media">
+        <div class="planet-object-dialog__image-frame">
+          <img class="planet-object-dialog__image" [src]="displayedImagePath" [alt]="details.title + ' image'" />
+        </div>
+        @if (isRawLoading) {
+          <p class="planet-object-dialog__image-status">Loading raw image...</p>
+        }
+        @if (rawLoadFailed) {
+          <p class="planet-object-dialog__image-status planet-object-dialog__image-status--warn">
+            Raw image unavailable. Showing optimized image.
+          </p>
+        }
+      </div>
+
+      <div class="planet-object-dialog__content">
+        @if (details.description.length > 0) {
+          <p class="planet-object-dialog__description">{{ details.description }}</p>
+        }
+
+        <div class="planet-object-dialog__sections">
+          @for (section of details.sections; track section.title) {
+            <section class="planet-object-dialog__section">
+              <h4 class="planet-object-dialog__section-title">{{ section.title }}</h4>
+              <div class="planet-object-dialog__rows">
+                @for (row of section.rows; track row.label + row.value) {
+                  <div class="planet-object-dialog__row">
+                    <span class="planet-object-dialog__row-label">{{ row.label }}</span>
+                    <span
+                      class="planet-object-dialog__row-value"
+                      [class.planet-object-dialog__row-value--good]="row.tone === 'good'"
+                      [class.planet-object-dialog__row-value--warn]="row.tone === 'warn'"
+                      [class.planet-object-dialog__row-value--bad]="row.tone === 'bad'"
+                      [class.planet-object-dialog__row-value--muted]="row.tone === 'muted'"
+                    >
+                      {{ row.value }}
+                    </span>
+                  </div>
+                }
+              </div>
+            </section>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+}

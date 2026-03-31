@@ -43,6 +43,7 @@ import { countPlanetaryBombs, isPlanetaryBombDefenceType } from '../../models/de
 import { Defence } from '../../models/defences/defence';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { Ship } from '../../models/fleets/ship';
+import { Weapon } from '../../models/fleets/weapon';
 import { Technology } from '../../models/tech/technology';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import {
@@ -53,6 +54,13 @@ import {
 } from '../ui/resources/resources.component';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { tradeResourceLabel } from '../../models/trade/trade-resource-type';
+import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
+import { PlanetObjectDialogComponent } from './planet-object-dialog.component';
+import type {
+  PlanetObjectDetailDialogData,
+  PlanetObjectDetailRow,
+  PlanetObjectDetailSection
+} from './planet-object-dialog.component';
 
 type PlanetTab = 'resources' | 'facilities' | 'ships' | 'defences' | 'operations' | 'queues';
 
@@ -126,7 +134,8 @@ type ResearchQueueRowVm = {
     FormsModule,
     CdkDropList,
     CdkDrag,
-    CdkDragHandle
+    CdkDragHandle,
+    PlanetObjectDialogComponent
   ],
   templateUrl: './planet-view.component.html',
   styleUrl: './planet-view.component.css'
@@ -156,6 +165,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected tradePortActionOfferId: number | null = null;
   protected buildingQueueMutationInFlight = false;
   protected shipyardQueueMutationInFlight = false;
+  protected selectedObjectDetails: PlanetObjectDetailDialogData | null = null;
 
   protected readonly resourceBuildings: Building[];
   protected readonly facilityBuildings: Building[];
@@ -574,6 +584,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected buildingStartError(building: Building): string | null {
     return this.buildingStartErrorByType.get(building.type) ?? null;
+  }
+
+  protected openBuildingDetails(building: Building): void {
+    this.selectedObjectDetails = this.createBuildingDetailDialogData(building);
+  }
+
+  protected openShipDetails(ship: Ship): void {
+    this.selectedObjectDetails = this.createShipDetailDialogData(ship);
+  }
+
+  protected openDefenceDetails(defence: Defence): void {
+    this.selectedObjectDetails = this.createDefenceDetailDialogData(defence);
+  }
+
+  protected closeObjectDetails(): void {
+    this.selectedObjectDetails = null;
   }
 
   protected shipAmountInput(shipType: ShipType): string {
@@ -1871,11 +1897,386 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return rows;
   }
 
+  private createBuildingDetailDialogData(building: Building): PlanetObjectDetailDialogData {
+    const currentLevel = this.buildingLevel(building.type);
+    const maxPower = this.buildingMaxPowerConsumption(building);
+    const currentPower = this.buildingCurrentPowerConsumption(building);
+    const summaryRows: PlanetObjectDetailRow[] = [
+      {
+        label: 'Category',
+        value: building.isFacility ? 'Facility' : 'Resource building'
+      },
+      {
+        label: 'Base armor',
+        value: String(building.armor)
+      },
+      {
+        label: 'Damage multiplier',
+        value: `${this.roundNumber(building.damageMultiplier, 2)}x`
+      }
+    ];
+
+    if (building.production1.length > 0) {
+      summaryRows.push({
+        label: currentLevel > 0 ? 'Current output' : 'Level 1 output',
+        value: String(currentLevel > 0 ? this.buildingProductionAtCurrentLevel(building) : this.getProductionAtLevel(building, 1))
+      });
+    }
+
+    if (building.powerConsumption > 0) {
+      summaryRows.push({
+        label: 'Power per level',
+        value: String(building.powerConsumption)
+      });
+    } else {
+      summaryRows.push({
+        label: 'Power',
+        value: 'No direct power draw',
+        tone: 'muted'
+      });
+    }
+
+    const stateRows: PlanetObjectDetailRow[] = [
+      {
+        label: 'Current level',
+        value: String(currentLevel)
+      },
+      {
+        label: 'Next level',
+        value: `L${this.buildingNextLevel(building)}`
+      }
+    ];
+
+    if (currentLevel <= 0) {
+      stateRows.push({
+        label: 'Status',
+        value: 'Not built yet',
+        tone: 'muted'
+      });
+    } else {
+      if (building.production1.length > 0) {
+        stateRows.push({
+          label: 'Current production',
+          value: String(this.buildingProductionAtCurrentLevel(building))
+        });
+      }
+
+      stateRows.push(
+        {
+          label: 'Structural points',
+          value: `${this.buildingCurrentStructuralPoints(building)} / ${this.buildingMaxStructuralPoints(building)}`
+        },
+        {
+          label: 'Structural efficiency',
+          value: `${this.buildingStructuralUtilizationPercent(building)}%`
+        }
+      );
+
+      if (maxPower > 0) {
+        stateRows.push({
+          label: 'Power usage',
+          value: `${currentPower} / ${maxPower}`,
+          tone: currentPower < maxPower ? 'warn' : 'default'
+        });
+      }
+    }
+
+    const sections: PlanetObjectDetailSection[] = [
+      this.createDetailSection('Summary', summaryRows),
+      this.createDetailSection('Current state', stateRows),
+      this.createDetailSection(this.buildingCostHeader(building), this.detailRowsFromCostRows(this.buildingCostRows(building))),
+      this.createDetailSection('Requirements', this.detailRowsFromRequirementRows(this.buildingRequirementRows(building)))
+    ];
+
+    return this.buildPlanetObjectDialogData('Building', building.type, building.description, building.imagePath, sections);
+  }
+
+  private createShipDetailDialogData(ship: Ship): PlanetObjectDetailDialogData {
+    const counts = this.shipCounts(ship.type);
+    const sections: PlanetObjectDetailSection[] = [
+      this.createDetailSection('Summary', [
+        {
+          label: 'Hull class',
+          value: ship.hullClass
+        },
+        {
+          label: 'Purposes',
+          value: Array.from(ship.purposes).join(', ') || 'None'
+        },
+        {
+          label: 'Size',
+          value: String(ship.size)
+        },
+        {
+          label: 'Cargo',
+          value: String(ship.cargoCapacity)
+        },
+        {
+          label: 'Hangar',
+          value: String(ship.hangarCapacity)
+        },
+        {
+          label: 'Jump capable',
+          value: ship.canJump ? 'Yes' : 'No',
+          tone: ship.canJump ? 'good' : 'muted'
+        },
+        {
+          label: 'Jump cost',
+          value: ship.canJump ? String(ship.jumpCost) : 'N/A',
+          tone: ship.canJump ? 'default' : 'muted'
+        }
+      ]),
+      this.createDetailSection('Current state', [
+        {
+          label: 'Owned on planet',
+          value: String(counts.total)
+        },
+        {
+          label: 'Undamaged',
+          value: String(counts.undamaged)
+        },
+        {
+          label: 'Damaged',
+          value: String(counts.damaged),
+          tone: counts.damaged > 0 ? 'warn' : 'default'
+        },
+        {
+          label: 'Missing hull',
+          value: String(counts.missingHull),
+          tone: counts.missingHull > 0 ? 'warn' : 'muted'
+        }
+      ]),
+      this.createDetailSection('Combat', [
+        {
+          label: 'Hull points',
+          value: String(ship.hullPointsCapacity)
+        },
+        {
+          label: 'Shield',
+          value: String(ship.shieldCapacity)
+        },
+        {
+          label: 'Armor',
+          value: String(ship.armor)
+        },
+        {
+          label: 'Critical threshold',
+          value: `${ship.criticalThreshold}%`
+        },
+        {
+          label: 'Evasion',
+          value: `${Math.round(ship.evasionChance * 100)}%`
+        }
+      ]),
+      this.createDetailSection('Weapons', this.detailRowsFromWeapons(ship.weapons)),
+      this.createDetailSection('Single ship cost', this.detailRowsFromCostRows(this.shipSingleCostRows(ship))),
+      this.createDetailSection('Requirements', this.detailRowsFromRequirementRows(this.shipRequirementRows(ship)))
+    ];
+
+    return this.buildPlanetObjectDialogData('Ship', ship.type, '', ship.imagePath, sections);
+  }
+
+  private createDefenceDetailDialogData(defence: Defence): PlanetObjectDetailDialogData {
+    const counts = this.defenceCounts(defence.type);
+    const isPlanetaryBomb = defence.hullClass === HullClass.PLANETARY_BOMB;
+    const stateRows: PlanetObjectDetailRow[] = [
+      {
+        label: 'Owned on planet',
+        value: String(counts.total)
+      },
+      {
+        label: 'Undamaged',
+        value: String(counts.undamaged)
+      },
+      {
+        label: 'Damaged',
+        value: String(counts.damaged),
+        tone: counts.damaged > 0 ? 'warn' : 'default'
+      },
+      {
+        label: 'Missing hull',
+        value: String(counts.missingHull),
+        tone: counts.missingHull > 0 ? 'warn' : 'muted'
+      }
+    ];
+
+    if (isPlanetaryBomb) {
+      stateRows.push({
+        label: 'Bomb depot storage',
+        value: `${this.currentPlanetaryBombCount()} / ${this.bombDepotCapacity()}${this.queuedPlanetaryBombCount() > 0 ? ` (+${this.queuedPlanetaryBombCount()} queued)` : ''}`,
+        tone: 'warn'
+      });
+    }
+
+    const sections: PlanetObjectDetailSection[] = [
+      this.createDetailSection('Summary', [
+        {
+          label: 'Hull class',
+          value: defence.hullClass
+        },
+        {
+          label: 'Role',
+          value: isPlanetaryBomb ? 'Stored bomb payload' : 'Planetary defence platform'
+        },
+        {
+          label: 'Size',
+          value: String(defence.size)
+        },
+        {
+          label: 'Can shoot to orbit',
+          value: defence.canShootToOrbit ? 'Yes' : 'No',
+          tone: defence.canShootToOrbit ? 'good' : 'muted'
+        }
+      ]),
+      this.createDetailSection('Current state', stateRows),
+      this.createDetailSection('Combat', [
+        {
+          label: 'Hull points',
+          value: String(defence.hullPointsCapacity)
+        },
+        {
+          label: 'Shield',
+          value: String(defence.shieldCapacity)
+        },
+        {
+          label: 'Armor',
+          value: String(defence.armor)
+        },
+        {
+          label: 'Critical threshold',
+          value: `${defence.criticalThreshold}%`
+        }
+      ]),
+      this.createDetailSection('Weapons', this.detailRowsFromWeapons(defence.weapons)),
+      this.createDetailSection('Single defence cost', this.detailRowsFromCostRows(this.defenceSingleCostRows(defence))),
+      this.createDetailSection('Requirements', this.detailRowsFromRequirementRows(this.defenceRequirementRows(defence)))
+    ];
+
+    return this.buildPlanetObjectDialogData('Defence', defence.type, '', defence.imagePath, sections);
+  }
+
+  private buildPlanetObjectDialogData(
+    kindLabel: string,
+    title: string,
+    description: string,
+    imagePath: string,
+    sections: PlanetObjectDetailSection[]
+  ): PlanetObjectDetailDialogData {
+    return {
+      kindLabel,
+      title,
+      subtitle: `${this.planet?.basicInfo.name ?? 'Planet View'} | ${kindLabel}`,
+      description,
+      previewImagePath: imagePath,
+      rawImagePath: toRawImagePath(imagePath),
+      sections: sections.filter((section) => section.rows.length > 0)
+    };
+  }
+
+  private createDetailSection(title: string, rows: PlanetObjectDetailRow[]): PlanetObjectDetailSection {
+    return {
+      title,
+      rows
+    };
+  }
+
+  private detailRowsFromCostRows(rows: BuildingCostRowVm[]): PlanetObjectDetailRow[] {
+    return rows.map((row) => ({
+      label: row.label,
+      value: String(row.amount),
+      tone: row.isEnough ? 'default' : 'bad'
+    }));
+  }
+
+  private detailRowsFromRequirementRows(rows: BuildingRequirementRowVm[]): PlanetObjectDetailRow[] {
+    return rows.map((row) => {
+      if (row.isPlaceholder) {
+        return {
+          label: 'Requirement',
+          value: row.label,
+          tone: 'muted'
+        };
+      }
+
+      const separatorIndex = row.label.indexOf(':');
+      const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
+      const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
+      let label = rawLabel;
+      if (rawLabel.startsWith('B ')) {
+        label = `Building ${rawLabel.slice(2)}`;
+      } else if (rawLabel.startsWith('T ')) {
+        label = `Technology ${rawLabel.slice(2)}`;
+      }
+
+      return {
+        label,
+        value,
+        tone: row.isMet ? 'good' : 'bad'
+      };
+    });
+  }
+
+  private detailRowsFromWeapons(weapons: Weapon[]): PlanetObjectDetailRow[] {
+    if (weapons.length <= 0) {
+      return [
+        {
+          label: 'Loadout',
+          value: 'None',
+          tone: 'muted'
+        }
+      ];
+    }
+
+    return weapons.map((weapon, index) => ({
+      label: weapons.length === 1 ? weapon.type : `${weapon.type} ${index + 1}`,
+      value: `${weapon.shots} x ${weapon.dmg}`
+    }));
+  }
+
+  private shipCounts(shipType: ShipType): {
+    total: number;
+    undamaged: number;
+    damaged: number;
+    missingHull: number;
+  } {
+    const total = ManyShips.countByType(this.planet?.objects.ships).get(shipType) ?? 0;
+    const undamaged = ManyShips.undamagedCountByType(this.planet?.objects.ships).get(shipType) ?? 0;
+    const damagedEntry = ManyShips.groupedDamagedEntries(this.planet?.objects.ships)
+      .find((entry) => entry.type === shipType);
+
+    return {
+      total,
+      undamaged,
+      damaged: damagedEntry?.amount ?? 0,
+      missingHull: damagedEntry?.totalMissingHull ?? 0
+    };
+  }
+
+  private defenceCounts(defenceType: DefenceType): {
+    total: number;
+    undamaged: number;
+    damaged: number;
+    missingHull: number;
+  } {
+    const total = ManyDefences.countByType(this.planet?.objects.defences).get(defenceType) ?? 0;
+    const undamaged = ManyDefences.undamagedCountByType(this.planet?.objects.defences).get(defenceType) ?? 0;
+    const damagedEntry = ManyDefences.groupedDamagedEntries(this.planet?.objects.defences)
+      .find((entry) => entry.type === defenceType);
+
+    return {
+      total,
+      undamaged,
+      damaged: damagedEntry?.amount ?? 0,
+      missingHull: damagedEntry?.totalMissingHull ?? 0
+    };
+  }
+
   private loadPlanet(x: number, y: number, z: number): void {
     this.stopQueueTabAutoRefresh();
     this.currentPlanetRequestKey += 1;
     const requestKey = this.currentPlanetRequestKey;
     this.isTradePortDialogOpen = false;
+    this.selectedObjectDetails = null;
     this.tradePortActionError = null;
     this.tradePortActionOfferId = null;
 

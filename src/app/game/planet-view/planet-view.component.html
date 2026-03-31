@@ -142,7 +142,14 @@
           <div class="planet-building-list">
             @for (building of resourceBuildings; track building.type; let isFirst = $first) {
               <article class="planet-building-card" [attr.data-tutorial-id]="isFirst ? 'planet-resource-card' : null">
-                <img class="planet-building-card__image" [src]="building.imagePath" [alt]="building.type + ' image'" />
+                <button
+                  type="button"
+                  class="planet-building-card__image-button"
+                  [attr.aria-label]="'Open details for ' + building.type"
+                  (click)="openBuildingDetails(building)"
+                >
+                  <img class="planet-building-card__image" [src]="building.imagePath" [alt]="building.type + ' image'" />
+                </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ building.type }}</h4>
                   <p class="planet-building-card__meta">Level: {{ buildingLevel(building.type) }}</p>
@@ -224,7 +231,14 @@
           <div class="planet-building-list">
             @for (building of facilityBuildings; track building.type) {
               <article class="planet-building-card">
-                <img class="planet-building-card__image" [src]="building.imagePath" [alt]="building.type + ' image'" />
+                <button
+                  type="button"
+                  class="planet-building-card__image-button"
+                  [attr.aria-label]="'Open details for ' + building.type"
+                  (click)="openBuildingDetails(building)"
+                >
+                  <img class="planet-building-card__image" [src]="building.imagePath" [alt]="building.type + ' image'" />
+                </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ building.type }}</h4>
                   <p class="planet-building-card__meta">Level: {{ buildingLevel(building.type) }}</p>
@@ -345,7 +359,14 @@
           <div class="planet-building-list">
             @for (ship of shipBlueprints; track ship.type) {
               <article class="planet-building-card planet-building-card--ship">
-                <img class="planet-building-card__image" [src]="ship.imagePath" [alt]="ship.type + ' image'" />
+                <button
+                  type="button"
+                  class="planet-building-card__image-button"
+                  [attr.aria-label]="'Open details for ' + ship.type"
+                  (click)="openShipDetails(ship)"
+                >
+                  <img class="planet-building-card__image" [src]="ship.imagePath" [alt]="ship.type + ' image'" />
+                </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ ship.type }}</h4>
                   <p class="planet-building-card__meta">Hull class: {{ ship.hullClass }}</p>
@@ -461,7 +482,14 @@
           <div class="planet-building-list">
             @for (defence of defenceBlueprints; track defence.type) {
               <article class="planet-building-card planet-building-card--ship">
-                <img class="planet-building-card__image" [src]="defence.imagePath" [alt]="defence.type + ' image'" />
+                <button
+                  type="button"
+                  class="planet-building-card__image-button"
+                  [attr.aria-label]="'Open details for ' + defence.type"
+                  (click)="openDefenceDetails(defence)"
+                >
+                  <img class="planet-building-card__image" [src]="defence.imagePath" [alt]="defence.type + ' image'" />
+                </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ defence.type }}</h4>
                   <p class="planet-building-card__meta">Hull class: {{ defence.hullClass }}</p>
@@ -726,6 +754,12 @@
     <p class="overview-empty">Planet data not loaded yet.</p>
   }
 </section>
+
+<app-planet-object-dialog
+  [isOpen]="selectedObjectDetails !== null"
+  [details]="selectedObjectDetails"
+  (closed)="closeObjectDetails()"
+></app-planet-object-dialog>
 
 @if (planet && isTradePortDialogOpen) {
   <div class="planet-view__modal-backdrop" (click)="closeTradePortDialog()"></div>

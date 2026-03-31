@@ -11,7 +11,7 @@
   top: 2rem;
   left: 50%;
   z-index: 1301;
-  width: min(1080px, calc(100vw - 2rem));
+  width: min(1240px, calc(100vw - 2rem));
   max-height: calc(100vh - 4rem);
   overflow: auto;
   transform: translateX(-50%);
@@ -22,6 +22,27 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(160deg, rgba(18, 24, 33, 0.98), rgba(12, 17, 24, 0.99));
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(108, 120, 136, 0.9) rgba(10, 14, 20, 0.9);
+}
+
+.encyclopedia-image-dialog::-webkit-scrollbar {
+  width: 10px;
+}
+
+.encyclopedia-image-dialog::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(10, 14, 20, 0.9);
+}
+
+.encyclopedia-image-dialog::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid rgba(10, 14, 20, 0.9);
+  background: rgba(108, 120, 136, 0.9);
+}
+
+.encyclopedia-image-dialog::-webkit-scrollbar-thumb:hover {
+  background: rgba(146, 160, 180, 0.95);
 }
 
 .encyclopedia-image-dialog__header {
@@ -54,7 +75,7 @@
 
 .encyclopedia-image-dialog__image {
   max-width: 100%;
-  max-height: calc(100vh - 12rem);
+  max-height: calc(100vh - 9rem);
   object-fit: contain;
   display: block;
 }

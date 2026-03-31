@@ -25,6 +25,13 @@ import { researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { TutorialService } from '../../tutorial/tutorial.service';
+import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
+import { PlanetObjectDialogComponent } from '../planet-view/planet-object-dialog.component';
+import type {
+  PlanetObjectDetailDialogData,
+  PlanetObjectDetailRow,
+  PlanetObjectDetailSection
+} from '../planet-view/planet-object-dialog.component';
 
 type EnergyState = {
   used: number;
@@ -67,7 +74,7 @@ type ResearchQueueRowVm = {
 
 @Component({
   selector: 'app-researches-view',
-  imports: [TopMenuComponent, MiniPlanetPreviewComponent, FormsModule],
+  imports: [TopMenuComponent, MiniPlanetPreviewComponent, FormsModule, PlanetObjectDialogComponent],
   templateUrl: './researches-view.component.html'
 })
 export class ResearchesViewComponent implements OnInit {
@@ -79,6 +86,7 @@ export class ResearchesViewComponent implements OnInit {
   protected maxLabsPerTechnology = 1;
   protected labSlotIndexes: number[] = [0];
   protected readonly technologies: Technology[];
+  protected selectedTechnologyDetails: PlanetObjectDetailDialogData | null = null;
 
   private readonly buildingBlueprintsByType: Map<BuildingType, Building>;
   private allOwnedPlanets: ClientPlanetDto[] = [];
@@ -103,6 +111,14 @@ export class ResearchesViewComponent implements OnInit {
 
   public ngOnInit(): void {
     this.loadResearchesData();
+  }
+
+  protected openTechnologyDetails(technology: Technology): void {
+    this.selectedTechnologyDetails = this.createTechnologyDetailDialogData(technology);
+  }
+
+  protected closeTechnologyDetails(): void {
+    this.selectedTechnologyDetails = null;
   }
 
   protected researchLabSummaryLabel(planet: ClientPlanetDto): string {
@@ -1069,5 +1085,136 @@ export class ResearchesViewComponent implements OnInit {
     }
 
     return left.coordinates.z - right.coordinates.z;
+  }
+
+  private createTechnologyDetailDialogData(technology: Technology): PlanetObjectDetailDialogData {
+    const currentLevel = this.currentTechnologyLevel(technology.type);
+    const targetLevel = this.technologyTargetLevel(technology.type);
+    const firstLab = this.firstAssignedLab(technology.type);
+    const queuedResearch = this.queuedResearchForTechnology(technology.type);
+    const selectedHelpers = this.selectedHelperCoordinates(technology.type);
+
+    const summaryRows: PlanetObjectDetailRow[] = [
+      {
+        label: 'Current level',
+        value: String(currentLevel)
+      },
+      {
+        label: 'Target level',
+        value: `L${targetLevel}`
+      },
+      {
+        label: 'Energy required',
+        value: String(this.technologyEnergyRequiredForTargetLevel(technology))
+      },
+      {
+        label: 'Research time',
+        value: String(this.technologyResearchTimeForTargetLevel(technology))
+      }
+    ];
+
+    const assignmentRows: PlanetObjectDetailRow[] = [
+      {
+        label: 'Main lab',
+        value: firstLab ? firstLab.label : 'Not selected',
+        tone: firstLab ? 'default' : 'warn'
+      },
+      {
+        label: 'Helper labs',
+        value: selectedHelpers.length > 0
+          ? selectedHelpers.map((coordinates) => `${coordinates.x}:${coordinates.y}:${coordinates.z}`).join(', ')
+          : 'None selected',
+        tone: selectedHelpers.length > 0 ? 'default' : 'muted'
+      }
+    ];
+
+    if (queuedResearch) {
+      assignmentRows.push(
+        {
+          label: 'Queued on',
+          value: `${queuedResearch.planet.basicInfo.name} [${queuedResearch.planet.coordinates.x}:${queuedResearch.planet.coordinates.y}:${queuedResearch.planet.coordinates.z}]`,
+          tone: 'good'
+        },
+        {
+          label: 'Queue status',
+          value: 'Researching',
+          tone: 'good'
+        }
+      );
+    } else {
+      assignmentRows.push({
+        label: 'Queue status',
+        value: this.canStartResearch(technology) ? 'Ready to start' : 'Not ready',
+        tone: this.canStartResearch(technology) ? 'good' : 'warn'
+      });
+    }
+
+    const sections: PlanetObjectDetailSection[] = [
+      this.createDetailSection('Summary', summaryRows),
+      this.createDetailSection('Lab assignment', assignmentRows),
+      this.createDetailSection(
+        `Next level cost (L${targetLevel})`,
+        this.detailRowsFromCostRows(this.technologyCostRows(technology))
+      ),
+      this.createDetailSection(
+        'Requirements',
+        this.detailRowsFromRequirementRows(this.technologyRequirementRows(technology))
+      )
+    ];
+
+    return {
+      kindLabel: 'Technology',
+      title: technology.type,
+      subtitle: firstLab
+        ? `${firstLab.planet.basicInfo.name} | Research View`
+        : 'Research View | Technology',
+      description: technology.description,
+      previewImagePath: technology.imagePath,
+      rawImagePath: toRawImagePath(technology.imagePath),
+      sections
+    };
+  }
+
+  private createDetailSection(title: string, rows: PlanetObjectDetailRow[]): PlanetObjectDetailSection {
+    return {
+      title,
+      rows
+    };
+  }
+
+  private detailRowsFromCostRows(rows: ResearchCostRowVm[]): PlanetObjectDetailRow[] {
+    return rows.map((row) => ({
+      label: row.label,
+      value: String(row.amount),
+      tone: row.isEnough ? 'default' : 'bad'
+    }));
+  }
+
+  private detailRowsFromRequirementRows(rows: ResearchRequirementRowVm[]): PlanetObjectDetailRow[] {
+    return rows.map((row) => {
+      if (row.isPlaceholder) {
+        return {
+          label: 'Requirement',
+          value: row.label,
+          tone: 'muted'
+        };
+      }
+
+      const separatorIndex = row.label.indexOf(':');
+      const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
+      const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
+      let label = rawLabel;
+      if (rawLabel.startsWith('B ')) {
+        label = `Building ${rawLabel.slice(2)}`;
+      } else if (rawLabel.startsWith('T ')) {
+        label = `Technology ${rawLabel.slice(2)}`;
+      }
+
+      return {
+        label,
+        value,
+        tone: row.isMet ? 'good' : 'bad'
+      };
+    });
   }
 }
