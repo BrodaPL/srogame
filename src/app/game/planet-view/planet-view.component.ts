@@ -14,6 +14,7 @@ import { BuildingRequirement } from '../../models/buildings/building-requirement
 import { BuildingType } from '../../models/enums/building-type';
 import { DefenceType } from '../../models/enums/defence-type';
 import { HullClass } from '../../models/enums/hull-class';
+import { ShipPurpose } from '../../models/enums/ship-purpose';
 import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import type {
@@ -143,6 +144,7 @@ type ResearchQueueRowVm = {
 export class PlanetViewComponent implements OnInit, OnDestroy {
   protected readonly HullClass = HullClass;
   protected readonly BuildingType = BuildingType;
+  protected readonly shipPurpose = ShipPurpose;
   protected planet: ClientPlanetDto | null = null;
   protected ownedPlanets: ClientPlanetDto[] = [];
   protected isLoading = false;
@@ -166,6 +168,16 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected buildingQueueMutationInFlight = false;
   protected shipyardQueueMutationInFlight = false;
   protected selectedObjectDetails: PlanetObjectDetailDialogData | null = null;
+  protected readonly shipPurposeFilters = new Map<ShipPurpose, boolean>([
+    [ShipPurpose.MILITARY, true],
+    [ShipPurpose.BOMBER, true],
+    [ShipPurpose.CARGO, true],
+    [ShipPurpose.UTILITY, true],
+    [ShipPurpose.CARRIER, true],
+    [ShipPurpose.RECYCLING, true]
+  ]);
+  protected showRegularDefences = true;
+  protected showPlanetaryBombDefences = true;
 
   protected readonly resourceBuildings: Building[];
   protected readonly facilityBuildings: Building[];
@@ -602,8 +614,42 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.selectedObjectDetails = null;
   }
 
+  protected shipPurposeFilterEntries(): Array<{ purpose: ShipPurpose; checked: boolean }> {
+    return Array.from(this.shipPurposeFilters.entries()).map(([purpose, checked]) => ({ purpose, checked }));
+  }
+
+  protected toggleShipPurposeFilter(purpose: ShipPurpose, enabled: boolean): void {
+    this.shipPurposeFilters.set(purpose, enabled);
+  }
+
+  protected filteredShipBlueprints(): Ship[] {
+    return this.shipBlueprints.filter((ship) => {
+      const hasAmountSelected = (this.shipAmount(ship.type) ?? 0) > 0;
+      return hasAmountSelected || this.matchesShipPurposeFilter(ship);
+    });
+  }
+
+  protected filteredDefenceBlueprints(): Defence[] {
+    return this.defenceBlueprints.filter((defence) => {
+      const hasAmountSelected = (this.defenceAmount(defence.type) ?? 0) > 0;
+      return hasAmountSelected || this.matchesDefenceFilter(defence);
+    });
+  }
+
   protected shipAmountInput(shipType: ShipType): string {
     return this.shipAmountInputs.get(shipType) ?? '';
+  }
+
+  protected shipPurposeTags(ship: Ship): ShipPurpose[] {
+    return Array.from(ship.purposes.values());
+  }
+
+  protected currentShipAmount(shipType: ShipType): number {
+    return ManyShips.countByType(this.planet?.objects.ships).get(shipType) ?? 0;
+  }
+
+  protected currentDefenceAmount(defenceType: DefenceType): number {
+    return ManyDefences.countByType(this.planet?.objects.defences).get(defenceType) ?? 0;
   }
 
   protected defenceAmountInput(defenceType: DefenceType): string {
@@ -2269,6 +2315,26 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       damaged: damagedEntry?.amount ?? 0,
       missingHull: damagedEntry?.totalMissingHull ?? 0
     };
+  }
+
+  private matchesShipPurposeFilter(ship: Ship): boolean {
+    const enabledPurposes = Array.from(this.shipPurposeFilters.entries())
+      .filter(([, enabled]) => enabled)
+      .map(([purpose]) => purpose);
+
+    if (enabledPurposes.length === 0) {
+      return false;
+    }
+
+    return enabledPurposes.some((purpose) => ship.purposes.has(purpose));
+  }
+
+  private matchesDefenceFilter(defence: Defence): boolean {
+    const isPlanetaryBomb = isPlanetaryBombDefenceType(defence.type) || defence.hullClass === HullClass.PLANETARY_BOMB;
+    const matchesRegularDefence = this.showRegularDefences && !isPlanetaryBomb;
+    const matchesPlanetaryBomb = this.showPlanetaryBombDefences && isPlanetaryBomb;
+
+    return matchesRegularDefence || matchesPlanetaryBomb;
   }
 
   private loadPlanet(x: number, y: number, z: number): void {

@@ -318,46 +318,63 @@
 
         @if (isActiveTab('ships')) {
           <section class="planet-ships-status">
-            <div class="planet-ships-status__header">
+            <div class="planet-ships-status__header planet-ships-status__header--inline">
               <h4 class="planet-view__section-title">Ship Damage Status</h4>
               @if (hasShipsOnPlanet()) {
-                <p class="planet-ships-status__meta">Total ships: {{ planetTotalShipsCount() }}</p>
-              }
-            </div>
-
-            @if (!hasShipsOnPlanet()) {
-              <p class="planet-tab-placeholder">No ships available.</p>
-            } @else {
-              <div class="planet-ships-status__grid">
                 <article
-                  class="planet-ships-status__card"
+                  class="planet-ships-status__card planet-ships-status__card--inline"
                   [class.planet-ships-status__card--green]="planetShipDamageTone() === 'green'"
                   [class.planet-ships-status__card--yellow]="planetShipDamageTone() === 'yellow'"
                   [class.planet-ships-status__card--orange]="planetShipDamageTone() === 'orange'"
                   [class.planet-ships-status__card--red]="planetShipDamageTone() === 'red'"
                   [attr.title]="planetUndamagedShipsTooltip()"
                 >
-                  <span class="planet-ships-status__label">Undamaged ships %</span>
+                  <span class="planet-ships-status__label">Undamaged ships:</span>
                   <strong class="planet-ships-status__value">{{ planetUndamagedShipsPercent() }}%</strong>
                 </article>
-
                 <article
-                  class="planet-ships-status__card"
+                  class="planet-ships-status__card planet-ships-status__card--inline"
                   [class.planet-ships-status__card--green]="planetShipDamageTone() === 'green'"
                   [class.planet-ships-status__card--yellow]="planetShipDamageTone() === 'yellow'"
                   [class.planet-ships-status__card--orange]="planetShipDamageTone() === 'orange'"
                   [class.planet-ships-status__card--red]="planetShipDamageTone() === 'red'"
                   [attr.title]="planetDamagedShipsTooltip()"
                 >
-                  <span class="planet-ships-status__label">Damaged ships %</span>
+                  <span class="planet-ships-status__label">Damaged ships:</span>
                   <strong class="planet-ships-status__value">{{ planetDamagedShipsPercent() }}%</strong>
                 </article>
-              </div>
+              }
+            </div>
+
+            @if (!hasShipsOnPlanet()) {
+              <p class="planet-tab-placeholder">No ships available.</p>
             }
           </section>
 
+          <section class="planet-view__filters-card">
+            <div class="planet-view__filters-bar">
+              <h4 class="planet-view__section-title">Ship Filters</h4>
+              <div class="planet-view__filters">
+                @for (filter of shipPurposeFilterEntries(); track filter.purpose) {
+                  <label class="planet-view__filter-chip">
+                    <input
+                      type="checkbox"
+                      [ngModel]="filter.checked"
+                      (ngModelChange)="toggleShipPurposeFilter(filter.purpose, $event)"
+                    />
+                    <span>{{ filter.purpose }}</span>
+                  </label>
+                }
+              </div>
+              @if (hasShipsOnPlanet()) {
+                <p class="planet-view__filters-total">Total ships: {{ planetTotalShipsCount() }}</p>
+              }
+            </div>
+          </section>
+
+          @if (filteredShipBlueprints().length > 0) {
           <div class="planet-building-list">
-            @for (ship of shipBlueprints; track ship.type) {
+            @for (ship of filteredShipBlueprints(); track ship.type) {
               <article class="planet-building-card planet-building-card--ship">
                 <button
                   type="button"
@@ -369,21 +386,16 @@
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ ship.type }}</h4>
+                  <p class="planet-building-card__meta">
+                    Current amount: <strong class="planet-building-card__meta-value">{{ currentShipAmount(ship.type) }}</strong>
+                  </p>
                   <p class="planet-building-card__meta">Hull class: {{ ship.hullClass }}</p>
                   <p class="planet-building-card__meta">Cargo: {{ ship.cargoCapacity }}</p>
-                  <label class="planet-building-card__amount">
-                    <span>Amount:</span>
-                    <input
-                      class="planet-building-card__amount-input"
-                      type="number"
-                      min="1"
-                      max="100000"
-                      step="1"
-                      [ngModel]="shipAmountInput(ship.type)"
-                      (ngModelChange)="onShipAmountInput(ship.type, $event)"
-                      placeholder="amount"
-                    />
-                  </label>
+                  <div class="planet-building-card__purpose-tags">
+                    @for (purpose of shipPurposeTags(ship); track purpose) {
+                      <span class="planet-building-card__purpose-tag">{{ purpose }}</span>
+                    }
+                  </div>
                 </div>
                 <div class="planet-building-card__cost">
                   <p class="planet-building-card__section-title">Single ship cost</p>
@@ -419,68 +431,110 @@
                     </p>
                   }
                 </div>
-                <button
-                  type="button"
-                  class="planet-building-card__action"
-                  [disabled]="!canBuildShip(ship)"
-                  [attr.title]="shipBuildTitle(ship)"
-                  (click)="onBuildShip(ship)"
-                >
-                  {{ shipBuildLabel(ship) }}
-                </button>
+                <div class="planet-building-card__action-stack">
+                  <label class="planet-building-card__amount">
+                    <span>Amount:</span>
+                    <input
+                      class="planet-building-card__amount-input"
+                      type="number"
+                      min="1"
+                      max="100000"
+                      step="1"
+                      [ngModel]="shipAmountInput(ship.type)"
+                      (ngModelChange)="onShipAmountInput(ship.type, $event)"
+                      placeholder="amount"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="planet-building-card__action"
+                    [disabled]="!canBuildShip(ship)"
+                    [attr.title]="shipBuildTitle(ship)"
+                    (click)="onBuildShip(ship)"
+                  >
+                    {{ shipBuildLabel(ship) }}
+                  </button>
+                </div>
                 @if (shipStartError(ship); as error) {
                   <p class="planet-building-card__power-error">{{ error }}</p>
                 }
               </article>
             }
           </div>
+          } @else {
+            <p class="planet-tab-placeholder">No ships match the current filters.</p>
+          }
         }
 
         @if (isActiveTab('defences')) {
           <section class="planet-ships-status">
-            <div class="planet-ships-status__header">
+            <div class="planet-ships-status__header planet-ships-status__header--inline">
               <h4 class="planet-view__section-title">Defence Damage Status</h4>
               @if (hasDefencesOnPlanet()) {
-                <p class="planet-ships-status__meta">Total defences: {{ planetTotalDefencesCount() }}</p>
-              }
-              @if (bombDepotStorageSummary(); as bombDepotSummary) {
-                <p class="planet-ships-status__meta">{{ bombDepotSummary }}</p>
-              }
-            </div>
-
-            @if (!hasDefencesOnPlanet()) {
-              <p class="planet-tab-placeholder">No planetary defences deployed.</p>
-            } @else {
-              <div class="planet-ships-status__grid">
                 <article
-                  class="planet-ships-status__card"
+                  class="planet-ships-status__card planet-ships-status__card--inline"
                   [class.planet-ships-status__card--green]="planetDefenceDamageTone() === 'green'"
                   [class.planet-ships-status__card--yellow]="planetDefenceDamageTone() === 'yellow'"
                   [class.planet-ships-status__card--orange]="planetDefenceDamageTone() === 'orange'"
                   [class.planet-ships-status__card--red]="planetDefenceDamageTone() === 'red'"
                   [attr.title]="planetUndamagedDefencesTooltip()"
                 >
-                  <span class="planet-ships-status__label">Undamaged defences %</span>
+                  <span class="planet-ships-status__label">Undamaged defences:</span>
                   <strong class="planet-ships-status__value">{{ planetUndamagedDefencesPercent() }}%</strong>
                 </article>
 
                 <article
-                  class="planet-ships-status__card"
+                  class="planet-ships-status__card planet-ships-status__card--inline"
                   [class.planet-ships-status__card--green]="planetDefenceDamageTone() === 'green'"
                   [class.planet-ships-status__card--yellow]="planetDefenceDamageTone() === 'yellow'"
                   [class.planet-ships-status__card--orange]="planetDefenceDamageTone() === 'orange'"
                   [class.planet-ships-status__card--red]="planetDefenceDamageTone() === 'red'"
                   [attr.title]="planetDamagedDefencesTooltip()"
                 >
-                  <span class="planet-ships-status__label">Damaged defences %</span>
+                  <span class="planet-ships-status__label">Damaged defences:</span>
                   <strong class="planet-ships-status__value">{{ planetDamagedDefencesPercent() }}%</strong>
                 </article>
-              </div>
+              }
+            </div>
+            @if (bombDepotStorageSummary(); as bombDepotSummary) {
+              <p class="planet-ships-status__meta">{{ bombDepotSummary }}</p>
+            }
+
+            @if (!hasDefencesOnPlanet()) {
+              <p class="planet-tab-placeholder">No planetary defences deployed.</p>
             }
           </section>
 
+          <section class="planet-view__filters-card">
+            <div class="planet-view__filters-bar">
+              <h4 class="planet-view__section-title">Defence Filters</h4>
+              <div class="planet-view__filters">
+                <label class="planet-view__filter-chip">
+                  <input
+                    type="checkbox"
+                    [ngModel]="showRegularDefences"
+                    (ngModelChange)="showRegularDefences = !!$event"
+                  />
+                  <span>Defences</span>
+                </label>
+                <label class="planet-view__filter-chip">
+                  <input
+                    type="checkbox"
+                    [ngModel]="showPlanetaryBombDefences"
+                    (ngModelChange)="showPlanetaryBombDefences = !!$event"
+                  />
+                  <span>Planetary bombs</span>
+                </label>
+              </div>
+              @if (hasDefencesOnPlanet()) {
+                <p class="planet-view__filters-total">Total defences: {{ planetTotalDefencesCount() }}</p>
+              }
+            </div>
+          </section>
+
+          @if (filteredDefenceBlueprints().length > 0) {
           <div class="planet-building-list">
-            @for (defence of defenceBlueprints; track defence.type) {
+            @for (defence of filteredDefenceBlueprints(); track defence.type) {
               <article class="planet-building-card planet-building-card--ship">
                 <button
                   type="button"
@@ -492,6 +546,9 @@
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ defence.type }}</h4>
+                  <p class="planet-building-card__meta">
+                    Current amount: <strong class="planet-building-card__meta-value">{{ currentDefenceAmount(defence.type) }}</strong>
+                  </p>
                   <p class="planet-building-card__meta">Hull class: {{ defence.hullClass }}</p>
                   @if (defence.hullClass === HullClass.PLANETARY_BOMB) {
                     <p class="planet-building-card__meta">Stored in Bomb Depot. Not active in combat yet.</p>
@@ -499,19 +556,6 @@
                   } @else {
                     <p class="planet-building-card__meta">Can shoot to orbit: {{ defence.canShootToOrbit ? 'Yes' : 'No' }}</p>
                   }
-                  <label class="planet-building-card__amount">
-                    <span>Amount:</span>
-                    <input
-                      class="planet-building-card__amount-input"
-                      type="number"
-                      min="1"
-                      max="100000"
-                      step="1"
-                      [ngModel]="defenceAmountInput(defence.type)"
-                      (ngModelChange)="onDefenceAmountInput(defence.type, $event)"
-                      placeholder="amount"
-                    />
-                  </label>
                 </div>
                 <div class="planet-building-card__cost">
                   <p class="planet-building-card__section-title">Single defence cost</p>
@@ -544,21 +588,39 @@
                     </p>
                   }
                 </div>
-                <button
-                  type="button"
-                  class="planet-building-card__action"
-                  [disabled]="!canBuildDefence(defence)"
-                  [attr.title]="defenceBuildTitle(defence)"
-                  (click)="onBuildDefence(defence)"
-                >
-                  {{ defenceBuildLabel(defence) }}
-                </button>
+                <div class="planet-building-card__action-stack">
+                  <label class="planet-building-card__amount">
+                    <span>Amount:</span>
+                    <input
+                      class="planet-building-card__amount-input"
+                      type="number"
+                      min="1"
+                      max="100000"
+                      step="1"
+                      [ngModel]="defenceAmountInput(defence.type)"
+                      (ngModelChange)="onDefenceAmountInput(defence.type, $event)"
+                      placeholder="amount"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="planet-building-card__action"
+                    [disabled]="!canBuildDefence(defence)"
+                    [attr.title]="defenceBuildTitle(defence)"
+                    (click)="onBuildDefence(defence)"
+                  >
+                    {{ defenceBuildLabel(defence) }}
+                  </button>
+                </div>
                 @if (defenceStartError(defence); as error) {
                   <p class="planet-building-card__power-error">{{ error }}</p>
                 }
               </article>
             }
           </div>
+          } @else {
+            <p class="planet-tab-placeholder">No defences match the current filters.</p>
+          }
         }
 
         @if (isActiveTab('operations')) {
