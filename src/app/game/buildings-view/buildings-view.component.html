@@ -133,11 +133,18 @@
           <div class="buildings-view__building-list">
             @for (building of visibleBuildings(); track building.type; let isFirst = $first) {
               <article class="buildings-view__building-row" [attr.data-tutorial-id]="isFirst ? 'buildings-primary-row' : null">
-                <img
-                  class="buildings-view__building-image"
-                  [src]="building.imagePath"
-                  [alt]="building.type + ' image'"
-                />
+                <button
+                  type="button"
+                  class="buildings-view__image-button"
+                  [attr.aria-label]="'Open ' + building.type + ' details'"
+                  (click)="openBuildingDetails(building)"
+                >
+                  <img
+                    class="buildings-view__building-image"
+                    [src]="building.imagePath"
+                    [alt]="building.type + ' image'"
+                  />
+                </button>
 
                 <div class="buildings-view__building-main">
                   <h4 class="buildings-view__building-title">{{ building.type }}</h4>
@@ -223,6 +230,12 @@
         </div>
       </aside>
     </div>
+
+    <app-planet-object-dialog
+      [isOpen]="selectedObjectDetails !== null"
+      [details]="selectedObjectDetails"
+      (closed)="closeObjectDetails()"
+    ></app-planet-object-dialog>
   } @else {
     <section class="overview-card">
       <h3>No owned planets</h3>

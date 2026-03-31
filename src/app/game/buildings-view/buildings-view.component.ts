@@ -19,6 +19,13 @@ import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { TutorialService } from '../../tutorial/tutorial.service';
+import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
+import {
+  PlanetObjectDetailDialogData,
+  PlanetObjectDetailRow,
+  PlanetObjectDetailSection,
+  PlanetObjectDialogComponent
+} from '../planet-view/planet-object-dialog.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import {
   PlanetPowersDisplay,
@@ -66,7 +73,8 @@ type BuildingQueueRowVm = {
     MiniPlanetPreviewComponent,
     CdkDropList,
     CdkDrag,
-    CdkDragHandle
+    CdkDragHandle,
+    PlanetObjectDialogComponent
   ],
   templateUrl: './buildings-view.component.html',
   styleUrl: './buildings-view.component.css'
@@ -90,12 +98,14 @@ export class BuildingsViewComponent implements OnInit {
   protected powersDisplay: PlanetPowersDisplay | null = null;
   protected buildingQueueActionError: string | null = null;
   protected buildingQueueMutationInFlight = false;
+  protected selectedObjectDetails: PlanetObjectDetailDialogData | null = null;
 
   private readonly resourceBuildings: Building[];
   private readonly facilityBuildings: Building[];
   private readonly buildingBlueprintsByType: Map<BuildingType, Building>;
   private readonly buildingLevelsByType = new Map<BuildingType, number>();
   private readonly buildingCurrentPowerByType = new Map<BuildingType, number>();
+  private readonly buildingCurrentStructuralPointsByType = new Map<BuildingType, number>();
   private readonly buildingQueueTypes = new Set<BuildingType>();
   private readonly techLevelsByType = new Map<TechnologyType, number>();
   private readonly buildingStartInFlightByType = new Set<BuildingType>();
@@ -185,6 +195,14 @@ export class BuildingsViewComponent implements OnInit {
 
   protected buildingLevel(buildingType: BuildingType): number {
     return this.buildingLevelsByType.get(buildingType) ?? 0;
+  }
+
+  protected openBuildingDetails(building: Building): void {
+    this.selectedObjectDetails = this.createBuildingDetailDialogData(building);
+  }
+
+  protected closeObjectDetails(): void {
+    this.selectedObjectDetails = null;
   }
 
   protected buildingCostRows(building: Building): BuildingCostRowVm[] {
@@ -530,12 +548,14 @@ export class BuildingsViewComponent implements OnInit {
   private rebuildSelectedPlanetState(): void {
     this.buildingLevelsByType.clear();
     this.buildingCurrentPowerByType.clear();
+    this.buildingCurrentStructuralPointsByType.clear();
     this.buildingQueueTypes.clear();
     this.techLevelsByType.clear();
     this.buildingStartInFlightByType.clear();
     this.buildingStartErrorByType.clear();
     this.buildingQueueActionError = null;
     this.buildingQueueMutationInFlight = false;
+    this.selectedObjectDetails = null;
 
     const planet = this.selectedPlanet();
     if (!planet) {
@@ -556,6 +576,13 @@ export class BuildingsViewComponent implements OnInit {
       this.buildingCurrentPowerByType.set(
         entry.type as BuildingType,
         this.roundNumber(Math.max(0, entry.currentPowerConsumption), 2)
+      );
+    }
+
+    for (const entry of planet.objects.buildingsCurrentStructuralPoints ?? []) {
+      this.buildingCurrentStructuralPointsByType.set(
+        entry.type as BuildingType,
+        Math.max(0, Math.floor(entry.currentStructuralPoints))
       );
     }
 
@@ -779,6 +806,159 @@ export class BuildingsViewComponent implements OnInit {
     return rows;
   }
 
+  private createBuildingDetailDialogData(building: Building): PlanetObjectDetailDialogData {
+    const currentLevel = this.buildingLevel(building.type);
+    const maxPower = this.maxBuildingPowerConsumption(building.type);
+    const currentPower = this.buildingCurrentPowerByType.get(building.type) ?? maxPower;
+    const summaryRows: PlanetObjectDetailRow[] = [
+      {
+        label: 'Category',
+        value: building.isFacility ? 'Facility' : 'Resource building'
+      },
+      {
+        label: 'Base armor',
+        value: String(building.armor)
+      },
+      {
+        label: 'Damage multiplier',
+        value: `${this.roundNumber(building.damageMultiplier, 2)}x`
+      }
+    ];
+
+    if (building.production1.length > 0) {
+      summaryRows.push({
+        label: currentLevel > 0 ? 'Current output' : 'Level 1 output',
+        value: String(currentLevel > 0 ? this.currentBuildingDetailProduction(building) : this.detailProductionAtLevel(building, 1))
+      });
+    }
+
+    if (building.powerConsumption > 0) {
+      summaryRows.push({
+        label: 'Power per level',
+        value: String(building.powerConsumption)
+      });
+    } else {
+      summaryRows.push({
+        label: 'Power',
+        value: 'No direct power draw',
+        tone: 'muted'
+      });
+    }
+
+    const stateRows: PlanetObjectDetailRow[] = [
+      {
+        label: 'Current level',
+        value: String(currentLevel)
+      },
+      {
+        label: 'Next level',
+        value: `L${currentLevel + 1}`
+      }
+    ];
+
+    if (currentLevel <= 0) {
+      stateRows.push({
+        label: 'Status',
+        value: 'Not built yet',
+        tone: 'muted'
+      });
+    } else {
+      if (building.production1.length > 0) {
+        stateRows.push({
+          label: 'Current production',
+          value: String(this.currentBuildingDetailProduction(building))
+        });
+      }
+
+      stateRows.push(
+        {
+          label: 'Structural points',
+          value: `${this.currentBuildingStructuralPoints(building.type)} / ${this.maxBuildingStructuralPoints(building.type, currentLevel)}`
+        },
+        {
+          label: 'Structural efficiency',
+          value: `${this.buildingStructuralUtilizationPercent(building.type)}%`
+        }
+      );
+
+      if (maxPower > 0) {
+        stateRows.push({
+          label: 'Power usage',
+          value: `${currentPower} / ${maxPower}`,
+          tone: currentPower < maxPower ? 'warn' : 'default'
+        });
+      }
+    }
+
+    const sections: PlanetObjectDetailSection[] = [
+      this.createDetailSection('Summary', summaryRows),
+      this.createDetailSection('Current state', stateRows),
+      this.createDetailSection(this.buildingCostHeader(building), this.detailRowsFromCostRows(this.buildingCostRows(building))),
+      this.createDetailSection('Requirements', this.detailRowsFromRequirementRows(this.buildingRequirementRows(building)))
+    ];
+
+    return {
+      kindLabel: 'Building',
+      title: building.type,
+      subtitle: `${this.selectedPlanet()?.basicInfo.name ?? 'Buildings View'} | Building`,
+      description: building.description,
+      previewImagePath: building.imagePath,
+      rawImagePath: toRawImagePath(building.imagePath),
+      sections: sections.filter((section) => section.rows.length > 0)
+    };
+  }
+
+  private createDetailSection(title: string, rows: PlanetObjectDetailRow[]): PlanetObjectDetailSection {
+    return {
+      title,
+      rows
+    };
+  }
+
+  private buildingCostHeader(building: Building): string {
+    return this.buildingLevel(building.type) <= 0
+      ? 'Initial cost'
+      : `Next level cost (L${this.buildingLevel(building.type) + 1})`;
+  }
+
+  private detailRowsFromCostRows(rows: BuildingCostRowVm[]): PlanetObjectDetailRow[] {
+    return rows.map((row) => ({
+      label: row.label === 'M' ? 'Metal' : row.label === 'C' ? 'Crystal' : row.label === 'D' ? 'Deuterium' : row.label,
+      value: String(row.amount),
+      tone: row.isEnough ? 'default' : 'bad'
+    }));
+  }
+
+  private detailRowsFromRequirementRows(rows: BuildingRequirementRowVm[]): PlanetObjectDetailRow[] {
+    if (rows.length === 0) {
+      return [
+        {
+          label: 'Requirement',
+          value: 'None',
+          tone: 'muted'
+        }
+      ];
+    }
+
+    return rows.map((row) => {
+      const separatorIndex = row.label.indexOf(':');
+      const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
+      const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
+      let label = rawLabel;
+      if (rawLabel.startsWith('B ')) {
+        label = `Building ${rawLabel.slice(2)}`;
+      } else if (rawLabel.startsWith('T ')) {
+        label = `Technology ${rawLabel.slice(2)}`;
+      }
+
+      return {
+        label,
+        value,
+        tone: row.isMet ? 'good' : 'bad'
+      };
+    });
+  }
+
   private hasBuildingRequirements(requirements: BuildingRequirement[], levelWeAreUpgradingTo: number): boolean {
     for (const requirement of requirements) {
       const requiredLevel = Math.ceil(levelWeAreUpgradingTo * requirement.level);
@@ -874,6 +1054,25 @@ export class BuildingsViewComponent implements OnInit {
     return Math.floor(baseProduction * utilization);
   }
 
+  private detailProductionAtLevel(building: Building, level: number): number {
+    const baseProduction = this.getRawProductionAtLevel(building, level);
+    if (baseProduction <= 0) {
+      return 0;
+    }
+
+    const utilization = this.powerUtilizationAtLevel(
+      building.type,
+      level,
+      building.powerConsumption ?? 0
+    );
+    const structuralUtilization = this.structuralUtilizationAtLevel(building.type, level);
+    return Math.floor(baseProduction * utilization * structuralUtilization);
+  }
+
+  private currentBuildingDetailProduction(building: Building): number {
+    return this.detailProductionAtLevel(building, this.buildingLevel(building.type));
+  }
+
   private getRawProductionAtLevel(building: Building, level: number): number {
     if (level <= 0) {
       return 0;
@@ -906,6 +1105,67 @@ export class BuildingsViewComponent implements OnInit {
       ? maxConsumption
       : Math.min(maxConsumption, Math.max(0, selectedConsumption));
     return normalizedConsumption / maxConsumption;
+  }
+
+  private currentBuildingStructuralPoints(buildingType: BuildingType): number {
+    const level = this.buildingLevel(buildingType);
+    const max = this.maxBuildingStructuralPoints(buildingType, level);
+    if (max <= 0) {
+      return 0;
+    }
+
+    const current = this.buildingCurrentStructuralPointsByType.get(buildingType);
+    return current === undefined ? max : Math.min(max, Math.max(0, current));
+  }
+
+  private buildingStructuralUtilizationPercent(buildingType: BuildingType): number {
+    return Math.round(this.structuralUtilizationAtLevel(buildingType, this.buildingLevel(buildingType)) * 100);
+  }
+
+  private structuralUtilizationAtLevel(buildingType: BuildingType, level: number): number {
+    if (level <= 0) {
+      return 0;
+    }
+
+    if (buildingType === BuildingType.TERRAFORMER) {
+      return 1;
+    }
+
+    const max = this.maxBuildingStructuralPoints(buildingType, level);
+    if (max <= 0) {
+      return 1;
+    }
+
+    const ratio = this.currentBuildingStructuralPoints(buildingType) / max;
+    return Math.min(1, Math.max(this.minimumStructuralUtilization(buildingType), ratio));
+  }
+
+  private maxBuildingStructuralPoints(buildingType: BuildingType, level: number): number {
+    if (level <= 0) {
+      return 0;
+    }
+
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const cost = blueprint.getCostForLevel(level);
+    return Math.max(0, Math.floor((cost.metal * 2) + cost.crystal + Math.floor(cost.deuterium * 0.5)));
+  }
+
+  private minimumStructuralUtilization(buildingType: BuildingType): number {
+    if (this.isZeroFloorBuilding(buildingType)) {
+      return 0;
+    }
+
+    return Math.min(1, 0.02 + (this.buildingLevel(BuildingType.BUNKER_NETWORK) * 0.01));
+  }
+
+  private isZeroFloorBuilding(buildingType: BuildingType): boolean {
+    return buildingType === BuildingType.JUMP_GATE
+      || buildingType === BuildingType.SENSOR_PHALANX
+      || buildingType === BuildingType.BOMB_DEPOT;
   }
 
   private isBuildingNotUsingFullPower(buildingType: BuildingType): boolean {
