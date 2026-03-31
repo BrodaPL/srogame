@@ -1,0 +1,85 @@
+.encyclopedia-image-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(7, 10, 15, 0.8);
+  backdrop-filter: blur(6px);
+}
+
+.encyclopedia-image-dialog {
+  position: fixed;
+  top: 2rem;
+  left: 50%;
+  z-index: 1301;
+  width: min(1080px, calc(100vw - 2rem));
+  max-height: calc(100vh - 4rem);
+  overflow: auto;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.2rem 1.25rem;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(160deg, rgba(18, 24, 33, 0.98), rgba(12, 17, 24, 0.99));
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45);
+}
+
+.encyclopedia-image-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.encyclopedia-image-dialog__header h3 {
+  margin: 0.2rem 0 0;
+}
+
+.encyclopedia-image-dialog__close {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  cursor: pointer;
+}
+
+.encyclopedia-image-dialog__body {
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.85rem;
+}
+
+.encyclopedia-image-dialog__image {
+  max-width: 100%;
+  max-height: calc(100vh - 12rem);
+  object-fit: contain;
+  display: block;
+}
+
+.encyclopedia-image-dialog__meta {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.encyclopedia-image-dialog__meta p {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .encyclopedia-image-dialog {
+    top: 1rem;
+    width: calc(100vw - 1rem);
+    max-height: calc(100vh - 2rem);
+  }
+
+  .encyclopedia-image-dialog__header {
+    flex-direction: column;
+  }
+
+  .encyclopedia-image-dialog__meta {
+    justify-content: flex-start;
+  }
+}

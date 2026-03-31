@@ -1,0 +1,35 @@
+@if (isOpen) {
+  <div class="encyclopedia-image-dialog__backdrop" (click)="close()"></div>
+  <section
+    class="encyclopedia-image-dialog"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="title + ' image preview'"
+    (click)="$event.stopPropagation()">
+    <div class="encyclopedia-image-dialog__header">
+      <div>
+        <p class="eyebrow">Encyclopedia</p>
+        <h3>{{ title }}</h3>
+      </div>
+      <button type="button" class="encyclopedia-image-dialog__close" (click)="close()">Close</button>
+    </div>
+
+    <div class="encyclopedia-image-dialog__body">
+      <img
+        class="encyclopedia-image-dialog__image"
+        [src]="displayedImagePath"
+        [alt]="title + ' image'"
+      />
+    </div>
+
+    <div class="encyclopedia-image-dialog__meta">
+      @if (isRawLoading) {
+        <p class="overview-muted">Loading raw image...</p>
+      } @else if (rawLoadFailed) {
+        <p class="overview-muted">Raw image could not be loaded. Showing optimized preview.</p>
+      } @else {
+        <p class="overview-muted">Showing raw image.</p>
+      }
+    </div>
+  </section>
+}

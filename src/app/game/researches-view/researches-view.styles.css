@@ -43,7 +43,7 @@
 
 .research-tech-card {
   display: grid;
-  grid-template-columns: 170px minmax(210px, 0.9fr) minmax(170px, 0.75fr) minmax(360px, 1.4fr) max-content;
+  grid-template-columns: 258px minmax(0, 14ch) minmax(220px, 0.95fr) minmax(360px, 1.4fr) max-content;
   align-items: start;
   gap: 0.72rem;
   padding: 0.52rem 0.6rem;
@@ -53,25 +53,31 @@
 }
 
 .research-tech-card__image {
-  width: 168px;
-  height: 168px;
+  width: 256px;
+  height: 256px;
   object-fit: contain;
 }
 
 .research-tech-card__main {
   display: grid;
   gap: 0.12rem;
+  min-width: 0;
 }
 
 .research-tech-card__title {
   margin: 0;
   font-size: 0.86rem;
+  max-width: 14ch;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .research-tech-card__meta {
   margin: 0;
   font-size: 0.75rem;
   color: var(--muted);
+  max-width: 14ch;
+  overflow-wrap: anywhere;
 }
 
 .research-tech-card__cost,

@@ -172,6 +172,25 @@ app-root {
   display: block;
 }
 
+.ship-media-button {
+  width: 100%;
+  padding: 0;
+  cursor: zoom-in;
+  appearance: none;
+  text-align: inherit;
+  color: inherit;
+}
+
+.ship-media-button:hover {
+  border-color: var(--accent);
+  box-shadow: 0 12px 24px rgba(255, 122, 79, 0.16);
+}
+
+.ship-media-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .ship-image {
   width: 100%;
   height: auto;
@@ -1771,7 +1790,7 @@ app-root {
 
 .planet-building-card {
   display: grid;
-  grid-template-columns: 168px minmax(220px, 1fr) minmax(170px, 0.8fr) minmax(210px, 1fr) auto;
+  grid-template-columns: 200px minmax(220px, 1fr) minmax(170px, 0.8fr) minmax(210px, 1fr) auto;
   gap: 0.7rem;
   align-items: center;
   padding: 0.55rem 0.65rem;
@@ -1781,8 +1800,8 @@ app-root {
 }
 
 .planet-building-card__image {
-  width: 168px;
-  height: 168px;
+  width: 200px;
+  height: 200px;
   object-fit: contain;
 }
 

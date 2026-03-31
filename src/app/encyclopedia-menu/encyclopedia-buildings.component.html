@@ -13,14 +13,18 @@
 
     <div class="encyclopedia-grid">
       <article class="ship-card" *ngFor="let building of buildings; let isFirst = first">
-        <div class="ship-media">
+        <button
+          type="button"
+          class="ship-media ship-media-button"
+          [attr.title]="'Open large image for ' + building.type"
+          (click)="openImageDialog(building)">
           <img
             class="building-image"
             [src]="building.imagePath"
             [alt]="building.type + ' image'"
             [attr.loading]="isFirst ? 'eager' : 'lazy'"
           />
-        </div>
+        </button>
         <header class="ship-card__header">
           <div>
             <h2 class="ship-card__title">{{ building.type }}</h2>
@@ -113,3 +117,11 @@
     </div>
   </section>
 </main>
+
+<app-encyclopedia-image-dialog
+  [isOpen]="selectedImage !== null"
+  [title]="selectedImage?.title ?? ''"
+  [previewImagePath]="selectedImage?.previewImagePath ?? ''"
+  [rawImagePath]="selectedImage?.rawImagePath ?? ''"
+  (closed)="closeImageDialog()"
+></app-encyclopedia-image-dialog>
