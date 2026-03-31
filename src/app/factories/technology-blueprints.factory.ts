@@ -38,25 +38,25 @@ interface TechRequirementJson {
 }
 
 export class TechnologyBlueprintsFactory {
-  private static readonly defaultImagePath = 'images/technologies/ENERGY_TECHNOLOGY.jpg';
+  private static readonly defaultImagePath = 'images/technologies/normal/ENERGY_TECHNOLOGY.jpg';
   private static readonly technologyImageMap: Record<string, string> = {
-    ENERGY_TECHNOLOGY: 'images/technologies/ENERGY_TECHNOLOGY.jpg',
-    WAVE_PARTICLE_TECHNOLOGY: 'images/technologies/BEAMS_WEAPONS.jpg',
-    MATERIAL_TECHNOLOGY: 'images/technologies/MATERIAL_TECHNOLOGY.jpg',
-    HYPERSPACE_TECHNOLOGY: 'images/technologies/HYPERSPACE_TECHNOLOGY.jpg',
-    ESPIONAGE_TECHNOLOGY: 'images/technologies/ESPIONAGE_TECHNOLOGY.jpg',
-    COMPUTER_TECHNOLOGY: 'images/technologies/COMPUTER_TECHNOLOGY.jpg',
-    ASTROPHYSICS_TECHNOLOGY: 'images/technologies/ASTROPHYSICS_TECHNOLOGY.jpg',
-    ADAPTIVE_TECHNOLOGY: 'images/technologies/ADAPTIVE_TECHNOLOGY.jpg',
-    INTERGALACTIC_RESEARCH_NETWORK: 'images/technologies/INTERGALACTIC_RESEARCH_NETWORK.jpg',
-    GRAVITON_TECHNOLOGY: 'images/technologies/GRAVITON_TECHNOLOGY.jpg',
-    SHIELDING_TECHNOLOGY: 'images/technologies/SHIELDING_TECHNOLOGY.jpg',
-    ARMOUR_TECHNOLOGY: 'images/technologies/ARMOUR_TECHNOLOGY.jpg',
-    RAILGUNS_WEAPONS: 'images/technologies/RAILGUNS_WEAPONS.jpg',
-    BEAMS_WEAPONS: 'images/technologies/BEAMS_WEAPONS.jpg',
-    MISSILES_WEAPONS: 'images/technologies/MISSILES_WEAPONS.jpg',
-    FUSION_DRIVE: 'images/technologies/FUSION_DRIVE.jpg',
-    HYPERSPACE_DRIVE: 'images/technologies/HYPERSPACE_DRIVE.jpg'
+    ENERGY_TECHNOLOGY: 'images/technologies/normal/ENERGY_TECHNOLOGY.jpg',
+    WAVE_PARTICLE_TECHNOLOGY: 'images/technologies/normal/BEAMS_WEAPONS.jpg',
+    MATERIAL_TECHNOLOGY: 'images/technologies/normal/MATERIAL_TECHNOLOGY.jpg',
+    HYPERSPACE_TECHNOLOGY: 'images/technologies/normal/HYPERSPACE_TECHNOLOGY.jpg',
+    ESPIONAGE_TECHNOLOGY: 'images/technologies/normal/ESPIONAGE_TECHNOLOGY.jpg',
+    COMPUTER_TECHNOLOGY: 'images/technologies/normal/COMPUTER_TECHNOLOGY.jpg',
+    ASTROPHYSICS_TECHNOLOGY: 'images/technologies/normal/ASTROPHYSICS_TECHNOLOGY.jpg',
+    ADAPTIVE_TECHNOLOGY: 'images/technologies/normal/ADAPTIVE_TECHNOLOGY.jpg',
+    INTERGALACTIC_RESEARCH_NETWORK: 'images/technologies/normal/INTERGALACTIC_RESEARCH_NETWORK.jpg',
+    GRAVITON_TECHNOLOGY: 'images/technologies/normal/GRAVITON_TECHNOLOGY.jpg',
+    SHIELDING_TECHNOLOGY: 'images/technologies/normal/SHIELDING_TECHNOLOGY.jpg',
+    ARMOUR_TECHNOLOGY: 'images/technologies/normal/ARMOUR_TECHNOLOGY.jpg',
+    RAILGUNS_WEAPONS: 'images/technologies/normal/RAILGUNS_WEAPONS.jpg',
+    BEAMS_WEAPONS: 'images/technologies/normal/BEAMS_WEAPONS.jpg',
+    MISSILES_WEAPONS: 'images/technologies/normal/MISSILES_WEAPONS.jpg',
+    FUSION_DRIVE: 'images/technologies/normal/FUSION_DRIVE.jpg',
+    HYPERSPACE_DRIVE: 'images/technologies/normal/HYPERSPACE_DRIVE.jpg'
   };
 
   static fromDefaultJson(): TechnologyBlueprints {

@@ -46,29 +46,29 @@ interface TechRequirementJson {
 }
 
 export class BuildingBlueprintsFactory {
-  private static readonly defaultImagePath = 'images/buildings/METAL_MINE.jpg';
+  private static readonly defaultImagePath = 'images/buildings/normal/METAL_MINE.jpg';
   private static readonly buildingImageMap: Record<string, string> = {
-    METAL_MINE: 'images/buildings/METAL_MINE.jpg',
-    CRYSTAL_MINE: 'images/buildings/CRYSTAL_MINE.jpg',
-    DEUTERIUM_SYNTHESIZER: 'images/buildings/DEUTERIUM_SYNTHESIZER.jpg',
-    SOLAR_WIND_GEOTHERMAL: 'images/buildings/SOLAR_WIND_GEOTHERMAL.jpg',
-    NUCLEAR_PLANT: 'images/buildings/NUCLEAR_PLANT.jpg',
-    FUSION_REACTOR: 'images/buildings/FUSION_REACTOR.jpg',
-    METAL_STORAGE: 'images/buildings/METAL_STORAGE.jpg',
-    CRYSTAL_STORAGE: 'images/buildings/CRYSTAL_STORAGE.jpg',
-    DEUTERIUM_TANK: 'images/buildings/DEUTERIUM_TANK.jpg',
-    ROBOTICS_FACTORY: 'images/buildings/ROBOTICS_FACTORY.jpg',
-    SHIPYARD: 'images/buildings/SHIPYARD.jpg',
-    RESEARCH_LAB: 'images/buildings/RESEARCH_LAB.jpg',
-    ALLIANCE_DEPOT: 'images/buildings/ALLIANCE_DEPOT.jpg',
-    BOMB_DEPOT: 'images/buildings/BOMB_DEPOT.jpg',
-    NANITE_FACTORY: 'images/buildings/NANITE_FACTORY.jpg',
-    TERRAFORMER: 'images/buildings/TERRAFORMER.jpg',
-    SPACEPORT: 'images/buildings/SHIPYARD.jpg',
-    SENSOR_PHALANX: 'images/buildings/SENSOR_PHALANX.jpg',
-    JUMP_GATE: 'images/buildings/JUMP_GATE.jpg',
-    INTERSTELLAR_TRADE_PORT: 'images/buildings/INTERSTELLAR_TRADE_PORT.jpg',
-    BUNKER_NETWORK: 'images/buildings/BUNKER_NETWORK.jpg'
+    METAL_MINE: 'images/buildings/normal/METAL_MINE.jpg',
+    CRYSTAL_MINE: 'images/buildings/normal/CRYSTAL_MINE.jpg',
+    DEUTERIUM_SYNTHESIZER: 'images/buildings/normal/DEUTERIUM_SYNTHESIZER.jpg',
+    SOLAR_WIND_GEOTHERMAL: 'images/buildings/normal/SOLAR_WIND_GEOTHERMAL.jpg',
+    NUCLEAR_PLANT: 'images/buildings/normal/NUCLEAR_PLANT.jpg',
+    FUSION_REACTOR: 'images/buildings/normal/FUSION_REACTOR.jpg',
+    METAL_STORAGE: 'images/buildings/normal/METAL_STORAGE.jpg',
+    CRYSTAL_STORAGE: 'images/buildings/normal/CRYSTAL_STORAGE.jpg',
+    DEUTERIUM_TANK: 'images/buildings/normal/DEUTERIUM_TANK.jpg',
+    ROBOTICS_FACTORY: 'images/buildings/normal/ROBOTICS_FACTORY.jpg',
+    SHIPYARD: 'images/buildings/normal/SHIPYARD.jpg',
+    RESEARCH_LAB: 'images/buildings/normal/RESEARCH_LAB.jpg',
+    ALLIANCE_DEPOT: 'images/buildings/normal/ALLIANCE_DEPOT.jpg',
+    BOMB_DEPOT: 'images/buildings/normal/BOMB_DEPOT.jpg',
+    NANITE_FACTORY: 'images/buildings/normal/NANITE_FACTORY.jpg',
+    TERRAFORMER: 'images/buildings/normal/TERRAFORMER.jpg',
+    SPACEPORT: 'images/buildings/normal/SHIPYARD.jpg',
+    SENSOR_PHALANX: 'images/buildings/normal/SENSOR_PHALANX.jpg',
+    JUMP_GATE: 'images/buildings/normal/JUMP_GATE.jpg',
+    INTERSTELLAR_TRADE_PORT: 'images/buildings/normal/INTERSTELLAR_TRADE_PORT.jpg',
+    BUNKER_NETWORK: 'images/buildings/normal/BUNKER_NETWORK.jpg'
   };
 
   static fromDefaultJson(): BuildingBlueprints {

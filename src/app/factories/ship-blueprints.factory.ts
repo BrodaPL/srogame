@@ -60,33 +60,33 @@ interface TechRequirementJson {
 }
 
 export class ShipBlueprintsFactory {
-  private static readonly defaultImagePath = 'images/ships/FIGHTER.jpg';
+  private static readonly defaultImagePath = 'images/ships/normal/FIGHTER.jpg';
   private static readonly shipImageMap: Partial<Record<ShipType, string>> = {
-    [ShipType.FIGHTER]: 'images/ships/FIGHTER.jpg',
-    [ShipType.ASSAULT_FIGHTER]: 'images/ships/ASSAULT_FIGHTER.jpg',
-    [ShipType.ATMOSPHERIC_FIGHTER]: 'images/ships/ATMOSPHERIC_FIGHTER.jpg',
-    [ShipType.ATMOSPHERIC_BOMBER]: 'images/ships/ATMOSPHERIC_BOMBER.jpg',
-    [ShipType.CORVETTE]: 'images/ships/CORVETE.jpg',
-    [ShipType.SPY_PROBE]: 'images/ships/SPY_PROBE.jpg',
-    [ShipType.REPAIR_DRONE]: 'images/ships/REPAIR_DRONE.jpg',
-    [ShipType.RECYCLER]: 'images/ships/RECYCLER.jpg',
-    [ShipType.CRUISER]: 'images/ships/CRUISER.jpg',
-    [ShipType.BATTLE_SHIP]: 'images/ships/BATTLE_SHIP.jpg',
-    [ShipType.FRIGATE]: 'images/ships/FRIGATE.jpg',
-    [ShipType.TRANSPORTER]: 'images/ships/TRANSPORTER.jpg',
-    [ShipType.BATTLE_CRUISER]: 'images/ships/BATTLE_CRUISER.jpg',
-    [ShipType.DESTROYER]: 'images/ships/DESTROYER.jpg',
-    [ShipType.DREADNOUGHT]: 'images/ships/DREADNOUGHT.jpg',
-    [ShipType.ORBITAL_BOMBER]: 'images/ships/ORBITAL_BOMBER.jpg',
-    [ShipType.CARRIER]: 'images/ships/CARRIER.jpg',
-    [ShipType.CARGO_SUPPORT]: 'images/ships/CARGO_SUPPORT.jpg',
-    [ShipType.MASS_HAULER]: 'images/ships/MASS_HAULER.jpg',
-    [ShipType.COLONIZER]: 'images/ships/COLONIZER.jpg',
-    [ShipType.TITAN]: 'images/ships/TITAN.jpg',
-    [ShipType.ARMAGEDDON_BOMBER]: 'images/ships/ARMAGEDDON_BOMBER.jpg',
-    [ShipType.BEHEMOTH]: 'images/ships/BEHEMOTH.jpg',
-    [ShipType.FLEET_CARRIER]: 'images/ships/FLEET_CARRIER.jpg',
-    [ShipType.MOTHER_SHIP]: 'images/ships/MOTHER_SHIP.jpg'
+    [ShipType.FIGHTER]: 'images/ships/normal/FIGHTER.jpg',
+    [ShipType.ASSAULT_FIGHTER]: 'images/ships/normal/ASSAULT_FIGHTER.jpg',
+    [ShipType.ATMOSPHERIC_FIGHTER]: 'images/ships/normal/ATMOSPHERIC_FIGHTER.jpg',
+    [ShipType.ATMOSPHERIC_BOMBER]: 'images/ships/normal/ATMOSPHERIC_BOMBER.jpg',
+    [ShipType.CORVETTE]: 'images/ships/normal/CORVETE.jpg',
+    [ShipType.SPY_PROBE]: 'images/ships/normal/SPY_PROBE.jpg',
+    [ShipType.REPAIR_DRONE]: 'images/ships/normal/REPAIR_DRONE.jpg',
+    [ShipType.RECYCLER]: 'images/ships/normal/RECYCLER.jpg',
+    [ShipType.CRUISER]: 'images/ships/normal/CRUISER.jpg',
+    [ShipType.BATTLE_SHIP]: 'images/ships/normal/BATTLE_SHIP.jpg',
+    [ShipType.FRIGATE]: 'images/ships/normal/FRIGATE.jpg',
+    [ShipType.TRANSPORTER]: 'images/ships/normal/TRANSPORTER.jpg',
+    [ShipType.BATTLE_CRUISER]: 'images/ships/normal/BATTLE_CRUISER.jpg',
+    [ShipType.DESTROYER]: 'images/ships/normal/DESTROYER.jpg',
+    [ShipType.DREADNOUGHT]: 'images/ships/normal/DREADNOUGHT.jpg',
+    [ShipType.ORBITAL_BOMBER]: 'images/ships/normal/ORBITAL_BOMBER.jpg',
+    [ShipType.CARRIER]: 'images/ships/normal/CARRIER.jpg',
+    [ShipType.CARGO_SUPPORT]: 'images/ships/normal/CARGO_SUPPORT.jpg',
+    [ShipType.MASS_HAULER]: 'images/ships/normal/MASS_HAULER.jpg',
+    [ShipType.COLONIZER]: 'images/ships/normal/COLONIZER.jpg',
+    [ShipType.TITAN]: 'images/ships/normal/TITAN.jpg',
+    [ShipType.ARMAGEDDON_BOMBER]: 'images/ships/normal/ARMAGEDDON_BOMBER.jpg',
+    [ShipType.BEHEMOTH]: 'images/ships/normal/BEHEMOTH.jpg',
+    [ShipType.FLEET_CARRIER]: 'images/ships/normal/FLEET_CARRIER.jpg',
+    [ShipType.MOTHER_SHIP]: 'images/ships/normal/MOTHER_SHIP.jpg'
   };
 
   static fromDefaultJson(): ShipBlueprints {

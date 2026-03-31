@@ -54,19 +54,19 @@ interface TechRequirementJson {
 }
 
 export class DefenceBlueprintsFactory {
-  private static readonly defaultImagePath = 'images/defence/LIGHT_BEAM_CANNON.jpg';
+  private static readonly defaultImagePath = 'images/defence/normal/LIGHT_BEAM_CANNON.jpg';
   private static readonly defenceImageMap: Partial<Record<DefenceType, string>> = {
-    [DefenceType.LIGHT_BEAM_CANNON]: 'images/defence/LIGHT_BEAM_CANNON.jpg',
-    [DefenceType.BEAM_CANNON]: 'images/defence/BEAM_CANNON.jpg',
-    [DefenceType.HEAVY_BEAM_CANNON]: 'images/defence/HEAVY_BEAM_CANNON.jpg',
-    [DefenceType.SAM_SITE]: 'images/defence/SAM_SITE.jpg',
-    [DefenceType.ORBITAL_MISSILE_LAUNCHER]: 'images/defence/ORBITAL_MISSILE_LAUNCHER.jpg',
-    [DefenceType.HEAVY_ORBITAL_MISSILE_LAUNCHER]: 'images/defence/HEAVY_ORBITAL_MISSILE_LAUNCHER.jpg',
-    [DefenceType.RAIL_GUN_CANNON]: 'images/defence/RAIL_GUN_CANNON.jpg',
-    [DefenceType.SMALL_BOMB]: 'images/defence/SMALL_BOMB.jpg',
-    [DefenceType.CLUSTER_BOMB]: 'images/defence/CLUSTER_BOMB.jpg',
-    [DefenceType.MEDIUM_BOMB]: 'images/defence/MEDIUM_BOMB.jpg',
-    [DefenceType.HEAVY_BOMB]: 'images/defence/HEAVY_BOMB.jpg'
+    [DefenceType.LIGHT_BEAM_CANNON]: 'images/defence/normal/LIGHT_BEAM_CANNON.jpg',
+    [DefenceType.BEAM_CANNON]: 'images/defence/normal/BEAM_CANNON.jpg',
+    [DefenceType.HEAVY_BEAM_CANNON]: 'images/defence/normal/HEAVY_BEAM_CANNON.jpg',
+    [DefenceType.SAM_SITE]: 'images/defence/normal/SAM_SITE.jpg',
+    [DefenceType.ORBITAL_MISSILE_LAUNCHER]: 'images/defence/normal/ORBITAL_MISSILE_LAUNCHER.jpg',
+    [DefenceType.HEAVY_ORBITAL_MISSILE_LAUNCHER]: 'images/defence/normal/HEAVY_ORBITAL_MISSILE_LAUNCHER.jpg',
+    [DefenceType.RAIL_GUN_CANNON]: 'images/defence/normal/RAIL_GUN_CANNON.jpg',
+    [DefenceType.SMALL_BOMB]: 'images/defence/normal/SMALL_BOMB.jpg',
+    [DefenceType.CLUSTER_BOMB]: 'images/defence/normal/CLUSTER_BOMB.jpg',
+    [DefenceType.MEDIUM_BOMB]: 'images/defence/normal/MEDIUM_BOMB.jpg',
+    [DefenceType.HEAVY_BOMB]: 'images/defence/normal/HEAVY_BOMB.jpg'
   };
 
   static fromDefaultJson(): DefenceBlueprints {
