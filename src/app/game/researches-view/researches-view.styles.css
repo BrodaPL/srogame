@@ -53,6 +53,7 @@
 }
 
 .research-tech-card__image {
+  grid-row: 1 / span 2;
   width: 256px;
   height: 256px;
   object-fit: contain;
@@ -122,6 +123,20 @@
   margin-left: 0.4rem;
 }
 
+.research-tech-card__description {
+  grid-column: 2 / -1;
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+}
+
+.research-tech-card__description-text {
+  margin: 0;
+  color: #fff;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .research-tech-card__lab-select option {
   background: #2f333b;
 }
@@ -161,6 +176,10 @@
     justify-self: start;
     margin-left: 0;
     justify-items: start;
+  }
+
+  .research-tech-card__description {
+    grid-column: auto;
   }
 
   .research-tech-card__action {

@@ -7,6 +7,7 @@ export class Technology {
   constructor(
     public type: TechnologyType,
     public imagePath: string,
+    public description: string,
     public basicCost: ResourcesPack,
     public energyRequired: number[],
     public researchTime: number[],
@@ -23,4 +24,3 @@ export class Technology {
     );
   }
 }
-

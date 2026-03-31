@@ -14,6 +14,7 @@ interface TechnologyBlueprintsJson {
 interface TechnologyBlueprintJson {
   type: string;
   imagePath?: string;
+  description?: string;
   basicCost: ResourcesPackJson;
   energyRequired: number[];
   researchTime: number[];
@@ -82,6 +83,7 @@ export class TechnologyBlueprintsFactory {
     return new Technology(
       this.parseEnumKey(TechnologyType, entry.type, 'TechnologyType'),
       imagePath,
+      entry.description ?? '',
       new ResourcesPack(cost.metal, cost.crystal, cost.deuterium),
       entry.energyRequired ?? [],
       entry.researchTime ?? [],
