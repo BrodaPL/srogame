@@ -150,26 +150,25 @@
             <div class="production-view__ship-list">
               @for (ship of shipBlueprints; track ship.type; let isFirst = $first) {
                 <article class="production-view__ship-row" [attr.data-tutorial-id]="isFirst ? 'production-primary-row' : null">
-                  <img class="production-view__ship-image" [src]="ship.imagePath" [alt]="ship.type + ' image'" />
+                  <button
+                    type="button"
+                    class="production-view__image-button"
+                    [attr.aria-label]="'Open details for ' + ship.type"
+                    (click)="openShipDetails(ship)"
+                  >
+                    <img class="production-view__ship-image" [src]="ship.imagePath" [alt]="ship.type + ' image'" />
+                  </button>
 
                   <div class="production-view__ship-main">
                     <h4 class="production-view__ship-title">{{ ship.type }}</h4>
-                    <p class="production-view__ship-meta">Hull class {{ ship.hullClass }}</p>
-                    <p class="production-view__ship-meta">Cargo {{ ship.cargoCapacity }}</p>
-
-                    <label class="production-view__amount-field">
-                      <span>Amount</span>
-                      <input
-                        class="production-view__amount-input"
-                        type="number"
-                        min="1"
-                        max="100000"
-                        step="1"
-                        [ngModel]="shipAmountInput(ship.type)"
-                        (ngModelChange)="onShipAmountInput(ship.type, $event)"
-                        placeholder="amount"
-                      />
-                    </label>
+                    <p class="production-view__ship-meta">
+                      Current amount: <strong class="production-view__ship-meta-value">{{ currentShipAmount(ship.type) }}</strong>
+                    </p>
+                    <div class="production-view__purpose-tags">
+                      @for (purpose of shipPurposeTags(ship); track purpose) {
+                        <span class="production-view__purpose-tag">{{ purpose }}</span>
+                      }
+                    </div>
                   </div>
 
                   <div class="production-view__ship-costs">
@@ -214,6 +213,18 @@
                   </div>
 
                   <div class="production-view__ship-action">
+                    <label class="production-view__amount-field">
+                      <input
+                        class="production-view__amount-input"
+                        type="number"
+                        min="1"
+                        max="100000"
+                        step="1"
+                        [ngModel]="shipAmountInput(ship.type)"
+                        (ngModelChange)="onShipAmountInput(ship.type, $event)"
+                        placeholder="amount"
+                      />
+                    </label>
                     <button
                       type="button"
                       class="game-dashboard__action-button"
@@ -234,11 +245,20 @@
             <div class="production-view__ship-list">
               @for (defence of defenceBlueprints; track defence.type) {
                 <article class="production-view__ship-row">
-                  <img class="production-view__ship-image" [src]="defence.imagePath" [alt]="defence.type + ' image'" />
+                  <button
+                    type="button"
+                    class="production-view__image-button"
+                    [attr.aria-label]="'Open details for ' + defence.type"
+                    (click)="openDefenceDetails(defence)"
+                  >
+                    <img class="production-view__ship-image" [src]="defence.imagePath" [alt]="defence.type + ' image'" />
+                  </button>
 
                   <div class="production-view__ship-main">
                     <h4 class="production-view__ship-title">{{ defence.type }}</h4>
-                    <p class="production-view__ship-meta">Hull class {{ defence.hullClass }}</p>
+                    <p class="production-view__ship-meta">
+                      Current amount: <strong class="production-view__ship-meta-value">{{ currentDefenceAmount(defence.type) }}</strong>
+                    </p>
                     @if (defence.hullClass === HullClass.PLANETARY_BOMB) {
                       <p class="production-view__ship-meta">Stored in Bomb Depot. Not active in combat yet.</p>
                       <p class="production-view__ship-meta">{{ currentPlanetaryBombCount() }}/{{ bombDepotCapacity() }} stored</p>
@@ -248,19 +268,6 @@
                       </p>
                     }
 
-                    <label class="production-view__amount-field">
-                      <span>Amount</span>
-                      <input
-                        class="production-view__amount-input"
-                        type="number"
-                        min="1"
-                        max="100000"
-                        step="1"
-                        [ngModel]="defenceAmountInput(defence.type)"
-                        (ngModelChange)="onDefenceAmountInput(defence.type, $event)"
-                        placeholder="amount"
-                      />
-                    </label>
                   </div>
 
                   <div class="production-view__ship-costs">
@@ -305,6 +312,18 @@
                   </div>
 
                   <div class="production-view__ship-action">
+                    <label class="production-view__amount-field">
+                      <input
+                        class="production-view__amount-input"
+                        type="number"
+                        min="1"
+                        max="100000"
+                        step="1"
+                        [ngModel]="defenceAmountInput(defence.type)"
+                        (ngModelChange)="onDefenceAmountInput(defence.type, $event)"
+                        placeholder="amount"
+                      />
+                    </label>
                     <button
                       type="button"
                       class="game-dashboard__action-button"
@@ -370,3 +389,9 @@
     </section>
   }
 </section>
+
+<app-planet-object-dialog
+  [isOpen]="selectedObjectDetails !== null"
+  [details]="selectedObjectDetails"
+  (closed)="closeObjectDetails()"
+></app-planet-object-dialog>
