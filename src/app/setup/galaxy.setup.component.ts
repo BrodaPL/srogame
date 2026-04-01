@@ -74,6 +74,7 @@ export class GalaxySetupComponent {
   }
 
   protected canStart(): boolean {
+    const session = this.session();
     const gameTypeValid = this.isValidGameType(this.form.gameType);
     const name = this.form.galaxyName.trim();
     const width = this.parseIntegerInRange(this.form.galaxyWidth, 10, 100);
@@ -98,7 +99,7 @@ export class GalaxySetupComponent {
 
     return (
       gameTypeValid &&
-      Boolean(this.session()) &&
+      session?.localAdmin === true &&
       Boolean(name) &&
       width !== null &&
       height !== null &&
@@ -126,6 +127,10 @@ export class GalaxySetupComponent {
     const session = this.session();
     if (!session) {
       this.startError = 'Login required to start a game.';
+      return;
+    }
+    if (!session.localAdmin) {
+      this.startError = 'Local admin privileges are required to start a single-player game.';
       return;
     }
 

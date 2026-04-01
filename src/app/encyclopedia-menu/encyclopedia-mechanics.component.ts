@@ -364,11 +364,11 @@ export class EncyclopediaMechanicsComponent {
       title: 'New Views and Screens',
       category: 'Core Loop',
       status: 'Partial',
-      summary: 'Most game-management screens are now live, but a few top-level routes still remain placeholders.',
+      summary: 'Most game-management screens are now live, with only a small number of top-level utility routes still placeholder-only.',
       details: [
-        'Imperium, Buildings, Production, Defence, Researches, Reports, Mail, Diplomacy, Operations, Mission Planner, Planet View, Galactic View, and Star System View are live.',
-        'Buildings and Production provide compact multi-planet management flows, while Reports, Mail, Diplomacy, and Operations handle strategic information and fleet state.',
-        'Top-level Load, Multiplayer, and Help/About placeholders still remain outside the main live game shell.'
+        'Imperium, Buildings, Production, Defence, Researches, Reports, Mail, Diplomacy, Operations, Mission Planner, Planet View, Galactic View, Star System View, Load Game, and Multiplayer Lobby are live.',
+        'Buildings and Production provide compact multi-planet management flows, while Reports, Mail, Diplomacy, Operations, Load Game, and Multiplayer Lobby handle strategic information, persistence, and fleet or lobby state.',
+        'Help/About remains a top-level placeholder outside the main live game shell.'
       ]
     },
     {

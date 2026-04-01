@@ -5,6 +5,7 @@ import {
   GameStateResponse,
   GameSaveSummaryResponse,
   LoadGameResponse,
+  MultiplayerLobbyResponse,
   StartGameRequest,
   StartGameResponse,
   ClientGalaxyDto,
@@ -51,7 +52,10 @@ import {
   UseTradePortOfferRequest,
   SensorPhalanxCapabilitiesDto,
   SensorPhalanxScanRequest,
-  SensorPhalanxScanResponse
+  SensorPhalanxScanResponse,
+  UpdateMultiplayerLobbySetupRequest,
+  ToggleMultiplayerLobbyReadyRequest,
+  AssignMultiplayerLobbySeatRequest
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -86,6 +90,85 @@ export class GameApiService {
   public loadGame(token: string) {
     return this.http.post<LoadGameResponse>(
       `${API_BASE_URL}/game/load`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getMultiplayerLobby(token?: string) {
+    return this.http.get<MultiplayerLobbyResponse>(
+      `${API_BASE_URL}/multiplayer/lobby`,
+      token ? { headers: this.authHeaders(token) } : {}
+    );
+  }
+
+  public openMultiplayerLobby(token: string) {
+    return this.http.post<MultiplayerLobbyResponse>(
+      `${API_BASE_URL}/multiplayer/lobby/open`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public joinMultiplayerLobby(token: string) {
+    return this.http.post<MultiplayerLobbyResponse>(
+      `${API_BASE_URL}/multiplayer/lobby/join`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public leaveMultiplayerLobby(token: string) {
+    return this.http.post<MultiplayerLobbyResponse>(
+      `${API_BASE_URL}/multiplayer/lobby/leave`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public toggleMultiplayerLobbyReady(request: ToggleMultiplayerLobbyReadyRequest, token: string) {
+    return this.http.post<MultiplayerLobbyResponse>(
+      `${API_BASE_URL}/multiplayer/lobby/ready`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public updateMultiplayerLobbySetup(request: UpdateMultiplayerLobbySetupRequest, token: string) {
+    return this.http.post<MultiplayerLobbyResponse>(
+      `${API_BASE_URL}/multiplayer/lobby/setup`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public bindMultiplayerLobbySave(token: string) {
+    return this.http.post<MultiplayerLobbyResponse>(
+      `${API_BASE_URL}/multiplayer/lobby/load-save`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public clearMultiplayerLobbySave(token: string) {
+    return this.http.post<MultiplayerLobbyResponse>(
+      `${API_BASE_URL}/multiplayer/lobby/new-game`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public assignMultiplayerLobbySeat(request: AssignMultiplayerLobbySeatRequest, token: string) {
+    return this.http.post<MultiplayerLobbyResponse>(
+      `${API_BASE_URL}/multiplayer/lobby/assign-seat`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public startMultiplayerLobbyGame(token: string) {
+    return this.http.post<LoadGameResponse>(
+      `${API_BASE_URL}/multiplayer/lobby/start`,
       {},
       { headers: this.authHeaders(token) }
     );

@@ -19,6 +19,7 @@ export class PlayerSessionService {
       if (this.isValid(parsed)) {
         return {
           ...parsed,
+          localAdmin: (parsed as Partial<PlayerSession>).localAdmin === true,
           unreadReportCount: this.normalizeUnreadReportCount(
             (parsed as Partial<PlayerSession>).unreadReportCount
           ),
@@ -63,7 +64,8 @@ export class PlayerSessionService {
       typeof session.playerName === 'string' &&
       session.playerName.trim().length > 0 &&
       typeof session.token === 'string' &&
-      session.token.trim().length > 0
+      session.token.trim().length > 0 &&
+      (session.localAdmin === undefined || typeof session.localAdmin === 'boolean')
     );
   }
 

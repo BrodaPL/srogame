@@ -65,7 +65,7 @@ describe('game-save', () => {
     expect(json).toContain('"fleetId":7');
   });
 
-  it('builds save summary, enforces owner-only load, and reads the summary from disk', () => {
+  it('builds save summary, enforces local-admin load, and reads the summary from disk', () => {
     const save = buildTestSave();
     const summary = buildGameSaveSummary(save);
 
@@ -77,15 +77,15 @@ describe('game-save', () => {
       currentTurn: 6,
       autoSaveTurns: 5
     });
-    expect(resolveGameSaveLoadAccess(save, null)).toEqual({
+    expect(resolveGameSaveLoadAccess(save, null, false)).toEqual({
       canLoad: false,
       canLoadReason: 'Login required to load the saved game.'
     });
-    expect(resolveGameSaveLoadAccess(save, 11)).toEqual({
+    expect(resolveGameSaveLoadAccess(save, 11, false)).toEqual({
       canLoad: false,
-      canLoadReason: 'Only the saved owner can load this game.'
+      canLoadReason: 'Local admin privileges are required to load the saved game.'
     });
-    expect(resolveGameSaveLoadAccess(save, 42)).toEqual({
+    expect(resolveGameSaveLoadAccess(save, 11, true)).toEqual({
       canLoad: true,
       canLoadReason: null
     });

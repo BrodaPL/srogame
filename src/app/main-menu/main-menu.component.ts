@@ -18,6 +18,14 @@ export class MainMenuComponent {
     this.session = this.authState.session;
   }
 
+  protected canManageSingleplayer(): boolean {
+    return this.session()?.localAdmin === true;
+  }
+
+  protected canLoadGame(): boolean {
+    return this.session()?.localAdmin === true;
+  }
+
   protected logout(): void {
     const session = this.session();
     if (!session) {

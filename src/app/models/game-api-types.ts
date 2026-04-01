@@ -88,6 +88,7 @@ export type PlayerSession = {
   id: number;
   playerName: string;
   token: string;
+  localAdmin: boolean;
   tutorialRead: TutorialReadState;
   unreadReportCount: number;
   unreadMailCount: number;
@@ -173,6 +174,65 @@ export type GameSaveSummaryResponse = {
   currentAccountId: number | null;
   canLoad: boolean;
   canLoadReason: string | null;
+};
+
+export type MultiplayerLobbyMode = 'NEW_GAME' | 'LOAD_SAVE';
+
+export type MultiplayerLobbyMemberDto = {
+  accountId: number;
+  playerName: string;
+  isLocalAdmin: boolean;
+  isReady: boolean;
+  joinedAt: string;
+};
+
+export type MultiplayerLobbyLoadSeatDto = {
+  savedPlayerId: number;
+  savedPlayerName: string;
+  assignedAccountId: number | null;
+  assignedPlayerName: string | null;
+  assignmentMode: 'ORIGINAL' | 'REPLACEMENT' | 'BOT';
+};
+
+export type MultiplayerLobbyDto = {
+  hostAccountId: number;
+  hostPlayerName: string;
+  mode: MultiplayerLobbyMode;
+  setup: GalaxySetup;
+  members: MultiplayerLobbyMemberDto[];
+  boundSave: GameSaveSummary | null;
+  loadSeats: MultiplayerLobbyLoadSeatDto[];
+  canManage: boolean;
+  isMember: boolean;
+  canJoin: boolean;
+  canLeave: boolean;
+  canToggleReady: boolean;
+  canBindSave: boolean;
+  canStart: boolean;
+  startBlockedReason: string | null;
+};
+
+export type MultiplayerLobbyResponse = {
+  lobby: MultiplayerLobbyDto | null;
+  activeGame: ActiveGameSummary | null;
+  save: GameSaveSummary | null;
+  isLoggedIn: boolean;
+  currentAccountId: number | null;
+  currentPlayerName: string | null;
+  currentPlayerIsLocalAdmin: boolean;
+};
+
+export type UpdateMultiplayerLobbySetupRequest = {
+  setup: GalaxySetup;
+};
+
+export type ToggleMultiplayerLobbyReadyRequest = {
+  ready: boolean;
+};
+
+export type AssignMultiplayerLobbySeatRequest = {
+  savedPlayerId: number;
+  accountId: number | null;
 };
 
 export type SetDiplomaticRelationRequest = {

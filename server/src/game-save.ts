@@ -382,7 +382,8 @@ export function buildGameSaveSummary(save: SavedGameFile): GameSaveSummary {
 
 export function resolveGameSaveLoadAccess(
   save: SavedGameFile | null,
-  currentAccountId: number | null
+  currentAccountId: number | null,
+  currentIsLocalAdmin: boolean
 ): GameSaveLoadAccess {
   if (!save) {
     return { canLoad: false, canLoadReason: 'No saved game found.' };
@@ -392,8 +393,8 @@ export function resolveGameSaveLoadAccess(
     return { canLoad: false, canLoadReason: 'Login required to load the saved game.' };
   }
 
-  if (save.ownerAccountId !== currentAccountId) {
-    return { canLoad: false, canLoadReason: 'Only the saved owner can load this game.' };
+  if (!currentIsLocalAdmin) {
+    return { canLoad: false, canLoadReason: 'Local admin privileges are required to load the saved game.' };
   }
 
   return { canLoad: true, canLoadReason: null };

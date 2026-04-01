@@ -1,11 +1,323 @@
 <main class="page">
-  <section class="panel panel--compact">
+  <section class="panel">
     <header class="panel__header">
       <p class="eyebrow">Multiplayer</p>
-      <h1>Multiplayer</h1>
-      <p class="subtitle">Multiplayer lobbies will be configured here.</p>
+      <h1>Multiplayer Lobby</h1>
+      <p class="subtitle">One global lobby, controlled by the local admin, for starting or loading the server game.</p>
     </header>
 
-    <a class="link button" routerLink="/">Back to main menu</a>
+    @if (isLoading && !response) {
+      <div class="saved">
+        <p class="saved__title">Loading</p>
+        <p>Reading multiplayer lobby state from the server.</p>
+      </div>
+    }
+
+    @if (error) {
+      <p class="form-error">{{ error }}</p>
+    }
+
+    @if (!session()) {
+      <p class="form-error">Login required to use the multiplayer lobby.</p>
+      <a class="link button" routerLink="/login">Go to login</a>
+    } @else {
+      <div class="saved">
+        <p class="saved__title">Current account</p>
+        <p>
+          {{ session()!.playerName }}
+          @if (session()!.localAdmin) {
+            <span>(Local Admin)</span>
+          }
+        </p>
+      </div>
+    }
+
+    @if (response?.activeGame) {
+      <div class="saved">
+        <p class="saved__title">Active Runtime Game</p>
+        <p>
+          Galaxy: {{ response!.activeGame!.galaxyName }}.
+          Turn: {{ response!.activeGame!.currentTurn }}.
+          Owner: {{ response!.activeGame!.ownerPlayerName ?? 'Unknown' }}.
+        </p>
+        <p class="form-error">Starting or loading from the multiplayer lobby will replace the active game.</p>
+      </div>
+    }
+
+    @if (response?.save) {
+      <div class="saved">
+        <p class="saved__title">Server Save</p>
+        <p>
+          Galaxy: {{ response!.save!.galaxyName }}.
+          Turn: {{ response!.save!.currentTurn }}.
+          Owner: {{ response!.save!.ownerPlayerName ?? 'Unknown' }}.
+          Saved: {{ response!.save!.savedAt }}.
+        </p>
+      </div>
+    }
+
+    @if (!response?.lobby) {
+      <div class="saved">
+        <p class="saved__title">No Lobby Open</p>
+        <p>Only the local admin can open the single global multiplayer lobby.</p>
+      </div>
+      @if (session()?.localAdmin) {
+        <button class="start-button" type="button" (click)="openLobby()" [disabled]="isActing">
+          {{ isActing ? 'Opening...' : 'Open multiplayer lobby' }}
+        </button>
+      }
+    } @else {
+      <div class="saved">
+        <p class="saved__title">Lobby</p>
+        <p>
+          Host: {{ response!.lobby!.hostPlayerName }}.
+          Mode:
+          {{ response!.lobby!.mode === 'LOAD_SAVE' ? 'Load saved game' : 'Start new game' }}.
+          Joined players: {{ response!.lobby!.members.length }}.
+        </p>
+        @if (response!.lobby!.startBlockedReason) {
+          <p class="form-error">{{ response!.lobby!.startBlockedReason }}</p>
+        }
+      </div>
+
+      <div class="saved">
+        <p class="saved__title">Players</p>
+        @for (member of response!.lobby!.members; track member.accountId) {
+          <p>
+            {{ member.playerName }}
+            @if (member.isLocalAdmin) {
+              <span>(Local Admin)</span>
+            }
+            -
+            {{ member.isReady ? 'Ready' : 'Not ready' }}
+          </p>
+        }
+      </div>
+
+      @if (response!.lobby!.boundSave) {
+        <div class="saved">
+          <p class="saved__title">Bound Save</p>
+          <p>
+            {{ response!.lobby!.boundSave!.galaxyName }} at turn {{ response!.lobby!.boundSave!.currentTurn }}.
+            Auto save:
+            {{ response!.lobby!.boundSave!.autoSaveTurns === 0 ? 'disabled' : 'every ' + response!.lobby!.boundSave!.autoSaveTurns + ' turns' }}.
+          </p>
+        </div>
+      }
+
+      @if (response!.lobby!.loadSeats.length > 0) {
+        <div class="saved">
+          <p class="saved__title">Saved Human Seats</p>
+          @for (seat of response!.lobby!.loadSeats; track seat.savedPlayerId) {
+            <div class="field">
+              <label for="seat-{{ seat.savedPlayerId }}">{{ seat.savedPlayerName }}</label>
+              <select
+                id="seat-{{ seat.savedPlayerId }}"
+                name="seat-{{ seat.savedPlayerId }}"
+                [ngModel]="seatValue(seat)"
+                (ngModelChange)="assignSeat(seat.savedPlayerId, $event)"
+                [disabled]="!response!.lobby!.canManage || isActing"
+              >
+                <option value="">Convert to bot</option>
+                @for (member of response!.lobby!.members; track member.accountId) {
+                  @if (canSelectSeatMember(seat, member.accountId) || seat.assignedAccountId === member.accountId) {
+                    <option [value]="member.accountId">{{ member.playerName }}</option>
+                  }
+                }
+              </select>
+              <small>
+                {{
+                  seat.assignmentMode === 'BOT'
+                    ? 'This seat will become a bot.'
+                    : seat.assignmentMode === 'ORIGINAL'
+                      ? 'Original saved player matched.'
+                      : 'Replacement player assigned.'
+                }}
+              </small>
+            </div>
+          }
+        </div>
+      }
+
+      @if (response!.lobby!.canJoin) {
+        <button class="start-button" type="button" (click)="joinLobby()" [disabled]="isActing">
+          {{ isActing ? 'Joining...' : 'Join lobby' }}
+        </button>
+      }
+
+      @if (response!.lobby!.canLeave) {
+        <button class="start-button" type="button" (click)="leaveLobby()" [disabled]="isActing">
+          {{ isActing ? 'Leaving...' : 'Leave lobby' }}
+        </button>
+      }
+
+      @if (response!.lobby!.canToggleReady) {
+        <div class="field-row">
+          <button class="start-button" type="button" (click)="setReady(true)" [disabled]="isActing">
+            Ready
+          </button>
+          <button class="start-button" type="button" (click)="setReady(false)" [disabled]="isActing">
+            Not ready
+          </button>
+        </div>
+      }
+
+      @if (response!.lobby!.canManage) {
+        <div class="field">
+          <label for="galaxyName">Galaxy name</label>
+          <input id="galaxyName" name="galaxyName" type="text" [(ngModel)]="setupForm.galaxyName" />
+        </div>
+
+        <div class="field">
+          <label for="gameType">Game type</label>
+          <select id="gameType" name="gameType" [(ngModel)]="setupForm.gameType">
+            <option value="PvP">PvP</option>
+            <option value="PvPvE">PvPvE</option>
+            <option value="PvE">PvE</option>
+            <option value="Sandbox">Sandbox</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="galaxyWidth">Galaxy width</label>
+            <input id="galaxyWidth" name="galaxyWidth" type="number" min="10" max="100" [(ngModel)]="setupForm.galaxyWidth" />
+          </div>
+          <div class="field">
+            <label for="galaxyHeight">Galaxy height</label>
+            <input id="galaxyHeight" name="galaxyHeight" type="number" min="10" max="100" [(ngModel)]="setupForm.galaxyHeight" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="galaxyCenterSize">Galaxy center size (%)</label>
+            <input id="galaxyCenterSize" name="galaxyCenterSize" type="number" min="5" max="35" [(ngModel)]="setupForm.galaxyCenterSize" />
+          </div>
+          <div class="field">
+            <label for="voidChance">Void chance (%)</label>
+            <input id="voidChance" name="voidChance" type="number" min="0" max="35" [(ngModel)]="setupForm.voidChance" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="starsAmountModifierMin">Stars modifier min</label>
+            <input id="starsAmountModifierMin" name="starsAmountModifierMin" type="number" min="-10" max="0" [(ngModel)]="setupForm.starsAmountModifierMin" />
+          </div>
+          <div class="field">
+            <label for="starsAmountModifierMax">Stars modifier max</label>
+            <input id="starsAmountModifierMax" name="starsAmountModifierMax" type="number" min="1" max="9" [(ngModel)]="setupForm.starsAmountModifierMax" />
+          </div>
+        </div>
+
+        <div class="saved">
+          <p>Human player amount is taken from joined lobby members: {{ response!.lobby!.members.length }}.</p>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="botsAmount">Bots amount</label>
+            <input id="botsAmount" name="botsAmount" type="number" min="0" max="12" [(ngModel)]="setupForm.botsAmount" />
+          </div>
+          <div class="field">
+            <label for="botDifficulty">Bot difficulty (%)</label>
+            <input id="botDifficulty" name="botDifficulty" type="number" min="-75" max="200" [(ngModel)]="setupForm.botDifficulty" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="neutralBotsAmount">Neutral bots amount (%)</label>
+            <input id="neutralBotsAmount" name="neutralBotsAmount" type="number" min="0" max="10" [(ngModel)]="setupForm.neutralBotsAmount" />
+          </div>
+          <div class="field">
+            <label for="neutralBotsDifficulty">Neutral bots difficulty (%)</label>
+            <input id="neutralBotsDifficulty" name="neutralBotsDifficulty" type="number" min="-100" max="200" [(ngModel)]="setupForm.neutralBotsDifficulty" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="autoSaveTurns">Auto save every N turns</label>
+          <input id="autoSaveTurns" name="autoSaveTurns" type="number" min="0" max="999" [(ngModel)]="setupForm.autoSaveTurns" />
+          <small>Use 0 to disable autosaving.</small>
+        </div>
+
+        <div class="field">
+          <label>Testing options</label>
+          <div class="test-options">
+            <label class="checkbox-field" for="createRandomPlanets">
+              <input id="createRandomPlanets" name="createRandomPlanets" type="checkbox" [(ngModel)]="setupForm.createRandomPlanets" />
+              <span>Create random planets</span>
+            </label>
+            <label class="checkbox-field" for="createStartingShips">
+              <input id="createStartingShips" name="createStartingShips" type="checkbox" [(ngModel)]="setupForm.createStartingShips" />
+              <span>Create starting ships</span>
+            </label>
+            <label class="checkbox-field" for="skipTutorial">
+              <input id="skipTutorial" name="skipTutorial" type="checkbox" [(ngModel)]="setupForm.skipTutorial" />
+              <span>Skip tutorial</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Starting resources</label>
+          <div class="resource-group">
+            <div class="resource-input">
+              <img class="resource-icon" src="images/icons/normal/metal.png" alt="Metal" />
+              <input id="startingMetal" name="startingMetal" type="number" min="0" max="999999" [(ngModel)]="setupForm.startingMetal" />
+            </div>
+            <div class="resource-input">
+              <img class="resource-icon" src="images/icons/normal/crystal.png" alt="Crystal" />
+              <input id="startingCrystal" name="startingCrystal" type="number" min="0" max="999999" [(ngModel)]="setupForm.startingCrystal" />
+            </div>
+            <div class="resource-input">
+              <img class="resource-icon" src="images/icons/normal/deuter.png" alt="Deuterium" />
+              <input id="startingDeuterium" name="startingDeuterium" type="number" min="0" max="999999" [(ngModel)]="setupForm.startingDeuterium" />
+            </div>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <button class="start-button" type="button" (click)="saveSetup()" [disabled]="isActing">
+            Save lobby setup
+          </button>
+          <button class="start-button" type="button" (click)="bindSave()" [disabled]="isActing">
+            Use server save
+          </button>
+          @if (response!.lobby!.mode === 'LOAD_SAVE') {
+            <button class="start-button" type="button" (click)="clearSaveBinding()" [disabled]="isActing">
+              Switch to new game
+            </button>
+          }
+        </div>
+      }
+
+      @if (response?.activeGame) {
+        <div class="field">
+          <label class="checkbox-field" for="confirmReplaceActiveGame">
+            <input
+              id="confirmReplaceActiveGame"
+              name="confirmReplaceActiveGame"
+              type="checkbox"
+              [(ngModel)]="confirmReplaceActiveGame"
+            />
+            <span>I understand that the lobby start will replace the active game.</span>
+          </label>
+        </div>
+      }
+
+      <button class="start-button" type="button" (click)="startLobbyGame()" [disabled]="!canStartLobbyGame()">
+        {{ isActing ? 'Starting...' : (response!.lobby!.mode === 'LOAD_SAVE' ? 'Load lobby game' : 'Start multiplayer game') }}
+      </button>
+    }
+
+    <div class="field-row">
+      <button class="start-button" type="button" (click)="loadLobby()" [disabled]="isLoading || isActing">
+        {{ isLoading ? 'Refreshing...' : 'Refresh lobby' }}
+      </button>
+      <a class="link button" routerLink="/">Back to main menu</a>
+    </div>
   </section>
 </main>

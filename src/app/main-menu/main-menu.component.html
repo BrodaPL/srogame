@@ -4,7 +4,12 @@
       <p class="eyebrow">Main Menu</p>
       <h1>Srogame</h1>
       @if (session()) {
-        <p class="subtitle">Logged in as {{ session()!.playerName }}</p>
+        <p class="subtitle">
+          Logged in as {{ session()!.playerName }}
+          @if (session()!.localAdmin) {
+            <span>(Local Admin)</span>
+          }
+        </p>
       } @else {
         <p class="subtitle">Not logged in</p>
       }
@@ -20,10 +25,10 @@
           Logout
         </button>
       }
-      <button class="menu-button" type="button" routerLink="/load">
+      <button class="menu-button" type="button" routerLink="/load" [disabled]="!canLoadGame()">
         Load Game
       </button>
-      <button class="menu-button" type="button" routerLink="/setup">
+      <button class="menu-button" type="button" routerLink="/setup" [disabled]="!canManageSingleplayer()">
         Singleplayer
       </button>
       <button class="menu-button" type="button" routerLink="/multiplayer">
