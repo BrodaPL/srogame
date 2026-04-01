@@ -42,6 +42,14 @@ export type ResourceTitleLink = {
   templateUrl: './resources.component.html'
 })
 export class ResourcesComponent {
+  protected readonly resourceIcons = {
+    metal: 'images/icons/normal/metal_big.png',
+    crystal: 'images/icons/normal/crystal_big.png',
+    deuterium: 'images/icons/normal/deuter_big.png',
+    energy: 'images/icons/normal/energy_big.png',
+    powers: 'images/icons/normal/industry_big.png'
+  } as const;
+
   @Input() viewName = '';
   @Input() titlePrefix = '';
   @Input() titleLink: ResourceTitleLink | null = null;
@@ -82,6 +90,14 @@ export class ResourcesComponent {
     }
 
     return ` [${resource.capacityPercent}%]`;
+  }
+
+  protected formatCapacityIndicator(resource: ResourceDisplay | null): string | null {
+    if (!resource || resource.capacityPercent === null || resource.capacityPercent === undefined) {
+      return null;
+    }
+
+    return `[${resource.capacityPercent}%]`;
   }
 
   protected formatIncome(resource: ResourceDisplay | null): string | null {
@@ -127,6 +143,21 @@ export class ResourcesComponent {
 
   protected energyOverloadLabel(resource: ResourceDisplay | null): string {
     return this.isEnergyOverloaded(resource) ? ' ! ' : '';
+  }
+
+  protected isStorageOverLimit(resource: ResourceDisplay | null): boolean {
+    const percent = resource?.capacityPercent;
+    return percent !== null && percent !== undefined && percent > 100;
+  }
+
+  protected isStorageNearLimit(resource: ResourceDisplay | null): boolean {
+    const percent = resource?.capacityPercent;
+    return percent !== null && percent !== undefined && percent > 75 && percent <= 100;
+  }
+
+  protected isStorageNormal(resource: ResourceDisplay | null): boolean {
+    const percent = resource?.capacityPercent;
+    return percent !== null && percent !== undefined && percent <= 75;
   }
 
   protected formatPower(value: number | null | undefined): string {

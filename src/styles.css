@@ -1164,13 +1164,37 @@ app-root {
 .resources-bar .resource {
   display: grid;
   gap: 0.2rem;
-  padding: 0.55rem 0.65rem;
+  position: relative;
+  min-height: 114px;
+  padding: 0.55rem 5.95rem 0.65rem 0.65rem;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.resource__icon {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  opacity: 0.9;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
+.resource__icon--compact {
+  width: 80px;
+  height: 80px;
+  top: 0.5rem;
+  right: 0.55rem;
 }
 
 .resource__label {
+  position: relative;
+  z-index: 1;
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.13em;
@@ -1179,6 +1203,8 @@ app-root {
 }
 
 .resource__value {
+  position: relative;
+  z-index: 1;
   font-family: var(--font-mono), serif;
   font-size: 0.9rem;
   font-weight: 700;
@@ -1201,16 +1227,41 @@ app-root {
 }
 
 .resource__sub-value {
+  position: relative;
+  z-index: 1;
   font-size: 0.72rem;
   color: #9fe9bd;
   font-family: var(--font-mono), serif;
 }
 
+.resource__capacity {
+  position: relative;
+  z-index: 1;
+  font-size: 0.72rem;
+  font-family: var(--font-mono), serif;
+  color: #cfd8e7;
+}
+
+.resource__capacity--normal {
+  color: #cfd8e7;
+}
+
+.resource__capacity--near {
+  color: #ffaf45;
+}
+
+.resource__capacity--over {
+  color: #ff6b6b;
+}
+
 .resource--power {
   align-content: start;
+  min-height: 128px;
 }
 
 .resource__power-line {
+  position: relative;
+  z-index: 1;
   font-size: 0.74rem;
   color: #cfd8e7;
   font-family: var(--font-mono), serif;

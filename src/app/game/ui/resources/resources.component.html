@@ -45,33 +45,67 @@
   </div>
   <div class="resources-bar__items">
     <div class="resource">
+      <img class="resource__icon" [src]="resourceIcons.metal" alt="" aria-hidden="true" />
       <span class="resource__label">Metal</span>
       <span class="resource__value">
-        {{ formatResource(metal) }}{{ formatCapacitySuffix(metal) }}
+        {{ formatResource(metal) }}
       </span>
+      @if (formatCapacityIndicator(metal); as capacity) {
+        <span
+          class="resource__capacity"
+          [class.resource__capacity--normal]="isStorageNormal(metal)"
+          [class.resource__capacity--near]="isStorageNearLimit(metal)"
+          [class.resource__capacity--over]="isStorageOverLimit(metal)"
+        >
+          {{ capacity }}
+        </span>
+      }
       @if (formatIncome(metal); as income) {
         <span class="resource__sub-value">{{ income }}</span>
       }
     </div>
     <div class="resource">
+      <img class="resource__icon" [src]="resourceIcons.crystal" alt="" aria-hidden="true" />
       <span class="resource__label">Crystal</span>
       <span class="resource__value">
-        {{ formatResource(crystal) }}{{ formatCapacitySuffix(crystal) }}
+        {{ formatResource(crystal) }}
       </span>
+      @if (formatCapacityIndicator(crystal); as capacity) {
+        <span
+          class="resource__capacity"
+          [class.resource__capacity--normal]="isStorageNormal(crystal)"
+          [class.resource__capacity--near]="isStorageNearLimit(crystal)"
+          [class.resource__capacity--over]="isStorageOverLimit(crystal)"
+        >
+          {{ capacity }}
+        </span>
+      }
       @if (formatIncome(crystal); as income) {
         <span class="resource__sub-value">{{ income }}</span>
       }
     </div>
     <div class="resource">
+      <img class="resource__icon" [src]="resourceIcons.deuterium" alt="" aria-hidden="true" />
       <span class="resource__label">Deuterium</span>
       <span class="resource__value">
-        {{ formatResource(deuterium) }}{{ formatCapacitySuffix(deuterium) }}
+        {{ formatResource(deuterium) }}
       </span>
+      @if (formatCapacityIndicator(deuterium); as capacity) {
+        <span
+          class="resource__capacity"
+          [class.resource__capacity--normal]="isStorageNormal(deuterium)"
+          [class.resource__capacity--near]="isStorageNearLimit(deuterium)"
+          [class.resource__capacity--over]="isStorageOverLimit(deuterium)"
+        >
+          {{ capacity }}
+        </span>
+      }
       @if (formatIncome(deuterium); as income) {
         <span class="resource__sub-value">{{ income }}</span>
       }
     </div>
     <div class="resource" [attr.title]="energyTooltip">
+      <img class="resource__icon resource__icon--compact" [src]="resourceIcons.energy" alt="" aria-hidden="true" />
       <span class="resource__label">Energy</span>
       <span
         class="resource__value"
@@ -80,10 +114,11 @@
         [class.resource__value--energy-near]="isEnergyNearLimit(energy)"
         [class.resource__value--energy-safe]="isEnergySafe(energy)"
       >
-        {{ formatResource(energy) }}{{ formatCapacitySuffix(energy) }}{{ energyOverloadLabel(energy) }}
+        {{ formatResource(energy) }}{{ energyOverloadLabel(energy) }}
       </span>
     </div>
     <div class="resource resource--power">
+      <img class="resource__icon resource__icon--compact" [src]="resourceIcons.powers" alt="" aria-hidden="true" />
       <span class="resource__label">Powers</span>
       <span
         class="resource__power-line"
