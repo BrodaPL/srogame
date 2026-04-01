@@ -1,11 +1,11 @@
 import { PlanetType } from '../enums/planet-type';
 
 export class PlanetImageHelper {
-  private static readonly basePath = 'images/planet_blank/small';
+  private static readonly basePath = 'images/planet_blank';
 
-  static getPlanetImage(type: PlanetType, planetSize: number): string {
+  static getPlanetImage(type: PlanetType, planetSize: number, variant: 'normal' | 'small' = 'normal'): string {
     const sizeCode = PlanetImageHelper.resolveSizeCode(planetSize);
-    return `${PlanetImageHelper.basePath}/${type}_${sizeCode}.png`;
+    return `${PlanetImageHelper.basePath}/${variant}/${type}_${sizeCode}.png`;
   }
 
   private static resolveSizeCode(planetSize: number): 'S' | 'M' | 'L' {

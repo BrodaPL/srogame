@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { ClientPlanetDto, ClientReportDataDto } from '../../../models/game-api-types';
 import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
 import { PlayerType } from '../../../models/enums/player-type';
+import { PlanetImageHelper } from '../../../models/planets/planet-image-helper';
 
 type MiniPlanetTagVm = {
   label: string;
@@ -34,8 +35,15 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   }
 
   protected planetImagePath(): string | null {
-    const imagePath = this.planet?.basicInfo.image?.trim() ?? '';
-    return imagePath ? imagePath : null;
+    if (!this.planet) {
+      return null;
+    }
+
+    return PlanetImageHelper.getPlanetImage(
+      this.planet.basicInfo.type,
+      this.planet.basicInfo.size,
+      'small'
+    );
   }
 
   protected coordinatesLabel(): string {

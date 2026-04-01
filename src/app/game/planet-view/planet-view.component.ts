@@ -34,6 +34,7 @@ import type {
   UseTradePortOfferRequest
 } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
+import { PlanetImageHelper } from '../../models/planets/planet-image-helper';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
@@ -457,6 +458,18 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     void navigator.clipboard.writeText(this.coordinatesLabel);
+  }
+
+  protected planetHeroImagePath(): string | null {
+    if (!this.planet) {
+      return null;
+    }
+
+    return PlanetImageHelper.getPlanetImage(
+      this.planet.basicInfo.type,
+      this.planet.basicInfo.size,
+      'normal'
+    );
   }
 
   protected buildingBuildLabel(building: Building): string {

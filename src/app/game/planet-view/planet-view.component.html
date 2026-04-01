@@ -72,11 +72,13 @@
           >
             &lt;
           </button>
-          <img
-            class="planet-view__planet-image"
-            [src]="planet.basicInfo.image"
-            [alt]="planet.basicInfo.name + ' image'"
-          />
+          @if (planetHeroImagePath(); as imagePath) {
+            <img
+              class="planet-view__planet-image"
+              [src]="imagePath"
+              [alt]="planet.basicInfo.name + ' image'"
+            />
+          }
           <button
             type="button"
             class="planet-view__switch-button"
