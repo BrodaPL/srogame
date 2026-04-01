@@ -192,10 +192,12 @@
                   <p class="planet-building-card__section-title">{{ buildingCostHeader(building) }}</p>
                   @for (cost of buildingCostRows(building); track cost.label) {
                     <p
-                      class="planet-building-card__line"
+                      class="planet-building-card__line planet-building-card__line--cost"
                       [class.planet-building-card__line--insufficient]="!cost.isEnough"
                     >
-                      {{ cost.label }}: {{ cost.amount }}
+                      <span class="sr-only">{{ cost.label }}:</span>
+                      <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                      {{ cost.amount }}
                     </p>
                   }
                 </div>
@@ -281,10 +283,12 @@
                   <p class="planet-building-card__section-title">{{ buildingCostHeader(building) }}</p>
                   @for (cost of buildingCostRows(building); track cost.label) {
                     <p
-                      class="planet-building-card__line"
+                      class="planet-building-card__line planet-building-card__line--cost"
                       [class.planet-building-card__line--insufficient]="!cost.isEnough"
                     >
-                      {{ cost.label }}: {{ cost.amount }}
+                      <span class="sr-only">{{ cost.label }}:</span>
+                      <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                      {{ cost.amount }}
                     </p>
                   }
                 </div>
@@ -412,11 +416,13 @@
                   <p class="planet-building-card__section-title planet-building-card__section-title--spaced">Total cost</p>
                   @for (cost of shipTotalCostRows(ship); track cost.label) {
                     <p
-                      class="planet-building-card__line"
+                      class="planet-building-card__line planet-building-card__line--cost"
                       [class.planet-building-card__line--insufficient]="!cost.isEnough && !cost.isPlaceholder"
                       [class.planet-building-card__line--placeholder]="cost.isPlaceholder"
                     >
-                      {{ cost.label }}: {{ cost.amount === null ? '--' : cost.amount }}
+                      <span class="sr-only">{{ cost.label }}:</span>
+                      <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                      {{ cost.amount === null ? '--' : cost.amount }}
                     </p>
                   }
                 </div>
@@ -569,11 +575,13 @@
                   <p class="planet-building-card__section-title planet-building-card__section-title--spaced">Total cost</p>
                   @for (cost of defenceTotalCostRows(defence); track cost.label) {
                     <p
-                      class="planet-building-card__line"
+                      class="planet-building-card__line planet-building-card__line--cost"
                       [class.planet-building-card__line--insufficient]="!cost.isEnough && !cost.isPlaceholder"
                       [class.planet-building-card__line--placeholder]="cost.isPlaceholder"
                     >
-                      {{ cost.label }}: {{ cost.amount === null ? '--' : cost.amount }}
+                      <span class="sr-only">{{ cost.label }}:</span>
+                      <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                      {{ cost.amount === null ? '--' : cost.amount }}
                     </p>
                   }
                 </div>

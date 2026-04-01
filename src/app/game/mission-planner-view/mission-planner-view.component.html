@@ -88,15 +88,24 @@
             } @else {
               <div class="mission-planner__cargo-grid">
                 <label class="mission-planner__cargo-field">
-                  <span>Metal</span>
+                  <span class="mission-planner__resource-label">
+                    <img class="mission-planner__resource-icon" [src]="resourceIcons.metal" alt="" aria-hidden="true" />
+                    Metal
+                  </span>
                   <input type="number" min="0" [(ngModel)]="cargoMetal" />
                 </label>
                 <label class="mission-planner__cargo-field">
-                  <span>Crystal</span>
+                  <span class="mission-planner__resource-label">
+                    <img class="mission-planner__resource-icon" [src]="resourceIcons.crystal" alt="" aria-hidden="true" />
+                    Crystal
+                  </span>
                   <input type="number" min="0" [(ngModel)]="cargoCrystal" />
                 </label>
                 <label class="mission-planner__cargo-field">
-                  <span>Deuterium</span>
+                  <span class="mission-planner__resource-label">
+                    <img class="mission-planner__resource-icon" [src]="resourceIcons.deuterium" alt="" aria-hidden="true" />
+                    Deuterium
+                  </span>
                   <input type="number" min="0" [(ngModel)]="cargoDeuterium" />
                 </label>
               </div>
@@ -234,7 +243,10 @@
                 </div>
                 <div class="overview-stat">
                   <span class="overview-stat__label">Fuel reserve</span>
-                  <span class="overview-stat__value">{{ fuelCostPreview() }}</span>
+                  <span class="overview-stat__value mission-planner__fuel-value">
+                    <span>{{ fuelCostPreview() }}</span>
+                    <img class="mission-planner__fuel-icon" [src]="resourceIcons.deuterium" alt="Deuterium" />
+                  </span>
                 </div>
               </div>
 

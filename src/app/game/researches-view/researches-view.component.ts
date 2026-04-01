@@ -188,6 +188,19 @@ export class ResearchesViewComponent implements OnInit {
     ];
   }
 
+  protected resourceCostIconPath(label: string): string {
+    switch (label) {
+      case 'Metal':
+        return 'images/icons/small/metal.png';
+      case 'Crystal':
+        return 'images/icons/small/crystal.png';
+      case 'Deuterium':
+        return 'images/icons/small/deuter.png';
+      default:
+        return '';
+    }
+  }
+
   protected technologyRequirementRows(technology: Technology): ResearchRequirementRowVm[] {
     const targetLevel = this.technologyTargetLevel(technology.type);
     const firstLab = this.firstAssignedLab(technology.type);

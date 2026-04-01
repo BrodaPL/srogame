@@ -157,7 +157,9 @@
                       class="game-dashboard__cost-chip"
                       [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough"
                     >
-                      {{ cost.label }} {{ cost.amount }}
+                      <span class="sr-only">{{ cost.label }}</span>
+                      <img class="game-dashboard__cost-chip-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                      {{ cost.amount }}
                     </span>
                   }
                 </div>

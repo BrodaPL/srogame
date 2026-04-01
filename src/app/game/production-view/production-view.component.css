@@ -63,6 +63,9 @@
 .production-view__ship-title {
   margin: 0;
   font-size: 0.88rem;
+  max-width: 16ch;
+  line-height: 1.22;
+  overflow-wrap: anywhere;
 }
 
 .production-view__ship-meta {

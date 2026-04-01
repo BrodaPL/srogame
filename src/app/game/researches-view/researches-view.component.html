@@ -144,10 +144,12 @@
                 </p>
                 @for (cost of technologyCostRows(technology); track cost.label) {
                   <p
-                    class="planet-building-card__line"
+                    class="planet-building-card__line planet-building-card__line--cost"
                     [class.planet-building-card__line--insufficient]="!cost.isEnough"
                   >
-                    {{ cost.label }}: {{ cost.amount }}
+                    <span class="sr-only">{{ cost.label }}:</span>
+                    <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                    {{ cost.amount }}
                   </p>
                 }
               </div>

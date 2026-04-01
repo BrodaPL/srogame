@@ -1956,6 +1956,19 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return rows;
   }
 
+  protected resourceCostIconPath(label: string): string {
+    switch (label) {
+      case 'Metal':
+        return 'images/icons/small/metal.png';
+      case 'Crystal':
+        return 'images/icons/small/crystal.png';
+      case 'Deuterium':
+        return 'images/icons/small/deuter.png';
+      default:
+        return '';
+    }
+  }
+
   private createBuildingDetailDialogData(building: Building): PlanetObjectDetailDialogData {
     const currentLevel = this.buildingLevel(building.type);
     const maxPower = this.buildingMaxPowerConsumption(building);

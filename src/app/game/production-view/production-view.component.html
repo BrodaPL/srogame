@@ -178,6 +178,9 @@
                         @for (cost of shipSingleCostRows(ship); track 'single-' + cost.label) {
                           <span
                             class="game-dashboard__cost-chip"
+                            [class.game-dashboard__cost-chip--metal]="cost.label === 'M'"
+                            [class.game-dashboard__cost-chip--crystal]="cost.label === 'C'"
+                            [class.game-dashboard__cost-chip--deuterium]="cost.label === 'D'"
                             [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough"
                           >
                             {{ cost.label }} {{ cost.amount }}
@@ -195,7 +198,9 @@
                             [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough && !cost.isPlaceholder"
                             [class.game-dashboard__cost-chip--placeholder]="cost.isPlaceholder"
                           >
-                            {{ cost.label }} {{ cost.amount === null ? '--' : cost.amount }}
+                            <span class="sr-only">{{ cost.label }}</span>
+                            <img class="game-dashboard__cost-chip-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                            {{ cost.amount === null ? '--' : cost.amount }}
                           </span>
                         }
                       </div>
@@ -277,6 +282,9 @@
                         @for (cost of defenceSingleCostRows(defence); track 'single-' + cost.label) {
                           <span
                             class="game-dashboard__cost-chip"
+                            [class.game-dashboard__cost-chip--metal]="cost.label === 'M'"
+                            [class.game-dashboard__cost-chip--crystal]="cost.label === 'C'"
+                            [class.game-dashboard__cost-chip--deuterium]="cost.label === 'D'"
                             [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough"
                           >
                             {{ cost.label }} {{ cost.amount }}
@@ -294,7 +302,9 @@
                             [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough && !cost.isPlaceholder"
                             [class.game-dashboard__cost-chip--placeholder]="cost.isPlaceholder"
                           >
-                            {{ cost.label }} {{ cost.amount === null ? '--' : cost.amount }}
+                            <span class="sr-only">{{ cost.label }}</span>
+                            <img class="game-dashboard__cost-chip-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                            {{ cost.amount === null ? '--' : cost.amount }}
                           </span>
                         }
                       </div>

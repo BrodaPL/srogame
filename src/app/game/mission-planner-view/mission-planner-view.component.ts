@@ -115,6 +115,12 @@ const MISSION_REGISTRY = FleetMissionRegistry.createDefault();
   templateUrl: './mission-planner-view.component.html'
 })
 export class MissionPlannerViewComponent implements OnInit {
+  protected readonly resourceIcons = {
+    metal: 'images/icons/small/metal.png',
+    crystal: 'images/icons/small/crystal.png',
+    deuterium: 'images/icons/small/deuter.png'
+  } as const;
+
   protected readonly shipPurpose = ShipPurpose;
   protected readonly bombardmentPriorityTarget = BombardmentPriorityTarget;
   protected readonly missionOptions: MissionOption[] = MISSION_REGISTRY.supportedMissions(PHASE_ONE_MISSION_TYPES)

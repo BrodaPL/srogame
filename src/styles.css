@@ -1565,6 +1565,28 @@ app-root {
   cursor: not-allowed;
 }
 
+.mission-planner__resource-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.mission-planner__resource-icon,
+.mission-planner__fuel-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex: 0 0 24px;
+}
+
+.mission-planner__fuel-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  width: 100%;
+}
+
 .game-dashboard__layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
@@ -1617,6 +1639,9 @@ app-root {
 }
 
 .game-dashboard__cost-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
@@ -1624,6 +1649,34 @@ app-root {
   padding: 0.18rem 0.48rem;
   font-size: 0.72rem;
   font-family: var(--font-mono), serif;
+}
+
+.game-dashboard__cost-chip:has(.game-dashboard__cost-chip-icon) {
+  gap: 0.16rem;
+  padding: 0.12rem 0.28rem 0.12rem 0.18rem;
+}
+
+.game-dashboard__cost-chip-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex: 0 0 32px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.22));
+}
+
+.game-dashboard__cost-chip--metal {
+  background: rgba(164, 174, 191, 0.16);
+  border-color: rgba(164, 174, 191, 0.34);
+}
+
+.game-dashboard__cost-chip--crystal {
+  background: rgba(78, 140, 255, 0.2);
+  border-color: rgba(78, 140, 255, 0.35);
+}
+
+.game-dashboard__cost-chip--deuterium {
+  background: rgba(70, 200, 140, 0.2);
+  border-color: rgba(70, 200, 140, 0.34);
 }
 
 .game-dashboard__cost-chip--insufficient {
@@ -2018,6 +2071,20 @@ app-root {
   font-size: 0.75rem;
   color: #cfd8e7;
   font-family: var(--font-mono), serif;
+}
+
+.planet-building-card__line--cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.planet-building-card__cost-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex: 0 0 32px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.28));
 }
 
 .planet-building-card__line--insufficient,

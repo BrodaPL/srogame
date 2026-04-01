@@ -228,6 +228,22 @@ export class BuildingsViewComponent implements OnInit {
     ];
   }
 
+  protected resourceCostIconPath(label: string): string {
+    switch (label) {
+      case 'M':
+      case 'Metal':
+        return 'images/icons/small/metal.png';
+      case 'C':
+      case 'Crystal':
+        return 'images/icons/small/crystal.png';
+      case 'D':
+      case 'Deuterium':
+        return 'images/icons/small/deuter.png';
+      default:
+        return '';
+    }
+  }
+
   protected unmetRequirementRows(building: Building): BuildingRequirementRowVm[] {
     return this.buildingRequirementRows(building).filter((row) => !row.isMet);
   }
