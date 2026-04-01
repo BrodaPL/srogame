@@ -61,6 +61,7 @@ Main shell:
 
 Server bootstrap:
 - `server/src/index.ts`
+- `server/src/game-save.ts`
 
 Smoke runner:
 - `scripts/run-smoke-tests.js`
@@ -116,6 +117,8 @@ Tutorial state:
 Local persistence:
 - `srogame:player` -> auth session + tutorial state + unread report/mail counts + pending incoming request count
 - `srogame:setup` -> last game setup
+- `server/data/auth.json` -> server auth accounts and sessions
+- `server/data/game.json` -> single active galaxy save snapshot written on game start and then by configured end-turn autosave cadence; `/load` can inspect and explicitly load it back into the single active runtime slot
 
 ## API Ownership Map
 
@@ -127,8 +130,16 @@ Auth endpoints:
 
 Game lifecycle:
 - `/api/game/start`
+- `/api/game/save-summary`
+- `/api/game/load`
 - `/api/game/state`
 - `/api/game/end-turn`
+
+Lifecycle persistence note:
+- `/api/game/start` writes the initial single-save snapshot through `server/src/game-save.ts`
+- `/api/game/save-summary` reads `server/data/game.json`, exposes saved metadata, and returns owner/loadability info plus active-runtime summary
+- `/api/game/load` hydrates `server/data/game.json` back into live runtime objects, replaces the active in-memory game, and rebuilds galaxy-presentation caches
+- `/api/game/end-turn` can write `server/data/game.json` when `GalaxySetup.autoSaveTurns` is greater than `0` and the configured cadence is reached
 
 Galaxy and planet reads:
 - `/api/game/client-galaxy`
@@ -421,6 +432,7 @@ Main server file:
 Server responsibilities:
 - auth/session persistence in `server/data/auth.json`
 - current in-memory galaxy owner
+- single-save persistence and hydration through `server/src/game-save.ts`
 - API validation and DTO translation
 - invoking shared domain rules
 - snapshot and report serialization
@@ -553,7 +565,9 @@ Change auth/session behavior:
 
 Change setup/start-game flow:
 - `src/app/setup/`
+- `src/app/load-game/`
 - `src/app/models/game-api-types.ts`
+- `server/src/game-save.ts`
 - `server/src/index.ts`
 - `src/app/models/planets/galaxy-creator.ts`
 

@@ -3,6 +3,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import {
   EndTurnResponse,
   GameStateResponse,
+  GameSaveSummaryResponse,
+  LoadGameResponse,
   StartGameRequest,
   StartGameResponse,
   ClientGalaxyDto,
@@ -70,6 +72,21 @@ export class GameApiService {
   public getGameState(token: string) {
     return this.http.get<GameStateResponse>(
       `${API_BASE_URL}/game/state`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getGameSaveSummary(token?: string) {
+    return this.http.get<GameSaveSummaryResponse>(
+      `${API_BASE_URL}/game/save-summary`,
+      token ? { headers: this.authHeaders(token) } : {}
+    );
+  }
+
+  public loadGame(token: string) {
+    return this.http.post<LoadGameResponse>(
+      `${API_BASE_URL}/game/load`,
+      {},
       { headers: this.authHeaders(token) }
     );
   }

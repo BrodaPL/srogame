@@ -222,6 +222,22 @@
       </div>
 
       <div class="field">
+        <label for="autoSaveTurns">Auto save every N turns</label>
+        <input
+          id="autoSaveTurns"
+          name="autoSaveTurns"
+          type="number"
+          min="0"
+          max="999"
+          step="1"
+          placeholder="5"
+          [(ngModel)]="form.autoSaveTurns"
+          required
+        />
+        <small>Use 0 to disable auto saving after end turn.</small>
+      </div>
+
+      <div class="field">
         <label>Testing options</label>
         <div class="test-options">
           <label class="checkbox-field" for="createRandomPlanets">
@@ -322,6 +338,8 @@
         <p>
           {{ savedConfig()!.galaxyName }} ({{ savedConfig()!.galaxyWidth }}x{{ savedConfig()!.galaxyHeight }}) with
           {{ savedConfig()!.playerAmount }} players, {{ savedConfig()!.botsAmount }} bots.
+          Auto save:
+          {{ savedConfig()!.autoSaveTurns === 0 ? 'disabled' : 'every ' + savedConfig()!.autoSaveTurns + ' turns' }}.
           Starting resources:
           {{ savedConfig()!.startingResources.metal }} metal,
           {{ savedConfig()!.startingResources.crystal }} crystal,

@@ -36,6 +36,7 @@ export type GalaxySetup = {
   botDifficulty: number;
   neutralBotsAmount: number;
   neutralBotsDifficulty: number;
+  autoSaveTurns: number;
   createRandomPlanets?: boolean;
   createStartingShips?: boolean;
   skipTutorial?: boolean;
@@ -46,6 +47,42 @@ export type GalaxySetup = {
     deuterium: number;
   };
 };
+
+export const DEFAULT_AUTO_SAVE_TURNS = 5;
+export const MIN_AUTO_SAVE_TURNS = 0;
+export const MAX_AUTO_SAVE_TURNS = 999;
+
+export type GalaxySetupWithOptionalAutoSaveTurns = Omit<GalaxySetup, 'autoSaveTurns'> & {
+  autoSaveTurns?: unknown;
+};
+
+export function normalizeAutoSaveTurns(
+  value: unknown,
+  fallback = DEFAULT_AUTO_SAVE_TURNS
+): number {
+  const normalizedFallback = Number.isInteger(fallback)
+    ? Math.min(MAX_AUTO_SAVE_TURNS, Math.max(MIN_AUTO_SAVE_TURNS, fallback))
+    : DEFAULT_AUTO_SAVE_TURNS;
+  const parsed = typeof value === 'string'
+    ? Number.parseInt(value, 10)
+    : typeof value === 'number'
+      ? value
+      : Number.NaN;
+  if (!Number.isInteger(parsed)) {
+    return normalizedFallback;
+  }
+
+  return Math.min(MAX_AUTO_SAVE_TURNS, Math.max(MIN_AUTO_SAVE_TURNS, parsed));
+}
+
+export function normalizeGalaxySetup(
+  setup: GalaxySetupWithOptionalAutoSaveTurns
+): GalaxySetup {
+  return {
+    ...setup,
+    autoSaveTurns: normalizeAutoSaveTurns(setup.autoSaveTurns)
+  };
+}
 
 export type PlayerSession = {
   id: number;
@@ -106,6 +143,36 @@ export type GameStateResponse = {
 export type EndTurnResponse = {
   player: PlayerSession;
   galaxy: GalaxySnapshot;
+};
+
+export type LoadGameResponse = {
+  player: PlayerSession;
+  galaxy: GalaxySnapshot;
+};
+
+export type GameSaveSummary = {
+  savedAt: string;
+  ownerAccountId: number;
+  ownerPlayerName: string | null;
+  galaxyName: string;
+  currentTurn: number;
+  autoSaveTurns: number;
+};
+
+export type ActiveGameSummary = {
+  ownerAccountId: number | null;
+  ownerPlayerName: string | null;
+  galaxyName: string;
+  currentTurn: number;
+};
+
+export type GameSaveSummaryResponse = {
+  save: GameSaveSummary | null;
+  activeGame: ActiveGameSummary | null;
+  isLoggedIn: boolean;
+  currentAccountId: number | null;
+  canLoad: boolean;
+  canLoadReason: string | null;
 };
 
 export type SetDiplomaticRelationRequest = {

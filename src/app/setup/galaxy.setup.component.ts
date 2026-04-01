@@ -6,7 +6,11 @@ import { GameStateService } from '../core/game-state.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { NAMES_LIST } from '../models/enums/names-list';
 import { GameType } from '../models/enums/game-type';
-import { GalaxySetup } from '../models/game-api-types';
+import {
+  GalaxySetup,
+  MAX_AUTO_SAVE_TURNS,
+  normalizeGalaxySetup
+} from '../models/game-api-types';
 import { ResourcesPack } from '../models/resources-pack';
 
 type GalaxySetupForm = {
@@ -23,6 +27,7 @@ type GalaxySetupForm = {
   botDifficulty: string;
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
+  autoSaveTurns: string;
   createRandomPlanets: boolean;
   createStartingShips: boolean;
   skipTutorial: boolean;
@@ -58,7 +63,7 @@ export class GalaxySetupComponent {
     }
 
     try {
-      const parsed = JSON.parse(stored) as GalaxySetup;
+      const parsed = normalizeGalaxySetup(JSON.parse(stored) as GalaxySetup);
       if (this.isValidConfig(parsed)) {
         this.savedConfig.set(parsed);
         this.form = this.formFromConfig(parsed);
@@ -86,6 +91,7 @@ export class GalaxySetupComponent {
       -100,
       200
     );
+    const autoSaveTurns = this.parseIntegerInRange(this.form.autoSaveTurns, 0, MAX_AUTO_SAVE_TURNS);
     const metal = this.parseNonNegativeInteger(this.form.startingMetal);
     const crystal = this.parseNonNegativeInteger(this.form.startingCrystal);
     const deuterium = this.parseNonNegativeInteger(this.form.startingDeuterium);
@@ -105,6 +111,7 @@ export class GalaxySetupComponent {
       botDifficulty !== null &&
       neutralBotsAmount !== null &&
       neutralBotsDifficulty !== null &&
+      autoSaveTurns !== null &&
       metal !== null &&
       crystal !== null &&
       deuterium !== null
@@ -138,6 +145,7 @@ export class GalaxySetupComponent {
       botDifficulty: Number(this.form.botDifficulty),
       neutralBotsAmount: Number(this.form.neutralBotsAmount),
       neutralBotsDifficulty: Number(this.form.neutralBotsDifficulty),
+      autoSaveTurns: Number(this.form.autoSaveTurns),
       createRandomPlanets: this.form.createRandomPlanets,
       createStartingShips: this.form.createStartingShips,
       skipTutorial: this.form.skipTutorial,
@@ -182,6 +190,7 @@ export class GalaxySetupComponent {
       botDifficulty: '0',
       neutralBotsAmount: '1',
       neutralBotsDifficulty: '0',
+      autoSaveTurns: '5',
       createRandomPlanets: false,
       createStartingShips: false,
       skipTutorial: true,
@@ -206,6 +215,7 @@ export class GalaxySetupComponent {
       botDifficulty: String(config.botDifficulty),
       neutralBotsAmount: String(config.neutralBotsAmount),
       neutralBotsDifficulty: String(config.neutralBotsDifficulty),
+      autoSaveTurns: String(config.autoSaveTurns),
       createRandomPlanets: config.createRandomPlanets === true,
       createStartingShips: config.createStartingShips === true,
       skipTutorial: config.skipTutorial === true,
@@ -280,6 +290,9 @@ export class GalaxySetupComponent {
       Number.isInteger(config.neutralBotsDifficulty) &&
       config.neutralBotsDifficulty >= -100 &&
       config.neutralBotsDifficulty <= 200 &&
+      Number.isInteger(config.autoSaveTurns) &&
+      config.autoSaveTurns >= 0 &&
+      config.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&
       (config.createRandomPlanets === undefined || typeof config.createRandomPlanets === 'boolean') &&
       (config.createStartingShips === undefined || typeof config.createStartingShips === 'boolean') &&
       (config.skipTutorial === undefined || typeof config.skipTutorial === 'boolean') &&

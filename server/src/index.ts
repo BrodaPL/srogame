@@ -5,6 +5,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import {
+  MAX_AUTO_SAVE_TURNS,
+  normalizeGalaxySetup
+} from '../../src/app/models/game-api-types.js';
 import galaxyCreatorModule from '../../src/app/models/planets/galaxy-creator.js';
 import planetAbandonmentModule from '../../src/app/models/planets/planet-abandonment.js';
 import galaxyPresentationDataModule from '../../src/app/models/planets/galaxy-presentation-data.js';
@@ -45,6 +49,15 @@ import technologyEffectsModule from '../../src/app/models/tech/technology-effect
 import phaseOneTurnResolverModule from '../../src/app/models/turns/phase-one-turn-resolver.js';
 import smokeTestScenariosModule from '../../src/app/models/testing/smoke-test-scenarios.js';
 import queueManagementModule from '../../src/app/models/queues/queue-management.js';
+import {
+  buildGameSaveSummary,
+  createGameSave,
+  hydrateGameSave,
+  readGameSave,
+  resolveGameSaveLoadAccess,
+  saveGameFile,
+  shouldAutoSaveAfterTurn
+} from './game-save.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
 import fleetReportModule from '../../src/app/models/reports/fleet-report.js';
 import sensorPhalanxReportModule from '../../src/app/models/reports/sensor-phalanx-report.js';
@@ -52,9 +65,11 @@ import resourcesPackModule from '../../src/app/models/resources-pack.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   EndTurnResponse,
+  GameSaveSummaryResponse,
   GalaxySetup,
   PlayerSession,
   GalaxySnapshot,
+  LoadGameResponse,
   StartGameRequest,
   StartGameResponse,
   GameStateResponse,
@@ -306,7 +321,6 @@ const { SensorPhalanxReport: SensorPhalanxReportModel } = sensorPhalanxReportMod
 const { ResourcesPack } = resourcesPackModule as {
   ResourcesPack: typeof import('../../src/app/models/resources-pack.js').ResourcesPack;
 };
-
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -316,6 +330,10 @@ app.use(express.json());
 const AUTH_DATA_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../data/auth.json'
+);
+const GAME_SAVE_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../data/game.json'
 );
 const PLAYER_NAME_MIN = 3;
 const PLAYER_NAME_MAX = 24;
@@ -365,6 +383,8 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
 
 let currentGalaxy: Galaxy | null = null;
 let currentGameOwnerId: number | null = null;
+let currentGameOwnerPlayerName: string | null = null;
+let currentGameSetup: GalaxySetup | null = null;
 let currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
 let isTurnProcessing = false;
 
@@ -456,25 +476,108 @@ app.post('/api/game/start', (req, res) => {
   }
 
   const body = req.body as StartGameRequest | undefined;
-  if (!body || !isValidSetup(body.setup)) {
+  if (!body || !body.setup) {
     return res.status(400).json({ error: 'Invalid setup payload.' });
   }
 
-  currentGalaxy = new GalaxyCreator(body.setup).createGalaxy([auth.session.playerName]);
-  if (body.setup.smokeTestScenario) {
-    applySmokeTestScenario(currentGalaxy, body.setup.smokeTestScenario);
+  const setup = normalizeGalaxySetup(body.setup);
+  if (!isValidSetup(setup)) {
+    return res.status(400).json({ error: 'Invalid setup payload.' });
   }
+
+  const nextGalaxy = new GalaxyCreator(setup).createGalaxy([auth.session.playerName]);
+  if (setup.smokeTestScenario) {
+    applySmokeTestScenario(nextGalaxy, setup.smokeTestScenario);
+  }
+  synchronizeTradePortState(nextGalaxy);
+  generateSelfReportsForHumanPlayers(nextGalaxy, nextGalaxy.currentTurn);
+  const nextPresentation = buildPresentationDataByPlayer(nextGalaxy);
+
+  try {
+    saveGameFile(GAME_SAVE_PATH, createGameSave(nextGalaxy, auth.session.accountId, setup));
+  } catch (error) {
+    console.error('Initial game save failed.', error);
+    return res.status(500).json({ error: 'Unable to save the new game.' });
+  }
+
+  currentGalaxy = nextGalaxy;
   currentGameOwnerId = auth.session.accountId;
-  synchronizeTradePortState(currentGalaxy);
-  generateSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
-  currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+  currentGameOwnerPlayerName = auth.session.playerName;
+  currentGameSetup = setup;
+  currentGalaxyPresentationByPlayer = nextPresentation;
 
   const response: StartGameResponse = {
-    player: toPlayerSession(auth.session, currentGalaxy),
-    galaxy: buildGalaxySnapshot(currentGalaxy)
+    player: toPlayerSession(auth.session, nextGalaxy),
+    galaxy: buildGalaxySnapshot(nextGalaxy)
   };
 
   return res.status(200).json(response);
+});
+
+app.get('/api/game/save-summary', (req, res) => {
+  const auth = getAuthSession(req);
+
+  try {
+    const save = readGameSave(GAME_SAVE_PATH);
+    const currentAccountId = auth?.session.accountId ?? null;
+    const loadAccess = resolveGameSaveLoadAccess(save, currentAccountId);
+    const response: GameSaveSummaryResponse = {
+      save: save ? buildGameSaveSummary(save) : null,
+      activeGame: currentGalaxy
+        ? {
+          ownerAccountId: currentGameOwnerId,
+          ownerPlayerName: currentGameOwnerPlayerName,
+          galaxyName: currentGalaxy.name,
+          currentTurn: currentGalaxy.currentTurn
+        }
+        : null,
+      isLoggedIn: !!auth,
+      currentAccountId,
+      canLoad: loadAccess.canLoad,
+      canLoadReason: loadAccess.canLoadReason
+    };
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error('Failed to read saved game summary.', error);
+    return res.status(500).json({ error: 'Unable to read saved game.' });
+  }
+});
+
+app.post('/api/game/load', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  try {
+    const save = readGameSave(GAME_SAVE_PATH);
+    if (!save) {
+      return res.status(404).json({ error: 'No saved game found.' });
+    }
+
+    const loadAccess = resolveGameSaveLoadAccess(save, auth.session.accountId);
+    if (!loadAccess.canLoad) {
+      return res.status(403).json({ error: loadAccess.canLoadReason ?? 'Forbidden.' });
+    }
+
+    const hydrated = hydrateGameSave(save);
+    currentGalaxy = hydrated.galaxy;
+    currentGameOwnerId = hydrated.ownerAccountId;
+    currentGameOwnerPlayerName = hydrated.ownerPlayerName;
+    currentGameSetup = hydrated.setup;
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+
+    const response: LoadGameResponse = {
+      player: toPlayerSession(auth.session, currentGalaxy),
+      galaxy: buildGalaxySnapshot(currentGalaxy)
+    };
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error('Failed to load saved game.', error);
+    return res.status(500).json({ error: 'Unable to load saved game.' });
+  }
 });
 
 app.get('/api/game/state', (req, res) => {
@@ -1104,6 +1207,13 @@ app.post('/api/game/end-turn', (req, res) => {
     synchronizeTradePortState(currentGalaxy);
     refreshOwnedPlanetSelfReportsForHumanPlayers(currentGalaxy, currentGalaxy.currentTurn);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+    if (currentGameSetup && shouldAutoSaveAfterTurn(currentGalaxy.currentTurn, currentGameSetup.autoSaveTurns)) {
+      try {
+        saveCurrentGameSnapshot();
+      } catch (error) {
+        console.error(`Auto save failed on turn ${currentGalaxy.currentTurn}.`, error);
+      }
+    }
 
     const response: EndTurnResponse = {
       player: toPlayerSession(auth.session, currentGalaxy),
@@ -2962,6 +3072,17 @@ function saveAuthData(data: AuthData): void {
 function ensureAuthDirectory(): void {
   const dir = path.dirname(AUTH_DATA_PATH);
   fs.mkdirSync(dir, { recursive: true });
+}
+
+function saveCurrentGameSnapshot(): void {
+  if (!currentGalaxy || currentGameOwnerId === null || !currentGameSetup) {
+    throw new Error('No active game snapshot available.');
+  }
+
+  saveGameFile(
+    GAME_SAVE_PATH,
+    createGameSave(currentGalaxy, currentGameOwnerId, currentGameSetup)
+  );
 }
 
 function createSession(data: AuthData, account: AuthAccount, timestamp: string): AuthSession {
@@ -6180,6 +6301,9 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Number.isInteger(setup.neutralBotsDifficulty) &&
     setup.neutralBotsDifficulty >= -100 &&
     setup.neutralBotsDifficulty <= 200 &&
+    Number.isInteger(setup.autoSaveTurns) &&
+    setup.autoSaveTurns >= 0 &&
+    setup.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&
     (setup.createRandomPlanets === undefined || typeof setup.createRandomPlanets === 'boolean') &&
     (setup.createStartingShips === undefined || typeof setup.createStartingShips === 'boolean') &&
     (setup.skipTutorial === undefined || typeof setup.skipTutorial === 'boolean') &&

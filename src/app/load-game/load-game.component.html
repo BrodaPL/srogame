@@ -1,10 +1,91 @@
 <main class="page">
-  <section class="panel panel--compact">
+  <section class="panel">
     <header class="panel__header">
       <p class="eyebrow">Load Game</p>
       <h1>Load Game</h1>
-      <p class="subtitle">Saved games will appear here.</p>
+      <p class="subtitle">Inspect the current server save and replace the active runtime game.</p>
     </header>
+
+    @if (isSummaryLoading && !summary) {
+      <div class="saved">
+        <p class="saved__title">Loading</p>
+        <p>Reading saved game summary from the server.</p>
+      </div>
+    } @else if (summaryError) {
+      <div class="saved">
+        <p class="saved__title">Summary Error</p>
+        <p>{{ summaryError }}</p>
+      </div>
+    } @else if (!summary?.save) {
+      <div class="saved">
+        <p class="saved__title">No Save Found</p>
+        <p>The server does not currently have a `server/data/game.json` save file.</p>
+      </div>
+    } @else {
+      <div class="saved">
+        <p class="saved__title">Saved Game</p>
+        <p>
+          Galaxy: {{ summary!.save!.galaxyName }}.
+          Turn: {{ summary!.save!.currentTurn }}.
+          Owner: {{ summary!.save!.ownerPlayerName ?? 'Unknown' }} (account {{ summary!.save!.ownerAccountId }}).
+          Saved: {{ summary!.save!.savedAt }}.
+          Auto save:
+          {{ summary!.save!.autoSaveTurns === 0 ? 'disabled' : 'every ' + summary!.save!.autoSaveTurns + ' turns' }}.
+        </p>
+      </div>
+    }
+
+    @if (summary; as currentSummary) {
+      @if (currentSummary.activeGame) {
+        <div class="saved">
+          <p class="saved__title">Active Runtime Game</p>
+          <p>
+            Galaxy: {{ currentSummary.activeGame.galaxyName }}.
+            Turn: {{ currentSummary.activeGame.currentTurn }}.
+            Owner: {{ currentSummary.activeGame.ownerPlayerName ?? 'Unknown' }}
+            @if (currentSummary.activeGame.ownerAccountId !== null) {
+              <span>(account {{ currentSummary.activeGame.ownerAccountId }})</span>
+            }.
+          </p>
+          <p class="form-error">Loading will replace the currently active in-memory game.</p>
+        </div>
+      }
+
+      @if (currentSummary.save && !currentSummary.canLoad && currentSummary.canLoadReason) {
+        <p class="form-error">{{ currentSummary.canLoadReason }}</p>
+      }
+    }
+
+    @if (!session()) {
+      <a class="link button" routerLink="/login">Login to load</a>
+    }
+
+    @if (summary?.save && summary?.activeGame) {
+      <div class="field">
+        <label class="checkbox-field" for="confirmReplaceActiveGame">
+          <input
+            id="confirmReplaceActiveGame"
+            name="confirmReplaceActiveGame"
+            type="checkbox"
+            [(ngModel)]="confirmReplaceActiveGame"
+          />
+          <span>I understand that loading will replace the active game.</span>
+        </label>
+      </div>
+    }
+
+    @if (loadError) {
+      <p class="form-error">{{ loadError }}</p>
+    }
+
+    <div class="field-row">
+      <button class="start-button" type="button" (click)="loadGame()" [disabled]="!canLoadGame()">
+        {{ isLoadAction ? 'Loading...' : 'Load saved game' }}
+      </button>
+      <button class="start-button" type="button" (click)="loadSummary()" [disabled]="isSummaryLoading || isLoadAction">
+        {{ isSummaryLoading ? 'Refreshing...' : 'Refresh summary' }}
+      </button>
+    </div>
 
     <a class="link button" routerLink="/">Back to main menu</a>
   </section>
