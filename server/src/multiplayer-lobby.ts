@@ -1,5 +1,5 @@
-import { GameType } from '../../src/app/models/enums/game-type.js';
-import { PlayerType } from '../../src/app/models/enums/player-type.js';
+import * as gameTypeEnumModule from '../../src/app/models/enums/game-type.js';
+import * as playerTypeEnumModule from '../../src/app/models/enums/player-type.js';
 import type {
   GameSaveSummary,
   GalaxySetup,
@@ -7,9 +7,20 @@ import type {
   MultiplayerLobbyLoadSeatDto,
   MultiplayerLobbyMemberDto
 } from '../../src/app/models/game-api-types.ts';
-import { DEFAULT_AUTO_SAVE_TURNS, normalizeGalaxySetup } from '../../src/app/models/game-api-types.js';
+import * as gameApiTypesModule from '../../src/app/models/game-api-types.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type { SavedGameFile } from './game-save.js';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { GameType } = resolveModule(gameTypeEnumModule) as typeof import('../../src/app/models/enums/game-type.js');
+const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../../src/app/models/enums/player-type.js');
+const {
+  DEFAULT_AUTO_SAVE_TURNS,
+  normalizeGalaxySetup
+} = resolveModule(gameApiTypesModule) as typeof import('../../src/app/models/game-api-types.js');
 
 export type MultiplayerLobbyMode = 'NEW_GAME' | 'LOAD_SAVE';
 

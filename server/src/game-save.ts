@@ -1,52 +1,103 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { normalizeGalaxySetup } from '../../src/app/models/game-api-types.js';
-import { BuildingQueueEntry } from '../../src/app/models/buildings/building-queue-entry.js';
-import { ManyDefences } from '../../src/app/models/defences/many-defences.js';
-import { Destination } from '../../src/app/models/fleets/destination.js';
-import { Fleet } from '../../src/app/models/fleets/fleet.js';
-import { ManyShips } from '../../src/app/models/fleets/many-ships.js';
-import { PlayerMessage as PlayerMessageModel } from '../../src/app/models/mail/player-message.js';
-import { Player } from '../../src/app/models/player.js';
-import { Galaxy } from '../../src/app/models/planets/galaxy.js';
-import { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ } from '../../src/app/models/planets/planet.js';
-import { PlanetaryParameters as PlanetaryParametersModel } from '../../src/app/models/planets/planetary-parameters.js';
-import { SolarSystem } from '../../src/app/models/planets/solar-system.js';
-import { StarSystemNote as StarSystemNoteModel } from '../../src/app/models/planets/star-system-note.js';
-import { BuildingQueue } from '../../src/app/models/reports/building-queue.js';
-import { BuildingsReport } from '../../src/app/models/reports/buildings-report.js';
-import { ColonizationReport } from '../../src/app/models/reports/colonization-report.js';
-import { DefenseReport } from '../../src/app/models/reports/defense-report.js';
-import { DefenceBuildingInstances } from '../../src/app/models/reports/defence-building-instances.js';
-import { DefencesQueue } from '../../src/app/models/reports/defences-queue.js';
-import { EspionageReportData as EspionageReportDataModel } from '../../src/app/models/reports/espionage-report-data.js';
-import { FleetReport } from '../../src/app/models/reports/fleet-report.js';
-import { MessageReport } from '../../src/app/models/reports/message-report.js';
-import { ProductionReport } from '../../src/app/models/reports/production-report.js';
-import { ResearchQueue } from '../../src/app/models/reports/research-queue.js';
-import { ResearchReport } from '../../src/app/models/reports/research-report.js';
-import { SensorPhalanxReport } from '../../src/app/models/reports/sensor-phalanx-report.js';
-import { ShipyardQueue } from '../../src/app/models/reports/shipyard-queue.js';
-import { StarSystemEspionageReport } from '../../src/app/models/reports/star-system-espionage-report.js';
-import { ResourcesPack as ResourcesPackModel } from '../../src/app/models/resources-pack.js';
-import { ReportType } from '../../src/app/models/enums/report-type.js';
-import { PlayerType } from '../../src/app/models/enums/player-type.js';
-import { ShipyardQueueEntry } from '../../src/app/models/fleets/shipyard-queue-entry.js';
-import { TechnologyQueueEntry } from '../../src/app/models/tech/technology-queue-entry.js';
-import { ResearchHelperFor } from '../../src/app/models/tech/research-helper-for.js';
+import * as gameApiTypesModule from '../../src/app/models/game-api-types.js';
+import * as buildingQueueEntryModule from '../../src/app/models/buildings/building-queue-entry.js';
+import * as manyDefencesModule from '../../src/app/models/defences/many-defences.js';
+import * as destinationModule from '../../src/app/models/fleets/destination.js';
+import * as fleetModule from '../../src/app/models/fleets/fleet.js';
+import * as manyShipsModule from '../../src/app/models/fleets/many-ships.js';
+import * as playerMessageModule from '../../src/app/models/mail/player-message.js';
+import * as playerModule from '../../src/app/models/player.js';
+import * as galaxyModule from '../../src/app/models/planets/galaxy.js';
+import * as planetModule from '../../src/app/models/planets/planet.js';
+import * as planetaryParametersModule from '../../src/app/models/planets/planetary-parameters.js';
+import * as solarSystemModule from '../../src/app/models/planets/solar-system.js';
+import * as starSystemNoteModule from '../../src/app/models/planets/star-system-note.js';
+import * as buildingQueueModule from '../../src/app/models/reports/building-queue.js';
+import * as buildingsReportModule from '../../src/app/models/reports/buildings-report.js';
+import * as colonizationReportModule from '../../src/app/models/reports/colonization-report.js';
+import * as defenseReportModule from '../../src/app/models/reports/defense-report.js';
+import * as defenceBuildingInstancesModule from '../../src/app/models/reports/defence-building-instances.js';
+import * as defencesQueueModule from '../../src/app/models/reports/defences-queue.js';
+import * as espionageReportDataModule from '../../src/app/models/reports/espionage-report-data.js';
+import * as fleetReportModule from '../../src/app/models/reports/fleet-report.js';
+import * as messageReportModule from '../../src/app/models/reports/message-report.js';
+import * as productionReportModule from '../../src/app/models/reports/production-report.js';
+import * as researchQueueModule from '../../src/app/models/reports/research-queue.js';
+import * as researchReportModule from '../../src/app/models/reports/research-report.js';
+import * as sensorPhalanxReportModule from '../../src/app/models/reports/sensor-phalanx-report.js';
+import * as shipyardQueueModule from '../../src/app/models/reports/shipyard-queue.js';
+import * as starSystemEspionageReportModule from '../../src/app/models/reports/star-system-espionage-report.js';
+import * as resourcesPackModule from '../../src/app/models/resources-pack.js';
+import * as reportTypeEnumModule from '../../src/app/models/enums/report-type.js';
+import * as playerTypeEnumModule from '../../src/app/models/enums/player-type.js';
+import * as shipyardQueueEntryModule from '../../src/app/models/fleets/shipyard-queue-entry.js';
+import * as technologyQueueEntryModule from '../../src/app/models/tech/technology-queue-entry.js';
+import * as researchHelperForModule from '../../src/app/models/tech/research-helper-for.js';
 import type {
   GameSaveSummary,
   GalaxySetup
 } from '../../src/app/models/game-api-types.ts';
+import type { BuildingQueueEntry as BuildingQueueEntryModel } from '../../src/app/models/buildings/building-queue-entry.ts';
+import type { Fleet as FleetModel } from '../../src/app/models/fleets/fleet.ts';
+import type { ShipyardQueueEntry as ShipyardQueueEntryModel } from '../../src/app/models/fleets/shipyard-queue-entry.ts';
 import type { PlayerReport } from '../../src/app/models/reports/player-report.ts';
 import type { EspionageReportData } from '../../src/app/models/reports/espionage-report-data.ts';
 import type { ManyShipsLike } from '../../src/app/models/fleets/many-ships.ts';
 import type { ManyDefencesLike } from '../../src/app/models/defences/many-defences.ts';
 import type { PlayerMessage } from '../../src/app/models/mail/player-message.ts';
+import type { PlayerMessage as PlayerMessageModelType } from '../../src/app/models/mail/player-message.ts';
+import type { Player as PlayerModel } from '../../src/app/models/player.ts';
+import type { Galaxy as GalaxyModel } from '../../src/app/models/planets/galaxy.ts';
+import type { Planet as PlanetModel } from '../../src/app/models/planets/planet.ts';
+import type { SolarSystem as SolarSystemModel } from '../../src/app/models/planets/solar-system.ts';
 import type { ResourcesPack } from '../../src/app/models/resources-pack.ts';
+import type { ResourcesPack as ResourcesPackModelType } from '../../src/app/models/resources-pack.ts';
 import type { PlanetaryParameters } from '../../src/app/models/planets/planetary-parameters.ts';
+import type { PlanetaryParameters as PlanetaryParametersModelType } from '../../src/app/models/planets/planetary-parameters.ts';
 import type { StarSystemNote } from '../../src/app/models/planets/star-system-note.ts';
 import type { DefenceType } from '../../src/app/models/enums/defence-type.ts';
+import type { TechnologyQueueEntry as TechnologyQueueEntryModel } from '../../src/app/models/tech/technology-queue-entry.ts';
+import type { ResearchHelperFor as ResearchHelperForModel } from '../../src/app/models/tech/research-helper-for.ts';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { BuildingQueueEntry } = resolveModule(buildingQueueEntryModule) as typeof import('../../src/app/models/buildings/building-queue-entry.js');
+const { ManyDefences } = resolveModule(manyDefencesModule) as typeof import('../../src/app/models/defences/many-defences.js');
+const { Destination } = resolveModule(destinationModule) as typeof import('../../src/app/models/fleets/destination.js');
+const { Fleet } = resolveModule(fleetModule) as typeof import('../../src/app/models/fleets/fleet.js');
+const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../src/app/models/fleets/many-ships.js');
+const { PlayerMessage: PlayerMessageModel } = resolveModule(playerMessageModule) as typeof import('../../src/app/models/mail/player-message.js');
+const { Player } = resolveModule(playerModule) as typeof import('../../src/app/models/player.js');
+const { Galaxy } = resolveModule(galaxyModule) as typeof import('../../src/app/models/planets/galaxy.js');
+const { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ } = resolveModule(planetModule) as typeof import('../../src/app/models/planets/planet.js');
+const { PlanetaryParameters: PlanetaryParametersModel } = resolveModule(planetaryParametersModule) as typeof import('../../src/app/models/planets/planetary-parameters.js');
+const { SolarSystem } = resolveModule(solarSystemModule) as typeof import('../../src/app/models/planets/solar-system.js');
+const { StarSystemNote: StarSystemNoteModel } = resolveModule(starSystemNoteModule) as typeof import('../../src/app/models/planets/star-system-note.js');
+const { BuildingQueue } = resolveModule(buildingQueueModule) as typeof import('../../src/app/models/reports/building-queue.js');
+const { BuildingsReport } = resolveModule(buildingsReportModule) as typeof import('../../src/app/models/reports/buildings-report.js');
+const { ColonizationReport } = resolveModule(colonizationReportModule) as typeof import('../../src/app/models/reports/colonization-report.js');
+const { DefenseReport } = resolveModule(defenseReportModule) as typeof import('../../src/app/models/reports/defense-report.js');
+const { DefenceBuildingInstances } = resolveModule(defenceBuildingInstancesModule) as typeof import('../../src/app/models/reports/defence-building-instances.js');
+const { DefencesQueue } = resolveModule(defencesQueueModule) as typeof import('../../src/app/models/reports/defences-queue.js');
+const { EspionageReportData: EspionageReportDataModel } = resolveModule(espionageReportDataModule) as typeof import('../../src/app/models/reports/espionage-report-data.js');
+const { FleetReport } = resolveModule(fleetReportModule) as typeof import('../../src/app/models/reports/fleet-report.js');
+const { MessageReport } = resolveModule(messageReportModule) as typeof import('../../src/app/models/reports/message-report.js');
+const { ProductionReport } = resolveModule(productionReportModule) as typeof import('../../src/app/models/reports/production-report.js');
+const { ResearchQueue } = resolveModule(researchQueueModule) as typeof import('../../src/app/models/reports/research-queue.js');
+const { ResearchReport } = resolveModule(researchReportModule) as typeof import('../../src/app/models/reports/research-report.js');
+const { SensorPhalanxReport } = resolveModule(sensorPhalanxReportModule) as typeof import('../../src/app/models/reports/sensor-phalanx-report.js');
+const { ShipyardQueue } = resolveModule(shipyardQueueModule) as typeof import('../../src/app/models/reports/shipyard-queue.js');
+const { StarSystemEspionageReport } = resolveModule(starSystemEspionageReportModule) as typeof import('../../src/app/models/reports/star-system-espionage-report.js');
+const { ResourcesPack: ResourcesPackModel } = resolveModule(resourcesPackModule) as typeof import('../../src/app/models/resources-pack.js');
+const { normalizeGalaxySetup } = resolveModule(gameApiTypesModule) as typeof import('../../src/app/models/game-api-types.js');
+const { ReportType } = resolveModule(reportTypeEnumModule) as typeof import('../../src/app/models/enums/report-type.js');
+const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../../src/app/models/enums/player-type.js');
+const { ShipyardQueueEntry } = resolveModule(shipyardQueueEntryModule) as typeof import('../../src/app/models/fleets/shipyard-queue-entry.js');
+const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as typeof import('../../src/app/models/tech/technology-queue-entry.js');
+const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../src/app/models/tech/research-helper-for.js');
 
 export const GAME_SAVE_VERSION = 1;
 
@@ -133,8 +184,8 @@ type SavedPlayerMessage = {
 type SavedPlayer = {
   playerId: number;
   playerName: string;
-  type: Player['type'];
-  tutorialRead: Player['tutorialRead'];
+  type: PlayerModel['type'];
+  tutorialRead: PlayerModel['tutorialRead'];
   nextReportId: number;
   nextMessageId: number;
   techLevels: Record<string, number>;
@@ -154,7 +205,7 @@ type SavedStarSystemNote = {
 type SavedFleet = {
   fleetId: number;
   ownerId: number;
-  missionType: Fleet['missionType'];
+  missionType: FleetModel['missionType'];
   origin: SavedCoordinates;
   target: SavedCoordinates;
   originPlanetName: string;
@@ -166,25 +217,25 @@ type SavedFleet = {
   usedCargoCapacity: number;
   travelTurns: number;
   returnTurns: number;
-  state: Fleet['state'];
+  state: FleetModel['state'];
   createdAtTurn: number;
   carriedBombs: SavedManyDefences;
-  orbitActivity: Fleet['orbitActivity'];
-  suspendedMissionType: Fleet['suspendedMissionType'];
-  returnReason: Fleet['returnReason'];
+  orbitActivity: FleetModel['orbitActivity'];
+  suspendedMissionType: FleetModel['suspendedMissionType'];
+  returnReason: FleetModel['returnReason'];
   maintenanceRequestAvailable: boolean;
   pendingMaintenanceRequestId: number | null;
   usesJumpGate: boolean;
   pendingJumpGateRequestId: number | null;
   lastMaintenanceRequestTurn: number | null;
-  bombardmentPriorities: Fleet['bombardmentPriorities'];
+  bombardmentPriorities: FleetModel['bombardmentPriorities'];
   remainingFuelReserve: number;
 };
 
 type SavedPlanet = {
   basicInfo: {
     name: string;
-    type: Planet['basicInfo']['type'];
+    type: PlanetModel['basicInfo']['type'];
     colonizationDifficulty: number;
     order: number;
     image: string;
@@ -202,13 +253,13 @@ type SavedPlanet = {
     buildingsCurrentStructuralPoints: Record<string, number>;
     defences: SavedManyDefences;
     ships: SavedManyShips;
-    currentResearchQueue: TechnologyQueueEntry | null;
-    researchHelperFor: ResearchHelperFor | null;
-    buildingQueue: BuildingQueueEntry[];
-    shipyardQueue: ShipyardQueueEntry[];
+    currentResearchQueue: TechnologyQueueEntryModel | null;
+    researchHelperFor: ResearchHelperForModel | null;
+    buildingQueue: BuildingQueueEntryModel[];
+    shipyardQueue: ShipyardQueueEntryModel[];
     fleetIds: number[];
     spaceDebris: SavedResourcesPack;
-    tradePortOffers: Planet['rBDSFTQ']['tradePortOffers'];
+    tradePortOffers: PlanetModel['rBDSFTQ']['tradePortOffers'];
     sensorPhalanxScansUsedTurn: number | null;
     sensorPhalanxScansUsed: number;
     sensorPhalanxKnownIncomingFleetIds: number[];
@@ -240,10 +291,10 @@ type SavedGalaxy = {
   players: SavedPlayer[];
   stars: SavedSolarSystem[][];
   activeFleets: SavedFleet[];
-  diplomaticRelations: Galaxy['diplomaticRelations'];
-  diplomaticProposals: Galaxy['diplomaticProposals'];
-  jumpGateRequests: Galaxy['jumpGateRequests'];
-  maintenanceRequests: Galaxy['maintenanceRequests'];
+  diplomaticRelations: GalaxyModel['diplomaticRelations'];
+  diplomaticProposals: GalaxyModel['diplomaticProposals'];
+  jumpGateRequests: GalaxyModel['jumpGateRequests'];
+  maintenanceRequests: GalaxyModel['maintenanceRequests'];
 };
 
 export type SavedGameFile = {
@@ -259,7 +310,7 @@ export type HydratedGameSave = {
   ownerAccountId: number;
   ownerPlayerName: string | null;
   setup: GalaxySetup;
-  galaxy: Galaxy;
+  galaxy: GalaxyModel;
 };
 
 export type GameSaveLoadAccess = {
@@ -268,7 +319,7 @@ export type GameSaveLoadAccess = {
 };
 
 export function createGameSave(
-  galaxy: Galaxy,
+  galaxy: GalaxyModel,
   ownerAccountId: number,
   setup: GalaxySetup,
   savedAt = new Date().toISOString()
@@ -403,7 +454,7 @@ export function resolveGameSaveLoadAccess(
 export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
   const players = save.galaxy.players.map((player) => hydrateSavedPlayer(player));
   const playersById = new Map(players.map((player) => [player.playerId, player]));
-  const planetsByCoordinates = new Map<string, Planet>();
+  const planetsByCoordinates = new Map<string, PlanetModel>();
   const planetFleetIdsByCoordinates = new Map<string, number[]>();
 
   const stars = save.galaxy.stars.map((row) =>
@@ -421,17 +472,17 @@ export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
 
     player.planets = savedPlayer.planetCoordinates
       .map((coordinates) => planetsByCoordinates.get(toCoordinatesKey(coordinates)))
-      .filter((planet): planet is Planet => !!planet);
+      .filter((planet): planet is PlanetModel => !!planet);
     player.fleets = savedPlayer.fleetIds
       .map((fleetId) => fleetsById.get(fleetId))
-      .filter((fleet): fleet is Fleet => !!fleet);
+      .filter((fleet): fleet is FleetModel => !!fleet);
   }
 
   for (const [coordinatesKey, planet] of planetsByCoordinates.entries()) {
     const fleetIds = planetFleetIdsByCoordinates.get(coordinatesKey) ?? [];
     planet.rBDSFTQ.fleets = fleetIds
       .map((fleetId) => fleetsById.get(fleetId))
-      .filter((fleet): fleet is Fleet => !!fleet);
+      .filter((fleet): fleet is FleetModel => !!fleet);
   }
 
   const galaxy = new Galaxy(
@@ -493,7 +544,7 @@ function ensureSaveDirectory(saveFilePath: string): void {
   fs.mkdirSync(path.dirname(saveFilePath), { recursive: true });
 }
 
-function hydrateSavedPlayer(savedPlayer: SavedPlayer): Player {
+function hydrateSavedPlayer(savedPlayer: SavedPlayer): PlayerModel {
   const player = new Player(
     savedPlayer.playerId,
     savedPlayer.playerName,
@@ -515,9 +566,9 @@ function hydrateSavedPlayer(savedPlayer: SavedPlayer): Player {
 
 function hydrateSavedSolarSystem(
   savedSystem: SavedSolarSystem,
-  planetsByCoordinates: Map<string, Planet>,
+  planetsByCoordinates: Map<string, PlanetModel>,
   planetFleetIdsByCoordinates: Map<string, number[]>
-): SolarSystem {
+): SolarSystemModel {
   const starSystemNotes = new Map(
     savedSystem.starSystemNotes.map((note) => [
       note.playerId,
@@ -555,7 +606,7 @@ function hydrateSavedSolarSystem(
   return system;
 }
 
-function hydrateSavedPlanet(savedPlanet: SavedPlanet, system: SolarSystem): Planet {
+function hydrateSavedPlanet(savedPlanet: SavedPlanet, system: SolarSystemModel): PlanetModel {
   const currentResearchQueue = savedPlanet.rBDSFTQ.currentResearchQueue
     ? new TechnologyQueueEntry(
       savedPlanet.rBDSFTQ.currentResearchQueue.technologyType,
@@ -619,7 +670,7 @@ function hydrateSavedPlanet(savedPlanet: SavedPlanet, system: SolarSystem): Plan
   return planet;
 }
 
-function hydrateSavedFleet(savedFleet: SavedFleet): Fleet {
+function hydrateSavedFleet(savedFleet: SavedFleet): FleetModel {
   const fleet = new Fleet(
     savedFleet.fleetId,
     savedFleet.ownerId,
@@ -653,7 +704,7 @@ function hydrateSavedFleet(savedFleet: SavedFleet): Fleet {
   return fleet;
 }
 
-function hydrateSavedPlayerMessage(savedMessage: SavedPlayerMessage): PlayerMessageModel {
+function hydrateSavedPlayerMessage(savedMessage: SavedPlayerMessage): PlayerMessageModelType {
   return new PlayerMessageModel({
     messageId: savedMessage.messageId,
     createdTurn: savedMessage.createdTurn,
@@ -725,11 +776,11 @@ function hydrateSavedPlayerReport(savedReport: SavedPlayerReport): PlayerReport 
   }
 }
 
-function hydrateSavedResourcesPack(savedResources: SavedResourcesPack): ResourcesPackModel {
+function hydrateSavedResourcesPack(savedResources: SavedResourcesPack): ResourcesPackModelType {
   return new ResourcesPackModel(savedResources.metal, savedResources.crystal, savedResources.deuterium);
 }
 
-function hydrateSavedPlanetaryParameters(savedParameters: SavedPlanetaryParameters): PlanetaryParametersModel {
+function hydrateSavedPlanetaryParameters(savedParameters: SavedPlanetaryParameters): PlanetaryParametersModelType {
   return new PlanetaryParametersModel(
     savedParameters.metalModifier,
     savedParameters.crystalModifier,
@@ -743,8 +794,8 @@ function hydrateSavedPlanetaryParameters(savedParameters: SavedPlanetaryParamete
   );
 }
 
-function buildPlanetCoordinateMap(galaxy: Galaxy): Map<Planet, SavedCoordinates> {
-  const map = new Map<Planet, SavedCoordinates>();
+function buildPlanetCoordinateMap(galaxy: GalaxyModel): Map<PlanetModel, SavedCoordinates> {
+  const map = new Map<PlanetModel, SavedCoordinates>();
   for (const row of galaxy.stars) {
     for (const system of row) {
       for (const planet of system.planets) {
@@ -761,8 +812,8 @@ function buildPlanetCoordinateMap(galaxy: Galaxy): Map<Planet, SavedCoordinates>
 }
 
 function serializePlayer(
-  player: Player,
-  planetCoordinatesByReference: Map<Planet, SavedCoordinates>
+  player: PlayerModel,
+  planetCoordinatesByReference: Map<PlanetModel, SavedCoordinates>
 ): SavedPlayer {
   return {
     playerId: player.playerId,
@@ -794,7 +845,7 @@ function serializeStarSystemNote(playerId: number, note: StarSystemNote): SavedS
   };
 }
 
-function serializePlanet(planet: Planet): SavedPlanet {
+function serializePlanet(planet: PlanetModel): SavedPlanet {
   return {
     basicInfo: {
       name: planet.basicInfo.name,
@@ -860,7 +911,7 @@ function serializePlanet(planet: Planet): SavedPlanet {
   };
 }
 
-function serializeFleet(fleet: Fleet): SavedFleet {
+function serializeFleet(fleet: FleetModel): SavedFleet {
   return {
     fleetId: fleet.fleetId,
     ownerId: fleet.ownerId,
@@ -1049,7 +1100,7 @@ function getSavedTextReportBody(report: SavedPlayerReport): string {
     : '';
 }
 
-function resolveGalaxySaveOwnerPlayerName(galaxy: Galaxy): string | null {
+function resolveGalaxySaveOwnerPlayerName(galaxy: GalaxyModel): string | null {
   return galaxy.players.find((player) => player.type === 'PLAYER')?.playerName ?? null;
 }
 
@@ -1062,9 +1113,9 @@ function resolveSavedOwnerPlayerNameFromGalaxy(galaxy: SavedGalaxy): string | nu
 }
 
 function buildPlayerTypeMap(
-  players: Player[],
-  playerType: Player['type']
-): Map<number, Player> {
+  players: PlayerModel[],
+  playerType: PlayerModel['type']
+): Map<number, PlayerModel> {
   return new Map(
     players
       .filter((player) => player.type === playerType)

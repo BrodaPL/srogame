@@ -5,10 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
-import {
-  MAX_AUTO_SAVE_TURNS,
-  normalizeGalaxySetup
-} from '../../src/app/models/game-api-types.js';
+import gameApiTypesModule from '../../src/app/models/game-api-types.js';
 import galaxyCreatorModule from '../../src/app/models/planets/galaxy-creator.js';
 import planetAbandonmentModule from '../../src/app/models/planets/planet-abandonment.js';
 import galaxyPresentationDataModule from '../../src/app/models/planets/galaxy-presentation-data.js';
@@ -219,6 +216,13 @@ import type { SensorPhalanxReport } from '../../src/app/models/reports/sensor-ph
 
 const { GalaxyCreator } = galaxyCreatorModule as {
   GalaxyCreator: typeof import('../../src/app/models/planets/galaxy-creator.js').GalaxyCreator;
+};
+const {
+  MAX_AUTO_SAVE_TURNS,
+  normalizeGalaxySetup
+} = gameApiTypesModule as {
+  MAX_AUTO_SAVE_TURNS: typeof import('../../src/app/models/game-api-types.js').MAX_AUTO_SAVE_TURNS;
+  normalizeGalaxySetup: typeof import('../../src/app/models/game-api-types.js').normalizeGalaxySetup;
 };
 const { abandonPlanetToNewNeutralOwner } = planetAbandonmentModule as typeof import('../../src/app/models/planets/planet-abandonment.js');
 const { GalaxyPresentationData } = galaxyPresentationDataModule as {
