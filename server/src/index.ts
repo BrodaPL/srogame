@@ -351,6 +351,7 @@ const BUILDING_TYPE_RESEARCH_LAB = BuildingType.RESEARCH_LAB as BuildingTypeType
 const TECH_TYPE_COMPUTER_TECHNOLOGY = TechnologyType.COMPUTER_TECHNOLOGY as TechnologyTypeType;
 const TECH_TYPE_INTERGALACTIC_RESEARCH_NETWORK = TechnologyType.INTERGALACTIC_RESEARCH_NETWORK as TechnologyTypeType;
 const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
+  FleetMissionType.ATTACK as FleetMissionTypeType,
   FleetMissionType.MOVE as FleetMissionTypeType,
   FleetMissionType.DEFEND as FleetMissionTypeType,
   FleetMissionType.TRANSPORT as FleetMissionTypeType,
@@ -2602,8 +2603,10 @@ app.post('/api/game/active-fleets', (req, res) => {
     || !ships
     || !carriedBombs
     || !cargo
-    || body?.bombardmentPriorities !== undefined && bombardmentPriorities === null
-    || body?.useJumpGate !== undefined && typeof body.useJumpGate !== 'boolean'
+    || (body?.bombardmentPriorities !== undefined
+      && body?.bombardmentPriorities !== null
+      && bombardmentPriorities === null)
+    || (body?.useJumpGate !== undefined && typeof body.useJumpGate !== 'boolean')
   ) {
     return res.status(400).json({ error: 'Invalid fleet mission payload.' });
   }

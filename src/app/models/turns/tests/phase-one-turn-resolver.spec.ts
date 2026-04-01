@@ -907,8 +907,8 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     resolvePhaseOneTurn(galaxy);
 
-    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(27);
-    expect(system.planets[0].rBDSFTQ.currentResearchQueue?.investedResearchPower).toBe(20);
+    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(23);
+    expect(system.planets[0].rBDSFTQ.currentResearchQueue?.investedResearchPower).toBe(32);
   });
 
   it('prioritizes non-small damaged ships for strong repair equipment', () => {
@@ -1081,6 +1081,142 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeLessThan(maxStructuralPoints);
   });
 
+  it('lets Attack missions steal resources from hostile planets and return immediately', () => {
+    const transporterCargoCapacity = blueprints.get(ShipType.TRANSPORTER)!.cargoCapacity;
+    const attackFleet = new Fleet(
+      299,
+      1,
+      FleetMissionType.ATTACK,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Storehouse',
+      manyShips({ type: ShipType.TRANSPORTER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      transporterCargoCapacity,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, attacker, system } = createPlayersAndGalaxy(attackFleet, (solarSystem) => {
+      solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+      solarSystem.planets[0].info.ownerId = 1;
+      solarSystem.planets[1].basicInfo.name = 'Beta Storehouse';
+      solarSystem.planets[1].info.ownerId = 2;
+      solarSystem.planets[1].rBDSFTQ.resources = new ResourcesPack(300, 300, 300);
+      solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+      solarSystem.planets[2].info.ownerId = 1;
+      solarSystem.planets[3].info.ownerId = 2;
+    });
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.RETURNING);
+    expect(galaxy.activeFleets[0].cargo.metal).toBe(200);
+    expect(galaxy.activeFleets[0].cargo.crystal).toBe(200);
+    expect(galaxy.activeFleets[0].cargo.deuterium).toBe(200);
+    expect(system.planets[1].rBDSFTQ.resources.metal).toBe(100);
+    expect(system.planets[1].rBDSFTQ.resources.crystal).toBe(100);
+    expect(system.planets[1].rBDSFTQ.resources.deuterium).toBe(100);
+    expect(attacker.reports.some((report) => report.title.startsWith('Plunder Report: Beta Storehouse'))).toBe(true);
+  });
+
+  it('reduces Attack plunder efficiency by raw Bunker Network production1 value', () => {
+    const transporterCargoCapacity = blueprints.get(ShipType.TRANSPORTER)!.cargoCapacity;
+    const attackFleet = new Fleet(
+      298,
+      1,
+      FleetMissionType.ATTACK,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Vault',
+      manyShips({ type: ShipType.TRANSPORTER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      transporterCargoCapacity,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, system } = createPlayersAndGalaxy(attackFleet, (solarSystem) => {
+      solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+      solarSystem.planets[0].info.ownerId = 1;
+      solarSystem.planets[1].basicInfo.name = 'Beta Vault';
+      solarSystem.planets[1].info.ownerId = 2;
+      solarSystem.planets[1].setBuildingLevel(BuildingType.BUNKER_NETWORK, 1);
+      solarSystem.planets[1].rBDSFTQ.resources = new ResourcesPack(100, 100, 100);
+      solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+      solarSystem.planets[2].info.ownerId = 1;
+      solarSystem.planets[3].info.ownerId = 2;
+    });
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets[0].cargo.metal).toBe(76);
+    expect(galaxy.activeFleets[0].cargo.crystal).toBe(76);
+    expect(galaxy.activeFleets[0].cargo.deuterium).toBe(76);
+    expect(system.planets[1].rBDSFTQ.resources.metal).toBe(24);
+    expect(system.planets[1].rBDSFTQ.resources.crystal).toBe(24);
+    expect(system.planets[1].rBDSFTQ.resources.deuterium).toBe(24);
+  });
+
+  it('adds plunder lines to battle reports when an Attack fleet wins with no free cargo space', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const titanCargoCapacity = blueprints.get(ShipType.TITAN)!.cargoCapacity * 3;
+    const attackFleet = new Fleet(
+      297,
+      1,
+      FleetMissionType.ATTACK,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.TITAN, amount: 3 }),
+      new ResourcesPack(titanCargoCapacity, 0, 0),
+      0,
+      titanCargoCapacity,
+      titanCargoCapacity,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, attacker, defender, system } = createPlayersAndGalaxy(attackFleet, (solarSystem) => {
+      solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+      solarSystem.planets[0].info.ownerId = 1;
+      solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+      solarSystem.planets[1].info.ownerId = 2;
+      solarSystem.planets[1].rBDSFTQ.resources = new ResourcesPack(200, 200, 200);
+      solarSystem.planets[1].rBDSFTQ.ships = ManyShips.fromShipInstances([shipInstance(ShipType.SPY_PROBE)]);
+      solarSystem.planets[2].info.ownerId = 1;
+      solarSystem.planets[3].info.ownerId = 2;
+    });
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.RETURNING);
+    expect(galaxy.activeFleets[0].cargo.metal).toBe(titanCargoCapacity);
+    expect(system.planets[1].rBDSFTQ.resources.metal).toBe(200);
+    expect(attacker.reports.some((report) =>
+      report.title.startsWith('Battle Report:') && report.show().includes('No free cargo space remained, so no resources were stolen.')
+    )).toBe(true);
+    expect(defender.reports.some((report) =>
+      report.title.startsWith('Battle Report:') && report.show().includes('Attacking fleet had no free cargo space, so no resources were stolen.')
+    )).toBe(true);
+  });
+
   it('lets carried planetary bombs drive Bombard missions even without ship bombardment weapons', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.6);
 
@@ -1185,15 +1321,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       FleetState.ORBITING,
       1,
       ManyDefences.empty(),
-      FleetOrbitActivity.MISSION_IN_PROGRESS,
-      null,
-      undefined,
-      false,
-      null,
-      null,
-      null,
-      5
+      FleetOrbitActivity.MISSION_IN_PROGRESS
     );
+    siegeFleet.remainingFuelReserve = 5;
 
     const { galaxy, system } = createPlayersAndGalaxy(siegeFleet, (solarSystem) => {
       solarSystem.planets[0].basicInfo.name = 'Alpha Prime';

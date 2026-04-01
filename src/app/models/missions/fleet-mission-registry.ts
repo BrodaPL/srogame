@@ -2,6 +2,7 @@ import { MissionBlueprintsFactory } from '../../factories/mission-blueprints.fac
 import { FleetMissionType } from '../enums/fleet-mission-type';
 import type { FleetMissionBlueprints } from './fleet-mission-blueprint';
 import { FleetMission } from './fleet-mission';
+import { AttackFleetMission } from './types/attack-fleet-mission';
 import { BombardFleetMission } from './types/bombard-fleet-mission';
 import { ColonizeFleetMission } from './types/colonize-fleet-mission';
 import { DefendFleetMission } from './types/defend-fleet-mission';
@@ -47,6 +48,7 @@ export class FleetMissionRegistry {
   }
 
   private registerReferenceMissions(): void {
+    const attack = this.blueprints.get(FleetMissionType.ATTACK);
     const move = this.blueprints.get(FleetMissionType.MOVE);
     const transport = this.blueprints.get(FleetMissionType.TRANSPORT);
     const spy = this.blueprints.get(FleetMissionType.SPY);
@@ -57,6 +59,10 @@ export class FleetMissionRegistry {
     const colonize = this.blueprints.get(FleetMissionType.COLONIZE);
     const defend = this.blueprints.get(FleetMissionType.DEFEND);
     const hold = this.blueprints.get(FleetMissionType.HOLD);
+
+    if (attack) {
+      this.missionByType.set(attack.type, new AttackFleetMission(attack));
+    }
 
     if (move) {
       this.missionByType.set(move.type, new MoveFleetMission(move));

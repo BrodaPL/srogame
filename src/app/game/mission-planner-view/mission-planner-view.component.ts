@@ -96,6 +96,7 @@ type BombardmentPriorityGroupVm = {
 };
 
 const PHASE_ONE_MISSION_TYPES: FleetMissionType[] = [
+  FleetMissionType.ATTACK,
   FleetMissionType.MOVE,
   FleetMissionType.DEFEND,
   FleetMissionType.TRANSPORT,
@@ -765,7 +766,7 @@ export class MissionPlannerViewComponent implements OnInit {
       useJumpGate: this.useJumpGate,
       bombardmentPriorities: this.supportsBombardmentPriorities()
         ? normalizeBombardmentPriorities(this.bombardmentPriorities)
-        : null
+        : undefined
     };
 
     this.isLaunching = true;

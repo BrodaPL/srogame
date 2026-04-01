@@ -1,6 +1,24 @@
 {
   "missions": [
     {
+      "type": "ATTACK",
+      "name": "Attack",
+      "description": "Attack hostile or passive planets, steal resources after victory, then return automatically.",
+      "battleRoundsModifier": 0,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["PASSIVE", "WAR"],
+        "allowUnowned": false
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": true,
+        "requiresCargo": false
+      }
+    },
+    {
       "type": "MOVE",
       "name": "Move",
       "description": "Relocate ships to your own planets, friendly orbit, or an unowned planet. Cargo is allowed.",

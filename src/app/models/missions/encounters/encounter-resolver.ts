@@ -1,4 +1,8 @@
-import { SpaceBattleResolver, type SpaceBattleResult } from '../../battles/space-battle-resolver';
+import {
+  SpaceBattleResolver,
+  type SpaceBattleReports,
+  type SpaceBattleResult
+} from '../../battles/space-battle-resolver';
 import { ManyDefences, type DefenceAmountRequest } from '../../defences/many-defences';
 import { splitPlanetaryBombDefences } from '../../defences/planetary-bomb';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
@@ -40,6 +44,11 @@ type OrbitForceRecord = {
   ships: ManyShips;
   defences: ManyDefences;
   orderKey: number;
+};
+
+type CoalitionBattleResolution = {
+  coalitionSurvivors: ManyShips;
+  battleReports: SpaceBattleReports | null;
 };
 
 const MISSION_PRIORITY: Record<FleetMissionType, number> = {
@@ -89,7 +98,8 @@ export class EncounterResolver {
           arrival: current,
           outcome: {
             fleetId: current.fleet.fleetId,
-            resolution: 'notInvolved'
+            resolution: 'notInvolved',
+            battleReports: null
           }
         });
         continue;
@@ -108,27 +118,38 @@ export class EncounterResolver {
 
       const orbitForces = this.createInitialOrbitForces(targetPlanet, stationaryOccupants, coalition);
 
-      const hostileDefenderCoalition = this.selectHostileDefenderCoalition(currentOwnerId, targetPlanet, orbitForces);
+      const hostileDefenderCoalition = this.selectHostileDefenderCoalition(
+        currentOwnerId,
+        targetPlanet,
+        orbitForces,
+        this.canAssaultPassiveOwner(coalition)
+      );
       if (!hostileDefenderCoalition || this.totalForceCombatants(hostileDefenderCoalition) <= 0) {
         for (const member of coalition) {
           resolvedArrivals.push({
             arrival: member,
             outcome: {
               fleetId: member.fleet.fleetId,
-              resolution: 'notInvolved'
+              resolution: 'notInvolved',
+              battleReports: null
             }
           });
         }
         continue;
       }
 
-      const coalitionSurvivorPool = this.resolveCoalitionBattle(
+      const battleResolution = this.resolveCoalitionBattle(
         coalition,
         hostileDefenderCoalition,
         targetPlanet
       );
-      this.distributeCoalitionSurvivors(coalition, coalitionSurvivorPool);
-      const hostileDefendersStillPresent = this.selectHostileDefenderCoalition(currentOwnerId, targetPlanet, orbitForces);
+      this.distributeCoalitionSurvivors(coalition, battleResolution.coalitionSurvivors);
+      const hostileDefendersStillPresent = this.selectHostileDefenderCoalition(
+        currentOwnerId,
+        targetPlanet,
+        orbitForces,
+        this.canAssaultPassiveOwner(coalition)
+      );
       const coalitionHasSurvivors = coalition.some((entry) => ManyShips.totalShipsCount(entry.fleet.ships) > 0);
       const coalitionWon = coalitionHasSurvivors
         && (!hostileDefendersStillPresent || this.totalForceCombatants(hostileDefendersStillPresent) <= 0);
@@ -139,6 +160,7 @@ export class EncounterResolver {
           arrival: member,
           outcome: {
             fleetId: member.fleet.fleetId,
+            battleReports: battleResolution.battleReports,
             resolution: survivingShips <= 0
               ? 'defeat'
               : coalitionWon
@@ -162,7 +184,10 @@ export class EncounterResolver {
     const coalitionOwnerId = arrivals[0]?.owner?.playerId ?? arrivals[0]?.fleet.ownerId ?? null;
     const coalitionThreatensPlanetOwner = coalitionOwnerId !== null
       && targetPlanet.info.ownerId !== null
-      && this.diplomacyResolver.getStatus(coalitionOwnerId, targetPlanet.info.ownerId) === DiplomaticStatus.WAR;
+      && this.isPlanetAssaultStatus(
+        this.diplomacyResolver.getStatus(coalitionOwnerId, targetPlanet.info.ownerId),
+        this.canAssaultPassiveOwner(arrivals)
+      );
     const coalitionContainsOrbitStayingMission = arrivals.some((entry) => this.isOrbitStayingMission(entry.fleet.missionType));
 
     if (
@@ -254,7 +279,8 @@ export class EncounterResolver {
   private selectHostileDefenderCoalition(
     attackerOwnerId: number,
     targetPlanet: Planet,
-    orbitForces: OrbitForceRecord[]
+    orbitForces: OrbitForceRecord[],
+    allowPassiveOwnerAssault: boolean
   ): OrbitForceRecord[] | null {
     const hostileForces = orbitForces.filter((force) => {
       const ownerId = this.resolveForceOwnerId(force, targetPlanet);
@@ -262,7 +288,14 @@ export class EncounterResolver {
         return false;
       }
 
-      return this.diplomacyResolver.getStatus(attackerOwnerId, ownerId) === DiplomaticStatus.WAR;
+      const status = this.diplomacyResolver.getStatus(attackerOwnerId, ownerId);
+      return status === DiplomaticStatus.WAR
+        || (
+          allowPassiveOwnerAssault
+          && targetPlanet.info.ownerId !== null
+          && ownerId === targetPlanet.info.ownerId
+          && status === DiplomaticStatus.PASSIVE
+        );
     });
 
     if (hostileForces.length <= 0) {
@@ -270,7 +303,13 @@ export class EncounterResolver {
     }
 
     const planetOwnerId = targetPlanet.info.ownerId;
-    if (planetOwnerId !== null && this.diplomacyResolver.getStatus(attackerOwnerId, planetOwnerId) === DiplomaticStatus.WAR) {
+    if (
+      planetOwnerId !== null
+      && this.isPlanetAssaultStatus(
+        this.diplomacyResolver.getStatus(attackerOwnerId, planetOwnerId),
+        allowPassiveOwnerAssault
+      )
+    ) {
       const planetOwnerCoalition = hostileForces.filter((force) => {
         const ownerId = this.resolveForceOwnerId(force, targetPlanet);
         const status = this.diplomacyResolver.getStatus(planetOwnerId, ownerId);
@@ -298,11 +337,14 @@ export class EncounterResolver {
     arrivals: PlanetOrbitEncounterArrival[],
     defenders: OrbitForceRecord[],
     targetPlanet: Planet
-  ): ManyShips {
+  ): CoalitionBattleResolution {
     const attacker = arrivals[0].owner;
     const defender = this.resolveDefenderPlayer(arrivals[0].targetOwner, defenders);
     if (!attacker || !defender) {
-      return ManyShips.empty();
+      return {
+        coalitionSurvivors: ManyShips.empty(),
+        battleReports: null
+      };
     }
 
     const coalitionShips = ManyShips.empty();
@@ -368,10 +410,13 @@ export class EncounterResolver {
       allocatedDefences.addManyDefences(defenderEntry.inactiveDefences);
       if (defenderEntry.force.kind === 'orbitingShips' && defenderEntry.force.planet) {
         defenderEntry.force.planet.rBDSFTQ.ships = allocated;
+        defenderEntry.force.ships = allocated;
       } else if (defenderEntry.force.kind === 'planetDefences' && defenderEntry.force.planet) {
         defenderEntry.force.planet.rBDSFTQ.defences = allocatedDefences;
+        defenderEntry.force.defences = allocatedDefences;
       } else if (defenderEntry.force.fleet) {
         defenderEntry.force.fleet.ships = allocated;
+        defenderEntry.force.ships = allocated;
       }
     }
 
@@ -393,7 +438,19 @@ export class EncounterResolver {
     );
     targetPlanet.rBDSFTQ.resources.addResourcePack(this.calculateDefenceDebris(battleResult));
 
-    return coalitionSurvivors;
+    return {
+      coalitionSurvivors,
+      battleReports: battleResult.reports
+    };
+  }
+
+  private canAssaultPassiveOwner(arrivals: PlanetOrbitEncounterArrival[]): boolean {
+    return arrivals.some((arrival) => arrival.fleet.missionType === FleetMissionType.ATTACK);
+  }
+
+  private isPlanetAssaultStatus(status: DiplomaticStatus, allowPassiveOwnerAssault: boolean): boolean {
+    return status === DiplomaticStatus.WAR
+      || (allowPassiveOwnerAssault && status === DiplomaticStatus.PASSIVE);
   }
 
   private distributeCoalitionSurvivors(

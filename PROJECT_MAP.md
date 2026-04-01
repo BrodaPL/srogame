@@ -271,7 +271,7 @@ Owns:
 - launch behavior contracts
 - target-arrival behavior dispatch
 - encounter integration points
-- player-facing mission set such as `Move`, `Guard`, `Bombard`, `Siege`, `Repair`, and `Recycle`
+- player-facing mission set such as `Attack`, `Move`, `Guard`, `Bombard`, `Siege`, `Repair`, and `Recycle`
 - optional Jump Gate launch mode for `Move`, `Guard`, and `Transport`, including one-turn approved travel
 
 ### Requests and mail actions
@@ -318,6 +318,7 @@ Owns:
 - queue progress
 - repair pass
 - battle/debris/recycling integration
+- post-battle `Attack` plunder resolution and bunker-reduced loot distribution
 
 ### Battles, bombardment, recycling, repairs
 
@@ -464,10 +465,11 @@ Change mission rules or add a mission:
 - `src/app/models/missions/encounters/` for orbit participation and coalition behavior
 - `src/app/models/bombardment/` for `Bombard` / `Siege` targeting logic and priority categories
 - `src/app/models/jump-gates/jump-gate-capacity.ts` for Jump Gate capacity math
+- `src/app/models/turns/phase-one-turn-resolver.ts` for post-battle `Attack` plunder, bunker reduction, and return behavior
+- `src/app/models/planets/planet.ts` or `src/app/blueprints/building-blueprints.json` if bunker/plunder formulas change
 - `src/app/game/mission-planner-view/`
 - `src/app/game/operations-view/`
 - `server/src/index.ts` for launch endpoint validation if needed
-- `src/app/models/turns/phase-one-turn-resolver.ts` if end-turn behavior changes
 
 Change maintenance-request / `ALLIANCE_DEPOT` logistics:
 - `src/app/models/requests/maintenance-request.ts`

@@ -13,7 +13,11 @@ import {
   bombardmentPriorityLabel,
   hasAnyBombardmentPriority
 } from '../bombardment/bombardment-priority';
-import { SpaceBattleResolver, type SpaceBattleResult } from '../battles/space-battle-resolver';
+import {
+  SpaceBattleResolver,
+  type SpaceBattleReports,
+  type SpaceBattleResult
+} from '../battles/space-battle-resolver';
 import { DefenceInstance } from '../defences/defence-instance';
 import { ManyDefences } from '../defences/many-defences';
 import { Defence } from '../defences/defence';
@@ -80,6 +84,14 @@ type PlanetTurnSnapshot = {
     targetId: string;
     technologyType: TechnologyType;
   } | null;
+};
+
+type AttackPlunderSummary = {
+  plunderPercent: number;
+  bunkerReductionPercent: number;
+  availableLoot: ResourcesPack;
+  stolenResources: ResourcesPack;
+  freeCargoCapacity: number;
 };
 
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
@@ -1360,6 +1372,15 @@ function resolveEncounterArrival(
 
   switch (outcome.resolution) {
     case 'victory':
+      applyAttackPlunderIfNeeded(
+        arrival.fleet,
+        arrival.targetPlanet,
+        arrival.owner,
+        arrival.targetOwner,
+        arrival.resolvedTurnNumber,
+        outcome.battleReports ?? null,
+        diplomacyResolver
+      );
       applyPostArrivalBombardmentIfNeeded(
         arrival.fleet,
         arrival.targetPlanet,
@@ -1384,6 +1405,15 @@ function resolveEncounterArrival(
       return null;
     case 'notInvolved':
     default:
+      applyAttackPlunderIfNeeded(
+        arrival.fleet,
+        arrival.targetPlanet,
+        arrival.owner,
+        arrival.targetOwner,
+        arrival.resolvedTurnNumber,
+        outcome.battleReports ?? null,
+        diplomacyResolver
+      );
       applyPostArrivalBombardmentIfNeeded(
         arrival.fleet,
         arrival.targetPlanet,
@@ -1397,6 +1427,243 @@ function resolveEncounterArrival(
         espionageReportGenerator
       );
   }
+}
+
+function applyAttackPlunderIfNeeded(
+  fleet: Fleet,
+  targetPlanet: Planet,
+  owner: Player | null,
+  targetOwner: Player | null,
+  resolvedTurnNumber: number,
+  battleReports: SpaceBattleReports | null,
+  diplomacyResolver: DiplomacyResolver
+): AttackPlunderSummary | null {
+  if (fleet.missionType !== FleetMissionType.ATTACK) {
+    return null;
+  }
+
+  const targetOwnerId = targetPlanet.info.ownerId;
+  const targetStatus = diplomacyResolver.getStatus(fleet.ownerId, targetOwnerId);
+  if (targetOwnerId === null || (targetStatus !== DiplomaticStatus.WAR && targetStatus !== DiplomaticStatus.PASSIVE)) {
+    return null;
+  }
+
+  const summary = resolveAttackPlunder(fleet, targetPlanet);
+  appendAttackPlunderToBattleReports(battleReports, targetPlanet, summary);
+  if (!battleReports) {
+    addAttackPlunderSummaryReport(owner, targetOwner, targetPlanet, summary, resolvedTurnNumber);
+  }
+
+  return summary;
+}
+
+function resolveAttackPlunder(
+  fleet: Fleet,
+  targetPlanet: Planet
+): AttackPlunderSummary {
+  const bunkerReductionPercent = resolveBunkerPlunderReductionPercent(targetPlanet);
+  const plunderPercent = Math.max(0, 80 - bunkerReductionPercent) / 100;
+  const availableLoot = new ResourcesPack(
+    Math.floor(Math.max(0, targetPlanet.rBDSFTQ.resources.metal) * plunderPercent),
+    Math.floor(Math.max(0, targetPlanet.rBDSFTQ.resources.crystal) * plunderPercent),
+    Math.floor(Math.max(0, targetPlanet.rBDSFTQ.resources.deuterium) * plunderPercent)
+  );
+  const freeCargoCapacity = Math.max(0, fleet.totalCargoCapacity - fleet.usedCargoCapacity);
+  const stolenResources = distributeAttackPlunder(availableLoot, freeCargoCapacity);
+
+  if (stolenResources.getTotalResourceAmount() > 0) {
+    targetPlanet.rBDSFTQ.resources.subtractResourcePack(stolenResources);
+    fleet.cargo.addResourcePack(stolenResources);
+    fleet.usedCargoCapacity = Math.min(
+      fleet.totalCargoCapacity,
+      fleet.usedCargoCapacity + stolenResources.getTotalResourceAmount()
+    );
+  }
+
+  return {
+    plunderPercent,
+    bunkerReductionPercent,
+    availableLoot,
+    stolenResources,
+    freeCargoCapacity
+  };
+}
+
+function resolveBunkerPlunderReductionPercent(targetPlanet: Planet): number {
+  const bunkerLevel = targetPlanet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
+  if (bunkerLevel <= 0) {
+    return 0;
+  }
+
+  const bunkerBlueprint = BUILDING_BLUEPRINTS.get(BuildingType.BUNKER_NETWORK);
+  if (!bunkerBlueprint) {
+    return 0;
+  }
+
+  const rawValue = bunkerBlueprint.production1[bunkerLevel - 1];
+  return Number.isFinite(rawValue) ? Math.max(0, Math.floor(rawValue)) : 0;
+}
+
+function distributeAttackPlunder(
+  availableLoot: ResourcesPack,
+  freeCargoCapacity: number
+): ResourcesPack {
+  const totalLootable = availableLoot.getTotalResourceAmount();
+  if (freeCargoCapacity <= 0 || totalLootable <= 0) {
+    return new ResourcesPack(0, 0, 0);
+  }
+
+  const remainingByType: Record<'metal' | 'crystal' | 'deuterium', number> = {
+    metal: availableLoot.metal,
+    crystal: availableLoot.crystal,
+    deuterium: availableLoot.deuterium
+  };
+  const stolen = new ResourcesPack(0, 0, 0);
+  let remainingCapacity = Math.min(freeCargoCapacity, totalLootable);
+  const resourceTypes: Array<'metal' | 'crystal' | 'deuterium'> = ['metal', 'crystal', 'deuterium'];
+  let activeTypes: Array<'metal' | 'crystal' | 'deuterium'> = resourceTypes
+    .filter((type) => remainingByType[type] > 0);
+
+  while (remainingCapacity > 0 && activeTypes.length > 0) {
+    const share = Math.max(1, Math.floor(remainingCapacity / activeTypes.length));
+    let progress = false;
+
+    for (const type of [...activeTypes]) {
+      if (remainingCapacity <= 0) {
+        break;
+      }
+
+      const take = Math.min(remainingByType[type], share, remainingCapacity);
+      if (take <= 0) {
+        continue;
+      }
+
+      addPlunderResource(stolen, type, take);
+      remainingByType[type] -= take;
+      remainingCapacity -= take;
+      progress = true;
+    }
+
+    activeTypes = activeTypes.filter((type) => remainingByType[type] > 0);
+    if (!progress) {
+      break;
+    }
+  }
+
+  return stolen;
+}
+
+function addPlunderResource(
+  pack: ResourcesPack,
+  type: 'metal' | 'crystal' | 'deuterium',
+  amount: number
+): void {
+  switch (type) {
+    case 'metal':
+      pack.metal += amount;
+      break;
+    case 'crystal':
+      pack.crystal += amount;
+      break;
+    case 'deuterium':
+      pack.deuterium += amount;
+      break;
+  }
+}
+
+function appendAttackPlunderToBattleReports(
+  battleReports: SpaceBattleReports | null,
+  targetPlanet: Planet,
+  summary: AttackPlunderSummary
+): void {
+  if (!battleReports) {
+    return;
+  }
+
+  const effectivePercent = Math.round(summary.plunderPercent * 100);
+  const availableTotal = summary.availableLoot.getTotalResourceAmount();
+  const stolenTotal = summary.stolenResources.getTotalResourceAmount();
+  const attackerLines = [
+    'Plunder summary:',
+    `Base plunder: 80%`,
+    `Bunker reduction: ${summary.bunkerReductionPercent}%`,
+    `Effective plunder: ${effectivePercent}%`,
+    `Free cargo space before looting: ${summary.freeCargoCapacity}`
+  ];
+  const defenderLines = [
+    'Enemy plunder summary:',
+    `Base plunder: 80%`,
+    `Bunker reduction: ${summary.bunkerReductionPercent}%`,
+    `Effective plunder: ${effectivePercent}%`
+  ];
+
+  if (availableTotal <= 0) {
+    attackerLines.push(`No stealable resources remained on ${targetPlanet.basicInfo.name}.`);
+    defenderLines.push(`No stealable resources remained on ${targetPlanet.basicInfo.name}.`);
+  } else if (summary.freeCargoCapacity <= 0) {
+    attackerLines.push('No free cargo space remained, so no resources were stolen.');
+    defenderLines.push('Attacking fleet had no free cargo space, so no resources were stolen.');
+  } else if (stolenTotal <= 0) {
+    attackerLines.push('Loot attempt failed to secure any resources.');
+    defenderLines.push('Attacking fleet failed to secure any resources.');
+  } else {
+    const breakdown = `Metal ${summary.stolenResources.metal}, Crystal ${summary.stolenResources.crystal}, Deuterium ${summary.stolenResources.deuterium}`;
+    attackerLines.push(`Resources stolen: ${breakdown}.`);
+    defenderLines.push(`Resources lost: ${breakdown}.`);
+  }
+
+  battleReports.attacker.body = `${battleReports.attacker.body}\n${attackerLines.join('\n')}`;
+  battleReports.defender.body = `${battleReports.defender.body}\n${defenderLines.join('\n')}`;
+}
+
+function addAttackPlunderSummaryReport(
+  player: Player | null,
+  targetOwner: Player | null,
+  targetPlanet: Planet,
+  summary: AttackPlunderSummary,
+  resolvedTurnNumber: number
+): void {
+  if (!player || player.type !== PlayerType.PLAYER) {
+    return;
+  }
+
+  const effectivePercent = Math.round(summary.plunderPercent * 100);
+  const stolenTotal = summary.stolenResources.getTotalResourceAmount();
+  const availableTotal = summary.availableLoot.getTotalResourceAmount();
+  let body = [
+    `Attack mission reached ${targetPlanet.basicInfo.name}.`,
+    `Base plunder: 80%`,
+    `Bunker reduction: ${summary.bunkerReductionPercent}%`,
+    `Effective plunder: ${effectivePercent}%`
+  ];
+
+  if (availableTotal <= 0) {
+    body.push('No stealable resources remained on the target.');
+  } else if (summary.freeCargoCapacity <= 0) {
+    body.push('No free cargo space remained, so no resources were stolen.');
+  } else if (stolenTotal <= 0) {
+    body.push('No resources were stolen.');
+  } else {
+    body.push(
+      `Resources stolen: Metal ${summary.stolenResources.metal}, `
+      + `Crystal ${summary.stolenResources.crystal}, `
+      + `Deuterium ${summary.stolenResources.deuterium}.`
+    );
+  }
+
+  const report = new FleetReport(
+    {
+      reportId: player.createReportId(),
+      createdTurn: resolvedTurnNumber,
+      title: `Plunder Report: ${targetPlanet.basicInfo.name}`,
+      sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      senderPlayerName: targetOwner?.playerName ?? player.playerName
+    },
+    body.join('\n')
+  );
+  player.addReport(report);
 }
 
 function resolveReturnArrival(

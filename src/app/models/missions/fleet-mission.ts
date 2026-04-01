@@ -319,7 +319,7 @@ export class FleetMission {
     }
 
     if (!context.hasMilitaryShips && this.missionType !== FleetMissionType.SPY) {
-      checks.push({ text: 'No military ships selected.', severity: 'note' });
+      checks.push({ text: 'No military ship has been assigned!', severity: 'note' });
     }
 
     if (context.totalHangarCapacity > 0 || context.usedHangarCapacity > 0) {
