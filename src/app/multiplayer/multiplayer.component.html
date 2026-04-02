@@ -29,6 +29,9 @@
             <span>(Local Admin)</span>
           }
         </p>
+        <button class="start-button" type="button" (click)="logout()" [disabled]="isActing || isLoading">
+          Logout
+        </button>
       </div>
     }
 

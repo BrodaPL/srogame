@@ -58,6 +58,10 @@
 
     @if (!session()) {
       <a class="link button" routerLink="/login">Login to load</a>
+    } @else {
+      <button class="start-button" type="button" (click)="logout()" [disabled]="isSummaryLoading || isLoadAction">
+        Logout
+      </button>
     }
 
     @if (summary?.save && summary?.activeGame) {

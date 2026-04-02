@@ -38,6 +38,24 @@ Result:
 - `WebStorm2025.3`: `chrome-devtools` present
 - `WebStorm2026.1`: no MCP servers configured
 
+## Browser Test Accounts
+
+Use these when a browser/MCP/Playwright verification flow needs authenticated users without creating fresh accounts:
+
+- `TestUserA`
+- `TestUserB`
+- `TestUserC`
+
+Shared password for all three:
+
+```text
+***REMOVED***
+```
+
+Current role note:
+- all three currently have `localAdmin=true` in `server/data/auth.json`
+- this is useful for testing `/setup`, `/load`, and `/multiplayer` host flows without editing auth data first
+
 ## Configuration Layers
 
 There are four different layers here. They must not be mixed up.

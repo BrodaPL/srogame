@@ -419,6 +419,10 @@
 .planet-view__trade-port-summary,
 .planet-view__trade-port-cost {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  white-space: nowrap;
 }
 
 .planet-view__trade-port-summary {
@@ -430,6 +434,14 @@
 .planet-view__trade-port-cost {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.planet-view__trade-port-resource-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex: 0 0 32px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.22));
 }
 
 .planet-view__trade-port-action {

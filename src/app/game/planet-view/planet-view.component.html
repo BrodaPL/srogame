@@ -859,9 +859,19 @@
             <article class="planet-view__trade-port-card" [class.planet-view__trade-port-card--used]="offer.used">
               <div class="planet-view__trade-port-main">
                 <p class="planet-view__trade-port-summary">
+                  <img
+                    class="planet-view__trade-port-resource-icon"
+                    [src]="tradePortResourceIconPath(offer.getResourceType)"
+                    [alt]="tradePortResourceLabel(offer.getResourceType)"
+                  />
                   {{ tradePortOfferGetLabel(offer) }}
                 </p>
                 <p class="planet-view__trade-port-cost">
+                  <img
+                    class="planet-view__trade-port-resource-icon"
+                    [src]="tradePortResourceIconPath(offer.costResourceType)"
+                    [alt]="tradePortResourceLabel(offer.costResourceType)"
+                  />
                   Cost: {{ tradePortOfferCostLabel(offer) }} {{ tradePortOfferModifierLabel(offer) }}
                 </p>
               </div>

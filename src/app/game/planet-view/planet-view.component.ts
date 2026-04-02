@@ -56,6 +56,7 @@ import {
 } from '../ui/resources/resources.component';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { tradeResourceLabel } from '../../models/trade/trade-resource-type';
+import type { TradeResourceType } from '../../models/trade/trade-resource-type';
 import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
 import { PlanetObjectDialogComponent } from './planet-object-dialog.component';
 import type {
@@ -1748,6 +1749,23 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected tradePortOfferCostLabel(offer: TradePortOfferDto): string {
     return `${offer.totalCost} ${tradeResourceLabel(offer.costResourceType)}`;
+  }
+
+  protected tradePortResourceIconPath(resourceType: TradeResourceType): string {
+    switch (resourceType) {
+      case 'metal':
+        return 'images/icons/small/metal.png';
+      case 'crystal':
+        return 'images/icons/small/crystal.png';
+      case 'deuterium':
+        return 'images/icons/small/deuter.png';
+      default:
+        return '';
+    }
+  }
+
+  protected tradePortResourceLabel(resourceType: TradeResourceType): string {
+    return tradeResourceLabel(resourceType);
   }
 
   protected tradePortOfferModifierLabel(offer: TradePortOfferDto): string {

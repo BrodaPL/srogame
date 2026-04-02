@@ -1,6 +1,7 @@
 import { Component, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
@@ -53,6 +54,7 @@ export class MultiplayerComponent implements OnDestroy {
   private readonly refreshHandle: number;
 
   constructor(
+    private readonly authApi: AuthApiService,
     private readonly authState: AuthStateService,
     private readonly gameApi: GameApiService,
     private readonly gameState: GameStateService,
@@ -205,6 +207,26 @@ export class MultiplayerComponent implements OnDestroy {
     return !lobby.loadSeats.some((entry) =>
       entry.savedPlayerId !== seat.savedPlayerId && entry.assignedAccountId === accountId
     );
+  }
+
+  protected logout(): void {
+    const session = this.session();
+    if (!session) {
+      return;
+    }
+
+    this.authApi.logout(session.token).subscribe({
+      next: () => {
+        this.authState.clearSession();
+        this.gameState.clearGalaxy();
+        this.router.navigate(['/']);
+      },
+      error: () => {
+        this.authState.clearSession();
+        this.gameState.clearGalaxy();
+        this.router.navigate(['/']);
+      }
+    });
   }
 
   private runLobbyMutation(
