@@ -30,6 +30,18 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         bubblePosition: 'top'
       },
       {
+        heading: 'Mission Type Comes First',
+        bodyHtml: `
+          <p>The planner is mission-first. Start by choosing what the fleet should do, then the rest of the screen adapts around that choice.</p>
+          <p>Attack, transport, spy, repair, recycle, colonize, bombardment, siege, and Jump Gate capable moves all share this same launch flow.</p>
+        `,
+        characterImages: [pilotImageA, pilotImageB],
+        characterSide: 'right',
+        bubblePosition: 'top',
+        targetId: 'mission-planner-mission-types',
+        targetPadding: 12
+      },
+      {
         heading: 'Resolve The Target',
         bodyHtml: `
           <p>The target card is where you resolve the destination. You can paste coordinates manually or reuse planets already visible in the planner.</p>
@@ -54,10 +66,10 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         targetPadding: 12
       },
       {
-        heading: 'Mission Details And Cargo',
+        heading: 'Mission Details And Special Controls',
         bodyHtml: `
-          <p>This card reflects the currently selected origin and shows repair capability plus cargo inputs for non-spy missions.</p>
-          <p>It is the main place where you tune what the fleet is carrying before launch.</p>
+          <p>This top area reflects the current mission and origin. It shows repair capability, cargo inputs, bomb load context, and other mission-specific controls.</p>
+          <p>When the chosen mission supports them, extra cards also appear here for tools like bombard priorities or Jump Gate travel.</p>
         `,
         characterImages: [pilotImageA, pilotImageB],
         characterSide: 'right',
@@ -68,8 +80,8 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
       {
         heading: 'Travel Summary',
         bodyHtml: `
-          <p>The travel summary turns your current setup into numbers: distance, ETA, return time, fuel reserve, cargo usage, and hangar usage.</p>
-          <p>Use it to sanity-check the trip before you spend ships and fuel on a bad route.</p>
+          <p>The travel summary turns your current setup into numbers: distance, ETA, return time, fuel reserve, cargo usage, bomb hangars, and total transport capacity.</p>
+          <p>Use it to sanity-check the trip before you spend ships and fuel on a bad route, especially on long launches or missions with tight cargo limits.</p>
         `,
         characterImages: [pilotImageA, pilotImageB],
         characterSide: 'right',
@@ -81,7 +93,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         heading: 'Fleet Composition',
         bodyHtml: `
           <p>This section is where you assemble the actual task force.</p>
-          <p>Mission relevance, purpose filters, ready versus damaged ship counts, cargo, and hangar capacity all come together here.</p>
+          <p>Mission relevance, purpose filters, ready versus damaged ship counts, cargo, hangar capacity, and Jump Gate capability all come together here.</p>
         `,
         characterImages: [pilotImageA, pilotImageB],
         characterSide: 'right',
@@ -133,12 +145,24 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         heading: 'Reading An Operation Card',
         bodyHtml: `
           <p>A single operation card gives you the mission type, current state, current position, destination, ETA, fuel, cargo load, ship summary, and repair capability.</p>
-          <p>This is the fast way to confirm where a fleet is, what it is carrying, and how much of your mobile force is still tied up in space.</p>
+          <p>It also shows newer mission states like pending Jump Gate approval, passive or guarding orbit, and mission-failure returns.</p>
         `,
         characterImages: [spaceOfficerImageA, spaceOfficerImageB],
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'operations-primary-card',
+        targetPadding: 12
+      },
+      {
+        heading: 'Live Fleet Commands',
+        bodyHtml: `
+          <p>The action row gives you the live commands that are currently safe for that fleet.</p>
+          <p><strong>Return now</strong> recalls a fleet, <strong>Delay +1</strong> stretches an outbound ETA, and <strong>Request maintenance</strong> opens the Alliance Depot support flow when orbit logistics allow it.</p>
+        `,
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'operations-card-actions',
         targetPadding: 12
       }
     ]
@@ -173,7 +197,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         heading: 'Current Building Queue',
         bodyHtml: `
           <p>This queue card shows what the active planet is already building, how far the head order has progressed, and the estimated turns remaining.</p>
-          <p>If nothing is queued, the empty state tells you immediately that the planet is idle.</p>
+          <p>You can also drag entries to reorder them and cancel orders here. Started entries keep their invested progress, while refunds depend on how far construction already advanced.</p>
         `,
         characterImages: [builderImageA, builderImageB],
         characterSide: 'right',
@@ -197,7 +221,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         heading: 'A Single Building Row',
         bodyHtml: `
           <p>Each row shows the current level, next-level cost chips, unmet requirements, and the build action.</p>
-          <p>This is the exact decision point for queueing the next upgrade on the selected colony.</p>
+          <p>This is the exact decision point for queueing the next upgrade on the selected colony without leaving the compact empire-management flow.</p>
         `,
         characterImages: [builderImageA, builderImageB],
         characterSide: 'right',
@@ -226,8 +250,8 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
       {
         heading: 'Welcome to Production View',
         bodyHtml: `
-          <p>This screen is the compact ship-production planner for your empire.</p>
-          <p>It keeps the active planet, shipyard queue, and production catalog in one place so you can line up new ships quickly across multiple colonies.</p>
+          <p>This screen is the compact production planner for ships and defences.</p>
+          <p>It keeps the active planet, live mixed queue, and production catalog in one place so you can line up military output quickly across multiple colonies.</p>
         `,
         characterImages: [engineerImageA, engineerImageB],
         characterSide: 'right',
@@ -236,8 +260,8 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
       {
         heading: 'Production Categories',
         bodyHtml: `
-          <p>The category toggle switches between <strong>Shipyard</strong> and the future <strong>Defences</strong> mode.</p>
-          <p>Right now the important path is Shipyard, which keeps ship production focused and compact on the selected planet.</p>
+          <p>The category toggle switches between <strong>Shipyard</strong> and <strong>Defences</strong>.</p>
+          <p>Both are live now, so the same planet can queue ships, static defences, and planetary bombs through one management screen.</p>
         `,
         characterImages: [engineerImageA, engineerImageB],
         characterSide: 'right',
@@ -246,10 +270,10 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         targetPadding: 12
       },
       {
-        heading: 'Production Queues',
+        heading: 'Shared Queue Management',
         bodyHtml: `
           <p>This queue area shows what the active planet is already producing.</p>
-          <p>The shipyard table tracks queue order, completed amount, current progress, and ETA, while the defence side is reserved for later implementation.</p>
+          <p>The visible order now matches the real mixed execution order for ships and defences, and you can drag entries to reorder them or cancel them directly here.</p>
         `,
         characterImages: [engineerImageA, engineerImageB],
         characterSide: 'right',
@@ -258,10 +282,10 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         targetPadding: 12
       },
       {
-        heading: 'Shipyard Queue Card',
+        heading: 'Current Production Queue',
         bodyHtml: `
-          <p>This card is the live shipyard queue for the selected planet.</p>
-          <p>Use it to see whether production is already active, how full the queue is, and how long the current order still needs.</p>
+          <p>This card is the live queue for the selected planet, even though the heading still says Shipyard.</p>
+          <p>Use it to see whether production is already active, how full the queue is, how much has already completed, and how long the current order still needs.</p>
         `,
         characterImages: [engineerImageA, engineerImageB],
         characterSide: 'right',
@@ -273,7 +297,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         heading: 'Production List',
         bodyHtml: `
           <p>This section is the compact production catalog for the active planet.</p>
-          <p>It is meant for quickly evaluating what the colony can build now without opening the heavier Planet View shipyard tab.</p>
+          <p>Switching the mode changes the list between ships and defences, while keeping the same fast empire-level management layout.</p>
         `,
         characterImages: [engineerImageA, engineerImageB],
         characterSide: 'right',
@@ -282,10 +306,10 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         targetPadding: 12
       },
       {
-        heading: 'A Single Ship Row',
+        heading: 'A Single Production Row',
         bodyHtml: `
-          <p>Each ship row combines amount input, single and total costs, unmet requirements, and the build action.</p>
-          <p>This is the exact decision point for adding another ship order to the selected planet's queue.</p>
+          <p>Each row combines amount input, single and total costs, unmet requirements, and the build action.</p>
+          <p>In ship mode this means mobile fleet production, while defence mode uses the same compact pattern for turrets, shields, and planetary bombs.</p>
         `,
         characterImages: [engineerImageA, engineerImageB],
         characterSide: 'right',
@@ -379,6 +403,122 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'reports-detail-body',
+        targetPadding: 12
+      }
+    ]
+  },
+  mailView: {
+    key: 'mailView',
+    title: 'Mail View Tutorial',
+    steps: [
+      {
+        heading: 'Welcome to Mail',
+        bodyHtml: `
+          <p>This screen is your communication center.</p>
+          <p>It combines player messages with diplomacy, Jump Gate, and maintenance requests so you can clear blockers and handle empire communication in one place.</p>
+        `,
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
+        bubblePosition: 'top'
+      },
+      {
+        heading: 'Compose New Mail',
+        bodyHtml: `
+          <p>Use this button to open the shared mail composer.</p>
+          <p>You can send direct player messages here, and some flows like replies reuse the same dialog with the recipient already locked in.</p>
+        `,
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
+        bubblePosition: 'top',
+        targetId: 'mail-compose-action',
+        targetPadding: 12
+      },
+      {
+        heading: 'Pending Requests',
+        bodyHtml: `
+          <p>This section is for live requests that still need an answer.</p>
+          <p>Incoming requests are especially important because unresolved ones can block End Turn until you approve, partially approve, reject, or otherwise clear them.</p>
+        `,
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
+        bubblePosition: 'top',
+        targetId: 'mail-pending-requests',
+        targetPadding: 12
+      },
+      {
+        heading: 'Resolved Request History',
+        bodyHtml: `
+          <p>Resolved requests stay here until you delete them manually.</p>
+          <p>This is the easiest place to confirm how a Jump Gate, diplomacy, or maintenance negotiation ended after the active decision is already over.</p>
+        `,
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'mail-resolved-requests',
+        targetPadding: 12
+      },
+      {
+        heading: 'Messages',
+        bodyHtml: `
+          <p>The message section separates unread and read mail. Opening a message marks it as read and exposes its reply or delete actions.</p>
+          <p>This makes Mail the place to clear message blockers, follow negotiations, and handle direct human communication without mixing it into Reports.</p>
+        `,
+        characterImages: [secretaryImageA, secretaryImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'mail-messages',
+        targetPadding: 12
+      }
+    ]
+  },
+  diplomacyView: {
+    key: 'diplomacyView',
+    title: 'Diplomacy View Tutorial',
+    steps: [
+      {
+        heading: 'Welcome to Diplomacy',
+        bodyHtml: `
+          <p>This screen is where discovered factions become manageable contacts.</p>
+          <p>Use it to review relations, inspect known planets from espionage intel, and prepare proposals before the actual accept or reject flow continues through Mail.</p>
+        `,
+        characterImages: [commanderImageA],
+        characterSide: 'right',
+        bubblePosition: 'top'
+      },
+      {
+        heading: 'Discovered Contacts',
+        bodyHtml: `
+          <p>The contact list only shows players you have actually discovered through current espionage-backed intel.</p>
+          <p>It is your fast index for who is known, what their current status is, and whether treaty proposals are available this turn.</p>
+        `,
+        characterImages: [commanderImageA],
+        characterSide: 'right',
+        bubblePosition: 'top',
+        targetId: 'diplomacy-contacts',
+        targetPadding: 12
+      },
+      {
+        heading: 'Selected Contact Detail',
+        bodyHtml: `
+          <p>This detail panel summarizes the selected contact, their known planets, and the actions currently available against them.</p>
+          <p>When a contact is selected, this is where you prepare treaty proposals and open the shared direct-message composer.</p>
+        `,
+        characterImages: [commanderImageA],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'diplomacy-detail-panel',
+        targetPadding: 12
+      },
+      {
+        heading: 'Active Proposals',
+        bodyHtml: `
+          <p>This section tracks unresolved diplomacy proposals and tells you whether they are incoming or outgoing.</p>
+          <p>The proposals stay visible here for context, but Mail is where acceptance, rejection, and cancellation are completed.</p>
+        `,
+        characterImages: [commanderImageA],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'diplomacy-proposals',
         targetPadding: 12
       }
     ]
@@ -537,9 +677,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         `,
         characterImages: [spaceOfficerImageA, spaceOfficerImageB],
         characterSide: 'right',
-        bubblePosition: 'bottom',
-        targetId: 'galactic-grid',
-        targetPadding: 18
+        bubblePosition: 'bottom'
       },
       {
         heading: 'Your Home System Is Preselected',
@@ -566,6 +704,18 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         targetPadding: 18
       },
       {
+        heading: 'Fleet Route Overlays',
+        bodyHtml: `
+          <p>The route toggle turns your own active fleet routes on or off across the map.</p>
+          <p>When enabled, the grid shows outbound and returning arrows, aggregates duplicate routes into count badges, and helps you read where your traffic is already committed.</p>
+        `,
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'galactic-route-toggle',
+        targetPadding: 12
+      },
+      {
         heading: 'Star System Preview',
         bodyHtml: `
           <p>The preview panel summarizes the selected system with coordinates, planet count, asteroid count, and local status.</p>
@@ -587,6 +737,18 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'galactic-planet-mini-cards',
+        targetPadding: 12
+      },
+      {
+        heading: 'Own Fleets In System',
+        bodyHtml: `
+          <p>If one of your fleets is currently stationed in the selected system, it appears here with mission, status, ETA, and route summary.</p>
+          <p>This works together with the green route overlays and green-highlighted cell values so you can see both where your fleets are and where they are headed.</p>
+        `,
+        characterImages: [spaceOfficerImageA, spaceOfficerImageB],
+        characterSide: 'right',
+        bubblePosition: 'bottom',
+        targetId: 'galactic-own-fleets',
         targetPadding: 12
       },
       {

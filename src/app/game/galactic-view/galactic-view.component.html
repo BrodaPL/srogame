@@ -16,7 +16,7 @@
         }
       </h3>
 
-      <label class="galaxy-preview__toggle">
+      <label class="galaxy-preview__toggle" data-tutorial-id="galactic-route-toggle">
         <input type="checkbox" [(ngModel)]="showFleetRoutes" />
         <span>Show fleet routes</span>
       </label>
@@ -227,7 +227,7 @@
           <p class="overview-empty">No planets in this star system.</p>
         }
 
-        <section class="star-system-preview__fleet-section">
+        <section class="star-system-preview__fleet-section" data-tutorial-id="galactic-own-fleets">
           <div class="star-system-preview__fleet-head">
             <h4>Own Fleets In System</h4>
             <span class="badge">{{ selectedSystemOwnFleets.length }}</span>

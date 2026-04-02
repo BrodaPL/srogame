@@ -346,6 +346,14 @@ export class TutorialService {
       return 'reportsView';
     }
 
+    if (url.startsWith('/game/mail')) {
+      return 'mailView';
+    }
+
+    if (url.startsWith('/game/diplomacy')) {
+      return 'diplomacyView';
+    }
+
     return null;
   }
 

@@ -51,7 +51,7 @@
     </header>
 
     <section class="diplomacy-view__layout">
-      <section class="overview-card diplomacy-view__contacts">
+      <section class="overview-card diplomacy-view__contacts" data-tutorial-id="diplomacy-contacts">
         <div class="diplomacy-view__panel-head">
           <div>
             <h3>Discovered Contacts</h3>
@@ -89,7 +89,7 @@
         }
       </section>
 
-      <section class="overview-card diplomacy-view__detail">
+      <section class="overview-card diplomacy-view__detail" data-tutorial-id="diplomacy-detail-panel">
         @if (selectedContact(); as contact) {
           <div class="diplomacy-view__panel-head">
             <div>
@@ -119,7 +119,7 @@
           </div>
 
           <div class="diplomacy-view__action-grid">
-            <section class="diplomacy-view__action-card">
+            <section class="diplomacy-view__action-card" data-tutorial-id="diplomacy-treaty-controls">
               <h4>Treaty Proposal</h4>
               <p class="overview-muted">{{ proposalAvailabilityCopy(contact) }}</p>
               <div class="diplomacy-view__proposal-controls">
@@ -142,7 +142,7 @@
               </div>
             </section>
 
-            <section class="diplomacy-view__action-card">
+            <section class="diplomacy-view__action-card" data-tutorial-id="diplomacy-direct-message">
               <h4>Direct Message</h4>
               <p class="overview-muted">Messages are now handled through Mail and the shared compose popup.</p>
               <button
@@ -179,7 +179,7 @@
       </section>
     </section>
 
-    <section class="overview-card diplomacy-view__proposals">
+    <section class="overview-card diplomacy-view__proposals" data-tutorial-id="diplomacy-proposals">
       <div class="diplomacy-view__panel-head">
         <div>
           <h3>Active Proposals</h3>

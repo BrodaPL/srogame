@@ -13,6 +13,7 @@ import {
   MaintenanceTransferPayloadDto,
   PlayerMailMessageDto
 } from '../../models/game-api-types';
+import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MessageComposeDialogComponent } from '../ui/message-compose-dialog/message-compose-dialog.component';
 
@@ -54,7 +55,8 @@ export class MailViewComponent implements OnInit {
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly authState: AuthStateService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {}
 
   public ngOnInit(): void {
@@ -486,6 +488,7 @@ export class MailViewComponent implements OnInit {
       : this.messages[0]?.messageId ?? null;
     this.closePartialApproval();
     this.syncMailCounts();
+    this.openTutorialAfterRender();
   }
 
   private runRequestAction(
@@ -574,5 +577,12 @@ export class MailViewComponent implements OnInit {
     }
 
     return Math.max(0, Math.floor(numericValue));
+  }
+
+  private openTutorialAfterRender(): void {
+    setTimeout(() => {
+      this.cdr.detectChanges();
+      this.tutorialService.autoOpenTutorial('mailView');
+    });
   }
 }

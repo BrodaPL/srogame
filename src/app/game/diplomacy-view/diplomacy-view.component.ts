@@ -12,6 +12,7 @@ import {
 } from '../../models/game-api-types';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { PlayerType } from '../../models/enums/player-type';
+import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { MessageComposeDialogComponent } from '../ui/message-compose-dialog/message-compose-dialog.component';
@@ -50,7 +51,8 @@ export class DiplomacyViewComponent implements OnInit {
   constructor(
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly tutorialService: TutorialService
   ) {}
 
   public ngOnInit(): void {
@@ -233,10 +235,12 @@ export class DiplomacyViewComponent implements OnInit {
 
     if (previousSelectedPlayerId !== null && this.contacts.some((contact) => contact.playerId === previousSelectedPlayerId)) {
       this.selectedPlayerId = previousSelectedPlayerId;
+      this.openTutorialAfterRender();
       return;
     }
 
     this.selectedPlayerId = this.contacts[0]?.playerId ?? null;
+    this.openTutorialAfterRender();
   }
 
   private syncProposalSelections(): void {
@@ -260,6 +264,13 @@ export class DiplomacyViewComponent implements OnInit {
         this.proposalSelectionByPlayerId.delete(contact.playerId);
       }
     }
+  }
+
+  private openTutorialAfterRender(): void {
+    setTimeout(() => {
+      this.cdr.detectChanges();
+      this.tutorialService.autoOpenTutorial('diplomacyView');
+    });
   }
 
 }

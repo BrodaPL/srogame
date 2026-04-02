@@ -7,7 +7,9 @@ export const TUTORIAL_VIEW_KEYS = [
   'researchesView',
   'missionPlannerView',
   'operationsView',
-  'reportsView'
+  'reportsView',
+  'mailView',
+  'diplomacyView'
 ] as const;
 
 export type TutorialViewKey = typeof TUTORIAL_VIEW_KEYS[number];
@@ -45,7 +47,9 @@ export function createTutorialReadState(isRead: boolean): TutorialReadState {
     researchesView: isRead,
     missionPlannerView: isRead,
     operationsView: isRead,
-    reportsView: isRead
+    reportsView: isRead,
+    mailView: isRead,
+    diplomacyView: isRead
   };
 }
 

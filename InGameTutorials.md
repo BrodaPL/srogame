@@ -34,6 +34,8 @@ Current keys:
 - `missionPlannerView`
 - `operationsView`
 - `reportsView`
+- `mailView`
+- `diplomacyView`
 
 ## Current Shared Mechanics
 
@@ -237,13 +239,15 @@ When polishing a view to phase-2 quality:
 - Anchors:
   - `galactic-grid`
   - `galactic-home-cell`
+  - `galactic-route-toggle`
   - `galactic-system-preview`
   - `galactic-planet-mini-cards`
+  - `galactic-own-fleets`
   - `galactic-note-action`
 - Safe preload:
   - home system auto-select/preload when no current selection exists
 - Current step count:
-  - 6
+  - 8
 
 #### `planetView`
 
@@ -273,7 +277,7 @@ When polishing a view to phase-2 quality:
   - first owned planet with ships is auto-selected as origin
   - first owned planet different from origin is auto-selected as default target when no route-prefill target exists
 - Current step count:
-  - 7
+  - 8
 
 #### `reportsView`
 
@@ -295,11 +299,12 @@ When polishing a view to phase-2 quality:
   - `operations-header`
   - `operations-main-state`
   - `operations-primary-card`
+  - `operations-card-actions`
 - Auto-open behavior:
   - tutorial auto-opens only when at least one active fleet exists
   - manual reopen remains available even on empty state
 - Current step count:
-  - 3
+  - 4
 
 #### `imperiumView`
 
@@ -357,6 +362,32 @@ When polishing a view to phase-2 quality:
 - Current step count:
   - 4
 
+#### `mailView`
+
+- Anchors:
+  - `mail-compose-action`
+  - `mail-pending-requests`
+  - `mail-resolved-requests`
+  - `mail-messages`
+- Safe preload:
+  - none needed; tutorial targets intentionally use always-present mail sections so the walkthrough still works on empty inboxes
+- Current step count:
+  - 5
+
+#### `diplomacyView`
+
+- Anchors:
+  - `diplomacy-contacts`
+  - `diplomacy-detail-panel`
+  - `diplomacy-treaty-controls`
+  - `diplomacy-direct-message`
+  - `diplomacy-proposals`
+- Safe preload:
+  - first discovered contact is auto-selected when any contact exists
+  - tutorial targets intentionally anchor the always-present contact/detail/proposal containers so the walkthrough still works on empty-state diplomacy screens
+- Current step count:
+  - 4
+
 ### Still pending for phase-2 polish
 
 None.
@@ -368,8 +399,9 @@ Phase-2 rollout is complete for currently supported tutorial views.
 ## Practical Warnings
 
 - `tutorial-overlay.component.css` currently exceeds its component stylesheet budget by about `761 bytes`.
-- Angular build also still reports pre-existing encyclopedia template warnings and a main bundle budget warning.
+- Angular build still reports the main bundle budget warning plus several component stylesheet budget warnings on larger game views.
 - Chrome MCP has been unreliable in this environment; when browser inspection is needed, use the documented fallback workflow from `McpTesting.md`.
+- Latest browser baseline check on `2026-04-02` used the documented Playwright fallback with `TestUserA` and a fresh `smokeSuite` game plus one seeded player `Move` mission. All 11 tutorialized routes opened, stepped past intro into a live spotlight on step 2, and produced no console or page errors.
 
 ## Maintenance Rule
 

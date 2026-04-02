@@ -2906,3 +2906,6 @@ Thumbs.db
 /.tmp-app.log
 /.tmp-server.err
 /.tmp-server.log
+/.tmp-server.err.log
+/.tmp-web.err.log
+/.tmp-web.log

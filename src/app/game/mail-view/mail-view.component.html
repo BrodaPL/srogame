@@ -46,14 +46,18 @@
           <span class="overview-stat__value">{{ pendingRequests().length }}</span>
         </div>
       </div>
-      <button type="button" class="top-menu__button top-menu__button--help" (click)="openNewMessageComposer()">
+      <button
+        type="button"
+        class="top-menu__button top-menu__button--help"
+        data-tutorial-id="mail-compose-action"
+        (click)="openNewMessageComposer()">
         Send message
       </button>
     </header>
 
     <section class="mail-view__layout">
       <section class="overview-card mail-view__requests">
-        <div class="mail-view__panel-head">
+        <div class="mail-view__panel-head" data-tutorial-id="mail-pending-requests">
           <div>
             <h3>Pending Requests</h3>
             <p class="overview-muted">Incoming requests must be resolved before End Turn becomes available.</p>
@@ -176,7 +180,9 @@
           </div>
         }
 
-        <div class="mail-view__panel-head mail-view__panel-head--spaced">
+        <div
+          class="mail-view__panel-head mail-view__panel-head--spaced"
+          data-tutorial-id="mail-resolved-requests">
           <div>
             <h3>Resolved Requests</h3>
             <p class="overview-muted">Resolved requests stay here until you delete them manually.</p>
@@ -211,7 +217,7 @@
         }
       </section>
 
-      <section class="overview-card mail-view__messages">
+      <section class="overview-card mail-view__messages" data-tutorial-id="mail-messages">
         <div class="mail-view__panel-head">
           <div>
             <h3>Messages</h3>
