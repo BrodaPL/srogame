@@ -2,7 +2,7 @@ import { NgClass, NgFor, NgIf } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-type MechanicStatus = 'Live' | 'Partial' | 'Planned';
+type MechanicStatus = 'Live' | 'Partial' | 'Planned' | 'Not Planned';
 type MechanicCategory =
   | 'Economy'
   | 'Queues'
@@ -28,7 +28,7 @@ type MechanicSection = {
   templateUrl: './encyclopedia-mechanics.component.html'
 })
 export class EncyclopediaMechanicsComponent {
-  readonly statusFilters: Array<'All' | MechanicStatus> = ['All', 'Live', 'Partial', 'Planned'];
+  readonly statusFilters: Array<'All' | MechanicStatus> = ['All', 'Live', 'Partial', 'Planned', 'Not Planned'];
   readonly categoryFilters: Array<'All' | MechanicCategory> = [
     'All',
     'Economy',
@@ -207,10 +207,10 @@ export class EncyclopediaMechanicsComponent {
       status: 'Partial',
       summary: 'Sensor Phalanx backend mechanics are live in phase 1, but they currently feed reports and APIs without a dedicated player-facing screen.',
       details: [
-        'Planets with Sensor Phalanx expose live capability data for range, scan cost, scans-per-turn, and already-used scans.',
+        'Planets with Sensor Phalanx already expose live capability data for range, scan cost, scans-per-turn, and already-used scans through server endpoints.',
         'Active scans consume deuterium from the origin planet and reveal only minimal fleet-contact data: direction, fleet size, ETA, and allied status.',
         'Passive detection runs during turn processing and creates Sensor Phalanx reports only for newly visible incoming fleets.',
-        'Current coverage is intentionally narrow: there is no dedicated scan view yet, and the system does not reveal full fleet composition.'
+        'Current coverage is intentionally narrow: there is still no dedicated scan view yet, and the system does not reveal full fleet composition.'
       ],
       formulas: [
         'normalRange = floor(baseRange * anomaliesAndNoise * finalBuildingEffectiveness)',
@@ -252,11 +252,12 @@ export class EncyclopediaMechanicsComponent {
       status: 'Live',
       summary: 'Mission Planner is live for launch across the currently supported mission set, with mission-first validation and shared mission definitions.',
       details: [
-        'Mission Planner currently supports Move, Guard, Transport, Spy, Bombard, Siege, Recycle, Repair, and Colonize.',
+        'Mission Planner currently supports Attack, Move, Guard, Transport, Spy, Bombard, Siege, Recycle, Repair, and Colonize.',
         'Validation includes coordinates, ownership/diplomacy constraints, ship capability checks, cargo rules, fuel reserves, and active-fleet-cap checks.',
         'Fleet composition splits launch selection into Ready and Damaged counters, and damaged hull entries can still be launched for now.',
         'Fleet lifecycle states are meaningful: fleets can be PENDING_JUMP_GATE, MOVING_TO_TARGET, ORBITING, RETURNING, MISSION_FAILURE_RETURNING, or MISSION_FAILURE_IDLE.',
         'Move to owned planets merges into the target planet, Move to non-hostile foreign or unowned orbit can stay in orbit, Transport delivers cargo then returns, and Spy creates structured espionage reports.',
+        'Attack can target WAR and PASSIVE owned planets, resolves hostile arrival combat, and steals metal, crystal, and deuterium after successful arrival resolution if cargo space remains.',
         'Bombard and Siege can store optional Main, Secondary, and Tertiary bombard priorities, which persist on the fleet for later siege turns.',
         'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn.',
         'Foreign Jump Gate targets require known gate intel from the latest espionage report and create a Mail request for the target owner unless diplomacy auto-approves it.',
@@ -265,9 +266,6 @@ export class EncyclopediaMechanicsComponent {
       formulas: [
         'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2',
         'fuelCost = sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves'
-      ],
-      notes: [
-        'Dedicated attack/plunder-style missions are still future work, but the current planner and mission runtime are fully live.'
       ]
     },
     {
@@ -375,13 +373,13 @@ export class EncyclopediaMechanicsComponent {
       title: 'In-Game Tutorials',
       category: 'Core Loop',
       status: 'Partial',
-      summary: 'The guided tutorial framework is live for several major desktop views, but coverage is still selective and mobile-specific layouts are not planned yet.',
+      summary: 'The guided tutorial framework is live for the main desktop management views, but not every route is covered and mobile-specific layouts are intentionally out of scope.',
       details: [
-        'Tutorials now exist for Galaxy View, Planet View, Mission Planner, Reports, Operations, Imperium, Buildings, Production, and Researches.',
+        'Tutorials now exist for Galaxy View, Planet View, Mission Planner, Reports, Mail, Diplomacy, Operations, Imperium, Buildings, Production, and Researches.',
         'The overlay uses staged focus, highlight, and bubble presentation with spotlight dimming, scroll locking, and target-aware placement via data-tutorial-id anchors.',
         'Whole-view intro steps can omit a target, and views can register preparation hooks so hidden UI is revealed safely before measurement.',
         'Auto-open behavior is view-specific and tries to land on meaningful data, for example requiring active fleets before opening the Operations tutorial.',
-        'Current polish is desktop-focused; unsupported views and mobile-specific tutorial layouts remain outside the implemented scope.'
+        'Current polish is desktop-focused; unsupported routes like Help and some lower-priority screens still sit outside the implemented tutorial scope.'
       ]
     },
     {
@@ -409,13 +407,25 @@ export class EncyclopediaMechanicsComponent {
       ]
     },
     {
-      title: 'Fleet Groups for Tactics',
+      title: 'Fleet Tactics and Group Templates',
       category: 'Core Loop',
-      status: 'Planned',
-      summary: 'Fleet groups are planned to allow richer tactical organization.',
+      status: 'Not Planned',
+      summary: 'Reusable fleet-tactics or group-template systems are not planned in the current roadmap.',
       details: [
-        'Players will be able to define reusable ship groups for faster mission setup.',
-        'Grouping is intended to support different strategic roles and formations.'
+        'The current mission flow focuses on direct ship selection, mission validation, and live fleet states instead of prebuilt tactical formations.',
+        'Future mission or combat work may still deepen existing systems, but dedicated fleet-tactics tooling is not an active planned feature.'
+      ]
+    },
+    {
+      title: 'Multiplayer Lobby and Seat Assignment',
+      category: 'Core Loop',
+      status: 'Partial',
+      summary: 'A real host-controlled multiplayer lobby is live, but broader multiplayer scale and hardening are still future work.',
+      details: [
+        'Multiplayer currently runs as one global lobby managed by a local-admin host.',
+        'The host can change lobby setup, bind a saved game, assign missing saved-human seats, and start the game.',
+        'Regular logged-in users can join, leave, and toggle ready, while saved human seats can be auto-reclaimed or replaced before start.',
+        'Expanded multiplayer support, broader scaling, and more hardened competitive flow remain future work.'
       ]
     },
     {
@@ -505,12 +515,13 @@ export class EncyclopediaMechanicsComponent {
       title: 'Saving and Loading Game',
       category: 'Core Loop',
       status: 'Partial',
-      summary: 'Auth and some client state persist, but the active galaxy is still an in-memory server runtime object.',
+      summary: 'Save inspection and manual load are live, but the active runtime game is still controlled as a server-memory session rather than a fully seamless persistent world.',
       details: [
-        'localStorage currently stores setup in srogame:setup and the auth/player session in srogame:player.',
+        'localStorage stores setup in srogame:setup and the auth/player session in srogame:player.',
         'Server auth accounts and sessions are stored in server/data/auth.json.',
-        'The active galaxy, diplomacy, fleets, queues, reports, and operations are still in-memory server state.',
-        'True durable load and resume flows for the galaxy itself are still future work.'
+        'The server now persists a full game snapshot to server/data/game.json on game start and on the configured autosave cadence.',
+        'The /load route can inspect the saved snapshot, confirm replacement of the active runtime game, and load that save back into the live server state.',
+        'Startup auto-load is still not implemented, and the active galaxy, diplomacy, fleets, queues, reports, and operations still run from in-memory live state between loads.'
       ]
     }
   ];
@@ -554,6 +565,10 @@ export class EncyclopediaMechanicsComponent {
 
     if (status === 'Partial') {
       return 'mechanics-status--partial';
+    }
+
+    if (status === 'Not Planned') {
+      return 'mechanics-status--not-planned';
     }
 
     return 'mechanics-status--planned';

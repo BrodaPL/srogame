@@ -370,7 +370,7 @@ app-root {
 
 .mechanics-overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
   margin-bottom: 1rem;
 }
@@ -398,6 +398,11 @@ app-root {
 .mechanics-overview__item--planned {
   border-color: rgba(159, 176, 202, 0.35);
   background: rgba(159, 176, 202, 0.12);
+}
+
+.mechanics-overview__item--not-planned {
+  border-color: rgba(214, 122, 122, 0.4);
+  background: rgba(214, 122, 122, 0.14);
 }
 
 .mechanics-overview__label {
@@ -502,6 +507,12 @@ app-root {
   border-color: rgba(159, 176, 202, 0.45);
   color: #d2deef;
   background: rgba(159, 176, 202, 0.16);
+}
+
+.mechanics-status--not-planned {
+  border-color: rgba(214, 122, 122, 0.45);
+  color: #ffc7c7;
+  background: rgba(214, 122, 122, 0.16);
 }
 
 .mechanics-formula-list {
