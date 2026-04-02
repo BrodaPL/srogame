@@ -1156,7 +1156,7 @@ export class ProductionViewComponent implements OnInit {
     const roboticsFactoryLevel = this.buildingLevel(BuildingType.ROBOTICS_FACTORY);
     const naniteFactoryLevel = this.buildingLevel(BuildingType.NANITE_FACTORY);
     const roboticsPower = roboticsFactoryLevel <= 0 ? 5 : this.getProductionAtLevelByType(BuildingType.ROBOTICS_FACTORY, roboticsFactoryLevel);
-    const naniteMultiplier = naniteFactoryLevel <= 0 ? 1 : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+    const naniteMultiplier = naniteFactoryLevel <= 0 ? 1 : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
     const industryPower = roboticsPower
       * naniteMultiplier
       * industryModifier
@@ -1170,7 +1170,7 @@ export class ProductionViewComponent implements OnInit {
     const shipyardLevel = this.buildingLevel(BuildingType.SHIPYARD);
     const naniteFactoryLevel = this.buildingLevel(BuildingType.NANITE_FACTORY);
     const shipyardBasePower = shipyardLevel <= 0 ? 0 : this.getProductionAtLevelByType(BuildingType.SHIPYARD, shipyardLevel);
-    const naniteMultiplier = naniteFactoryLevel <= 0 ? 1 : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+    const naniteMultiplier = naniteFactoryLevel <= 0 ? 1 : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
     const shipyardPower = shipyardBasePower
       * naniteMultiplier
       * industryModifier
@@ -1414,6 +1414,11 @@ export class ProductionViewComponent implements OnInit {
     return blueprint ? this.getProductionAtLevel(blueprint, level) : 0;
   }
 
+  private getProductionAtLevelByTypeExact(buildingType: BuildingType, level: number): number {
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    return blueprint ? this.getProductionAtLevelExact(blueprint, level) : 0;
+  }
+
   private getProductionAtLevel(building: Building, level: number): number {
     const baseProduction = this.getRawProductionAtLevel(building, level);
     if (baseProduction <= 0) {
@@ -1425,6 +1430,17 @@ export class ProductionViewComponent implements OnInit {
       * this.powerUtilizationAtLevel(building.type, level, building.powerConsumption ?? 0)
       * this.structuralUtilizationAtLevel(building.type, level)
     );
+  }
+
+  private getProductionAtLevelExact(building: Building, level: number): number {
+    const baseProduction = this.getRawProductionAtLevel(building, level);
+    if (baseProduction <= 0) {
+      return 0;
+    }
+
+    return baseProduction
+      * this.powerUtilizationAtLevel(building.type, level, building.powerConsumption ?? 0)
+      * this.structuralUtilizationAtLevel(building.type, level);
   }
 
   private getRawProductionAtLevel(building: Building, level: number): number {

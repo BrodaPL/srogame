@@ -213,6 +213,14 @@ describe('Planet', () => {
     expect(planet.getJumpGateCapacity(3)).toBe(34);
   });
 
+  it('preserves fractional nanite production for multiplier-based calculations', () => {
+    const planet = createPlanet();
+    planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+
+    expect(planet.getBuildingProductionValue1(BuildingType.NANITE_FACTORY)).toBe(1);
+    expect(planet.getBuildingProductionValue1Exact(BuildingType.NANITE_FACTORY)).toBe(1.5);
+  });
+
   it('calculates live trade port capacity from level, power, damage, hyperspace modifiers, tech, and jump gate bonus', () => {
     const planet = createPlanet({ hyperspaceParameters: 1.1 });
     planet.setBuildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT, 2);

@@ -12,6 +12,7 @@ import { ManyDefences } from '../../defences/many-defences';
 import { Fleet, FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import { ManyShips } from '../../fleets/many-ships';
 import { ShipInstance } from '../../fleets/ship-instance';
+import { ShipyardQueueEntry } from '../../fleets/shipyard-queue-entry';
 import { Galaxy } from '../../planets/galaxy';
 import { SolarSystem } from '../../planets/solar-system';
 import { Player } from '../../player';
@@ -909,6 +910,31 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(23);
     expect(system.planets[0].rBDSFTQ.currentResearchQueue?.investedResearchPower).toBe(32);
+  });
+
+  it('applies fractional nanite multipliers to industry and shipyard power', () => {
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        const homePlanet = solarSystem.planets[0];
+        homePlanet.info.ownerId = 1;
+        homePlanet.info.planetaryParameters.industryModifier = 1;
+        homePlanet.info.planetaryParameters.energyModifierRES = 1;
+        homePlanet.info.planetaryParameters.energyModifierNuclear = 1;
+        homePlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+        homePlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+        homePlanet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+        homePlanet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+        homePlanet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(BuildingType.FUSION_REACTOR, 1, 0));
+        homePlanet.rBDSFTQ.shipyardQueue.push(ShipyardQueueEntry.ship(ShipType.ATMOSPHERIC_BOMBER, 1, 0));
+      },
+      (solarSystem) => ([new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER)])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(60);
+    expect(system.planets[0].rBDSFTQ.shipyardQueue[0]?.investedShipyardPower).toBe(52);
   });
 
   it('prioritizes non-small damaged ships for strong repair equipment', () => {

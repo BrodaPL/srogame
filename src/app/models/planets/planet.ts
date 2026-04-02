@@ -308,6 +308,15 @@ export class Planet {
     return Math.floor(baseProduction * this.getBuildingEffectiveness(type));
   }
 
+  public getBuildingProductionValue1Exact(type: BuildingType): number {
+    const baseProduction = this.getRawBuildingProductionValue1(type);
+    if (baseProduction <= 0) {
+      return 0;
+    }
+
+    return baseProduction * this.getBuildingEffectiveness(type);
+  }
+
   public getBuildingProductionValue2(type: BuildingType): number {
     const baseProduction = this.getRawBuildingProductionValue2(type);
     if (baseProduction <= 0) {

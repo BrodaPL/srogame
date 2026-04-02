@@ -787,7 +787,7 @@ export class ImperiumViewComponent implements OnInit {
       : this.currentBuildingProduction(planet, BuildingType.ROBOTICS_FACTORY);
     const naniteMultiplier = naniteFactoryLevel <= 0
       ? 1
-      : this.currentBuildingProduction(planet, BuildingType.NANITE_FACTORY);
+      : this.currentBuildingProductionExact(planet, BuildingType.NANITE_FACTORY);
     const shipyardBasePower = shipyardLevel <= 0
       ? 0
       : this.currentBuildingProduction(planet, BuildingType.SHIPYARD);
@@ -845,6 +845,21 @@ export class ImperiumViewComponent implements OnInit {
     }
 
     return Math.floor(rawProduction * this.powerUtilization(planet, buildingType));
+  }
+
+  private currentBuildingProductionExact(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    const blueprint = this.buildingByType.get(buildingType);
+    const level = this.buildingLevel(planet, buildingType);
+    if (!blueprint || level <= 0) {
+      return 0;
+    }
+
+    const rawProduction = blueprint.production1[level - 1];
+    if (!Number.isFinite(rawProduction) || rawProduction <= 0) {
+      return 0;
+    }
+
+    return rawProduction * this.powerUtilization(planet, buildingType);
   }
 
   private powerUtilization(planet: ClientPlanetDto, buildingType: BuildingType): number {

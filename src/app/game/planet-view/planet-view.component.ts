@@ -3028,7 +3028,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       : this.getProductionAtLevelByType(BuildingType.ROBOTICS_FACTORY, roboticsFactoryLevel);
     const naniteMultiplier = naniteFactoryLevel <= 0
       ? 1
-      : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+      : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
     const industryPower = roboticsPower
       * naniteMultiplier
@@ -3052,7 +3052,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       : this.getProductionAtLevelByType(BuildingType.SHIPYARD, shipyardLevel);
     const naniteMultiplier = naniteFactoryLevel <= 0
       ? 1
-      : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+      : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
     const shipyardPower = shipyardBasePower
       * naniteMultiplier
@@ -3133,7 +3133,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       : this.productionAtPlanetBuildingLevel(planet, BuildingType.SHIPYARD);
     const naniteMultiplier = naniteFactoryLevel <= 0
       ? 1
-      : this.productionAtPlanetBuildingLevel(planet, BuildingType.NANITE_FACTORY);
+      : this.productionAtPlanetBuildingLevelExact(planet, BuildingType.NANITE_FACTORY);
 
     const shipyardPower = shipyardBasePower
       * naniteMultiplier
@@ -3418,7 +3418,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       : this.productionAtPlanetBuildingLevel(planet, BuildingType.ROBOTICS_FACTORY);
     const naniteMultiplier = naniteFactoryLevel <= 0
       ? 1
-      : this.productionAtPlanetBuildingLevel(planet, BuildingType.NANITE_FACTORY);
+      : this.productionAtPlanetBuildingLevelExact(planet, BuildingType.NANITE_FACTORY);
     const industryPower = roboticsPower
       * naniteMultiplier
       * industryModifier
@@ -3547,6 +3547,21 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     );
   }
 
+  private productionAtPlanetBuildingLevelExact(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const level = this.buildingLevelForPlanet(planet, buildingType);
+    return this.getProductionAtLevelExact(
+      blueprint,
+      level,
+      this.currentPlanetBuildingPowerConsumption(planet, buildingType),
+      this.structuralUtilizationForPlanet(planet, buildingType)
+    );
+  }
+
   private techLevelForPlanet(planet: ClientPlanetDto, technologyType: TechnologyType): number {
     return planet.reportData?.techLevels.find((entry) => entry.type === technologyType)?.level ?? 0;
   }
@@ -3617,6 +3632,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return this.getProductionAtLevel(blueprint, level);
   }
 
+  private getProductionAtLevelByTypeExact(buildingType: BuildingType, level: number): number {
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    return this.getProductionAtLevelExact(blueprint, level);
+  }
+
   private getProductionAtLevel(
     building: Building,
     level: number,
@@ -3636,6 +3660,27 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     );
     const structuralUtilization = explicitStructuralUtilization ?? this.structuralUtilizationAtLevel(building.type, level);
     return Math.floor(baseProduction * utilization * structuralUtilization);
+  }
+
+  private getProductionAtLevelExact(
+    building: Building,
+    level: number,
+    explicitPowerConsumption?: number | null,
+    explicitStructuralUtilization?: number | null
+  ): number {
+    const baseProduction = this.getRawProductionAtLevel(building, level);
+    if (baseProduction <= 0) {
+      return 0;
+    }
+
+    const utilization = this.powerUtilizationAtLevel(
+      building.type,
+      level,
+      building.powerConsumption ?? 0,
+      explicitPowerConsumption
+    );
+    const structuralUtilization = explicitStructuralUtilization ?? this.structuralUtilizationAtLevel(building.type, level);
+    return baseProduction * utilization * structuralUtilization;
   }
 
   private getRawProductionAtLevel(building: Building, level: number): number {

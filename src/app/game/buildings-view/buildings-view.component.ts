@@ -741,7 +741,7 @@ export class BuildingsViewComponent implements OnInit {
       : this.getProductionAtLevelByType(BuildingType.ROBOTICS_FACTORY, roboticsFactoryLevel);
     const naniteMultiplier = naniteFactoryLevel <= 0
       ? 1
-      : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+      : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
     const industryPower = roboticsPower
       * naniteMultiplier
@@ -761,7 +761,7 @@ export class BuildingsViewComponent implements OnInit {
       : this.getProductionAtLevelByType(BuildingType.SHIPYARD, shipyardLevel);
     const naniteMultiplier = naniteFactoryLevel <= 0
       ? 1
-      : this.getProductionAtLevelByType(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+      : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
     const shipyardPower = shipyardBasePower
       * naniteMultiplier
@@ -1056,6 +1056,15 @@ export class BuildingsViewComponent implements OnInit {
     return this.getProductionAtLevel(blueprint, level);
   }
 
+  private getProductionAtLevelByTypeExact(buildingType: BuildingType, level: number): number {
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    return this.getProductionAtLevelExact(blueprint, level);
+  }
+
   private getProductionAtLevel(building: Building, level: number): number {
     const baseProduction = this.getRawProductionAtLevel(building, level);
     if (baseProduction <= 0) {
@@ -1068,6 +1077,20 @@ export class BuildingsViewComponent implements OnInit {
       building.powerConsumption ?? 0
     );
     return Math.floor(baseProduction * utilization);
+  }
+
+  private getProductionAtLevelExact(building: Building, level: number): number {
+    const baseProduction = this.getRawProductionAtLevel(building, level);
+    if (baseProduction <= 0) {
+      return 0;
+    }
+
+    const utilization = this.powerUtilizationAtLevel(
+      building.type,
+      level,
+      building.powerConsumption ?? 0
+    );
+    return baseProduction * utilization;
   }
 
   private detailProductionAtLevel(building: Building, level: number): number {

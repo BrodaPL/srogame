@@ -205,7 +205,7 @@ function createPlanetTurnSnapshot(
   const effectiveParameters = planet.getEffectivePlanetaryParameters();
   const naniteMultiplier = planet.getBuildingLevel(BuildingType.NANITE_FACTORY) <= 0
     ? 1
-    : planet.getBuildingProductionValue1(BuildingType.NANITE_FACTORY);
+    : planet.getBuildingProductionValue1Exact(BuildingType.NANITE_FACTORY);
   const roboticsPower = planet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY) <= 0
     ? 5
     : planet.getBuildingProductionValue1(BuildingType.ROBOTICS_FACTORY);
