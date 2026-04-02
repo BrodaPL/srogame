@@ -5,7 +5,7 @@ import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
-import { GameSaveSummaryResponse } from '../models/game-api-types';
+import { GameSaveSummary, GameSavesResponse } from '../models/game-api-types';
 
 @Component({
   selector: 'app-load-game',
@@ -14,11 +14,12 @@ import { GameSaveSummaryResponse } from '../models/game-api-types';
 })
 export class LoadGameComponent {
   protected readonly session: AuthStateService['session'];
-  protected summary: GameSaveSummaryResponse | null = null;
+  protected response: GameSavesResponse | null = null;
   protected isSummaryLoading = false;
-  protected isLoadAction = false;
+  protected pendingAction: 'load' | 'delete' | null = null;
+  protected pendingSaveId: string | null = null;
   protected summaryError: string | null = null;
-  protected loadError: string | null = null;
+  protected actionError: string | null = null;
   protected confirmReplaceActiveGame = false;
 
   constructor(
@@ -29,62 +30,103 @@ export class LoadGameComponent {
     private readonly gameState: GameStateService
   ) {
     this.session = this.authState.session;
-    this.loadSummary();
+    this.loadSaves();
   }
 
-  protected loadSummary(): void {
+  protected loadSaves(): void {
     this.isSummaryLoading = true;
     this.summaryError = null;
 
     const token = this.session()?.token;
-    this.gameApi.getGameSaveSummary(token).subscribe({
-      next: (summary) => {
-        this.summary = summary;
+    this.gameApi.getGameSaves(token).subscribe({
+      next: (response) => {
+        this.response = response;
         this.isSummaryLoading = false;
-        if (!summary.activeGame) {
+        if (!response.activeGame) {
           this.confirmReplaceActiveGame = false;
         }
       },
       error: (error) => {
-        this.summary = null;
+        this.response = null;
         this.summaryError = error?.error?.error ?? 'Unable to load save summary.';
         this.isSummaryLoading = false;
       }
     });
   }
 
-  protected canLoadGame(): boolean {
-    return !!this.summary?.save
-      && this.summary.canLoad
-      && (!this.summary.activeGame || this.confirmReplaceActiveGame)
-      && !this.isLoadAction;
+  protected canManageSaves(): boolean {
+    return this.response?.canManage === true;
   }
 
-  protected loadGame(): void {
+  protected canLoadGame(save: GameSaveSummary): boolean {
+    return !!save
+      && this.canManageSaves()
+      && (!this.response?.activeGame || this.confirmReplaceActiveGame)
+      && this.pendingAction === null;
+  }
+
+  protected canDeleteGame(save: GameSaveSummary): boolean {
+    return !!save && this.canManageSaves() && this.pendingAction === null;
+  }
+
+  protected loadGame(save: GameSaveSummary): void {
     const session = this.session();
     if (!session) {
       this.router.navigate(['/login']);
       return;
     }
 
-    if (!this.canLoadGame()) {
+    if (!this.canLoadGame(save)) {
       return;
     }
 
-    this.isLoadAction = true;
-    this.loadError = null;
+    this.pendingAction = 'load';
+    this.pendingSaveId = save.saveId;
+    this.actionError = null;
 
-    this.gameApi.loadGame(session.token).subscribe({
+    this.gameApi.loadGame(save.saveId, session.token).subscribe({
       next: (response) => {
         this.authState.setSession(response.player);
         this.gameState.setGalaxy(response.galaxy);
-        this.isLoadAction = false;
+        this.pendingAction = null;
+        this.pendingSaveId = null;
         this.router.navigate(['/game/imperium']);
       },
       error: (error) => {
-        this.loadError = error?.error?.error ?? 'Unable to load saved game.';
-        this.isLoadAction = false;
-        this.loadSummary();
+        this.actionError = error?.error?.error ?? 'Unable to load saved game.';
+        this.pendingAction = null;
+        this.pendingSaveId = null;
+        this.loadSaves();
+      }
+    });
+  }
+
+  protected deleteSave(save: GameSaveSummary): void {
+    const session = this.session();
+    if (!session) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    if (!this.canDeleteGame(save)) {
+      return;
+    }
+
+    this.pendingAction = 'delete';
+    this.pendingSaveId = save.saveId;
+    this.actionError = null;
+
+    this.gameApi.deleteGameSave(save.saveId, session.token).subscribe({
+      next: () => {
+        this.pendingAction = null;
+        this.pendingSaveId = null;
+        this.loadSaves();
+      },
+      error: (error) => {
+        this.actionError = error?.error?.error ?? 'Unable to delete saved game.';
+        this.pendingAction = null;
+        this.pendingSaveId = null;
+        this.loadSaves();
       }
     });
   }
@@ -107,5 +149,13 @@ export class LoadGameComponent {
         this.router.navigate(['/']);
       }
     });
+  }
+
+  protected isPendingLoad(save: GameSaveSummary): boolean {
+    return this.pendingAction === 'load' && this.pendingSaveId === save.saveId;
+  }
+
+  protected isPendingDelete(save: GameSaveSummary): boolean {
+    return this.pendingAction === 'delete' && this.pendingSaveId === save.saveId;
   }
 }

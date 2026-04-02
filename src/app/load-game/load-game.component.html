@@ -3,68 +3,56 @@
     <header class="panel__header">
       <p class="eyebrow">Load Game</p>
       <h1>Load Game</h1>
-      <p class="subtitle">Inspect the current server save and replace the active runtime game.</p>
+      <p class="subtitle">Manage the server save list and replace the active runtime game with a selected save.</p>
     </header>
 
-    @if (isSummaryLoading && !summary) {
+    @if (isSummaryLoading && !response) {
       <div class="saved">
         <p class="saved__title">Loading</p>
-        <p>Reading saved game summary from the server.</p>
+        <p>Reading saved games from the server.</p>
       </div>
     } @else if (summaryError) {
       <div class="saved">
         <p class="saved__title">Summary Error</p>
         <p>{{ summaryError }}</p>
       </div>
-    } @else if (!summary?.save) {
+    } @else if (response && response.saves.length === 0) {
       <div class="saved">
-        <p class="saved__title">No Save Found</p>
-        <p>The server does not currently have a `server/data/game.json` save file.</p>
-      </div>
-    } @else {
-      <div class="saved">
-        <p class="saved__title">Saved Game</p>
-        <p>
-          Galaxy: {{ summary!.save!.galaxyName }}.
-          Turn: {{ summary!.save!.currentTurn }}.
-          Owner: {{ summary!.save!.ownerPlayerName ?? 'Unknown' }} (account {{ summary!.save!.ownerAccountId }}).
-          Saved: {{ summary!.save!.savedAt }}.
-          Auto save:
-          {{ summary!.save!.autoSaveTurns === 0 ? 'disabled' : 'every ' + summary!.save!.autoSaveTurns + ' turns' }}.
-        </p>
+        <p class="saved__title">No Saves Found</p>
+        <p>The server does not currently have any saved games in `server/data/saves/`.</p>
       </div>
     }
 
-    @if (summary; as currentSummary) {
-      @if (currentSummary.activeGame) {
+    @if (response; as currentResponse) {
+      @if (currentResponse.activeGame) {
         <div class="saved">
           <p class="saved__title">Active Runtime Game</p>
           <p>
-            Galaxy: {{ currentSummary.activeGame.galaxyName }}.
-            Turn: {{ currentSummary.activeGame.currentTurn }}.
-            Owner: {{ currentSummary.activeGame.ownerPlayerName ?? 'Unknown' }}
-            @if (currentSummary.activeGame.ownerAccountId !== null) {
-              <span>(account {{ currentSummary.activeGame.ownerAccountId }})</span>
+            Galaxy: {{ currentResponse.activeGame.galaxyName }}.
+            Turn: {{ currentResponse.activeGame.currentTurn }}.
+            Owner: {{ currentResponse.activeGame.ownerPlayerName ?? 'Unknown' }}
+            @if (currentResponse.activeGame.ownerAccountId !== null) {
+              <span>(account {{ currentResponse.activeGame.ownerAccountId }})</span>
             }.
           </p>
           <p class="form-error">Loading will replace the currently active in-memory game.</p>
         </div>
       }
 
-      @if (currentSummary.save && !currentSummary.canLoad && currentSummary.canLoadReason) {
-        <p class="form-error">{{ currentSummary.canLoadReason }}</p>
+      @if (!currentResponse.canManage && currentResponse.canManageReason) {
+        <p class="form-error">{{ currentResponse.canManageReason }}</p>
       }
     }
 
     @if (!session()) {
       <a class="link button" routerLink="/login">Login to load</a>
     } @else {
-      <button class="start-button" type="button" (click)="logout()" [disabled]="isSummaryLoading || isLoadAction">
+      <button class="start-button" type="button" (click)="logout()" [disabled]="isSummaryLoading || pendingAction !== null">
         Logout
       </button>
     }
 
-    @if (summary?.save && summary?.activeGame) {
+    @if (response?.saves?.length && response?.activeGame) {
       <div class="field">
         <label class="checkbox-field" for="confirmReplaceActiveGame">
           <input
@@ -78,15 +66,36 @@
       </div>
     }
 
-    @if (loadError) {
-      <p class="form-error">{{ loadError }}</p>
+    @if (actionError) {
+      <p class="form-error">{{ actionError }}</p>
+    }
+
+    @if (response?.saves?.length) {
+      <div class="saved">
+        <p class="saved__title">Saved Games</p>
+        @for (save of response!.saves; track save.saveId) {
+          <div class="field">
+            <p>
+              {{ save.displayName }}.
+              Owner: {{ save.ownerPlayerName ?? 'Unknown' }} (account {{ save.ownerAccountId }}).
+              Auto save:
+              {{ save.autoSaveTurns === 0 ? 'disabled' : 'every ' + save.autoSaveTurns + ' turns' }}.
+            </p>
+            <div class="field-row">
+              <button class="start-button" type="button" (click)="loadGame(save)" [disabled]="!canLoadGame(save)">
+                {{ isPendingLoad(save) ? 'Loading...' : 'Load' }}
+              </button>
+              <button class="start-button" type="button" (click)="deleteSave(save)" [disabled]="!canDeleteGame(save)">
+                {{ isPendingDelete(save) ? 'Deleting...' : 'Delete' }}
+              </button>
+            </div>
+          </div>
+        }
+      </div>
     }
 
     <div class="field-row">
-      <button class="start-button" type="button" (click)="loadGame()" [disabled]="!canLoadGame()">
-        {{ isLoadAction ? 'Loading...' : 'Load saved game' }}
-      </button>
-      <button class="start-button" type="button" (click)="loadSummary()" [disabled]="isSummaryLoading || isLoadAction">
+      <button class="start-button" type="button" (click)="loadSaves()" [disabled]="isSummaryLoading || pendingAction !== null">
         {{ isSummaryLoading ? 'Refreshing...' : 'Refresh summary' }}
       </button>
     </div>

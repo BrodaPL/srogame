@@ -36,10 +36,13 @@ import {
   buildGameSaveSummary,
   createGameSave,
   hydrateGameSave,
+  listGameSaveSummaries,
+  readGameSaveById,
   readGameSaveSummary,
   resolveGameSaveLoadAccess,
   saveGameFile,
-  shouldAutoSaveAfterTurn
+  shouldAutoSaveAfterTurn,
+  writeRotatingAutoSave
 } from './game-save.js';
 
 describe('game-save', () => {
@@ -69,7 +72,11 @@ describe('game-save', () => {
     const save = buildTestSave();
     const summary = buildGameSaveSummary(save);
 
-    expect(summary).toEqual({
+    expect(summary).toMatchObject({
+      saveId: expect.stringContaining('save-test-turn-6-20260401-120000'),
+      displayName: 'Save Test - Turn 6 - 2026-04-01T12:00:00.000Z',
+      saveType: 'AUTOSAVE',
+      autoSaveSlot: null,
       savedAt: '2026-04-01T12:00:00.000Z',
       ownerAccountId: 42,
       ownerPlayerName: 'Alpha',
@@ -158,6 +165,39 @@ describe('game-save', () => {
     });
 
     expect(normalized.autoSaveTurns).toBe(DEFAULT_AUTO_SAVE_TURNS);
+  });
+
+  it('writes rotating autosaves with galaxy-based names and keeps five slots', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'srogame-saves-'));
+
+    try {
+      const save = buildTestSave();
+      for (let index = 0; index < 7; index += 1) {
+        const nextSave = {
+          ...save,
+          savedAt: `2026-04-01T12:00:0${index}.000Z`,
+          galaxy: {
+            ...save.galaxy,
+            currentTurn: 6 + index
+          }
+        };
+
+        writeRotatingAutoSave(tempDir, hydrateGameSave(nextSave).galaxy, 42, nextSave.setup, {
+          savedAt: nextSave.savedAt,
+          rotationLimit: 5,
+          maxSaveFiles: 100
+        });
+      }
+
+      const summaries = listGameSaveSummaries(tempDir);
+      expect(summaries).toHaveLength(5);
+      expect(summaries.map((entry) => entry.autoSaveSlot).sort()).toEqual([1, 2, 3, 4, 5]);
+      expect(summaries[0].displayName).toContain('Save Test - Turn 12');
+      expect(summaries[0].saveId).toContain('save-test-turn-12-20260401-120006-autosave-2');
+      expect(readGameSaveById(tempDir, summaries[0].saveId)?.autoSaveSlot).toBe(summaries[0].autoSaveSlot);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
 

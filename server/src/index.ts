@@ -47,13 +47,16 @@ import phaseOneTurnResolverModule from '../../src/app/models/turns/phase-one-tur
 import smokeTestScenariosModule from '../../src/app/models/testing/smoke-test-scenarios.js';
 import queueManagementModule from '../../src/app/models/queues/queue-management.js';
 import {
+  AUTO_SAVE_ROTATION_LIMIT,
+  MAX_GAME_SAVE_FILES,
   buildGameSaveSummary,
-  createGameSave,
+  deleteGameSaveById,
   hydrateGameSave,
-  readGameSave,
+  listGameSaveSummaries,
+  readGameSaveById,
   resolveGameSaveLoadAccess,
-  saveGameFile,
-  shouldAutoSaveAfterTurn
+  shouldAutoSaveAfterTurn,
+  writeRotatingAutoSave
 } from './game-save.js';
 import {
   applyLobbyLoadSeatsToGalaxy,
@@ -77,7 +80,7 @@ import resourcesPackModule from '../../src/app/models/resources-pack.js';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   EndTurnResponse,
-  GameSaveSummaryResponse,
+  GameSavesResponse,
   GalaxySetup,
   PlayerSession,
   GalaxySnapshot,
@@ -155,6 +158,7 @@ import type {
   UpdateMultiplayerLobbySetupRequest,
   ToggleMultiplayerLobbyReadyRequest,
   AssignMultiplayerLobbySeatRequest,
+  BindMultiplayerLobbySaveRequest,
   AbandonPlanetRequest,
   AbandonPlanetResponse,
   UseTradePortOfferRequest,
@@ -355,9 +359,9 @@ const AUTH_DATA_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../data/auth.json'
 );
-const GAME_SAVE_PATH = path.resolve(
+const GAME_SAVES_DIRECTORY_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../data/game.json'
+  '../data/saves'
 );
 const PLAYER_NAME_MIN = 3;
 const PLAYER_NAME_MAX = 24;
@@ -524,7 +528,16 @@ app.post('/api/game/start', (req, res) => {
   const nextPresentation = buildPresentationDataByPlayer(nextGalaxy);
 
   try {
-    saveGameFile(GAME_SAVE_PATH, createGameSave(nextGalaxy, auth.session.accountId, setup));
+    writeRotatingAutoSave(
+      GAME_SAVES_DIRECTORY_PATH,
+      nextGalaxy,
+      auth.session.accountId,
+      setup,
+      {
+        rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
+        maxSaveFiles: MAX_GAME_SAVE_FILES
+      }
+    );
   } catch (error) {
     console.error('Initial game save failed.', error);
     return res.status(500).json({ error: 'Unable to save the new game.' });
@@ -545,46 +558,27 @@ app.post('/api/game/start', (req, res) => {
   return res.status(200).json(response);
 });
 
-app.get('/api/game/save-summary', (req, res) => {
+app.get('/api/game/saves', (req, res) => {
   const auth = getAuthSession(req);
 
   try {
-    const save = readGameSave(GAME_SAVE_PATH);
-    const currentAccountId = auth?.session.accountId ?? null;
-    const loadAccess = resolveGameSaveLoadAccess(save, currentAccountId, auth?.session.localAdmin === true);
-    const response: GameSaveSummaryResponse = {
-      save: save ? buildGameSaveSummary(save) : null,
-      activeGame: currentGalaxy
-        ? {
-          ownerAccountId: currentGameOwnerId,
-          ownerPlayerName: currentGameOwnerPlayerName,
-          galaxyName: currentGalaxy.name,
-          currentTurn: currentGalaxy.currentTurn
-        }
-        : null,
-      isLoggedIn: !!auth,
-      currentAccountId,
-      canLoad: loadAccess.canLoad,
-      canLoadReason: loadAccess.canLoadReason
-    };
-
-    return res.status(200).json(response);
+    return res.status(200).json(buildGameSavesResponse(auth?.session ?? null));
   } catch (error) {
-    console.error('Failed to read saved game summary.', error);
-    return res.status(500).json({ error: 'Unable to read saved game.' });
+    console.error('Failed to read game saves.', error);
+    return res.status(500).json({ error: 'Unable to read game saves.' });
   }
 });
 
-app.post('/api/game/load', (req, res) => {
+app.post('/api/game/saves/:saveId/load', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
   try {
-    const save = readGameSave(GAME_SAVE_PATH);
+    const save = readGameSaveById(GAME_SAVES_DIRECTORY_PATH, req.params.saveId);
     if (!save) {
-      return res.status(404).json({ error: 'No saved game found.' });
+      return res.status(404).json({ error: 'Saved game not found.' });
     }
 
     const loadAccess = resolveGameSaveLoadAccess(save, auth.session.accountId, auth.session.localAdmin === true);
@@ -609,6 +603,29 @@ app.post('/api/game/load', (req, res) => {
   } catch (error) {
     console.error('Failed to load saved game.', error);
     return res.status(500).json({ error: 'Unable to load saved game.' });
+  }
+});
+
+app.delete('/api/game/saves/:saveId', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (!isLocalAdminSession(auth.session)) {
+    return res.status(403).json({ error: 'Local admin privileges are required to manage saves.' });
+  }
+
+  try {
+    const deleted = deleteGameSaveById(GAME_SAVES_DIRECTORY_PATH, req.params.saveId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Saved game not found.' });
+    }
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error('Failed to delete saved game.', error);
+    return res.status(500).json({ error: 'Unable to delete saved game.' });
   }
 });
 
@@ -741,16 +758,23 @@ app.post('/api/multiplayer/lobby/load-save', (req, res) => {
   }
 
   try {
-    const save = readGameSave(GAME_SAVE_PATH);
+    const body = req.body as BindMultiplayerLobbySaveRequest | undefined;
+    const saveId = typeof body?.saveId === 'string' ? body.saveId.trim() : '';
+    if (!saveId) {
+      return res.status(400).json({ error: 'Save selection is required.' });
+    }
+
+    const save = readGameSaveById(GAME_SAVES_DIRECTORY_PATH, saveId);
     const loadAccess = resolveGameSaveLoadAccess(save, auth.session.accountId, auth.session.localAdmin === true);
     if (!loadAccess.canLoad || !save) {
-      return res.status(save ? 403 : 404).json({ error: loadAccess.canLoadReason ?? 'No saved game found.' });
+      return res.status(save ? 403 : 404).json({ error: loadAccess.canLoadReason ?? 'Saved game not found.' });
     }
 
     currentMultiplayerLobby = bindSaveToLobby(
       currentMultiplayerLobby,
+      saveId,
       save,
-      buildGameSaveSummary(save)
+      buildGameSaveSummary(save, saveId)
     );
     return res.status(200).json(buildMultiplayerLobbyResponse(auth.session));
   } catch (error) {
@@ -834,9 +858,11 @@ app.post('/api/multiplayer/lobby/start', (req, res) => {
 
   try {
     if (currentMultiplayerLobby.mode === 'LOAD_SAVE') {
-      const save = readGameSave(GAME_SAVE_PATH);
+      const save = currentMultiplayerLobby.boundSaveId
+        ? readGameSaveById(GAME_SAVES_DIRECTORY_PATH, currentMultiplayerLobby.boundSaveId)
+        : null;
       if (!save) {
-        return res.status(404).json({ error: 'No saved game found.' });
+        return res.status(404).json({ error: 'Saved game not found.' });
       }
 
       const hydrated = hydrateGameSave(save);
@@ -3285,9 +3311,15 @@ function saveCurrentGameSnapshot(): void {
     throw new Error('No active game snapshot available.');
   }
 
-  saveGameFile(
-    GAME_SAVE_PATH,
-    createGameSave(currentGalaxy, currentGameOwnerId, currentGameSetup)
+  writeRotatingAutoSave(
+    GAME_SAVES_DIRECTORY_PATH,
+    currentGalaxy,
+    currentGameOwnerId,
+    currentGameSetup,
+    {
+      rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
+      maxSaveFiles: MAX_GAME_SAVE_FILES
+    }
   );
 }
 
@@ -3305,12 +3337,11 @@ function buildActiveGameSummary() {
 }
 
 function buildMultiplayerLobbyResponse(session: AuthSession | null): MultiplayerLobbyResponse {
-  let saveSummary = null;
+  let availableSaves: ReturnType<typeof listGameSaveSummaries> = [];
   try {
-    const save = readGameSave(GAME_SAVE_PATH);
-    saveSummary = save ? buildGameSaveSummary(save) : null;
+    availableSaves = listGameSaveSummaries(GAME_SAVES_DIRECTORY_PATH);
   } catch (error) {
-    console.error('Failed to read save summary for multiplayer lobby.', error);
+    console.error('Failed to read saves for multiplayer lobby.', error);
   }
 
   return {
@@ -3322,11 +3353,34 @@ function buildMultiplayerLobbyResponse(session: AuthSession | null): Multiplayer
       )
       : null,
     activeGame: buildActiveGameSummary(),
-    save: saveSummary,
+    availableSaves,
     isLoggedIn: !!session,
     currentAccountId: session?.accountId ?? null,
     currentPlayerName: session?.playerName ?? null,
     currentPlayerIsLocalAdmin: session?.localAdmin === true
+  };
+}
+
+function buildGameSavesResponse(session: AuthSession | null): GameSavesResponse {
+  let saves: ReturnType<typeof listGameSaveSummaries> = [];
+  try {
+    saves = listGameSaveSummaries(GAME_SAVES_DIRECTORY_PATH);
+  } catch (error) {
+    console.error('Failed to read game saves.', error);
+  }
+
+  return {
+    saves,
+    activeGame: buildActiveGameSummary(),
+    isLoggedIn: !!session,
+    currentAccountId: session?.accountId ?? null,
+    currentPlayerIsLocalAdmin: session?.localAdmin === true,
+    canManage: session?.localAdmin === true,
+    canManageReason: session
+      ? session.localAdmin === true
+        ? null
+        : 'Local admin privileges are required to manage saves.'
+      : 'Login required to manage saves.'
   };
 }
 

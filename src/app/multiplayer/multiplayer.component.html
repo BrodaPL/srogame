@@ -47,15 +47,10 @@
       </div>
     }
 
-    @if (response?.save) {
+    @if (response?.availableSaves?.length) {
       <div class="saved">
-        <p class="saved__title">Server Save</p>
-        <p>
-          Galaxy: {{ response!.save!.galaxyName }}.
-          Turn: {{ response!.save!.currentTurn }}.
-          Owner: {{ response!.save!.ownerPlayerName ?? 'Unknown' }}.
-          Saved: {{ response!.save!.savedAt }}.
-        </p>
+        <p class="saved__title">Available Saves</p>
+        <p>{{ response!.availableSaves.length }} saved games are available on the server.</p>
       </div>
     }
 
@@ -101,7 +96,7 @@
         <div class="saved">
           <p class="saved__title">Bound Save</p>
           <p>
-            {{ response!.lobby!.boundSave!.galaxyName }} at turn {{ response!.lobby!.boundSave!.currentTurn }}.
+            {{ response!.lobby!.boundSave!.displayName }}.
             Auto save:
             {{ response!.lobby!.boundSave!.autoSaveTurns === 0 ? 'disabled' : 'every ' + response!.lobby!.boundSave!.autoSaveTurns + ' turns' }}.
           </p>
@@ -286,9 +281,21 @@
           <button class="start-button" type="button" (click)="saveSetup()" [disabled]="isActing">
             Save lobby setup
           </button>
-          <button class="start-button" type="button" (click)="bindSave()" [disabled]="isActing">
-            Use server save
-          </button>
+          @if (response!.availableSaves.length > 0) {
+            <select
+              id="lobby-save-id"
+              name="lobby-save-id"
+              [(ngModel)]="selectedSaveId"
+              [disabled]="isActing"
+            >
+              @for (save of response!.availableSaves; track save.saveId) {
+                <option [value]="save.saveId">{{ save.displayName }}</option>
+              }
+            </select>
+            <button class="start-button" type="button" (click)="bindSave()" [disabled]="isActing || !selectedSaveId">
+              Bind selected save
+            </button>
+          }
           @if (response!.lobby!.mode === 'LOAD_SAVE') {
             <button class="start-button" type="button" (click)="clearSaveBinding()" [disabled]="isActing">
               Switch to new game

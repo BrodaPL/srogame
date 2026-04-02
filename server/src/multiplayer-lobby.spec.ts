@@ -22,7 +22,7 @@ describe('multiplayer-lobby', () => {
     lobby = joinMultiplayerLobby(lobby, { accountId: 3, playerName: 'Gamma', isLocalAdmin: false }, '2026-04-02T10:02:00.000Z');
     lobby = setMultiplayerLobbyMemberReady(lobby, 2, true);
     lobby = setMultiplayerLobbyMemberReady(lobby, 3, true);
-    lobby = bindSaveToLobby(lobby, createSavedGame(['Admin', 'Alpha', 'Beta']), createSaveSummary());
+    lobby = bindSaveToLobby(lobby, 'lobby-save.json', createSavedGame(['Admin', 'Alpha', 'Beta']), createSaveSummary());
 
     const alphaSeat = lobby.loadSeats.find((seat) => seat.savedPlayerName === 'Alpha');
     const betaSeat = lobby.loadSeats.find((seat) => seat.savedPlayerName === 'Beta');
@@ -89,6 +89,7 @@ describe('multiplayer-lobby', () => {
         { accountId: 11, playerName: 'Gamma', isLocalAdmin: false, isReady: true, joinedAt: '2026-04-02T10:01:00.000Z' }
       ],
       mode: 'LOAD_SAVE' as const,
+      boundSaveId: 'lobby-save.json',
       boundSave: createSaveSummary(),
       loadSeats: [
         { savedPlayerId: 1, savedPlayerName: 'Alpha', assignedAccountId: 11 },
@@ -109,6 +110,8 @@ describe('multiplayer-lobby', () => {
 function createSavedGame(playerNames: string[]): SavedGameFile {
   return {
     version: 1,
+    saveType: 'AUTOSAVE',
+    autoSaveSlot: 1,
     savedAt: '2026-04-02T09:55:00.000Z',
     ownerAccountId: 1,
     ownerPlayerName: 'Admin',
@@ -160,6 +163,10 @@ function createSavedGame(playerNames: string[]): SavedGameFile {
 
 function createSaveSummary(): GameSaveSummary {
   return {
+    saveId: 'lobby-save.json',
+    displayName: 'Lobby Save - Turn 8 - 2026-04-02T09:55:00.000Z',
+    saveType: 'AUTOSAVE',
+    autoSaveSlot: 1,
     savedAt: '2026-04-02T09:55:00.000Z',
     ownerAccountId: 1,
     ownerPlayerName: 'Admin',

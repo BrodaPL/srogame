@@ -44,6 +44,7 @@ export type MultiplayerLobbyState = {
   mode: MultiplayerLobbyMode;
   setup: GalaxySetup;
   members: MultiplayerLobbyMember[];
+  boundSaveId: string | null;
   boundSave: GameSaveSummary | null;
   loadSeats: MultiplayerLobbyLoadSeat[];
 };
@@ -92,6 +93,7 @@ export function openMultiplayerLobby(
       isReady: true,
       joinedAt: openedAt
     }],
+    boundSaveId: null,
     boundSave: null,
     loadSeats: []
   };
@@ -164,6 +166,7 @@ export function updateMultiplayerLobbySetup(
 
 export function bindSaveToLobby(
   lobby: MultiplayerLobbyState,
+  saveId: string,
   save: SavedGameFile,
   summary: GameSaveSummary
 ): MultiplayerLobbyState {
@@ -174,6 +177,7 @@ export function bindSaveToLobby(
       ...summaryToSetupFallback(summary, save.setup),
       playerAmount: Math.max(1, lobby.members.length)
     }),
+    boundSaveId: saveId,
     boundSave: summary,
     loadSeats: save.galaxy.players
       .filter((player) => player.type === PlayerType.PLAYER)
@@ -189,6 +193,7 @@ export function clearLobbySaveBinding(lobby: MultiplayerLobbyState): Multiplayer
   return reconcileLobbyState({
     ...lobby,
     mode: 'NEW_GAME',
+    boundSaveId: null,
     boundSave: null,
     loadSeats: []
   });
@@ -271,6 +276,7 @@ export function buildMultiplayerLobbyDto(
       isReady: member.isReady,
       joinedAt: member.joinedAt
     })),
+    boundSaveId: lobby.boundSaveId,
     boundSave: lobby.boundSave,
     loadSeats: lobby.loadSeats.map((seat): MultiplayerLobbyLoadSeatDto => {
       const assignedMember = seat.assignedAccountId !== null

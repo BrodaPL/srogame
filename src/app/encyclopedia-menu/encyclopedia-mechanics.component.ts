@@ -519,7 +519,7 @@ export class EncyclopediaMechanicsComponent {
       details: [
         'localStorage stores setup in srogame:setup and the auth/player session in srogame:player.',
         'Server auth accounts and sessions are stored in server/data/auth.json.',
-        'The server now persists a full game snapshot to server/data/game.json on game start and on the configured autosave cadence.',
+        'The server now persists rotating full-game autosaves under server/data/saves/ on game start and on the configured autosave cadence.',
         'The /load route can inspect the saved snapshot, confirm replacement of the active runtime game, and load that save back into the live server state.',
         'Startup auto-load is still not implemented, and the active galaxy, diplomacy, fleets, queues, reports, and operations still run from in-memory live state between loads.'
       ]

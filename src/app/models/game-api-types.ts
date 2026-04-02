@@ -152,6 +152,10 @@ export type LoadGameResponse = {
 };
 
 export type GameSaveSummary = {
+  saveId: string;
+  displayName: string;
+  saveType: 'AUTOSAVE';
+  autoSaveSlot: number | null;
   savedAt: string;
   ownerAccountId: number;
   ownerPlayerName: string | null;
@@ -167,13 +171,14 @@ export type ActiveGameSummary = {
   currentTurn: number;
 };
 
-export type GameSaveSummaryResponse = {
-  save: GameSaveSummary | null;
+export type GameSavesResponse = {
+  saves: GameSaveSummary[];
   activeGame: ActiveGameSummary | null;
   isLoggedIn: boolean;
   currentAccountId: number | null;
-  canLoad: boolean;
-  canLoadReason: string | null;
+  currentPlayerIsLocalAdmin: boolean;
+  canManage: boolean;
+  canManageReason: string | null;
 };
 
 export type MultiplayerLobbyMode = 'NEW_GAME' | 'LOAD_SAVE';
@@ -200,6 +205,7 @@ export type MultiplayerLobbyDto = {
   mode: MultiplayerLobbyMode;
   setup: GalaxySetup;
   members: MultiplayerLobbyMemberDto[];
+  boundSaveId: string | null;
   boundSave: GameSaveSummary | null;
   loadSeats: MultiplayerLobbyLoadSeatDto[];
   canManage: boolean;
@@ -215,7 +221,7 @@ export type MultiplayerLobbyDto = {
 export type MultiplayerLobbyResponse = {
   lobby: MultiplayerLobbyDto | null;
   activeGame: ActiveGameSummary | null;
-  save: GameSaveSummary | null;
+  availableSaves: GameSaveSummary[];
   isLoggedIn: boolean;
   currentAccountId: number | null;
   currentPlayerName: string | null;
@@ -233,6 +239,10 @@ export type ToggleMultiplayerLobbyReadyRequest = {
 export type AssignMultiplayerLobbySeatRequest = {
   savedPlayerId: number;
   accountId: number | null;
+};
+
+export type BindMultiplayerLobbySaveRequest = {
+  saveId: string;
 };
 
 export type SetDiplomaticRelationRequest = {

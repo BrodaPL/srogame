@@ -100,6 +100,8 @@ const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as ty
 const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../src/app/models/tech/research-helper-for.js');
 
 export const GAME_SAVE_VERSION = 1;
+export const AUTO_SAVE_ROTATION_LIMIT = 5;
+export const MAX_GAME_SAVE_FILES = 100;
 
 type SavedCoordinates = {
   x: number;
@@ -299,6 +301,8 @@ type SavedGalaxy = {
 
 export type SavedGameFile = {
   version: number;
+  saveType: 'AUTOSAVE';
+  autoSaveSlot: number | null;
   savedAt: string;
   ownerAccountId: number;
   ownerPlayerName: string | null;
@@ -318,16 +322,25 @@ export type GameSaveLoadAccess = {
   canLoadReason: string | null;
 };
 
+export type RotatingAutoSaveOptions = {
+  rotationLimit?: number;
+  maxSaveFiles?: number;
+  savedAt?: string;
+};
+
 export function createGameSave(
   galaxy: GalaxyModel,
   ownerAccountId: number,
   setup: GalaxySetup,
-  savedAt = new Date().toISOString()
+  savedAt = new Date().toISOString(),
+  autoSaveSlot: number | null = null
 ): SavedGameFile {
   const planetCoordinatesByReference = buildPlanetCoordinateMap(galaxy);
 
   return {
     version: GAME_SAVE_VERSION,
+    saveType: 'AUTOSAVE',
+    autoSaveSlot,
     savedAt,
     ownerAccountId,
     ownerPlayerName: resolveGalaxySaveOwnerPlayerName(galaxy),
@@ -385,6 +398,86 @@ export function saveGameFile(saveFilePath: string, data: SavedGameFile): void {
   fs.writeFileSync(saveFilePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+export function listGameSaveSummaries(saveDirectoryPath: string): GameSaveSummary[] {
+  if (!fs.existsSync(saveDirectoryPath)) {
+    return [];
+  }
+
+  return fs.readdirSync(saveDirectoryPath, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+    .map((entry) => {
+      const save = readGameSave(path.join(saveDirectoryPath, entry.name));
+      return save ? buildGameSaveSummary(save, entry.name) : null;
+    })
+    .filter((summary): summary is GameSaveSummary => !!summary)
+    .sort(compareGameSaveSummariesDesc);
+}
+
+export function readGameSaveById(
+  saveDirectoryPath: string,
+  saveId: string
+): SavedGameFile | null {
+  const safeSaveId = normalizeSaveId(saveId);
+  if (!safeSaveId) {
+    return null;
+  }
+
+  return readGameSave(path.join(saveDirectoryPath, safeSaveId));
+}
+
+export function deleteGameSaveById(
+  saveDirectoryPath: string,
+  saveId: string
+): boolean {
+  const safeSaveId = normalizeSaveId(saveId);
+  if (!safeSaveId) {
+    return false;
+  }
+
+  const savePath = path.join(saveDirectoryPath, safeSaveId);
+  if (!fs.existsSync(savePath)) {
+    return false;
+  }
+
+  fs.rmSync(savePath, { force: true });
+  return true;
+}
+
+export function writeRotatingAutoSave(
+  saveDirectoryPath: string,
+  galaxy: GalaxyModel,
+  ownerAccountId: number,
+  setup: GalaxySetup,
+  options: RotatingAutoSaveOptions = {}
+): GameSaveSummary {
+  const rotationLimit = normalizePositiveInteger(options.rotationLimit, AUTO_SAVE_ROTATION_LIMIT);
+  const maxSaveFiles = normalizePositiveInteger(options.maxSaveFiles, MAX_GAME_SAVE_FILES);
+  const existingSaves = listGameSaveSummaries(saveDirectoryPath);
+  const autosaves = existingSaves.filter((save) => save.saveType === 'AUTOSAVE');
+  const latestAutosave = autosaves[0] ?? null;
+  const nextSlot = latestAutosave?.autoSaveSlot
+    ? (latestAutosave.autoSaveSlot % rotationLimit) + 1
+    : 1;
+
+  const existingSlotSave = autosaves.find((save) => save.autoSaveSlot === nextSlot);
+  if (existingSlotSave) {
+    deleteGameSaveById(saveDirectoryPath, existingSlotSave.saveId);
+  }
+
+  const save = createGameSave(
+    galaxy,
+    ownerAccountId,
+    setup,
+    options.savedAt ?? new Date().toISOString(),
+    nextSlot
+  );
+  const saveId = buildGameSaveFileName(save);
+  saveGameFile(path.join(saveDirectoryPath, saveId), save);
+  pruneGameSaves(saveDirectoryPath, maxSaveFiles);
+
+  return buildGameSaveSummary(save, saveId);
+}
+
 export function readGameSave(saveFilePath: string): SavedGameFile | null {
   if (!fs.existsSync(saveFilePath)) {
     return null;
@@ -406,6 +499,10 @@ export function readGameSave(saveFilePath: string): SavedGameFile | null {
     version: typeof parsed.version === 'number' && Number.isInteger(parsed.version)
       ? parsed.version
       : GAME_SAVE_VERSION,
+    saveType: parsed.saveType === 'AUTOSAVE' ? parsed.saveType : 'AUTOSAVE',
+    autoSaveSlot: typeof parsed.autoSaveSlot === 'number' && Number.isInteger(parsed.autoSaveSlot)
+      ? parsed.autoSaveSlot
+      : null,
     savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : new Date(0).toISOString(),
     ownerAccountId: typeof parsed.ownerAccountId === 'number' && Number.isInteger(parsed.ownerAccountId)
       ? parsed.ownerAccountId
@@ -420,8 +517,12 @@ export function readGameSaveSummary(saveFilePath: string): GameSaveSummary | nul
   return save ? buildGameSaveSummary(save) : null;
 }
 
-export function buildGameSaveSummary(save: SavedGameFile): GameSaveSummary {
+export function buildGameSaveSummary(save: SavedGameFile, saveId = buildGameSaveFileName(save)): GameSaveSummary {
   return {
+    saveId,
+    displayName: buildGameSaveDisplayName(save),
+    saveType: save.saveType,
+    autoSaveSlot: save.autoSaveSlot,
     savedAt: save.savedAt,
     ownerAccountId: save.ownerAccountId,
     ownerPlayerName: save.ownerPlayerName ?? resolveSavedOwnerPlayerName(save),
@@ -449,6 +550,19 @@ export function resolveGameSaveLoadAccess(
   }
 
   return { canLoad: true, canLoadReason: null };
+}
+
+export function getLatestGameSaveSummary(saveDirectoryPath: string): GameSaveSummary | null {
+  return listGameSaveSummaries(saveDirectoryPath)[0] ?? null;
+}
+
+export function readLatestGameSave(saveDirectoryPath: string): SavedGameFile | null {
+  const latestSummary = getLatestGameSaveSummary(saveDirectoryPath);
+  if (!latestSummary) {
+    return null;
+  }
+
+  return readGameSaveById(saveDirectoryPath, latestSummary.saveId);
 }
 
 export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
@@ -1110,6 +1224,81 @@ function resolveSavedOwnerPlayerName(save: SavedGameFile): string | null {
 
 function resolveSavedOwnerPlayerNameFromGalaxy(galaxy: SavedGalaxy): string | null {
   return galaxy.players.find((player) => player.type === 'PLAYER')?.playerName ?? null;
+}
+
+function buildGameSaveFileName(save: SavedGameFile): string {
+  const galaxySlug = slugifySaveName(save.galaxy.name);
+  const timestamp = formatSaveTimestamp(save.savedAt);
+  const slotSuffix = save.autoSaveSlot !== null ? `-autosave-${save.autoSaveSlot}` : '';
+  return `${galaxySlug}-turn-${save.galaxy.currentTurn}-${timestamp}${slotSuffix}.json`;
+}
+
+function buildGameSaveDisplayName(save: SavedGameFile): string {
+  const slotLabel = save.autoSaveSlot !== null ? ` (Autosave ${save.autoSaveSlot})` : '';
+  return `${save.galaxy.name} - Turn ${save.galaxy.currentTurn} - ${save.savedAt}${slotLabel}`;
+}
+
+function slugifySaveName(value: string): string {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+
+  return slug || 'galaxy-save';
+}
+
+function formatSaveTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '00000000-000000';
+  }
+
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+
+  return `${year}${month}${day}-${hours}${minutes}${seconds}`;
+}
+
+function compareGameSaveSummariesDesc(left: GameSaveSummary, right: GameSaveSummary): number {
+  const leftTime = Date.parse(left.savedAt);
+  const rightTime = Date.parse(right.savedAt);
+  if (leftTime !== rightTime) {
+    return rightTime - leftTime;
+  }
+
+  return right.saveId.localeCompare(left.saveId);
+}
+
+function normalizeSaveId(saveId: string): string | null {
+  const normalized = path.basename(saveId).trim();
+  if (!normalized || normalized !== saveId || !normalized.endsWith('.json')) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function pruneGameSaves(saveDirectoryPath: string, maxSaveFiles: number): void {
+  const saves = listGameSaveSummaries(saveDirectoryPath);
+  if (saves.length <= maxSaveFiles) {
+    return;
+  }
+
+  for (const save of saves.slice(maxSaveFiles)) {
+    deleteGameSaveById(saveDirectoryPath, save.saveId);
+  }
+}
+
+function normalizePositiveInteger(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+    ? value
+    : fallback;
 }
 
 function buildPlayerTypeMap(

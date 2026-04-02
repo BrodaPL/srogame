@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import {
   EndTurnResponse,
   GameStateResponse,
-  GameSaveSummaryResponse,
+  GameSavesResponse,
   LoadGameResponse,
   MultiplayerLobbyResponse,
   StartGameRequest,
@@ -55,7 +55,8 @@ import {
   SensorPhalanxScanResponse,
   UpdateMultiplayerLobbySetupRequest,
   ToggleMultiplayerLobbyReadyRequest,
-  AssignMultiplayerLobbySeatRequest
+  AssignMultiplayerLobbySeatRequest,
+  BindMultiplayerLobbySaveRequest
 } from '../models/game-api-types';
 import { API_BASE_URL } from './api-constants';
 
@@ -80,17 +81,24 @@ export class GameApiService {
     );
   }
 
-  public getGameSaveSummary(token?: string) {
-    return this.http.get<GameSaveSummaryResponse>(
-      `${API_BASE_URL}/game/save-summary`,
+  public getGameSaves(token?: string) {
+    return this.http.get<GameSavesResponse>(
+      `${API_BASE_URL}/game/saves`,
       token ? { headers: this.authHeaders(token) } : {}
     );
   }
 
-  public loadGame(token: string) {
+  public loadGame(saveId: string, token: string) {
     return this.http.post<LoadGameResponse>(
-      `${API_BASE_URL}/game/load`,
+      `${API_BASE_URL}/game/saves/${encodeURIComponent(saveId)}/load`,
       {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public deleteGameSave(saveId: string, token: string) {
+    return this.http.delete<void>(
+      `${API_BASE_URL}/game/saves/${encodeURIComponent(saveId)}`,
       { headers: this.authHeaders(token) }
     );
   }
@@ -142,10 +150,10 @@ export class GameApiService {
     );
   }
 
-  public bindMultiplayerLobbySave(token: string) {
+  public bindMultiplayerLobbySave(request: BindMultiplayerLobbySaveRequest, token: string) {
     return this.http.post<MultiplayerLobbyResponse>(
       `${API_BASE_URL}/multiplayer/lobby/load-save`,
-      {},
+      request,
       { headers: this.authHeaders(token) }
     );
   }

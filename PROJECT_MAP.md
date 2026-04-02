@@ -118,7 +118,7 @@ Local persistence:
 - `srogame:player` -> auth session + tutorial state + unread report/mail counts + pending incoming request count
 - `srogame:setup` -> last game setup
 - `server/data/auth.json` -> server auth accounts and sessions
-- `server/data/game.json` -> single active galaxy save snapshot written on game start and then by configured end-turn autosave cadence; `/load` and the multiplayer lobby can inspect and explicitly load it back into the single active runtime slot
+- `server/data/saves/` -> managed save directory for server-side galaxy snapshots; autosaves use slugified galaxy-name + turn + timestamp filenames, rotate through 5 autosave slots, and the directory is capped at 100 files. `/load` and the multiplayer lobby both use this same save list.
 
 ## API Ownership Map
 
@@ -134,8 +134,9 @@ Auth/session note:
 
 Game lifecycle:
 - `/api/game/start`
-- `/api/game/save-summary`
-- `/api/game/load`
+- `/api/game/saves`
+- `/api/game/saves/:saveId/load`
+- `/api/game/saves/:saveId`
 - `/api/game/state`
 - `/api/game/end-turn`
 
@@ -152,11 +153,12 @@ Multiplayer lobby lifecycle:
 - `/api/multiplayer/lobby/start`
 
 Lifecycle persistence note:
-- `/api/game/start` writes the initial single-save snapshot through `server/src/game-save.ts`
-- `/api/game/save-summary` reads `server/data/game.json`, exposes saved metadata, and returns admin-loadability info plus active-runtime summary
-- `/api/game/load` hydrates `server/data/game.json` back into live runtime objects, replaces the active in-memory game, and rebuilds galaxy-presentation caches
-- `/api/game/end-turn` can write `server/data/game.json` when `GalaxySetup.autoSaveTurns` is greater than `0` and the configured cadence is reached
-- `/api/multiplayer/lobby/load-save` binds the single server save into lobby state without mutating runtime
+- `/api/game/start` writes the initial autosave snapshot through `server/src/game-save.ts`
+- `/api/game/saves` lists all managed saves plus the active-runtime summary and admin-manageability state
+- `/api/game/saves/:saveId/load` hydrates a selected save back into live runtime objects, replaces the active in-memory game, and rebuilds galaxy-presentation caches
+- `/api/game/saves/:saveId` deletes a selected save file
+- `/api/game/end-turn` writes rotating autosaves into `server/data/saves/` when `GalaxySetup.autoSaveTurns` is greater than `0` and the configured cadence is reached
+- `/api/multiplayer/lobby/load-save` binds a selected save from the shared save list into lobby state without mutating runtime
 - `/api/multiplayer/lobby/start` either creates a new multiplayer galaxy from joined lobby members or hydrates the bound save, applies seat assignments, converts unresolved saved humans to `BOT`, and then replaces the active runtime game
 
 Galaxy and planet reads:

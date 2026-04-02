@@ -9,7 +9,6 @@ import { GameType } from '../models/enums/game-type';
 import {
   GalaxySetup,
   MAX_AUTO_SAVE_TURNS,
-  MultiplayerLobbyDto,
   MultiplayerLobbyLoadSeatDto,
   MultiplayerLobbyResponse,
   normalizeGalaxySetup
@@ -50,6 +49,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected isActing = false;
   protected error: string | null = null;
   protected confirmReplaceActiveGame = false;
+  protected selectedSaveId = '';
   protected setupForm: LobbySetupForm = this.createForm(this.defaultSetup());
   private readonly refreshHandle: number;
 
@@ -87,6 +87,7 @@ export class MultiplayerComponent implements OnDestroy {
         if (response.lobby) {
           this.setupForm = this.createForm(response.lobby.setup);
         }
+        this.syncSelectedSave(response);
         if (!response.activeGame) {
           this.confirmReplaceActiveGame = false;
         }
@@ -131,7 +132,12 @@ export class MultiplayerComponent implements OnDestroy {
   }
 
   protected bindSave(): void {
-    this.runLobbyMutation((token) => this.gameApi.bindMultiplayerLobbySave(token));
+    if (!this.selectedSaveId) {
+      this.error = 'Select a save first.';
+      return;
+    }
+
+    this.runLobbyMutation((token) => this.gameApi.bindMultiplayerLobbySave({ saveId: this.selectedSaveId }, token));
   }
 
   protected clearSaveBinding(): void {
@@ -185,10 +191,6 @@ export class MultiplayerComponent implements OnDestroy {
       && lobby.canStart
       && (!this.response?.activeGame || this.confirmReplaceActiveGame)
       && !this.isActing;
-  }
-
-  protected getLobby(): MultiplayerLobbyDto | null {
-    return this.response?.lobby ?? null;
   }
 
   protected seatValue(seat: MultiplayerLobbyLoadSeatDto): string {
@@ -247,6 +249,7 @@ export class MultiplayerComponent implements OnDestroy {
         if (response.lobby) {
           this.setupForm = this.createForm(response.lobby.setup);
         }
+        this.syncSelectedSave(response);
         if (!response.activeGame) {
           this.confirmReplaceActiveGame = false;
         }
@@ -384,5 +387,18 @@ export class MultiplayerComponent implements OnDestroy {
         deuterium: 1
       }
     });
+  }
+
+  private syncSelectedSave(response: MultiplayerLobbyResponse): void {
+    if (response.lobby?.boundSaveId) {
+      this.selectedSaveId = response.lobby.boundSaveId;
+      return;
+    }
+
+    if (response.availableSaves.some((save) => save.saveId === this.selectedSaveId)) {
+      return;
+    }
+
+    this.selectedSaveId = response.availableSaves[0]?.saveId ?? '';
   }
 }
