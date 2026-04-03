@@ -1,9 +1,16 @@
-import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as diplomaticStatusEnumModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import type { DiplomaticStatus as DiplomaticStatusType } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { DiplomaticProposal } from '../../../src/app/models/diplomacy/diplomatic-proposal.ts';
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { Player } from '../../../src/app/models/player.ts';
 import type { BotProfile } from './bot-profile.ts';
 import { buildBotDiplomacyContexts, type BotDiplomacyContext } from './bot-diplomacy-awareness.js';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { DiplomaticStatus } = resolveModule(diplomaticStatusEnumModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-status.js');
 
 export type BotDiplomaticProposalDecision = {
   approve: boolean;
@@ -34,7 +41,7 @@ export function decideIncomingDiplomaticProposal(
 
 export function decideIncomingDiplomaticProposalWithContext(
   profile: BotProfile,
-  requestedStatus: DiplomaticStatus,
+  requestedStatus: DiplomaticStatusType,
   context: BotDiplomacyContext
 ): BotDiplomaticProposalDecision {
   if (requestedStatus === DiplomaticStatus.PEACE) {

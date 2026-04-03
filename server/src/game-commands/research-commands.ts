@@ -1,5 +1,3 @@
-import { BuildingType } from '../../../src/app/models/enums/building-type.js';
-import { ResourcesPack } from '../../../src/app/models/resources-pack.js';
 import type { TechnologyType } from '../../../src/app/models/enums/technology-type.ts';
 import type { ClientCoordinates } from '../../../src/app/models/game-api-types.ts';
 import type { Planet } from '../../../src/app/models/planets/planet.ts';
@@ -7,6 +5,8 @@ import type { ResourcesPack as ResourcesPackType } from '../../../src/app/models
 import type { GameCommandContext } from './command-context.ts';
 import type { CommandResult } from './command-result.ts';
 import {
+  BuildingType,
+  ResourcesPack,
   TECHNOLOGY_BLUEPRINTS,
   ResearchHelperFor,
   TechnologyQueueEntry,

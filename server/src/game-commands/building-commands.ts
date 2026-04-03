@@ -1,4 +1,3 @@
-import { ResourcesPack } from '../../../src/app/models/resources-pack.js';
 import type { BuildingType } from '../../../src/app/models/enums/building-type.ts';
 import type { Planet } from '../../../src/app/models/planets/planet.ts';
 import type { ResourcesPack as ResourcesPackType } from '../../../src/app/models/resources-pack.ts';
@@ -12,6 +11,7 @@ import {
   commandOk,
   hasBuildingRequirements,
   hasTechnologyRequirements,
+  ResourcesPack,
   resolveOwnedPlanetOrError,
   resolvePlayerOrError
 } from './command-helpers.ts';

@@ -1,14 +1,23 @@
-import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
-import { DiplomaticProposalState } from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
-import { allowedDiplomaticProposalStatuses } from '../../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
+import * as diplomaticStatusEnumModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as diplomaticProposalStateModule from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import * as diplomaticProposalRulesModule from '../../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
 import { hasOutgoingProposalSentThisTurn, isPlayerVisibleInDiplomacy } from '../game-commands/diplomacy-commands.js';
+import type { DiplomaticStatus as DiplomaticStatusType } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { Player } from '../../../src/app/models/player.ts';
 import type { BotProfile } from './bot-profile.ts';
 import { buildBotDiplomacyContexts, type BotDiplomacyContext } from './bot-diplomacy-awareness.js';
 
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { DiplomaticStatus } = resolveModule(diplomaticStatusEnumModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-status.js');
+const { DiplomaticProposalState } = resolveModule(diplomaticProposalStateModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-proposal-state.js');
+const { allowedDiplomaticProposalStatuses } = resolveModule(diplomaticProposalRulesModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-proposal-rules.js');
+
 export type BotDiplomacyProposalCandidate = {
-  requestedStatus: DiplomaticStatus.PEACE | DiplomaticStatus.ALLIED;
+  requestedStatus: DiplomaticStatusType;
   targetPlayerId: number;
   utility: number;
   reason: string;
@@ -133,7 +142,7 @@ function buildAllianceProposalCandidate(
 function wasRecentlyProposedTo(
   player: Player,
   targetPlayerId: number,
-  requestedStatus: DiplomaticStatus.PEACE | DiplomaticStatus.ALLIED,
+  requestedStatus: 'PEACE' | 'ALLIED',
   currentTurn: number
 ): boolean {
   return (player.botMemory?.recentDiplomacyTargets ?? []).some((entry) =>

@@ -1,10 +1,10 @@
-import { DiplomacyResolver } from '../../../src/app/models/diplomacy/diplomacy-resolver.js';
-import { FleetMissionRegistry } from '../../../src/app/models/missions/fleet-mission-registry.js';
-import { Destination } from '../../../src/app/models/fleets/destination.js';
-import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../../src/app/models/fleets/fleet.js';
-import { ManyShips } from '../../../src/app/models/fleets/many-ships.js';
-import { ResourcesPack } from '../../../src/app/models/resources-pack.js';
-import { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.js';
+import * as diplomacyResolverModule from '../../../src/app/models/diplomacy/diplomacy-resolver.js';
+import * as fleetMissionRegistryModule from '../../../src/app/models/missions/fleet-mission-registry.js';
+import * as destinationModule from '../../../src/app/models/fleets/destination.js';
+import * as fleetModelModule from '../../../src/app/models/fleets/fleet.js';
+import * as manyShipsModule from '../../../src/app/models/fleets/many-ships.js';
+import * as resourcesPackModule from '../../../src/app/models/resources-pack.js';
+import * as fleetMissionTypeEnumModule from '../../../src/app/models/enums/fleet-mission-type.js';
 import type {
   CreateFleetBombSelectionEntry,
   CreateFleetShipSelectionEntry,
@@ -17,6 +17,7 @@ import type { FleetMissionType as FleetMissionTypeType } from '../../../src/app/
 import type { MissionLaunchContext } from '../../../src/app/models/missions/mission-context.ts';
 import type { Planet } from '../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../src/app/models/player.ts';
+import type { Fleet as FleetType } from '../../../src/app/models/fleets/fleet.ts';
 import type { ManyShips as ManyShipsType } from '../../../src/app/models/fleets/many-ships.ts';
 import type { GameCommandContext } from './command-context.ts';
 import type { CommandResult } from './command-result.ts';
@@ -41,6 +42,18 @@ import {
   toShipAmountEntriesFromSelections,
   validateJumpGateLaunchAccess
 } from './command-helpers.ts';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { DiplomacyResolver } = resolveModule(diplomacyResolverModule) as typeof import('../../../src/app/models/diplomacy/diplomacy-resolver.js');
+const { FleetMissionRegistry } = resolveModule(fleetMissionRegistryModule) as typeof import('../../../src/app/models/missions/fleet-mission-registry.js');
+const { Destination } = resolveModule(destinationModule) as typeof import('../../../src/app/models/fleets/destination.js');
+const { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } = resolveModule(fleetModelModule) as typeof import('../../../src/app/models/fleets/fleet.js');
+const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../../src/app/models/fleets/many-ships.js');
+const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeEnumModule) as typeof import('../../../src/app/models/enums/fleet-mission-type.js');
 
 const FLEET_MISSION_REGISTRY = FleetMissionRegistry.createDefault();
 const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
@@ -68,7 +81,7 @@ export type CreateFleetMissionCommand = {
 };
 
 export type CreateFleetMissionResult = {
-  fleet: Fleet;
+  fleet: FleetType;
   mode: 'LAUNCHED' | 'PENDING_JUMP_GATE';
   message: string | null;
   originPlanet: Planet;

@@ -1,4 +1,4 @@
-import { DiplomaticProposalState } from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import * as diplomaticProposalStateModule from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
 import type { JumpGateRequest } from '../../../src/app/models/requests/jump-gate-request.ts';
 import type { GameCommandContext } from './command-context.ts';
 import type { CommandResult } from './command-result.ts';
@@ -11,6 +11,12 @@ import {
   restorePendingJumpGateFleetToOrigin,
   validateJumpGateLaunchAccess
 } from './command-helpers.ts';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { DiplomaticProposalState } = resolveModule(diplomaticProposalStateModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-proposal-state.js');
 
 export type ResolveJumpGateRequestResult = {
   request: JumpGateRequest;

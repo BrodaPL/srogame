@@ -519,6 +519,34 @@ Browser smoke entry point:
 Smoke scenario definitions:
 - `src/app/models/testing/smoke-test-scenarios.ts`
 
+Bot benchmark scenario definitions:
+- `src/app/models/testing/bot-benchmark-scenarios.ts`
+- `server/src/bots/bot-benchmark-scenarios.spec.ts`
+
+Advisory benchmark runner:
+- `scripts/run-bot-benchmarks.ts`
+- writes `tmp/bot-benchmark-results.json`
+
+Advisory bot smoke runner:
+- `scripts/run-bot-smoke-tests.js`
+- writes `tmp/bot-smoke-results.json`
+- runs a live local-admin single-player bot game for 10 turns, clears mail/request blockers, then checks `/game/operations`, `/game/mail`, `/game/diplomacy`, and `/game/bot-debug`
+
+Advisory bot simulation runner:
+- `scripts/run-bot-simulations.ts`
+- writes `tmp/bot-simulation-results.json`
+- runs standalone 20/50/100-turn all-bot simulations using `GalaxyCreator`, `runBotTurnPhase(...)`, and `resolvePhaseOneTurn(...)`
+- includes `baselineMixed`, `frontierPressure`, and `warHotspot` presets
+- `warHotspot` additionally occupies the remaining map, seeds mutual full-strength espionage intel, and sets contender pairs to explicit `WAR` so advisory runs can surface attack behavior instead of only growth/logistics
+- output now includes per-run `profileSummary` plus top-level `overallProfileSummary` aggregates for profile-level tuning
+- supports `--profiles=AGGRESSOR,TURTLE` and `--compare=AGGRESSOR,TURTLE` for targeted comparison runs
+
+Advisory simulation baseline compare:
+- `scripts/run-bot-sim-baselines.ts`
+- `scripts/bot-simulation-baselines.json`
+- writes `tmp/bot-simulation-baseline-results.json`
+- replays checked-in targeted `warHotspot` profile comparisons against broad advisory tolerances so tuning drift can be reviewed without failing the workflow
+
 Notable smoke coverage:
 - `guardOrbitStatus` seeds one `Guarding Orbit` fleet and one `Passive Orbit` fleet so the Operations/UI and orbit-state serialization stay visible in browser verification
 - no dedicated maintenance-request smoke scenario yet; current maintenance coverage is TypeScript build + shared resolver/spec suites only
@@ -621,7 +649,14 @@ Change tutorials:
 
 Change smoke/browser verification:
 - `scripts/run-smoke-tests.js`
+- `scripts/run-bot-benchmarks.ts`
+- `scripts/run-bot-smoke-tests.js`
+- `scripts/run-bot-simulations.ts`
+- `scripts/run-bot-sim-baselines.ts`
+- `scripts/bot-simulation-baselines.json`
 - `src/app/models/testing/smoke-test-scenarios.ts`
+- `src/app/models/testing/bot-benchmark-scenarios.ts`
+- `server/src/bots/bot-benchmark-scenarios.spec.ts`
 - `McpTesting.md` if the workflow itself changes
 
 Change auth/session behavior:

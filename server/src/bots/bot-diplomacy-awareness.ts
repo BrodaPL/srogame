@@ -1,16 +1,25 @@
-import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
-import { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.js';
+import * as diplomaticStatusEnumModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as fleetMissionTypeEnumModule from '../../../src/app/models/enums/fleet-mission-type.js';
 import { SHIP_BLUEPRINTS, DEFENCE_BLUEPRINTS, calculateTravelDistance, resolveDiplomaticStatus } from '../game-commands/command-helpers.js';
 import type { EspionageReportData } from '../../../src/app/models/reports/espionage-report-data.ts';
+import type { DiplomaticStatus as DiplomaticStatusType } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
+import type { FleetMissionType as FleetMissionTypeType } from '../../../src/app/models/enums/fleet-mission-type.ts';
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { Planet } from '../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../src/app/models/player.ts';
 import type { ClientCoordinates } from '../../../src/app/models/game-api-types.ts';
 import type { ShipType } from '../../../src/app/models/enums/ship-type.ts';
 
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { DiplomaticStatus } = resolveModule(diplomaticStatusEnumModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-status.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeEnumModule) as typeof import('../../../src/app/models/enums/fleet-mission-type.js');
+
 export type BotDiplomacyContext = {
   otherPlayerId: number;
-  currentStatus: DiplomaticStatus;
+  currentStatus: DiplomaticStatusType;
   relativeStrengthRatio: number;
   sharesBorder: boolean;
   borderPressure: number;
@@ -119,7 +128,7 @@ function analyzeBorderSituation(
 }
 
 function estimateStrategicValue(
-  status: DiplomaticStatus,
+  status: DiplomaticStatusType,
   sharesBorder: boolean,
   borderConnections: number,
   relativeStrengthRatio: number
@@ -157,7 +166,7 @@ function estimateRecentConflictScore(
   return score;
 }
 
-function hostileMissionConflictWeight(missionType: FleetMissionType): number {
+function hostileMissionConflictWeight(missionType: FleetMissionTypeType): number {
   switch (missionType) {
     case FleetMissionType.ATTACK:
       return 4;
@@ -172,7 +181,7 @@ function hostileMissionConflictWeight(missionType: FleetMissionType): number {
   }
 }
 
-function ownHostileMissionConflictWeight(missionType: FleetMissionType): number {
+function ownHostileMissionConflictWeight(missionType: FleetMissionTypeType): number {
   switch (missionType) {
     case FleetMissionType.ATTACK:
       return 2;
@@ -187,7 +196,7 @@ function ownHostileMissionConflictWeight(missionType: FleetMissionType): number 
   }
 }
 
-function pressureScaleForStatus(status: DiplomaticStatus): number {
+function pressureScaleForStatus(status: DiplomaticStatusType): number {
   switch (status) {
     case DiplomaticStatus.WAR:
       return 1;

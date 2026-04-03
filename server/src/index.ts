@@ -84,6 +84,7 @@ import {
   setBotProfile,
   toBotAdminState
 } from './bots/bot-admin.js';
+import { BOT_PROFILE_IDS } from './bots/bot-profile.js';
 import { startBuildingConstruction } from './game-commands/building-commands.js';
 import { runBotTurnPhase } from './bots/bot-turn-runner.js';
 import {
@@ -237,7 +238,6 @@ import type { Defence } from '../../src/app/models/defences/defence.ts';
 import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
-import { BOT_PROFILE_IDS } from '../../src/app/models/player.js';
 import type { BotProfileId } from '../../src/app/models/player.ts';
 import type { PlayerMessage } from '../../src/app/models/mail/player-message.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';

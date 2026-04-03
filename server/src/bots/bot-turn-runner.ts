@@ -1,25 +1,30 @@
-import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
-import { DiplomaticProposalState } from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
-import { BuildingType } from '../../../src/app/models/enums/building-type.js';
-import { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.js';
-import { ManyShips } from '../../../src/app/models/fleets/many-ships.js';
-import { FleetState } from '../../../src/app/models/fleets/fleet.js';
-import { PlayerType } from '../../../src/app/models/enums/player-type.js';
-import { ShipPurpose } from '../../../src/app/models/enums/ship-purpose.js';
-import { ShipType } from '../../../src/app/models/enums/ship-type.js';
-import { TechnologyType } from '../../../src/app/models/enums/technology-type.js';
-import { ResourcesPack } from '../../../src/app/models/resources-pack.js';
-import { defaultBotProfileIdForPlayerId } from '../../../src/app/models/player.js';
-import { BombardmentPriorityTarget } from '../../../src/app/models/bombardment/bombardment-priority.js';
+import * as diplomaticStatusEnumModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as diplomaticProposalStateModule from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import * as buildingTypeEnumModule from '../../../src/app/models/enums/building-type.js';
+import * as fleetMissionTypeEnumModule from '../../../src/app/models/enums/fleet-mission-type.js';
+import * as manyShipsModule from '../../../src/app/models/fleets/many-ships.js';
+import * as fleetModelModule from '../../../src/app/models/fleets/fleet.js';
+import * as playerTypeEnumModule from '../../../src/app/models/enums/player-type.js';
+import * as shipPurposeEnumModule from '../../../src/app/models/enums/ship-purpose.js';
+import * as shipTypeEnumModule from '../../../src/app/models/enums/ship-type.js';
+import * as technologyTypeEnumModule from '../../../src/app/models/enums/technology-type.js';
+import * as resourcesPackModule from '../../../src/app/models/resources-pack.js';
+import * as playerModule from '../../../src/app/models/player.js';
+import * as bombardmentPriorityModule from '../../../src/app/models/bombardment/bombardment-priority.js';
 import type {
   ClientCoordinates,
   CreateFleetShipSelectionEntry,
   FleetMaintenanceOptionsDto
 } from '../../../src/app/models/game-api-types.ts';
 import type { BombardmentPriorities } from '../../../src/app/models/bombardment/bombardment-priority.ts';
+import type { BuildingType as BuildingTypeType } from '../../../src/app/models/enums/building-type.ts';
+import type { TechnologyType as TechnologyTypeType } from '../../../src/app/models/enums/technology-type.ts';
+import type { ShipType as ShipTypeType } from '../../../src/app/models/enums/ship-type.ts';
+import type { FleetMissionType as FleetMissionTypeType } from '../../../src/app/models/enums/fleet-mission-type.ts';
 import type { Planet } from '../../../src/app/models/planets/planet.ts';
 import type { EspionageReportData } from '../../../src/app/models/reports/espionage-report-data.ts';
 import type { ResourcesPack as ResourcesPackType } from '../../../src/app/models/resources-pack.ts';
+import type { ManyShips as ManyShipsType } from '../../../src/app/models/fleets/many-ships.ts';
 import type { BotGoalType, BotMemory, BotMemoryCoordinates, BotProfileId, Player } from '../../../src/app/models/player.ts';
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { StartBuildingConstructionCommand } from '../game-commands/building-commands.ts';
@@ -73,6 +78,24 @@ import { recordBotDecisionTrace } from './bot-debug-store.js';
 import type { BotDecisionTrace, BotRejectedActionTrace, BotTraceStopReason } from './bot-debug.ts';
 import { isBotPaused } from './bot-admin.js';
 import { BOT_PROFILES, type BotProfile } from './bot-profile.js';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { DiplomaticStatus } = resolveModule(diplomaticStatusEnumModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-status.js');
+const { DiplomaticProposalState } = resolveModule(diplomaticProposalStateModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-proposal-state.js');
+const { BuildingType } = resolveModule(buildingTypeEnumModule) as typeof import('../../../src/app/models/enums/building-type.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeEnumModule) as typeof import('../../../src/app/models/enums/fleet-mission-type.js');
+const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../../src/app/models/fleets/many-ships.js');
+const { FleetState } = resolveModule(fleetModelModule) as typeof import('../../../src/app/models/fleets/fleet.js');
+const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../../../src/app/models/enums/player-type.js');
+const { ShipPurpose } = resolveModule(shipPurposeEnumModule) as typeof import('../../../src/app/models/enums/ship-purpose.js');
+const { ShipType } = resolveModule(shipTypeEnumModule) as typeof import('../../../src/app/models/enums/ship-type.js');
+const { TechnologyType } = resolveModule(technologyTypeEnumModule) as typeof import('../../../src/app/models/enums/technology-type.js');
+const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
+const { defaultBotProfileIdForPlayerId } = resolveModule(playerModule) as typeof import('../../../src/app/models/player.js');
+const { BombardmentPriorityTarget } = resolveModule(bombardmentPriorityModule) as typeof import('../../../src/app/models/bombardment/bombardment-priority.js');
 
 type BuildingCandidate = {
   kind: 'building';
@@ -143,7 +166,7 @@ type BotTurnCounters = {
   move: number;
 };
 
-const BUILDING_PRIORITY_TYPES: BuildingType[] = [
+const BUILDING_PRIORITY_TYPES: BuildingTypeType[] = [
   BuildingType.METAL_MINE,
   BuildingType.CRYSTAL_MINE,
   BuildingType.DEUTERIUM_SYNTHESIZER,
@@ -158,7 +181,7 @@ const BUILDING_PRIORITY_TYPES: BuildingType[] = [
   BuildingType.BUNKER_NETWORK
 ];
 
-const RESEARCH_PRIORITY_TYPES: TechnologyType[] = [
+const RESEARCH_PRIORITY_TYPES: TechnologyTypeType[] = [
   TechnologyType.ENERGY_TECHNOLOGY,
   TechnologyType.MATERIAL_TECHNOLOGY,
   TechnologyType.ASTROPHYSICS_TECHNOLOGY,
@@ -167,7 +190,7 @@ const RESEARCH_PRIORITY_TYPES: TechnologyType[] = [
   TechnologyType.INTERGALACTIC_RESEARCH_NETWORK
 ];
 
-const SHIPYARD_PRIORITY_TYPES: Array<{ type: ShipType; amount: number }> = [
+const SHIPYARD_PRIORITY_TYPES: Array<{ type: ShipTypeType; amount: number }> = [
   { type: ShipType.SPY_PROBE, amount: 1 },
   { type: ShipType.TRANSPORTER, amount: 1 },
   { type: ShipType.FIGHTER, amount: 1 },
@@ -534,7 +557,12 @@ function resolveOutgoingBotDiplomacyProposal(
     return;
   }
 
-  appendRecentDiplomacyTarget(player, candidate.targetPlayerId, candidate.requestedStatus, galaxy.currentTurn);
+  appendRecentDiplomacyTarget(
+    player,
+    candidate.targetPlayerId,
+    candidate.requestedStatus as 'PEACE' | 'ALLIED',
+    galaxy.currentTurn
+  );
   trace.chosenActions.push({
     kind: candidate.requestedStatus === DiplomaticStatus.PEACE ? 'propose-peace' : 'propose-alliance',
     reason: candidate.reason,
@@ -1951,7 +1979,7 @@ function appendRecentDiplomacyTarget(
 }
 
 function estimateBuildingBaseScore(
-  buildingType: BuildingType,
+  buildingType: BuildingTypeType,
   planet: Planet,
   player: Player,
   profile: BotProfile,
@@ -1990,7 +2018,7 @@ function estimateBuildingBaseScore(
 }
 
 function estimateResearchBaseScore(
-  technologyType: TechnologyType,
+  technologyType: TechnologyTypeType,
   profile: BotProfile,
   player: Player
 ): number {
@@ -2013,7 +2041,7 @@ function estimateResearchBaseScore(
 }
 
 function estimateShipyardBaseScore(
-  shipType: ShipType,
+  shipType: ShipTypeType,
   existingAmount: number,
   ownedPlanetCount: number,
   profile: BotProfile
@@ -2131,7 +2159,7 @@ function estimateBombardTargetValue(report: EspionageReportData): number {
   return (resourceBuildingValue * 5) + (facilityValue * 7) + (report.totalDefencesAmount * 2);
 }
 
-function estimateMissingHullOnShips(ships: ManyShips): number {
+function estimateMissingHullOnShips(ships: ManyShipsType): number {
   let total = 0;
   for (const damagedShip of ships.damagedShips) {
     const blueprint = SHIP_BLUEPRINTS.get(damagedShip.type);
@@ -2208,7 +2236,7 @@ function estimateShipSelectionCombatStrength(ships: CreateFleetShipSelectionEntr
   return total;
 }
 
-function estimateShipCombatPower(shipType: ShipType): number {
+function estimateShipCombatPower(shipType: ShipTypeType): number {
   const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return 0;
@@ -2826,12 +2854,12 @@ function flattenPlanets(galaxy: Galaxy): Planet[] {
   return galaxy.stars.flatMap((row) => row.flatMap((system) => system.planets));
 }
 
-function planetUndamagedAmount(planet: Planet, shipType: ShipType): number {
+function planetUndamagedAmount(planet: Planet, shipType: ShipTypeType): number {
   return planet.rBDSFTQ.ships.undamagedCountByType().get(shipType) ?? 0;
 }
 
-function countOwnedShipsByType(player: Player): Map<ShipType, number> {
-  const counts = new Map<ShipType, number>();
+function countOwnedShipsByType(player: Player): Map<ShipTypeType, number> {
+  const counts = new Map<ShipTypeType, number>();
 
   for (const planet of player.planets) {
     for (const [type, amount] of planet.rBDSFTQ.ships.countByType().entries()) {
@@ -2978,7 +3006,7 @@ function pushRejectedActionTrace(
 function shouldUseJumpGateRoute(
   galaxy: Galaxy,
   playerId: number,
-  missionType: FleetMissionType,
+  missionType: FleetMissionTypeType,
   originPlanet: Planet,
   targetPlanet: Planet,
   ships: CreateFleetShipSelectionEntry[]

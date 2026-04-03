@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
 import { AuthStateService } from '../../core/auth-state.service';
@@ -21,6 +21,9 @@ export class BotDebugViewComponent implements OnInit {
   protected actionError: string | null = null;
   protected traces: BotDecisionTraceDto[] = [];
   protected botStates: BotAdminStateDto[] = [];
+  protected botOptionList: Array<{ playerId: number; playerName: string }> = [];
+  protected visibleTraceList: BotDecisionTraceDto[] = [];
+  protected selectedBotNameLabel = 'All bots';
   protected selectedPlayerId: number | null = null;
   protected selectedProfileId: BotProfileId | null = null;
   protected currentTurn: number | null = null;
@@ -28,7 +31,8 @@ export class BotDebugViewComponent implements OnInit {
   constructor(
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly authState: AuthStateService
+    private readonly authState: AuthStateService,
+    private readonly changeDetectorRef: ChangeDetectorRef
   ) {}
 
   public ngOnInit(): void {
@@ -39,42 +43,10 @@ export class BotDebugViewComponent implements OnInit {
     return this.authState.session()?.localAdmin === true;
   }
 
-  protected botOptions(): Array<{ playerId: number; playerName: string }> {
-    const options = new Map<number, string>();
-    for (const bot of this.botStates) {
-      options.set(bot.playerId, bot.playerName);
-    }
-    for (const trace of this.traces) {
-      options.set(trace.playerId, trace.playerName);
-    }
-
-    return [...options.entries()]
-      .map(([playerId, playerName]) => ({ playerId, playerName }))
-      .sort((left, right) => left.playerId - right.playerId);
-  }
-
-  protected visibleTraces(): BotDecisionTraceDto[] {
-    const traces = this.selectedPlayerId === null
-      ? this.traces
-      : this.traces.filter((trace) => trace.playerId === this.selectedPlayerId);
-
-    return [...traces].sort((left, right) =>
-      right.turn - left.turn || right.playerId - left.playerId
-    );
-  }
-
-  protected selectedBotName(): string {
-    if (this.selectedPlayerId === null) {
-      return 'All bots';
-    }
-
-    return this.botOptions().find((option) => option.playerId === this.selectedPlayerId)?.playerName
-      ?? `Bot ${this.selectedPlayerId}`;
-  }
-
   protected setSelectedPlayer(playerId: number | null): void {
     this.selectedPlayerId = playerId;
     this.selectedProfileId = this.selectedBotState()?.profileId ?? null;
+    this.syncDerivedState();
   }
 
   protected refresh(): void {
@@ -160,6 +132,7 @@ export class BotDebugViewComponent implements OnInit {
     })
       .pipe(finalize(() => {
         this.isLoading = false;
+        this.changeDetectorRef.detectChanges();
       }))
       .subscribe({
         next: (response) => {
@@ -174,11 +147,40 @@ export class BotDebugViewComponent implements OnInit {
             this.selectedPlayerId = null;
           }
           this.selectedProfileId = this.selectedBotState()?.profileId ?? null;
+          this.syncDerivedState();
+          this.changeDetectorRef.detectChanges();
         },
         error: (error) => {
           this.loadError = error?.error?.error ?? 'Unable to load bot traces.';
+          this.changeDetectorRef.detectChanges();
         }
       });
+  }
+
+  private syncDerivedState(): void {
+    const options = new Map<number, string>();
+    for (const bot of this.botStates) {
+      options.set(bot.playerId, bot.playerName);
+    }
+    for (const trace of this.traces) {
+      options.set(trace.playerId, trace.playerName);
+    }
+
+    this.botOptionList = [...options.entries()]
+      .map(([playerId, playerName]) => ({ playerId, playerName }))
+      .sort((left, right) => left.playerId - right.playerId);
+
+    const traces = this.selectedPlayerId === null
+      ? this.traces
+      : this.traces.filter((trace) => trace.playerId === this.selectedPlayerId);
+    this.visibleTraceList = [...traces].sort((left, right) =>
+      right.turn - left.turn || right.playerId - left.playerId
+    );
+
+    this.selectedBotNameLabel = this.selectedPlayerId === null
+      ? 'All bots'
+      : this.botOptionList.find((option) => option.playerId === this.selectedPlayerId)?.playerName
+        ?? `Bot ${this.selectedPlayerId}`;
   }
 
   private sessionToken(): string | null {
@@ -200,11 +202,13 @@ export class BotDebugViewComponent implements OnInit {
     action(state.playerId, token)
       .pipe(finalize(() => {
         this.isApplyingAction = false;
+        this.changeDetectorRef.detectChanges();
       }))
       .subscribe({
         next: () => this.loadTraces(),
         error: (error) => {
           this.actionError = error?.error?.error ?? fallbackError;
+          this.changeDetectorRef.detectChanges();
         }
       });
   }

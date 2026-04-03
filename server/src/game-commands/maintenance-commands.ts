@@ -1,15 +1,12 @@
-import { FleetReport } from '../../../src/app/models/reports/fleet-report.js';
-import { DiplomaticProposalState } from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
-import { BuildingType } from '../../../src/app/models/enums/building-type.js';
-import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
-import { FleetState } from '../../../src/app/models/fleets/fleet.js';
-import { HullClass } from '../../../src/app/models/enums/hull-class.js';
-import { ManyDefences } from '../../../src/app/models/defences/many-defences.js';
-import { ManyShips } from '../../../src/app/models/fleets/many-ships.js';
-import {
-  createMaintenanceRequest,
-  normalizeMaintenanceTransferPayload
-} from '../../../src/app/models/requests/maintenance-request.js';
+import * as fleetReportModule from '../../../src/app/models/reports/fleet-report.js';
+import * as diplomaticProposalStateModule from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import * as buildingTypeEnumModule from '../../../src/app/models/enums/building-type.js';
+import * as diplomaticStatusEnumModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as fleetModelModule from '../../../src/app/models/fleets/fleet.js';
+import * as hullClassEnumModule from '../../../src/app/models/enums/hull-class.js';
+import * as manyDefencesModule from '../../../src/app/models/defences/many-defences.js';
+import * as manyShipsModule from '../../../src/app/models/fleets/many-ships.js';
+import * as maintenanceRequestModule from '../../../src/app/models/requests/maintenance-request.js';
 import type {
   FleetMaintenanceBombOptionDto,
   FleetMaintenanceOptionsDto,
@@ -22,6 +19,10 @@ import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { Planet } from '../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../src/app/models/player.ts';
 import type { Fleet } from '../../../src/app/models/fleets/fleet.ts';
+import type { DiplomaticStatus as DiplomaticStatusType } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
+import type { DiplomaticProposalState as DiplomaticProposalStateType } from '../../../src/app/models/diplomacy/diplomatic-proposal-state.ts';
+import type { ManyShips as ManyShipsType } from '../../../src/app/models/fleets/many-ships.ts';
+import type { ManyDefences as ManyDefencesType } from '../../../src/app/models/defences/many-defences.ts';
 import type { GameCommandContext } from './command-context.ts';
 import type { CommandResult } from './command-result.ts';
 import {
@@ -32,7 +33,25 @@ import {
   resolvePlanetOrError,
   resolvePlayerById
 } from './command-helpers.ts';
-import { isPlanetaryBombDefenceType } from '../../../src/app/models/defences/planetary-bomb.js';
+import * as planetaryBombModule from '../../../src/app/models/defences/planetary-bomb.js';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { FleetReport } = resolveModule(fleetReportModule) as typeof import('../../../src/app/models/reports/fleet-report.js');
+const { DiplomaticProposalState } = resolveModule(diplomaticProposalStateModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-proposal-state.js');
+const { BuildingType } = resolveModule(buildingTypeEnumModule) as typeof import('../../../src/app/models/enums/building-type.js');
+const { DiplomaticStatus } = resolveModule(diplomaticStatusEnumModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-status.js');
+const { FleetState } = resolveModule(fleetModelModule) as typeof import('../../../src/app/models/fleets/fleet.js');
+const { HullClass } = resolveModule(hullClassEnumModule) as typeof import('../../../src/app/models/enums/hull-class.js');
+const { ManyDefences } = resolveModule(manyDefencesModule) as typeof import('../../../src/app/models/defences/many-defences.js');
+const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../../src/app/models/fleets/many-ships.js');
+const {
+  createMaintenanceRequest,
+  normalizeMaintenanceTransferPayload
+} = resolveModule(maintenanceRequestModule) as typeof import('../../../src/app/models/requests/maintenance-request.js');
+const { isPlanetaryBombDefenceType } = resolveModule(planetaryBombModule) as typeof import('../../../src/app/models/defences/planetary-bomb.js');
 
 type MaintenanceContext = {
   fleet: Fleet;
@@ -384,7 +403,7 @@ function resolveMaintenanceStatus(
   galaxy: Galaxy,
   requesterPlayerId: number,
   targetOwnerId: number
-): DiplomaticStatus {
+): DiplomaticStatusType {
   if (requesterPlayerId === targetOwnerId) {
     return DiplomaticStatus.SELF;
   }
@@ -396,7 +415,7 @@ function resolveMaintenanceStatus(
   return directRelation?.status ?? DiplomaticStatus.NEUTRAL;
 }
 
-function isMaintenanceStatusAllowed(status: DiplomaticStatus): boolean {
+function isMaintenanceStatusAllowed(status: DiplomaticStatusType): boolean {
   return status === DiplomaticStatus.SELF
     || status === DiplomaticStatus.ALLIED
     || status === DiplomaticStatus.PEACE
@@ -611,7 +630,7 @@ function applyMaintenanceTransfer(
 function rejectOrCancelMaintenanceRequest(
   galaxy: Galaxy,
   request: MaintenanceRequest,
-  state: DiplomaticProposalState,
+  state: DiplomaticProposalStateType,
   ownerBody: string,
   requesterBody: string
 ): void {
@@ -645,7 +664,7 @@ function extractMaintenanceShips(
   targetPlanet: Planet,
   fleet: Fleet,
   requestedShips: MaintenanceRequest['requested']['ships']
-): ManyShips {
+): ManyShipsType {
   const extracted = ManyShips.empty();
   let remainingHangarCapacity = Math.max(
     0,
@@ -709,7 +728,7 @@ function extractMaintenanceBombs(
   targetPlanet: Planet,
   fleet: Fleet,
   requestedBombs: MaintenanceRequest['requested']['bombs']
-): ManyDefences {
+): ManyDefencesType {
   const extracted = ManyDefences.empty();
   let remainingTotalHangar = Math.max(
     0,
@@ -782,7 +801,7 @@ function extractMaintenanceBombs(
   return extracted;
 }
 
-function calculateBombHangarUsageForManyDefences(defences: ManyDefences): number {
+function calculateBombHangarUsageForManyDefences(defences: ManyDefencesType): number {
   let total = 0;
   for (const [type, amount] of ManyDefences.countByType(defences).entries()) {
     const blueprint = DEFENCE_BLUEPRINTS.get(type);

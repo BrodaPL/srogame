@@ -1,12 +1,9 @@
-import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
-import { DiplomacyResolver } from '../../../src/app/models/diplomacy/diplomacy-resolver.js';
-import { DiplomaticProposalState } from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
-import {
-  createDiplomaticProposal,
-  isPendingDiplomaticProposalForPair
-} from '../../../src/app/models/diplomacy/diplomatic-proposal.js';
-import { allowedDiplomaticProposalStatuses, isDiplomaticProposalRequestedStatus } from '../../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
-import { PlayerType } from '../../../src/app/models/enums/player-type.js';
+import * as diplomaticStatusEnumModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as diplomacyResolverModule from '../../../src/app/models/diplomacy/diplomacy-resolver.js';
+import * as diplomaticProposalStateModule from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import * as diplomaticProposalModule from '../../../src/app/models/diplomacy/diplomatic-proposal.js';
+import * as diplomaticProposalRulesModule from '../../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
+import * as playerTypeEnumModule from '../../../src/app/models/enums/player-type.js';
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { DiplomaticProposal } from '../../../src/app/models/diplomacy/diplomatic-proposal.ts';
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
@@ -19,6 +16,23 @@ import {
   resolvePlayerById,
   resolvePlayerOrError
 } from './command-helpers.ts';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { DiplomaticStatus } = resolveModule(diplomaticStatusEnumModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-status.js');
+const { DiplomacyResolver } = resolveModule(diplomacyResolverModule) as typeof import('../../../src/app/models/diplomacy/diplomacy-resolver.js');
+const { DiplomaticProposalState } = resolveModule(diplomaticProposalStateModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-proposal-state.js');
+const {
+  createDiplomaticProposal,
+  isPendingDiplomaticProposalForPair
+} = resolveModule(diplomaticProposalModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-proposal.js');
+const {
+  allowedDiplomaticProposalStatuses,
+  isDiplomaticProposalRequestedStatus
+} = resolveModule(diplomaticProposalRulesModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-proposal-rules.js');
+const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../../../src/app/models/enums/player-type.js');
 
 export type CreateDiplomaticProposalCommand = {
   targetPlayerId: number;

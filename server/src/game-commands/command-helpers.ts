@@ -1,25 +1,25 @@
-import { BuildingBlueprintsFactory } from '../../../src/app/factories/building-blueprints.factory.js';
-import { DefenceBlueprintsFactory } from '../../../src/app/factories/defence-blueprints.factory.js';
-import { ShipBlueprintsFactory } from '../../../src/app/factories/ship-blueprints.factory.js';
-import { TechnologyBlueprintsFactory } from '../../../src/app/factories/technology-blueprints.factory.js';
-import { BuildingQueueEntry } from '../../../src/app/models/buildings/building-queue-entry.js';
-import { BuildingType } from '../../../src/app/models/enums/building-type.js';
-import { DefenceType } from '../../../src/app/models/enums/defence-type.js';
-import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
-import { DiplomacyResolver } from '../../../src/app/models/diplomacy/diplomacy-resolver.js';
-import { ShipType } from '../../../src/app/models/enums/ship-type.js';
-import { TechnologyType } from '../../../src/app/models/enums/technology-type.js';
-import { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.js';
-import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../../src/app/models/fleets/fleet.js';
-import { ManyShips } from '../../../src/app/models/fleets/many-ships.js';
-import { calculateJumpGateCapacity } from '../../../src/app/models/jump-gates/jump-gate-capacity.js';
-import { createJumpGateRequest } from '../../../src/app/models/requests/jump-gate-request.js';
-import { ResourcesPack } from '../../../src/app/models/resources-pack.js';
-import { ResearchHelperFor } from '../../../src/app/models/tech/research-helper-for.js';
-import { maxActiveFleets } from '../../../src/app/models/tech/technology-effects.js';
-import { ShipyardQueueEntry } from '../../../src/app/models/fleets/shipyard-queue-entry.js';
-import { TechnologyQueueEntry } from '../../../src/app/models/tech/technology-queue-entry.js';
-import { countPlanetaryBombs, isPlanetaryBombDefenceType } from '../../../src/app/models/defences/planetary-bomb.js';
+import * as buildingBlueprintsFactoryModule from '../../../src/app/factories/building-blueprints.factory.js';
+import * as defenceBlueprintsFactoryModule from '../../../src/app/factories/defence-blueprints.factory.js';
+import * as shipBlueprintsFactoryModule from '../../../src/app/factories/ship-blueprints.factory.js';
+import * as technologyBlueprintsFactoryModule from '../../../src/app/factories/technology-blueprints.factory.js';
+import * as buildingQueueEntryModule from '../../../src/app/models/buildings/building-queue-entry.js';
+import * as buildingTypeEnumModule from '../../../src/app/models/enums/building-type.js';
+import * as defenceTypeEnumModule from '../../../src/app/models/enums/defence-type.js';
+import * as diplomaticStatusEnumModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as diplomacyResolverModule from '../../../src/app/models/diplomacy/diplomacy-resolver.js';
+import * as shipTypeEnumModule from '../../../src/app/models/enums/ship-type.js';
+import * as technologyTypeEnumModule from '../../../src/app/models/enums/technology-type.js';
+import * as fleetMissionTypeEnumModule from '../../../src/app/models/enums/fleet-mission-type.js';
+import * as fleetModelModule from '../../../src/app/models/fleets/fleet.js';
+import * as manyShipsModule from '../../../src/app/models/fleets/many-ships.js';
+import * as jumpGateCapacityModule from '../../../src/app/models/jump-gates/jump-gate-capacity.js';
+import * as jumpGateRequestModule from '../../../src/app/models/requests/jump-gate-request.js';
+import * as resourcesPackModule from '../../../src/app/models/resources-pack.js';
+import * as researchHelperForModule from '../../../src/app/models/tech/research-helper-for.js';
+import * as technologyEffectsModule from '../../../src/app/models/tech/technology-effects.js';
+import * as shipyardQueueEntryModule from '../../../src/app/models/fleets/shipyard-queue-entry.js';
+import * as technologyQueueEntryModule from '../../../src/app/models/tech/technology-queue-entry.js';
+import * as planetaryBombModule from '../../../src/app/models/defences/planetary-bomb.js';
 import type { Building } from '../../../src/app/models/buildings/building.ts';
 import type { Defence } from '../../../src/app/models/defences/defence.ts';
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
@@ -39,6 +39,33 @@ import type { ManyShips as ManyShipsType, ShipSelectionEntry as ShipSelectionEnt
 import type { JumpGateRequest } from '../../../src/app/models/requests/jump-gate-request.ts';
 import type { CommandResult, GameCommandError, GameCommandErrorCode } from './command-result.ts';
 import type { GameCommandContext } from './command-context.ts';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { BuildingBlueprintsFactory } = resolveModule(buildingBlueprintsFactoryModule) as typeof import('../../../src/app/factories/building-blueprints.factory.js');
+const { DefenceBlueprintsFactory } = resolveModule(defenceBlueprintsFactoryModule) as typeof import('../../../src/app/factories/defence-blueprints.factory.js');
+const { ShipBlueprintsFactory } = resolveModule(shipBlueprintsFactoryModule) as typeof import('../../../src/app/factories/ship-blueprints.factory.js');
+const { TechnologyBlueprintsFactory } = resolveModule(technologyBlueprintsFactoryModule) as typeof import('../../../src/app/factories/technology-blueprints.factory.js');
+const { BuildingQueueEntry } = resolveModule(buildingQueueEntryModule) as typeof import('../../../src/app/models/buildings/building-queue-entry.js');
+const { BuildingType } = resolveModule(buildingTypeEnumModule) as typeof import('../../../src/app/models/enums/building-type.js');
+const { DefenceType } = resolveModule(defenceTypeEnumModule) as typeof import('../../../src/app/models/enums/defence-type.js');
+const { DiplomaticStatus } = resolveModule(diplomaticStatusEnumModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-status.js');
+const { DiplomacyResolver } = resolveModule(diplomacyResolverModule) as typeof import('../../../src/app/models/diplomacy/diplomacy-resolver.js');
+const { ShipType } = resolveModule(shipTypeEnumModule) as typeof import('../../../src/app/models/enums/ship-type.js');
+const { TechnologyType } = resolveModule(technologyTypeEnumModule) as typeof import('../../../src/app/models/enums/technology-type.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeEnumModule) as typeof import('../../../src/app/models/enums/fleet-mission-type.js');
+const { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } = resolveModule(fleetModelModule) as typeof import('../../../src/app/models/fleets/fleet.js');
+const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../../src/app/models/fleets/many-ships.js');
+const { calculateJumpGateCapacity } = resolveModule(jumpGateCapacityModule) as typeof import('../../../src/app/models/jump-gates/jump-gate-capacity.js');
+const { createJumpGateRequest } = resolveModule(jumpGateRequestModule) as typeof import('../../../src/app/models/requests/jump-gate-request.js');
+const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
+const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../../src/app/models/tech/research-helper-for.js');
+const { maxActiveFleets } = resolveModule(technologyEffectsModule) as typeof import('../../../src/app/models/tech/technology-effects.js');
+const { ShipyardQueueEntry } = resolveModule(shipyardQueueEntryModule) as typeof import('../../../src/app/models/fleets/shipyard-queue-entry.js');
+const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as typeof import('../../../src/app/models/tech/technology-queue-entry.js');
+const { countPlanetaryBombs, isPlanetaryBombDefenceType } = resolveModule(planetaryBombModule) as typeof import('../../../src/app/models/defences/planetary-bomb.js');
 
 export const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
 export const DEFENCE_BLUEPRINTS = DefenceBlueprintsFactory.fromDefaultJson();
@@ -267,7 +294,7 @@ export function toCoordinatesId(coordinates: ClientCoordinates): string {
   return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
 }
 
-export function multiplyResourcePack(base: ResourcesPackType, amount: number): ResourcesPack {
+export function multiplyResourcePack(base: ResourcesPackType, amount: number): ResourcesPackType {
   return new ResourcesPack(
     base.metal * amount,
     base.crystal * amount,
@@ -465,7 +492,7 @@ export function validateJumpGateLaunchAccess(
 
 export function createJumpGatePendingRequest(
   galaxy: Galaxy,
-  fleet: Fleet,
+  fleet: import('../../../src/app/models/fleets/fleet.ts').Fleet,
   targetOwner: Player,
   totalShips: number
 ): JumpGateRequest {
@@ -489,7 +516,10 @@ export function createJumpGatePendingRequest(
   return request;
 }
 
-export function dispatchJumpGateFleet(galaxy: Galaxy, fleet: Fleet): void {
+export function dispatchJumpGateFleet(
+  galaxy: Galaxy,
+  fleet: import('../../../src/app/models/fleets/fleet.ts').Fleet
+): void {
   fleet.state = FleetState.MOVING_TO_TARGET;
   fleet.createdAtTurn = galaxy.currentTurn;
   fleet.travelTurns = 1;
@@ -500,7 +530,7 @@ export function dispatchJumpGateFleet(galaxy: Galaxy, fleet: Fleet): void {
 
 export function restorePendingJumpGateFleetToOrigin(
   galaxy: Galaxy,
-  fleet: Fleet,
+  fleet: import('../../../src/app/models/fleets/fleet.ts').Fleet,
   restoreFuelReserve: boolean
 ): void {
   fleet.pendingJumpGateRequestId = null;
@@ -530,8 +560,10 @@ export function restorePendingJumpGateFleetToOrigin(
 }
 
 export {
+  BuildingType,
   BuildingQueueEntry,
   ResearchHelperFor,
+  ResourcesPack,
   ShipyardQueueEntry,
   TechnologyQueueEntry,
   countPlanetaryBombs,

@@ -1,5 +1,3 @@
-import { BuildingType } from '../../../src/app/models/enums/building-type.js';
-import { ResourcesPack } from '../../../src/app/models/resources-pack.js';
 import type { DefenceType } from '../../../src/app/models/enums/defence-type.ts';
 import type { ShipType } from '../../../src/app/models/enums/ship-type.ts';
 import type { Planet } from '../../../src/app/models/planets/planet.ts';
@@ -9,6 +7,8 @@ import type { CommandResult } from './command-result.ts';
 import {
   DEFENCE_BLUEPRINTS,
   SHIP_BLUEPRINTS,
+  BuildingType,
+  ResourcesPack,
   ShipyardQueueEntry,
   calculateMaxShipyardQueueLength,
   commandError,

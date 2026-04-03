@@ -262,3 +262,5 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
     maxMoveActionsPerTurn: 1
   }
 };
+
+export const BOT_PROFILE_IDS = Object.freeze(Object.keys(BOT_PROFILES) as BotProfileId[]);

@@ -42,7 +42,7 @@
           (click)="setSelectedPlayer(null)">
           All bots
         </button>
-        @for (bot of botOptions(); track bot.playerId) {
+        @for (bot of botOptionList; track bot.playerId) {
           <button
             class="bot-debug-view__filter"
             type="button"
@@ -52,7 +52,7 @@
           </button>
         }
       </div>
-      <p class="overview-muted">Showing {{ visibleTraces().length }} trace(s) for {{ selectedBotName() }}.</p>
+      <p class="overview-muted">Showing {{ visibleTraceList.length }} trace(s) for {{ selectedBotNameLabel }}.</p>
     </section>
 
     @if (selectedBotState(); as selectedBot) {
@@ -104,13 +104,13 @@
       </section>
     }
 
-    @if (visibleTraces().length === 0) {
+    @if (visibleTraceList.length === 0) {
       <section class="overview-card">
         <p class="overview-muted">No bot traces recorded yet for this filter.</p>
       </section>
     } @else {
       <section class="bot-debug-view__trace-list">
-        @for (trace of visibleTraces(); track trace.turn + '-' + trace.playerId) {
+        @for (trace of visibleTraceList; track trace.turn + '-' + trace.playerId) {
           <article class="overview-card bot-debug-view__trace">
             <header class="bot-debug-view__trace-head">
               <div>

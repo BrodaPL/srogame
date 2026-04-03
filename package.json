@@ -8,6 +8,10 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "smoke:test": "node scripts/run-smoke-tests.js",
+    "bot:bench": "npx tsx scripts/run-bot-benchmarks.ts",
+    "bot:smoke": "node scripts/run-bot-smoke-tests.js",
+    "bot:sim": "npx tsx scripts/run-bot-simulations.ts",
+    "bot:sim:baseline": "npx tsx scripts/run-bot-sim-baselines.ts",
     "ships:descr": "node scripts/generate-ships-descr.ts",
     "defences:descr": "node scripts/generate-defences-descr.ts"
   },

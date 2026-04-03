@@ -1,0 +1,108 @@
+{
+  "baselines": [
+    {
+      "id": "warHotspotAggressorVsTurtle",
+      "description": "Hotspot war profile comparison between AGGRESSOR and TURTLE.",
+      "options": {
+        "presetKeys": ["warHotspot"],
+        "profileFilter": ["AGGRESSOR", "TURTLE"],
+        "comparePair": ["AGGRESSOR", "TURTLE"]
+      },
+      "expected": {
+        "profiles": {
+          "AGGRESSOR": {
+            "metrics": {
+              "avgPlanetsOwned": 18.67,
+              "avgCombatActions": 0,
+              "avgDiplomacyActions": 14.33,
+              "avgColonizeActions": 5.5,
+              "avgMoveActions": 5.33,
+              "avgTransportActions": 7.17,
+              "avgTotalResourceValue": 26417
+            },
+            "proposalStateCounts": {
+              "ACCEPTED": 52,
+              "EXPIRED": 11,
+              "REJECTED": 10
+            }
+          },
+          "TURTLE": {
+            "metrics": {
+              "avgPlanetsOwned": 15.67,
+              "avgCombatActions": 1.67,
+              "avgDiplomacyActions": 15.67,
+              "avgColonizeActions": 2,
+              "avgMoveActions": 18,
+              "avgTransportActions": 7,
+              "avgTotalResourceValue": 26339
+            },
+            "proposalStateCounts": {
+              "ACCEPTED": 6,
+              "EXPIRED": 17
+            }
+          }
+        },
+        "comparison": {
+          "avgPlanetsOwned": 3,
+          "avgCombatActions": -1.67,
+          "avgDiplomacyActions": -1.33,
+          "avgColonizeActions": 3.5,
+          "avgMoveActions": -12.67,
+          "avgTransportActions": 0.17,
+          "avgTotalResourceValue": 78.33
+        }
+      }
+    },
+    {
+      "id": "warHotspotAggressorVsMiner",
+      "description": "Hotspot war profile comparison between AGGRESSOR and MINER.",
+      "options": {
+        "presetKeys": ["warHotspot"],
+        "profileFilter": ["AGGRESSOR", "MINER"],
+        "comparePair": ["AGGRESSOR", "MINER"]
+      },
+      "expected": {
+        "profiles": {
+          "AGGRESSOR": {
+            "metrics": {
+              "avgPlanetsOwned": 19.17,
+              "avgCombatActions": 0.17,
+              "avgDiplomacyActions": 10.33,
+              "avgColonizeActions": 5.5,
+              "avgMoveActions": 5,
+              "avgTransportActions": 6.5,
+              "avgTotalResourceValue": 26262
+            },
+            "proposalStateCounts": {
+              "ACCEPTED": 54,
+              "EXPIRED": 2
+            }
+          },
+          "MINER": {
+            "metrics": {
+              "avgPlanetsOwned": 14,
+              "avgCombatActions": 1,
+              "avgDiplomacyActions": 17.67,
+              "avgColonizeActions": 0.67,
+              "avgMoveActions": 10.33,
+              "avgTransportActions": 2,
+              "avgTotalResourceValue": 25024
+            },
+            "proposalStateCounts": {
+              "EXPIRED": 23
+            }
+          }
+        },
+        "comparison": {
+          "avgPlanetsOwned": 5.17,
+          "avgCombatActions": -0.83,
+          "avgDiplomacyActions": -7.33,
+          "avgColonizeActions": 4.83,
+          "avgMoveActions": -5.33,
+          "avgTransportActions": 4.5,
+          "avgTotalResourceValue": 1238.67
+        }
+      }
+    }
+  ]
+}

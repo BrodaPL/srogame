@@ -1,6 +1,6 @@
 import type { BotGoalType, BotProfileId, Player } from '../../../src/app/models/player.ts';
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
-import { BOT_PROFILE_IDS } from '../../../src/app/models/player.js';
+import { BOT_PROFILE_IDS } from './bot-profile.js';
 
 const pausedBotPlayerIds = new Set<number>();
 

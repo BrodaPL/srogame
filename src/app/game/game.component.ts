@@ -40,13 +40,17 @@ export class GameComponent implements OnInit {
 
     this.gameApi.getGameState(session.token).subscribe({
       next: (response) => {
-        this.authState.setSession(response.player);
-        this.gameState.setGalaxy(response.galaxy);
-        this.isLoading = false;
+        window.setTimeout(() => {
+          this.authState.setSession(response.player);
+          this.gameState.setGalaxy(response.galaxy);
+          this.isLoading = false;
+        });
       },
       error: () => {
-        this.stateError = 'Unable to load galaxy from server.';
-        this.isLoading = false;
+        window.setTimeout(() => {
+          this.stateError = 'Unable to load galaxy from server.';
+          this.isLoading = false;
+        });
       }
     });
   }
