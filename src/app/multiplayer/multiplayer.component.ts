@@ -1,4 +1,4 @@
-import { Component, OnDestroy } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
@@ -52,8 +52,10 @@ export class MultiplayerComponent implements OnDestroy {
   protected selectedSaveId = '';
   protected setupForm: LobbySetupForm = this.createForm(this.defaultSetup());
   private readonly refreshHandle: number;
+  private lobbyRequestVersion = 0;
 
   constructor(
+    private readonly cdr: ChangeDetectorRef,
     private readonly authApi: AuthApiService,
     private readonly authState: AuthStateService,
     private readonly gameApi: GameApiService,
@@ -63,7 +65,7 @@ export class MultiplayerComponent implements OnDestroy {
     this.session = this.authState.session;
     this.loadLobby();
     this.refreshHandle = window.setInterval(() => {
-      if (!this.isActing) {
+      if (!this.isActing && !this.isLoading) {
         this.loadLobby(false);
       }
     }, 5000);
@@ -74,6 +76,7 @@ export class MultiplayerComponent implements OnDestroy {
   }
 
   protected loadLobby(resetError = true): void {
+    const requestVersion = ++this.lobbyRequestVersion;
     this.isLoading = true;
     if (resetError) {
       this.error = null;
@@ -82,6 +85,10 @@ export class MultiplayerComponent implements OnDestroy {
     const token = this.session()?.token;
     this.gameApi.getMultiplayerLobby(token).subscribe({
       next: (response) => {
+        if (requestVersion !== this.lobbyRequestVersion) {
+          return;
+        }
+
         this.response = response;
         this.isLoading = false;
         if (response.lobby) {
@@ -91,24 +98,42 @@ export class MultiplayerComponent implements OnDestroy {
         if (!response.activeGame) {
           this.confirmReplaceActiveGame = false;
         }
+        this.cdr.markForCheck();
       },
       error: (error) => {
+        if (requestVersion !== this.lobbyRequestVersion) {
+          return;
+        }
+
         this.error = error?.error?.error ?? 'Unable to load multiplayer lobby.';
         this.response = null;
         this.isLoading = false;
+        this.cdr.markForCheck();
       }
     });
   }
 
   protected openLobby(): void {
+    if (this.isActing || this.isLoading) {
+      return;
+    }
+
     this.runLobbyMutation((token) => this.gameApi.openMultiplayerLobby(token));
   }
 
   protected joinLobby(): void {
+    if (this.isActing || this.isLoading) {
+      return;
+    }
+
     this.runLobbyMutation((token) => this.gameApi.joinMultiplayerLobby(token));
   }
 
   protected leaveLobby(): void {
+    if (this.isActing || this.isLoading) {
+      return;
+    }
+
     this.runLobbyMutation((token) => this.gameApi.leaveMultiplayerLobby(token));
   }
 
@@ -175,11 +200,13 @@ export class MultiplayerComponent implements OnDestroy {
         this.authState.setSession(response.player);
         this.gameState.setGalaxy(response.galaxy);
         this.isActing = false;
+        this.cdr.markForCheck();
         this.router.navigate(['/game/imperium']);
       },
       error: (error) => {
         this.error = error?.error?.error ?? 'Unable to start the multiplayer game.';
         this.isActing = false;
+        this.cdr.markForCheck();
         this.loadLobby(false);
       }
     });
@@ -240,12 +267,18 @@ export class MultiplayerComponent implements OnDestroy {
       return;
     }
 
+    const requestVersion = ++this.lobbyRequestVersion;
     this.isActing = true;
     this.error = null;
     action(session.token).subscribe({
       next: (response) => {
+        if (requestVersion !== this.lobbyRequestVersion) {
+          return;
+        }
+
         this.response = response;
         this.isActing = false;
+        this.isLoading = false;
         if (response.lobby) {
           this.setupForm = this.createForm(response.lobby.setup);
         }
@@ -253,10 +286,16 @@ export class MultiplayerComponent implements OnDestroy {
         if (!response.activeGame) {
           this.confirmReplaceActiveGame = false;
         }
+        this.cdr.markForCheck();
       },
       error: (error) => {
+        if (requestVersion !== this.lobbyRequestVersion) {
+          return;
+        }
+
         this.error = error?.error?.error ?? 'Lobby action failed.';
         this.isActing = false;
+        this.cdr.markForCheck();
         this.loadLobby(false);
       }
     });
