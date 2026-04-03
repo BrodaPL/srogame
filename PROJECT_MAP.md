@@ -220,13 +220,21 @@ Fleet command ownership note:
 - `server/src/game-commands/jump-gate-request-commands.ts` owns Jump Gate mail-request approval/reject/cancel validation + mutation
 - `server/src/game-commands/command-helpers.ts` now also owns shared fleet-launch helpers used by the command layer
 
+Diplomacy command ownership note:
+- `server/src/index.ts` owns auth/session checks, request parsing, and diplomacy view/mail DTO projection
+- `server/src/game-commands/diplomacy-commands.ts` owns treaty-proposal create/accept/reject/cancel validation + mutation, diplomacy-contact visibility checks, human/bot proposal eligibility, and shared one-outgoing-per-turn / pending-pair enforcement
+- `src/app/models/diplomacy/diplomatic-proposal-rules.ts` owns the shared treaty ladder used by both server and Angular UI (`NEUTRAL` / `WAR` -> `PEACE`, `PEACE` -> `ALLIED`)
+
 Bot runtime ownership note:
 - `server/src/index.ts` owns the end-turn hook and runs bot planning immediately before `resolvePhaseOneTurn(...)`
 - `server/src/bots/bot-turn-runner.ts` owns current server-side bot turn planning and action application
 - `server/src/bots/bot-profile.ts` owns fixed bot personality weights, military thresholds, and per-turn soft caps
+- `server/src/bots/bot-diplomacy-awareness.ts` owns lightweight per-contact diplomacy context building for bot planning
+- `server/src/bots/bot-diplomacy-planner.ts` owns outgoing bot `PEACE` / `ALLIED` proposal candidate generation plus proposal cooldown heuristics
+- `server/src/bots/bot-diplomacy-resolver.ts` owns bot treaty-response heuristics for incoming `PEACE` / `ALLIED` proposals
 - `server/src/bots/bot-admin.ts` owns controller-only runtime bot controls and paused-bot state
 - `server/src/bots/bot-debug.ts` and `server/src/bots/bot-debug-store.ts` own the in-memory bot decision trace model and ring buffer used for controller-side AI inspection
-- bot actions currently reuse the shared command layer in `server/src/game-commands/` for buildings, research, shipyard, spy, colonize, attack, transport, maintenance, recycle, repair, bombard, siege, guard, and move launches; self-owned move/transport/guard routes can now opt into Jump Gate travel when access is valid and the distance benefit is meaningful, orbiting self-owned fleets can request auto-approved Alliance Depot maintenance support, bots now resolve incoming allied/peace maintenance + Jump Gate requests before normal action planning, owned planets can trigger conservative recycle/repair support launches, and high-infrastructure hostile worlds can trigger bombard/siege plans instead of default raids
+- bot actions currently reuse the shared command layer in `server/src/game-commands/` for buildings, research, shipyard, spy, colonize, attack, transport, maintenance, recycle, repair, bombard, siege, guard, and move launches; self-owned move/transport/guard routes can now opt into Jump Gate travel when access is valid and the distance benefit is meaningful, orbiting self-owned fleets can request auto-approved Alliance Depot maintenance support, bots now resolve incoming allied/peace maintenance + Jump Gate requests plus incoming `PEACE` / `ALLIED` diplomacy proposals before normal action planning, can initiate one conservative outgoing `PEACE` / `ALLIED` proposal per turn using cooldown memory, owned planets can trigger conservative recycle/repair support launches, high-infrastructure hostile worlds can trigger bombard/siege plans instead of default raids, and current diplomacy status now feeds back into bot attack/spy/border-defense scoring
 
 Reports and tutorials:
 - `/api/game/reports`
@@ -410,6 +418,7 @@ Primary files:
 - `src/app/models/diplomacy/diplomacy-resolver.ts`
 - `src/app/models/diplomacy/diplomatic-proposal.ts`
 - `src/app/models/diplomacy/diplomatic-proposal-state.ts`
+- `src/app/models/diplomacy/diplomatic-proposal-rules.ts`
 
 Owns:
 - diplomatic relation rules
@@ -633,6 +642,9 @@ Change setup/start-game flow:
 Change bot AI:
 - `server/src/bots/bot-turn-runner.ts`
 - `server/src/bots/bot-profile.ts`
+- `server/src/bots/bot-diplomacy-awareness.ts`
+- `server/src/bots/bot-diplomacy-planner.ts`
+- `server/src/bots/bot-diplomacy-resolver.ts`
 - `server/src/bots/bot-debug.ts`
 - `server/src/bots/bot-debug-store.ts`
 - `server/src/game-commands/` when bot actions need new shared validation/mutation paths

@@ -8,6 +8,14 @@ export type BotProfile = {
   defenseWeight: number;
   spyWeight: number;
   savingsDiscipline: number;
+  peaceAcceptanceBias: number;
+  allianceAcceptanceBias: number;
+  peaceInitiationBias: number;
+  allianceInitiationBias: number;
+  warPersistenceBias: number;
+  recentConflictPenaltyScale: number;
+  borderThreatSensitivity: number;
+  diplomacyActionThreshold: number;
   minUtilityThreshold: number;
   minAttackStrengthRatio: number;
   reserveFloorRatio: number;
@@ -39,6 +47,14 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
     defenseWeight: 1,
     spyWeight: 1,
     savingsDiscipline: 1,
+    peaceAcceptanceBias: 1.5,
+    allianceAcceptanceBias: 0.75,
+    peaceInitiationBias: 0.9,
+    allianceInitiationBias: 0.35,
+    warPersistenceBias: 0.75,
+    recentConflictPenaltyScale: 0.8,
+    borderThreatSensitivity: 1.1,
+    diplomacyActionThreshold: 5,
     minUtilityThreshold: 3,
     minAttackStrengthRatio: 1.6,
     reserveFloorRatio: 0.35,
@@ -68,6 +84,14 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
     defenseWeight: 0.8,
     spyWeight: 1.2,
     savingsDiscipline: 0.8,
+    peaceAcceptanceBias: -2.5,
+    allianceAcceptanceBias: -3,
+    peaceInitiationBias: -2.25,
+    allianceInitiationBias: -3.25,
+    warPersistenceBias: 2.25,
+    recentConflictPenaltyScale: 1.15,
+    borderThreatSensitivity: 0.45,
+    diplomacyActionThreshold: 5.5,
     minUtilityThreshold: 2.5,
     minAttackStrengthRatio: 1.35,
     reserveFloorRatio: 0.25,
@@ -97,6 +121,14 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
     defenseWeight: 1.35,
     spyWeight: 0.8,
     savingsDiscipline: 1.2,
+    peaceAcceptanceBias: 2.25,
+    allianceAcceptanceBias: 1.25,
+    peaceInitiationBias: 1.65,
+    allianceInitiationBias: 0.9,
+    warPersistenceBias: 0.45,
+    recentConflictPenaltyScale: 0.7,
+    borderThreatSensitivity: 1.2,
+    diplomacyActionThreshold: 4.5,
     minUtilityThreshold: 3,
     minAttackStrengthRatio: 2,
     reserveFloorRatio: 0.45,
@@ -126,6 +158,14 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
     defenseWeight: 0.85,
     spyWeight: 0.75,
     savingsDiscipline: 1.3,
+    peaceAcceptanceBias: 2,
+    allianceAcceptanceBias: 0.5,
+    peaceInitiationBias: 1.8,
+    allianceInitiationBias: 0.45,
+    warPersistenceBias: 0.35,
+    recentConflictPenaltyScale: 0.75,
+    borderThreatSensitivity: 1,
+    diplomacyActionThreshold: 4.5,
     minUtilityThreshold: 3.5,
     minAttackStrengthRatio: 1.9,
     reserveFloorRatio: 0.4,
@@ -155,6 +195,14 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
     defenseWeight: 1.1,
     spyWeight: 0.95,
     savingsDiscipline: 1.25,
+    peaceAcceptanceBias: 2.75,
+    allianceAcceptanceBias: 1.1,
+    peaceInitiationBias: 2.2,
+    allianceInitiationBias: 0.95,
+    warPersistenceBias: 0.2,
+    recentConflictPenaltyScale: 0.65,
+    borderThreatSensitivity: 1.35,
+    diplomacyActionThreshold: 4.25,
     minUtilityThreshold: 3,
     minAttackStrengthRatio: 2.1,
     reserveFloorRatio: 0.45,
@@ -184,6 +232,14 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
     defenseWeight: 1.4,
     spyWeight: 0.9,
     savingsDiscipline: 1.15,
+    peaceAcceptanceBias: 1.9,
+    allianceAcceptanceBias: 0.25,
+    peaceInitiationBias: 1.4,
+    allianceInitiationBias: 0.2,
+    warPersistenceBias: 0.7,
+    recentConflictPenaltyScale: 0.85,
+    borderThreatSensitivity: 1.15,
+    diplomacyActionThreshold: 4.75,
     minUtilityThreshold: 3,
     minAttackStrengthRatio: 1.8,
     reserveFloorRatio: 0.4,

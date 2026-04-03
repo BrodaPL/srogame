@@ -3,11 +3,12 @@ import { DiplomaticStatus } from '../diplomatic-status';
 import { DiplomacyResolver } from '../diplomacy-resolver';
 
 describe('DiplomacyResolver', () => {
-  it('treats same owner as SELF and missing relations as WAR', () => {
+  it('treats same owner as SELF and missing relations as NEUTRAL', () => {
     const resolver = new DiplomacyResolver();
 
     expect(resolver.getStatus(3, 3)).toBe(DiplomaticStatus.SELF);
-    expect(resolver.getStatus(1, 2)).toBe(DiplomaticStatus.WAR);
+    expect(resolver.getStatus(1, 2)).toBe(DiplomaticStatus.NEUTRAL);
+    expect(resolver.getStatus(1, null)).toBe(DiplomaticStatus.NEUTRAL);
   });
 
   it('stores normalized allied and peace relations', () => {
@@ -25,14 +26,19 @@ describe('DiplomacyResolver', () => {
     ]);
   });
 
-  it('drops explicit relations when set back to WAR', () => {
+  it('stores explicit WAR relations and drops explicit relations when set back to NEUTRAL', () => {
     const resolver = new DiplomacyResolver([
       { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED }
     ]);
 
     resolver.setStatus(2, 1, DiplomaticStatus.WAR);
-
     expect(resolver.getStatus(1, 2)).toBe(DiplomaticStatus.WAR);
+    expect(resolver.toRelations()).toEqual([
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ]);
+
+    resolver.setStatus(2, 1, DiplomaticStatus.NEUTRAL);
+    expect(resolver.getStatus(1, 2)).toBe(DiplomaticStatus.NEUTRAL);
     expect(resolver.toRelations()).toEqual([]);
   });
 });

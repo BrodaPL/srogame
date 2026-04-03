@@ -393,7 +393,7 @@ function resolveMaintenanceStatus(
     (entry.playerAId === requesterPlayerId && entry.playerBId === targetOwnerId)
     || (entry.playerAId === targetOwnerId && entry.playerBId === requesterPlayerId)
   );
-  return directRelation?.status ?? DiplomaticStatus.WAR;
+  return directRelation?.status ?? DiplomaticStatus.NEUTRAL;
 }
 
 function isMaintenanceStatusAllowed(status: DiplomaticStatus): boolean {

@@ -958,7 +958,8 @@ function serializePlayer(
         goalExpiresTurn: player.botMemory.goalExpiresTurn,
         reservedResources: { ...player.botMemory.reservedResources },
         lastSpyTargets: player.botMemory.lastSpyTargets.map((entry) => ({ ...entry })),
-        lastAttackTargets: player.botMemory.lastAttackTargets.map((entry) => ({ ...entry }))
+        lastAttackTargets: player.botMemory.lastAttackTargets.map((entry) => ({ ...entry })),
+        recentDiplomacyTargets: player.botMemory.recentDiplomacyTargets.map((entry) => ({ ...entry }))
       }
       : null
   };

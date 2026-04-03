@@ -434,6 +434,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
         new Player(2, 'Beta', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
       ])
     );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ];
 
     resolvePhaseOneTurn(galaxy);
 
@@ -550,7 +553,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       ])
     );
     galaxy.diplomaticRelations = [
-      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED }
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED },
+      { playerAId: 1, playerBId: 3, status: DiplomaticStatus.WAR },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.WAR }
     ];
 
     const targetPlanetShipsBefore = ManyShips.totalShipsCount(system.planets[1].rBDSFTQ.ships);
@@ -601,7 +606,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       ])
     );
     galaxy.diplomaticRelations = [
-      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED }
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED },
+      { playerAId: 1, playerBId: 3, status: DiplomaticStatus.WAR },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.WAR }
     ];
 
     const targetResourcesBefore = {
@@ -689,15 +696,15 @@ describe('resolvePhaseOneTurn battle integration', () => {
       ManyDefences.empty(),
       FleetOrbitActivity.PASSIVE_HOLD
     );
-    const hostileMoveFleet = new Fleet(
+    const hostileSiegeFleet = new Fleet(
       51,
       3,
-      FleetMissionType.MOVE,
+      FleetMissionType.SIEGE,
       point(1, 1, 2),
       point(1, 1, 1),
       'Gamma Spearhead',
       'Beta Bastion',
-      manyShips({ type: ShipType.SPY_PROBE, amount: 1 }),
+      manyShips({ type: ShipType.ATMOSPHERIC_FIGHTER, amount: 1 }),
       new ResourcesPack(0, 0, 0),
       0,
       0,
@@ -709,7 +716,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
     );
 
     const { galaxy } = createGalaxyWithPlayers(
-      [alliedIdleFleet, hostileMoveFleet],
+      [alliedIdleFleet, hostileSiegeFleet],
       (solarSystem) => {
         solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
         solarSystem.planets[0].info.ownerId = 1;
@@ -726,7 +733,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       ])
     );
     galaxy.diplomaticRelations = [
-      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED }
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED },
+      { playerAId: 1, playerBId: 3, status: DiplomaticStatus.WAR },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.WAR }
     ];
 
     resolvePhaseOneTurn(galaxy);
@@ -1098,6 +1107,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       solarSystem.planets[1].setBuildingLevel(BuildingType.METAL_MINE, 1);
       solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
     });
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ];
 
     const maxStructuralPoints = system.planets[1].getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
 
@@ -1276,6 +1288,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
       solarSystem.planets[1].rBDSFTQ.defences = ManyDefences.empty();
     });
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ];
 
     const maxStructuralPoints = system.planets[1].getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
 
@@ -1319,6 +1334,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       solarSystem.planets[1].setBuildingLevel(BuildingType.METAL_MINE, 1);
       solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
     });
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ];
 
     const maxStructuralPoints = system.planets[1].getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
 
@@ -1360,6 +1378,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       solarSystem.planets[1].setBuildingLevel(BuildingType.METAL_MINE, 1);
       solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
     });
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ];
 
     const maxStructuralPoints = system.planets[1].getMaxBuildingStructuralPoints(BuildingType.METAL_MINE);
 

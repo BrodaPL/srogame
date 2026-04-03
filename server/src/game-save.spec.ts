@@ -129,6 +129,7 @@ describe('game-save', () => {
     expect(player.botProfileId).toBe('BALANCED');
     expect(player.botMemory?.currentGoal).toBe('KEY_BUILDING_UP');
     expect(player.botMemory?.reservedResources).toEqual({ metal: 40, crystal: 20, deuterium: 10 });
+    expect(player.botMemory?.recentDiplomacyTargets).toEqual([{ playerId: 2, requestedStatus: 'PEACE', turn: 5 }]);
     expect(player.planets[0]).toBe(planet);
     expect(player.fleets[0]).toBe(fleet);
     expect(planet.info.ownerId).toBe(player.playerId);
@@ -350,7 +351,8 @@ function buildTestSave() {
         goalExpiresTurn: 8,
         reservedResources: { metal: 40, crystal: 20, deuterium: 10 },
         lastSpyTargets: [{ x: 1, y: 0, z: 0 }],
-        lastAttackTargets: [{ x: 2, y: 1, z: 0 }]
+        lastAttackTargets: [{ x: 2, y: 1, z: 0 }],
+        recentDiplomacyTargets: [{ playerId: 2, requestedStatus: 'PEACE', turn: 5 }]
       }
     }
   );

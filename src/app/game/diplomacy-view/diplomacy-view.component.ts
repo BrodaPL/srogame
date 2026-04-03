@@ -11,6 +11,7 @@ import {
   MailRecipientDto
 } from '../../models/game-api-types';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
+import { allowedDiplomaticProposalStatuses } from '../../models/diplomacy/diplomatic-proposal-rules';
 import { PlayerType } from '../../models/enums/player-type';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -25,11 +26,6 @@ import { MessageComposeDialogComponent } from '../ui/message-compose-dialog/mess
 })
 export class DiplomacyViewComponent implements OnInit {
   protected readonly playerType = PlayerType;
-  protected readonly proposableStatuses = [
-    DiplomaticStatus.ALLIED,
-    DiplomaticStatus.PEACE,
-    DiplomaticStatus.WAR
-  ];
 
   protected isLoading = false;
   protected loadError: string | null = null;
@@ -84,7 +80,7 @@ export class DiplomacyViewComponent implements OnInit {
   }
 
   protected setSelectedProposalStatus(contact: DiplomacyContactDto, status: string): void {
-    if (!this.proposableStatuses.includes(status as DiplomaticStatus)) {
+    if (!this.availableProposalStatuses(contact).includes(status as DiplomaticStatus)) {
       return;
     }
 
@@ -92,7 +88,7 @@ export class DiplomacyViewComponent implements OnInit {
   }
 
   protected availableProposalStatuses(contact: DiplomacyContactDto): DiplomaticStatus[] {
-    return this.proposableStatuses.filter((status) => status !== contact.currentStatus);
+    return allowedDiplomaticProposalStatuses(contact.currentStatus);
   }
 
   protected proposalAvailabilityCopy(contact: DiplomacyContactDto): string {

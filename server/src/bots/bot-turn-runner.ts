@@ -29,6 +29,11 @@ import type { StartTechnologyResearchCommand } from '../game-commands/research-c
 import type { StartShipyardConstructionCommand } from '../game-commands/shipyard-commands.ts';
 import { startBuildingConstruction } from '../game-commands/building-commands.js';
 import {
+  approveDiplomaticProposalCommand,
+  createDiplomaticProposalCommand,
+  rejectDiplomaticProposalCommand
+} from '../game-commands/diplomacy-commands.js';
+import {
   approveJumpGateRequestCommand,
   rejectJumpGateRequestCommand
 } from '../game-commands/jump-gate-request-commands.js';
@@ -61,6 +66,9 @@ import {
 } from '../game-commands/maintenance-commands.js';
 import { startTechnologyResearch } from '../game-commands/research-commands.js';
 import { startShipyardConstruction } from '../game-commands/shipyard-commands.js';
+import { buildBotDiplomacyContexts, type BotDiplomacyContext } from './bot-diplomacy-awareness.js';
+import { buildBotDiplomacyProposalCandidate } from './bot-diplomacy-planner.js';
+import { decideIncomingDiplomaticProposal } from './bot-diplomacy-resolver.js';
 import { recordBotDecisionTrace } from './bot-debug-store.js';
 import type { BotDecisionTrace, BotRejectedActionTrace, BotTraceStopReason } from './bot-debug.ts';
 import { isBotPaused } from './bot-admin.js';
@@ -223,6 +231,7 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
   let stopReason: BotTraceStopReason | null = null;
 
   resolveIncomingBotRequests(galaxy, player, profile, trace);
+  resolveOutgoingBotDiplomacyProposal(galaxy, player, profile, trace);
 
   while (counters.total < profile.maxActionsPerTurn) {
     const candidates = buildBotCandidates(galaxy, player, profile, counters, blockedKeys)
@@ -364,13 +373,15 @@ function buildBotCandidates(
   counters: BotTurnCounters,
   blockedKeys: Set<string>
 ): BotCandidate[] {
+  const diplomacyContexts = buildBotDiplomacyContexts(galaxy, player);
+
   return [
     ...buildResearchCandidates(player, profile, counters, blockedKeys),
     ...buildBuildingCandidates(player, profile, counters, blockedKeys),
     ...buildShipyardCandidates(player, profile, counters, blockedKeys),
-    ...buildSpyCandidates(galaxy, player, profile, counters, blockedKeys),
+    ...buildSpyCandidates(galaxy, player, profile, counters, blockedKeys, diplomacyContexts),
     ...buildColonizeCandidates(galaxy, player, profile, counters, blockedKeys),
-    ...buildAttackCandidates(galaxy, player, profile, counters, blockedKeys),
+    ...buildAttackCandidates(galaxy, player, profile, counters, blockedKeys, diplomacyContexts),
     ...buildTransportCandidates(galaxy, player, profile, counters, blockedKeys),
     ...buildMaintenanceCandidates(galaxy, player, profile, counters, blockedKeys),
     ...buildRecycleCandidates(galaxy, player, profile, counters, blockedKeys),
@@ -455,6 +466,82 @@ function resolveIncomingBotRequests(
       requestSummary: `Maintenance request #${request.requestId} @ ${request.targetPlanetName}`
     });
   }
+
+  const pendingDiplomaticProposals = [...galaxy.diplomaticProposals]
+    .filter((proposal) =>
+      proposal.state === DiplomaticProposalState.PENDING
+      && proposal.toPlayerId === player.playerId
+    );
+  for (const proposal of pendingDiplomaticProposals) {
+    const decision = decideIncomingDiplomaticProposal(galaxy, player, profile, proposal);
+    const result = decision.approve
+      ? approveDiplomaticProposalCommand(context, { proposalId: proposal.proposalId })
+      : rejectDiplomaticProposalCommand(context, { proposalId: proposal.proposalId });
+    if (!result.ok) {
+      trace.rejectedActions.push({
+        kind: decision.traceKind,
+        reason: decision.reason,
+        rejectionType: 'command_failed',
+        expectedUtility: decision.utility,
+        details: {
+          message: result.error.message,
+          requestSummary: `Diplomacy proposal #${proposal.proposalId} ${proposal.requestedStatus}`,
+          utility: Number.isFinite(decision.utility) ? Number(decision.utility.toFixed(2)) : null
+        }
+      });
+      continue;
+    }
+
+    trace.chosenActions.push({
+      kind: decision.traceKind,
+      reason: decision.reason,
+      expectedUtility: Number.isFinite(decision.utility) ? decision.utility : 0,
+      goalType: null,
+      requestSummary: `${proposal.requestedStatus} proposal #${proposal.proposalId} from player ${proposal.fromPlayerId}`
+    });
+  }
+}
+
+function resolveOutgoingBotDiplomacyProposal(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile,
+  trace: BotDecisionTrace
+): void {
+  const candidate = buildBotDiplomacyProposalCandidate(galaxy, player, profile);
+  if (!candidate) {
+    return;
+  }
+
+  const result = createDiplomaticProposalCommand(
+    { galaxy, playerId: player.playerId },
+    {
+      targetPlayerId: candidate.targetPlayerId,
+      requestedStatus: candidate.requestedStatus
+    }
+  );
+  if (!result.ok) {
+    trace.rejectedActions.push({
+      kind: candidate.requestedStatus === DiplomaticStatus.PEACE ? 'propose-peace' : 'propose-alliance',
+      reason: candidate.reason,
+      rejectionType: 'command_failed',
+      expectedUtility: candidate.utility,
+      details: {
+        message: result.error.message,
+        requestSummary: `${candidate.requestedStatus} -> player ${candidate.targetPlayerId}`
+      }
+    });
+    return;
+  }
+
+  appendRecentDiplomacyTarget(player, candidate.targetPlayerId, candidate.requestedStatus, galaxy.currentTurn);
+  trace.chosenActions.push({
+    kind: candidate.requestedStatus === DiplomaticStatus.PEACE ? 'propose-peace' : 'propose-alliance',
+    reason: candidate.reason,
+    expectedUtility: candidate.utility,
+    goalType: null,
+    requestSummary: `${candidate.requestedStatus} proposal -> player ${candidate.targetPlayerId}`
+  });
 }
 
 function buildBuildingCandidates(
@@ -669,7 +756,8 @@ function buildSpyCandidates(
   player: Player,
   profile: BotProfile,
   counters: BotTurnCounters,
-  blockedKeys: Set<string>
+  blockedKeys: Set<string>,
+  diplomacyContexts: Map<number, BotDiplomacyContext>
 ): BotCandidate[] {
   if (counters.spy >= profile.maxSpyActionsPerTurn) {
     return [];
@@ -721,7 +809,7 @@ function buildSpyCandidates(
         continue;
       }
 
-      const interest = estimateSpyTargetInterest(galaxy, player, targetPlanet, report);
+      const interest = estimateSpyTargetInterest(galaxy, player, targetPlanet, report, diplomacyContexts);
       const recentlySpiedPenalty = hasRecentTarget(player.botMemory?.lastSpyTargets ?? [], targetCoordinates) ? 3 : 0;
       const base = (8 * profile.spyWeight) + interest + stalenessTurns - distance - recentlySpiedPenalty;
       const utility = applyGoalBonus(player.botMemory, 'REFRESH_INTEL', base, targetCoordinates);
@@ -821,7 +909,8 @@ function buildAttackCandidates(
   player: Player,
   profile: BotProfile,
   counters: BotTurnCounters,
-  blockedKeys: Set<string>
+  blockedKeys: Set<string>,
+  diplomacyContexts: Map<number, BotDiplomacyContext>
 ): BotCandidate[] {
   if (counters.attack >= profile.maxAttackActionsPerTurn) {
     return [];
@@ -846,9 +935,15 @@ function buildAttackCandidates(
     }
 
     const targetStatus = resolveDiplomaticStatus(galaxy, player.playerId, targetOwner.playerId);
-    if (targetStatus !== DiplomaticStatus.WAR && targetStatus !== DiplomaticStatus.PASSIVE) {
+    if (
+      targetStatus !== DiplomaticStatus.WAR
+      && targetStatus !== DiplomaticStatus.NEUTRAL
+      && targetStatus !== DiplomaticStatus.PASSIVE
+    ) {
       continue;
     }
+
+    const diplomacyContext = diplomacyContexts.get(targetOwner.playerId) ?? null;
 
     const report = targetPlanet.lastReportData.get(player.playerId) ?? null;
     if (!report) {
@@ -899,7 +994,12 @@ function buildAttackCandidates(
       }
 
       const attackerStrength = estimateShipSelectionCombatStrength(request.ships);
-      const requiredRatio = profile.minAttackStrengthRatio + (stalenessTurns * profile.staleIntelPenaltyScale);
+      const relationRiskPenalty = targetStatus === DiplomaticStatus.NEUTRAL
+        ? 0.2
+        : targetStatus === DiplomaticStatus.PASSIVE
+          ? 0.05
+          : 0;
+      const requiredRatio = profile.minAttackStrengthRatio + (stalenessTurns * profile.staleIntelPenaltyScale) + relationRiskPenalty;
       const ratio = attackerStrength / defenderStrength;
       if (ratio < requiredRatio) {
         continue;
@@ -912,8 +1012,16 @@ function buildAttackCandidates(
       const infrastructurePressurePenalty = targetStatus === DiplomaticStatus.WAR && bombardValue >= 80
         ? bombardValue / 18
         : 0;
+      const relationUtilityBonus = targetStatus === DiplomaticStatus.WAR
+        ? 5
+        : targetStatus === DiplomaticStatus.PASSIVE
+          ? 2.5
+          : 1.5;
+      const borderThreatBonus = diplomacyContext ? (diplomacyContext.borderPressure * 0.6) : 0;
       const base = (12 * profile.militaryWeight)
         + (effectiveRatio * 6)
+        + relationUtilityBonus
+        + borderThreatBonus
         + (lootValue / 150)
         - (distance * 1.5)
         - (stalenessTurns * profile.staleIntelPenaltyScale * 8)
@@ -923,7 +1031,7 @@ function buildAttackCandidates(
       candidates.push({
         kind: 'attack',
         utility,
-        reason: `Attack ${targetPlanet.basicInfo.name} with favorable ${ratio.toFixed(2)} ratio`,
+        reason: `Attack ${targetPlanet.basicInfo.name} (${targetStatus}) with favorable ${ratio.toFixed(2)} ratio`,
         goalType: 'PREPARE_SAFE_ATTACK',
         request
       });
@@ -1791,7 +1899,8 @@ function ensureBotMemory(player: Player, currentTurn: number): void {
       goalExpiresTurn: null,
       reservedResources: { metal: 0, crystal: 0, deuterium: 0 },
       lastSpyTargets: memory?.lastSpyTargets ?? [],
-      lastAttackTargets: memory?.lastAttackTargets ?? []
+      lastAttackTargets: memory?.lastAttackTargets ?? [],
+      recentDiplomacyTargets: memory?.recentDiplomacyTargets ?? []
     };
   }
 }
@@ -1815,8 +1924,30 @@ function updateBotMemoryAfterAction(player: Player, currentTurn: number, candida
     goalExpiresTurn: currentTurn + 2,
     reservedResources: { metal: 0, crystal: 0, deuterium: 0 },
     lastSpyTargets: nextSpyTargets,
-    lastAttackTargets: nextAttackTargets
+    lastAttackTargets: nextAttackTargets,
+    recentDiplomacyTargets: previousMemory?.recentDiplomacyTargets ?? []
   };
+}
+
+function appendRecentDiplomacyTarget(
+  player: Player,
+  targetPlayerId: number,
+  requestedStatus: 'PEACE' | 'ALLIED',
+  currentTurn: number
+): void {
+  const memory = player.botMemory;
+  if (!memory) {
+    return;
+  }
+
+  memory.recentDiplomacyTargets.push({
+    playerId: targetPlayerId,
+    requestedStatus,
+    turn: currentTurn
+  });
+  while (memory.recentDiplomacyTargets.length > 20) {
+    memory.recentDiplomacyTargets.shift();
+  }
 }
 
 function estimateBuildingBaseScore(
@@ -1936,18 +2067,30 @@ function estimateSpyTargetInterest(
   galaxy: Galaxy,
   player: Player,
   targetPlanet: Planet,
-  report: EspionageReportData | null
+  report: EspionageReportData | null,
+  diplomacyContexts: Map<number, BotDiplomacyContext>
 ): number {
   const owner = targetPlanet.info.ownerId === null
     ? null
     : resolvePlayerById(galaxy, targetPlanet.info.ownerId);
   const status = owner ? resolveDiplomaticStatus(galaxy, player.playerId, owner.playerId) : null;
-  const ownerBias = status === DiplomaticStatus.WAR ? 4 : status === DiplomaticStatus.PASSIVE ? 2 : 1;
+  const diplomacyContext = owner ? (diplomacyContexts.get(owner.playerId) ?? null) : null;
+  const ownerBias = status === DiplomaticStatus.WAR
+    ? 4
+    : status === DiplomaticStatus.NEUTRAL
+      ? 2.5
+      : status === DiplomaticStatus.PASSIVE
+        ? 2
+        : status === DiplomaticStatus.PEACE
+          ? 0.5
+          : -0.5;
+  const borderPressureBonus = diplomacyContext ? Math.min(2.5, diplomacyContext.borderPressure * 0.5) : 0;
   if (!report) {
-    return ownerBias + 2;
+    return ownerBias + borderPressureBonus + 2;
   }
 
   return ownerBias
+    + borderPressureBonus
     + (estimateResourceValue(report.resourcesAmount) / 200)
     + (report.totalShipsAmount / 3)
     + (report.totalDefencesAmount / 3);
@@ -2621,7 +2764,16 @@ function estimateNearbyThreat(
     }
 
     const status = resolveDiplomaticStatus(galaxy, player.playerId, foreignOwner.playerId);
-    if (status !== DiplomaticStatus.WAR && status !== DiplomaticStatus.PASSIVE) {
+    const pressureScale = status === DiplomaticStatus.WAR
+      ? 1
+      : status === DiplomaticStatus.PASSIVE
+        ? 0.85
+        : status === DiplomaticStatus.NEUTRAL
+          ? 0.65
+          : status === DiplomaticStatus.PEACE
+            ? 0.15
+            : 0;
+    if (pressureScale <= 0) {
       continue;
     }
 
@@ -2636,7 +2788,7 @@ function estimateNearbyThreat(
     }
 
     const reportStrength = Math.max(1, estimateReportCombatStrength(report));
-    const pressure = reportStrength / Math.max(1, distance);
+    const pressure = (reportStrength / Math.max(1, distance)) * pressureScale;
     if (!best || pressure > best.pressure) {
       best = { pressure, reportStrength };
     }

@@ -290,6 +290,7 @@ export class EncounterResolver {
 
       const status = this.diplomacyResolver.getStatus(attackerOwnerId, ownerId);
       return status === DiplomaticStatus.WAR
+        || status === DiplomaticStatus.NEUTRAL
         || (
           allowPassiveOwnerAssault
           && targetPlanet.info.ownerId !== null
@@ -450,6 +451,7 @@ export class EncounterResolver {
 
   private isPlanetAssaultStatus(status: DiplomaticStatus, allowPassiveOwnerAssault: boolean): boolean {
     return status === DiplomaticStatus.WAR
+      || status === DiplomaticStatus.NEUTRAL
       || (allowPassiveOwnerAssault && status === DiplomaticStatus.PASSIVE);
   }
 

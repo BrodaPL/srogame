@@ -3,7 +3,9 @@ import { runBotTurnPhase } from './bot-turn-runner.js';
 import { clearBotDecisionTraces, getBotDecisionTraces } from './bot-debug-store.js';
 import { pauseBot, resetBotAdminRuntimeState } from './bot-admin.js';
 import { EspionageReportGenerator } from '../../../src/app/generators/espionage-report-generator.js';
+import { createDiplomaticProposal } from '../../../src/app/models/diplomacy/diplomatic-proposal.js';
 import { DiplomaticProposalState } from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import { DiplomacyResolver } from '../../../src/app/models/diplomacy/diplomacy-resolver.js';
 import { Galaxy } from '../../../src/app/models/planets/galaxy.js';
 import { SolarSystem } from '../../../src/app/models/planets/solar-system.js';
 import { Planet } from '../../../src/app/models/planets/planet.js';
@@ -78,6 +80,9 @@ describe('bot-turn-runner', () => {
     const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
     homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 20);
     homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
+    galaxy.diplomaticRelations = [
+      { playerAId: bot.playerId, playerBId: targetOwner.playerId, status: DiplomaticStatus.WAR }
+    ];
     targetPlanet.lastReportData.set(
       bot.playerId,
       new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
@@ -210,6 +215,63 @@ describe('bot-turn-runner', () => {
     expect(fleet.pendingMaintenanceRequestId).toBeNull();
   });
 
+  it('approves an incoming peace proposal when the bot is pressured on the border', () => {
+    const { galaxy, bot, targetPlanet, targetOwner, proposal } = createIncomingPeaceProposalGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    expect(proposal.state).toBe(DiplomaticProposalState.ACCEPTED);
+    expect(new DiplomacyResolver(galaxy.diplomaticRelations).getStatus(bot.playerId, targetOwner.playerId)).toBe(DiplomaticStatus.PEACE);
+    expect(getBotDecisionTraces(bot.playerId)[0]?.chosenActions.some((entry) => entry.kind === 'approve-peace')).toBe(true);
+    expect(targetPlanet.lastReportData.has(bot.playerId)).toBe(true);
+  });
+
+  it('rejects an incoming peace proposal when an aggressor bot is clearly winning', () => {
+    const { galaxy, bot, targetOwner, proposal } = createAggressorPeaceRejectionGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    expect(proposal.state).toBe(DiplomaticProposalState.REJECTED);
+    expect(new DiplomacyResolver(galaxy.diplomaticRelations).getStatus(bot.playerId, targetOwner.playerId)).toBe(DiplomaticStatus.WAR);
+    expect(getBotDecisionTraces(bot.playerId)[0]?.chosenActions.some((entry) => entry.kind === 'reject-peace')).toBe(true);
+  });
+
+  it('approves an incoming alliance proposal only from an existing peace relation', () => {
+    const { galaxy, bot, targetOwner, proposal } = createIncomingAllianceProposalGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    expect(proposal.state).toBe(DiplomaticProposalState.ACCEPTED);
+    expect(new DiplomacyResolver(galaxy.diplomaticRelations).getStatus(bot.playerId, targetOwner.playerId)).toBe(DiplomaticStatus.ALLIED);
+    expect(getBotDecisionTraces(bot.playerId)[0]?.chosenActions.some((entry) => entry.kind === 'approve-alliance')).toBe(true);
+  });
+
+  it('proposes peace when an avoider bot is pressured by a stronger war neighbor', () => {
+    const { galaxy, bot, targetOwner } = createOutgoingPeaceProposalGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    expect(galaxy.diplomaticProposals.some((proposal) =>
+      proposal.fromPlayerId === bot.playerId
+      && proposal.toPlayerId === targetOwner.playerId
+      && proposal.requestedStatus === DiplomaticStatus.PEACE
+    )).toBe(true);
+    expect(getBotDecisionTraces(bot.playerId)[0]?.chosenActions.some((entry) => entry.kind === 'propose-peace')).toBe(true);
+  });
+
+  it('proposes alliance from an existing peace relation when the strategic value is high', () => {
+    const { galaxy, bot, targetOwner } = createOutgoingAllianceProposalGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    expect(galaxy.diplomaticProposals.some((proposal) =>
+      proposal.fromPlayerId === bot.playerId
+      && proposal.toPlayerId === targetOwner.playerId
+      && proposal.requestedStatus === DiplomaticStatus.ALLIED
+    )).toBe(true);
+    expect(getBotDecisionTraces(bot.playerId)[0]?.chosenActions.some((entry) => entry.kind === 'propose-alliance')).toBe(true);
+  });
+
   it('launches a recycle mission when own debris is valuable and a recycler is available', () => {
     const { galaxy, bot } = createRecycleScenarioGalaxy();
 
@@ -300,6 +362,20 @@ describe('bot-turn-runner', () => {
 
     expect(galaxy.activeFleets).toHaveLength(0);
     expect(getBotDecisionTraces(bot.playerId)).toHaveLength(0);
+  });
+
+  it('prefers attacking a war target over an equally weak neutral target', () => {
+    const { galaxy, bot, warPlanet } = createWarAndNeutralTargetGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    const attackFleet = galaxy.activeFleets.find((fleet) =>
+      fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.ATTACK
+    ) ?? null;
+    expect(attackFleet).not.toBeNull();
+    expect(attackFleet?.target.x).toBe(warPlanet.basicInfo.solarSystem.coordinates.x);
+    expect(attackFleet?.target.y).toBe(warPlanet.basicInfo.solarSystem.coordinates.y);
+    expect(attackFleet?.target.z).toBe(warPlanet.basicInfo.order - 1);
   });
 });
 
@@ -783,6 +859,215 @@ function createIncomingMaintenanceRequestGalaxy(): {
   return { galaxy, bot, request, fleet };
 }
 
+function createIncomingPeaceProposalGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  targetPlanet: Planet;
+  targetOwner: Player;
+  proposal: ReturnType<typeof createDiplomaticProposal>;
+} {
+  const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.PLAYER);
+  galaxy.currentTurn = 6;
+  galaxy.diplomaticRelations = [
+    { playerAId: bot.playerId, playerBId: targetOwner.playerId, status: DiplomaticStatus.WAR }
+  ];
+  homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CORVETTE, 1);
+  targetPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 7);
+  targetPlanet.lastReportData.set(
+    bot.playerId,
+    new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+      forcedReportLevel: 12,
+      createdTurn: 6
+    })
+  );
+
+  const proposal = createDiplomaticProposal(
+    1,
+    targetOwner.playerId,
+    bot.playerId,
+    DiplomaticStatus.PEACE,
+    galaxy.currentTurn,
+    galaxy.currentTurn + 1
+  );
+  galaxy.diplomaticProposals = [proposal];
+  galaxy.nextDiplomaticProposalId = 2;
+
+  return { galaxy, bot, targetPlanet, targetOwner, proposal };
+}
+
+function createAggressorPeaceRejectionGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  targetOwner: Player;
+  proposal: ReturnType<typeof createDiplomaticProposal>;
+} {
+  const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.PLAYER);
+  galaxy.currentTurn = 6;
+  galaxy.diplomaticRelations = [
+    { playerAId: bot.playerId, playerBId: targetOwner.playerId, status: DiplomaticStatus.WAR }
+  ];
+  bot.botProfileId = 'AGGRESSOR';
+  homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 8);
+  targetPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CORVETTE, 1);
+  targetPlanet.lastReportData.set(
+    bot.playerId,
+    new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+      forcedReportLevel: 12,
+      createdTurn: 6
+    })
+  );
+
+  const proposal = createDiplomaticProposal(
+    1,
+    targetOwner.playerId,
+    bot.playerId,
+    DiplomaticStatus.PEACE,
+    galaxy.currentTurn,
+    galaxy.currentTurn + 1
+  );
+  galaxy.diplomaticProposals = [proposal];
+  galaxy.nextDiplomaticProposalId = 2;
+
+  return { galaxy, bot, targetOwner, proposal };
+}
+
+function createIncomingAllianceProposalGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  targetOwner: Player;
+  proposal: ReturnType<typeof createDiplomaticProposal>;
+} {
+  const { galaxy, bot, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.PLAYER);
+  galaxy.currentTurn = 6;
+  galaxy.diplomaticRelations = [
+    { playerAId: bot.playerId, playerBId: targetOwner.playerId, status: DiplomaticStatus.PEACE }
+  ];
+  bot.botProfileId = 'TURTLE';
+  targetPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 8);
+  targetPlanet.lastReportData.set(
+    bot.playerId,
+    new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+      forcedReportLevel: 12,
+      createdTurn: 6
+    })
+  );
+
+  const proposal = createDiplomaticProposal(
+    1,
+    targetOwner.playerId,
+    bot.playerId,
+    DiplomaticStatus.ALLIED,
+    galaxy.currentTurn,
+    galaxy.currentTurn + 1
+  );
+  galaxy.diplomaticProposals = [proposal];
+  galaxy.nextDiplomaticProposalId = 2;
+
+  return { galaxy, bot, targetOwner, proposal };
+}
+
+function createWarAndNeutralTargetGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  warPlanet: Planet;
+} {
+  const system = new SolarSystem('WarNeutralSys', 3, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const homePlanet = Planet.createStartingPlanet('WarNeutralSys I', 1, system, 1);
+  const warPlanet = Planet.createStartingPlanet('WarNeutralSys II', 2, system, 2);
+  const neutralPlanet = Planet.createStartingPlanet('WarNeutralSys III', 3, system, 3);
+  system.planets[0] = homePlanet;
+  system.planets[1] = warPlanet;
+  system.planets[2] = neutralPlanet;
+
+  const bot = new Player(1, 'Bot-1', [homePlanet], new Map(), [], PlayerType.BOT, createTutorialReadState(true));
+  const warOwner = new Player(2, 'WarTarget', [warPlanet], new Map(), [], PlayerType.PLAYER, createTutorialReadState(true));
+  const neutralOwner = new Player(3, 'NeutralTarget', [neutralPlanet], new Map(), [], PlayerType.PLAYER, createTutorialReadState(true));
+
+  initializePlanet(homePlanet, bot.playerId);
+  initializePlanet(warPlanet, warOwner.playerId);
+  initializePlanet(neutralPlanet, neutralOwner.playerId);
+  homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 180);
+  homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 6);
+  warPlanet.rBDSFTQ.resources = new ResourcesPack(240, 100, 50);
+  neutralPlanet.rBDSFTQ.resources = new ResourcesPack(240, 100, 50);
+  warPlanet.lastReportData.set(
+    bot.playerId,
+    new EspionageReportGenerator().createEspionageReport(bot, warOwner, warPlanet, 4, {
+      forcedReportLevel: 12,
+      createdTurn: 6
+    })
+  );
+  neutralPlanet.lastReportData.set(
+    bot.playerId,
+    new EspionageReportGenerator().createEspionageReport(bot, neutralOwner, neutralPlanet, 4, {
+      forcedReportLevel: 12,
+      createdTurn: 6
+    })
+  );
+
+  const galaxy = new Galaxy(
+    'Bot Test',
+    [bot, warOwner, neutralOwner],
+    [[system]],
+    6,
+    [],
+    1,
+    new Map(),
+    new Map([[bot.playerId, bot]]),
+    new Map([[warOwner.playerId, warOwner], [neutralOwner.playerId, neutralOwner]]),
+    new Map([[bot.playerName, bot.playerId], [warOwner.playerName, warOwner.playerId], [neutralOwner.playerName, neutralOwner.playerId]]),
+    [{ playerAId: bot.playerId, playerBId: warOwner.playerId, status: DiplomaticStatus.WAR }]
+  );
+
+  return { galaxy, bot, warPlanet };
+}
+
+function createOutgoingPeaceProposalGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  targetOwner: Player;
+} {
+  const { galaxy, bot, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.PLAYER);
+  galaxy.currentTurn = 6;
+  galaxy.diplomaticRelations = [
+    { playerAId: bot.playerId, playerBId: targetOwner.playerId, status: DiplomaticStatus.WAR }
+  ];
+  bot.botProfileId = 'AVOIDER';
+  targetPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 8);
+  targetPlanet.lastReportData.set(
+    bot.playerId,
+    new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+      forcedReportLevel: 12,
+      createdTurn: 6
+    })
+  );
+
+  return { galaxy, bot, targetOwner };
+}
+
+function createOutgoingAllianceProposalGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  targetOwner: Player;
+} {
+  const { galaxy, bot, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.PLAYER);
+  galaxy.currentTurn = 6;
+  galaxy.diplomaticRelations = [
+    { playerAId: bot.playerId, playerBId: targetOwner.playerId, status: DiplomaticStatus.PEACE }
+  ];
+  bot.botProfileId = 'TURTLE';
+  targetPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 7);
+  targetPlanet.lastReportData.set(
+    bot.playerId,
+    new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+      forcedReportLevel: 12,
+      createdTurn: 6
+    })
+  );
+
+  return { galaxy, bot, targetOwner };
+}
+
 function createRecycleScenarioGalaxy(): {
   galaxy: Galaxy;
   bot: Player;
@@ -857,6 +1142,9 @@ function createBombardScenarioGalaxy(): {
   bot: Player;
 } {
   const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.PLAYER);
+  galaxy.diplomaticRelations = [
+    { playerAId: bot.playerId, playerBId: targetOwner.playerId, status: DiplomaticStatus.WAR }
+  ];
   homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 220);
   homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.ORBITAL_BOMBER, 2);
   targetPlanet.rBDSFTQ.resources = new ResourcesPack(20, 10, 0);
@@ -884,6 +1172,9 @@ function createSiegeScenarioGalaxy(): {
   bot: Player;
 } {
   const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.PLAYER);
+  galaxy.diplomaticRelations = [
+    { playerAId: bot.playerId, playerBId: targetOwner.playerId, status: DiplomaticStatus.WAR }
+  ];
   homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 320);
   homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.ARMAGEDDON_BOMBER, 2);
   targetPlanet.rBDSFTQ.resources = new ResourcesPack(10, 10, 0);

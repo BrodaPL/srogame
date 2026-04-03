@@ -45,7 +45,8 @@ describe('bot-admin', () => {
           goalExpiresTurn: 9,
           reservedResources: { metal: 10, crystal: 5, deuterium: 2 },
           lastSpyTargets: [],
-          lastAttackTargets: []
+          lastAttackTargets: [],
+          recentDiplomacyTargets: []
         } satisfies BotMemory
       }
     );

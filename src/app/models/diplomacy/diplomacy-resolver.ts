@@ -22,7 +22,7 @@ export class DiplomacyResolver {
     }
 
     if (leftOwnerId === null || rightOwnerId === null) {
-      return DiplomaticStatus.WAR;
+      return DiplomaticStatus.NEUTRAL;
     }
 
     const relation = this.relationByPairKey.get(this.toPairKey(leftOwnerId, rightOwnerId));
@@ -30,7 +30,7 @@ export class DiplomacyResolver {
       return relation;
     }
 
-    return DiplomaticStatus.WAR;
+    return DiplomaticStatus.NEUTRAL;
   }
 
   public setStatus(
@@ -42,7 +42,7 @@ export class DiplomacyResolver {
       return;
     }
 
-    if (status === DiplomaticStatus.WAR) {
+    if (status === DiplomaticStatus.NEUTRAL) {
       this.relationByPairKey.delete(this.toPairKey(leftOwnerId, rightOwnerId));
       return;
     }

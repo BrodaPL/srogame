@@ -1486,7 +1486,14 @@ function applyAttackPlunderIfNeeded(
 
   const targetOwnerId = targetPlanet.info.ownerId;
   const targetStatus = diplomacyResolver.getStatus(fleet.ownerId, targetOwnerId);
-  if (targetOwnerId === null || (targetStatus !== DiplomaticStatus.WAR && targetStatus !== DiplomaticStatus.PASSIVE)) {
+  if (
+    targetOwnerId === null
+    || (
+      targetStatus !== DiplomaticStatus.WAR
+      && targetStatus !== DiplomaticStatus.NEUTRAL
+      && targetStatus !== DiplomaticStatus.PASSIVE
+    )
+  ) {
     return null;
   }
 

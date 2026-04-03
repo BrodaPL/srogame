@@ -39,8 +39,12 @@ export class AttackFleetMission extends FleetMission {
       context.targetPlanet.info.ownerId,
       context.diplomacyResolver ?? null
     );
-    if (targetStatus !== DiplomaticStatus.WAR && targetStatus !== DiplomaticStatus.PASSIVE) {
-      return this.failedArrival('Attack mission failed because the target was no longer hostile or passive on arrival.');
+    if (
+      targetStatus !== DiplomaticStatus.WAR
+      && targetStatus !== DiplomaticStatus.NEUTRAL
+      && targetStatus !== DiplomaticStatus.PASSIVE
+    ) {
+      return this.failedArrival('Attack mission failed because the target was no longer attackable on arrival.');
     }
 
     return {
@@ -76,9 +80,13 @@ export class AttackFleetMission extends FleetMission {
     );
     if (
       targetOwnerId === null
-      || (targetStatus !== DiplomaticStatus.WAR && targetStatus !== DiplomaticStatus.PASSIVE)
+      || (
+        targetStatus !== DiplomaticStatus.WAR
+        && targetStatus !== DiplomaticStatus.NEUTRAL
+        && targetStatus !== DiplomaticStatus.PASSIVE
+      )
     ) {
-      checks.push({ text: 'Attack mission target must be a hostile or passive owned planet.', severity: 'error' });
+      checks.push({ text: 'Attack mission target must be a WAR, NEUTRAL, or PASSIVE owned planet.', severity: 'error' });
     }
   }
 

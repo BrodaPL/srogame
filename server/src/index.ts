@@ -26,6 +26,7 @@ import diplomaticStatusEnumModule from '../../src/app/models/diplomacy/diplomati
 import diplomacyResolverModule from '../../src/app/models/diplomacy/diplomacy-resolver.js';
 import diplomaticProposalStateModule from '../../src/app/models/diplomacy/diplomatic-proposal-state.js';
 import diplomaticProposalModule from '../../src/app/models/diplomacy/diplomatic-proposal.js';
+import diplomacyProposalRulesModule from '../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
 import planetaryBombModule from '../../src/app/models/defences/planetary-bomb.js';
 import bombardmentPriorityModule from '../../src/app/models/bombardment/bombardment-priority.js';
 import jumpGateCapacityModule from '../../src/app/models/jump-gates/jump-gate-capacity.js';
@@ -85,6 +86,15 @@ import {
 } from './bots/bot-admin.js';
 import { startBuildingConstruction } from './game-commands/building-commands.js';
 import { runBotTurnPhase } from './bots/bot-turn-runner.js';
+import {
+  approveDiplomaticProposalCommand,
+  cancelDiplomaticProposalCommand,
+  createDiplomaticProposalCommand,
+  currentDiplomaticStatusForPair,
+  hasOutgoingProposalSentThisTurn,
+  isPlayerVisibleInDiplomacy,
+  rejectDiplomaticProposalCommand
+} from './game-commands/diplomacy-commands.js';
 import { createFleetMission } from './game-commands/fleet-commands.js';
 import {
   approveJumpGateRequestCommand,
@@ -317,9 +327,11 @@ const { DiplomaticProposalState } = diplomaticProposalStateModule as {
   DiplomaticProposalState: typeof import('../../src/app/models/diplomacy/diplomatic-proposal-state.js').DiplomaticProposalState;
 };
 const {
-  createDiplomaticProposal,
   isPendingDiplomaticProposalForPair
 } = diplomaticProposalModule as typeof import('../../src/app/models/diplomacy/diplomatic-proposal.js');
+const {
+  allowedDiplomaticProposalStatuses
+} = diplomacyProposalRulesModule as typeof import('../../src/app/models/diplomacy/diplomatic-proposal-rules.js');
 const {
   countPlanetaryBombs,
   isPlanetaryBombDefenceType
@@ -402,6 +414,7 @@ const PLAYER_NAME_MAX = 24;
 const PASSWORD_MIN = 6;
 const PASSWORD_MAX = 72;
 const PLAYER_TYPE_PLAYER = 'PLAYER' as const;
+const PLAYER_TYPE_NEUTRAL = 'NEUTRAL' as const;
 const SELF_REPORT_LEVEL = 999;
 const STARTING_SYSTEM_REPORT_LEVEL = 1;
 const STAR_SYSTEM_NOTE_TEXT_MAX_LENGTH = 500;
@@ -421,6 +434,7 @@ const TECHNOLOGY_TYPE_VALUES = new Set<string>(Array.from(TECHNOLOGY_BLUEPRINTS.
 const DIPLOMATIC_STATUS_VALUES = new Set<string>([
   DiplomaticStatus.ALLIED,
   DiplomaticStatus.PEACE,
+  DiplomaticStatus.NEUTRAL,
   DiplomaticStatus.PASSIVE,
   DiplomaticStatus.WAR
 ]);
@@ -1139,36 +1153,18 @@ app.post('/api/game/diplomacy/proposals', (req, res) => {
 
   const body = req.body as CreateDiplomaticProposalRequest | undefined;
   const targetPlayerId = parseBodyPositiveInt(body?.targetPlayerId);
-  const requestedStatus = normalizeProposableDiplomaticStatus(body?.requestedStatus);
+  const requestedStatus = normalizeDiplomaticStatus(body?.requestedStatus);
   if (targetPlayerId === null || requestedStatus === null) {
     return res.status(400).json({ error: 'Invalid diplomacy proposal payload.' });
   }
 
-  const targetPlayer = resolvePlayerById(authPlayer.galaxy, targetPlayerId);
-  if (!targetPlayer || targetPlayer.playerId === authPlayer.player.playerId) {
-    return res.status(404).json({ error: 'Diplomacy target not found.' });
-  }
-
-  const validationError = validateDiplomaticProposalCreation(
-    authPlayer.galaxy,
-    authPlayer.player,
-    targetPlayer,
-    requestedStatus
+  const result = createDiplomaticProposalCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    { targetPlayerId, requestedStatus }
   );
-  if (validationError) {
-    return res.status(validationError.status).json({ error: validationError.error });
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
   }
-
-  const proposal = createDiplomaticProposal(
-    authPlayer.galaxy.nextDiplomaticProposalId,
-    authPlayer.player.playerId,
-    targetPlayer.playerId,
-    requestedStatus,
-    authPlayer.galaxy.currentTurn,
-    authPlayer.galaxy.currentTurn + 1
-  );
-  authPlayer.galaxy.nextDiplomaticProposalId += 1;
-  authPlayer.galaxy.diplomaticProposals.push(proposal);
 
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
 });
@@ -1184,17 +1180,13 @@ app.post('/api/game/diplomacy/proposals/:proposalId/accept', (req, res) => {
     return res.status(400).json({ error: 'Invalid diplomacy proposal id.' });
   }
 
-  const proposal = authPlayer.galaxy.diplomaticProposals.find((entry) => entry.proposalId === proposalId);
-  if (!proposal || proposal.state !== DiplomaticProposalState.PENDING) {
-    return res.status(404).json({ error: 'Pending diplomacy proposal not found.' });
+  const result = approveDiplomaticProposalCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    { proposalId }
+  );
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
   }
-
-  if (proposal.toPlayerId !== authPlayer.player.playerId) {
-    return res.status(403).json({ error: 'Only the target player can accept this proposal.' });
-  }
-
-  proposal.state = DiplomaticProposalState.ACCEPTED;
-  upsertDiplomaticRelation(authPlayer.galaxy, proposal.fromPlayerId, proposal.toPlayerId, proposal.requestedStatus);
 
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
 });
@@ -1210,16 +1202,13 @@ app.post('/api/game/diplomacy/proposals/:proposalId/reject', (req, res) => {
     return res.status(400).json({ error: 'Invalid diplomacy proposal id.' });
   }
 
-  const proposal = authPlayer.galaxy.diplomaticProposals.find((entry) => entry.proposalId === proposalId);
-  if (!proposal || proposal.state !== DiplomaticProposalState.PENDING) {
-    return res.status(404).json({ error: 'Pending diplomacy proposal not found.' });
+  const result = rejectDiplomaticProposalCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    { proposalId }
+  );
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
   }
-
-  if (proposal.toPlayerId !== authPlayer.player.playerId) {
-    return res.status(403).json({ error: 'Only the target player can reject this proposal.' });
-  }
-
-  proposal.state = DiplomaticProposalState.REJECTED;
 
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
 });
@@ -1235,16 +1224,13 @@ app.post('/api/game/diplomacy/proposals/:proposalId/cancel', (req, res) => {
     return res.status(400).json({ error: 'Invalid diplomacy proposal id.' });
   }
 
-  const proposal = authPlayer.galaxy.diplomaticProposals.find((entry) => entry.proposalId === proposalId);
-  if (!proposal || proposal.state !== DiplomaticProposalState.PENDING) {
-    return res.status(404).json({ error: 'Pending diplomacy proposal not found.' });
+  const result = cancelDiplomaticProposalCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    { proposalId }
+  );
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
   }
-
-  if (proposal.fromPlayerId !== authPlayer.player.playerId) {
-    return res.status(403).json({ error: 'Only the proposing player can cancel this proposal.' });
-  }
-
-  proposal.state = DiplomaticProposalState.CANCELLED;
 
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
 });
@@ -3324,7 +3310,7 @@ function upsertDiplomaticRelation(
     relation.playerAId === playerAId && relation.playerBId === playerBId
   );
 
-  if (status === DiplomaticStatus.WAR) {
+  if (status === DiplomaticStatus.NEUTRAL) {
     if (existingIndex >= 0) {
       galaxy.diplomaticRelations.splice(existingIndex, 1);
     }
@@ -3585,15 +3571,6 @@ function normalizeDiplomaticStatus(value: unknown): DiplomaticStatusType | null 
   }
 
   return value as DiplomaticStatusType;
-}
-
-function normalizeProposableDiplomaticStatus(value: unknown): DiplomaticStatusType | null {
-  const status = normalizeDiplomaticStatus(value);
-  if (!status || status === DiplomaticStatus.PASSIVE) {
-    return null;
-  }
-
-  return status;
 }
 
 function parseBodyReportIds(value: unknown): number[] | null {
@@ -4807,17 +4784,23 @@ function buildDiplomacyContactDtos(galaxy: Galaxy, viewer: Player): DiplomacyCon
     .filter((candidate) => isPlayerVisibleInDiplomacy(galaxy, viewer.playerId, candidate.playerId))
     .map((candidate) => {
       const currentStatus = diplomacyResolver.getStatus(viewer.playerId, candidate.playerId);
+      const availableStatuses = candidate.type !== PLAYER_TYPE_NEUTRAL
+        ? allowedDiplomaticProposalStatuses(currentStatus)
+        : [];
       const pendingPairProposal = galaxy.diplomaticProposals.some((proposal) =>
         isPendingDiplomaticProposalForPair(proposal, viewer.playerId, candidate.playerId)
       );
-      const isReadOnly = candidate.type !== 'PLAYER' && currentStatus === DiplomaticStatus.WAR;
-      const canSendProposal = candidate.type === 'PLAYER'
+      const isReadOnly = candidate.type === 'NEUTRAL' || availableStatuses.length <= 0;
+      const canSendProposal = candidate.type !== 'NEUTRAL'
+        && availableStatuses.length > 0
         && !pendingPairProposal
         && !outgoingProposalSentThisTurn;
 
       let proposalBlockedReason: string | null = null;
-      if (candidate.type !== 'PLAYER') {
-        proposalBlockedReason = 'Only human players can participate in treaty proposals.';
+      if (candidate.type === 'NEUTRAL') {
+        proposalBlockedReason = 'Neutral factions do not participate in treaty proposals.';
+      } else if (availableStatuses.length <= 0) {
+        proposalBlockedReason = 'No higher treaty proposal is available from the current diplomacy status.';
       } else if (pendingPairProposal) {
         proposalBlockedReason = 'A diplomacy proposal for this player pair is already pending.';
       } else if (outgoingProposalSentThisTurn) {
@@ -5049,47 +5032,6 @@ function mailRequestGroupOrder(state: DiplomaticProposalStateType): number {
   return state === DiplomaticProposalState.PENDING ? 0 : 1;
 }
 
-function validateDiplomaticProposalCreation(
-  galaxy: Galaxy,
-  sourcePlayer: Player,
-  targetPlayer: Player,
-  requestedStatus: DiplomaticStatusType
-): { status: number; error: string } | null {
-  if (!isPlayerVisibleInDiplomacy(galaxy, sourcePlayer.playerId, targetPlayer.playerId)) {
-    return { status: 403, error: 'Target player is not visible in Diplomacy View.' };
-  }
-
-  if (targetPlayer.type !== 'PLAYER') {
-    return { status: 403, error: 'Only human players can receive diplomacy proposals.' };
-  }
-
-  if (resolveDiplomaticStatus(galaxy, sourcePlayer.playerId, targetPlayer.playerId) === requestedStatus) {
-    return { status: 409, error: 'That diplomacy status is already active for this player pair.' };
-  }
-
-  if (galaxy.diplomaticProposals.some((proposal) =>
-    isPendingDiplomaticProposalForPair(proposal, sourcePlayer.playerId, targetPlayer.playerId)
-  )) {
-    return { status: 409, error: 'A diplomacy proposal for this player pair is already pending.' };
-  }
-
-  if (hasOutgoingProposalSentThisTurn(galaxy, sourcePlayer.playerId, galaxy.currentTurn)) {
-    return { status: 409, error: 'You have already sent a diplomacy proposal this turn.' };
-  }
-
-  return null;
-}
-
-function hasOutgoingProposalSentThisTurn(
-  galaxy: Galaxy,
-  playerId: number,
-  turnNumber: number
-): boolean {
-  return galaxy.diplomaticProposals.some((proposal) =>
-    proposal.fromPlayerId === playerId && proposal.createdTurn === turnNumber
-  );
-}
-
 function countPendingMailRequestsForPlayer(galaxy: Galaxy, playerId: number): number {
   const diplomacyPending = galaxy.diplomaticProposals.filter((proposal) =>
     proposal.state === DiplomaticProposalState.PENDING
@@ -5112,52 +5054,12 @@ function countUnreadMailMessagesForPlayer(galaxy: Galaxy, playerId: number): num
   return player?.messages.filter((message) => !message.isRead).length ?? 0;
 }
 
-function isPlayerVisibleInDiplomacy(
-  galaxy: Galaxy,
-  viewerPlayerId: number,
-  targetPlayerId: number
-): boolean {
-  if (viewerPlayerId === targetPlayerId) {
-    return false;
-  }
-
-  const targetPlayer = resolvePlayerById(galaxy, targetPlayerId);
-  if (!targetPlayer) {
-    return false;
-  }
-
-  if (!hasDiscoveredOwnedPlanetForPlayer(galaxy, viewerPlayerId, targetPlayerId)) {
-    return false;
-  }
-
-  const currentStatus = resolveDiplomaticStatus(galaxy, viewerPlayerId, targetPlayerId);
-  return !(targetPlayer.type === 'NEUTRAL' && currentStatus === DiplomaticStatus.WAR);
-}
-
-function hasDiscoveredOwnedPlanetForPlayer(
-  galaxy: Galaxy,
-  viewerPlayerId: number,
-  targetPlayerId: number
-): boolean {
-  for (const row of galaxy.stars) {
-    for (const system of row) {
-      for (const planet of system.planets) {
-        if (planet.info.ownerId === targetPlayerId && planet.lastReportData.has(viewerPlayerId)) {
-          return true;
-        }
-      }
-    }
-  }
-
-  return false;
-}
-
 function resolveDiplomaticStatus(
   galaxy: Galaxy,
   leftPlayerId: number,
   rightPlayerId: number
 ): DiplomaticStatusType {
-  return new DiplomacyResolver(galaxy.diplomaticRelations).getStatus(leftPlayerId, rightPlayerId);
+  return currentDiplomaticStatusForPair(galaxy, leftPlayerId, rightPlayerId);
 }
 
 function canSendDirectMailToPlayer(

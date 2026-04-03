@@ -48,6 +48,12 @@ export type BotMemoryResources = {
   deuterium: number;
 };
 
+export type BotMemoryDiplomacyTarget = {
+  playerId: number;
+  requestedStatus: 'PEACE' | 'ALLIED';
+  turn: number;
+};
+
 export type BotMemory = {
   currentGoal: BotGoalType | null;
   goalTarget: BotMemoryCoordinates | null;
@@ -55,6 +61,7 @@ export type BotMemory = {
   reservedResources: BotMemoryResources;
   lastSpyTargets: BotMemoryCoordinates[];
   lastAttackTargets: BotMemoryCoordinates[];
+  recentDiplomacyTargets: BotMemoryDiplomacyTarget[];
 };
 
 export type PlayerExtras = {
@@ -251,7 +258,8 @@ export class Player {
       goalExpiresTurn: Number.isInteger(memory.goalExpiresTurn) ? memory.goalExpiresTurn : null,
       reservedResources: Player.normalizeBotMemoryResources(memory.reservedResources),
       lastSpyTargets: Player.normalizeBotMemoryCoordinatesList(memory.lastSpyTargets),
-      lastAttackTargets: Player.normalizeBotMemoryCoordinatesList(memory.lastAttackTargets)
+      lastAttackTargets: Player.normalizeBotMemoryCoordinatesList(memory.lastAttackTargets),
+      recentDiplomacyTargets: Player.normalizeBotMemoryDiplomacyTargets(memory.recentDiplomacyTargets)
     };
   }
 
@@ -303,5 +311,27 @@ export class Player {
       crystal: Number.isFinite(resources.crystal) ? Math.max(0, Math.floor(resources.crystal)) : 0,
       deuterium: Number.isFinite(resources.deuterium) ? Math.max(0, Math.floor(resources.deuterium)) : 0
     };
+  }
+
+  private static normalizeBotMemoryDiplomacyTargets(
+    entries: BotMemoryDiplomacyTarget[] | null | undefined
+  ): BotMemoryDiplomacyTarget[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .filter((entry) =>
+        !!entry
+        && Number.isInteger(entry.playerId)
+        && (entry.requestedStatus === 'PEACE' || entry.requestedStatus === 'ALLIED')
+        && Number.isInteger(entry.turn)
+      )
+      .map((entry) => ({
+        playerId: entry.playerId,
+        requestedStatus: entry.requestedStatus,
+        turn: entry.turn
+      }))
+      .slice(-20);
   }
 }

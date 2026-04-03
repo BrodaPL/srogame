@@ -95,5 +95,5 @@ export function resolveTargetDiplomaticStatus(
     return DiplomaticStatus.SELF;
   }
 
-  return DiplomaticStatus.WAR;
+  return DiplomaticStatus.NEUTRAL;
 }
