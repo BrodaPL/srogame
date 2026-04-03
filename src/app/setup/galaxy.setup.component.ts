@@ -6,9 +6,13 @@ import { GameStateService } from '../core/game-state.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { NAMES_LIST } from '../models/enums/names-list';
 import { GameType } from '../models/enums/game-type';
+import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
 import {
+  BotProfileCountMap,
   GalaxySetup,
   MAX_AUTO_SAVE_TURNS,
+  createDefaultBotProfileCounts,
+  hasExactBotProfileCountMatch,
   normalizeGalaxySetup
 } from '../models/game-api-types';
 import { ResourcesPack } from '../models/resources-pack';
@@ -28,6 +32,7 @@ type GalaxySetupForm = {
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
   autoSaveTurns: string;
+  botProfileCounts: Record<string, string>;
   createRandomPlanets: boolean;
   createStartingShips: boolean;
   skipTutorial: boolean;
@@ -42,6 +47,8 @@ type GalaxySetupForm = {
   templateUrl: './galaxy.setup.component.html'
 })
 export class GalaxySetupComponent {
+  protected readonly botProfileIds = BOT_PROFILE_IDS;
+  protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly savedConfig = signal<GalaxySetup | null>(null);
   protected readonly session: AuthStateService['session'];
   protected isStarting = false;
@@ -93,6 +100,9 @@ export class GalaxySetupComponent {
       200
     );
     const autoSaveTurns = this.parseIntegerInRange(this.form.autoSaveTurns, 0, MAX_AUTO_SAVE_TURNS);
+    const botProfileCounts = botsAmount === 0
+      ? createDefaultBotProfileCounts(0)
+      : this.buildBotProfileCounts(this.form.botProfileCounts);
     const metal = this.parseNonNegativeInteger(this.form.startingMetal);
     const crystal = this.parseNonNegativeInteger(this.form.startingCrystal);
     const deuterium = this.parseNonNegativeInteger(this.form.startingDeuterium);
@@ -110,6 +120,7 @@ export class GalaxySetupComponent {
       playerAmount !== null &&
       botsAmount !== null &&
       botDifficulty !== null &&
+      hasExactBotProfileCountMatch(botProfileCounts, botsAmount) &&
       neutralBotsAmount !== null &&
       neutralBotsDifficulty !== null &&
       autoSaveTurns !== null &&
@@ -134,6 +145,7 @@ export class GalaxySetupComponent {
       return;
     }
 
+    const botsAmount = Number(this.form.botsAmount);
     const config: GalaxySetup = {
       gameType: this.form.gameType,
       galaxyName: this.form.galaxyName.trim(),
@@ -146,8 +158,11 @@ export class GalaxySetupComponent {
         Number(this.form.starsAmountModifierMax)
       ],
       playerAmount: Number(this.form.playerAmount),
-      botsAmount: Number(this.form.botsAmount),
+      botsAmount,
       botDifficulty: Number(this.form.botDifficulty),
+      botProfileCounts: botsAmount === 0
+        ? createDefaultBotProfileCounts(0)
+        : this.buildBotProfileCounts(this.form.botProfileCounts),
       neutralBotsAmount: Number(this.form.neutralBotsAmount),
       neutralBotsDifficulty: Number(this.form.neutralBotsDifficulty),
       autoSaveTurns: Number(this.form.autoSaveTurns),
@@ -181,6 +196,7 @@ export class GalaxySetupComponent {
   }
 
   private createDefaultForm(): GalaxySetupForm {
+    const botProfileCounts = createDefaultBotProfileCounts(0);
     return {
       gameType: GameType.PVE,
       galaxyName: this.randomGalaxyName(),
@@ -196,6 +212,7 @@ export class GalaxySetupComponent {
       neutralBotsAmount: '1',
       neutralBotsDifficulty: '0',
       autoSaveTurns: '5',
+      botProfileCounts: this.formStringsFromBotProfileCounts(botProfileCounts),
       createRandomPlanets: false,
       createStartingShips: false,
       skipTutorial: true,
@@ -221,6 +238,9 @@ export class GalaxySetupComponent {
       neutralBotsAmount: String(config.neutralBotsAmount),
       neutralBotsDifficulty: String(config.neutralBotsDifficulty),
       autoSaveTurns: String(config.autoSaveTurns),
+      botProfileCounts: this.formStringsFromBotProfileCounts(
+        config.botProfileCounts ?? createDefaultBotProfileCounts(config.botsAmount)
+      ),
       createRandomPlanets: config.createRandomPlanets === true,
       createStartingShips: config.createStartingShips === true,
       skipTutorial: config.skipTutorial === true,
@@ -289,6 +309,7 @@ export class GalaxySetupComponent {
       Number.isInteger(config.botDifficulty) &&
       config.botDifficulty >= -75 &&
       config.botDifficulty <= 200 &&
+      hasExactBotProfileCountMatch(config.botProfileCounts, config.botsAmount) &&
       Number.isInteger(config.neutralBotsAmount) &&
       config.neutralBotsAmount >= 0 &&
       config.neutralBotsAmount <= 10 &&
@@ -324,6 +345,58 @@ export class GalaxySetupComponent {
       value === GameType.PVE ||
       value === GameType.SANDBOX
     );
+  }
+
+  protected botPersonalityValidationMessage(): string | null {
+    const botsAmount = this.parseIntegerInRange(this.form.botsAmount, 0, 12);
+    if (botsAmount === null || botsAmount === 0) {
+      return null;
+    }
+
+    const assigned = this.assignedBotProfilesCount();
+    if (assigned === botsAmount) {
+      return null;
+    }
+
+    return `Assigned bot personalities must total exactly ${botsAmount}. Current total: ${assigned}.`;
+  }
+
+  protected assignedBotProfilesCount(): number {
+    if (this.configuredBotsAmount() === 0) {
+      return 0;
+    }
+
+    return Object.values(this.buildBotProfileCounts(this.form.botProfileCounts))
+      .reduce((total, value) => total + value, 0);
+  }
+
+  protected configuredBotsAmount(): number {
+    return this.parseIntegerInRange(this.form.botsAmount, 0, 12) ?? 0;
+  }
+
+  protected botProfileCountValue(profileId: keyof BotProfileCountMap): string {
+    return this.form.botProfileCounts[profileId] ?? '0';
+  }
+
+  protected setBotProfileCountValue(profileId: keyof BotProfileCountMap, value: string): void {
+    this.form.botProfileCounts[profileId] = value;
+  }
+
+  private buildBotProfileCounts(values: Record<string, string>): BotProfileCountMap {
+    const counts = {} as BotProfileCountMap;
+    for (const profileId of BOT_PROFILE_IDS) {
+      const parsed = Number.parseInt(values[profileId] ?? '0', 10);
+      counts[profileId] = Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+    }
+
+    return counts;
+  }
+
+  private formStringsFromBotProfileCounts(counts: BotProfileCountMap): Record<string, string> {
+    return BOT_PROFILE_IDS.reduce((result, profileId) => {
+      result[profileId] = String(counts[profileId] ?? 0);
+      return result;
+    }, {} as Record<string, string>);
   }
 
 }

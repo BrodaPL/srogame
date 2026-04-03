@@ -192,6 +192,36 @@
         </div>
       </div>
 
+      @if (configuredBotsAmount() > 0) {
+        <div class="field">
+          <label>Bot personalities</label>
+          <div class="saved">
+            <p class="saved__title">Assigned: {{ assignedBotProfilesCount() }} / {{ configuredBotsAmount() }}</p>
+            <p>Choose the exact amount of each implemented bot personality.</p>
+          </div>
+          <div class="field-row">
+            @for (profileId of botProfileIds; track profileId) {
+              <div class="field">
+                <label for="bot-profile-{{ profileId }}">{{ botProfileLabels[profileId] }}</label>
+                <input
+                  id="bot-profile-{{ profileId }}"
+                  name="bot-profile-{{ profileId }}"
+                  type="number"
+                  min="0"
+                  max="12"
+                  step="1"
+                  [ngModel]="botProfileCountValue(profileId)"
+                  (ngModelChange)="setBotProfileCountValue(profileId, $event)"
+                />
+              </div>
+            }
+          </div>
+          @if (botPersonalityValidationMessage()) {
+            <p class="form-error">{{ botPersonalityValidationMessage() }}</p>
+          }
+        </div>
+      }
+
       <div class="field-row">
         <div class="field">
           <label for="neutralBotsAmount">Neutral bots amount (%)</label>

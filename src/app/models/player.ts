@@ -28,6 +28,15 @@ export const BOT_PROFILE_IDS: BotProfileId[] = [
   'BUNKERER'
 ];
 
+export const BOT_PROFILE_LABELS: Record<BotProfileId, string> = {
+  BALANCED: 'Balanced',
+  AGGRESSOR: 'Aggressor',
+  TURTLE: 'Turtle',
+  MINER: 'Miner',
+  AVOIDER: 'Avoider',
+  BUNKERER: 'Bunkerer'
+};
+
 export type BotGoalType =
   | 'KEY_BUILDING_UP'
   | 'ECONOMY_TECH_UP'

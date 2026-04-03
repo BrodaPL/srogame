@@ -77,4 +77,29 @@ describe('GalaxyCreator', () => {
     expect(homeSystem.planets.length).toBe(1);
     expect(homeSystemNeutralPlanets.length).toBe(0);
   });
+
+  it('assigns requested bot profile counts exactly for fresh-game bots', () => {
+    const galaxy = new GalaxyCreator(createSetup({
+      botsAmount: 4,
+      botProfileCounts: {
+        BALANCED: 1,
+        AGGRESSOR: 2,
+        TURTLE: 0,
+        MINER: 1,
+        AVOIDER: 0,
+        BUNKERER: 0
+      }
+    })).createGalaxy(['Human']);
+
+    const botProfiles = galaxy.players
+      .filter((entry) => entry.type === PlayerType.BOT)
+      .map((entry) => entry.botProfileId);
+
+    expect(botProfiles).toEqual([
+      'BALANCED',
+      'AGGRESSOR',
+      'AGGRESSOR',
+      'MINER'
+    ]);
+  });
 });

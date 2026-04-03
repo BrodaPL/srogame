@@ -6,11 +6,15 @@ import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { GameType } from '../models/enums/game-type';
+import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
 import {
+  BotProfileCountMap,
   GalaxySetup,
   MAX_AUTO_SAVE_TURNS,
   MultiplayerLobbyLoadSeatDto,
   MultiplayerLobbyResponse,
+  createDefaultBotProfileCounts,
+  hasExactBotProfileCountMatch,
   normalizeGalaxySetup
 } from '../models/game-api-types';
 import { ResourcesPack } from '../models/resources-pack';
@@ -29,6 +33,7 @@ type LobbySetupForm = {
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
   autoSaveTurns: string;
+  botProfileCounts: Record<string, string>;
   createRandomPlanets: boolean;
   createStartingShips: boolean;
   skipTutorial: boolean;
@@ -43,6 +48,8 @@ type LobbySetupForm = {
   templateUrl: './multiplayer.component.html'
 })
 export class MultiplayerComponent implements OnDestroy {
+  protected readonly botProfileIds = BOT_PROFILE_IDS;
+  protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly session: AuthStateService['session'];
   protected response: MultiplayerLobbyResponse | null = null;
   protected isLoading = false;
@@ -149,7 +156,7 @@ export class MultiplayerComponent implements OnDestroy {
 
     const setup = this.buildSetup(lobby.members.length);
     if (!setup) {
-      this.error = 'Lobby setup is incomplete or invalid.';
+      this.error = this.botPersonalityValidationMessage() ?? 'Lobby setup is incomplete or invalid.';
       return;
     }
 
@@ -313,6 +320,9 @@ export class MultiplayerComponent implements OnDestroy {
     const neutralBotsAmount = this.parseIntegerInRange(this.setupForm.neutralBotsAmount, 0, 10);
     const neutralBotsDifficulty = this.parseIntegerInRange(this.setupForm.neutralBotsDifficulty, -100, 200);
     const autoSaveTurns = this.parseIntegerInRange(this.setupForm.autoSaveTurns, 0, MAX_AUTO_SAVE_TURNS);
+    const botProfileCounts = botsAmount === 0
+      ? createDefaultBotProfileCounts(0)
+      : this.buildBotProfileCounts(this.setupForm.botProfileCounts);
     const startingMetal = this.parseIntegerInRange(this.setupForm.startingMetal, 0, 999999);
     const startingCrystal = this.parseIntegerInRange(this.setupForm.startingCrystal, 0, 999999);
     const startingDeuterium = this.parseIntegerInRange(this.setupForm.startingDeuterium, 0, 999999);
@@ -329,6 +339,7 @@ export class MultiplayerComponent implements OnDestroy {
       || starsMax === null
       || botsAmount === null
       || botDifficulty === null
+      || !hasExactBotProfileCountMatch(botProfileCounts, botsAmount)
       || neutralBotsAmount === null
       || neutralBotsDifficulty === null
       || autoSaveTurns === null
@@ -350,6 +361,7 @@ export class MultiplayerComponent implements OnDestroy {
       playerAmount,
       botsAmount,
       botDifficulty,
+      botProfileCounts,
       neutralBotsAmount,
       neutralBotsDifficulty,
       autoSaveTurns,
@@ -375,6 +387,9 @@ export class MultiplayerComponent implements OnDestroy {
       neutralBotsAmount: String(setup.neutralBotsAmount),
       neutralBotsDifficulty: String(setup.neutralBotsDifficulty),
       autoSaveTurns: String(setup.autoSaveTurns),
+      botProfileCounts: this.formStringsFromBotProfileCounts(
+        setup.botProfileCounts ?? createDefaultBotProfileCounts(setup.botsAmount)
+      ),
       createRandomPlanets: setup.createRandomPlanets === true,
       createStartingShips: setup.createStartingShips === true,
       skipTutorial: setup.skipTutorial === true,
@@ -414,6 +429,7 @@ export class MultiplayerComponent implements OnDestroy {
       playerAmount: 2,
       botsAmount: 0,
       botDifficulty: 0,
+      botProfileCounts: createDefaultBotProfileCounts(0),
       neutralBotsAmount: 1,
       neutralBotsDifficulty: 0,
       autoSaveTurns: 5,
@@ -439,5 +455,57 @@ export class MultiplayerComponent implements OnDestroy {
     }
 
     this.selectedSaveId = response.availableSaves[0]?.saveId ?? '';
+  }
+
+  protected configuredBotsAmount(): number {
+    return this.parseIntegerInRange(this.setupForm.botsAmount, 0, 12) ?? 0;
+  }
+
+  protected assignedBotProfilesCount(): number {
+    if (this.configuredBotsAmount() === 0) {
+      return 0;
+    }
+
+    return Object.values(this.buildBotProfileCounts(this.setupForm.botProfileCounts))
+      .reduce((total, value) => total + value, 0);
+  }
+
+  protected botPersonalityValidationMessage(): string | null {
+    const botsAmount = this.parseIntegerInRange(this.setupForm.botsAmount, 0, 12);
+    if (botsAmount === null || botsAmount === 0) {
+      return null;
+    }
+
+    const assigned = this.assignedBotProfilesCount();
+    if (assigned === botsAmount) {
+      return null;
+    }
+
+    return `Assigned bot personalities must total exactly ${botsAmount}. Current total: ${assigned}.`;
+  }
+
+  protected botProfileCountValue(profileId: keyof BotProfileCountMap): string {
+    return this.setupForm.botProfileCounts[profileId] ?? '0';
+  }
+
+  protected setBotProfileCountValue(profileId: keyof BotProfileCountMap, value: string): void {
+    this.setupForm.botProfileCounts[profileId] = value;
+  }
+
+  private buildBotProfileCounts(values: Record<string, string>): BotProfileCountMap {
+    const counts = {} as BotProfileCountMap;
+    for (const profileId of BOT_PROFILE_IDS) {
+      const parsed = Number.parseInt(values[profileId] ?? '0', 10);
+      counts[profileId] = Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+    }
+
+    return counts;
+  }
+
+  private formStringsFromBotProfileCounts(counts: BotProfileCountMap): Record<string, string> {
+    return BOT_PROFILE_IDS.reduce((result, profileId) => {
+      result[profileId] = String(counts[profileId] ?? 0);
+      return result;
+    }, {} as Record<string, string>);
   }
 }

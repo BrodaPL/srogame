@@ -113,6 +113,7 @@ Auth/session:
 Game snapshot/state:
 - `src/app/core/game-api.service.ts`: game HTTP calls
 - `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` owner on the client
+- `src/app/models/game-api-types.ts`: shared `GalaxySetup` normalization, including count-based bot-profile setup validation/helpers
 
 Tutorial state:
 - `src/app/tutorial/tutorial.service.ts`: overlay control, auto-open rules, step preparation
@@ -284,7 +285,7 @@ Owns:
 - effective planetary parameter derivation and permanent terraformer size bonus handling
 - abandonment and ownership transitions
 - galaxy-view presentation data, including own-fleet route and presence summaries
-- initial bot empire creation from `GalaxySetup.botsAmount`, including default bot profile assignment
+- initial bot empire creation from `GalaxySetup.botsAmount`, including deterministic bot profile assignment from `GalaxySetup.botProfileCounts`
 
 ### Fleets, ships, and mission payload state
 

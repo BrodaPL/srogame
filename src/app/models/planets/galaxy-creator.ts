@@ -5,6 +5,7 @@ import { defaultBotProfileIdForPlayerId, Player } from '../player';
 import { GameType } from '../enums/game-type';
 import { PlayerType } from '../enums/player-type';
 import { PlanetType } from '../enums/planet-type';
+import { expandBotProfileCounts } from '../game-api-types';
 import type { GalaxySetup } from '../game-api-types';
 import { RngBuildingGenerator } from '../../generators/rng-building-generator';
 import { RngTechnologyGenerator } from '../../generators/rng-technology-generator';
@@ -428,6 +429,7 @@ export class GalaxyCreator {
       (maxId, player) => Math.max(maxId, player.playerId),
       0
     ) + 1;
+    const configuredProfiles = expandBotProfileCounts(this.setup.botProfileCounts);
 
     for (let index = 0; index < targetCount; index += 1) {
       if (availablePlanets.length === 0) {
@@ -469,7 +471,7 @@ export class GalaxyCreator {
         [],
         1,
         {
-          botProfileId: defaultBotProfileIdForPlayerId(playerId),
+          botProfileId: configuredProfiles[index] ?? defaultBotProfileIdForPlayerId(playerId),
           botMemory: null
         }
       );

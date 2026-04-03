@@ -22,7 +22,10 @@ import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
 import type { DiplomaticProposalState } from './diplomacy/diplomatic-proposal-state';
 import type { BombardmentPriorities } from './bombardment/bombardment-priority';
 import type { TradeResourceType } from './trade/trade-resource-type';
+import { BOT_PROFILE_IDS } from './player';
 import type { BotGoalType, BotProfileId } from './player';
+
+export type BotProfileCountMap = Record<BotProfileId, number>;
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -35,6 +38,7 @@ export type GalaxySetup = {
   playerAmount: number;
   botsAmount: number;
   botDifficulty: number;
+  botProfileCounts?: BotProfileCountMap;
   neutralBotsAmount: number;
   neutralBotsDifficulty: number;
   autoSaveTurns: number;
@@ -53,8 +57,9 @@ export const DEFAULT_AUTO_SAVE_TURNS = 5;
 export const MIN_AUTO_SAVE_TURNS = 0;
 export const MAX_AUTO_SAVE_TURNS = 999;
 
-export type GalaxySetupWithOptionalAutoSaveTurns = Omit<GalaxySetup, 'autoSaveTurns'> & {
+export type GalaxySetupWithOptionalAutoSaveTurns = Omit<GalaxySetup, 'autoSaveTurns' | 'botProfileCounts'> & {
   autoSaveTurns?: unknown;
+  botProfileCounts?: Partial<Record<BotProfileId, unknown>>;
 };
 
 export function normalizeAutoSaveTurns(
@@ -79,10 +84,90 @@ export function normalizeAutoSaveTurns(
 export function normalizeGalaxySetup(
   setup: GalaxySetupWithOptionalAutoSaveTurns
 ): GalaxySetup {
+  const botsAmount = Number.isInteger(setup.botsAmount) ? Math.max(0, setup.botsAmount) : 0;
   return {
     ...setup,
+    botsAmount,
+    botProfileCounts: normalizeBotProfileCounts(
+      (setup as Partial<GalaxySetup>).botProfileCounts,
+      botsAmount
+    ),
     autoSaveTurns: normalizeAutoSaveTurns(setup.autoSaveTurns)
   };
+}
+
+export function createEmptyBotProfileCounts(): BotProfileCountMap {
+  return BOT_PROFILE_IDS.reduce((counts, profileId) => {
+    counts[profileId] = 0;
+    return counts;
+  }, {} as BotProfileCountMap);
+}
+
+export function createDefaultBotProfileCounts(botsAmount: number): BotProfileCountMap {
+  const normalizedBotsAmount = Number.isInteger(botsAmount) ? Math.max(0, botsAmount) : 0;
+  const counts = createEmptyBotProfileCounts();
+  counts.BALANCED = normalizedBotsAmount;
+  return counts;
+}
+
+export function normalizeBotProfileCounts(
+  counts: Partial<Record<BotProfileId, unknown>> | null | undefined,
+  botsAmount: number
+): BotProfileCountMap {
+  const normalizedBotsAmount = Number.isInteger(botsAmount) ? Math.max(0, botsAmount) : 0;
+  if (!counts) {
+    return createDefaultBotProfileCounts(normalizedBotsAmount);
+  }
+
+  const normalized = createEmptyBotProfileCounts();
+  for (const profileId of BOT_PROFILE_IDS) {
+    const value = counts[profileId];
+    const parsed = typeof value === 'string'
+      ? Number.parseInt(value, 10)
+      : typeof value === 'number'
+        ? value
+        : Number.NaN;
+    normalized[profileId] = Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+  }
+
+  if (sumBotProfileCounts(normalized) === 0 && normalizedBotsAmount > 0) {
+    return createDefaultBotProfileCounts(normalizedBotsAmount);
+  }
+
+  return normalized;
+}
+
+export function sumBotProfileCounts(counts: Partial<Record<BotProfileId, number>> | null | undefined): number {
+  if (!counts) {
+    return 0;
+  }
+
+  return BOT_PROFILE_IDS.reduce((total, profileId) => {
+    const value = counts[profileId] ?? 0;
+    const normalizedValue = Number.isInteger(value) && value >= 0 ? value : 0;
+    return total + normalizedValue;
+  }, 0);
+}
+
+export function hasExactBotProfileCountMatch(
+  counts: Partial<Record<BotProfileId, number>> | null | undefined,
+  botsAmount: number
+): boolean {
+  const normalizedBotsAmount = Number.isInteger(botsAmount) ? Math.max(0, botsAmount) : 0;
+  return sumBotProfileCounts(counts) === normalizedBotsAmount;
+}
+
+export function expandBotProfileCounts(counts: Partial<Record<BotProfileId, number>> | null | undefined): BotProfileId[] {
+  const expanded: BotProfileId[] = [];
+  for (const profileId of BOT_PROFILE_IDS) {
+    const amount = counts?.[profileId] ?? 0;
+    const normalizedAmount = Number.isInteger(amount) && amount > 0 ? amount : 0;
+    for (let index = 0; index < normalizedAmount; index += 1) {
+      expanded.push(profileId);
+    }
+  }
+
+  return expanded;
 }
 
 export type PlayerSession = {

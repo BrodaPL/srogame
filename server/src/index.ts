@@ -267,9 +267,11 @@ const { GalaxyCreator } = galaxyCreatorModule as {
 };
 const {
   MAX_AUTO_SAVE_TURNS,
+  hasExactBotProfileCountMatch,
   normalizeGalaxySetup
 } = gameApiTypesModule as {
   MAX_AUTO_SAVE_TURNS: typeof import('../../src/app/models/game-api-types.js').MAX_AUTO_SAVE_TURNS;
+  hasExactBotProfileCountMatch: typeof import('../../src/app/models/game-api-types.js').hasExactBotProfileCountMatch;
   normalizeGalaxySetup: typeof import('../../src/app/models/game-api-types.js').normalizeGalaxySetup;
 };
 const { abandonPlanetToNewNeutralOwner } = planetAbandonmentModule as typeof import('../../src/app/models/planets/planet-abandonment.js');
@@ -6323,6 +6325,7 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Number.isInteger(setup.botDifficulty) &&
     setup.botDifficulty >= -75 &&
     setup.botDifficulty <= 200 &&
+    hasExactBotProfileCountMatch(setup.botProfileCounts, setup.botsAmount) &&
     Number.isInteger(setup.neutralBotsAmount) &&
     setup.neutralBotsAmount >= 0 &&
     setup.neutralBotsAmount <= 10 &&

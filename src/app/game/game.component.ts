@@ -5,7 +5,7 @@ import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameType } from '../models/enums/game-type';
-import { GalaxySetup } from '../models/game-api-types';
+import { GalaxySetup, hasExactBotProfileCountMatch } from '../models/game-api-types';
 
 @Component({
   selector: 'app-game',
@@ -114,6 +114,7 @@ export class GameComponent implements OnInit {
       Number.isInteger(config.botDifficulty) &&
       config.botDifficulty >= -75 &&
       config.botDifficulty <= 200 &&
+      hasExactBotProfileCountMatch(config.botProfileCounts, config.botsAmount) &&
       Number.isInteger(config.neutralBotsAmount) &&
       config.neutralBotsAmount >= 0 &&
       config.neutralBotsAmount <= 10 &&
