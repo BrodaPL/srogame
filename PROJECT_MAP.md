@@ -30,6 +30,7 @@ Usually do not update this file for:
 
 - `AGENTS.md`: session handoff, current behavior, working notes, recent history
 - `PROJECT_MAP.md`: stable architecture map and "where to change" guide
+- `BOT_LOGIC.md`: current bot-AI behavior, observed findings, and tuning notes
 - `McpTesting.md`: project-specific Chrome MCP and browser-testing workflow
 - `InGameTutorials.md`: tutorial-authoring and maintenance guide
 

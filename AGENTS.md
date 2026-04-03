@@ -15,6 +15,7 @@ This file captures session context for collaborators and future AI agents.
 ## Documentation Rules
 - `AGENTS.md` is the fast handoff file: current behavior, key files, workflow notes, and recent session history.
 - `PROJECT_MAP.md` is the stable architecture-first project map: routes, ownership boundaries, key modules, API families, and `Where To Change` guidance.
+- `BOT_LOGIC.md` is the dedicated bot-AI behavior, findings, and tuning-notes reference.
 - `McpTesting.md` is the browser/MCP workflow reference for this project.
 - `InGameTutorials.md` is the tutorial-authoring and tutorial-maintenance reference.
 - Keep session history out of `PROJECT_MAP.md`; put it in `AGENTS.md`.
@@ -68,6 +69,7 @@ This file captures session context for collaborators and future AI agents.
 
 ## Key Files
 - Tutorial maintenance guide: `InGameTutorials.md`
+- Bot behavior and findings guide: `BOT_LOGIC.md`
 - App bootstrap: `src/main.ts`, `src/app/app.config.ts`
 - Routes: `src/app/app.routes.ts`
 - Root component: `src/app/app.ts`, `src/app/app.html`
