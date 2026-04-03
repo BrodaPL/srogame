@@ -94,6 +94,10 @@ type AttackPlunderSummary = {
   freeCargoCapacity: number;
 };
 
+export type TurnDifficultyConfig = {
+  botDifficultyPercent?: number;
+};
+
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
 const DEFENCE_BLUEPRINTS = DefenceBlueprintsFactory.fromDefaultJson();
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
@@ -105,7 +109,8 @@ const FLEET_MISSION_REGISTRY = FleetMissionRegistry.createDefault();
 
 export function resolvePhaseOneTurn(
   galaxy: Galaxy,
-  resolvedTurnNumber = galaxy.currentTurn + 1
+  resolvedTurnNumber = galaxy.currentTurn + 1,
+  difficultyConfig: TurnDifficultyConfig = {}
 ): void {
   const playersById = new Map<number, Player>();
   const techLevelsByPlayerId = new Map<number, Map<TechnologyType, number>>();
@@ -127,7 +132,11 @@ export function resolvePhaseOneTurn(
           createPlanetTurnSnapshot(
             planet,
             coordinatesId,
-            techLevelsByPlayerId.get(planet.info.ownerId ?? -1) ?? null
+            techLevelsByPlayerId.get(planet.info.ownerId ?? -1) ?? null,
+            planet.info.ownerId === null
+              ? null
+              : playersById.get(planet.info.ownerId) ?? null,
+            difficultyConfig
           )
         );
       }
@@ -194,7 +203,9 @@ export function resolvePhaseOneTurn(
 function createPlanetTurnSnapshot(
   planet: Planet,
   coordinatesId: string,
-  techLevels: Map<TechnologyType, number> | null
+  techLevels: Map<TechnologyType, number> | null,
+  owner: Player | null,
+  difficultyConfig: TurnDifficultyConfig
 ): PlanetTurnSnapshot {
   const adaptiveTechnologyLevel = techLevels?.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? 0;
   const computerTechnologyLevel = techLevels?.get(TechnologyType.COMPUTER_TECHNOLOGY) ?? 0;
@@ -221,13 +232,26 @@ function createPlanetTurnSnapshot(
     adaptiveTechnologyLevel,
     intergalacticResearchNetworkLevel
   );
+  const botDifficultyMultiplier = resolveBotDifficultyMultiplier(owner, difficultyConfig);
 
   return {
     coordinatesId,
     ownerId: planet.info.ownerId,
-    metalIncome: Math.floor(planet.getMetalGain(adaptiveTechnologyLevel) * energyEfficiency),
-    crystalIncome: Math.floor(planet.getCrystalGain(adaptiveTechnologyLevel) * energyEfficiency),
-    deuteriumIncome: Math.floor(planet.getDeuteriumGain(adaptiveTechnologyLevel) * energyEfficiency),
+    metalIncome: Math.floor(
+      planet.getMetalGain(adaptiveTechnologyLevel)
+      * energyEfficiency
+      * botDifficultyMultiplier
+    ),
+    crystalIncome: Math.floor(
+      planet.getCrystalGain(adaptiveTechnologyLevel)
+      * energyEfficiency
+      * botDifficultyMultiplier
+    ),
+    deuteriumIncome: Math.floor(
+      planet.getDeuteriumGain(adaptiveTechnologyLevel)
+      * energyEfficiency
+      * botDifficultyMultiplier
+    ),
     metalCapacity: planet.getBuildingProductionValue1(BuildingType.METAL_STORAGE),
     crystalCapacity: planet.getBuildingProductionValue1(BuildingType.CRYSTAL_STORAGE),
     deuteriumCapacity: planet.getBuildingProductionValue1(BuildingType.DEUTERIUM_TANK),
@@ -237,6 +261,7 @@ function createPlanetTurnSnapshot(
       * industryModifier
       * adaptiveIndustryMultiplier
       * energyEfficiency
+      * botDifficultyMultiplier
     )),
     shipyardPower: Math.max(0, Math.floor(
       shipyardBasePower
@@ -244,12 +269,14 @@ function createPlanetTurnSnapshot(
       * industryModifier
       * adaptiveIndustryMultiplier
       * energyEfficiency
+      * botDifficultyMultiplier
     )),
     researchPower: Math.max(0, Math.floor(
       researchLabBasePower
       * totalResearchMultiplier
       * scienceModifier
       * energyEfficiency
+      * botDifficultyMultiplier
     )),
     currentResearchQueue: planet.rBDSFTQ.currentResearchQueue
       ? {
@@ -270,6 +297,21 @@ function createPlanetTurnSnapshot(
       }
       : null
   };
+}
+
+function resolveBotDifficultyMultiplier(
+  owner: Player | null,
+  difficultyConfig: TurnDifficultyConfig
+): number {
+  if (!owner || owner.type !== PlayerType.BOT) {
+    return 1;
+  }
+
+  const configuredPercent = difficultyConfig.botDifficultyPercent;
+  const percent = typeof configuredPercent === 'number' && Number.isFinite(configuredPercent)
+    ? configuredPercent
+    : 0;
+  return Math.max(0.25, 1 + (percent / 100));
 }
 
 function calculateEnergyState(

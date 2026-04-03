@@ -1,5 +1,6 @@
 import * as gameTypeEnumModule from '../../src/app/models/enums/game-type.js';
 import * as playerTypeEnumModule from '../../src/app/models/enums/player-type.js';
+import * as playerModule from '../../src/app/models/player.js';
 import type {
   GameSaveSummary,
   GalaxySetup,
@@ -17,6 +18,7 @@ function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
 
 const { GameType } = resolveModule(gameTypeEnumModule) as typeof import('../../src/app/models/enums/game-type.js');
 const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../../src/app/models/enums/player-type.js');
+const { defaultBotProfileIdForPlayerId } = resolveModule(playerModule) as typeof import('../../src/app/models/player.js');
 const {
   DEFAULT_AUTO_SAVE_TURNS,
   normalizeGalaxySetup
@@ -352,12 +354,16 @@ export function applyLobbyLoadSeatsToGalaxy(
     const assignedAccountId = assignments.get(player.playerId) ?? null;
     if (assignedAccountId === null) {
       player.type = PlayerType.BOT;
+      player.botProfileId = player.botProfileId ?? defaultBotProfileIdForPlayerId(player.playerId);
+      player.botMemory = null;
       continue;
     }
 
     const assignedMember = membersById.get(assignedAccountId);
     if (!assignedMember) {
       player.type = PlayerType.BOT;
+      player.botProfileId = player.botProfileId ?? defaultBotProfileIdForPlayerId(player.playerId);
+      player.botMemory = null;
       continue;
     }
 

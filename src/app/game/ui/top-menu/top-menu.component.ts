@@ -89,6 +89,10 @@ export class TopMenuComponent {
     return this.isEndTurnBlockedByMail() && !this.isMailRoute();
   }
 
+  protected canInspectBots(): boolean {
+    return this.authState.session()?.localAdmin === true;
+  }
+
   protected isProcessingTurn(): boolean {
     return this.gameState.isProcessingTurn;
   }

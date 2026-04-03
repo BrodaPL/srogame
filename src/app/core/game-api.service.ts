@@ -1,6 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import {
+  BotAdminActionResponse,
+  BotAdminStatesResponse,
+  BotDecisionTracesResponse,
   EndTurnResponse,
   GameStateResponse,
   GameSavesResponse,
@@ -13,6 +16,7 @@ import {
   ClientPlanetDto,
   GalaxyPresentationDataDto,
   UpsertStarSystemNoteRequest,
+  UpdateBotProfileRequest,
   StarSystemNoteDto,
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
@@ -185,6 +189,55 @@ export class GameApiService {
   public endTurn(token: string) {
     return this.http.post<EndTurnResponse>(
       `${API_BASE_URL}/game/end-turn`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getBotDecisionTraces(token: string, playerId?: number) {
+    return this.http.get<BotDecisionTracesResponse>(
+      `${API_BASE_URL}/admin/bots/traces`,
+      {
+        headers: this.authHeaders(token),
+        params: playerId === undefined ? {} : { playerId }
+      }
+    );
+  }
+
+  public getBotAdminStates(token: string) {
+    return this.http.get<BotAdminStatesResponse>(
+      `${API_BASE_URL}/admin/bots`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public setBotProfile(playerId: number, request: UpdateBotProfileRequest, token: string) {
+    return this.http.post<BotAdminActionResponse>(
+      `${API_BASE_URL}/admin/bots/${playerId}/profile`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public pauseBot(playerId: number, token: string) {
+    return this.http.post<BotAdminActionResponse>(
+      `${API_BASE_URL}/admin/bots/${playerId}/pause`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public resumeBot(playerId: number, token: string) {
+    return this.http.post<BotAdminActionResponse>(
+      `${API_BASE_URL}/admin/bots/${playerId}/resume`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public clearBotMemory(playerId: number, token: string) {
+    return this.http.post<BotAdminActionResponse>(
+      `${API_BASE_URL}/admin/bots/${playerId}/clear-memory`,
       {},
       { headers: this.authHeaders(token) }
     );

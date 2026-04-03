@@ -1,7 +1,7 @@
 import { Galaxy } from './galaxy';
 import { Planet } from './planet';
 import { SolarSystem } from './solar-system';
-import { Player } from '../player';
+import { defaultBotProfileIdForPlayerId, Player } from '../player';
 import { GameType } from '../enums/game-type';
 import { PlayerType } from '../enums/player-type';
 import { PlanetType } from '../enums/planet-type';
@@ -127,6 +127,7 @@ export class GalaxyCreator {
     }
 
     this.assignStartingPlayers(galaxy, playerNames);
+    this.assignStartingBots(galaxy);
     this.applyTestingSetupOptions(galaxy, playerNames);
 
     //5. GameType specific modifications
@@ -406,6 +407,75 @@ export class GalaxyCreator {
 
       galaxy.players.push(player);
       galaxy.humanPlayerMap.set(playerId, player);
+      galaxy.playerNameMap.set(player.playerName, playerId);
+
+      this.ensureHomeSystemNeutralPlanet(galaxy, player);
+    }
+  }
+
+  private assignStartingBots(galaxy: Galaxy): void {
+    const targetCount = Math.max(0, Math.floor(this.setup.botsAmount));
+    if (targetCount <= 0) {
+      return;
+    }
+
+    const availablePlanets = this.collectAvailablePlanets(galaxy);
+    if (availablePlanets.length === 0) {
+      return;
+    }
+
+    const nextPlayerIdBase = galaxy.players.reduce(
+      (maxId, player) => Math.max(maxId, player.playerId),
+      0
+    ) + 1;
+
+    for (let index = 0; index < targetCount; index += 1) {
+      if (availablePlanets.length === 0) {
+        return;
+      }
+
+      const candidateIndex = this.randomInt(0, availablePlanets.length - 1);
+      const slot = availablePlanets.splice(candidateIndex, 1)[0];
+      const playerId = nextPlayerIdBase + index;
+      const botName = `Bot-${index + 1}`;
+
+      const startingPlanet = Planet.createStartingPlanet(
+        slot.planet.basicInfo.name,
+        slot.planet.basicInfo.order,
+        slot.system,
+        playerId
+      );
+      startingPlanet.basicInfo.name = this.buildPlanetName(
+        slot.system.name,
+        slot.planet.basicInfo.order,
+        startingPlanet.basicInfo.type
+      );
+      this.applyBuildingLevelsToPlanet(startingPlanet, this.createStartingBuildings());
+      startingPlanet.rBDSFTQ.resources = this.createStartingResources();
+      startingPlanet.rBDSFTQ.ships = ManyShips.empty();
+
+      slot.system.planets[slot.index] = startingPlanet;
+
+      const player = new Player(
+        playerId,
+        botName,
+        [startingPlanet],
+        new Map(),
+        [],
+        PlayerType.BOT,
+        createTutorialReadState(true),
+        [],
+        1,
+        [],
+        1,
+        {
+          botProfileId: defaultBotProfileIdForPlayerId(playerId),
+          botMemory: null
+        }
+      );
+
+      galaxy.players.push(player);
+      galaxy.botPlayerMap.set(playerId, player);
       galaxy.playerNameMap.set(player.playerName, playerId);
 
       this.ensureHomeSystemNeutralPlanet(galaxy, player);

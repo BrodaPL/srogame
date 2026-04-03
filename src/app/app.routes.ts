@@ -8,6 +8,7 @@ import { EncyclopediaTechnologiesComponent } from './encyclopedia-menu/encyclope
 import { AuthComponent } from './auth/auth.component';
 import { GameComponent } from './game/game.component';
 import { BuildingsViewComponent } from './game/buildings-view/buildings-view.component';
+import { BotDebugViewComponent } from './game/bot-debug-view/bot-debug-view.component';
 import { DefenceViewComponent } from './game/defence-view/defence-view.component';
 import { DiplomacyViewComponent } from './game/diplomacy-view/diplomacy-view.component';
 import { GalacticViewComponent } from './game/galactic-view/galactic-view.component';
@@ -54,6 +55,7 @@ export const routes: Routes = [
       { path: 'researches', component: ResearchesViewComponent },
       { path: 'production', component: ProductionViewComponent },
       { path: 'buildings', component: BuildingsViewComponent },
+      { path: 'bot-debug', component: BotDebugViewComponent },
       { path: 'defence', component: DefenceViewComponent },
       { path: 'operations', component: OperationsViewComponent },
       { path: 'mission-planner', component: MissionPlannerViewComponent }

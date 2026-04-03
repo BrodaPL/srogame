@@ -1,0 +1,181 @@
+<app-top-menu></app-top-menu>
+
+<section class="bot-debug-view">
+  @if (isLoading) {
+    <section class="status status--info">
+      <h3>Loading Bot Traces</h3>
+      <p>Reading the latest server-side bot decision traces.</p>
+    </section>
+  } @else if (loadError) {
+    <section class="status status--error">
+      <h3>Bot trace view unavailable</h3>
+      <p>{{ loadError }}</p>
+    </section>
+  } @else {
+    <section class="overview-card bot-debug-view__header">
+      <div>
+        <p class="eyebrow">Controller Tools</p>
+        <h1>Bot Decision Traces</h1>
+        <p class="overview-muted">Inspect recent chosen actions, failed command attempts, and why each bot stopped planning.</p>
+      </div>
+      <div class="bot-debug-view__header-actions">
+        <div class="overview-stats">
+          <div class="overview-stat">
+            <span class="overview-stat__label">Current turn</span>
+            <span class="overview-stat__value">{{ currentTurn ?? 'n/a' }}</span>
+          </div>
+          <div class="overview-stat">
+            <span class="overview-stat__label">Stored traces</span>
+            <span class="overview-stat__value">{{ traces.length }}</span>
+          </div>
+        </div>
+        <button class="top-menu__button" type="button" (click)="refresh()">Refresh</button>
+      </div>
+    </section>
+
+    <section class="overview-card bot-debug-view__filters">
+      <div class="bot-debug-view__filter-row">
+        <button
+          class="bot-debug-view__filter"
+          type="button"
+          [class.bot-debug-view__filter--active]="selectedPlayerId === null"
+          (click)="setSelectedPlayer(null)">
+          All bots
+        </button>
+        @for (bot of botOptions(); track bot.playerId) {
+          <button
+            class="bot-debug-view__filter"
+            type="button"
+            [class.bot-debug-view__filter--active]="selectedPlayerId === bot.playerId"
+            (click)="setSelectedPlayer(bot.playerId)">
+            {{ bot.playerName }} (#{{ bot.playerId }})
+          </button>
+        }
+      </div>
+      <p class="overview-muted">Showing {{ visibleTraces().length }} trace(s) for {{ selectedBotName() }}.</p>
+    </section>
+
+    @if (selectedBotState(); as selectedBot) {
+      <section class="overview-card bot-debug-view__controls">
+        <div>
+          <p class="eyebrow">Live Controls</p>
+          <h2>{{ selectedBot.playerName }} (#{{ selectedBot.playerId }})</h2>
+          <p class="overview-muted">
+            Profile {{ selectedBot.profileId ?? 'n/a' }} | Goal {{ selectedBot.currentGoal ?? 'none' }} |
+            {{ selectedBot.planetsOwned }} planets | {{ selectedBot.activeFleetCount }} active fleets
+          </p>
+        </div>
+
+        <div class="bot-debug-view__control-grid">
+          <label class="bot-debug-view__control-field">
+            <span>Profile</span>
+            <select [(ngModel)]="selectedProfileId">
+              @for (profileId of profileOptions(); track profileId) {
+                <option [ngValue]="profileId">{{ profileId }}</option>
+              }
+            </select>
+          </label>
+
+          <div class="bot-debug-view__control-actions">
+            <button class="top-menu__button" type="button" (click)="applySelectedProfile()" [disabled]="isApplyingAction || !selectedProfileId">
+              Apply profile
+            </button>
+            @if (selectedBot.paused) {
+              <button class="top-menu__button" type="button" (click)="resumeSelectedBot()" [disabled]="isApplyingAction">
+                Resume bot
+              </button>
+            } @else {
+              <button class="top-menu__button" type="button" (click)="pauseSelectedBot()" [disabled]="isApplyingAction">
+                Pause bot
+              </button>
+            }
+            <button class="top-menu__button" type="button" (click)="clearSelectedBotMemory()" [disabled]="isApplyingAction">
+              Clear memory
+            </button>
+          </div>
+        </div>
+
+        @if (selectedBot.paused) {
+          <p class="overview-muted">This bot is currently paused and will be skipped by the server bot runner.</p>
+        }
+        @if (actionError) {
+          <p class="status-text status-text--error">{{ actionError }}</p>
+        }
+      </section>
+    }
+
+    @if (visibleTraces().length === 0) {
+      <section class="overview-card">
+        <p class="overview-muted">No bot traces recorded yet for this filter.</p>
+      </section>
+    } @else {
+      <section class="bot-debug-view__trace-list">
+        @for (trace of visibleTraces(); track trace.turn + '-' + trace.playerId) {
+          <article class="overview-card bot-debug-view__trace">
+            <header class="bot-debug-view__trace-head">
+              <div>
+                <h3>{{ trace.playerName }} (#{{ trace.playerId }})</h3>
+                <p class="overview-muted">
+                  Turn {{ trace.turn }} | Profile {{ trace.profileId ?? 'n/a' }} |
+                  Start goal {{ trace.startingGoal ?? 'none' }} |
+                  End goal {{ trace.endingGoal ?? 'none' }}
+                </p>
+              </div>
+              <div class="bot-debug-view__trace-budget">
+                <span class="badge">{{ trace.actionBudget.used }} / {{ trace.actionBudget.max }} actions</span>
+                <span class="overview-muted">{{ stopReasonLabel(trace.actionBudget.stopReason) }}</span>
+              </div>
+            </header>
+
+            <section class="bot-debug-view__columns">
+              <div class="bot-debug-view__column">
+                <h4>Chosen actions</h4>
+                @if (trace.chosenActions.length === 0) {
+                  <p class="overview-muted">No actions applied.</p>
+                } @else {
+                  <div class="bot-debug-view__items">
+                    @for (action of trace.chosenActions; track action.kind + action.requestSummary) {
+                      <article class="bot-debug-view__item">
+                        <div class="bot-debug-view__item-head">
+                          <strong>{{ action.kind }}</strong>
+                          <span class="badge">{{ action.expectedUtility.toFixed(2) }}</span>
+                        </div>
+                        <p>{{ action.reason }}</p>
+                        <p class="overview-muted">{{ action.requestSummary }}</p>
+                        <p class="overview-muted">Goal: {{ action.goalType ?? 'none' }}</p>
+                      </article>
+                    }
+                  </div>
+                }
+              </div>
+
+              <div class="bot-debug-view__column">
+                <h4>Rejected actions</h4>
+                @if (trace.rejectedActions.length === 0) {
+                  <p class="overview-muted">No rejected actions recorded.</p>
+                } @else {
+                  <div class="bot-debug-view__items">
+                    @for (action of trace.rejectedActions; track action.kind + action.reason + action.rejectionType) {
+                      <article class="bot-debug-view__item bot-debug-view__item--rejected">
+                        <div class="bot-debug-view__item-head">
+                          <strong>{{ action.kind }}</strong>
+                          <span class="badge">{{ action.rejectionType }}</span>
+                        </div>
+                        <p>{{ action.reason }}</p>
+                        <p class="overview-muted">Utility: {{ action.expectedUtility ?? 'n/a' }}</p>
+                        <p class="overview-muted">{{ action.details['requestSummary'] }}</p>
+                        @if (action.details['message']) {
+                          <p class="overview-muted">Message: {{ action.details['message'] }}</p>
+                        }
+                      </article>
+                    }
+                  </div>
+                }
+              </div>
+            </section>
+          </article>
+        }
+      </section>
+    }
+  }
+</section>

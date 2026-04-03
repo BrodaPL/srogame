@@ -22,6 +22,7 @@ import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
 import type { DiplomaticProposalState } from './diplomacy/diplomatic-proposal-state';
 import type { BombardmentPriorities } from './bombardment/bombardment-priority';
 import type { TradeResourceType } from './trade/trade-resource-type';
+import type { BotGoalType, BotProfileId } from './player';
 
 export type GalaxySetup = {
   gameType: GameType;
@@ -139,6 +140,72 @@ export type StartGameResponse = {
 export type GameStateResponse = {
   player: PlayerSession;
   galaxy: GalaxySnapshot;
+};
+
+export type BotTraceStopReason =
+  | 'action_cap'
+  | 'below_threshold'
+  | 'no_candidates';
+
+export type BotRejectedActionTraceDto = {
+  kind: string;
+  reason: string;
+  rejectionType: 'threshold' | 'command_failed';
+  expectedUtility: number | null;
+  details: Record<string, string | number | boolean | null>;
+};
+
+export type BotChosenActionTraceDto = {
+  kind: string;
+  reason: string;
+  expectedUtility: number;
+  goalType: BotGoalType | null;
+  requestSummary: string;
+};
+
+export type BotDecisionTraceDto = {
+  playerId: number;
+  playerName: string;
+  turn: number;
+  profileId: BotProfileId | null;
+  startingGoal: BotGoalType | null;
+  endingGoal: BotGoalType | null;
+  actionBudget: {
+    max: number;
+    used: number;
+    stopReason: BotTraceStopReason | null;
+  };
+  chosenActions: BotChosenActionTraceDto[];
+  rejectedActions: BotRejectedActionTraceDto[];
+};
+
+export type BotDecisionTracesResponse = {
+  turn: number;
+  traces: BotDecisionTraceDto[];
+};
+
+export type BotAdminStateDto = {
+  playerId: number;
+  playerName: string;
+  profileId: BotProfileId | null;
+  currentGoal: BotGoalType | null;
+  planetsOwned: number;
+  activeFleetCount: number;
+  paused: boolean;
+};
+
+export type BotAdminStatesResponse = {
+  turn: number;
+  bots: BotAdminStateDto[];
+};
+
+export type UpdateBotProfileRequest = {
+  profileId: BotProfileId;
+};
+
+export type BotAdminActionResponse = {
+  turn: number;
+  bot: BotAdminStateDto;
 };
 
 export type EndTurnResponse = {

@@ -14,6 +14,7 @@ import { ManyShips } from '../../fleets/many-ships';
 import { ShipInstance } from '../../fleets/ship-instance';
 import { ShipyardQueueEntry } from '../../fleets/shipyard-queue-entry';
 import { Galaxy } from '../../planets/galaxy';
+import { Planet } from '../../planets/planet';
 import { SolarSystem } from '../../planets/solar-system';
 import { Player } from '../../player';
 import { ResourcesPack } from '../../resources-pack';
@@ -1528,5 +1529,65 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     expect(system.planets[0].getCurrentBuildingStructuralPoints(BuildingType.METAL_MINE)).toBeGreaterThan(initialStructuralPoints);
     expect(system.planets[0].rBDSFTQ.ships.totalMissingHull()).toBeLessThan(initialMissingHull);
+  });
+
+  it('applies configured bot difficulty bonuses to bot income and turn throughput only', () => {
+    const system = new SolarSystem('Economy Test', 2, false, false, { x: 1, y: 1 }, new Set<number>(), new Map());
+    const humanPlanet = Planet.createStartingPlanet('Human Prime', 1, system, 1);
+    const botPlanet = Planet.createStartingPlanet('Bot Prime', 2, system, 2);
+    system.planets[0] = humanPlanet;
+    system.planets[1] = botPlanet;
+
+    humanPlanet.info.ownerId = 1;
+    botPlanet.info.ownerId = 2;
+
+    for (const planet of [humanPlanet, botPlanet]) {
+      planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+      planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+      planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+      planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 5);
+      planet.setBuildingLevel(BuildingType.METAL_STORAGE, 5);
+      planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 5);
+      planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 5);
+      planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 3);
+      planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
+      planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 3);
+      planet.rBDSFTQ.resources = new ResourcesPack(0, 0, 0);
+      planet.rBDSFTQ.buildingQueue = [new BuildingQueueEntry(BuildingType.METAL_MINE, 5, 0)];
+      planet.rBDSFTQ.shipyardQueue = [ShipyardQueueEntry.ship(ShipType.SPY_PROBE, 2, 0)];
+      planet.rBDSFTQ.currentResearchQueue = new TechnologyQueueEntry(
+        TechnologyType.ENERGY_TECHNOLOGY,
+        1,
+        0,
+        []
+      );
+    }
+
+    const human = new Player(1, 'Human', [humanPlanet], new Map(), [], PlayerType.PLAYER);
+    const bot = new Player(2, 'Bot', [botPlanet], new Map(), [], PlayerType.BOT);
+    const galaxy = new Galaxy(
+      'Economy Galaxy',
+      [human, bot],
+      [[system]],
+      1,
+      [],
+      1,
+      new Map([[human.playerId, human]]),
+      new Map([[bot.playerId, bot]]),
+      new Map(),
+      new Map([[human.playerName, human.playerId], [bot.playerName, bot.playerId]])
+    );
+
+    resolvePhaseOneTurn(galaxy, 2, { botDifficultyPercent: 100 });
+
+    expect(botPlanet.rBDSFTQ.resources.metal).toBeGreaterThan(humanPlanet.rBDSFTQ.resources.metal);
+    expect(botPlanet.rBDSFTQ.resources.crystal).toBeGreaterThan(humanPlanet.rBDSFTQ.resources.crystal);
+    expect(botPlanet.rBDSFTQ.resources.deuterium).toBeGreaterThan(humanPlanet.rBDSFTQ.resources.deuterium);
+    expect(botPlanet.rBDSFTQ.buildingQueue[0]?.investedIndustryPower ?? 0)
+      .toBeGreaterThan(humanPlanet.rBDSFTQ.buildingQueue[0]?.investedIndustryPower ?? 0);
+    expect(botPlanet.rBDSFTQ.shipyardQueue[0]?.investedShipyardPower ?? 0)
+      .toBeGreaterThan(humanPlanet.rBDSFTQ.shipyardQueue[0]?.investedShipyardPower ?? 0);
+    expect(botPlanet.rBDSFTQ.currentResearchQueue?.investedResearchPower ?? 0)
+      .toBeGreaterThan(humanPlanet.rBDSFTQ.currentResearchQueue?.investedResearchPower ?? 0);
   });
 });

@@ -62,6 +62,8 @@ Main shell:
 Server bootstrap:
 - `server/src/index.ts`
 - `server/src/game-save.ts`
+- `server/src/game-commands/`
+- `server/src/bots/`
 
 Smoke runner:
 - `scripts/run-smoke-tests.js`
@@ -91,12 +93,14 @@ Game child routes:
 - `/game/researches` -> `src/app/game/researches-view/`
 - `/game/production` -> `src/app/game/production-view/`
 - `/game/buildings` -> `src/app/game/buildings-view/`
+- `/game/bot-debug` -> `src/app/game/bot-debug-view/`
 - `/game/defence` -> `src/app/game/defence-view/`
 - `/game/operations` -> `src/app/game/operations-view/`
 - `/game/mission-planner` -> `src/app/game/mission-planner-view/`
 
 Shared game UI components:
 - `src/app/game/ui/`
+- `src/app/game/ui/top-menu/` owns the shared in-game navigation, including the local-admin `Bot AI` link
 
 ## Client State Ownership
 
@@ -139,6 +143,12 @@ Game lifecycle:
 - `/api/game/saves/:saveId`
 - `/api/game/state`
 - `/api/game/end-turn`
+- `/api/admin/bots`
+- `/api/admin/bots/traces`
+- `/api/admin/bots/:playerId/profile`
+- `/api/admin/bots/:playerId/pause`
+- `/api/admin/bots/:playerId/resume`
+- `/api/admin/bots/:playerId/clear-memory`
 
 Multiplayer lobby lifecycle:
 - `/api/multiplayer/lobby`
@@ -160,6 +170,8 @@ Lifecycle persistence note:
 - `/api/game/end-turn` writes rotating autosaves into `server/data/saves/` when `GalaxySetup.autoSaveTurns` is greater than `0` and the configured cadence is reached
 - `/api/multiplayer/lobby/load-save` binds a selected save from the shared save list into lobby state without mutating runtime
 - `/api/multiplayer/lobby/start` either creates a new multiplayer galaxy from joined lobby members or hydrates the bound save, applies seat assignments, converts unresolved saved humans to `BOT`, and then replaces the active runtime game
+- `/api/game/end-turn` now also runs the server-side bot planning phase before shared turn resolution
+- `/api/admin/bots*` exposes local-admin/controller-only bot inspection and live runtime controls for profile, pause/resume, and memory clearing
 
 Galaxy and planet reads:
 - `/api/game/client-galaxy`
@@ -185,12 +197,36 @@ Queues and production:
 - `/api/game/shipyard-queue/cancel`
 - `/api/game/technology-queue`
 
+Queue command ownership note:
+- `server/src/index.ts` owns auth/session checks, request parsing, and HTTP DTO responses for queue-start endpoints
+- `server/src/game-commands/building-commands.ts` owns building-queue validation + mutation
+- `server/src/game-commands/shipyard-commands.ts` owns shipyard-queue validation + mutation
+- `server/src/game-commands/research-commands.ts` owns technology-queue validation + mutation
+- `server/src/game-commands/command-helpers.ts` owns shared player/planet resolution plus queue/research requirement helpers
+- `server/src/game-commands/command-result.ts` defines the shared internal command result/error shape used by those modules
+
 Fleet operations:
 - `/api/game/active-fleets`
 - `/api/game/active-fleets/:fleetId/maintenance-options`
 - `/api/game/active-fleets/:fleetId/maintenance-request`
 - `/api/game/active-fleets/:fleetId/return`
 - `/api/game/active-fleets/:fleetId/delay`
+- `/api/admin/bots/traces`
+
+Fleet command ownership note:
+- `server/src/index.ts` owns auth/session checks, mission payload parsing, and HTTP response DTO shaping for fleet launch
+- `server/src/game-commands/fleet-commands.ts` owns fleet-launch validation + mutation, including mission validation, cargo/fuel checks, and Jump Gate launch side effects
+- `server/src/game-commands/maintenance-commands.ts` owns fleet-maintenance option validation, request creation, and auto-approved depot transfer side effects for maintenance requests
+- `server/src/game-commands/jump-gate-request-commands.ts` owns Jump Gate mail-request approval/reject/cancel validation + mutation
+- `server/src/game-commands/command-helpers.ts` now also owns shared fleet-launch helpers used by the command layer
+
+Bot runtime ownership note:
+- `server/src/index.ts` owns the end-turn hook and runs bot planning immediately before `resolvePhaseOneTurn(...)`
+- `server/src/bots/bot-turn-runner.ts` owns current server-side bot turn planning and action application
+- `server/src/bots/bot-profile.ts` owns fixed bot personality weights, military thresholds, and per-turn soft caps
+- `server/src/bots/bot-admin.ts` owns controller-only runtime bot controls and paused-bot state
+- `server/src/bots/bot-debug.ts` and `server/src/bots/bot-debug-store.ts` own the in-memory bot decision trace model and ring buffer used for controller-side AI inspection
+- bot actions currently reuse the shared command layer in `server/src/game-commands/` for buildings, research, shipyard, spy, colonize, attack, transport, maintenance, recycle, repair, bombard, siege, guard, and move launches; self-owned move/transport/guard routes can now opt into Jump Gate travel when access is valid and the distance benefit is meaningful, orbiting self-owned fleets can request auto-approved Alliance Depot maintenance support, bots now resolve incoming allied/peace maintenance + Jump Gate requests before normal action planning, owned planets can trigger conservative recycle/repair support launches, and high-infrastructure hostile worlds can trigger bombard/siege plans instead of default raids
 
 Reports and tutorials:
 - `/api/game/reports`
@@ -239,6 +275,7 @@ Owns:
 - effective planetary parameter derivation and permanent terraformer size bonus handling
 - abandonment and ownership transitions
 - galaxy-view presentation data, including own-fleet route and presence summaries
+- initial bot empire creation from `GalaxySetup.botsAmount`, including default bot profile assignment
 
 ### Fleets, ships, and mission payload state
 
@@ -456,6 +493,7 @@ Server responsibilities:
 - API validation and DTO translation
 - invoking shared domain rules
 - snapshot and report serialization
+- orchestrating server-side bot planning during end turn through `server/src/bots/`
 
 Important constraint:
 - the server is large and central, but many rules should still stay in shared domain modules under `src/app/models`
@@ -590,6 +628,17 @@ Change setup/start-game flow:
 - `server/src/game-save.ts`
 - `server/src/index.ts`
 - `src/app/models/planets/galaxy-creator.ts`
+- `server/src/multiplayer-lobby.ts` if saved-human seat conversion or bot defaults change
+
+Change bot AI:
+- `server/src/bots/bot-turn-runner.ts`
+- `server/src/bots/bot-profile.ts`
+- `server/src/bots/bot-debug.ts`
+- `server/src/bots/bot-debug-store.ts`
+- `server/src/game-commands/` when bot actions need new shared validation/mutation paths
+- `server/src/index.ts` for end-turn orchestration
+- `src/app/models/player.ts` and `server/src/game-save.ts` for bot profile/memory persistence
+- `src/app/models/planets/galaxy-creator.ts` and `server/src/multiplayer-lobby.ts` for starting-bot and converted-bot assignment rules
 
 ## Danger Zones
 

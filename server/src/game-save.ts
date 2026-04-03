@@ -195,6 +195,8 @@ type SavedPlayer = {
   fleetIds: number[];
   reports: SavedPlayerReport[];
   messages: SavedPlayerMessage[];
+  botProfileId: PlayerModel['botProfileId'];
+  botMemory: PlayerModel['botMemory'];
 };
 
 type SavedStarSystemNote = {
@@ -670,7 +672,11 @@ function hydrateSavedPlayer(savedPlayer: SavedPlayer): PlayerModel {
     savedPlayer.reports.map((report) => hydrateSavedPlayerReport(report)),
     savedPlayer.nextReportId,
     savedPlayer.messages.map((message) => hydrateSavedPlayerMessage(message)),
-    savedPlayer.nextMessageId
+    savedPlayer.nextMessageId,
+    {
+      botProfileId: savedPlayer.botProfileId ?? null,
+      botMemory: Player.normalizeBotMemory(savedPlayer.botMemory ?? null)
+    }
   );
 
   player.nextReportId = savedPlayer.nextReportId;
@@ -943,7 +949,18 @@ function serializePlayer(
       .map((coordinates) => ({ ...coordinates })),
     fleetIds: player.fleets.map((fleet) => fleet.fleetId),
     reports: player.reports.map((report) => serializePlayerReport(report)),
-    messages: player.messages.map((message) => serializePlayerMessage(message))
+    messages: player.messages.map((message) => serializePlayerMessage(message)),
+    botProfileId: player.botProfileId,
+    botMemory: player.botMemory
+      ? {
+        currentGoal: player.botMemory.currentGoal,
+        goalTarget: player.botMemory.goalTarget ? { ...player.botMemory.goalTarget } : null,
+        goalExpiresTurn: player.botMemory.goalExpiresTurn,
+        reservedResources: { ...player.botMemory.reservedResources },
+        lastSpyTargets: player.botMemory.lastSpyTargets.map((entry) => ({ ...entry })),
+        lastAttackTargets: player.botMemory.lastAttackTargets.map((entry) => ({ ...entry }))
+      }
+      : null
   };
 }
 

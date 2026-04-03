@@ -57,6 +57,8 @@ describe('game-save', () => {
     expect(save.galaxy.players[0].fleetIds).toEqual([7]);
     expect(save.galaxy.players[0].reports).toHaveLength(2);
     expect(save.galaxy.players[0].messages[0].title).toBe('Mail');
+    expect(save.galaxy.players[0].botProfileId).toBe('BALANCED');
+    expect(save.galaxy.players[0].botMemory?.currentGoal).toBe('KEY_BUILDING_UP');
     expect(save.galaxy.stars[0][0].starSystemNotes[0].text).toBe('Scout route');
     expect(save.galaxy.stars[0][0].planets[0].rBDSFTQ.fleetIds).toEqual([7]);
     expect(save.galaxy.stars[0][0].planets[0].lastReportData[0].report.reportType).toBe('Espionage Report');
@@ -124,6 +126,9 @@ describe('game-save', () => {
     const fleet = hydrated.galaxy.activeFleets[0];
 
     expect(player.playerName).toBe('Alpha');
+    expect(player.botProfileId).toBe('BALANCED');
+    expect(player.botMemory?.currentGoal).toBe('KEY_BUILDING_UP');
+    expect(player.botMemory?.reservedResources).toEqual({ metal: 40, crystal: 20, deuterium: 10 });
     expect(player.planets[0]).toBe(planet);
     expect(player.fleets[0]).toBe(fleet);
     expect(planet.info.ownerId).toBe(player.playerId);
@@ -331,7 +336,23 @@ function buildTestSave() {
     [planet],
     new Map([[TechnologyType.COMPUTER_TECHNOLOGY, 2]]),
     [fleet],
-    PlayerType.PLAYER
+    PlayerType.PLAYER,
+    undefined,
+    [],
+    1,
+    [],
+    1,
+    {
+      botProfileId: 'BALANCED',
+      botMemory: {
+        currentGoal: 'KEY_BUILDING_UP',
+        goalTarget: { x: 0, y: 0, z: 0 },
+        goalExpiresTurn: 8,
+        reservedResources: { metal: 40, crystal: 20, deuterium: 10 },
+        lastSpyTargets: [{ x: 1, y: 0, z: 0 }],
+        lastAttackTargets: [{ x: 2, y: 1, z: 0 }]
+      }
+    }
   );
   player.nextReportId = 9;
   player.nextMessageId = 4;

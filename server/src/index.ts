@@ -73,12 +73,43 @@ import {
   setMultiplayerLobbyMemberReady,
   updateMultiplayerLobbySetup
 } from './multiplayer-lobby.js';
+import { clearBotDecisionTraces, getBotDecisionTraces } from './bots/bot-debug-store.js';
+import {
+  clearBotMemory,
+  listBotAdminStates,
+  pauseBot,
+  resetBotAdminRuntimeState,
+  resumeBot,
+  setBotProfile,
+  toBotAdminState
+} from './bots/bot-admin.js';
+import { startBuildingConstruction } from './game-commands/building-commands.js';
+import { runBotTurnPhase } from './bots/bot-turn-runner.js';
+import { createFleetMission } from './game-commands/fleet-commands.js';
+import {
+  approveJumpGateRequestCommand,
+  cancelJumpGateRequestCommand,
+  rejectJumpGateRequestCommand
+} from './game-commands/jump-gate-request-commands.js';
+import {
+  canFleetRequestMaintenance as canFleetRequestMaintenanceCommand,
+  approveFleetMaintenanceRequest,
+  cancelFleetMaintenanceRequest,
+  createFleetMaintenanceRequest,
+  rejectFleetMaintenanceRequest,
+  resolveFleetMaintenanceOptions
+} from './game-commands/maintenance-commands.js';
+import { startShipyardConstruction } from './game-commands/shipyard-commands.js';
+import { startTechnologyResearch } from './game-commands/research-commands.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
 import fleetReportModule from '../../src/app/models/reports/fleet-report.js';
 import sensorPhalanxReportModule from '../../src/app/models/reports/sensor-phalanx-report.js';
 import resourcesPackModule from '../../src/app/models/resources-pack.js';
+import type { GameCommandError } from './game-commands/command-result.ts';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
+  BotAdminActionResponse,
+  BotAdminStatesResponse,
   EndTurnResponse,
   GameSavesResponse,
   GalaxySetup,
@@ -111,6 +142,7 @@ import type {
   LoginRequest,
   RegisterRequest,
   UpsertStarSystemNoteRequest,
+  UpdateBotProfileRequest,
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
   StartBuildingConstructionRequest,
@@ -195,6 +227,8 @@ import type { Defence } from '../../src/app/models/defences/defence.ts';
 import type { Ship } from '../../src/app/models/fleets/ship.ts';
 import type { Technology } from '../../src/app/models/tech/technology.ts';
 import type { Player } from '../../src/app/models/player.ts';
+import { BOT_PROFILE_IDS } from '../../src/app/models/player.js';
+import type { BotProfileId } from '../../src/app/models/player.ts';
 import type { PlayerMessage } from '../../src/app/models/mail/player-message.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
 import type {
@@ -548,6 +582,8 @@ app.post('/api/game/start', (req, res) => {
   currentGameOwnerPlayerName = auth.session.playerName;
   currentGameSetup = setup;
   currentGalaxyPresentationByPlayer = nextPresentation;
+  clearBotDecisionTraces();
+  resetBotAdminRuntimeState();
   currentMultiplayerLobby = null;
 
   const response: StartGameResponse = {
@@ -592,6 +628,8 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
     currentGameOwnerPlayerName = auth.session.playerName;
     currentGameSetup = hydrated.setup;
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+    clearBotDecisionTraces();
+    resetBotAdminRuntimeState();
     currentMultiplayerLobby = null;
 
     const response: LoadGameResponse = {
@@ -872,6 +910,8 @@ app.post('/api/multiplayer/lobby/start', (req, res) => {
       currentGameOwnerPlayerName = auth.session.playerName;
       currentGameSetup = hydrated.setup;
       currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+      clearBotDecisionTraces();
+      resetBotAdminRuntimeState();
       saveCurrentGameSnapshot();
     } else {
       const setup = normalizeGalaxySetup({
@@ -891,6 +931,8 @@ app.post('/api/multiplayer/lobby/start', (req, res) => {
       currentGameOwnerPlayerName = auth.session.playerName;
       currentGameSetup = setup;
       currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+      clearBotDecisionTraces();
+      resetBotAdminRuntimeState();
       saveCurrentGameSnapshot();
     }
 
@@ -917,6 +959,129 @@ app.get('/api/game/state', (req, res) => {
     galaxy: buildGalaxySnapshot(access.galaxy)
   };
 
+  return res.status(200).json(response);
+});
+
+app.get('/api/admin/bots/traces', (req, res) => {
+  const controller = resolveAuthenticatedController(req);
+  if ('error' in controller) {
+    return res.status(controller.status).json({ error: controller.error });
+  }
+
+  const requestedPlayerId = typeof req.query.playerId === 'string'
+    ? Number.parseInt(req.query.playerId, 10)
+    : NaN;
+  const playerId = Number.isInteger(requestedPlayerId) && requestedPlayerId > 0
+    ? requestedPlayerId
+    : undefined;
+
+  return res.status(200).json({
+    turn: controller.galaxy.currentTurn,
+    traces: getBotDecisionTraces(playerId)
+  });
+});
+
+app.get('/api/admin/bots', (req, res) => {
+  const controller = resolveAuthenticatedController(req);
+  if ('error' in controller) {
+    return res.status(controller.status).json({ error: controller.error });
+  }
+
+  const response: BotAdminStatesResponse = {
+    turn: controller.galaxy.currentTurn,
+    bots: listBotAdminStates(controller.galaxy)
+  };
+  return res.status(200).json(response);
+});
+
+app.post('/api/admin/bots/:playerId/profile', (req, res) => {
+  const controller = resolveAuthenticatedController(req);
+  if ('error' in controller) {
+    return res.status(controller.status).json({ error: controller.error });
+  }
+
+  const playerId = parseRoutePositiveInt(req.params.playerId);
+  const profileId = normalizeBotProfileId((req.body as UpdateBotProfileRequest | undefined)?.profileId);
+  if (playerId === null || !profileId) {
+    return res.status(400).json({ error: 'Invalid bot profile payload.' });
+  }
+
+  const bot = controller.galaxy.botPlayerMap.get(playerId) ?? null;
+  if (!bot) {
+    return res.status(404).json({ error: 'Bot player not found.' });
+  }
+
+  setBotProfile(bot, profileId);
+  const response: BotAdminActionResponse = {
+    turn: controller.galaxy.currentTurn,
+    bot: toBotAdminState(controller.galaxy, bot)
+  };
+  return res.status(200).json(response);
+});
+
+app.post('/api/admin/bots/:playerId/pause', (req, res) => {
+  const controller = resolveAuthenticatedController(req);
+  if ('error' in controller) {
+    return res.status(controller.status).json({ error: controller.error });
+  }
+
+  const playerId = parseRoutePositiveInt(req.params.playerId);
+  const bot = playerId === null
+    ? null
+    : controller.galaxy.botPlayerMap.get(playerId) ?? null;
+  if (!bot) {
+    return res.status(404).json({ error: 'Bot player not found.' });
+  }
+
+  pauseBot(bot.playerId);
+  const response: BotAdminActionResponse = {
+    turn: controller.galaxy.currentTurn,
+    bot: toBotAdminState(controller.galaxy, bot)
+  };
+  return res.status(200).json(response);
+});
+
+app.post('/api/admin/bots/:playerId/resume', (req, res) => {
+  const controller = resolveAuthenticatedController(req);
+  if ('error' in controller) {
+    return res.status(controller.status).json({ error: controller.error });
+  }
+
+  const playerId = parseRoutePositiveInt(req.params.playerId);
+  const bot = playerId === null
+    ? null
+    : controller.galaxy.botPlayerMap.get(playerId) ?? null;
+  if (!bot) {
+    return res.status(404).json({ error: 'Bot player not found.' });
+  }
+
+  resumeBot(bot.playerId);
+  const response: BotAdminActionResponse = {
+    turn: controller.galaxy.currentTurn,
+    bot: toBotAdminState(controller.galaxy, bot)
+  };
+  return res.status(200).json(response);
+});
+
+app.post('/api/admin/bots/:playerId/clear-memory', (req, res) => {
+  const controller = resolveAuthenticatedController(req);
+  if ('error' in controller) {
+    return res.status(controller.status).json({ error: controller.error });
+  }
+
+  const playerId = parseRoutePositiveInt(req.params.playerId);
+  const bot = playerId === null
+    ? null
+    : controller.galaxy.botPlayerMap.get(playerId) ?? null;
+  if (!bot) {
+    return res.status(404).json({ error: 'Bot player not found.' });
+  }
+
+  clearBotMemory(bot);
+  const response: BotAdminActionResponse = {
+    turn: controller.galaxy.currentTurn,
+    bot: toBotAdminState(controller.galaxy, bot)
+  };
   return res.status(200).json(response);
 });
 
@@ -1235,13 +1400,13 @@ app.post('/api/game/mail/maintenance-requests/:requestId/approve', (req, res) =>
 
   const body = req.body as ResolveMaintenanceRequestRequest | undefined;
   const requestedApproval = normalizeMaintenanceTransferPayload(body);
-  const result = approveMaintenanceRequestForFleet(
-    authPlayer.galaxy,
-    request,
+  const result = approveFleetMaintenanceRequest(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId,
     isExplicitMaintenancePayload(body) ? requestedApproval : null
   );
-  if ('error' in result) {
-    return res.status(result.status).json({ error: result.error });
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
 
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
@@ -1271,12 +1436,13 @@ app.post('/api/game/mail/maintenance-requests/:requestId/reject', (req, res) => 
     return res.status(409).json({ error: 'Maintenance request is no longer pending.' });
   }
 
-  rejectMaintenanceRequest(
-    authPlayer.galaxy,
-    request,
-    'Maintenance request rejected.',
-    'Your maintenance request was rejected.'
+  const result = rejectFleetMaintenanceRequest(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId
   );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
+  }
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
@@ -1304,12 +1470,13 @@ app.post('/api/game/mail/maintenance-requests/:requestId/cancel', (req, res) => 
     return res.status(409).json({ error: 'Maintenance request is no longer pending.' });
   }
 
-  cancelMaintenanceRequest(
-    authPlayer.galaxy,
-    request,
-    'You cancelled the maintenance request.',
-    'The requesting fleet cancelled its maintenance request.'
+  const result = cancelFleetMaintenanceRequest(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId
   );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
+  }
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
@@ -1337,9 +1504,12 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/approve', (req, res) => {
     return res.status(409).json({ error: 'Jump Gate request is no longer pending.' });
   }
 
-  const result = approveJumpGateRequest(authPlayer.galaxy, request);
-  if ('error' in result) {
-    return res.status(result.status).json({ error: result.error });
+  const result = approveJumpGateRequestCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId
+  );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
 
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
@@ -1369,7 +1539,13 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/reject', (req, res) => {
     return res.status(409).json({ error: 'Jump Gate request is no longer pending.' });
   }
 
-  rejectJumpGateRequest(authPlayer.galaxy, request, DiplomaticProposalState.REJECTED);
+  const result = rejectJumpGateRequestCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId
+  );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
+  }
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
@@ -1397,7 +1573,13 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/cancel', (req, res) => {
     return res.status(409).json({ error: 'Jump Gate request is no longer pending.' });
   }
 
-  rejectJumpGateRequest(authPlayer.galaxy, request, DiplomaticProposalState.CANCELLED);
+  const result = cancelJumpGateRequestCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId
+  );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
+  }
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
@@ -1492,7 +1674,10 @@ app.post('/api/game/end-turn', (req, res) => {
 
   try {
     const resolvedTurnNumber = controller.galaxy.currentTurn + 1;
-    resolvePhaseOneTurn(controller.galaxy, resolvedTurnNumber);
+    runBotTurnPhase(controller.galaxy);
+    resolvePhaseOneTurn(controller.galaxy, resolvedTurnNumber, {
+      botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0
+    });
     controller.galaxy.currentTurn = resolvedTurnNumber;
     processSensorPhalanxTurnStart(controller.galaxy, controller.galaxy.currentTurn);
     expirePendingDiplomaticProposals(controller.galaxy, controller.galaxy.currentTurn);
@@ -1915,55 +2100,15 @@ app.post('/api/game/building-queue', (req, res) => {
     return res.status(400).json({ error: 'Invalid building queue payload.' });
   }
 
-  const system = currentGalaxy.stars[y]?.[x];
-  if (!system) {
-    return res.status(404).json({ error: 'Star system not found.' });
-  }
-
-  const planet = system.planets[z];
-  if (!planet) {
-    return res.status(404).json({ error: 'Planet not found.' });
-  }
-
-  if (planet.info.ownerId !== playerId) {
-    return res.status(403).json({ error: 'Only your own planets can be modified.' });
-  }
-
-  const queueLimit = calculateMaxBuildingQueueLength(planet, player);
-  if (planet.rBDSFTQ.buildingQueue.length >= queueLimit) {
-    return res.status(400).json({ error: 'Queue full.' });
-  }
-
-  const alreadyQueued = planet.rBDSFTQ.buildingQueue.some(
-    (entry) => entry.buildingType === buildingType
+  const result = startBuildingConstruction(
+    { galaxy: currentGalaxy, playerId },
+    { x, y, z, buildingType }
   );
-  if (alreadyQueued) {
-    return res.status(400).json({ error: 'Building type is already queued.' });
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
   }
 
-  const building = BUILDING_BLUEPRINTS.get(buildingType);
-  if (!building) {
-    return res.status(400).json({ error: 'Unknown building type.' });
-  }
-
-  const nextLevel = planet.getBuildingLevel(buildingType) + 1;
-  if (!hasBuildingRequirements(planet, building, nextLevel)) {
-    return res.status(400).json({ error: 'Building requirements are not met.' });
-  }
-
-  if (!hasTechnologyRequirements(player, building, nextLevel)) {
-    return res.status(400).json({ error: 'Technology requirements are not met.' });
-  }
-
-  const cost = building.getCostForLevel(nextLevel);
-  if (!planet.rBDSFTQ.resources.isSufficient(cost)) {
-    return res.status(400).json({ error: 'Insufficient resources.' });
-  }
-
-  planet.rBDSFTQ.resources.subtractResourcePack(cost);
-  planet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(buildingType, nextLevel, 0));
-
-  const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  const clientPlanet = currentGalaxy.createClientPlanet(result.value.planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
   return res.status(200).json(response);
 });
@@ -2130,79 +2275,15 @@ app.post('/api/game/shipyard-queue', (req, res) => {
     return res.status(400).json({ error: 'Invalid shipyard queue payload.' });
   }
 
-  const system = currentGalaxy.stars[y]?.[x];
-  if (!system) {
-    return res.status(404).json({ error: 'Star system not found.' });
-  }
-
-  const planet = system.planets[z];
-  if (!planet) {
-    return res.status(404).json({ error: 'Planet not found.' });
-  }
-
-  if (planet.info.ownerId !== playerId) {
-    return res.status(403).json({ error: 'Only your own planets can be modified.' });
-  }
-
-  const shipyardLevel = planet.getBuildingLevel(BUILDING_TYPE_SHIPYARD);
-  if (shipyardLevel <= 0) {
-    return res.status(400).json({ error: 'Build Shipyard first.' });
-  }
-
-  const queueLimit = calculateMaxShipyardQueueLength(planet, player);
-  if (planet.rBDSFTQ.shipyardQueue.length >= queueLimit) {
-    return res.status(400).json({ error: 'Queue full.' });
-  }
-
-  const ship = itemKind === 'ship' && shipType ? SHIP_BLUEPRINTS.get(shipType) : null;
-  const defence = itemKind === 'defence' && defenceType ? DEFENCE_BLUEPRINTS.get(defenceType) : null;
-  const blueprint = ship ?? defence;
-  if (!blueprint) {
-    return res.status(400).json({ error: itemKind === 'ship' ? 'Unknown ship type.' : 'Unknown defence type.' });
-  }
-
-  const hasBuildingReqs = itemKind === 'ship'
-    ? hasShipBuildingRequirements(planet, ship!)
-    : hasDefenceBuildingRequirements(planet, defence!);
-  if (!hasBuildingReqs) {
-    return res.status(400).json({ error: 'Building requirements are not met.' });
-  }
-
-  const hasTechReqs = itemKind === 'ship'
-    ? hasShipTechnologyRequirements(player, ship!)
-    : hasDefenceTechnologyRequirements(player, defence!);
-  if (!hasTechReqs) {
-    return res.status(400).json({ error: 'Technology requirements are not met.' });
-  }
-
-  if (
-    itemKind === 'defence'
-    && defenceType
-    && isPlanetaryBombDefenceType(defenceType as DefenceTypeType)
-  ) {
-    const bombDepotCapacity = Math.max(0, Math.floor(planet.getBuildingProductionValue1(BuildingType.BOMB_DEPOT as BuildingTypeType)));
-    const queuedBombs = planet.rBDSFTQ.shipyardQueue
-      .filter((entry) => entry.itemKind === 'defence' && isPlanetaryBombDefenceType(entry.defenceType as DefenceTypeType))
-      .reduce((sum, entry) => sum + Math.max(0, Math.floor(entry.amount)), 0);
-    const totalBombsAfterQueue = countPlanetaryBombs(planet.rBDSFTQ.defences) + queuedBombs + amount;
-    if (totalBombsAfterQueue > bombDepotCapacity) {
-      return res.status(400).json({ error: 'Bomb Depot capacity reached.' });
-    }
-  }
-
-  const totalCost = multiplyResourcePack(blueprint.cost, amount);
-  if (!planet.rBDSFTQ.resources.isSufficient(totalCost)) {
-    return res.status(400).json({ error: 'Insufficient resources.' });
-  }
-
-  planet.rBDSFTQ.resources.subtractResourcePack(totalCost);
-  planet.rBDSFTQ.shipyardQueue.push(
-    itemKind === 'ship'
-      ? ShipyardQueueEntry.ship(shipType as ShipTypeType, amount, 0)
-      : ShipyardQueueEntry.defence(defenceType as DefenceTypeType, amount, 0)
+  const result = startShipyardConstruction(
+    { galaxy: currentGalaxy, playerId },
+    { x, y, z, itemKind, shipType, defenceType, amount }
   );
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
+  }
 
-  const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  const clientPlanet = currentGalaxy.createClientPlanet(result.value.planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
   return res.status(200).json(response);
 });
@@ -2364,124 +2445,12 @@ app.post('/api/game/technology-queue', (req, res) => {
     return res.status(400).json({ error: 'Invalid technology queue payload.' });
   }
 
-  const system = currentGalaxy.stars[y]?.[x];
-  if (!system) {
-    return res.status(404).json({ error: 'Star system not found.' });
-  }
-
-  const planet = system.planets[z];
-  if (!planet) {
-    return res.status(404).json({ error: 'Planet not found.' });
-  }
-
-  if (planet.info.ownerId !== playerId) {
-    return res.status(403).json({ error: 'Only your own planets can be modified.' });
-  }
-
-  if (planet.getBuildingLevel(BUILDING_TYPE_RESEARCH_LAB) <= 0) {
-    return res.status(400).json({ error: 'Build Research Lab first.' });
-  }
-
-  if (planet.rBDSFTQ.currentResearchQueue) {
-    return res.status(400).json({ error: 'Queue full.' });
-  }
-
-  if (planet.rBDSFTQ.researchHelperFor) {
-    return res.status(400).json({ error: 'Research Lab is currently assigned as helper.' });
-  }
-
-  const technology = TECHNOLOGY_BLUEPRINTS.get(technologyType);
-  if (!technology) {
-    return res.status(400).json({ error: 'Unknown technology type.' });
-  }
-
-  const technologyAlreadyQueued = player.planets.some((entry) => {
-    const queue = entry.rBDSFTQ.currentResearchQueue;
-    return queue !== null && queue.technologyType === technologyType;
-  });
-  if (technologyAlreadyQueued) {
-    return res.status(400).json({ error: 'Technology is already being researched.' });
-  }
-
-  const maxLabsPerTechnology = calculateMaxLabsPerTechnology(player);
-
-  const starterCoordinates: ClientCoordinates = { x, y, z };
-  const uniqueHelperCoordinates: ClientCoordinates[] = [];
-  const helperPlanets: Planet[] = [];
-  const helperIds = new Set<string>();
-
-  for (const coordinates of helperCoordinates) {
-    if (sameCoordinates(coordinates, starterCoordinates)) {
-      continue;
-    }
-
-    const helperId = toCoordinatesId(coordinates);
-    if (helperIds.has(helperId)) {
-      continue;
-    }
-
-    const helperSystem = currentGalaxy.stars[coordinates.y]?.[coordinates.x];
-    if (!helperSystem) {
-      return res.status(404).json({ error: 'Helper planet star system not found.' });
-    }
-
-    const helperPlanet = helperSystem.planets[coordinates.z];
-    if (!helperPlanet) {
-      return res.status(404).json({ error: 'Helper planet not found.' });
-    }
-
-    if (helperPlanet.info.ownerId !== playerId) {
-      return res.status(403).json({ error: 'Helper planet must be owned by you.' });
-    }
-
-    if (helperPlanet.getBuildingLevel(BUILDING_TYPE_RESEARCH_LAB) <= 0) {
-      return res.status(400).json({ error: 'Selected helper planet has no Research Lab.' });
-    }
-
-    if (helperPlanet.rBDSFTQ.currentResearchQueue || helperPlanet.rBDSFTQ.researchHelperFor) {
-      return res.status(400).json({ error: 'Selected helper lab is busy.' });
-    }
-
-    helperIds.add(helperId);
-    uniqueHelperCoordinates.push(coordinates);
-    helperPlanets.push(helperPlanet);
-  }
-
-  if ((1 + uniqueHelperCoordinates.length) > maxLabsPerTechnology) {
-    return res.status(400).json({ error: 'Too many helper labs assigned.' });
-  }
-
-  const nextLevel = player.getTechLevel(technologyType) + 1;
-  if (!hasResearchBuildingRequirements(planet, technology, nextLevel)) {
-    return res.status(400).json({ error: 'Building requirements are not met.' });
-  }
-
-  if (!hasResearchTechnologyRequirements(player, technology, nextLevel)) {
-    return res.status(400).json({ error: 'Technology requirements are not met.' });
-  }
-
-  const cost = technology.getCostForLevel(nextLevel);
-  if (!planet.rBDSFTQ.resources.isSufficient(cost)) {
-    return res.status(400).json({ error: 'Insufficient resources.' });
-  }
-
-  planet.rBDSFTQ.resources.subtractResourcePack(cost);
-  planet.rBDSFTQ.currentResearchQueue = new TechnologyQueueEntry(
-    technologyType,
-    nextLevel,
-    0,
-    uniqueHelperCoordinates
+  const result = startTechnologyResearch(
+    { galaxy: currentGalaxy, playerId },
+    { x, y, z, technologyType, helperPlanets: helperCoordinates }
   );
-
-  for (const helperPlanet of helperPlanets) {
-    helperPlanet.rBDSFTQ.researchHelperFor = new ResearchHelperFor(
-      {
-        x: starterCoordinates.x,
-        y: starterCoordinates.y,
-        z: starterCoordinates.z
-      },
-      technologyType
-    );
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
   }
 
   const presentation = getPresentationData(currentGalaxy, playerId);
@@ -2768,12 +2737,12 @@ app.get('/api/game/active-fleets/:fleetId/maintenance-options', (req, res) => {
     return res.status(400).json({ error: 'Invalid fleet id.' });
   }
 
-  const result = resolveMaintenanceOptionsForFleet(authPlayer.galaxy, authPlayer.player.playerId, fleetId);
-  if ('error' in result) {
-    return res.status(result.status).json({ error: result.error });
+  const result = resolveFleetMaintenanceOptions({ galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId }, fleetId);
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
 
-  return res.status(200).json(result.options);
+  return res.status(200).json(result.value);
 });
 
 app.post('/api/game/active-fleets/:fleetId/maintenance-request', (req, res) => {
@@ -2789,15 +2758,15 @@ app.post('/api/game/active-fleets/:fleetId/maintenance-request', (req, res) => {
 
   const body = req.body as CreateMaintenanceRequestRequest | undefined;
   const payload = normalizeMaintenanceTransferPayload(body);
-  const result = createMaintenanceRequestForFleet(authPlayer.galaxy, authPlayer.player.playerId, fleetId, payload);
-  if ('error' in result) {
-    return res.status(result.status).json({ error: result.error });
+  const result = createFleetMaintenanceRequest({ galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId }, fleetId, payload);
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
 
   const response: CreateMaintenanceRequestResponse = {
     activeFleets: buildOwnedActiveFleetsResponse(authPlayer.galaxy, authPlayer.player.playerId),
-    mode: result.mode,
-    message: result.message
+    mode: result.value.mode,
+    message: result.value.message
   };
   return res.status(200).json(response);
 });
@@ -2950,228 +2919,20 @@ app.post('/api/game/active-fleets', (req, res) => {
     return res.status(400).json({ error: 'Invalid fleet mission payload.' });
   }
 
-  if (!PHASE_ONE_MISSION_TYPES.has(missionType)) {
-    return res.status(400).json({ error: 'Mission type is not available in phase 1.' });
-  }
-
-  const mission = FLEET_MISSION_REGISTRY.get(missionType);
-  if (!mission) {
-    return res.status(400).json({ error: 'Mission definition not found.' });
-  }
-  const diplomacyResolver = createDiplomacyResolver(currentGalaxy);
-
-  const originSystem = currentGalaxy.stars[origin.y]?.[origin.x];
-  const targetSystem = currentGalaxy.stars[target.y]?.[target.x];
-  const originPlanet = originSystem?.planets[origin.z];
-  const targetPlanet = targetSystem?.planets[target.z];
-
-  if (!originSystem || !originPlanet) {
-    return res.status(404).json({ error: 'Origin planet not found.' });
-  }
-
-  if (!targetSystem || !targetPlanet) {
-    return res.status(404).json({ error: 'Target planet not found.' });
-  }
-
-  if (originPlanet.info.ownerId !== playerId) {
-    return res.status(403).json({ error: 'Origin planet must be owned by you.' });
-  }
-
-  const player = resolvePlayerById(currentGalaxy, playerId);
-  if (!player) {
-    return res.status(404).json({ error: 'Player not found.' });
-  }
-
-  const playerActiveFleetCount = currentGalaxy.activeFleets.filter((fleet) => fleet.ownerId === playerId).length;
-  const playerMaxActiveFleets = maxActiveFleets(player.getTechLevel(TECH_TYPE_COMPUTER_TECHNOLOGY));
-  if (playerActiveFleetCount >= playerMaxActiveFleets) {
-    return res.status(400).json({ error: 'Active fleet limit reached. Upgrade COMPUTER_TECHNOLOGY to control more fleets.' });
-  }
-
-  if (ships.length === 0) {
-    return res.status(400).json({ error: 'Select at least one ship.' });
-  }
-
-  const availableUndamagedShipsByType = countPlanetUndamagedShipsByType(originPlanet);
-  const availableDamagedShipsByType = countPlanetDamagedShipsByType(originPlanet);
-  for (const ship of ships) {
-    const availableUndamagedAmount = availableUndamagedShipsByType.get(ship.type) ?? 0;
-    if (availableUndamagedAmount < ship.undamagedAmount) {
-      return res.status(400).json({ error: `${ship.type}: not enough ready ships on origin planet.` });
-    }
-
-    const availableDamagedAmount = availableDamagedShipsByType.get(ship.type) ?? 0;
-    if (availableDamagedAmount < ship.damagedAmount) {
-      return res.status(400).json({ error: `${ship.type}: not enough damaged ships on origin planet.` });
-    }
-  }
-
-  const availableBombsByType = countPlanetBombsByType(originPlanet);
-  for (const bomb of carriedBombs) {
-    const availableAmount = availableBombsByType.get(bomb.type) ?? 0;
-    if (availableAmount < bomb.amount) {
-      return res.status(400).json({ error: `${bomb.type}: not enough bombs in BOMB_DEPOT.` });
-    }
-  }
-
-  const totalShipAmounts = toShipAmountEntriesFromSelections(ships);
-  const selectedFleetShips = toManyShipsFromShipAmounts(totalShipAmounts);
-  const totalHangarCapacity = ManyShips.totalTravelHangarCapacity(selectedFleetShips);
-  const totalBomberHangarCapacity = ManyShips.totalBomberHangarCapacity(selectedFleetShips);
-  const usedBombHangarCapacity = calculateBombHangarUsage(carriedBombs);
-  const usedHangarCapacity = ManyShips.totalRequiredHangarCapacity(selectedFleetShips) + usedBombHangarCapacity;
-  if (usedHangarCapacity > totalHangarCapacity) {
-    return res.status(400).json({ error: 'Insufficient hangar space for carried ships and bombs.' });
-  }
-  if (usedBombHangarCapacity > totalBomberHangarCapacity) {
-    return res.status(400).json({ error: 'Insufficient bomber hangar space for carried bombs.' });
-  }
-
-  const totalCargoCapacity = calculateFleetCargoCapacity(totalShipAmounts);
-  const usedCargoCapacity = cargo.metal + cargo.crystal + cargo.deuterium;
-  if (usedCargoCapacity > totalCargoCapacity) {
-    return res.status(400).json({ error: 'Insufficient cargo space.' });
-  }
-
-  const travelDistance = calculateTravelDistance(origin, target);
-  const travelTurns = useJumpGate ? 1 : Math.max(1, travelDistance);
-  const fuelMultiplier = mission.minimumFuelReserves;
-  const fuelCost = calculateFuelCost(totalShipAmounts, travelDistance, fuelMultiplier);
-
-  const hasMilitaryShips = totalShipAmounts.some((entry) => {
-    const blueprint = SHIP_BLUEPRINTS.shipsMap.get(entry.type);
-    return blueprint ? blueprint.weapons.length > 0 : false;
-  });
-  const missionLaunchContext: MissionLaunchContext = {
-    selection: {
-      ships,
-      carriedBombs,
-      cargo
-    },
-    playerId,
-    originPlanet,
-    targetPlanet,
-    targetOwner: targetPlanet.info.ownerId === null
-      ? null
-      : resolvePlayerById(currentGalaxy, targetPlanet.info.ownerId),
-    activeFleetCount: playerActiveFleetCount,
-    maxActiveFleetCount: playerMaxActiveFleets,
-    totalCargoCapacity,
-    usedCargoCapacity,
-    totalHangarCapacity,
-    usedHangarCapacity,
-    hasMilitaryShips,
-    fuelCost,
-    diplomacyResolver
-  };
-  const missionErrors = mission.validateLaunch(missionLaunchContext);
-  if (missionErrors.length > 0) {
-    return res.status(400).json({ error: missionErrors[0].text });
-  }
-
-  const totalRequiredResources = {
-    metal: cargo.metal,
-    crystal: cargo.crystal,
-    deuterium: cargo.deuterium + fuelCost
-  } as ResourcesPackType;
-  if (!originPlanet.rBDSFTQ.resources.isSufficient(totalRequiredResources)) {
-    return res.status(400).json({ error: 'Insufficient resources for cargo and fuel.' });
-  }
-
-  let jumpGateLaunchStatus: DiplomaticStatusType | null = null;
-  let jumpGateTargetOwner: Player | null = null;
-  if (useJumpGate) {
-    const jumpGateAccess = validateJumpGateLaunchAccess(
-      currentGalaxy,
-      playerId,
-      missionType,
-      originPlanet,
-      targetPlanet,
-      selectedFleetShips.totalShipsCount()
-    );
-    if ('error' in jumpGateAccess) {
-      return res.status(jumpGateAccess.status).json({ error: jumpGateAccess.error });
-    }
-
-    if (targetPlanet.info.ownerId === null) {
-      return res.status(409).json({ error: 'Jump Gate requires an owned target planet.' });
-    }
-
-    jumpGateLaunchStatus = jumpGateAccess.status;
-    jumpGateTargetOwner = jumpGateAccess.targetOwner;
-  }
-
-  let fleetShips: ManyShipsType;
-  try {
-    fleetShips = originPlanet.rBDSFTQ.ships.extractSelectedShips(ships);
-  } catch (error) {
-    console.error('Fleet launch ship extraction failed.', error);
-    return res.status(400).json({ error: 'Requested ship selection is no longer available on origin planet.' });
-  }
-  const fleetBombs = originPlanet.rBDSFTQ.defences.extractAnyDefencesByType(carriedBombs);
-
-  originPlanet.rBDSFTQ.resources.subtractResourcePack(totalRequiredResources);
-
-  const fleet = {
-    fleetId: currentGalaxy.nextFleetId,
-    ownerId: playerId,
-    missionType,
-    origin: { x: origin.x, y: origin.y, z: origin.z },
-    target: { x: target.x, y: target.y, z: target.z },
-    originPlanetName: originPlanet.basicInfo.name,
-    targetPlanetName: targetPlanet.basicInfo.name,
-    ships: fleetShips,
-    carriedBombs: fleetBombs,
-    cargo: {
-      metal: cargo.metal,
-      crystal: cargo.crystal,
-      deuterium: cargo.deuterium
-    },
-    fuelCost,
-    totalCargoCapacity,
-    usedCargoCapacity,
-    travelTurns,
-    returnTurns: travelTurns,
-    state: useJumpGate && jumpGateLaunchStatus !== null && jumpGateTargetOwner && !isJumpGateAutoApprovedStatus(jumpGateLaunchStatus)
-      ? FleetState.PENDING_JUMP_GATE
-      : FleetState.MOVING_TO_TARGET,
-    createdAtTurn: currentGalaxy.currentTurn,
-    orbitActivity: FleetOrbitActivity.IDLE,
-    suspendedMissionType: null,
-    returnReason: FleetReturnReason.NORMAL,
-    usesJumpGate: useJumpGate,
-    pendingJumpGateRequestId: null,
-    bombardmentPriorities,
-    remainingFuelReserve: fuelCost
-  } as Fleet;
-
-  currentGalaxy.nextFleetId += 1;
-  currentGalaxy.activeFleets.push(fleet);
-
-  let responseMode: CreateFleetMissionResponse['mode'] = 'LAUNCHED';
-  let responseMessage: string | null = null;
-  if (useJumpGate) {
-    if (jumpGateLaunchStatus !== null && jumpGateTargetOwner && !isJumpGateAutoApprovedStatus(jumpGateLaunchStatus)) {
-      createJumpGatePendingRequest(
-        currentGalaxy,
-        fleet,
-        jumpGateTargetOwner,
-        selectedFleetShips.totalShipsCount()
-      );
-      responseMode = 'PENDING_JUMP_GATE';
-      responseMessage = 'Jump Gate request sent. Fleet is waiting at the origin planet.';
-    } else {
-      dispatchJumpGateFleet(currentGalaxy, fleet);
-      responseMessage = 'Jump Gate launch approved. Fleet is en route.';
-    }
+  const result = createFleetMission(
+    { galaxy: currentGalaxy, playerId },
+    { missionType, origin, target, ships, carriedBombs, cargo, useJumpGate, bombardmentPriorities }
+  );
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
   }
 
   const presentation = getPresentationData(currentGalaxy, playerId);
   const response: CreateFleetMissionResponse = {
     ownedPlanets: presentation.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet)),
     activeFleets: buildOwnedActiveFleetsResponse(currentGalaxy, playerId),
-    mode: responseMode,
-    message: responseMessage
+    mode: result.value.mode,
+    message: result.value.message
   };
   return res.status(201).json(response);
 });
@@ -3544,6 +3305,13 @@ function resolveAuthenticatedGamePlayer(req: Request):
   };
 }
 
+function sendGameCommandError(
+  res: express.Response,
+  error: GameCommandError
+) {
+  return res.status(error.status).json({ error: error.message });
+}
+
 function upsertDiplomaticRelation(
   galaxy: Galaxy,
   leftPlayerId: number,
@@ -3786,6 +3554,16 @@ function parseRoutePositiveInt(value: unknown): number | null {
 
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeBotProfileId(value: unknown): BotProfileId | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return BOT_PROFILE_IDS.includes(value as BotProfileId)
+    ? value as BotProfileId
+    : null;
 }
 
 function parseBodyIntInRange(value: unknown, min: number, max: number): number | null {
@@ -5491,7 +5269,7 @@ function annotateFleetRequestMetadata(galaxy: Galaxy, fleet: Fleet): Fleet {
   const pendingJumpGateRequest = findPendingJumpGateRequestForFleet(galaxy, fleet.ownerId, fleet.fleetId);
   fleet.pendingMaintenanceRequestId = pendingMaintenanceRequest?.requestId ?? null;
   fleet.pendingJumpGateRequestId = pendingJumpGateRequest?.requestId ?? null;
-  fleet.maintenanceRequestAvailable = canFleetRequestMaintenance(galaxy, fleet);
+  fleet.maintenanceRequestAvailable = canFleetRequestMaintenanceCommand(galaxy, fleet);
   return fleet;
 }
 

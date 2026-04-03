@@ -11,7 +11,66 @@ import {
   normalizeTutorialReadState
 } from '../tutorial/tutorial-types';
 
+export type BotProfileId =
+  | 'BALANCED'
+  | 'AGGRESSOR'
+  | 'TURTLE'
+  | 'MINER'
+  | 'AVOIDER'
+  | 'BUNKERER';
+
+export const BOT_PROFILE_IDS: BotProfileId[] = [
+  'BALANCED',
+  'AGGRESSOR',
+  'TURTLE',
+  'MINER',
+  'AVOIDER',
+  'BUNKERER'
+];
+
+export type BotGoalType =
+  | 'KEY_BUILDING_UP'
+  | 'ECONOMY_TECH_UP'
+  | 'COLONIZE_NEARBY'
+  | 'REFRESH_INTEL'
+  | 'PREPARE_SAFE_ATTACK'
+  | 'FORTIFY_BORDER';
+
+export type BotMemoryCoordinates = {
+  x: number;
+  y: number;
+  z: number;
+};
+
+export type BotMemoryResources = {
+  metal: number;
+  crystal: number;
+  deuterium: number;
+};
+
+export type BotMemory = {
+  currentGoal: BotGoalType | null;
+  goalTarget: BotMemoryCoordinates | null;
+  goalExpiresTurn: number | null;
+  reservedResources: BotMemoryResources;
+  lastSpyTargets: BotMemoryCoordinates[];
+  lastAttackTargets: BotMemoryCoordinates[];
+};
+
+export type PlayerExtras = {
+  botProfileId?: BotProfileId | null;
+  botMemory?: BotMemory | null;
+};
+
+export function defaultBotProfileIdForPlayerId(playerId: number): BotProfileId {
+  const normalizedPlayerId = Number.isInteger(playerId) ? Math.abs(playerId) : 0;
+  return BOT_PROFILE_IDS[normalizedPlayerId % BOT_PROFILE_IDS.length] ?? 'BALANCED';
+}
+
 export class Player {
+  public botProfileId: BotProfileId | null;
+  public botMemory: BotMemory | null;
+
   constructor(
     public playerId: number,
     public playerName: string,
@@ -23,8 +82,12 @@ export class Player {
     public reports: PlayerReport[] = [],
     public nextReportId = 1,
     public messages: PlayerMessage[] = [],
-    public nextMessageId = 1
-  ) {}
+    public nextMessageId = 1,
+    extras: PlayerExtras = {}
+  ) {
+    this.botProfileId = extras.botProfileId ?? null;
+    this.botMemory = Player.normalizeBotMemory(extras.botMemory);
+  }
 
   public getTechLevel(type: TechnologyType): number {
     return this.tech.get(type) ?? 0;
@@ -175,5 +238,70 @@ export class Player {
     fallback = false
   ): TutorialReadState {
     return normalizeTutorialReadState(record, fallback);
+  }
+
+  public static normalizeBotMemory(memory: BotMemory | null | undefined): BotMemory | null {
+    if (!memory) {
+      return null;
+    }
+
+    return {
+      currentGoal: memory.currentGoal ?? null,
+      goalTarget: Player.normalizeBotMemoryCoordinates(memory.goalTarget),
+      goalExpiresTurn: Number.isInteger(memory.goalExpiresTurn) ? memory.goalExpiresTurn : null,
+      reservedResources: Player.normalizeBotMemoryResources(memory.reservedResources),
+      lastSpyTargets: Player.normalizeBotMemoryCoordinatesList(memory.lastSpyTargets),
+      lastAttackTargets: Player.normalizeBotMemoryCoordinatesList(memory.lastAttackTargets)
+    };
+  }
+
+  private static normalizeBotMemoryCoordinates(
+    coordinates: BotMemoryCoordinates | null | undefined
+  ): BotMemoryCoordinates | null {
+    if (
+      !coordinates
+      || !Number.isInteger(coordinates.x)
+      || !Number.isInteger(coordinates.y)
+      || !Number.isInteger(coordinates.z)
+    ) {
+      return null;
+    }
+
+    return {
+      x: coordinates.x,
+      y: coordinates.y,
+      z: coordinates.z
+    };
+  }
+
+  private static normalizeBotMemoryCoordinatesList(
+    coordinates: BotMemoryCoordinates[] | null | undefined
+  ): BotMemoryCoordinates[] {
+    if (!Array.isArray(coordinates)) {
+      return [];
+    }
+
+    return coordinates
+      .map((entry) => Player.normalizeBotMemoryCoordinates(entry))
+      .filter((entry): entry is BotMemoryCoordinates => entry !== null)
+      .slice(0, 20);
+  }
+
+  private static normalizeBotMemoryResources(
+    resources: BotMemoryResources | null | undefined
+  ): BotMemoryResources {
+    if (!resources) {
+      return {
+        metal: 0,
+        crystal: 0,
+        deuterium: 0
+      };
+    }
+
+    return {
+      metal: Number.isFinite(resources.metal) ? Math.max(0, Math.floor(resources.metal)) : 0,
+      crystal: Number.isFinite(resources.crystal) ? Math.max(0, Math.floor(resources.crystal)) : 0,
+      deuterium: Number.isFinite(resources.deuterium) ? Math.max(0, Math.floor(resources.deuterium)) : 0
+    };
   }
 }

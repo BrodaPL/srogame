@@ -41,6 +41,11 @@
   <a class="top-menu__button" routerLink="/game/mission-planner" routerLinkActive="top-menu__button--active">
     Mission Planner
   </a>
+  @if (canInspectBots()) {
+    <a class="top-menu__button" routerLink="/game/bot-debug" routerLinkActive="top-menu__button--active">
+      Bot AI
+    </a>
+  }
   <span class="top-menu__spacer" aria-hidden="true"></span>
   <button
     class="top-menu__button top-menu__button--end-turn"
