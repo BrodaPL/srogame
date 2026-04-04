@@ -7,6 +7,7 @@ import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { GameType } from '../models/enums/game-type';
 import {
+  STARTING_HOMEWORLD_PRESET_TOOLTIPS,
   STARTING_HOMEWORLD_PRESET_VALUES,
   StartingHomeworldPreset
 } from '../models/enums/starting-homeworld-preset';
@@ -57,6 +58,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected readonly botProfileIds = BOT_PROFILE_IDS;
   protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
+  protected readonly startingHomeworldPresetTooltips = STARTING_HOMEWORLD_PRESET_TOOLTIPS;
   protected readonly session: AuthStateService['session'];
   protected response: MultiplayerLobbyResponse | null = null;
   protected isLoading = false;

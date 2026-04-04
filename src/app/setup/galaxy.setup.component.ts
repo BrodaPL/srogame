@@ -8,6 +8,7 @@ import { NAMES_LIST } from '../models/enums/names-list';
 import { GameType } from '../models/enums/game-type';
 import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
 import {
+  STARTING_HOMEWORLD_PRESET_TOOLTIPS,
   STARTING_HOMEWORLD_PRESET_VALUES,
   StartingHomeworldPreset
 } from '../models/enums/starting-homeworld-preset';
@@ -56,6 +57,7 @@ export class GalaxySetupComponent {
   protected readonly botProfileIds = BOT_PROFILE_IDS;
   protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
+  protected readonly startingHomeworldPresetTooltips = STARTING_HOMEWORLD_PRESET_TOOLTIPS;
   protected readonly savedConfig = signal<GalaxySetup | null>(null);
   protected readonly session: AuthStateService['session'];
   protected isStarting = false;

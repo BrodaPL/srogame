@@ -274,13 +274,18 @@
         <label>Starting homeworld preset</label>
         <div class="test-options">
           @for (preset of startingHomeworldPresetValues; track preset) {
-            <label class="checkbox-field" for="startingHomeworldPreset-{{ preset }}">
+            <label
+              class="checkbox-field"
+              for="startingHomeworldPreset-{{ preset }}"
+              [attr.title]="startingHomeworldPresetTooltips[preset]"
+            >
               <input
                 id="startingHomeworldPreset-{{ preset }}"
                 name="startingHomeworldPreset"
                 type="radio"
                 [value]="preset"
                 [(ngModel)]="form.startingHomeworldPreset"
+                [attr.title]="startingHomeworldPresetTooltips[preset]"
               />
               <span>{{ preset }}</span>
             </label>
