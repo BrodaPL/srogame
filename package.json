@@ -8,6 +8,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "smoke:test": "node scripts/run-smoke-tests.js",
+    "mcp:smoke": "node scripts/run-mcp-smoke-tests.js",
     "bot:bench": "npx tsx scripts/run-bot-benchmarks.ts",
     "bot:smoke": "node scripts/run-bot-smoke-tests.js",
     "bot:sim": "npx tsx scripts/run-bot-simulations.ts",

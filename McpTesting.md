@@ -12,20 +12,23 @@ Sources used for this summary:
 
 ## Current State
 
-As of 2026-03-18, Chrome MCP is not configured in the active Codex home for this session:
+As of 2026-04-04, Chrome MCP has two separate configuration paths in this project, and both were verified:
 
 ```powershell
 $env:CODEX_HOME
 codex.cmd mcp list
 ```
 
-Observed result in this session:
+Observed result after the 2026-04-04 fix:
 - `CODEX_HOME=C:\Users\Broda\AppData\Local\JetBrains\WebStorm2026.1\aia\codex`
-- `codex.cmd mcp list` returned `No MCP servers configured yet.`
+- `codex.cmd mcp add chrome-devtools -- cmd /c npx -y chrome-devtools-mcp@latest --isolated` succeeded
+- `codex.cmd mcp list` now shows `chrome-devtools` enabled in the active Codex home
+- `.vscode/mcp.json` now also includes a workspace-level `chrome-devtools` entry using `cmd /c npx -y chrome-devtools-mcp@latest --isolated`
 
-Important mismatch:
+Important remaining mismatch:
 - The older Codex home at `C:\Users\Broda\AppData\Local\JetBrains\WebStorm2025.3\aia\codex` does have `chrome-devtools` registered.
-- That means previous sessions could truthfully report "Chrome MCP is configured" while a newer JetBrains Codex runtime still has no MCP servers at all.
+- Historically, the newer `WebStorm2026.1` home could still say `No MCP servers configured yet.`
+- The workspace-level config fixes new-repo-open drift, but the current chat session can still fail to expose a callable browser-backed MCP tool even when configuration is correct.
 
 Verified check:
 
@@ -66,12 +69,13 @@ Project file:
 - `.vscode/mcp.json`
 
 Current content:
-- only `angular-cli` is configured there
-- `chrome-devtools` is not configured in repo-local MCP settings
+- `angular-cli` is configured there
+- `chrome-devtools` is now also configured there with `cmd /c npx -y chrome-devtools-mcp@latest --isolated`
 
 Conclusion:
-- Chrome MCP is currently a Codex/IDE environment concern, not a project-configured concern
-- opening this repo does not automatically give Chrome MCP unless the active Codex home already has it registered
+- Chrome MCP is now configured at the workspace level as well as the Codex-home level
+- opening this repo should request Chrome MCP without depending only on stale global Codex-home state
+- this still does not guarantee that an already-running chat session will dynamically expose the browser MCP tool surface
 
 ### 2. Codex-home MCP registration
 
@@ -80,7 +84,7 @@ This is what `codex.cmd mcp list` and `codex.cmd mcp add ...` manage.
 Known working registration command on this machine:
 
 ```powershell
-codex.cmd mcp add chrome-devtools -- cmd /c npx -y chrome-devtools-mcp@latest
+codex.cmd mcp add chrome-devtools -- cmd /c npx -y chrome-devtools-mcp@latest --isolated
 ```
 
 Why `.cmd` matters:
@@ -122,18 +126,19 @@ codex.cmd mcp list
 If `chrome-devtools` is missing, register it against the active home:
 
 ```powershell
-codex.cmd mcp add chrome-devtools -- cmd /c npx -y chrome-devtools-mcp@latest
+codex.cmd mcp add chrome-devtools -- cmd /c npx -y chrome-devtools-mcp@latest --isolated
 codex.cmd mcp list
 ```
 
-### Step 2: Do not assume repo config covers Chrome MCP
+### Step 2: Check repo config, but do not confuse it with current-session usability
 
 Check `.vscode/mcp.json` only if you want to understand repo-scoped MCP.
 
 Current reality:
 - repo MCP config exists
-- but it only covers Angular CLI MCP
-- it does not solve Chrome MCP availability
+- it now includes both `angular-cli` and `chrome-devtools`
+- it helps new workspace sessions start with the right MCP declaration
+- it still does not prove that the already-running chat session can call a browser-backed MCP tool
 
 ### Step 3: Distinguish "registered" from "usable in this session"
 
@@ -203,17 +208,20 @@ Verified project history:
 Fix:
 - always check `$env:CODEX_HOME` before trusting any earlier MCP assumption
 
-### Repo config does not include Chrome MCP
+### Repo config can include Chrome MCP and now does in this repo
 
 Symptom:
 - project has `.vscode/mcp.json`
 - but Chrome MCP still is unavailable
 
 Cause:
-- repo config only registers `angular-cli`
+- repo config is not the same thing as current-session tool exposure
+- a workspace change does not retroactively give the already-running chat session a new browser tool surface
 
 Fix:
-- manage Chrome MCP through `codex.cmd mcp add ...`, or add separate repo-level config intentionally in the future
+- keep the workspace-level `chrome-devtools` entry in `.vscode/mcp.json`
+- if the active Codex home is still missing the server, run `codex.cmd mcp add ... --isolated`
+- if the current chat session still lacks browser MCP afterward, switch to Playwright or a dedicated MCP client instead of retrying blindly
 
 ### In-session tool surface can still fail after successful registration
 
@@ -392,6 +400,41 @@ Important runner notes:
 - debris smoke must use a hostile seeded fleet attacking an owned planet, because `/api/game/active-fleets` only exposes the current player's fleets and `client-planet` hides non-owned debris without report data
 - if scenario edits are made under `src/app/models/testing/`, restart the API server; `tsx watch` running from `server/` may not always pick up cross-tree changes reliably
 
+### Dedicated local MCP smoke runner now exists
+
+As of 2026-04-04, the project also has a repeatable Chrome-MCP browser smoke command:
+
+```powershell
+npm.cmd run mcp:smoke
+npm.cmd run mcp:smoke -- --headed
+```
+
+Current implementation:
+- runner: `scripts/run-mcp-smoke-tests.js`
+- result artifact: `tmp/mcp-route-smoke/result.json`
+- additional artifacts: `tmp/mcp-route-smoke/*.txt`, `tmp/mcp-route-smoke/reports.png`
+- browser path: `chrome-devtools-mcp` launching isolated Chrome directly
+
+What it covers:
+- deterministic `routeSmoke` setup through the API using a shared `localAdmin` test account
+- localStorage session/setup injection through Chrome MCP
+- main menu
+- `Planet View`
+- `Mission Planner`
+- `Operations`
+- `Reports`
+
+Operational notes:
+- defaults to `TestUserA` / `***REMOVED***`
+- override credentials with `SROGAME_MCP_USER` and `SROGAME_MCP_PASSWORD`
+- default mode is headless for repeatability; pass `--headed` to watch the visible Chrome window
+- requires the UI and API to already be running locally
+
+Verified result on 2026-04-04:
+- `npm.cmd run mcp:smoke`: passed
+- `npm.cmd run mcp:smoke -- --headed`: passed
+- both runs reached `http://localhost:4200/game/reports` and produced snapshots plus request/console artifacts
+
 ### PowerShell quoting around `npm exec ... node -e`
 
 Symptom:
@@ -444,6 +487,7 @@ Historical success:
 
 Most useful evidence:
 - `.tmp-mcp-run4.log`
+- `scripts/run-mcp-smoke-tests.js`
 
 That run shows:
 - connection to Chrome MCP succeeded
@@ -453,7 +497,7 @@ That run shows:
 - `Transport` became `RETURNING` and then resolved
 - `Spy` produced a report visible in Reports
 
-So the project has real evidence that Chrome MCP can be useful here, but not necessarily through the built-in chat tool surface.
+So the project now has both historical evidence and a checked-in repeatable runner showing that Chrome MCP can be useful here, but not necessarily through the built-in chat tool surface.
 
 ### Real browser automation fallback worked
 
@@ -483,7 +527,7 @@ For this project, use this decision rule:
 1. Check `CODEX_HOME` and `codex.cmd mcp list`.
 2. If `chrome-devtools` is missing, register it.
 3. If the chat session still does not expose stable browser-backed MCP, stop debugging the chat surface quickly.
-4. If MCP itself matters, use a dedicated local MCP client over stdio.
+4. If MCP itself matters, use the dedicated local runner first: `npm.cmd run mcp:smoke` or `npm.cmd run mcp:smoke -- --headed`.
 5. If the real goal is application verification, use Playwright + installed Chrome and proceed.
 6. If generated game state blocks the exact live scenario you wanted, record that as a test-state limitation and switch to deterministic API/model/spec verification for the blocked feature.
 

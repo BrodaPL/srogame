@@ -534,6 +534,12 @@ Advisory bot smoke runner:
 - writes `tmp/bot-smoke-results.json`
 - runs a live local-admin single-player bot game for 10 turns, clears mail/request blockers, then checks `/game/operations`, `/game/mail`, `/game/diplomacy`, and `/game/bot-debug`
 
+Local Chrome MCP route smoke runner:
+- `scripts/run-mcp-smoke-tests.js`
+- package entry: `npm.cmd run mcp:smoke`
+- writes `tmp/mcp-route-smoke/result.json`
+- drives Chrome through `chrome-devtools-mcp`, injects a deterministic `routeSmoke` session, and verifies main menu, Planet View, Mission Planner, Operations, and Reports
+
 Advisory bot simulation runner:
 - `scripts/run-bot-simulations.ts`
 - writes `tmp/bot-simulation-results.json`
@@ -651,6 +657,7 @@ Change tutorials:
 
 Change smoke/browser verification:
 - `scripts/run-smoke-tests.js`
+- `scripts/run-mcp-smoke-tests.js`
 - `scripts/run-bot-benchmarks.ts`
 - `scripts/run-bot-smoke-tests.js`
 - `scripts/run-bot-simulations.ts`
