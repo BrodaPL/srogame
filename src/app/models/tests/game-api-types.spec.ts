@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { StartingHomeworldPreset } from '../enums/starting-homeworld-preset';
 import {
   createDefaultBotProfileCounts,
+  DEFAULT_STARTING_HOMEWORLD_PRESET,
   expandBotProfileCounts,
   hasExactBotProfileCountMatch,
   normalizeBotProfileCounts,
@@ -38,6 +40,7 @@ describe('game-api-types bot profile counts', () => {
       AVOIDER: 0,
       BUNKERER: 0
     });
+    expect(setup.startingHomeworldPreset).toBe(DEFAULT_STARTING_HOMEWORLD_PRESET);
   });
 
   it('normalizes invalid values to zero and preserves exact totals', () => {
@@ -74,5 +77,34 @@ describe('game-api-types bot profile counts', () => {
       'AGGRESSOR',
       'MINER'
     ]);
+  });
+
+  it('falls back to MEDIUM when the homeworld preset is missing or invalid', () => {
+    const missingPreset = normalizeGalaxySetup({
+      gameType: 'PvE',
+      galaxyName: 'Missing Preset',
+      galaxyWidth: 25,
+      galaxyHeight: 20,
+      galaxyCenterSize: 10,
+      voidChance: 5,
+      starsAmountModifier: [-1, 4],
+      playerAmount: 1,
+      botsAmount: 0,
+      botDifficulty: 0,
+      neutralBotsAmount: 1,
+      neutralBotsDifficulty: 0,
+      startingResources: {
+        metal: 6,
+        crystal: 3,
+        deuterium: 1
+      }
+    });
+    const invalidPreset = normalizeGalaxySetup({
+      ...missingPreset,
+      startingHomeworldPreset: 'Broken' as StartingHomeworldPreset
+    });
+
+    expect(missingPreset.startingHomeworldPreset).toBe(StartingHomeworldPreset.MEDIUM);
+    expect(invalidPreset.startingHomeworldPreset).toBe(StartingHomeworldPreset.MEDIUM);
   });
 });

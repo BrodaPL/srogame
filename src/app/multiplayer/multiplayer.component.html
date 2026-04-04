@@ -272,6 +272,25 @@
         </div>
 
         <div class="field">
+          <label>Starting homeworld preset</label>
+          <div class="test-options">
+            @for (preset of startingHomeworldPresetValues; track preset) {
+              <label class="checkbox-field" for="lobby-startingHomeworldPreset-{{ preset }}">
+                <input
+                  id="lobby-startingHomeworldPreset-{{ preset }}"
+                  name="lobby-startingHomeworldPreset"
+                  type="radio"
+                  [value]="preset"
+                  [(ngModel)]="setupForm.startingHomeworldPreset"
+                />
+                <span>{{ preset }}</span>
+              </label>
+            }
+          </div>
+          <small>Applies only to human and bot home planets. Neutral starts stay RNG-based.</small>
+        </div>
+
+        <div class="field">
           <label>Testing options</label>
           <div class="test-options">
             <label class="checkbox-field" for="createRandomPlanets">

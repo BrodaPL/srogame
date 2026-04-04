@@ -8,7 +8,12 @@ import { NAMES_LIST } from '../models/enums/names-list';
 import { GameType } from '../models/enums/game-type';
 import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
 import {
+  STARTING_HOMEWORLD_PRESET_VALUES,
+  StartingHomeworldPreset
+} from '../models/enums/starting-homeworld-preset';
+import {
   BotProfileCountMap,
+  DEFAULT_STARTING_HOMEWORLD_PRESET,
   GalaxySetup,
   MAX_AUTO_SAVE_TURNS,
   createDefaultBotProfileCounts,
@@ -32,6 +37,7 @@ type GalaxySetupForm = {
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
   autoSaveTurns: string;
+  startingHomeworldPreset: StartingHomeworldPreset;
   botProfileCounts: Record<string, string>;
   createRandomPlanets: boolean;
   createStartingShips: boolean;
@@ -49,6 +55,7 @@ type GalaxySetupForm = {
 export class GalaxySetupComponent {
   protected readonly botProfileIds = BOT_PROFILE_IDS;
   protected readonly botProfileLabels = BOT_PROFILE_LABELS;
+  protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
   protected readonly savedConfig = signal<GalaxySetup | null>(null);
   protected readonly session: AuthStateService['session'];
   protected isStarting = false;
@@ -166,6 +173,7 @@ export class GalaxySetupComponent {
       neutralBotsAmount: Number(this.form.neutralBotsAmount),
       neutralBotsDifficulty: Number(this.form.neutralBotsDifficulty),
       autoSaveTurns: Number(this.form.autoSaveTurns),
+      startingHomeworldPreset: this.form.startingHomeworldPreset,
       createRandomPlanets: this.form.createRandomPlanets,
       createStartingShips: this.form.createStartingShips,
       skipTutorial: this.form.skipTutorial,
@@ -212,6 +220,7 @@ export class GalaxySetupComponent {
       neutralBotsAmount: '1',
       neutralBotsDifficulty: '0',
       autoSaveTurns: '5',
+      startingHomeworldPreset: DEFAULT_STARTING_HOMEWORLD_PRESET,
       botProfileCounts: this.formStringsFromBotProfileCounts(botProfileCounts),
       createRandomPlanets: false,
       createStartingShips: false,
@@ -238,6 +247,7 @@ export class GalaxySetupComponent {
       neutralBotsAmount: String(config.neutralBotsAmount),
       neutralBotsDifficulty: String(config.neutralBotsDifficulty),
       autoSaveTurns: String(config.autoSaveTurns),
+      startingHomeworldPreset: config.startingHomeworldPreset,
       botProfileCounts: this.formStringsFromBotProfileCounts(
         config.botProfileCounts ?? createDefaultBotProfileCounts(config.botsAmount)
       ),
@@ -319,6 +329,9 @@ export class GalaxySetupComponent {
       Number.isInteger(config.autoSaveTurns) &&
       config.autoSaveTurns >= 0 &&
       config.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&
+      (config.startingHomeworldPreset === StartingHomeworldPreset.LOW
+        || config.startingHomeworldPreset === StartingHomeworldPreset.MEDIUM
+        || config.startingHomeworldPreset === StartingHomeworldPreset.HIGH) &&
       (config.createRandomPlanets === undefined || typeof config.createRandomPlanets === 'boolean') &&
       (config.createStartingShips === undefined || typeof config.createStartingShips === 'boolean') &&
       (config.skipTutorial === undefined || typeof config.skipTutorial === 'boolean') &&

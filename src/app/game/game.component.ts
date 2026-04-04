@@ -5,7 +5,12 @@ import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameType } from '../models/enums/game-type';
-import { GalaxySetup, hasExactBotProfileCountMatch } from '../models/game-api-types';
+import { StartingHomeworldPreset } from '../models/enums/starting-homeworld-preset';
+import {
+  GalaxySetup,
+  hasExactBotProfileCountMatch,
+  normalizeGalaxySetup
+} from '../models/game-api-types';
 
 @Component({
   selector: 'app-game',
@@ -66,7 +71,7 @@ export class GameComponent implements OnInit {
     }
 
     try {
-      const parsed = JSON.parse(stored) as GalaxySetup;
+      const parsed = normalizeGalaxySetup(JSON.parse(stored) as GalaxySetup);
       if (this.isValidConfig(parsed)) {
         return parsed;
       }
@@ -121,6 +126,9 @@ export class GameComponent implements OnInit {
       Number.isInteger(config.neutralBotsDifficulty) &&
       config.neutralBotsDifficulty >= -100 &&
       config.neutralBotsDifficulty <= 200 &&
+      (config.startingHomeworldPreset === StartingHomeworldPreset.LOW
+        || config.startingHomeworldPreset === StartingHomeworldPreset.MEDIUM
+        || config.startingHomeworldPreset === StartingHomeworldPreset.HIGH) &&
       (config.skipTutorial === undefined || typeof config.skipTutorial === 'boolean') &&
       Number.isFinite(config.startingResources?.metal) &&
       config.startingResources.metal >= 0 &&

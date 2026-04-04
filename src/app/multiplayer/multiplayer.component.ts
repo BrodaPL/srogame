@@ -6,9 +6,14 @@ import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { GameType } from '../models/enums/game-type';
+import {
+  STARTING_HOMEWORLD_PRESET_VALUES,
+  StartingHomeworldPreset
+} from '../models/enums/starting-homeworld-preset';
 import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
 import {
   BotProfileCountMap,
+  DEFAULT_STARTING_HOMEWORLD_PRESET,
   GalaxySetup,
   MAX_AUTO_SAVE_TURNS,
   MultiplayerLobbyLoadSeatDto,
@@ -33,6 +38,7 @@ type LobbySetupForm = {
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
   autoSaveTurns: string;
+  startingHomeworldPreset: StartingHomeworldPreset;
   botProfileCounts: Record<string, string>;
   createRandomPlanets: boolean;
   createStartingShips: boolean;
@@ -50,6 +56,7 @@ type LobbySetupForm = {
 export class MultiplayerComponent implements OnDestroy {
   protected readonly botProfileIds = BOT_PROFILE_IDS;
   protected readonly botProfileLabels = BOT_PROFILE_LABELS;
+  protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
   protected readonly session: AuthStateService['session'];
   protected response: MultiplayerLobbyResponse | null = null;
   protected isLoading = false;
@@ -365,6 +372,7 @@ export class MultiplayerComponent implements OnDestroy {
       neutralBotsAmount,
       neutralBotsDifficulty,
       autoSaveTurns,
+      startingHomeworldPreset: this.setupForm.startingHomeworldPreset,
       createRandomPlanets: this.setupForm.createRandomPlanets,
       createStartingShips: this.setupForm.createStartingShips,
       skipTutorial: this.setupForm.skipTutorial,
@@ -387,6 +395,7 @@ export class MultiplayerComponent implements OnDestroy {
       neutralBotsAmount: String(setup.neutralBotsAmount),
       neutralBotsDifficulty: String(setup.neutralBotsDifficulty),
       autoSaveTurns: String(setup.autoSaveTurns),
+      startingHomeworldPreset: setup.startingHomeworldPreset,
       botProfileCounts: this.formStringsFromBotProfileCounts(
         setup.botProfileCounts ?? createDefaultBotProfileCounts(setup.botsAmount)
       ),
@@ -433,6 +442,7 @@ export class MultiplayerComponent implements OnDestroy {
       neutralBotsAmount: 1,
       neutralBotsDifficulty: 0,
       autoSaveTurns: 5,
+      startingHomeworldPreset: DEFAULT_STARTING_HOMEWORLD_PRESET,
       createRandomPlanets: false,
       createStartingShips: false,
       skipTutorial: true,

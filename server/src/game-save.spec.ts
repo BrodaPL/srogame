@@ -8,6 +8,7 @@ import { DefenceType } from '../../src/app/models/enums/defence-type.js';
 import { FleetMissionType } from '../../src/app/models/enums/fleet-mission-type.js';
 import { FleetOrbitActivity, FleetState } from '../../src/app/models/fleets/fleet.js';
 import { GameType } from '../../src/app/models/enums/game-type.js';
+import { StartingHomeworldPreset } from '../../src/app/models/enums/starting-homeworld-preset.js';
 import { DEFAULT_AUTO_SAVE_TURNS, normalizeGalaxySetup } from '../../src/app/models/game-api-types.js';
 import { NoteBorderColor } from '../../src/app/models/enums/note-border-color.js';
 import { PlayerType } from '../../src/app/models/enums/player-type.js';
@@ -171,6 +172,7 @@ describe('game-save', () => {
     });
 
     expect(normalized.autoSaveTurns).toBe(DEFAULT_AUTO_SAVE_TURNS);
+    expect(normalized.startingHomeworldPreset).toBe(StartingHomeworldPreset.MEDIUM);
   });
 
   it('writes rotating autosaves with galaxy-based names and keeps five slots', () => {
@@ -455,6 +457,7 @@ function buildTestSave() {
     createRandomPlanets: false,
     createStartingShips: false,
     skipTutorial: true,
+    startingHomeworldPreset: StartingHomeworldPreset.MEDIUM,
     startingResources: { metal: 6, crystal: 3, deuterium: 1 }
   }, '2026-04-01T12:00:00.000Z');
 }

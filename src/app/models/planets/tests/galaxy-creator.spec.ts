@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { BuildingType } from '../../enums/building-type';
+import { DefenceType } from '../../enums/defence-type';
 import { GalaxyCreator } from '../galaxy-creator';
 import { GameType } from '../../enums/game-type';
+import { StartingHomeworldPreset } from '../../enums/starting-homeworld-preset';
 import { PlayerType } from '../../enums/player-type';
 import { PlanetType } from '../../enums/planet-type';
+import { ShipType } from '../../enums/ship-type';
+import { TechnologyType } from '../../enums/technology-type';
+import { ManyDefences } from '../../defences/many-defences';
+import { ManyShips } from '../../fleets/many-ships';
 import type { GalaxySetup } from '../../game-api-types';
 
 describe('GalaxyCreator', () => {
@@ -19,6 +26,7 @@ describe('GalaxyCreator', () => {
     botDifficulty: 0,
     neutralBotsAmount: 1,
     neutralBotsDifficulty: 0,
+    startingHomeworldPreset: StartingHomeworldPreset.MEDIUM,
     startingResources: {
       metal: 1000,
       crystal: 1000,
@@ -101,5 +109,49 @@ describe('GalaxyCreator', () => {
       'AGGRESSOR',
       'MINER'
     ]);
+  });
+
+  it('applies the configured homeworld preset to both human and bot starts', () => {
+    const galaxy = new GalaxyCreator(createSetup({
+      botsAmount: 1,
+      neutralBotsAmount: 0,
+      startingHomeworldPreset: StartingHomeworldPreset.HIGH
+    })).createGalaxy(['Human']);
+
+    const human = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER);
+    const bot = galaxy.players.find((entry) => entry.type === PlayerType.BOT);
+
+    expect(human).toBeTruthy();
+    expect(bot).toBeTruthy();
+
+    const humanHome = human!.planets[0];
+    const botHome = bot!.planets[0];
+    const humanShips = ManyShips.countByType(humanHome.rBDSFTQ.ships);
+    const botShips = ManyShips.countByType(botHome.rBDSFTQ.ships);
+    const humanDefences = ManyDefences.undamagedCountByType(humanHome.rBDSFTQ.defences);
+    const botDefences = ManyDefences.undamagedCountByType(botHome.rBDSFTQ.defences);
+
+    expect(humanHome.getBuildingLevel(BuildingType.METAL_STORAGE)).toBe(2);
+    expect(humanHome.getBuildingLevel(BuildingType.METAL_MINE)).toBe(3);
+    expect(humanHome.getBuildingLevel(BuildingType.FUSION_REACTOR)).toBe(1);
+    expect(humanHome.getBuildingLevel(BuildingType.SHIPYARD)).toBe(2);
+    expect(humanHome.getBuildingLevel(BuildingType.RESEARCH_LAB)).toBe(1);
+    expect(humanShips.get(ShipType.FIGHTER)).toBe(8);
+    expect(humanShips.get(ShipType.SPY_PROBE)).toBe(16);
+    expect(humanShips.get(ShipType.BATTLE_SHIP)).toBe(1);
+    expect(humanShips.get(ShipType.TRANSPORTER)).toBe(1);
+    expect(humanShips.get(ShipType.COLONIZER)).toBe(1);
+    expect(humanDefences.get(DefenceType.SAM_SITE)).toBe(10);
+    expect(human!.getTechLevel(TechnologyType.FUSION_DRIVE)).toBe(1);
+    expect(human!.getTechLevel(TechnologyType.HYPERSPACE_DRIVE)).toBe(1);
+    expect(human!.getTechLevel(TechnologyType.COMPUTER_TECHNOLOGY)).toBe(1);
+    expect(human!.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY)).toBe(2);
+    expect(human!.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY)).toBe(1);
+
+    expect(botHome.getBuildingLevel(BuildingType.METAL_STORAGE)).toBe(2);
+    expect(botShips.get(ShipType.FIGHTER)).toBe(8);
+    expect(botShips.get(ShipType.COLONIZER)).toBe(1);
+    expect(botDefences.get(DefenceType.SAM_SITE)).toBe(10);
+    expect(bot!.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY)).toBe(2);
   });
 });

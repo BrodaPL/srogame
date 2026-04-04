@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingType } from '../../enums/building-type';
 import { GameType } from '../../enums/game-type';
+import { StartingHomeworldPreset } from '../../enums/starting-homeworld-preset';
 import { PlayerType } from '../../enums/player-type';
 import { ShipType } from '../../enums/ship-type';
 import { TechnologyType } from '../../enums/technology-type';
@@ -25,6 +26,7 @@ function createSetup(): GalaxySetup {
     botDifficulty: 0,
     neutralBotsAmount: 0,
     neutralBotsDifficulty: 0,
+    startingHomeworldPreset: StartingHomeworldPreset.MEDIUM,
     createRandomPlanets: false,
     createStartingShips: false,
     skipTutorial: true,

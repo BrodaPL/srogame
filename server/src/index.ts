@@ -6335,6 +6335,9 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Number.isInteger(setup.autoSaveTurns) &&
     setup.autoSaveTurns >= 0 &&
     setup.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&
+    (setup.startingHomeworldPreset === 'Low'
+      || setup.startingHomeworldPreset === 'Medium'
+      || setup.startingHomeworldPreset === 'High') &&
     (setup.createRandomPlanets === undefined || typeof setup.createRandomPlanets === 'boolean') &&
     (setup.createStartingShips === undefined || typeof setup.createStartingShips === 'boolean') &&
     (setup.skipTutorial === undefined || typeof setup.skipTutorial === 'boolean') &&

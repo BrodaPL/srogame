@@ -13,9 +13,14 @@ import { RngShipsGenerator } from '../../generators/rng-ships-generator';
 import { RngResourceGenerator } from '../../generators/rng-resource-generator';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { BuildingType } from '../enums/building-type';
+import { DefenceType } from '../enums/defence-type';
+import { StartingHomeworldPreset } from '../enums/starting-homeworld-preset';
+import { TechnologyType } from '../enums/technology-type';
+import { ShipType } from '../enums/ship-type';
 import { ManyShips } from '../fleets/many-ships';
 import { ResourcesPack } from '../resources-pack';
 import { ShipInstance } from '../fleets/ship-instance';
+import { ManyDefences } from '../defences/many-defences';
 import { createTutorialReadState } from '../../tutorial/tutorial-types';
 
 
@@ -390,9 +395,7 @@ export class GalaxyCreator {
         slot.planet.basicInfo.order,
         startingPlanet.basicInfo.type
       );
-      this.applyBuildingLevelsToPlanet(startingPlanet, this.createStartingBuildings());
-      startingPlanet.rBDSFTQ.resources = this.createStartingResources();
-      startingPlanet.rBDSFTQ.ships = ManyShips.empty();
+      this.applyStartingHomeworldPreset(startingPlanet);
 
       slot.system.planets[slot.index] = startingPlanet;
 
@@ -400,7 +403,7 @@ export class GalaxyCreator {
         playerId,
         name,
         [startingPlanet],
-        new Map(),
+        this.createStartingTechLevels(),
         [],
         PlayerType.PLAYER,
         createTutorialReadState(this.setup.skipTutorial === true)
@@ -452,9 +455,7 @@ export class GalaxyCreator {
         slot.planet.basicInfo.order,
         startingPlanet.basicInfo.type
       );
-      this.applyBuildingLevelsToPlanet(startingPlanet, this.createStartingBuildings());
-      startingPlanet.rBDSFTQ.resources = this.createStartingResources();
-      startingPlanet.rBDSFTQ.ships = ManyShips.empty();
+      this.applyStartingHomeworldPreset(startingPlanet);
 
       slot.system.planets[slot.index] = startingPlanet;
 
@@ -462,7 +463,7 @@ export class GalaxyCreator {
         playerId,
         botName,
         [startingPlanet],
-        new Map(),
+        this.createStartingTechLevels(),
         [],
         PlayerType.BOT,
         createTutorialReadState(true),
@@ -607,22 +608,120 @@ export class GalaxyCreator {
 
   private createStartingBuildings(): Map<BuildingType, number> {
     const map = new Map<BuildingType, number>();
-    const starters: BuildingType[] = [
-      BuildingType.METAL_MINE,
-      BuildingType.CRYSTAL_MINE,
-      BuildingType.SOLAR_WIND_GEOTHERMAL,
-      BuildingType.NUCLEAR_PLANT,
-      BuildingType.METAL_STORAGE,
-      BuildingType.CRYSTAL_STORAGE,
-      BuildingType.DEUTERIUM_TANK,
-      BuildingType.ROBOTICS_FACTORY
-    ];
-
-    for (const type of starters) {
-      map.set(type, 1);
+    switch (this.setup.startingHomeworldPreset) {
+      case StartingHomeworldPreset.LOW:
+        map.set(BuildingType.METAL_STORAGE, 1);
+        map.set(BuildingType.CRYSTAL_STORAGE, 1);
+        map.set(BuildingType.DEUTERIUM_TANK, 1);
+        map.set(BuildingType.METAL_MINE, 1);
+        map.set(BuildingType.CRYSTAL_MINE, 1);
+        map.set(BuildingType.SOLAR_WIND_GEOTHERMAL, 1);
+        map.set(BuildingType.NUCLEAR_PLANT, 1);
+        map.set(BuildingType.ROBOTICS_FACTORY, 1);
+        break;
+      case StartingHomeworldPreset.HIGH:
+        map.set(BuildingType.METAL_STORAGE, 2);
+        map.set(BuildingType.CRYSTAL_STORAGE, 2);
+        map.set(BuildingType.DEUTERIUM_TANK, 2);
+        map.set(BuildingType.METAL_MINE, 3);
+        map.set(BuildingType.CRYSTAL_MINE, 2);
+        map.set(BuildingType.DEUTERIUM_SYNTHESIZER, 1);
+        map.set(BuildingType.SOLAR_WIND_GEOTHERMAL, 2);
+        map.set(BuildingType.NUCLEAR_PLANT, 2);
+        map.set(BuildingType.FUSION_REACTOR, 1);
+        map.set(BuildingType.ROBOTICS_FACTORY, 3);
+        map.set(BuildingType.SHIPYARD, 2);
+        map.set(BuildingType.RESEARCH_LAB, 1);
+        break;
+      case StartingHomeworldPreset.MEDIUM:
+      default:
+        map.set(BuildingType.METAL_STORAGE, 1);
+        map.set(BuildingType.CRYSTAL_STORAGE, 1);
+        map.set(BuildingType.DEUTERIUM_TANK, 1);
+        map.set(BuildingType.METAL_MINE, 2);
+        map.set(BuildingType.CRYSTAL_MINE, 1);
+        map.set(BuildingType.DEUTERIUM_SYNTHESIZER, 1);
+        map.set(BuildingType.SOLAR_WIND_GEOTHERMAL, 2);
+        map.set(BuildingType.NUCLEAR_PLANT, 2);
+        map.set(BuildingType.ROBOTICS_FACTORY, 2);
+        map.set(BuildingType.SHIPYARD, 1);
+        map.set(BuildingType.RESEARCH_LAB, 1);
+        break;
     }
 
     return map;
+  }
+
+  private createStartingTechLevels(): Map<TechnologyType, number> {
+    const map = new Map<TechnologyType, number>();
+
+    switch (this.setup.startingHomeworldPreset) {
+      case StartingHomeworldPreset.LOW:
+        break;
+      case StartingHomeworldPreset.HIGH:
+        map.set(TechnologyType.FUSION_DRIVE, 1);
+        map.set(TechnologyType.HYPERSPACE_DRIVE, 1);
+        map.set(TechnologyType.COMPUTER_TECHNOLOGY, 1);
+        map.set(TechnologyType.ESPIONAGE_TECHNOLOGY, 2);
+        map.set(TechnologyType.ADAPTIVE_TECHNOLOGY, 1);
+        break;
+      case StartingHomeworldPreset.MEDIUM:
+      default:
+        map.set(TechnologyType.FUSION_DRIVE, 1);
+        map.set(TechnologyType.HYPERSPACE_DRIVE, 1);
+        map.set(TechnologyType.ESPIONAGE_TECHNOLOGY, 1);
+        break;
+    }
+
+    return map;
+  }
+
+  private createStartingShips(): ManyShips {
+    const ships = ManyShips.empty();
+
+    switch (this.setup.startingHomeworldPreset) {
+      case StartingHomeworldPreset.LOW:
+        break;
+      case StartingHomeworldPreset.HIGH:
+        ships.addUndamaged(ShipType.FIGHTER, 8);
+        ships.addUndamaged(ShipType.SPY_PROBE, 16);
+        ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
+        ships.addUndamaged(ShipType.TRANSPORTER, 1);
+        ships.addUndamaged(ShipType.COLONIZER, 1);
+        break;
+      case StartingHomeworldPreset.MEDIUM:
+      default:
+        ships.addUndamaged(ShipType.SPY_PROBE, 8);
+        ships.addUndamaged(ShipType.TRANSPORTER, 1);
+        break;
+    }
+
+    return ships;
+  }
+
+  private createStartingDefences(): ManyDefences {
+    const defences = ManyDefences.empty();
+
+    switch (this.setup.startingHomeworldPreset) {
+      case StartingHomeworldPreset.LOW:
+        break;
+      case StartingHomeworldPreset.HIGH:
+        defences.addUndamaged(DefenceType.SAM_SITE, 10);
+        break;
+      case StartingHomeworldPreset.MEDIUM:
+      default:
+        defences.addUndamaged(DefenceType.SAM_SITE, 4);
+        break;
+    }
+
+    return defences;
+  }
+
+  private applyStartingHomeworldPreset(planet: Planet): void {
+    this.applyBuildingLevelsToPlanet(planet, this.createStartingBuildings());
+    planet.rBDSFTQ.resources = this.createStartingResources();
+    planet.rBDSFTQ.defences = this.createStartingDefences();
+    planet.rBDSFTQ.ships = this.createStartingShips();
   }
 
   private applyBuildingLevelsToPlanet(planet: Planet, buildingLevels: Map<BuildingType, number>): void {

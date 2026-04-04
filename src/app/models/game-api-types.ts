@@ -22,6 +22,7 @@ import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
 import type { DiplomaticProposalState } from './diplomacy/diplomatic-proposal-state';
 import type { BombardmentPriorities } from './bombardment/bombardment-priority';
 import type { TradeResourceType } from './trade/trade-resource-type';
+import { StartingHomeworldPreset } from './enums/starting-homeworld-preset';
 import { BOT_PROFILE_IDS } from './player';
 import type { BotGoalType, BotProfileId } from './player';
 
@@ -42,6 +43,7 @@ export type GalaxySetup = {
   neutralBotsAmount: number;
   neutralBotsDifficulty: number;
   autoSaveTurns: number;
+  startingHomeworldPreset: StartingHomeworldPreset;
   createRandomPlanets?: boolean;
   createStartingShips?: boolean;
   skipTutorial?: boolean;
@@ -56,10 +58,15 @@ export type GalaxySetup = {
 export const DEFAULT_AUTO_SAVE_TURNS = 5;
 export const MIN_AUTO_SAVE_TURNS = 0;
 export const MAX_AUTO_SAVE_TURNS = 999;
+export const DEFAULT_STARTING_HOMEWORLD_PRESET = StartingHomeworldPreset.MEDIUM;
 
-export type GalaxySetupWithOptionalAutoSaveTurns = Omit<GalaxySetup, 'autoSaveTurns' | 'botProfileCounts'> & {
+export type GalaxySetupWithOptionalAutoSaveTurns = Omit<
+  GalaxySetup,
+  'autoSaveTurns' | 'botProfileCounts' | 'startingHomeworldPreset'
+> & {
   autoSaveTurns?: unknown;
   botProfileCounts?: Partial<Record<BotProfileId, unknown>>;
+  startingHomeworldPreset?: unknown;
 };
 
 export function normalizeAutoSaveTurns(
@@ -92,8 +99,20 @@ export function normalizeGalaxySetup(
       (setup as Partial<GalaxySetup>).botProfileCounts,
       botsAmount
     ),
-    autoSaveTurns: normalizeAutoSaveTurns(setup.autoSaveTurns)
+    autoSaveTurns: normalizeAutoSaveTurns(setup.autoSaveTurns),
+    startingHomeworldPreset: normalizeStartingHomeworldPreset(setup.startingHomeworldPreset)
   };
+}
+
+export function normalizeStartingHomeworldPreset(
+  value: unknown,
+  fallback = DEFAULT_STARTING_HOMEWORLD_PRESET
+): StartingHomeworldPreset {
+  return value === StartingHomeworldPreset.LOW
+    || value === StartingHomeworldPreset.MEDIUM
+    || value === StartingHomeworldPreset.HIGH
+    ? value
+    : fallback;
 }
 
 export function createEmptyBotProfileCounts(): BotProfileCountMap {
