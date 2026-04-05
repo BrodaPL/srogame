@@ -43,20 +43,16 @@ Result:
 
 ## Browser Test Accounts
 
-Use these when a browser/MCP/Playwright verification flow needs authenticated users without creating fresh accounts:
+Use local `localAdmin` test accounts from the ignored `server/data/auth.json` when a browser/MCP/Playwright verification flow needs authenticated users without creating fresh accounts.
 
-- `TestUserA`
-- `TestUserB`
-- `TestUserC`
-
-Shared password for all three:
-
-```text
-***REMOVED***
-```
+Credentials are intentionally not stored in git anymore.
+Browser smoke runners now load them from:
+- `scripts/local-test-credentials.json` (ignored)
+- template: `scripts/local-test-credentials.example.json`
 
 Current role note:
-- all three currently have `localAdmin=true` in `server/data/auth.json`
+- typical local names used on this machine are `TestUserA`, `TestUserB`, and `TestUserC`
+- those local test users currently have `localAdmin=true` in `server/data/auth.json`
 - this is useful for testing `/setup`, `/load`, and `/multiplayer` host flows without editing auth data first
 
 ## Configuration Layers
@@ -425,8 +421,7 @@ What it covers:
 - `Reports`
 
 Operational notes:
-- defaults to `TestUserA` / `***REMOVED***`
-- override credentials with `SROGAME_MCP_USER` and `SROGAME_MCP_PASSWORD`
+- credentials come from the ignored `scripts/local-test-credentials.json` file under the `mcpSmoke` key
 - default mode is headless for repeatability; pass `--headed` to watch the visible Chrome window
 - requires the UI and API to already be running locally
 

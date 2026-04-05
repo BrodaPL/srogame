@@ -2,13 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const { performance } = require('perf_hooks');
 const { chromium } = require('playwright');
+const { loadTestCredential } = require('./test-credential-loader');
 
 const BASE_UI_URL = process.env.SROGAME_UI_URL ?? 'http://localhost:4200';
 const BASE_API_URL = process.env.SROGAME_API_URL ?? 'http://localhost:3000/api';
 const OUTPUT_PATH = path.resolve(__dirname, '..', 'tmp', 'bot-smoke-results.json');
 
-const TEST_USER_NAME = process.env.SROGAME_BOT_SMOKE_USER ?? 'TestUserA';
-const TEST_USER_PASSWORD = process.env.SROGAME_BOT_SMOKE_PASSWORD ?? '***REMOVED***';
+const TEST_CREDENTIALS = loadTestCredential('botSmoke');
 
 const CHROME_CANDIDATES = [
   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
@@ -106,11 +106,11 @@ async function loginLocalAdmin() {
   const login = await api('/auth/login', {
     method: 'POST',
     body: JSON.stringify({
-      playerName: TEST_USER_NAME,
-      password: TEST_USER_PASSWORD
+      playerName: TEST_CREDENTIALS.playerName,
+      password: TEST_CREDENTIALS.password
     })
   });
-  assert(login.response.ok, `Login failed for ${TEST_USER_NAME}: ${login.response.status}`);
+  assert(login.response.ok, `Login failed for ${TEST_CREDENTIALS.playerName}: ${login.response.status}`);
   return login.data;
 }
 

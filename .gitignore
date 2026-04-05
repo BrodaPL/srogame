@@ -2902,6 +2902,8 @@ Thumbs.db
 /aiChat/tempComm.txt
 /aiChat/tempComp.txt
 /server/data/auth.json
+/server/data/game.json
+/scripts/local-test-credentials.json
 /.tmp-app.err
 /.tmp-app.log
 /.tmp-server.err

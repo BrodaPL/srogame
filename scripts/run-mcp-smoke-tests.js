@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { performance } = require('perf_hooks');
 const { spawn } = require('child_process');
+const { loadTestCredential } = require('./test-credential-loader');
 
 const BASE_UI_URL = 'http://localhost:4200';
 const BASE_API_URL = 'http://localhost:3000/api';
@@ -123,10 +124,7 @@ function buildSetup() {
 }
 
 function resolveCredentials() {
-  return {
-    playerName: process.env.SROGAME_MCP_USER ?? 'TestUserA',
-    password: process.env.SROGAME_MCP_PASSWORD ?? '***REMOVED***'
-  };
+  return loadTestCredential('mcpSmoke');
 }
 
 async function loginAndStartGame() {
