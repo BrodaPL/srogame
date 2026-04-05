@@ -94,6 +94,7 @@ export class MultiplayerComponent implements OnDestroy {
 
   protected loadLobby(resetError = true): void {
     const requestVersion = ++this.lobbyRequestVersion;
+    const hadLobby = !!this.response?.lobby;
     this.isLoading = true;
     if (resetError) {
       this.error = null;
@@ -108,8 +109,11 @@ export class MultiplayerComponent implements OnDestroy {
 
         this.response = response;
         this.isLoading = false;
-        if (response.lobby) {
-          this.syncSetupForm(response.lobby.setup);
+        if (response.lobby && !hadLobby) {
+          this.syncSetupForm(response.lobby.setup, true);
+        }
+        if (!response.lobby) {
+          this.hasUnsavedSetupChanges = false;
         }
         this.syncSelectedSave(response);
         if (!response.activeGame) {
