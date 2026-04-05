@@ -18,6 +18,7 @@ This file captures session context for collaborators and future AI agents.
 - `BOT_LOGIC.md` is the dedicated bot-AI behavior, findings, and tuning-notes reference.
 - `McpTesting.md` is the browser/MCP workflow reference for this project.
 - `InGameTutorials.md` is the tutorial-authoring and tutorial-maintenance reference.
+- `RaspberryPiDeployment.md` is the Raspberry Pi/nginx deployment reference for this project.
 - Keep session history out of `PROJECT_MAP.md`; put it in `AGENTS.md`.
 - Updating `PROJECT_MAP.md` is mandatory after structural changes: routes, API families, major feature modules, responsibility shifts, major refactors, or smoke-test entry-point changes.
 - Usually do not update `PROJECT_MAP.md` for isolated bugfixes, copy tweaks, or styling-only changes.
@@ -68,6 +69,7 @@ This file captures session context for collaborators and future AI agents.
 - Credentials are intentionally not documented in git; browser smoke runners now read them from the ignored `scripts/local-test-credentials.json` file instead.
 
 ## Key Files
+- Raspberry Pi deployment reference: `RaspberryPiDeployment.md`
 - Tutorial maintenance guide: `InGameTutorials.md`
 - Bot behavior and findings guide: `BOT_LOGIC.md`
 - App bootstrap: `src/main.ts`, `src/app/app.config.ts`
