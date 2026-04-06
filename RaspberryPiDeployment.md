@@ -59,7 +59,7 @@ export const API_BASE_URL = '/api';
   - `/srv/srogame/server/data/auth.json`
   - `/srv/srogame/server/data/saves/`
 - The backend previously hardcoded `cors({ origin: 'http://localhost:4200' })`; this has been corrected so CORS is only enabled when `FRONTEND_ORIGIN` is explicitly set. That fits nginx same-origin deployment and still allows optional cross-origin dev usage when needed.
-- The frontend now also includes `proxy.conf.json`, and `npm run start` uses it so the relative `/api` base still works during local Angular development against a backend on `localhost:3000`.
+- The frontend now also includes `proxy.conf.json`, and the Angular `serve` target uses it by default so the relative `/api` base still works during local Angular development against a backend on `localhost:3000`.
 
 ## Checked-In Deployment Templates
 
