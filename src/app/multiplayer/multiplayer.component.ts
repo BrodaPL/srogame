@@ -55,6 +55,7 @@ type LobbySetupForm = {
   templateUrl: './multiplayer.component.html'
 })
 export class MultiplayerComponent implements OnDestroy {
+  protected readonly fixedGameType = GameType.SANDBOX;
   protected readonly botProfileIds = BOT_PROFILE_IDS;
   protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
@@ -365,7 +366,7 @@ export class MultiplayerComponent implements OnDestroy {
     }
 
     return normalizeGalaxySetup({
-      gameType: this.setupForm.gameType,
+      gameType: this.fixedGameType,
       galaxyName,
       galaxyWidth: width,
       galaxyHeight: height,
@@ -389,7 +390,7 @@ export class MultiplayerComponent implements OnDestroy {
 
   private createForm(setup: GalaxySetup): LobbySetupForm {
     return {
-      gameType: setup.gameType,
+      gameType: this.fixedGameType,
       galaxyName: setup.galaxyName,
       galaxyWidth: String(setup.galaxyWidth),
       galaxyHeight: String(setup.galaxyHeight),
@@ -435,7 +436,7 @@ export class MultiplayerComponent implements OnDestroy {
 
   private defaultSetup(): GalaxySetup {
     return normalizeGalaxySetup({
-      gameType: GameType.PVP,
+      gameType: this.fixedGameType,
       galaxyName: 'Multiplayer Sector',
       galaxyWidth: 25,
       galaxyHeight: 20,

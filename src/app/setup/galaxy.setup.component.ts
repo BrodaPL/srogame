@@ -54,6 +54,7 @@ type GalaxySetupForm = {
   templateUrl: './galaxy.setup.component.html'
 })
 export class GalaxySetupComponent {
+  protected readonly fixedGameType = GameType.SANDBOX;
   protected readonly botProfileIds = BOT_PROFILE_IDS;
   protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
@@ -156,7 +157,7 @@ export class GalaxySetupComponent {
 
     const botsAmount = Number(this.form.botsAmount);
     const config: GalaxySetup = {
-      gameType: this.form.gameType,
+      gameType: this.fixedGameType,
       galaxyName: this.form.galaxyName.trim(),
       galaxyWidth: Number(this.form.galaxyWidth),
       galaxyHeight: Number(this.form.galaxyHeight),
@@ -208,7 +209,7 @@ export class GalaxySetupComponent {
   private createDefaultForm(): GalaxySetupForm {
     const botProfileCounts = createDefaultBotProfileCounts(0);
     return {
-      gameType: GameType.PVE,
+      gameType: this.fixedGameType,
       galaxyName: this.randomGalaxyName(),
       galaxyWidth: '25',
       galaxyHeight: '20',
@@ -235,7 +236,7 @@ export class GalaxySetupComponent {
 
   private formFromConfig(config: GalaxySetup): GalaxySetupForm {
     return {
-      gameType: this.normalizeGameType(config.gameType),
+      gameType: this.fixedGameType,
       galaxyName: config.galaxyName,
       galaxyWidth: String(config.galaxyWidth),
       galaxyHeight: String(config.galaxyHeight),
@@ -350,7 +351,7 @@ export class GalaxySetupComponent {
   }
 
   private normalizeGameType(value: unknown): GameType {
-    return this.isValidGameType(value) ? value : GameType.PVE;
+    return this.isValidGameType(value) ? value : this.fixedGameType;
   }
 
   private isValidGameType(value: unknown): value is GameType {
