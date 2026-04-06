@@ -69,6 +69,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected setupForm: LobbySetupForm = this.createForm(this.defaultSetup());
   private readonly refreshHandle: number;
   private lobbyRequestVersion = 0;
+  private hasUnsavedSetupChanges = false;
 
   constructor(
     private readonly cdr: ChangeDetectorRef,
@@ -93,6 +94,7 @@ export class MultiplayerComponent implements OnDestroy {
 
   protected loadLobby(resetError = true): void {
     const requestVersion = ++this.lobbyRequestVersion;
+    const hadLobby = !!this.response?.lobby;
     this.isLoading = true;
     if (resetError) {
       this.error = null;
@@ -107,8 +109,11 @@ export class MultiplayerComponent implements OnDestroy {
 
         this.response = response;
         this.isLoading = false;
-        if (response.lobby) {
-          this.setupForm = this.createForm(response.lobby.setup);
+        if (response.lobby && !hadLobby) {
+          this.syncSetupForm(response.lobby.setup, true);
+        }
+        if (!response.lobby) {
+          this.hasUnsavedSetupChanges = false;
         }
         this.syncSelectedSave(response);
         if (!response.activeGame) {
@@ -296,7 +301,7 @@ export class MultiplayerComponent implements OnDestroy {
         this.isActing = false;
         this.isLoading = false;
         if (response.lobby) {
-          this.setupForm = this.createForm(response.lobby.setup);
+          this.syncSetupForm(response.lobby.setup, true);
         }
         this.syncSelectedSave(response);
         if (!response.activeGame) {
@@ -501,7 +506,12 @@ export class MultiplayerComponent implements OnDestroy {
   }
 
   protected setBotProfileCountValue(profileId: keyof BotProfileCountMap, value: string): void {
+    this.markSetupDirty();
     this.setupForm.botProfileCounts[profileId] = value;
+  }
+
+  protected markSetupDirty(): void {
+    this.hasUnsavedSetupChanges = true;
   }
 
   private buildBotProfileCounts(values: Record<string, string>): BotProfileCountMap {
@@ -519,5 +529,14 @@ export class MultiplayerComponent implements OnDestroy {
       result[profileId] = String(counts[profileId] ?? 0);
       return result;
     }, {} as Record<string, string>);
+  }
+
+  private syncSetupForm(setup: GalaxySetup, force = false): void {
+    if (this.hasUnsavedSetupChanges && !force) {
+      return;
+    }
+
+    this.setupForm = this.createForm(setup);
+    this.hasUnsavedSetupChanges = false;
   }
 }

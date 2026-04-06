@@ -399,8 +399,11 @@ const { ResourcesPack } = resourcesPackModule as {
 };
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN?.trim();
 
-app.use(cors({ origin: 'http://localhost:4200' }));
+if (FRONTEND_ORIGIN) {
+  app.use(cors({ origin: FRONTEND_ORIGIN }));
+}
 app.use(express.json());
 
 const AUTH_DATA_PATH = path.resolve(
@@ -6350,5 +6353,4 @@ function isValidSetup(setup: GalaxySetup): boolean {
     setup.startingResources.deuterium >= 0
   );
 }
-
 
