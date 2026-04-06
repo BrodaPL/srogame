@@ -4,13 +4,6 @@ import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
 import { AuthStateService } from '../core/auth-state.service';
-import { GameType } from '../models/enums/game-type';
-import { StartingHomeworldPreset } from '../models/enums/starting-homeworld-preset';
-import {
-  GalaxySetup,
-  hasExactBotProfileCountMatch,
-  normalizeGalaxySetup
-} from '../models/game-api-types';
 
 @Component({
   selector: 'app-game',
@@ -18,9 +11,12 @@ import {
   templateUrl: './game.component.html'
 })
 export class GameComponent implements OnInit {
-  protected readonly config = this.loadConfig();
+  protected stateTitle = '';
   protected stateError: string | null = null;
+  protected stateActionLabel = 'Back to main menu';
+  protected stateActionRoute = '/';
   protected isLoading = false;
+  protected isGameReady = false;
 
   constructor(
     private readonly gameState: GameStateService,
@@ -30,31 +26,31 @@ export class GameComponent implements OnInit {
   ) {}
 
   public ngOnInit(): void {
-    if (!this.config) {
-      return;
-    }
-
     const session = this.playerSession.load();
     if (!session) {
-      this.stateError = 'No player session found. Start a new game.';
+      this.handleMissingSession();
       return;
     }
 
     this.isLoading = true;
+    this.isGameReady = false;
+    this.stateTitle = '';
     this.stateError = null;
 
     this.gameApi.getGameState(session.token).subscribe({
       next: (response) => {
-        window.setTimeout(() => {
+        globalThis.setTimeout(() => {
           this.authState.setSession(response.player);
           this.gameState.setGalaxy(response.galaxy);
+          this.stateTitle = '';
+          this.stateError = null;
+          this.isGameReady = true;
           this.isLoading = false;
         });
       },
-      error: () => {
-        window.setTimeout(() => {
-          this.stateError = 'Unable to load galaxy from server.';
-          this.isLoading = false;
+      error: (error) => {
+        globalThis.setTimeout(() => {
+          this.handleStateLoadError(error);
         });
       }
     });
@@ -64,87 +60,41 @@ export class GameComponent implements OnInit {
     return this.gameState.isProcessingTurn;
   }
 
-  private loadConfig(): GalaxySetup | null {
-    const stored = localStorage.getItem('srogame:setup');
-    if (!stored) {
-      return null;
-    }
-
-    try {
-      const parsed = normalizeGalaxySetup(JSON.parse(stored) as GalaxySetup);
-      if (this.isValidConfig(parsed)) {
-        return parsed;
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
+  private handleMissingSession(): void {
+    this.gameState.clearGalaxy();
+    this.isLoading = false;
+    this.isGameReady = false;
+    this.stateTitle = 'Login required';
+    this.stateError = 'Login to continue, then start or join a game.';
+    this.stateActionLabel = 'Go to login';
+    this.stateActionRoute = '/login';
   }
 
-  private isValidConfig(config: GalaxySetup): boolean {
-    const gameTypeValue = (config as { gameType?: unknown }).gameType;
-    const gameTypeValid = gameTypeValue === undefined || this.isValidGameType(gameTypeValue);
+  private handleStateLoadError(error: { status?: number; error?: { error?: string } }): void {
+    this.gameState.clearGalaxy();
+    this.isLoading = false;
+    this.isGameReady = false;
 
-    return (
-      gameTypeValid &&
-      typeof config.galaxyName === 'string' &&
-      config.galaxyName.trim().length > 0 &&
-      Number.isInteger(config.galaxyWidth) &&
-      config.galaxyWidth >= 10 &&
-      config.galaxyWidth <= 100 &&
-      Number.isInteger(config.galaxyHeight) &&
-      config.galaxyHeight >= 10 &&
-      config.galaxyHeight <= 100 &&
-      Number.isInteger(config.galaxyCenterSize) &&
-      config.galaxyCenterSize >= 5 &&
-      config.galaxyCenterSize <= 35 &&
-      Number.isInteger(config.voidChance) &&
-      config.voidChance >= 0 &&
-      config.voidChance <= 35 &&
-      Array.isArray(config.starsAmountModifier) &&
-      config.starsAmountModifier.length === 2 &&
-      Number.isInteger(config.starsAmountModifier[0]) &&
-      config.starsAmountModifier[0] >= -10 &&
-      config.starsAmountModifier[0] <= 0 &&
-      Number.isInteger(config.starsAmountModifier[1]) &&
-      config.starsAmountModifier[1] >= 1 &&
-      config.starsAmountModifier[1] <= 9 &&
-      Number.isInteger(config.playerAmount) &&
-      config.playerAmount >= 1 &&
-      config.playerAmount <= 4 &&
-      Number.isInteger(config.botsAmount) &&
-      config.botsAmount >= 0 &&
-      config.botsAmount <= 12 &&
-      Number.isInteger(config.botDifficulty) &&
-      config.botDifficulty >= -75 &&
-      config.botDifficulty <= 200 &&
-      hasExactBotProfileCountMatch(config.botProfileCounts, config.botsAmount) &&
-      Number.isInteger(config.neutralBotsAmount) &&
-      config.neutralBotsAmount >= 0 &&
-      config.neutralBotsAmount <= 10 &&
-      Number.isInteger(config.neutralBotsDifficulty) &&
-      config.neutralBotsDifficulty >= -100 &&
-      config.neutralBotsDifficulty <= 200 &&
-      (config.startingHomeworldPreset === StartingHomeworldPreset.LOW
-        || config.startingHomeworldPreset === StartingHomeworldPreset.MEDIUM
-        || config.startingHomeworldPreset === StartingHomeworldPreset.HIGH) &&
-      (config.skipTutorial === undefined || typeof config.skipTutorial === 'boolean') &&
-      Number.isFinite(config.startingResources?.metal) &&
-      config.startingResources.metal >= 0 &&
-      Number.isFinite(config.startingResources?.crystal) &&
-      config.startingResources.crystal >= 0 &&
-      Number.isFinite(config.startingResources?.deuterium) &&
-      config.startingResources.deuterium >= 0
-    );
-  }
+    if (error?.status === 401) {
+      this.authState.clearSession();
+      this.stateTitle = 'Login required';
+      this.stateError = 'Login to continue, then start or join a game.';
+      this.stateActionLabel = 'Go to login';
+      this.stateActionRoute = '/login';
+      return;
+    }
 
-  private isValidGameType(value: unknown): value is GameType {
-    return (
-      value === GameType.PVP ||
-      value === GameType.PVPVE ||
-      value === GameType.PVE ||
-      value === GameType.SANDBOX
-    );
+    if (error?.status === 403 || error?.status === 404) {
+      this.stateTitle = 'No active game';
+      this.stateError = 'This account is not assigned to the current active game. Join or start a game from the main menu.';
+      this.stateActionLabel = 'Back to main menu';
+      this.stateActionRoute = '/';
+      return;
+    }
+
+    this.stateTitle = 'Unable to load game';
+    this.stateError = error?.error?.error ?? 'The server did not return the current game state.';
+    this.stateActionLabel = 'Back to main menu';
+    this.stateActionRoute = '/';
   }
 }

@@ -1,5 +1,16 @@
 <main class="game" [class.game--locked]="isUiLocked()">
-  @if (config) {
+  @if (isLoading) {
+    <section class="empty">
+      <h1>Loading game</h1>
+      <p>Loading the current galaxy state from the server.</p>
+    </section>
+  } @else if (stateError) {
+    <section class="empty">
+      <h1>{{ stateTitle }}</h1>
+      <p>{{ stateError }}</p>
+      <a class="link button" [routerLink]="stateActionRoute">{{ stateActionLabel }}</a>
+    </section>
+  } @else if (isGameReady) {
     <router-outlet />
     @if (isUiLocked()) {
       <section class="game-lock-overlay" aria-live="polite" aria-busy="true">
@@ -10,11 +21,5 @@
         </div>
       </section>
     }
-  } @else {
-    <section class="empty">
-      <h1>No setup found</h1>
-      <p>Start a new game to initialize your commander profile.</p>
-      <a class="link button" routerLink="/setup">Go to setup</a>
-    </section>
   }
 </main>

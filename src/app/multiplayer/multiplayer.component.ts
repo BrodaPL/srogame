@@ -24,6 +24,7 @@ import {
   normalizeGalaxySetup
 } from '../models/game-api-types';
 import { ResourcesPack } from '../models/resources-pack';
+import { shouldAutoEnterStartedMultiplayerGame } from './multiplayer-active-game-entry';
 
 type LobbySetupForm = {
   gameType: GameType;
@@ -71,6 +72,7 @@ export class MultiplayerComponent implements OnDestroy {
   private readonly refreshHandle: number;
   private lobbyRequestVersion = 0;
   private hasUnsavedSetupChanges = false;
+  private isAutoEnteringActiveGame = false;
 
   constructor(
     private readonly cdr: ChangeDetectorRef,
@@ -96,6 +98,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected loadLobby(resetError = true): void {
     const requestVersion = ++this.lobbyRequestVersion;
     const hadLobby = !!this.response?.lobby;
+    const previousLobby = this.response?.lobby ?? null;
     this.isLoading = true;
     if (resetError) {
       this.error = null;
@@ -119,6 +122,10 @@ export class MultiplayerComponent implements OnDestroy {
         this.syncSelectedSave(response);
         if (!response.activeGame) {
           this.confirmReplaceActiveGame = false;
+        }
+        if (shouldAutoEnterStartedMultiplayerGame(previousLobby, response)) {
+          this.tryEnterStartedGame();
+          return;
         }
         this.cdr.markForCheck();
       },
@@ -539,5 +546,30 @@ export class MultiplayerComponent implements OnDestroy {
 
     this.setupForm = this.createForm(setup);
     this.hasUnsavedSetupChanges = false;
+  }
+
+  private tryEnterStartedGame(): void {
+    const session = this.session();
+    if (!session || this.isAutoEnteringActiveGame) {
+      return;
+    }
+
+    this.isAutoEnteringActiveGame = true;
+    this.isLoading = true;
+    this.gameApi.getGameState(session.token).subscribe({
+      next: (response) => {
+        this.authState.setSession(response.player);
+        this.gameState.setGalaxy(response.galaxy);
+        this.isAutoEnteringActiveGame = false;
+        this.isLoading = false;
+        this.cdr.markForCheck();
+        this.router.navigate(['/game/imperium']);
+      },
+      error: () => {
+        this.isAutoEnteringActiveGame = false;
+        this.isLoading = false;
+        this.cdr.markForCheck();
+      }
+    });
   }
 }
