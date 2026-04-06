@@ -53,7 +53,7 @@ export type MultiplayerLobbyState = {
 
 export function createDefaultMultiplayerLobbySetup(): GalaxySetup {
   return normalizeGalaxySetup({
-    gameType: GameType.PVP,
+    gameType: GameType.SANDBOX,
     galaxyName: 'Multiplayer Sector',
     galaxyWidth: 25,
     galaxyHeight: 20,
