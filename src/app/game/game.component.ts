@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
@@ -22,7 +22,8 @@ export class GameComponent implements OnInit {
     private readonly gameState: GameStateService,
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly authState: AuthStateService
+    private readonly authState: AuthStateService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   public ngOnInit(): void {
@@ -39,19 +40,17 @@ export class GameComponent implements OnInit {
 
     this.gameApi.getGameState(session.token).subscribe({
       next: (response) => {
-        globalThis.setTimeout(() => {
-          this.authState.setSession(response.player);
-          this.gameState.setGalaxy(response.galaxy);
-          this.stateTitle = '';
-          this.stateError = null;
-          this.isGameReady = true;
-          this.isLoading = false;
-        });
+        this.authState.setSession(response.player);
+        this.gameState.setGalaxy(response.galaxy);
+        this.stateTitle = '';
+        this.stateError = null;
+        this.isGameReady = true;
+        this.isLoading = false;
+        this.cdr.markForCheck();
       },
       error: (error) => {
-        globalThis.setTimeout(() => {
-          this.handleStateLoadError(error);
-        });
+        this.handleStateLoadError(error);
+        this.cdr.markForCheck();
       }
     });
   }
