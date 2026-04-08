@@ -142,6 +142,7 @@ describe('GalaxyCreator', () => {
     expect(humanShips.get(ShipType.TRANSPORTER)).toBe(1);
     expect(humanShips.get(ShipType.COLONIZER)).toBe(1);
     expect(humanDefences.get(DefenceType.SAM_SITE)).toBe(10);
+    expect(human!.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY)).toBe(1);
     expect(human!.getTechLevel(TechnologyType.FUSION_DRIVE)).toBe(1);
     expect(human!.getTechLevel(TechnologyType.HYPERSPACE_DRIVE)).toBe(1);
     expect(human!.getTechLevel(TechnologyType.COMPUTER_TECHNOLOGY)).toBe(1);
@@ -152,7 +153,26 @@ describe('GalaxyCreator', () => {
     expect(botShips.get(ShipType.FIGHTER)).toBe(8);
     expect(botShips.get(ShipType.COLONIZER)).toBe(1);
     expect(botDefences.get(DefenceType.SAM_SITE)).toBe(10);
+    expect(bot!.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY)).toBe(1);
     expect(bot!.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY)).toBe(2);
+  });
+
+  it('adds Energy Technology 1 to medium preset starts for both humans and bots', () => {
+    const galaxy = new GalaxyCreator(createSetup({
+      botsAmount: 1,
+      neutralBotsAmount: 0,
+      startingHomeworldPreset: StartingHomeworldPreset.MEDIUM
+    })).createGalaxy(['Human']);
+
+    const human = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER);
+    const bot = galaxy.players.find((entry) => entry.type === PlayerType.BOT);
+
+    expect(human).toBeTruthy();
+    expect(bot).toBeTruthy();
+    expect(human!.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY)).toBe(1);
+    expect(bot!.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY)).toBe(1);
+    expect(human!.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY)).toBe(1);
+    expect(bot!.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY)).toBe(1);
   });
 
   it('keeps player ids unique when guaranteed home-system neutrals are enabled for multiple humans', () => {

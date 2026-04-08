@@ -655,6 +655,7 @@ export class GalaxyCreator {
       case StartingHomeworldPreset.LOW:
         break;
       case StartingHomeworldPreset.HIGH:
+        map.set(TechnologyType.ENERGY_TECHNOLOGY, 1);
         map.set(TechnologyType.FUSION_DRIVE, 1);
         map.set(TechnologyType.HYPERSPACE_DRIVE, 1);
         map.set(TechnologyType.COMPUTER_TECHNOLOGY, 1);
@@ -663,6 +664,7 @@ export class GalaxyCreator {
         break;
       case StartingHomeworldPreset.MEDIUM:
       default:
+        map.set(TechnologyType.ENERGY_TECHNOLOGY, 1);
         map.set(TechnologyType.FUSION_DRIVE, 1);
         map.set(TechnologyType.HYPERSPACE_DRIVE, 1);
         map.set(TechnologyType.ESPIONAGE_TECHNOLOGY, 1);
