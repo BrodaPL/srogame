@@ -1861,23 +1861,65 @@ app-root {
   font-size: 0.68rem;
   font-weight: 600;
   padding: 0.16rem 0.5rem;
-  color: #dbe5f6;
+  color: #c3d1e6;
 }
 
 .mini-planet-preview__button {
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: #dbe5f6;
-  font-size: 0.66rem;
-  font-weight: 600;
-  padding: 0.16rem 0.48rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  color: #f5f8ff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.3rem 0.68rem;
+  min-height: 2rem;
   cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.mini-planet-preview__button:hover {
+  border-color: rgba(246, 180, 76, 0.62);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.mini-planet-preview__button:focus-visible {
+  outline: 2px solid rgba(246, 180, 76, 0.8);
+  outline-offset: 2px;
+}
+
+.mini-planet-preview__button--mission {
+  border-color: rgba(246, 180, 76, 0.34);
+  background: linear-gradient(135deg, rgba(246, 180, 76, 0.24), rgba(246, 180, 76, 0.08));
+}
+
+.mini-planet-preview__button--spy {
+  border-color: rgba(60, 201, 189, 0.34);
+  background: linear-gradient(135deg, rgba(60, 201, 189, 0.24), rgba(60, 201, 189, 0.08));
+}
+
+.mini-planet-preview__button--utility,
+.mini-planet-preview__button--intel {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03));
 }
 
 .mini-planet-preview--selected {
   border-color: rgba(246, 180, 76, 0.8);
   box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.35);
+}
+
+.mini-planet-preview__actions {
+  margin-top: 0.15rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mini-planet-preview__notice {
+  margin: 0.2rem 0 0;
+  color: #9ef0be;
+  font-size: 0.72rem;
+  font-family: var(--font-mono), serif;
 }
 
 .reports-view {
