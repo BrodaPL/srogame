@@ -50,7 +50,7 @@
   <button
     class="top-menu__button top-menu__button--end-turn"
     type="button"
-    [disabled]="isProcessingTurn() || isEndTurnBlockedByMail()"
+    [disabled]="isProcessingTurn() || isEndTurnBlockedByMail() || isWaitingForOtherPlayers()"
     (click)="endTurn()">
     {{ endTurnLabel() }}
   </button>
@@ -62,6 +62,9 @@
 }
 @if (isEndTurnBlockedByMail()) {
   <p class="top-menu__error top-menu__error--mail-lock">{{ endTurnBlockedMessage() }}</p>
+}
+@if (isWaitingForOtherPlayers()) {
+  <p class="top-menu__error">{{ waitingForPlayersMessage() }}</p>
 }
 @if (endTurnError) {
   <p class="top-menu__error">{{ endTurnError }}</p>

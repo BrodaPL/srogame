@@ -154,4 +154,28 @@ describe('GalaxyCreator', () => {
     expect(botDefences.get(DefenceType.SAM_SITE)).toBe(10);
     expect(bot!.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY)).toBe(2);
   });
+
+  it('keeps player ids unique when guaranteed home-system neutrals are enabled for multiple humans', () => {
+    const galaxy = new GalaxyCreator(createSetup({
+      playerAmount: 2,
+      neutralBotsAmount: 1
+    })).createGalaxy(['Human-A', 'Human-B']);
+
+    const playerIds = galaxy.players.map((player) => player.playerId);
+    const humanPlayers = galaxy.players.filter((player) => player.type === PlayerType.PLAYER);
+
+    expect(new Set(playerIds).size).toBe(playerIds.length);
+    expect(humanPlayers).toHaveLength(2);
+
+    for (const player of humanPlayers) {
+      expect(player.planets).toHaveLength(1);
+
+      const ownedPlanets = galaxy.stars
+        .flatMap((row) => row.flatMap((system) => system.planets))
+        .filter((planet) => planet.info.ownerId === player.playerId);
+
+      expect(ownedPlanets).toHaveLength(1);
+      expect(ownedPlanets[0]).toBe(player.planets[0]);
+    }
+  });
 });

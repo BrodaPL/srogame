@@ -97,8 +97,26 @@ export class TopMenuComponent {
     return this.gameState.isProcessingTurn;
   }
 
+  protected isWaitingForOtherPlayers(): boolean {
+    const turnStatus = this.gameState.turnStatus;
+    return !!turnStatus
+      && turnStatus.requiresAllPlayersReady
+      && turnStatus.currentPlayerReady
+      && turnStatus.waitingForPlayerIds.length > 0
+      && !turnStatus.isProcessing;
+  }
+
+  protected waitingForPlayersMessage(): string {
+    const turnStatus = this.gameState.turnStatus;
+    if (!turnStatus || turnStatus.waitingForPlayerNames.length === 0) {
+      return 'Ready. Waiting for other players.';
+    }
+
+    return `Ready. Waiting for: ${turnStatus.waitingForPlayerNames.join(', ')}.`;
+  }
+
   protected endTurn(): void {
-    if (this.gameState.isProcessingTurn || this.isEndTurnBlockedByMail()) {
+    if (this.gameState.isProcessingTurn || this.isEndTurnBlockedByMail() || this.isWaitingForOtherPlayers()) {
       if (this.isEndTurnBlockedByMail()) {
         this.endTurnError = this.endTurnBlockedMessage();
       }
@@ -125,7 +143,14 @@ export class TopMenuComponent {
       .subscribe({
         next: (response) => {
           this.authState.setSession(response.player);
+          this.gameState.setTurnStatus(response.turnStatus);
           this.gameState.setGalaxy(response.galaxy);
+          if (response.resolution === 'WAITING') {
+            this.gameState.setProcessingTurn(false);
+            this.endTurnError = null;
+            return;
+          }
+
           window.location.reload();
         },
         error: (error) => {

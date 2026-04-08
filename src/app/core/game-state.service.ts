@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { GalaxySnapshot } from '../models/game-api-types';
+import { GalaxySnapshot, TurnStatusResponse } from '../models/game-api-types';
 import { DiplomacyResolver } from '../models/diplomacy/diplomacy-resolver';
 
 @Injectable({
@@ -7,10 +7,15 @@ import { DiplomacyResolver } from '../models/diplomacy/diplomacy-resolver';
 })
 export class GameStateService {
   public galaxy: GalaxySnapshot | null = null;
+  public turnStatus: TurnStatusResponse | null = null;
   public isProcessingTurn = false;
 
   public setGalaxy(galaxy: GalaxySnapshot): void {
     this.galaxy = galaxy;
+  }
+
+  public setTurnStatus(turnStatus: TurnStatusResponse | null): void {
+    this.turnStatus = turnStatus;
   }
 
   public setProcessingTurn(isProcessingTurn: boolean): void {
@@ -27,6 +32,7 @@ export class GameStateService {
 
   public clearGalaxy(): void {
     this.galaxy = null;
+    this.turnStatus = null;
     this.isProcessingTurn = false;
   }
 }

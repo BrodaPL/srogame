@@ -74,6 +74,11 @@ import {
   setMultiplayerLobbyMemberReady,
   updateMultiplayerLobbySetup
 } from './multiplayer-lobby.js';
+import {
+  areAllHumanPlayersReady,
+  buildTurnStatusResponse,
+  requiresAllPlayersReady
+} from './active-game-turn.js';
 import { clearBotDecisionTraces, getBotDecisionTraces } from './bots/bot-debug-store.js';
 import {
   clearBotMemory,
@@ -122,6 +127,7 @@ import type {
   BotAdminActionResponse,
   BotAdminStatesResponse,
   EndTurnResponse,
+  TurnStatusResponse,
   GameSavesResponse,
   GalaxySetup,
   PlayerSession,
@@ -469,6 +475,12 @@ let currentGameSetup: GalaxySetup | null = null;
 let currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
 let currentMultiplayerLobby: MultiplayerLobbyState | null = null;
 let isTurnProcessing = false;
+let currentTurnReadyPlayerIds = new Set<number>();
+
+function resetActiveTurnState(): void {
+  currentTurnReadyPlayerIds = new Set<number>();
+  isTurnProcessing = false;
+}
 
 app.post('/api/auth/register', (req, res) => {
   const body = req.body as RegisterRequest | undefined;
@@ -601,6 +613,7 @@ app.post('/api/game/start', (req, res) => {
   currentGameOwnerPlayerName = auth.session.playerName;
   currentGameSetup = setup;
   currentGalaxyPresentationByPlayer = nextPresentation;
+  resetActiveTurnState();
   clearBotDecisionTraces();
   resetBotAdminRuntimeState();
   currentMultiplayerLobby = null;
@@ -647,6 +660,7 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
     currentGameOwnerPlayerName = auth.session.playerName;
     currentGameSetup = hydrated.setup;
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+    resetActiveTurnState();
     clearBotDecisionTraces();
     resetBotAdminRuntimeState();
     currentMultiplayerLobby = null;
@@ -929,6 +943,7 @@ app.post('/api/multiplayer/lobby/start', (req, res) => {
       currentGameOwnerPlayerName = auth.session.playerName;
       currentGameSetup = hydrated.setup;
       currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+      resetActiveTurnState();
       clearBotDecisionTraces();
       resetBotAdminRuntimeState();
       saveCurrentGameSnapshot();
@@ -950,6 +965,7 @@ app.post('/api/multiplayer/lobby/start', (req, res) => {
       currentGameOwnerPlayerName = auth.session.playerName;
       currentGameSetup = setup;
       currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+      resetActiveTurnState();
       clearBotDecisionTraces();
       resetBotAdminRuntimeState();
       saveCurrentGameSnapshot();
@@ -978,6 +994,21 @@ app.get('/api/game/state', (req, res) => {
     galaxy: buildGalaxySnapshot(access.galaxy)
   };
 
+  return res.status(200).json(response);
+});
+
+app.get('/api/game/turn-status', (req, res) => {
+  const access = resolveAuthenticatedGameAccess(req);
+  if ('error' in access) {
+    return res.status(access.status).json({ error: access.error });
+  }
+
+  const response: TurnStatusResponse = buildTurnStatusResponse(
+    access.galaxy,
+    currentTurnReadyPlayerIds,
+    access.playerId,
+    isTurnProcessing
+  );
   return res.status(200).json(response);
 });
 
@@ -1641,57 +1672,72 @@ app.post('/api/game/end-turn', (req, res) => {
     return res.status(409).json({ error: 'Turn processing is already in progress.' });
   }
 
-  const controller = resolveAuthenticatedController(req);
-  if ('error' in controller) {
-    return res.status(controller.status).json({ error: controller.error });
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return res.status(authPlayer.status).json({ error: authPlayer.error });
   }
 
-  const playerId = resolvePlayerId(controller.galaxy, controller.auth.session);
-  if (playerId === null) {
-    return res.status(404).json({ error: 'Player not found in galaxy.' });
-  }
+  const playerId = authPlayer.player.playerId;
 
-  synchronizeJumpGateRequests(controller.galaxy);
-  synchronizeMaintenanceRequests(controller.galaxy);
-  const pendingRequestCount = countPendingMailRequestsForPlayer(controller.galaxy, playerId);
-  const unreadMailCount = countUnreadMailMessagesForPlayer(controller.galaxy, playerId);
+  synchronizeJumpGateRequests(authPlayer.galaxy);
+  synchronizeMaintenanceRequests(authPlayer.galaxy);
+  const pendingRequestCount = countPendingMailRequestsForPlayer(authPlayer.galaxy, playerId);
+  const unreadMailCount = countUnreadMailMessagesForPlayer(authPlayer.galaxy, playerId);
   if (pendingRequestCount > 0 || unreadMailCount > 0) {
     return res.status(409).json({
       error: buildEndTurnMailBlockMessage(unreadMailCount, pendingRequestCount)
     });
   }
 
+  const requiresReady = requiresAllPlayersReady(authPlayer.galaxy);
+  if (requiresReady) {
+    currentTurnReadyPlayerIds.add(playerId);
+    if (!areAllHumanPlayersReady(authPlayer.galaxy, currentTurnReadyPlayerIds)) {
+      const response: EndTurnResponse = {
+        player: toPlayerSession(authPlayer.auth.session, authPlayer.galaxy),
+        galaxy: buildGalaxySnapshot(authPlayer.galaxy),
+        resolution: 'WAITING',
+        turnStatus: buildTurnStatusResponse(authPlayer.galaxy, currentTurnReadyPlayerIds, playerId, false)
+      };
+      return res.status(200).json(response);
+    }
+  }
+
   isTurnProcessing = true;
 
   try {
-    const resolvedTurnNumber = controller.galaxy.currentTurn + 1;
-    runBotTurnPhase(controller.galaxy);
-    resolvePhaseOneTurn(controller.galaxy, resolvedTurnNumber, {
+    const resolvedTurnNumber = authPlayer.galaxy.currentTurn + 1;
+    runBotTurnPhase(authPlayer.galaxy);
+    resolvePhaseOneTurn(authPlayer.galaxy, resolvedTurnNumber, {
       botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0
     });
-    controller.galaxy.currentTurn = resolvedTurnNumber;
-    processSensorPhalanxTurnStart(controller.galaxy, controller.galaxy.currentTurn);
-    expirePendingDiplomaticProposals(controller.galaxy, controller.galaxy.currentTurn);
-    synchronizeJumpGateRequests(controller.galaxy);
-    synchronizeMaintenanceRequests(controller.galaxy);
-    synchronizeTradePortState(controller.galaxy);
-    refreshOwnedPlanetSelfReportsForHumanPlayers(controller.galaxy, controller.galaxy.currentTurn);
-    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(controller.galaxy);
-    if (currentGameSetup && shouldAutoSaveAfterTurn(controller.galaxy.currentTurn, currentGameSetup.autoSaveTurns)) {
+    authPlayer.galaxy.currentTurn = resolvedTurnNumber;
+    processSensorPhalanxTurnStart(authPlayer.galaxy, authPlayer.galaxy.currentTurn);
+    expirePendingDiplomaticProposals(authPlayer.galaxy, authPlayer.galaxy.currentTurn);
+    synchronizeJumpGateRequests(authPlayer.galaxy);
+    synchronizeMaintenanceRequests(authPlayer.galaxy);
+    synchronizeTradePortState(authPlayer.galaxy);
+    refreshOwnedPlanetSelfReportsForHumanPlayers(authPlayer.galaxy, authPlayer.galaxy.currentTurn);
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(authPlayer.galaxy);
+    currentTurnReadyPlayerIds = new Set<number>();
+    if (currentGameSetup && shouldAutoSaveAfterTurn(authPlayer.galaxy.currentTurn, currentGameSetup.autoSaveTurns)) {
       try {
         saveCurrentGameSnapshot();
       } catch (error) {
-        console.error(`Auto save failed on turn ${controller.galaxy.currentTurn}.`, error);
+        console.error(`Auto save failed on turn ${authPlayer.galaxy.currentTurn}.`, error);
       }
     }
 
     const response: EndTurnResponse = {
-      player: toPlayerSession(controller.auth.session, controller.galaxy),
-      galaxy: buildGalaxySnapshot(controller.galaxy)
+      player: toPlayerSession(authPlayer.auth.session, authPlayer.galaxy),
+      galaxy: buildGalaxySnapshot(authPlayer.galaxy),
+      resolution: 'RESOLVED',
+      turnStatus: buildTurnStatusResponse(authPlayer.galaxy, currentTurnReadyPlayerIds, playerId, false)
     };
 
     return res.status(200).json(response);
   } catch (error) {
+    currentTurnReadyPlayerIds = new Set<number>();
     console.error('End-turn processing failed.', error);
     return res.status(500).json({ error: 'Turn processing failed.' });
   } finally {

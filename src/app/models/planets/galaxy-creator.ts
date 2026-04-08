@@ -367,7 +367,7 @@ export class GalaxyCreator {
       const name = normalizedNames[index] ?? `Player-${index + 1}`;
       const candidateIndex = this.randomInt(0, availablePlanets.length - 1);
       const slot = availablePlanets.splice(candidateIndex, 1)[0];
-      const playerId = index + 1;
+      const playerId = this.nextAvailablePlayerId(galaxy);
 
       const previousOwner = slot.planet.info.ownerId !== null
         ? playersById.get(slot.planet.info.ownerId) ?? null
@@ -428,10 +428,6 @@ export class GalaxyCreator {
       return;
     }
 
-    const nextPlayerIdBase = galaxy.players.reduce(
-      (maxId, player) => Math.max(maxId, player.playerId),
-      0
-    ) + 1;
     const configuredProfiles = expandBotProfileCounts(this.setup.botProfileCounts);
 
     for (let index = 0; index < targetCount; index += 1) {
@@ -441,7 +437,7 @@ export class GalaxyCreator {
 
       const candidateIndex = this.randomInt(0, availablePlanets.length - 1);
       const slot = availablePlanets.splice(candidateIndex, 1)[0];
-      const playerId = nextPlayerIdBase + index;
+      const playerId = this.nextAvailablePlayerId(galaxy);
       const botName = `Bot-${index + 1}`;
 
       const startingPlanet = Planet.createStartingPlanet(
