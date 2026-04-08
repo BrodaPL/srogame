@@ -801,23 +801,23 @@ export class BuildingsViewComponent implements OnInit {
     const targetLevel = this.buildingNextLevel(building);
     const rows: BuildingRequirementRowVm[] = [];
 
-    for (const requirement of building.buildingRequirements) {
-      const requiredLevel = Math.ceil(targetLevel * requirement.level);
-      const currentLevel = this.buildingLevel(requirement.building);
-      rows.push({
-        label: `B ${requirement.building}: ${currentLevel}/${requiredLevel}`,
-        isMet: currentLevel >= requiredLevel
-      });
-    }
+      for (const requirement of building.buildingRequirements) {
+        const requiredLevel = Math.ceil(targetLevel * requirement.level);
+        const currentLevel = this.buildingLevel(requirement.building);
+        rows.push({
+          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+          isMet: currentLevel >= requiredLevel
+        });
+      }
 
-    for (const requirement of building.techRequirements) {
-      const requiredLevel = Math.ceil(targetLevel * requirement.level);
-      const currentLevel = this.techLevel(requirement.tech);
-      rows.push({
-        label: `T ${requirement.tech}: ${currentLevel}/${requiredLevel}`,
-        isMet: currentLevel >= requiredLevel
-      });
-    }
+      for (const requirement of building.techRequirements) {
+        const requiredLevel = Math.ceil(targetLevel * requirement.level);
+        const currentLevel = this.techLevel(requirement.tech);
+        rows.push({
+          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+          isMet: currentLevel >= requiredLevel
+        });
+      }
 
     return rows;
   }
@@ -956,23 +956,17 @@ export class BuildingsViewComponent implements OnInit {
       ];
     }
 
-    return rows.map((row) => {
-      const separatorIndex = row.label.indexOf(':');
-      const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
-      const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
-      let label = rawLabel;
-      if (rawLabel.startsWith('B ')) {
-        label = `Building ${rawLabel.slice(2)}`;
-      } else if (rawLabel.startsWith('T ')) {
-        label = `Technology ${rawLabel.slice(2)}`;
-      }
+      return rows.map((row) => {
+        const separatorIndex = row.label.indexOf(':');
+        const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
+        const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
 
-      return {
-        label,
-        value,
-        tone: row.isMet ? 'good' : 'bad'
-      };
-    });
+        return {
+          label: rawLabel,
+          value,
+          tone: row.isMet ? 'good' : 'bad'
+        };
+      });
   }
 
   private hasBuildingRequirements(requirements: BuildingRequirement[], levelWeAreUpgradingTo: number): boolean {

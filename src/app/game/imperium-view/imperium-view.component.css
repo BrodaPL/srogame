@@ -1,6 +1,8 @@
-.imperium-view {
+.imperium-view,
+:host {
   display: grid;
   gap: 0.85rem;
+  align-content: start;
 }
 
 .imperium-view__title {
@@ -33,6 +35,13 @@
   color: #fff;
   padding: 0.42rem 0.58rem;
   font: inherit;
+  color-scheme: dark;
+}
+
+.imperium-view__control select option,
+.imperium-view__control select optgroup {
+  background: #121821;
+  color: #f4f8ff;
 }
 
 .imperium-view__attention-grid,

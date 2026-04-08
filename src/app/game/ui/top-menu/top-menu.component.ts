@@ -1,4 +1,3 @@
-import { Location } from '@angular/common';
 import { Component } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -12,13 +11,13 @@ import { TutorialService } from '../../../tutorial/tutorial.service';
 @Component({
   selector: 'app-top-menu',
   imports: [RouterLink, RouterLinkActive, TutorialOverlayComponent],
-  templateUrl: './top-menu.component.html'
+  templateUrl: './top-menu.component.html',
+  styleUrl: './top-menu.component.css'
 })
 export class TopMenuComponent {
   protected endTurnError: string | null = null;
 
   constructor(
-    private readonly location: Location,
     private readonly router: Router,
     private readonly tutorialService: TutorialService,
     private readonly gameApi: GameApiService,
@@ -26,10 +25,6 @@ export class TopMenuComponent {
     private readonly playerSession: PlayerSessionService,
     private readonly authState: AuthStateService
   ) {}
-
-  public goBack(): void {
-    this.location.back();
-  }
 
   protected hasCurrentTutorial(): boolean {
     return this.tutorialService.hasTutorial(this.currentTutorialKey());

@@ -4,6 +4,7 @@ import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
 import { AuthStateService } from '../core/auth-state.service';
+import type { GameStateResponse } from '../models/game-api-types';
 
 @Component({
   selector: 'app-game',
@@ -35,31 +36,22 @@ export class GameComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.isLoading = true;
-    this.isGameReady = false;
     this.stateTitle = '';
     this.stateError = null;
 
-    this.gameApi.getGameState(session.token).subscribe({
-      next: (response) => {
-        globalThis.setTimeout(() => {
-          this.authState.setSession(response.player);
-          this.gameState.setGalaxy(response.galaxy);
-          this.gameState.setTurnStatus(null);
-          this.stateTitle = '';
-          this.stateError = null;
-          this.isGameReady = true;
-          this.isLoading = false;
-          this.startTurnStatusPolling();
-          this.refreshTurnStatus();
-        });
-      },
-      error: (error) => {
-        globalThis.setTimeout(() => {
-          this.handleStateLoadError(error);
-        });
-      }
-    });
+    if (this.gameState.galaxy) {
+      this.gameState.setTurnStatus(null);
+      this.isGameReady = true;
+      this.isLoading = false;
+      this.startTurnStatusPolling();
+      this.refreshTurnStatus();
+      this.syncGameStateInBackground(session.token);
+      return;
+    }
+
+    this.isLoading = true;
+    this.isGameReady = false;
+    this.loadGameState(session.token);
   }
 
   public ngOnDestroy(): void {
@@ -175,5 +167,41 @@ export class GameComponent implements OnInit, OnDestroy {
         this.handleStateLoadError(error);
       }
     });
+  }
+
+  private loadGameState(token: string): void {
+    this.gameApi.getGameState(token).subscribe({
+      next: (response) => {
+        this.applyGameStateResponse(response);
+      },
+      error: (error) => {
+        this.handleStateLoadError(error);
+      }
+    });
+  }
+
+  private syncGameStateInBackground(token: string): void {
+    this.gameApi.getGameState(token).subscribe({
+      next: (response) => {
+        this.applyGameStateResponse(response);
+      },
+      error: (error) => {
+        if (error?.status === 401 || error?.status === 403 || error?.status === 404) {
+          this.handleStateLoadError(error);
+        }
+      }
+    });
+  }
+
+  private applyGameStateResponse(response: GameStateResponse): void {
+    this.authState.setSession(response.player);
+    this.gameState.setGalaxy(response.galaxy);
+    this.gameState.setTurnStatus(null);
+    this.stateTitle = '';
+    this.stateError = null;
+    this.isGameReady = true;
+    this.isLoading = false;
+    this.startTurnStatusPolling();
+    this.refreshTurnStatus();
   }
 }

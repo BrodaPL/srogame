@@ -46,6 +46,36 @@ describe('GameComponent', () => {
     expect((component as { stateError: string | null }).stateError).toBeNull();
   });
 
+  it('renders immediately from in-memory game state and syncs the server in background', () => {
+    const response = createGameStateResponse();
+    const gameState = createGameStateMock(response.galaxy);
+    const gameApi = {
+      getGameState: vi.fn().mockReturnValue(of(response)),
+      getTurnStatus: vi.fn().mockReturnValue(of(createTurnStatusResponse()))
+    };
+    const playerSession = {
+      load: vi.fn().mockReturnValue(response.player)
+    };
+    const authState = {
+      setSession: vi.fn(),
+      clearSession: vi.fn()
+    };
+
+    const component = new GameComponent(
+      gameState as never,
+      gameApi as never,
+      playerSession as never,
+      authState as never
+    );
+
+    component.ngOnInit();
+
+    expect((component as { isLoading: boolean }).isLoading).toBe(false);
+    expect((component as { isGameReady: boolean }).isGameReady).toBe(true);
+    expect(gameApi.getGameState).toHaveBeenCalledWith(response.player.token);
+    expect(gameApi.getTurnStatus).toHaveBeenCalledWith(response.player.token);
+  });
+
   it('shows no-active-game guidance when the server denies access', () => {
     const gameState = createGameStateMock();
     const gameApi = {
@@ -102,9 +132,9 @@ function createGameStateResponse(): GameStateResponse {
   };
 }
 
-function createGameStateMock() {
+function createGameStateMock(galaxy: GameStateResponse['galaxy'] | null = null) {
   return {
-    galaxy: null,
+    galaxy,
     turnStatus: null,
     isProcessingTurn: false,
     currentTurn: vi.fn().mockReturnValue(1),

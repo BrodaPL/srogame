@@ -206,24 +206,24 @@ export class ResearchesViewComponent implements OnInit {
     const firstLab = this.firstAssignedLab(technology.type);
     const rows: ResearchRequirementRowVm[] = [];
 
-    for (const requirement of technology.buildingRequirements) {
-      const requiredLevel = Math.ceil(targetLevel * requirement.level);
-      const currentLevel = firstLab ? this.buildingLevel(firstLab.planet, requirement.building) : 0;
-      rows.push({
-        label: `B ${requirement.building}: ${currentLevel}/${requiredLevel}`,
-        isMet: firstLab ? currentLevel >= requiredLevel : false,
-        isPlaceholder: false
-      });
+      for (const requirement of technology.buildingRequirements) {
+        const requiredLevel = Math.ceil(targetLevel * requirement.level);
+        const currentLevel = firstLab ? this.buildingLevel(firstLab.planet, requirement.building) : 0;
+        rows.push({
+          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+          isMet: firstLab ? currentLevel >= requiredLevel : false,
+          isPlaceholder: false
+        });
     }
 
-    for (const requirement of technology.techRequirements) {
-      const requiredLevel = Math.ceil(targetLevel * requirement.level);
-      const currentLevel = this.currentTechnologyLevel(requirement.tech);
-      rows.push({
-        label: `T ${requirement.tech}: ${currentLevel}/${requiredLevel}`,
-        isMet: currentLevel >= requiredLevel,
-        isPlaceholder: false
-      });
+      for (const requirement of technology.techRequirements) {
+        const requiredLevel = Math.ceil(targetLevel * requirement.level);
+        const currentLevel = this.currentTechnologyLevel(requirement.tech);
+        rows.push({
+          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+          isMet: currentLevel >= requiredLevel,
+          isPlaceholder: false
+        });
     }
 
     if (rows.length === 0) {
@@ -1213,21 +1213,15 @@ export class ResearchesViewComponent implements OnInit {
         };
       }
 
-      const separatorIndex = row.label.indexOf(':');
-      const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
-      const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
-      let label = rawLabel;
-      if (rawLabel.startsWith('B ')) {
-        label = `Building ${rawLabel.slice(2)}`;
-      } else if (rawLabel.startsWith('T ')) {
-        label = `Technology ${rawLabel.slice(2)}`;
-      }
+        const separatorIndex = row.label.indexOf(':');
+        const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
+        const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
 
-      return {
-        label,
-        value,
-        tone: row.isMet ? 'good' : 'bad'
-      };
-    });
+        return {
+          label: rawLabel,
+          value,
+          tone: row.isMet ? 'good' : 'bad'
+        };
+      });
   }
 }
