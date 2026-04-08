@@ -1,18 +1,22 @@
 import { TutorialEntry, TutorialViewKey } from './tutorial-types';
 
-const secretaryImageA = 'images/instructors/secretary_1_waifu.png';
-const secretaryImageB = 'images/instructors/secretary_2_waifu.png';
-const commanderImageA = 'images/instructors/commander_1_waifu.png';
-const spaceOfficerImageA = 'images/instructors/spaceOfficer_1_waifu.png';
-const spaceOfficerImageB = 'images/instructors/spaceOfficer_2_waifu.png';
-const scientistImageA = 'images/instructors/scientist_1_waifu.png';
-const scientistImageB = 'images/instructors/scientist_2_waifu.png';
-const engineerImageA = 'images/instructors/engineer_1_waifu.png';
-const engineerImageB = 'images/instructors/engineer_2_waifu.png';
-const builderImageA = 'images/instructors/builder_1_waifu.png';
-const builderImageB = 'images/instructors/builder_2_waifu.png';
-const pilotImageA = 'images/instructors/pilot_1_waifu.png';
-const pilotImageB = 'images/instructors/pilot_2_waifu.png';
+const secretaryImageA = 'images/instructors/normal/secretary_1_waifu.png';
+const secretaryImageB = 'images/instructors/normal/secretary_2_waifu.png';
+const commanderImageA = 'images/instructors/normal/commander_1_waifu.png';
+const commanderImageB = 'images/instructors/normal/commander_2_waifu.png';
+const spaceOfficerImageA = 'images/instructors/normal/spaceOfficer_1_waifu.png';
+const spaceOfficerImageB = 'images/instructors/normal/spaceOfficer_2_waifu.png';
+const scientistImageA = 'images/instructors/normal/scientist_1_waifu.png';
+const scientistImageB = 'images/instructors/normal/scientist_2_waifu.png';
+const engineerImageA = 'images/instructors/normal/engineer_1_waifu.png';
+const engineerImageB = 'images/instructors/normal/engineer_2_waifu.png';
+const builderImageA = 'images/instructors/normal/builder_1_waifu.png';
+const builderImageB = 'images/instructors/normal/builder_2_waifu.png';
+const pilotImageA = 'images/instructors/normal/pilot_1_waifu.png';
+const pilotImageB = 'images/instructors/normal/pilot_2_waifu.png';
+
+const secretaryImages = [secretaryImageA, secretaryImageB];
+const commanderImages = [commanderImageA, commanderImageB];
 
 export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> = {
   missionPlannerView: {
@@ -341,7 +345,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This screen is your empire inbox.</p>
           <p>It keeps the report list and the selected dossier side by side, so you can scan what happened, filter it by type, and read the details without leaving the view.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'top'
       },
@@ -351,7 +355,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The footer under the tabs keeps track of how many reports are visible and how many are selected.</p>
           <p>Use <strong>Select all visible</strong> and <strong>Delete selected</strong> to clean the inbox without opening each entry one by one.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'top',
         targetId: 'reports-actions',
@@ -363,7 +367,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The left column is the actual inbox. Unread reports stand out more strongly, and clicking one opens it in the detail pane.</p>
           <p>Checkboxes are only for bulk actions, while opening a report is what marks unread entries as read.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'reports-inbox-list',
@@ -375,7 +379,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The top of the detail pane shows the selected report title, type, and turn.</p>
           <p>If the report has usable coordinates, the same header area also lets you preview the related location without leaving the inbox flow.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'reports-detail-head',
@@ -387,7 +391,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This stat row summarizes the currently selected report: read state, source, coordinates, and sender.</p>
           <p>It gives you the basic context before you dive into the full message body or dossier.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'reports-detail-stats',
@@ -399,7 +403,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This scroll area holds the full content of the selected report.</p>
           <p>Plain reports show their text directly, while espionage reports expand into a structured dossier with resources, buildings, ships, defences, and planetary parameters.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'reports-detail-body',
@@ -417,7 +421,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This screen is your communication center.</p>
           <p>It combines player messages with diplomacy, Jump Gate, and maintenance requests so you can clear blockers and handle empire communication in one place.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'top'
       },
@@ -427,7 +431,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>Use this button to open the shared mail composer.</p>
           <p>You can send direct player messages here, and some flows like replies reuse the same dialog with the recipient already locked in.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'top',
         targetId: 'mail-compose-action',
@@ -439,7 +443,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This section is for live requests that still need an answer.</p>
           <p>Incoming requests are especially important because unresolved ones can block End Turn until you approve, partially approve, reject, or otherwise clear them.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'top',
         targetId: 'mail-pending-requests',
@@ -451,7 +455,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>Resolved requests stay here until you delete them manually.</p>
           <p>This is the easiest place to confirm how a Jump Gate, diplomacy, or maintenance negotiation ended after the active decision is already over.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'mail-resolved-requests',
@@ -463,7 +467,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The message section separates unread and read mail. Opening a message marks it as read and exposes its reply or delete actions.</p>
           <p>This makes Mail the place to clear message blockers, follow negotiations, and handle direct human communication without mixing it into Reports.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'mail-messages',
@@ -481,7 +485,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This screen is where discovered factions become manageable contacts.</p>
           <p>Use it to review relations, inspect known planets from espionage intel, and prepare proposals before the actual accept or reject flow continues through Mail.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'top'
       },
@@ -491,7 +495,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The contact list only shows players you have actually discovered through current espionage-backed intel.</p>
           <p>It is your fast index for who is known, what their current status is, and whether treaty proposals are available this turn.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'top',
         targetId: 'diplomacy-contacts',
@@ -503,7 +507,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This detail panel summarizes the selected contact, their known planets, and the actions currently available against them.</p>
           <p>When a contact is selected, this is where you prepare treaty proposals and open the shared direct-message composer.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'diplomacy-detail-panel',
@@ -515,7 +519,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This section tracks unresolved diplomacy proposals and tells you whether they are incoming or outgoing.</p>
           <p>The proposals stay visible here for context, but Mail is where acceptance, rejection, and cancellation are completed.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'diplomacy-proposals',
@@ -533,7 +537,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This screen is the strategic dashboard for your whole empire.</p>
           <p>It aggregates economy, warnings, colonies, fleets, and infrastructure into one place so you can decide what needs attention before diving into individual planets.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'top'
       },
@@ -543,7 +547,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This block gives the most compact empire totals: number of planets, total ships, and how many building, shipyard, and research queues are currently active.</p>
           <p>Use it to answer quickly whether your empire is growing or sitting idle.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'top',
         targetId: 'imperium-empire-totals',
@@ -555,7 +559,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The attention panel groups planets by problem type, such as energy shortage, empty queues, or reduced production power.</p>
           <p>Each entry acts like a prioritized to-do list, and the planet links let you jump straight to the affected colony.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'imperium-attention-panel',
@@ -567,7 +571,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This section is the heart of Imperium. It lets you sort and filter all colonies, then compare them as compact management cards.</p>
           <p>It is the fastest way to scan queue state, production output, power values, and local warning state across your empire.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'imperium-owned-planets',
@@ -579,7 +583,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>Each planet card condenses one colony into practical numbers: resource income, energy, power, repair capability, local warnings, and queue summaries.</p>
           <p>This is where you compare colonies quickly and decide which one needs your next action.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'imperium-primary-planet-card',
@@ -591,7 +595,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This block aggregates owned ships by type across all planets.</p>
           <p>Use it to estimate military scale, transport capacity, and whether your empire can support another wave of missions or combat.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'imperium-fleet-totals',
@@ -603,7 +607,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The building table summarizes average, minimum, and maximum levels for every building type across your empire.</p>
           <p>It helps you spot weak infrastructure, uneven development, and the next obvious upgrade targets at a strategic level.</p>
         `,
-        characterImages: [commanderImageA],
+        characterImages: commanderImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'imperium-building-stats',
@@ -775,7 +779,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This screen is the main control room for a single colony.</p>
           <p>It combines local economy, buildings, ships, warnings, and queues into one place so you can manage a planet in detail without hopping between separate screens.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'top'
       },
@@ -785,7 +789,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>This overview block combines the planet portrait with practical status panels.</p>
           <p><strong>Planet Parameters</strong> show local production modifiers, while <strong>Needs Attention</strong> warns about issues like bad energy balance, empty queues, or idle research capacity.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'top',
         targetId: 'planet-overview',
@@ -797,7 +801,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The arrow buttons beside the planet image move through your owned planets without leaving Planet View.</p>
           <p>Use them when you want to review several colonies quickly while keeping the same management layout.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'planet-navigation',
@@ -809,7 +813,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The tab bar splits the planet into focused work areas: economy, facilities, ships, and queues.</p>
           <p>You do not need separate screens for most local management. Switch tabs here when you want to stay on the same planet and go deeper.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'planet-tab-bar',
@@ -821,7 +825,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>Each building card shows level, output, power usage, next costs, and requirement checks in one place.</p>
           <p>This is where you inspect the local economy and queue the next upgrade when the planet is ready.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'bottom',
         targetId: 'planet-resource-card',
@@ -833,7 +837,7 @@ export const TUTORIAL_CONTENT: Partial<Record<TutorialViewKey, TutorialEntry>> =
           <p>The queues tab gathers current construction, shipyard work, and research activity for this colony.</p>
           <p>Use it to see what is already in progress, what is waiting next, and where the planet may need your attention.</p>
         `,
-        characterImages: [secretaryImageA, secretaryImageB],
+        characterImages: secretaryImages,
         characterSide: 'right',
         bubblePosition: 'top',
         targetId: 'planet-queues-grid',

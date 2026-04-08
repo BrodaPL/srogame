@@ -443,10 +443,7 @@ export class TutorialService {
     const targetPadding = Math.max(0, step.targetPadding ?? 12);
     const targetRect = this.measureTargetRect(this.findTargetElement(step.targetId), targetPadding);
     const layout = this.buildLayout(step, targetRect);
-    const previousSide = this.resolvePreviousStepCharacterSide(stepIndex);
-    const characterImageIndex = step.characterImages.length > 1 && previousSide === layout.resolvedCharacterSide
-      ? 1
-      : 0;
+    const characterImageIndex = this.resolveCharacterImageIndex(stepIndex, layout.resolvedCharacterSide);
 
     return {
       targetRect,
@@ -459,24 +456,49 @@ export class TutorialService {
     };
   }
 
-  private resolvePreviousStepCharacterSide(stepIndex: number): TutorialCharacterSide | null {
+  private resolveCharacterImageIndex(
+    stepIndex: number,
+    resolvedCharacterSide: TutorialCharacterSide
+  ): number {
     const current = this.stateSignal();
     const entry = current.entry;
-    if (!entry || stepIndex <= 0) {
-      return null;
+    if (!entry) {
+      return 0;
     }
 
-    const previousStep = entry.steps[stepIndex - 1];
-    if (!previousStep) {
-      return null;
+    let previousSide: TutorialCharacterSide | null = null;
+    let previousImageIndex = 0;
+
+    for (let index = 0; index < stepIndex; index += 1) {
+      const priorStep = entry.steps[index];
+      if (!priorStep) {
+        break;
+      }
+
+      const priorSide = this.resolveStepCharacterSide(priorStep);
+      const priorImageIndex = priorStep.characterImages.length > 1 && previousSide === priorSide
+        ? (previousImageIndex + 1) % priorStep.characterImages.length
+        : 0;
+
+      previousSide = priorSide;
+      previousImageIndex = priorImageIndex;
     }
 
+    const step = entry.steps[stepIndex];
+    if (!step || step.characterImages.length <= 1 || previousSide !== resolvedCharacterSide) {
+      return 0;
+    }
+
+    return (previousImageIndex + 1) % step.characterImages.length;
+  }
+
+  private resolveStepCharacterSide(step: TutorialStep): TutorialCharacterSide {
     const targetRect = this.measureTargetRect(
-      this.findTargetElement(previousStep.targetId),
-      Math.max(0, previousStep.targetPadding ?? 12)
+      this.findTargetElement(step.targetId),
+      Math.max(0, step.targetPadding ?? 12)
     );
 
-    return this.buildLayout(previousStep, targetRect).resolvedCharacterSide;
+    return this.buildLayout(step, targetRect).resolvedCharacterSide;
   }
 
   private buildLayout(step: TutorialStep, targetRect: TutorialTargetRect | null): TutorialLayout {
