@@ -232,10 +232,6 @@ function validateDiplomaticProposalCreation(
   targetPlayer: Player,
   requestedStatus: DiplomaticStatusType
 ) {
-  if (!isPlayerVisibleInDiplomacy(galaxy, sourcePlayer.playerId, targetPlayer.playerId)) {
-    return commandError(403, 'FORBIDDEN', 'Target player is not visible in Diplomacy View.');
-  }
-
   if (targetPlayer.type === PlayerType.NEUTRAL) {
     return commandError(403, 'FORBIDDEN', 'Neutral factions do not participate in treaty proposals.');
   }

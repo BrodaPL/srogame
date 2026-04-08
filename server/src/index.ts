@@ -4832,7 +4832,6 @@ function buildDiplomacyContactDtos(galaxy: Galaxy, viewer: Player): DiplomacyCon
 
   return galaxy.players
     .filter((candidate) => candidate.playerId !== viewer.playerId)
-    .filter((candidate) => isPlayerVisibleInDiplomacy(galaxy, viewer.playerId, candidate.playerId))
     .map((candidate) => {
       const currentStatus = diplomacyResolver.getStatus(viewer.playerId, candidate.playerId);
       const availableStatuses = candidate.type !== PLAYER_TYPE_NEUTRAL
@@ -5121,7 +5120,7 @@ function canSendDirectMailToPlayer(
   const targetPlayer = resolvePlayerById(galaxy, targetPlayerId);
   return !!targetPlayer
     && targetPlayer.type === PLAYER_TYPE_PLAYER
-    && isPlayerVisibleInDiplomacy(galaxy, senderPlayerId, targetPlayerId);
+    && targetPlayer.playerId !== senderPlayerId;
 }
 
 function addPlayerMessage(
