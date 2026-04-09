@@ -11,6 +11,7 @@ import {
   bindSaveToLobby,
   getMultiplayerLobbyStartBlockedReason,
   joinMultiplayerLobby,
+  leaveMultiplayerLobby,
   openMultiplayerLobby,
   setMultiplayerLobbyMemberReady
 } from './multiplayer-lobby.js';
@@ -105,11 +106,24 @@ describe('multiplayer-lobby', () => {
     expect(galaxy.playerNameMap.get('Gamma')).toBe(1);
     expect(galaxy.botPlayerMap.get(2)).toBe(beta);
   });
+
+  it('reassigns host when the current host leaves', () => {
+    let lobby = openMultiplayerLobby(1, 'Admin', '2026-04-02T10:00:00.000Z');
+    lobby = joinMultiplayerLobby(lobby, { accountId: 2, playerName: 'Alpha', isLocalAdmin: false }, '2026-04-02T10:01:00.000Z');
+    lobby = joinMultiplayerLobby(lobby, { accountId: 3, playerName: 'OtherAdmin', isLocalAdmin: true }, '2026-04-02T10:02:00.000Z');
+
+    const nextLobby = leaveMultiplayerLobby(lobby, 1);
+
+    expect(nextLobby).not.toBeNull();
+    expect(nextLobby?.hostAccountId).toBe(3);
+    expect(nextLobby?.hostPlayerName).toBe('OtherAdmin');
+  });
 });
 
 function createSavedGame(playerNames: string[]): SavedGameFile {
   return {
-    version: 1,
+    version: 2,
+    gameId: 'lobby-game',
     saveType: 'AUTOSAVE',
     autoSaveSlot: 1,
     savedAt: '2026-04-02T09:55:00.000Z',
@@ -163,6 +177,7 @@ function createSavedGame(playerNames: string[]): SavedGameFile {
 
 function createSaveSummary(): GameSaveSummary {
   return {
+    gameId: 'lobby-game',
     saveId: 'lobby-save.json',
     displayName: 'Lobby Save - Turn 8 - 2026-04-02T09:55:00.000Z',
     saveType: 'AUTOSAVE',

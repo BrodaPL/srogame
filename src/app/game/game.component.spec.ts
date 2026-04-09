@@ -38,8 +38,8 @@ describe('GameComponent', () => {
     component.ngOnInit();
     vi.advanceTimersByTime(0);
 
-    expect(gameApi.getGameState).toHaveBeenCalledWith(response.player.token);
-    expect(gameApi.getTurnStatus).toHaveBeenCalledWith(response.player.token);
+    expect(gameApi.getGameState).toHaveBeenCalledWith(response.player.token, response.player.currentGameId);
+    expect(gameApi.getTurnStatus).toHaveBeenCalledWith(response.player.token, response.player.currentGameId);
     expect(authState.setSession).toHaveBeenCalledWith(response.player);
     expect(gameState.setGalaxy).toHaveBeenCalledWith(response.galaxy);
     expect((component as { isGameReady: boolean }).isGameReady).toBe(true);
@@ -72,8 +72,8 @@ describe('GameComponent', () => {
 
     expect((component as { isLoading: boolean }).isLoading).toBe(false);
     expect((component as { isGameReady: boolean }).isGameReady).toBe(true);
-    expect(gameApi.getGameState).toHaveBeenCalledWith(response.player.token);
-    expect(gameApi.getTurnStatus).toHaveBeenCalledWith(response.player.token);
+    expect(gameApi.getGameState).toHaveBeenCalledWith(response.player.token, response.player.currentGameId);
+    expect(gameApi.getTurnStatus).toHaveBeenCalledWith(response.player.token, response.player.currentGameId);
   });
 
   it('shows no-active-game guidance when the server denies access', () => {
@@ -116,7 +116,8 @@ function createPlayerSession(): PlayerSession {
     tutorialRead: {},
     unreadReportCount: 0,
     unreadMailCount: 0,
-    pendingRequestCount: 0
+    pendingRequestCount: 0,
+    currentGameId: 'game-1'
   };
 }
 

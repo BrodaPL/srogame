@@ -38,6 +38,7 @@ import {
   createGameSave,
   hydrateGameSave,
   listGameSaveSummaries,
+  listGameSaveSummariesForGame,
   readGameSaveById,
   readGameSaveSummary,
   resolveGameSaveLoadAccess,
@@ -50,7 +51,8 @@ describe('game-save', () => {
   it('serializes the live galaxy state into a save DTO without circular references', () => {
     const save = buildTestSave();
 
-    expect(save.version).toBe(1);
+    expect(save.version).toBe(2);
+    expect(save.gameId).toBe('game-save-test');
     expect(save.ownerAccountId).toBe(42);
     expect(save.savedAt).toBe('2026-04-01T12:00:00.000Z');
     expect(save.setup.autoSaveTurns).toBe(5);
@@ -76,7 +78,8 @@ describe('game-save', () => {
     const summary = buildGameSaveSummary(save);
 
     expect(summary).toMatchObject({
-      saveId: expect.stringContaining('save-test-turn-6-20260401-120000'),
+      gameId: 'game-save-test',
+      saveId: expect.stringContaining('save-test-game-game-save-test-turn-6-20260401-120000'),
       displayName: 'Save Test - Turn 6 - 2026-04-01T12:00:00.000Z',
       saveType: 'AUTOSAVE',
       autoSaveSlot: null,
@@ -115,6 +118,7 @@ describe('game-save', () => {
     const save = buildTestSave();
     const hydrated = hydrateGameSave(save);
 
+    expect(hydrated.gameId).toBe('game-save-test');
     expect(hydrated.ownerAccountId).toBe(42);
     expect(hydrated.ownerPlayerName).toBe('Alpha');
     expect(hydrated.setup.autoSaveTurns).toBe(5);
@@ -175,11 +179,16 @@ describe('game-save', () => {
     expect(normalized.startingHomeworldPreset).toBe(StartingHomeworldPreset.MEDIUM);
   });
 
-  it('writes rotating autosaves with galaxy-based names and keeps five slots', () => {
+  it('writes rotating autosaves per game and keeps five slots for each game independently', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'srogame-saves-'));
 
     try {
       const save = buildTestSave();
+      const otherSave = {
+        ...save,
+        gameId: 'other-game',
+        savedAt: '2026-04-01T13:00:00.000Z'
+      };
       for (let index = 0; index < 7; index += 1) {
         const nextSave = {
           ...save,
@@ -193,16 +202,65 @@ describe('game-save', () => {
         writeRotatingAutoSave(tempDir, hydrateGameSave(nextSave).galaxy, 42, nextSave.setup, {
           savedAt: nextSave.savedAt,
           rotationLimit: 5,
-          maxSaveFiles: 100
+          maxSaveFiles: 100,
+          gameId: nextSave.gameId
         });
+        if (index < 3) {
+          const nextOtherSave = {
+            ...otherSave,
+            savedAt: `2026-04-01T13:00:0${index}.000Z`,
+            galaxy: {
+              ...otherSave.galaxy,
+              currentTurn: 20 + index
+            }
+          };
+
+          writeRotatingAutoSave(tempDir, hydrateGameSave(nextOtherSave).galaxy, 42, nextOtherSave.setup, {
+            savedAt: nextOtherSave.savedAt,
+            rotationLimit: 5,
+            maxSaveFiles: 100,
+            gameId: nextOtherSave.gameId
+          });
+        }
       }
 
       const summaries = listGameSaveSummaries(tempDir);
-      expect(summaries).toHaveLength(5);
-      expect(summaries.map((entry) => entry.autoSaveSlot).sort()).toEqual([1, 2, 3, 4, 5]);
-      expect(summaries[0].displayName).toContain('Save Test - Turn 12');
-      expect(summaries[0].saveId).toContain('save-test-turn-12-20260401-120006-autosave-2');
-      expect(readGameSaveById(tempDir, summaries[0].saveId)?.autoSaveSlot).toBe(summaries[0].autoSaveSlot);
+      const mainGameSummaries = listGameSaveSummariesForGame(tempDir, 'game-save-test');
+      const otherGameSummaries = listGameSaveSummariesForGame(tempDir, 'other-game');
+      expect(summaries).toHaveLength(8);
+      expect(mainGameSummaries).toHaveLength(5);
+      expect(otherGameSummaries).toHaveLength(3);
+      expect(mainGameSummaries.map((entry) => entry.autoSaveSlot).sort()).toEqual([1, 2, 3, 4, 5]);
+      expect(otherGameSummaries.map((entry) => entry.autoSaveSlot).sort()).toEqual([1, 2, 3]);
+      expect(mainGameSummaries[0].displayName).toContain('Save Test - Turn 12');
+      expect(mainGameSummaries[0].saveId).toContain('save-test-game-game-save-test-turn-12-20260401-120006-autosave-2');
+      expect(readGameSaveById(tempDir, mainGameSummaries[0].saveId)?.autoSaveSlot).toBe(mainGameSummaries[0].autoSaveSlot);
+      expect(readGameSaveById(tempDir, mainGameSummaries[0].saveId)?.gameId).toBe('game-save-test');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps legacy saves loadable when gameId is missing', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'srogame-legacy-save-'));
+
+    try {
+      const save = buildTestSave();
+      const legacySavePath = path.join(tempDir, 'legacy-save.json');
+      const legacySave = {
+        ...save,
+        version: 1
+      } as Record<string, unknown>;
+      delete legacySave.gameId;
+
+      fs.writeFileSync(legacySavePath, JSON.stringify(legacySave, null, 2), 'utf-8');
+
+      const summary = readGameSaveSummary(legacySavePath);
+      const hydrated = readGameSaveById(tempDir, 'legacy-save.json');
+
+      expect(summary?.gameId).toBeNull();
+      expect(hydrated?.gameId).toBeNull();
+      expect(hydrated?.version).toBe(1);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -459,5 +517,5 @@ function buildTestSave() {
     skipTutorial: true,
     startingHomeworldPreset: StartingHomeworldPreset.MEDIUM,
     startingResources: { metal: 6, crystal: 3, deuterium: 1 }
-  }, '2026-04-01T12:00:00.000Z');
+  }, '2026-04-01T12:00:00.000Z', null, 'game-save-test');
 }

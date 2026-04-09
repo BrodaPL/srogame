@@ -1,0 +1,114 @@
+{
+  "lobbies": [
+    {
+      "gameId": "75a7b817-1ced-471e-b173-0ae83ee4d438",
+      "createdAt": "2026-04-09T08:22:39.337Z",
+      "updatedAt": "2026-04-09T08:22:39.337Z",
+      "hostAccountId": 279,
+      "hostPlayerName": "TestUserA",
+      "mode": "NEW_GAME",
+      "setup": {
+        "gameType": "Sandbox",
+        "galaxyName": "Multiplayer Sector",
+        "galaxyWidth": 25,
+        "galaxyHeight": 20,
+        "galaxyCenterSize": 10,
+        "voidChance": 5,
+        "starsAmountModifier": [
+          -1,
+          4
+        ],
+        "playerAmount": 2,
+        "botsAmount": 0,
+        "botDifficulty": 0,
+        "neutralBotsAmount": 1,
+        "neutralBotsDifficulty": 0,
+        "autoSaveTurns": 5,
+        "createRandomPlanets": false,
+        "createStartingShips": false,
+        "skipTutorial": true,
+        "startingResources": {
+          "metal": 6,
+          "crystal": 3,
+          "deuterium": 1
+        },
+        "botProfileCounts": {
+          "BALANCED": 0,
+          "AGGRESSOR": 0,
+          "TURTLE": 0,
+          "MINER": 0,
+          "AVOIDER": 0,
+          "BUNKERER": 0
+        },
+        "startingHomeworldPreset": "Medium"
+      },
+      "members": [
+        {
+          "accountId": 279,
+          "playerName": "TestUserA",
+          "isLocalAdmin": true,
+          "isReady": true,
+          "joinedAt": "2026-04-09T08:22:39.337Z"
+        }
+      ],
+      "boundSaveId": null,
+      "boundSave": null,
+      "loadSeats": []
+    },
+    {
+      "gameId": "2bd86021-2ffa-4240-bd3a-0acad2940626",
+      "createdAt": "2026-04-09T07:32:37.154Z",
+      "updatedAt": "2026-04-09T07:32:37.154Z",
+      "hostAccountId": 279,
+      "hostPlayerName": "TestUserA",
+      "mode": "NEW_GAME",
+      "setup": {
+        "gameType": "Sandbox",
+        "galaxyName": "Multiplayer Sector",
+        "galaxyWidth": 25,
+        "galaxyHeight": 20,
+        "galaxyCenterSize": 10,
+        "voidChance": 5,
+        "starsAmountModifier": [
+          -1,
+          4
+        ],
+        "playerAmount": 2,
+        "botsAmount": 0,
+        "botDifficulty": 0,
+        "neutralBotsAmount": 1,
+        "neutralBotsDifficulty": 0,
+        "autoSaveTurns": 5,
+        "createRandomPlanets": false,
+        "createStartingShips": false,
+        "skipTutorial": true,
+        "startingResources": {
+          "metal": 6,
+          "crystal": 3,
+          "deuterium": 1
+        },
+        "botProfileCounts": {
+          "BALANCED": 0,
+          "AGGRESSOR": 0,
+          "TURTLE": 0,
+          "MINER": 0,
+          "AVOIDER": 0,
+          "BUNKERER": 0
+        },
+        "startingHomeworldPreset": "Medium"
+      },
+      "members": [
+        {
+          "accountId": 279,
+          "playerName": "TestUserA",
+          "isLocalAdmin": true,
+          "isReady": true,
+          "joinedAt": "2026-04-09T07:32:37.154Z"
+        }
+      ],
+      "boundSaveId": null,
+      "boundSave": null,
+      "loadSeats": []
+    }
+  ]
+}

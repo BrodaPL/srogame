@@ -21,6 +21,7 @@ export class LoadGameComponent {
   protected summaryError: string | null = null;
   protected actionError: string | null = null;
   protected confirmReplaceActiveGame = false;
+  protected selectedGameId: string | null = null;
 
   constructor(
     private readonly router: Router,
@@ -38,7 +39,9 @@ export class LoadGameComponent {
     this.summaryError = null;
 
     const token = this.session()?.token;
-    this.gameApi.getGameSaves(token).subscribe({
+    const currentGameId = this.session()?.currentGameId ?? null;
+    this.selectedGameId = currentGameId;
+    this.gameApi.getGameSaves(token, currentGameId).subscribe({
       next: (response) => {
         this.response = response;
         this.isSummaryLoading = false;
@@ -56,6 +59,10 @@ export class LoadGameComponent {
 
   protected canManageSaves(): boolean {
     return this.response?.canManage === true;
+  }
+
+  protected selectedGameLabel(): string {
+    return this.selectedGameId ? `Selected game: ${this.selectedGameId}` : 'Showing all server saves.';
   }
 
   protected canLoadGame(save: GameSaveSummary): boolean {

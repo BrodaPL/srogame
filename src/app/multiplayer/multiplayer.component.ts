@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
@@ -13,18 +13,22 @@ import {
 } from '../models/enums/starting-homeworld-preset';
 import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
 import {
-  BotProfileCountMap,
+  type BotProfileCountMap,
   DEFAULT_STARTING_HOMEWORLD_PRESET,
-  GalaxySetup,
+  type GameSaveSummary,
+  type GalaxySetup,
+  type GameSavesResponse,
   MAX_AUTO_SAVE_TURNS,
-  MultiplayerLobbyLoadSeatDto,
-  MultiplayerLobbyResponse,
+  type MultiplayerGameBrowserResponse,
+  type MultiplayerGameDetailResponse,
+  type MultiplayerGameListItem,
+  type MultiplayerLobbyDto,
+  type MultiplayerLobbyLoadSeatDto,
   createDefaultBotProfileCounts,
   hasExactBotProfileCountMatch,
   normalizeGalaxySetup
 } from '../models/game-api-types';
 import { ResourcesPack } from '../models/resources-pack';
-import { shouldAutoEnterStartedMultiplayerGame } from './multiplayer-active-game-entry';
 
 type LobbySetupForm = {
   gameType: GameType;
@@ -53,7 +57,8 @@ type LobbySetupForm = {
 @Component({
   selector: 'app-multiplayer',
   imports: [FormsModule, RouterLink],
-  templateUrl: './multiplayer.component.html'
+  templateUrl: './multiplayer.component.html',
+  styleUrl: './multiplayer.component.css'
 })
 export class MultiplayerComponent implements OnDestroy {
   protected readonly fixedGameType = GameType.SANDBOX;
@@ -62,17 +67,23 @@ export class MultiplayerComponent implements OnDestroy {
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
   protected readonly startingHomeworldPresetTooltips = STARTING_HOMEWORLD_PRESET_TOOLTIPS;
   protected readonly session: AuthStateService['session'];
-  protected response: MultiplayerLobbyResponse | null = null;
-  protected isLoading = false;
+  protected browserResponse: MultiplayerGameBrowserResponse | null = null;
+  protected detailResponse: MultiplayerGameDetailResponse | null = null;
+  protected saveResponse: GameSavesResponse | null = null;
+  protected selectedGameId: string | null = null;
+  protected isLoadingBrowser = false;
+  protected isLoadingDetail = false;
+  protected isLoadingSaves = false;
   protected isActing = false;
   protected error: string | null = null;
-  protected confirmReplaceActiveGame = false;
+  protected infoMessage: string | null = null;
   protected selectedSaveId = '';
   protected setupForm: LobbySetupForm = this.createForm(this.defaultSetup());
   private readonly refreshHandle: number;
-  private lobbyRequestVersion = 0;
+  private browserRequestVersion = 0;
+  private detailRequestVersion = 0;
+  private saveRequestVersion = 0;
   private hasUnsavedSetupChanges = false;
-  private isAutoEnteringActiveGame = false;
 
   constructor(
     private readonly cdr: ChangeDetectorRef,
@@ -83,10 +94,23 @@ export class MultiplayerComponent implements OnDestroy {
     private readonly router: Router
   ) {
     this.session = this.authState.session;
-    this.loadLobby();
+    effect(() => {
+      const session = this.session();
+      if (!session) {
+        this.error = null;
+        this.infoMessage = null;
+      }
+
+      this.loadBrowser();
+      this.loadAvailableSaves();
+    });
+
     this.refreshHandle = window.setInterval(() => {
-      if (!this.isActing && !this.isLoading) {
-        this.loadLobby(false);
+      if (!this.isActing) {
+        this.loadBrowser(false);
+        if (this.selectedGameId) {
+          this.loadSelectedGameDetail(false);
+        }
       }
     }, 5000);
   }
@@ -95,84 +119,193 @@ export class MultiplayerComponent implements OnDestroy {
     window.clearInterval(this.refreshHandle);
   }
 
-  protected loadLobby(resetError = true): void {
-    const requestVersion = ++this.lobbyRequestVersion;
-    const hadLobby = !!this.response?.lobby;
-    const previousLobby = this.response?.lobby ?? null;
-    this.isLoading = true;
-    if (resetError) {
-      this.error = null;
+  protected draftLobbies(): MultiplayerGameListItem[] {
+    return this.browserResponse?.draftLobbies ?? [];
+  }
+
+  protected runningGames(): MultiplayerGameListItem[] {
+    return this.browserResponse?.runningGames ?? [];
+  }
+
+  protected selectedBrowserItem(): MultiplayerGameListItem | null {
+    const gameId = this.selectedGameId;
+    if (!gameId) {
+      return null;
     }
 
-    const token = this.session()?.token;
-    this.gameApi.getMultiplayerLobby(token).subscribe({
-      next: (response) => {
-        if (requestVersion !== this.lobbyRequestVersion) {
-          return;
-        }
+    return [...this.draftLobbies(), ...this.runningGames()].find((entry) => entry.gameId === gameId) ?? null;
+  }
 
-        this.response = response;
-        this.isLoading = false;
-        if (response.lobby && !hadLobby) {
+  protected selectedLobby(): MultiplayerLobbyDto | null {
+    return this.detailResponse?.lobby ?? null;
+  }
+
+  protected selectedGame(): MultiplayerGameDetailResponse['game'] | null {
+    return this.detailResponse?.game ?? null;
+  }
+
+  protected availableSaves(): GameSaveSummary[] {
+    return this.saveResponse?.saves ?? [];
+  }
+
+  protected hasGames(): boolean {
+    return this.draftLobbies().length > 0 || this.runningGames().length > 0;
+  }
+
+  protected isSelected(item: MultiplayerGameListItem): boolean {
+    return this.selectedGameId === item.gameId;
+  }
+
+  protected canCreateLobby(): boolean {
+    return this.session()?.localAdmin === true && !this.isActing;
+  }
+
+  protected canManageSelectedLobby(): boolean {
+    return this.selectedLobby()?.canManage === true;
+  }
+
+  protected canStartSelectedLobby(): boolean {
+    return this.selectedLobby()?.canStart === true && !this.isActing;
+  }
+
+  protected configuredBotsAmount(): number {
+    return this.parseIntegerInRange(this.setupForm.botsAmount, 0, 12) ?? 0;
+  }
+
+  protected assignedBotProfilesCount(): number {
+    if (this.configuredBotsAmount() === 0) {
+      return 0;
+    }
+
+    return Object.values(this.buildBotProfileCounts(this.setupForm.botProfileCounts))
+      .reduce((total, value) => total + value, 0);
+  }
+
+  protected botPersonalityValidationMessage(): string | null {
+    const botsAmount = this.parseIntegerInRange(this.setupForm.botsAmount, 0, 12);
+    if (botsAmount === null || botsAmount === 0) {
+      return null;
+    }
+
+    const assigned = this.assignedBotProfilesCount();
+    if (assigned === botsAmount) {
+      return null;
+    }
+
+    return `Assigned bot personalities must total exactly ${botsAmount}. Current total: ${assigned}.`;
+  }
+
+  protected botProfileCountValue(profileId: keyof BotProfileCountMap): string {
+    return this.setupForm.botProfileCounts[profileId] ?? '0';
+  }
+
+  protected setBotProfileCountValue(profileId: keyof BotProfileCountMap, value: string): void {
+    this.markSetupDirty();
+    this.setupForm.botProfileCounts[profileId] = value;
+  }
+
+  protected selectGame(item: MultiplayerGameListItem): void {
+    if (this.selectedGameId === item.gameId && this.detailResponse?.game.gameId === item.gameId) {
+      return;
+    }
+
+    this.selectedGameId = item.gameId;
+    this.detailResponse = null;
+    this.infoMessage = null;
+    this.error = null;
+    this.hasUnsavedSetupChanges = false;
+    this.loadSelectedGameDetail();
+  }
+
+  protected createLobby(): void {
+    const session = this.session();
+    if (!session) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.isActing = true;
+    this.error = null;
+    this.infoMessage = null;
+    this.gameApi.createMultiplayerGame(session.token).subscribe({
+      next: (response) => {
+        this.isActing = false;
+        this.detailResponse = response;
+        this.selectedGameId = response.game.gameId;
+        if (response.lobby) {
           this.syncSetupForm(response.lobby.setup, true);
+          this.syncSelectedSaveFromLobby(response.lobby);
         }
-        if (!response.lobby) {
-          this.hasUnsavedSetupChanges = false;
-        }
-        this.syncSelectedSave(response);
-        if (!response.activeGame) {
-          this.confirmReplaceActiveGame = false;
-        }
-        if (shouldAutoEnterStartedMultiplayerGame(previousLobby, response)) {
-          this.tryEnterStartedGame();
-          return;
-        }
+        this.loadBrowser(false);
         this.cdr.markForCheck();
       },
       error: (error) => {
-        if (requestVersion !== this.lobbyRequestVersion) {
-          return;
-        }
-
-        this.error = error?.error?.error ?? 'Unable to load multiplayer lobby.';
-        this.response = null;
-        this.isLoading = false;
+        this.isActing = false;
+        this.error = error?.error?.error ?? 'Unable to create a multiplayer lobby.';
         this.cdr.markForCheck();
       }
     });
   }
 
-  protected openLobby(): void {
-    if (this.isActing || this.isLoading) {
+  protected joinSelectedLobby(): void {
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
+      this.router.navigate(['/login']);
       return;
     }
 
-    this.runLobbyMutation((token) => this.gameApi.openMultiplayerLobby(token));
+    this.runDetailMutation(
+      () => this.gameApi.joinMultiplayerGame(gameId, session.token),
+      'Joined draft lobby. Any previous draft-lobby membership was cleared.'
+    );
   }
 
-  protected joinLobby(): void {
-    if (this.isActing || this.isLoading) {
+  protected leaveSelectedLobby(): void {
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
+      this.router.navigate(['/login']);
       return;
     }
 
-    this.runLobbyMutation((token) => this.gameApi.joinMultiplayerLobby(token));
-  }
-
-  protected leaveLobby(): void {
-    if (this.isActing || this.isLoading) {
-      return;
-    }
-
-    this.runLobbyMutation((token) => this.gameApi.leaveMultiplayerLobby(token));
+    this.isActing = true;
+    this.error = null;
+    this.infoMessage = null;
+    this.gameApi.leaveMultiplayerGame(gameId, session.token).subscribe({
+      next: () => {
+        this.isActing = false;
+        this.infoMessage = 'Left draft lobby.';
+        this.loadBrowser(false);
+        this.detailResponse = null;
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.isActing = false;
+        this.error = error?.error?.error ?? 'Unable to leave the draft lobby.';
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   protected setReady(ready: boolean): void {
-    this.runLobbyMutation((token) => this.gameApi.toggleMultiplayerLobbyReady({ ready }, token));
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
+      return;
+    }
+
+    this.runDetailMutation(
+      () => this.gameApi.setMultiplayerGameReady(gameId, { ready }, session.token),
+      ready ? 'Marked ready.' : 'Marked not ready.'
+    );
   }
 
   protected saveSetup(): void {
-    const lobby = this.response?.lobby;
-    if (!lobby) {
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    const lobby = this.selectedLobby();
+    if (!session || !gameId || !lobby) {
       return;
     }
 
@@ -182,49 +315,78 @@ export class MultiplayerComponent implements OnDestroy {
       return;
     }
 
-    this.runLobbyMutation((token) => this.gameApi.updateMultiplayerLobbySetup({ setup }, token));
+    this.runDetailMutation(
+      () => this.gameApi.updateMultiplayerGameSetup(gameId, { setup }, session.token),
+      'Lobby setup saved.'
+    );
   }
 
   protected bindSave(): void {
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
+      return;
+    }
+
     if (!this.selectedSaveId) {
       this.error = 'Select a save first.';
       return;
     }
 
-    this.runLobbyMutation((token) => this.gameApi.bindMultiplayerLobbySave({ saveId: this.selectedSaveId }, token));
+    this.runDetailMutation(
+      () => this.gameApi.bindMultiplayerGameSave(gameId, { saveId: this.selectedSaveId }, session.token),
+      'Save bound to draft lobby.'
+    );
   }
 
   protected clearSaveBinding(): void {
-    this.runLobbyMutation((token) => this.gameApi.clearMultiplayerLobbySave(token));
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
+      return;
+    }
+
+    this.runDetailMutation(
+      () => this.gameApi.clearMultiplayerGameSave(gameId, session.token),
+      'Draft lobby switched back to new-game mode.'
+    );
   }
 
   protected assignSeat(savedPlayerId: number, nextValue: string): void {
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
+      return;
+    }
+
     const accountId = nextValue === '' ? null : Number(nextValue);
     if (nextValue !== '' && !Number.isInteger(accountId)) {
       this.error = 'Invalid seat assignment.';
       return;
     }
 
-    this.runLobbyMutation((token) => this.gameApi.assignMultiplayerLobbySeat({
-      savedPlayerId,
-      accountId
-    }, token));
+    this.runDetailMutation(
+      () => this.gameApi.assignMultiplayerGameSeat(gameId, { savedPlayerId, accountId }, session.token),
+      'Seat assignment updated.'
+    );
   }
 
   protected startLobbyGame(): void {
     const session = this.session();
-    if (!session) {
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
       this.router.navigate(['/login']);
       return;
     }
 
-    if (!this.canStartLobbyGame()) {
+    if (!this.canStartSelectedLobby()) {
       return;
     }
 
     this.isActing = true;
     this.error = null;
-    this.gameApi.startMultiplayerLobbyGame(session.token).subscribe({
+    this.infoMessage = null;
+    this.gameApi.startMultiplayerGame(gameId, session.token).subscribe({
       next: (response) => {
         this.authState.setSession(response.player);
         this.gameState.setGalaxy(response.galaxy);
@@ -236,17 +398,52 @@ export class MultiplayerComponent implements OnDestroy {
         this.error = error?.error?.error ?? 'Unable to start the multiplayer game.';
         this.isActing = false;
         this.cdr.markForCheck();
-        this.loadLobby(false);
+        this.loadSelectedGameDetail(false);
+        this.loadBrowser(false);
       }
     });
   }
 
-  protected canStartLobbyGame(): boolean {
-    const lobby = this.response?.lobby;
-    return !!lobby
-      && lobby.canStart
-      && (!this.response?.activeGame || this.confirmReplaceActiveGame)
-      && !this.isActing;
+  protected enterRunningGame(item?: MultiplayerGameListItem | null): void {
+    const session = this.session();
+    const target = item ?? this.selectedBrowserItem();
+    if (!session || !target) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    if (!target.canEnter) {
+      this.error = 'This multiplayer game is not currently enterable.';
+      return;
+    }
+
+    this.isActing = true;
+    this.error = null;
+    this.infoMessage = null;
+    this.gameApi.selectGame(target.gameId, session.token).subscribe({
+      next: (status) => {
+        const nextSession = this.session();
+        if (nextSession) {
+          this.authState.setSession({
+            ...nextSession,
+            currentGameId: status.currentGameId
+          });
+        }
+        this.isActing = false;
+        if (status.canResume) {
+          this.router.navigate(['/game/imperium']);
+          return;
+        }
+
+        this.error = status.unavailableReason ?? 'This multiplayer game is not currently active.';
+        this.loadBrowser(false);
+      },
+      error: (error) => {
+        this.isActing = false;
+        this.error = error?.error?.error ?? 'Unable to enter the selected multiplayer game.';
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   protected seatValue(seat: MultiplayerLobbyLoadSeatDto): string {
@@ -257,7 +454,7 @@ export class MultiplayerComponent implements OnDestroy {
     seat: MultiplayerLobbyLoadSeatDto,
     accountId: number
   ): boolean {
-    const lobby = this.response?.lobby;
+    const lobby = this.selectedLobby();
     if (!lobby) {
       return false;
     }
@@ -265,6 +462,36 @@ export class MultiplayerComponent implements OnDestroy {
     return !lobby.loadSeats.some((entry) =>
       entry.savedPlayerId !== seat.savedPlayerId && entry.assignedAccountId === accountId
     );
+  }
+
+  protected browserStatusLabel(item: MultiplayerGameListItem): string {
+    const sections = [
+      item.status,
+      `${item.memberCount} member${item.memberCount === 1 ? '' : 's'}`
+    ];
+    return sections.join(' / ');
+  }
+
+  protected detailedStatusLabel(): string {
+    const game = this.selectedGame();
+    if (!game) {
+      return '';
+    }
+
+    const sections: string[] = [game.kind, game.status];
+    if (game.currentTurn !== null) {
+      sections.push(`Turn ${game.currentTurn}`);
+    }
+    return sections.join(' / ');
+  }
+
+  protected updatedAtLabel(item: MultiplayerGameListItem): string {
+    const date = new Date(item.updatedAt);
+    if (Number.isNaN(date.getTime())) {
+      return item.updatedAt;
+    }
+
+    return date.toLocaleString();
   }
 
   protected logout(): void {
@@ -287,47 +514,208 @@ export class MultiplayerComponent implements OnDestroy {
     });
   }
 
-  private runLobbyMutation(
-    action: (token: string) => ReturnType<GameApiService['getMultiplayerLobby']>
-  ): void {
-    const session = this.session();
-    if (!session) {
-      this.router.navigate(['/login']);
-      return;
+  protected markSetupDirty(): void {
+    this.hasUnsavedSetupChanges = true;
+  }
+
+  protected loadBrowser(resetError = true): void {
+    const requestVersion = ++this.browserRequestVersion;
+    this.isLoadingBrowser = true;
+    if (resetError) {
+      this.error = null;
     }
 
-    const requestVersion = ++this.lobbyRequestVersion;
-    this.isActing = true;
-    this.error = null;
-    action(session.token).subscribe({
+    const token = this.session()?.token;
+    this.gameApi.getMultiplayerGames(token).subscribe({
       next: (response) => {
-        if (requestVersion !== this.lobbyRequestVersion) {
+        if (requestVersion !== this.browserRequestVersion) {
           return;
         }
 
-        this.response = response;
-        this.isActing = false;
-        this.isLoading = false;
-        if (response.lobby) {
-          this.syncSetupForm(response.lobby.setup, true);
+        this.browserResponse = response;
+        this.isLoadingBrowser = false;
+        this.syncSessionCurrentGameId(response.selectedGameId);
+        const nextSelectedGameId = this.resolveNextSelectedGameId(response);
+        const selectionChanged = nextSelectedGameId !== this.selectedGameId;
+        this.selectedGameId = nextSelectedGameId;
+
+        if (!this.selectedGameId) {
+          this.detailResponse = null;
+          this.cdr.markForCheck();
+          return;
         }
-        this.syncSelectedSave(response);
-        if (!response.activeGame) {
-          this.confirmReplaceActiveGame = false;
+
+        if (selectionChanged || !this.detailResponse || this.detailResponse.game.gameId !== this.selectedGameId) {
+          this.loadSelectedGameDetail(false);
+          return;
+        }
+
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        if (requestVersion !== this.browserRequestVersion) {
+          return;
+        }
+
+        this.browserResponse = null;
+        this.detailResponse = null;
+        this.isLoadingBrowser = false;
+        this.error = error?.error?.error ?? 'Unable to load multiplayer games.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  private loadSelectedGameDetail(resetError = true): void {
+    if (!this.selectedGameId) {
+      this.detailResponse = null;
+      this.isLoadingDetail = false;
+      return;
+    }
+
+    const requestVersion = ++this.detailRequestVersion;
+    this.isLoadingDetail = true;
+    if (resetError) {
+      this.error = null;
+    }
+
+    const token = this.session()?.token;
+    this.gameApi.getMultiplayerGameDetail(this.selectedGameId, token).subscribe({
+      next: (response) => {
+        if (requestVersion !== this.detailRequestVersion) {
+          return;
+        }
+
+        this.detailResponse = response;
+        this.isLoadingDetail = false;
+        if (response.lobby) {
+          this.syncSetupForm(response.lobby.setup, false);
+          this.syncSelectedSaveFromLobby(response.lobby);
+        } else {
+          this.hasUnsavedSetupChanges = false;
         }
         this.cdr.markForCheck();
       },
       error: (error) => {
-        if (requestVersion !== this.lobbyRequestVersion) {
+        if (requestVersion !== this.detailRequestVersion) {
           return;
         }
 
-        this.error = error?.error?.error ?? 'Lobby action failed.';
-        this.isActing = false;
+        this.detailResponse = null;
+        this.isLoadingDetail = false;
+        this.error = error?.error?.error ?? 'Unable to load multiplayer game details.';
         this.cdr.markForCheck();
-        this.loadLobby(false);
       }
     });
+  }
+
+  private loadAvailableSaves(resetError = false): void {
+    const requestVersion = ++this.saveRequestVersion;
+    this.isLoadingSaves = true;
+    if (resetError) {
+      this.error = null;
+    }
+
+    const token = this.session()?.token;
+    this.gameApi.getGameSaves(token).subscribe({
+      next: (response) => {
+        if (requestVersion !== this.saveRequestVersion) {
+          return;
+        }
+
+        this.saveResponse = response;
+        this.isLoadingSaves = false;
+        this.syncSelectedSaveFromLobby(this.selectedLobby());
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        if (requestVersion !== this.saveRequestVersion) {
+          return;
+        }
+
+        this.saveResponse = null;
+        this.isLoadingSaves = false;
+        if (resetError) {
+          this.error = error?.error?.error ?? 'Unable to load available saves.';
+        }
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  private runDetailMutation(
+    action: () => ReturnType<GameApiService['getMultiplayerGameDetail']>,
+    successMessage: string
+  ): void {
+    this.isActing = true;
+    this.error = null;
+    this.infoMessage = null;
+    action().subscribe({
+      next: (response) => {
+        this.isActing = false;
+        this.detailResponse = response;
+        if (response.lobby) {
+          this.syncSetupForm(response.lobby.setup, true);
+          this.syncSelectedSaveFromLobby(response.lobby);
+        } else {
+          this.hasUnsavedSetupChanges = false;
+        }
+        this.infoMessage = successMessage;
+        this.loadBrowser(false);
+        this.loadAvailableSaves();
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.isActing = false;
+        this.error = error?.error?.error ?? 'Multiplayer action failed.';
+        this.cdr.markForCheck();
+        this.loadSelectedGameDetail(false);
+        this.loadBrowser(false);
+      }
+    });
+  }
+
+  private resolveNextSelectedGameId(response: MultiplayerGameBrowserResponse): string | null {
+    const gameIds = new Set([
+      ...response.draftLobbies.map((entry) => entry.gameId),
+      ...response.runningGames.map((entry) => entry.gameId)
+    ]);
+
+    if (this.selectedGameId && gameIds.has(this.selectedGameId)) {
+      return this.selectedGameId;
+    }
+
+    if (response.selectedGameId && gameIds.has(response.selectedGameId)) {
+      return response.selectedGameId;
+    }
+
+    return response.draftLobbies[0]?.gameId ?? response.runningGames[0]?.gameId ?? null;
+  }
+
+  private syncSessionCurrentGameId(currentGameId: string | null): void {
+    const session = this.session();
+    if (!session || session.currentGameId === currentGameId) {
+      return;
+    }
+
+    this.authState.setSession({
+      ...session,
+      currentGameId
+    });
+  }
+
+  private syncSelectedSaveFromLobby(lobby: MultiplayerLobbyDto | null): void {
+    if (lobby?.boundSaveId) {
+      this.selectedSaveId = lobby.boundSaveId;
+      return;
+    }
+
+    const saves = this.availableSaves();
+    if (saves.some((save) => save.saveId === this.selectedSaveId)) {
+      return;
+    }
+
+    this.selectedSaveId = saves[0]?.saveId ?? '';
   }
 
   private buildSetup(playerAmount: number): GalaxySetup | null {
@@ -423,6 +811,15 @@ export class MultiplayerComponent implements OnDestroy {
     };
   }
 
+  private syncSetupForm(setup: GalaxySetup, force: boolean): void {
+    if (this.hasUnsavedSetupChanges && !force) {
+      return;
+    }
+
+    this.setupForm = this.createForm(setup);
+    this.hasUnsavedSetupChanges = false;
+  }
+
   private parseIntegerInRange(value: string, min: number, max: number): number | null {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
@@ -469,59 +866,6 @@ export class MultiplayerComponent implements OnDestroy {
     });
   }
 
-  private syncSelectedSave(response: MultiplayerLobbyResponse): void {
-    if (response.lobby?.boundSaveId) {
-      this.selectedSaveId = response.lobby.boundSaveId;
-      return;
-    }
-
-    if (response.availableSaves.some((save) => save.saveId === this.selectedSaveId)) {
-      return;
-    }
-
-    this.selectedSaveId = response.availableSaves[0]?.saveId ?? '';
-  }
-
-  protected configuredBotsAmount(): number {
-    return this.parseIntegerInRange(this.setupForm.botsAmount, 0, 12) ?? 0;
-  }
-
-  protected assignedBotProfilesCount(): number {
-    if (this.configuredBotsAmount() === 0) {
-      return 0;
-    }
-
-    return Object.values(this.buildBotProfileCounts(this.setupForm.botProfileCounts))
-      .reduce((total, value) => total + value, 0);
-  }
-
-  protected botPersonalityValidationMessage(): string | null {
-    const botsAmount = this.parseIntegerInRange(this.setupForm.botsAmount, 0, 12);
-    if (botsAmount === null || botsAmount === 0) {
-      return null;
-    }
-
-    const assigned = this.assignedBotProfilesCount();
-    if (assigned === botsAmount) {
-      return null;
-    }
-
-    return `Assigned bot personalities must total exactly ${botsAmount}. Current total: ${assigned}.`;
-  }
-
-  protected botProfileCountValue(profileId: keyof BotProfileCountMap): string {
-    return this.setupForm.botProfileCounts[profileId] ?? '0';
-  }
-
-  protected setBotProfileCountValue(profileId: keyof BotProfileCountMap, value: string): void {
-    this.markSetupDirty();
-    this.setupForm.botProfileCounts[profileId] = value;
-  }
-
-  protected markSetupDirty(): void {
-    this.hasUnsavedSetupChanges = true;
-  }
-
   private buildBotProfileCounts(values: Record<string, string>): BotProfileCountMap {
     const counts = {} as BotProfileCountMap;
     for (const profileId of BOT_PROFILE_IDS) {
@@ -537,39 +881,5 @@ export class MultiplayerComponent implements OnDestroy {
       result[profileId] = String(counts[profileId] ?? 0);
       return result;
     }, {} as Record<string, string>);
-  }
-
-  private syncSetupForm(setup: GalaxySetup, force = false): void {
-    if (this.hasUnsavedSetupChanges && !force) {
-      return;
-    }
-
-    this.setupForm = this.createForm(setup);
-    this.hasUnsavedSetupChanges = false;
-  }
-
-  private tryEnterStartedGame(): void {
-    const session = this.session();
-    if (!session || this.isAutoEnteringActiveGame) {
-      return;
-    }
-
-    this.isAutoEnteringActiveGame = true;
-    this.isLoading = true;
-    this.gameApi.getGameState(session.token).subscribe({
-      next: (response) => {
-        this.authState.setSession(response.player);
-        this.gameState.setGalaxy(response.galaxy);
-        this.isAutoEnteringActiveGame = false;
-        this.isLoading = false;
-        this.cdr.markForCheck();
-        this.router.navigate(['/game/imperium']);
-      },
-      error: () => {
-        this.isAutoEnteringActiveGame = false;
-        this.isLoading = false;
-        this.cdr.markForCheck();
-      }
-    });
   }
 }

@@ -1,0 +1,22 @@
+{
+  "memberships": [
+    {
+      "gameId": "2bd86021-2ffa-4240-bd3a-0acad2940626",
+      "accountId": 279,
+      "playerName": "TestUserA",
+      "role": "HOST",
+      "joinedAt": "2026-04-09T07:32:37.154Z",
+      "lastSeenAt": "2026-04-09T07:32:37.160Z",
+      "isActive": true
+    },
+    {
+      "gameId": "75a7b817-1ced-471e-b173-0ae83ee4d438",
+      "accountId": 279,
+      "playerName": "TestUserA",
+      "role": "HOST",
+      "joinedAt": "2026-04-09T08:22:39.337Z",
+      "lastSeenAt": "2026-04-09T08:22:39.360Z",
+      "isActive": true
+    }
+  ]
+}

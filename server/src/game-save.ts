@@ -99,7 +99,7 @@ const { ShipyardQueueEntry } = resolveModule(shipyardQueueEntryModule) as typeof
 const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as typeof import('../../src/app/models/tech/technology-queue-entry.js');
 const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../src/app/models/tech/research-helper-for.js');
 
-export const GAME_SAVE_VERSION = 1;
+export const GAME_SAVE_VERSION = 2;
 export const AUTO_SAVE_ROTATION_LIMIT = 5;
 export const MAX_GAME_SAVE_FILES = 100;
 
@@ -303,6 +303,7 @@ type SavedGalaxy = {
 
 export type SavedGameFile = {
   version: number;
+  gameId: string | null;
   saveType: 'AUTOSAVE';
   autoSaveSlot: number | null;
   savedAt: string;
@@ -313,6 +314,7 @@ export type SavedGameFile = {
 };
 
 export type HydratedGameSave = {
+  gameId: string | null;
   ownerAccountId: number;
   ownerPlayerName: string | null;
   setup: GalaxySetup;
@@ -328,6 +330,7 @@ export type RotatingAutoSaveOptions = {
   rotationLimit?: number;
   maxSaveFiles?: number;
   savedAt?: string;
+  gameId?: string | null;
 };
 
 export function createGameSave(
@@ -335,12 +338,14 @@ export function createGameSave(
   ownerAccountId: number,
   setup: GalaxySetup,
   savedAt = new Date().toISOString(),
-  autoSaveSlot: number | null = null
+  autoSaveSlot: number | null = null,
+  gameId: string | null = null
 ): SavedGameFile {
   const planetCoordinatesByReference = buildPlanetCoordinateMap(galaxy);
 
   return {
     version: GAME_SAVE_VERSION,
+    gameId,
     saveType: 'AUTOSAVE',
     autoSaveSlot,
     savedAt,
@@ -415,6 +420,13 @@ export function listGameSaveSummaries(saveDirectoryPath: string): GameSaveSummar
     .sort(compareGameSaveSummariesDesc);
 }
 
+export function listGameSaveSummariesForGame(
+  saveDirectoryPath: string,
+  gameId: string | null
+): GameSaveSummary[] {
+  return listGameSaveSummaries(saveDirectoryPath).filter((summary) => summary.gameId === gameId);
+}
+
 export function readGameSaveById(
   saveDirectoryPath: string,
   saveId: string
@@ -454,7 +466,10 @@ export function writeRotatingAutoSave(
 ): GameSaveSummary {
   const rotationLimit = normalizePositiveInteger(options.rotationLimit, AUTO_SAVE_ROTATION_LIMIT);
   const maxSaveFiles = normalizePositiveInteger(options.maxSaveFiles, MAX_GAME_SAVE_FILES);
-  const existingSaves = listGameSaveSummaries(saveDirectoryPath);
+  const gameId = normalizeGameIdOrNull(options.gameId);
+  const existingSaves = gameId === null
+    ? listGameSaveSummaries(saveDirectoryPath)
+    : listGameSaveSummariesForGame(saveDirectoryPath, gameId);
   const autosaves = existingSaves.filter((save) => save.saveType === 'AUTOSAVE');
   const latestAutosave = autosaves[0] ?? null;
   const nextSlot = latestAutosave?.autoSaveSlot
@@ -471,7 +486,8 @@ export function writeRotatingAutoSave(
     ownerAccountId,
     setup,
     options.savedAt ?? new Date().toISOString(),
-    nextSlot
+    nextSlot,
+    gameId
   );
   const saveId = buildGameSaveFileName(save);
   saveGameFile(path.join(saveDirectoryPath, saveId), save);
@@ -501,6 +517,7 @@ export function readGameSave(saveFilePath: string): SavedGameFile | null {
     version: typeof parsed.version === 'number' && Number.isInteger(parsed.version)
       ? parsed.version
       : GAME_SAVE_VERSION,
+    gameId: normalizeGameIdOrNull(parsed.gameId),
     saveType: parsed.saveType === 'AUTOSAVE' ? parsed.saveType : 'AUTOSAVE',
     autoSaveSlot: typeof parsed.autoSaveSlot === 'number' && Number.isInteger(parsed.autoSaveSlot)
       ? parsed.autoSaveSlot
@@ -521,6 +538,7 @@ export function readGameSaveSummary(saveFilePath: string): GameSaveSummary | nul
 
 export function buildGameSaveSummary(save: SavedGameFile, saveId = buildGameSaveFileName(save)): GameSaveSummary {
   return {
+    gameId: save.gameId,
     saveId,
     displayName: buildGameSaveDisplayName(save),
     saveType: save.saveType,
@@ -558,8 +576,27 @@ export function getLatestGameSaveSummary(saveDirectoryPath: string): GameSaveSum
   return listGameSaveSummaries(saveDirectoryPath)[0] ?? null;
 }
 
+export function getLatestGameSaveSummaryForGame(
+  saveDirectoryPath: string,
+  gameId: string | null
+): GameSaveSummary | null {
+  return listGameSaveSummariesForGame(saveDirectoryPath, gameId)[0] ?? null;
+}
+
 export function readLatestGameSave(saveDirectoryPath: string): SavedGameFile | null {
   const latestSummary = getLatestGameSaveSummary(saveDirectoryPath);
+  if (!latestSummary) {
+    return null;
+  }
+
+  return readGameSaveById(saveDirectoryPath, latestSummary.saveId);
+}
+
+export function readLatestGameSaveForGame(
+  saveDirectoryPath: string,
+  gameId: string | null
+): SavedGameFile | null {
+  const latestSummary = getLatestGameSaveSummaryForGame(saveDirectoryPath, gameId);
   if (!latestSummary) {
     return null;
   }
@@ -641,6 +678,7 @@ export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
   );
 
   return {
+    gameId: save.gameId,
     ownerAccountId: save.ownerAccountId,
     ownerPlayerName: save.ownerPlayerName ?? resolveSavedOwnerPlayerName(save),
     setup: normalizeGalaxySetup(save.setup),
@@ -1246,9 +1284,10 @@ function resolveSavedOwnerPlayerNameFromGalaxy(galaxy: SavedGalaxy): string | nu
 
 function buildGameSaveFileName(save: SavedGameFile): string {
   const galaxySlug = slugifySaveName(save.galaxy.name);
+  const gameSuffix = save.gameId ? `-game-${slugifySaveName(save.gameId).slice(0, 16)}` : '';
   const timestamp = formatSaveTimestamp(save.savedAt);
   const slotSuffix = save.autoSaveSlot !== null ? `-autosave-${save.autoSaveSlot}` : '';
-  return `${galaxySlug}-turn-${save.galaxy.currentTurn}-${timestamp}${slotSuffix}.json`;
+  return `${galaxySlug}${gameSuffix}-turn-${save.galaxy.currentTurn}-${timestamp}${slotSuffix}.json`;
 }
 
 function buildGameSaveDisplayName(save: SavedGameFile): string {
@@ -1291,6 +1330,12 @@ function compareGameSaveSummariesDesc(left: GameSaveSummary, right: GameSaveSumm
   }
 
   return right.saveId.localeCompare(left.saveId);
+}
+
+function normalizeGameIdOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value.trim()
+    ? value.trim()
+    : null;
 }
 
 function normalizeSaveId(saveId: string): string | null {

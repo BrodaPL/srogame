@@ -9,6 +9,7 @@ export class GameStateService {
   public galaxy: GalaxySnapshot | null = null;
   public turnStatus: TurnStatusResponse | null = null;
   public isProcessingTurn = false;
+  public currentGameId: string | null = null;
 
   public setGalaxy(galaxy: GalaxySnapshot): void {
     this.galaxy = galaxy;
@@ -20,6 +21,10 @@ export class GameStateService {
 
   public setProcessingTurn(isProcessingTurn: boolean): void {
     this.isProcessingTurn = isProcessingTurn;
+  }
+
+  public setCurrentGameId(currentGameId: string | null): void {
+    this.currentGameId = currentGameId?.trim() ? currentGameId : null;
   }
 
   public currentTurn(): number | null {
@@ -34,5 +39,6 @@ export class GameStateService {
     this.galaxy = null;
     this.turnStatus = null;
     this.isProcessingTurn = false;
+    this.currentGameId = null;
   }
 }

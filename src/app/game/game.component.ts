@@ -88,9 +88,10 @@ export class GameComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (error?.status === 403 || error?.status === 404) {
+    if (error?.status === 403 || error?.status === 404 || error?.status === 409) {
       this.stateTitle = 'No active game';
-      this.stateError = 'This account is not assigned to the current active game. Join or start a game from the main menu.';
+      this.stateError = error?.error?.error
+        ?? 'This account is not assigned to the current selected game. Join, resume, or start a game from the main menu.';
       this.stateActionLabel = 'Back to main menu';
       this.stateActionRoute = '/';
       return;
@@ -128,7 +129,7 @@ export class GameComponent implements OnInit, OnDestroy {
     }
 
     this.isPollingTurnStatus = true;
-    this.gameApi.getTurnStatus(session.token).subscribe({
+    this.gameApi.getTurnStatus(session.token, session.currentGameId).subscribe({
       next: (response) => {
         this.isPollingTurnStatus = false;
         this.gameState.setTurnStatus(response);
@@ -141,7 +142,7 @@ export class GameComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.isPollingTurnStatus = false;
-        if (error?.status === 401 || error?.status === 403 || error?.status === 404) {
+        if (error?.status === 401 || error?.status === 403 || error?.status === 404 || error?.status === 409) {
           this.handleStateLoadError(error);
         }
       }
@@ -154,7 +155,7 @@ export class GameComponent implements OnInit, OnDestroy {
     }
 
     this.isRefreshingAfterTurnChange = true;
-    this.gameApi.getGameState(token).subscribe({
+    this.gameApi.getGameState(token, this.playerSession.load()?.currentGameId ?? null).subscribe({
       next: (response) => {
         this.authState.setSession(response.player);
         this.gameState.setGalaxy(response.galaxy);
@@ -170,7 +171,7 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   private loadGameState(token: string): void {
-    this.gameApi.getGameState(token).subscribe({
+    this.gameApi.getGameState(token, this.playerSession.load()?.currentGameId ?? null).subscribe({
       next: (response) => {
         this.applyGameStateResponse(response);
       },
@@ -181,12 +182,12 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   private syncGameStateInBackground(token: string): void {
-    this.gameApi.getGameState(token).subscribe({
+    this.gameApi.getGameState(token, this.playerSession.load()?.currentGameId ?? null).subscribe({
       next: (response) => {
         this.applyGameStateResponse(response);
       },
       error: (error) => {
-        if (error?.status === 401 || error?.status === 403 || error?.status === 404) {
+        if (error?.status === 401 || error?.status === 403 || error?.status === 404 || error?.status === 409) {
           this.handleStateLoadError(error);
         }
       }

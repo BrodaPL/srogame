@@ -127,7 +127,7 @@ export class TopMenuComponent {
     this.endTurnError = null;
     this.gameState.setProcessingTurn(true);
 
-    this.gameApi.endTurn(session.token)
+    this.gameApi.endTurn(session.token, session.currentGameId)
       .pipe(finalize(() => {
         if (!this.gameState.isProcessingTurn) {
           return;

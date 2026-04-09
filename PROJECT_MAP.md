@@ -65,6 +65,10 @@ Server bootstrap:
 - `server/src/index.ts`
 - `server/src/active-game-turn.ts`
 - `server/src/game-save.ts`
+- `server/src/game-registry.ts`
+- `server/src/game-membership.ts`
+- `server/src/game-runtime-store.ts`
+- `server/src/multiplayer-lobby-store.ts`
 - `server/src/game-commands/`
 - `server/src/bots/`
 
@@ -83,6 +87,14 @@ Top-level routes:
 - `/help` -> `src/app/help-about/`
 - `/encyclopedia/*` -> `src/app/encyclopedia-menu/`
 - `/game/*` -> `src/app/game/`
+
+Main menu note:
+- `src/app/main-menu/` now reads `/api/games/current`, shows `Resume current game` when a current game exists for the account, and uses `/api/games/:gameId/select` before entering the game shell
+- `src/app/main-menu/` also reads `/api/games` to show accessible games, allowing explicit current-game selection and direct enter for running games
+
+Multiplayer route note:
+- `src/app/multiplayer/` now uses the per-game `/api/multiplayer/games*` family and renders a browser/detail layout with separate draft-lobby and running-game sections
+- the selected draft detail panel owns join/leave/ready state, host setup/save/seat/start controls, and uses the shared save list only for save binding while the old singleton lobby UI is being phased out
 
 Game child routes:
 
@@ -109,13 +121,17 @@ Shared game UI components:
 
 Auth/session:
 - `src/app/core/auth-api.service.ts`: auth HTTP calls
-- `src/app/core/auth-state.service.ts`: current authenticated session signal
-- `src/app/core/player-session.service.ts`: localStorage owner for `srogame:player`
+- `src/app/core/auth-state.service.ts`: current authenticated session signal and current-game synchronization into client game state
+- `src/app/core/player-session.service.ts`: localStorage owner for `srogame:player`, including persisted `currentGameId`
 
 Game snapshot/state:
-- `src/app/core/game-api.service.ts`: game HTTP calls
-- `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` plus active turn-status owner on the client
+- `src/app/core/game-api.service.ts`: game HTTP calls; now includes the first game-registry/current-game endpoints and supports optional explicit `gameId` for state/turn/save/end-turn calls
+- `src/app/core/game-api.service.ts` also now exposes the full per-game multiplayer browser/draft management endpoints under `/api/multiplayer/games*`
+- `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` plus active turn-status owner on the client, plus selected/current `gameId`
 - `src/app/models/game-api-types.ts`: shared `GalaxySetup` normalization, including count-based bot-profile setup validation/helpers
+
+Load/save note:
+- `src/app/load-game/` now scopes its save list to the selected/current `gameId` when one exists, instead of always showing one undifferentiated global save list
 
 Tutorial state:
 - `src/app/tutorial/tutorial.service.ts`: overlay control, auto-open rules, step preparation
@@ -125,8 +141,11 @@ Tutorial state:
 Local persistence:
 - `srogame:player` -> auth session + tutorial state + unread report/mail counts + pending incoming request count
 - `srogame:setup` -> last game setup
-- `server/data/auth.json` -> server auth accounts and sessions
-- `server/data/saves/` -> managed save directory for server-side galaxy snapshots; autosaves use slugified galaxy-name + turn + timestamp filenames, rotate through 5 autosave slots, and the directory is capped at 100 files. `/load` and the multiplayer lobby both use this same save list.
+- `server/data/auth.json` -> server auth accounts and sessions, including per-account `currentGameId`
+- `server/data/games.json` -> persistent server-side game metadata registry
+- `server/data/game-memberships.json` -> persistent account-to-game membership records
+- `server/data/multiplayer-lobbies.json` -> persistent draft multiplayer-lobby records keyed by `gameId`
+- `server/data/saves/` -> managed save directory for server-side galaxy snapshots; save payloads now carry `gameId` when they belong to a registered game, legacy pre-`gameId` saves still load as `gameId: null`, autosaves rotate through 5 slots per game, and the directory is still capped at 100 files globally. `/load` and the multiplayer lobby still use the shared save list for now.
 
 ## API Ownership Map
 
@@ -138,8 +157,17 @@ Auth endpoints:
 
 Auth/session note:
 - `server/src/index.ts` persists a manual `localAdmin` boolean on accounts/sessions through `server/data/auth.json`
+- `server/src/index.ts` now also persists `currentGameId` on accounts/sessions as the selected resume/default game pointer
 - `localAdmin` is required for single-player start, direct save load, and multiplayer lobby host/control actions
 - active-game turn advancement is no longer controller-only: in multiplayer-scale active games every human player must mark ready through `/api/game/end-turn`, while singleplayer still resolves immediately
+
+Game registry:
+- `/api/games`
+- `/api/games/current`
+- `/api/games/:gameId/select`
+- `/api/games/:gameId/saves`
+- `/api/games/:gameId/state`
+- `/api/games/:gameId/turn-status`
 
 Game lifecycle:
 - `/api/game/start`
@@ -157,26 +185,41 @@ Game lifecycle:
 - `/api/admin/bots/:playerId/clear-memory`
 
 Multiplayer lobby lifecycle:
-- `/api/multiplayer/lobby`
-- `/api/multiplayer/lobby/open`
-- `/api/multiplayer/lobby/join`
-- `/api/multiplayer/lobby/leave`
-- `/api/multiplayer/lobby/ready`
-- `/api/multiplayer/lobby/setup`
-- `/api/multiplayer/lobby/load-save`
-- `/api/multiplayer/lobby/new-game`
-- `/api/multiplayer/lobby/assign-seat`
-- `/api/multiplayer/lobby/start`
+- `/api/multiplayer/games`
+- `/api/multiplayer/games/:gameId`
+- `/api/multiplayer/games/:gameId/join`
+- `/api/multiplayer/games/:gameId/leave`
+- `/api/multiplayer/games/:gameId/ready`
+- `/api/multiplayer/games/:gameId/setup`
+- `/api/multiplayer/games/:gameId/bind-save`
+- `/api/multiplayer/games/:gameId/clear-save`
+- `/api/multiplayer/games/:gameId/assign-seat`
+- `/api/multiplayer/games/:gameId/start`
 
 Lifecycle persistence note:
+- `/api/games` lists persistent game metadata from `server/data/games.json`; current implementation is the first multi-game groundwork layer and does not yet replace all legacy `/api/game/*` global-runtime assumptions
+- `/api/games/current` exposes the authenticated account `currentGameId`, the matching game summary if present, and resume availability/unavailability state for main-menu resume flows
+- `/api/games/:gameId/select` updates the authenticated account `currentGameId` and, when that runtime is already loaded, switches the legacy global runtime pointers onto the selected game
+- `/api/games/:gameId/saves` is the first game-scoped save-list endpoint and currently returns the existing `GameSavesResponse` shape filtered by `gameId`
+- `/api/games/:gameId/state` and `/api/games/:gameId/turn-status` are the first game-scoped runtime read endpoints; they resolve through `server/src/game-runtime-store.ts` instead of assuming the one global active game
+- `/api/games/:gameId/end-turn` now exists as the first game-scoped mutation endpoint for active runtime progression
+- `/api/multiplayer/games` is the new multiplayer browser endpoint family; it lists many `MULTIPLAYER` draft lobbies and running games instead of assuming one global lobby
+- `server/src/multiplayer-lobby-store.ts` now persists draft multiplayer lobbies by `gameId` in `server/data/multiplayer-lobbies.json`
+- `/api/multiplayer/games` `POST` creates a new `MULTIPLAYER` `DRAFT` game record plus matching draft-lobby record; `/api/multiplayer/games/:gameId/join` enforces the new rule that an account may belong to only one draft multiplayer lobby at a time by removing it from other draft lobbies first
+- `/api/multiplayer/games/:gameId/leave` cleans up empty draft lobbies by deleting the stored draft record and archiving the corresponding game record
+- `/api/multiplayer/games/:gameId/setup`, `/bind-save`, `/clear-save`, `/assign-seat`, and `/start` now move draft-lobby management onto the per-game API family; `/start` keeps the same `gameId`, promotes the draft record to a running multiplayer game, switches all lobby members to that `currentGameId`, deletes the stored draft-lobby record, and preserves any previously mounted runtime in `server/src/game-runtime-store.ts`
+- `src/app/multiplayer/multiplayer.component.ts` and `.html` now consume that API family directly, so the frontend no longer depends on the singleton-lobby response shape for the main multiplayer route
 - `/api/game/start` writes the initial autosave snapshot through `server/src/game-save.ts`
+- `server/src/game-save.ts` now writes immutable snapshots with `gameId` when available, includes `gameId` in `GameSaveSummary`, and exposes per-game save listing helpers while keeping legacy save compatibility
+- `/api/game/start` now also registers a running `SINGLEPLAYER` game record plus owner membership and updates the starting account `currentGameId`
 - `/api/game/saves` lists all managed saves plus the active-runtime summary and admin-manageability state
 - `/api/game/saves/:saveId/load` hydrates a selected save back into live runtime objects, replaces the active in-memory game, and rebuilds galaxy-presentation caches
 - `/api/game/saves/:saveId` deletes a selected save file
 - `/api/game/turn-status` is the lightweight active-game polling endpoint used by the Angular game shell to detect ready-state and turn-number changes without reloading the full game snapshot every poll
 - `/api/game/end-turn` writes rotating autosaves into `server/data/saves/` when `GalaxySetup.autoSaveTurns` is greater than `0` and the configured cadence is reached
-- `/api/multiplayer/lobby/load-save` binds a selected save from the shared save list into lobby state without mutating runtime
-- `/api/multiplayer/lobby/start` either creates a new multiplayer galaxy from joined lobby members or hydrates the bound save, applies seat assignments, converts unresolved saved humans to `BOT`, and then replaces the active runtime game
+- `/api/game/end-turn` now also updates the persistent game registry turn/update metadata for the currently loaded runtime game
+- `server/src/game-runtime-store.ts` now persists the in-memory per-game runtime payload plus per-game ready-state and turn-processing state, which is used by the new game-scoped runtime read/select endpoints
+- legacy gameplay endpoints under `/api/game/*` now resolve their runtime via the authenticated account `currentGameId` first; if that selected game is not loaded, they return the same unavailable/resume-needed behavior instead of silently acting on another loaded game
 - `/api/game/end-turn` now also runs the server-side bot planning phase before shared turn resolution; for active games with more than one human player it first records per-player readiness and resolves only after every human has clicked End Turn for that turn
 - `/api/admin/bots*` exposes local-admin/controller-only bot inspection and live runtime controls for profile, pause/resume, and memory clearing
 

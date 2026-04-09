@@ -198,6 +198,53 @@ export type PlayerSession = {
   unreadReportCount: number;
   unreadMailCount: number;
   pendingRequestCount: number;
+  currentGameId: string | null;
+};
+
+export type GameId = string;
+
+export type GameKind = 'SINGLEPLAYER' | 'MULTIPLAYER';
+
+export type GameStatus = 'DRAFT' | 'RUNNING' | 'OFFLINE' | 'ARCHIVED';
+
+export type GameMembershipRole = 'OWNER' | 'HOST' | 'MEMBER';
+
+export type GameSeatControlMode =
+  | 'HUMAN_ACTIVE'
+  | 'HUMAN_OFFLINE_BOT_CONTROLLED'
+  | 'BOT_PERMANENT';
+
+export type GameSummary = {
+  gameId: GameId;
+  kind: GameKind;
+  status: GameStatus;
+  name: string;
+  ownerAccountId: number | null;
+  ownerPlayerName: string | null;
+  hostAccountId: number | null;
+  hostPlayerName: string | null;
+  currentTurn: number | null;
+  updatedAt: string;
+  isCurrentGame: boolean;
+  canResume: boolean;
+  canJoin: boolean;
+  canManage: boolean;
+};
+
+export type CurrentGameStatusResponse = {
+  currentGameId: GameId | null;
+  game: GameSummary | null;
+  canResume: boolean;
+  unavailableReason: string | null;
+};
+
+export type GameListResponse = {
+  games: GameSummary[];
+  currentGameId: GameId | null;
+  isLoggedIn: boolean;
+  currentAccountId: number | null;
+  currentPlayerName: string | null;
+  currentPlayerIsLocalAdmin: boolean;
 };
 
 export type RegisterRequest = {
@@ -336,6 +383,7 @@ export type LoadGameResponse = {
 };
 
 export type GameSaveSummary = {
+  gameId: GameId | null;
   saveId: string;
   displayName: string;
   saveType: 'AUTOSAVE';
@@ -402,14 +450,34 @@ export type MultiplayerLobbyDto = {
   startBlockedReason: string | null;
 };
 
-export type MultiplayerLobbyResponse = {
-  lobby: MultiplayerLobbyDto | null;
-  activeGame: ActiveGameSummary | null;
-  availableSaves: GameSaveSummary[];
+export type MultiplayerGameListItem = {
+  gameId: GameId;
+  name: string;
+  status: GameStatus;
+  hostAccountId: number | null;
+  hostPlayerName: string | null;
+  memberCount: number;
+  isMember: boolean;
+  isCurrentGame: boolean;
+  canJoin: boolean;
+  canEnter: boolean;
+  canManage: boolean;
+  updatedAt: string;
+};
+
+export type MultiplayerGameBrowserResponse = {
+  draftLobbies: MultiplayerGameListItem[];
+  runningGames: MultiplayerGameListItem[];
+  selectedGameId: GameId | null;
   isLoggedIn: boolean;
   currentAccountId: number | null;
   currentPlayerName: string | null;
   currentPlayerIsLocalAdmin: boolean;
+};
+
+export type MultiplayerGameDetailResponse = {
+  game: GameSummary;
+  lobby: MultiplayerLobbyDto | null;
 };
 
 export type UpdateMultiplayerLobbySetupRequest = {

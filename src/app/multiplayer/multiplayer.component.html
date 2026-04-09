@@ -1,387 +1,464 @@
 <main class="page">
-  <section class="panel">
+  <section class="panel multiplayer-panel">
     <header class="panel__header">
       <p class="eyebrow">Multiplayer</p>
-      <h1>Multiplayer Lobby</h1>
-      <p class="subtitle">One global lobby, controlled by the local admin, for starting or loading the server game.</p>
+      <h1>Lobby Browser</h1>
+      <p class="subtitle">
+        Browse many draft lobbies and running multiplayer games. Joining a draft lobby removes you from any other draft lobby.
+      </p>
     </header>
-
-    @if (isLoading && !response) {
-      <div class="saved">
-        <p class="saved__title">Loading</p>
-        <p>Reading multiplayer lobby state from the server.</p>
-      </div>
-    }
 
     @if (error) {
       <p class="form-error">{{ error }}</p>
     }
 
+    @if (infoMessage) {
+      <div class="saved">
+        <p class="saved__title">Update</p>
+        <p>{{ infoMessage }}</p>
+      </div>
+    }
+
     @if (!session()) {
-      <p class="form-error">Login required to use the multiplayer lobby.</p>
-      <a class="link button" routerLink="/login">Go to login</a>
+      <div class="saved">
+        <p class="saved__title">Login Required</p>
+        <p>You can browse multiplayer games, but joining or managing them requires login.</p>
+      </div>
     } @else {
-      <div class="saved">
-        <p class="saved__title">Current account</p>
-        <p>
-          {{ session()!.playerName }}
-          @if (session()!.localAdmin) {
-            <span>(Local Admin)</span>
-          }
-        </p>
-        <button class="start-button" type="button" (click)="logout()" [disabled]="isActing || isLoading">
-          Logout
-        </button>
-      </div>
-    }
-
-    @if (response?.activeGame) {
-      <div class="saved">
-        <p class="saved__title">Active Runtime Game</p>
-        <p>
-          Galaxy: {{ response!.activeGame!.galaxyName }}.
-          Turn: {{ response!.activeGame!.currentTurn }}.
-          Owner: {{ response!.activeGame!.ownerPlayerName ?? 'Unknown' }}.
-        </p>
-        <p class="form-error">Starting or loading from the multiplayer lobby will replace the active game.</p>
-      </div>
-    }
-
-    @if (response?.availableSaves?.length) {
-      <div class="saved">
-        <p class="saved__title">Available Saves</p>
-        <p>{{ response!.availableSaves.length }} saved games are available on the server.</p>
-      </div>
-    }
-
-    @if (!response?.lobby) {
-      <div class="saved">
-        <p class="saved__title">No Lobby Open</p>
-        <p>Only the local admin can open the single global multiplayer lobby.</p>
-      </div>
-      @if (session()?.localAdmin) {
-        <button class="start-button" type="button" (click)="openLobby()" [disabled]="isActing || (isLoading && !response)">
-          {{ isActing ? 'Opening...' : ((isLoading && !response) ? 'Loading...' : 'Open multiplayer lobby') }}
-        </button>
-      }
-    } @else {
-      <div class="saved">
-        <p class="saved__title">Lobby</p>
-        <p>
-          Host: {{ response!.lobby!.hostPlayerName }}.
-          Mode:
-          {{ response!.lobby!.mode === 'LOAD_SAVE' ? 'Load saved game' : 'Start new game' }}.
-          Joined players: {{ response!.lobby!.members.length }}.
-        </p>
-        @if (response!.lobby!.startBlockedReason) {
-          <p class="form-error">{{ response!.lobby!.startBlockedReason }}</p>
-        }
-      </div>
-
-      <div class="saved">
-        <p class="saved__title">Players</p>
-        @for (member of response!.lobby!.members; track member.accountId) {
+      <div class="multiplayer-account">
+        <div>
+          <p class="saved__title">Current account</p>
           <p>
-            {{ member.playerName }}
-            @if (member.isLocalAdmin) {
+            {{ session()!.playerName }}
+            @if (session()!.localAdmin) {
               <span>(Local Admin)</span>
             }
-            -
-            {{ member.isReady ? 'Ready' : 'Not ready' }}
           </p>
-        }
+        </div>
+        <div class="multiplayer-account__actions">
+          @if (canCreateLobby()) {
+            <button class="start-button" type="button" (click)="createLobby()" [disabled]="isActing">
+              {{ isActing ? 'Creating...' : 'Create draft lobby' }}
+            </button>
+          }
+          <button class="start-button" type="button" (click)="logout()" [disabled]="isActing || isLoadingBrowser">
+            Logout
+          </button>
+        </div>
       </div>
-
-      @if (response!.lobby!.boundSave) {
-        <div class="saved">
-          <p class="saved__title">Bound Save</p>
-          <p>
-            {{ response!.lobby!.boundSave!.displayName }}.
-            Auto save:
-            {{ response!.lobby!.boundSave!.autoSaveTurns === 0 ? 'disabled' : 'every ' + response!.lobby!.boundSave!.autoSaveTurns + ' turns' }}.
-          </p>
-        </div>
-      }
-
-      @if (response!.lobby!.loadSeats.length > 0) {
-        <div class="saved">
-          <p class="saved__title">Saved Human Seats</p>
-          @for (seat of response!.lobby!.loadSeats; track seat.savedPlayerId) {
-            <div class="field">
-              <label for="seat-{{ seat.savedPlayerId }}">{{ seat.savedPlayerName }}</label>
-              <select
-                id="seat-{{ seat.savedPlayerId }}"
-                name="seat-{{ seat.savedPlayerId }}"
-                [ngModel]="seatValue(seat)"
-                (ngModelChange)="assignSeat(seat.savedPlayerId, $event)"
-                [disabled]="!response!.lobby!.canManage || isActing"
-              >
-                <option value="">Convert to bot</option>
-                @for (member of response!.lobby!.members; track member.accountId) {
-                  @if (canSelectSeatMember(seat, member.accountId) || seat.assignedAccountId === member.accountId) {
-                    <option [value]="member.accountId">{{ member.playerName }}</option>
-                  }
-                }
-              </select>
-              <small>
-                {{
-                  seat.assignmentMode === 'BOT'
-                    ? 'This seat will become a bot.'
-                    : seat.assignmentMode === 'ORIGINAL'
-                      ? 'Original saved player matched.'
-                      : 'Replacement player assigned.'
-                }}
-              </small>
-            </div>
-          }
-        </div>
-      }
-
-      @if (response!.lobby!.canJoin) {
-        <button class="start-button" type="button" (click)="joinLobby()" [disabled]="isActing">
-          {{ isActing ? 'Joining...' : 'Join lobby' }}
-        </button>
-      }
-
-      @if (response!.lobby!.canLeave) {
-        <button class="start-button" type="button" (click)="leaveLobby()" [disabled]="isActing">
-          {{ isActing ? 'Leaving...' : 'Leave lobby' }}
-        </button>
-      }
-
-      @if (response!.lobby!.canToggleReady) {
-        <div class="field-row">
-          <button class="start-button" type="button" (click)="setReady(true)" [disabled]="isActing">
-            Ready
-          </button>
-          <button class="start-button" type="button" (click)="setReady(false)" [disabled]="isActing">
-            Not ready
-          </button>
-        </div>
-      }
-
-      @if (response!.lobby!.canManage) {
-        <div (input)="markSetupDirty()" (change)="markSetupDirty()">
-        <div class="field">
-          <label for="galaxyName">Galaxy name</label>
-          <input id="galaxyName" name="galaxyName" type="text" [(ngModel)]="setupForm.galaxyName" />
-        </div>
-
-        <div class="field">
-          <label for="gameType">Game type</label>
-          <select id="gameType" name="gameType" [(ngModel)]="setupForm.gameType" disabled>
-            <option value="PvP">PvP</option>
-            <option value="PvPvE">PvPvE</option>
-            <option value="PvE">PvE</option>
-            <option value="Sandbox">Sandbox</option>
-          </select>
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label for="galaxyWidth">Galaxy width</label>
-            <input id="galaxyWidth" name="galaxyWidth" type="number" min="10" max="100" [(ngModel)]="setupForm.galaxyWidth" />
-          </div>
-          <div class="field">
-            <label for="galaxyHeight">Galaxy height</label>
-            <input id="galaxyHeight" name="galaxyHeight" type="number" min="10" max="100" [(ngModel)]="setupForm.galaxyHeight" />
-          </div>
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label for="galaxyCenterSize">Galaxy center size (%)</label>
-            <input id="galaxyCenterSize" name="galaxyCenterSize" type="number" min="5" max="35" [(ngModel)]="setupForm.galaxyCenterSize" />
-          </div>
-          <div class="field">
-            <label for="voidChance">Void chance (%)</label>
-            <input id="voidChance" name="voidChance" type="number" min="0" max="35" [(ngModel)]="setupForm.voidChance" />
-          </div>
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label for="starsAmountModifierMin">Stars modifier min</label>
-            <input id="starsAmountModifierMin" name="starsAmountModifierMin" type="number" min="-10" max="0" [(ngModel)]="setupForm.starsAmountModifierMin" />
-          </div>
-          <div class="field">
-            <label for="starsAmountModifierMax">Stars modifier max</label>
-            <input id="starsAmountModifierMax" name="starsAmountModifierMax" type="number" min="1" max="9" [(ngModel)]="setupForm.starsAmountModifierMax" />
-          </div>
-        </div>
-
-        <div class="saved">
-          <p>Human player amount is taken from joined lobby members: {{ response!.lobby!.members.length }}.</p>
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label for="botsAmount">Bots amount</label>
-            <input id="botsAmount" name="botsAmount" type="number" min="0" max="12" [(ngModel)]="setupForm.botsAmount" />
-          </div>
-          <div class="field">
-            <label for="botDifficulty">Bot difficulty (%)</label>
-            <input id="botDifficulty" name="botDifficulty" type="number" min="-75" max="200" [(ngModel)]="setupForm.botDifficulty" />
-          </div>
-        </div>
-
-        @if (configuredBotsAmount() > 0) {
-          <div class="field">
-            <label>Bot personalities</label>
-            <div class="saved">
-              <p class="saved__title">Assigned: {{ assignedBotProfilesCount() }} / {{ configuredBotsAmount() }}</p>
-              <p>Choose the exact amount of each implemented bot personality.</p>
-            </div>
-            <div class="field-row">
-              @for (profileId of botProfileIds; track profileId) {
-                <div class="field">
-                  <label for="lobby-bot-profile-{{ profileId }}">{{ botProfileLabels[profileId] }}</label>
-                  <input
-                    id="lobby-bot-profile-{{ profileId }}"
-                    name="lobby-bot-profile-{{ profileId }}"
-                    type="number"
-                    min="0"
-                    max="12"
-                    step="1"
-                    [ngModel]="botProfileCountValue(profileId)"
-                    (ngModelChange)="setBotProfileCountValue(profileId, $event)"
-                  />
-                </div>
-              }
-            </div>
-            @if (botPersonalityValidationMessage()) {
-              <p class="form-error">{{ botPersonalityValidationMessage() }}</p>
-            }
-          </div>
-        }
-
-        <div class="field-row">
-          <div class="field">
-            <label for="neutralBotsAmount">Neutral bots amount (%)</label>
-            <input id="neutralBotsAmount" name="neutralBotsAmount" type="number" min="0" max="10" [(ngModel)]="setupForm.neutralBotsAmount" />
-          </div>
-          <div class="field">
-            <label for="neutralBotsDifficulty">Neutral bots difficulty (%)</label>
-            <input id="neutralBotsDifficulty" name="neutralBotsDifficulty" type="number" min="-100" max="200" [(ngModel)]="setupForm.neutralBotsDifficulty" />
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="autoSaveTurns">Auto save every N turns</label>
-          <input id="autoSaveTurns" name="autoSaveTurns" type="number" min="0" max="999" [(ngModel)]="setupForm.autoSaveTurns" />
-          <small>Use 0 to disable autosaving.</small>
-        </div>
-
-        <div class="field">
-          <label>Starting homeworld preset</label>
-          <div class="test-options">
-            @for (preset of startingHomeworldPresetValues; track preset) {
-              <label
-                class="checkbox-field"
-                for="lobby-startingHomeworldPreset-{{ preset }}"
-                [attr.title]="startingHomeworldPresetTooltips[preset]"
-              >
-                <input
-                  id="lobby-startingHomeworldPreset-{{ preset }}"
-                  name="lobby-startingHomeworldPreset"
-                  type="radio"
-                  [value]="preset"
-                  [(ngModel)]="setupForm.startingHomeworldPreset"
-                  [attr.title]="startingHomeworldPresetTooltips[preset]"
-                />
-                <span>{{ preset }}</span>
-              </label>
-            }
-          </div>
-          <small>Applies only to human and bot home planets. Neutral starts stay RNG-based.</small>
-        </div>
-
-        <div class="field">
-          <label>Testing options</label>
-          <div class="test-options">
-            <label class="checkbox-field" for="createRandomPlanets">
-              <input id="createRandomPlanets" name="createRandomPlanets" type="checkbox" [(ngModel)]="setupForm.createRandomPlanets" />
-              <span>Create random planets</span>
-            </label>
-            <label class="checkbox-field" for="createStartingShips">
-              <input id="createStartingShips" name="createStartingShips" type="checkbox" [(ngModel)]="setupForm.createStartingShips" />
-              <span>Create starting ships</span>
-            </label>
-            <label class="checkbox-field" for="skipTutorial">
-              <input id="skipTutorial" name="skipTutorial" type="checkbox" [(ngModel)]="setupForm.skipTutorial" />
-              <span>Skip tutorial</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Starting resources</label>
-          <div class="resource-group">
-            <div class="resource-input">
-              <img class="resource-icon" src="images/icons/normal/metal.png" alt="Metal" />
-              <input id="startingMetal" name="startingMetal" type="number" min="0" max="999999" [(ngModel)]="setupForm.startingMetal" />
-            </div>
-            <div class="resource-input">
-              <img class="resource-icon" src="images/icons/normal/crystal.png" alt="Crystal" />
-              <input id="startingCrystal" name="startingCrystal" type="number" min="0" max="999999" [(ngModel)]="setupForm.startingCrystal" />
-            </div>
-            <div class="resource-input">
-              <img class="resource-icon" src="images/icons/normal/deuter.png" alt="Deuterium" />
-              <input id="startingDeuterium" name="startingDeuterium" type="number" min="0" max="999999" [(ngModel)]="setupForm.startingDeuterium" />
-            </div>
-          </div>
-        </div>
-
-        <div class="field-row">
-          <button class="start-button" type="button" (click)="saveSetup()" [disabled]="isActing">
-            Save lobby setup
-          </button>
-          @if (response!.availableSaves.length > 0) {
-            <select
-              id="lobby-save-id"
-              name="lobby-save-id"
-              [(ngModel)]="selectedSaveId"
-              [disabled]="isActing"
-            >
-              @for (save of response!.availableSaves; track save.saveId) {
-                <option [value]="save.saveId">{{ save.displayName }}</option>
-              }
-            </select>
-            <button class="start-button" type="button" (click)="bindSave()" [disabled]="isActing || !selectedSaveId">
-              Bind selected save
-            </button>
-          }
-          @if (response!.lobby!.mode === 'LOAD_SAVE') {
-            <button class="start-button" type="button" (click)="clearSaveBinding()" [disabled]="isActing">
-              Switch to new game
-            </button>
-          }
-        </div>
-        </div>
-      }
-
-      @if (response?.activeGame) {
-        <div class="field">
-          <label class="checkbox-field" for="confirmReplaceActiveGame">
-            <input
-              id="confirmReplaceActiveGame"
-              name="confirmReplaceActiveGame"
-              type="checkbox"
-              [(ngModel)]="confirmReplaceActiveGame"
-            />
-            <span>I understand that the lobby start will replace the active game.</span>
-          </label>
-        </div>
-      }
-
-      <button class="start-button" type="button" (click)="startLobbyGame()" [disabled]="!canStartLobbyGame()">
-        {{ isActing ? 'Starting...' : (response!.lobby!.mode === 'LOAD_SAVE' ? 'Load lobby game' : 'Start multiplayer game') }}
-      </button>
     }
 
+    <div class="multiplayer-layout">
+      <aside class="multiplayer-sidebar">
+        <section class="multiplayer-browser-section">
+          <div class="multiplayer-browser-section__head">
+            <div>
+              <p class="saved__title">Draft Lobbies</p>
+              <p class="multiplayer-browser-section__meta">Open multiplayer drafts waiting for players and setup.</p>
+            </div>
+          </div>
+
+          @if (isLoadingBrowser && draftLobbies().length === 0) {
+            <div class="saved">
+              <p>Loading draft lobbies.</p>
+            </div>
+          } @else if (draftLobbies().length === 0) {
+            <div class="saved">
+              <p>No draft lobbies are open right now.</p>
+            </div>
+          } @else {
+            <div class="multiplayer-browser-list">
+              @for (item of draftLobbies(); track item.gameId) {
+                <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
+                  <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
+                    <span class="multiplayer-browser-card__title">{{ item.name }}</span>
+                    <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                    <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
+                    <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                  </button>
+                </article>
+              }
+            </div>
+          }
+        </section>
+
+        <section class="multiplayer-browser-section">
+          <div class="multiplayer-browser-section__head">
+            <div>
+              <p class="saved__title">Running Games</p>
+              <p class="multiplayer-browser-section__meta">Active multiplayer games you can enter or inspect.</p>
+            </div>
+          </div>
+
+          @if (isLoadingBrowser && runningGames().length === 0) {
+            <div class="saved">
+              <p>Loading running multiplayer games.</p>
+            </div>
+          } @else if (runningGames().length === 0) {
+            <div class="saved">
+              <p>No running multiplayer games are visible to this account yet.</p>
+            </div>
+          } @else {
+            <div class="multiplayer-browser-list">
+              @for (item of runningGames(); track item.gameId) {
+                <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
+                  <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
+                    <span class="multiplayer-browser-card__title">{{ item.name }}</span>
+                    <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                    <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
+                    <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                  </button>
+                  @if (item.canEnter) {
+                    <button class="start-button multiplayer-browser-card__action" type="button" (click)="enterRunningGame(item)" [disabled]="isActing">
+                      Enter
+                    </button>
+                  }
+                </article>
+              }
+            </div>
+          }
+        </section>
+      </aside>
+
+      <section class="multiplayer-detail">
+        @if (!selectedGameId) {
+          <div class="saved">
+            <p class="saved__title">No Selection</p>
+            <p>Select a draft lobby or running game from the browser.</p>
+          </div>
+        } @else if (isLoadingDetail && !detailResponse) {
+          <div class="saved">
+            <p class="saved__title">Loading</p>
+            <p>Reading selected multiplayer game details.</p>
+          </div>
+        } @else if (!detailResponse) {
+          <div class="saved">
+            <p class="saved__title">Unavailable</p>
+            <p>The selected multiplayer game is no longer available.</p>
+          </div>
+        } @else {
+          <header class="multiplayer-detail__header">
+            <div>
+              <p class="saved__title">Selected Game</p>
+              <h2>{{ detailResponse.game.name }}</h2>
+              <p class="multiplayer-detail__subtitle">{{ detailedStatusLabel() }}</p>
+            </div>
+            <div class="multiplayer-detail__actions">
+              @if (selectedBrowserItem()?.canEnter) {
+                <button class="start-button" type="button" (click)="enterRunningGame()" [disabled]="isActing">
+                  Enter running game
+                </button>
+              }
+              @if (selectedLobby()?.canJoin) {
+                <button class="start-button" type="button" (click)="joinSelectedLobby()" [disabled]="isActing">
+                  Join draft lobby
+                </button>
+              }
+              @if (selectedLobby()?.canLeave) {
+                <button class="start-button" type="button" (click)="leaveSelectedLobby()" [disabled]="isActing">
+                  Leave draft lobby
+                </button>
+              }
+            </div>
+          </header>
+
+          @if (!selectedLobby()) {
+            <div class="saved">
+              <p class="saved__title">Running Multiplayer Game</p>
+              <p>This game is already running. Use Enter to rejoin it if you have access.</p>
+            </div>
+          } @else {
+            <div class="multiplayer-detail__grid">
+              <section class="saved">
+                <p class="saved__title">Lobby Overview</p>
+                <p>Host: {{ selectedLobby()!.hostPlayerName }}</p>
+                <p>Mode: {{ selectedLobby()!.mode === 'LOAD_SAVE' ? 'Load saved game' : 'Start new game' }}</p>
+                <p>Joined players: {{ selectedLobby()!.members.length }}</p>
+                @if (selectedLobby()!.startBlockedReason) {
+                  <p class="form-error">{{ selectedLobby()!.startBlockedReason }}</p>
+                }
+              </section>
+
+              <section class="saved">
+                <p class="saved__title">Members</p>
+                <div class="multiplayer-member-list">
+                  @for (member of selectedLobby()!.members; track member.accountId) {
+                    <div class="multiplayer-member">
+                      <strong>{{ member.playerName }}</strong>
+                      <span>
+                        @if (member.isLocalAdmin) {
+                          Local Admin /
+                        }
+                        {{ member.isReady ? 'Ready' : 'Not ready' }}
+                      </span>
+                    </div>
+                  }
+                </div>
+
+                @if (selectedLobby()!.canToggleReady) {
+                  <div class="field-row">
+                    <button class="start-button" type="button" (click)="setReady(true)" [disabled]="isActing">Ready</button>
+                    <button class="start-button" type="button" (click)="setReady(false)" [disabled]="isActing">Not ready</button>
+                  </div>
+                }
+              </section>
+            </div>
+
+            @if (selectedLobby()!.boundSave) {
+              <section class="saved">
+                <p class="saved__title">Bound Save</p>
+                <p>{{ selectedLobby()!.boundSave!.displayName }}</p>
+                <p>
+                  Auto save:
+                  {{ selectedLobby()!.boundSave!.autoSaveTurns === 0 ? 'disabled' : 'every ' + selectedLobby()!.boundSave!.autoSaveTurns + ' turns' }}
+                </p>
+              </section>
+            }
+
+            @if (selectedLobby()!.loadSeats.length > 0) {
+              <section class="saved">
+                <p class="saved__title">Saved Human Seats</p>
+                @for (seat of selectedLobby()!.loadSeats; track seat.savedPlayerId) {
+                  <div class="field">
+                    <label for="seat-{{ seat.savedPlayerId }}">{{ seat.savedPlayerName }}</label>
+                    <select
+                      id="seat-{{ seat.savedPlayerId }}"
+                      name="seat-{{ seat.savedPlayerId }}"
+                      [ngModel]="seatValue(seat)"
+                      (ngModelChange)="assignSeat(seat.savedPlayerId, $event)"
+                      [disabled]="!selectedLobby()!.canManage || isActing">
+                      <option value="">Convert to bot</option>
+                      @for (member of selectedLobby()!.members; track member.accountId) {
+                        @if (canSelectSeatMember(seat, member.accountId) || seat.assignedAccountId === member.accountId) {
+                          <option [value]="member.accountId">{{ member.playerName }}</option>
+                        }
+                      }
+                    </select>
+                    <small>
+                      {{
+                        seat.assignmentMode === 'BOT'
+                          ? 'This seat will become a bot.'
+                          : seat.assignmentMode === 'ORIGINAL'
+                            ? 'Original saved player matched.'
+                            : 'Replacement player assigned.'
+                      }}
+                    </small>
+                  </div>
+                }
+              </section>
+            }
+
+            @if (canManageSelectedLobby()) {
+              <section class="multiplayer-management" (input)="markSetupDirty()" (change)="markSetupDirty()">
+                <div class="saved">
+                  <p class="saved__title">Host Controls</p>
+                  <p>Only the local-admin host can manage this draft lobby and start the game.</p>
+                </div>
+
+                <div class="field">
+                  <label for="galaxyName">Galaxy name</label>
+                  <input id="galaxyName" name="galaxyName" type="text" [(ngModel)]="setupForm.galaxyName" />
+                </div>
+
+                <div class="field">
+                  <label for="gameType">Game type</label>
+                  <select id="gameType" name="gameType" [(ngModel)]="setupForm.gameType" disabled>
+                    <option value="PvP">PvP</option>
+                    <option value="PvPvE">PvPvE</option>
+                    <option value="PvE">PvE</option>
+                    <option value="Sandbox">Sandbox</option>
+                  </select>
+                </div>
+
+                <div class="field-row">
+                  <div class="field">
+                    <label for="galaxyWidth">Galaxy width</label>
+                    <input id="galaxyWidth" name="galaxyWidth" type="number" min="10" max="100" [(ngModel)]="setupForm.galaxyWidth" />
+                  </div>
+                  <div class="field">
+                    <label for="galaxyHeight">Galaxy height</label>
+                    <input id="galaxyHeight" name="galaxyHeight" type="number" min="10" max="100" [(ngModel)]="setupForm.galaxyHeight" />
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field">
+                    <label for="galaxyCenterSize">Galaxy center size (%)</label>
+                    <input id="galaxyCenterSize" name="galaxyCenterSize" type="number" min="5" max="35" [(ngModel)]="setupForm.galaxyCenterSize" />
+                  </div>
+                  <div class="field">
+                    <label for="voidChance">Void chance (%)</label>
+                    <input id="voidChance" name="voidChance" type="number" min="0" max="35" [(ngModel)]="setupForm.voidChance" />
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field">
+                    <label for="starsAmountModifierMin">Stars modifier min</label>
+                    <input id="starsAmountModifierMin" name="starsAmountModifierMin" type="number" min="-10" max="0" [(ngModel)]="setupForm.starsAmountModifierMin" />
+                  </div>
+                  <div class="field">
+                    <label for="starsAmountModifierMax">Stars modifier max</label>
+                    <input id="starsAmountModifierMax" name="starsAmountModifierMax" type="number" min="1" max="9" [(ngModel)]="setupForm.starsAmountModifierMax" />
+                  </div>
+                </div>
+
+                <div class="saved">
+                  <p>Human player amount is taken from joined lobby members: {{ selectedLobby()!.members.length }}.</p>
+                </div>
+
+                <div class="field-row">
+                  <div class="field">
+                    <label for="botsAmount">Bots amount</label>
+                    <input id="botsAmount" name="botsAmount" type="number" min="0" max="12" [(ngModel)]="setupForm.botsAmount" />
+                  </div>
+                  <div class="field">
+                    <label for="botDifficulty">Bot difficulty (%)</label>
+                    <input id="botDifficulty" name="botDifficulty" type="number" min="-75" max="200" [(ngModel)]="setupForm.botDifficulty" />
+                  </div>
+                </div>
+
+                @if (configuredBotsAmount() > 0) {
+                  <div class="field">
+                    <label>Bot personalities</label>
+                    <div class="saved">
+                      <p class="saved__title">Assigned: {{ assignedBotProfilesCount() }} / {{ configuredBotsAmount() }}</p>
+                      <p>Choose the exact amount of each implemented bot personality.</p>
+                    </div>
+                    <div class="field-row">
+                      @for (profileId of botProfileIds; track profileId) {
+                        <div class="field">
+                          <label for="lobby-bot-profile-{{ profileId }}">{{ botProfileLabels[profileId] }}</label>
+                          <input
+                            id="lobby-bot-profile-{{ profileId }}"
+                            name="lobby-bot-profile-{{ profileId }}"
+                            type="number"
+                            min="0"
+                            max="12"
+                            step="1"
+                            [ngModel]="botProfileCountValue(profileId)"
+                            (ngModelChange)="setBotProfileCountValue(profileId, $event)" />
+                        </div>
+                      }
+                    </div>
+                    @if (botPersonalityValidationMessage()) {
+                      <p class="form-error">{{ botPersonalityValidationMessage() }}</p>
+                    }
+                  </div>
+                }
+
+                <div class="field-row">
+                  <div class="field">
+                    <label for="neutralBotsAmount">Neutral bots amount (%)</label>
+                    <input id="neutralBotsAmount" name="neutralBotsAmount" type="number" min="0" max="10" [(ngModel)]="setupForm.neutralBotsAmount" />
+                  </div>
+                  <div class="field">
+                    <label for="neutralBotsDifficulty">Neutral bots difficulty (%)</label>
+                    <input id="neutralBotsDifficulty" name="neutralBotsDifficulty" type="number" min="-100" max="200" [(ngModel)]="setupForm.neutralBotsDifficulty" />
+                  </div>
+                </div>
+
+                <div class="field">
+                  <label for="autoSaveTurns">Auto save every N turns</label>
+                  <input id="autoSaveTurns" name="autoSaveTurns" type="number" min="0" max="999" [(ngModel)]="setupForm.autoSaveTurns" />
+                  <small>Use 0 to disable autosaving.</small>
+                </div>
+
+                <div class="field">
+                  <label>Starting homeworld preset</label>
+                  <div class="test-options">
+                    @for (preset of startingHomeworldPresetValues; track preset) {
+                      <label
+                        class="checkbox-field"
+                        for="lobby-startingHomeworldPreset-{{ preset }}"
+                        [attr.title]="startingHomeworldPresetTooltips[preset]">
+                        <input
+                          id="lobby-startingHomeworldPreset-{{ preset }}"
+                          name="lobby-startingHomeworldPreset"
+                          type="radio"
+                          [value]="preset"
+                          [(ngModel)]="setupForm.startingHomeworldPreset"
+                          [attr.title]="startingHomeworldPresetTooltips[preset]" />
+                        <span>{{ preset }}</span>
+                      </label>
+                    }
+                  </div>
+                  <small>Applies only to human and bot home planets. Neutral starts stay RNG-based.</small>
+                </div>
+
+                <div class="field">
+                  <label>Testing options</label>
+                  <div class="test-options">
+                    <label class="checkbox-field" for="createRandomPlanets">
+                      <input id="createRandomPlanets" name="createRandomPlanets" type="checkbox" [(ngModel)]="setupForm.createRandomPlanets" />
+                      <span>Create random planets</span>
+                    </label>
+                    <label class="checkbox-field" for="createStartingShips">
+                      <input id="createStartingShips" name="createStartingShips" type="checkbox" [(ngModel)]="setupForm.createStartingShips" />
+                      <span>Create starting ships</span>
+                    </label>
+                    <label class="checkbox-field" for="skipTutorial">
+                      <input id="skipTutorial" name="skipTutorial" type="checkbox" [(ngModel)]="setupForm.skipTutorial" />
+                      <span>Skip tutorial</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <label>Starting resources</label>
+                  <div class="resource-group">
+                    <div class="resource-input">
+                      <label class="sr-only" for="startingMetal">Starting metal</label>
+                      <img class="resource-icon" src="images/icons/normal/metal.png" alt="Metal" />
+                      <input id="startingMetal" name="startingMetal" type="number" min="0" max="999999" aria-label="Starting metal" [(ngModel)]="setupForm.startingMetal" />
+                    </div>
+                    <div class="resource-input">
+                      <label class="sr-only" for="startingCrystal">Starting crystal</label>
+                      <img class="resource-icon" src="images/icons/normal/crystal.png" alt="Crystal" />
+                      <input id="startingCrystal" name="startingCrystal" type="number" min="0" max="999999" aria-label="Starting crystal" [(ngModel)]="setupForm.startingCrystal" />
+                    </div>
+                    <div class="resource-input">
+                      <label class="sr-only" for="startingDeuterium">Starting deuterium</label>
+                      <img class="resource-icon" src="images/icons/normal/deuter.png" alt="Deuterium" />
+                      <input id="startingDeuterium" name="startingDeuterium" type="number" min="0" max="999999" aria-label="Starting deuterium" [(ngModel)]="setupForm.startingDeuterium" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <button class="start-button" type="button" (click)="saveSetup()" [disabled]="isActing">
+                    Save lobby setup
+                  </button>
+                  @if (availableSaves().length > 0) {
+                    <select id="lobby-save-id" name="lobby-save-id" [(ngModel)]="selectedSaveId" [disabled]="isActing || isLoadingSaves">
+                      @for (save of availableSaves(); track save.saveId) {
+                        <option [value]="save.saveId">{{ save.displayName }}</option>
+                      }
+                    </select>
+                    <button class="start-button" type="button" (click)="bindSave()" [disabled]="isActing || !selectedSaveId">
+                      Bind selected save
+                    </button>
+                  }
+                  @if (selectedLobby()!.mode === 'LOAD_SAVE') {
+                    <button class="start-button" type="button" (click)="clearSaveBinding()" [disabled]="isActing">
+                      Switch to new game
+                    </button>
+                  }
+                </div>
+
+                <button class="start-button multiplayer-management__start" type="button" (click)="startLobbyGame()" [disabled]="!canStartSelectedLobby()">
+                  {{ isActing ? 'Starting...' : (selectedLobby()!.mode === 'LOAD_SAVE' ? 'Start from save' : 'Start multiplayer game') }}
+                </button>
+              </section>
+            }
+          }
+        }
+      </section>
+    </div>
+
     <div class="field-row">
-      <button class="start-button" type="button" (click)="loadLobby()" [disabled]="isLoading || isActing">
-        {{ isLoading ? 'Refreshing...' : 'Refresh lobby' }}
+      <button class="start-button" type="button" (click)="loadBrowser()" [disabled]="isLoadingBrowser || isActing">
+        {{ isLoadingBrowser ? 'Refreshing...' : 'Refresh browser' }}
       </button>
       <a class="link button" routerLink="/">Back to main menu</a>
     </div>

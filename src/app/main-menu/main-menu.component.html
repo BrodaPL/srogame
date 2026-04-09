@@ -24,6 +24,21 @@
         <button class="menu-button" type="button" (click)="logout()">
           Logout
         </button>
+        @if (shouldShowResumeCurrentGame()) {
+          <button
+            class="menu-button"
+            type="button"
+            (click)="resumeCurrentGame()"
+            [disabled]="!canResumeCurrentGame() || isLoadingCurrentGameStatus"
+            [title]="resumeUnavailableReason() ?? ''">
+            Resume Current Game
+          </button>
+          @if (resumeUnavailableReason() || resumeError) {
+            <p class="subtitle">
+              {{ resumeError ?? resumeUnavailableReason() }}
+            </p>
+          }
+        }
       }
       <button class="menu-button" type="button" routerLink="/load" [disabled]="!canLoadGame()">
         Load Game
@@ -41,5 +56,46 @@
         Help &amp; About
       </button>
     </nav>
+
+    @if (session()) {
+      <section class="saved">
+        <p class="saved__title">Available Games</p>
+        @if (isLoadingGames && !hasVisibleGames()) {
+          <p>Loading your accessible games.</p>
+        } @else if (gameListError) {
+          <p class="form-error">{{ gameListError }}</p>
+        } @else if (!hasVisibleGames()) {
+          <p>No accessible games found yet.</p>
+        } @else {
+          @for (game of availableGames(); track game.gameId) {
+            <div class="field">
+              <p>
+                <strong>{{ game.name }}</strong>
+                @if (isCurrentGame(game)) {
+                  <span>(Current)</span>
+                }
+              </p>
+              <p>{{ gameStatusLabel(game) }}</p>
+              <div class="field-row">
+                <button
+                  class="start-button"
+                  type="button"
+                  (click)="selectGame(game)"
+                  [disabled]="isCurrentGame(game) || pendingGameActionId !== null">
+                  {{ isPendingGameAction(game) && !isCurrentGame(game) ? 'Selecting...' : (isCurrentGame(game) ? 'Selected' : 'Select') }}
+                </button>
+                <button
+                  class="start-button"
+                  type="button"
+                  (click)="enterGame(game)"
+                  [disabled]="!canEnterGame(game) || pendingGameActionId !== null">
+                  {{ isPendingGameAction(game) ? 'Entering...' : 'Enter' }}
+                </button>
+              </div>
+            </div>
+          }
+        }
+      </section>
+    }
   </section>
 </main>

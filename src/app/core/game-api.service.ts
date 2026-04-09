@@ -4,11 +4,14 @@ import {
   BotAdminActionResponse,
   BotAdminStatesResponse,
   BotDecisionTracesResponse,
+  CurrentGameStatusResponse,
   EndTurnResponse,
+  GameListResponse,
   GameStateResponse,
   GameSavesResponse,
   LoadGameResponse,
-  MultiplayerLobbyResponse,
+  MultiplayerGameBrowserResponse,
+  MultiplayerGameDetailResponse,
   StartGameRequest,
   StartGameResponse,
   ClientGalaxyDto,
@@ -71,6 +74,28 @@ import { API_BASE_URL } from './api-constants';
 export class GameApiService {
   constructor(private readonly http: HttpClient) {}
 
+  public getGames(token: string) {
+    return this.http.get<GameListResponse>(
+      `${API_BASE_URL}/games`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getCurrentGameStatus(token: string) {
+    return this.http.get<CurrentGameStatusResponse>(
+      `${API_BASE_URL}/games/current`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public selectGame(gameId: string, token: string) {
+    return this.http.post<CurrentGameStatusResponse>(
+      `${API_BASE_URL}/games/${encodeURIComponent(gameId)}/select`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
   public startGame(request: StartGameRequest, token: string) {
     return this.http.post<StartGameResponse>(
       `${API_BASE_URL}/game/start`,
@@ -79,16 +104,20 @@ export class GameApiService {
     );
   }
 
-  public getGameState(token: string) {
+  public getGameState(token: string, gameId?: string | null) {
     return this.http.get<GameStateResponse>(
-      `${API_BASE_URL}/game/state`,
+      gameId
+        ? `${API_BASE_URL}/games/${encodeURIComponent(gameId)}/state`
+        : `${API_BASE_URL}/game/state`,
       { headers: this.authHeaders(token) }
     );
   }
 
-  public getGameSaves(token?: string) {
+  public getGameSaves(token?: string, gameId?: string | null) {
     return this.http.get<GameSavesResponse>(
-      `${API_BASE_URL}/game/saves`,
+      gameId
+        ? `${API_BASE_URL}/games/${encodeURIComponent(gameId)}/saves`
+        : `${API_BASE_URL}/game/saves`,
       token ? { headers: this.authHeaders(token) } : {}
     );
   }
@@ -108,96 +137,107 @@ export class GameApiService {
     );
   }
 
-  public getMultiplayerLobby(token?: string) {
-    return this.http.get<MultiplayerLobbyResponse>(
-      `${API_BASE_URL}/multiplayer/lobby`,
+  public getMultiplayerGames(token?: string) {
+    return this.http.get<MultiplayerGameBrowserResponse>(
+      `${API_BASE_URL}/multiplayer/games`,
       token ? { headers: this.authHeaders(token) } : {}
     );
   }
 
-  public openMultiplayerLobby(token: string) {
-    return this.http.post<MultiplayerLobbyResponse>(
-      `${API_BASE_URL}/multiplayer/lobby/open`,
+  public createMultiplayerGame(token: string) {
+    return this.http.post<MultiplayerGameDetailResponse>(
+      `${API_BASE_URL}/multiplayer/games`,
       {},
       { headers: this.authHeaders(token) }
     );
   }
 
-  public joinMultiplayerLobby(token: string) {
-    return this.http.post<MultiplayerLobbyResponse>(
-      `${API_BASE_URL}/multiplayer/lobby/join`,
+  public getMultiplayerGameDetail(gameId: string, token?: string) {
+    return this.http.get<MultiplayerGameDetailResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}`,
+      token ? { headers: this.authHeaders(token) } : {}
+    );
+  }
+
+  public joinMultiplayerGame(gameId: string, token: string) {
+    return this.http.post<MultiplayerGameDetailResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/join`,
       {},
       { headers: this.authHeaders(token) }
     );
   }
 
-  public leaveMultiplayerLobby(token: string) {
-    return this.http.post<MultiplayerLobbyResponse>(
-      `${API_BASE_URL}/multiplayer/lobby/leave`,
+  public leaveMultiplayerGame(gameId: string, token: string) {
+    return this.http.post<MultiplayerGameDetailResponse | null>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/leave`,
       {},
       { headers: this.authHeaders(token) }
     );
   }
 
-  public toggleMultiplayerLobbyReady(request: ToggleMultiplayerLobbyReadyRequest, token: string) {
-    return this.http.post<MultiplayerLobbyResponse>(
-      `${API_BASE_URL}/multiplayer/lobby/ready`,
+  public setMultiplayerGameReady(gameId: string, request: ToggleMultiplayerLobbyReadyRequest, token: string) {
+    return this.http.post<MultiplayerGameDetailResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/ready`,
       request,
       { headers: this.authHeaders(token) }
     );
   }
 
-  public updateMultiplayerLobbySetup(request: UpdateMultiplayerLobbySetupRequest, token: string) {
-    return this.http.post<MultiplayerLobbyResponse>(
-      `${API_BASE_URL}/multiplayer/lobby/setup`,
+  public updateMultiplayerGameSetup(gameId: string, request: UpdateMultiplayerLobbySetupRequest, token: string) {
+    return this.http.post<MultiplayerGameDetailResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/setup`,
       request,
       { headers: this.authHeaders(token) }
     );
   }
 
-  public bindMultiplayerLobbySave(request: BindMultiplayerLobbySaveRequest, token: string) {
-    return this.http.post<MultiplayerLobbyResponse>(
-      `${API_BASE_URL}/multiplayer/lobby/load-save`,
+  public bindMultiplayerGameSave(gameId: string, request: BindMultiplayerLobbySaveRequest, token: string) {
+    return this.http.post<MultiplayerGameDetailResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/bind-save`,
       request,
       { headers: this.authHeaders(token) }
     );
   }
 
-  public clearMultiplayerLobbySave(token: string) {
-    return this.http.post<MultiplayerLobbyResponse>(
-      `${API_BASE_URL}/multiplayer/lobby/new-game`,
+  public clearMultiplayerGameSave(gameId: string, token: string) {
+    return this.http.post<MultiplayerGameDetailResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/clear-save`,
       {},
       { headers: this.authHeaders(token) }
     );
   }
 
-  public assignMultiplayerLobbySeat(request: AssignMultiplayerLobbySeatRequest, token: string) {
-    return this.http.post<MultiplayerLobbyResponse>(
-      `${API_BASE_URL}/multiplayer/lobby/assign-seat`,
+  public assignMultiplayerGameSeat(gameId: string, request: AssignMultiplayerLobbySeatRequest, token: string) {
+    return this.http.post<MultiplayerGameDetailResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/assign-seat`,
       request,
       { headers: this.authHeaders(token) }
     );
   }
 
-  public startMultiplayerLobbyGame(token: string) {
+  public startMultiplayerGame(gameId: string, token: string) {
     return this.http.post<LoadGameResponse>(
-      `${API_BASE_URL}/multiplayer/lobby/start`,
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/start`,
       {},
       { headers: this.authHeaders(token) }
     );
   }
 
-  public endTurn(token: string) {
+  public endTurn(token: string, gameId?: string | null) {
     return this.http.post<EndTurnResponse>(
-      `${API_BASE_URL}/game/end-turn`,
+      gameId
+        ? `${API_BASE_URL}/games/${encodeURIComponent(gameId)}/end-turn`
+        : `${API_BASE_URL}/game/end-turn`,
       {},
       { headers: this.authHeaders(token) }
     );
   }
 
-  public getTurnStatus(token: string) {
+  public getTurnStatus(token: string, gameId?: string | null) {
     return this.http.get<TurnStatusResponse>(
-      `${API_BASE_URL}/game/turn-status`,
+      gameId
+        ? `${API_BASE_URL}/games/${encodeURIComponent(gameId)}/turn-status`
+        : `${API_BASE_URL}/game/turn-status`,
       { headers: this.authHeaders(token) }
     );
   }

@@ -43,6 +43,7 @@ export class AuthStateService {
 
   public setSession(session: PlayerSession): void {
     this.playerSession.save(session);
+    this.gameState.setCurrentGameId(session.currentGameId);
     this.sessionSignal.set(session);
   }
 

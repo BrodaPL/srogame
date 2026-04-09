@@ -20,6 +20,9 @@ export class PlayerSessionService {
         return {
           ...parsed,
           localAdmin: (parsed as Partial<PlayerSession>).localAdmin === true,
+          currentGameId: this.normalizeCurrentGameId(
+            (parsed as Partial<PlayerSession>).currentGameId
+          ),
           unreadReportCount: this.normalizeUnreadReportCount(
             (parsed as Partial<PlayerSession>).unreadReportCount
           ),
@@ -65,8 +68,15 @@ export class PlayerSessionService {
       session.playerName.trim().length > 0 &&
       typeof session.token === 'string' &&
       session.token.trim().length > 0 &&
+      (session.currentGameId === null || session.currentGameId === undefined || typeof session.currentGameId === 'string') &&
       (session.localAdmin === undefined || typeof session.localAdmin === 'boolean')
     );
+  }
+
+  private normalizeCurrentGameId(value: string | null | undefined): string | null {
+    return typeof value === 'string' && value.trim().length > 0
+      ? value.trim()
+      : null;
   }
 
   private normalizeUnreadReportCount(value: number | undefined): number {

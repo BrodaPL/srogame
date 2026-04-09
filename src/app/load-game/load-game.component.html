@@ -3,7 +3,10 @@
     <header class="panel__header">
       <p class="eyebrow">Load Game</p>
       <h1>Load Game</h1>
-      <p class="subtitle">Manage the server save list and replace the active runtime game with a selected save.</p>
+      <p class="subtitle">Manage saves for the currently selected game and replace the active runtime game with a selected save.</p>
+      @if (session()) {
+        <p class="subtitle">{{ selectedGameLabel() }}</p>
+      }
     </header>
 
     @if (isSummaryLoading && !response) {
@@ -19,7 +22,7 @@
     } @else if (response && response.saves.length === 0) {
       <div class="saved">
         <p class="saved__title">No Saves Found</p>
-        <p>The server does not currently have any saved games in `server/data/saves/`.</p>
+        <p>No saves were found for the currently selected game context.</p>
       </div>
     }
 

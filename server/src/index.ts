@@ -54,11 +54,39 @@ import {
   deleteGameSaveById,
   hydrateGameSave,
   listGameSaveSummaries,
+  listGameSaveSummariesForGame,
   readGameSaveById,
   resolveGameSaveLoadAccess,
   shouldAutoSaveAfterTurn,
   writeRotatingAutoSave
 } from './game-save.js';
+import {
+  createGameId,
+  createGameRecord,
+  getGameById,
+  listGames,
+  upsertGameRecord,
+  updateGameRecord
+} from './game-registry.js';
+import {
+  isAccountMemberOfGame,
+  listMembershipsForGame,
+  listMembershipsForAccount,
+  removeMembership,
+  upsertMembership
+} from './game-membership.js';
+import {
+  deleteMultiplayerLobby,
+  getMultiplayerLobbyByGameId,
+  listMultiplayerLobbies,
+  upsertMultiplayerLobby
+} from './multiplayer-lobby-store.js';
+import {
+  getGameRuntime,
+  hasGameRuntime,
+  setGameRuntime,
+  updateGameRuntime
+} from './game-runtime-store.js';
 import {
   applyLobbyLoadSeatsToGalaxy,
   assignLobbyLoadSeat,
@@ -70,7 +98,6 @@ import {
   joinMultiplayerLobby,
   leaveMultiplayerLobby,
   openMultiplayerLobby,
-  reconcileLobbyState,
   setMultiplayerLobbyMemberReady,
   updateMultiplayerLobbySetup
 } from './multiplayer-lobby.js';
@@ -128,12 +155,15 @@ import type {
   BotAdminStatesResponse,
   EndTurnResponse,
   TurnStatusResponse,
+  CurrentGameStatusResponse,
+  GameListResponse,
   GameSavesResponse,
+  GameSummary,
   GalaxySetup,
+  GameKind,
   PlayerSession,
   GalaxySnapshot,
   LoadGameResponse,
-  MultiplayerLobbyResponse,
   StartGameRequest,
   StartGameResponse,
   GameStateResponse,
@@ -204,6 +234,8 @@ import type {
   MaintenanceTransferPayloadDto,
   SendMailMessageRequest,
   SendMailMessageResponse,
+  MultiplayerGameBrowserResponse,
+  MultiplayerGameDetailResponse,
   UpdateMultiplayerLobbySetupRequest,
   ToggleMultiplayerLobbyReadyRequest,
   AssignMultiplayerLobbySeatRequest,
@@ -416,6 +448,18 @@ const AUTH_DATA_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../data/auth.json'
 );
+const GAME_REGISTRY_DATA_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../data/games.json'
+);
+const GAME_MEMBERSHIPS_DATA_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../data/game-memberships.json'
+);
+const MULTIPLAYER_LOBBY_STORE_DATA_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../data/multiplayer-lobbies.json'
+);
 const GAME_SAVES_DIRECTORY_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../data/saves'
@@ -469,11 +513,11 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
 ]);
 
 let currentGalaxy: Galaxy | null = null;
+let currentRuntimeGameId: string | null = null;
 let currentGameOwnerId: number | null = null;
 let currentGameOwnerPlayerName: string | null = null;
 let currentGameSetup: GalaxySetup | null = null;
 let currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
-let currentMultiplayerLobby: MultiplayerLobbyState | null = null;
 let isTurnProcessing = false;
 let currentTurnReadyPlayerIds = new Set<number>();
 
@@ -504,7 +548,8 @@ app.post('/api/auth/register', (req, res) => {
     playerNameKey,
     passwordHash: hashPassword(password),
     localAdmin: false,
-    createdAt: now
+    createdAt: now,
+    currentGameId: null
   };
 
   data.nextAccountId += 1;
@@ -564,6 +609,96 @@ app.post('/api/auth/logout', (req, res) => {
   return res.status(204).send();
 });
 
+app.get('/api/games', (req, res) => {
+  const auth = getAuthSession(req);
+  return res.status(200).json(buildGameListResponse(auth?.session ?? null));
+});
+
+app.get('/api/games/current', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  return res.status(200).json(buildCurrentGameStatusResponse(auth.session));
+});
+
+app.post('/api/games/:gameId/select', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  const gameId = typeof req.params.gameId === 'string' ? req.params.gameId.trim() : '';
+  const record = gameId ? getGameById(GAME_REGISTRY_DATA_PATH, gameId) : null;
+  if (!record || !canSessionViewGameRecord(gameId, auth.session)) {
+    return res.status(404).json({ error: 'Game not found.' });
+  }
+
+  setAccountCurrentGameId(auth.data, auth.session.accountId, gameId);
+  saveAuthData(auth.data);
+  auth.session.currentGameId = gameId;
+  if (hasGameRuntime(gameId)) {
+    switchCurrentRuntime(gameId);
+  }
+
+  return res.status(200).json(buildCurrentGameStatusResponse(auth.session));
+});
+
+app.get('/api/games/:gameId/saves', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  const gameId = typeof req.params.gameId === 'string' ? req.params.gameId.trim() : '';
+  const record = gameId ? getGameById(GAME_REGISTRY_DATA_PATH, gameId) : null;
+  if (!record || !canSessionViewGameRecord(gameId, auth.session)) {
+    return res.status(404).json({ error: 'Game not found.' });
+  }
+
+  try {
+    return res.status(200).json(buildGameSavesResponse(auth.session, gameId));
+  } catch (error) {
+    console.error('Failed to read game saves for game.', error);
+    return res.status(500).json({ error: 'Unable to read game saves.' });
+  }
+});
+
+app.get('/api/games/:gameId/state', (req, res) => {
+  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId);
+  if ('error' in access) {
+    return res.status(access.status).json({ error: access.error });
+  }
+
+  const response: GameStateResponse = {
+    player: toPlayerSession(access.auth.session, access.galaxy),
+    galaxy: buildGalaxySnapshot(access.galaxy)
+  };
+
+  return res.status(200).json(response);
+});
+
+app.get('/api/games/:gameId/turn-status', (req, res) => {
+  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId);
+  if ('error' in access) {
+    return res.status(access.status).json({ error: access.error });
+  }
+
+  return res.status(200).json(
+    buildTurnStatusResponse(
+      access.galaxy,
+      access.readyPlayerIds,
+      access.playerId,
+      access.isProcessing
+    )
+  );
+});
+
+app.post('/api/games/:gameId/end-turn', (req, res) => {
+  return handleEndTurnRequest(req, res, req.params.gameId);
+});
+
 app.post('/api/game/start', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
@@ -591,16 +726,19 @@ app.post('/api/game/start', (req, res) => {
   synchronizeTradePortState(nextGalaxy);
   generateSelfReportsForHumanPlayers(nextGalaxy, nextGalaxy.currentTurn);
   const nextPresentation = buildPresentationDataByPlayer(nextGalaxy);
+  const nextGameId = createGameId();
+  let initialSaveSummary: ReturnType<typeof buildGameSaveSummary> | null = null;
 
   try {
-    writeRotatingAutoSave(
+    initialSaveSummary = writeRotatingAutoSave(
       GAME_SAVES_DIRECTORY_PATH,
       nextGalaxy,
       auth.session.accountId,
       setup,
       {
         rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
-        maxSaveFiles: MAX_GAME_SAVE_FILES
+        maxSaveFiles: MAX_GAME_SAVE_FILES,
+        gameId: nextGameId
       }
     );
   } catch (error) {
@@ -616,7 +754,21 @@ app.post('/api/game/start', (req, res) => {
   resetActiveTurnState();
   clearBotDecisionTraces();
   resetBotAdminRuntimeState();
-  currentMultiplayerLobby = null;
+    registerRunningGame(auth.data, 'SINGLEPLAYER', nextGalaxy, {
+      gameId: nextGameId,
+      ownerAccountId: auth.session.accountId,
+    ownerPlayerName: auth.session.playerName,
+    hostAccountId: auth.session.accountId,
+    hostPlayerName: auth.session.playerName,
+    currentSaveId: initialSaveSummary?.saveId ?? null,
+    lastSavedAt: initialSaveSummary?.savedAt ?? null,
+    currentGameAccountIds: [auth.session.accountId],
+    memberships: [{
+      accountId: auth.session.accountId,
+      playerName: auth.session.playerName,
+      role: 'OWNER'
+    }]
+  });
 
   const response: StartGameResponse = {
     player: toPlayerSession(auth.session, nextGalaxy),
@@ -663,7 +815,21 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
     resetActiveTurnState();
     clearBotDecisionTraces();
     resetBotAdminRuntimeState();
-    currentMultiplayerLobby = null;
+    registerRunningGame(auth.data, 'SINGLEPLAYER', currentGalaxy, {
+      gameId: save.gameId ?? undefined,
+      ownerAccountId: auth.session.accountId,
+      ownerPlayerName: auth.session.playerName,
+      hostAccountId: auth.session.accountId,
+      hostPlayerName: auth.session.playerName,
+      currentSaveId: req.params.saveId,
+      lastSavedAt: save.savedAt,
+      currentGameAccountIds: [auth.session.accountId],
+      memberships: [{
+        accountId: auth.session.accountId,
+        playerName: auth.session.playerName,
+        role: 'OWNER'
+      }]
+    });
 
     const response: LoadGameResponse = {
       player: toPlayerSession(auth.session, currentGalaxy),
@@ -700,73 +866,156 @@ app.delete('/api/game/saves/:saveId', (req, res) => {
   }
 });
 
-app.get('/api/multiplayer/lobby', (req, res) => {
+app.get('/api/multiplayer/games', (req, res) => {
   const auth = getAuthSession(req);
-  return res.status(200).json(buildMultiplayerLobbyResponse(auth?.session ?? null));
+  return res.status(200).json(buildMultiplayerGameBrowserResponse(auth?.session ?? null));
 });
 
-app.post('/api/multiplayer/lobby/open', (req, res) => {
+app.post('/api/multiplayer/games', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
   if (!isLocalAdminSession(auth.session)) {
-    return res.status(403).json({ error: 'Local admin privileges are required to open the multiplayer lobby.' });
+    return res.status(403).json({ error: 'Local admin privileges are required to create a multiplayer lobby.' });
   }
 
-  currentMultiplayerLobby = openMultiplayerLobby(
+  const now = new Date().toISOString();
+  const gameId = createGameId();
+  const lobby = openMultiplayerLobby(
     auth.session.accountId,
     auth.session.playerName,
-    new Date().toISOString(),
-    currentMultiplayerLobby?.setup ?? createDefaultMultiplayerLobbySetup()
+    now,
+    createDefaultMultiplayerLobbySetup()
   );
-  return res.status(200).json(buildMultiplayerLobbyResponse(auth.session));
+  const record = createGameRecord({
+    gameId,
+    kind: 'MULTIPLAYER',
+    status: 'DRAFT',
+    name: lobby.setup.galaxyName,
+    ownerAccountId: auth.session.accountId,
+    ownerPlayerName: auth.session.playerName,
+    hostAccountId: auth.session.accountId,
+    hostPlayerName: auth.session.playerName,
+    currentTurn: null,
+    currentSaveId: null,
+    lastStartedAt: null,
+    lastSavedAt: null,
+    createdAt: now,
+    updatedAt: now
+  });
+  upsertGameRecord(GAME_REGISTRY_DATA_PATH, record);
+  upsertDraftLobbyWithMemberships({
+    ...lobby,
+    gameId,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  return res.status(200).json(buildMultiplayerGameDetailResponse(gameId, auth.session));
 });
 
-app.post('/api/multiplayer/lobby/join', (req, res) => {
+app.get('/api/multiplayer/games/:gameId', (req, res) => {
+  const auth = getAuthSession(req);
+  const response = buildMultiplayerGameDetailResponse(req.params.gameId, auth?.session ?? null);
+  if (!response) {
+    return res.status(404).json({ error: 'Multiplayer game not found.' });
+  }
+
+  return res.status(200).json(response);
+});
+
+app.post('/api/multiplayer/games/:gameId/join', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  if (!currentMultiplayerLobby) {
-    return res.status(404).json({ error: 'No multiplayer lobby is open.' });
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
   }
 
-  currentMultiplayerLobby = joinMultiplayerLobby(currentMultiplayerLobby, {
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
+  if (!lobby) {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
+  }
+
+  removeAccountFromOtherDraftMultiplayerLobbies(auth.session.accountId, req.params.gameId);
+  const nextLobby = joinMultiplayerLobby(lobby, {
     accountId: auth.session.accountId,
     playerName: auth.session.playerName,
     isLocalAdmin: auth.session.localAdmin === true
   }, new Date().toISOString());
-  return res.status(200).json(buildMultiplayerLobbyResponse(auth.session));
+  upsertDraftLobbyWithMemberships({
+    ...nextLobby,
+    gameId: req.params.gameId,
+    createdAt: lobby.createdAt,
+    updatedAt: new Date().toISOString()
+  });
+
+  return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
 });
 
-app.post('/api/multiplayer/lobby/leave', (req, res) => {
+app.post('/api/multiplayer/games/:gameId/leave', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  if (!currentMultiplayerLobby) {
-    return res.status(404).json({ error: 'No multiplayer lobby is open.' });
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
   }
 
-  currentMultiplayerLobby = leaveMultiplayerLobby(currentMultiplayerLobby, auth.session.accountId);
-  return res.status(200).json(buildMultiplayerLobbyResponse(auth.session));
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
+  if (!lobby) {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
+  }
+
+  if (!lobby.members.some((member) => member.accountId === auth.session.accountId)) {
+    return res.status(403).json({ error: 'Join the lobby first.' });
+  }
+
+  const nextLobby = leaveMultiplayerLobby(lobby, auth.session.accountId);
+  removeMembership(GAME_MEMBERSHIPS_DATA_PATH, req.params.gameId, auth.session.accountId);
+  if (!nextLobby) {
+    deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
+    updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
+      status: 'ARCHIVED',
+      updatedAt: new Date().toISOString()
+    });
+    return res.status(204).send();
+  }
+
+  upsertDraftLobbyWithMemberships({
+    ...nextLobby,
+    gameId: req.params.gameId,
+    createdAt: lobby.createdAt,
+    updatedAt: new Date().toISOString()
+  });
+
+  return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
 });
 
-app.post('/api/multiplayer/lobby/ready', (req, res) => {
+app.post('/api/multiplayer/games/:gameId/ready', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  if (!currentMultiplayerLobby) {
-    return res.status(404).json({ error: 'No multiplayer lobby is open.' });
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
   }
 
-  if (!currentMultiplayerLobby.members.some((member) => member.accountId === auth.session.accountId)) {
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
+  if (!lobby) {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
+  }
+
+  if (!lobby.members.some((member) => member.accountId === auth.session.accountId)) {
     return res.status(403).json({ error: 'Join the lobby first.' });
   }
 
@@ -775,26 +1024,26 @@ app.post('/api/multiplayer/lobby/ready', (req, res) => {
     return res.status(400).json({ error: 'Invalid ready payload.' });
   }
 
-  currentMultiplayerLobby = setMultiplayerLobbyMemberReady(
-    currentMultiplayerLobby,
-    auth.session.accountId,
-    body.ready
-  );
-  return res.status(200).json(buildMultiplayerLobbyResponse(auth.session));
+  const nextLobby = setMultiplayerLobbyMemberReady(lobby, auth.session.accountId, body.ready);
+  upsertDraftLobbyWithMemberships({
+    ...nextLobby,
+    gameId: req.params.gameId,
+    createdAt: lobby.createdAt,
+    updatedAt: new Date().toISOString()
+  });
+
+  return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
 });
 
-app.post('/api/multiplayer/lobby/setup', (req, res) => {
+app.post('/api/multiplayer/games/:gameId/setup', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  if (!currentMultiplayerLobby) {
-    return res.status(404).json({ error: 'No multiplayer lobby is open.' });
-  }
-
-  if (!isLocalAdminSession(auth.session) || auth.session.accountId !== currentMultiplayerLobby.hostAccountId) {
-    return res.status(403).json({ error: 'Only the local admin host can change the lobby setup.' });
+  const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
+  if (!managed) {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
   }
 
   const body = req.body as UpdateMultiplayerLobbySetupRequest | undefined;
@@ -804,28 +1053,36 @@ app.post('/api/multiplayer/lobby/setup', (req, res) => {
 
   const setup = normalizeGalaxySetup({
     ...body.setup,
-    playerAmount: Math.max(1, currentMultiplayerLobby.members.length)
+    playerAmount: Math.max(1, managed.lobby.members.length)
   });
   if (!isValidSetup(setup)) {
     return res.status(400).json({ error: 'Invalid setup payload.' });
   }
 
-  currentMultiplayerLobby = updateMultiplayerLobbySetup(currentMultiplayerLobby, setup);
-  return res.status(200).json(buildMultiplayerLobbyResponse(auth.session));
+  const nextLobby = updateMultiplayerLobbySetup(managed.lobby, setup);
+  upsertDraftLobbyWithMemberships({
+    ...nextLobby,
+    gameId: req.params.gameId,
+    createdAt: managed.lobby.createdAt,
+    updatedAt: new Date().toISOString()
+  });
+  updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
+    name: nextLobby.setup.galaxyName,
+    updatedAt: new Date().toISOString()
+  });
+
+  return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
 });
 
-app.post('/api/multiplayer/lobby/load-save', (req, res) => {
+app.post('/api/multiplayer/games/:gameId/bind-save', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  if (!currentMultiplayerLobby) {
-    return res.status(404).json({ error: 'No multiplayer lobby is open.' });
-  }
-
-  if (!isLocalAdminSession(auth.session) || auth.session.accountId !== currentMultiplayerLobby.hostAccountId) {
-    return res.status(403).json({ error: 'Only the local admin host can bind a save to the lobby.' });
+  const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
+  if (!managed) {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
   }
 
   try {
@@ -841,49 +1098,65 @@ app.post('/api/multiplayer/lobby/load-save', (req, res) => {
       return res.status(save ? 403 : 404).json({ error: loadAccess.canLoadReason ?? 'Saved game not found.' });
     }
 
-    currentMultiplayerLobby = bindSaveToLobby(
-      currentMultiplayerLobby,
+    const nextLobby = bindSaveToLobby(
+      managed.lobby,
       saveId,
       save,
       buildGameSaveSummary(save, saveId)
     );
-    return res.status(200).json(buildMultiplayerLobbyResponse(auth.session));
+    upsertDraftLobbyWithMemberships({
+      ...nextLobby,
+      gameId: req.params.gameId,
+      createdAt: managed.lobby.createdAt,
+      updatedAt: new Date().toISOString()
+    });
+    updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
+      name: nextLobby.boundSave?.galaxyName ?? nextLobby.setup.galaxyName,
+      updatedAt: new Date().toISOString()
+    });
+
+    return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
   } catch (error) {
     console.error('Failed to bind saved game to multiplayer lobby.', error);
     return res.status(500).json({ error: 'Unable to bind saved game.' });
   }
 });
 
-app.post('/api/multiplayer/lobby/new-game', (req, res) => {
+app.post('/api/multiplayer/games/:gameId/clear-save', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  if (!currentMultiplayerLobby) {
-    return res.status(404).json({ error: 'No multiplayer lobby is open.' });
+  const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
+  if (!managed) {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
   }
 
-  if (!isLocalAdminSession(auth.session) || auth.session.accountId !== currentMultiplayerLobby.hostAccountId) {
-    return res.status(403).json({ error: 'Only the local admin host can switch the lobby back to new-game mode.' });
-  }
+  const nextLobby = clearLobbySaveBinding(managed.lobby);
+  upsertDraftLobbyWithMemberships({
+    ...nextLobby,
+    gameId: req.params.gameId,
+    createdAt: managed.lobby.createdAt,
+    updatedAt: new Date().toISOString()
+  });
+  updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
+    name: nextLobby.setup.galaxyName,
+    updatedAt: new Date().toISOString()
+  });
 
-  currentMultiplayerLobby = clearLobbySaveBinding(currentMultiplayerLobby);
-  return res.status(200).json(buildMultiplayerLobbyResponse(auth.session));
+  return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
 });
 
-app.post('/api/multiplayer/lobby/assign-seat', (req, res) => {
+app.post('/api/multiplayer/games/:gameId/assign-seat', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  if (!currentMultiplayerLobby) {
-    return res.status(404).json({ error: 'No multiplayer lobby is open.' });
-  }
-
-  if (!isLocalAdminSession(auth.session) || auth.session.accountId !== currentMultiplayerLobby.hostAccountId) {
-    return res.status(403).json({ error: 'Only the local admin host can assign saved seats.' });
+  const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
+  if (!managed) {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
   }
 
   const body = req.body as AssignMultiplayerLobbySeatRequest | undefined;
@@ -893,92 +1166,59 @@ app.post('/api/multiplayer/lobby/assign-seat', (req, res) => {
     return res.status(400).json({ error: 'Invalid seat assignment payload.' });
   }
 
-  if (!currentMultiplayerLobby.loadSeats.some((seat) => seat.savedPlayerId === savedPlayerId)) {
+  if (!managed.lobby.loadSeats.some((seat) => seat.savedPlayerId === savedPlayerId)) {
     return res.status(404).json({ error: 'Saved human seat not found.' });
   }
 
   if (
     accountId !== null
-    && !currentMultiplayerLobby.members.some((member) => member.accountId === accountId)
+    && !managed.lobby.members.some((member) => member.accountId === accountId)
   ) {
     return res.status(404).json({ error: 'Lobby member not found.' });
   }
 
-  currentMultiplayerLobby = assignLobbyLoadSeat(currentMultiplayerLobby, savedPlayerId, accountId);
-  return res.status(200).json(buildMultiplayerLobbyResponse(auth.session));
+  const nextLobby = assignLobbyLoadSeat(managed.lobby, savedPlayerId, accountId);
+  upsertDraftLobbyWithMemberships({
+    ...nextLobby,
+    gameId: req.params.gameId,
+    createdAt: managed.lobby.createdAt,
+    updatedAt: new Date().toISOString()
+  });
+
+  return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
 });
 
-app.post('/api/multiplayer/lobby/start', (req, res) => {
+app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  if (!currentMultiplayerLobby) {
-    return res.status(404).json({ error: 'No multiplayer lobby is open.' });
+  const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
+  if (!managed) {
+    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
   }
 
-  if (!isLocalAdminSession(auth.session) || auth.session.accountId !== currentMultiplayerLobby.hostAccountId) {
-    return res.status(403).json({ error: 'Only the local admin host can start the lobby game.' });
-  }
-
-  const blockedReason = getMultiplayerLobbyStartBlockedReason(currentMultiplayerLobby);
+  const blockedReason = getMultiplayerLobbyStartBlockedReason(managed.lobby);
   if (blockedReason) {
     return res.status(409).json({ error: blockedReason });
   }
 
   try {
-    if (currentMultiplayerLobby.mode === 'LOAD_SAVE') {
-      const save = currentMultiplayerLobby.boundSaveId
-        ? readGameSaveById(GAME_SAVES_DIRECTORY_PATH, currentMultiplayerLobby.boundSaveId)
-        : null;
-      if (!save) {
-        return res.status(404).json({ error: 'Saved game not found.' });
-      }
-
-      const hydrated = hydrateGameSave(save);
-      applyLobbyLoadSeatsToGalaxy(hydrated.galaxy, currentMultiplayerLobby);
-      currentGalaxy = hydrated.galaxy;
-      currentGameOwnerId = auth.session.accountId;
-      currentGameOwnerPlayerName = auth.session.playerName;
-      currentGameSetup = hydrated.setup;
-      currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
-      resetActiveTurnState();
-      clearBotDecisionTraces();
-      resetBotAdminRuntimeState();
-      saveCurrentGameSnapshot();
-    } else {
-      const setup = normalizeGalaxySetup({
-        ...currentMultiplayerLobby.setup,
-        playerAmount: currentMultiplayerLobby.members.length
-      });
-      const nextGalaxy = new GalaxyCreator(setup).createGalaxy(
-        currentMultiplayerLobby.members.map((member) => member.playerName)
-      );
-      if (setup.smokeTestScenario) {
-        applySmokeTestScenario(nextGalaxy, setup.smokeTestScenario);
-      }
-      synchronizeTradePortState(nextGalaxy);
-      generateSelfReportsForHumanPlayers(nextGalaxy, nextGalaxy.currentTurn);
-      currentGalaxy = nextGalaxy;
-      currentGameOwnerId = auth.session.accountId;
-      currentGameOwnerPlayerName = auth.session.playerName;
-      currentGameSetup = setup;
-      currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
-      resetActiveTurnState();
-      clearBotDecisionTraces();
-      resetBotAdminRuntimeState();
-      saveCurrentGameSnapshot();
-    }
-
-    currentMultiplayerLobby = null;
-    const response: LoadGameResponse = {
-      player: toPlayerSession(auth.session, currentGalaxy),
-      galaxy: buildGalaxySnapshot(currentGalaxy)
-    };
+    const response = hydrateRunningMultiplayerGameFromLobby(
+      auth.data,
+      auth.session,
+      req.params.gameId,
+      managed.lobby
+    );
     return res.status(200).json(response);
   } catch (error) {
-    console.error('Failed to start multiplayer lobby game.', error);
+    const message = error instanceof Error ? error.message : 'Unable to start multiplayer game.';
+    if (message === 'Saved game not found.') {
+      return res.status(404).json({ error: message });
+    }
+
+    console.error('Failed to start multiplayer game.', error);
     return res.status(500).json({ error: 'Unable to start multiplayer game.' });
   }
 });
@@ -1668,81 +1908,7 @@ app.post('/api/game/mail/messages/send', (req, res) => {
 });
 
 app.post('/api/game/end-turn', (req, res) => {
-  if (isTurnProcessing) {
-    return res.status(409).json({ error: 'Turn processing is already in progress.' });
-  }
-
-  const authPlayer = resolveAuthenticatedGamePlayer(req);
-  if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
-  }
-
-  const playerId = authPlayer.player.playerId;
-
-  synchronizeJumpGateRequests(authPlayer.galaxy);
-  synchronizeMaintenanceRequests(authPlayer.galaxy);
-  const pendingRequestCount = countPendingMailRequestsForPlayer(authPlayer.galaxy, playerId);
-  const unreadMailCount = countUnreadMailMessagesForPlayer(authPlayer.galaxy, playerId);
-  if (pendingRequestCount > 0 || unreadMailCount > 0) {
-    return res.status(409).json({
-      error: buildEndTurnMailBlockMessage(unreadMailCount, pendingRequestCount)
-    });
-  }
-
-  const requiresReady = requiresAllPlayersReady(authPlayer.galaxy);
-  if (requiresReady) {
-    currentTurnReadyPlayerIds.add(playerId);
-    if (!areAllHumanPlayersReady(authPlayer.galaxy, currentTurnReadyPlayerIds)) {
-      const response: EndTurnResponse = {
-        player: toPlayerSession(authPlayer.auth.session, authPlayer.galaxy),
-        galaxy: buildGalaxySnapshot(authPlayer.galaxy),
-        resolution: 'WAITING',
-        turnStatus: buildTurnStatusResponse(authPlayer.galaxy, currentTurnReadyPlayerIds, playerId, false)
-      };
-      return res.status(200).json(response);
-    }
-  }
-
-  isTurnProcessing = true;
-
-  try {
-    const resolvedTurnNumber = authPlayer.galaxy.currentTurn + 1;
-    runBotTurnPhase(authPlayer.galaxy);
-    resolvePhaseOneTurn(authPlayer.galaxy, resolvedTurnNumber, {
-      botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0
-    });
-    authPlayer.galaxy.currentTurn = resolvedTurnNumber;
-    processSensorPhalanxTurnStart(authPlayer.galaxy, authPlayer.galaxy.currentTurn);
-    expirePendingDiplomaticProposals(authPlayer.galaxy, authPlayer.galaxy.currentTurn);
-    synchronizeJumpGateRequests(authPlayer.galaxy);
-    synchronizeMaintenanceRequests(authPlayer.galaxy);
-    synchronizeTradePortState(authPlayer.galaxy);
-    refreshOwnedPlanetSelfReportsForHumanPlayers(authPlayer.galaxy, authPlayer.galaxy.currentTurn);
-    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(authPlayer.galaxy);
-    currentTurnReadyPlayerIds = new Set<number>();
-    if (currentGameSetup && shouldAutoSaveAfterTurn(authPlayer.galaxy.currentTurn, currentGameSetup.autoSaveTurns)) {
-      try {
-        saveCurrentGameSnapshot();
-      } catch (error) {
-        console.error(`Auto save failed on turn ${authPlayer.galaxy.currentTurn}.`, error);
-      }
-    }
-
-    const response: EndTurnResponse = {
-      player: toPlayerSession(authPlayer.auth.session, authPlayer.galaxy),
-      galaxy: buildGalaxySnapshot(authPlayer.galaxy),
-      resolution: 'RESOLVED',
-      turnStatus: buildTurnStatusResponse(authPlayer.galaxy, currentTurnReadyPlayerIds, playerId, false)
-    };
-
-    return res.status(200).json(response);
-  } catch (error) {
-    currentTurnReadyPlayerIds = new Set<number>();
-    console.error('End-turn processing failed.', error);
-    return res.status(500).json({ error: 'Turn processing failed.' });
-  } finally {
-    isTurnProcessing = false;
-  }
+  return handleEndTurnRequest(req, res);
 });
 
 app.get('/api/game/galaxy-presentation-data', (req, res) => {
@@ -2990,6 +3156,7 @@ type AuthAccount = {
   passwordHash: string;
   localAdmin: boolean;
   createdAt: string;
+  currentGameId: string | null;
 };
 
 type AuthSession = {
@@ -2999,6 +3166,7 @@ type AuthSession = {
   localAdmin: boolean;
   createdAt: string;
   lastSeenAt: string;
+  currentGameId: string | null;
 };
 
 type AuthData = {
@@ -3080,6 +3248,20 @@ function loadAuthData(): AuthData {
         account.playerNameKey = toPlayerNameKey(account.playerName);
       }
       account.localAdmin = account.localAdmin === true;
+      account.currentGameId = typeof account.currentGameId === 'string' && account.currentGameId.trim()
+        ? account.currentGameId
+        : null;
+    }
+
+    for (const entry of sessions) {
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+
+      const session = entry as AuthSession;
+      session.currentGameId = typeof session.currentGameId === 'string' && session.currentGameId.trim()
+        ? session.currentGameId
+        : null;
     }
 
     return {
@@ -3099,26 +3281,186 @@ function saveAuthData(data: AuthData): void {
   fs.writeFileSync(AUTH_DATA_PATH, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+function setAccountCurrentGameId(data: AuthData, accountId: number, currentGameId: string | null): void {
+  const normalizedCurrentGameId = typeof currentGameId === 'string' && currentGameId.trim()
+    ? currentGameId
+    : null;
+  const account = data.accounts.find((entry) => entry.id === accountId);
+  if (account) {
+    account.currentGameId = normalizedCurrentGameId;
+  }
+
+  for (const session of data.sessions) {
+    if (session.accountId === accountId) {
+      session.currentGameId = normalizedCurrentGameId;
+    }
+  }
+}
+
 function ensureAuthDirectory(): void {
   const dir = path.dirname(AUTH_DATA_PATH);
   fs.mkdirSync(dir, { recursive: true });
 }
 
 function saveCurrentGameSnapshot(): void {
-  if (!currentGalaxy || currentGameOwnerId === null || !currentGameSetup) {
+  if (!currentGalaxy || currentGameOwnerId === null || !currentGameSetup || !currentRuntimeGameId) {
     throw new Error('No active game snapshot available.');
   }
 
-  writeRotatingAutoSave(
+  const summary = writeRotatingAutoSave(
     GAME_SAVES_DIRECTORY_PATH,
     currentGalaxy,
     currentGameOwnerId,
     currentGameSetup,
     {
       rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
-      maxSaveFiles: MAX_GAME_SAVE_FILES
+      maxSaveFiles: MAX_GAME_SAVE_FILES,
+      gameId: currentRuntimeGameId
     }
   );
+
+  updateGameRecord(GAME_REGISTRY_DATA_PATH, currentRuntimeGameId, {
+    currentTurn: currentGalaxy.currentTurn,
+    currentSaveId: summary.saveId,
+    lastSavedAt: summary.savedAt,
+    updatedAt: summary.savedAt
+  });
+}
+
+function registerRunningGame(
+  authData: AuthData,
+  kind: GameKind,
+  galaxy: Galaxy,
+  options: {
+    gameId?: string;
+    ownerAccountId: number | null;
+    ownerPlayerName: string | null;
+    hostAccountId: number | null;
+    hostPlayerName: string | null;
+    currentSaveId?: string | null;
+    lastSavedAt?: string | null;
+    currentGameAccountIds: number[];
+    memberships: Array<{
+      accountId: number;
+      playerName: string;
+      role: 'OWNER' | 'HOST' | 'MEMBER';
+    }>;
+  }
+): string {
+  const now = new Date().toISOString();
+  const existingRecord = options.gameId ? getGameById(GAME_REGISTRY_DATA_PATH, options.gameId) : null;
+  const record = createGameRecord({
+    gameId: options.gameId,
+    kind,
+    status: 'RUNNING',
+    name: galaxy.name,
+    ownerAccountId: options.ownerAccountId,
+    ownerPlayerName: options.ownerPlayerName,
+    hostAccountId: options.hostAccountId,
+    hostPlayerName: options.hostPlayerName,
+    currentTurn: galaxy.currentTurn,
+    currentSaveId: options.currentSaveId ?? null,
+    lastStartedAt: now,
+    lastSavedAt: options.lastSavedAt ?? null,
+    createdAt: existingRecord?.createdAt ?? now,
+    updatedAt: now
+  });
+
+  upsertGameRecord(GAME_REGISTRY_DATA_PATH, record);
+
+  for (const membership of options.memberships) {
+    upsertMembership(GAME_MEMBERSHIPS_DATA_PATH, {
+      gameId: record.gameId,
+      accountId: membership.accountId,
+      playerName: membership.playerName,
+      role: membership.role,
+      joinedAt: now,
+      lastSeenAt: now,
+      isActive: true
+    });
+  }
+
+  for (const accountId of options.currentGameAccountIds) {
+    setAccountCurrentGameId(authData, accountId, record.gameId);
+  }
+
+  saveAuthData(authData);
+  currentRuntimeGameId = record.gameId;
+  persistCurrentRuntimeStoreState();
+  return record.gameId;
+}
+
+function updateCurrentRuntimeGameRegistryRecord(): void {
+  if (!currentRuntimeGameId || !currentGalaxy) {
+    return;
+  }
+
+  updateGameRecord(GAME_REGISTRY_DATA_PATH, currentRuntimeGameId, {
+    status: 'RUNNING',
+    name: currentGalaxy.name,
+    currentTurn: currentGalaxy.currentTurn,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function persistCurrentRuntimeStoreState(): void {
+  if (!currentRuntimeGameId || !currentGalaxy || !currentGameSetup) {
+    return;
+  }
+
+  const existingRuntime = getGameRuntime(currentRuntimeGameId);
+  if (!existingRuntime) {
+    const now = new Date().toISOString();
+    setGameRuntime({
+      gameId: currentRuntimeGameId,
+      galaxy: currentGalaxy,
+      setup: currentGameSetup,
+      presentationByPlayer: currentGalaxyPresentationByPlayer,
+      loadedAt: now,
+      lastTouchedAt: now,
+      isDirty: false,
+      currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
+      isTurnProcessing
+    });
+    return;
+  }
+
+  updateGameRuntime(currentRuntimeGameId, {
+    galaxy: currentGalaxy,
+    setup: currentGameSetup,
+    presentationByPlayer: currentGalaxyPresentationByPlayer,
+    currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
+    isTurnProcessing,
+    isDirty: false
+  });
+}
+
+function switchCurrentRuntime(gameId: string): boolean {
+  if (currentRuntimeGameId && currentRuntimeGameId !== gameId) {
+    persistCurrentRuntimeStoreState();
+  }
+
+  const runtime = getGameRuntime(gameId);
+  if (!runtime) {
+    return false;
+  }
+
+  currentRuntimeGameId = runtime.gameId;
+  currentGalaxy = runtime.galaxy;
+  currentGameSetup = runtime.setup;
+  currentGalaxyPresentationByPlayer = runtime.presentationByPlayer;
+  currentTurnReadyPlayerIds = new Set(runtime.currentTurnReadyPlayerIds);
+  isTurnProcessing = runtime.isTurnProcessing;
+  currentGameOwnerId = null;
+  currentGameOwnerPlayerName = null;
+
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  if (record) {
+    currentGameOwnerId = record.ownerAccountId;
+    currentGameOwnerPlayerName = record.ownerPlayerName;
+  }
+
+  return true;
 }
 
 function buildActiveGameSummary() {
@@ -3134,24 +3476,15 @@ function buildActiveGameSummary() {
   };
 }
 
-function buildMultiplayerLobbyResponse(session: AuthSession | null): MultiplayerLobbyResponse {
-  let availableSaves: ReturnType<typeof listGameSaveSummaries> = [];
-  try {
-    availableSaves = listGameSaveSummaries(GAME_SAVES_DIRECTORY_PATH);
-  } catch (error) {
-    console.error('Failed to read saves for multiplayer lobby.', error);
-  }
+function buildGameListResponse(session: AuthSession | null): GameListResponse {
+  const records = listGames(GAME_REGISTRY_DATA_PATH);
+  const visibleRecords = session?.localAdmin === true
+    ? records
+    : records.filter((record) => session ? canSessionViewGameRecord(record.gameId, session) : false);
 
   return {
-    lobby: currentMultiplayerLobby
-      ? buildMultiplayerLobbyDto(
-        currentMultiplayerLobby,
-        session?.accountId ?? null,
-        session?.localAdmin === true
-      )
-      : null,
-    activeGame: buildActiveGameSummary(),
-    availableSaves,
+    games: visibleRecords.map((record) => buildGameSummary(record, session)),
+    currentGameId: session?.currentGameId ?? null,
     isLoggedIn: !!session,
     currentAccountId: session?.accountId ?? null,
     currentPlayerName: session?.playerName ?? null,
@@ -3159,17 +3492,350 @@ function buildMultiplayerLobbyResponse(session: AuthSession | null): Multiplayer
   };
 }
 
-function buildGameSavesResponse(session: AuthSession | null): GameSavesResponse {
+function buildCurrentGameStatusResponse(session: AuthSession): CurrentGameStatusResponse {
+  if (!session.currentGameId) {
+    return {
+      currentGameId: null,
+      game: null,
+      canResume: false,
+      unavailableReason: null
+    };
+  }
+
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, session.currentGameId);
+  if (!record || !canSessionViewGameRecord(session.currentGameId, session)) {
+    return {
+      currentGameId: null,
+      game: null,
+      canResume: false,
+      unavailableReason: null
+    };
+  }
+
+  const summary = buildGameSummary(record, session);
+  return {
+    currentGameId: session.currentGameId,
+    game: summary,
+    canResume: summary.canResume,
+    unavailableReason: summary.canResume
+      ? null
+      : record.status === 'RUNNING'
+        ? 'You do not currently have access to resume this game.'
+        : 'This game is not currently active. Ask localAdmin to resume it.'
+  };
+}
+
+function buildGameSummary(record: ReturnType<typeof listGames>[number], session: AuthSession | null): GameSummary {
+  const canView = !!session && canSessionViewGameRecord(record.gameId, session);
+  const isCurrentGame = session?.currentGameId === record.gameId;
+  const canResume = canView && isCurrentGame && record.status === 'RUNNING' && hasGameRuntime(record.gameId);
+  return {
+    gameId: record.gameId,
+    kind: record.kind,
+    status: record.status,
+    name: record.name,
+    ownerAccountId: record.ownerAccountId,
+    ownerPlayerName: record.ownerPlayerName,
+    hostAccountId: record.hostAccountId,
+    hostPlayerName: record.hostPlayerName,
+    currentTurn: record.currentTurn,
+    updatedAt: record.updatedAt,
+    isCurrentGame,
+    canResume,
+    canJoin: canView && record.status === 'RUNNING',
+    canManage: session?.localAdmin === true
+  };
+}
+
+function buildMultiplayerGameBrowserResponse(session: AuthSession | null): MultiplayerGameBrowserResponse {
+  const multiplayerRecords = listGames(GAME_REGISTRY_DATA_PATH)
+    .filter((record) => record.kind === 'MULTIPLAYER');
+  const draftLobbies = multiplayerRecords
+    .filter((record) => record.status === 'DRAFT')
+    .map((record) => buildMultiplayerGameListItem(record, session));
+  const runningGames = multiplayerRecords
+    .filter((record) => record.status === 'RUNNING')
+    .filter((record) => session?.localAdmin === true || (session ? canSessionViewGameRecord(record.gameId, session) : false))
+    .map((record) => buildMultiplayerGameListItem(record, session));
+  const selectedRecord = session?.currentGameId
+    ? multiplayerRecords.find((record) => record.gameId === session.currentGameId) ?? null
+    : null;
+
+  return {
+    draftLobbies,
+    runningGames,
+    selectedGameId: selectedRecord?.gameId ?? null,
+    isLoggedIn: !!session,
+    currentAccountId: session?.accountId ?? null,
+    currentPlayerName: session?.playerName ?? null,
+    currentPlayerIsLocalAdmin: session?.localAdmin === true
+  };
+}
+
+function buildMultiplayerGameDetailResponse(
+  gameId: string,
+  session: AuthSession | null
+): MultiplayerGameDetailResponse | null {
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  if (!record || record.kind !== 'MULTIPLAYER') {
+    return null;
+  }
+
+  const canViewRunning = !!session && (session.localAdmin === true || canSessionViewGameRecord(record.gameId, session));
+  if (record.status !== 'DRAFT' && !canViewRunning) {
+    return null;
+  }
+
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
+  return {
+    game: buildGameSummary(record, session),
+    lobby: lobby
+      ? buildMultiplayerLobbyDto(
+        lobby,
+        session?.accountId ?? null,
+        session?.localAdmin === true
+      )
+      : null
+  };
+}
+
+function buildMultiplayerGameListItem(
+  record: ReturnType<typeof listGames>[number],
+  session: AuthSession | null
+): MultiplayerGameBrowserResponse['draftLobbies'][number] {
+  const lobby = record.status === 'DRAFT'
+    ? getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId)
+    : null;
+  const membershipCount = record.status === 'DRAFT'
+    ? (lobby?.members.length ?? 0)
+    : listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId)
+      .filter((entry) => entry.isActive)
+      .length;
+  const isMember = !!session && (
+    lobby
+      ? lobby.members.some((member) => member.accountId === session.accountId)
+      : isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId, session.accountId)
+  );
+  return {
+    gameId: record.gameId,
+    name: record.name,
+    status: record.status,
+    hostAccountId: record.hostAccountId,
+    hostPlayerName: record.hostPlayerName,
+    memberCount: membershipCount,
+    isMember,
+    isCurrentGame: session?.currentGameId === record.gameId,
+    canJoin: record.status === 'DRAFT' && !!session && !isMember,
+    canEnter: record.status === 'RUNNING' && !!session && canSessionViewGameRecord(record.gameId, session),
+    canManage: session?.localAdmin === true && (record.status !== 'DRAFT' || record.hostAccountId === session.accountId),
+    updatedAt: record.updatedAt
+  };
+}
+
+function upsertDraftLobbyWithMemberships(lobby: MultiplayerLobbyState & { gameId: string; createdAt?: string; updatedAt?: string }): void {
+  const now = new Date().toISOString();
+  const existing = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, lobby.gameId);
+  const normalizedLobby = upsertMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, {
+    ...lobby,
+    createdAt: existing?.createdAt ?? lobby.createdAt ?? now,
+    updatedAt: lobby.updatedAt ?? now
+  });
+  const existingMemberships = listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, lobby.gameId)
+    .filter((entry) => entry.isActive);
+  const activeAccountIds = new Set(normalizedLobby.members.map((member) => member.accountId));
+
+  for (const membership of existingMemberships) {
+    if (!activeAccountIds.has(membership.accountId)) {
+      removeMembership(GAME_MEMBERSHIPS_DATA_PATH, lobby.gameId, membership.accountId);
+    }
+  }
+
+  for (const member of normalizedLobby.members) {
+    upsertMembership(GAME_MEMBERSHIPS_DATA_PATH, {
+      gameId: normalizedLobby.gameId,
+      accountId: member.accountId,
+      playerName: member.playerName,
+      role: member.accountId === normalizedLobby.hostAccountId ? 'HOST' : 'MEMBER',
+      joinedAt: member.joinedAt,
+      lastSeenAt: now,
+      isActive: true
+    });
+  }
+
+  updateGameRecord(GAME_REGISTRY_DATA_PATH, normalizedLobby.gameId, {
+    hostAccountId: normalizedLobby.hostAccountId,
+    hostPlayerName: normalizedLobby.hostPlayerName,
+    updatedAt: normalizedLobby.updatedAt
+  });
+}
+
+function removeAccountFromOtherDraftMultiplayerLobbies(accountId: number, exceptGameId: string): void {
+  const memberships = listMembershipsForAccount(GAME_MEMBERSHIPS_DATA_PATH, accountId)
+    .filter((entry) => entry.isActive && entry.gameId !== exceptGameId);
+
+  for (const membership of memberships) {
+    const record = getGameById(GAME_REGISTRY_DATA_PATH, membership.gameId);
+    if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
+      continue;
+    }
+
+    const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, membership.gameId);
+    if (!lobby || !lobby.members.some((member) => member.accountId === accountId)) {
+      removeMembership(GAME_MEMBERSHIPS_DATA_PATH, membership.gameId, accountId);
+      continue;
+    }
+
+    const nextLobby = leaveMultiplayerLobby(lobby, accountId);
+    removeMembership(GAME_MEMBERSHIPS_DATA_PATH, membership.gameId, accountId);
+    if (!nextLobby) {
+      deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, membership.gameId);
+      updateGameRecord(GAME_REGISTRY_DATA_PATH, membership.gameId, {
+        status: 'ARCHIVED',
+        updatedAt: new Date().toISOString()
+      });
+      continue;
+    }
+
+    upsertDraftLobbyWithMemberships({
+      ...nextLobby,
+      gameId: membership.gameId,
+      createdAt: lobby.createdAt,
+      updatedAt: new Date().toISOString()
+    });
+  }
+}
+
+function loadDraftMultiplayerLobbyForManagement(
+  session: AuthSession,
+  gameId: string
+): {
+  record: NonNullable<ReturnType<typeof getGameById>>;
+  lobby: NonNullable<ReturnType<typeof getMultiplayerLobbyByGameId>>;
+} | null {
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
+    return null;
+  }
+
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
+  if (!lobby) {
+    return null;
+  }
+
+  if (!isLocalAdminSession(session) || session.accountId !== lobby.hostAccountId) {
+    return null;
+  }
+
+  return { record, lobby };
+}
+
+function hydrateRunningMultiplayerGameFromLobby(
+  authData: AuthData,
+  session: AuthSession,
+  gameId: string,
+  lobby: NonNullable<ReturnType<typeof getMultiplayerLobbyByGameId>>
+): LoadGameResponse {
+  if (currentRuntimeGameId && currentRuntimeGameId !== gameId) {
+    persistCurrentRuntimeStoreState();
+  }
+
+  if (lobby.mode === 'LOAD_SAVE') {
+    const save = lobby.boundSaveId
+      ? readGameSaveById(GAME_SAVES_DIRECTORY_PATH, lobby.boundSaveId)
+      : null;
+    if (!save) {
+      throw new Error('Saved game not found.');
+    }
+
+    const hydrated = hydrateGameSave(save);
+    applyLobbyLoadSeatsToGalaxy(hydrated.galaxy, lobby);
+    currentGalaxy = hydrated.galaxy;
+    currentGameOwnerId = session.accountId;
+    currentGameOwnerPlayerName = session.playerName;
+    currentGameSetup = hydrated.setup;
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+    resetActiveTurnState();
+    clearBotDecisionTraces();
+    resetBotAdminRuntimeState();
+    registerRunningGame(authData, 'MULTIPLAYER', currentGalaxy, {
+      gameId,
+      ownerAccountId: session.accountId,
+      ownerPlayerName: session.playerName,
+      hostAccountId: lobby.hostAccountId,
+      hostPlayerName: lobby.hostPlayerName,
+      currentGameAccountIds: lobby.members.map((member) => member.accountId),
+      memberships: lobby.members.map((member) => ({
+        accountId: member.accountId,
+        playerName: member.playerName,
+        role: member.accountId === lobby.hostAccountId ? 'HOST' : 'MEMBER'
+      }))
+    });
+    saveCurrentGameSnapshot();
+  } else {
+    const setup = normalizeGalaxySetup({
+      ...lobby.setup,
+      playerAmount: lobby.members.length
+    });
+    const nextGalaxy = new GalaxyCreator(setup).createGalaxy(
+      lobby.members.map((member) => member.playerName)
+    );
+    if (setup.smokeTestScenario) {
+      applySmokeTestScenario(nextGalaxy, setup.smokeTestScenario);
+    }
+    synchronizeTradePortState(nextGalaxy);
+    generateSelfReportsForHumanPlayers(nextGalaxy, nextGalaxy.currentTurn);
+    currentGalaxy = nextGalaxy;
+    currentGameOwnerId = session.accountId;
+    currentGameOwnerPlayerName = session.playerName;
+    currentGameSetup = setup;
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+    resetActiveTurnState();
+    clearBotDecisionTraces();
+    resetBotAdminRuntimeState();
+    registerRunningGame(authData, 'MULTIPLAYER', currentGalaxy, {
+      gameId,
+      ownerAccountId: session.accountId,
+      ownerPlayerName: session.playerName,
+      hostAccountId: lobby.hostAccountId,
+      hostPlayerName: lobby.hostPlayerName,
+      currentGameAccountIds: lobby.members.map((member) => member.accountId),
+      memberships: lobby.members.map((member) => ({
+        accountId: member.accountId,
+        playerName: member.playerName,
+        role: member.accountId === lobby.hostAccountId ? 'HOST' : 'MEMBER'
+      }))
+    });
+    saveCurrentGameSnapshot();
+  }
+
+  deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
+  return {
+    player: toPlayerSession(session, currentGalaxy),
+    galaxy: buildGalaxySnapshot(currentGalaxy)
+  };
+}
+
+function canSessionViewGameRecord(gameId: string, session: AuthSession): boolean {
+  return session.localAdmin === true
+    || session.currentGameId === gameId
+    || isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, gameId, session.accountId);
+}
+
+function buildGameSavesResponse(session: AuthSession | null, gameId: string | null = null): GameSavesResponse {
   let saves: ReturnType<typeof listGameSaveSummaries> = [];
   try {
-    saves = listGameSaveSummaries(GAME_SAVES_DIRECTORY_PATH);
+    saves = gameId
+      ? listGameSaveSummariesForGame(GAME_SAVES_DIRECTORY_PATH, gameId)
+      : listGameSaveSummaries(GAME_SAVES_DIRECTORY_PATH);
   } catch (error) {
     console.error('Failed to read game saves.', error);
   }
 
   return {
     saves,
-    activeGame: buildActiveGameSummary(),
+    activeGame: gameId === null || currentRuntimeGameId === gameId
+      ? buildActiveGameSummary()
+      : null,
     isLoggedIn: !!session,
     currentAccountId: session?.accountId ?? null,
     currentPlayerIsLocalAdmin: session?.localAdmin === true,
@@ -3189,7 +3855,8 @@ function createSession(data: AuthData, account: AuthAccount, timestamp: string):
     playerName: account.playerName,
     localAdmin: account.localAdmin === true,
     createdAt: timestamp,
-    lastSeenAt: timestamp
+    lastSeenAt: timestamp,
+    currentGameId: account.currentGameId
   };
 
   data.sessions.push(session);
@@ -3206,7 +3873,8 @@ function toPlayerSession(session: AuthSession, galaxy: Galaxy | null = currentGa
     tutorialRead: player?.tutorialRead ?? createTutorialReadState(false),
     unreadReportCount: player?.reports.filter((report) => !report.isRead && report.reportType !== ReportType.MESSAGE).length ?? 0,
     unreadMailCount: player?.messages.filter((message) => !message.isRead).length ?? 0,
-    pendingRequestCount: player && galaxy ? countPendingMailRequestsForPlayer(galaxy, player.playerId) : 0
+    pendingRequestCount: player && galaxy ? countPendingMailRequestsForPlayer(galaxy, player.playerId) : 0,
+    currentGameId: session.currentGameId
   };
 }
 
@@ -3238,6 +3906,7 @@ function getAuthSession(req: Request): { data: AuthData; session: AuthSession } 
   }
 
   session.localAdmin = account.localAdmin === true;
+  session.currentGameId = account.currentGameId;
   session.lastSeenAt = new Date().toISOString();
   saveAuthData(data);
 
@@ -3256,11 +3925,90 @@ function canSessionAccessCurrentGame(galaxy: Galaxy, session: AuthSession): bool
   return resolvePlayerId(galaxy, session) !== null;
 }
 
+function resolveSessionRuntimeAccess(
+  auth: { data: AuthData; session: AuthSession },
+  requestedGameId?: string | null
+):
+  | {
+    gameId: string;
+    runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
+    auth: { data: AuthData; session: AuthSession };
+  }
+  | { status: number; error: string } {
+  const explicitGameId = typeof requestedGameId === 'string' && requestedGameId.trim()
+    ? requestedGameId.trim()
+    : null;
+  const gameId = explicitGameId ?? auth.session.currentGameId ?? currentRuntimeGameId;
+  if (!gameId) {
+    return { status: 404, error: 'No active game.' };
+  }
+
+  if (!canSessionViewGameRecord(gameId, auth.session)) {
+    return { status: 404, error: 'Game not found.' };
+  }
+
+  const runtime = getGameRuntime(gameId);
+  if (!runtime) {
+    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+  }
+
+  if (currentRuntimeGameId !== gameId) {
+    switchCurrentRuntime(gameId);
+  }
+
+  return {
+    gameId,
+    runtime,
+    auth
+  };
+}
+
 function resolveAuthenticatedGameAccess(req: Request):
   | { galaxy: Galaxy; auth: { data: AuthData; session: AuthSession }; playerId: number }
   | { status: number; error: string } {
-  if (!currentGalaxy || currentGameOwnerId === null) {
-    return { status: 404, error: 'No active game.' };
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return { status: 401, error: 'Unauthorized.' };
+  }
+
+  const runtimeAccess = resolveSessionRuntimeAccess(auth);
+  if ('error' in runtimeAccess) {
+    return runtimeAccess;
+  }
+
+  const { runtime } = runtimeAccess;
+  const playerId = resolvePlayerId(runtime.galaxy, auth.session);
+  if (playerId === null) {
+    return { status: 403, error: 'Forbidden.' };
+  }
+
+  synchronizeJumpGateRequests(runtime.galaxy);
+  synchronizeMaintenanceRequests(runtime.galaxy);
+  if (synchronizeTradePortState(runtime.galaxy)) {
+    const nextPresentation = buildPresentationDataByPlayer(runtime.galaxy);
+    updateGameRuntime(runtime.gameId, { presentationByPlayer: nextPresentation });
+    currentGalaxyPresentationByPlayer = nextPresentation;
+  }
+
+  return {
+    galaxy: runtime.galaxy,
+    auth,
+    playerId
+  };
+}
+
+function resolveAuthenticatedGameAccessForGame(req: Request, requestedGameId: string):
+  | {
+    galaxy: Galaxy;
+    auth: { data: AuthData; session: AuthSession };
+    playerId: number;
+    readyPlayerIds: ReadonlySet<number>;
+    isProcessing: boolean;
+  }
+  | { status: number; error: string } {
+  const gameId = typeof requestedGameId === 'string' ? requestedGameId.trim() : '';
+  if (!gameId) {
+    return { status: 400, error: 'Invalid game id.' };
   }
 
   const auth = getAuthSession(req);
@@ -3268,34 +4016,47 @@ function resolveAuthenticatedGameAccess(req: Request):
     return { status: 401, error: 'Unauthorized.' };
   }
 
-  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  const runtimeAccess = resolveSessionRuntimeAccess(auth, gameId);
+  if ('error' in runtimeAccess) {
+    return runtimeAccess;
+  }
+
+  const { runtime } = runtimeAccess;
+  const playerId = resolvePlayerId(runtime.galaxy, auth.session);
   if (playerId === null) {
     return { status: 403, error: 'Forbidden.' };
   }
 
-  synchronizeJumpGateRequests(currentGalaxy);
-  synchronizeMaintenanceRequests(currentGalaxy);
-  if (synchronizeTradePortState(currentGalaxy)) {
-    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+  synchronizeJumpGateRequests(runtime.galaxy);
+  synchronizeMaintenanceRequests(runtime.galaxy);
+  if (synchronizeTradePortState(runtime.galaxy)) {
+    const nextPresentation = buildPresentationDataByPlayer(runtime.galaxy);
+    updateGameRuntime(gameId, { presentationByPlayer: nextPresentation });
+    if (currentRuntimeGameId === gameId) {
+      currentGalaxyPresentationByPlayer = nextPresentation;
+    }
   }
 
   return {
-    galaxy: currentGalaxy,
+    galaxy: runtime.galaxy,
     auth,
-    playerId
+    playerId,
+    readyPlayerIds: runtime.currentTurnReadyPlayerIds,
+    isProcessing: runtime.isTurnProcessing
   };
 }
 
 function resolveAuthenticatedController(req: Request):
   | { galaxy: Galaxy; auth: { data: AuthData; session: AuthSession } }
   | { status: number; error: string } {
-  if (!currentGalaxy || currentGameOwnerId === null) {
-    return { status: 404, error: 'No active game.' };
-  }
-
   const auth = getAuthSession(req);
   if (!auth) {
     return { status: 401, error: 'Unauthorized.' };
+  }
+
+  const runtimeAccess = resolveSessionRuntimeAccess(auth);
+  if ('error' in runtimeAccess) {
+    return runtimeAccess;
   }
 
   if (!isCurrentGameController(auth.session)) {
@@ -3303,7 +4064,7 @@ function resolveAuthenticatedController(req: Request):
   }
 
   return {
-    galaxy: currentGalaxy,
+    galaxy: runtimeAccess.runtime.galaxy,
     auth
   };
 }
@@ -3340,6 +4101,100 @@ function resolveAuthenticatedGamePlayer(req: Request):
     player,
     auth: access.auth
   };
+}
+
+function handleEndTurnRequest(
+  req: Request,
+  res: express.Response,
+  requestedGameId?: string
+) {
+  const access = requestedGameId
+    ? resolveAuthenticatedGameAccessForGame(req, requestedGameId)
+    : resolveAuthenticatedGameAccess(req);
+  if ('error' in access) {
+    return res.status(access.status).json({ error: access.error });
+  }
+
+  if (isTurnProcessing) {
+    return res.status(409).json({ error: 'Turn processing is already in progress.' });
+  }
+
+  const player = resolvePlayerById(access.galaxy, access.playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const playerId = player.playerId;
+  synchronizeJumpGateRequests(access.galaxy);
+  synchronizeMaintenanceRequests(access.galaxy);
+  const pendingRequestCount = countPendingMailRequestsForPlayer(access.galaxy, playerId);
+  const unreadMailCount = countUnreadMailMessagesForPlayer(access.galaxy, playerId);
+  if (pendingRequestCount > 0 || unreadMailCount > 0) {
+    return res.status(409).json({
+      error: buildEndTurnMailBlockMessage(unreadMailCount, pendingRequestCount)
+    });
+  }
+
+  const requiresReady = requiresAllPlayersReady(access.galaxy);
+  if (requiresReady) {
+    currentTurnReadyPlayerIds.add(playerId);
+    persistCurrentRuntimeStoreState();
+    if (!areAllHumanPlayersReady(access.galaxy, currentTurnReadyPlayerIds)) {
+      const response: EndTurnResponse = {
+        player: toPlayerSession(access.auth.session, access.galaxy),
+        galaxy: buildGalaxySnapshot(access.galaxy),
+        resolution: 'WAITING',
+        turnStatus: buildTurnStatusResponse(access.galaxy, currentTurnReadyPlayerIds, playerId, false)
+      };
+      return res.status(200).json(response);
+    }
+  }
+
+  isTurnProcessing = true;
+  persistCurrentRuntimeStoreState();
+
+  try {
+    const resolvedTurnNumber = access.galaxy.currentTurn + 1;
+    runBotTurnPhase(access.galaxy);
+    resolvePhaseOneTurn(access.galaxy, resolvedTurnNumber, {
+      botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0
+    });
+    access.galaxy.currentTurn = resolvedTurnNumber;
+    processSensorPhalanxTurnStart(access.galaxy, access.galaxy.currentTurn);
+    expirePendingDiplomaticProposals(access.galaxy, access.galaxy.currentTurn);
+    synchronizeJumpGateRequests(access.galaxy);
+    synchronizeMaintenanceRequests(access.galaxy);
+    synchronizeTradePortState(access.galaxy);
+    refreshOwnedPlanetSelfReportsForHumanPlayers(access.galaxy, access.galaxy.currentTurn);
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(access.galaxy);
+    currentTurnReadyPlayerIds = new Set<number>();
+    persistCurrentRuntimeStoreState();
+    if (currentGameSetup && shouldAutoSaveAfterTurn(access.galaxy.currentTurn, currentGameSetup.autoSaveTurns)) {
+      try {
+        saveCurrentGameSnapshot();
+      } catch (error) {
+        console.error(`Auto save failed on turn ${access.galaxy.currentTurn}.`, error);
+      }
+    }
+    updateCurrentRuntimeGameRegistryRecord();
+
+    const response: EndTurnResponse = {
+      player: toPlayerSession(access.auth.session, access.galaxy),
+      galaxy: buildGalaxySnapshot(access.galaxy),
+      resolution: 'RESOLVED',
+      turnStatus: buildTurnStatusResponse(access.galaxy, currentTurnReadyPlayerIds, playerId, false)
+    };
+
+    return res.status(200).json(response);
+  } catch (error) {
+    currentTurnReadyPlayerIds = new Set<number>();
+    persistCurrentRuntimeStoreState();
+    console.error('End-turn processing failed.', error);
+    return res.status(500).json({ error: 'Turn processing failed.' });
+  } finally {
+    isTurnProcessing = false;
+    persistCurrentRuntimeStoreState();
+  }
 }
 
 function sendGameCommandError(
