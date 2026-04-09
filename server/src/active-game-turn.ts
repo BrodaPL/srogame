@@ -16,24 +16,52 @@ export function requiresAllPlayersReady(galaxy: Galaxy): boolean {
   return activeHumanPlayers(galaxy).length > 1;
 }
 
-export function areAllHumanPlayersReady(galaxy: Galaxy, readyPlayerIds: ReadonlySet<number>): boolean {
+export function areAllHumanPlayersReady(
+  galaxy: Galaxy,
+  readyPlayerIds: ReadonlySet<number>,
+  blockingPlayerIds?: ReadonlySet<number>
+): boolean {
   const humans = activeHumanPlayers(galaxy);
-  return humans.length > 1 && humans.every((player) => readyPlayerIds.has(player.playerId));
+  const blockingHumans = blockingPlayerIds
+    ? humans.filter((player) => blockingPlayerIds.has(player.playerId))
+    : humans;
+  return blockingHumans.length > 0 && blockingHumans.every((player) => readyPlayerIds.has(player.playerId));
 }
 
 export function buildTurnStatusResponse(
   galaxy: Galaxy,
   readyPlayerIds: ReadonlySet<number>,
   currentPlayerId: number,
-  isProcessing: boolean
+  isProcessing: boolean,
+  options: {
+    onlineHumanCount?: number;
+    minimumOnlineHumanCount?: number;
+    progressionBlockedReason?: string | null;
+    blockingPlayerIds?: ReadonlySet<number>;
+    currentPlayerPresenceState?: TurnStatusResponse['currentPlayerPresenceState'];
+    currentPlayerAutoSkipEnabled?: boolean;
+    currentPlayerAutoSkipActivatedAt?: string | null;
+    showAutoSkipReturnNotice?: boolean;
+  } = {}
 ): TurnStatusResponse {
   const humans = activeHumanPlayers(galaxy);
-  const readyPlayers = humans.filter((player) => readyPlayerIds.has(player.playerId));
-  const waitingPlayers = humans.filter((player) => !readyPlayerIds.has(player.playerId));
+  const blockingPlayerIds = options.blockingPlayerIds;
+  const blockingHumans = blockingPlayerIds
+    ? humans.filter((player) => blockingPlayerIds.has(player.playerId))
+    : humans;
+  const readyPlayers = blockingHumans.filter((player) => readyPlayerIds.has(player.playerId));
+  const waitingPlayers = blockingHumans.filter((player) => !readyPlayerIds.has(player.playerId));
 
   return {
     currentTurn: galaxy.currentTurn,
     requiresAllPlayersReady: humans.length > 1,
+    onlineHumanCount: options.onlineHumanCount ?? humans.length,
+    minimumOnlineHumanCount: options.minimumOnlineHumanCount ?? 1,
+    progressionBlockedReason: options.progressionBlockedReason ?? null,
+    currentPlayerPresenceState: options.currentPlayerPresenceState ?? null,
+    currentPlayerAutoSkipEnabled: options.currentPlayerAutoSkipEnabled ?? false,
+    currentPlayerAutoSkipActivatedAt: options.currentPlayerAutoSkipActivatedAt ?? null,
+    showAutoSkipReturnNotice: options.showAutoSkipReturnNotice ?? false,
     isProcessing,
     currentPlayerReady: readyPlayerIds.has(currentPlayerId),
     readyPlayerIds: readyPlayers.map((player) => player.playerId),

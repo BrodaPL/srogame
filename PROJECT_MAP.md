@@ -69,6 +69,7 @@ Server bootstrap:
 - `server/src/game-membership.ts`
 - `server/src/game-runtime-store.ts`
 - `server/src/multiplayer-lobby-store.ts`
+- `server/src/multiplayer-presence.ts`
 - `server/src/auth-account-security.ts`
 - `server/src/auth-rate-limit.ts`
 - `server/src/turnstile.ts`
@@ -123,6 +124,7 @@ Game child routes:
 Shared game UI components:
 - `src/app/game/ui/`
 - `src/app/game/ui/top-menu/` owns the shared in-game navigation, including the local-admin `Bot AI` link
+- `src/app/game/game.component.ts` also owns client-side multiplayer AFK detection, presence heartbeats, and the auto-skip return notice overlay
 
 ## Client State Ownership
 
@@ -134,7 +136,7 @@ Auth/session:
 Game snapshot/state:
 - `src/app/core/game-api.service.ts`: game HTTP calls; now includes the first game-registry/current-game endpoints and supports optional explicit `gameId` for state/turn/save/end-turn calls
 - `src/app/core/game-api.service.ts` also now exposes the full per-game multiplayer browser/draft management endpoints under `/api/multiplayer/games*`
-- `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` plus active turn-status owner on the client, plus selected/current `gameId`
+- `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` plus active turn-status owner on the client, selected/current `gameId`, and an observable turn-status stream used by the game shell
 - `src/app/models/game-api-types.ts`: shared `GalaxySetup` normalization, including count-based bot-profile setup validation/helpers
 
 Load/save note:
@@ -152,6 +154,7 @@ Local persistence:
 - `server/data/games.json` -> persistent server-side game metadata registry
 - `server/data/game-memberships.json` -> persistent account-to-game membership records
 - `server/data/multiplayer-lobbies.json` -> persistent draft multiplayer-lobby records keyed by `gameId`
+- `server/data/multiplayer-presence.json` -> persistent running-multiplayer presence records keyed by `gameId + accountId`
 - `server/data/saves/` -> managed save directory for server-side galaxy snapshots; save payloads now carry `gameId` when they belong to a registered game, legacy pre-`gameId` saves still load as `gameId: null`, autosaves rotate through 5 slots per game, and the directory is still capped at 100 files globally. `/load` and the multiplayer lobby still use the shared save list for now.
 
 ## API Ownership Map
@@ -173,7 +176,7 @@ Auth/session note:
 - `server/src/auth-rate-limit.ts` owns the lightweight in-memory auth/account rate-limit buckets currently used for register, login, and settings mutations
 - `server/src/auth-account-security.ts` owns the pure pending-confirmation cleanup, login-lockout, and login-eligibility helpers used by `server/src/index.ts`
 - `server/src/turnstile.ts` owns Cloudflare Turnstile registration config/verification and supports an optional local-dev bypass via `TURNSTILE_BYPASS_FOR_LOCAL_DEV=true`
-- `server/src/index.ts` now exports the Express `app`, only auto-listens when run as the main module, and supports test/dev data-path overrides via `SROGAME_AUTH_DATA_PATH`, `SROGAME_GAME_REGISTRY_DATA_PATH`, `SROGAME_GAME_MEMBERSHIPS_DATA_PATH`, `SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH`, and `SROGAME_GAME_SAVES_DIRECTORY_PATH`
+- `server/src/index.ts` now exports the Express `app`, only auto-listens when run as the main module, and supports test/dev data-path overrides via `SROGAME_AUTH_DATA_PATH`, `SROGAME_GAME_REGISTRY_DATA_PATH`, `SROGAME_GAME_MEMBERSHIPS_DATA_PATH`, `SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH`, `SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH`, and `SROGAME_GAME_SAVES_DIRECTORY_PATH`
 - `/api/auth/register` now requires `playerName`, `email`, and `password`, creates a `PENDING_CONFIRMATION` account, and no longer auto-logs the player in
 - `/api/auth/register-config` tells the client whether registration is currently available and whether Turnstile is required
 - `/api/auth/resend-confirmation` refreshes the pending confirmation window for unconfirmed accounts, enforces a 10-minute resend cooldown, and currently returns a manual-activation reminder because SMTP delivery is still not wired
@@ -183,6 +186,9 @@ Auth/session note:
 - `server/src/index.ts` now also persists `currentGameId` on accounts/sessions as the selected resume/default game pointer
 - `localAdmin` is required for single-player start, direct save load, and multiplayer lobby host/control actions
 - active-game turn advancement is no longer controller-only: in multiplayer-scale active games every human player must mark ready through `/api/game/end-turn`, while singleplayer still resolves immediately
+- running multiplayer games now also require at least 2 human players to be online in that specific game before turn progression is allowed; this rule is exposed through `TurnStatusResponse.onlineHumanCount`, `minimumOnlineHumanCount`, and `progressionBlockedReason`
+- running multiplayer presence is now tracked separately in `server/src/multiplayer-presence.ts`; it now powers AFK auto-skip state, return notices, and the presence-aware multiplayer progression gate
+- running multiplayer progression is now presence-aware: `ACTIVE` plus `AUTO_SKIP_TURN` counts as present humans, but only `ACTIVE` humans block ready-state and appear in waiting lists
 
 Auth/security test coverage:
 - `server/src/auth-account-security.spec.ts` covers expired pending-account cleanup, pending-confirmation login blocking, password-failure lockout, and successful-login lock reset behavior
@@ -225,6 +231,8 @@ Multiplayer lobby lifecycle:
 - `/api/multiplayer/games/:gameId/clear-save`
 - `/api/multiplayer/games/:gameId/assign-seat`
 - `/api/multiplayer/games/:gameId/start`
+- `/api/multiplayer/games/:gameId/presence`
+- `/api/multiplayer/games/:gameId/auto-skip-turn`
 
 Lifecycle persistence note:
 - `/api/games` lists persistent game metadata from `server/data/games.json`; current implementation is the first multi-game groundwork layer and does not yet replace all legacy `/api/game/*` global-runtime assumptions
@@ -240,6 +248,9 @@ Lifecycle persistence note:
 - `/api/multiplayer/games/:gameId/leave` and `/leave-lobby` clean up empty draft lobbies by deleting the stored draft record and archiving the corresponding game record
 - `/api/multiplayer/games/:gameId/leave-current-game` clears the account `currentGameId` but keeps multiplayer membership; if that leaves fewer than 2 online humans in the running game, the server snapshots the game, unloads the runtime, and the browser reclassifies it as `Saved / Inactive`
 - `/api/multiplayer/games/:gameId/setup`, `/bind-save`, `/clear-save`, `/assign-seat`, and `/start` now move draft-lobby management onto the per-game API family; `/start` keeps the same `gameId`, promotes the draft record to a running multiplayer game, switches all lobby members to that `currentGameId`, deletes the stored draft-lobby record, and preserves any previously mounted runtime in `server/src/game-runtime-store.ts`
+- `server/src/multiplayer-presence.ts` now persists per-game running-multiplayer presence records (`ACTIVE` vs `AUTO_SKIP_TURN`, auto-skip enabled flag, last seen timestamp, and return notice state)
+- `/api/multiplayer/games/:gameId/presence` is the explicit heartbeat endpoint the Angular game shell uses for meaningful multiplayer activity; passive turn-status polling intentionally does not count as AFK-preventing activity
+- `/api/multiplayer/games/:gameId/auto-skip-turn` enables or disables the player's per-game AFK auto-skip flag and can also force immediate `AUTO_SKIP_TURN` activation when the client inactivity timer fires
 - `src/app/multiplayer/multiplayer.component.ts` and `.html` now consume that API family directly, so the frontend no longer depends on the singleton-lobby response shape for the main multiplayer route
 - `/api/game/start` writes the initial autosave snapshot through `server/src/game-save.ts`
 - `server/src/game-save.ts` now writes immutable snapshots with `gameId` when available, includes `gameId` in `GameSaveSummary`, and exposes per-game save listing helpers while keeping legacy save compatibility
@@ -248,6 +259,9 @@ Lifecycle persistence note:
 - `/api/game/saves/:saveId/load` hydrates a selected save back into live runtime objects, replaces the active in-memory game, and rebuilds galaxy-presentation caches
 - `/api/game/saves/:saveId` deletes a selected save file
 - `/api/game/turn-status` is the lightweight active-game polling endpoint used by the Angular game shell to detect ready-state and turn-number changes without reloading the full game snapshot every poll
+- `/api/game/turn-status` and `/api/games/:gameId/turn-status` now also report the multiplayer online-human gate, so the top menu can show when a running multiplayer game is blocked because fewer than 2 human players are online
+- `/api/game/turn-status` and `/api/games/:gameId/turn-status` now also carry the current player's multiplayer presence metadata: `currentPlayerPresenceState`, `currentPlayerAutoSkipEnabled`, `currentPlayerAutoSkipActivatedAt`, and `showAutoSkipReturnNotice`
+- `/api/game/end-turn` and `/api/games/:gameId/end-turn` now interpret running multiplayer readiness through presence: `ACTIVE + AUTO_SKIP_TURN` must be at least `2`, but only `ACTIVE` humans are counted as ready blockers; all-auto-skip presence is blocked with `At least 1 active human player must be present to progress this multiplayer game.`
 - `/api/game/end-turn` writes rotating autosaves into `server/data/saves/` when `GalaxySetup.autoSaveTurns` is greater than `0` and the configured cadence is reached
 - `/api/game/end-turn` now also updates the persistent game registry turn/update metadata for the currently loaded runtime game
 - `server/src/game-runtime-store.ts` now persists the in-memory per-game runtime payload plus per-game ready-state and turn-processing state, which is used by the new game-scoped runtime read/select endpoints

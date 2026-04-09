@@ -7,7 +7,7 @@
         Browse many draft lobbies and running multiplayer games. Joining a draft lobby removes you from any other draft lobby.
       </p>
       <p class="subtitle">
-        If a running multiplayer member enabled logout replacement, their seat can continue as a bot until they return. Players who keep that option disabled may still block ready-state when absent.
+        If a running multiplayer member enabled logout replacement, their seat can continue as a bot until they return. Multiplayer turns still require at least 2 human players to be online, and players who keep that option disabled may still block ready-state when absent.
       </p>
     </header>
 
@@ -230,13 +230,23 @@
               @if (selectedRunningMembers().length > 0) {
                 <div class="multiplayer-member-list">
                   @for (member of selectedRunningMembers(); track member.accountId) {
-                    <div class="multiplayer-member" [class.multiplayer-member--offline-bot]="member.isOfflineBotControlled">
+                    <div
+                      class="multiplayer-member"
+                      [class.multiplayer-member--offline-bot]="member.isOfflineBotControlled"
+                      [class.multiplayer-member--auto-skip]="member.isAutoSkipTurn">
                       <strong>{{ member.playerName }}</strong>
                       <span class="multiplayer-member__status">
                         <span
                           class="multiplayer-member__status-pill"
-                          [class.multiplayer-member__status-pill--offline-bot]="member.isOfflineBotControlled">
-                          {{ member.isOfflineBotControlled ? 'Offline bot' : 'Online' }}
+                          [class.multiplayer-member__status-pill--offline-bot]="member.isOfflineBotControlled"
+                          [class.multiplayer-member__status-pill--auto-skip]="member.isAutoSkipTurn">
+                          {{
+                            member.isOfflineBotControlled
+                              ? 'Offline bot'
+                              : member.isAutoSkipTurn
+                                ? 'Auto skip'
+                                : 'Online'
+                          }}
                         </span>
                         <span>{{ runningMemberStatusLabel(member) }}</span>
                       </span>
@@ -279,7 +289,7 @@
                 </div>
                 <div class="multiplayer-callout">
                   <p class="multiplayer-callout__title">Logout replacement</p>
-                  <p>Players who enable logout replacement can be temporarily bot-controlled in the running game; disabled players will still block readiness while absent.</p>
+                  <p>Players who enable logout replacement can be temporarily bot-controlled in the running game, but multiplayer turns still require at least 2 human players online. Disabled players will still block readiness while absent.</p>
                 </div>
 
                 @if (selectedLobby()!.canToggleReady) {

@@ -24,6 +24,13 @@ describe('active-game-turn', () => {
     expect(buildTurnStatusResponse(galaxy, readyPlayerIds, 1, false)).toEqual({
       currentTurn: 1,
       requiresAllPlayersReady: true,
+      onlineHumanCount: 3,
+      minimumOnlineHumanCount: 1,
+      progressionBlockedReason: null,
+      currentPlayerPresenceState: null,
+      currentPlayerAutoSkipEnabled: false,
+      currentPlayerAutoSkipActivatedAt: null,
+      showAutoSkipReturnNotice: false,
       isProcessing: false,
       currentPlayerReady: true,
       readyPlayerIds: [1, 3],
@@ -38,6 +45,32 @@ describe('active-game-turn', () => {
 
     expect(areAllHumanPlayersReady(galaxy, new Set([1]))).toBe(false);
     expect(areAllHumanPlayersReady(galaxy, new Set([1, 2]))).toBe(true);
+  });
+
+  it('excludes auto-skip players from waiting lists when blocking ids are provided', () => {
+    const galaxy = createGalaxy(['Alpha', 'Beta']);
+
+    expect(buildTurnStatusResponse(galaxy, new Set<number>(), 1, false, {
+      onlineHumanCount: 2,
+      minimumOnlineHumanCount: 2,
+      blockingPlayerIds: new Set([1])
+    })).toEqual({
+      currentTurn: 1,
+      requiresAllPlayersReady: true,
+      onlineHumanCount: 2,
+      minimumOnlineHumanCount: 2,
+      progressionBlockedReason: null,
+      currentPlayerPresenceState: null,
+      currentPlayerAutoSkipEnabled: false,
+      currentPlayerAutoSkipActivatedAt: null,
+      showAutoSkipReturnNotice: false,
+      isProcessing: false,
+      currentPlayerReady: false,
+      readyPlayerIds: [],
+      readyPlayerNames: [],
+      waitingForPlayerIds: [1],
+      waitingForPlayerNames: ['Alpha']
+    });
   });
 });
 

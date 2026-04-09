@@ -62,6 +62,7 @@ import {
   SensorPhalanxScanRequest,
   SensorPhalanxScanResponse,
   TurnStatusResponse,
+  UpdateMultiplayerAutoSkipTurnRequest,
   UpdateMultiplayerLobbySetupRequest,
   ToggleMultiplayerLobbyReadyRequest,
   AssignMultiplayerLobbySeatRequest,
@@ -187,6 +188,22 @@ export class GameApiService {
   public setMultiplayerGameReady(gameId: string, request: ToggleMultiplayerLobbyReadyRequest, token: string) {
     return this.http.post<MultiplayerGameDetailResponse>(
       `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/ready`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public updateMultiplayerGamePresence(gameId: string, request: Pick<UpdateMultiplayerAutoSkipTurnRequest, 'acknowledgeNotice'>, token: string) {
+    return this.http.post<TurnStatusResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/presence`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public updateMultiplayerAutoSkipTurn(gameId: string, request: UpdateMultiplayerAutoSkipTurnRequest, token: string) {
+    return this.http.post<TurnStatusResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/auto-skip-turn`,
       request,
       { headers: this.authHeaders(token) }
     );

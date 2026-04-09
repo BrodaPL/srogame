@@ -44,10 +44,20 @@
       ?
     </button>
   }
+  @if (showAutoSkipTurnControl()) {
+    <button
+      class="top-menu__button"
+      type="button"
+      [class.top-menu__button--active]="isAutoSkipTurnEnabled()"
+      [title]="autoSkipTurnTooltip()"
+      (click)="toggleAutoSkipTurn()">
+      Auto
+    </button>
+  }
   <button
     class="top-menu__button top-menu__button--end-turn"
     type="button"
-    [disabled]="isProcessingTurn() || isEndTurnBlockedByMail() || isWaitingForOtherPlayers()"
+    [disabled]="isProcessingTurn() || isEndTurnBlockedByMail() || isEndTurnBlockedByOnlineRequirement() || isWaitingForOtherPlayers()"
     (click)="endTurn()">
     {{ endTurnLabel() }}
   </button>
@@ -62,6 +72,9 @@
 }
 @if (isWaitingForOtherPlayers()) {
   <p class="top-menu__error">{{ waitingForPlayersMessage() }}</p>
+}
+@if (isEndTurnBlockedByOnlineRequirement()) {
+  <p class="top-menu__error">{{ onlineRequirementMessage() }}</p>
 }
 @if (endTurnError) {
   <p class="top-menu__error">{{ endTurnError }}</p>

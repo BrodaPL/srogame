@@ -539,6 +539,10 @@ export class MultiplayerComponent implements OnDestroy {
   }
 
   protected runningMemberStatusLabel(member: MultiplayerRunningMemberDto): string {
+    if (member.isAutoSkipTurn) {
+      return 'Auto skip turn';
+    }
+
     if (!member.isOfflineBotControlled) {
       return 'Online / human-controlled';
     }

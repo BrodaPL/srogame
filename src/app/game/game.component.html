@@ -21,5 +21,22 @@
         </div>
       </section>
     }
+    @if (showAutoSkipReturnNotice && !isUiLocked()) {
+      <section class="game-lock-overlay" aria-live="polite">
+        <div class="game-lock-overlay__card">
+          <p class="game-lock-overlay__eyebrow">Auto Skip Turn</p>
+          <h2>Auto skip turn was activated because you were AFK.</h2>
+          <p>Your multiplayer seat is still present, but your turns are being skipped until you disable auto skip.</p>
+          <div class="game-lock-overlay__actions">
+            <button class="top-menu__button" type="button" (click)="keepAutoSkipTurnEnabled()">
+              Keep enabled
+            </button>
+            <button class="top-menu__button top-menu__button--end-turn" type="button" (click)="disableAutoSkipTurn()">
+              Disable auto skip turn
+            </button>
+          </div>
+        </div>
+      </section>
+    }
   }
 </main>

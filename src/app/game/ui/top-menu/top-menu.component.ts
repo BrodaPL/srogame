@@ -96,9 +96,26 @@ export class TopMenuComponent {
     const turnStatus = this.gameState.turnStatus;
     return !!turnStatus
       && turnStatus.requiresAllPlayersReady
+      && !turnStatus.progressionBlockedReason
       && turnStatus.currentPlayerReady
       && turnStatus.waitingForPlayerIds.length > 0
       && !turnStatus.isProcessing;
+  }
+
+  protected isEndTurnBlockedByOnlineRequirement(): boolean {
+    return !!this.gameState.turnStatus?.progressionBlockedReason;
+  }
+
+  protected showAutoSkipTurnControl(): boolean {
+    return (this.gameState.turnStatus?.minimumOnlineHumanCount ?? 1) > 1;
+  }
+
+  protected isAutoSkipTurnEnabled(): boolean {
+    return this.gameState.turnStatus?.currentPlayerAutoSkipEnabled === true;
+  }
+
+  protected autoSkipTurnTooltip(): string {
+    return 'Auto skip turn while AFK. After 5 minutes of inactivity in this multiplayer game, your turns are skipped automatically. Longer AFK removal from active presence is planned separately.';
   }
 
   protected waitingForPlayersMessage(): string {
@@ -110,10 +127,46 @@ export class TopMenuComponent {
     return `Ready. Waiting for: ${turnStatus.waitingForPlayerNames.join(', ')}.`;
   }
 
+  protected onlineRequirementMessage(): string {
+    return this.gameState.turnStatus?.progressionBlockedReason
+      ?? 'At least 2 human players must be online to progress this multiplayer game.';
+  }
+
+  protected toggleAutoSkipTurn(): void {
+    if (this.gameState.isProcessingTurn) {
+      return;
+    }
+
+    const session = this.playerSession.load();
+    if (!session?.currentGameId) {
+      this.endTurnError = 'Select a running multiplayer game first.';
+      return;
+    }
+
+    this.gameApi.updateMultiplayerAutoSkipTurn(session.currentGameId, {
+      enabled: !this.isAutoSkipTurnEnabled()
+    }, session.token).subscribe({
+      next: (turnStatus) => {
+        this.endTurnError = null;
+        this.gameState.setTurnStatus(turnStatus);
+      },
+      error: (error) => {
+        this.endTurnError = error?.error?.error ?? 'Unable to update auto skip turn.';
+      }
+    });
+  }
+
   protected endTurn(): void {
-    if (this.gameState.isProcessingTurn || this.isEndTurnBlockedByMail() || this.isWaitingForOtherPlayers()) {
+    if (
+      this.gameState.isProcessingTurn
+      || this.isEndTurnBlockedByMail()
+      || this.isEndTurnBlockedByOnlineRequirement()
+      || this.isWaitingForOtherPlayers()
+    ) {
       if (this.isEndTurnBlockedByMail()) {
         this.endTurnError = this.endTurnBlockedMessage();
+      } else if (this.isEndTurnBlockedByOnlineRequirement()) {
+        this.endTurnError = this.onlineRequirementMessage();
       }
       return;
     }

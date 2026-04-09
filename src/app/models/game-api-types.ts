@@ -431,6 +431,13 @@ export type EndTurnResponse = {
 export type TurnStatusResponse = {
   currentTurn: number;
   requiresAllPlayersReady: boolean;
+  onlineHumanCount: number;
+  minimumOnlineHumanCount: number;
+  progressionBlockedReason: string | null;
+  currentPlayerPresenceState: MultiplayerPresenceState | null;
+  currentPlayerAutoSkipEnabled: boolean;
+  currentPlayerAutoSkipActivatedAt: string | null;
+  showAutoSkipReturnNotice: boolean;
   isProcessing: boolean;
   currentPlayerReady: boolean;
   readyPlayerIds: number[];
@@ -488,9 +495,12 @@ export type MultiplayerLobbyMemberDto = {
 export type MultiplayerRunningMemberDto = {
   accountId: number;
   playerName: string;
+  isAutoSkipTurn: boolean;
   isOfflineBotControlled: boolean;
   offlineBotProfileId: BotProfileId | null;
 };
+
+export type MultiplayerPresenceState = 'ACTIVE' | 'AUTO_SKIP_TURN';
 
 export type MultiplayerLobbyLoadSeatDto = {
   savedPlayerId: number;
@@ -556,6 +566,12 @@ export type MultiplayerGameDetailResponse = {
 export type LeaveCurrentMultiplayerGameResponse = {
   message: string | null;
   currentGameId: GameId | null;
+};
+
+export type UpdateMultiplayerAutoSkipTurnRequest = {
+  enabled: boolean;
+  activateNow?: boolean;
+  acknowledgeNotice?: boolean;
 };
 
 export type UpdateMultiplayerLobbySetupRequest = {

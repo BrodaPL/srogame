@@ -1,5 +1,5 @@
 import '@angular/compiler';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameStateResponse, PlayerSession, TurnStatusResponse } from '../models/game-api-types';
 import { GameComponent } from './game.component';
@@ -105,6 +105,52 @@ describe('GameComponent', () => {
     expect((component as { stateActionRoute: string }).stateActionRoute).toBe('/');
     expect((component as { isGameReady: boolean }).isGameReady).toBe(false);
   });
+
+  it('can disable auto skip turn from the return notice popup', () => {
+    const response = createGameStateResponse();
+    const updatedTurnStatus = createTurnStatusResponse({
+      currentPlayerAutoSkipEnabled: false,
+      currentPlayerPresenceState: 'ACTIVE',
+      showAutoSkipReturnNotice: false
+    });
+    const gameState = createGameStateMock();
+    const gameApi = {
+      getGameState: vi.fn().mockReturnValue(of(response)),
+      getTurnStatus: vi.fn().mockReturnValue(of(createTurnStatusResponse({
+        currentPlayerAutoSkipEnabled: true,
+        currentPlayerPresenceState: 'AUTO_SKIP_TURN',
+        showAutoSkipReturnNotice: true
+      }))),
+      updateMultiplayerAutoSkipTurn: vi.fn().mockReturnValue(of(updatedTurnStatus))
+    };
+    const playerSession = {
+      load: vi.fn().mockReturnValue(response.player)
+    };
+    const authState = {
+      setSession: vi.fn(),
+      clearSession: vi.fn()
+    };
+
+    const component = new GameComponent(
+      gameState as never,
+      gameApi as never,
+      playerSession as never,
+      authState as never
+    );
+
+    component.ngOnInit();
+    vi.advanceTimersByTime(0);
+
+    expect((component as { showAutoSkipReturnNotice: boolean }).showAutoSkipReturnNotice).toBe(true);
+
+    (component as unknown as { disableAutoSkipTurn(): void }).disableAutoSkipTurn();
+
+    expect(gameApi.updateMultiplayerAutoSkipTurn).toHaveBeenCalledWith('game-1', {
+      enabled: false,
+      acknowledgeNotice: true
+    }, 'token');
+    expect(gameState.setTurnStatus).toHaveBeenLastCalledWith(updatedTurnStatus);
+  });
 });
 
 function createPlayerSession(): PlayerSession {
@@ -134,27 +180,44 @@ function createGameStateResponse(): GameStateResponse {
 }
 
 function createGameStateMock(galaxy: GameStateResponse['galaxy'] | null = null) {
-  return {
+  const turnStatusChanges = new Subject<TurnStatusResponse | null>();
+  const state = {
     galaxy,
-    turnStatus: null,
+    turnStatus: null as TurnStatusResponse | null,
+    turnStatusChanges: turnStatusChanges.asObservable(),
     isProcessingTurn: false,
     currentTurn: vi.fn().mockReturnValue(1),
     setGalaxy: vi.fn(),
-    setTurnStatus: vi.fn(),
+    setTurnStatus: vi.fn((turnStatus: TurnStatusResponse | null) => {
+      state.turnStatus = turnStatus;
+      turnStatusChanges.next(turnStatus);
+    }),
     setProcessingTurn: vi.fn(),
     clearGalaxy: vi.fn()
   };
+
+  return {
+    ...state
+  };
 }
 
-function createTurnStatusResponse(): TurnStatusResponse {
+function createTurnStatusResponse(overrides: Partial<TurnStatusResponse> = {}): TurnStatusResponse {
   return {
     currentTurn: 1,
     requiresAllPlayersReady: false,
+    onlineHumanCount: 1,
+    minimumOnlineHumanCount: 1,
+    progressionBlockedReason: null,
+    currentPlayerPresenceState: null,
+    currentPlayerAutoSkipEnabled: false,
+    currentPlayerAutoSkipActivatedAt: null,
+    showAutoSkipReturnNotice: false,
     isProcessing: false,
     currentPlayerReady: false,
     readyPlayerIds: [],
     readyPlayerNames: [],
     waitingForPlayerIds: [],
-    waitingForPlayerNames: []
+    waitingForPlayerNames: [],
+    ...overrides
   };
 }

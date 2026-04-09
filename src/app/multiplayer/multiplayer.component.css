@@ -173,6 +173,11 @@
   background: linear-gradient(160deg, rgba(255, 168, 76, 0.1), rgba(255, 255, 255, 0.03));
 }
 
+.multiplayer-member--auto-skip {
+  border-color: rgba(99, 177, 255, 0.28);
+  background: linear-gradient(160deg, rgba(99, 177, 255, 0.1), rgba(255, 255, 255, 0.03));
+}
+
 .multiplayer-member__status {
   display: flex;
   flex-wrap: wrap;
@@ -203,6 +208,12 @@
   border-color: rgba(255, 168, 76, 0.35);
   background: rgba(255, 168, 76, 0.14);
   color: #ffcf8a;
+}
+
+.multiplayer-member__status-pill--auto-skip {
+  border-color: rgba(99, 177, 255, 0.35);
+  background: rgba(99, 177, 255, 0.14);
+  color: #b6d8ff;
 }
 
 .multiplayer-member__status-pill--draft {

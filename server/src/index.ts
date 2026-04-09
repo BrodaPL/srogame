@@ -90,6 +90,15 @@ import {
   updateGameRuntime
 } from './game-runtime-store.js';
 import {
+  acknowledgeAutoSkipTurnNotice,
+  activateAutoSkipTurn,
+  getPresenceForGameAccount,
+  markPresenceSeen,
+  removePresence,
+  removePresenceForGame,
+  setAutoSkipTurnEnabled
+} from './multiplayer-presence.js';
+import {
   applyLobbyLoadSeatsToGalaxy,
   assignLobbyLoadSeat,
   bindSaveToLobby,
@@ -105,6 +114,7 @@ import {
 } from './multiplayer-lobby.js';
 import { reconcileOfflineBotControlledSeats } from './offline-bot-control.js';
 import {
+  activeHumanPlayers,
   areAllHumanPlayersReady,
   buildTurnStatusResponse,
   requiresAllPlayersReady
@@ -267,6 +277,7 @@ import type {
   MultiplayerRunningMemberDto,
   UpdateMultiplayerLobbySetupRequest,
   ToggleMultiplayerLobbyReadyRequest,
+  UpdateMultiplayerAutoSkipTurnRequest,
   AssignMultiplayerLobbySeatRequest,
   BindMultiplayerLobbySaveRequest,
   AbandonPlanetRequest,
@@ -486,6 +497,7 @@ const AUTH_DATA_PATH = resolveDataPath('SROGAME_AUTH_DATA_PATH', '../data/auth.j
 const GAME_REGISTRY_DATA_PATH = resolveDataPath('SROGAME_GAME_REGISTRY_DATA_PATH', '../data/games.json');
 const GAME_MEMBERSHIPS_DATA_PATH = resolveDataPath('SROGAME_GAME_MEMBERSHIPS_DATA_PATH', '../data/game-memberships.json');
 const MULTIPLAYER_LOBBY_STORE_DATA_PATH = resolveDataPath('SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH', '../data/multiplayer-lobbies.json');
+const MULTIPLAYER_PRESENCE_DATA_PATH = resolveDataPath('SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH', '../data/multiplayer-presence.json');
 const GAME_SAVES_DIRECTORY_PATH = resolveDataPath('SROGAME_GAME_SAVES_DIRECTORY_PATH', '../data/saves');
 const PLAYER_NAME_MIN = 3;
 const PLAYER_NAME_MAX = 24;
@@ -942,6 +954,8 @@ app.get('/api/games/:gameId/state', (req, res) => {
     return res.status(access.status).json({ error: access.error });
   }
 
+  markRunningMultiplayerPresenceSeen(access);
+
   const response: GameStateResponse = {
     player: toPlayerSession(access.auth.session, access.galaxy),
     galaxy: buildGalaxySnapshot(access.galaxy)
@@ -956,14 +970,7 @@ app.get('/api/games/:gameId/turn-status', (req, res) => {
     return res.status(access.status).json({ error: access.error });
   }
 
-  return res.status(200).json(
-    buildTurnStatusResponse(
-      access.galaxy,
-      access.readyPlayerIds,
-      access.playerId,
-      access.isProcessing
-    )
-  );
+  return res.status(200).json(buildGameTurnStatusResponse(access));
 });
 
 app.post('/api/games/:gameId/end-turn', (req, res) => {
@@ -1298,12 +1305,13 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
 
   setAccountCurrentGameId(auth.data, auth.session.accountId, null);
   auth.session.currentGameId = null;
+  removePresence(MULTIPLAYER_PRESENCE_DATA_PATH, req.params.gameId, auth.session.accountId);
 
   reconcileOfflineBotControlledSeatsForRuntime(req.params.gameId, runtime, auth.data);
 
-  const onlineHumanCount = countOnlineHumanMembersForGame(auth.data, req.params.gameId);
+  const presenceSummary = buildMultiplayerPresenceSummary(auth.data, req.params.gameId, runtime);
   let message: string | null = null;
-  if (onlineHumanCount < 2) {
+  if (presenceSummary.presentHumanCount < 2) {
     saveAndUnloadRunningMultiplayerGame(req.params.gameId, runtime, record);
     message = 'Not enough online players, saving and stopping the game.';
   } else {
@@ -1316,6 +1324,76 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
     message
   };
   return res.status(200).json(response);
+});
+
+app.post('/api/multiplayer/games/:gameId/presence', (req, res) => {
+  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId);
+  if ('error' in access) {
+    return res.status(access.status).json({ error: access.error });
+  }
+
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING') {
+    return res.status(404).json({ error: 'Running multiplayer game not found.' });
+  }
+
+  const body = req.body as UpdateMultiplayerAutoSkipTurnRequest | undefined;
+  markPresenceSeen(
+    MULTIPLAYER_PRESENCE_DATA_PATH,
+    req.params.gameId,
+    access.auth.session.accountId
+  );
+  if (body?.acknowledgeNotice === true) {
+    acknowledgeAutoSkipTurnNotice(
+      MULTIPLAYER_PRESENCE_DATA_PATH,
+      req.params.gameId,
+      access.auth.session.accountId
+    );
+  }
+
+  return res.status(200).json(buildGameTurnStatusResponse(access));
+});
+
+app.post('/api/multiplayer/games/:gameId/auto-skip-turn', (req, res) => {
+  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId);
+  if ('error' in access) {
+    return res.status(access.status).json({ error: access.error });
+  }
+
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING') {
+    return res.status(404).json({ error: 'Running multiplayer game not found.' });
+  }
+
+  const body = req.body as UpdateMultiplayerAutoSkipTurnRequest | undefined;
+  if (typeof body?.enabled !== 'boolean') {
+    return res.status(400).json({ error: 'Auto skip toggle requires an enabled boolean.' });
+  }
+
+  if (body.enabled && body.activateNow === true) {
+    activateAutoSkipTurn(
+      MULTIPLAYER_PRESENCE_DATA_PATH,
+      req.params.gameId,
+      access.auth.session.accountId
+    );
+  } else {
+    setAutoSkipTurnEnabled(
+      MULTIPLAYER_PRESENCE_DATA_PATH,
+      req.params.gameId,
+      access.auth.session.accountId,
+      body.enabled
+    );
+  }
+
+  if (body.acknowledgeNotice === true) {
+    acknowledgeAutoSkipTurnNotice(
+      MULTIPLAYER_PRESENCE_DATA_PATH,
+      req.params.gameId,
+      access.auth.session.accountId
+    );
+  }
+
+  return res.status(200).json(buildGameTurnStatusResponse(access));
 });
 
 app.post('/api/multiplayer/games/:gameId/ready', (req, res) => {
@@ -1548,6 +1626,8 @@ app.get('/api/game/state', (req, res) => {
     return res.status(access.status).json({ error: access.error });
   }
 
+  markRunningMultiplayerPresenceSeen(access);
+
   const response: GameStateResponse = {
     player: toPlayerSession(access.auth.session, access.galaxy),
     galaxy: buildGalaxySnapshot(access.galaxy)
@@ -1562,12 +1642,7 @@ app.get('/api/game/turn-status', (req, res) => {
     return res.status(access.status).json({ error: access.error });
   }
 
-  const response: TurnStatusResponse = buildTurnStatusResponse(
-    access.galaxy,
-    currentTurnReadyPlayerIds,
-    access.playerId,
-    isTurnProcessing
-  );
+  const response: TurnStatusResponse = buildGameTurnStatusResponse(access);
   return res.status(200).json(response);
 });
 
@@ -3759,18 +3834,206 @@ function saveRuntimeSnapshot(
   });
 }
 
-function countOnlineHumanMembersForGame(authData: AuthData, gameId: string): number {
-  const activeMembershipAccountIds = new Set(
-    listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId)
-      .filter((entry) => entry.isActive)
-      .map((entry) => entry.accountId)
-  );
-  const onlineAccountIds = new Set(
+function isRunningMultiplayerGame(gameId: string): boolean {
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  return record?.kind === 'MULTIPLAYER' && record.status === 'RUNNING';
+}
+
+function buildMultiplayerPresenceSummary(
+  authData: AuthData,
+  gameId: string,
+  runtime: NonNullable<ReturnType<typeof getGameRuntime>>
+): {
+  presentHumanCount: number;
+  activeHumanCount: number;
+  blockingPlayerIds: Set<number>;
+} {
+  if (!isRunningMultiplayerGame(gameId)) {
+    const blockingPlayerIds = new Set(
+      activeHumanPlayers(runtime.galaxy).map((player) => player.playerId)
+    );
+    return {
+      presentHumanCount: blockingPlayerIds.size,
+      activeHumanCount: blockingPlayerIds.size,
+      blockingPlayerIds
+    };
+  }
+
+  const memberships = listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId)
+    .filter((entry) => entry.isActive);
+  const sessionByAccountId = new Map(
     authData.sessions
-      .filter((session) => session.currentGameId === gameId && activeMembershipAccountIds.has(session.accountId))
-      .map((session) => session.accountId)
+      .filter((session) => session.currentGameId === gameId)
+      .map((session) => [session.accountId, session] as const)
   );
-  return onlineAccountIds.size;
+  let presentHumanCount = 0;
+  let activeHumanCount = 0;
+  const blockingPlayerIds = new Set<number>();
+
+  for (const membership of memberships) {
+    if (!sessionByAccountId.has(membership.accountId)) {
+      continue;
+    }
+
+    const playerId = runtime.galaxy.playerNameMap.get(membership.playerName);
+    if (typeof playerId !== 'number') {
+      continue;
+    }
+
+    const presence = getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, membership.accountId);
+    const derivedState = presence?.state ?? 'ACTIVE';
+    if (derivedState !== 'ACTIVE' && derivedState !== 'AUTO_SKIP_TURN') {
+      continue;
+    }
+
+    presentHumanCount += 1;
+    if (derivedState === 'ACTIVE') {
+      activeHumanCount += 1;
+      blockingPlayerIds.add(playerId);
+    }
+  }
+
+  return {
+    presentHumanCount,
+    activeHumanCount,
+    blockingPlayerIds
+  };
+}
+
+function buildCurrentPlayerPresenceOptions(gameId: string, accountId: number): {
+  currentPlayerPresenceState: TurnStatusResponse['currentPlayerPresenceState'];
+  currentPlayerAutoSkipEnabled: boolean;
+  currentPlayerAutoSkipActivatedAt: string | null;
+  showAutoSkipReturnNotice: boolean;
+} {
+  if (!isRunningMultiplayerGame(gameId)) {
+    return {
+      currentPlayerPresenceState: null,
+      currentPlayerAutoSkipEnabled: false,
+      currentPlayerAutoSkipActivatedAt: null,
+      showAutoSkipReturnNotice: false
+    };
+  }
+
+  const presence = getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, accountId);
+  if (!presence) {
+    return {
+      currentPlayerPresenceState: 'ACTIVE',
+      currentPlayerAutoSkipEnabled: false,
+      currentPlayerAutoSkipActivatedAt: null,
+      showAutoSkipReturnNotice: false
+    };
+  }
+
+  return {
+    currentPlayerPresenceState: presence.state,
+    currentPlayerAutoSkipEnabled: presence.autoSkipTurnEnabled,
+    currentPlayerAutoSkipActivatedAt: presence.autoSkipTurnActivatedAt,
+    showAutoSkipReturnNotice: presence.returnNoticePending
+  };
+}
+
+function markRunningMultiplayerPresenceSeen(access: {
+  gameId: string;
+  auth: { session: AuthSession };
+}): void {
+  if (!isRunningMultiplayerGame(access.gameId)) {
+    return;
+  }
+
+  markPresenceSeen(
+    MULTIPLAYER_PRESENCE_DATA_PATH,
+    access.gameId,
+    access.auth.session.accountId
+  );
+}
+
+function minimumOnlineHumansRequiredForGame(gameId: string): number {
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  return record?.kind === 'MULTIPLAYER' && record.status === 'RUNNING' ? 2 : 1;
+}
+
+function buildOnlineHumansRequiredMessage(gameId: string): string | null {
+  return minimumOnlineHumansRequiredForGame(gameId) > 1
+    ? 'At least 2 human players must be online to progress this multiplayer game.'
+    : null;
+}
+
+function buildActiveHumanRequiredMessage(gameId: string): string | null {
+  return minimumOnlineHumansRequiredForGame(gameId) > 1
+    ? 'At least 1 active human player must be present to progress this multiplayer game.'
+    : null;
+}
+
+function reconcileReadyStateForOnlineHumans(
+  gameId: string,
+  runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
+  authData: AuthData
+): {
+  presentHumanCount: number;
+  activeHumanCount: number;
+  blockingPlayerIds: Set<number>;
+} {
+  const presenceSummary = buildMultiplayerPresenceSummary(authData, gameId, runtime);
+  const minimumOnlineHumansRequired = minimumOnlineHumansRequiredForGame(gameId);
+  if (
+    minimumOnlineHumansRequired <= 1
+    || (presenceSummary.presentHumanCount >= minimumOnlineHumansRequired && presenceSummary.activeHumanCount >= 1)
+  ) {
+    return presenceSummary;
+  }
+
+  if (runtime.currentTurnReadyPlayerIds.size === 0) {
+    return presenceSummary;
+  }
+
+  runtime.currentTurnReadyPlayerIds.clear();
+  updateGameRuntime(gameId, {
+    currentTurnReadyPlayerIds: new Set<number>()
+  });
+  if (currentRuntimeGameId === gameId) {
+    currentTurnReadyPlayerIds.clear();
+  }
+  return presenceSummary;
+}
+
+function buildGameTurnStatusResponse(
+  access: {
+    gameId: string;
+    galaxy: Galaxy;
+    auth: { data: AuthData; session: AuthSession };
+    playerId: number;
+    readyPlayerIds: ReadonlySet<number>;
+    isProcessing: boolean;
+    runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
+  }
+): TurnStatusResponse {
+  const presenceSummary = reconcileReadyStateForOnlineHumans(access.gameId, access.runtime, access.auth.data);
+  const readyPlayerIds = currentRuntimeGameId === access.gameId
+    ? currentTurnReadyPlayerIds
+    : access.runtime.currentTurnReadyPlayerIds;
+  const isProcessing = currentRuntimeGameId === access.gameId
+    ? isTurnProcessing
+    : access.isProcessing;
+  const minimumOnlineHumansRequired = minimumOnlineHumansRequiredForGame(access.gameId);
+  const progressionBlockedReason = presenceSummary.presentHumanCount < minimumOnlineHumansRequired
+    ? buildOnlineHumansRequiredMessage(access.gameId)
+    : presenceSummary.activeHumanCount < 1
+      ? buildActiveHumanRequiredMessage(access.gameId)
+      : null;
+  return buildTurnStatusResponse(
+    access.galaxy,
+    readyPlayerIds,
+    access.playerId,
+    isProcessing,
+    {
+      onlineHumanCount: presenceSummary.presentHumanCount,
+      minimumOnlineHumanCount: minimumOnlineHumansRequired,
+      progressionBlockedReason,
+      blockingPlayerIds: presenceSummary.blockingPlayerIds,
+      ...buildCurrentPlayerPresenceOptions(access.gameId, access.auth.session.accountId)
+    }
+  );
 }
 
 function saveAndUnloadRunningMultiplayerGame(
@@ -3784,6 +4047,7 @@ function saveAndUnloadRunningMultiplayerGame(
   }
 
   deleteGameRuntime(gameId);
+  removePresenceForGame(MULTIPLAYER_PRESENCE_DATA_PATH, gameId);
   moveMountedRuntimeAwayFromGame(gameId);
 
   updateGameRecord(GAME_REGISTRY_DATA_PATH, gameId, {
@@ -4180,6 +4444,12 @@ function buildRunningMultiplayerMembers(
     .filter((entry) => entry.isActive)
     .sort((left, right) => left.joinedAt.localeCompare(right.joinedAt) || left.accountId - right.accountId);
   const offlineBotControlledPlayerIds = runtime?.offlineBotControlledPlayerIds ?? new Set<number>();
+  const authData = loadAuthData();
+  const sessionByAccountId = new Map(
+    authData.sessions
+      .filter((session) => session.currentGameId === gameId)
+      .map((session) => [session.accountId, session] as const)
+  );
 
   return memberships.map((membership) => {
     const playerId = runtime?.galaxy.playerNameMap.get(membership.playerName) ?? null;
@@ -4187,10 +4457,14 @@ function buildRunningMultiplayerMembers(
       ? resolvePlayerById(runtime.galaxy, playerId)
       : null;
     const isOfflineBotControlled = playerId !== null && offlineBotControlledPlayerIds.has(playerId);
+    const presence = sessionByAccountId.has(membership.accountId)
+      ? getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, membership.accountId)
+      : null;
 
     return {
       accountId: membership.accountId,
       playerName: membership.playerName,
+      isAutoSkipTurn: !isOfflineBotControlled && presence?.state === 'AUTO_SKIP_TURN',
       isOfflineBotControlled,
       offlineBotProfileId: isOfflineBotControlled ? (player?.botProfileId ?? null) : null
     };
@@ -4544,7 +4818,15 @@ function resolveSessionRuntimeAccess(
 }
 
 function resolveAuthenticatedGameAccess(req: Request):
-  | { galaxy: Galaxy; auth: { data: AuthData; session: AuthSession }; playerId: number }
+  | {
+    gameId: string;
+    runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
+    galaxy: Galaxy;
+    auth: { data: AuthData; session: AuthSession };
+    playerId: number;
+    readyPlayerIds: ReadonlySet<number>;
+    isProcessing: boolean;
+  }
   | { status: number; error: string } {
   const auth = getAuthSession(req);
   if (!auth) {
@@ -4571,14 +4853,20 @@ function resolveAuthenticatedGameAccess(req: Request):
   }
 
   return {
+    gameId: runtime.gameId,
+    runtime,
     galaxy: runtime.galaxy,
     auth,
-    playerId
+    playerId,
+    readyPlayerIds: runtime.currentTurnReadyPlayerIds,
+    isProcessing: runtime.isTurnProcessing
   };
 }
 
 function resolveAuthenticatedGameAccessForGame(req: Request, requestedGameId: string):
   | {
+    gameId: string;
+    runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
     galaxy: Galaxy;
     auth: { data: AuthData; session: AuthSession };
     playerId: number;
@@ -4618,6 +4906,8 @@ function resolveAuthenticatedGameAccessForGame(req: Request, requestedGameId: st
   }
 
   return {
+    gameId,
+    runtime,
     galaxy: runtime.galaxy,
     auth,
     playerId,
@@ -4705,6 +4995,7 @@ function handleEndTurnRequest(
   }
 
   const playerId = player.playerId;
+  markRunningMultiplayerPresenceSeen(access);
   synchronizeJumpGateRequests(access.galaxy);
   synchronizeMaintenanceRequests(access.galaxy);
   const pendingRequestCount = countPendingMailRequestsForPlayer(access.galaxy, playerId);
@@ -4715,16 +5006,29 @@ function handleEndTurnRequest(
     });
   }
 
+  const presenceSummary = reconcileReadyStateForOnlineHumans(access.gameId, access.runtime, access.auth.data);
+  const minimumOnlineHumansRequired = minimumOnlineHumansRequiredForGame(access.gameId);
+  if (presenceSummary.presentHumanCount < minimumOnlineHumansRequired) {
+    return res.status(409).json({
+      error: buildOnlineHumansRequiredMessage(access.gameId) ?? 'Not enough human players are online to progress this game.'
+    });
+  }
+  if (presenceSummary.activeHumanCount < 1) {
+    return res.status(409).json({
+      error: buildActiveHumanRequiredMessage(access.gameId) ?? 'At least 1 active human player must be present to progress this game.'
+    });
+  }
+
   const requiresReady = requiresAllPlayersReady(access.galaxy);
   if (requiresReady) {
     currentTurnReadyPlayerIds.add(playerId);
     persistCurrentRuntimeStoreState();
-    if (!areAllHumanPlayersReady(access.galaxy, currentTurnReadyPlayerIds)) {
+    if (!areAllHumanPlayersReady(access.galaxy, currentTurnReadyPlayerIds, presenceSummary.blockingPlayerIds)) {
       const response: EndTurnResponse = {
         player: toPlayerSession(access.auth.session, access.galaxy),
         galaxy: buildGalaxySnapshot(access.galaxy),
         resolution: 'WAITING',
-        turnStatus: buildTurnStatusResponse(access.galaxy, currentTurnReadyPlayerIds, playerId, false)
+        turnStatus: buildGameTurnStatusResponse(access)
       };
       return res.status(200).json(response);
     }
@@ -4762,7 +5066,7 @@ function handleEndTurnRequest(
       player: toPlayerSession(access.auth.session, access.galaxy),
       galaxy: buildGalaxySnapshot(access.galaxy),
       resolution: 'RESOLVED',
-      turnStatus: buildTurnStatusResponse(access.galaxy, currentTurnReadyPlayerIds, playerId, false)
+      turnStatus: buildGameTurnStatusResponse(access)
     };
 
     return res.status(200).json(response);

@@ -1021,6 +1021,14 @@ app-root {
   color: rgba(255, 255, 255, 0.76);
 }
 
+.game-lock-overlay__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
 .game-lock-overlay__eyebrow {
   color: var(--accent);
   font-size: 0.72rem;

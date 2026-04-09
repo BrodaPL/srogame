@@ -22,6 +22,7 @@ describe.sequential('auth api', () => {
   const originalGameRegistryPath = process.env.SROGAME_GAME_REGISTRY_DATA_PATH;
   const originalMembershipsPath = process.env.SROGAME_GAME_MEMBERSHIPS_DATA_PATH;
   const originalLobbyPath = process.env.SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH;
+  const originalPresencePath = process.env.SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH;
   const originalSavesPath = process.env.SROGAME_GAME_SAVES_DIRECTORY_PATH;
   const originalTurnstileBypass = process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV;
   const originalPort = process.env.PORT;
@@ -38,6 +39,7 @@ describe.sequential('auth api', () => {
     process.env.SROGAME_GAME_REGISTRY_DATA_PATH = path.join(tempDir, 'games.json');
     process.env.SROGAME_GAME_MEMBERSHIPS_DATA_PATH = path.join(tempDir, 'game-memberships.json');
     process.env.SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH = path.join(tempDir, 'multiplayer-lobbies.json');
+    process.env.SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH = path.join(tempDir, 'multiplayer-presence.json');
     process.env.SROGAME_GAME_SAVES_DIRECTORY_PATH = path.join(tempDir, 'saves');
     process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV = 'true';
     process.env.PORT = '0';
@@ -77,6 +79,7 @@ describe.sequential('auth api', () => {
     process.env.SROGAME_GAME_REGISTRY_DATA_PATH = originalGameRegistryPath;
     process.env.SROGAME_GAME_MEMBERSHIPS_DATA_PATH = originalMembershipsPath;
     process.env.SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH = originalLobbyPath;
+    process.env.SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH = originalPresencePath;
     process.env.SROGAME_GAME_SAVES_DIRECTORY_PATH = originalSavesPath;
     process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV = originalTurnstileBypass;
     process.env.PORT = originalPort;
@@ -397,6 +400,258 @@ describe.sequential('auth api', () => {
     const authData = readAuthData();
     const adminAccount = authData.accounts.find((entry) => entry.playerName === 'RunAdmin');
     expect(adminAccount?.currentGameId).toBeNull();
+  });
+
+  it('blocks multiplayer turn progression when fewer than two human players are online', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'TurnAdmin',
+      email: 'turn-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.51');
+    activateAccount('TurnAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'TurnGuest',
+      email: 'turn-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.52');
+    activateAccount('TurnGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'TurnAdmin',
+      password: 'secret-123'
+    }, '10.0.0.51');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'TurnGuest',
+      password: 'secret-123'
+    }, '10.0.0.52');
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.51', adminToken);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.52', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.52', guestToken);
+    const startResponse = await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.51', adminToken);
+    expect(startResponse.status).toBe(200);
+
+    const logoutResponse = await request('POST', '/api/auth/logout', {}, '10.0.0.52', guestToken);
+    expect(logoutResponse.status).toBe(204);
+
+    const turnStatusResponse = await request('GET', `/api/games/${gameId}/turn-status`, undefined, '10.0.0.51', adminToken);
+    expect(turnStatusResponse.status).toBe(200);
+    expect(turnStatusResponse.json).toMatchObject({
+      onlineHumanCount: 1,
+      minimumOnlineHumanCount: 2,
+      progressionBlockedReason: 'At least 2 human players must be online to progress this multiplayer game.'
+    });
+
+    const endTurnResponse = await request('POST', `/api/games/${gameId}/end-turn`, {}, '10.0.0.51', adminToken);
+    expect(endTurnResponse.status).toBe(409);
+    expect(endTurnResponse.json).toEqual({
+      error: 'At least 2 human players must be online to progress this multiplayer game.'
+    });
+  });
+
+  it('allows one active human to progress when another present human is on auto skip turn', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'SkipAdmin',
+      email: 'skip-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.71');
+    activateAccount('SkipAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'SkipGuest',
+      email: 'skip-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.72');
+    activateAccount('SkipGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'SkipAdmin',
+      password: 'secret-123'
+    }, '10.0.0.71');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'SkipGuest',
+      password: 'secret-123'
+    }, '10.0.0.72');
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.71', adminToken);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.72', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.72', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.71', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.71', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.72', guestToken);
+
+    const autoSkipResponse = await request('POST', `/api/multiplayer/games/${gameId}/auto-skip-turn`, {
+      enabled: true,
+      activateNow: true
+    }, '10.0.0.72', guestToken);
+    expect(autoSkipResponse.status).toBe(200);
+
+    const turnStatusResponse = await request('GET', `/api/games/${gameId}/turn-status`, undefined, '10.0.0.71', adminToken);
+    expect(turnStatusResponse.status).toBe(200);
+    expect(turnStatusResponse.json).toMatchObject({
+      onlineHumanCount: 2,
+      minimumOnlineHumanCount: 2,
+      progressionBlockedReason: null,
+      waitingForPlayerNames: ['SkipAdmin']
+    });
+
+    const endTurnResponse = await request('POST', `/api/games/${gameId}/end-turn`, {}, '10.0.0.71', adminToken);
+    expect(endTurnResponse.status).toBe(200);
+    expect(endTurnResponse.json?.resolution).toBe('RESOLVED');
+  });
+
+  it('blocks multiplayer progression when all present humans are on auto skip turn', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'AllSkipAdmin',
+      email: 'all-skip-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.81');
+    activateAccount('AllSkipAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'AllSkipGuest',
+      email: 'all-skip-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.82');
+    activateAccount('AllSkipGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'AllSkipAdmin',
+      password: 'secret-123'
+    }, '10.0.0.81');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'AllSkipGuest',
+      password: 'secret-123'
+    }, '10.0.0.82');
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.81', adminToken);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.82', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.82', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.81', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.81', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.82', guestToken);
+
+    await request('POST', `/api/multiplayer/games/${gameId}/auto-skip-turn`, {
+      enabled: true,
+      activateNow: true
+    }, '10.0.0.81', adminToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/auto-skip-turn`, {
+      enabled: true,
+      activateNow: true
+    }, '10.0.0.82', guestToken);
+
+    const turnStatusResponse = await request('GET', `/api/games/${gameId}/turn-status`, undefined, '10.0.0.81', adminToken);
+    expect(turnStatusResponse.status).toBe(200);
+    expect(turnStatusResponse.json).toMatchObject({
+      onlineHumanCount: 2,
+      minimumOnlineHumanCount: 2,
+      progressionBlockedReason: 'At least 1 active human player must be present to progress this multiplayer game.',
+      waitingForPlayerNames: []
+    });
+
+    const endTurnResponse = await request('POST', `/api/games/${gameId}/end-turn`, {}, '10.0.0.81', adminToken);
+    expect(endTurnResponse.status).toBe(409);
+    expect(endTurnResponse.json).toEqual({
+      error: 'At least 1 active human player must be present to progress this multiplayer game.'
+    });
+  });
+
+  it('tracks multiplayer presence and auto skip turn state for the current player', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'PresenceAdmin',
+      email: 'presence-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.61');
+    activateAccount('PresenceAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'PresenceGuest',
+      email: 'presence-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.62');
+    activateAccount('PresenceGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'PresenceAdmin',
+      password: 'secret-123'
+    }, '10.0.0.61');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'PresenceGuest',
+      password: 'secret-123'
+    }, '10.0.0.62');
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.61', adminToken);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.62', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.62', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.61', adminToken);
+
+    const presenceResponse = await request('POST', `/api/multiplayer/games/${gameId}/presence`, {}, '10.0.0.61', adminToken);
+    expect(presenceResponse.status).toBe(200);
+    expect(presenceResponse.json).toMatchObject({
+      currentPlayerPresenceState: 'ACTIVE',
+      currentPlayerAutoSkipEnabled: false,
+      showAutoSkipReturnNotice: false
+    });
+
+    const enableResponse = await request('POST', `/api/multiplayer/games/${gameId}/auto-skip-turn`, {
+      enabled: true
+    }, '10.0.0.61', adminToken);
+    expect(enableResponse.status).toBe(200);
+    expect(enableResponse.json).toMatchObject({
+      currentPlayerPresenceState: 'ACTIVE',
+      currentPlayerAutoSkipEnabled: true,
+      showAutoSkipReturnNotice: false
+    });
+
+    const activateResponse = await request('POST', `/api/multiplayer/games/${gameId}/auto-skip-turn`, {
+      enabled: true,
+      activateNow: true
+    }, '10.0.0.61', adminToken);
+    expect(activateResponse.status).toBe(200);
+    expect(activateResponse.json).toMatchObject({
+      currentPlayerPresenceState: 'AUTO_SKIP_TURN',
+      currentPlayerAutoSkipEnabled: true,
+      showAutoSkipReturnNotice: true
+    });
+
+    const acknowledgeResponse = await request('POST', `/api/multiplayer/games/${gameId}/presence`, {
+      acknowledgeNotice: true
+    }, '10.0.0.61', adminToken);
+    expect(acknowledgeResponse.status).toBe(200);
+    expect(acknowledgeResponse.json).toMatchObject({
+      currentPlayerPresenceState: 'AUTO_SKIP_TURN',
+      currentPlayerAutoSkipEnabled: true,
+      showAutoSkipReturnNotice: false
+    });
   });
 
   function activateFirstPendingAccount(): void {
