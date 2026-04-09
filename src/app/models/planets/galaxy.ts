@@ -11,6 +11,8 @@ import { ClientInfo, ClientStarSystem } from './client-star-system';
 import { Fleet } from '../fleets/fleet';
 import { ManyShips } from '../fleets/many-ships';
 import { ManyDefences } from '../defences/many-defences';
+import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
+import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
 import type { DiplomaticRelation } from '../diplomacy/diplomatic-relation';
 import type { DiplomaticProposal } from '../diplomacy/diplomatic-proposal';
 import type { JumpGateRequest } from '../requests/jump-gate-request';
@@ -62,9 +64,11 @@ export class Galaxy {
     planet: Planet,
     playerId: number,
     playerTypeById: Map<number, PlayerType> = this.buildPlayerTypeMap(),
-    playerNameById: Map<number, string> = this.buildPlayerNameById()
+    playerNameById: Map<number, string> = this.buildPlayerNameById(),
+    diplomacyResolver: DiplomacyResolver = new DiplomacyResolver(this.diplomaticRelations)
   ): ClientPlanet {
     const reportData = planet.lastReportData.get(playerId) ?? null;
+    const actualOwnerId = planet.info.ownerId;
     const basicInfo = new PlanetBasicInfo(
       planet.basicInfo.name,
       planet.basicInfo.type,
@@ -76,10 +80,20 @@ export class Galaxy {
       planet.basicInfo.terraformerSizeBonus
     );
 
-    const isOwnedByPlayer = planet.info.ownerId === playerId;
+    const isOwnedByPlayer = actualOwnerId === playerId;
+    const friendlyForeignOwnerRevealed = !isOwnedByPlayer
+      && actualOwnerId !== null
+      && (
+        reportData !== null
+        || this.canRevealFriendlyForeignOwner(playerId, actualOwnerId, diplomacyResolver)
+      );
+    const revealedOwnerId = isOwnedByPlayer || friendlyForeignOwnerRevealed
+      ? actualOwnerId
+      : null;
     const info = isOwnedByPlayer
       ? new PlanetInfo(planet.info.ownerId, planet.getEffectivePlanetaryParameters())
       : new PlanetInfo(null, new PlanetaryParameters(0, 0, 0, 0, 0, 0, 0, 0, 0));
+    info.ownerId = revealedOwnerId;
     const rBDSFTQ = isOwnedByPlayer
       ? planet.rBDSFTQ
       : new RBDSFTQ(
@@ -98,13 +112,13 @@ export class Galaxy {
       );
     const ownerPlayerType = isOwnedByPlayer
       ? PlayerType.PLAYER
-      : reportData && planet.info.ownerId !== null
-        ? playerTypeById.get(planet.info.ownerId) ?? null
+      : revealedOwnerId !== null
+        ? playerTypeById.get(revealedOwnerId) ?? null
         : null;
     const ownerPlayerName = isOwnedByPlayer
       ? playerNameById.get(playerId) ?? null
-      : reportData && planet.info.ownerId !== null
-        ? playerNameById.get(planet.info.ownerId) ?? null
+      : revealedOwnerId !== null
+        ? playerNameById.get(revealedOwnerId) ?? null
         : null;
 
     return new ClientPlanet(
@@ -125,11 +139,13 @@ export class Galaxy {
   ): ClientStarSystem {
     const playerTypeById = this.buildPlayerTypeMap();
     const playerNameById = this.buildPlayerNameById();
+    const diplomacyResolver = new DiplomacyResolver(this.diplomaticRelations);
     return this.createClientStarSystemInternal(
       system,
       playerId,
       playerTypeById,
       playerNameById,
+      diplomacyResolver,
       includePlanets
     );
   }
@@ -137,6 +153,7 @@ export class Galaxy {
   public createClientGalaxy(playerId: number, includePlanets = true): ClientGalaxy {
     const playerTypeById = this.buildPlayerTypeMap();
     const playerNameById = this.buildPlayerNameById();
+    const diplomacyResolver = new DiplomacyResolver(this.diplomaticRelations);
 
     const clientStars = this.stars.map((row) =>
       row.map((system) =>
@@ -145,6 +162,7 @@ export class Galaxy {
           playerId,
           playerTypeById,
           playerNameById,
+          diplomacyResolver,
           includePlanets
         )
       )
@@ -158,12 +176,13 @@ export class Galaxy {
     playerId: number,
     playerTypeById: Map<number, PlayerType>,
     playerNameById: Map<number, string>,
+    diplomacyResolver: DiplomacyResolver,
     includePlanets: boolean
   ): ClientStarSystem {
     const clientInfo = new ClientInfo();
     const clientPlanets = includePlanets
       ? system.planets.map((planet) =>
-        this.createClientPlanet(planet, playerId, playerTypeById, playerNameById)
+        this.createClientPlanet(planet, playerId, playerTypeById, playerNameById, diplomacyResolver)
       )
       : [];
 
@@ -220,6 +239,15 @@ export class Galaxy {
       map.set(player.playerId, player.playerName);
     }
     return map;
+  }
+
+  private canRevealFriendlyForeignOwner(
+    viewerPlayerId: number,
+    ownerPlayerId: number,
+    diplomacyResolver: DiplomacyResolver
+  ): boolean {
+    const status = diplomacyResolver.getStatus(viewerPlayerId, ownerPlayerId);
+    return status === DiplomaticStatus.ALLIED || status === DiplomaticStatus.PEACE;
   }
 
   private static shuffleInPlace(values: string[]): void {

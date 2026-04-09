@@ -1,9 +1,9 @@
 import { Component, EventEmitter, Input, OnChanges, Output } from '@angular/core';
 import { Router } from '@angular/router';
 import type { ClientPlanetDto, ClientReportDataDto } from '../../../models/game-api-types';
-import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
 import { PlayerType } from '../../../models/enums/player-type';
 import { PlanetImageHelper } from '../../../models/planets/planet-image-helper';
+import { SpyLaunchDialogComponent } from '../spy-launch-dialog/spy-launch-dialog.component';
 
 type MiniPlanetTagVm = {
   label: string;
@@ -12,6 +12,7 @@ type MiniPlanetTagVm = {
 
 @Component({
   selector: 'app-mini-planet-preview',
+  imports: [SpyLaunchDialogComponent],
   templateUrl: './mini-planet-preview.component.html'
 })
 export class MiniPlanetPreviewComponent implements OnChanges {
@@ -23,6 +24,8 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   @Output() chooseAsTarget = new EventEmitter<ClientPlanetDto>();
 
   protected tags: MiniPlanetTagVm[] = [];
+  protected isSpyDialogOpen = false;
+  protected spyLaunchNotice: string | null = null;
 
   constructor(private readonly router: Router) {}
 
@@ -129,7 +132,32 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     );
   }
 
-  protected openSpyPlanet(): void {
+  protected canUseAsMissionOrigin(): boolean {
+    return this.planet?.info.ownerId !== null;
+  }
+
+  protected showSpyAction(): boolean {
+    return !!this.planet && this.planet.info.ownerId === null;
+  }
+
+  protected openMissionPlannerAsOrigin(): void {
+    if (!this.planet || !this.canUseAsMissionOrigin()) {
+      return;
+    }
+
+    void this.router.navigate(
+      ['/game/mission-planner'],
+      {
+        queryParams: {
+          originX: this.planet.coordinates.x,
+          originY: this.planet.coordinates.y,
+          originZ: this.planet.coordinates.z
+        }
+      }
+    );
+  }
+
+  protected openMissionPlannerAsTarget(): void {
     if (!this.planet) {
       return;
     }
@@ -138,13 +166,30 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       ['/game/mission-planner'],
       {
         queryParams: {
-          mission: FleetMissionType.SPY,
           targetX: this.planet.coordinates.x,
           targetY: this.planet.coordinates.y,
           targetZ: this.planet.coordinates.z
         }
       }
     );
+  }
+
+  protected openSpyDialog(): void {
+    if (!this.showSpyAction()) {
+      return;
+    }
+
+    this.spyLaunchNotice = null;
+    this.isSpyDialogOpen = true;
+  }
+
+  protected closeSpyDialog(): void {
+    this.isSpyDialogOpen = false;
+  }
+
+  protected handleSpyMissionLaunched(event: { message: string }): void {
+    this.spyLaunchNotice = event.message;
+    this.isSpyDialogOpen = false;
   }
 
   protected emitChooseAsOrigin(): void {

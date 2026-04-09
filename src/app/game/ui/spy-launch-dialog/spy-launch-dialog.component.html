@@ -1,0 +1,88 @@
+@if (isOpen && targetPlanet) {
+  <div class="spy-launch-dialog__backdrop" (click)="close()"></div>
+  <section
+    class="spy-launch-dialog"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'Spy ' + targetPlanet.basicInfo.name"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="spy-launch-dialog__header">
+      <div>
+        <p class="eyebrow">Spy</p>
+        <h3>Launch Espionage Probes</h3>
+        <p class="spy-launch-dialog__subtitle">
+          Target: {{ targetPlanet.basicInfo.name }} ({{ targetCoordinatesLabel() }})
+        </p>
+      </div>
+      <button type="button" class="spy-launch-dialog__close" (click)="close()">Close</button>
+    </div>
+
+    @if (error) {
+      <section class="status status--error">
+        <h3>Spy mission unavailable</h3>
+        <p>{{ error }}</p>
+      </section>
+    }
+
+    <div class="spy-launch-dialog__body">
+      @if (isLoading) {
+        <p class="overview-muted">Loading owned planets with available probes.</p>
+      } @else if (eligibleOrigins.length === 0) {
+        <p class="overview-muted">No owned planets with espionage probes are available.</p>
+      } @else {
+        <fieldset class="spy-launch-dialog__fieldset">
+          <legend>Mission origin</legend>
+          <div class="spy-launch-dialog__origin-list">
+            @for (origin of eligibleOrigins; track origin.coordinatesLabel) {
+              <label class="spy-launch-dialog__origin-option">
+                <input
+                  type="radio"
+                  name="spy-origin"
+                  [value]="origin.coordinatesLabel"
+                  [(ngModel)]="selectedOriginCoordinates"
+                  (ngModelChange)="setSelectedOrigin($event)"
+                />
+                <span class="spy-launch-dialog__origin-copy">
+                  <strong>{{ origin.label }}</strong>
+                  <span>
+                    Distance: {{ origin.distance }} | Available: {{ origin.totalProbes }}
+                    @if (origin.damagedProbes > 0) {
+                      <span> | Damaged: {{ origin.damagedProbes }}</span>
+                    }
+                  </span>
+                </span>
+              </label>
+            }
+          </div>
+        </fieldset>
+
+        <label class="spy-launch-dialog__field">
+          <span>Probe amount</span>
+          <input
+            class="spy-launch-dialog__amount-input"
+            type="number"
+            min="1"
+            [max]="selectedOriginMaxProbeAmount()"
+            [(ngModel)]="probeAmount"
+          />
+        </label>
+        <p class="overview-muted">
+          Max from selected origin: {{ selectedOriginMaxProbeAmount() }}
+        </p>
+      }
+    </div>
+
+    <div class="spy-launch-dialog__actions">
+      <button type="button" class="top-menu__button" (click)="close()">Cancel</button>
+      <button
+        type="button"
+        class="top-menu__button top-menu__button--end-turn"
+        [disabled]="!canLaunch()"
+        (click)="launch()"
+      >
+        {{ isLaunching ? 'Launching...' : 'Launch' }}
+      </button>
+    </div>
+  </section>
+}

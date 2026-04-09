@@ -11,7 +11,7 @@
       <a class="link button" [routerLink]="stateActionRoute">{{ stateActionLabel }}</a>
     </section>
   } @else if (isGameReady) {
-    <router-outlet></router-outlet>
+    <router-outlet />
     @if (isUiLocked()) {
       <section class="game-lock-overlay" aria-live="polite" aria-busy="true">
         <div class="game-lock-overlay__card">

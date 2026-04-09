@@ -1,6 +1,13 @@
+:host {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
 .production-view {
   display: grid;
   gap: 0.85rem;
+  align-content: start;
 }
 
 .production-view__queue-grid {

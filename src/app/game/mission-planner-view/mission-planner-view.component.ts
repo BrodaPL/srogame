@@ -167,6 +167,7 @@ export class MissionPlannerViewComponent implements OnInit {
   private readonly undamagedShipSelectionByType = new Map<ShipType, number>();
   private readonly damagedShipSelectionByType = new Map<ShipType, number>();
   private readonly bombSelectionByType = new Map<DefenceType, number>();
+  private pendingOriginCoordinates: ClientCoordinates | null = null;
   private pendingTargetCoordinates: ClientCoordinates | null = null;
   private pendingMissionType: FleetMissionType | null = null;
 
@@ -1178,6 +1179,9 @@ export class MissionPlannerViewComponent implements OnInit {
   private readRoutePrefill(): void {
     const queryParamMap = this.route.snapshot.queryParamMap;
     const mission = queryParamMap.get('mission');
+    const originX = this.parseQueryCoordinate(queryParamMap.get('originX'));
+    const originY = this.parseQueryCoordinate(queryParamMap.get('originY'));
+    const originZ = this.parseQueryCoordinate(queryParamMap.get('originZ'));
     const targetX = this.parseQueryCoordinate(queryParamMap.get('targetX'));
     const targetY = this.parseQueryCoordinate(queryParamMap.get('targetY'));
     const targetZ = this.parseQueryCoordinate(queryParamMap.get('targetZ'));
@@ -1186,6 +1190,11 @@ export class MissionPlannerViewComponent implements OnInit {
       this.pendingMissionType = mission as FleetMissionType;
       this.selectedMissionType = this.pendingMissionType;
       this.onMissionTypeChange();
+    }
+
+    if (originX !== null && originY !== null && originZ !== null) {
+      this.pendingOriginCoordinates = { x: originX, y: originY, z: originZ };
+      this.originCoordinatesInput = this.coordinatesLabel(this.pendingOriginCoordinates);
     }
 
     if (targetX !== null && targetY !== null && targetZ !== null) {
@@ -1199,6 +1208,14 @@ export class MissionPlannerViewComponent implements OnInit {
       this.selectedMissionType = this.pendingMissionType;
       this.onMissionTypeChange();
       this.pendingMissionType = null;
+    }
+
+    if (this.pendingOriginCoordinates) {
+      const originPlanet = this.findOwnedPlanet(this.pendingOriginCoordinates);
+      if (originPlanet) {
+        this.selectOriginPlanet(originPlanet);
+      }
+      this.pendingOriginCoordinates = null;
     }
 
     if (!this.pendingTargetCoordinates) {

@@ -1,7 +1,7 @@
 import '@angular/compiler';
 import { of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GameStateResponse, PlayerSession } from '../models/game-api-types';
+import type { GameStateResponse, PlayerSession, TurnStatusResponse } from '../models/game-api-types';
 import { GameComponent } from './game.component';
 
 describe('GameComponent', () => {
@@ -17,7 +17,8 @@ describe('GameComponent', () => {
     const response = createGameStateResponse();
     const gameState = createGameStateMock();
     const gameApi = {
-      getGameState: vi.fn().mockReturnValue(of(response))
+      getGameState: vi.fn().mockReturnValue(of(response)),
+      getTurnStatus: vi.fn().mockReturnValue(of(createTurnStatusResponse()))
     };
     const playerSession = {
       load: vi.fn().mockReturnValue(response.player)
@@ -35,19 +36,51 @@ describe('GameComponent', () => {
     );
 
     component.ngOnInit();
-    vi.runAllTimers();
+    vi.advanceTimersByTime(0);
 
     expect(gameApi.getGameState).toHaveBeenCalledWith(response.player.token);
+    expect(gameApi.getTurnStatus).toHaveBeenCalledWith(response.player.token);
     expect(authState.setSession).toHaveBeenCalledWith(response.player);
     expect(gameState.setGalaxy).toHaveBeenCalledWith(response.galaxy);
     expect((component as { isGameReady: boolean }).isGameReady).toBe(true);
     expect((component as { stateError: string | null }).stateError).toBeNull();
   });
 
+  it('renders immediately from in-memory game state and syncs the server in background', () => {
+    const response = createGameStateResponse();
+    const gameState = createGameStateMock(response.galaxy);
+    const gameApi = {
+      getGameState: vi.fn().mockReturnValue(of(response)),
+      getTurnStatus: vi.fn().mockReturnValue(of(createTurnStatusResponse()))
+    };
+    const playerSession = {
+      load: vi.fn().mockReturnValue(response.player)
+    };
+    const authState = {
+      setSession: vi.fn(),
+      clearSession: vi.fn()
+    };
+
+    const component = new GameComponent(
+      gameState as never,
+      gameApi as never,
+      playerSession as never,
+      authState as never
+    );
+
+    component.ngOnInit();
+
+    expect((component as { isLoading: boolean }).isLoading).toBe(false);
+    expect((component as { isGameReady: boolean }).isGameReady).toBe(true);
+    expect(gameApi.getGameState).toHaveBeenCalledWith(response.player.token);
+    expect(gameApi.getTurnStatus).toHaveBeenCalledWith(response.player.token);
+  });
+
   it('shows no-active-game guidance when the server denies access', () => {
     const gameState = createGameStateMock();
     const gameApi = {
-      getGameState: vi.fn().mockReturnValue(throwError(() => ({ status: 404 })))
+      getGameState: vi.fn().mockReturnValue(throwError(() => ({ status: 404 }))),
+      getTurnStatus: vi.fn()
     };
     const playerSession = {
       load: vi.fn().mockReturnValue(createPlayerSession())
@@ -65,7 +98,7 @@ describe('GameComponent', () => {
     );
 
     component.ngOnInit();
-    vi.runAllTimers();
+    vi.advanceTimersByTime(0);
 
     expect(gameState.clearGalaxy).toHaveBeenCalled();
     expect((component as { stateTitle: string }).stateTitle).toBe('No active game');
@@ -99,11 +132,28 @@ function createGameStateResponse(): GameStateResponse {
   };
 }
 
-function createGameStateMock() {
+function createGameStateMock(galaxy: GameStateResponse['galaxy'] | null = null) {
   return {
-    galaxy: null,
+    galaxy,
+    turnStatus: null,
     isProcessingTurn: false,
+    currentTurn: vi.fn().mockReturnValue(1),
     setGalaxy: vi.fn(),
+    setTurnStatus: vi.fn(),
+    setProcessingTurn: vi.fn(),
     clearGalaxy: vi.fn()
+  };
+}
+
+function createTurnStatusResponse(): TurnStatusResponse {
+  return {
+    currentTurn: 1,
+    requiresAllPlayersReady: false,
+    isProcessing: false,
+    currentPlayerReady: false,
+    readyPlayerIds: [],
+    readyPlayerNames: [],
+    waitingForPlayerIds: [],
+    waitingForPlayerNames: []
   };
 }

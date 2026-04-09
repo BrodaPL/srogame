@@ -315,6 +315,19 @@ export type BotAdminActionResponse = {
 export type EndTurnResponse = {
   player: PlayerSession;
   galaxy: GalaxySnapshot;
+  resolution: 'WAITING' | 'RESOLVED';
+  turnStatus: TurnStatusResponse;
+};
+
+export type TurnStatusResponse = {
+  currentTurn: number;
+  requiresAllPlayersReady: boolean;
+  isProcessing: boolean;
+  currentPlayerReady: boolean;
+  readyPlayerIds: number[];
+  readyPlayerNames: string[];
+  waitingForPlayerIds: number[];
+  waitingForPlayerNames: string[];
 };
 
 export type LoadGameResponse = {

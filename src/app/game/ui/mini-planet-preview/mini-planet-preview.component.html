@@ -53,7 +53,7 @@
     <div class="mini-planet-preview__actions">
       <button
         type="button"
-        class="mini-planet-preview__button"
+        class="mini-planet-preview__button mini-planet-preview__button--intel"
         [disabled]="!canViewPlanet()"
         [attr.title]="canViewPlanet() ? 'Open planet intel view' : 'Planet intel is unavailable'"
         (click)="openPlanetView()"
@@ -62,20 +62,49 @@
       </button>
       <button
         type="button"
-        class="mini-planet-preview__button"
-        [attr.title]="'Open Mission Planner with target ' + coordinatesLabel()"
-        (click)="openSpyPlanet()"
+        class="mini-planet-preview__button mini-planet-preview__button--mission"
+        [disabled]="!canUseAsMissionOrigin()"
+        [attr.title]="canUseAsMissionOrigin() ? 'Open Mission Planner with origin ' + coordinatesLabel() : 'Only owned planets can be used as mission origin here'"
+        (click)="openMissionPlannerAsOrigin()"
       >
-        Spy Planet
+        Mission: origin
       </button>
       <button
         type="button"
-        class="mini-planet-preview__button"
+        class="mini-planet-preview__button mini-planet-preview__button--mission"
+        [attr.title]="'Open Mission Planner with target ' + coordinatesLabel()"
+        (click)="openMissionPlannerAsTarget()"
+      >
+        Mission: target
+      </button>
+      @if (showSpyAction()) {
+        <button
+          type="button"
+          class="mini-planet-preview__button mini-planet-preview__button--spy"
+          [attr.title]="'Launch espionage probes at ' + coordinatesLabel()"
+          (click)="openSpyDialog()"
+        >
+          Spy
+        </button>
+      }
+      <button
+        type="button"
+        class="mini-planet-preview__button mini-planet-preview__button--utility"
         [attr.title]="'Copy: ' + coordinatesLabel()"
         (click)="copyCoordinates()"
       >
         Copy coordinates
       </button>
     </div>
+    @if (spyLaunchNotice) {
+      <p class="mini-planet-preview__notice">{{ spyLaunchNotice }}</p>
+    }
   }
 </article>
+
+<app-spy-launch-dialog
+  [isOpen]="isSpyDialogOpen"
+  [targetPlanet]="planet"
+  (closed)="closeSpyDialog()"
+  (launched)="handleSpyMissionLaunched($event)"
+></app-spy-launch-dialog>

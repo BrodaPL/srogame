@@ -422,17 +422,17 @@ export class ProductionViewComponent implements OnInit {
   protected defenceRequirementRows(defence: Defence): ShipRequirementRowVm[] {
     const rows: ShipRequirementRowVm[] = [];
 
-    for (const requirement of defence.buildingRequirements) {
-      const requiredLevel = Math.ceil(requirement.level);
-      const currentLevel = this.buildingLevel(requirement.building);
-      rows.push({ label: `B ${requirement.building} ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
-    }
+      for (const requirement of defence.buildingRequirements) {
+        const requiredLevel = Math.ceil(requirement.level);
+        const currentLevel = this.buildingLevel(requirement.building);
+        rows.push({ label: `${requirement.building}: ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
+      }
 
-    for (const requirement of defence.techRequirements) {
-      const requiredLevel = Math.ceil(requirement.level);
-      const currentLevel = this.techLevel(requirement.tech);
-      rows.push({ label: `T ${requirement.tech} ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
-    }
+      for (const requirement of defence.techRequirements) {
+        const requiredLevel = Math.ceil(requirement.level);
+        const currentLevel = this.techLevel(requirement.tech);
+        rows.push({ label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
+      }
 
     return rows;
   }
@@ -745,11 +745,11 @@ export class ProductionViewComponent implements OnInit {
       return [{ label: 'Requirement', value: 'None', tone: 'muted' }];
     }
 
-    return rows.map((row) => ({
-      label: row.label.startsWith('B ') ? `Building ${row.label.slice(2).split(':')[0].trim()}` : row.label.startsWith('T ') ? `Technology ${row.label.slice(2).split(':')[0].trim()}` : row.label,
-      value: row.label.includes(':') ? row.label.split(':').slice(1).join(':').trim() : (row.isMet ? 'Met' : 'Missing'),
-      tone: row.isMet ? 'good' : 'bad'
-    }));
+      return rows.map((row) => ({
+        label: row.label.split(':')[0]?.trim() || row.label,
+        value: row.label.includes(':') ? row.label.split(':').slice(1).join(':').trim() : (row.isMet ? 'Met' : 'Missing'),
+        tone: row.isMet ? 'good' : 'bad'
+      }));
   }
 
   private detailRowsFromWeapons(weapons: Weapon[]): PlanetObjectDetailRow[] {
@@ -1207,12 +1207,12 @@ export class ProductionViewComponent implements OnInit {
     for (const requirement of ship.buildingRequirements) {
       const requiredLevel = Math.ceil(requirement.level);
       const currentLevel = this.buildingLevel(requirement.building);
-      rows.push({ label: `B ${requirement.building}: ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
+      rows.push({ label: `${requirement.building}: ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
     }
     for (const requirement of ship.techRequirements) {
       const requiredLevel = Math.ceil(requirement.level);
       const currentLevel = this.techLevel(requirement.tech);
-      rows.push({ label: `T ${requirement.tech}: ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
+      rows.push({ label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`, isMet: currentLevel >= requiredLevel });
     }
 
     return rows;

@@ -941,23 +941,23 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const rows: BuildingRequirementRowVm[] = [];
 
     for (const requirement of ship.buildingRequirements) {
-      const requiredLevel = Math.ceil(requirement.level);
-      const currentLevel = this.buildingLevel(requirement.building);
-      rows.push({
-        label: `B ${requirement.building}: ${currentLevel}/${requiredLevel}`,
-        isMet: currentLevel >= requiredLevel,
-        isPlaceholder: false
-      });
+        const requiredLevel = Math.ceil(requirement.level);
+        const currentLevel = this.buildingLevel(requirement.building);
+        rows.push({
+          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+          isMet: currentLevel >= requiredLevel,
+          isPlaceholder: false
+        });
     }
 
     for (const requirement of ship.techRequirements) {
-      const requiredLevel = Math.ceil(requirement.level);
-      const currentLevel = this.techLevel(requirement.tech);
-      rows.push({
-        label: `T ${requirement.tech}: ${currentLevel}/${requiredLevel}`,
-        isMet: currentLevel >= requiredLevel,
-        isPlaceholder: false
-      });
+        const requiredLevel = Math.ceil(requirement.level);
+        const currentLevel = this.techLevel(requirement.tech);
+        rows.push({
+          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+          isMet: currentLevel >= requiredLevel,
+          isPlaceholder: false
+        });
     }
 
     if (rows.length === 0) {
@@ -977,23 +977,23 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const rows: BuildingRequirementRowVm[] = [];
 
     for (const requirement of defence.buildingRequirements) {
-      const requiredLevel = Math.ceil(requirement.level);
-      const currentLevel = this.buildingLevel(requirement.building);
-      rows.push({
-        label: `B ${requirement.building}: ${currentLevel}/${requiredLevel}`,
-        isMet: currentLevel >= requiredLevel,
-        isPlaceholder: false
-      });
+        const requiredLevel = Math.ceil(requirement.level);
+        const currentLevel = this.buildingLevel(requirement.building);
+        rows.push({
+          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+          isMet: currentLevel >= requiredLevel,
+          isPlaceholder: false
+        });
     }
 
     for (const requirement of defence.techRequirements) {
-      const requiredLevel = Math.ceil(requirement.level);
-      const currentLevel = this.techLevel(requirement.tech);
-      rows.push({
-        label: `T ${requirement.tech}: ${currentLevel}/${requiredLevel}`,
-        isMet: currentLevel >= requiredLevel,
-        isPlaceholder: false
-      });
+        const requiredLevel = Math.ceil(requirement.level);
+        const currentLevel = this.techLevel(requirement.tech);
+        rows.push({
+          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+          isMet: currentLevel >= requiredLevel,
+          isPlaceholder: false
+        });
     }
 
     if (rows.length === 0) {
@@ -1942,23 +1942,23 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const rows: BuildingRequirementRowVm[] = [];
 
     for (const requirement of building.buildingRequirements) {
-      const requiredLevel = Math.ceil(targetLevel * requirement.level);
-      const currentLevel = this.buildingLevel(requirement.building);
-      rows.push({
-        label: `B ${requirement.building}: ${currentLevel}/${requiredLevel}`,
-        isMet: currentLevel >= requiredLevel,
-        isPlaceholder: false
-      });
+        const requiredLevel = Math.ceil(targetLevel * requirement.level);
+        const currentLevel = this.buildingLevel(requirement.building);
+        rows.push({
+          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+          isMet: currentLevel >= requiredLevel,
+          isPlaceholder: false
+        });
     }
 
     for (const requirement of building.techRequirements) {
-      const requiredLevel = Math.ceil(targetLevel * requirement.level);
-      const currentLevel = this.techLevel(requirement.tech);
-      rows.push({
-        label: `T ${requirement.tech}: ${currentLevel}/${requiredLevel}`,
-        isMet: currentLevel >= requiredLevel,
-        isPlaceholder: false
-      });
+        const requiredLevel = Math.ceil(targetLevel * requirement.level);
+        const currentLevel = this.techLevel(requirement.tech);
+        rows.push({
+          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+          isMet: currentLevel >= requiredLevel,
+          isPlaceholder: false
+        });
     }
 
     if (rows.length === 0) {
@@ -2288,22 +2288,16 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         };
       }
 
-      const separatorIndex = row.label.indexOf(':');
-      const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
-      const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
-      let label = rawLabel;
-      if (rawLabel.startsWith('B ')) {
-        label = `Building ${rawLabel.slice(2)}`;
-      } else if (rawLabel.startsWith('T ')) {
-        label = `Technology ${rawLabel.slice(2)}`;
-      }
+        const separatorIndex = row.label.indexOf(':');
+        const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
+        const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
 
-      return {
-        label,
-        value,
-        tone: row.isMet ? 'good' : 'bad'
-      };
-    });
+        return {
+          label: rawLabel,
+          value,
+          tone: row.isMet ? 'good' : 'bad'
+        };
+      });
   }
 
   private detailRowsFromWeapons(weapons: Weapon[]): PlanetObjectDetailRow[] {

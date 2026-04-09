@@ -60,6 +60,7 @@ export class MailViewComponent implements OnInit {
   ) {}
 
   public ngOnInit(): void {
+    this.scrollViewportToTop();
     this.loadMailView();
   }
 
@@ -584,5 +585,13 @@ export class MailViewComponent implements OnInit {
       this.cdr.detectChanges();
       this.tutorialService.autoOpenTutorial('mailView');
     });
+  }
+
+  private scrollViewportToTop(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }
 }

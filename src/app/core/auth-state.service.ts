@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { PlayerSession } from '../models/game-api-types';
 import { PlayerSessionService } from './player-session.service';
 import { AuthApiService } from './auth-api.service';
+import { GameStateService } from './game-state.service';
 
 @Injectable({
   providedIn: 'root'
@@ -14,7 +15,8 @@ export class AuthStateService {
 
   constructor(
     private readonly playerSession: PlayerSessionService,
-    private readonly authApi: AuthApiService
+    private readonly authApi: AuthApiService,
+    private readonly gameState: GameStateService
   ) {}
 
   public init(): void {
@@ -46,6 +48,7 @@ export class AuthStateService {
 
   public clearSession(): void {
     this.playerSession.clear();
+    this.gameState.clearGalaxy();
     this.sessionSignal.set(null);
   }
 }
