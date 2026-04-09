@@ -1,6 +1,13 @@
+:host {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
 .buildings-view {
   display: grid;
   gap: 0.85rem;
+  align-content: start;
 }
 
 .buildings-view__building-list {

@@ -1,22 +1,26 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
 import { AuthStateService } from '../core/auth-state.service';
+import type { GameStateResponse } from '../models/game-api-types';
 
 @Component({
   selector: 'app-game',
   imports: [RouterLink, RouterOutlet],
   templateUrl: './game.component.html'
 })
-export class GameComponent implements OnInit {
+export class GameComponent implements OnInit, OnDestroy {
   protected stateTitle = '';
   protected stateError: string | null = null;
   protected stateActionLabel = 'Back to main menu';
   protected stateActionRoute = '/';
   protected isLoading = false;
   protected isGameReady = false;
+  private turnStatusPollHandle: number | null = null;
+  private isPollingTurnStatus = false;
+  private isRefreshingAfterTurnChange = false;
 
   constructor(
     private readonly gameState: GameStateService,
@@ -32,28 +36,26 @@ export class GameComponent implements OnInit {
       return;
     }
 
-    this.isLoading = true;
-    this.isGameReady = false;
     this.stateTitle = '';
     this.stateError = null;
 
-    this.gameApi.getGameState(session.token).subscribe({
-      next: (response) => {
-        globalThis.setTimeout(() => {
-          this.authState.setSession(response.player);
-          this.gameState.setGalaxy(response.galaxy);
-          this.stateTitle = '';
-          this.stateError = null;
-          this.isGameReady = true;
-          this.isLoading = false;
-        });
-      },
-      error: (error) => {
-        globalThis.setTimeout(() => {
-          this.handleStateLoadError(error);
-        });
-      }
-    });
+    if (this.gameState.galaxy) {
+      this.gameState.setTurnStatus(null);
+      this.isGameReady = true;
+      this.isLoading = false;
+      this.startTurnStatusPolling();
+      this.refreshTurnStatus();
+      this.syncGameStateInBackground(session.token);
+      return;
+    }
+
+    this.isLoading = true;
+    this.isGameReady = false;
+    this.loadGameState(session.token);
+  }
+
+  public ngOnDestroy(): void {
+    this.stopTurnStatusPolling();
   }
 
   protected isUiLocked(): boolean {
@@ -61,6 +63,7 @@ export class GameComponent implements OnInit {
   }
 
   private handleMissingSession(): void {
+    this.stopTurnStatusPolling();
     this.gameState.clearGalaxy();
     this.isLoading = false;
     this.isGameReady = false;
@@ -71,6 +74,7 @@ export class GameComponent implements OnInit {
   }
 
   private handleStateLoadError(error: { status?: number; error?: { error?: string } }): void {
+    this.stopTurnStatusPolling();
     this.gameState.clearGalaxy();
     this.isLoading = false;
     this.isGameReady = false;
@@ -96,5 +100,108 @@ export class GameComponent implements OnInit {
     this.stateError = error?.error?.error ?? 'The server did not return the current game state.';
     this.stateActionLabel = 'Back to main menu';
     this.stateActionRoute = '/';
+  }
+
+  private startTurnStatusPolling(): void {
+    if (this.turnStatusPollHandle !== null) {
+      return;
+    }
+
+    this.turnStatusPollHandle = globalThis.setInterval(() => {
+      this.refreshTurnStatus();
+    }, 3000);
+  }
+
+  private stopTurnStatusPolling(): void {
+    if (this.turnStatusPollHandle !== null) {
+      globalThis.clearInterval(this.turnStatusPollHandle);
+      this.turnStatusPollHandle = null;
+    }
+    this.isPollingTurnStatus = false;
+    this.isRefreshingAfterTurnChange = false;
+  }
+
+  private refreshTurnStatus(): void {
+    const session = this.playerSession.load();
+    if (!session || !this.isGameReady || this.isLoading || this.isPollingTurnStatus || this.isRefreshingAfterTurnChange) {
+      return;
+    }
+
+    this.isPollingTurnStatus = true;
+    this.gameApi.getTurnStatus(session.token).subscribe({
+      next: (response) => {
+        this.isPollingTurnStatus = false;
+        this.gameState.setTurnStatus(response);
+        this.gameState.setProcessingTurn(response.isProcessing);
+
+        const currentTurn = this.gameState.currentTurn();
+        if (currentTurn !== null && response.currentTurn !== currentTurn) {
+          this.refreshGameStateAfterTurnChange(session.token);
+        }
+      },
+      error: (error) => {
+        this.isPollingTurnStatus = false;
+        if (error?.status === 401 || error?.status === 403 || error?.status === 404) {
+          this.handleStateLoadError(error);
+        }
+      }
+    });
+  }
+
+  private refreshGameStateAfterTurnChange(token: string): void {
+    if (this.isRefreshingAfterTurnChange) {
+      return;
+    }
+
+    this.isRefreshingAfterTurnChange = true;
+    this.gameApi.getGameState(token).subscribe({
+      next: (response) => {
+        this.authState.setSession(response.player);
+        this.gameState.setGalaxy(response.galaxy);
+        this.gameState.setProcessingTurn(false);
+        this.isRefreshingAfterTurnChange = false;
+        globalThis.location?.reload();
+      },
+      error: (error) => {
+        this.isRefreshingAfterTurnChange = false;
+        this.handleStateLoadError(error);
+      }
+    });
+  }
+
+  private loadGameState(token: string): void {
+    this.gameApi.getGameState(token).subscribe({
+      next: (response) => {
+        this.applyGameStateResponse(response);
+      },
+      error: (error) => {
+        this.handleStateLoadError(error);
+      }
+    });
+  }
+
+  private syncGameStateInBackground(token: string): void {
+    this.gameApi.getGameState(token).subscribe({
+      next: (response) => {
+        this.applyGameStateResponse(response);
+      },
+      error: (error) => {
+        if (error?.status === 401 || error?.status === 403 || error?.status === 404) {
+          this.handleStateLoadError(error);
+        }
+      }
+    });
+  }
+
+  private applyGameStateResponse(response: GameStateResponse): void {
+    this.authState.setSession(response.player);
+    this.gameState.setGalaxy(response.galaxy);
+    this.gameState.setTurnStatus(null);
+    this.stateTitle = '';
+    this.stateError = null;
+    this.isGameReady = true;
+    this.isLoading = false;
+    this.startTurnStatusPolling();
+    this.refreshTurnStatus();
   }
 }

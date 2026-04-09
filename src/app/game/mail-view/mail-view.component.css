@@ -1,3 +1,9 @@
+:host {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
 .mail-view,
 .mail-view__layout,
 .mail-view__summary,
@@ -8,7 +14,8 @@
 }
 
 .mail-view {
-  margin-top: 1rem;
+  margin-top: 0;
+  align-content: start;
 }
 
 .mail-view__header,

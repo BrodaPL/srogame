@@ -59,9 +59,11 @@ Frontend bootstrap:
 Main shell:
 - `src/app/app.ts`
 - `src/app/game/game.component.ts`
+- `src/app/game/ui/top-menu/top-menu.component.ts`
 
 Server bootstrap:
 - `server/src/index.ts`
+- `server/src/active-game-turn.ts`
 - `server/src/game-save.ts`
 - `server/src/game-commands/`
 - `server/src/bots/`
@@ -112,7 +114,7 @@ Auth/session:
 
 Game snapshot/state:
 - `src/app/core/game-api.service.ts`: game HTTP calls
-- `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` owner on the client
+- `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` plus active turn-status owner on the client
 - `src/app/models/game-api-types.ts`: shared `GalaxySetup` normalization, including count-based bot-profile setup validation/helpers
 
 Tutorial state:
@@ -136,7 +138,8 @@ Auth endpoints:
 
 Auth/session note:
 - `server/src/index.ts` persists a manual `localAdmin` boolean on accounts/sessions through `server/data/auth.json`
-- `localAdmin` is required for single-player start, direct save load, multiplayer lobby host/control actions, and active-game controller actions such as end turn
+- `localAdmin` is required for single-player start, direct save load, and multiplayer lobby host/control actions
+- active-game turn advancement is no longer controller-only: in multiplayer-scale active games every human player must mark ready through `/api/game/end-turn`, while singleplayer still resolves immediately
 
 Game lifecycle:
 - `/api/game/start`
@@ -144,6 +147,7 @@ Game lifecycle:
 - `/api/game/saves/:saveId/load`
 - `/api/game/saves/:saveId`
 - `/api/game/state`
+- `/api/game/turn-status`
 - `/api/game/end-turn`
 - `/api/admin/bots`
 - `/api/admin/bots/traces`
@@ -169,10 +173,11 @@ Lifecycle persistence note:
 - `/api/game/saves` lists all managed saves plus the active-runtime summary and admin-manageability state
 - `/api/game/saves/:saveId/load` hydrates a selected save back into live runtime objects, replaces the active in-memory game, and rebuilds galaxy-presentation caches
 - `/api/game/saves/:saveId` deletes a selected save file
+- `/api/game/turn-status` is the lightweight active-game polling endpoint used by the Angular game shell to detect ready-state and turn-number changes without reloading the full game snapshot every poll
 - `/api/game/end-turn` writes rotating autosaves into `server/data/saves/` when `GalaxySetup.autoSaveTurns` is greater than `0` and the configured cadence is reached
 - `/api/multiplayer/lobby/load-save` binds a selected save from the shared save list into lobby state without mutating runtime
 - `/api/multiplayer/lobby/start` either creates a new multiplayer galaxy from joined lobby members or hydrates the bound save, applies seat assignments, converts unresolved saved humans to `BOT`, and then replaces the active runtime game
-- `/api/game/end-turn` now also runs the server-side bot planning phase before shared turn resolution
+- `/api/game/end-turn` now also runs the server-side bot planning phase before shared turn resolution; for active games with more than one human player it first records per-player readiness and resolves only after every human has clicked End Turn for that turn
 - `/api/admin/bots*` exposes local-admin/controller-only bot inspection and live runtime controls for profile, pause/resume, and memory clearing
 
 Galaxy and planet reads:

@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
+import { GameStateService } from '../core/game-state.service';
 
 @Component({
   selector: 'app-auth',
@@ -23,6 +24,7 @@ export class AuthComponent {
   constructor(
     private readonly authApi: AuthApiService,
     private readonly authState: AuthStateService,
+    private readonly gameState: GameStateService,
     private readonly router: Router,
     private readonly cdr: ChangeDetectorRef
   ) {}
@@ -44,6 +46,7 @@ export class AuthComponent {
 
     this.authApi.login({ playerName, password }).subscribe({
       next: (session) => {
+        this.gameState.clearGalaxy();
         this.authState.setSession(session);
         this.isLoggingIn = false;
         this.cdr.markForCheck();
@@ -80,6 +83,7 @@ export class AuthComponent {
 
     this.authApi.register({ playerName, password }).subscribe({
       next: (session) => {
+        this.gameState.clearGalaxy();
         this.authState.setSession(session);
         this.isRegistering = false;
         this.cdr.markForCheck();

@@ -161,6 +161,7 @@
       }
 
       @if (response!.lobby!.canManage) {
+        <div (input)="markSetupDirty()" (change)="markSetupDirty()">
         <div class="field">
           <label for="galaxyName">Galaxy name</label>
           <input id="galaxyName" name="galaxyName" type="text" [(ngModel)]="setupForm.galaxyName" />
@@ -355,6 +356,7 @@
               Switch to new game
             </button>
           }
+        </div>
         </div>
       }
 

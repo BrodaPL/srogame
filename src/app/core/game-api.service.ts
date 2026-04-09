@@ -57,6 +57,7 @@ import {
   SensorPhalanxCapabilitiesDto,
   SensorPhalanxScanRequest,
   SensorPhalanxScanResponse,
+  TurnStatusResponse,
   UpdateMultiplayerLobbySetupRequest,
   ToggleMultiplayerLobbyReadyRequest,
   AssignMultiplayerLobbySeatRequest,
@@ -190,6 +191,13 @@ export class GameApiService {
     return this.http.post<EndTurnResponse>(
       `${API_BASE_URL}/game/end-turn`,
       {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getTurnStatus(token: string) {
+    return this.http.get<TurnStatusResponse>(
+      `${API_BASE_URL}/game/turn-status`,
       { headers: this.authHeaders(token) }
     );
   }

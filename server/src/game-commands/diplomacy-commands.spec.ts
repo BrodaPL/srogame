@@ -13,7 +13,6 @@ function createDiplomacyTestGalaxy() {
   const system = new SolarSystem('Diplomacy Test', 2, false, false, { x: 1, y: 1 }, new Set<number>(), new Map());
   system.planets[0].info.ownerId = 1;
   system.planets[1].info.ownerId = 2;
-  system.planets[1].lastReportData.set(1, {} as never);
 
   const alpha = new Player(1, 'Alpha', [system.planets[0]], new Map(), [], PlayerType.PLAYER);
   const beta = new Player(2, 'Beta', [system.planets[1]], new Map(), [], PlayerType.PLAYER);
@@ -32,6 +31,18 @@ describe('diplomacy commands', () => {
     expect(result.ok).toBe(true);
     expect(galaxy.diplomaticProposals).toHaveLength(1);
     expect(galaxy.diplomaticProposals[0].requestedStatus).toBe(DiplomaticStatus.PEACE);
+  });
+
+  it('allows proposals without prior espionage visibility', () => {
+    const galaxy = createDiplomacyTestGalaxy();
+
+    const result = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1 },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.PEACE }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(galaxy.diplomaticProposals).toHaveLength(1);
   });
 
   it('rejects direct NEUTRAL to ALLIED proposals', () => {
@@ -79,8 +90,6 @@ describe('diplomacy commands', () => {
     system.planets[0].info.ownerId = 1;
     system.planets[1].info.ownerId = 2;
     system.planets[2].info.ownerId = 3;
-    system.planets[1].lastReportData.set(1, {} as never);
-    system.planets[2].lastReportData.set(1, {} as never);
 
     const alpha = new Player(1, 'Alpha', [system.planets[0]], new Map(), [], PlayerType.PLAYER);
     const bot = new Player(2, 'Bot', [system.planets[1]], new Map(), [], PlayerType.BOT);
