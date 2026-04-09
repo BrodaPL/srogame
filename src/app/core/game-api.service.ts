@@ -9,6 +9,7 @@ import {
   GameListResponse,
   GameStateResponse,
   GameSavesResponse,
+  LeaveCurrentMultiplayerGameResponse,
   LoadGameResponse,
   MultiplayerGameBrowserResponse,
   MultiplayerGameDetailResponse,
@@ -167,9 +168,17 @@ export class GameApiService {
     );
   }
 
-  public leaveMultiplayerGame(gameId: string, token: string) {
+  public leaveMultiplayerLobby(gameId: string, token: string) {
     return this.http.post<MultiplayerGameDetailResponse | null>(
-      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/leave`,
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/leave-lobby`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public leaveCurrentMultiplayerGame(gameId: string, token: string) {
+    return this.http.post<LeaveCurrentMultiplayerGameResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/leave-current-game`,
       {},
       { headers: this.authHeaders(token) }
     );

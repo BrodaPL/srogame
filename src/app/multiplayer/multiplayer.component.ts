@@ -24,6 +24,7 @@ import {
   type MultiplayerGameListItem,
   type MultiplayerLobbyDto,
   type MultiplayerLobbyLoadSeatDto,
+  type MultiplayerRunningMemberDto,
   createDefaultBotProfileCounts,
   hasExactBotProfileCountMatch,
   normalizeGalaxySetup
@@ -77,6 +78,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected isActing = false;
   protected error: string | null = null;
   protected infoMessage: string | null = null;
+  protected showOtherGames = false;
   protected selectedSaveId = '';
   protected setupForm: LobbySetupForm = this.createForm(this.defaultSetup());
   private readonly refreshHandle: number;
@@ -119,12 +121,16 @@ export class MultiplayerComponent implements OnDestroy {
     window.clearInterval(this.refreshHandle);
   }
 
-  protected draftLobbies(): MultiplayerGameListItem[] {
-    return this.browserResponse?.draftLobbies ?? [];
+  protected activeDraftLobbies(): MultiplayerGameListItem[] {
+    return this.browserResponse?.activeDraftLobbies ?? [];
   }
 
-  protected runningGames(): MultiplayerGameListItem[] {
-    return this.browserResponse?.runningGames ?? [];
+  protected activeRunningGames(): MultiplayerGameListItem[] {
+    return this.browserResponse?.activeRunningGames ?? [];
+  }
+
+  protected otherMultiplayerGames(): MultiplayerGameListItem[] {
+    return this.browserResponse?.otherMultiplayerGames ?? [];
   }
 
   protected selectedBrowserItem(): MultiplayerGameListItem | null {
@@ -133,7 +139,8 @@ export class MultiplayerComponent implements OnDestroy {
       return null;
     }
 
-    return [...this.draftLobbies(), ...this.runningGames()].find((entry) => entry.gameId === gameId) ?? null;
+    return [...this.activeDraftLobbies(), ...this.activeRunningGames(), ...this.otherMultiplayerGames()]
+      .find((entry) => entry.gameId === gameId) ?? null;
   }
 
   protected selectedLobby(): MultiplayerLobbyDto | null {
@@ -144,12 +151,18 @@ export class MultiplayerComponent implements OnDestroy {
     return this.detailResponse?.game ?? null;
   }
 
+  protected selectedRunningMembers(): MultiplayerRunningMemberDto[] {
+    return this.detailResponse?.runningMembers ?? [];
+  }
+
   protected availableSaves(): GameSaveSummary[] {
     return this.saveResponse?.saves ?? [];
   }
 
   protected hasGames(): boolean {
-    return this.draftLobbies().length > 0 || this.runningGames().length > 0;
+    return this.activeDraftLobbies().length > 0
+      || this.activeRunningGames().length > 0
+      || this.otherMultiplayerGames().length > 0;
   }
 
   protected isSelected(item: MultiplayerGameListItem): boolean {
@@ -272,7 +285,7 @@ export class MultiplayerComponent implements OnDestroy {
     this.isActing = true;
     this.error = null;
     this.infoMessage = null;
-    this.gameApi.leaveMultiplayerGame(gameId, session.token).subscribe({
+    this.gameApi.leaveMultiplayerLobby(gameId, session.token).subscribe({
       next: () => {
         this.isActing = false;
         this.infoMessage = 'Left draft lobby.';
@@ -283,6 +296,37 @@ export class MultiplayerComponent implements OnDestroy {
       error: (error) => {
         this.isActing = false;
         this.error = error?.error?.error ?? 'Unable to leave the draft lobby.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  protected leaveCurrentGame(): void {
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.isActing = true;
+    this.error = null;
+    this.infoMessage = null;
+    this.gameApi.leaveCurrentMultiplayerGame(gameId, session.token).subscribe({
+      next: (response) => {
+        this.isActing = false;
+        this.authState.setSession({
+          ...session,
+          currentGameId: response.currentGameId
+        });
+        this.infoMessage = response.message ?? 'Left current multiplayer game. You can rejoin it later.';
+        this.loadBrowser(false);
+        this.loadSelectedGameDetail(false);
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.isActing = false;
+        this.error = error?.error?.error ?? 'Unable to leave the current multiplayer game.';
         this.cdr.markForCheck();
       }
     });
@@ -466,7 +510,7 @@ export class MultiplayerComponent implements OnDestroy {
 
   protected browserStatusLabel(item: MultiplayerGameListItem): string {
     const sections = [
-      item.status,
+      item.statusLabel,
       `${item.memberCount} member${item.memberCount === 1 ? '' : 's'}`
     ];
     return sections.join(' / ');
@@ -492,6 +536,17 @@ export class MultiplayerComponent implements OnDestroy {
     }
 
     return date.toLocaleString();
+  }
+
+  protected runningMemberStatusLabel(member: MultiplayerRunningMemberDto): string {
+    if (!member.isOfflineBotControlled) {
+      return 'Online / human-controlled';
+    }
+
+    const profileLabel = member.offlineBotProfileId
+      ? this.botProfileLabels[member.offlineBotProfileId]
+      : 'Default';
+    return `Offline, bot-controlled (${profileLabel})`;
   }
 
   protected logout(): void {
@@ -677,8 +732,9 @@ export class MultiplayerComponent implements OnDestroy {
 
   private resolveNextSelectedGameId(response: MultiplayerGameBrowserResponse): string | null {
     const gameIds = new Set([
-      ...response.draftLobbies.map((entry) => entry.gameId),
-      ...response.runningGames.map((entry) => entry.gameId)
+      ...response.activeDraftLobbies.map((entry) => entry.gameId),
+      ...response.activeRunningGames.map((entry) => entry.gameId),
+      ...response.otherMultiplayerGames.map((entry) => entry.gameId)
     ]);
 
     if (this.selectedGameId && gameIds.has(this.selectedGameId)) {
@@ -689,7 +745,10 @@ export class MultiplayerComponent implements OnDestroy {
       return response.selectedGameId;
     }
 
-    return response.draftLobbies[0]?.gameId ?? response.runningGames[0]?.gameId ?? null;
+    return response.activeDraftLobbies[0]?.gameId
+      ?? response.activeRunningGames[0]?.gameId
+      ?? response.otherMultiplayerGames[0]?.gameId
+      ?? null;
   }
 
   private syncSessionCurrentGameId(currentGameId: string | null): void {

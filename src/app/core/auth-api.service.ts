@@ -2,9 +2,16 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { API_BASE_URL } from './api-constants';
 import {
+  AccountSettingsResponse,
   LoginRequest,
+  ResendConfirmationRequest,
+  ResendConfirmationResponse,
   RegisterRequest,
-  PlayerSession
+  RegisterConfigResponse,
+  RegisterResponse,
+  PlayerSession,
+  ResetAccountTutorialsResponse,
+  UpdateAccountPreferencesRequest
 } from '../models/game-api-types';
 
 @Injectable({
@@ -13,8 +20,16 @@ import {
 export class AuthApiService {
   constructor(private readonly http: HttpClient) {}
 
+  public getRegisterConfig() {
+    return this.http.get<RegisterConfigResponse>(`${API_BASE_URL}/auth/register-config`);
+  }
+
   public register(request: RegisterRequest) {
-    return this.http.post<PlayerSession>(`${API_BASE_URL}/auth/register`, request);
+    return this.http.post<RegisterResponse>(`${API_BASE_URL}/auth/register`, request);
+  }
+
+  public resendConfirmation(request: ResendConfirmationRequest) {
+    return this.http.post<ResendConfirmationResponse>(`${API_BASE_URL}/auth/resend-confirmation`, request);
   }
 
   public login(request: LoginRequest) {
@@ -30,6 +45,29 @@ export class AuthApiService {
   public logout(token: string) {
     return this.http.post<void>(
       `${API_BASE_URL}/auth/logout`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getAccountSettings(token: string) {
+    return this.http.get<AccountSettingsResponse>(
+      `${API_BASE_URL}/account/settings`,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public updateAccountPreferences(request: UpdateAccountPreferencesRequest, token: string) {
+    return this.http.post<AccountSettingsResponse>(
+      `${API_BASE_URL}/account/settings/preferences`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public resetAccountTutorials(token: string) {
+    return this.http.post<ResetAccountTutorialsResponse>(
+      `${API_BASE_URL}/account/settings/tutorials/reset`,
       {},
       { headers: this.authHeaders(token) }
     );

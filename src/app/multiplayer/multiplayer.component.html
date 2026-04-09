@@ -6,6 +6,9 @@
       <p class="subtitle">
         Browse many draft lobbies and running multiplayer games. Joining a draft lobby removes you from any other draft lobby.
       </p>
+      <p class="subtitle">
+        If a running multiplayer member enabled logout replacement, their seat can continue as a bot until they return. Players who keep that option disabled may still block ready-state when absent.
+      </p>
     </header>
 
     @if (error) {
@@ -53,27 +56,30 @@
         <section class="multiplayer-browser-section">
           <div class="multiplayer-browser-section__head">
             <div>
-              <p class="saved__title">Draft Lobbies</p>
-              <p class="multiplayer-browser-section__meta">Open multiplayer drafts waiting for players and setup.</p>
+              <p class="saved__title">Active Draft Lobbies</p>
+              <p class="multiplayer-browser-section__meta">Open multiplayer drafts updated within the last hour.</p>
             </div>
           </div>
 
-          @if (isLoadingBrowser && draftLobbies().length === 0) {
+          @if (isLoadingBrowser && activeDraftLobbies().length === 0) {
             <div class="saved">
               <p>Loading draft lobbies.</p>
             </div>
-          } @else if (draftLobbies().length === 0) {
+          } @else if (activeDraftLobbies().length === 0) {
             <div class="saved">
-              <p>No draft lobbies are open right now.</p>
+              <p>No current draft lobbies are open right now.</p>
             </div>
           } @else {
             <div class="multiplayer-browser-list">
-              @for (item of draftLobbies(); track item.gameId) {
+              @for (item of activeDraftLobbies(); track item.gameId) {
                 <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
                   <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
                     <span class="multiplayer-browser-card__title">{{ item.name }}</span>
                     <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
                     <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
+                    @if (item.offlineBotControlledCount > 0) {
+                      <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
+                    }
                     <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
                   </button>
                 </article>
@@ -85,27 +91,30 @@
         <section class="multiplayer-browser-section">
           <div class="multiplayer-browser-section__head">
             <div>
-              <p class="saved__title">Running Games</p>
-              <p class="multiplayer-browser-section__meta">Active multiplayer games you can enter or inspect.</p>
+              <p class="saved__title">Active Running Games</p>
+              <p class="multiplayer-browser-section__meta">Currently loaded multiplayer games you can enter or inspect.</p>
             </div>
           </div>
 
-          @if (isLoadingBrowser && runningGames().length === 0) {
+          @if (isLoadingBrowser && activeRunningGames().length === 0) {
             <div class="saved">
               <p>Loading running multiplayer games.</p>
             </div>
-          } @else if (runningGames().length === 0) {
+          } @else if (activeRunningGames().length === 0) {
             <div class="saved">
               <p>No running multiplayer games are visible to this account yet.</p>
             </div>
           } @else {
             <div class="multiplayer-browser-list">
-              @for (item of runningGames(); track item.gameId) {
+              @for (item of activeRunningGames(); track item.gameId) {
                 <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
                   <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
                     <span class="multiplayer-browser-card__title">{{ item.name }}</span>
                     <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
                     <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
+                    @if (item.offlineBotControlledCount > 0) {
+                      <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
+                    }
                     <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
                   </button>
                   @if (item.canEnter) {
@@ -116,6 +125,47 @@
                 </article>
               }
             </div>
+          }
+        </section>
+
+        <section class="multiplayer-browser-section">
+          <div class="multiplayer-browser-section__head">
+            <div>
+              <p class="saved__title">Other Multiplayer Games</p>
+              <p class="multiplayer-browser-section__meta">Older drafts, saved inactive games, and archived multiplayer records.</p>
+            </div>
+            <button class="start-button multiplayer-browser-section__toggle" type="button" (click)="showOtherGames = !showOtherGames">
+              {{ showOtherGames ? 'Hide other games' : 'Show other games' }}
+            </button>
+          </div>
+
+          @if (showOtherGames) {
+            @if (otherMultiplayerGames().length === 0) {
+              <div class="saved">
+                <p>No other multiplayer games are visible to this account.</p>
+              </div>
+            } @else {
+              <div class="multiplayer-browser-list">
+                @for (item of otherMultiplayerGames(); track item.gameId) {
+                  <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
+                    <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
+                      <span class="multiplayer-browser-card__title">{{ item.name }}</span>
+                      <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                      <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
+                      @if (item.offlineBotControlledCount > 0) {
+                        <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
+                      }
+                      <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                    </button>
+                    @if (item.canEnter) {
+                      <button class="start-button multiplayer-browser-card__action" type="button" (click)="enterRunningGame(item)" [disabled]="isActing">
+                        Enter
+                      </button>
+                    }
+                  </article>
+                }
+              </div>
+            }
           }
         </section>
       </aside>
@@ -149,6 +199,11 @@
                   Enter running game
                 </button>
               }
+              @if (selectedBrowserItem()?.isCurrentGame && !selectedLobby()) {
+                <button class="start-button" type="button" (click)="leaveCurrentGame()" [disabled]="isActing">
+                  Leave current game
+                </button>
+              }
               @if (selectedLobby()?.canJoin) {
                 <button class="start-button" type="button" (click)="joinSelectedLobby()" [disabled]="isActing">
                   Join draft lobby
@@ -164,8 +219,31 @@
 
           @if (!selectedLobby()) {
             <div class="saved">
-              <p class="saved__title">Running Multiplayer Game</p>
-              <p>This game is already running. Use Enter to rejoin it if you have access.</p>
+              <p class="saved__title">{{ selectedBrowserItem()?.statusLabel === 'Saved / Inactive' ? 'Saved / Inactive' : 'Running Multiplayer Game' }}</p>
+              <p>
+                {{
+                  selectedBrowserItem()?.statusLabel === 'Saved / Inactive'
+                    ? 'This multiplayer game is saved but not currently loaded. Ask localAdmin to resume it before entering again.'
+                    : 'This game is already running. Use Enter to rejoin it if you have access.'
+                }}
+              </p>
+              @if (selectedRunningMembers().length > 0) {
+                <div class="multiplayer-member-list">
+                  @for (member of selectedRunningMembers(); track member.accountId) {
+                    <div class="multiplayer-member" [class.multiplayer-member--offline-bot]="member.isOfflineBotControlled">
+                      <strong>{{ member.playerName }}</strong>
+                      <span class="multiplayer-member__status">
+                        <span
+                          class="multiplayer-member__status-pill"
+                          [class.multiplayer-member__status-pill--offline-bot]="member.isOfflineBotControlled">
+                          {{ member.isOfflineBotControlled ? 'Offline bot' : 'Online' }}
+                        </span>
+                        <span>{{ runningMemberStatusLabel(member) }}</span>
+                      </span>
+                    </div>
+                  }
+                </div>
+              }
             </div>
           } @else {
             <div class="multiplayer-detail__grid">
@@ -185,14 +263,23 @@
                   @for (member of selectedLobby()!.members; track member.accountId) {
                     <div class="multiplayer-member">
                       <strong>{{ member.playerName }}</strong>
-                      <span>
+                      <span class="multiplayer-member__status">
+                        <span class="multiplayer-member__status-pill multiplayer-member__status-pill--draft">
+                          {{ member.isReady ? 'Ready' : 'Not ready' }}
+                        </span>
+                        <span>
                         @if (member.isLocalAdmin) {
                           Local Admin /
                         }
-                        {{ member.isReady ? 'Ready' : 'Not ready' }}
+                        {{ member.isReady ? 'Ready for start' : 'Waiting for ready' }}
+                        </span>
                       </span>
                     </div>
                   }
+                </div>
+                <div class="multiplayer-callout">
+                  <p class="multiplayer-callout__title">Logout replacement</p>
+                  <p>Players who enable logout replacement can be temporarily bot-controlled in the running game; disabled players will still block readiness while absent.</p>
                 </div>
 
                 @if (selectedLobby()!.canToggleReady) {

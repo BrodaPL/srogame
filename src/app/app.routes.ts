@@ -25,6 +25,7 @@ import { HelpAboutComponent } from './help-about/help-about.component';
 import { LoadGameComponent } from './load-game/load-game.component';
 import { MainMenuComponent } from './main-menu/main-menu.component';
 import { MultiplayerComponent } from './multiplayer/multiplayer.component';
+import { SettingsComponent } from './settings/settings.component';
 import { GalaxySetupComponent } from './setup/galaxy.setup.component';
 
 export const routes: Routes = [
@@ -33,6 +34,7 @@ export const routes: Routes = [
   { path: 'setup', component: GalaxySetupComponent },
   { path: 'load', component: LoadGameComponent },
   { path: 'multiplayer', component: MultiplayerComponent },
+  { path: 'settings', component: SettingsComponent },
   { path: 'help', component: HelpAboutComponent },
   { path: 'encyclopedia', component: EncyclopediaMenuComponent },
   { path: 'encyclopedia/ships', component: EncyclopediaShipsComponent },

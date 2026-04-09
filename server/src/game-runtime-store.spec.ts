@@ -32,7 +32,8 @@ describe('game-runtime-store', () => {
         lastTouchedAt: '2026-04-09T10:00:00.000Z',
         isDirty: false,
         currentTurnReadyPlayerIds: new Set([1]),
-        isTurnProcessing: false
+        isTurnProcessing: false,
+        offlineBotControlledPlayerIds: new Set<number>()
       });
 
       updateGameRuntime('game-a', {

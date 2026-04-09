@@ -82,8 +82,10 @@ import {
   upsertMultiplayerLobby
 } from './multiplayer-lobby-store.js';
 import {
+  deleteGameRuntime,
   getGameRuntime,
   hasGameRuntime,
+  listLoadedGameIds,
   setGameRuntime,
   updateGameRuntime
 } from './game-runtime-store.js';
@@ -101,11 +103,27 @@ import {
   setMultiplayerLobbyMemberReady,
   updateMultiplayerLobbySetup
 } from './multiplayer-lobby.js';
+import { reconcileOfflineBotControlledSeats } from './offline-bot-control.js';
 import {
   areAllHumanPlayersReady,
   buildTurnStatusResponse,
   requiresAllPlayersReady
 } from './active-game-turn.js';
+import {
+  buildResendConfirmationCooldownMessage,
+  buildLockedAccountMessage,
+  canResendConfirmation,
+  cleanupExpiredPendingAccounts,
+  clearExpiredLoginLock,
+  clearLoginFailureState,
+  DEFAULT_MAX_PASSWORD_RETRY_ATTEMPTS,
+  DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS,
+  getLoginBlockResponse,
+  getResendConfirmationNextAllowedAt,
+  markConfirmationResent,
+  registerFailedPasswordAttempt
+} from './auth-account-security.js';
+import { consumeRateLimit } from './auth-rate-limit.js';
 import { clearBotDecisionTraces, getBotDecisionTraces } from './bots/bot-debug-store.js';
 import {
   clearBotMemory,
@@ -117,6 +135,7 @@ import {
   toBotAdminState
 } from './bots/bot-admin.js';
 import { BOT_PROFILE_IDS } from './bots/bot-profile.js';
+import { buildRegisterConfigResponse, verifyTurnstileToken } from './turnstile.js';
 import { startBuildingConstruction } from './game-commands/building-commands.js';
 import { runBotTurnPhase } from './bots/bot-turn-runner.js';
 import {
@@ -156,6 +175,8 @@ import type {
   EndTurnResponse,
   TurnStatusResponse,
   CurrentGameStatusResponse,
+  AccountStatus,
+  AccountSettingsResponse,
   GameListResponse,
   GameSavesResponse,
   GameSummary,
@@ -188,7 +209,13 @@ import type {
   PlayerNameEntry,
   LoginRequest,
   RegisterRequest,
+  RegisterConfigResponse,
+  ResendConfirmationRequest,
+  ResendConfirmationResponse,
+  RegisterResponse,
+  ResetAccountTutorialsResponse,
   UpsertStarSystemNoteRequest,
+  UpdateAccountPreferencesRequest,
   UpdateBotProfileRequest,
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
@@ -236,6 +263,8 @@ import type {
   SendMailMessageResponse,
   MultiplayerGameBrowserResponse,
   MultiplayerGameDetailResponse,
+  LeaveCurrentMultiplayerGameResponse,
+  MultiplayerRunningMemberDto,
   UpdateMultiplayerLobbySetupRequest,
   ToggleMultiplayerLobbyReadyRequest,
   AssignMultiplayerLobbySeatRequest,
@@ -435,7 +464,7 @@ const { SensorPhalanxReport: SensorPhalanxReportModel } = sensorPhalanxReportMod
 const { ResourcesPack } = resourcesPackModule as {
   ResourcesPack: typeof import('../../src/app/models/resources-pack.js').ResourcesPack;
 };
-const app = express();
+export const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN?.trim();
 
@@ -444,30 +473,29 @@ if (FRONTEND_ORIGIN) {
 }
 app.use(express.json());
 
-const AUTH_DATA_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../data/auth.json'
-);
-const GAME_REGISTRY_DATA_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../data/games.json'
-);
-const GAME_MEMBERSHIPS_DATA_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../data/game-memberships.json'
-);
-const MULTIPLAYER_LOBBY_STORE_DATA_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../data/multiplayer-lobbies.json'
-);
-const GAME_SAVES_DIRECTORY_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../data/saves'
-);
+function resolveDataPath(envName: string, relativeFallbackPath: string): string {
+  const override = process.env[envName]?.trim();
+  if (override) {
+    return path.resolve(override);
+  }
+
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), relativeFallbackPath);
+}
+
+const AUTH_DATA_PATH = resolveDataPath('SROGAME_AUTH_DATA_PATH', '../data/auth.json');
+const GAME_REGISTRY_DATA_PATH = resolveDataPath('SROGAME_GAME_REGISTRY_DATA_PATH', '../data/games.json');
+const GAME_MEMBERSHIPS_DATA_PATH = resolveDataPath('SROGAME_GAME_MEMBERSHIPS_DATA_PATH', '../data/game-memberships.json');
+const MULTIPLAYER_LOBBY_STORE_DATA_PATH = resolveDataPath('SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH', '../data/multiplayer-lobbies.json');
+const GAME_SAVES_DIRECTORY_PATH = resolveDataPath('SROGAME_GAME_SAVES_DIRECTORY_PATH', '../data/saves');
 const PLAYER_NAME_MIN = 3;
 const PLAYER_NAME_MAX = 24;
 const PASSWORD_MIN = 6;
 const PASSWORD_MAX = 72;
+const PENDING_CONFIRMATION_LIFETIME_MS = 30 * 60 * 1000;
+const REGISTER_RATE_LIMIT = { limit: 5, windowMs: 60 * 60 * 1000 };
+const LOGIN_RATE_LIMIT = { limit: 20, windowMs: 15 * 60 * 1000 };
+const RESEND_CONFIRMATION_RATE_LIMIT = { limit: 5, windowMs: 60 * 60 * 1000 };
+const ACCOUNT_MUTATION_RATE_LIMIT = { limit: 30, windowMs: 15 * 60 * 1000 };
 const PLAYER_TYPE_PLAYER = 'PLAYER' as const;
 const PLAYER_TYPE_NEUTRAL = 'NEUTRAL' as const;
 const SELF_REPORT_LEVEL = 999;
@@ -520,25 +548,73 @@ let currentGameSetup: GalaxySetup | null = null;
 let currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
 let isTurnProcessing = false;
 let currentTurnReadyPlayerIds = new Set<number>();
+const ACTIVE_MULTIPLAYER_DRAFT_WINDOW_MS = 60 * 60 * 1000;
 
 function resetActiveTurnState(): void {
   currentTurnReadyPlayerIds = new Set<number>();
   isTurnProcessing = false;
 }
 
-app.post('/api/auth/register', (req, res) => {
+function clearMountedRuntimeState(): void {
+  currentGalaxy = null;
+  currentRuntimeGameId = null;
+  currentGameOwnerId = null;
+  currentGameOwnerPlayerName = null;
+  currentGameSetup = null;
+  currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
+  resetActiveTurnState();
+}
+
+function moveMountedRuntimeAwayFromGame(gameId: string): void {
+  if (currentRuntimeGameId !== gameId) {
+    return;
+  }
+
+  clearMountedRuntimeState();
+  const fallbackRuntimeId = listLoadedGameIds().find((loadedGameId) => loadedGameId !== gameId) ?? null;
+  if (fallbackRuntimeId) {
+    switchCurrentRuntime(fallbackRuntimeId);
+  }
+}
+
+app.get('/api/auth/register-config', (_req, res) => {
+  const response: RegisterConfigResponse = buildRegisterConfigResponse();
+  return res.status(200).json(response);
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  const registerRateLimit = consumeRateLimit('auth-register', getRequestIdentity(req), REGISTER_RATE_LIMIT);
+  if (!registerRateLimit.allowed) {
+    return res.status(429).json({ error: `Too many registration attempts. Try again in ${registerRateLimit.retryAfterSeconds} seconds.` });
+  }
+
   const body = req.body as RegisterRequest | undefined;
   const playerName = normalizePlayerName(body?.playerName);
+  const email = normalizeEmail(body?.email);
   const password = normalizePassword(body?.password);
 
-  if (!playerName || !password) {
-    return res.status(400).json({ error: 'Invalid player name or password.' });
+  if (!playerName || !email || !password) {
+    return res.status(400).json({ error: 'Invalid player name, email, or password.' });
+  }
+
+  const data = loadAuthData();
+  if (cleanupExpiredPendingAccounts(data)) {
+    saveAuthData(data);
   }
 
   const playerNameKey = toPlayerNameKey(playerName);
-  const data = loadAuthData();
+  const emailKey = toEmailKey(email);
   if (data.accounts.some((account) => account.playerNameKey === playerNameKey)) {
     return res.status(409).json({ error: 'User already exists.' });
+  }
+  if (data.accounts.some((account) => account.emailKey && account.emailKey === emailKey)) {
+    return res.status(409).json({ error: 'Email already exists.' });
+  }
+
+  const turnstileToken = typeof body?.turnstileToken === 'string' ? body.turnstileToken : null;
+  const turnstile = await verifyTurnstileToken(turnstileToken, getRequestIdentity(req));
+  if (!turnstile.ok) {
+    return res.status(400).json({ error: turnstile.error ?? 'CAPTCHA verification failed.' });
   }
 
   const now = new Date().toISOString();
@@ -546,22 +622,92 @@ app.post('/api/auth/register', (req, res) => {
     id: data.nextAccountId,
     playerName,
     playerNameKey,
+    email,
+    emailKey,
     passwordHash: hashPassword(password),
+    status: 'PENDING_CONFIRMATION' as AccountStatus,
     localAdmin: false,
     createdAt: now,
+    emailConfirmedAt: null,
+    confirmationExpiresAt: new Date(Date.parse(now) + PENDING_CONFIRMATION_LIFETIME_MS).toISOString(),
+    lastConfirmationSentAt: now,
+    lastPasswordResetRequestedAt: null,
+    failedLoginAttempts: 0,
+    loginLockedUntil: null,
+    replaceWithBotOnLogout: false,
+    logoutBotProfileId: null,
+    language: null,
     currentGameId: null
   };
 
   data.nextAccountId += 1;
   data.accounts.push(account);
-
-  const session = createSession(data, account, now);
   saveAuthData(data);
 
-  return res.status(201).json(toPlayerSession(session));
+  const response: RegisterResponse = {
+    playerName: account.playerName,
+    email: account.email,
+    accountStatus: account.status,
+    requiresConfirmation: true,
+    confirmationExpiresAt: account.confirmationExpiresAt,
+    message: 'Account created. Email confirmation is required before login. For now activation must be completed manually on the server.'
+  };
+  return res.status(201).json(response);
+});
+
+app.post('/api/auth/resend-confirmation', (req, res) => {
+  const resendRateLimit = consumeRateLimit('auth-resend-confirmation', getRequestIdentity(req), RESEND_CONFIRMATION_RATE_LIMIT);
+  if (!resendRateLimit.allowed) {
+    return res.status(429).json({ error: `Too many confirmation resend attempts. Try again in ${resendRateLimit.retryAfterSeconds} seconds.` });
+  }
+
+  const body = req.body as ResendConfirmationRequest | undefined;
+  const email = normalizeEmail(body?.email);
+  if (!email) {
+    return res.status(400).json({ error: 'Invalid email.' });
+  }
+
+  const data = loadAuthData();
+  if (cleanupExpiredPendingAccounts(data)) {
+    saveAuthData(data);
+  }
+
+  const emailKey = toEmailKey(email);
+  const account = data.accounts.find((entry) => entry.emailKey === emailKey);
+  const genericResponse: ResendConfirmationResponse = {
+    message: 'If a pending account exists for that email, the confirmation window was refreshed. Email delivery is not configured yet on this server; activation must still be completed manually on the server.',
+    confirmationExpiresAt: null,
+    nextAllowedAt: null
+  };
+
+  if (!account || account.status !== 'PENDING_CONFIRMATION') {
+    return res.status(200).json(genericResponse);
+  }
+
+  const nowMs = Date.now();
+  if (!canResendConfirmation(account, nowMs, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS)) {
+    return res.status(429).json({
+      error: buildResendConfirmationCooldownMessage(account, nowMs, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS),
+      nextAllowedAt: getResendConfirmationNextAllowedAt(account, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS)
+    });
+  }
+
+  const updated = markConfirmationResent(account, nowMs, PENDING_CONFIRMATION_LIFETIME_MS);
+  saveAuthData(data);
+  const response: ResendConfirmationResponse = {
+    message: genericResponse.message,
+    confirmationExpiresAt: updated.confirmationExpiresAt,
+    nextAllowedAt: getResendConfirmationNextAllowedAt(account, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS)
+  };
+  return res.status(200).json(response);
 });
 
 app.post('/api/auth/login', (req, res) => {
+  const loginRateLimit = consumeRateLimit('auth-login', getRequestIdentity(req), LOGIN_RATE_LIMIT);
+  if (!loginRateLimit.allowed) {
+    return res.status(429).json({ error: `Too many login attempts. Try again in ${loginRateLimit.retryAfterSeconds} seconds.` });
+  }
+
   const body = req.body as LoginRequest | undefined;
   const playerName = normalizePlayerName(body?.playerName);
   const password = normalizePassword(body?.password);
@@ -571,16 +717,36 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const data = loadAuthData();
+  if (cleanupExpiredPendingAccounts(data)) {
+    saveAuthData(data);
+  }
+  const nowMs = Date.now();
   const playerNameKey = toPlayerNameKey(playerName);
   const account = data.accounts.find((entry) => entry.playerNameKey === playerNameKey);
   if (!account) {
     return res.status(404).json({ error: 'No such user.' });
   }
+  if (clearExpiredLoginLock(account, nowMs)) {
+    saveAuthData(data);
+  }
+  const loginBlock = getLoginBlockResponse(account, nowMs);
+  if (loginBlock) {
+    return res.status(loginBlock.status).json({ error: loginBlock.error });
+  }
   if (!verifyPassword(password, account.passwordHash)) {
-    return res.status(401).json({ error: 'Wrong password.' });
+    const lockedUntil = registerFailedPasswordAttempt(account, nowMs);
+    saveAuthData(data);
+    if (lockedUntil) {
+      return res.status(423).json({ error: buildLockedAccountMessage(account, nowMs) });
+    }
+    const attemptsLeft = Math.max(0, DEFAULT_MAX_PASSWORD_RETRY_ATTEMPTS - account.failedLoginAttempts);
+    return res.status(401).json({
+      error: `Wrong password. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} left before a 10 minute lock.`
+    });
   }
 
   const now = new Date().toISOString();
+  clearLoginFailureState(account);
   const session = createSession(data, account, now);
   saveAuthData(data);
 
@@ -588,6 +754,10 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', (req, res) => {
+  const data = loadAuthData();
+  if (cleanupExpiredPendingAccounts(data)) {
+    saveAuthData(data);
+  }
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
@@ -603,10 +773,111 @@ app.post('/api/auth/logout', (req, res) => {
   }
 
   const data = loadAuthData();
+  cleanupExpiredPendingAccounts(data);
   data.sessions = data.sessions.filter((session) => session.token !== token);
   saveAuthData(data);
 
   return res.status(204).send();
+});
+
+app.get('/api/account/settings', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (cleanupExpiredPendingAccounts(auth.data)) {
+    saveAuthData(auth.data);
+  }
+
+  const account = auth.data.accounts.find((entry) => entry.id === auth.session.accountId);
+  if (!account) {
+    return res.status(404).json({ error: 'Account not found.' });
+  }
+
+  return res.status(200).json(buildAccountSettingsResponse(account));
+});
+
+app.post('/api/account/settings/preferences', (req, res) => {
+  const rateLimit = consumeRateLimit('account-settings', getRequestIdentity(req), ACCOUNT_MUTATION_RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ error: `Too many settings updates. Try again in ${rateLimit.retryAfterSeconds} seconds.` });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (cleanupExpiredPendingAccounts(auth.data)) {
+    saveAuthData(auth.data);
+  }
+
+  const account = auth.data.accounts.find((entry) => entry.id === auth.session.accountId);
+  if (!account) {
+    return res.status(404).json({ error: 'Account not found.' });
+  }
+
+  const body = req.body as UpdateAccountPreferencesRequest | undefined;
+  const replaceWithBotOnLogout = body?.replaceWithBotOnLogout === true;
+  const logoutBotProfileId = normalizeBotProfileId(body?.logoutBotProfileId);
+  if (replaceWithBotOnLogout && !logoutBotProfileId) {
+    return res.status(400).json({ error: 'A valid bot profile is required when bot replacement is enabled.' });
+  }
+
+  const language = normalizeLanguagePreference(body?.language);
+  account.replaceWithBotOnLogout = replaceWithBotOnLogout;
+  account.logoutBotProfileId = logoutBotProfileId;
+  account.language = language;
+  saveAuthData(auth.data);
+
+  return res.status(200).json(buildAccountSettingsResponse(account));
+});
+
+app.post('/api/account/settings/tutorials/reset', (req, res) => {
+  const rateLimit = consumeRateLimit('account-settings', getRequestIdentity(req), ACCOUNT_MUTATION_RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ error: `Too many settings updates. Try again in ${rateLimit.retryAfterSeconds} seconds.` });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (cleanupExpiredPendingAccounts(auth.data)) {
+    saveAuthData(auth.data);
+  }
+
+  const account = auth.data.accounts.find((entry) => entry.id === auth.session.accountId);
+  if (!account) {
+    return res.status(404).json({ error: 'Account not found.' });
+  }
+
+  let playerSession = toPlayerSession(auth.session, null);
+  const access = auth.session.currentGameId
+    ? resolveAuthenticatedGameAccessForGame(req, auth.session.currentGameId)
+    : { status: 400, error: 'No current game selected.' as string };
+  if (!('error' in access)) {
+    const player = resolvePlayerById(access.galaxy, access.playerId);
+    if (player) {
+      player.tutorialRead = createTutorialReadState(false);
+    }
+    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(access.galaxy);
+    playerSession = toPlayerSession(access.auth.session, access.galaxy);
+  } else {
+    playerSession = {
+      ...playerSession,
+      tutorialRead: createTutorialReadState(false)
+    };
+  }
+
+  const response: ResetAccountTutorialsResponse = {
+    settings: buildAccountSettingsResponse(account),
+    player: playerSession,
+    message: 'Tutorial progress was reset for your current session.'
+  };
+  return res.status(200).json(response);
 });
 
 app.get('/api/games', (req, res) => {
@@ -958,7 +1229,7 @@ app.post('/api/multiplayer/games/:gameId/join', (req, res) => {
   return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
 });
 
-app.post('/api/multiplayer/games/:gameId/leave', (req, res) => {
+app.post(['/api/multiplayer/games/:gameId/leave', '/api/multiplayer/games/:gameId/leave-lobby'], (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
@@ -997,6 +1268,54 @@ app.post('/api/multiplayer/games/:gameId/leave', (req, res) => {
   });
 
   return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
+});
+
+app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING') {
+    return res.status(404).json({ error: 'Running multiplayer game not found.' });
+  }
+
+  if (!isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, req.params.gameId, auth.session.accountId)) {
+    return res.status(403).json({ error: 'Join the multiplayer game first.' });
+  }
+
+  const runtime = getGameRuntime(req.params.gameId);
+  if (!runtime) {
+    setAccountCurrentGameId(auth.data, auth.session.accountId, null);
+    saveAuthData(auth.data);
+    const response: LeaveCurrentMultiplayerGameResponse = {
+      currentGameId: null,
+      message: null
+    };
+    return res.status(200).json(response);
+  }
+
+  setAccountCurrentGameId(auth.data, auth.session.accountId, null);
+  auth.session.currentGameId = null;
+
+  reconcileOfflineBotControlledSeatsForRuntime(req.params.gameId, runtime, auth.data);
+
+  const onlineHumanCount = countOnlineHumanMembersForGame(auth.data, req.params.gameId);
+  let message: string | null = null;
+  if (onlineHumanCount < 2) {
+    saveAndUnloadRunningMultiplayerGame(req.params.gameId, runtime, record);
+    message = 'Not enough online players, saving and stopping the game.';
+  } else {
+    moveMountedRuntimeAwayFromGame(req.params.gameId);
+  }
+
+  saveAuthData(auth.data);
+  const response: LeaveCurrentMultiplayerGameResponse = {
+    currentGameId: null,
+    message
+  };
+  return res.status(200).json(response);
 });
 
 app.post('/api/multiplayer/games/:gameId/ready', (req, res) => {
@@ -3144,18 +3463,38 @@ app.get('/api/health', (_req, res) => {
   return res.status(200).json({ status: 'ok' });
 });
 
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`SroGame server listening on http://localhost:${PORT}`);
-});
+const isMainModule = process.argv[1]
+  ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  : false;
+
+if (isMainModule) {
+  const server = app.listen(PORT, () => {
+    const address = server.address();
+    const actualPort = typeof address === 'object' && address ? address.port : PORT;
+    // eslint-disable-next-line no-console
+    console.log(`SroGame server listening on http://localhost:${actualPort}`);
+  });
+}
 
 type AuthAccount = {
   id: number;
   playerName: string;
   playerNameKey: string;
+  email: string;
+  emailKey: string;
   passwordHash: string;
+  status: AccountStatus;
   localAdmin: boolean;
   createdAt: string;
+  emailConfirmedAt: string | null;
+  confirmationExpiresAt: string | null;
+  lastConfirmationSentAt: string | null;
+  lastPasswordResetRequestedAt: string | null;
+  failedLoginAttempts: number;
+  loginLockedUntil: string | null;
+  replaceWithBotOnLogout: boolean;
+  logoutBotProfileId: BotProfileId | null;
+  language: 'en' | 'pl' | null;
   currentGameId: string | null;
 };
 
@@ -3192,6 +3531,24 @@ function toPlayerNameKey(playerName: string): string {
   return playerName.trim().toLowerCase();
 }
 
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 320) {
+    return null;
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailPattern.test(trimmed) ? trimmed : null;
+}
+
+function toEmailKey(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 function normalizePassword(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -3202,6 +3559,16 @@ function normalizePassword(value: unknown): string | null {
   }
 
   return value;
+}
+
+function normalizeAccountStatus(value: unknown, fallback: AccountStatus = 'ACTIVE'): AccountStatus {
+  return value === 'PENDING_CONFIRMATION' || value === 'ACTIVE'
+    ? value
+    : fallback;
+}
+
+function normalizeLanguagePreference(value: unknown): 'en' | 'pl' | null {
+  return value === 'en' || value === 'pl' ? value : null;
 }
 
 function hashPassword(password: string): string {
@@ -3247,7 +3614,47 @@ function loadAuthData(): AuthData {
       if (typeof account.playerName === 'string') {
         account.playerNameKey = toPlayerNameKey(account.playerName);
       }
+      const createdAtMs = Date.parse(account.createdAt);
+      const normalizedCreatedAt = Number.isFinite(createdAtMs)
+        ? new Date(createdAtMs).toISOString()
+        : new Date().toISOString();
+      const normalizedCreatedAtMs = Number.isFinite(createdAtMs)
+        ? createdAtMs
+        : Date.parse(normalizedCreatedAt);
+      account.createdAt = normalizedCreatedAt;
+      account.email = typeof account.email === 'string' ? account.email.trim() : '';
+      account.emailKey = account.email ? toEmailKey(account.email) : '';
+      account.status = normalizeAccountStatus(account.status, 'ACTIVE');
       account.localAdmin = account.localAdmin === true;
+      account.emailConfirmedAt = typeof account.emailConfirmedAt === 'string' && account.emailConfirmedAt.trim()
+        ? account.emailConfirmedAt
+        : account.status === 'ACTIVE' && account.email
+          ? normalizedCreatedAt
+          : null;
+      account.confirmationExpiresAt = typeof account.confirmationExpiresAt === 'string' && account.confirmationExpiresAt.trim()
+        ? account.confirmationExpiresAt
+        : account.status === 'PENDING_CONFIRMATION'
+          ? new Date(normalizedCreatedAtMs + PENDING_CONFIRMATION_LIFETIME_MS).toISOString()
+          : null;
+      account.lastConfirmationSentAt = typeof account.lastConfirmationSentAt === 'string' && account.lastConfirmationSentAt.trim()
+        ? account.lastConfirmationSentAt
+        : account.status === 'PENDING_CONFIRMATION'
+          ? normalizedCreatedAt
+          : null;
+      account.lastPasswordResetRequestedAt = typeof account.lastPasswordResetRequestedAt === 'string'
+        && account.lastPasswordResetRequestedAt.trim()
+        ? account.lastPasswordResetRequestedAt
+        : null;
+      account.failedLoginAttempts = Number.isInteger(account.failedLoginAttempts)
+        ? Math.max(0, account.failedLoginAttempts)
+        : 0;
+      account.loginLockedUntil = typeof account.loginLockedUntil === 'string' && account.loginLockedUntil.trim()
+        ? account.loginLockedUntil
+        : null;
+      clearExpiredLoginLock(account);
+      account.replaceWithBotOnLogout = account.replaceWithBotOnLogout === true;
+      account.logoutBotProfileId = normalizeBotProfileId(account.logoutBotProfileId);
+      account.language = normalizeLanguagePreference(account.language);
       account.currentGameId = typeof account.currentGameId === 'string' && account.currentGameId.trim()
         ? account.currentGameId
         : null;
@@ -3324,6 +3731,63 @@ function saveCurrentGameSnapshot(): void {
     currentSaveId: summary.saveId,
     lastSavedAt: summary.savedAt,
     updatedAt: summary.savedAt
+  });
+}
+
+function saveRuntimeSnapshot(
+  gameId: string,
+  runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
+  ownerAccountId: number
+): void {
+  const summary = writeRotatingAutoSave(
+    GAME_SAVES_DIRECTORY_PATH,
+    runtime.galaxy,
+    ownerAccountId,
+    runtime.setup,
+    {
+      rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
+      maxSaveFiles: MAX_GAME_SAVE_FILES,
+      gameId
+    }
+  );
+
+  updateGameRecord(GAME_REGISTRY_DATA_PATH, gameId, {
+    currentTurn: runtime.galaxy.currentTurn,
+    currentSaveId: summary.saveId,
+    lastSavedAt: summary.savedAt,
+    updatedAt: summary.savedAt
+  });
+}
+
+function countOnlineHumanMembersForGame(authData: AuthData, gameId: string): number {
+  const activeMembershipAccountIds = new Set(
+    listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId)
+      .filter((entry) => entry.isActive)
+      .map((entry) => entry.accountId)
+  );
+  const onlineAccountIds = new Set(
+    authData.sessions
+      .filter((session) => session.currentGameId === gameId && activeMembershipAccountIds.has(session.accountId))
+      .map((session) => session.accountId)
+  );
+  return onlineAccountIds.size;
+}
+
+function saveAndUnloadRunningMultiplayerGame(
+  gameId: string,
+  runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
+  record: NonNullable<ReturnType<typeof getGameById>>
+): void {
+  const ownerAccountId = record.ownerAccountId ?? record.hostAccountId;
+  if (ownerAccountId !== null) {
+    saveRuntimeSnapshot(gameId, runtime, ownerAccountId);
+  }
+
+  deleteGameRuntime(gameId);
+  moveMountedRuntimeAwayFromGame(gameId);
+
+  updateGameRecord(GAME_REGISTRY_DATA_PATH, gameId, {
+    updatedAt: new Date().toISOString()
   });
 }
 
@@ -3420,7 +3884,8 @@ function persistCurrentRuntimeStoreState(): void {
       lastTouchedAt: now,
       isDirty: false,
       currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
-      isTurnProcessing
+      isTurnProcessing,
+      offlineBotControlledPlayerIds: new Set<number>()
     });
     return;
   }
@@ -3430,6 +3895,7 @@ function persistCurrentRuntimeStoreState(): void {
     setup: currentGameSetup,
     presentationByPlayer: currentGalaxyPresentationByPlayer,
     currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
+    offlineBotControlledPlayerIds: new Set(existingRuntime.offlineBotControlledPlayerIds),
     isTurnProcessing,
     isDirty: false
   });
@@ -3525,6 +3991,30 @@ function buildCurrentGameStatusResponse(session: AuthSession): CurrentGameStatus
   };
 }
 
+function buildAccountSettingsResponse(account: AuthAccount): AccountSettingsResponse {
+  const currentGameRecord = account.currentGameId
+    ? getGameById(GAME_REGISTRY_DATA_PATH, account.currentGameId)
+    : null;
+
+  return {
+    playerName: account.playerName,
+    email: account.email,
+    accountStatus: account.status,
+    emailConfirmed: account.emailConfirmedAt !== null && account.status === 'ACTIVE',
+    emailConfirmedAt: account.emailConfirmedAt,
+    accountCreatedAt: account.createdAt,
+    localAdmin: account.localAdmin === true,
+    currentGameId: account.currentGameId,
+    currentGameName: currentGameRecord?.name ?? null,
+    replaceWithBotOnLogout: account.replaceWithBotOnLogout === true,
+    logoutBotProfileId: account.logoutBotProfileId,
+    language: account.language,
+    forgotPasswordEnabled: false,
+    forgotPasswordAvailableAt: account.lastPasswordResetRequestedAt,
+    forgotPasswordInfo: 'Password reset by email is not available yet.'
+  };
+}
+
 function buildGameSummary(record: ReturnType<typeof listGames>[number], session: AuthSession | null): GameSummary {
   const canView = !!session && canSessionViewGameRecord(record.gameId, session);
   const isCurrentGame = session?.currentGameId === record.gameId;
@@ -3548,22 +4038,27 @@ function buildGameSummary(record: ReturnType<typeof listGames>[number], session:
 }
 
 function buildMultiplayerGameBrowserResponse(session: AuthSession | null): MultiplayerGameBrowserResponse {
+  const nowMs = Date.now();
   const multiplayerRecords = listGames(GAME_REGISTRY_DATA_PATH)
-    .filter((record) => record.kind === 'MULTIPLAYER');
-  const draftLobbies = multiplayerRecords
-    .filter((record) => record.status === 'DRAFT')
+    .filter((record) => record.kind === 'MULTIPLAYER')
+    .filter((record) => canSessionViewMultiplayerBrowserRecord(record, session));
+  const activeDraftLobbies = multiplayerRecords
+    .filter((record) => isActiveDraftLobbyForBrowser(record, nowMs))
     .map((record) => buildMultiplayerGameListItem(record, session));
-  const runningGames = multiplayerRecords
-    .filter((record) => record.status === 'RUNNING')
-    .filter((record) => session?.localAdmin === true || (session ? canSessionViewGameRecord(record.gameId, session) : false))
+  const activeRunningGames = multiplayerRecords
+    .filter((record) => isActiveRunningMultiplayerGameForBrowser(record))
+    .map((record) => buildMultiplayerGameListItem(record, session));
+  const otherMultiplayerGames = multiplayerRecords
+    .filter((record) => !isActiveDraftLobbyForBrowser(record, nowMs) && !isActiveRunningMultiplayerGameForBrowser(record))
     .map((record) => buildMultiplayerGameListItem(record, session));
   const selectedRecord = session?.currentGameId
     ? multiplayerRecords.find((record) => record.gameId === session.currentGameId) ?? null
     : null;
 
   return {
-    draftLobbies,
-    runningGames,
+    activeDraftLobbies,
+    activeRunningGames,
+    otherMultiplayerGames,
     selectedGameId: selectedRecord?.gameId ?? null,
     isLoggedIn: !!session,
     currentAccountId: session?.accountId ?? null,
@@ -3587,6 +4082,7 @@ function buildMultiplayerGameDetailResponse(
   }
 
   const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
+  const runtime = getGameRuntime(gameId);
   return {
     game: buildGameSummary(record, session),
     lobby: lobby
@@ -3595,14 +4091,17 @@ function buildMultiplayerGameDetailResponse(
         session?.accountId ?? null,
         session?.localAdmin === true
       )
-      : null
+      : null,
+    runningMembers: record.status === 'RUNNING'
+      ? buildRunningMultiplayerMembers(record.gameId, runtime)
+      : []
   };
 }
 
 function buildMultiplayerGameListItem(
   record: ReturnType<typeof listGames>[number],
   session: AuthSession | null
-): MultiplayerGameBrowserResponse['draftLobbies'][number] {
+): MultiplayerGameBrowserResponse['activeDraftLobbies'][number] {
   const lobby = record.status === 'DRAFT'
     ? getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId)
     : null;
@@ -3616,13 +4115,18 @@ function buildMultiplayerGameListItem(
       ? lobby.members.some((member) => member.accountId === session.accountId)
       : isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId, session.accountId)
   );
+  const runtime = record.status === 'RUNNING'
+    ? getGameRuntime(record.gameId)
+    : null;
   return {
     gameId: record.gameId,
     name: record.name,
     status: record.status,
+    statusLabel: buildMultiplayerGameStatusLabel(record),
     hostAccountId: record.hostAccountId,
     hostPlayerName: record.hostPlayerName,
     memberCount: membershipCount,
+    offlineBotControlledCount: runtime?.offlineBotControlledPlayerIds.size ?? 0,
     isMember,
     isCurrentGame: session?.currentGameId === record.gameId,
     canJoin: record.status === 'DRAFT' && !!session && !isMember,
@@ -3630,6 +4134,67 @@ function buildMultiplayerGameListItem(
     canManage: session?.localAdmin === true && (record.status !== 'DRAFT' || record.hostAccountId === session.accountId),
     updatedAt: record.updatedAt
   };
+}
+
+function canSessionViewMultiplayerBrowserRecord(
+  record: ReturnType<typeof listGames>[number],
+  session: AuthSession | null
+): boolean {
+  if (record.status === 'DRAFT') {
+    return true;
+  }
+
+  return session?.localAdmin === true || (session ? canSessionViewGameRecord(record.gameId, session) : false);
+}
+
+function isActiveDraftLobbyForBrowser(record: ReturnType<typeof listGames>[number], nowMs: number): boolean {
+  if (record.status !== 'DRAFT') {
+    return false;
+  }
+
+  const updatedAtMs = Date.parse(record.updatedAt);
+  if (Number.isNaN(updatedAtMs)) {
+    return false;
+  }
+
+  return nowMs - updatedAtMs <= ACTIVE_MULTIPLAYER_DRAFT_WINDOW_MS;
+}
+
+function isActiveRunningMultiplayerGameForBrowser(record: ReturnType<typeof listGames>[number]): boolean {
+  return record.status === 'RUNNING' && hasGameRuntime(record.gameId);
+}
+
+function buildMultiplayerGameStatusLabel(record: ReturnType<typeof listGames>[number]): string {
+  if (record.status === 'RUNNING' && !hasGameRuntime(record.gameId)) {
+    return 'Saved / Inactive';
+  }
+
+  return record.status;
+}
+
+function buildRunningMultiplayerMembers(
+  gameId: string,
+  runtime: ReturnType<typeof getGameRuntime>
+): MultiplayerRunningMemberDto[] {
+  const memberships = listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId)
+    .filter((entry) => entry.isActive)
+    .sort((left, right) => left.joinedAt.localeCompare(right.joinedAt) || left.accountId - right.accountId);
+  const offlineBotControlledPlayerIds = runtime?.offlineBotControlledPlayerIds ?? new Set<number>();
+
+  return memberships.map((membership) => {
+    const playerId = runtime?.galaxy.playerNameMap.get(membership.playerName) ?? null;
+    const player = playerId !== null && runtime
+      ? resolvePlayerById(runtime.galaxy, playerId)
+      : null;
+    const isOfflineBotControlled = playerId !== null && offlineBotControlledPlayerIds.has(playerId);
+
+    return {
+      accountId: membership.accountId,
+      playerName: membership.playerName,
+      isOfflineBotControlled,
+      offlineBotProfileId: isOfflineBotControlled ? (player?.botProfileId ?? null) : null
+    };
+  });
 }
 
 function upsertDraftLobbyWithMemberships(lobby: MultiplayerLobbyState & { gameId: string; createdAt?: string; updatedAt?: string }): void {
@@ -3878,6 +4443,19 @@ function toPlayerSession(session: AuthSession, galaxy: Galaxy | null = currentGa
   };
 }
 
+function getRequestIdentity(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0]?.trim() || req.ip || 'unknown';
+  }
+
+  if (Array.isArray(forwarded) && forwarded.length > 0) {
+    return forwarded[0]?.trim() || req.ip || 'unknown';
+  }
+
+  return req.ip || 'unknown';
+}
+
 function getTokenFromRequest(req: Request): string | null {
   const authHeader = req.headers.authorization ?? '';
   const token = authHeader.startsWith('Bearer ')
@@ -3899,7 +4477,7 @@ function getAuthSession(req: Request): { data: AuthData; session: AuthSession } 
   }
 
   const account = data.accounts.find((entry) => entry.id === session.accountId);
-  if (!account || account.playerName !== session.playerName) {
+  if (!account || account.playerName !== session.playerName || account.status !== 'ACTIVE') {
     data.sessions = data.sessions.filter((entry) => entry.token !== token);
     saveAuthData(data);
     return null;
@@ -3952,13 +4530,15 @@ function resolveSessionRuntimeAccess(
     return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
   }
 
+  reconcileOfflineBotControlledSeatsForRuntime(gameId, runtime, auth.data);
+
   if (currentRuntimeGameId !== gameId) {
     switchCurrentRuntime(gameId);
   }
 
   return {
     gameId,
-    runtime,
+    runtime: getGameRuntime(gameId) ?? runtime,
     auth
   };
 }
@@ -5976,6 +6556,62 @@ function canSendDirectMailToPlayer(
   return !!targetPlayer
     && targetPlayer.type === PLAYER_TYPE_PLAYER
     && targetPlayer.playerId !== senderPlayerId;
+}
+
+function reconcileOfflineBotControlledSeatsForRuntime(
+  gameId: string,
+  runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
+  authData: AuthData
+): void {
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING') {
+    if (runtime.offlineBotControlledPlayerIds.size > 0) {
+      updateGameRuntime(gameId, {
+        offlineBotControlledPlayerIds: new Set<number>()
+      });
+    }
+    return;
+  }
+
+  const result = reconcileOfflineBotControlledSeats(
+    runtime.galaxy,
+    gameId,
+    listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId),
+    authData.accounts.map((account) => ({
+      id: account.id,
+      replaceWithBotOnLogout: account.replaceWithBotOnLogout,
+      logoutBotProfileId: account.logoutBotProfileId
+    })),
+    authData.sessions.map((session) => ({
+      accountId: session.accountId,
+      currentGameId: session.currentGameId
+    })),
+    runtime.offlineBotControlledPlayerIds
+  );
+
+  if (!result.changed) {
+    return;
+  }
+
+  const nextPresentation = buildPresentationDataByPlayer(runtime.galaxy);
+  const nextReadyPlayerIds = new Set(
+    [...runtime.currentTurnReadyPlayerIds].filter((playerId) =>
+      !result.offlineBotControlledPlayerIds.has(playerId)
+    )
+  );
+
+  updateGameRuntime(gameId, {
+    galaxy: runtime.galaxy,
+    presentationByPlayer: nextPresentation,
+    currentTurnReadyPlayerIds: nextReadyPlayerIds,
+    offlineBotControlledPlayerIds: result.offlineBotControlledPlayerIds
+  });
+
+  if (currentRuntimeGameId === gameId) {
+    currentGalaxy = runtime.galaxy;
+    currentGalaxyPresentationByPlayer = nextPresentation;
+    currentTurnReadyPlayerIds = nextReadyPlayerIds;
+  }
 }
 
 function addPlayerMessage(

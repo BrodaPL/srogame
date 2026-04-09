@@ -69,6 +69,9 @@ Server bootstrap:
 - `server/src/game-membership.ts`
 - `server/src/game-runtime-store.ts`
 - `server/src/multiplayer-lobby-store.ts`
+- `server/src/auth-account-security.ts`
+- `server/src/auth-rate-limit.ts`
+- `server/src/turnstile.ts`
 - `server/src/game-commands/`
 - `server/src/bots/`
 
@@ -81,6 +84,7 @@ Top-level routes:
 
 - `/` -> `src/app/main-menu/`
 - `/login` -> `src/app/auth/`
+- `/settings` -> `src/app/settings/`
 - `/setup` -> `src/app/setup/`
 - `/load` -> `src/app/load-game/`
 - `/multiplayer` -> `src/app/multiplayer/`
@@ -91,10 +95,13 @@ Top-level routes:
 Main menu note:
 - `src/app/main-menu/` now reads `/api/games/current`, shows `Resume current game` when a current game exists for the account, and uses `/api/games/:gameId/select` before entering the game shell
 - `src/app/main-menu/` also reads `/api/games` to show accessible games, allowing explicit current-game selection and direct enter for running games
+- `src/app/main-menu/` now also links authenticated players to `/settings`
 
 Multiplayer route note:
-- `src/app/multiplayer/` now uses the per-game `/api/multiplayer/games*` family and renders a browser/detail layout with separate draft-lobby and running-game sections
-- the selected draft detail panel owns join/leave/ready state, host setup/save/seat/start controls, and uses the shared save list only for save binding while the old singleton lobby UI is being phased out
+- `src/app/multiplayer/` now uses the per-game `/api/multiplayer/games*` family and renders a browser/detail layout with three sections: `Active Draft Lobbies`, `Active Running Games`, and collapsed `Other Multiplayer Games`
+  - `Other Multiplayer Games` is where stale drafts, unloaded running games (`Saved / Inactive`), and archived multiplayer history now appear
+  - the selected draft detail panel owns join/leave/ready state, host setup/save/seat/start controls, and uses the shared save list only for save binding while the old singleton lobby UI is being phased out
+  - the selected running-game detail now also exposes `Leave current game` for the current account
 
 Game child routes:
 
@@ -150,16 +157,37 @@ Local persistence:
 ## API Ownership Map
 
 Auth endpoints:
+- `/api/auth/register-config`
 - `/api/auth/register`
+- `/api/auth/resend-confirmation`
 - `/api/auth/login`
 - `/api/auth/me`
 - `/api/auth/logout`
+- `/api/account/settings`
+- `/api/account/settings/preferences`
+- `/api/account/settings/tutorials/reset`
 
 Auth/session note:
 - `server/src/index.ts` persists a manual `localAdmin` boolean on accounts/sessions through `server/data/auth.json`
+- `server/src/index.ts` now also persists account email, account status (`PENDING_CONFIRMATION` / `ACTIVE`), confirmation-expiry metadata, and initial user-preference placeholders (`replaceWithBotOnLogout`, `logoutBotProfileId`, `language`) through `server/data/auth.json`
+- `server/src/auth-rate-limit.ts` owns the lightweight in-memory auth/account rate-limit buckets currently used for register, login, and settings mutations
+- `server/src/auth-account-security.ts` owns the pure pending-confirmation cleanup, login-lockout, and login-eligibility helpers used by `server/src/index.ts`
+- `server/src/turnstile.ts` owns Cloudflare Turnstile registration config/verification and supports an optional local-dev bypass via `TURNSTILE_BYPASS_FOR_LOCAL_DEV=true`
+- `server/src/index.ts` now exports the Express `app`, only auto-listens when run as the main module, and supports test/dev data-path overrides via `SROGAME_AUTH_DATA_PATH`, `SROGAME_GAME_REGISTRY_DATA_PATH`, `SROGAME_GAME_MEMBERSHIPS_DATA_PATH`, `SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH`, and `SROGAME_GAME_SAVES_DIRECTORY_PATH`
+- `/api/auth/register` now requires `playerName`, `email`, and `password`, creates a `PENDING_CONFIRMATION` account, and no longer auto-logs the player in
+- `/api/auth/register-config` tells the client whether registration is currently available and whether Turnstile is required
+- `/api/auth/resend-confirmation` refreshes the pending confirmation window for unconfirmed accounts, enforces a 10-minute resend cooldown, and currently returns a manual-activation reminder because SMTP delivery is still not wired
+- `/api/auth/login` now blocks unconfirmed accounts, applies the per-IP auth rate limit, and also enforces account-level password lockout: 5 wrong passwords lock that account for 10 minutes
+- expired pending accounts are cleaned up during auth/account requests instead of via a background job
+- `/api/account/settings*` owns read/update access to account preferences plus tutorial reset from the main-menu settings screen
 - `server/src/index.ts` now also persists `currentGameId` on accounts/sessions as the selected resume/default game pointer
 - `localAdmin` is required for single-player start, direct save load, and multiplayer lobby host/control actions
 - active-game turn advancement is no longer controller-only: in multiplayer-scale active games every human player must mark ready through `/api/game/end-turn`, while singleplayer still resolves immediately
+
+Auth/security test coverage:
+- `server/src/auth-account-security.spec.ts` covers expired pending-account cleanup, pending-confirmation login blocking, password-failure lockout, and successful-login lock reset behavior
+- `server/src/turnstile.spec.ts` covers Turnstile registration config modes and invalid verification response handling without requiring a live Cloudflare round trip
+- `server/src/auth-api.spec.ts` runs a spawned real server process against temp data files and covers register-config, pending-confirmation registration, resend-confirmation cooldown/refresh behavior, blocked login for unconfirmed users, account lockout after 5 wrong passwords, successful-login reset, and settings preference persistence through the actual HTTP routes
 
 Game registry:
 - `/api/games`
@@ -189,6 +217,8 @@ Multiplayer lobby lifecycle:
 - `/api/multiplayer/games/:gameId`
 - `/api/multiplayer/games/:gameId/join`
 - `/api/multiplayer/games/:gameId/leave`
+- `/api/multiplayer/games/:gameId/leave-lobby`
+- `/api/multiplayer/games/:gameId/leave-current-game`
 - `/api/multiplayer/games/:gameId/ready`
 - `/api/multiplayer/games/:gameId/setup`
 - `/api/multiplayer/games/:gameId/bind-save`
@@ -203,10 +233,12 @@ Lifecycle persistence note:
 - `/api/games/:gameId/saves` is the first game-scoped save-list endpoint and currently returns the existing `GameSavesResponse` shape filtered by `gameId`
 - `/api/games/:gameId/state` and `/api/games/:gameId/turn-status` are the first game-scoped runtime read endpoints; they resolve through `server/src/game-runtime-store.ts` instead of assuming the one global active game
 - `/api/games/:gameId/end-turn` now exists as the first game-scoped mutation endpoint for active runtime progression
-- `/api/multiplayer/games` is the new multiplayer browser endpoint family; it lists many `MULTIPLAYER` draft lobbies and running games instead of assuming one global lobby
+- `/api/multiplayer/games` is the multiplayer browser endpoint family; it now returns `activeDraftLobbies`, `activeRunningGames`, and `otherMultiplayerGames` instead of one undifferentiated list
 - `server/src/multiplayer-lobby-store.ts` now persists draft multiplayer lobbies by `gameId` in `server/data/multiplayer-lobbies.json`
 - `/api/multiplayer/games` `POST` creates a new `MULTIPLAYER` `DRAFT` game record plus matching draft-lobby record; `/api/multiplayer/games/:gameId/join` enforces the new rule that an account may belong to only one draft multiplayer lobby at a time by removing it from other draft lobbies first
-- `/api/multiplayer/games/:gameId/leave` cleans up empty draft lobbies by deleting the stored draft record and archiving the corresponding game record
+- browser classification rules now treat drafts updated within 1 hour as active, loaded `RUNNING` games as active running, and everything else visible as `Other Multiplayer Games`; unloaded running games get the UI label `Saved / Inactive`
+- `/api/multiplayer/games/:gameId/leave` and `/leave-lobby` clean up empty draft lobbies by deleting the stored draft record and archiving the corresponding game record
+- `/api/multiplayer/games/:gameId/leave-current-game` clears the account `currentGameId` but keeps multiplayer membership; if that leaves fewer than 2 online humans in the running game, the server snapshots the game, unloads the runtime, and the browser reclassifies it as `Saved / Inactive`
 - `/api/multiplayer/games/:gameId/setup`, `/bind-save`, `/clear-save`, `/assign-seat`, and `/start` now move draft-lobby management onto the per-game API family; `/start` keeps the same `gameId`, promotes the draft record to a running multiplayer game, switches all lobby members to that `currentGameId`, deletes the stored draft-lobby record, and preserves any previously mounted runtime in `server/src/game-runtime-store.ts`
 - `src/app/multiplayer/multiplayer.component.ts` and `.html` now consume that API family directly, so the frontend no longer depends on the singleton-lobby response shape for the main multiplayer route
 - `/api/game/start` writes the initial autosave snapshot through `server/src/game-save.ts`

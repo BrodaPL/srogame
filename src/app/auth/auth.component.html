@@ -3,7 +3,7 @@
     <header class="panel__header">
       <p class="eyebrow">Account</p>
       <h1>Login or Register</h1>
-      <p class="subtitle">Use your player name to access the server.</p>
+      <p class="subtitle">Use your player name to access the server. New accounts require email confirmation before login.</p>
     </header>
 
     <div class="setup-form">
@@ -55,6 +55,17 @@
           />
         </div>
         <div class="field">
+          <label for="registerEmail">Email</label>
+          <input
+            id="registerEmail"
+            name="registerEmail"
+            type="email"
+            placeholder="commander@example.com"
+            [(ngModel)]="registerEmail"
+            required
+          />
+        </div>
+        <div class="field">
           <label for="registerPassword">Password</label>
           <input
             id="registerPassword"
@@ -76,12 +87,57 @@
             required
           />
         </div>
-        <button class="start-button" type="button" (click)="register()" [disabled]="isRegistering">
+        @if (registerConfig?.requiresTurnstile) {
+          <div class="field">
+            <label>CAPTCHA</label>
+            <div #turnstileHost></div>
+          </div>
+        }
+        @if (turnstileError) {
+          <div class="status status--error">
+            <p>{{ turnstileError }}</p>
+          </div>
+        }
+        <button class="start-button" type="button" (click)="register()" [disabled]="!canRegister()">
           Create account
         </button>
         @if (registerError) {
           <div class="status status--error">
             <p>{{ registerError }}</p>
+          </div>
+        }
+        @if (registerInfo) {
+          <div class="status">
+            <p>{{ registerInfo }}</p>
+          </div>
+        }
+      </section>
+
+      <section class="field">
+        <h2>Resend confirmation</h2>
+        <p class="subtitle">Use the registration email for an unconfirmed account. This refreshes the pending confirmation window, but activation is still manual on this server for now.</p>
+        <div class="field">
+          <label for="resendEmail">Email</label>
+          <input
+            id="resendEmail"
+            name="resendEmail"
+            type="email"
+            placeholder="commander@example.com"
+            [(ngModel)]="resendEmail"
+            required
+          />
+        </div>
+        <button class="start-button" type="button" (click)="resendConfirmation()" [disabled]="isResendingConfirmation">
+          {{ isResendingConfirmation ? 'Sending...' : 'Resend confirmation' }}
+        </button>
+        @if (resendError) {
+          <div class="status status--error">
+            <p>{{ resendError }}</p>
+          </div>
+        }
+        @if (resendInfo) {
+          <div class="status">
+            <p>{{ resendInfo }}</p>
           </div>
         }
       </section>

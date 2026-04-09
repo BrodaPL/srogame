@@ -247,14 +247,76 @@ export type GameListResponse = {
   currentPlayerIsLocalAdmin: boolean;
 };
 
+export type AccountStatus = 'PENDING_CONFIRMATION' | 'ACTIVE';
+
 export type RegisterRequest = {
   playerName: string;
   password: string;
+  email: string;
+  turnstileToken?: string | null;
+};
+
+export type RegisterResponse = {
+  playerName: string;
+  email: string;
+  accountStatus: AccountStatus;
+  requiresConfirmation: boolean;
+  confirmationExpiresAt: string | null;
+  message: string;
+};
+
+export type RegisterConfigResponse = {
+  registerEnabled: boolean;
+  requiresTurnstile: boolean;
+  turnstileSiteKey: string | null;
+  registerUnavailableReason: string | null;
+};
+
+export type ResendConfirmationRequest = {
+  email: string;
+};
+
+export type ResendConfirmationResponse = {
+  message: string;
+  confirmationExpiresAt: string | null;
+  nextAllowedAt: string | null;
 };
 
 export type LoginRequest = {
   playerName: string;
   password: string;
+};
+
+export type LanguagePreference = 'en' | 'pl';
+
+export type AccountSettingsResponse = {
+  playerName: string;
+  email: string;
+  accountStatus: AccountStatus;
+  emailConfirmed: boolean;
+  emailConfirmedAt: string | null;
+  accountCreatedAt: string;
+  localAdmin: boolean;
+  currentGameId: GameId | null;
+  currentGameName: string | null;
+  replaceWithBotOnLogout: boolean;
+  logoutBotProfileId: BotProfileId | null;
+  language: LanguagePreference | null;
+  forgotPasswordEnabled: boolean;
+  forgotPasswordAvailableAt: string | null;
+  forgotPasswordInfo: string | null;
+};
+
+export type UpdateAccountPreferencesRequest = {
+  replaceWithBotOnLogout: boolean;
+  logoutBotProfileId: BotProfileId | null;
+  language: LanguagePreference | null;
+};
+
+export type ResetAccountTutorialsResponse = {
+  settings: AccountSettingsResponse;
+  player: PlayerSession;
+  message: string;
 };
 
 export type GalaxySystemSnapshot = {
@@ -423,6 +485,13 @@ export type MultiplayerLobbyMemberDto = {
   joinedAt: string;
 };
 
+export type MultiplayerRunningMemberDto = {
+  accountId: number;
+  playerName: string;
+  isOfflineBotControlled: boolean;
+  offlineBotProfileId: BotProfileId | null;
+};
+
 export type MultiplayerLobbyLoadSeatDto = {
   savedPlayerId: number;
   savedPlayerName: string;
@@ -454,9 +523,11 @@ export type MultiplayerGameListItem = {
   gameId: GameId;
   name: string;
   status: GameStatus;
+  statusLabel: string;
   hostAccountId: number | null;
   hostPlayerName: string | null;
   memberCount: number;
+  offlineBotControlledCount: number;
   isMember: boolean;
   isCurrentGame: boolean;
   canJoin: boolean;
@@ -466,8 +537,9 @@ export type MultiplayerGameListItem = {
 };
 
 export type MultiplayerGameBrowserResponse = {
-  draftLobbies: MultiplayerGameListItem[];
-  runningGames: MultiplayerGameListItem[];
+  activeDraftLobbies: MultiplayerGameListItem[];
+  activeRunningGames: MultiplayerGameListItem[];
+  otherMultiplayerGames: MultiplayerGameListItem[];
   selectedGameId: GameId | null;
   isLoggedIn: boolean;
   currentAccountId: number | null;
@@ -478,6 +550,12 @@ export type MultiplayerGameBrowserResponse = {
 export type MultiplayerGameDetailResponse = {
   game: GameSummary;
   lobby: MultiplayerLobbyDto | null;
+  runningMembers: MultiplayerRunningMemberDto[];
+};
+
+export type LeaveCurrentMultiplayerGameResponse = {
+  message: string | null;
+  currentGameId: GameId | null;
 };
 
 export type UpdateMultiplayerLobbySetupRequest = {

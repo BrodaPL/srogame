@@ -24,6 +24,9 @@
         <button class="menu-button" type="button" (click)="logout()">
           Logout
         </button>
+        <button class="menu-button" type="button" routerLink="/settings">
+          Settings
+        </button>
         @if (shouldShowResumeCurrentGame()) {
           <button
             class="menu-button"

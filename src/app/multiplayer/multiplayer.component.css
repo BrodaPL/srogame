@@ -108,6 +108,21 @@
   font-size: 0.84rem;
 }
 
+.multiplayer-browser-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 168, 76, 0.35);
+  background: rgba(255, 168, 76, 0.12);
+  color: #ffcf8a;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .multiplayer-browser-card__action {
   margin-top: 0;
   width: fit-content;
@@ -153,9 +168,68 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+.multiplayer-member--offline-bot {
+  border-color: rgba(255, 168, 76, 0.28);
+  background: linear-gradient(160deg, rgba(255, 168, 76, 0.1), rgba(255, 255, 255, 0.03));
+}
+
+.multiplayer-member__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
 .multiplayer-member span {
   color: var(--muted);
   text-align: right;
+}
+
+.multiplayer-member__status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.58rem;
+  border-radius: 999px;
+  border: 1px solid rgba(60, 201, 189, 0.26);
+  background: rgba(60, 201, 189, 0.12);
+  color: #a7f5ee;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.multiplayer-member__status-pill--offline-bot {
+  border-color: rgba(255, 168, 76, 0.35);
+  background: rgba(255, 168, 76, 0.14);
+  color: #ffcf8a;
+}
+
+.multiplayer-member__status-pill--draft {
+  border-color: rgba(153, 164, 186, 0.25);
+  background: rgba(153, 164, 186, 0.12);
+  color: #d7dce6;
+}
+
+.multiplayer-callout {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 168, 76, 0.26);
+  background: rgba(255, 168, 76, 0.08);
+}
+
+.multiplayer-callout p {
+  margin: 0;
+}
+
+.multiplayer-callout__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ffcf8a;
 }
 
 .multiplayer-management {
@@ -191,7 +265,9 @@
     flex-direction: column;
   }
 
-  .multiplayer-member span {
+  .multiplayer-member span,
+  .multiplayer-member__status {
     text-align: left;
+    justify-content: flex-start;
   }
 }

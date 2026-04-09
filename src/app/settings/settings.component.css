@@ -1,0 +1,68 @@
+.settings-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-card {
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 23, 30, 0.92);
+  padding: 1.25rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.settings-card h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.settings-checkbox,
+.settings-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.settings-select {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(14, 18, 24, 0.95);
+  color: inherit;
+  padding: 0.75rem 0.9rem;
+}
+
+.settings-radio-group {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.settings-callout {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(60, 201, 189, 0.24);
+  background: rgba(60, 201, 189, 0.08);
+}
+
+.settings-callout--warning {
+  border-color: rgba(255, 168, 76, 0.28);
+  background: rgba(255, 168, 76, 0.09);
+}
+
+.settings-callout p {
+  margin: 0;
+}
+
+.settings-callout__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #a7f5ee;
+}
+
+.settings-callout--warning .settings-callout__title {
+  color: #ffcf8a;
+}

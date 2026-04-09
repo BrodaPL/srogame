@@ -12,6 +12,7 @@ export type GameRuntimeState = {
   isDirty: boolean;
   currentTurnReadyPlayerIds: Set<number>;
   isTurnProcessing: boolean;
+  offlineBotControlledPlayerIds: Set<number>;
 };
 
 const runtimes = new Map<string, GameRuntimeState>();
@@ -66,6 +67,7 @@ export function updateGameRuntime(
     gameId: runtime.gameId,
     loadedAt: runtime.loadedAt,
     currentTurnReadyPlayerIds: patch.currentTurnReadyPlayerIds ?? runtime.currentTurnReadyPlayerIds,
+    offlineBotControlledPlayerIds: patch.offlineBotControlledPlayerIds ?? runtime.offlineBotControlledPlayerIds,
     lastTouchedAt: patch.lastTouchedAt ?? new Date().toISOString()
   };
   runtimes.set(gameId, nextRuntime);

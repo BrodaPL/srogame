@@ -1,0 +1,141 @@
+<main class="page">
+  <section class="panel">
+    <header class="panel__header">
+      <p class="eyebrow">Settings</p>
+      <h1>Account Settings</h1>
+      <p class="subtitle">Manage your account status, multiplayer logout preferences, and tutorial controls.</p>
+    </header>
+
+    @if (isLoading && !settings) {
+      <p>Loading settings.</p>
+    } @else if (loadError) {
+      <div class="status status--error">
+        <p>{{ loadError }}</p>
+      </div>
+    } @else if (settings) {
+      <div class="settings-grid">
+        <section class="settings-card">
+          <h2>Account</h2>
+          <div class="field">
+            <p><strong>Player</strong></p>
+            <p>{{ settings.playerName }}</p>
+          </div>
+          <div class="field">
+            <p><strong>Email</strong></p>
+            <p>{{ settings.email }}</p>
+          </div>
+          <div class="field">
+            <p><strong>Email confirmation</strong></p>
+            <p>{{ settings.emailConfirmed ? 'Confirmed' : 'Pending confirmation' }}</p>
+          </div>
+          <div class="field">
+            <p><strong>Account status</strong></p>
+            <p>{{ settings.accountStatus }}</p>
+          </div>
+          <div class="field">
+            <p><strong>Created</strong></p>
+            <p>{{ settings.accountCreatedAt | date:'medium' }}</p>
+          </div>
+          <div class="field">
+            <p><strong>Current game</strong></p>
+            <p>{{ settings.currentGameName ?? 'No game selected.' }}</p>
+          </div>
+          <div class="field">
+            <p><strong>Privileges</strong></p>
+            <p>{{ settings.localAdmin ? 'Local Admin' : 'Regular player' }}</p>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>Security</h2>
+          <div class="field">
+            <p><strong>Forgot password</strong></p>
+            <p>{{ settings.forgotPasswordInfo }}</p>
+          </div>
+          <button class="start-button" type="button" disabled title="Password reset by email is not available yet.">
+            Reset password
+          </button>
+        </section>
+
+        <section class="settings-card">
+          <h2>Gameplay</h2>
+          <label class="settings-checkbox">
+            <input
+              type="checkbox"
+              [ngModel]="replaceWithBotOnLogout"
+              (ngModelChange)="onReplaceWithBotChange($event)" />
+            <span>Replace me with bot after logout</span>
+          </label>
+
+          <div class="field">
+            <label for="logoutBotProfileId">Bot type when offline</label>
+            <select
+              id="logoutBotProfileId"
+              name="logoutBotProfileId"
+              class="settings-select"
+              [ngModel]="logoutBotProfileId"
+              (ngModelChange)="logoutBotProfileId = $event"
+              [disabled]="!replaceWithBotOnLogout">
+              @for (profileId of botProfileIds; track profileId) {
+                <option [ngValue]="profileId">{{ botProfileLabels[profileId] }}</option>
+              }
+            </select>
+          </div>
+          <div class="settings-callout" [class.settings-callout--warning]="!replaceWithBotOnLogout">
+            <p class="settings-callout__title">
+              {{ replaceWithBotOnLogout ? 'Offline bot replacement enabled' : 'Offline bot replacement disabled' }}
+            </p>
+            <p>
+              @if (replaceWithBotOnLogout) {
+                When you leave a running multiplayer game, your seat may be played by this bot profile until you return.
+              } @else {
+                If you leave a running multiplayer game, other players may still need to wait for you.
+              }
+            </p>
+          </div>
+          <button class="start-button" type="button" (click)="savePreferences()" [disabled]="!canSavePreferences()">
+            {{ isSaving ? 'Saving...' : 'Save preferences' }}
+          </button>
+        </section>
+
+        <section class="settings-card">
+          <h2>Interface</h2>
+          <p class="subtitle">Language selection is reserved for future localization work.</p>
+          <div class="settings-radio-group" role="radiogroup" aria-label="Language selection">
+            <label class="settings-radio">
+              <input type="radio" name="language" disabled checked />
+              <span>English</span>
+            </label>
+            <label class="settings-radio">
+              <input type="radio" name="language" disabled />
+              <span>Polish</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>Tutorials</h2>
+          <p class="subtitle">Reset tutorial progress for the current session and currently selected running game.</p>
+          <button class="start-button" type="button" (click)="resetTutorials()" [disabled]="isResettingTutorials">
+            {{ isResettingTutorials ? 'Resetting...' : 'Reset tutorials' }}
+          </button>
+        </section>
+      </div>
+
+      @if (saveError) {
+        <div class="status status--error">
+          <p>{{ saveError }}</p>
+        </div>
+      }
+      @if (saveInfo) {
+        <div class="status">
+          <p>{{ saveInfo }}</p>
+        </div>
+      }
+    }
+
+    <div class="saved">
+      <a class="link button" routerLink="/">Back to main menu</a>
+    </div>
+  </section>
+</main>

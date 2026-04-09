@@ -1,0 +1,508 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+type AuthDataFile = {
+  nextAccountId: number;
+  accounts: Array<Record<string, unknown>>;
+  sessions: Array<Record<string, unknown>>;
+};
+
+type GameRegistryFile = {
+  games: Array<Record<string, unknown>>;
+};
+
+let testBaseUrl = '';
+let testServerLogs = '';
+
+describe.sequential('auth api', () => {
+  const originalAuthPath = process.env.SROGAME_AUTH_DATA_PATH;
+  const originalGameRegistryPath = process.env.SROGAME_GAME_REGISTRY_DATA_PATH;
+  const originalMembershipsPath = process.env.SROGAME_GAME_MEMBERSHIPS_DATA_PATH;
+  const originalLobbyPath = process.env.SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH;
+  const originalSavesPath = process.env.SROGAME_GAME_SAVES_DIRECTORY_PATH;
+  const originalTurnstileBypass = process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV;
+  const originalPort = process.env.PORT;
+
+  let tempDir = '';
+  let authPath = '';
+  let serverProcess: ChildProcess | null = null;
+  let baseUrl = '';
+  beforeAll(async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'srogame-auth-api-'));
+    authPath = path.join(tempDir, 'auth.json');
+    testServerLogs = '';
+    process.env.SROGAME_AUTH_DATA_PATH = authPath;
+    process.env.SROGAME_GAME_REGISTRY_DATA_PATH = path.join(tempDir, 'games.json');
+    process.env.SROGAME_GAME_MEMBERSHIPS_DATA_PATH = path.join(tempDir, 'game-memberships.json');
+    process.env.SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH = path.join(tempDir, 'multiplayer-lobbies.json');
+    process.env.SROGAME_GAME_SAVES_DIRECTORY_PATH = path.join(tempDir, 'saves');
+    process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV = 'true';
+    process.env.PORT = '0';
+
+    serverProcess = spawn(
+      'npx tsx server/src/index.ts',
+      {
+        cwd: process.cwd(),
+        env: process.env as NodeJS.ProcessEnv,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: true
+      }
+    );
+    serverProcess.stdout?.on('data', (chunk) => {
+      testServerLogs += chunk.toString();
+    });
+    serverProcess.stderr?.on('data', (chunk) => {
+      testServerLogs += chunk.toString();
+    });
+
+    const port = await waitForServerPort();
+    baseUrl = `http://127.0.0.1:${port}`;
+    testBaseUrl = baseUrl;
+    await waitForHealth(baseUrl);
+  }, 30000);
+
+  afterAll(async () => {
+    if (serverProcess) {
+      serverProcess.kill();
+      await new Promise<void>((resolve) => {
+        serverProcess?.once('exit', () => resolve());
+        setTimeout(() => resolve(), 2000);
+      });
+    }
+
+    process.env.SROGAME_AUTH_DATA_PATH = originalAuthPath;
+    process.env.SROGAME_GAME_REGISTRY_DATA_PATH = originalGameRegistryPath;
+    process.env.SROGAME_GAME_MEMBERSHIPS_DATA_PATH = originalMembershipsPath;
+    process.env.SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH = originalLobbyPath;
+    process.env.SROGAME_GAME_SAVES_DIRECTORY_PATH = originalSavesPath;
+    process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV = originalTurnstileBypass;
+    process.env.PORT = originalPort;
+
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }, 30000);
+
+  beforeEach(() => {
+    writeAuthData({
+      nextAccountId: 1,
+      accounts: [],
+      sessions: []
+    });
+  });
+
+  it('returns register config and creates a pending-confirmation account', async () => {
+    const registerConfig = await request('GET', '/api/auth/register-config', undefined, '10.0.0.1');
+    expect(registerConfig.status).toBe(200);
+    expect(registerConfig.json).toEqual({
+      registerEnabled: true,
+      requiresTurnstile: false,
+      turnstileSiteKey: null,
+      registerUnavailableReason: null
+    });
+
+    const registerResponse = await request('POST', '/api/auth/register', {
+      playerName: 'TestUserA',
+      email: 'test-a@example.com',
+      password: 'secret-123'
+    }, '10.0.0.1');
+
+    expect(registerResponse.status).toBe(201);
+    expect(registerResponse.json?.accountStatus).toBe('PENDING_CONFIRMATION');
+    expect(registerResponse.json?.requiresConfirmation).toBe(true);
+
+    const data = readAuthData();
+    expect(data.accounts).toHaveLength(1);
+    expect(data.accounts[0]?.playerName).toBe('TestUserA');
+    expect(data.accounts[0]?.email).toBe('test-a@example.com');
+    expect(data.accounts[0]?.status).toBe('PENDING_CONFIRMATION');
+    expect(data.sessions).toHaveLength(0);
+  });
+
+  it('blocks login for pending-confirmation accounts', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'TestUserB',
+      email: 'test-b@example.com',
+      password: 'secret-123'
+    }, '10.0.0.2');
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'TestUserB',
+      password: 'secret-123'
+    }, '10.0.0.2');
+
+    expect(loginResponse.status).toBe(403);
+    expect(loginResponse.json).toEqual({ error: 'Account is not confirmed yet.' });
+  });
+
+  it('resends confirmation with cooldown and refreshes the pending expiry window', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'TestUserResend',
+      email: 'test-resend@example.com',
+      password: 'secret-123'
+    }, '10.0.0.22');
+
+    let resendResponse = await request('POST', '/api/auth/resend-confirmation', {
+      email: 'test-resend@example.com'
+    }, '10.0.0.22');
+    expect(resendResponse.status).toBe(429);
+    expect(resendResponse.json?.error).toContain('Confirmation can be resent again');
+
+    const data = readAuthData();
+    const account = data.accounts[0];
+    if (!account) {
+      throw new Error('Expected pending account for resend test.');
+    }
+
+    const now = Date.now();
+    account.lastConfirmationSentAt = new Date(now - 20 * 60 * 1000).toISOString();
+    account.confirmationExpiresAt = new Date(now + 10 * 60 * 1000).toISOString();
+    writeAuthData(data);
+
+    resendResponse = await request('POST', '/api/auth/resend-confirmation', {
+      email: 'test-resend@example.com'
+    }, '10.0.0.22');
+    expect(resendResponse.status).toBe(200);
+    expect(resendResponse.json?.message).toContain('pending account exists');
+    expect(typeof resendResponse.json?.confirmationExpiresAt).toBe('string');
+    expect(typeof resendResponse.json?.nextAllowedAt).toBe('string');
+
+    const updatedData = readAuthData();
+    expect(updatedData.accounts[0]?.lastConfirmationSentAt).not.toBe(account.lastConfirmationSentAt);
+    expect(updatedData.accounts[0]?.confirmationExpiresAt).not.toBe(account.confirmationExpiresAt);
+  });
+
+  it('locks an account after five wrong passwords and keeps login blocked while locked', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'TestUserC',
+      email: 'test-c@example.com',
+      password: 'secret-123'
+    }, '10.0.0.3');
+    activateFirstPendingAccount();
+
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const response = await request('POST', '/api/auth/login', {
+        playerName: 'TestUserC',
+        password: 'wrong-pass'
+      }, '10.0.0.3');
+
+      expect(response.status).toBe(401);
+      expect(response.json?.error).toContain('Wrong password.');
+    }
+
+    const fifthResponse = await request('POST', '/api/auth/login', {
+      playerName: 'TestUserC',
+      password: 'wrong-pass'
+    }, '10.0.0.3');
+    expect(fifthResponse.status).toBe(423);
+    expect(fifthResponse.json?.error).toContain('Account login is locked');
+
+    const lockedData = readAuthData();
+    expect(lockedData.accounts[0]?.failedLoginAttempts).toBe(5);
+    expect(typeof lockedData.accounts[0]?.loginLockedUntil).toBe('string');
+
+    const blockedCorrectLogin = await request('POST', '/api/auth/login', {
+      playerName: 'TestUserC',
+      password: 'secret-123'
+    }, '10.0.0.3');
+    expect(blockedCorrectLogin.status).toBe(423);
+  });
+
+  it('clears failed-login state after a successful login and allows settings updates', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'TestUserD',
+      email: 'test-d@example.com',
+      password: 'secret-123'
+    }, '10.0.0.4');
+    activateFirstPendingAccount();
+
+    await request('POST', '/api/auth/login', {
+      playerName: 'TestUserD',
+      password: 'wrong-pass'
+    }, '10.0.0.4');
+    await request('POST', '/api/auth/login', {
+      playerName: 'TestUserD',
+      password: 'wrong-pass'
+    }, '10.0.0.4');
+
+    let data = readAuthData();
+    expect(data.accounts[0]?.failedLoginAttempts).toBe(2);
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'TestUserD',
+      password: 'secret-123'
+    }, '10.0.0.4');
+    expect(loginResponse.status).toBe(200);
+    expect(typeof loginResponse.json?.token).toBe('string');
+
+    data = readAuthData();
+    expect(data.accounts[0]?.failedLoginAttempts).toBe(0);
+    expect(data.accounts[0]?.loginLockedUntil).toBeNull();
+
+    const token = loginResponse.json?.token as string;
+    const settingsResponse = await request('GET', '/api/account/settings', undefined, '10.0.0.5', token);
+    expect(settingsResponse.status).toBe(200);
+    expect(settingsResponse.json?.playerName).toBe('TestUserD');
+    expect(settingsResponse.json?.email).toBe('test-d@example.com');
+
+    const updateResponse = await request('POST', '/api/account/settings/preferences', {
+      replaceWithBotOnLogout: true,
+      logoutBotProfileId: 'TURTLE',
+      language: 'en'
+    }, '10.0.0.5', token);
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.json?.replaceWithBotOnLogout).toBe(true);
+    expect(updateResponse.json?.logoutBotProfileId).toBe('TURTLE');
+    expect(updateResponse.json?.language).toBe('en');
+
+    data = readAuthData();
+    expect(data.accounts[0]?.replaceWithBotOnLogout).toBe(true);
+    expect(data.accounts[0]?.logoutBotProfileId).toBe('TURTLE');
+    expect(data.accounts[0]?.language).toBe('en');
+  });
+
+  it('resets tutorial progress through the account settings endpoint', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'TestUserTutorials',
+      email: 'test-tutorials@example.com',
+      password: 'secret-123'
+    }, '10.0.0.6');
+    activateFirstPendingAccount();
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'TestUserTutorials',
+      password: 'secret-123'
+    }, '10.0.0.6');
+    expect(loginResponse.status).toBe(200);
+
+    const token = loginResponse.json?.token as string;
+    const resetResponse = await request('POST', '/api/account/settings/tutorials/reset', {}, '10.0.0.6', token);
+    expect(resetResponse.status).toBe(200);
+    expect(resetResponse.json?.message).toBe('Tutorial progress was reset for your current session.');
+    expect(resetResponse.json?.settings).toMatchObject({
+      playerName: 'TestUserTutorials',
+      email: 'test-tutorials@example.com'
+    });
+    expect(resetResponse.json?.player).toMatchObject({
+      playerName: 'TestUserTutorials',
+      token,
+      currentGameId: null
+    });
+  });
+
+  it('classifies stale draft lobbies into other multiplayer games', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'DraftAdmin',
+      email: 'draft-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.31');
+    activateAccount('DraftAdmin', { localAdmin: true });
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'DraftAdmin',
+      password: 'secret-123'
+    }, '10.0.0.31');
+    expect(loginResponse.status).toBe(200);
+    const token = loginResponse.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.31', token);
+    expect(createResponse.status).toBe(200);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    const registry = readGameRegistry();
+    const game = registry.games.find((entry) => entry.gameId === gameId);
+    if (!game) {
+      throw new Error('Expected created draft game in registry.');
+    }
+    game.updatedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    writeGameRegistry(registry);
+
+    const browserResponse = await request('GET', '/api/multiplayer/games', undefined, '10.0.0.31', token);
+    expect(browserResponse.status).toBe(200);
+    expect(Array.isArray(browserResponse.json?.activeDraftLobbies)).toBe(true);
+    expect(Array.isArray(browserResponse.json?.otherMultiplayerGames)).toBe(true);
+    expect((browserResponse.json?.activeDraftLobbies as unknown[])).toHaveLength(0);
+    expect((browserResponse.json?.otherMultiplayerGames as Array<Record<string, unknown>>)[0]).toMatchObject({
+      gameId,
+      status: 'DRAFT',
+      statusLabel: 'DRAFT'
+    });
+  });
+
+  it('leaving the last online multiplayer game saves and unloads it as inactive', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'RunAdmin',
+      email: 'run-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.41');
+    activateAccount('RunAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'RunGuest',
+      email: 'run-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.42');
+    activateAccount('RunGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'RunAdmin',
+      password: 'secret-123'
+    }, '10.0.0.41');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'RunGuest',
+      password: 'secret-123'
+    }, '10.0.0.42');
+    expect(adminLogin.status).toBe(200);
+    expect(guestLogin.status).toBe(200);
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.41', adminToken);
+    expect(createResponse.status).toBe(200);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    const joinResponse = await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.42', guestToken);
+    expect(joinResponse.status).toBe(200);
+    const readyResponse = await request('POST', `/api/multiplayer/games/${gameId}/ready`, {
+      ready: true
+    }, '10.0.0.42', guestToken);
+    expect(readyResponse.status).toBe(200);
+
+    const startResponse = await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.41', adminToken);
+    expect(startResponse.status).toBe(200);
+
+    const leaveCurrentResponse = await request('POST', `/api/multiplayer/games/${gameId}/leave-current-game`, {}, '10.0.0.41', adminToken);
+    expect(leaveCurrentResponse.status).toBe(200);
+    expect(leaveCurrentResponse.json).toEqual({
+      currentGameId: null,
+      message: 'Not enough online players, saving and stopping the game.'
+    });
+
+    const browserResponse = await request('GET', '/api/multiplayer/games', undefined, '10.0.0.41', adminToken);
+    expect(browserResponse.status).toBe(200);
+    expect(browserResponse.json?.activeRunningGames).toEqual([]);
+    expect((browserResponse.json?.otherMultiplayerGames as Array<Record<string, unknown>>)[0]).toMatchObject({
+      gameId,
+      status: 'RUNNING',
+      statusLabel: 'Saved / Inactive'
+    });
+
+    const authData = readAuthData();
+    const adminAccount = authData.accounts.find((entry) => entry.playerName === 'RunAdmin');
+    expect(adminAccount?.currentGameId).toBeNull();
+  });
+
+  function activateFirstPendingAccount(): void {
+    const data = readAuthData();
+    const account = data.accounts[0];
+    if (!account) {
+      throw new Error('No account available to activate.');
+    }
+
+    const now = new Date().toISOString();
+    account.status = 'ACTIVE';
+    account.emailConfirmedAt = now;
+    account.confirmationExpiresAt = null;
+    writeAuthData(data);
+  }
+
+  function activateAccount(playerName: string, options: { localAdmin?: boolean } = {}): void {
+    const data = readAuthData();
+    const account = data.accounts.find((entry) => entry.playerName === playerName);
+    if (!account) {
+      throw new Error(`No account found for ${playerName}.`);
+    }
+
+    const now = new Date().toISOString();
+    account.status = 'ACTIVE';
+    account.localAdmin = options.localAdmin === true;
+    account.emailConfirmedAt = now;
+    account.confirmationExpiresAt = null;
+    writeAuthData(data);
+  }
+
+  function readAuthData(): AuthDataFile {
+    return JSON.parse(fs.readFileSync(authPath, 'utf-8')) as AuthDataFile;
+  }
+
+  function writeAuthData(data: AuthDataFile): void {
+    fs.writeFileSync(authPath, JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  function readGameRegistry(): GameRegistryFile {
+    return JSON.parse(fs.readFileSync(process.env.SROGAME_GAME_REGISTRY_DATA_PATH!, 'utf-8')) as GameRegistryFile;
+  }
+
+  function writeGameRegistry(data: GameRegistryFile): void {
+    fs.writeFileSync(process.env.SROGAME_GAME_REGISTRY_DATA_PATH!, JSON.stringify(data, null, 2), 'utf-8');
+  }
+});
+
+async function waitForHealth(baseUrl: string): Promise<void> {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${baseUrl}/api/health`);
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // server not ready yet
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  throw new Error('Timed out waiting for auth test server to start.');
+}
+
+async function waitForServerPort(): Promise<number> {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const match = /SroGame server listening on http:\/\/localhost:(\d+)/.exec(testServerLogs);
+    if (match) {
+      return Number.parseInt(match[1] ?? '', 10);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error(`Timed out waiting for auth test server port. Logs:\n${testServerLogs}`);
+}
+
+async function request(
+  method: 'GET' | 'POST',
+  routePath: string,
+  body?: unknown,
+  forwardedFor = '127.0.0.1',
+  token?: string
+): Promise<{ status: number; json: Record<string, unknown> | null }> {
+  const headers: Record<string, string> = {
+    'x-forwarded-for': forwardedFor
+  };
+  if (body !== undefined) {
+    headers['content-type'] = 'application/json';
+  }
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${testBaseUrl}${routePath}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+
+  const text = await response.text();
+  return {
+    status: response.status,
+    json: text ? JSON.parse(text) as Record<string, unknown> : null
+  };
+}
