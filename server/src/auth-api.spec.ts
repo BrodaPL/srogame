@@ -845,6 +845,115 @@ describe.sequential('auth api', () => {
     expect((browserResponse.json?.otherMultiplayerGames as Array<Record<string, unknown>>).some((entry) => entry.gameId === gameId)).toBe(false);
   });
 
+  it('reopens a saved inactive multiplayer game as a resumed lobby and keeps it out of the inactive list', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'ResumeAdmin',
+      email: 'resume-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.97');
+    activateAccount('ResumeAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'ResumeGuest',
+      email: 'resume-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.98');
+    activateAccount('ResumeGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'ResumeAdmin',
+      password: 'secret-123'
+    }, '10.0.0.97');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'ResumeGuest',
+      password: 'secret-123'
+    }, '10.0.0.98');
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.97', adminToken);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.98', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.98', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.97', adminToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/leave-current-game`, {}, '10.0.0.97', adminToken);
+
+    const resumeResponse = await request('POST', `/api/multiplayer/games/${gameId}/resume-lobby`, {}, '10.0.0.97', adminToken);
+    expect(resumeResponse.status).toBe(200);
+    expect(resumeResponse.json?.lobby).toMatchObject({
+      isResumeLobby: true,
+      mode: 'LOAD_SAVE'
+    });
+
+    const browserResponse = await request('GET', '/api/multiplayer/games', undefined, '10.0.0.97', adminToken);
+    expect(browserResponse.status).toBe(200);
+    expect(browserResponse.json?.activeDraftLobbies).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        gameId,
+        isResumeLobby: true,
+        statusLabel: 'Resumed lobby'
+      })
+    ]));
+    expect((browserResponse.json?.otherMultiplayerGames as Array<Record<string, unknown>>).some((entry) => entry.gameId === gameId)).toBe(false);
+  });
+
+  it('archives an inactive multiplayer game for local admin', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'ArchiveAdmin',
+      email: 'archive-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.99');
+    activateAccount('ArchiveAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'ArchiveGuest',
+      email: 'archive-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.100');
+    activateAccount('ArchiveGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'ArchiveAdmin',
+      password: 'secret-123'
+    }, '10.0.0.99');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'ArchiveGuest',
+      password: 'secret-123'
+    }, '10.0.0.100');
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.99', adminToken);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.100', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.100', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.99', adminToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/leave-current-game`, {}, '10.0.0.99', adminToken);
+
+    const archiveResponse = await request('POST', `/api/multiplayer/games/${gameId}/archive`, {}, '10.0.0.99', adminToken);
+    expect(archiveResponse.status).toBe(204);
+
+    const browserResponse = await request('GET', '/api/multiplayer/games', undefined, '10.0.0.99', adminToken);
+    expect(browserResponse.status).toBe(200);
+    expect(browserResponse.json?.otherMultiplayerGames).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        gameId,
+        status: 'ARCHIVED'
+      })
+    ]));
+
+    const registry = readGameRegistry();
+    expect(registry.games.find((entry) => entry.gameId === gameId)?.status).toBe('ARCHIVED');
+  });
+
   function activateFirstPendingAccount(): void {
     const data = readAuthData();
     const account = data.accounts[0];

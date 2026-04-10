@@ -44,6 +44,7 @@ export type MultiplayerLobbyState = {
   hostAccountId: number;
   hostPlayerName: string;
   mode: MultiplayerLobbyMode;
+  isResumeLobby: boolean;
   setup: GalaxySetup;
   members: MultiplayerLobbyMember[];
   boundSaveId: string | null;
@@ -87,6 +88,7 @@ export function openMultiplayerLobby(
     hostAccountId,
     hostPlayerName,
     mode: 'NEW_GAME',
+    isResumeLobby: false,
     setup: normalizeGalaxySetup({ ...setup, playerAmount: 2 }),
     members: [{
       accountId: hostAccountId,
@@ -254,6 +256,7 @@ export function reconcileLobbyState(lobby: MultiplayerLobbyState): MultiplayerLo
 
   return {
     ...lobby,
+    isResumeLobby: lobby.isResumeLobby === true,
     members: validMembers,
     loadSeats
   };
@@ -270,6 +273,7 @@ export function buildMultiplayerLobbyDto(
     hostAccountId: lobby.hostAccountId,
     hostPlayerName: lobby.hostPlayerName,
     mode: lobby.mode,
+    isResumeLobby: lobby.isResumeLobby === true,
     setup: normalizeGalaxySetup({ ...lobby.setup, playerAmount: Math.max(1, lobby.members.length) }),
     members: lobby.members.map((member): MultiplayerLobbyMemberDto => ({
       accountId: member.accountId,
@@ -303,7 +307,8 @@ export function buildMultiplayerLobbyDto(
     canLeave: !!currentAccountId && lobby.members.some((member) => member.accountId === currentAccountId),
     canToggleReady: !!currentAccountId
       && lobby.members.some((member) => member.accountId === currentAccountId && !member.isLocalAdmin),
-    canBindSave: currentPlayerIsLocalAdmin && currentAccountId === lobby.hostAccountId,
+    canBindSave: !lobby.isResumeLobby && currentPlayerIsLocalAdmin && currentAccountId === lobby.hostAccountId,
+    canEditSetup: !lobby.isResumeLobby && currentPlayerIsLocalAdmin && currentAccountId === lobby.hostAccountId,
     canStart: startBlockedReason === null && currentPlayerIsLocalAdmin && currentAccountId === lobby.hostAccountId,
     startBlockedReason
   };

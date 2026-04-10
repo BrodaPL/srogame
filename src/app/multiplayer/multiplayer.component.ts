@@ -181,6 +181,14 @@ export class MultiplayerComponent implements OnDestroy {
     return this.selectedLobby()?.canStart === true && !this.isActing;
   }
 
+  protected canResumeSelectedLobby(): boolean {
+    return this.selectedBrowserItem()?.canResumeLobby === true && !this.isActing;
+  }
+
+  protected canArchiveSelectedGame(): boolean {
+    return this.selectedBrowserItem()?.canArchive === true && !this.isActing;
+  }
+
   protected configuredBotsAmount(): number {
     return this.parseIntegerInRange(this.setupForm.botsAmount, 0, 12) ?? 0;
   }
@@ -327,6 +335,47 @@ export class MultiplayerComponent implements OnDestroy {
       error: (error) => {
         this.isActing = false;
         this.error = error?.error?.error ?? 'Unable to leave the current multiplayer game.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  protected reopenSelectedResumeLobby(): void {
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.runDetailMutation(
+      () => this.gameApi.reopenMultiplayerResumeLobby(gameId, session.token),
+      'Reopened saved multiplayer game as a resumed lobby.'
+    );
+  }
+
+  protected archiveSelectedGame(): void {
+    const session = this.session();
+    const gameId = this.selectedGameId;
+    if (!session || !gameId) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.isActing = true;
+    this.error = null;
+    this.infoMessage = null;
+    this.gameApi.archiveMultiplayerGame(gameId, session.token).subscribe({
+      next: () => {
+        this.isActing = false;
+        this.infoMessage = 'Archived multiplayer game.';
+        this.detailResponse = null;
+        this.loadBrowser(false);
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.isActing = false;
+        this.error = error?.error?.error ?? 'Unable to archive the selected multiplayer game.';
         this.cdr.markForCheck();
       }
     });
@@ -527,6 +576,15 @@ export class MultiplayerComponent implements OnDestroy {
       sections.push(`Turn ${game.currentTurn}`);
     }
     return sections.join(' / ');
+  }
+
+  protected inactiveReasonLabel(item?: MultiplayerGameListItem | null): string | null {
+    return item?.inactiveReasonText ?? null;
+  }
+
+  protected enterButtonLabel(item?: MultiplayerGameListItem | null): string {
+    const target = item ?? this.selectedBrowserItem();
+    return target?.canReturnToGame ? 'Return to game' : 'Enter running game';
   }
 
   protected updatedAtLabel(item: MultiplayerGameListItem): string {

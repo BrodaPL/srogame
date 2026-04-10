@@ -77,6 +77,9 @@
                     <span class="multiplayer-browser-card__title">{{ item.name }}</span>
                     <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
                     <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
+                    @if (item.isResumeLobby) {
+                      <span class="multiplayer-browser-card__badge">Resumed lobby</span>
+                    }
                     @if (item.offlineBotControlledCount > 0) {
                       <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
                     }
@@ -149,17 +152,30 @@
                 @for (item of otherMultiplayerGames(); track item.gameId) {
                   <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
                     <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
-                      <span class="multiplayer-browser-card__title">{{ item.name }}</span>
-                      <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
-                      <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
-                      @if (item.offlineBotControlledCount > 0) {
-                        <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
-                      }
-                      <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
-                    </button>
+                    <span class="multiplayer-browser-card__title">{{ item.name }}</span>
+                    <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                    <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
+                    @if (item.inactiveReasonText) {
+                      <span class="multiplayer-browser-card__meta">{{ item.inactiveReasonText }}</span>
+                    }
+                    @if (item.offlineBotControlledCount > 0) {
+                      <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
+                    }
+                    <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                  </button>
                     @if (item.canEnter) {
                       <button class="start-button multiplayer-browser-card__action" type="button" (click)="enterRunningGame(item)" [disabled]="isActing">
-                        Enter
+                        {{ enterButtonLabel(item) }}
+                      </button>
+                    }
+                    @if (item.canResumeLobby) {
+                      <button class="start-button multiplayer-browser-card__action" type="button" (click)="selectGame(item); reopenSelectedResumeLobby()" [disabled]="isActing">
+                        Resume lobby
+                      </button>
+                    }
+                    @if (item.canArchive) {
+                      <button class="start-button multiplayer-browser-card__action" type="button" (click)="selectGame(item); archiveSelectedGame()" [disabled]="isActing">
+                        Archive
                       </button>
                     }
                   </article>
@@ -196,7 +212,17 @@
             <div class="multiplayer-detail__actions">
               @if (selectedBrowserItem()?.canEnter) {
                 <button class="start-button" type="button" (click)="enterRunningGame()" [disabled]="isActing">
-                  Enter running game
+                  {{ enterButtonLabel() }}
+                </button>
+              }
+              @if (canResumeSelectedLobby()) {
+                <button class="start-button" type="button" (click)="reopenSelectedResumeLobby()" [disabled]="isActing">
+                  Resume lobby
+                </button>
+              }
+              @if (canArchiveSelectedGame()) {
+                <button class="start-button" type="button" (click)="archiveSelectedGame()" [disabled]="isActing">
+                  Archive
                 </button>
               }
               @if (selectedBrowserItem()?.isCurrentGame && !selectedLobby()) {
@@ -227,6 +253,9 @@
                     : 'This game is already running. Use Enter to rejoin it if you have access.'
                 }}
               </p>
+              @if (inactiveReasonLabel(selectedBrowserItem())) {
+                <p>{{ inactiveReasonLabel(selectedBrowserItem()) }}</p>
+              }
               @if (selectedRunningMembers().length > 0) {
                 <div class="multiplayer-member-list">
                   @for (member of selectedRunningMembers(); track member.accountId) {
@@ -261,6 +290,9 @@
                 <p class="saved__title">Lobby Overview</p>
                 <p>Host: {{ selectedLobby()!.hostPlayerName }}</p>
                 <p>Mode: {{ selectedLobby()!.mode === 'LOAD_SAVE' ? 'Load saved game' : 'Start new game' }}</p>
+                @if (selectedLobby()!.isResumeLobby) {
+                  <p>Resume mode: locked to the saved multiplayer snapshot.</p>
+                }
                 <p>Joined players: {{ selectedLobby()!.members.length }}</p>
                 @if (selectedLobby()!.startBlockedReason) {
                   <p class="form-error">{{ selectedLobby()!.startBlockedReason }}</p>
@@ -345,7 +377,7 @@
               </section>
             }
 
-            @if (canManageSelectedLobby()) {
+            @if (canManageSelectedLobby() && !selectedLobby()!.isResumeLobby) {
               <section class="multiplayer-management" (input)="markSetupDirty()" (change)="markSetupDirty()">
                 <div class="saved">
                   <p class="saved__title">Host Controls</p>
@@ -546,6 +578,13 @@
                 <button class="start-button multiplayer-management__start" type="button" (click)="startLobbyGame()" [disabled]="!canStartSelectedLobby()">
                   {{ isActing ? 'Starting...' : (selectedLobby()!.mode === 'LOAD_SAVE' ? 'Start from save' : 'Start multiplayer game') }}
                 </button>
+              </section>
+            }
+
+            @if (canManageSelectedLobby() && selectedLobby()!.isResumeLobby) {
+              <section class="saved">
+                <p class="saved__title">Resume Lobby</p>
+                <p>This lobby is locked to the selected saved multiplayer snapshot. Players can rejoin, seat replacements can be adjusted if needed, and localAdmin can start the saved game again.</p>
               </section>
             }
           }

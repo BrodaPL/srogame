@@ -42,6 +42,7 @@ export function buildTurnStatusResponse(
     currentPlayerAutoSkipEnabled?: boolean;
     currentPlayerAutoSkipActivatedAt?: string | null;
     showAutoSkipReturnNotice?: boolean;
+    showPresenceRemovedReturnNotice?: boolean;
   } = {}
 ): TurnStatusResponse {
   const humans = activeHumanPlayers(galaxy);
@@ -62,6 +63,7 @@ export function buildTurnStatusResponse(
     currentPlayerAutoSkipEnabled: options.currentPlayerAutoSkipEnabled ?? false,
     currentPlayerAutoSkipActivatedAt: options.currentPlayerAutoSkipActivatedAt ?? null,
     showAutoSkipReturnNotice: options.showAutoSkipReturnNotice ?? false,
+    showPresenceRemovedReturnNotice: options.showPresenceRemovedReturnNotice ?? false,
     isProcessing,
     currentPlayerReady: readyPlayerIds.has(currentPlayerId),
     readyPlayerIds: readyPlayers.map((player) => player.playerId),

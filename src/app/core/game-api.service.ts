@@ -193,10 +193,30 @@ export class GameApiService {
     );
   }
 
-  public updateMultiplayerGamePresence(gameId: string, request: Pick<UpdateMultiplayerAutoSkipTurnRequest, 'acknowledgeNotice'>, token: string) {
+  public updateMultiplayerGamePresence(
+    gameId: string,
+    request: Pick<UpdateMultiplayerAutoSkipTurnRequest, 'acknowledgeNotice' | 'acknowledgePresenceRemovedNotice'>,
+    token: string
+  ) {
     return this.http.post<TurnStatusResponse>(
       `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/presence`,
       request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public reopenMultiplayerResumeLobby(gameId: string, token: string) {
+    return this.http.post<MultiplayerGameDetailResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/resume-lobby`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public archiveMultiplayerGame(gameId: string, token: string) {
+    return this.http.post<void>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/archive`,
+      {},
       { headers: this.authHeaders(token) }
     );
   }

@@ -12,6 +12,7 @@ export type GameRecord = {
   kind: GameKind;
   status: GameStatus;
   name: string;
+  inactiveReason: 'NO_PRESENT_HUMANS' | 'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS' | null;
   ownerAccountId: number | null;
   ownerPlayerName: string | null;
   hostAccountId: number | null;
@@ -28,10 +29,11 @@ export type GameRegistryData = {
   games: GameRecord[];
 };
 
-export type CreateGameRecordInput = Omit<GameRecord, 'gameId' | 'createdAt' | 'updatedAt'> & {
+export type CreateGameRecordInput = Omit<GameRecord, 'gameId' | 'createdAt' | 'updatedAt' | 'inactiveReason'> & {
   gameId?: GameId;
   createdAt?: string;
   updatedAt?: string;
+  inactiveReason?: GameRecord['inactiveReason'];
 };
 
 export type UpdateGameRecordPatch = Partial<Omit<GameRecord, 'gameId' | 'createdAt'>>;
@@ -85,6 +87,7 @@ export function createGameRecord(input: CreateGameRecordInput): GameRecord {
     kind: input.kind,
     status: input.status,
     name: input.name.trim() || 'Unnamed Game',
+    inactiveReason: input.inactiveReason ?? null,
     ownerAccountId: input.ownerAccountId ?? null,
     ownerPlayerName: input.ownerPlayerName ?? null,
     hostAccountId: input.hostAccountId ?? null,
@@ -158,6 +161,9 @@ function normalizeGameRecord(value: unknown): GameRecord | null {
     kind,
     status,
     name: typeof record.name === 'string' && record.name.trim() ? record.name.trim() : 'Unnamed Game',
+    inactiveReason: record.inactiveReason === 'NO_PRESENT_HUMANS' || record.inactiveReason === 'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS'
+      ? record.inactiveReason
+      : null,
     ownerAccountId: normalizeIntegerOrNull(record.ownerAccountId),
     ownerPlayerName: typeof record.ownerPlayerName === 'string' ? record.ownerPlayerName : null,
     hostAccountId: normalizeIntegerOrNull(record.hostAccountId),

@@ -21,7 +21,20 @@
         </div>
       </section>
     }
-    @if (showAutoSkipReturnNotice && !isUiLocked()) {
+    @if (showPresenceRemovedReturnNotice && !isUiLocked()) {
+      <section class="game-lock-overlay" aria-live="polite">
+        <div class="game-lock-overlay__card">
+          <p class="game-lock-overlay__eyebrow">Multiplayer Presence</p>
+          <h2>You were removed from active multiplayer presence after being away too long.</h2>
+          <p>You have re-entered the loaded game now, but other players could keep playing only after enough humans were present again.</p>
+          <div class="game-lock-overlay__actions">
+            <button class="top-menu__button top-menu__button--end-turn" type="button" (click)="acknowledgePresenceRemovedNotice()">
+              Continue
+            </button>
+          </div>
+        </div>
+      </section>
+    } @else if (showAutoSkipReturnNotice && !isUiLocked()) {
       <section class="game-lock-overlay" aria-live="polite">
         <div class="game-lock-overlay__card">
           <p class="game-lock-overlay__eyebrow">Auto Skip Turn</p>

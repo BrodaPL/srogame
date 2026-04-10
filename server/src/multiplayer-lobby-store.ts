@@ -139,6 +139,7 @@ function normalizeMultiplayerLobbyRecord(value: unknown): MultiplayerLobbyRecord
     hostAccountId: record.hostAccountId,
     hostPlayerName: record.hostPlayerName,
     mode,
+    isResumeLobby: record.isResumeLobby === true,
     setup,
     members: Array.isArray(record.members) ? record.members : [],
     boundSaveId: typeof record.boundSaveId === 'string' && record.boundSaveId.trim() ? record.boundSaveId : null,

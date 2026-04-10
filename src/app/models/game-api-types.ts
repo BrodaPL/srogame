@@ -438,6 +438,7 @@ export type TurnStatusResponse = {
   currentPlayerAutoSkipEnabled: boolean;
   currentPlayerAutoSkipActivatedAt: string | null;
   showAutoSkipReturnNotice: boolean;
+  showPresenceRemovedReturnNotice: boolean;
   isProcessing: boolean;
   currentPlayerReady: boolean;
   readyPlayerIds: number[];
@@ -514,6 +515,7 @@ export type MultiplayerLobbyDto = {
   hostAccountId: number;
   hostPlayerName: string;
   mode: MultiplayerLobbyMode;
+  isResumeLobby: boolean;
   setup: GalaxySetup;
   members: MultiplayerLobbyMemberDto[];
   boundSaveId: string | null;
@@ -525,6 +527,7 @@ export type MultiplayerLobbyDto = {
   canLeave: boolean;
   canToggleReady: boolean;
   canBindSave: boolean;
+  canEditSetup: boolean;
   canStart: boolean;
   startBlockedReason: string | null;
 };
@@ -534,6 +537,8 @@ export type MultiplayerGameListItem = {
   name: string;
   status: GameStatus;
   statusLabel: string;
+  isResumeLobby: boolean;
+  inactiveReasonText: string | null;
   hostAccountId: number | null;
   hostPlayerName: string | null;
   memberCount: number;
@@ -542,7 +547,10 @@ export type MultiplayerGameListItem = {
   isCurrentGame: boolean;
   canJoin: boolean;
   canEnter: boolean;
+  canReturnToGame: boolean;
+  canResumeLobby: boolean;
   canManage: boolean;
+  canArchive: boolean;
   updatedAt: string;
 };
 
@@ -572,6 +580,7 @@ export type UpdateMultiplayerAutoSkipTurnRequest = {
   enabled: boolean;
   activateNow?: boolean;
   acknowledgeNotice?: boolean;
+  acknowledgePresenceRemovedNotice?: boolean;
 };
 
 export type UpdateMultiplayerLobbySetupRequest = {

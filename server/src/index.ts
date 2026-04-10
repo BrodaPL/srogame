@@ -1199,6 +1199,7 @@ app.post('/api/multiplayer/games', (req, res) => {
     kind: 'MULTIPLAYER',
     status: 'DRAFT',
     name: lobby.setup.galaxyName,
+    inactiveReason: null,
     ownerAccountId: auth.session.accountId,
     ownerPlayerName: auth.session.playerName,
     hostAccountId: auth.session.accountId,
@@ -1234,24 +1235,106 @@ app.get('/api/multiplayer/games/:gameId', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.post('/api/multiplayer/games/:gameId/resume-lobby', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (!isLocalAdminSession(auth.session)) {
+    return res.status(403).json({ error: 'Local admin privileges are required to reopen an inactive multiplayer lobby.' });
+  }
+
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING' || hasGameRuntime(req.params.gameId)) {
+    return res.status(404).json({ error: 'Saved inactive multiplayer game not found.' });
+  }
+
+  const existingLobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
+  if (existingLobby) {
+    return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
+  }
+
+  try {
+    const saveId = record.currentSaveId
+      ?? listGameSaveSummariesForGame(GAME_SAVES_DIRECTORY_PATH, req.params.gameId)[0]?.saveId
+      ?? null;
+    if (!saveId) {
+      return res.status(404).json({ error: 'No saved snapshot is available for this multiplayer game.' });
+    }
+
+    const save = readGameSaveById(GAME_SAVES_DIRECTORY_PATH, saveId);
+    if (!save) {
+      return res.status(404).json({ error: 'Saved snapshot not found.' });
+    }
+
+    const summary = buildGameSaveSummary(save, saveId);
+    const lobby = bindSaveToLobby(
+      {
+        ...openMultiplayerLobby(auth.session.accountId, auth.session.playerName, new Date().toISOString()),
+        isResumeLobby: true
+      },
+      saveId,
+      save,
+      summary
+    );
+    upsertDraftLobbyWithMemberships({
+      ...lobby,
+      isResumeLobby: true,
+      gameId: req.params.gameId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
+      hostAccountId: auth.session.accountId,
+      hostPlayerName: auth.session.playerName,
+      updatedAt: new Date().toISOString()
+    });
+
+    return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
+  } catch (error) {
+    console.error('Failed to reopen inactive multiplayer game as a resume lobby.', error);
+    return res.status(500).json({ error: 'Unable to reopen the saved multiplayer game.' });
+  }
+});
+
+app.post('/api/multiplayer/games/:gameId/archive', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (!isLocalAdminSession(auth.session)) {
+    return res.status(403).json({ error: 'Local admin privileges are required to archive multiplayer games.' });
+  }
+
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
+  if (!record || record.kind !== 'MULTIPLAYER' || hasGameRuntime(req.params.gameId)) {
+    return res.status(404).json({ error: 'Inactive multiplayer game not found.' });
+  }
+
+  deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
+  updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
+    status: 'ARCHIVED',
+    updatedAt: new Date().toISOString()
+  });
+
+  return res.status(204).send();
+});
+
 app.post('/api/multiplayer/games/:gameId/join', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
-  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
-  }
-
-  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
-  if (!lobby) {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
+  const joinable = loadJoinableMultiplayerLobby(req.params.gameId);
+  if (!joinable) {
+    return res.status(404).json({ error: 'Joinable multiplayer lobby not found.' });
   }
 
   removeAccountFromOtherDraftMultiplayerLobbies(auth.session.accountId, req.params.gameId);
-  const nextLobby = joinMultiplayerLobby(lobby, {
+  const nextLobby = joinMultiplayerLobby(joinable.lobby, {
     accountId: auth.session.accountId,
     playerName: auth.session.playerName,
     isLocalAdmin: auth.session.localAdmin === true
@@ -1259,7 +1342,7 @@ app.post('/api/multiplayer/games/:gameId/join', (req, res) => {
   upsertDraftLobbyWithMemberships({
     ...nextLobby,
     gameId: req.params.gameId,
-    createdAt: lobby.createdAt,
+    createdAt: joinable.lobby.createdAt,
     updatedAt: new Date().toISOString()
   });
 
@@ -1272,35 +1355,34 @@ app.post(['/api/multiplayer/games/:gameId/leave', '/api/multiplayer/games/:gameI
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
-  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
+  const joinable = loadJoinableMultiplayerLobby(req.params.gameId);
+  if (!joinable) {
+    return res.status(404).json({ error: 'Joinable multiplayer lobby not found.' });
   }
 
-  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
-  if (!lobby) {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
-  }
-
-  if (!lobby.members.some((member) => member.accountId === auth.session.accountId)) {
+  if (!joinable.lobby.members.some((member) => member.accountId === auth.session.accountId)) {
     return res.status(403).json({ error: 'Join the lobby first.' });
   }
 
-  const nextLobby = leaveMultiplayerLobby(lobby, auth.session.accountId);
+  const nextLobby = leaveMultiplayerLobby(joinable.lobby, auth.session.accountId);
   removeMembership(GAME_MEMBERSHIPS_DATA_PATH, req.params.gameId, auth.session.accountId);
   if (!nextLobby) {
     deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
-    updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
-      status: 'ARCHIVED',
-      updatedAt: new Date().toISOString()
-    });
+    updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, joinable.record.status === 'DRAFT'
+      ? {
+        status: 'ARCHIVED',
+        updatedAt: new Date().toISOString()
+      }
+      : {
+        updatedAt: new Date().toISOString()
+      });
     return res.status(204).send();
   }
 
   upsertDraftLobbyWithMemberships({
     ...nextLobby,
     gameId: req.params.gameId,
-    createdAt: lobby.createdAt,
+    createdAt: joinable.lobby.createdAt,
     updatedAt: new Date().toISOString()
   });
 
@@ -1342,7 +1424,7 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
   const presenceSummary = buildMultiplayerPresenceSummary(auth.data, req.params.gameId, runtime);
   let message: string | null = null;
   if (presenceSummary.presentHumanCount < 2) {
-    saveAndUnloadRunningMultiplayerGame(req.params.gameId, runtime, record);
+    saveAndUnloadRunningMultiplayerGame(req.params.gameId, runtime, record, 'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS');
     message = 'Not enough online players, saving and stopping the game.';
   } else {
     moveMountedRuntimeAwayFromGame(req.params.gameId);
@@ -1374,6 +1456,12 @@ app.post('/api/multiplayer/games/:gameId/presence', (req, res) => {
       req.params.gameId,
       access.auth.session.accountId
     );
+  }
+  if (body?.acknowledgePresenceRemovedNotice === true) {
+    if (clearPresenceRemovedNoticeForAccount(access.auth.data, access.auth.session.accountId, req.params.gameId)) {
+      saveAuthData(access.auth.data);
+      access.auth.session.pendingPresenceRemovedNoticeGameId = null;
+    }
   }
 
   return res.status(200).json(buildGameTurnStatusResponse(access));
@@ -1417,6 +1505,12 @@ app.post('/api/multiplayer/games/:gameId/auto-skip-turn', (req, res) => {
       access.auth.session.accountId
     );
   }
+  if (body.acknowledgePresenceRemovedNotice === true) {
+    if (clearPresenceRemovedNoticeForAccount(access.auth.data, access.auth.session.accountId, req.params.gameId)) {
+      saveAuthData(access.auth.data);
+      access.auth.session.pendingPresenceRemovedNoticeGameId = null;
+    }
+  }
 
   return res.status(200).json(buildGameTurnStatusResponse(access));
 });
@@ -1427,17 +1521,12 @@ app.post('/api/multiplayer/games/:gameId/ready', (req, res) => {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
-  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
+  const joinable = loadJoinableMultiplayerLobby(req.params.gameId);
+  if (!joinable) {
+    return res.status(404).json({ error: 'Joinable multiplayer lobby not found.' });
   }
 
-  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
-  if (!lobby) {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found.' });
-  }
-
-  if (!lobby.members.some((member) => member.accountId === auth.session.accountId)) {
+  if (!joinable.lobby.members.some((member) => member.accountId === auth.session.accountId)) {
     return res.status(403).json({ error: 'Join the lobby first.' });
   }
 
@@ -1446,11 +1535,11 @@ app.post('/api/multiplayer/games/:gameId/ready', (req, res) => {
     return res.status(400).json({ error: 'Invalid ready payload.' });
   }
 
-  const nextLobby = setMultiplayerLobbyMemberReady(lobby, auth.session.accountId, body.ready);
+  const nextLobby = setMultiplayerLobbyMemberReady(joinable.lobby, auth.session.accountId, body.ready);
   upsertDraftLobbyWithMemberships({
     ...nextLobby,
     gameId: req.params.gameId,
-    createdAt: lobby.createdAt,
+    createdAt: joinable.lobby.createdAt,
     updatedAt: new Date().toISOString()
   });
 
@@ -1466,6 +1555,9 @@ app.post('/api/multiplayer/games/:gameId/setup', (req, res) => {
   const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
   if (!managed) {
     return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
+  }
+  if (managed.lobby.isResumeLobby) {
+    return res.status(409).json({ error: 'Resume lobbies use locked saved-game settings.' });
   }
 
   const body = req.body as UpdateMultiplayerLobbySetupRequest | undefined;
@@ -1505,6 +1597,9 @@ app.post('/api/multiplayer/games/:gameId/bind-save', (req, res) => {
   const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
   if (!managed) {
     return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
+  }
+  if (managed.lobby.isResumeLobby) {
+    return res.status(409).json({ error: 'Resume lobbies are already locked to their saved game.' });
   }
 
   try {
@@ -1553,6 +1648,9 @@ app.post('/api/multiplayer/games/:gameId/clear-save', (req, res) => {
   const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
   if (!managed) {
     return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
+  }
+  if (managed.lobby.isResumeLobby) {
+    return res.status(409).json({ error: 'Resume lobbies stay locked to their saved game.' });
   }
 
   const nextLobby = clearLobbySaveBinding(managed.lobby);
@@ -3604,6 +3702,7 @@ type AuthSession = {
   createdAt: string;
   lastSeenAt: string;
   currentGameId: string | null;
+  pendingPresenceRemovedNoticeGameId: string | null;
 };
 
 type AuthData = {
@@ -3767,6 +3866,10 @@ function loadAuthData(): AuthData {
       session.currentGameId = typeof session.currentGameId === 'string' && session.currentGameId.trim()
         ? session.currentGameId
         : null;
+      session.pendingPresenceRemovedNoticeGameId =
+        typeof session.pendingPresenceRemovedNoticeGameId === 'string' && session.pendingPresenceRemovedNoticeGameId.trim()
+          ? session.pendingPresenceRemovedNoticeGameId
+          : null;
     }
 
     return {
@@ -3798,8 +3901,38 @@ function setAccountCurrentGameId(data: AuthData, accountId: number, currentGameI
   for (const session of data.sessions) {
     if (session.accountId === accountId) {
       session.currentGameId = normalizedCurrentGameId;
+      if (session.pendingPresenceRemovedNoticeGameId && session.pendingPresenceRemovedNoticeGameId !== normalizedCurrentGameId) {
+        session.pendingPresenceRemovedNoticeGameId = null;
+      }
     }
   }
+}
+
+function setPresenceRemovedNoticeForAccount(data: AuthData, accountId: number, gameId: string): boolean {
+  let changed = false;
+  for (const session of data.sessions) {
+    if (session.accountId !== accountId) {
+      continue;
+    }
+    if (session.pendingPresenceRemovedNoticeGameId === gameId) {
+      continue;
+    }
+    session.pendingPresenceRemovedNoticeGameId = gameId;
+    changed = true;
+  }
+  return changed;
+}
+
+function clearPresenceRemovedNoticeForAccount(data: AuthData, accountId: number, gameId: string): boolean {
+  let changed = false;
+  for (const session of data.sessions) {
+    if (session.accountId !== accountId || session.pendingPresenceRemovedNoticeGameId !== gameId) {
+      continue;
+    }
+    session.pendingPresenceRemovedNoticeGameId = null;
+    changed = true;
+  }
+  return changed;
 }
 
 function ensureAuthDirectory(): void {
@@ -3926,6 +4059,7 @@ function buildMultiplayerPresenceSummary(
 function reconcileTimedOutMultiplayerPresence(
   gameId: string,
   runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
+  authData: AuthData,
   nowMs = Date.now()
 ): boolean {
   if (!isRunningMultiplayerGame(gameId)) {
@@ -3949,12 +4083,14 @@ function reconcileTimedOutMultiplayerPresence(
 
   const nextReadyPlayerIds = new Set(runtime.currentTurnReadyPlayerIds);
   let changed = false;
+  let authChanged = false;
   for (const presence of timedOutPresences) {
     if (!removePresence(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, presence.accountId)) {
       continue;
     }
 
     changed = true;
+    authChanged = setPresenceRemovedNoticeForAccount(authData, presence.accountId, gameId) || authChanged;
     const membership = membershipsByAccountId.get(presence.accountId);
     const playerId = membership
       ? runtime.galaxy.playerNameMap.get(membership.playerName) ?? null
@@ -3973,6 +4109,9 @@ function reconcileTimedOutMultiplayerPresence(
   });
   if (currentRuntimeGameId === gameId) {
     currentTurnReadyPlayerIds = nextReadyPlayerIds;
+  }
+  if (authChanged) {
+    saveAuthData(authData);
   }
   return true;
 }
@@ -4003,7 +4142,7 @@ function reconcileEmptyPresenceUnloadState(
     return false;
   }
 
-  saveAndUnloadRunningMultiplayerGame(gameId, runtime, record);
+  saveAndUnloadRunningMultiplayerGame(gameId, runtime, record, 'NO_PRESENT_HUMANS');
   return true;
 }
 
@@ -4018,7 +4157,7 @@ function reconcileRunningMultiplayerLifecycle(
     return { unloaded: false };
   }
 
-  reconcileTimedOutMultiplayerPresence(gameId, runtime, nowMs);
+  reconcileTimedOutMultiplayerPresence(gameId, runtime, authData, nowMs);
   const runtimeAfterTimeout = getGameRuntime(gameId);
   if (!runtimeAfterTimeout) {
     return { unloaded: true };
@@ -4041,28 +4180,31 @@ function reconcileLoadedRunningMultiplayerGames(authData: AuthData, nowMs = Date
   }
 }
 
-function buildCurrentPlayerPresenceOptions(gameId: string, accountId: number): {
+function buildCurrentPlayerPresenceOptions(gameId: string, session: AuthSession): {
   currentPlayerPresenceState: TurnStatusResponse['currentPlayerPresenceState'];
   currentPlayerAutoSkipEnabled: boolean;
   currentPlayerAutoSkipActivatedAt: string | null;
   showAutoSkipReturnNotice: boolean;
+  showPresenceRemovedReturnNotice: boolean;
 } {
   if (!isRunningMultiplayerGame(gameId)) {
     return {
       currentPlayerPresenceState: null,
       currentPlayerAutoSkipEnabled: false,
       currentPlayerAutoSkipActivatedAt: null,
-      showAutoSkipReturnNotice: false
+      showAutoSkipReturnNotice: false,
+      showPresenceRemovedReturnNotice: false
     };
   }
 
-  const presence = getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, accountId);
+  const presence = getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, session.accountId);
   if (!presence) {
     return {
       currentPlayerPresenceState: null,
       currentPlayerAutoSkipEnabled: false,
       currentPlayerAutoSkipActivatedAt: null,
-      showAutoSkipReturnNotice: false
+      showAutoSkipReturnNotice: false,
+      showPresenceRemovedReturnNotice: session.pendingPresenceRemovedNoticeGameId === gameId
     };
   }
 
@@ -4070,7 +4212,8 @@ function buildCurrentPlayerPresenceOptions(gameId: string, accountId: number): {
     currentPlayerPresenceState: presence.state,
     currentPlayerAutoSkipEnabled: presence.autoSkipTurnEnabled,
     currentPlayerAutoSkipActivatedAt: presence.autoSkipTurnActivatedAt,
-    showAutoSkipReturnNotice: presence.returnNoticePending
+    showAutoSkipReturnNotice: presence.returnNoticePending,
+    showPresenceRemovedReturnNotice: session.pendingPresenceRemovedNoticeGameId === gameId
   };
 }
 
@@ -4157,7 +4300,7 @@ function buildGameTurnStatusResponse(
       minimumOnlineHumanCount: minimumOnlineHumansRequired,
       progressionBlockedReason,
       blockingPlayerIds: presenceSummary.blockingPlayerIds,
-      ...buildCurrentPlayerPresenceOptions(access.gameId, access.auth.session.accountId)
+      ...buildCurrentPlayerPresenceOptions(access.gameId, access.auth.session)
     }
   );
 }
@@ -4165,7 +4308,8 @@ function buildGameTurnStatusResponse(
 function saveAndUnloadRunningMultiplayerGame(
   gameId: string,
   runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
-  record: NonNullable<ReturnType<typeof getGameById>>
+  record: NonNullable<ReturnType<typeof getGameById>>,
+  inactiveReason: 'NO_PRESENT_HUMANS' | 'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS'
 ): void {
   const ownerAccountId = record.ownerAccountId ?? record.hostAccountId;
   if (ownerAccountId !== null) {
@@ -4177,6 +4321,7 @@ function saveAndUnloadRunningMultiplayerGame(
   moveMountedRuntimeAwayFromGame(gameId);
 
   updateGameRecord(GAME_REGISTRY_DATA_PATH, gameId, {
+    inactiveReason,
     updatedAt: new Date().toISOString()
   });
 }
@@ -4208,6 +4353,7 @@ function registerRunningGame(
     kind,
     status: 'RUNNING',
     name: galaxy.name,
+    inactiveReason: null,
     ownerAccountId: options.ownerAccountId,
     ownerPlayerName: options.ownerPlayerName,
     hostAccountId: options.hostAccountId,
@@ -4251,6 +4397,7 @@ function updateCurrentRuntimeGameRegistryRecord(): void {
 
   updateGameRecord(GAME_REGISTRY_DATA_PATH, currentRuntimeGameId, {
     status: 'RUNNING',
+    inactiveReason: null,
     name: currentGalaxy.name,
     currentTurn: currentGalaxy.currentTurn,
     updatedAt: new Date().toISOString()
@@ -4468,12 +4615,12 @@ function buildMultiplayerGameDetailResponse(
     return null;
   }
 
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
   const canViewRunning = !!session && (session.localAdmin === true || canSessionViewGameRecord(record.gameId, session));
-  if (record.status !== 'DRAFT' && !canViewRunning) {
+  if (record.status !== 'DRAFT' && !lobby && !canViewRunning) {
     return null;
   }
 
-  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
   const runtime = getGameRuntime(gameId);
   return {
     game: buildGameSummary(record, session),
@@ -4494,10 +4641,8 @@ function buildMultiplayerGameListItem(
   record: ReturnType<typeof listGames>[number],
   session: AuthSession | null
 ): MultiplayerGameBrowserResponse['activeDraftLobbies'][number] {
-  const lobby = record.status === 'DRAFT'
-    ? getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId)
-    : null;
-  const membershipCount = record.status === 'DRAFT'
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId);
+  const membershipCount = lobby
     ? (lobby?.members.length ?? 0)
     : listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId)
       .filter((entry) => entry.isActive)
@@ -4510,20 +4655,26 @@ function buildMultiplayerGameListItem(
   const runtime = record.status === 'RUNNING'
     ? getGameRuntime(record.gameId)
     : null;
+  const canEnter = record.status === 'RUNNING' && !lobby && !!session && canSessionViewGameRecord(record.gameId, session);
   return {
     gameId: record.gameId,
     name: record.name,
     status: record.status,
     statusLabel: buildMultiplayerGameStatusLabel(record),
+    isResumeLobby: lobby?.isResumeLobby === true,
+    inactiveReasonText: buildMultiplayerInactiveReasonText(record),
     hostAccountId: record.hostAccountId,
     hostPlayerName: record.hostPlayerName,
     memberCount: membershipCount,
     offlineBotControlledCount: runtime?.offlineBotControlledPlayerIds.size ?? 0,
     isMember,
     isCurrentGame: session?.currentGameId === record.gameId,
-    canJoin: record.status === 'DRAFT' && !!session && !isMember,
-    canEnter: record.status === 'RUNNING' && !!session && canSessionViewGameRecord(record.gameId, session),
-    canManage: session?.localAdmin === true && (record.status !== 'DRAFT' || record.hostAccountId === session.accountId),
+    canJoin: !!lobby && !!session && !isMember,
+    canEnter,
+    canReturnToGame: canEnter && isMember && session?.currentGameId !== record.gameId,
+    canResumeLobby: record.status === 'RUNNING' && !runtime && !lobby && session?.localAdmin === true,
+    canManage: session?.localAdmin === true && (!lobby || lobby.hostAccountId === session.accountId),
+    canArchive: record.status === 'RUNNING' && !runtime && !lobby && session?.localAdmin === true,
     updatedAt: record.updatedAt
   };
 }
@@ -4532,7 +4683,7 @@ function canSessionViewMultiplayerBrowserRecord(
   record: ReturnType<typeof listGames>[number],
   session: AuthSession | null
 ): boolean {
-  if (record.status === 'DRAFT') {
+  if (getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId)) {
     return true;
   }
 
@@ -4540,6 +4691,13 @@ function canSessionViewMultiplayerBrowserRecord(
 }
 
 function isActiveDraftLobbyForBrowser(record: ReturnType<typeof listGames>[number], nowMs: number): boolean {
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId);
+  if (!lobby) {
+    return false;
+  }
+  if (lobby.isResumeLobby) {
+    return record.status === 'RUNNING' && !hasGameRuntime(record.gameId);
+  }
   if (record.status !== 'DRAFT') {
     return false;
   }
@@ -4553,15 +4711,32 @@ function isActiveDraftLobbyForBrowser(record: ReturnType<typeof listGames>[numbe
 }
 
 function isActiveRunningMultiplayerGameForBrowser(record: ReturnType<typeof listGames>[number]): boolean {
-  return record.status === 'RUNNING' && hasGameRuntime(record.gameId);
+  return record.status === 'RUNNING'
+    && hasGameRuntime(record.gameId)
+    && !getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId);
 }
 
 function buildMultiplayerGameStatusLabel(record: ReturnType<typeof listGames>[number]): string {
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId);
+  if (lobby?.isResumeLobby) {
+    return 'Resumed lobby';
+  }
   if (record.status === 'RUNNING' && !hasGameRuntime(record.gameId)) {
     return 'Saved / Inactive';
   }
 
   return record.status;
+}
+
+function buildMultiplayerInactiveReasonText(record: ReturnType<typeof listGames>[number]): string | null {
+  switch (record.inactiveReason) {
+    case 'NO_PRESENT_HUMANS':
+      return 'Stopped because no players remained present.';
+    case 'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS':
+      return 'Stopped because not enough players remained online.';
+    default:
+      return null;
+  }
 }
 
 function buildRunningMultiplayerMembers(
@@ -4642,11 +4817,14 @@ function removeAccountFromOtherDraftMultiplayerLobbies(accountId: number, except
 
   for (const membership of memberships) {
     const record = getGameById(GAME_REGISTRY_DATA_PATH, membership.gameId);
-    if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
+    const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, membership.gameId);
+    const isJoinableDraftLikeLobby = !!record
+      && record.kind === 'MULTIPLAYER'
+      && !!lobby
+      && (record.status === 'DRAFT' || (record.status === 'RUNNING' && !hasGameRuntime(membership.gameId) && lobby.isResumeLobby));
+    if (!isJoinableDraftLikeLobby) {
       continue;
     }
-
-    const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, membership.gameId);
     if (!lobby || !lobby.members.some((member) => member.accountId === accountId)) {
       removeMembership(GAME_MEMBERSHIPS_DATA_PATH, membership.gameId, accountId);
       continue;
@@ -4656,10 +4834,14 @@ function removeAccountFromOtherDraftMultiplayerLobbies(accountId: number, except
     removeMembership(GAME_MEMBERSHIPS_DATA_PATH, membership.gameId, accountId);
     if (!nextLobby) {
       deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, membership.gameId);
-      updateGameRecord(GAME_REGISTRY_DATA_PATH, membership.gameId, {
-        status: 'ARCHIVED',
-        updatedAt: new Date().toISOString()
-      });
+      updateGameRecord(GAME_REGISTRY_DATA_PATH, membership.gameId, record.status === 'DRAFT'
+        ? {
+          status: 'ARCHIVED',
+          updatedAt: new Date().toISOString()
+        }
+        : {
+          updatedAt: new Date().toISOString()
+        });
       continue;
     }
 
@@ -4680,7 +4862,7 @@ function loadDraftMultiplayerLobbyForManagement(
   lobby: NonNullable<ReturnType<typeof getMultiplayerLobbyByGameId>>;
 } | null {
   const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
-  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'DRAFT') {
+  if (!record || record.kind !== 'MULTIPLAYER') {
     return null;
   }
 
@@ -4694,6 +4876,33 @@ function loadDraftMultiplayerLobbyForManagement(
   }
 
   return { record, lobby };
+}
+
+function loadJoinableMultiplayerLobby(
+  gameId: string
+): {
+  record: NonNullable<ReturnType<typeof getGameById>>;
+  lobby: NonNullable<ReturnType<typeof getMultiplayerLobbyByGameId>>;
+} | null {
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  if (!record || record.kind !== 'MULTIPLAYER') {
+    return null;
+  }
+
+  const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
+  if (!lobby) {
+    return null;
+  }
+
+  if (record.status === 'DRAFT') {
+    return { record, lobby };
+  }
+
+  if (record.status === 'RUNNING' && !hasGameRuntime(gameId) && lobby.isResumeLobby) {
+    return { record, lobby };
+  }
+
+  return null;
 }
 
 function hydrateRunningMultiplayerGameFromLobby(
@@ -4823,7 +5032,8 @@ function createSession(data: AuthData, account: AuthAccount, timestamp: string):
     localAdmin: account.localAdmin === true,
     createdAt: timestamp,
     lastSeenAt: timestamp,
-    currentGameId: account.currentGameId
+    currentGameId: account.currentGameId,
+    pendingPresenceRemovedNoticeGameId: null
   };
 
   data.sessions.push(session);

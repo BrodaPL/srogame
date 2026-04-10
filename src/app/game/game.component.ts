@@ -23,6 +23,7 @@ export class GameComponent implements OnInit, OnDestroy {
   protected isLoading = false;
   protected isGameReady = false;
   protected showAutoSkipReturnNotice = false;
+  protected showPresenceRemovedReturnNotice = false;
   private turnStatusPollHandle: number | null = null;
   private autoSkipInactivityHandle: number | null = null;
   private isPollingTurnStatus = false;
@@ -91,6 +92,7 @@ export class GameComponent implements OnInit, OnDestroy {
     this.isLoading = false;
     this.isGameReady = false;
     this.showAutoSkipReturnNotice = false;
+    this.showPresenceRemovedReturnNotice = false;
     this.stateTitle = 'Login required';
     this.stateError = 'Login to continue, then start or join a game.';
     this.stateActionLabel = 'Go to login';
@@ -104,6 +106,7 @@ export class GameComponent implements OnInit, OnDestroy {
     this.isLoading = false;
     this.isGameReady = false;
     this.showAutoSkipReturnNotice = false;
+    this.showPresenceRemovedReturnNotice = false;
 
     if (error?.status === 401) {
       this.authState.clearSession();
@@ -236,6 +239,7 @@ export class GameComponent implements OnInit, OnDestroy {
     const session = this.playerSession.load();
     if (!session?.currentGameId) {
       this.showAutoSkipReturnNotice = false;
+      this.showPresenceRemovedReturnNotice = false;
       return;
     }
 
@@ -245,9 +249,11 @@ export class GameComponent implements OnInit, OnDestroy {
       next: (turnStatus) => {
         this.applyTurnStatus(turnStatus);
         this.showAutoSkipReturnNotice = false;
+        this.showPresenceRemovedReturnNotice = false;
       },
       error: () => {
         this.showAutoSkipReturnNotice = false;
+        this.showPresenceRemovedReturnNotice = false;
       }
     });
   }
@@ -256,6 +262,7 @@ export class GameComponent implements OnInit, OnDestroy {
     const session = this.playerSession.load();
     if (!session?.currentGameId) {
       this.showAutoSkipReturnNotice = false;
+      this.showPresenceRemovedReturnNotice = false;
       return;
     }
 
@@ -266,9 +273,31 @@ export class GameComponent implements OnInit, OnDestroy {
       next: (turnStatus) => {
         this.applyTurnStatus(turnStatus);
         this.showAutoSkipReturnNotice = false;
+        this.showPresenceRemovedReturnNotice = false;
       },
       error: () => {
         this.showAutoSkipReturnNotice = false;
+        this.showPresenceRemovedReturnNotice = false;
+      }
+    });
+  }
+
+  protected acknowledgePresenceRemovedNotice(): void {
+    const session = this.playerSession.load();
+    if (!session?.currentGameId) {
+      this.showPresenceRemovedReturnNotice = false;
+      return;
+    }
+
+    this.gameApi.updateMultiplayerGamePresence(session.currentGameId, {
+      acknowledgePresenceRemovedNotice: true
+    }, session.token).subscribe({
+      next: (turnStatus) => {
+        this.applyTurnStatus(turnStatus);
+        this.showPresenceRemovedReturnNotice = false;
+      },
+      error: () => {
+        this.showPresenceRemovedReturnNotice = false;
       }
     });
   }
@@ -279,6 +308,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   private handleTurnStatusUpdated(turnStatus: TurnStatusResponse | null): void {
     this.showAutoSkipReturnNotice = turnStatus?.showAutoSkipReturnNotice === true;
+    this.showPresenceRemovedReturnNotice = turnStatus?.showPresenceRemovedReturnNotice === true;
     this.resetAutoSkipTimer();
   }
 
