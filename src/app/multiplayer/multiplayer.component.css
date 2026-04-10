@@ -123,6 +123,12 @@
   letter-spacing: 0.01em;
 }
 
+.multiplayer-browser-card__badge--resume {
+  border-color: rgba(60, 201, 189, 0.32);
+  background: rgba(60, 201, 189, 0.12);
+  color: #a7f5ee;
+}
+
 .multiplayer-browser-card__action {
   margin-top: 0;
   width: fit-content;
@@ -241,6 +247,15 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #ffcf8a;
+}
+
+.multiplayer-callout--resume {
+  border-color: rgba(60, 201, 189, 0.26);
+  background: rgba(60, 201, 189, 0.08);
+}
+
+.multiplayer-callout--resume .multiplayer-callout__title {
+  color: #a7f5ee;
 }
 
 .multiplayer-management {

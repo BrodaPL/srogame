@@ -96,13 +96,15 @@ Top-level routes:
 Main menu note:
 - `src/app/main-menu/` now reads `/api/games/current`, shows a primary `Resume current game` action plus a compact current-game status card, and uses `/api/games/:gameId/select` before entering the game shell
 - `src/app/main-menu/` no longer tries to act as a general game browser; lobby selection stays in `/multiplayer`, and broader save browsing stays in `/load`
+- `src/app/main-menu/` now also offers a direct `Open Multiplayer` handoff when the current selected game is a saved/inactive multiplayer game that cannot be resumed directly
 - `src/app/main-menu/` now also links authenticated players to `/settings`
 
 Multiplayer route note:
-- `src/app/multiplayer/` now uses the per-game `/api/multiplayer/games*` family and renders a browser/detail layout with three sections: `Active Draft Lobbies`, `Active Running Games`, and collapsed `Other Multiplayer Games`
-  - `Other Multiplayer Games` is where stale drafts, unloaded running games (`Saved / Inactive`), and archived multiplayer history now appear
+- `src/app/multiplayer/` now uses the per-game `/api/multiplayer/games*` family and renders a browser/detail layout with four sections: `Active Draft Lobbies`, `Active Running Games`, collapsed `Other Multiplayer Games`, and collapsed `Archived Multiplayer Games`
+  - `Other Multiplayer Games` is where stale drafts and unloaded running games (`Saved / Inactive`) now appear
+  - `Archived Multiplayer Games` is split out so history does not clutter the normal recovery flow
   - the selected draft detail panel owns join/leave/ready state, host setup/save/seat/start controls, and uses the shared save list only for save binding while the old singleton lobby UI is being phased out
-  - the selected running-game detail now also exposes `Leave current game` for the current account
+  - resumed lobbies now get a clearer locked-snapshot callout, and the selected running-game detail now also exposes `Leave current game` for the current account
 
 Game child routes:
 

@@ -36,6 +36,11 @@
   box-shadow: 0 14px 28px rgba(255, 122, 79, 0.16);
 }
 
+.menu-button--secondary {
+  border-color: rgba(60, 201, 189, 0.35);
+  background: rgba(60, 201, 189, 0.12);
+}
+
 .menu-button:disabled {
   cursor: not-allowed;
   opacity: 0.68;

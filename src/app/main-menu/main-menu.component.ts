@@ -49,6 +49,14 @@ export class MainMenuComponent {
     return this.currentGameStatus?.canResume === true;
   }
 
+  protected shouldShowOpenMultiplayer(): boolean {
+    const game = this.currentGameStatus?.game;
+    return !!game
+      && game.kind === 'MULTIPLAYER'
+      && game.status === 'RUNNING'
+      && this.currentGameStatus?.canResume !== true;
+  }
+
   protected showCurrentGameCard(): boolean {
     return !!this.session();
   }

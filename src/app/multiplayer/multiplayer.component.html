@@ -78,7 +78,7 @@
                     <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
                     <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
                     @if (item.isResumeLobby) {
-                      <span class="multiplayer-browser-card__badge">Resumed lobby</span>
+                      <span class="multiplayer-browser-card__badge multiplayer-browser-card__badge--resume">Resumed lobby</span>
                     }
                     @if (item.offlineBotControlledCount > 0) {
                       <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
@@ -135,7 +135,7 @@
           <div class="multiplayer-browser-section__head">
             <div>
               <p class="saved__title">Other Multiplayer Games</p>
-              <p class="multiplayer-browser-section__meta">Older drafts, saved inactive games, and archived multiplayer records.</p>
+              <p class="multiplayer-browser-section__meta">Older drafts and saved inactive multiplayer games that are not currently joinable.</p>
             </div>
             <button class="start-button multiplayer-browser-section__toggle" type="button" (click)="showOtherGames = !showOtherGames">
               {{ showOtherGames ? 'Hide other games' : 'Show other games' }}
@@ -143,26 +143,26 @@
           </div>
 
           @if (showOtherGames) {
-            @if (otherMultiplayerGames().length === 0) {
+            @if (visibleOtherMultiplayerGames().length === 0) {
               <div class="saved">
                 <p>No other multiplayer games are visible to this account.</p>
               </div>
             } @else {
               <div class="multiplayer-browser-list">
-                @for (item of otherMultiplayerGames(); track item.gameId) {
+                @for (item of visibleOtherMultiplayerGames(); track item.gameId) {
                   <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
                     <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
-                    <span class="multiplayer-browser-card__title">{{ item.name }}</span>
-                    <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
-                    <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
-                    @if (item.inactiveReasonText) {
-                      <span class="multiplayer-browser-card__meta">{{ item.inactiveReasonText }}</span>
-                    }
-                    @if (item.offlineBotControlledCount > 0) {
-                      <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
-                    }
-                    <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
-                  </button>
+                      <span class="multiplayer-browser-card__title">{{ item.name }}</span>
+                      <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                      <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
+                      @if (item.inactiveReasonText) {
+                        <span class="multiplayer-browser-card__meta">{{ item.inactiveReasonText }}</span>
+                      }
+                      @if (item.offlineBotControlledCount > 0) {
+                        <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
+                      }
+                      <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                    </button>
                     @if (item.canEnter) {
                       <button class="start-button multiplayer-browser-card__action" type="button" (click)="enterRunningGame(item)" [disabled]="isActing">
                         {{ enterButtonLabel(item) }}
@@ -178,6 +178,39 @@
                         Archive
                       </button>
                     }
+                  </article>
+                }
+              </div>
+            }
+          }
+        </section>
+
+        <section class="multiplayer-browser-section">
+          <div class="multiplayer-browser-section__head">
+            <div>
+              <p class="saved__title">Archived Multiplayer Games</p>
+              <p class="multiplayer-browser-section__meta">Historical multiplayer records kept out of the normal recovery flow by default.</p>
+            </div>
+            <button class="start-button multiplayer-browser-section__toggle" type="button" (click)="showArchivedGames = !showArchivedGames">
+              {{ showArchivedGames ? 'Hide archived' : 'Show archived' }}
+            </button>
+          </div>
+
+          @if (showArchivedGames) {
+            @if (archivedMultiplayerGames().length === 0) {
+              <div class="saved">
+                <p>No archived multiplayer games are visible to this account.</p>
+              </div>
+            } @else {
+              <div class="multiplayer-browser-list">
+                @for (item of archivedMultiplayerGames(); track item.gameId) {
+                  <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
+                    <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
+                      <span class="multiplayer-browser-card__title">{{ item.name }}</span>
+                      <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                      <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
+                      <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                    </button>
                   </article>
                 }
               </div>
@@ -291,7 +324,10 @@
                 <p>Host: {{ selectedLobby()!.hostPlayerName }}</p>
                 <p>Mode: {{ selectedLobby()!.mode === 'LOAD_SAVE' ? 'Load saved game' : 'Start new game' }}</p>
                 @if (selectedLobby()!.isResumeLobby) {
-                  <p>Resume mode: locked to the saved multiplayer snapshot.</p>
+                  <div class="multiplayer-callout multiplayer-callout--resume">
+                    <p class="multiplayer-callout__title">Resumed lobby</p>
+                    <p>This lobby resumes a saved multiplayer game. Settings stay locked to the saved snapshot while players rejoin and localAdmin prepares the restart.</p>
+                  </div>
                 }
                 <p>Joined players: {{ selectedLobby()!.members.length }}</p>
                 @if (selectedLobby()!.startBlockedReason) {
@@ -584,7 +620,7 @@
             @if (canManageSelectedLobby() && selectedLobby()!.isResumeLobby) {
               <section class="saved">
                 <p class="saved__title">Resume Lobby</p>
-                <p>This lobby is locked to the selected saved multiplayer snapshot. Players can rejoin, seat replacements can be adjusted if needed, and localAdmin can start the saved game again.</p>
+                <p>This resumed lobby is locked to the saved multiplayer snapshot. Players can rejoin here, seat replacements can still be adjusted if needed, and localAdmin can start the saved game again once everyone is ready.</p>
               </section>
             }
           }

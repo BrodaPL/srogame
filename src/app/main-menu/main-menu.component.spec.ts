@@ -68,6 +68,7 @@ describe('MainMenuComponent', () => {
     expect(component.canResumeCurrentGame()).toBe(false);
     expect(component.currentGameStatusLabel()).toBe('Saved / Inactive');
     expect(component.resumeUnavailableReason()).toBe('This multiplayer game is saved and inactive. Open Multiplayer to resume it.');
+    expect(component.shouldShowOpenMultiplayer()).toBe(true);
   });
 
   it('shows the empty current-game state when no game is selected', () => {
@@ -84,6 +85,7 @@ describe('MainMenuComponent', () => {
     expect(component.currentGameName()).toBe('No current game selected');
     expect(component.currentGameStatusLabel()).toBe('No game selected');
     expect(component.resumeUnavailableReason()).toBe('Select or create a game first.');
+    expect(component.shouldShowOpenMultiplayer()).toBe(false);
   });
 });
 
@@ -98,6 +100,7 @@ function createBareComponent(
   resumeError: string | null;
   session: () => PlayerSession | null;
   canResumeCurrentGame(): boolean;
+  shouldShowOpenMultiplayer(): boolean;
   currentGameName(): string;
   currentGameStatusLabel(): string;
   resumeUnavailableReason(): string | null;
@@ -108,6 +111,7 @@ function createBareComponent(
     resumeError: string | null;
     session: () => PlayerSession | null;
     canResumeCurrentGame(): boolean;
+    shouldShowOpenMultiplayer(): boolean;
     currentGameName(): string;
     currentGameStatusLabel(): string;
     resumeUnavailableReason(): string | null;

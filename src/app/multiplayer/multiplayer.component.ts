@@ -79,6 +79,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected error: string | null = null;
   protected infoMessage: string | null = null;
   protected showOtherGames = false;
+  protected showArchivedGames = false;
   protected selectedSaveId = '';
   protected setupForm: LobbySetupForm = this.createForm(this.defaultSetup());
   private readonly refreshHandle: number;
@@ -133,6 +134,14 @@ export class MultiplayerComponent implements OnDestroy {
     return this.browserResponse?.otherMultiplayerGames ?? [];
   }
 
+  protected visibleOtherMultiplayerGames(): MultiplayerGameListItem[] {
+    return this.otherMultiplayerGames().filter((item) => item.status !== 'ARCHIVED');
+  }
+
+  protected archivedMultiplayerGames(): MultiplayerGameListItem[] {
+    return this.otherMultiplayerGames().filter((item) => item.status === 'ARCHIVED');
+  }
+
   protected selectedBrowserItem(): MultiplayerGameListItem | null {
     const gameId = this.selectedGameId;
     if (!gameId) {
@@ -162,7 +171,8 @@ export class MultiplayerComponent implements OnDestroy {
   protected hasGames(): boolean {
     return this.activeDraftLobbies().length > 0
       || this.activeRunningGames().length > 0
-      || this.otherMultiplayerGames().length > 0;
+      || this.visibleOtherMultiplayerGames().length > 0
+      || this.archivedMultiplayerGames().length > 0;
   }
 
   protected isSelected(item: MultiplayerGameListItem): boolean {

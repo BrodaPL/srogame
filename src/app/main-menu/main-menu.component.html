@@ -47,6 +47,11 @@
         @if (resumeUnavailableReason()) {
           <p class="subtitle main-menu-resume-reason">{{ resumeUnavailableReason() }}</p>
         }
+        @if (shouldShowOpenMultiplayer()) {
+          <button class="menu-button menu-button--secondary" type="button" routerLink="/multiplayer">
+            Open Multiplayer
+          </button>
+        }
         <button class="menu-button" type="button" routerLink="/setup" [disabled]="!canManageSingleplayer()">
           Singleplayer
         </button>
