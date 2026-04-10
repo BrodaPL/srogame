@@ -40,12 +40,24 @@
           class="menu-button menu-button--primary"
           type="button"
           (click)="resumeCurrentGame()"
-          [disabled]="!canResumeCurrentGame() || isLoadingCurrentGameStatus"
+          [disabled]="!canResumeCurrentGame() || isLoadingCurrentGameStatus || isClosingCurrentGame"
           [title]="resumeUnavailableReason() ?? ''">
           Resume Current Game
         </button>
+        @if (shouldShowCloseCurrentGame()) {
+          <button
+            class="menu-button menu-button--secondary"
+            type="button"
+            (click)="closeCurrentGame()"
+            [disabled]="isLoadingCurrentGameStatus || isClosingCurrentGame">
+            {{ isClosingCurrentGame ? 'Closing...' : 'Close Current Game' }}
+          </button>
+        }
         @if (resumeUnavailableReason()) {
           <p class="subtitle main-menu-resume-reason">{{ resumeUnavailableReason() }}</p>
+        }
+        @if (closeError) {
+          <p class="subtitle main-menu-resume-reason">{{ closeError }}</p>
         }
         @if (shouldShowOpenMultiplayer()) {
           <button class="menu-button menu-button--secondary" type="button" routerLink="/multiplayer">

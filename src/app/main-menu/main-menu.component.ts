@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
+import { GameStateService } from '../core/game-state.service';
 import type { CurrentGameStatusResponse } from '../models/game-api-types';
 
 @Component({
@@ -15,12 +16,15 @@ export class MainMenuComponent {
   protected readonly session: AuthStateService['session'];
   protected currentGameStatus: CurrentGameStatusResponse | null = null;
   protected isLoadingCurrentGameStatus = false;
+  protected isClosingCurrentGame = false;
   protected resumeError: string | null = null;
+  protected closeError: string | null = null;
 
   constructor(
     private readonly authApi: AuthApiService,
     private readonly authState: AuthStateService,
     private readonly gameApi: GameApiService,
+    private readonly gameState: GameStateService,
     private readonly router: Router
   ) {
     this.session = this.authState.session;
@@ -29,7 +33,9 @@ export class MainMenuComponent {
       if (!session) {
         this.currentGameStatus = null;
         this.isLoadingCurrentGameStatus = false;
+        this.isClosingCurrentGame = false;
         this.resumeError = null;
+        this.closeError = null;
         return;
       }
 
@@ -55,6 +61,14 @@ export class MainMenuComponent {
       && game.kind === 'MULTIPLAYER'
       && game.status === 'RUNNING'
       && this.currentGameStatus?.canResume !== true;
+  }
+
+  protected shouldShowCloseCurrentGame(): boolean {
+    const game = this.currentGameStatus?.game;
+    return this.session()?.localAdmin === true
+      && !!game
+      && game.kind === 'SINGLEPLAYER'
+      && this.currentGameStatus?.canResume === true;
   }
 
   protected showCurrentGameCard(): boolean {
@@ -126,6 +140,7 @@ export class MainMenuComponent {
     }
 
     this.resumeError = null;
+    this.closeError = null;
     this.gameApi.selectGame(gameId, session.token).subscribe({
       next: (status) => {
         this.currentGameStatus = status;
@@ -142,6 +157,37 @@ export class MainMenuComponent {
       },
       error: (error) => {
         this.resumeError = error?.error?.error ?? 'Unable to resume the selected game.';
+        this.loadCurrentGameStatus(session.token);
+      }
+    });
+  }
+
+  protected closeCurrentGame(): void {
+    const session = this.session();
+    const gameId = this.currentGameStatus?.currentGameId;
+    if (!session || !gameId || !this.shouldShowCloseCurrentGame()) {
+      return;
+    }
+
+    this.isClosingCurrentGame = true;
+    this.closeError = null;
+    this.resumeError = null;
+    this.gameApi.closeCurrentGame(gameId, session.token).subscribe({
+      next: (status) => {
+        this.currentGameStatus = status;
+        this.isClosingCurrentGame = false;
+        const nextSession = this.session();
+        if (nextSession) {
+          this.authState.setSession({
+            ...nextSession,
+            currentGameId: status.currentGameId
+          });
+        }
+        this.gameState.clearGalaxy();
+      },
+      error: (error) => {
+        this.isClosingCurrentGame = false;
+        this.closeError = error?.error?.error ?? 'Unable to close the current game.';
         this.loadCurrentGameStatus(session.token);
       }
     });
@@ -169,7 +215,9 @@ export class MainMenuComponent {
       next: (status) => {
         this.currentGameStatus = status;
         this.isLoadingCurrentGameStatus = false;
+        this.isClosingCurrentGame = false;
         this.resumeError = null;
+        this.closeError = null;
       },
       error: () => {
         this.currentGameStatus = null;

@@ -954,6 +954,49 @@ app.post('/api/games/:gameId/select', (req, res) => {
   return res.status(200).json(buildCurrentGameStatusResponse(auth.session));
 });
 
+app.post('/api/games/:gameId/close-current', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (!isLocalAdminSession(auth.session)) {
+    return res.status(403).json({ error: 'Local admin privileges are required to close a single-player game.' });
+  }
+
+  const gameId = typeof req.params.gameId === 'string' ? req.params.gameId.trim() : '';
+  if (!gameId || auth.session.currentGameId !== gameId) {
+    return res.status(403).json({ error: 'Select this game as your current game first.' });
+  }
+
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  if (!record) {
+    return res.status(404).json({ error: 'Game not found.' });
+  }
+
+  if (record.kind === 'MULTIPLAYER') {
+    return res.status(400).json({ error: 'Use multiplayer leave/resume actions for multiplayer games.' });
+  }
+
+  const runtime = getGameRuntime(gameId);
+  if (!runtime) {
+    return res.status(409).json({ error: 'This single-player game is not currently loaded.' });
+  }
+
+  try {
+    saveRuntimeSnapshot(gameId, runtime, record.ownerAccountId ?? auth.session.accountId);
+    deleteGameRuntime(gameId);
+    moveMountedRuntimeAwayFromGame(gameId);
+    setAccountCurrentGameId(auth.data, auth.session.accountId, null);
+    auth.session.currentGameId = null;
+    saveAuthData(auth.data);
+    return res.status(200).json(buildCurrentGameStatusResponse(auth.session));
+  } catch (error) {
+    console.error('Failed to close the current single-player game.', error);
+    return res.status(500).json({ error: 'Unable to close the current single-player game.' });
+  }
+});
+
 app.get('/api/games/:gameId/saves', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {

@@ -297,6 +297,58 @@ describe.sequential('auth api', () => {
     });
   });
 
+  it('closes the current loaded single-player game, saves it, and clears the current game pointer', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'SingleplayerAdmin',
+      email: 'singleplayer-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.7');
+    activateAccount('SingleplayerAdmin', { localAdmin: true });
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'SingleplayerAdmin',
+      password: 'secret-123'
+    }, '10.0.0.7');
+    expect(loginResponse.status).toBe(200);
+    const token = loginResponse.json?.token as string;
+
+    const startResponse = await request('POST', '/api/game/start', {
+      setup: createSingleplayerSetup('Close Test Sector')
+    }, '10.0.0.7', token);
+    expect(startResponse.status).toBe(200);
+    const startedPlayer = startResponse.json?.player as Record<string, unknown> | undefined;
+    const gameId = typeof startedPlayer?.currentGameId === 'string' ? startedPlayer.currentGameId : null;
+    expect(typeof gameId).toBe('string');
+
+    const closeResponse = await request('POST', `/api/games/${gameId}/close-current`, {}, '10.0.0.7', token);
+    expect(closeResponse.status).toBe(200);
+    expect(closeResponse.json).toEqual({
+      currentGameId: null,
+      game: null,
+      canResume: false,
+      unavailableReason: null
+    });
+
+    const authData = readAuthData();
+    expect(authData.accounts[0]?.currentGameId).toBeNull();
+    expect(authData.sessions[0]?.currentGameId).toBeNull();
+
+    const registry = readGameRegistry();
+    const game = registry.games.find((entry) => entry.gameId === gameId);
+    expect(game?.kind).toBe('SINGLEPLAYER');
+    expect(game?.status).toBe('RUNNING');
+    expect(typeof game?.currentSaveId).toBe('string');
+
+    const currentResponse = await request('GET', '/api/games/current', undefined, '10.0.0.7', token);
+    expect(currentResponse.status).toBe(200);
+    expect(currentResponse.json).toEqual({
+      currentGameId: null,
+      game: null,
+      canResume: false,
+      unavailableReason: null
+    });
+  });
+
   it('classifies stale draft lobbies into other multiplayer games', async () => {
     await request('POST', '/api/auth/register', {
       playerName: 'DraftAdmin',
@@ -1084,4 +1136,38 @@ async function request(
 
 async function delay(durationMs: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, durationMs));
+}
+
+function createSingleplayerSetup(galaxyName: string): Record<string, unknown> {
+  return {
+    gameType: 'Sandbox',
+    galaxyName,
+    galaxyWidth: 25,
+    galaxyHeight: 20,
+    galaxyCenterSize: 10,
+    voidChance: 5,
+    starsAmountModifier: [-1, 4],
+    playerAmount: 1,
+    botsAmount: 0,
+    botDifficulty: 0,
+    botProfileCounts: {
+      TURTLE: 0,
+      BALANCED: 0,
+      RUSHER: 0,
+      RECYCLER: 0,
+      TECHNOLOGIST: 0
+    },
+    neutralBotsAmount: 1,
+    neutralBotsDifficulty: 0,
+    autoSaveTurns: 5,
+    startingHomeworldPreset: 'Medium',
+    createRandomPlanets: false,
+    createStartingShips: false,
+    skipTutorial: true,
+    startingResources: {
+      metal: 6,
+      crystal: 3,
+      deuterium: 1
+    }
+  };
 }

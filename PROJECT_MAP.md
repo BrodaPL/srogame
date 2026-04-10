@@ -97,6 +97,7 @@ Main menu note:
 - `src/app/main-menu/` now reads `/api/games/current`, shows a primary `Resume current game` action plus a compact current-game status card, and uses `/api/games/:gameId/select` before entering the game shell
 - `src/app/main-menu/` no longer tries to act as a general game browser; lobby selection stays in `/multiplayer`, and broader save browsing stays in `/load`
 - `src/app/main-menu/` now also offers a direct `Open Multiplayer` handoff when the current selected game is a saved/inactive multiplayer game that cannot be resumed directly
+- `src/app/main-menu/` now also offers `Close current game` for resumable loaded single-player current games; that action calls `/api/games/:gameId/close-current`, auto-saves, unloads the runtime, and clears the current-game pointer
 - `src/app/main-menu/` now also links authenticated players to `/settings`
 
 Multiplayer route note:
@@ -204,6 +205,7 @@ Game registry:
 - `/api/games`
 - `/api/games/current`
 - `/api/games/:gameId/select`
+- `/api/games/:gameId/close-current`
 - `/api/games/:gameId/saves`
 - `/api/games/:gameId/state`
 - `/api/games/:gameId/turn-status`

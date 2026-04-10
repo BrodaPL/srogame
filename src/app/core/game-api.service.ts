@@ -98,6 +98,14 @@ export class GameApiService {
     );
   }
 
+  public closeCurrentGame(gameId: string, token: string) {
+    return this.http.post<CurrentGameStatusResponse>(
+      `${API_BASE_URL}/games/${encodeURIComponent(gameId)}/close-current`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
   public startGame(request: StartGameRequest, token: string) {
     return this.http.post<StartGameResponse>(
       `${API_BASE_URL}/game/start`,
