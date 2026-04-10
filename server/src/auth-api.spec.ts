@@ -24,6 +24,7 @@ describe.sequential('auth api', () => {
   const originalLobbyPath = process.env.SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH;
   const originalPresencePath = process.env.SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH;
   const originalSavesPath = process.env.SROGAME_GAME_SAVES_DIRECTORY_PATH;
+  const originalEmptyRuntimeUnloadMs = process.env.SROGAME_MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS;
   const originalTurnstileBypass = process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV;
   const originalPort = process.env.PORT;
 
@@ -41,6 +42,7 @@ describe.sequential('auth api', () => {
     process.env.SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH = path.join(tempDir, 'multiplayer-lobbies.json');
     process.env.SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH = path.join(tempDir, 'multiplayer-presence.json');
     process.env.SROGAME_GAME_SAVES_DIRECTORY_PATH = path.join(tempDir, 'saves');
+    process.env.SROGAME_MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS = '250';
     process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV = 'true';
     process.env.PORT = '0';
 
@@ -81,6 +83,7 @@ describe.sequential('auth api', () => {
     process.env.SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH = originalLobbyPath;
     process.env.SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH = originalPresencePath;
     process.env.SROGAME_GAME_SAVES_DIRECTORY_PATH = originalSavesPath;
+    process.env.SROGAME_MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS = originalEmptyRuntimeUnloadMs;
     process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV = originalTurnstileBypass;
     process.env.PORT = originalPort;
 
@@ -438,6 +441,8 @@ describe.sequential('auth api', () => {
     await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.52', guestToken);
     const startResponse = await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.51', adminToken);
     expect(startResponse.status).toBe(200);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.51', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.52', guestToken);
 
     const logoutResponse = await request('POST', '/api/auth/logout', {}, '10.0.0.52', guestToken);
     expect(logoutResponse.status).toBe(204);
@@ -654,6 +659,192 @@ describe.sequential('auth api', () => {
     });
   });
 
+  it('removes long-afk presence, clears ready state, and switches opted-in players to offline bot control', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'AfkAdmin',
+      email: 'afk-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.91');
+    activateAccount('AfkAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'AfkGuest',
+      email: 'afk-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.92');
+    activateAccount('AfkGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'AfkAdmin',
+      password: 'secret-123'
+    }, '10.0.0.91');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'AfkGuest',
+      password: 'secret-123'
+    }, '10.0.0.92');
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const preferencesResponse = await request('POST', '/api/account/settings/preferences', {
+      replaceWithBotOnLogout: true,
+      logoutBotProfileId: 'TURTLE',
+      language: null
+    }, '10.0.0.92', guestToken);
+    expect(preferencesResponse.status).toBe(200);
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.91', adminToken);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.92', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.92', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.91', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.91', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.92', guestToken);
+
+    setPresenceLastSeen(gameId!, 2, new Date(Date.now() - 31 * 60 * 1000).toISOString());
+
+    const detailResponse = await request('GET', `/api/multiplayer/games/${gameId}`, undefined, '10.0.0.91', adminToken);
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.json?.runningMembers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        playerName: 'AfkGuest',
+        isAutoSkipTurn: false,
+        isOfflineBotControlled: true,
+        offlineBotProfileId: 'TURTLE'
+      })
+    ]));
+
+    const turnStatusResponse = await request('GET', `/api/games/${gameId}/turn-status`, undefined, '10.0.0.91', adminToken);
+    expect(turnStatusResponse.status).toBe(200);
+    expect(turnStatusResponse.json).toMatchObject({
+      onlineHumanCount: 1,
+      minimumOnlineHumanCount: 2,
+      waitingForPlayerNames: ['AfkAdmin'],
+      progressionBlockedReason: 'At least 2 human players must be online to progress this multiplayer game.'
+    });
+  });
+
+  it('saves and unloads a running multiplayer game after zero present humans remain past the unload grace period', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'EmptyAdmin',
+      email: 'empty-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.93');
+    activateAccount('EmptyAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'EmptyGuest',
+      email: 'empty-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.94');
+    activateAccount('EmptyGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'EmptyAdmin',
+      password: 'secret-123'
+    }, '10.0.0.93');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'EmptyGuest',
+      password: 'secret-123'
+    }, '10.0.0.94');
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.93', adminToken);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.94', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.94', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.93', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.93', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.94', guestToken);
+
+    setPresenceLastSeen(gameId!, 1, new Date(Date.now() - 31 * 60 * 1000).toISOString());
+    setPresenceLastSeen(gameId!, 2, new Date(Date.now() - 31 * 60 * 1000).toISOString());
+
+    const beforeUnloadResponse = await request('GET', '/api/multiplayer/games', undefined, '10.0.0.93', adminToken);
+    expect(beforeUnloadResponse.status).toBe(200);
+    expect(beforeUnloadResponse.json?.activeRunningGames).toEqual(expect.arrayContaining([
+      expect.objectContaining({ gameId })
+    ]));
+
+    await delay(350);
+
+    const afterUnloadResponse = await request('GET', '/api/multiplayer/games', undefined, '10.0.0.93', adminToken);
+    expect(afterUnloadResponse.status).toBe(200);
+    expect(afterUnloadResponse.json?.activeRunningGames).toEqual([]);
+    expect(afterUnloadResponse.json?.otherMultiplayerGames).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        gameId,
+        status: 'RUNNING',
+        statusLabel: 'Saved / Inactive'
+      })
+    ]));
+  });
+
+  it('cancels the empty-runtime unload deadline when a human returns before unload', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'ReturnAdmin',
+      email: 'return-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.95');
+    activateAccount('ReturnAdmin', { localAdmin: true });
+
+    await request('POST', '/api/auth/register', {
+      playerName: 'ReturnGuest',
+      email: 'return-guest@example.com',
+      password: 'secret-123'
+    }, '10.0.0.96');
+    activateAccount('ReturnGuest');
+
+    const adminLogin = await request('POST', '/api/auth/login', {
+      playerName: 'ReturnAdmin',
+      password: 'secret-123'
+    }, '10.0.0.95');
+    const guestLogin = await request('POST', '/api/auth/login', {
+      playerName: 'ReturnGuest',
+      password: 'secret-123'
+    }, '10.0.0.96');
+    const adminToken = adminLogin.json?.token as string;
+    const guestToken = guestLogin.json?.token as string;
+
+    const createResponse = await request('POST', '/api/multiplayer/games', {}, '10.0.0.95', adminToken);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    expect(typeof gameId).toBe('string');
+
+    await request('POST', `/api/multiplayer/games/${gameId}/join`, {}, '10.0.0.96', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/ready`, { ready: true }, '10.0.0.96', guestToken);
+    await request('POST', `/api/multiplayer/games/${gameId}/start`, {}, '10.0.0.95', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.95', adminToken);
+    await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.96', guestToken);
+
+    setPresenceLastSeen(gameId!, 1, new Date(Date.now() - 31 * 60 * 1000).toISOString());
+    setPresenceLastSeen(gameId!, 2, new Date(Date.now() - 31 * 60 * 1000).toISOString());
+
+    const startUnloadResponse = await request('GET', '/api/multiplayer/games', undefined, '10.0.0.95', adminToken);
+    expect(startUnloadResponse.status).toBe(200);
+
+    const returnResponse = await request('GET', `/api/games/${gameId}/state`, undefined, '10.0.0.95', adminToken);
+    expect(returnResponse.status).toBe(200);
+
+    await delay(350);
+
+    const browserResponse = await request('GET', '/api/multiplayer/games', undefined, '10.0.0.95', adminToken);
+    expect(browserResponse.status).toBe(200);
+    expect(browserResponse.json?.activeRunningGames).toEqual(expect.arrayContaining([
+      expect.objectContaining({ gameId })
+    ]));
+    expect((browserResponse.json?.otherMultiplayerGames as Array<Record<string, unknown>>).some((entry) => entry.gameId === gameId)).toBe(false);
+  });
+
   function activateFirstPendingAccount(): void {
     const data = readAuthData();
     const account = data.accounts[0];
@@ -697,6 +888,26 @@ describe.sequential('auth api', () => {
 
   function writeGameRegistry(data: GameRegistryFile): void {
     fs.writeFileSync(process.env.SROGAME_GAME_REGISTRY_DATA_PATH!, JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  function setPresenceLastSeen(gameId: string, accountId: number, lastSeenAt: string): void {
+    const presencePath = process.env.SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH;
+    if (!presencePath) {
+      throw new Error('Missing multiplayer presence path for auth API tests.');
+    }
+
+    const data = JSON.parse(fs.readFileSync(presencePath, 'utf-8')) as {
+      presences?: Array<Record<string, unknown>>;
+    };
+    const entry = data.presences?.find((presence) =>
+      presence.gameId === gameId && presence.accountId === accountId
+    );
+    if (!entry) {
+      throw new Error(`Expected presence record for ${gameId}/${accountId}.`);
+    }
+
+    entry.lastSeenAt = lastSeenAt;
+    fs.writeFileSync(presencePath, JSON.stringify(data, null, 2), 'utf-8');
   }
 });
 
@@ -760,4 +971,8 @@ async function request(
     status: response.status,
     json: text ? JSON.parse(text) as Record<string, unknown> : null
   };
+}
+
+async function delay(durationMs: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, durationMs));
 }

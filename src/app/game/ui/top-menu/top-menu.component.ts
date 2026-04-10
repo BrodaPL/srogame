@@ -115,7 +115,7 @@ export class TopMenuComponent {
   }
 
   protected autoSkipTurnTooltip(): string {
-    return 'Auto skip turn while AFK. After 5 minutes of inactivity in this multiplayer game, your turns are skipped automatically. Longer AFK removal from active presence is planned separately.';
+    return 'Auto skip turn while AFK. After 5 minutes of inactivity in this multiplayer game, your turns are skipped automatically. After 30 minutes of inactivity, you are removed from active multiplayer presence.';
   }
 
   protected waitingForPlayersMessage(): string {

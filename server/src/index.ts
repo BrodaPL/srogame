@@ -93,6 +93,7 @@ import {
   acknowledgeAutoSkipTurnNotice,
   activateAutoSkipTurn,
   getPresenceForGameAccount,
+  listPresenceForGame,
   markPresenceSeen,
   removePresence,
   removePresenceForGame,
@@ -493,12 +494,24 @@ function resolveDataPath(envName: string, relativeFallbackPath: string): string 
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), relativeFallbackPath);
 }
 
+function resolveDurationEnv(envName: string, fallbackMs: number): number {
+  const override = process.env[envName]?.trim();
+  if (!override) {
+    return fallbackMs;
+  }
+
+  const parsed = Number.parseInt(override, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallbackMs;
+}
+
 const AUTH_DATA_PATH = resolveDataPath('SROGAME_AUTH_DATA_PATH', '../data/auth.json');
 const GAME_REGISTRY_DATA_PATH = resolveDataPath('SROGAME_GAME_REGISTRY_DATA_PATH', '../data/games.json');
 const GAME_MEMBERSHIPS_DATA_PATH = resolveDataPath('SROGAME_GAME_MEMBERSHIPS_DATA_PATH', '../data/game-memberships.json');
 const MULTIPLAYER_LOBBY_STORE_DATA_PATH = resolveDataPath('SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH', '../data/multiplayer-lobbies.json');
 const MULTIPLAYER_PRESENCE_DATA_PATH = resolveDataPath('SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH', '../data/multiplayer-presence.json');
 const GAME_SAVES_DIRECTORY_PATH = resolveDataPath('SROGAME_GAME_SAVES_DIRECTORY_PATH', '../data/saves');
+const MULTIPLAYER_PRESENCE_TIMEOUT_MS = resolveDurationEnv('SROGAME_MULTIPLAYER_PRESENCE_TIMEOUT_MS', 30 * 60 * 1000);
+const MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS = resolveDurationEnv('SROGAME_MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS', 3 * 60 * 1000);
 const PLAYER_NAME_MIN = 3;
 const PLAYER_NAME_MAX = 24;
 const PASSWORD_MIN = 6;
@@ -775,6 +788,7 @@ app.get('/api/auth/me', (req, res) => {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
+  reconcileLoadedRunningMultiplayerGames(data);
   return res.status(200).json(toPlayerSession(auth.session));
 });
 
@@ -786,7 +800,12 @@ app.post('/api/auth/logout', (req, res) => {
 
   const data = loadAuthData();
   cleanupExpiredPendingAccounts(data);
-  data.sessions = data.sessions.filter((session) => session.token !== token);
+  const session = data.sessions.find((entry) => entry.token === token) ?? null;
+  data.sessions = data.sessions.filter((entry) => entry.token !== token);
+  if (session?.currentGameId && isRunningMultiplayerGame(session.currentGameId)) {
+    removePresence(MULTIPLAYER_PRESENCE_DATA_PATH, session.currentGameId, session.accountId);
+    reconcileRunningMultiplayerLifecycle(session.currentGameId, data);
+  }
   saveAuthData(data);
 
   return res.status(204).send();
@@ -806,6 +825,8 @@ app.get('/api/account/settings', (req, res) => {
   if (!account) {
     return res.status(404).json({ error: 'Account not found.' });
   }
+
+  reconcileLoadedRunningMultiplayerGames(auth.data);
 
   return res.status(200).json(buildAccountSettingsResponse(account));
 });
@@ -894,6 +915,9 @@ app.post('/api/account/settings/tutorials/reset', (req, res) => {
 
 app.get('/api/games', (req, res) => {
   const auth = getAuthSession(req);
+  if (auth) {
+    reconcileLoadedRunningMultiplayerGames(auth.data);
+  }
   return res.status(200).json(buildGameListResponse(auth?.session ?? null));
 });
 
@@ -902,6 +926,8 @@ app.get('/api/games/current', (req, res) => {
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
+
+  reconcileLoadedRunningMultiplayerGames(auth.data);
 
   return res.status(200).json(buildCurrentGameStatusResponse(auth.session));
 });
@@ -949,12 +975,10 @@ app.get('/api/games/:gameId/saves', (req, res) => {
 });
 
 app.get('/api/games/:gameId/state', (req, res) => {
-  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId);
+  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId, { markPresenceSeen: true });
   if ('error' in access) {
     return res.status(access.status).json({ error: access.error });
   }
-
-  markRunningMultiplayerPresenceSeen(access);
 
   const response: GameStateResponse = {
     player: toPlayerSession(access.auth.session, access.galaxy),
@@ -1146,6 +1170,9 @@ app.delete('/api/game/saves/:saveId', (req, res) => {
 
 app.get('/api/multiplayer/games', (req, res) => {
   const auth = getAuthSession(req);
+  if (auth) {
+    reconcileLoadedRunningMultiplayerGames(auth.data);
+  }
   return res.status(200).json(buildMultiplayerGameBrowserResponse(auth?.session ?? null));
 });
 
@@ -1196,6 +1223,9 @@ app.post('/api/multiplayer/games', (req, res) => {
 
 app.get('/api/multiplayer/games/:gameId', (req, res) => {
   const auth = getAuthSession(req);
+  if (auth) {
+    reconcileLoadedRunningMultiplayerGames(auth.data);
+  }
   const response = buildMultiplayerGameDetailResponse(req.params.gameId, auth?.session ?? null);
   if (!response) {
     return res.status(404).json({ error: 'Multiplayer game not found.' });
@@ -1327,7 +1357,7 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
 });
 
 app.post('/api/multiplayer/games/:gameId/presence', (req, res) => {
-  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId);
+  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId, { markPresenceSeen: true });
   if ('error' in access) {
     return res.status(access.status).json({ error: access.error });
   }
@@ -1338,11 +1368,6 @@ app.post('/api/multiplayer/games/:gameId/presence', (req, res) => {
   }
 
   const body = req.body as UpdateMultiplayerAutoSkipTurnRequest | undefined;
-  markPresenceSeen(
-    MULTIPLAYER_PRESENCE_DATA_PATH,
-    req.params.gameId,
-    access.auth.session.accountId
-  );
   if (body?.acknowledgeNotice === true) {
     acknowledgeAutoSkipTurnNotice(
       MULTIPLAYER_PRESENCE_DATA_PATH,
@@ -1621,12 +1646,10 @@ app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
 });
 
 app.get('/api/game/state', (req, res) => {
-  const access = resolveAuthenticatedGameAccess(req);
+  const access = resolveAuthenticatedGameAccess(req, { markPresenceSeen: true });
   if ('error' in access) {
     return res.status(access.status).json({ error: access.error });
   }
-
-  markRunningMultiplayerPresenceSeen(access);
 
   const response: GameStateResponse = {
     player: toPlayerSession(access.auth.session, access.galaxy),
@@ -3881,7 +3904,7 @@ function buildMultiplayerPresenceSummary(
     }
 
     const presence = getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, membership.accountId);
-    const derivedState = presence?.state ?? 'ACTIVE';
+    const derivedState = presence?.state;
     if (derivedState !== 'ACTIVE' && derivedState !== 'AUTO_SKIP_TURN') {
       continue;
     }
@@ -3898,6 +3921,124 @@ function buildMultiplayerPresenceSummary(
     activeHumanCount,
     blockingPlayerIds
   };
+}
+
+function reconcileTimedOutMultiplayerPresence(
+  gameId: string,
+  runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
+  nowMs = Date.now()
+): boolean {
+  if (!isRunningMultiplayerGame(gameId)) {
+    return false;
+  }
+
+  const membershipsByAccountId = new Map(
+    listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId)
+      .filter((membership) => membership.isActive)
+      .map((membership) => [membership.accountId, membership] as const)
+  );
+  const timedOutPresences = listPresenceForGame(MULTIPLAYER_PRESENCE_DATA_PATH, gameId)
+    .filter((presence) => {
+      const lastSeenMs = Date.parse(presence.lastSeenAt);
+      return Number.isNaN(lastSeenMs) || nowMs - lastSeenMs >= MULTIPLAYER_PRESENCE_TIMEOUT_MS;
+    });
+
+  if (timedOutPresences.length === 0) {
+    return false;
+  }
+
+  const nextReadyPlayerIds = new Set(runtime.currentTurnReadyPlayerIds);
+  let changed = false;
+  for (const presence of timedOutPresences) {
+    if (!removePresence(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, presence.accountId)) {
+      continue;
+    }
+
+    changed = true;
+    const membership = membershipsByAccountId.get(presence.accountId);
+    const playerId = membership
+      ? runtime.galaxy.playerNameMap.get(membership.playerName) ?? null
+      : null;
+    if (playerId !== null) {
+      nextReadyPlayerIds.delete(playerId);
+    }
+  }
+
+  if (!changed) {
+    return false;
+  }
+
+  updateGameRuntime(gameId, {
+    currentTurnReadyPlayerIds: nextReadyPlayerIds
+  });
+  if (currentRuntimeGameId === gameId) {
+    currentTurnReadyPlayerIds = nextReadyPlayerIds;
+  }
+  return true;
+}
+
+function reconcileEmptyPresenceUnloadState(
+  gameId: string,
+  runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
+  record: NonNullable<ReturnType<typeof getGameById>>,
+  presentHumanCount: number,
+  nowMs = Date.now()
+): boolean {
+  if (presentHumanCount > 0) {
+    if (runtime.emptyPresenceUnloadAt) {
+      updateGameRuntime(gameId, { emptyPresenceUnloadAt: null });
+    }
+    return false;
+  }
+
+  if (!runtime.emptyPresenceUnloadAt) {
+    updateGameRuntime(gameId, {
+      emptyPresenceUnloadAt: new Date(nowMs + MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS).toISOString()
+    });
+    return false;
+  }
+
+  const unloadAtMs = Date.parse(runtime.emptyPresenceUnloadAt);
+  if (Number.isNaN(unloadAtMs) || unloadAtMs > nowMs) {
+    return false;
+  }
+
+  saveAndUnloadRunningMultiplayerGame(gameId, runtime, record);
+  return true;
+}
+
+function reconcileRunningMultiplayerLifecycle(
+  gameId: string,
+  authData: AuthData,
+  nowMs = Date.now()
+): { unloaded: boolean } {
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  const runtime = getGameRuntime(gameId);
+  if (!record || !runtime || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING') {
+    return { unloaded: false };
+  }
+
+  reconcileTimedOutMultiplayerPresence(gameId, runtime, nowMs);
+  const runtimeAfterTimeout = getGameRuntime(gameId);
+  if (!runtimeAfterTimeout) {
+    return { unloaded: true };
+  }
+
+  reconcileOfflineBotControlledSeatsForRuntime(gameId, runtimeAfterTimeout, authData);
+  const runtimeAfterBotControl = getGameRuntime(gameId);
+  if (!runtimeAfterBotControl) {
+    return { unloaded: true };
+  }
+
+  const presenceSummary = buildMultiplayerPresenceSummary(authData, gameId, runtimeAfterBotControl);
+  const unloaded = reconcileEmptyPresenceUnloadState(gameId, runtimeAfterBotControl, record, presenceSummary.presentHumanCount, nowMs);
+  return { unloaded };
+}
+
+function reconcileLoadedRunningMultiplayerGames(authData: AuthData, nowMs = Date.now()): void {
+  for (const gameId of listLoadedGameIds()) {
+    reconcileRunningMultiplayerLifecycle(gameId, authData, nowMs);
+  }
 }
 
 function buildCurrentPlayerPresenceOptions(gameId: string, accountId: number): {
@@ -3918,7 +4059,7 @@ function buildCurrentPlayerPresenceOptions(gameId: string, accountId: number): {
   const presence = getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, accountId);
   if (!presence) {
     return {
-      currentPlayerPresenceState: 'ACTIVE',
+      currentPlayerPresenceState: null,
       currentPlayerAutoSkipEnabled: false,
       currentPlayerAutoSkipActivatedAt: null,
       showAutoSkipReturnNotice: false
@@ -3931,21 +4072,6 @@ function buildCurrentPlayerPresenceOptions(gameId: string, accountId: number): {
     currentPlayerAutoSkipActivatedAt: presence.autoSkipTurnActivatedAt,
     showAutoSkipReturnNotice: presence.returnNoticePending
   };
-}
-
-function markRunningMultiplayerPresenceSeen(access: {
-  gameId: string;
-  auth: { session: AuthSession };
-}): void {
-  if (!isRunningMultiplayerGame(access.gameId)) {
-    return;
-  }
-
-  markPresenceSeen(
-    MULTIPLAYER_PRESENCE_DATA_PATH,
-    access.gameId,
-    access.auth.session.accountId
-  );
 }
 
 function minimumOnlineHumansRequiredForGame(gameId: string): number {
@@ -4149,7 +4275,8 @@ function persistCurrentRuntimeStoreState(): void {
       isDirty: false,
       currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
       isTurnProcessing,
-      offlineBotControlledPlayerIds: new Set<number>()
+      offlineBotControlledPlayerIds: new Set<number>(),
+      emptyPresenceUnloadAt: null
     });
     return;
   }
@@ -4160,6 +4287,7 @@ function persistCurrentRuntimeStoreState(): void {
     presentationByPlayer: currentGalaxyPresentationByPlayer,
     currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
     offlineBotControlledPlayerIds: new Set(existingRuntime.offlineBotControlledPlayerIds),
+    emptyPresenceUnloadAt: existingRuntime.emptyPresenceUnloadAt,
     isTurnProcessing,
     isDirty: false
   });
@@ -4817,7 +4945,10 @@ function resolveSessionRuntimeAccess(
   };
 }
 
-function resolveAuthenticatedGameAccess(req: Request):
+function resolveAuthenticatedGameAccess(
+  req: Request,
+  options: { markPresenceSeen?: boolean } = {}
+):
   | {
     gameId: string;
     runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
@@ -4844,26 +4975,43 @@ function resolveAuthenticatedGameAccess(req: Request):
     return { status: 403, error: 'Forbidden.' };
   }
 
-  synchronizeJumpGateRequests(runtime.galaxy);
-  synchronizeMaintenanceRequests(runtime.galaxy);
-  if (synchronizeTradePortState(runtime.galaxy)) {
-    const nextPresentation = buildPresentationDataByPlayer(runtime.galaxy);
-    updateGameRuntime(runtime.gameId, { presentationByPlayer: nextPresentation });
+  if (options.markPresenceSeen === true && isRunningMultiplayerGame(runtime.gameId)) {
+    markPresenceSeen(MULTIPLAYER_PRESENCE_DATA_PATH, runtime.gameId, auth.session.accountId);
+  }
+  const lifecycle = reconcileRunningMultiplayerLifecycle(runtime.gameId, auth.data);
+  if (lifecycle.unloaded) {
+    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+  }
+
+  const refreshedRuntime = getGameRuntime(runtime.gameId);
+  if (!refreshedRuntime) {
+    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+  }
+
+  synchronizeJumpGateRequests(refreshedRuntime.galaxy);
+  synchronizeMaintenanceRequests(refreshedRuntime.galaxy);
+  if (synchronizeTradePortState(refreshedRuntime.galaxy)) {
+    const nextPresentation = buildPresentationDataByPlayer(refreshedRuntime.galaxy);
+    updateGameRuntime(refreshedRuntime.gameId, { presentationByPlayer: nextPresentation });
     currentGalaxyPresentationByPlayer = nextPresentation;
   }
 
   return {
-    gameId: runtime.gameId,
-    runtime,
-    galaxy: runtime.galaxy,
+    gameId: refreshedRuntime.gameId,
+    runtime: refreshedRuntime,
+    galaxy: refreshedRuntime.galaxy,
     auth,
     playerId,
-    readyPlayerIds: runtime.currentTurnReadyPlayerIds,
-    isProcessing: runtime.isTurnProcessing
+    readyPlayerIds: refreshedRuntime.currentTurnReadyPlayerIds,
+    isProcessing: refreshedRuntime.isTurnProcessing
   };
 }
 
-function resolveAuthenticatedGameAccessForGame(req: Request, requestedGameId: string):
+function resolveAuthenticatedGameAccessForGame(
+  req: Request,
+  requestedGameId: string,
+  options: { markPresenceSeen?: boolean } = {}
+):
   | {
     gameId: string;
     runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
@@ -4895,10 +5043,23 @@ function resolveAuthenticatedGameAccessForGame(req: Request, requestedGameId: st
     return { status: 403, error: 'Forbidden.' };
   }
 
-  synchronizeJumpGateRequests(runtime.galaxy);
-  synchronizeMaintenanceRequests(runtime.galaxy);
-  if (synchronizeTradePortState(runtime.galaxy)) {
-    const nextPresentation = buildPresentationDataByPlayer(runtime.galaxy);
+  if (options.markPresenceSeen === true && isRunningMultiplayerGame(gameId)) {
+    markPresenceSeen(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, auth.session.accountId);
+  }
+  const lifecycle = reconcileRunningMultiplayerLifecycle(gameId, auth.data);
+  if (lifecycle.unloaded) {
+    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+  }
+
+  const refreshedRuntime = getGameRuntime(gameId);
+  if (!refreshedRuntime) {
+    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+  }
+
+  synchronizeJumpGateRequests(refreshedRuntime.galaxy);
+  synchronizeMaintenanceRequests(refreshedRuntime.galaxy);
+  if (synchronizeTradePortState(refreshedRuntime.galaxy)) {
+    const nextPresentation = buildPresentationDataByPlayer(refreshedRuntime.galaxy);
     updateGameRuntime(gameId, { presentationByPlayer: nextPresentation });
     if (currentRuntimeGameId === gameId) {
       currentGalaxyPresentationByPlayer = nextPresentation;
@@ -4907,12 +5068,12 @@ function resolveAuthenticatedGameAccessForGame(req: Request, requestedGameId: st
 
   return {
     gameId,
-    runtime,
-    galaxy: runtime.galaxy,
+    runtime: refreshedRuntime,
+    galaxy: refreshedRuntime.galaxy,
     auth,
     playerId,
-    readyPlayerIds: runtime.currentTurnReadyPlayerIds,
-    isProcessing: runtime.isTurnProcessing
+    readyPlayerIds: refreshedRuntime.currentTurnReadyPlayerIds,
+    isProcessing: refreshedRuntime.isTurnProcessing
   };
 }
 
@@ -4979,8 +5140,8 @@ function handleEndTurnRequest(
   requestedGameId?: string
 ) {
   const access = requestedGameId
-    ? resolveAuthenticatedGameAccessForGame(req, requestedGameId)
-    : resolveAuthenticatedGameAccess(req);
+    ? resolveAuthenticatedGameAccessForGame(req, requestedGameId, { markPresenceSeen: true })
+    : resolveAuthenticatedGameAccess(req, { markPresenceSeen: true });
   if ('error' in access) {
     return res.status(access.status).json({ error: access.error });
   }
@@ -4995,7 +5156,6 @@ function handleEndTurnRequest(
   }
 
   const playerId = player.playerId;
-  markRunningMultiplayerPresenceSeen(access);
   synchronizeJumpGateRequests(access.galaxy);
   synchronizeMaintenanceRequests(access.galaxy);
   const pendingRequestCount = countPendingMailRequestsForPlayer(access.galaxy, playerId);
@@ -6886,10 +7046,13 @@ function reconcileOfflineBotControlledSeatsForRuntime(
       replaceWithBotOnLogout: account.replaceWithBotOnLogout,
       logoutBotProfileId: account.logoutBotProfileId
     })),
-    authData.sessions.map((session) => ({
-      accountId: session.accountId,
-      currentGameId: session.currentGameId
-    })),
+    authData.sessions
+      .filter((session) => session.currentGameId === gameId)
+      .filter((session) => !!getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, session.accountId))
+      .map((session) => ({
+        accountId: session.accountId,
+        currentGameId: session.currentGameId
+      })),
     runtime.offlineBotControlledPlayerIds
   );
 

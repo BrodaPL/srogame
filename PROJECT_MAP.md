@@ -181,6 +181,7 @@ Auth/session note:
 - `/api/auth/register-config` tells the client whether registration is currently available and whether Turnstile is required
 - `/api/auth/resend-confirmation` refreshes the pending confirmation window for unconfirmed accounts, enforces a 10-minute resend cooldown, and currently returns a manual-activation reminder because SMTP delivery is still not wired
 - `/api/auth/login` now blocks unconfirmed accounts, applies the per-IP auth rate limit, and also enforces account-level password lockout: 5 wrong passwords lock that account for 10 minutes
+- `/api/auth/logout` now also removes the account's running-multiplayer presence immediately before the server reconciles bot replacement and empty-runtime unload state for that game
 - expired pending accounts are cleaned up during auth/account requests instead of via a background job
 - `/api/account/settings*` owns read/update access to account preferences plus tutorial reset from the main-menu settings screen
 - `server/src/index.ts` now also persists `currentGameId` on accounts/sessions as the selected resume/default game pointer
@@ -189,6 +190,8 @@ Auth/session note:
 - running multiplayer games now also require at least 2 human players to be online in that specific game before turn progression is allowed; this rule is exposed through `TurnStatusResponse.onlineHumanCount`, `minimumOnlineHumanCount`, and `progressionBlockedReason`
 - running multiplayer presence is now tracked separately in `server/src/multiplayer-presence.ts`; it now powers AFK auto-skip state, return notices, and the presence-aware multiplayer progression gate
 - running multiplayer progression is now presence-aware: `ACTIVE` plus `AUTO_SKIP_TURN` counts as present humans, but only `ACTIVE` humans block ready-state and appear in waiting lists
+- running multiplayer presence now has a second timeout tier: after 30 minutes with no meaningful activity, the server removes that player from presence, clears their ready-state, and can switch their seat to offline bot control if the account enabled replacement
+- running multiplayer runtimes now also carry a request-driven empty-runtime unload deadline: if zero present humans remain for 3 minutes, the server snapshots the game, unloads the runtime, and the multiplayer browser reclassifies it as `Saved / Inactive`
 
 Auth/security test coverage:
 - `server/src/auth-account-security.spec.ts` covers expired pending-account cleanup, pending-confirmation login blocking, password-failure lockout, and successful-login lock reset behavior
@@ -251,6 +254,7 @@ Lifecycle persistence note:
 - `server/src/multiplayer-presence.ts` now persists per-game running-multiplayer presence records (`ACTIVE` vs `AUTO_SKIP_TURN`, auto-skip enabled flag, last seen timestamp, and return notice state)
 - `/api/multiplayer/games/:gameId/presence` is the explicit heartbeat endpoint the Angular game shell uses for meaningful multiplayer activity; passive turn-status polling intentionally does not count as AFK-preventing activity
 - `/api/multiplayer/games/:gameId/auto-skip-turn` enables or disables the player's per-game AFK auto-skip flag and can also force immediate `AUTO_SKIP_TURN` activation when the client inactivity timer fires
+- request-driven multiplayer lifecycle reconciliation now runs from `/api/auth/me`, `/api/account/settings`, `/api/games`, `/api/games/current`, `/api/multiplayer/games`, `/api/multiplayer/games/:gameId`, and all game-state / turn-status / end-turn runtime-access routes so long-AFK cleanup and empty-runtime unloads can complete without a background worker
 - `src/app/multiplayer/multiplayer.component.ts` and `.html` now consume that API family directly, so the frontend no longer depends on the singleton-lobby response shape for the main multiplayer route
 - `/api/game/start` writes the initial autosave snapshot through `server/src/game-save.ts`
 - `server/src/game-save.ts` now writes immutable snapshots with `gameId` when available, includes `gameId` in `GameSaveSummary`, and exposes per-game save listing helpers while keeping legacy save compatibility
@@ -264,7 +268,7 @@ Lifecycle persistence note:
 - `/api/game/end-turn` and `/api/games/:gameId/end-turn` now interpret running multiplayer readiness through presence: `ACTIVE + AUTO_SKIP_TURN` must be at least `2`, but only `ACTIVE` humans are counted as ready blockers; all-auto-skip presence is blocked with `At least 1 active human player must be present to progress this multiplayer game.`
 - `/api/game/end-turn` writes rotating autosaves into `server/data/saves/` when `GalaxySetup.autoSaveTurns` is greater than `0` and the configured cadence is reached
 - `/api/game/end-turn` now also updates the persistent game registry turn/update metadata for the currently loaded runtime game
-- `server/src/game-runtime-store.ts` now persists the in-memory per-game runtime payload plus per-game ready-state and turn-processing state, which is used by the new game-scoped runtime read/select endpoints
+- `server/src/game-runtime-store.ts` now persists the in-memory per-game runtime payload plus per-game ready-state, turn-processing state, offline-bot-controlled seats, and `emptyPresenceUnloadAt`, which is used by the game-scoped runtime read/select endpoints and the multiplayer empty-runtime unload flow
 - legacy gameplay endpoints under `/api/game/*` now resolve their runtime via the authenticated account `currentGameId` first; if that selected game is not loaded, they return the same unavailable/resume-needed behavior instead of silently acting on another loaded game
 - `/api/game/end-turn` now also runs the server-side bot planning phase before shared turn resolution; for active games with more than one human player it first records per-player readiness and resolves only after every human has clicked End Turn for that turn
 - `/api/admin/bots*` exposes local-admin/controller-only bot inspection and live runtime controls for profile, pause/resume, and memory clearing
