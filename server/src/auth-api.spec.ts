@@ -332,12 +332,25 @@ describe.sequential('auth api', () => {
     const authData = readAuthData();
     expect(authData.accounts[0]?.currentGameId).toBeNull();
     expect(authData.sessions[0]?.currentGameId).toBeNull();
+    expect(authData.accounts[0]?.lastClosedGameId).toBe(gameId);
+    expect(typeof authData.accounts[0]?.lastClosedAt).toBe('string');
+    expect(authData.sessions[0]?.lastClosedGameId).toBe(gameId);
+    expect(typeof authData.sessions[0]?.lastClosedAt).toBe('string');
 
     const registry = readGameRegistry();
     const game = registry.games.find((entry) => entry.gameId === gameId);
     expect(game?.kind).toBe('SINGLEPLAYER');
     expect(game?.status).toBe('RUNNING');
     expect(typeof game?.currentSaveId).toBe('string');
+
+    const savesResponse = await request('GET', '/api/game/saves', undefined, '10.0.0.7', token);
+    expect(savesResponse.status).toBe(200);
+    expect(savesResponse.json?.currentSelectedGameId).toBeNull();
+    expect((savesResponse.json?.recommendedReopen as Record<string, unknown>)?.gameId).toBe(gameId);
+    expect(Array.isArray(savesResponse.json?.saveGroups)).toBe(true);
+    const saveGroups = savesResponse.json?.saveGroups as Array<Record<string, unknown>>;
+    expect(saveGroups[0]?.gameId).toBe(gameId);
+    expect(saveGroups[0]?.isLastClosedGame).toBe(true);
 
     const currentResponse = await request('GET', '/api/games/current', undefined, '10.0.0.7', token);
     expect(currentResponse.status).toBe(200);

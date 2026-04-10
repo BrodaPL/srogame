@@ -3,7 +3,7 @@
     <header class="panel__header">
       <p class="eyebrow">Load Game</p>
       <h1>Load Game</h1>
-      <p class="subtitle">Manage saves for the currently selected game and replace the active runtime game with a selected save.</p>
+      <p class="subtitle">Manage server saves, reopen recently closed singleplayer games, and replace the active runtime game with a selected save.</p>
       @if (session()) {
         <p class="subtitle">{{ selectedGameLabel() }}</p>
       }
@@ -73,10 +73,34 @@
       <p class="form-error">{{ actionError }}</p>
     }
 
-    @if (response?.saves?.length) {
+    @if (recommendedReopen(); as recommendation) {
       <div class="saved">
-        <p class="saved__title">Saved Games</p>
-        @for (save of response!.saves; track save.saveId) {
+        <p class="saved__title">Recommended Reopen</p>
+        <p>{{ recommendation.reasonText }}</p>
+        <p>
+          {{ recommendation.gameName }}.
+          {{ recommendation.statusLabel }}.
+          Latest save: {{ recommendation.save.displayName }}.
+        </p>
+        <div class="field-row">
+          <button class="start-button" type="button" (click)="loadGame(recommendation.save)" [disabled]="!canLoadGame(recommendation.save)">
+            {{ isPendingLoad(recommendation.save) ? 'Loading...' : 'Load latest save' }}
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (saveGroups().length) {
+      @for (group of saveGroups(); track group.gameId ?? group.gameName) {
+        <div class="saved load-game-group">
+          <div class="load-game-group__head">
+            <div>
+              <p class="saved__title">{{ group.gameName }}</p>
+              <p class="subtitle load-game-group__meta">{{ groupSubtitle(group) }}</p>
+            </div>
+            <span class="badge">{{ group.saves.length }} save{{ group.saves.length === 1 ? '' : 's' }}</span>
+          </div>
+          @for (save of group.saves; track save.saveId) {
           <div class="field">
             <p>
               {{ save.displayName }}.
@@ -93,8 +117,9 @@
               </button>
             </div>
           </div>
-        }
-      </div>
+          }
+        </div>
+      }
     }
 
     <div class="field-row">

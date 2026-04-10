@@ -100,6 +100,10 @@ Main menu note:
 - `src/app/main-menu/` now also offers `Close current game` for resumable loaded single-player current games; that action calls `/api/games/:gameId/close-current`, auto-saves, unloads the runtime, and clears the current-game pointer
 - `src/app/main-menu/` now also links authenticated players to `/settings`
 
+Load route note:
+- `src/app/load-game/` still owns explicit save browsing and reopen flows
+- `/load` now consumes grouped save metadata from `/api/game/saves`, surfaces a `Recommended Reopen` card for the last closed single-player game when possible, and keeps current/selected game saves first without moving that browser back onto `/`
+
 Multiplayer route note:
 - `src/app/multiplayer/` now uses the per-game `/api/multiplayer/games*` family and renders a browser/detail layout with four sections: `Active Draft Lobbies`, `Active Running Games`, collapsed `Other Multiplayer Games`, and collapsed `Archived Multiplayer Games`
   - `Other Multiplayer Games` is where stale drafts and unloaded running games (`Saved / Inactive`) now appear

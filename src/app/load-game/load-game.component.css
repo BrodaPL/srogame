@@ -1,0 +1,15 @@
+.load-game-group {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.load-game-group__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.load-game-group__meta {
+  margin: 0.2rem 0 0;
+}

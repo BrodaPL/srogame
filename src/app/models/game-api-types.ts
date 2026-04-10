@@ -466,6 +466,25 @@ export type GameSaveSummary = {
   autoSaveTurns: number;
 };
 
+export type GameSaveGroup = {
+  gameId: GameId | null;
+  gameName: string;
+  gameKind: GameKind | null;
+  statusLabel: string;
+  isCurrentGame: boolean;
+  isLastClosedGame: boolean;
+  saves: GameSaveSummary[];
+};
+
+export type RecommendedReopenSave = {
+  gameId: GameId;
+  gameName: string;
+  gameKind: GameKind | null;
+  statusLabel: string;
+  reasonText: string;
+  save: GameSaveSummary;
+};
+
 export type ActiveGameSummary = {
   ownerAccountId: number | null;
   ownerPlayerName: string | null;
@@ -475,7 +494,11 @@ export type ActiveGameSummary = {
 
 export type GameSavesResponse = {
   saves: GameSaveSummary[];
+  saveGroups: GameSaveGroup[];
+  recommendedReopen: RecommendedReopenSave | null;
   activeGame: ActiveGameSummary | null;
+  currentSelectedGameId: GameId | null;
+  currentSelectedGameName: string | null;
   isLoggedIn: boolean;
   currentAccountId: number | null;
   currentPlayerIsLocalAdmin: boolean;

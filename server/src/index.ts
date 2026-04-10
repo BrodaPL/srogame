@@ -662,7 +662,9 @@ app.post('/api/auth/register', async (req, res) => {
     replaceWithBotOnLogout: false,
     logoutBotProfileId: null,
     language: null,
-    currentGameId: null
+    currentGameId: null,
+    lastClosedGameId: null,
+    lastClosedAt: null
   };
 
   data.nextAccountId += 1;
@@ -987,6 +989,7 @@ app.post('/api/games/:gameId/close-current', (req, res) => {
     saveRuntimeSnapshot(gameId, runtime, record.ownerAccountId ?? auth.session.accountId);
     deleteGameRuntime(gameId);
     moveMountedRuntimeAwayFromGame(gameId);
+    setLastClosedGameInfo(auth.data, auth.session.accountId, gameId, new Date().toISOString());
     setAccountCurrentGameId(auth.data, auth.session.accountId, null);
     auth.session.currentGameId = null;
     saveAuthData(auth.data);
@@ -3735,6 +3738,8 @@ type AuthAccount = {
   logoutBotProfileId: BotProfileId | null;
   language: 'en' | 'pl' | null;
   currentGameId: string | null;
+  lastClosedGameId: string | null;
+  lastClosedAt: string | null;
 };
 
 type AuthSession = {
@@ -3745,6 +3750,8 @@ type AuthSession = {
   createdAt: string;
   lastSeenAt: string;
   currentGameId: string | null;
+  lastClosedGameId: string | null;
+  lastClosedAt: string | null;
   pendingPresenceRemovedNoticeGameId: string | null;
 };
 
@@ -3898,6 +3905,12 @@ function loadAuthData(): AuthData {
       account.currentGameId = typeof account.currentGameId === 'string' && account.currentGameId.trim()
         ? account.currentGameId
         : null;
+      account.lastClosedGameId = typeof account.lastClosedGameId === 'string' && account.lastClosedGameId.trim()
+        ? account.lastClosedGameId
+        : null;
+      account.lastClosedAt = typeof account.lastClosedAt === 'string' && account.lastClosedAt.trim()
+        ? account.lastClosedAt
+        : null;
     }
 
     for (const entry of sessions) {
@@ -3908,6 +3921,12 @@ function loadAuthData(): AuthData {
       const session = entry as AuthSession;
       session.currentGameId = typeof session.currentGameId === 'string' && session.currentGameId.trim()
         ? session.currentGameId
+        : null;
+      session.lastClosedGameId = typeof session.lastClosedGameId === 'string' && session.lastClosedGameId.trim()
+        ? session.lastClosedGameId
+        : null;
+      session.lastClosedAt = typeof session.lastClosedAt === 'string' && session.lastClosedAt.trim()
+        ? session.lastClosedAt
         : null;
       session.pendingPresenceRemovedNoticeGameId =
         typeof session.pendingPresenceRemovedNoticeGameId === 'string' && session.pendingPresenceRemovedNoticeGameId.trim()
@@ -3948,6 +3967,29 @@ function setAccountCurrentGameId(data: AuthData, accountId: number, currentGameI
         session.pendingPresenceRemovedNoticeGameId = null;
       }
     }
+  }
+}
+
+function setLastClosedGameInfo(data: AuthData, accountId: number, gameId: string | null, timestamp: string | null): void {
+  const normalizedGameId = typeof gameId === 'string' && gameId.trim()
+    ? gameId
+    : null;
+  const normalizedTimestamp = typeof timestamp === 'string' && timestamp.trim()
+    ? timestamp
+    : null;
+
+  const account = data.accounts.find((entry) => entry.id === accountId);
+  if (account) {
+    account.lastClosedGameId = normalizedGameId;
+    account.lastClosedAt = normalizedTimestamp;
+  }
+
+  for (const session of data.sessions) {
+    if (session.accountId !== accountId) {
+      continue;
+    }
+    session.lastClosedGameId = normalizedGameId;
+    session.lastClosedAt = normalizedTimestamp;
   }
 }
 
@@ -5040,6 +5082,84 @@ function canSessionViewGameRecord(gameId: string, session: AuthSession): boolean
     || isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, gameId, session.accountId);
 }
 
+function buildGameSaveGroupStatusLabel(
+  record: ReturnType<typeof getGameById>,
+  gameId: string | null,
+  options: { isCurrentGame: boolean; isLastClosedGame: boolean }
+): string {
+  if (options.isCurrentGame) {
+    return 'Current selected game';
+  }
+
+  if (options.isLastClosedGame) {
+    return 'Recently closed single-player game';
+  }
+
+  if (!record) {
+    return gameId ? 'Tracked saves' : 'Untracked saves';
+  }
+
+  if (hasGameRuntime(record.gameId)) {
+    return 'Active runtime';
+  }
+
+  if (record.kind === 'MULTIPLAYER' && record.status === 'RUNNING') {
+    return 'Saved / Inactive';
+  }
+
+  if (record.status === 'ARCHIVED') {
+    return 'Archived';
+  }
+
+  return record.kind === 'SINGLEPLAYER' ? 'Singleplayer saves' : 'Multiplayer saves';
+}
+
+function buildGameSaveGroups(
+  saves: GameSavesResponse['saves'],
+  session: AuthSession | null
+): GameSavesResponse['saveGroups'] {
+  const grouped = new Map<string, GameSavesResponse['saveGroups'][number]>();
+
+  for (const save of saves) {
+    const key = save.gameId ?? '__untracked__';
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.saves.push(save);
+      continue;
+    }
+
+    const record = save.gameId ? getGameById(GAME_REGISTRY_DATA_PATH, save.gameId) : null;
+    const isCurrentGame = session?.currentGameId === save.gameId;
+    const isLastClosedGame = session?.lastClosedGameId === save.gameId;
+    grouped.set(key, {
+      gameId: save.gameId,
+      gameName: record?.name ?? save.galaxyName,
+      gameKind: record?.kind ?? null,
+      statusLabel: buildGameSaveGroupStatusLabel(record, save.gameId, { isCurrentGame, isLastClosedGame }),
+      isCurrentGame,
+      isLastClosedGame,
+      saves: [save]
+    });
+  }
+
+  return Array.from(grouped.values())
+    .map((group) => ({
+      ...group,
+      saves: [...group.saves].sort((left, right) => Date.parse(right.savedAt) - Date.parse(left.savedAt))
+    }))
+    .sort((left, right) => {
+      const leftRank = left.isCurrentGame ? 0 : left.isLastClosedGame ? 1 : 2;
+      const rightRank = right.isCurrentGame ? 0 : right.isLastClosedGame ? 1 : 2;
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+
+      const leftLatest = left.saves[0] ? Date.parse(left.saves[0].savedAt) : 0;
+      const rightLatest = right.saves[0] ? Date.parse(right.saves[0].savedAt) : 0;
+      return rightLatest - leftLatest;
+    });
+}
+
 function buildGameSavesResponse(session: AuthSession | null, gameId: string | null = null): GameSavesResponse {
   let saves: ReturnType<typeof listGameSaveSummaries> = [];
   try {
@@ -5050,11 +5170,32 @@ function buildGameSavesResponse(session: AuthSession | null, gameId: string | nu
     console.error('Failed to read game saves.', error);
   }
 
+  const saveGroups = buildGameSaveGroups(saves, session);
+  const currentSelectedGameRecord = session?.currentGameId
+    ? getGameById(GAME_REGISTRY_DATA_PATH, session.currentGameId)
+    : null;
+  const recommendedGroup = session?.lastClosedGameId
+    ? saveGroups.find((group) => group.gameId === session.lastClosedGameId)
+    : null;
+
   return {
     saves,
+    saveGroups,
+    recommendedReopen: recommendedGroup && recommendedGroup.saves[0] && recommendedGroup.gameId
+      ? {
+        gameId: recommendedGroup.gameId,
+        gameName: recommendedGroup.gameName,
+        gameKind: recommendedGroup.gameKind,
+        statusLabel: recommendedGroup.statusLabel,
+        reasonText: 'Recently closed single-player game. Load the latest save to reopen it.',
+        save: recommendedGroup.saves[0]
+      }
+      : null,
     activeGame: gameId === null || currentRuntimeGameId === gameId
       ? buildActiveGameSummary()
       : null,
+    currentSelectedGameId: session?.currentGameId ?? null,
+    currentSelectedGameName: currentSelectedGameRecord?.name ?? null,
     isLoggedIn: !!session,
     currentAccountId: session?.accountId ?? null,
     currentPlayerIsLocalAdmin: session?.localAdmin === true,
@@ -5076,6 +5217,8 @@ function createSession(data: AuthData, account: AuthAccount, timestamp: string):
     createdAt: timestamp,
     lastSeenAt: timestamp,
     currentGameId: account.currentGameId,
+    lastClosedGameId: account.lastClosedGameId,
+    lastClosedAt: account.lastClosedAt,
     pendingPresenceRemovedNoticeGameId: null
   };
 

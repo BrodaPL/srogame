@@ -5,12 +5,13 @@ import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
-import { GameSaveSummary, GameSavesResponse } from '../models/game-api-types';
+import { GameSaveGroup, GameSaveSummary, GameSavesResponse, RecommendedReopenSave } from '../models/game-api-types';
 
 @Component({
   selector: 'app-load-game',
   imports: [FormsModule, RouterLink],
-  templateUrl: './load-game.component.html'
+  templateUrl: './load-game.component.html',
+  styleUrl: './load-game.component.css'
 })
 export class LoadGameComponent {
   protected readonly session: AuthStateService['session'];
@@ -39,11 +40,11 @@ export class LoadGameComponent {
     this.summaryError = null;
 
     const token = this.session()?.token;
-    const currentGameId = this.session()?.currentGameId ?? null;
-    this.selectedGameId = currentGameId;
-    this.gameApi.getGameSaves(token, currentGameId).subscribe({
+    this.selectedGameId = this.session()?.currentGameId ?? null;
+    this.gameApi.getGameSaves(token).subscribe({
       next: (response) => {
         this.response = response;
+        this.selectedGameId = response.currentSelectedGameId;
         this.isSummaryLoading = false;
         if (!response.activeGame) {
           this.confirmReplaceActiveGame = false;
@@ -62,7 +63,17 @@ export class LoadGameComponent {
   }
 
   protected selectedGameLabel(): string {
-    return this.selectedGameId ? `Selected game: ${this.selectedGameId}` : 'Showing all server saves.';
+    return this.response?.currentSelectedGameName
+      ? `Current selection: ${this.response.currentSelectedGameName}`
+      : 'Showing all server saves.';
+  }
+
+  protected recommendedReopen(): RecommendedReopenSave | null {
+    return this.response?.recommendedReopen ?? null;
+  }
+
+  protected saveGroups(): GameSaveGroup[] {
+    return this.response?.saveGroups ?? [];
   }
 
   protected canLoadGame(save: GameSaveSummary): boolean {
@@ -164,5 +175,21 @@ export class LoadGameComponent {
 
   protected isPendingDelete(save: GameSaveSummary): boolean {
     return this.pendingAction === 'delete' && this.pendingSaveId === save.saveId;
+  }
+
+  protected groupSubtitle(group: GameSaveGroup): string {
+    const kindLabel = group.gameKind === 'MULTIPLAYER'
+      ? 'Multiplayer'
+      : group.gameKind === 'SINGLEPLAYER'
+        ? 'Singleplayer'
+        : 'Untracked';
+    const badges: string[] = [kindLabel, group.statusLabel];
+    if (group.isCurrentGame) {
+      badges.push('Current selection');
+    } else if (group.isLastClosedGame) {
+      badges.push('Recently closed');
+    }
+
+    return badges.join(' / ');
   }
 }
