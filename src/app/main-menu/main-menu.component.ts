@@ -1,25 +1,21 @@
 import { Component, effect } from '@angular/core';
-import { Router } from '@angular/router';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
-import type { CurrentGameStatusResponse, GameListResponse, GameSummary } from '../models/game-api-types';
+import type { CurrentGameStatusResponse } from '../models/game-api-types';
 
 @Component({
   selector: 'app-main-menu',
   imports: [RouterLink],
-  templateUrl: './main-menu.component.html'
+  templateUrl: './main-menu.component.html',
+  styleUrl: './main-menu.component.css'
 })
 export class MainMenuComponent {
   protected readonly session: AuthStateService['session'];
   protected currentGameStatus: CurrentGameStatusResponse | null = null;
-  protected gameListResponse: GameListResponse | null = null;
   protected isLoadingCurrentGameStatus = false;
-  protected isLoadingGames = false;
   protected resumeError: string | null = null;
-  protected gameListError: string | null = null;
-  protected pendingGameActionId: string | null = null;
 
   constructor(
     private readonly authApi: AuthApiService,
@@ -32,16 +28,12 @@ export class MainMenuComponent {
       const session = this.session();
       if (!session) {
         this.currentGameStatus = null;
-        this.gameListResponse = null;
         this.isLoadingCurrentGameStatus = false;
-        this.isLoadingGames = false;
         this.resumeError = null;
-        this.gameListError = null;
         return;
       }
 
       this.loadCurrentGameStatus(session.token);
-      this.loadGames(session.token);
     });
   }
 
@@ -57,32 +49,65 @@ export class MainMenuComponent {
     return this.currentGameStatus?.canResume === true;
   }
 
-  protected shouldShowResumeCurrentGame(): boolean {
-    return !!this.session() && !!this.currentGameStatus?.game;
+  protected showCurrentGameCard(): boolean {
+    return !!this.session();
+  }
+
+  protected currentGameName(): string {
+    return this.currentGameStatus?.game?.name ?? 'No current game selected';
+  }
+
+  protected currentGameStatusLabel(): string {
+    const game = this.currentGameStatus?.game;
+    if (!game) {
+      return this.isLoadingCurrentGameStatus ? 'Checking current game' : 'No game selected';
+    }
+
+    if (this.currentGameStatus?.canResume) {
+      return 'Running';
+    }
+
+    if (game.kind === 'MULTIPLAYER' && game.status === 'RUNNING') {
+      return 'Saved / Inactive';
+    }
+
+    return game.status;
   }
 
   protected resumeUnavailableReason(): string | null {
-    return this.currentGameStatus?.unavailableReason ?? null;
+    if (this.resumeError) {
+      return this.resumeError;
+    }
+
+    const game = this.currentGameStatus?.game;
+    if (!game) {
+      return 'Select or create a game first.';
+    }
+
+    if (this.currentGameStatus?.canResume) {
+      return null;
+    }
+
+    if (game.kind === 'MULTIPLAYER' && game.status === 'RUNNING') {
+      return 'This multiplayer game is saved and inactive. Open Multiplayer to resume it.';
+    }
+
+    return this.currentGameStatus?.unavailableReason ?? 'This game is not currently available.';
   }
 
-  protected availableGames(): GameSummary[] {
-    return this.gameListResponse?.games ?? [];
-  }
+  protected currentGameHint(): string | null {
+    const game = this.currentGameStatus?.game;
+    if (!game) {
+      return null;
+    }
 
-  protected hasVisibleGames(): boolean {
-    return this.availableGames().length > 0;
-  }
+    if (this.currentGameStatus?.canResume) {
+      return game.kind === 'MULTIPLAYER'
+        ? 'Resume directly into the current running multiplayer game.'
+        : 'Resume directly into your current game.';
+    }
 
-  protected isCurrentGame(game: GameSummary): boolean {
-    return this.session()?.currentGameId === game.gameId;
-  }
-
-  protected canEnterGame(game: GameSummary): boolean {
-    return game.status === 'RUNNING';
-  }
-
-  protected gameStatusLabel(game: GameSummary): string {
-    return `${game.kind} · ${game.status}${game.currentTurn === null ? '' : ` · Turn ${game.currentTurn}`}`;
+    return this.resumeUnavailableReason();
   }
 
   protected resumeCurrentGame(): void {
@@ -114,77 +139,6 @@ export class MainMenuComponent {
     });
   }
 
-  protected selectGame(game: GameSummary): void {
-    const session = this.session();
-    if (!session || this.pendingGameActionId) {
-      return;
-    }
-
-    this.pendingGameActionId = game.gameId;
-    this.gameListError = null;
-    this.gameApi.selectGame(game.gameId, session.token).subscribe({
-      next: (status) => {
-        const nextSession = this.session();
-        if (nextSession) {
-          this.authState.setSession({
-            ...nextSession,
-            currentGameId: status.currentGameId
-          });
-        }
-        this.currentGameStatus = status;
-        this.pendingGameActionId = null;
-        this.loadGames(session.token);
-      },
-      error: (error) => {
-        this.pendingGameActionId = null;
-        this.gameListError = error?.error?.error ?? 'Unable to select the game.';
-      }
-    });
-  }
-
-  protected enterGame(game: GameSummary): void {
-    const session = this.session();
-    if (!session || this.pendingGameActionId) {
-      return;
-    }
-
-    if (!this.canEnterGame(game)) {
-      this.gameListError = 'This game is not currently active. Ask localAdmin to resume it.';
-      return;
-    }
-
-    this.pendingGameActionId = game.gameId;
-    this.gameListError = null;
-    this.gameApi.selectGame(game.gameId, session.token).subscribe({
-      next: (status) => {
-        const nextSession = this.session();
-        if (nextSession) {
-          this.authState.setSession({
-            ...nextSession,
-            currentGameId: status.currentGameId
-          });
-        }
-        this.currentGameStatus = status;
-        this.pendingGameActionId = null;
-        if (status.canResume) {
-          this.router.navigate(['/game/imperium']);
-          return;
-        }
-
-        this.resumeError = status.unavailableReason ?? 'This game is not currently active.';
-        this.loadGames(session.token);
-      },
-      error: (error) => {
-        this.pendingGameActionId = null;
-        this.gameListError = error?.error?.error ?? 'Unable to enter the selected game.';
-      }
-    });
-  }
-
-  protected isPendingGameAction(game: GameSummary): boolean {
-    return this.pendingGameActionId === game.gameId;
-  }
-
   protected logout(): void {
     const session = this.session();
     if (!session) {
@@ -212,22 +166,6 @@ export class MainMenuComponent {
       error: () => {
         this.currentGameStatus = null;
         this.isLoadingCurrentGameStatus = false;
-      }
-    });
-  }
-
-  private loadGames(token: string): void {
-    this.isLoadingGames = true;
-    this.gameApi.getGames(token).subscribe({
-      next: (response) => {
-        this.gameListResponse = response;
-        this.isLoadingGames = false;
-        this.gameListError = null;
-      },
-      error: () => {
-        this.gameListResponse = null;
-        this.isLoadingGames = false;
-        this.gameListError = 'Unable to load games list.';
       }
     });
   }

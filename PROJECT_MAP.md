@@ -94,8 +94,8 @@ Top-level routes:
 - `/game/*` -> `src/app/game/`
 
 Main menu note:
-- `src/app/main-menu/` now reads `/api/games/current`, shows `Resume current game` when a current game exists for the account, and uses `/api/games/:gameId/select` before entering the game shell
-- `src/app/main-menu/` also reads `/api/games` to show accessible games, allowing explicit current-game selection and direct enter for running games
+- `src/app/main-menu/` now reads `/api/games/current`, shows a primary `Resume current game` action plus a compact current-game status card, and uses `/api/games/:gameId/select` before entering the game shell
+- `src/app/main-menu/` no longer tries to act as a general game browser; lobby selection stays in `/multiplayer`, and broader save browsing stays in `/load`
 - `src/app/main-menu/` now also links authenticated players to `/settings`
 
 Multiplayer route note:
