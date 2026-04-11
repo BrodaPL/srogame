@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { GameApiService } from '../core/game-api.service';
@@ -26,6 +26,9 @@ export class GameComponent implements OnInit, OnDestroy {
   protected showPresenceRemovedReturnNotice = false;
   private turnStatusPollHandle: number | null = null;
   private autoSkipInactivityHandle: number | null = null;
+  private lastAutoSkipTurnEnabled = false;
+  private lastPresenceState: TurnStatusResponse['currentPlayerPresenceState'] = null;
+  private lastShouldManagePresence = false;
   private isPollingTurnStatus = false;
   private isRefreshingAfterTurnChange = false;
   private lastPresenceSyncAt = 0;
@@ -38,6 +41,7 @@ export class GameComponent implements OnInit, OnDestroy {
   };
 
   constructor(
+    private readonly cdr: ChangeDetectorRef,
     private readonly gameState: GameStateService,
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
@@ -97,6 +101,7 @@ export class GameComponent implements OnInit, OnDestroy {
     this.stateError = 'Login to continue, then start or join a game.';
     this.stateActionLabel = 'Go to login';
     this.stateActionRoute = '/login';
+    this.requestUiRefresh();
   }
 
   private handleStateLoadError(error: { status?: number; error?: { error?: string } }): void {
@@ -114,6 +119,7 @@ export class GameComponent implements OnInit, OnDestroy {
       this.stateError = 'Login to continue, then start or join a game.';
       this.stateActionLabel = 'Go to login';
       this.stateActionRoute = '/login';
+      this.requestUiRefresh();
       return;
     }
 
@@ -123,6 +129,7 @@ export class GameComponent implements OnInit, OnDestroy {
         ?? 'This account is not assigned to the current selected game. Join, resume, or start a game from the main menu.';
       this.stateActionLabel = 'Back to main menu';
       this.stateActionRoute = '/';
+      this.requestUiRefresh();
       return;
     }
 
@@ -130,6 +137,7 @@ export class GameComponent implements OnInit, OnDestroy {
     this.stateError = error?.error?.error ?? 'The server did not return the current game state.';
     this.stateActionLabel = 'Back to main menu';
     this.stateActionRoute = '/';
+    this.requestUiRefresh();
   }
 
   private startTurnStatusPolling(): void {
@@ -233,6 +241,7 @@ export class GameComponent implements OnInit, OnDestroy {
     this.isLoading = false;
     this.startTurnStatusPolling();
     this.refreshTurnStatus();
+    this.requestUiRefresh();
   }
 
   protected keepAutoSkipTurnEnabled(): void {
@@ -250,10 +259,12 @@ export class GameComponent implements OnInit, OnDestroy {
         this.applyTurnStatus(turnStatus);
         this.showAutoSkipReturnNotice = false;
         this.showPresenceRemovedReturnNotice = false;
+        this.requestUiRefresh();
       },
       error: () => {
         this.showAutoSkipReturnNotice = false;
         this.showPresenceRemovedReturnNotice = false;
+        this.requestUiRefresh();
       }
     });
   }
@@ -274,10 +285,12 @@ export class GameComponent implements OnInit, OnDestroy {
         this.applyTurnStatus(turnStatus);
         this.showAutoSkipReturnNotice = false;
         this.showPresenceRemovedReturnNotice = false;
+        this.requestUiRefresh();
       },
       error: () => {
         this.showAutoSkipReturnNotice = false;
         this.showPresenceRemovedReturnNotice = false;
+        this.requestUiRefresh();
       }
     });
   }
@@ -295,9 +308,11 @@ export class GameComponent implements OnInit, OnDestroy {
       next: (turnStatus) => {
         this.applyTurnStatus(turnStatus);
         this.showPresenceRemovedReturnNotice = false;
+        this.requestUiRefresh();
       },
       error: () => {
         this.showPresenceRemovedReturnNotice = false;
+        this.requestUiRefresh();
       }
     });
   }
@@ -307,9 +322,22 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   private handleTurnStatusUpdated(turnStatus: TurnStatusResponse | null): void {
+    const autoSkipTurnEnabled = turnStatus?.currentPlayerAutoSkipEnabled === true;
+    const presenceState = turnStatus?.currentPlayerPresenceState ?? null;
+    const shouldManagePresence = this.shouldManageMultiplayerPresence();
+    const shouldResetAutoSkipTimer = autoSkipTurnEnabled !== this.lastAutoSkipTurnEnabled
+      || presenceState !== this.lastPresenceState
+      || shouldManagePresence !== this.lastShouldManagePresence;
+
     this.showAutoSkipReturnNotice = turnStatus?.showAutoSkipReturnNotice === true;
     this.showPresenceRemovedReturnNotice = turnStatus?.showPresenceRemovedReturnNotice === true;
-    this.resetAutoSkipTimer();
+    this.lastAutoSkipTurnEnabled = autoSkipTurnEnabled;
+    this.lastPresenceState = presenceState;
+    this.lastShouldManagePresence = shouldManagePresence;
+    if (shouldResetAutoSkipTimer) {
+      this.resetAutoSkipTimer();
+    }
+    this.requestUiRefresh();
   }
 
   private bindActivityListeners(): void {
@@ -400,9 +428,20 @@ export class GameComponent implements OnInit, OnDestroy {
     }, session.token).subscribe({
       next: (turnStatus) => {
         this.applyTurnStatus(turnStatus);
+        this.requestUiRefresh();
       },
       error: () => {
         // Ignore transient failures; the player can still toggle manually.
+      }
+    });
+  }
+
+  private requestUiRefresh(): void {
+    queueMicrotask(() => {
+      try {
+        this.cdr.detectChanges();
+      } catch {
+        // Ignore refresh attempts after destroy or during transient dev-mode checks.
       }
     });
   }

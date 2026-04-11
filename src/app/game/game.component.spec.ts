@@ -13,9 +13,10 @@ describe('GameComponent', () => {
     vi.useRealTimers();
   });
 
-  it('loads current game state for a logged-in player without relying on stored setup', () => {
+  it('loads current game state for a logged-in player without relying on stored setup', async () => {
     const response = createGameStateResponse();
     const gameState = createGameStateMock();
+    const cdr = createChangeDetectorRefMock();
     const gameApi = {
       getGameState: vi.fn().mockReturnValue(of(response)),
       getTurnStatus: vi.fn().mockReturnValue(of(createTurnStatusResponse()))
@@ -29,6 +30,7 @@ describe('GameComponent', () => {
     };
 
     const component = new GameComponent(
+      cdr as never,
       gameState as never,
       gameApi as never,
       playerSession as never,
@@ -37,6 +39,7 @@ describe('GameComponent', () => {
 
     component.ngOnInit();
     vi.advanceTimersByTime(0);
+    await Promise.resolve();
 
     expect(gameApi.getGameState).toHaveBeenCalledWith(response.player.token, response.player.currentGameId);
     expect(gameApi.getTurnStatus).toHaveBeenCalledWith(response.player.token, response.player.currentGameId);
@@ -46,9 +49,10 @@ describe('GameComponent', () => {
     expect((component as { stateError: string | null }).stateError).toBeNull();
   });
 
-  it('renders immediately from in-memory game state and syncs the server in background', () => {
+  it('renders immediately from in-memory game state and syncs the server in background', async () => {
     const response = createGameStateResponse();
     const gameState = createGameStateMock(response.galaxy);
+    const cdr = createChangeDetectorRefMock();
     const gameApi = {
       getGameState: vi.fn().mockReturnValue(of(response)),
       getTurnStatus: vi.fn().mockReturnValue(of(createTurnStatusResponse()))
@@ -62,6 +66,7 @@ describe('GameComponent', () => {
     };
 
     const component = new GameComponent(
+      cdr as never,
       gameState as never,
       gameApi as never,
       playerSession as never,
@@ -69,6 +74,7 @@ describe('GameComponent', () => {
     );
 
     component.ngOnInit();
+    await Promise.resolve();
 
     expect((component as { isLoading: boolean }).isLoading).toBe(false);
     expect((component as { isGameReady: boolean }).isGameReady).toBe(true);
@@ -76,8 +82,9 @@ describe('GameComponent', () => {
     expect(gameApi.getTurnStatus).toHaveBeenCalledWith(response.player.token, response.player.currentGameId);
   });
 
-  it('shows no-active-game guidance when the server denies access', () => {
+  it('shows no-active-game guidance when the server denies access', async () => {
     const gameState = createGameStateMock();
+    const cdr = createChangeDetectorRefMock();
     const gameApi = {
       getGameState: vi.fn().mockReturnValue(throwError(() => ({ status: 404 }))),
       getTurnStatus: vi.fn()
@@ -91,6 +98,7 @@ describe('GameComponent', () => {
     };
 
     const component = new GameComponent(
+      cdr as never,
       gameState as never,
       gameApi as never,
       playerSession as never,
@@ -99,6 +107,7 @@ describe('GameComponent', () => {
 
     component.ngOnInit();
     vi.advanceTimersByTime(0);
+    await Promise.resolve();
 
     expect(gameState.clearGalaxy).toHaveBeenCalled();
     expect((component as { stateTitle: string }).stateTitle).toBe('No active game');
@@ -106,7 +115,7 @@ describe('GameComponent', () => {
     expect((component as { isGameReady: boolean }).isGameReady).toBe(false);
   });
 
-  it('can disable auto skip turn from the return notice popup', () => {
+  it('can disable auto skip turn from the return notice popup', async () => {
     const response = createGameStateResponse();
     const updatedTurnStatus = createTurnStatusResponse({
       currentPlayerAutoSkipEnabled: false,
@@ -119,7 +128,7 @@ describe('GameComponent', () => {
       getTurnStatus: vi.fn().mockReturnValue(of(createTurnStatusResponse({
         currentPlayerAutoSkipEnabled: true,
         currentPlayerPresenceState: 'AUTO_SKIP_TURN',
-        showAutoSkipReturnNotice: true
+      showAutoSkipReturnNotice: true
       }))),
       updateMultiplayerAutoSkipTurn: vi.fn().mockReturnValue(of(updatedTurnStatus))
     };
@@ -130,8 +139,10 @@ describe('GameComponent', () => {
       setSession: vi.fn(),
       clearSession: vi.fn()
     };
+    const cdr = createChangeDetectorRefMock();
 
     const component = new GameComponent(
+      cdr as never,
       gameState as never,
       gameApi as never,
       playerSession as never,
@@ -140,10 +151,12 @@ describe('GameComponent', () => {
 
     component.ngOnInit();
     vi.advanceTimersByTime(0);
+    await Promise.resolve();
 
     expect((component as { showAutoSkipReturnNotice: boolean }).showAutoSkipReturnNotice).toBe(true);
 
     (component as unknown as { disableAutoSkipTurn(): void }).disableAutoSkipTurn();
+    await Promise.resolve();
 
     expect(gameApi.updateMultiplayerAutoSkipTurn).toHaveBeenCalledWith('game-1', {
       enabled: false,
@@ -219,5 +232,11 @@ function createTurnStatusResponse(overrides: Partial<TurnStatusResponse> = {}): 
     waitingForPlayerIds: [],
     waitingForPlayerNames: [],
     ...overrides
+  };
+}
+
+function createChangeDetectorRefMock() {
+  return {
+    detectChanges: vi.fn()
   };
 }

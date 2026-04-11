@@ -621,6 +621,9 @@
               <section class="saved">
                 <p class="saved__title">Resume Lobby</p>
                 <p>This resumed lobby is locked to the saved multiplayer snapshot. Players can rejoin here, seat replacements can still be adjusted if needed, and localAdmin can start the saved game again once everyone is ready.</p>
+                <button class="start-button multiplayer-management__start" type="button" (click)="startLobbyGame()" [disabled]="!canStartSelectedLobby()">
+                  {{ isActing ? 'Starting...' : 'Start from save' }}
+                </button>
               </section>
             }
           }
