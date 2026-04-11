@@ -6,6 +6,7 @@ import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
 import { AuthStateService } from '../core/auth-state.service';
 import type { GameStateResponse, TurnStatusResponse } from '../models/game-api-types';
+import { getMultiplayerAutoSkipIdleMs } from './multiplayer-test-timing';
 
 @Component({
   selector: 'app-game',
@@ -13,7 +14,6 @@ import type { GameStateResponse, TurnStatusResponse } from '../models/game-api-t
   templateUrl: './game.component.html'
 })
 export class GameComponent implements OnInit, OnDestroy {
-  private static readonly AUTO_SKIP_IDLE_MS = 5 * 60 * 1000;
   private static readonly PRESENCE_SYNC_THROTTLE_MS = 30 * 1000;
 
   protected stateTitle = '';
@@ -374,7 +374,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
     this.autoSkipInactivityHandle = globalThis.setTimeout(() => {
       this.activateAutoSkipTurn();
-    }, GameComponent.AUTO_SKIP_IDLE_MS);
+    }, getMultiplayerAutoSkipIdleMs());
   }
 
   private clearAutoSkipTimer(): void {

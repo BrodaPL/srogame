@@ -55,6 +55,182 @@ Current role note:
 - those local test users currently have `localAdmin=true` in `server/data/auth.json`
 - this is useful for testing `/setup`, `/load`, and `/multiplayer` host flows without editing auth data first
 
+For multiplayer browser verification on one machine, prefer:
+- Browser A: `localAdmin` host account
+- Browser B: regular secondary account if available, otherwise another fixed local test account in a separate browser context/profile
+
+Important:
+- multiplayer tests that need 2 players should use 2 separate browser contexts/profiles
+- do not reuse one authenticated browser profile for both players
+- separate contexts avoid localStorage/session collisions and match real presence behavior better
+
+## Multiplayer MCP Workflow
+
+The multiplayer browser/runtime now has enough per-player presence logic that single-browser smoke is not enough for some scenarios.
+
+Recommended standard setup for real multiplayer verification:
+- one local API server
+- one local UI server
+- Browser A in one isolated profile/context
+- Browser B in a second isolated profile/context
+- fixed local accounts from `scripts/local-test-credentials.json`
+
+Recommended default roles:
+- Browser A: `localAdmin` host
+- Browser B: second player
+
+Recommended browser strategy:
+- verify real UI interactions in the browser
+- seed state through API/helpers only when setup would otherwise dominate the test
+- do not create giant end-to-end flows when smaller scenario checks will give clearer failures
+
+## Multiplayer Timing Overrides
+
+Not every multiplayer timing path should run at full production durations during MCP/browser verification.
+
+Current test-friendly timing knobs:
+
+Server-side env vars:
+- `SROGAME_MULTIPLAYER_PRESENCE_TIMEOUT_MS`
+  - controls long-AFK removal from multiplayer presence
+  - default: `1800000` (`30 minutes`)
+- `SROGAME_MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS`
+  - controls save/unload when zero present humans remain
+  - default: `180000` (`3 minutes`)
+
+Client-side browser override:
+- localStorage key `srogame:test:autoSkipIdleMs`
+  - controls the client-side AFK auto-skip timer in `/game`
+  - default: `300000` (`5 minutes`)
+
+Practical rule:
+- use production defaults for normal manual checks
+- shorten timeouts only for explicit timing scenarios like auto-skip, long AFK removal, or empty-runtime unload
+
+Example server launch with shorter multiplayer timing:
+
+```powershell
+$env:SROGAME_MULTIPLAYER_PRESENCE_TIMEOUT_MS='60000'
+$env:SROGAME_MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS='15000'
+npm.cmd run server
+```
+
+Example browser-side override for Browser B before opening `/game`:
+
+```javascript
+localStorage.setItem('srogame:test:autoSkipIdleMs', '15000');
+```
+
+Reset after the test:
+
+```javascript
+localStorage.removeItem('srogame:test:autoSkipIdleMs');
+```
+
+Note:
+- the in-game `Auto` tooltip now reflects the browser-side override duration
+- server-side timeout changes still require restarting the API server
+
+## Multiplayer Scenario Tiers
+
+Do not run every multiplayer MCP scenario every time. They consume time, browser effort, and token budget.
+
+Recommended tiers:
+
+### `smoke`
+
+Use for:
+- ordinary UI verification
+- quick route/render checks
+
+Suggested coverage:
+- main menu
+- `/multiplayer` loads
+- draft list/running list render
+- one logged-in user basic actions that do not need a second player
+
+### `multiplayer-core`
+
+Use for:
+- changes to lobby flow
+- ready/start/rejoin behavior
+- turn gating
+
+Suggested coverage:
+- Browser A creates draft lobby
+- Browser B joins
+- both ready
+- Browser A starts
+- both enter the running game
+- verify one-player end-turn does not progress until the second player is also ready/present
+
+### `multiplayer-timing`
+
+Use for:
+- AFK auto-skip changes
+- long-AFK presence removal
+- empty-runtime unload logic
+
+Suggested coverage:
+- shortened browser auto-skip timer
+- shortened server presence/unload timers
+- verify:
+  - `Auto skip turn`
+  - presence removal
+  - `Saved / Inactive`
+
+### `full-manual`
+
+Use for:
+- milestone verification only
+- not routine change checks
+
+Suggested coverage:
+- draft join/ready/start
+- running turn gate
+- AFK auto-skip
+- long AFK removal
+- saved/inactive resume lobby
+
+Rule:
+- prefer the smallest tier that actually covers the changed behavior
+
+## Recommended First Manual Multiplayer Scenarios
+
+### 1. Draft Join / Ready / Start
+
+- Browser A logs in as `localAdmin`
+- Browser B logs in as the second player
+- Browser A opens `/multiplayer` and creates a draft lobby
+- Browser B joins the draft lobby
+- both toggle ready
+- Browser A starts the game
+- verify both players can enter the running game
+
+### 2. Running Turn Gate
+
+- both players are in the same running multiplayer game
+- Browser A clicks `End Turn`
+- verify progression does not complete yet
+- Browser B clicks `End Turn`
+- verify progression completes
+
+### 3. AFK Auto-Skip
+
+- shorten `srogame:test:autoSkipIdleMs`
+- Browser B becomes idle
+- verify Browser A sees Browser B as `Auto skip turn`
+- verify progression still works with Browser A active and Browser B auto-skip
+
+### 4. Saved / Inactive Resume Lobby
+
+- reduce server unload timing if needed
+- make the running game become `Saved / Inactive`
+- Browser A opens `/multiplayer`
+- Browser A reopens `Resume lobby`
+- Browser B rejoins
+- verify resumed-lobby badge/copy/start flow
+
 ## Configuration Layers
 
 There are four different layers here. They must not be mixed up.
