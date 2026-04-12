@@ -948,6 +948,7 @@ export type ClientPlanetDto = {
     size: number;
   };
   info: {
+    isOwnedByViewer: boolean;
     ownerId: number | null;
     ownerPlayerType: PlayerType | null;
     ownerPlayerName: string | null;

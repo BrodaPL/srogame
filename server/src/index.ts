@@ -2708,6 +2708,7 @@ app.get('/api/game/client-planet', (req, res) => {
   const x = parseNonNegativeInt(req.query.x);
   const y = parseNonNegativeInt(req.query.y);
   const z = parseNonNegativeInt(req.query.z);
+  const ownedOnly = parseBooleanFlag(req.query.ownedOnly);
   if (x === null || y === null || z === null) {
     return res.status(400).json({ error: 'Invalid coordinates.' });
   }
@@ -2731,6 +2732,9 @@ app.get('/api/game/client-planet', (req, res) => {
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
   }
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
+  if (ownedOnly && !clientPlanet.isOwnedByViewer) {
+    return res.status(403).json({ error: 'Planet view is available only for your own planets.' });
+  }
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, {
     x,
     y,
@@ -7151,6 +7155,7 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       size: clientPlanet.basicInfo.size
     },
     info: {
+      isOwnedByViewer: clientPlanet.isOwnedByViewer,
       ownerId: clientPlanet.info.ownerId,
       ownerPlayerType: clientPlanet.ownerPlayerType,
       ownerPlayerName: clientPlanet.ownerPlayerName,
@@ -7451,9 +7456,9 @@ function toClientGalaxyDto(clientGalaxy: ClientGalaxy, includePlanets: boolean):
   };
 }
 
-function parseIncludePlanets(value: unknown): boolean {
+function parseBooleanFlag(value: unknown): boolean {
   if (Array.isArray(value)) {
-    return parseIncludePlanets(value[0]);
+    return parseBooleanFlag(value[0]);
   }
 
   if (typeof value !== 'string') {
@@ -7462,6 +7467,10 @@ function parseIncludePlanets(value: unknown): boolean {
 
   const normalized = value.trim().toLowerCase();
   return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+function parseIncludePlanets(value: unknown): boolean {
+  return parseBooleanFlag(value);
 }
 
 function buildGalaxySnapshot(galaxy: Galaxy): GalaxySnapshot {

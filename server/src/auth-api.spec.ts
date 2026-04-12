@@ -365,6 +365,74 @@ describe.sequential('auth api', () => {
     });
   });
 
+  it('rejects owned-only client-planet requests for a neutral home-system neighbor', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'PlanetGuardAdmin',
+      email: 'planet-guard-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.68');
+    activateAccount('PlanetGuardAdmin', { localAdmin: true });
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'PlanetGuardAdmin',
+      password: 'secret-123'
+    }, '10.0.0.68');
+    expect(loginResponse.status).toBe(200);
+    const token = loginResponse.json?.token as string;
+
+    const startResponse = await request('POST', '/api/game/start', {
+      setup: createSingleplayerSetup('Planet Guard Sector')
+    }, '10.0.0.68', token);
+    expect(startResponse.status).toBe(200);
+
+    const ownedPlanetsResponse = await request('GET', '/api/game/owned-planets', undefined, '10.0.0.68', token);
+    expect(ownedPlanetsResponse.status).toBe(200);
+    const ownedPlanets = Array.isArray(ownedPlanetsResponse.json) ? ownedPlanetsResponse.json : [];
+    const homeCoordinates = (ownedPlanets[0] as { coordinates?: { x?: number; y?: number; z?: number } } | undefined)?.coordinates;
+    expect(homeCoordinates).toBeDefined();
+
+    const systemResponse = await request(
+      'GET',
+      `/api/game/client-star-system?x=${homeCoordinates?.x}&y=${homeCoordinates?.y}`,
+      undefined,
+      '10.0.0.68',
+      token
+    );
+    expect(systemResponse.status).toBe(200);
+    const planets = Array.isArray(systemResponse.json?.planets) ? systemResponse.json.planets : [];
+    const neutralNeighbor = planets.find((planet) =>
+      planet?.coordinates?.z !== homeCoordinates?.z
+      && planet?.info?.isOwnedByViewer === false
+      && planet?.info?.ownerPlayerType === 'NEUTRAL'
+    );
+    expect(neutralNeighbor).toBeDefined();
+
+    const normalClientPlanetResponse = await request(
+      'GET',
+      `/api/game/client-planet?x=${neutralNeighbor?.coordinates?.x}&y=${neutralNeighbor?.coordinates?.y}&z=${neutralNeighbor?.coordinates?.z}`,
+      undefined,
+      '10.0.0.68',
+      token
+    );
+    expect(normalClientPlanetResponse.status).toBe(200);
+    expect(normalClientPlanetResponse.json?.info).toMatchObject({
+      isOwnedByViewer: false,
+      ownerPlayerType: 'NEUTRAL'
+    });
+
+    const ownedOnlyResponse = await request(
+      'GET',
+      `/api/game/client-planet?x=${neutralNeighbor?.coordinates?.x}&y=${neutralNeighbor?.coordinates?.y}&z=${neutralNeighbor?.coordinates?.z}&ownedOnly=true`,
+      undefined,
+      '10.0.0.68',
+      token
+    );
+    expect(ownedOnlyResponse.status).toBe(403);
+    expect(ownedOnlyResponse.json).toMatchObject({
+      error: 'Planet view is available only for your own planets.'
+    });
+  });
+
   it('closes the current loaded single-player game, saves it, and clears the current game pointer', async () => {
     await request('POST', '/api/auth/register', {
       playerName: 'SingleplayerAdmin',

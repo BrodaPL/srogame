@@ -372,12 +372,23 @@ export class GameApiService {
     );
   }
 
-  public getClientPlanet(x: number, y: number, z: number, token: string) {
+  public getClientPlanet(
+    x: number,
+    y: number,
+    z: number,
+    token: string,
+    options?: { ownedOnly?: boolean }
+  ) {
     return this.http.get<ClientPlanetDto>(
       `${API_BASE_URL}/game/client-planet`,
       {
         headers: this.authHeaders(token),
-        params: { x, y, z }
+        params: {
+          x,
+          y,
+          z,
+          ...(options?.ownedOnly ? { ownedOnly: true } : {})
+        }
       }
     );
   }

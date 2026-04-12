@@ -20,6 +20,7 @@ describe('Galaxy', () => {
 
     const clientPlanet = galaxy.createClientPlanet(targetPlanet, 1);
 
+    expect(clientPlanet.isOwnedByViewer).toBe(false);
     expect(clientPlanet.info.ownerId).toBe(2);
     expect(clientPlanet.ownerPlayerName).toBe('Beta');
   });
@@ -42,6 +43,7 @@ describe('Galaxy', () => {
 
     const clientPlanet = galaxy.createClientPlanet(targetPlanet, 1);
 
+    expect(clientPlanet.isOwnedByViewer).toBe(false);
     expect(clientPlanet.info.ownerId).toBe(2);
     expect(clientPlanet.ownerPlayerName).toBe('Beta');
   });

@@ -125,6 +125,7 @@ export class Galaxy {
       basicInfo,
       info,
       rBDSFTQ,
+      isOwnedByPlayer,
       ownerPlayerType,
       ownerPlayerName,
       reportData,

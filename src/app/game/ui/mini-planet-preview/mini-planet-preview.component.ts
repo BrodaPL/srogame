@@ -66,12 +66,16 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   }
 
   protected canViewPlanet(): boolean {
-    return this.planet?.reportData !== null;
+    return this.planet?.info.isOwnedByViewer === true;
   }
 
   protected ownershipLabel(): string {
-    if (!this.planet || this.planet.reportData === null) {
+    if (!this.planet) {
       return 'Owned by: NO DATA';
+    }
+
+    if (this.planet.info.isOwnedByViewer) {
+      return `Owned by: ${this.planet.info.ownerPlayerName ?? 'YOU'}`;
     }
 
     if (this.planet.info.ownerId !== null) {
@@ -86,32 +90,37 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       return `Owned by: ${this.planet.info.ownerPlayerName}`;
     }
 
-    return 'Owned by: FREE';
+    return this.isNoDataPlanet()
+      ? 'Owned by: NO DATA'
+      : 'Owned by: FREE';
   }
 
   protected isNoDataPlanet(): boolean {
-    return this.planet?.reportData === null;
+    return !!this.planet
+      && !this.planet.info.isOwnedByViewer
+      && this.planet.reportData === null
+      && this.planet.info.ownerPlayerType === null;
   }
 
   protected isPlayerOwnedPlanet(): boolean {
-    return !this.isNoDataPlanet() && this.planet?.info.ownerId !== null;
+    return this.planet?.info.isOwnedByViewer === true;
   }
 
   protected isNeutralOwnedPlanet(): boolean {
-    return !this.isNoDataPlanet()
-      && this.planet?.info.ownerId === null
+    return !!this.planet
+      && !this.planet.info.isOwnedByViewer
       && this.planet?.info.ownerPlayerType === PlayerType.NEUTRAL;
   }
 
   protected isHumanOwnedPlanet(): boolean {
-    return !this.isNoDataPlanet()
-      && this.planet?.info.ownerId === null
+    return !!this.planet
+      && !this.planet.info.isOwnedByViewer
       && this.planet?.info.ownerPlayerType === PlayerType.PLAYER;
   }
 
   protected isBotOwnedPlanet(): boolean {
-    return !this.isNoDataPlanet()
-      && this.planet?.info.ownerId === null
+    return !!this.planet
+      && !this.planet.info.isOwnedByViewer
       && this.planet?.info.ownerPlayerType === PlayerType.BOT;
   }
 
@@ -133,11 +142,11 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   }
 
   protected canUseAsMissionOrigin(): boolean {
-    return this.planet?.info.ownerId !== null;
+    return this.planet?.info.isOwnedByViewer === true;
   }
 
   protected showSpyAction(): boolean {
-    return !!this.planet && this.planet.info.ownerId === null;
+    return !!this.planet && !this.planet.info.isOwnedByViewer;
   }
 
   protected openMissionPlannerAsOrigin(): void {

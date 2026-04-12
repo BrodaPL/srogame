@@ -138,6 +138,7 @@ function createPlanet(
       size: 100
     },
     info: {
+      isOwnedByViewer: true,
       ownerId: 1,
       ownerPlayerType: PlayerType.PLAYER,
       ownerPlayerName: 'Player',
@@ -179,6 +180,7 @@ function createForeignPlanet(name: string, coordinates: ClientCoordinates): Clie
   return {
     ...createPlanet(name, coordinates, 0),
     info: {
+      isOwnedByViewer: false,
       ownerId: null,
       ownerPlayerType: PlayerType.BOT,
       ownerPlayerName: 'Enemy',

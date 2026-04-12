@@ -2400,7 +2400,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.armLoadingSafetyTimeout(requestKey);
 
     forkJoin({
-      planet: this.gameApi.getClientPlanet(x, y, z, session.token),
+      planet: this.gameApi.getClientPlanet(x, y, z, session.token, { ownedOnly: true }),
       ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
       activeFleets: this.gameApi.getActiveFleets(session.token)
     })
@@ -2423,7 +2423,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           }
 
           try {
-            if (planet.info.ownerId === null) {
+            if (!planet.info.isOwnedByViewer) {
               this.loadError = 'Planet view is available only for your own planets.';
               this.planet = null;
               this.cdr.markForCheck();
@@ -3973,7 +3973,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const expectedZ = planet.coordinates.z;
 
     this.queueTabRefreshInFlight = true;
-    this.gameApi.getClientPlanet(expectedX, expectedY, expectedZ, session.token)
+    this.gameApi.getClientPlanet(expectedX, expectedY, expectedZ, session.token, { ownedOnly: true })
       .pipe(
         timeout(8000),
         finalize(() => {

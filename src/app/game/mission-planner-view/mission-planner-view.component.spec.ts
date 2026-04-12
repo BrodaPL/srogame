@@ -77,6 +77,7 @@ function createOwnedPlanet(name: string, coordinates: ClientCoordinates): Client
       size: 100
     },
     info: {
+      isOwnedByViewer: true,
       ownerId: 1,
       ownerPlayerType: PlayerType.PLAYER,
       ownerPlayerName: 'Player',
