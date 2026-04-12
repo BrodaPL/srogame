@@ -1020,6 +1020,16 @@ app.post('/api/games/:gameId/select', (req, res) => {
   auth.session.currentGameId = gameId;
   if (hasGameRuntime(gameId)) {
     switchCurrentRuntime(gameId);
+  } else if (record.kind === 'SINGLEPLAYER') {
+    const resumeResult = loadSingleplayerGameRecord(auth.data, auth.session, record);
+    if (!resumeResult.ok) {
+      return sendApiError(
+        res,
+        resumeResult.status,
+        resumeResult.error,
+        resumeResult.errorKey
+      );
+    }
   }
 
   return res.status(200).json(buildCurrentGameStatusResponse(auth.session));
@@ -4911,7 +4921,13 @@ function buildAccountSettingsResponse(account: AuthAccount): AccountSettingsResp
 function buildGameSummary(record: ReturnType<typeof listGames>[number], session: AuthSession | null): GameSummary {
   const canView = !!session && canSessionViewGameRecord(record.gameId, session);
   const isCurrentGame = session?.currentGameId === record.gameId;
-  const canResume = canView && isCurrentGame && record.status === 'RUNNING' && hasGameRuntime(record.gameId);
+  const canResume = canView
+    && isCurrentGame
+    && record.status === 'RUNNING'
+    && (
+      hasGameRuntime(record.gameId)
+      || canResumeSingleplayerGameRecord(record)
+    );
   return {
     gameId: record.gameId,
     kind: record.kind,
@@ -4928,6 +4944,84 @@ function buildGameSummary(record: ReturnType<typeof listGames>[number], session:
     canJoin: canView && record.status === 'RUNNING',
     canManage: session?.localAdmin === true
   };
+}
+
+function canResumeSingleplayerGameRecord(record: ReturnType<typeof listGames>[number]): boolean {
+  return record.kind === 'SINGLEPLAYER'
+    && typeof record.currentSaveId === 'string'
+    && record.currentSaveId.trim().length > 0;
+}
+
+function loadSingleplayerGameRecord(
+  authData: AuthData,
+  session: AuthSession,
+  record: ReturnType<typeof getGameById>
+): { ok: true } | { ok: false; status: number; error: string; errorKey: string } {
+  if (!record || record.kind !== 'SINGLEPLAYER') {
+    return {
+      ok: false,
+      status: 404,
+      error: 'Game not found.',
+      errorKey: 'api.errors.gameNotFound'
+    };
+  }
+
+  const saveId = typeof record.currentSaveId === 'string' ? record.currentSaveId.trim() : '';
+  if (!saveId) {
+    return {
+      ok: false,
+      status: 404,
+      error: 'No save is available for this game.',
+      errorKey: 'api.games.current.noSaveAvailable'
+    };
+  }
+
+  const save = readGameSaveById(GAME_SAVES_DIRECTORY_PATH, saveId);
+  if (!save) {
+    return {
+      ok: false,
+      status: 404,
+      error: 'Saved game not found.',
+      errorKey: 'api.games.current.savedGameNotFound'
+    };
+  }
+
+  const loadAccess = resolveGameSaveLoadAccess(save, session.accountId, session.localAdmin === true);
+  if (!loadAccess.canLoad) {
+    return {
+      ok: false,
+      status: 403,
+      error: loadAccess.canLoadReason ?? 'Forbidden.',
+      errorKey: 'api.errors.forbidden'
+    };
+  }
+
+  const hydrated = hydrateGameSave(save);
+  currentGalaxy = hydrated.galaxy;
+  currentGameOwnerId = session.accountId;
+  currentGameOwnerPlayerName = session.playerName;
+  currentGameSetup = hydrated.setup;
+  currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+  resetActiveTurnState();
+  clearBotDecisionTraces();
+  resetBotAdminRuntimeState();
+  registerRunningGame(authData, 'SINGLEPLAYER', currentGalaxy, {
+    gameId: save.gameId ?? record.gameId,
+    ownerAccountId: session.accountId,
+    ownerPlayerName: session.playerName,
+    hostAccountId: session.accountId,
+    hostPlayerName: session.playerName,
+    currentSaveId: saveId,
+    lastSavedAt: save.savedAt,
+    currentGameAccountIds: [session.accountId],
+    memberships: [{
+      accountId: session.accountId,
+      playerName: session.playerName,
+      role: 'OWNER'
+    }]
+  });
+
+  return { ok: true };
 }
 
 function buildMultiplayerGameBrowserResponse(session: AuthSession | null): MultiplayerGameBrowserResponse {

@@ -502,6 +502,72 @@ describe.sequential('auth api', () => {
     });
   });
 
+  it('resumes a selected single-player game from its current save when the runtime is inactive', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'ResumeSingleplayerAdmin',
+      email: 'resume-singleplayer-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.71');
+    activateAccount('ResumeSingleplayerAdmin', { localAdmin: true });
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'ResumeSingleplayerAdmin',
+      password: 'secret-123'
+    }, '10.0.0.71');
+    expect(loginResponse.status).toBe(200);
+    const token = loginResponse.json?.token as string;
+
+    const startResponse = await request('POST', '/api/game/start', {
+      setup: createSingleplayerSetup('Resume Singleplayer Sector')
+    }, '10.0.0.71', token);
+    expect(startResponse.status).toBe(200);
+    const startedPlayer = startResponse.json?.player as Record<string, unknown> | undefined;
+    const gameId = typeof startedPlayer?.currentGameId === 'string' ? startedPlayer.currentGameId : null;
+    expect(typeof gameId).toBe('string');
+
+    const closeResponse = await request('POST', `/api/games/${gameId}/close-current`, {}, '10.0.0.71', token);
+    expect(closeResponse.status).toBe(200);
+
+    const authData = readAuthData();
+    authData.accounts[0]!.currentGameId = gameId;
+    authData.sessions[0]!.currentGameId = gameId;
+    writeAuthData(authData);
+
+    const currentResponse = await request('GET', '/api/games/current', undefined, '10.0.0.71', token);
+    expect(currentResponse.status).toBe(200);
+    expect(currentResponse.json).toMatchObject({
+      currentGameId: gameId,
+      canResume: true,
+      game: {
+        gameId,
+        kind: 'SINGLEPLAYER',
+        status: 'RUNNING',
+        canResume: true
+      },
+      unavailableReason: null,
+      unavailableReasonKey: null,
+      unavailableReasonParams: null
+    });
+
+    const selectResponse = await request('POST', `/api/games/${gameId}/select`, {}, '10.0.0.71', token);
+    expect(selectResponse.status).toBe(200);
+    expect(selectResponse.json).toMatchObject({
+      currentGameId: gameId,
+      canResume: true,
+      game: {
+        gameId,
+        kind: 'SINGLEPLAYER',
+        status: 'RUNNING',
+        canResume: true
+      }
+    });
+
+    const stateResponse = await request('GET', '/api/game/state', undefined, '10.0.0.71', token);
+    expect(stateResponse.status).toBe(200);
+    expect(stateResponse.json?.player?.currentGameId).toBe(gameId);
+    expect(stateResponse.json?.galaxy?.name).toBe('Resume Singleplayer Sector');
+  });
+
   it('classifies stale draft lobbies into other multiplayer games', async () => {
     await request('POST', '/api/auth/register', {
       playerName: 'DraftAdmin',
