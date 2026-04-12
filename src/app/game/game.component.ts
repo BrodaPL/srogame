@@ -5,7 +5,9 @@ import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { PlayerSessionService } from '../core/player-session.service';
 import { AuthStateService } from '../core/auth-state.service';
-import type { GameStateResponse, TurnStatusResponse } from '../models/game-api-types';
+import type { ApiErrorResponse, GameStateResponse, TurnStatusResponse } from '../models/game-api-types';
+import { resolveApiErrorMessage } from '../i18n/api-message.utils';
+import { I18nService } from '../i18n/i18n.service';
 import { getMultiplayerAutoSkipIdleMs } from './multiplayer-test-timing';
 
 @Component({
@@ -45,7 +47,8 @@ export class GameComponent implements OnInit, OnDestroy {
     private readonly gameState: GameStateService,
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly authState: AuthStateService
+    private readonly authState: AuthStateService,
+    private readonly i18n: I18nService
   ) {}
 
   public ngOnInit(): void {
@@ -104,7 +107,7 @@ export class GameComponent implements OnInit, OnDestroy {
     this.requestUiRefresh();
   }
 
-  private handleStateLoadError(error: { status?: number; error?: { error?: string } }): void {
+  private handleStateLoadError(error: { status?: number; error?: ApiErrorResponse }): void {
     this.stopTurnStatusPolling();
     this.clearAutoSkipTimer();
     this.gameState.clearGalaxy();
@@ -125,8 +128,11 @@ export class GameComponent implements OnInit, OnDestroy {
 
     if (error?.status === 403 || error?.status === 404 || error?.status === 409) {
       this.stateTitle = 'No active game';
-      this.stateError = error?.error?.error
-        ?? 'This account is not assigned to the current selected game. Join, resume, or start a game from the main menu.';
+      this.stateError = resolveApiErrorMessage(
+        this.i18n,
+        error,
+        'This account is not assigned to the current selected game. Join, resume, or start a game from the main menu.'
+      );
       this.stateActionLabel = 'Back to main menu';
       this.stateActionRoute = '/';
       this.requestUiRefresh();
@@ -134,7 +140,11 @@ export class GameComponent implements OnInit, OnDestroy {
     }
 
     this.stateTitle = 'Unable to load game';
-    this.stateError = error?.error?.error ?? 'The server did not return the current game state.';
+    this.stateError = resolveApiErrorMessage(
+      this.i18n,
+      error,
+      'The server did not return the current game state.'
+    );
     this.stateActionLabel = 'Back to main menu';
     this.stateActionRoute = '/';
     this.requestUiRefresh();

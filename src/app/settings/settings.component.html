@@ -50,7 +50,7 @@
           <h2>{{ 'settings.sections.security' | t }}</h2>
           <div class="field">
             <p><strong>{{ 'settings.security.forgotPassword' | t }}</strong></p>
-            <p>{{ settings.forgotPasswordInfo }}</p>
+            <p>{{ forgotPasswordInfoLabel() }}</p>
           </div>
           <button class="start-button" type="button" disabled [title]="'settings.security.resetPasswordUnavailableTitle' | t">
             {{ 'settings.security.resetPassword' | t }}

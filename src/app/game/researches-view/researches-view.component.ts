@@ -1,8 +1,10 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nService } from '../../i18n/i18n.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
 import { Building } from '../../models/buildings/building';
@@ -78,6 +80,7 @@ type ResearchQueueRowVm = {
   templateUrl: './researches-view.component.html'
 })
 export class ResearchesViewComponent implements OnInit {
+  private readonly i18n = inject(I18nService);
   protected isLoading = false;
   protected loadError: string | null = null;
   protected startResearchError: string | null = null;
@@ -425,7 +428,7 @@ export class ResearchesViewComponent implements OnInit {
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {
-          this.startResearchError = error?.error?.error ?? 'Unable to add technology to queue.';
+          this.startResearchError = resolveApiErrorMessage(this.i18n, error, 'Unable to add technology to queue.');
           this.cdr.markForCheck();
         }
       });

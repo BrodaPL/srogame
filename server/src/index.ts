@@ -183,6 +183,7 @@ import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   BotAdminActionResponse,
   BotAdminStatesResponse,
+  ApiMessageParams,
   EndTurnResponse,
   TurnStatusResponse,
   CurrentGameStatusResponse,
@@ -610,7 +611,13 @@ app.get('/api/auth/register-config', (_req, res) => {
 app.post('/api/auth/register', async (req, res) => {
   const registerRateLimit = consumeRateLimit('auth-register', getRequestIdentity(req), REGISTER_RATE_LIMIT);
   if (!registerRateLimit.allowed) {
-    return res.status(429).json({ error: `Too many registration attempts. Try again in ${registerRateLimit.retryAfterSeconds} seconds.` });
+    return sendApiError(
+      res,
+      429,
+      `Too many registration attempts. Try again in ${registerRateLimit.retryAfterSeconds} seconds.`,
+      'api.auth.register.rateLimited',
+      { retryAfterSeconds: registerRateLimit.retryAfterSeconds }
+    );
   }
 
   const body = req.body as RegisterRequest | undefined;
@@ -619,7 +626,7 @@ app.post('/api/auth/register', async (req, res) => {
   const password = normalizePassword(body?.password);
 
   if (!playerName || !email || !password) {
-    return res.status(400).json({ error: 'Invalid player name, email, or password.' });
+    return sendApiError(res, 400, 'Invalid player name, email, or password.', 'api.auth.register.invalidPayload');
   }
 
   const data = loadAuthData();
@@ -630,16 +637,21 @@ app.post('/api/auth/register', async (req, res) => {
   const playerNameKey = toPlayerNameKey(playerName);
   const emailKey = toEmailKey(email);
   if (data.accounts.some((account) => account.playerNameKey === playerNameKey)) {
-    return res.status(409).json({ error: 'User already exists.' });
+    return sendApiError(res, 409, 'User already exists.', 'api.auth.register.userExists');
   }
   if (data.accounts.some((account) => account.emailKey && account.emailKey === emailKey)) {
-    return res.status(409).json({ error: 'Email already exists.' });
+    return sendApiError(res, 409, 'Email already exists.', 'api.auth.register.emailExists');
   }
 
   const turnstileToken = typeof body?.turnstileToken === 'string' ? body.turnstileToken : null;
   const turnstile = await verifyTurnstileToken(turnstileToken, getRequestIdentity(req));
   if (!turnstile.ok) {
-    return res.status(400).json({ error: turnstile.error ?? 'CAPTCHA verification failed.' });
+    return sendApiError(
+      res,
+      400,
+      turnstile.error ?? 'CAPTCHA verification failed.',
+      'api.auth.register.captchaFailed'
+    );
   }
 
   const now = new Date().toISOString();
@@ -671,27 +683,33 @@ app.post('/api/auth/register', async (req, res) => {
   data.accounts.push(account);
   saveAuthData(data);
 
-  const response: RegisterResponse = {
+  const response: RegisterResponse = withApiMessage({
     playerName: account.playerName,
     email: account.email,
     accountStatus: account.status,
     requiresConfirmation: true,
     confirmationExpiresAt: account.confirmationExpiresAt,
     message: 'Account created. Email confirmation is required before login. For now activation must be completed manually on the server.'
-  };
+  }, 'api.auth.register.successManualActivation');
   return res.status(201).json(response);
 });
 
 app.post('/api/auth/resend-confirmation', (req, res) => {
   const resendRateLimit = consumeRateLimit('auth-resend-confirmation', getRequestIdentity(req), RESEND_CONFIRMATION_RATE_LIMIT);
   if (!resendRateLimit.allowed) {
-    return res.status(429).json({ error: `Too many confirmation resend attempts. Try again in ${resendRateLimit.retryAfterSeconds} seconds.` });
+    return sendApiError(
+      res,
+      429,
+      `Too many confirmation resend attempts. Try again in ${resendRateLimit.retryAfterSeconds} seconds.`,
+      'api.auth.resendConfirmation.rateLimited',
+      { retryAfterSeconds: resendRateLimit.retryAfterSeconds }
+    );
   }
 
   const body = req.body as ResendConfirmationRequest | undefined;
   const email = normalizeEmail(body?.email);
   if (!email) {
-    return res.status(400).json({ error: 'Invalid email.' });
+    return sendApiError(res, 400, 'Invalid email.', 'api.auth.resendConfirmation.invalidEmail');
   }
 
   const data = loadAuthData();
@@ -701,11 +719,11 @@ app.post('/api/auth/resend-confirmation', (req, res) => {
 
   const emailKey = toEmailKey(email);
   const account = data.accounts.find((entry) => entry.emailKey === emailKey);
-  const genericResponse: ResendConfirmationResponse = {
+  const genericResponse: ResendConfirmationResponse = withApiMessage({
     message: 'If a pending account exists for that email, the confirmation window was refreshed. Email delivery is not configured yet on this server; activation must still be completed manually on the server.',
     confirmationExpiresAt: null,
     nextAllowedAt: null
-  };
+  }, 'api.auth.resendConfirmation.successGeneric');
 
   if (!account || account.status !== 'PENDING_CONFIRMATION') {
     return res.status(200).json(genericResponse);
@@ -713,26 +731,42 @@ app.post('/api/auth/resend-confirmation', (req, res) => {
 
   const nowMs = Date.now();
   if (!canResendConfirmation(account, nowMs, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS)) {
+    const nextAllowedAt = getResendConfirmationNextAllowedAt(account, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS);
+    const nextAllowedAtMs = nextAllowedAt ? Date.parse(nextAllowedAt) : Number.NaN;
+    const retryAfterMs = Number.isFinite(nextAllowedAtMs)
+      ? Math.max(0, nextAllowedAtMs - nowMs)
+      : DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS;
+    const retryAfterMinutes = Math.max(1, Math.ceil(retryAfterMs / 60000));
     return res.status(429).json({
-      error: buildResendConfirmationCooldownMessage(account, nowMs, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS),
-      nextAllowedAt: getResendConfirmationNextAllowedAt(account, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS)
+      ...buildApiErrorBody(
+        buildResendConfirmationCooldownMessage(account, nowMs, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS),
+        'api.auth.resendConfirmation.cooldown',
+        buildRetryAfterMinutesParams(retryAfterMinutes)
+      ),
+      nextAllowedAt
     });
   }
 
   const updated = markConfirmationResent(account, nowMs, PENDING_CONFIRMATION_LIFETIME_MS);
   saveAuthData(data);
-  const response: ResendConfirmationResponse = {
+  const response: ResendConfirmationResponse = withApiMessage({
     message: genericResponse.message,
     confirmationExpiresAt: updated.confirmationExpiresAt,
     nextAllowedAt: getResendConfirmationNextAllowedAt(account, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS)
-  };
+  }, 'api.auth.resendConfirmation.successGeneric');
   return res.status(200).json(response);
 });
 
 app.post('/api/auth/login', (req, res) => {
   const loginRateLimit = consumeRateLimit('auth-login', getRequestIdentity(req), LOGIN_RATE_LIMIT);
   if (!loginRateLimit.allowed) {
-    return res.status(429).json({ error: `Too many login attempts. Try again in ${loginRateLimit.retryAfterSeconds} seconds.` });
+    return sendApiError(
+      res,
+      429,
+      `Too many login attempts. Try again in ${loginRateLimit.retryAfterSeconds} seconds.`,
+      'api.auth.login.rateLimited',
+      { retryAfterSeconds: loginRateLimit.retryAfterSeconds }
+    );
   }
 
   const body = req.body as LoginRequest | undefined;
@@ -740,7 +774,7 @@ app.post('/api/auth/login', (req, res) => {
   const password = normalizePassword(body?.password);
 
   if (!playerName || !password) {
-    return res.status(400).json({ error: 'Invalid player name or password.' });
+    return sendApiError(res, 400, 'Invalid player name or password.', 'api.auth.login.invalidCredentials');
   }
 
   const data = loadAuthData();
@@ -751,25 +785,48 @@ app.post('/api/auth/login', (req, res) => {
   const playerNameKey = toPlayerNameKey(playerName);
   const account = data.accounts.find((entry) => entry.playerNameKey === playerNameKey);
   if (!account) {
-    return res.status(404).json({ error: 'No such user.' });
+    return sendApiError(res, 404, 'No such user.', 'api.auth.login.userNotFound');
   }
   if (clearExpiredLoginLock(account, nowMs)) {
     saveAuthData(data);
   }
   const loginBlock = getLoginBlockResponse(account, nowMs);
   if (loginBlock) {
-    return res.status(loginBlock.status).json({ error: loginBlock.error });
+    const retryAfterMinutes = account.loginLockedUntil
+      ? Math.max(1, Math.ceil((Date.parse(account.loginLockedUntil) - nowMs) / 60000))
+      : 10;
+    return sendApiError(
+      res,
+      loginBlock.status,
+      loginBlock.error,
+      loginBlock.status === 403 ? 'api.auth.login.pendingConfirmation' : 'api.auth.login.accountLocked',
+      loginBlock.status === 423 ? buildRetryAfterMinutesParams(retryAfterMinutes) : null
+    );
   }
   if (!verifyPassword(password, account.passwordHash)) {
     const lockedUntil = registerFailedPasswordAttempt(account, nowMs);
     saveAuthData(data);
     if (lockedUntil) {
-      return res.status(423).json({ error: buildLockedAccountMessage(account, nowMs) });
+      const retryAfterMinutes = Math.max(1, Math.ceil((Date.parse(lockedUntil) - nowMs) / 60000));
+      return sendApiError(
+        res,
+        423,
+        buildLockedAccountMessage(account, nowMs),
+        'api.auth.login.accountLocked',
+        buildRetryAfterMinutesParams(retryAfterMinutes)
+      );
     }
     const attemptsLeft = Math.max(0, DEFAULT_MAX_PASSWORD_RETRY_ATTEMPTS - account.failedLoginAttempts);
-    return res.status(401).json({
-      error: `Wrong password. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} left before a 10 minute lock.`
-    });
+    return sendApiError(
+      res,
+      401,
+      `Wrong password. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} left before a 10 minute lock.`,
+      'api.auth.login.wrongPasswordAttemptsLeft',
+      {
+        attemptsLeft,
+        attemptSuffix: pluralSuffix(attemptsLeft)
+      }
+    );
   }
 
   const now = new Date().toISOString();
@@ -787,7 +844,7 @@ app.get('/api/auth/me', (req, res) => {
   }
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   reconcileLoadedRunningMultiplayerGames(data);
@@ -816,7 +873,7 @@ app.post('/api/auth/logout', (req, res) => {
 app.get('/api/account/settings', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   if (cleanupExpiredPendingAccounts(auth.data)) {
@@ -825,7 +882,7 @@ app.get('/api/account/settings', (req, res) => {
 
   const account = auth.data.accounts.find((entry) => entry.id === auth.session.accountId);
   if (!account) {
-    return res.status(404).json({ error: 'Account not found.' });
+    return sendApiError(res, 404, 'Account not found.', 'api.account.settings.notFound');
   }
 
   reconcileLoadedRunningMultiplayerGames(auth.data);
@@ -836,12 +893,18 @@ app.get('/api/account/settings', (req, res) => {
 app.post('/api/account/settings/preferences', (req, res) => {
   const rateLimit = consumeRateLimit('account-settings', getRequestIdentity(req), ACCOUNT_MUTATION_RATE_LIMIT);
   if (!rateLimit.allowed) {
-    return res.status(429).json({ error: `Too many settings updates. Try again in ${rateLimit.retryAfterSeconds} seconds.` });
+    return sendApiError(
+      res,
+      429,
+      `Too many settings updates. Try again in ${rateLimit.retryAfterSeconds} seconds.`,
+      'api.account.settings.rateLimited',
+      { retryAfterSeconds: rateLimit.retryAfterSeconds }
+    );
   }
 
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   if (cleanupExpiredPendingAccounts(auth.data)) {
@@ -850,14 +913,14 @@ app.post('/api/account/settings/preferences', (req, res) => {
 
   const account = auth.data.accounts.find((entry) => entry.id === auth.session.accountId);
   if (!account) {
-    return res.status(404).json({ error: 'Account not found.' });
+    return sendApiError(res, 404, 'Account not found.', 'api.account.settings.notFound');
   }
 
   const body = req.body as UpdateAccountPreferencesRequest | undefined;
   const replaceWithBotOnLogout = body?.replaceWithBotOnLogout === true;
   const logoutBotProfileId = normalizeBotProfileId(body?.logoutBotProfileId);
   if (replaceWithBotOnLogout && !logoutBotProfileId) {
-    return res.status(400).json({ error: 'A valid bot profile is required when bot replacement is enabled.' });
+    return sendApiError(res, 400, 'A valid bot profile is required when bot replacement is enabled.', 'api.account.settings.invalidBotProfile');
   }
 
   const language = normalizeLanguagePreference(body?.language);
@@ -872,12 +935,18 @@ app.post('/api/account/settings/preferences', (req, res) => {
 app.post('/api/account/settings/tutorials/reset', (req, res) => {
   const rateLimit = consumeRateLimit('account-settings', getRequestIdentity(req), ACCOUNT_MUTATION_RATE_LIMIT);
   if (!rateLimit.allowed) {
-    return res.status(429).json({ error: `Too many settings updates. Try again in ${rateLimit.retryAfterSeconds} seconds.` });
+    return sendApiError(
+      res,
+      429,
+      `Too many settings updates. Try again in ${rateLimit.retryAfterSeconds} seconds.`,
+      'api.account.settings.rateLimited',
+      { retryAfterSeconds: rateLimit.retryAfterSeconds }
+    );
   }
 
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   if (cleanupExpiredPendingAccounts(auth.data)) {
@@ -886,7 +955,7 @@ app.post('/api/account/settings/tutorials/reset', (req, res) => {
 
   const account = auth.data.accounts.find((entry) => entry.id === auth.session.accountId);
   if (!account) {
-    return res.status(404).json({ error: 'Account not found.' });
+    return sendApiError(res, 404, 'Account not found.', 'api.account.settings.notFound');
   }
 
   let playerSession = toPlayerSession(auth.session, null);
@@ -907,11 +976,11 @@ app.post('/api/account/settings/tutorials/reset', (req, res) => {
     };
   }
 
-  const response: ResetAccountTutorialsResponse = {
+  const response: ResetAccountTutorialsResponse = withApiMessage({
     settings: buildAccountSettingsResponse(account),
     player: playerSession,
     message: 'Tutorial progress was reset for your current session.'
-  };
+  }, 'api.account.settings.tutorialsReset');
   return res.status(200).json(response);
 });
 
@@ -926,7 +995,7 @@ app.get('/api/games', (req, res) => {
 app.get('/api/games/current', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   reconcileLoadedRunningMultiplayerGames(auth.data);
@@ -937,13 +1006,13 @@ app.get('/api/games/current', (req, res) => {
 app.post('/api/games/:gameId/select', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const gameId = typeof req.params.gameId === 'string' ? req.params.gameId.trim() : '';
   const record = gameId ? getGameById(GAME_REGISTRY_DATA_PATH, gameId) : null;
   if (!record || !canSessionViewGameRecord(gameId, auth.session)) {
-    return res.status(404).json({ error: 'Game not found.' });
+    return sendApiError(res, 404, 'Game not found.', 'api.errors.gameNotFound');
   }
 
   setAccountCurrentGameId(auth.data, auth.session.accountId, gameId);
@@ -959,30 +1028,50 @@ app.post('/api/games/:gameId/select', (req, res) => {
 app.post('/api/games/:gameId/close-current', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   if (!isLocalAdminSession(auth.session)) {
-    return res.status(403).json({ error: 'Local admin privileges are required to close a single-player game.' });
+    return sendApiError(
+      res,
+      403,
+      'Local admin privileges are required to close a single-player game.',
+      'api.games.closeCurrent.requiresLocalAdmin'
+    );
   }
 
   const gameId = typeof req.params.gameId === 'string' ? req.params.gameId.trim() : '';
   if (!gameId || auth.session.currentGameId !== gameId) {
-    return res.status(403).json({ error: 'Select this game as your current game first.' });
+    return sendApiError(
+      res,
+      403,
+      'Select this game as your current game first.',
+      'api.games.closeCurrent.selectFirst'
+    );
   }
 
   const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
   if (!record) {
-    return res.status(404).json({ error: 'Game not found.' });
+    return sendApiError(res, 404, 'Game not found.', 'api.errors.gameNotFound');
   }
 
   if (record.kind === 'MULTIPLAYER') {
-    return res.status(400).json({ error: 'Use multiplayer leave/resume actions for multiplayer games.' });
+    return sendApiError(
+      res,
+      400,
+      'Use multiplayer leave/resume actions for multiplayer games.',
+      'api.games.closeCurrent.useMultiplayerActions'
+    );
   }
 
   const runtime = getGameRuntime(gameId);
   if (!runtime) {
-    return res.status(409).json({ error: 'This single-player game is not currently loaded.' });
+    return sendApiError(
+      res,
+      409,
+      'This single-player game is not currently loaded.',
+      'api.games.closeCurrent.notLoaded'
+    );
   }
 
   try {
@@ -996,7 +1085,12 @@ app.post('/api/games/:gameId/close-current', (req, res) => {
     return res.status(200).json(buildCurrentGameStatusResponse(auth.session));
   } catch (error) {
     console.error('Failed to close the current single-player game.', error);
-    return res.status(500).json({ error: 'Unable to close the current single-player game.' });
+    return sendApiError(
+      res,
+      500,
+      'Unable to close the current single-player game.',
+      'api.games.closeCurrent.failed'
+    );
   }
 });
 
@@ -1023,7 +1117,7 @@ app.get('/api/games/:gameId/saves', (req, res) => {
 app.get('/api/games/:gameId/state', (req, res) => {
   const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId, { markPresenceSeen: true });
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const response: GameStateResponse = {
@@ -1037,7 +1131,7 @@ app.get('/api/games/:gameId/state', (req, res) => {
 app.get('/api/games/:gameId/turn-status', (req, res) => {
   const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId);
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   return res.status(200).json(buildGameTurnStatusResponse(access));
@@ -1487,12 +1581,17 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/presence', (req, res) => {
   const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId, { markPresenceSeen: true });
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
   if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING') {
-    return res.status(404).json({ error: 'Running multiplayer game not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Running multiplayer game not found.',
+      'api.multiplayer.presence.runningGameNotFound'
+    );
   }
 
   const body = req.body as UpdateMultiplayerAutoSkipTurnRequest | undefined;
@@ -1516,17 +1615,27 @@ app.post('/api/multiplayer/games/:gameId/presence', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/auto-skip-turn', (req, res) => {
   const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId);
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
   if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING') {
-    return res.status(404).json({ error: 'Running multiplayer game not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Running multiplayer game not found.',
+      'api.multiplayer.presence.runningGameNotFound'
+    );
   }
 
   const body = req.body as UpdateMultiplayerAutoSkipTurnRequest | undefined;
   if (typeof body?.enabled !== 'boolean') {
-    return res.status(400).json({ error: 'Auto skip toggle requires an enabled boolean.' });
+    return sendApiError(
+      res,
+      400,
+      'Auto skip toggle requires an enabled boolean.',
+      'api.multiplayer.presence.autoSkipRequiresEnabledBoolean'
+    );
   }
 
   if (body.enabled && body.activateNow === true) {
@@ -1792,7 +1901,7 @@ app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
 app.get('/api/game/state', (req, res) => {
   const access = resolveAuthenticatedGameAccess(req, { markPresenceSeen: true });
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const response: GameStateResponse = {
@@ -1806,7 +1915,7 @@ app.get('/api/game/state', (req, res) => {
 app.get('/api/game/turn-status', (req, res) => {
   const access = resolveAuthenticatedGameAccess(req);
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const response: TurnStatusResponse = buildGameTurnStatusResponse(access);
@@ -1939,7 +2048,7 @@ app.post('/api/admin/bots/:playerId/clear-memory', (req, res) => {
 app.get('/api/game/diplomacy', (req, res) => {
   const access = resolveAuthenticatedGameAccess(req);
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   return res.status(200).json(toDiplomaticRelationDtos(access.galaxy.diplomaticRelations));
@@ -1976,7 +2085,7 @@ app.post('/api/game/diplomacy', (req, res) => {
 app.get('/api/game/diplomacy-view', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
@@ -1985,7 +2094,7 @@ app.get('/api/game/diplomacy-view', (req, res) => {
 app.post('/api/game/diplomacy/proposals', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const body = req.body as CreateDiplomaticProposalRequest | undefined;
@@ -2009,7 +2118,7 @@ app.post('/api/game/diplomacy/proposals', (req, res) => {
 app.post('/api/game/diplomacy/proposals/:proposalId/accept', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const proposalId = parseRoutePositiveInt(req.params.proposalId);
@@ -2031,7 +2140,7 @@ app.post('/api/game/diplomacy/proposals/:proposalId/accept', (req, res) => {
 app.post('/api/game/diplomacy/proposals/:proposalId/reject', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const proposalId = parseRoutePositiveInt(req.params.proposalId);
@@ -2053,7 +2162,7 @@ app.post('/api/game/diplomacy/proposals/:proposalId/reject', (req, res) => {
 app.post('/api/game/diplomacy/proposals/:proposalId/cancel', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const proposalId = parseRoutePositiveInt(req.params.proposalId);
@@ -2075,7 +2184,7 @@ app.post('/api/game/diplomacy/proposals/:proposalId/cancel', (req, res) => {
 app.get('/api/game/mail', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
@@ -2084,7 +2193,7 @@ app.get('/api/game/mail', (req, res) => {
 app.post('/api/game/mail/messages/read', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const body = req.body as MarkMailMessageReadRequest | undefined;
@@ -2103,7 +2212,7 @@ app.post('/api/game/mail/messages/read', (req, res) => {
 app.post('/api/game/mail/messages/delete', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const body = req.body as DeleteMailMessagesRequest | undefined;
@@ -2120,7 +2229,7 @@ app.post('/api/game/mail/messages/delete', (req, res) => {
 app.post('/api/game/mail/requests/delete', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const body = req.body as DeleteMailRequestsRequest | undefined;
@@ -2200,7 +2309,7 @@ app.post('/api/game/mail/requests/delete', (req, res) => {
 app.post('/api/game/mail/maintenance-requests/:requestId/approve', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const requestId = Number.parseInt(req.params.requestId, 10);
@@ -2238,7 +2347,7 @@ app.post('/api/game/mail/maintenance-requests/:requestId/approve', (req, res) =>
 app.post('/api/game/mail/maintenance-requests/:requestId/reject', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const requestId = Number.parseInt(req.params.requestId, 10);
@@ -2272,7 +2381,7 @@ app.post('/api/game/mail/maintenance-requests/:requestId/reject', (req, res) => 
 app.post('/api/game/mail/maintenance-requests/:requestId/cancel', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const requestId = Number.parseInt(req.params.requestId, 10);
@@ -2306,7 +2415,7 @@ app.post('/api/game/mail/maintenance-requests/:requestId/cancel', (req, res) => 
 app.post('/api/game/mail/jump-gate-requests/:requestId/approve', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const requestId = Number.parseInt(req.params.requestId, 10);
@@ -2341,7 +2450,7 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/approve', (req, res) => {
 app.post('/api/game/mail/jump-gate-requests/:requestId/reject', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const requestId = Number.parseInt(req.params.requestId, 10);
@@ -2375,7 +2484,7 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/reject', (req, res) => {
 app.post('/api/game/mail/jump-gate-requests/:requestId/cancel', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const requestId = Number.parseInt(req.params.requestId, 10);
@@ -2409,7 +2518,7 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/cancel', (req, res) => {
 app.post('/api/game/mail/messages/send', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const body = req.body as SendMailMessageRequest | undefined;
@@ -2475,7 +2584,7 @@ app.post('/api/game/end-turn', (req, res) => {
 app.get('/api/game/galaxy-presentation-data', (req, res) => {
   const access = resolveAuthenticatedGameAccess(req);
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const presentation = getPresentationData(access.galaxy, access.playerId);
@@ -2490,7 +2599,7 @@ app.get('/api/game/galaxy-presentation-data', (req, res) => {
 app.post('/api/game/star-system-note', (req, res) => {
   const access = resolveAuthenticatedGameAccess(req);
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const body = req.body as UpsertStarSystemNoteRequest | undefined;
@@ -2522,7 +2631,7 @@ app.post('/api/game/star-system-note', (req, res) => {
 app.delete('/api/game/star-system-note', (req, res) => {
   const access = resolveAuthenticatedGameAccess(req);
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const x = parseNonNegativeInt(req.query.x);
@@ -2547,7 +2656,7 @@ app.delete('/api/game/star-system-note', (req, res) => {
 app.get('/api/game/client-galaxy', (req, res) => {
   const access = resolveAuthenticatedGameAccess(req);
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const includePlanets = parseIncludePlanets(req.query.includePlanets);
@@ -2559,7 +2668,7 @@ app.get('/api/game/client-galaxy', (req, res) => {
 app.get('/api/game/client-star-system', (req, res) => {
   const access = resolveAuthenticatedGameAccess(req);
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   const x = parseNonNegativeInt(req.query.x);
@@ -2633,7 +2742,7 @@ app.get('/api/game/client-planet', (req, res) => {
 app.get('/api/game/sensor-phalanx/capabilities', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const x = parseNonNegativeInt(req.query.x);
@@ -2661,7 +2770,7 @@ app.get('/api/game/sensor-phalanx/capabilities', (req, res) => {
 app.post('/api/game/sensor-phalanx/scan', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const body = req.body as SensorPhalanxScanRequest | undefined;
@@ -2723,7 +2832,7 @@ app.post('/api/game/sensor-phalanx/scan', (req, res) => {
 app.post('/api/game/abandon-planet', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const body = req.body as AbandonPlanetRequest | undefined;
@@ -2777,7 +2886,7 @@ app.post('/api/game/abandon-planet', (req, res) => {
 app.post('/api/game/trade-port/use-offer', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const body = req.body as UseTradePortOfferRequest | undefined;
@@ -3493,7 +3602,7 @@ app.get('/api/game/active-fleets', (req, res) => {
 app.get('/api/game/active-fleets/:fleetId/maintenance-options', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const fleetId = Number.parseInt(req.params.fleetId, 10);
@@ -3512,7 +3621,7 @@ app.get('/api/game/active-fleets/:fleetId/maintenance-options', (req, res) => {
 app.post('/api/game/active-fleets/:fleetId/maintenance-request', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
-    return res.status(authPlayer.status).json({ error: authPlayer.error });
+    return sendApiRouteError(res, authPlayer);
   }
 
   const fleetId = Number.parseInt(req.params.fleetId, 10);
@@ -3716,6 +3825,132 @@ if (isMainModule) {
     // eslint-disable-next-line no-console
     console.log(`SroGame server listening on http://localhost:${actualPort}`);
   });
+}
+
+function withApiMessage<T extends { message: string }>(
+  body: T,
+  messageKey: string,
+  messageParams: ApiMessageParams | null = null
+): T & { messageKey: string; messageParams: ApiMessageParams | null } {
+  return {
+    ...body,
+    messageKey,
+    messageParams
+  };
+}
+
+function buildApiErrorBody(
+  error: string,
+  errorKey: string,
+  errorParams: ApiMessageParams | null = null,
+  extra: Record<string, unknown> = {}
+): { error: string; errorKey: string; errorParams: ApiMessageParams | null } & Record<string, unknown> {
+  return {
+    ...extra,
+    error,
+    errorKey,
+    errorParams
+  };
+}
+
+function sendApiError(
+  res: express.Response,
+  status: number,
+  error: string,
+  errorKey: string,
+  errorParams: ApiMessageParams | null = null,
+  extra: Record<string, unknown> = {}
+) {
+  return res.status(status).json(buildApiErrorBody(error, errorKey, errorParams, extra));
+}
+
+type ApiRouteError = {
+  status: number;
+  error: string;
+  errorKey: string;
+  errorParams: ApiMessageParams | null;
+};
+
+function createApiRouteError(
+  status: number,
+  error: string,
+  errorKey: string,
+  errorParams: ApiMessageParams | null = null
+): ApiRouteError {
+  return {
+    status,
+    error,
+    errorKey,
+    errorParams
+  };
+}
+
+function sendApiRouteError(res: express.Response, routeError: ApiRouteError) {
+  return res.status(routeError.status).json(
+    buildApiErrorBody(routeError.error, routeError.errorKey, routeError.errorParams)
+  );
+}
+
+function pluralSuffix(value: number): string {
+  return value === 1 ? '' : 's';
+}
+
+function buildRetryAfterMinutesParams(retryAfterMinutes: number): ApiMessageParams {
+  return {
+    retryAfterMinutes,
+    minuteSuffix: pluralSuffix(retryAfterMinutes)
+  };
+}
+
+function buildEndTurnMailBlockParams(unreadMailCount: number, pendingRequestCount: number): ApiMessageParams {
+  return {
+    pendingRequestCount,
+    pendingRequestSuffix: pendingRequestCount === 1 ? '' : 's',
+    unreadMailCount,
+    unreadMailSuffix: unreadMailCount === 1 ? '' : 's',
+    unreadMessageSuffix: unreadMailCount === 1 ? '' : 'es',
+    mailJoinClause: pendingRequestCount > 0 && unreadMailCount > 0 ? ' and ' : ''
+  };
+}
+
+function buildOnlineHumansRequiredMessageMetadata(gameId: string): {
+  message: string | null;
+  key: string | null;
+  params: ApiMessageParams | null;
+} {
+  if (minimumOnlineHumansRequiredForGame(gameId) <= 1) {
+    return {
+      message: null,
+      key: null,
+      params: null
+    };
+  }
+
+  return {
+    message: 'At least 2 human players must be online to progress this multiplayer game.',
+    key: 'api.gameplay.endTurn.notEnoughOnlineHumans',
+    params: null
+  };
+}
+
+function buildActiveHumanRequiredMessageMetadata(gameId: string): {
+  message: string | null;
+  key: string | null;
+  params: ApiMessageParams | null;
+} {
+  if (minimumOnlineHumansRequiredForGame(gameId) <= 1) {
+    return {
+      message: null,
+      key: null,
+      params: null
+    };
+  }
+
+  return {
+    message: 'At least 1 active human player must be present to progress this multiplayer game.',
+    key: 'api.gameplay.endTurn.activeHumanRequired',
+    params: null
+  };
 }
 
 type AuthAccount = {
@@ -4328,15 +4563,11 @@ function minimumOnlineHumansRequiredForGame(gameId: string): number {
 }
 
 function buildOnlineHumansRequiredMessage(gameId: string): string | null {
-  return minimumOnlineHumansRequiredForGame(gameId) > 1
-    ? 'At least 2 human players must be online to progress this multiplayer game.'
-    : null;
+  return buildOnlineHumansRequiredMessageMetadata(gameId).message;
 }
 
 function buildActiveHumanRequiredMessage(gameId: string): string | null {
-  return minimumOnlineHumansRequiredForGame(gameId) > 1
-    ? 'At least 1 active human player must be present to progress this multiplayer game.'
-    : null;
+  return buildActiveHumanRequiredMessageMetadata(gameId).message;
 }
 
 function reconcileReadyStateForOnlineHumans(
@@ -4391,10 +4622,10 @@ function buildGameTurnStatusResponse(
     : access.isProcessing;
   const minimumOnlineHumansRequired = minimumOnlineHumansRequiredForGame(access.gameId);
   const progressionBlockedReason = presenceSummary.presentHumanCount < minimumOnlineHumansRequired
-    ? buildOnlineHumansRequiredMessage(access.gameId)
+    ? buildOnlineHumansRequiredMessageMetadata(access.gameId)
     : presenceSummary.activeHumanCount < 1
-      ? buildActiveHumanRequiredMessage(access.gameId)
-      : null;
+      ? buildActiveHumanRequiredMessageMetadata(access.gameId)
+      : { message: null, key: null, params: null };
   return buildTurnStatusResponse(
     access.galaxy,
     readyPlayerIds,
@@ -4403,7 +4634,9 @@ function buildGameTurnStatusResponse(
     {
       onlineHumanCount: presenceSummary.presentHumanCount,
       minimumOnlineHumanCount: minimumOnlineHumansRequired,
-      progressionBlockedReason,
+      progressionBlockedReason: progressionBlockedReason.message,
+      progressionBlockedReasonKey: progressionBlockedReason.key,
+      progressionBlockedReasonParams: progressionBlockedReason.params,
       blockingPlayerIds: presenceSummary.blockingPlayerIds,
       ...buildCurrentPlayerPresenceOptions(access.gameId, access.auth.session)
     }
@@ -4608,7 +4841,9 @@ function buildCurrentGameStatusResponse(session: AuthSession): CurrentGameStatus
       currentGameId: null,
       game: null,
       canResume: false,
-      unavailableReason: null
+      unavailableReason: null,
+      unavailableReasonKey: null,
+      unavailableReasonParams: null
     };
   }
 
@@ -4618,7 +4853,9 @@ function buildCurrentGameStatusResponse(session: AuthSession): CurrentGameStatus
       currentGameId: null,
       game: null,
       canResume: false,
-      unavailableReason: null
+      unavailableReason: null,
+      unavailableReasonKey: null,
+      unavailableReasonParams: null
     };
   }
 
@@ -4631,7 +4868,13 @@ function buildCurrentGameStatusResponse(session: AuthSession): CurrentGameStatus
       ? null
       : record.status === 'RUNNING'
         ? 'You do not currently have access to resume this game.'
-        : 'This game is not currently active. Ask localAdmin to resume it.'
+        : 'This game is not currently active. Ask localAdmin to resume it.',
+    unavailableReasonKey: summary.canResume
+      ? null
+      : record.status === 'RUNNING'
+        ? 'api.games.current.unavailableResume'
+        : 'api.games.current.inactiveAskAdmin',
+    unavailableReasonParams: null
   };
 }
 
@@ -4655,7 +4898,9 @@ function buildAccountSettingsResponse(account: AuthAccount): AccountSettingsResp
     language: account.language,
     forgotPasswordEnabled: false,
     forgotPasswordAvailableAt: account.lastPasswordResetRequestedAt,
-    forgotPasswordInfo: 'Password reset by email is not available yet.'
+    forgotPasswordInfo: 'Password reset by email is not available yet.',
+    forgotPasswordInfoKey: 'api.account.settings.forgotPasswordUnavailable',
+    forgotPasswordInfoParams: null
   };
 }
 
@@ -5333,22 +5578,26 @@ function resolveSessionRuntimeAccess(
     runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
     auth: { data: AuthData; session: AuthSession };
   }
-  | { status: number; error: string } {
+  | ApiRouteError {
   const explicitGameId = typeof requestedGameId === 'string' && requestedGameId.trim()
     ? requestedGameId.trim()
     : null;
   const gameId = explicitGameId ?? auth.session.currentGameId ?? currentRuntimeGameId;
   if (!gameId) {
-    return { status: 404, error: 'No active game.' };
+    return createApiRouteError(404, 'No active game.', 'api.errors.noCurrentGameSelected');
   }
 
   if (!canSessionViewGameRecord(gameId, auth.session)) {
-    return { status: 404, error: 'Game not found.' };
+    return createApiRouteError(404, 'Game not found.', 'api.errors.gameNotFound');
   }
 
   const runtime = getGameRuntime(gameId);
   if (!runtime) {
-    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+    return createApiRouteError(
+      409,
+      'This game is not currently active. Ask localAdmin to resume it.',
+      'api.errors.gameNotActiveAskAdmin'
+    );
   }
 
   reconcileOfflineBotControlledSeatsForRuntime(gameId, runtime, auth.data);
@@ -5377,10 +5626,10 @@ function resolveAuthenticatedGameAccess(
     readyPlayerIds: ReadonlySet<number>;
     isProcessing: boolean;
   }
-  | { status: number; error: string } {
+  | ApiRouteError {
   const auth = getAuthSession(req);
   if (!auth) {
-    return { status: 401, error: 'Unauthorized.' };
+    return createApiRouteError(401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const runtimeAccess = resolveSessionRuntimeAccess(auth);
@@ -5391,7 +5640,7 @@ function resolveAuthenticatedGameAccess(
   const { runtime } = runtimeAccess;
   const playerId = resolvePlayerId(runtime.galaxy, auth.session);
   if (playerId === null) {
-    return { status: 403, error: 'Forbidden.' };
+    return createApiRouteError(403, 'Forbidden.', 'api.errors.forbidden');
   }
 
   if (options.markPresenceSeen === true && isRunningMultiplayerGame(runtime.gameId)) {
@@ -5399,12 +5648,20 @@ function resolveAuthenticatedGameAccess(
   }
   const lifecycle = reconcileRunningMultiplayerLifecycle(runtime.gameId, auth.data);
   if (lifecycle.unloaded) {
-    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+    return createApiRouteError(
+      409,
+      'This game is not currently active. Ask localAdmin to resume it.',
+      'api.errors.gameNotActiveAskAdmin'
+    );
   }
 
   const refreshedRuntime = getGameRuntime(runtime.gameId);
   if (!refreshedRuntime) {
-    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+    return createApiRouteError(
+      409,
+      'This game is not currently active. Ask localAdmin to resume it.',
+      'api.errors.gameNotActiveAskAdmin'
+    );
   }
 
   synchronizeJumpGateRequests(refreshedRuntime.galaxy);
@@ -5440,15 +5697,15 @@ function resolveAuthenticatedGameAccessForGame(
     readyPlayerIds: ReadonlySet<number>;
     isProcessing: boolean;
   }
-  | { status: number; error: string } {
+  | ApiRouteError {
   const gameId = typeof requestedGameId === 'string' ? requestedGameId.trim() : '';
   if (!gameId) {
-    return { status: 400, error: 'Invalid game id.' };
+    return createApiRouteError(400, 'Invalid game id.', 'api.errors.invalidGameId');
   }
 
   const auth = getAuthSession(req);
   if (!auth) {
-    return { status: 401, error: 'Unauthorized.' };
+    return createApiRouteError(401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const runtimeAccess = resolveSessionRuntimeAccess(auth, gameId);
@@ -5459,7 +5716,7 @@ function resolveAuthenticatedGameAccessForGame(
   const { runtime } = runtimeAccess;
   const playerId = resolvePlayerId(runtime.galaxy, auth.session);
   if (playerId === null) {
-    return { status: 403, error: 'Forbidden.' };
+    return createApiRouteError(403, 'Forbidden.', 'api.errors.forbidden');
   }
 
   if (options.markPresenceSeen === true && isRunningMultiplayerGame(gameId)) {
@@ -5467,12 +5724,20 @@ function resolveAuthenticatedGameAccessForGame(
   }
   const lifecycle = reconcileRunningMultiplayerLifecycle(gameId, auth.data);
   if (lifecycle.unloaded) {
-    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+    return createApiRouteError(
+      409,
+      'This game is not currently active. Ask localAdmin to resume it.',
+      'api.errors.gameNotActiveAskAdmin'
+    );
   }
 
   const refreshedRuntime = getGameRuntime(gameId);
   if (!refreshedRuntime) {
-    return { status: 409, error: 'This game is not currently active. Ask localAdmin to resume it.' };
+    return createApiRouteError(
+      409,
+      'This game is not currently active. Ask localAdmin to resume it.',
+      'api.errors.gameNotActiveAskAdmin'
+    );
   }
 
   synchronizeJumpGateRequests(refreshedRuntime.galaxy);
@@ -5535,7 +5800,7 @@ function resolvePlayerById(galaxy: Galaxy, playerId: number): Player | null {
 
 function resolveAuthenticatedGamePlayer(req: Request):
   | { galaxy: Galaxy; player: Player; auth: { data: AuthData; session: AuthSession } }
-  | { status: number; error: string } {
+  | ApiRouteError {
   const access = resolveAuthenticatedGameAccess(req);
   if ('error' in access) {
     return access;
@@ -5543,7 +5808,7 @@ function resolveAuthenticatedGamePlayer(req: Request):
 
   const player = resolvePlayerById(access.galaxy, access.playerId);
   if (!player) {
-    return { status: 404, error: 'Player not found in galaxy.' };
+    return createApiRouteError(404, 'Player not found in galaxy.', 'api.errors.playerNotFoundInGame');
   }
 
   return {
@@ -5562,16 +5827,21 @@ function handleEndTurnRequest(
     ? resolveAuthenticatedGameAccessForGame(req, requestedGameId, { markPresenceSeen: true })
     : resolveAuthenticatedGameAccess(req, { markPresenceSeen: true });
   if ('error' in access) {
-    return res.status(access.status).json({ error: access.error });
+    return sendApiRouteError(res, access);
   }
 
   if (isTurnProcessing) {
-    return res.status(409).json({ error: 'Turn processing is already in progress.' });
+    return sendApiError(
+      res,
+      409,
+      'Turn processing is already in progress.',
+      'api.gameplay.endTurn.processingInProgress'
+    );
   }
 
   const player = resolvePlayerById(access.galaxy, access.playerId);
   if (!player) {
-    return res.status(404).json({ error: 'Player not found in galaxy.' });
+    return sendApiError(res, 404, 'Player not found in galaxy.', 'api.errors.playerNotFoundInGame');
   }
 
   const playerId = player.playerId;
@@ -5580,22 +5850,36 @@ function handleEndTurnRequest(
   const pendingRequestCount = countPendingMailRequestsForPlayer(access.galaxy, playerId);
   const unreadMailCount = countUnreadMailMessagesForPlayer(access.galaxy, playerId);
   if (pendingRequestCount > 0 || unreadMailCount > 0) {
-    return res.status(409).json({
-      error: buildEndTurnMailBlockMessage(unreadMailCount, pendingRequestCount)
-    });
+    return sendApiError(
+      res,
+      409,
+      buildEndTurnMailBlockMessage(unreadMailCount, pendingRequestCount),
+      'api.gameplay.endTurn.mailBlocked',
+      buildEndTurnMailBlockParams(unreadMailCount, pendingRequestCount)
+    );
   }
 
   const presenceSummary = reconcileReadyStateForOnlineHumans(access.gameId, access.runtime, access.auth.data);
   const minimumOnlineHumansRequired = minimumOnlineHumansRequiredForGame(access.gameId);
   if (presenceSummary.presentHumanCount < minimumOnlineHumansRequired) {
-    return res.status(409).json({
-      error: buildOnlineHumansRequiredMessage(access.gameId) ?? 'Not enough human players are online to progress this game.'
-    });
+    const metadata = buildOnlineHumansRequiredMessageMetadata(access.gameId);
+    return sendApiError(
+      res,
+      409,
+      metadata.message ?? 'Not enough human players are online to progress this game.',
+      metadata.key ?? 'api.gameplay.endTurn.notEnoughOnlineHumans',
+      metadata.params
+    );
   }
   if (presenceSummary.activeHumanCount < 1) {
-    return res.status(409).json({
-      error: buildActiveHumanRequiredMessage(access.gameId) ?? 'At least 1 active human player must be present to progress this game.'
-    });
+    const metadata = buildActiveHumanRequiredMessageMetadata(access.gameId);
+    return sendApiError(
+      res,
+      409,
+      metadata.message ?? 'At least 1 active human player must be present to progress this game.',
+      metadata.key ?? 'api.gameplay.endTurn.activeHumanRequired',
+      metadata.params
+    );
   }
 
   const requiresReady = requiresAllPlayersReady(access.galaxy);
@@ -5653,7 +5937,12 @@ function handleEndTurnRequest(
     currentTurnReadyPlayerIds = new Set<number>();
     persistCurrentRuntimeStoreState();
     console.error('End-turn processing failed.', error);
-    return res.status(500).json({ error: 'Turn processing failed.' });
+    return sendApiError(
+      res,
+      500,
+      'Turn processing failed.',
+      'api.gameplay.endTurn.processingFailed'
+    );
   } finally {
     isTurnProcessing = false;
     persistCurrentRuntimeStoreState();
@@ -5664,7 +5953,95 @@ function sendGameCommandError(
   res: express.Response,
   error: GameCommandError
 ) {
+  const metadata = resolveGameCommandErrorMetadata(error);
+  if (metadata.key) {
+    return sendApiError(res, error.status, error.message, metadata.key, metadata.params);
+  }
   return res.status(error.status).json({ error: error.message });
+}
+
+function resolveGameCommandErrorMetadata(error: GameCommandError): {
+  key: string | null;
+  params: ApiMessageParams | null;
+} {
+  switch (error.message) {
+    case 'Queue full.':
+      return { key: 'api.commands.common.queueFull', params: null };
+    case 'Building requirements are not met.':
+      return { key: 'api.commands.common.buildingRequirementsNotMet', params: null };
+    case 'Technology requirements are not met.':
+      return { key: 'api.commands.common.technologyRequirementsNotMet', params: null };
+    case 'Insufficient resources.':
+      return { key: 'api.commands.common.insufficientResources', params: null };
+    case 'Only your own planets can be modified.':
+      return { key: 'api.commands.common.onlyOwnPlanetModifiable', params: null };
+    case 'Star system not found.':
+      return { key: 'api.commands.common.starSystemNotFound', params: null };
+    case 'Planet not found.':
+      return { key: 'api.commands.common.planetNotFound', params: null };
+    case 'Building type is already queued.':
+      return { key: 'api.commands.building.alreadyQueued', params: null };
+    case 'Unknown building type.':
+      return { key: 'api.commands.building.unknownType', params: null };
+    case 'Build Shipyard first.':
+      return { key: 'api.commands.shipyard.buildShipyardFirst', params: null };
+    case 'Unknown ship type.':
+      return { key: 'api.commands.shipyard.unknownShipType', params: null };
+    case 'Unknown defence type.':
+      return { key: 'api.commands.shipyard.unknownDefenceType', params: null };
+    case 'Bomb Depot capacity reached.':
+      return { key: 'api.commands.shipyard.bombDepotCapacityReached', params: null };
+    case 'Build Research Lab first.':
+      return { key: 'api.commands.research.buildResearchLabFirst', params: null };
+    case 'Research Lab is currently assigned as helper.':
+      return { key: 'api.commands.research.labAssignedAsHelper', params: null };
+    case 'Unknown technology type.':
+      return { key: 'api.commands.research.unknownTechnologyType', params: null };
+    case 'Technology is already being researched.':
+      return { key: 'api.commands.research.alreadyQueued', params: null };
+    case 'Helper planet star system not found.':
+      return { key: 'api.commands.research.helperSystemNotFound', params: null };
+    case 'Helper planet not found.':
+      return { key: 'api.commands.research.helperPlanetNotFound', params: null };
+    case 'Helper planet must be owned by you.':
+      return { key: 'api.commands.research.helperPlanetMustBeOwned', params: null };
+    case 'Selected helper planet has no Research Lab.':
+      return { key: 'api.commands.research.helperNeedsResearchLab', params: null };
+    case 'Selected helper lab is busy.':
+      return { key: 'api.commands.research.helperLabBusy', params: null };
+    case 'Too many helper labs assigned.':
+      return { key: 'api.commands.research.tooManyHelperLabs', params: null };
+    case 'Mission type is not available in phase 1.':
+      return { key: 'api.commands.fleet.missionUnavailable', params: null };
+    case 'Mission definition not found.':
+      return { key: 'api.commands.fleet.missionDefinitionNotFound', params: null };
+    case 'Origin planet not found.':
+      return { key: 'api.commands.fleet.originPlanetNotFound', params: null };
+    case 'Target planet not found.':
+      return { key: 'api.commands.fleet.targetPlanetNotFound', params: null };
+    case 'Origin planet must be owned by you.':
+      return { key: 'api.commands.fleet.originPlanetMustBeOwned', params: null };
+    case 'Player not found.':
+      return { key: 'api.commands.fleet.playerNotFound', params: null };
+    case 'Active fleet limit reached. Upgrade COMPUTER_TECHNOLOGY to control more fleets.':
+      return { key: 'api.commands.fleet.activeFleetLimitReached', params: null };
+    case 'Select at least one ship.':
+      return { key: 'api.commands.fleet.selectAtLeastOneShip', params: null };
+    case 'Insufficient hangar space for carried ships and bombs.':
+      return { key: 'api.commands.fleet.insufficientHangarSpace', params: null };
+    case 'Insufficient bomber hangar space for carried bombs.':
+      return { key: 'api.commands.fleet.insufficientBomberHangarSpace', params: null };
+    case 'Insufficient cargo space.':
+      return { key: 'api.commands.fleet.insufficientCargoSpace', params: null };
+    case 'Insufficient resources for cargo and fuel.':
+      return { key: 'api.commands.fleet.insufficientResourcesCargoFuel', params: null };
+    case 'Jump Gate requires an owned target planet.':
+      return { key: 'api.commands.fleet.jumpGateRequiresOwnedTarget', params: null };
+    case 'Requested ship selection is no longer available on origin planet.':
+      return { key: 'api.commands.fleet.requestedShipSelectionUnavailable', params: null };
+    default:
+      return { key: null, params: null };
+  }
 }
 
 function upsertDiplomaticRelation(
@@ -8775,4 +9152,5 @@ function isValidSetup(setup: GalaxySetup): boolean {
     setup.startingResources.deuterium >= 0
   );
 }
+
 

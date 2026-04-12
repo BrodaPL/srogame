@@ -150,6 +150,9 @@ Localization:
 - `src/app/i18n/i18n.pipe.ts`: template translation pipe for standalone components
 - `src/app/i18n/language-preference.service.ts`: guest/local fallback persistence under `srogame:language`
 - `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `main-menu`, `settings`) aggregated per language
+- `src/app/i18n/api-message.utils.ts`: client bridge that resolves server `errorKey` / `messageKey` metadata through the runtime i18n layer with raw-message fallback during the Phase 2 migration
+- `src/app/game/ui/top-menu/top-menu.component.ts`: consumes keyed `TurnStatusResponse.progressionBlockedReason*` metadata and keyed end-turn / auto-skip API errors
+- `server/src/game-commands/command-result.ts` + `server/src/index.ts::sendGameCommandError(...)`: shared command-error transport point; common `GameCommandError.message` values are now mapped to `api.commands.*` localization keys before hitting the client
 
 Game snapshot/state:
 - `src/app/core/game-api.service.ts`: game HTTP calls; now includes the first game-registry/current-game endpoints and supports optional explicit `gameId` for state/turn/save/end-turn calls
@@ -200,6 +203,7 @@ Auth/session note:
 - `/api/auth/register-config` tells the client whether registration is currently available and whether Turnstile is required
 - `/api/auth/resend-confirmation` refreshes the pending confirmation window for unconfirmed accounts, enforces a 10-minute resend cooldown, and currently returns a manual-activation reminder because SMTP delivery is still not wired
 - `/api/auth/login` now blocks unconfirmed accounts, applies the per-IP auth rate limit, and also enforces account-level password lockout: 5 wrong passwords lock that account for 10 minutes
+- migrated auth/account responses now also carry localization-ready transport metadata: successes may include `messageKey` + `messageParams`, and errors may include `errorKey` + `errorParams` alongside the legacy English text
 - `/api/auth/logout` now also removes the account's running-multiplayer presence immediately before the server reconciles bot replacement and empty-runtime unload state for that game
 - expired pending accounts are cleaned up during auth/account requests instead of via a background job
 - `/api/account/settings*` owns read/update access to account preferences plus tutorial reset from the main-menu settings screen
@@ -260,10 +264,13 @@ Multiplayer lobby lifecycle:
 Lifecycle persistence note:
 - `/api/games` lists persistent game metadata from `server/data/games.json`; current implementation is the first multi-game groundwork layer and does not yet replace all legacy `/api/game/*` global-runtime assumptions
 - `/api/games/current` exposes the authenticated account `currentGameId`, the matching game summary if present, and resume availability/unavailability state for main-menu resume flows
+- `/api/games/current` now also carries optional `unavailableReasonKey` + `unavailableReasonParams` metadata for localization-ready current-game blockers
 - `/api/games/:gameId/select` updates the authenticated account `currentGameId` and, when that runtime is already loaded, switches the legacy global runtime pointers onto the selected game
+- `/api/games/:gameId/select` and `/api/games/:gameId/close-current` now also return keyed error metadata for the main-menu current-game flow
 - `/api/games/:gameId/saves` is the first game-scoped save-list endpoint and currently returns the existing `GameSavesResponse` shape filtered by `gameId`
 - `/api/games/:gameId/state` and `/api/games/:gameId/turn-status` are the first game-scoped runtime read endpoints; they resolve through `server/src/game-runtime-store.ts` instead of assuming the one global active game
 - `/api/games/:gameId/end-turn` now exists as the first game-scoped mutation endpoint for active runtime progression
+- the shared runtime-access helpers behind `/api/game/state`, `/api/game/turn-status`, `/api/games/:gameId/state`, `/api/games/:gameId/turn-status`, `/api/games/:gameId/end-turn`, and many `authPlayer`-backed in-game routes now emit localization-ready `errorKey` / `errorParams` metadata instead of raw `{ error }` only
 - `/api/multiplayer/games` is the multiplayer browser endpoint family; it now returns `activeDraftLobbies`, `activeRunningGames`, and `otherMultiplayerGames` instead of one undifferentiated list
 - `server/src/multiplayer-lobby-store.ts` now persists draft multiplayer lobbies by `gameId` in `server/data/multiplayer-lobbies.json`
 - `/api/multiplayer/games` `POST` creates a new `MULTIPLAYER` `DRAFT` game record plus matching draft-lobby record; `/api/multiplayer/games/:gameId/join` enforces the new rule that an account may belong to only one draft multiplayer lobby at a time by removing it from other draft lobbies first
@@ -294,6 +301,9 @@ Lifecycle persistence note:
 - `server/src/game-runtime-store.ts` now persists the in-memory per-game runtime payload plus per-game ready-state, turn-processing state, offline-bot-controlled seats, and `emptyPresenceUnloadAt`, which is used by the game-scoped runtime read/select endpoints and the multiplayer empty-runtime unload flow
 - legacy gameplay endpoints under `/api/game/*` now resolve their runtime via the authenticated account `currentGameId` first; if that selected game is not loaded, they return the same unavailable/resume-needed behavior instead of silently acting on another loaded game
 - `/api/game/end-turn` now also runs the server-side bot planning phase before shared turn resolution; for active games with more than one human player it first records per-player readiness and resolves only after every human has clicked End Turn for that turn
+- `/api/game/turn-status` and `/api/games/:gameId/turn-status` now also carry optional `progressionBlockedReasonKey` + `progressionBlockedReasonParams` metadata for localization-ready active-play blockers
+- `/api/game/end-turn`, `/api/games/:gameId/end-turn`, and `/api/multiplayer/games/:gameId/auto-skip-turn` now also return keyed error metadata for the common active-play blockers and validation failures used by the top menu / game shell
+- `/api/game/building-queue`, `/api/game/shipyard-queue`, `/api/game/technology-queue`, and `/api/game/fleet` now also return keyed metadata for the mapped common `GameCommandError` cases, while still falling back to raw English for dynamic or not-yet-mapped command messages
 - `/api/admin/bots*` exposes local-admin/controller-only bot inspection and live runtime controls for profile, pause/resume, and memory clearing
 
 Galaxy and planet reads:
@@ -386,6 +396,7 @@ Diplomacy and messages:
 
 Primary API contracts:
 - `src/app/models/game-api-types.ts`
+- `ApiErrorResponse` and `ApiMessageMetadata` in `src/app/models/game-api-types.ts` are the shared Phase 2 transport shapes for backend-owned localized messages; migrated clients should prefer keyed metadata and fall back to raw `error` / `message` strings while server coverage is still partial
 
 ## Domain Ownership Map
 

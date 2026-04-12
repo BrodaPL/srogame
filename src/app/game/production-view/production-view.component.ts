@@ -1,9 +1,11 @@
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
-import { ChangeDetectorRef, Component, Input, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nService } from '../../i18n/i18n.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
@@ -83,6 +85,7 @@ type ShipyardQueueRowVm = {
   styleUrl: './production-view.component.css'
 })
 export class ProductionViewComponent implements OnInit {
+  private readonly i18n = inject(I18nService);
   protected readonly HullClass = HullClass;
   protected readonly shipPurpose = ShipPurpose;
   @Input() public hideTopMenu = false;
@@ -504,7 +507,7 @@ export class ProductionViewComponent implements OnInit {
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {
-          this.shipStartErrorByType.set(ship.type, error?.error?.error ?? 'Unable to add ship order to queue.');
+          this.shipStartErrorByType.set(ship.type, resolveApiErrorMessage(this.i18n, error, 'Unable to add ship order to queue.'));
           this.cdr.markForCheck();
         }
       });
@@ -578,7 +581,7 @@ export class ProductionViewComponent implements OnInit {
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {
-          this.defenceStartErrorByType.set(defence.type, error?.error?.error ?? 'Unable to add defence order to queue.');
+          this.defenceStartErrorByType.set(defence.type, resolveApiErrorMessage(this.i18n, error, 'Unable to add defence order to queue.'));
           this.cdr.markForCheck();
         }
       });
@@ -942,7 +945,7 @@ export class ProductionViewComponent implements OnInit {
           this.applyUpdatedPlanet(updatedPlanet);
         },
         error: (error: { error?: { error?: string } }) => {
-          this.shipyardQueueActionError = error?.error?.error ?? 'Unable to reorder shipyard queue.';
+          this.shipyardQueueActionError = resolveApiErrorMessage(this.i18n, error, 'Unable to reorder shipyard queue.');
           this.cdr.markForCheck();
         }
       });
@@ -980,7 +983,7 @@ export class ProductionViewComponent implements OnInit {
           this.applyUpdatedPlanet(updatedPlanet);
         },
         error: (error: { error?: { error?: string } }) => {
-          this.shipyardQueueActionError = error?.error?.error ?? 'Unable to cancel shipyard queue entry.';
+          this.shipyardQueueActionError = resolveApiErrorMessage(this.i18n, error, 'Unable to cancel shipyard queue entry.');
           this.cdr.markForCheck();
         }
       });

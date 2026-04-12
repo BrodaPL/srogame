@@ -4,6 +4,8 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameStateService } from '../core/game-state.service';
+import { resolveApiErrorMessage, resolveApiMessage } from '../i18n/api-message.utils';
+import { I18nService } from '../i18n/i18n.service';
 import type { RegisterConfigResponse } from '../models/game-api-types';
 
 type TurnstileApi = {
@@ -60,6 +62,7 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
     private readonly authApi: AuthApiService,
     private readonly authState: AuthStateService,
     private readonly gameState: GameStateService,
+    private readonly i18n: I18nService,
     private readonly router: Router,
     private readonly cdr: ChangeDetectorRef
   ) {}
@@ -119,7 +122,7 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
         this.router.navigate(['/']);
       },
       error: (err) => {
-        this.loginError = this.resolveAuthError(err, 'Login failed.');
+        this.loginError = resolveApiErrorMessage(this.i18n, err, 'Login failed.');
         this.isLoggingIn = false;
         this.cdr.markForCheck();
       }
@@ -167,13 +170,13 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
         this.registerPassword = '';
         this.registerPasswordConfirm = '';
         this.turnstileToken = null;
-        this.registerInfo = response.message;
+        this.registerInfo = resolveApiMessage(this.i18n, response, response.message);
         this.isRegistering = false;
         this.resetTurnstileWidget();
         this.cdr.markForCheck();
       },
       error: (err) => {
-        this.registerError = this.resolveAuthError(err, 'Registration failed.');
+        this.registerError = resolveApiErrorMessage(this.i18n, err, 'Registration failed.');
         this.isRegistering = false;
         this.turnstileToken = null;
         this.resetTurnstileWidget();
@@ -198,12 +201,12 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
     this.resendInfo = null;
     this.authApi.resendConfirmation({ email }).subscribe({
       next: (response) => {
-        this.resendInfo = response.message;
+        this.resendInfo = resolveApiMessage(this.i18n, response, response.message);
         this.isResendingConfirmation = false;
         this.cdr.markForCheck();
       },
       error: (err) => {
-        this.resendError = this.resolveAuthError(err, 'Unable to resend confirmation.');
+        this.resendError = resolveApiErrorMessage(this.i18n, err, 'Unable to resend confirmation.');
         this.isResendingConfirmation = false;
         this.cdr.markForCheck();
       }
@@ -220,35 +223,6 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     return !this.registerConfig.requiresTurnstile || !!this.turnstileToken;
-  }
-
-  private resolveAuthError(err: unknown, fallback: string): string {
-    const errorObj = err as { status?: number; error?: { error?: string } | string };
-    const directMessage =
-      typeof errorObj?.error === 'string'
-        ? errorObj.error
-        : errorObj?.error?.error;
-
-    if (directMessage) {
-      return directMessage;
-    }
-
-    switch (errorObj?.status) {
-      case 401:
-        return 'Wrong password.';
-      case 404:
-        return 'No such user.';
-      case 409:
-        return 'User already exists.';
-      case 403:
-        return 'This account is not confirmed yet.';
-      case 423:
-        return 'Account login is temporarily locked due to too many wrong passwords.';
-      case 429:
-        return directMessage ?? 'Too many attempts. Please wait before trying again.';
-      default:
-        return fallback;
-    }
   }
 
   private async maybeRenderTurnstile(): Promise<void> {

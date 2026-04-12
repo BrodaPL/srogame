@@ -1,9 +1,11 @@
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { finalize, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
+import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nService } from '../../i18n/i18n.service';
 import { Building } from '../../models/buildings/building';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
@@ -80,6 +82,7 @@ type BuildingQueueRowVm = {
   styleUrl: './buildings-view.component.css'
 })
 export class BuildingsViewComponent implements OnInit {
+  private readonly i18n = inject(I18nService);
   protected readonly modeOptions: Array<{ value: BuildingsMode; label: string }> = [
     { value: 'resources', label: 'Resources infrastructure' },
     { value: 'facilities', label: 'Facilities' }
@@ -380,7 +383,7 @@ export class BuildingsViewComponent implements OnInit {
         error: (error: { error?: { error?: string } }) => {
           this.buildingStartErrorByType.set(
             building.type,
-            error?.error?.error ?? 'Unable to add building to queue.'
+            resolveApiErrorMessage(this.i18n, error, 'Unable to add building to queue.')
           );
           this.cdr.markForCheck();
         }
@@ -489,7 +492,7 @@ export class BuildingsViewComponent implements OnInit {
           this.applyUpdatedPlanet(updatedPlanet);
         },
         error: (error: { error?: { error?: string } }) => {
-          this.buildingQueueActionError = error?.error?.error ?? 'Unable to reorder building queue.';
+          this.buildingQueueActionError = resolveApiErrorMessage(this.i18n, error, 'Unable to reorder building queue.');
           this.cdr.markForCheck();
         }
       });
@@ -527,7 +530,7 @@ export class BuildingsViewComponent implements OnInit {
           this.applyUpdatedPlanet(updatedPlanet);
         },
         error: (error: { error?: { error?: string } }) => {
-          this.buildingQueueActionError = error?.error?.error ?? 'Unable to cancel building queue entry.';
+          this.buildingQueueActionError = resolveApiErrorMessage(this.i18n, error, 'Unable to cancel building queue entry.');
           this.cdr.markForCheck();
         }
       });

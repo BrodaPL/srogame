@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
+import { resolveApiErrorMessage, resolveApiMessage, resolveApiText } from '../i18n/api-message.utils';
 import { I18nPipe } from '../i18n/i18n.pipe';
 import { I18nService } from '../i18n/i18n.service';
 import type { LanguagePreference } from '../models/game-api-types';
@@ -102,7 +103,7 @@ export class SettingsComponent {
       },
       error: (error) => {
         this.isSaving = false;
-        this.saveError = error?.error?.error ?? this.i18n.t('settings.errors.update');
+        this.saveError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('settings.errors.update'));
       }
     });
   }
@@ -153,6 +154,14 @@ export class SettingsComponent {
     );
   }
 
+  protected forgotPasswordInfoLabel(): string | null {
+    return resolveApiText(this.i18n, {
+      text: this.settings?.forgotPasswordInfo ?? null,
+      key: this.settings?.forgotPasswordInfoKey ?? null,
+      params: this.settings?.forgotPasswordInfoParams ?? null
+    }, this.i18n.t('settings.security.resetPasswordUnavailableTitle'));
+  }
+
   protected resetTutorials(): void {
     const session = this.session();
     if (!session || this.isResettingTutorials) {
@@ -167,11 +176,11 @@ export class SettingsComponent {
         this.settings = response.settings;
         this.authState.setSession(response.player);
         this.isResettingTutorials = false;
-        this.saveInfo = response.message;
+        this.saveInfo = resolveApiMessage(this.i18n, response, response.message);
       },
       error: (error) => {
         this.isResettingTutorials = false;
-        this.saveError = error?.error?.error ?? this.i18n.t('settings.errors.resetTutorials');
+        this.saveError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('settings.errors.resetTutorials'));
       }
     });
   }
@@ -187,7 +196,7 @@ export class SettingsComponent {
       error: (error) => {
         this.settings = null;
         this.isLoading = false;
-        this.loadError = error?.error?.error ?? this.i18n.t('settings.errors.load');
+        this.loadError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('settings.errors.load'));
       }
     });
   }

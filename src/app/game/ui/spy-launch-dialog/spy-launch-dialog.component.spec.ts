@@ -20,7 +20,8 @@ describe('SpyLaunchDialogComponent', () => {
     const component = new SpyLaunchDialogComponent(
       gameApi as never,
       createPlayerSessionService() as never,
-      createChangeDetectorRef() as never
+      createChangeDetectorRef() as never,
+      createI18nService() as never
     );
 
     component.isOpen = true;
@@ -48,7 +49,8 @@ describe('SpyLaunchDialogComponent', () => {
         createFleetMission
       } as never,
       createPlayerSessionService() as never,
-      createChangeDetectorRef() as never
+      createChangeDetectorRef() as never,
+      createI18nService() as never
     );
     const launched = vi.fn();
     const closed = vi.fn();
@@ -100,6 +102,12 @@ function createPlayerSessionService() {
 function createChangeDetectorRef() {
   return {
     markForCheck: vi.fn()
+  };
+}
+
+function createI18nService() {
+  return {
+    t: vi.fn((key: string) => key)
   };
 }
 

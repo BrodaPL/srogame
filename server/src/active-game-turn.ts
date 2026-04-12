@@ -37,6 +37,8 @@ export function buildTurnStatusResponse(
     onlineHumanCount?: number;
     minimumOnlineHumanCount?: number;
     progressionBlockedReason?: string | null;
+    progressionBlockedReasonKey?: string | null;
+    progressionBlockedReasonParams?: TurnStatusResponse['progressionBlockedReasonParams'];
     blockingPlayerIds?: ReadonlySet<number>;
     currentPlayerPresenceState?: TurnStatusResponse['currentPlayerPresenceState'];
     currentPlayerAutoSkipEnabled?: boolean;
@@ -59,6 +61,8 @@ export function buildTurnStatusResponse(
     onlineHumanCount: options.onlineHumanCount ?? humans.length,
     minimumOnlineHumanCount: options.minimumOnlineHumanCount ?? 1,
     progressionBlockedReason: options.progressionBlockedReason ?? null,
+    progressionBlockedReasonKey: options.progressionBlockedReasonKey ?? null,
+    progressionBlockedReasonParams: options.progressionBlockedReasonParams ?? null,
     currentPlayerPresenceState: options.currentPlayerPresenceState ?? null,
     currentPlayerAutoSkipEnabled: options.currentPlayerAutoSkipEnabled ?? false,
     currentPlayerAutoSkipActivatedAt: options.currentPlayerAutoSkipActivatedAt ?? null,

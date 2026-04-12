@@ -5,6 +5,8 @@ import { AuthStateService } from '../../../core/auth-state.service';
 import { GameApiService } from '../../../core/game-api.service';
 import { GameStateService } from '../../../core/game-state.service';
 import { PlayerSessionService } from '../../../core/player-session.service';
+import { resolveApiErrorMessage, resolveApiText } from '../../../i18n/api-message.utils';
+import { I18nService } from '../../../i18n/i18n.service';
 import { TutorialOverlayComponent } from '../../../tutorial/tutorial-overlay.component';
 import { TutorialService } from '../../../tutorial/tutorial.service';
 import { formatDurationLabel, getMultiplayerAutoSkipIdleMs } from '../../multiplayer-test-timing';
@@ -24,7 +26,8 @@ export class TopMenuComponent {
     private readonly gameApi: GameApiService,
     private readonly gameState: GameStateService,
     private readonly playerSession: PlayerSessionService,
-    private readonly authState: AuthStateService
+    private readonly authState: AuthStateService,
+    private readonly i18n: I18nService
   ) {}
 
   protected hasCurrentTutorial(): boolean {
@@ -129,7 +132,12 @@ export class TopMenuComponent {
   }
 
   protected onlineRequirementMessage(): string {
-    return this.gameState.turnStatus?.progressionBlockedReason
+    const turnStatus = this.gameState.turnStatus;
+    return resolveApiText(this.i18n, {
+      text: turnStatus?.progressionBlockedReason ?? null,
+      key: turnStatus?.progressionBlockedReasonKey ?? null,
+      params: turnStatus?.progressionBlockedReasonParams ?? null
+    }, 'At least 2 human players must be online to progress this multiplayer game.')
       ?? 'At least 2 human players must be online to progress this multiplayer game.';
   }
 
@@ -152,7 +160,7 @@ export class TopMenuComponent {
         this.gameState.setTurnStatus(turnStatus);
       },
       error: (error) => {
-        this.endTurnError = error?.error?.error ?? 'Unable to update auto skip turn.';
+        this.endTurnError = resolveApiErrorMessage(this.i18n, error, 'Unable to update auto skip turn.');
       }
     });
   }
@@ -203,7 +211,7 @@ export class TopMenuComponent {
           window.location.reload();
         },
         error: (error) => {
-          this.endTurnError = error?.error?.error ?? 'Unable to process turn.';
+          this.endTurnError = resolveApiErrorMessage(this.i18n, error, 'Unable to process turn.');
           this.gameState.setProcessingTurn(false);
         }
       });

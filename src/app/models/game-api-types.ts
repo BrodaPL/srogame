@@ -237,6 +237,8 @@ export type CurrentGameStatusResponse = {
   game: GameSummary | null;
   canResume: boolean;
   unavailableReason: string | null;
+  unavailableReasonKey?: string | null;
+  unavailableReasonParams?: ApiMessageParams | null;
 };
 
 export type GameListResponse = {
@@ -257,7 +259,22 @@ export type RegisterRequest = {
   turnstileToken?: string | null;
 };
 
-export type RegisterResponse = {
+export type ApiMessageParamValue = string | number | boolean | null;
+
+export type ApiMessageParams = Record<string, ApiMessageParamValue>;
+
+export type ApiErrorResponse = {
+  error: string;
+  errorKey?: string | null;
+  errorParams?: ApiMessageParams | null;
+};
+
+export type ApiMessageMetadata = {
+  messageKey?: string | null;
+  messageParams?: ApiMessageParams | null;
+};
+
+export type RegisterResponse = ApiMessageMetadata & {
   playerName: string;
   email: string;
   accountStatus: AccountStatus;
@@ -277,7 +294,7 @@ export type ResendConfirmationRequest = {
   email: string;
 };
 
-export type ResendConfirmationResponse = {
+export type ResendConfirmationResponse = ApiMessageMetadata & {
   message: string;
   confirmationExpiresAt: string | null;
   nextAllowedAt: string | null;
@@ -306,6 +323,8 @@ export type AccountSettingsResponse = {
   forgotPasswordEnabled: boolean;
   forgotPasswordAvailableAt: string | null;
   forgotPasswordInfo: string | null;
+  forgotPasswordInfoKey?: string | null;
+  forgotPasswordInfoParams?: ApiMessageParams | null;
 };
 
 export type UpdateAccountPreferencesRequest = {
@@ -314,7 +333,7 @@ export type UpdateAccountPreferencesRequest = {
   language: LanguagePreference | null;
 };
 
-export type ResetAccountTutorialsResponse = {
+export type ResetAccountTutorialsResponse = ApiMessageMetadata & {
   settings: AccountSettingsResponse;
   player: PlayerSession;
   message: string;
@@ -435,6 +454,8 @@ export type TurnStatusResponse = {
   onlineHumanCount: number;
   minimumOnlineHumanCount: number;
   progressionBlockedReason: string | null;
+  progressionBlockedReasonKey?: string | null;
+  progressionBlockedReasonParams?: ApiMessageParams | null;
   currentPlayerPresenceState: MultiplayerPresenceState | null;
   currentPlayerAutoSkipEnabled: boolean;
   currentPlayerAutoSkipActivatedAt: string | null;

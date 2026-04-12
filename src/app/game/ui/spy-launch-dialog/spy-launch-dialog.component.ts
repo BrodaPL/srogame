@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { GameApiService } from '../../../core/game-api.service';
 import { PlayerSessionService } from '../../../core/player-session.service';
+import { resolveApiErrorMessage } from '../../../i18n/api-message.utils';
+import { I18nService } from '../../../i18n/i18n.service';
 import { ShipType } from '../../../models/enums/ship-type';
 import type { ClientCoordinates, ClientPlanetDto, CreateFleetMissionRequest } from '../../../models/game-api-types';
 import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
@@ -41,7 +43,8 @@ export class SpyLaunchDialogComponent implements OnChanges {
   constructor(
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
-    private readonly changeDetectorRef: ChangeDetectorRef
+    private readonly changeDetectorRef: ChangeDetectorRef,
+    private readonly i18n: I18nService
   ) {}
 
   public ngOnChanges(changes: SimpleChanges): void {
@@ -153,7 +156,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
           this.closed.emit();
         },
         error: (error) => {
-          this.error = error?.error?.error ?? 'Unable to launch spy mission.';
+          this.error = resolveApiErrorMessage(this.i18n, error, 'Unable to launch spy mission.');
           this.changeDetectorRef.markForCheck();
         }
       });
@@ -207,7 +210,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
           }
         },
         error: (error) => {
-          this.error = error?.error?.error ?? 'Unable to load spy launch origins.';
+          this.error = resolveApiErrorMessage(this.i18n, error, 'Unable to load spy launch origins.');
         }
       });
   }

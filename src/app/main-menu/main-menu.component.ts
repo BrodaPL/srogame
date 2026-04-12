@@ -4,6 +4,7 @@ import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
+import { resolveApiErrorMessage, resolveApiText } from '../i18n/api-message.utils';
 import { I18nPipe } from '../i18n/i18n.pipe';
 import { I18nService } from '../i18n/i18n.service';
 import type { CurrentGameStatusResponse } from '../models/game-api-types';
@@ -128,7 +129,11 @@ export class MainMenuComponent {
       return this.i18n.t('mainMenu.currentGame.multiplayerSavedInactiveHint');
     }
 
-    return this.currentGameStatus?.unavailableReason ?? this.i18n.t('mainMenu.currentGame.unavailable');
+    return resolveApiText(this.i18n, {
+      text: this.currentGameStatus?.unavailableReason ?? null,
+      key: this.currentGameStatus?.unavailableReasonKey ?? null,
+      params: this.currentGameStatus?.unavailableReasonParams ?? null
+    }, this.i18n.t('mainMenu.currentGame.unavailable'));
   }
 
   protected currentGameHint(): string | null {
@@ -170,7 +175,11 @@ export class MainMenuComponent {
         this.router.navigate(['/game/imperium']);
       },
       error: (error) => {
-        this.resumeError = error?.error?.error ?? this.i18n.t('mainMenu.currentGame.resumeUnavailable');
+        this.resumeError = resolveApiErrorMessage(
+          this.i18n,
+          error,
+          this.i18n.t('mainMenu.currentGame.resumeUnavailable')
+        );
         this.loadCurrentGameStatus(session.token);
       }
     });
@@ -201,7 +210,11 @@ export class MainMenuComponent {
       },
       error: (error) => {
         this.isClosingCurrentGame = false;
-        this.closeError = error?.error?.error ?? this.i18n.t('mainMenu.currentGame.closeUnavailable');
+        this.closeError = resolveApiErrorMessage(
+          this.i18n,
+          error,
+          this.i18n.t('mainMenu.currentGame.closeUnavailable')
+        );
         this.loadCurrentGameStatus(session.token);
       }
     });

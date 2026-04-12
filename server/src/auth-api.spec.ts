@@ -139,7 +139,11 @@ describe.sequential('auth api', () => {
     }, '10.0.0.2');
 
     expect(loginResponse.status).toBe(403);
-    expect(loginResponse.json).toEqual({ error: 'Account is not confirmed yet.' });
+    expect(loginResponse.json).toMatchObject({
+      error: 'Account is not confirmed yet.',
+      errorKey: 'api.auth.login.pendingConfirmation',
+      errorParams: null
+    });
   });
 
   it('resends confirmation with cooldown and refreshes the pending expiry window', async () => {
@@ -297,6 +301,70 @@ describe.sequential('auth api', () => {
     });
   });
 
+  it('returns keyed runtime-access errors when no current game is selected', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'NoGameUser',
+      email: 'no-game@example.com',
+      password: 'secret-123'
+    }, '10.0.0.66');
+    activateAccount('NoGameUser');
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'NoGameUser',
+      password: 'secret-123'
+    }, '10.0.0.66');
+    expect(loginResponse.status).toBe(200);
+
+    const token = loginResponse.json?.token as string;
+    const stateResponse = await request('GET', '/api/game/state', undefined, '10.0.0.66', token);
+    expect(stateResponse.status).toBe(404);
+    expect(stateResponse.json).toMatchObject({
+      error: 'No active game.',
+      errorKey: 'api.errors.noCurrentGameSelected',
+      errorParams: null
+    });
+  });
+
+  it('returns keyed command errors for mapped building-queue failures', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'BuilderAdmin',
+      email: 'builder-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.67');
+    activateAccount('BuilderAdmin', { localAdmin: true });
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'BuilderAdmin',
+      password: 'secret-123'
+    }, '10.0.0.67');
+    expect(loginResponse.status).toBe(200);
+    const token = loginResponse.json?.token as string;
+
+    const startResponse = await request('POST', '/api/game/start', {
+      setup: createSingleplayerSetup('Builder Test Sector')
+    }, '10.0.0.67', token);
+    expect(startResponse.status).toBe(200);
+
+    const ownedPlanetsResponse = await request('GET', '/api/game/owned-planets', undefined, '10.0.0.67', token);
+    expect(ownedPlanetsResponse.status).toBe(200);
+    const ownedPlanets = Array.isArray(ownedPlanetsResponse.json) ? ownedPlanetsResponse.json : [];
+    const coordinates = (ownedPlanets[0] as { coordinates?: { x?: number; y?: number; z?: number } } | undefined)?.coordinates;
+    expect(coordinates).toBeDefined();
+
+    const buildResponse = await request('POST', '/api/game/building-queue', {
+      x: coordinates?.x,
+      y: coordinates?.y,
+      z: coordinates?.z,
+      buildingType: 'Jump Gate'
+    }, '10.0.0.67', token);
+    expect(buildResponse.status).toBe(400);
+    expect(buildResponse.json).toMatchObject({
+      error: 'Building requirements are not met.',
+      errorKey: 'api.commands.common.buildingRequirementsNotMet',
+      errorParams: null
+    });
+  });
+
   it('closes the current loaded single-player game, saves it, and clears the current game pointer', async () => {
     await request('POST', '/api/auth/register', {
       playerName: 'SingleplayerAdmin',
@@ -322,11 +390,13 @@ describe.sequential('auth api', () => {
 
     const closeResponse = await request('POST', `/api/games/${gameId}/close-current`, {}, '10.0.0.7', token);
     expect(closeResponse.status).toBe(200);
-    expect(closeResponse.json).toEqual({
+    expect(closeResponse.json).toMatchObject({
       currentGameId: null,
       game: null,
       canResume: false,
-      unavailableReason: null
+      unavailableReason: null,
+      unavailableReasonKey: null,
+      unavailableReasonParams: null
     });
 
     const authData = readAuthData();
@@ -354,11 +424,13 @@ describe.sequential('auth api', () => {
 
     const currentResponse = await request('GET', '/api/games/current', undefined, '10.0.0.7', token);
     expect(currentResponse.status).toBe(200);
-    expect(currentResponse.json).toEqual({
+    expect(currentResponse.json).toMatchObject({
       currentGameId: null,
       game: null,
       canResume: false,
-      unavailableReason: null
+      unavailableReason: null,
+      unavailableReasonKey: null,
+      unavailableReasonParams: null
     });
   });
 
@@ -517,13 +589,17 @@ describe.sequential('auth api', () => {
     expect(turnStatusResponse.json).toMatchObject({
       onlineHumanCount: 1,
       minimumOnlineHumanCount: 2,
-      progressionBlockedReason: 'At least 2 human players must be online to progress this multiplayer game.'
+      progressionBlockedReason: 'At least 2 human players must be online to progress this multiplayer game.',
+      progressionBlockedReasonKey: 'api.gameplay.endTurn.notEnoughOnlineHumans',
+      progressionBlockedReasonParams: null
     });
 
     const endTurnResponse = await request('POST', `/api/games/${gameId}/end-turn`, {}, '10.0.0.51', adminToken);
     expect(endTurnResponse.status).toBe(409);
-    expect(endTurnResponse.json).toEqual({
-      error: 'At least 2 human players must be online to progress this multiplayer game.'
+    expect(endTurnResponse.json).toMatchObject({
+      error: 'At least 2 human players must be online to progress this multiplayer game.',
+      errorKey: 'api.gameplay.endTurn.notEnoughOnlineHumans',
+      errorParams: null
     });
   });
 
@@ -638,13 +714,17 @@ describe.sequential('auth api', () => {
       onlineHumanCount: 2,
       minimumOnlineHumanCount: 2,
       progressionBlockedReason: 'At least 1 active human player must be present to progress this multiplayer game.',
+      progressionBlockedReasonKey: 'api.gameplay.endTurn.activeHumanRequired',
+      progressionBlockedReasonParams: null,
       waitingForPlayerNames: []
     });
 
     const endTurnResponse = await request('POST', `/api/games/${gameId}/end-turn`, {}, '10.0.0.81', adminToken);
     expect(endTurnResponse.status).toBe(409);
-    expect(endTurnResponse.json).toEqual({
-      error: 'At least 1 active human player must be present to progress this multiplayer game.'
+    expect(endTurnResponse.json).toMatchObject({
+      error: 'At least 1 active human player must be present to progress this multiplayer game.',
+      errorKey: 'api.gameplay.endTurn.activeHumanRequired',
+      errorParams: null
     });
   });
 
@@ -690,6 +770,16 @@ describe.sequential('auth api', () => {
       currentPlayerPresenceState: 'ACTIVE',
       currentPlayerAutoSkipEnabled: false,
       showAutoSkipReturnNotice: false
+    });
+
+    const invalidAutoSkipResponse = await request('POST', `/api/multiplayer/games/${gameId}/auto-skip-turn`, {
+      acknowledgeNotice: true
+    }, '10.0.0.61', adminToken);
+    expect(invalidAutoSkipResponse.status).toBe(400);
+    expect(invalidAutoSkipResponse.json).toMatchObject({
+      error: 'Auto skip toggle requires an enabled boolean.',
+      errorKey: 'api.multiplayer.presence.autoSkipRequiresEnabledBoolean',
+      errorParams: null
     });
 
     const enableResponse = await request('POST', `/api/multiplayer/games/${gameId}/auto-skip-turn`, {
@@ -788,7 +878,9 @@ describe.sequential('auth api', () => {
       onlineHumanCount: 1,
       minimumOnlineHumanCount: 2,
       waitingForPlayerNames: ['AfkAdmin'],
-      progressionBlockedReason: 'At least 2 human players must be online to progress this multiplayer game.'
+      progressionBlockedReason: 'At least 2 human players must be online to progress this multiplayer game.',
+      progressionBlockedReasonKey: 'api.gameplay.endTurn.notEnoughOnlineHumans',
+      progressionBlockedReasonParams: null
     });
   });
 

@@ -38,6 +38,9 @@ describe('MissionPlannerViewComponent', () => {
       } as never,
       {
         autoOpenTutorial: vi.fn()
+      } as never,
+      {
+        t: vi.fn((key: string) => key)
       } as never
     );
 

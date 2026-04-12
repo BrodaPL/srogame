@@ -5,6 +5,8 @@ import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nService } from '../../i18n/i18n.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
@@ -177,7 +179,8 @@ export class MissionPlannerViewComponent implements OnInit {
     private readonly gameState: GameStateService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly tutorialService: TutorialService
+    private readonly tutorialService: TutorialService,
+    private readonly i18n: I18nService
   ) {
     const shipBlueprints = ShipBlueprintsFactory.fromDefaultJson();
     for (const [shipType, ship] of shipBlueprints.shipsMap.entries()) {
@@ -794,7 +797,7 @@ export class MissionPlannerViewComponent implements OnInit {
           this.useJumpGate = false;
         },
         error: (error) => {
-          this.launchError = error?.error?.error ?? 'Unable to create fleet mission.';
+          this.launchError = resolveApiErrorMessage(this.i18n, error, 'Unable to create fleet mission.');
         }
       });
   }
@@ -865,7 +868,7 @@ export class MissionPlannerViewComponent implements OnInit {
         this.cdr.markForCheck();
       },
       error: (error) => {
-        this.targetLookupError = error?.error?.error ?? 'Target planet could not be resolved.';
+        this.targetLookupError = resolveApiErrorMessage(this.i18n, error, 'Target planet could not be resolved.');
         this.selectedTargetPlanet = null;
         this.useJumpGate = false;
         this.cdr.markForCheck();

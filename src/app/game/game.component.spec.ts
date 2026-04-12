@@ -34,7 +34,8 @@ describe('GameComponent', () => {
       gameState as never,
       gameApi as never,
       playerSession as never,
-      authState as never
+      authState as never,
+      createI18nMock() as never
     );
 
     component.ngOnInit();
@@ -70,7 +71,8 @@ describe('GameComponent', () => {
       gameState as never,
       gameApi as never,
       playerSession as never,
-      authState as never
+      authState as never,
+      createI18nMock() as never
     );
 
     component.ngOnInit();
@@ -86,7 +88,14 @@ describe('GameComponent', () => {
     const gameState = createGameStateMock();
     const cdr = createChangeDetectorRefMock();
     const gameApi = {
-      getGameState: vi.fn().mockReturnValue(throwError(() => ({ status: 404 }))),
+      getGameState: vi.fn().mockReturnValue(throwError(() => ({
+        status: 404,
+        error: {
+          error: 'No active game.',
+          errorKey: 'api.errors.noCurrentGameSelected',
+          errorParams: null
+        }
+      }))),
       getTurnStatus: vi.fn()
     };
     const playerSession = {
@@ -102,7 +111,8 @@ describe('GameComponent', () => {
       gameState as never,
       gameApi as never,
       playerSession as never,
-      authState as never
+      authState as never,
+      createI18nMock() as never
     );
 
     component.ngOnInit();
@@ -113,6 +123,8 @@ describe('GameComponent', () => {
     expect((component as { stateTitle: string }).stateTitle).toBe('No active game');
     expect((component as { stateActionRoute: string }).stateActionRoute).toBe('/');
     expect((component as { isGameReady: boolean }).isGameReady).toBe(false);
+    expect((component as { stateError: string | null }).stateError)
+      .toBe('No current game is selected. Join, resume, or start a game from the main menu.');
   });
 
   it('can disable auto skip turn from the return notice popup', async () => {
@@ -146,7 +158,8 @@ describe('GameComponent', () => {
       gameState as never,
       gameApi as never,
       playerSession as never,
-      authState as never
+      authState as never,
+      createI18nMock() as never
     );
 
     component.ngOnInit();
@@ -222,6 +235,8 @@ function createTurnStatusResponse(overrides: Partial<TurnStatusResponse> = {}): 
     onlineHumanCount: 1,
     minimumOnlineHumanCount: 1,
     progressionBlockedReason: null,
+    progressionBlockedReasonKey: null,
+    progressionBlockedReasonParams: null,
     currentPlayerPresenceState: null,
     currentPlayerAutoSkipEnabled: false,
     currentPlayerAutoSkipActivatedAt: null,
@@ -239,5 +254,15 @@ function createTurnStatusResponse(overrides: Partial<TurnStatusResponse> = {}): 
 function createChangeDetectorRefMock() {
   return {
     detectChanges: vi.fn()
+  };
+}
+
+function createI18nMock() {
+  const translations: Record<string, string> = {
+    'api.errors.noCurrentGameSelected': 'No current game is selected. Join, resume, or start a game from the main menu.'
+  };
+
+  return {
+    t: vi.fn((key: string) => translations[key] ?? key)
   };
 }
