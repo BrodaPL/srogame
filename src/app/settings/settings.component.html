@@ -1,13 +1,13 @@
 <main class="page">
   <section class="panel">
     <header class="panel__header">
-      <p class="eyebrow">Settings</p>
-      <h1>Account Settings</h1>
-      <p class="subtitle">Manage your account status, multiplayer logout preferences, and tutorial controls.</p>
+      <p class="eyebrow">{{ 'settings.eyebrow' | t }}</p>
+      <h1>{{ 'settings.title' | t }}</h1>
+      <p class="subtitle">{{ 'settings.subtitle' | t }}</p>
     </header>
 
     @if (isLoading && !settings) {
-      <p>Loading settings.</p>
+      <p>{{ 'settings.loading' | t }}</p>
     } @else if (loadError) {
       <div class="status status--error">
         <p>{{ loadError }}</p>
@@ -15,60 +15,60 @@
     } @else if (settings) {
       <div class="settings-grid">
         <section class="settings-card">
-          <h2>Account</h2>
+          <h2>{{ 'settings.sections.account' | t }}</h2>
           <div class="field">
-            <p><strong>Player</strong></p>
+            <p><strong>{{ 'settings.account.player' | t }}</strong></p>
             <p>{{ settings.playerName }}</p>
           </div>
           <div class="field">
-            <p><strong>Email</strong></p>
+            <p><strong>{{ 'settings.account.email' | t }}</strong></p>
             <p>{{ settings.email }}</p>
           </div>
           <div class="field">
-            <p><strong>Email confirmation</strong></p>
-            <p>{{ settings.emailConfirmed ? 'Confirmed' : 'Pending confirmation' }}</p>
+            <p><strong>{{ 'settings.account.emailConfirmation' | t }}</strong></p>
+            <p>{{ emailConfirmationLabel() }}</p>
           </div>
           <div class="field">
-            <p><strong>Account status</strong></p>
-            <p>{{ settings.accountStatus }}</p>
+            <p><strong>{{ 'settings.account.accountStatus' | t }}</strong></p>
+            <p>{{ accountStatusLabel() }}</p>
           </div>
           <div class="field">
-            <p><strong>Created</strong></p>
-            <p>{{ settings.accountCreatedAt | date:'medium' }}</p>
+            <p><strong>{{ 'settings.account.created' | t }}</strong></p>
+            <p>{{ accountCreatedAtLabel() }}</p>
           </div>
           <div class="field">
-            <p><strong>Current game</strong></p>
-            <p>{{ settings.currentGameName ?? 'No game selected.' }}</p>
+            <p><strong>{{ 'settings.account.currentGame' | t }}</strong></p>
+            <p>{{ settings.currentGameName ?? ('settings.account.noGameSelected' | t) }}</p>
           </div>
           <div class="field">
-            <p><strong>Privileges</strong></p>
-            <p>{{ settings.localAdmin ? 'Local Admin' : 'Regular player' }}</p>
+            <p><strong>{{ 'settings.account.privileges' | t }}</strong></p>
+            <p>{{ privilegesLabel() }}</p>
           </div>
         </section>
 
         <section class="settings-card">
-          <h2>Security</h2>
+          <h2>{{ 'settings.sections.security' | t }}</h2>
           <div class="field">
-            <p><strong>Forgot password</strong></p>
+            <p><strong>{{ 'settings.security.forgotPassword' | t }}</strong></p>
             <p>{{ settings.forgotPasswordInfo }}</p>
           </div>
-          <button class="start-button" type="button" disabled title="Password reset by email is not available yet.">
-            Reset password
+          <button class="start-button" type="button" disabled [title]="'settings.security.resetPasswordUnavailableTitle' | t">
+            {{ 'settings.security.resetPassword' | t }}
           </button>
         </section>
 
         <section class="settings-card">
-          <h2>Gameplay</h2>
+          <h2>{{ 'settings.sections.gameplay' | t }}</h2>
           <label class="settings-checkbox">
             <input
               type="checkbox"
               [ngModel]="replaceWithBotOnLogout"
               (ngModelChange)="onReplaceWithBotChange($event)" />
-            <span>Replace me with bot after logout</span>
+            <span>{{ 'settings.gameplay.replaceWithBotOnLogout' | t }}</span>
           </label>
 
           <div class="field">
-            <label for="logoutBotProfileId">Bot type when offline</label>
+            <label for="logoutBotProfileId">{{ 'settings.gameplay.botTypeWhenOffline' | t }}</label>
             <select
               id="logoutBotProfileId"
               name="logoutBotProfileId"
@@ -77,47 +77,57 @@
               (ngModelChange)="logoutBotProfileId = $event"
               [disabled]="!replaceWithBotOnLogout">
               @for (profileId of botProfileIds; track profileId) {
-                <option [ngValue]="profileId">{{ botProfileLabels[profileId] }}</option>
+                <option [ngValue]="profileId">{{ botProfileLabel(profileId) }}</option>
               }
             </select>
           </div>
           <div class="settings-callout" [class.settings-callout--warning]="!replaceWithBotOnLogout">
             <p class="settings-callout__title">
-              {{ replaceWithBotOnLogout ? 'Offline bot replacement enabled' : 'Offline bot replacement disabled' }}
+              {{ replaceWithBotOnLogout ? ('settings.gameplay.offlineBotReplacementEnabled' | t) : ('settings.gameplay.offlineBotReplacementDisabled' | t) }}
             </p>
             <p>
               @if (replaceWithBotOnLogout) {
-                When you leave a running multiplayer game, your seat may be played by this bot profile until you return. Multiplayer turns still require at least 2 human players to be online.
+                {{ 'settings.gameplay.offlineBotReplacementEnabledBody' | t }}
               } @else {
-                If you leave a running multiplayer game, other players may still need to wait for you. Multiplayer turns still require at least 2 human players to be online.
+                {{ 'settings.gameplay.offlineBotReplacementDisabledBody' | t }}
               }
             </p>
           </div>
           <button class="start-button" type="button" (click)="savePreferences()" [disabled]="!canSavePreferences()">
-            {{ isSaving ? 'Saving...' : 'Save preferences' }}
+            {{ isSaving ? ('common.actions.saving' | t) : ('common.actions.savePreferences' | t) }}
           </button>
         </section>
 
         <section class="settings-card">
-          <h2>Interface</h2>
-          <p class="subtitle">Language selection is reserved for future localization work.</p>
-          <div class="settings-radio-group" role="radiogroup" aria-label="Language selection">
-            <label class="settings-radio">
-              <input type="radio" name="language" disabled checked />
-              <span>English</span>
-            </label>
-            <label class="settings-radio">
-              <input type="radio" name="language" disabled />
-              <span>Polish</span>
-            </label>
+          <h2>{{ 'settings.sections.interface' | t }}</h2>
+          <p class="subtitle">{{ 'settings.interface.subtitle' | t }}</p>
+          <div class="settings-language-grid" role="radiogroup" [attr.aria-label]="'settings.interface.languageSelectionAriaLabel' | t">
+            @for (option of languageOptions; track option.id) {
+              <label
+                class="settings-language-option"
+                [class.settings-language-option--selected]="selectedLanguage === option.id">
+                <input
+                  type="radio"
+                  name="language"
+                  [checked]="selectedLanguage === option.id"
+                  (change)="onLanguageChange(option.id)"
+                  [attr.aria-label]="languageAccessibleLabel(option.id)" />
+                <img class="settings-language-option__icon" [src]="option.iconSrc" alt="" />
+                <span class="settings-language-option__text">
+                  <span class="settings-language-option__eyebrow">{{ 'settings.interface.languageLabel' | t }}</span>
+                  <span class="settings-language-option__label">{{ option.shortLabelKey | t }}</span>
+                  <span class="sr-only">{{ languageAccessibleLabel(option.id) }}</span>
+                </span>
+              </label>
+            }
           </div>
         </section>
 
         <section class="settings-card">
-          <h2>Tutorials</h2>
-          <p class="subtitle">Reset tutorial progress for the current session and currently selected running game.</p>
+          <h2>{{ 'settings.sections.tutorials' | t }}</h2>
+          <p class="subtitle">{{ 'settings.tutorials.subtitle' | t }}</p>
           <button class="start-button" type="button" (click)="resetTutorials()" [disabled]="isResettingTutorials">
-            {{ isResettingTutorials ? 'Resetting...' : 'Reset tutorials' }}
+            {{ isResettingTutorials ? ('common.actions.resetting' | t) : ('common.actions.resetTutorials' | t) }}
           </button>
         </section>
       </div>
@@ -135,7 +145,7 @@
     }
 
     <div class="saved">
-      <a class="link button" routerLink="/">Back to main menu</a>
+      <a class="link button" routerLink="/">{{ 'common.actions.backToMainMenu' | t }}</a>
     </div>
   </section>
 </main>

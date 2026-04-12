@@ -863,7 +863,7 @@ app.post('/api/account/settings/preferences', (req, res) => {
   const language = normalizeLanguagePreference(body?.language);
   account.replaceWithBotOnLogout = replaceWithBotOnLogout;
   account.logoutBotProfileId = logoutBotProfileId;
-  account.language = language;
+  setAccountLanguagePreference(auth.data, account.id, language);
   saveAuthData(auth.data);
 
   return res.status(200).json(buildAccountSettingsResponse(account));
@@ -3747,6 +3747,7 @@ type AuthSession = {
   accountId: number;
   playerName: string;
   localAdmin: boolean;
+  language: 'en' | 'pl' | null;
   createdAt: string;
   lastSeenAt: string;
   currentGameId: string | null;
@@ -3919,6 +3920,7 @@ function loadAuthData(): AuthData {
       }
 
       const session = entry as AuthSession;
+      session.language = normalizeLanguagePreference(session.language);
       session.currentGameId = typeof session.currentGameId === 'string' && session.currentGameId.trim()
         ? session.currentGameId
         : null;
@@ -3966,6 +3968,24 @@ function setAccountCurrentGameId(data: AuthData, accountId: number, currentGameI
       if (session.pendingPresenceRemovedNoticeGameId && session.pendingPresenceRemovedNoticeGameId !== normalizedCurrentGameId) {
         session.pendingPresenceRemovedNoticeGameId = null;
       }
+    }
+  }
+}
+
+function setAccountLanguagePreference(
+  data: AuthData,
+  accountId: number,
+  language: 'en' | 'pl' | null
+): void {
+  const normalizedLanguage = normalizeLanguagePreference(language);
+  const account = data.accounts.find((entry) => entry.id === accountId);
+  if (account) {
+    account.language = normalizedLanguage;
+  }
+
+  for (const session of data.sessions) {
+    if (session.accountId === accountId) {
+      session.language = normalizedLanguage;
     }
   }
 }
@@ -5214,6 +5234,7 @@ function createSession(data: AuthData, account: AuthAccount, timestamp: string):
     accountId: account.id,
     playerName: account.playerName,
     localAdmin: account.localAdmin === true,
+    language: account.language,
     createdAt: timestamp,
     lastSeenAt: timestamp,
     currentGameId: account.currentGameId,
@@ -5233,6 +5254,7 @@ function toPlayerSession(session: AuthSession, galaxy: Galaxy | null = currentGa
     playerName: session.playerName,
     token: session.token,
     localAdmin: session.localAdmin === true,
+    language: session.language,
     tutorialRead: player?.tutorialRead ?? createTutorialReadState(false),
     unreadReportCount: player?.reports.filter((report) => !report.isRead && report.reportType !== ReportType.MESSAGE).length ?? 0,
     unreadMailCount: player?.messages.filter((message) => !message.isRead).length ?? 0,
@@ -5282,6 +5304,7 @@ function getAuthSession(req: Request): { data: AuthData; session: AuthSession } 
   }
 
   session.localAdmin = account.localAdmin === true;
+  session.language = account.language;
   session.currentGameId = account.currentGameId;
   session.lastSeenAt = new Date().toISOString();
   saveAuthData(data);

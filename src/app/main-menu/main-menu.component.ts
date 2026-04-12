@@ -4,11 +4,13 @@ import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
+import { I18nPipe } from '../i18n/i18n.pipe';
+import { I18nService } from '../i18n/i18n.service';
 import type { CurrentGameStatusResponse } from '../models/game-api-types';
 
 @Component({
   selector: 'app-main-menu',
-  imports: [RouterLink],
+  imports: [RouterLink, I18nPipe],
   templateUrl: './main-menu.component.html',
   styleUrl: './main-menu.component.css'
 })
@@ -25,6 +27,7 @@ export class MainMenuComponent {
     private readonly authState: AuthStateService,
     private readonly gameApi: GameApiService,
     private readonly gameState: GameStateService,
+    private readonly i18n: I18nService,
     private readonly router: Router
   ) {
     this.session = this.authState.session;
@@ -76,24 +79,35 @@ export class MainMenuComponent {
   }
 
   protected currentGameName(): string {
-    return this.currentGameStatus?.game?.name ?? 'No current game selected';
+    return this.currentGameStatus?.game?.name ?? this.i18n.t('mainMenu.currentGame.noCurrentGameSelected');
   }
 
   protected currentGameStatusLabel(): string {
     const game = this.currentGameStatus?.game;
     if (!game) {
-      return this.isLoadingCurrentGameStatus ? 'Checking current game' : 'No game selected';
+      return this.isLoadingCurrentGameStatus
+        ? this.i18n.t('mainMenu.currentGame.checkingCurrentGame')
+        : this.i18n.t('mainMenu.currentGame.noGameSelected');
     }
 
     if (this.currentGameStatus?.canResume) {
-      return 'Running';
+      return this.i18n.t('mainMenu.currentGame.running');
     }
 
     if (game.kind === 'MULTIPLAYER' && game.status === 'RUNNING') {
-      return 'Saved / Inactive';
+      return this.i18n.t('mainMenu.currentGame.savedInactive');
     }
 
-    return game.status;
+    switch (game.status) {
+      case 'DRAFT':
+        return this.i18n.t('mainMenu.currentGame.draft');
+      case 'OFFLINE':
+        return this.i18n.t('mainMenu.currentGame.offline');
+      case 'ARCHIVED':
+        return this.i18n.t('mainMenu.currentGame.archived');
+      default:
+        return game.status;
+    }
   }
 
   protected resumeUnavailableReason(): string | null {
@@ -103,7 +117,7 @@ export class MainMenuComponent {
 
     const game = this.currentGameStatus?.game;
     if (!game) {
-      return 'Select or create a game first.';
+      return this.i18n.t('mainMenu.currentGame.selectOrCreateFirst');
     }
 
     if (this.currentGameStatus?.canResume) {
@@ -111,10 +125,10 @@ export class MainMenuComponent {
     }
 
     if (game.kind === 'MULTIPLAYER' && game.status === 'RUNNING') {
-      return 'This multiplayer game is saved and inactive. Open Multiplayer to resume it.';
+      return this.i18n.t('mainMenu.currentGame.multiplayerSavedInactiveHint');
     }
 
-    return this.currentGameStatus?.unavailableReason ?? 'This game is not currently available.';
+    return this.currentGameStatus?.unavailableReason ?? this.i18n.t('mainMenu.currentGame.unavailable');
   }
 
   protected currentGameHint(): string | null {
@@ -125,8 +139,8 @@ export class MainMenuComponent {
 
     if (this.currentGameStatus?.canResume) {
       return game.kind === 'MULTIPLAYER'
-        ? 'Resume directly into the current running multiplayer game.'
-        : 'Resume directly into your current game.';
+        ? this.i18n.t('mainMenu.currentGame.resumeMultiplayerHint')
+        : this.i18n.t('mainMenu.currentGame.resumeHint');
     }
 
     return this.resumeUnavailableReason();
@@ -156,7 +170,7 @@ export class MainMenuComponent {
         this.router.navigate(['/game/imperium']);
       },
       error: (error) => {
-        this.resumeError = error?.error?.error ?? 'Unable to resume the selected game.';
+        this.resumeError = error?.error?.error ?? this.i18n.t('mainMenu.currentGame.resumeUnavailable');
         this.loadCurrentGameStatus(session.token);
       }
     });
@@ -187,7 +201,7 @@ export class MainMenuComponent {
       },
       error: (error) => {
         this.isClosingCurrentGame = false;
-        this.closeError = error?.error?.error ?? 'Unable to close the current game.';
+        this.closeError = error?.error?.error ?? this.i18n.t('mainMenu.currentGame.closeUnavailable');
         this.loadCurrentGameStatus(session.token);
       }
     });

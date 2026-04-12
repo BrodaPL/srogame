@@ -1,23 +1,20 @@
-import { TestBed } from '@angular/core/testing';
+import '@angular/compiler';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from './app';
 
 describe('App', () => {
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [App],
-    }).compileComponents();
-  });
+  it('initializes auth state and i18n on startup', () => {
+    const authState = {
+      init: vi.fn()
+    };
+    const i18n = {
+      init: vi.fn()
+    };
 
-  it('should create the app', () => {
-    const fixture = TestBed.createComponent(App);
-    const app = fixture.componentInstance;
+    const app = new App(authState as never, i18n as never);
+
     expect(app).toBeTruthy();
-  });
-
-  it('should render the root router outlet shell', async () => {
-    const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('router-outlet')).toBeTruthy();
+    expect(authState.init).toHaveBeenCalledOnce();
+    expect(i18n.init).toHaveBeenCalledOnce();
   });
 });

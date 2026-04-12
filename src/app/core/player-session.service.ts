@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { PlayerSession } from '../models/game-api-types';
+import { LanguagePreference, PlayerSession } from '../models/game-api-types';
 import { normalizeTutorialReadState } from '../tutorial/tutorial-types';
 
 @Injectable({
@@ -20,6 +20,7 @@ export class PlayerSessionService {
         return {
           ...parsed,
           localAdmin: (parsed as Partial<PlayerSession>).localAdmin === true,
+          language: this.normalizeLanguage((parsed as Partial<PlayerSession>).language),
           currentGameId: this.normalizeCurrentGameId(
             (parsed as Partial<PlayerSession>).currentGameId
           ),
@@ -68,9 +69,14 @@ export class PlayerSessionService {
       session.playerName.trim().length > 0 &&
       typeof session.token === 'string' &&
       session.token.trim().length > 0 &&
+      (session.language === null || session.language === undefined || session.language === 'en' || session.language === 'pl') &&
       (session.currentGameId === null || session.currentGameId === undefined || typeof session.currentGameId === 'string') &&
       (session.localAdmin === undefined || typeof session.localAdmin === 'boolean')
     );
+  }
+
+  private normalizeLanguage(value: LanguagePreference | null | undefined): LanguagePreference | null {
+    return value === 'en' || value === 'pl' ? value : null;
   }
 
   private normalizeCurrentGameId(value: string | null | undefined): string | null {

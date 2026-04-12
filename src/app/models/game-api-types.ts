@@ -194,6 +194,7 @@ export type PlayerSession = {
   playerName: string;
   token: string;
   localAdmin: boolean;
+  language: LanguagePreference | null;
   tutorialRead: TutorialReadState;
   unreadReportCount: number;
   unreadMailCount: number;

@@ -172,6 +172,7 @@ function createPlayerSession(): PlayerSession {
     playerName: 'Admin',
     token: 'token',
     localAdmin: true,
+    language: 'en',
     tutorialRead: {},
     unreadReportCount: 0,
     unreadMailCount: 0,

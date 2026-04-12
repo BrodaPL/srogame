@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
+import { I18nService } from '../i18n/i18n.service';
 import type {
   AccountSettingsResponse,
   PlayerSession,
@@ -24,6 +25,12 @@ describe('SettingsComponent', () => {
   let router: {
     navigate: ReturnType<typeof vi.fn>;
   };
+  let i18n: {
+    t: ReturnType<typeof vi.fn>;
+    setLanguage: ReturnType<typeof vi.fn>;
+    formatDateTime: ReturnType<typeof vi.fn>;
+    language: ReturnType<typeof vi.fn>;
+  };
   let sessionSignal: ReturnType<typeof signal<PlayerSession | null>>;
 
   beforeEach(() => {
@@ -40,10 +47,16 @@ describe('SettingsComponent', () => {
     router = {
       navigate: vi.fn().mockResolvedValue(true)
     };
+    i18n = {
+      t: vi.fn((key: string) => settingsTranslationForKey(key)),
+      setLanguage: vi.fn(),
+      formatDateTime: vi.fn((value: string) => value),
+      language: vi.fn().mockReturnValue('en')
+    };
   });
 
   it('loads settings into component state', () => {
-    const component = createBareComponent(authApi, authState, router);
+    const component = createBareComponent(authApi, authState, router, i18n);
 
     component.loadSettings('token');
 
@@ -57,7 +70,7 @@ describe('SettingsComponent', () => {
     authApi.getAccountSettings.mockReturnValue(throwError(() => ({
       error: { error: 'Settings are unavailable.' }
     })));
-    const component = createBareComponent(authApi, authState, router);
+    const component = createBareComponent(authApi, authState, router, i18n);
 
     component.loadSettings('token');
 
@@ -71,7 +84,7 @@ describe('SettingsComponent', () => {
       replaceWithBotOnLogout: false,
       logoutBotProfileId: null
     })));
-    const component = createBareComponent(authApi, authState, router);
+    const component = createBareComponent(authApi, authState, router, i18n);
     component.settings = createAccountSettings();
     component.replaceWithBotOnLogout = false;
     component.logoutBotProfileId = 'TURTLE';
@@ -89,7 +102,7 @@ describe('SettingsComponent', () => {
   it('resets tutorials and refreshes the stored player session', () => {
     const response = createTutorialResetResponse();
     authApi.resetAccountTutorials.mockReturnValue(of(response));
-    const component = createBareComponent(authApi, authState, router);
+    const component = createBareComponent(authApi, authState, router, i18n);
 
     component.resetTutorials();
 
@@ -100,7 +113,7 @@ describe('SettingsComponent', () => {
   });
 
   it('normalizes a missing bot profile to BALANCED when bot replacement is enabled', () => {
-    const component = createBareComponent(authApi, authState, router);
+    const component = createBareComponent(authApi, authState, router, i18n);
     component.logoutBotProfileId = null;
 
     component.onReplaceWithBotChange(true);
@@ -113,11 +126,13 @@ describe('SettingsComponent', () => {
 function createBareComponent(
   authApi: Pick<AuthApiService, 'getAccountSettings' | 'updateAccountPreferences' | 'resetAccountTutorials'>,
   authState: Pick<AuthStateService, 'session' | 'setSession'>,
-  router: { navigate: (commands: string[]) => Promise<boolean> }
+  router: { navigate: (commands: string[]) => Promise<boolean> },
+  i18n: Pick<I18nService, 't' | 'setLanguage' | 'formatDateTime' | 'language'>
 ): SettingsComponent & {
   settings: AccountSettingsResponse | null;
   replaceWithBotOnLogout: boolean;
   logoutBotProfileId: 'BALANCED' | 'TURTLE' | null;
+  selectedLanguage: 'en' | 'pl';
   isLoading: boolean;
   isSaving: boolean;
   isResettingTutorials: boolean;
@@ -134,6 +149,7 @@ function createBareComponent(
     settings: AccountSettingsResponse | null;
     replaceWithBotOnLogout: boolean;
     logoutBotProfileId: 'BALANCED' | 'TURTLE' | null;
+    selectedLanguage: 'en' | 'pl';
     isLoading: boolean;
     isSaving: boolean;
     isResettingTutorials: boolean;
@@ -149,11 +165,13 @@ function createBareComponent(
 
   (component as never as { authApi: typeof authApi }).authApi = authApi;
   (component as never as { authState: typeof authState }).authState = authState;
+  (component as never as { i18n: typeof i18n }).i18n = i18n;
   (component as never as { router: typeof router }).router = router;
   component.session = authState.session;
   component.settings = null;
   component.replaceWithBotOnLogout = false;
   component.logoutBotProfileId = 'BALANCED';
+  component.selectedLanguage = 'en';
   component.isLoading = false;
   component.isSaving = false;
   component.isResettingTutorials = false;
@@ -164,12 +182,30 @@ function createBareComponent(
   return component;
 }
 
+function settingsTranslationForKey(key: string): string {
+  return {
+    'settings.info.preferencesUpdated': 'Preferences updated.',
+    'settings.errors.update': 'Unable to update preferences.',
+    'settings.errors.resetTutorials': 'Unable to reset tutorials.',
+    'settings.errors.load': 'Unable to load settings.',
+    'common.status.confirmed': 'Confirmed',
+    'common.status.pendingConfirmation': 'Pending confirmation',
+    'common.status.localAdmin': 'Local Admin',
+    'common.status.regularPlayer': 'Regular player',
+    'settings.account.accountStatusActive': 'Active',
+    'settings.account.accountStatusPendingConfirmation': 'Pending confirmation',
+    'settings.botProfiles.BALANCED': 'Balanced',
+    'settings.botProfiles.TURTLE': 'Turtle'
+  }[key] ?? key;
+}
+
 function createPlayerSession(overrides: Partial<PlayerSession> = {}): PlayerSession {
   return {
     id: 1,
     playerName: 'Commander',
     token: 'token',
     localAdmin: true,
+    language: 'en',
     tutorialRead: {},
     unreadReportCount: 0,
     unreadMailCount: 0,

@@ -8,6 +8,7 @@ import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
+import { I18nService } from '../i18n/i18n.service';
 
 describe('MainMenuComponent', () => {
   let authApi: {
@@ -28,6 +29,9 @@ describe('MainMenuComponent', () => {
   };
   let router: {
     navigate: ReturnType<typeof vi.fn>;
+  };
+  let i18n: {
+    t: ReturnType<typeof vi.fn>;
   };
   let sessionSignal: ReturnType<typeof signal<PlayerSession | null>>;
 
@@ -57,10 +61,13 @@ describe('MainMenuComponent', () => {
     router = {
       navigate: vi.fn().mockResolvedValue(true)
     };
+    i18n = {
+      t: vi.fn((key: string) => translationForKey(key))
+    };
   });
 
   it('enables resume for a running current game', () => {
-    const component = createBareComponent(authApi, authState, gameApi, gameState, router);
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n);
 
     component['loadCurrentGameStatus']('token');
 
@@ -75,7 +82,7 @@ describe('MainMenuComponent', () => {
       canResume: false,
       unavailableReason: 'You do not currently have access to resume this game.'
     })));
-    const component = createBareComponent(authApi, authState, gameApi, gameState, router);
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n);
 
     component['loadCurrentGameStatus']('token');
 
@@ -93,7 +100,7 @@ describe('MainMenuComponent', () => {
       canResume: false,
       unavailableReason: null
     } satisfies CurrentGameStatusResponse));
-    const component = createBareComponent(authApi, authState, gameApi, gameState, router);
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n);
 
     component['loadCurrentGameStatus']('token');
 
@@ -111,7 +118,7 @@ describe('MainMenuComponent', () => {
         kind: 'SINGLEPLAYER'
       }
     })));
-    const component = createBareComponent(authApi, authState, gameApi, gameState, router);
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n);
 
     component['loadCurrentGameStatus']('token');
 
@@ -132,7 +139,8 @@ function createBareComponent(
   authState: Pick<AuthStateService, 'session' | 'clearSession' | 'setSession'>,
   gameApi: Pick<GameApiService, 'getCurrentGameStatus' | 'selectGame' | 'closeCurrentGame'>,
   gameState: Pick<GameStateService, 'clearGalaxy'>,
-  router: { navigate: (commands: string[]) => Promise<boolean> }
+  router: { navigate: (commands: string[]) => Promise<boolean> },
+  i18n: Pick<I18nService, 't'>
 ): MainMenuComponent & {
   currentGameStatus: CurrentGameStatusResponse | null;
   isLoadingCurrentGameStatus: boolean;
@@ -169,6 +177,7 @@ function createBareComponent(
   (component as never as { gameApi: typeof gameApi }).gameApi = gameApi;
   (component as never as { gameState: typeof gameState }).gameState = gameState;
   (component as never as { router: typeof router }).router = router;
+  (component as never as { i18n: typeof i18n }).i18n = i18n;
   component.session = authState.session;
   component.currentGameStatus = null;
   component.isLoadingCurrentGameStatus = false;
@@ -179,12 +188,33 @@ function createBareComponent(
   return component;
 }
 
+function translationForKey(key: string): string {
+  return {
+    'mainMenu.currentGame.noCurrentGameSelected': 'No current game selected',
+    'mainMenu.currentGame.checkingCurrentGame': 'Checking current game',
+    'mainMenu.currentGame.noGameSelected': 'No game selected',
+    'mainMenu.currentGame.running': 'Running',
+    'mainMenu.currentGame.savedInactive': 'Saved / Inactive',
+    'mainMenu.currentGame.draft': 'Draft',
+    'mainMenu.currentGame.offline': 'Offline',
+    'mainMenu.currentGame.archived': 'Archived',
+    'mainMenu.currentGame.selectOrCreateFirst': 'Select or create a game first.',
+    'mainMenu.currentGame.multiplayerSavedInactiveHint': 'This multiplayer game is saved and inactive. Open Multiplayer to resume it.',
+    'mainMenu.currentGame.unavailable': 'This game is not currently available.',
+    'mainMenu.currentGame.resumeMultiplayerHint': 'Resume directly into the current running multiplayer game.',
+    'mainMenu.currentGame.resumeHint': 'Resume directly into your current game.',
+    'mainMenu.currentGame.closeUnavailable': 'Unable to close the current game.',
+    'mainMenu.currentGame.resumeUnavailable': 'Unable to resume the selected game.'
+  }[key] ?? key;
+}
+
 function createPlayerSession(overrides: Partial<PlayerSession> = {}): PlayerSession {
   return {
     id: 1,
     playerName: 'Commander',
     token: 'token',
     localAdmin: true,
+    language: 'en',
     tutorialRead: {},
     unreadReportCount: 0,
     unreadMailCount: 0,

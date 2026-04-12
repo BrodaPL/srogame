@@ -1,17 +1,17 @@
 <main class="page">
   <section class="panel panel--compact">
     <header class="panel__header">
-      <p class="eyebrow">Main Menu</p>
+      <p class="eyebrow">{{ 'mainMenu.eyebrow' | t }}</p>
       <h1>Srogame</h1>
       @if (session()) {
         <p class="subtitle">
-          Logged in as {{ session()!.playerName }}
+          {{ 'mainMenu.subtitle.loggedInAs' | t:{ playerName: session()!.playerName } }}
           @if (session()!.localAdmin) {
-            <span>(Local Admin)</span>
+            <span>{{ 'mainMenu.subtitle.localAdminTag' | t }}</span>
           }
         </p>
       } @else {
-        <p class="subtitle">Not logged in</p>
+        <p class="subtitle">{{ 'mainMenu.subtitle.notLoggedIn' | t }}</p>
       }
     </header>
 
@@ -19,7 +19,7 @@
       <section class="main-menu-current-game">
         <div class="main-menu-current-game__head">
           <div>
-            <p class="saved__title">Current Game</p>
+            <p class="saved__title">{{ 'mainMenu.currentGame.title' | t }}</p>
             <h2>{{ currentGameName() }}</h2>
           </div>
           <span class="badge main-menu-current-game__status">{{ currentGameStatusLabel() }}</span>
@@ -33,7 +33,7 @@
     <nav class="menu">
       @if (!session()) {
         <button class="menu-button menu-button--primary" type="button" routerLink="/login">
-          Login / Register
+          {{ 'mainMenu.actions.loginRegister' | t }}
         </button>
       } @else {
         <button
@@ -42,7 +42,7 @@
           (click)="resumeCurrentGame()"
           [disabled]="!canResumeCurrentGame() || isLoadingCurrentGameStatus || isClosingCurrentGame"
           [title]="resumeUnavailableReason() ?? ''">
-          Resume Current Game
+          {{ 'mainMenu.actions.resumeCurrentGame' | t }}
         </button>
         @if (shouldShowCloseCurrentGame()) {
           <button
@@ -50,7 +50,7 @@
             type="button"
             (click)="closeCurrentGame()"
             [disabled]="isLoadingCurrentGameStatus || isClosingCurrentGame">
-            {{ isClosingCurrentGame ? 'Closing...' : 'Close Current Game' }}
+            {{ isClosingCurrentGame ? ('mainMenu.actions.closing' | t) : ('mainMenu.actions.closeCurrentGame' | t) }}
           </button>
         }
         @if (resumeUnavailableReason()) {
@@ -61,30 +61,30 @@
         }
         @if (shouldShowOpenMultiplayer()) {
           <button class="menu-button menu-button--secondary" type="button" routerLink="/multiplayer">
-            Open Multiplayer
+            {{ 'mainMenu.actions.openMultiplayer' | t }}
           </button>
         }
         <button class="menu-button" type="button" routerLink="/setup" [disabled]="!canManageSingleplayer()">
-          Singleplayer
+          {{ 'mainMenu.actions.singleplayer' | t }}
         </button>
         <button class="menu-button" type="button" routerLink="/multiplayer">
-          Multiplayer
+          {{ 'mainMenu.actions.multiplayer' | t }}
         </button>
         <button class="menu-button" type="button" routerLink="/load" [disabled]="!canLoadGame()">
-          Load Game
+          {{ 'mainMenu.actions.loadGame' | t }}
         </button>
         <button class="menu-button" type="button" routerLink="/settings">
-          Settings
+          {{ 'mainMenu.actions.settings' | t }}
         </button>
         <button class="menu-button" type="button" (click)="logout()">
-          Logout
+          {{ 'mainMenu.actions.logout' | t }}
         </button>
       }
       <button class="menu-button" type="button" routerLink="/encyclopedia">
-        Encyclopedia
+        {{ 'mainMenu.actions.encyclopedia' | t }}
       </button>
       <button class="menu-button" type="button" routerLink="/help">
-        Help &amp; About
+        {{ 'mainMenu.actions.helpAbout' | t }}
       </button>
     </nav>
   </section>
