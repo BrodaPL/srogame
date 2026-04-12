@@ -356,6 +356,42 @@
       ]
     },
     {
+      "type": "COLONIZER",
+      "imagePath": "images/ships/normal/COLONIZER.jpg",
+      "hullClass": "BIG",
+      "canJump": true,
+      "size": 0,
+      "evasionChance": 0,
+      "hullPointsCapacity": 200,
+      "criticalThreshold": 40,
+      "shieldCapacity": 80,
+      "armor": 2,
+      "weapons": [
+        { "type": "BEAM", "dmg": 10, "shots": 1 },
+        { "type": "REPAIR_EQUIPMENT", "dmg": 50, "shots": 1 }
+      ],
+      "cargoCapacity": 500,
+      "hangarCapacity": 4,
+      "purposes": ["UTILITY"],
+      "jumpCost": 10,
+      "cost": { "metal": 600, "crystal": 400, "deuterium": 100 },
+      "buildingRequirements": [
+        { "building": "SHIPYARD", "level": 4 }
+      ],
+      "techRequirements": [
+        { "tech": "FUSION_DRIVE", "level": 2 },
+        { "tech": "HYPERSPACE_DRIVE", "level": 1 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 1 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 1 },
+        { "tech": "BEAMS_WEAPONS", "level": 1 },
+        { "tech": "ENERGY_TECHNOLOGY", "level": 2 },
+        { "tech": "COMPUTER_TECHNOLOGY", "level": 2 },
+        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 1 },
+        { "tech": "ADAPTIVE_TECHNOLOGY", "level": 1 }
+      ]
+    },
+    {
       "type": "BATTLE_CRUISER",
       "imagePath": "images/ships/normal/BATTLE_CRUISER.jpg",
       "hullClass": "BIG",
@@ -585,42 +621,6 @@
         { "tech": "MATERIAL_TECHNOLOGY", "level": 3 },
         { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
         { "tech": "BEAMS_WEAPONS", "level": 1 }
-      ]
-    },
-    {
-      "type": "COLONIZER",
-      "imagePath": "images/ships/normal/COLONIZER.jpg",
-      "hullClass": "BIG",
-      "canJump": true,
-      "size": 0,
-      "evasionChance": 0,
-      "hullPointsCapacity": 200,
-      "criticalThreshold": 40,
-      "shieldCapacity": 100,
-      "armor": 2,
-      "weapons": [
-        { "type": "BEAM", "dmg": 10, "shots": 1 },
-        { "type": "REPAIR_EQUIPMENT", "dmg": 50, "shots": 1 }
-      ],
-      "cargoCapacity": 500,
-      "hangarCapacity": 4,
-      "purposes": ["UTILITY"],
-      "jumpCost": 5,
-      "cost": { "metal": 600, "crystal": 300, "deuterium": 100 },
-      "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 4 }
-      ],
-      "techRequirements": [
-        { "tech": "FUSION_DRIVE", "level": 3 },
-        { "tech": "HYPERSPACE_DRIVE", "level": 2 },
-        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 2 },
-        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
-        { "tech": "BEAMS_WEAPONS", "level": 1 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 3 },
-        { "tech": "COMPUTER_TECHNOLOGY", "level": 2 },
-        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 2 },
-        { "tech": "ADAPTIVE_TECHNOLOGY", "level": 1 }
       ]
     },
     {

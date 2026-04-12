@@ -29,7 +29,7 @@
       "imagePath": "images/technologies/normal/HYPERSPACE_TECHNOLOGY.jpg",
       "description": "Gives +2% bonus to Sensor Phlanx range, increses Jump Gate and Interstellar Trade Port capacity by 5%.",
       "basicCost": { "metal": 0, "crystal": 20, "deuterium": 30 },
-      "energyRequired": [10],
+      "energyRequired": [0],
       "researchTime": [1.5],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 0.25 }
@@ -136,21 +136,21 @@
         { "building": "RESEARCH_LAB", "level": 0.5 }
       ],
       "techRequirements": [
-        { "tech": "ENERGY_TECHNOLOGY", "level": 1 }
+        { "tech": "ENERGY_TECHNOLOGY", "level": 0.5 }
       ]
     },
     {
       "type": "ARMOUR_TECHNOLOGY",
       "imagePath": "images/technologies/normal/ARMOUR_TECHNOLOGY.jpg",
       "description": "Give +10% to every hull durability, and decreases ship destruction chance by 1%.",
-      "basicCost": { "metal": 20, "crystal": 10, "deuterium": 0 },
+      "basicCost": { "metal": 30, "crystal": 5, "deuterium": 0 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 0.25 }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 1 }
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 0.5 }
       ]
     },
     {
@@ -164,8 +164,8 @@
         { "building": "RESEARCH_LAB", "level": 0.25 }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 1 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 1 }
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 0.5 },
+        { "tech": "ENERGY_TECHNOLOGY", "level": 0.5 }
       ]
     },
     {
@@ -179,7 +179,7 @@
         { "building": "RESEARCH_LAB", "level": 0.25 }
       ],
       "techRequirements": [
-        { "tech": "ENERGY_TECHNOLOGY", "level": 1 }
+        { "tech": "ENERGY_TECHNOLOGY", "level": 0.5 }
       ]
     },
     {
@@ -194,14 +194,14 @@
       ],
       "techRequirements": [
         { "tech": "MATERIAL_TECHNOLOGY", "level": 1 },
-        { "tech": "FUSION_DRIVE", "level": 1 }
+        { "tech": "FUSION_DRIVE", "level": 0.5 }
       ]
     },
     {
       "type": "FUSION_DRIVE",
       "imagePath": "images/technologies/normal/FUSION_DRIVE.jpg",
       "description": "Increases in star system, ship speed by 1, and increses evasion chance by 3%.",
-      "basicCost": { "metal": 20, "crystal": 40, "deuterium": 40 },
+      "basicCost": { "metal": 40, "crystal": 30, "deuterium": 20 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [

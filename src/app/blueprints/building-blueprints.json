@@ -6,7 +6,7 @@
                     "imagePath":  "images/buildings/normal/METAL_MINE.jpg",
                     "basicCost":  {
                                       "metal":  60,
-                                      "crystal":  20,
+                                      "crystal":  10,
                                       "deuterium":  0
                                   },
                     "level":  0,
@@ -60,8 +60,8 @@
                     "description":  "Mines rare materials.",
                     "imagePath":  "images/buildings/normal/CRYSTAL_MINE.jpg",
                     "basicCost":  {
-                                      "metal":  40,
-                                      "crystal":  40,
+                                      "metal":  50,
+                                      "crystal":  20,
                                       "deuterium":  0
                                   },
                     "level":  0,
@@ -116,7 +116,7 @@
                     "imagePath":  "images/buildings/normal/DEUTERIUM_SYNTHESIZER.jpg",
                     "basicCost":  {
                                       "metal":  40,
-                                      "crystal":  60,
+                                      "crystal":  40,
                                       "deuterium":  0
                                   },
                     "level":  0,
@@ -170,8 +170,8 @@
                     "description":  "Using most efficient Renewable energy sorces on planet. Utilising mass energy storage devices.",
                     "imagePath":  "images/buildings/normal/SOLAR_WIND_GEOTHERMAL.jpg",
                     "basicCost":  {
-                                      "metal":  15,
-                                      "crystal":  20,
+                                      "metal":  10,
+                                      "crystal":  15,
                                       "deuterium":  0
                                   },
                     "level":  0,
@@ -221,7 +221,7 @@
                     "imagePath":  "images/buildings/normal/NUCLEAR_PLANT.jpg",
                     "basicCost":  {
                                       "metal":  30,
-                                      "crystal":  20,
+                                      "crystal":  10,
                                       "deuterium":  0
                                   },
                     "level":  0,
@@ -270,8 +270,8 @@
                     "description":  "Good old nuclear power technology. Safe, steady and reliable.",
                     "imagePath":  "images/buildings/normal/FUSION_REACTOR.jpg",
                     "basicCost":  {
-                                      "metal":  60,
-                                      "crystal":  60,
+                                      "metal":  40,
+                                      "crystal":  40,
                                       "deuterium":  5
                                   },
                     "level":  0,
@@ -315,21 +315,21 @@
                                         400
                                     ],
                     "production2":  [
-                                        1,
                                         2,
-                                        3,
                                         4,
-                                        5,
-                                        7,
-                                        9,
-                                        12,
-                                        16,
-                                        22,
-                                        30,
-                                        42,
-                                        55,
-                                        75,
-                                        100
+                                        6,
+                                        8,
+                                        10,
+                                        14,
+                                        18,
+                                        24,
+                                        32,
+                                        44,
+                                        60,
+                                        84,
+                                        110,
+                                        150,
+                                        200
                                     ],
                     "production3":  [
 
@@ -341,8 +341,8 @@
                     "description":  "Planetary METAL storages.",
                     "imagePath":  "images/buildings/normal/METAL_STORAGE.jpg",
                     "basicCost":  {
-                                      "metal":  15,
-                                      "crystal":  5,
+                                      "metal":  20,
+                                      "crystal":  0,
                                       "deuterium":  0
                                   },
                     "level":  0,
@@ -389,8 +389,8 @@
                     "description":  "Planetary CRYSTAL deposits.",
                     "imagePath":  "images/buildings/normal/CRYSTAL_STORAGE.jpg",
                     "basicCost":  {
-                                      "metal":  10,
-                                      "crystal":  10,
+                                      "metal":  15,
+                                      "crystal":  5,
                                       "deuterium":  0
                                   },
                     "level":  0,
@@ -437,8 +437,8 @@
                     "description":  "Planetary DEUTERIUM tanks.",
                     "imagePath":  "images/buildings/normal/DEUTERIUM_TANK.jpg",
                     "basicCost":  {
-                                      "metal":  5,
-                                      "crystal":  15,
+                                      "metal":  10,
+                                      "crystal":  10,
                                       "deuterium":  0
                                   },
                     "level":  0,
@@ -486,7 +486,7 @@
                     "imagePath":  "images/buildings/normal/ROBOTICS_FACTORY.jpg",
                     "basicCost":  {
                                       "metal":  60,
-                                      "crystal":  30,
+                                      "crystal":  20,
                                       "deuterium":  0
                                   },
                     "level":  0,
