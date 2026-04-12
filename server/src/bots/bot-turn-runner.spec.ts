@@ -76,6 +76,64 @@ describe('bot-turn-runner', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('uses an idle economy fallback when the best affordable action is slightly below threshold', () => {
+    const system = new SolarSystem('StallSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+    const planet = Planet.createStartingPlanet('StallSys I', 1, system, 1);
+    system.planets[0] = planet;
+
+    const bot = new Player(
+      1,
+      'Bot-1',
+      [planet],
+      new Map(),
+      [],
+      PlayerType.BOT,
+      createTutorialReadState(true)
+    );
+
+    initializePlanet(planet, bot.playerId);
+    bot.botProfileId = 'BALANCED';
+    bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 2);
+    bot.setTechLevel(TechnologyType.FUSION_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.ASTROPHYSICS_TECHNOLOGY, 3);
+    bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.COMPUTER_TECHNOLOGY, 2);
+
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 3);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 3);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 2);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 2);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 3);
+    planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 2);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 2);
+    planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 1);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+    planet.rBDSFTQ.resources = new ResourcesPack(1600, 1200, 400);
+    planet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
+
+    const galaxy = new Galaxy(
+      'Bot Test',
+      [bot],
+      [[system]],
+      263,
+      [],
+      1,
+      new Map(),
+      new Map([[bot.playerId, bot]]),
+      new Map(),
+      new Map([[bot.playerName, bot.playerId]])
+    );
+
+    runBotTurnPhase(galaxy);
+
+    expect(planet.rBDSFTQ.buildingQueue.length).toBeGreaterThan(0);
+    expect(getBotDecisionTraces(bot.playerId)[0]?.actionBudget.used).toBeGreaterThan(0);
+  });
+
   it('launches a spy mission when nearby intel is stale and a probe is available', () => {
     const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
     homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 20);

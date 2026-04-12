@@ -264,7 +264,10 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
       stopReason = 'no_candidates';
       break;
     }
-    if (best.utility < profile.minUtilityThreshold) {
+    if (
+      best.utility < profile.minUtilityThreshold
+      && !shouldAllowIdleEconomyFallback(player, profile, counters, best)
+    ) {
       trace.rejectedActions.push({
         kind: best.kind,
         reason: best.reason,
@@ -414,6 +417,41 @@ function buildBotCandidates(
     ...buildGuardCandidates(galaxy, player, profile, counters, blockedKeys),
     ...buildMoveCandidates(galaxy, player, profile, counters, blockedKeys)
   ];
+}
+
+function shouldAllowIdleEconomyFallback(
+  player: Player,
+  profile: BotProfile,
+  counters: BotTurnCounters,
+  candidate: BotCandidate
+): boolean {
+  if (!isEconomyCandidate(candidate) || counters.total > 0) {
+    return false;
+  }
+
+  if (player.fleets.length > 0) {
+    return false;
+  }
+
+  const hasQueuedWork = player.planets.some((planet) =>
+    planet.rBDSFTQ.buildingQueue.length > 0
+    || planet.rBDSFTQ.shipyardQueue.length > 0
+    || planet.rBDSFTQ.currentResearchQueue !== null
+  );
+  if (hasQueuedWork) {
+    return false;
+  }
+
+  const fallbackThreshold = profile.minUtilityThreshold - 1.5;
+  return candidate.utility >= fallbackThreshold;
+}
+
+function isEconomyCandidate(
+  candidate: BotCandidate
+): candidate is BuildingCandidate | ResearchCandidate | ShipyardCandidate {
+  return candidate.kind === 'building'
+    || candidate.kind === 'research'
+    || candidate.kind === 'shipyard';
 }
 
 function resolveIncomingBotRequests(
