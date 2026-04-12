@@ -34,12 +34,10 @@ export function buildRegisterConfigResponse() {
 
   const configured = !!config.siteKey && !!config.secretKey;
   return {
-    registerEnabled: configured,
+    registerEnabled: true,
     requiresTurnstile: configured,
     turnstileSiteKey: configured ? config.siteKey : null,
-    registerUnavailableReason: configured
-      ? null
-      : 'Registration is temporarily unavailable until CAPTCHA is configured on the server.'
+    registerUnavailableReason: null
   };
 }
 
@@ -53,7 +51,7 @@ export async function verifyTurnstileToken(
   }
 
   if (!config.siteKey || !config.secretKey) {
-    return { ok: false, error: 'Registration is temporarily unavailable until CAPTCHA is configured on the server.' };
+    return { ok: true, error: null };
   }
 
   if (!token?.trim()) {

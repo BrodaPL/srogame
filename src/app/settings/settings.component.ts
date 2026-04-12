@@ -1,4 +1,4 @@
-import { Component, effect } from '@angular/core';
+import { ChangeDetectorRef, Component, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
@@ -55,7 +55,8 @@ export class SettingsComponent {
     private readonly authApi: AuthApiService,
     private readonly authState: AuthStateService,
     private readonly i18n: I18nService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly cdr: ChangeDetectorRef
   ) {
     this.session = this.authState.session;
 
@@ -100,10 +101,12 @@ export class SettingsComponent {
         this.applySettings(settings);
         this.isSaving = false;
         this.saveInfo = this.i18n.t('settings.info.preferencesUpdated');
+        this.cdr.markForCheck();
       },
       error: (error) => {
         this.isSaving = false;
         this.saveError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('settings.errors.update'));
+        this.cdr.markForCheck();
       }
     });
   }
@@ -177,10 +180,12 @@ export class SettingsComponent {
         this.authState.setSession(response.player);
         this.isResettingTutorials = false;
         this.saveInfo = resolveApiMessage(this.i18n, response, response.message);
+        this.cdr.markForCheck();
       },
       error: (error) => {
         this.isResettingTutorials = false;
         this.saveError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('settings.errors.resetTutorials'));
+        this.cdr.markForCheck();
       }
     });
   }
@@ -192,11 +197,13 @@ export class SettingsComponent {
       next: (settings) => {
         this.applySettings(settings);
         this.isLoading = false;
+        this.cdr.markForCheck();
       },
       error: (error) => {
         this.settings = null;
         this.isLoading = false;
         this.loadError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('settings.errors.load'));
+        this.cdr.markForCheck();
       }
     });
   }

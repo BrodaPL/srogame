@@ -13,16 +13,21 @@ describe('turnstile', () => {
     vi.unstubAllGlobals();
   });
 
-  it('disables registration when Turnstile is not configured', () => {
+  it('keeps registration enabled without Turnstile when no keys are configured', async () => {
     delete process.env.TURNSTILE_SITE_KEY;
     delete process.env.TURNSTILE_SECRET_KEY;
     delete process.env.TURNSTILE_BYPASS_FOR_LOCAL_DEV;
 
     expect(buildRegisterConfigResponse()).toEqual({
-      registerEnabled: false,
+      registerEnabled: true,
       requiresTurnstile: false,
       turnstileSiteKey: null,
-      registerUnavailableReason: 'Registration is temporarily unavailable until CAPTCHA is configured on the server.'
+      registerUnavailableReason: null
+    });
+
+    await expect(verifyTurnstileToken(null, '127.0.0.1')).resolves.toEqual({
+      ok: true,
+      error: null
     });
   });
 
