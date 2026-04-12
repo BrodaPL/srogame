@@ -1,72 +1,16 @@
 import '@angular/compiler';
-import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { MissionPlannerViewComponent } from './mission-planner-view.component';
+import { OperationsViewComponent } from './operations-view.component';
 import type { ClientCoordinates, ClientPlanetDto, PlayerSession } from '../../models/game-api-types';
 import { PlanetType } from '../../models/enums/planet-type';
 import { PlayerType } from '../../models/enums/player-type';
-import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 
-describe('MissionPlannerViewComponent', () => {
-  it('prefills the origin planet from query parameters', () => {
-    const originPlanet = createOwnedPlanet('Origin', { x: 3, y: 4, z: 5 });
-    const fallbackPlanet = createOwnedPlanet('Fallback', { x: 8, y: 9, z: 1 });
-    const component = new MissionPlannerViewComponent(
-      {
-        snapshot: {
-          queryParamMap: {
-            get: (key: string) => ({
-              originX: '3',
-              originY: '4',
-              originZ: '5'
-            }[key] ?? null)
-          }
-        }
-      } as never,
-      {
-        getOwnedPlanets: vi.fn().mockReturnValue(of([fallbackPlanet, originPlanet])),
-        getActiveFleets: vi.fn().mockReturnValue(of([]))
-      } as never,
-      {
-        diplomacyResolver: vi.fn()
-      } as never,
-      {
-        load: vi.fn().mockReturnValue(createPlayerSession())
-      } as never,
-      {
-        markForCheck: vi.fn()
-      } as never,
-      {
-        autoOpenTutorial: vi.fn()
-      } as never,
-      {
-        t: vi.fn((key: string) => key)
-      } as never
-    );
-
-    component.ngOnInit();
-
-    expect((component as { selectedOriginPlanet: ClientPlanetDto | null }).selectedOriginPlanet?.basicInfo.name).toBe('Origin');
-    expect((component as { originCoordinatesInput: string }).originCoordinatesInput).toBe('3:4:5');
-  });
-
+describe('OperationsViewComponent', () => {
   it('shows active fleet count against the maximum fleet cap', () => {
-    const component = new MissionPlannerViewComponent(
-      {
-        snapshot: {
-          queryParamMap: {
-            get: () => null
-          }
-        }
-      } as never,
-      {
-        getOwnedPlanets: vi.fn().mockReturnValue(of([])),
-        getActiveFleets: vi.fn().mockReturnValue(of([]))
-      } as never,
-      {
-        diplomacyResolver: vi.fn()
-      } as never,
+    const component = new OperationsViewComponent(
+      {} as never,
+      {} as never,
       {
         load: vi.fn().mockReturnValue(createPlayerSession())
       } as never,
@@ -75,14 +19,11 @@ describe('MissionPlannerViewComponent', () => {
       } as never,
       {
         autoOpenTutorial: vi.fn()
-      } as never,
-      {
-        t: vi.fn((key: string) => key)
       } as never
     );
 
     (component as { ownedPlanets: ClientPlanetDto[] }).ownedPlanets = [
-      createOwnedPlanet('Origin', { x: 3, y: 4, z: 5 }, 2)
+      createOwnedPlanet('Origin', { x: 1, y: 2, z: 3 }, 2)
     ];
     (component as { activeFleets: Array<unknown> }).activeFleets = [{}, {}, {}];
 
@@ -133,15 +74,12 @@ function createOwnedPlanet(name: string, coordinates: ClientCoordinates, compute
       }
     },
     objects: {
-      resources: { metal: 0, crystal: 0, deuterium: 10 },
+      resources: { metal: 0, crystal: 0, deuterium: 0 },
       buildingsLevels: [],
       buildingsCurrentPowerConsumption: [],
       buildingsCurrentStructuralPoints: [],
       defences: { undamagedDefencesCount: {}, damagedDefences: [] },
-      ships: {
-        undamagedShipsCount: { [ShipType.SPY_PROBE]: 1 },
-        damagedShips: []
-      },
+      ships: { undamagedShipsCount: {}, damagedShips: [] },
       currentResearchQueue: null,
       researchHelperFor: null,
       buildingQueue: [],
@@ -175,7 +113,7 @@ function createOwnedPlanet(name: string, coordinates: ClientCoordinates, compute
       averageTotalResources: 0,
       averageTechLevel: 0,
       totalDefencesAmount: 0,
-      totalShipsAmount: 1,
+      totalShipsAmount: 0,
       buildingsLevels: [],
       resourcesAmount: { metal: 0, crystal: 0, deuterium: 0 },
       techLevels: [{

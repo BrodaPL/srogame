@@ -19,6 +19,9 @@
   width: calc(var(--right-feature-space) - 0.75rem);
   max-height: none;
   overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #2f3640 #0d1117;
   display: grid;
   gap: 0.75rem;
   align-content: start;
@@ -27,6 +30,25 @@
   border: 1px solid var(--line);
   background: rgba(12, 16, 22, 0.9);
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35);
+}
+
+.star-system-preview::-webkit-scrollbar {
+  width: 10px;
+}
+
+.star-system-preview::-webkit-scrollbar-track {
+  background: #0d1117;
+  border-radius: 999px;
+}
+
+.star-system-preview::-webkit-scrollbar-thumb {
+  background: #2f3640;
+  border-radius: 999px;
+  border: 2px solid #0d1117;
+}
+
+.star-system-preview::-webkit-scrollbar-thumb:hover {
+  background: #3a424d;
 }
 
 .star-system-preview__title {

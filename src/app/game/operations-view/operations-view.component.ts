@@ -1,12 +1,13 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import {
+  ClientPlanetDto,
   CreateMaintenanceRequestResponse,
   FleetMaintenanceBombOptionDto,
   FleetMaintenanceOptionsDto,
@@ -14,11 +15,13 @@ import {
   MaintenanceTransferPayloadDto
 } from '../../models/game-api-types';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
+import { TechnologyType } from '../../models/enums/technology-type';
 import { WeaponType } from '../../models/enums/weapon-type';
 import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { calculateRecycleCapabilityForManyShips } from '../../models/recycling/recycling-capability';
+import { maxActiveFleets } from '../../models/tech/technology-effects';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
@@ -38,6 +41,7 @@ export class OperationsViewComponent implements OnInit {
   protected actionError: string | null = null;
   protected actionSuccess: string | null = null;
   protected activeFleets: Fleet[] = [];
+  protected ownedPlanets: ClientPlanetDto[] = [];
   protected activeActionFleetId: number | null = null;
   protected maintenanceDialogFleetId: number | null = null;
   protected maintenanceOptions: FleetMaintenanceOptionsDto | null = null;
@@ -68,6 +72,10 @@ export class OperationsViewComponent implements OnInit {
 
   protected primaryFleet(): Fleet | null {
     return this.activeFleets[0] ?? null;
+  }
+
+  protected activeFleetCountLabel(): string {
+    return `${this.activeFleets.length}/${this.maxActiveFleetCount()}`;
   }
 
   protected shipSummary(fleet: Fleet): string {
@@ -454,13 +462,17 @@ export class OperationsViewComponent implements OnInit {
     this.loadError = null;
     this.actionError = null;
 
-    this.gameApi.getActiveFleets(session.token)
+    forkJoin({
+      activeFleets: this.gameApi.getActiveFleets(session.token),
+      ownedPlanets: this.gameApi.getOwnedPlanets(session.token)
+    })
       .pipe(finalize(() => {
         this.isLoading = false;
         this.cdr.markForCheck();
       }))
       .subscribe({
-        next: (activeFleets) => {
+        next: ({ activeFleets, ownedPlanets }) => {
+          this.ownedPlanets = [...ownedPlanets];
           this.applyActiveFleetUpdate(activeFleets);
           if (this.activeFleets.length > 0) {
             this.tutorialService.autoOpenTutorial('operationsView');
@@ -549,5 +561,15 @@ export class OperationsViewComponent implements OnInit {
     }
 
     return Math.max(0, Math.floor(numericValue));
+  }
+
+  private maxActiveFleetCount(): number {
+    return maxActiveFleets(this.techLevel(TechnologyType.COMPUTER_TECHNOLOGY));
+  }
+
+  private techLevel(technologyType: TechnologyType): number {
+    const techLevels = this.ownedPlanets[0]?.reportData?.techLevels ?? [];
+    const matchingEntry = techLevels.find((entry) => entry.type === technologyType);
+    return matchingEntry?.level ?? 0;
   }
 }

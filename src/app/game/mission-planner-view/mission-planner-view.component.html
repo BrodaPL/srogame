@@ -76,6 +76,10 @@
               {{ selectedOriginPlanet ? selectedOriginPlanet.basicInfo.name + ' (' + originCoordinatesInput + ')' : 'No origin selected' }}
             </p>
             <div class="overview-stat mission-planner__detail-stat">
+              <span class="overview-stat__label">Active fleets</span>
+              <span class="overview-stat__value">{{ activeFleetCountLabel() }}</span>
+            </div>
+            <div class="overview-stat mission-planner__detail-stat">
               <span class="overview-stat__label">Ship repair capability</span>
               <span class="overview-stat__value">{{ shipRepairCapabilityLabel() }}</span>
             </div>

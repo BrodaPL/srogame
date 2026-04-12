@@ -346,8 +346,16 @@ export class MissionPlannerViewComponent implements OnInit {
     return !this.isLaunching && this.warningRows().every((warning) => warning.severity !== 'error');
   }
 
+  protected activeFleetCount(): number {
+    return this.activeFleets.length;
+  }
+
   protected maxActiveFleetCount(): number {
     return maxActiveFleets(this.techLevel(TechnologyType.COMPUTER_TECHNOLOGY));
+  }
+
+  protected activeFleetCountLabel(): string {
+    return `${this.activeFleetCount()}/${this.maxActiveFleetCount()}`;
   }
 
   protected totalCargoCapacity(): number {
