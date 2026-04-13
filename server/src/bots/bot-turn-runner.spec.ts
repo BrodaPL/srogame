@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { runBotTurnPhase } from './bot-turn-runner.js';
+import { evaluateIdleEconomyFallbackDecision, runBotTurnPhase } from './bot-turn-runner.js';
+import { BOT_PROFILES } from './bot-profile.js';
 import { clearBotDecisionTraces, getBotDecisionTraces } from './bot-debug-store.js';
 import { pauseBot, resetBotAdminRuntimeState } from './bot-admin.js';
 import { EspionageReportGenerator } from '../../../src/app/generators/espionage-report-generator.js';
@@ -92,7 +93,7 @@ describe('bot-turn-runner', () => {
     );
 
     initializePlanet(planet, bot.playerId);
-    bot.botProfileId = 'BALANCED';
+    bot.botProfileId = 'MINER';
     bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 2);
     bot.setTechLevel(TechnologyType.FUSION_DRIVE, 1);
     bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 1);
@@ -131,7 +132,49 @@ describe('bot-turn-runner', () => {
     runBotTurnPhase(galaxy);
 
     expect(planet.rBDSFTQ.buildingQueue.length).toBeGreaterThan(0);
-    expect(getBotDecisionTraces(bot.playerId)[0]?.actionBudget.used).toBeGreaterThan(0);
+    const trace = getBotDecisionTraces(bot.playerId)[0];
+    expect(trace?.actionBudget.used).toBeGreaterThan(0);
+    expect(trace?.chosenActions[0]?.details['idleFallbackFloor']).not.toBeUndefined();
+  });
+
+  it('widens the idle economy fallback window for low-value buildings and research', () => {
+    const minerBuildingFallback = evaluateIdleEconomyFallbackDecision(
+      'building',
+      BOT_PROFILES.MINER,
+      0,
+      0,
+      false,
+      1.33
+    );
+    const aggressorResearchFallback = evaluateIdleEconomyFallbackDecision(
+      'research',
+      BOT_PROFILES.AGGRESSOR,
+      0,
+      0,
+      false,
+      -1.08
+    );
+
+    expect(minerBuildingFallback.allowed).toBe(true);
+    expect(minerBuildingFallback.used).toBe(true);
+    expect(minerBuildingFallback.floor).toBe(0.5);
+
+    expect(aggressorResearchFallback.allowed).toBe(true);
+    expect(aggressorResearchFallback.used).toBe(true);
+    expect(aggressorResearchFallback.floor).toBe(-1.25);
+
+    const bunkererBuildingFallback = evaluateIdleEconomyFallbackDecision(
+      'building',
+      BOT_PROFILES.BUNKERER,
+      0,
+      0,
+      false,
+      0
+    );
+
+    expect(bunkererBuildingFallback.allowed).toBe(true);
+    expect(bunkererBuildingFallback.used).toBe(true);
+    expect(bunkererBuildingFallback.floor).toBe(0);
   });
 
   it('launches a spy mission when nearby intel is stale and a probe is available', () => {

@@ -394,6 +394,7 @@ export type BotChosenActionTraceDto = {
   expectedUtility: number;
   goalType: BotGoalType | null;
   requestSummary: string;
+  details: Record<string, string | number | boolean | null>;
 };
 
 export type BotDecisionTraceDto = {

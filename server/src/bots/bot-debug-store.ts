@@ -19,7 +19,10 @@ class BotDebugStore {
     return filtered.map((entry) => ({
       ...entry,
       actionBudget: { ...entry.actionBudget },
-      chosenActions: entry.chosenActions.map((action) => ({ ...action })),
+      chosenActions: entry.chosenActions.map((action) => ({
+        ...action,
+        details: { ...action.details }
+      })),
       rejectedActions: entry.rejectedActions.map((action) => ({
         ...action,
         details: { ...action.details }

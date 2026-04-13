@@ -264,9 +264,10 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
       stopReason = 'no_candidates';
       break;
     }
+    const idleFallback = getIdleEconomyFallbackDecision(player, profile, counters, best);
     if (
       best.utility < profile.minUtilityThreshold
-      && !shouldAllowIdleEconomyFallback(player, profile, counters, best)
+      && !idleFallback.allowed
     ) {
       trace.rejectedActions.push({
         kind: best.kind,
@@ -275,7 +276,10 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
         expectedUtility: best.utility,
         details: {
           threshold: profile.minUtilityThreshold,
-          requestSummary: summarizeCandidateRequest(best)
+          requestSummary: summarizeCandidateRequest(best),
+          idleFallbackEligible: idleFallback.eligible,
+          idleFallbackFloor: idleFallback.floor,
+          idleFallbackReason: idleFallback.reason
         }
       });
       stopReason = 'below_threshold';
@@ -379,7 +383,12 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
       reason: best.reason,
       expectedUtility: best.utility,
       goalType: best.goalType,
-      requestSummary: summarizeCandidateRequest(best)
+      requestSummary: summarizeCandidateRequest(best),
+      details: {
+        idleFallbackApplied: idleFallback.used,
+        idleFallbackFloor: idleFallback.floor,
+        threshold: profile.minUtilityThreshold
+      }
     });
   }
 
@@ -419,39 +428,103 @@ function buildBotCandidates(
   ];
 }
 
-function shouldAllowIdleEconomyFallback(
+export type IdleEconomyFallbackDecision = {
+  eligible: boolean;
+  allowed: boolean;
+  used: boolean;
+  floor: number | null;
+  reason: string;
+};
+
+function getIdleEconomyFallbackDecision(
   player: Player,
   profile: BotProfile,
   counters: BotTurnCounters,
   candidate: BotCandidate
-): boolean {
-  if (!isEconomyCandidate(candidate) || counters.total > 0) {
-    return false;
-  }
-
-  if (player.fleets.length > 0) {
-    return false;
-  }
-
+): IdleEconomyFallbackDecision {
   const hasQueuedWork = player.planets.some((planet) =>
     planet.rBDSFTQ.buildingQueue.length > 0
     || planet.rBDSFTQ.shipyardQueue.length > 0
     || planet.rBDSFTQ.currentResearchQueue !== null
   );
-  if (hasQueuedWork) {
-    return false;
-  }
-
-  const fallbackThreshold = profile.minUtilityThreshold - 1.5;
-  return candidate.utility >= fallbackThreshold;
+  return evaluateIdleEconomyFallbackDecision(
+    candidate.kind,
+    profile,
+    counters.total,
+    player.fleets.length,
+    hasQueuedWork,
+    candidate.utility
+  );
 }
 
-function isEconomyCandidate(
-  candidate: BotCandidate
-): candidate is BuildingCandidate | ResearchCandidate | ShipyardCandidate {
-  return candidate.kind === 'building'
-    || candidate.kind === 'research'
-    || candidate.kind === 'shipyard';
+export function evaluateIdleEconomyFallbackDecision(
+  candidateKind: BotCandidate['kind'],
+  profile: BotProfile,
+  actionsUsed: number,
+  fleetsCount: number,
+  hasQueuedWork: boolean,
+  utility: number
+): IdleEconomyFallbackDecision {
+  if (candidateKind !== 'building' && candidateKind !== 'research') {
+    return {
+      eligible: false,
+      allowed: false,
+      used: false,
+      floor: null,
+      reason: 'not_economy_candidate'
+    };
+  }
+
+  if (actionsUsed > 0) {
+    return {
+      eligible: false,
+      allowed: false,
+      used: false,
+      floor: null,
+      reason: 'action_already_taken'
+    };
+  }
+
+  if (fleetsCount > 0) {
+    return {
+      eligible: false,
+      allowed: false,
+      used: false,
+      floor: null,
+      reason: 'has_fleets'
+    };
+  }
+
+  if (hasQueuedWork) {
+    return {
+      eligible: false,
+      allowed: false,
+      used: false,
+      floor: null,
+      reason: 'has_queued_work'
+    };
+  }
+
+  const floor = calculateIdleEconomyFallbackFloor(profile, candidateKind);
+  const allowed = utility >= floor;
+  return {
+    eligible: true,
+    allowed,
+    used: allowed && utility < profile.minUtilityThreshold,
+    floor,
+    reason: allowed ? 'within_fallback_window' : 'below_fallback_floor'
+  };
+}
+
+function calculateIdleEconomyFallbackFloor(
+  profile: BotProfile,
+  candidateKind: 'building' | 'research'
+): number {
+  if (candidateKind === 'research') {
+    return Math.max(-1.25, profile.minUtilityThreshold - 3.75);
+  }
+
+  return Math.max(0, profile.minUtilityThreshold - 3);
 }
 
 function resolveIncomingBotRequests(

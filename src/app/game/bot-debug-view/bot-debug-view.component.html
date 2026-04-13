@@ -143,6 +143,11 @@
                         <p>{{ action.reason }}</p>
                         <p class="overview-muted">{{ action.requestSummary }}</p>
                         <p class="overview-muted">Goal: {{ action.goalType ?? 'none' }}</p>
+                        @if (action.details['idleFallbackApplied']) {
+                          <p class="overview-muted">
+                            Idle fallback applied. Floor: {{ action.details['idleFallbackFloor'] }}, threshold: {{ action.details['threshold'] }}
+                          </p>
+                        }
                       </article>
                     }
                   </div>
@@ -164,6 +169,14 @@
                         <p>{{ action.reason }}</p>
                         <p class="overview-muted">Utility: {{ action.expectedUtility ?? 'n/a' }}</p>
                         <p class="overview-muted">{{ action.details['requestSummary'] }}</p>
+                        @if (action.details['idleFallbackReason']) {
+                          <p class="overview-muted">
+                            Idle fallback: {{ action.details['idleFallbackReason'] }}
+                            @if (action.details['idleFallbackFloor'] !== null && action.details['idleFallbackFloor'] !== undefined) {
+                              (floor {{ action.details['idleFallbackFloor'] }})
+                            }
+                          </p>
+                        }
                         @if (action.details['message']) {
                           <p class="overview-muted">Message: {{ action.details['message'] }}</p>
                         }

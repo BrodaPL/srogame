@@ -74,6 +74,7 @@ type PlanetTurnSnapshot = {
   crystalCapacity: number;
   deuteriumCapacity: number;
   industryPower: number;
+  buildingRepairPower: number;
   droneIndustryPower: number;
   totalIndustryPower: number;
   shipyardPower: number;
@@ -237,6 +238,13 @@ function createPlanetTurnSnapshot(
     intergalacticResearchNetworkLevel
   );
   const botDifficultyMultiplier = resolveBotDifficultyMultiplier(owner, difficultyConfig);
+  const buildingRepairPower = Math.max(0, Math.floor(
+    roboticsPower
+    * naniteMultiplier
+    * industryModifier
+    * adaptiveIndustryMultiplier
+    * botDifficultyMultiplier
+  ));
   const industryPower = Math.max(0, Math.floor(
     roboticsPower
     * naniteMultiplier
@@ -274,6 +282,7 @@ function createPlanetTurnSnapshot(
     crystalCapacity: planet.getBuildingProductionValue1(BuildingType.CRYSTAL_STORAGE),
     deuteriumCapacity: planet.getBuildingProductionValue1(BuildingType.DEUTERIUM_TANK),
     industryPower,
+    buildingRepairPower,
     droneIndustryPower,
     totalIndustryPower: industryPower + droneIndustryPower,
     shipyardPower: Math.max(0, Math.floor(
@@ -1049,7 +1058,7 @@ function resolveShipRepairs(
       defenceDamagePresent
     );
     const industryRepairSplit = splitIndustryRepairBudget(
-      Math.max(0, Math.floor(snapshot.industryPower)),
+      Math.max(0, Math.floor(snapshot.buildingRepairPower)),
       buildingDamagePresent,
       defenceDamagePresent
     );
