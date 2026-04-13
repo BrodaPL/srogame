@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
+import { BuildingType } from '../../enums/building-type';
 import { PlayerType } from '../../enums/player-type';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
 import { FleetState } from '../../fleets/fleet';
@@ -26,6 +27,53 @@ function manyShips(...entries: Array<{ type: ShipType; amount: number }>): ManyS
 }
 
 describe('resolvePhaseOneTurn colonize integration', () => {
+  it('seeds basic colony buildings after colonizing an unowned planet', () => {
+    const system = new SolarSystem('Colonize Seed', 2, false, false, { x: 3, y: 3 }, new Set<number>(), new Map());
+    const originPlanet = system.planets[0];
+    const targetPlanet = system.planets[1];
+
+    originPlanet.basicInfo.name = 'Alpha Prime';
+    originPlanet.info.ownerId = 1;
+    targetPlanet.basicInfo.name = 'New Colony';
+    targetPlanet.info.ownerId = null;
+
+    const player = new Player(1, 'Alpha', [originPlanet], new Map(), [], PlayerType.PLAYER);
+    const fleet = new Fleet(
+      10,
+      1,
+      FleetMissionType.COLONIZE,
+      point(3, 3, 0),
+      point(3, 3, 1),
+      'Alpha Prime',
+      'New Colony',
+      manyShips({ type: ShipType.COLONIZER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      1000,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const galaxy = new Galaxy('Colonize Seed Galaxy', [player], [[system]], 1, [fleet], 1);
+    galaxy.humanPlayerMap.set(player.playerId, player);
+    galaxy.playerNameMap.set(player.playerName, player.playerId);
+
+    resolvePhaseOneTurn(galaxy, 2);
+
+    expect(targetPlanet.info.ownerId).toBe(player.playerId);
+    expect(targetPlanet.getBuildingLevel(BuildingType.NUCLEAR_PLANT)).toBe(1);
+    expect(targetPlanet.getBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL)).toBe(1);
+    expect(targetPlanet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY)).toBe(1);
+    expect(targetPlanet.getBuildingLevel(BuildingType.METAL_STORAGE)).toBe(1);
+    expect(targetPlanet.getBuildingLevel(BuildingType.CRYSTAL_STORAGE)).toBe(1);
+    expect(targetPlanet.getBuildingLevel(BuildingType.DEUTERIUM_TANK)).toBe(1);
+    expect(targetPlanet.getBuildingLevel(BuildingType.METAL_MINE)).toBe(1);
+    expect(targetPlanet.getBuildingLevel(BuildingType.CRYSTAL_MINE)).toBe(1);
+  });
+
   it('lets Colonize reclaim a passive neutral planet and removes the temporary neutral owner', () => {
     const system = new SolarSystem('Colonize Test', 2, false, false, { x: 4, y: 4 }, new Set<number>(), new Map());
     const originPlanet = system.planets[0];
@@ -76,6 +124,14 @@ describe('resolvePhaseOneTurn colonize integration', () => {
     expect(galaxy.players.some((candidate) => candidate.playerId === neutralOwner.playerId)).toBe(false);
     expect(galaxy.neutralPlayerMap.has(neutralOwner.playerId)).toBe(false);
     expect(galaxy.diplomaticRelations).toHaveLength(0);
+    expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.NUCLEAR_PLANT)).toBe(1);
+    expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL)).toBe(1);
+    expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY)).toBe(1);
+    expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.METAL_STORAGE)).toBe(1);
+    expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.CRYSTAL_STORAGE)).toBe(1);
+    expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.DEUTERIUM_TANK)).toBe(1);
+    expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.METAL_MINE)).toBe(1);
+    expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.CRYSTAL_MINE)).toBe(1);
     expect(ManyShips.undamagedCountByType(passiveNeutralPlanet.rBDSFTQ.ships).get(ShipType.COLONIZER) ?? 0).toBe(1);
     expect(ManyShips.undamagedCountByType(passiveNeutralPlanet.rBDSFTQ.ships).get(ShipType.FIGHTER) ?? 0).toBe(2);
     expect(passiveNeutralPlanet.rBDSFTQ.resources.metal).toBe(350);

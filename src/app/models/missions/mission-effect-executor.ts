@@ -1,4 +1,5 @@
 import { EspionageReportGenerator } from '../../generators/espionage-report-generator';
+import { BuildingType } from '../enums/building-type';
 import { ShipType } from '../enums/ship-type';
 import { ManyShips } from '../fleets/many-ships';
 import { ResourcesPack } from '../resources-pack';
@@ -21,6 +22,20 @@ export type MissionEffectExecutionContext = {
 };
 
 export class MissionEffectExecutor {
+  private static readonly COLONY_STARTING_BUILDING_LEVELS: ReadonlyArray<{
+    type: BuildingType;
+    level: number;
+  }> = [
+    { type: BuildingType.NUCLEAR_PLANT, level: 1 },
+    { type: BuildingType.SOLAR_WIND_GEOTHERMAL, level: 1 },
+    { type: BuildingType.ROBOTICS_FACTORY, level: 1 },
+    { type: BuildingType.METAL_STORAGE, level: 1 },
+    { type: BuildingType.CRYSTAL_STORAGE, level: 1 },
+    { type: BuildingType.DEUTERIUM_TANK, level: 1 },
+    { type: BuildingType.METAL_MINE, level: 1 },
+    { type: BuildingType.CRYSTAL_MINE, level: 1 }
+  ];
+
   public execute(
     context: MissionEffectExecutionContext,
     resolution: MissionResolutionResult
@@ -46,6 +61,7 @@ export class MissionEffectExecutor {
       case 'colonizeTargetPlanet':
         if (context.owner && context.targetPlanet) {
           claimPlanetForPlayer(context.galaxy, context.targetPlanet, context.owner);
+          this.applyColonyStartingBuildings(context.targetPlanet);
         }
         break;
       case 'mergeFleetToPlanet':
@@ -142,5 +158,15 @@ export class MissionEffectExecutor {
       context.fleet.totalCargoCapacity,
       context.fleet.usedCargoCapacity + collected.getTotalResourceAmount()
     );
+  }
+
+  private applyColonyStartingBuildings(planet: Planet): void {
+    for (const entry of MissionEffectExecutor.COLONY_STARTING_BUILDING_LEVELS) {
+      if (planet.getBuildingLevel(entry.type) >= entry.level) {
+        continue;
+      }
+
+      planet.setBuildingLevel(entry.type, entry.level);
+    }
   }
 }
