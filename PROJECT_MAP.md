@@ -316,10 +316,17 @@ Galaxy and planet reads:
 Planet/system mutations:
 - `/api/game/star-system-note`
 - `/api/game/power-consumption`
+- `/api/game/fusion-reactor-stage`
 - `/api/game/abandon-planet`
 - `/api/game/sensor-phalanx/capabilities`
 - `/api/game/sensor-phalanx/scan`
 - `/api/game/trade-port/use-offer`
+
+Planet power-operation note:
+- `/api/game/power-consumption` still owns the normal electrical-load throttling for buildings that consume power
+- `/api/game/fusion-reactor-stage` now owns the Fusion Reactor operating-stage selection separately because Fusion trades power output against deuterium upkeep instead of electrical consumption
+- `ClientPlanetDto.objects.fusionReactorStage` carries the selected Fusion stage to the client, while the effective stage/output/upkeep are derived from the shared domain model at read time
+- `src/app/models/planets/fusion-reactor-operation.ts` owns the shared selected-stage -> effective-stage clamp against gross deuterium income, and `server/src/game-save.ts` persists the selected stage in save payloads
 
 Queues and production:
 - `/api/game/building-queue`
@@ -752,8 +759,20 @@ Change Jump Gate travel and approval flow:
 
 Change turn resolution:
 - `src/app/models/turns/phase-one-turn-resolver.ts`
+- `src/app/models/planets/fusion-reactor-operation.ts` when Fusion output/upkeep rules or deuterium-income clamping change
+- `src/app/models/planets/planet.ts` when stored Fusion stage state or planet-side net deuterium helpers change
 - supporting helpers in `battles/`, `repairs/`, `recycling/`, `missions/encounters/`
 - tests in `src/app/models/turns/tests/`
+
+Change building power / Fusion Reactor operating rules:
+- `src/app/models/planets/fusion-reactor-operation.ts`
+- `src/app/models/planets/planet.ts`
+- `src/app/models/game-api-types.ts`
+- `src/app/core/game-api.service.ts`
+- `server/src/index.ts`
+- `server/src/game-save.ts`
+- `src/app/game/planet-view/`
+- read-only parity surfaces in `src/app/game/buildings-view/`, `src/app/game/production-view/`, `src/app/game/researches-view/`, and `src/app/game/imperium-view/`
 
 Change battles:
 - `src/app/models/battles/space-battle-resolver.ts`

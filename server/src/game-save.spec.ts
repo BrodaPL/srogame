@@ -69,6 +69,7 @@ describe('game-save', () => {
     expect(save.galaxy.stars[0][0].planets[0].rBDSFTQ.fleetIds).toEqual([7]);
     expect(save.galaxy.stars[0][0].planets[0].lastReportData[0].report.reportType).toBe('Espionage Report');
     expect(save.galaxy.activeFleets[0].bombardmentPriorities?.main).toBe(BuildingType.METAL_MINE);
+    expect(save.galaxy.stars[0][0].planets[0].rBDSFTQ.fusionReactorSelectedStage).toBe(1);
 
     const json = JSON.stringify(save);
     expect(json).toContain('"ownerAccountId":42');
@@ -146,6 +147,7 @@ describe('game-save', () => {
     expect(planet.lastReportData.get(player.playerId)?.reportType).toBe('Espionage Report');
     expect(planet.rBDSFTQ.currentResearchQueue?.technologyType).toBe(TechnologyType.COMPUTER_TECHNOLOGY);
     expect(planet.rBDSFTQ.researchHelperFor?.mainResearchCoordinates).toEqual({ x: 0, y: 0, z: 0 });
+    expect(planet.getFusionReactorSelectedStage()).toBe(1);
     expect(fleet.origin.x).toBe(0);
     expect(fleet.pendingJumpGateRequestId).toBe(13);
     expect(fleet.bombardmentPriorities?.main).toBe(BuildingType.METAL_MINE);
@@ -309,7 +311,9 @@ function buildTestSave() {
   planet.rBDSFTQ.resources = new ResourcesPack(123, 45, 6);
   planet.rBDSFTQ.spaceDebris = new ResourcesPack(7, 8, 9);
   planet.rBDSFTQ.buildingsLevels.set(BuildingType.METAL_MINE, 4);
+  planet.rBDSFTQ.buildingsLevels.set(BuildingType.FUSION_REACTOR, 2);
   planet.rBDSFTQ.buildingsCurrentPowerConsumption.set(BuildingType.METAL_MINE, 12);
+  planet.rBDSFTQ.fusionReactorSelectedStage = 1;
   planet.rBDSFTQ.buildingsCurrentStructuralPoints.set(BuildingType.METAL_MINE, 99);
   planet.rBDSFTQ.ships = new ManyShips({ [ShipType.FIGHTER]: 3 }, [{ type: ShipType.CRUISER, hull: 55 }]);
   planet.rBDSFTQ.defences = new ManyDefences(

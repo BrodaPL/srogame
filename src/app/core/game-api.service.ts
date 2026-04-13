@@ -24,6 +24,8 @@ import {
   StarSystemNoteDto,
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
+  SetFusionReactorStageRequest,
+  SetFusionReactorStageResponse,
   StartBuildingConstructionRequest,
   ReorderBuildingQueueRequest,
   CancelBuildingQueueEntryRequest,
@@ -439,6 +441,14 @@ export class GameApiService {
   public setBuildingPowerConsumption(request: SetBuildingPowerConsumptionRequest, token: string) {
     return this.http.post<SetBuildingPowerConsumptionResponse>(
       `${API_BASE_URL}/game/power-consumption`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public setFusionReactorStage(request: SetFusionReactorStageRequest, token: string) {
+    return this.http.post<SetFusionReactorStageResponse>(
+      `${API_BASE_URL}/game/fusion-reactor-stage`,
       request,
       { headers: this.authHeaders(token) }
     );

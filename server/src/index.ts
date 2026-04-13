@@ -214,6 +214,7 @@ import type {
   BuildingLevelEntry,
   BuildingPowerConsumptionEntry,
   BuildingStructuralPointsEntry,
+  FusionReactorStageEntry,
   TechLevelEntry,
   ShipAmountEntry,
   CreateFleetShipSelectionEntry,
@@ -231,6 +232,8 @@ import type {
   UpdateBotProfileRequest,
   SetBuildingPowerConsumptionRequest,
   SetBuildingPowerConsumptionResponse,
+  SetFusionReactorStageRequest,
+  SetFusionReactorStageResponse,
   StartBuildingConstructionRequest,
   ReorderBuildingQueueRequest,
   CancelBuildingQueueEntryRequest,
@@ -3412,6 +3415,56 @@ app.post('/api/game/power-consumption', (req, res) => {
   const response: SetBuildingPowerConsumptionResponse = {
     buildingType,
     currentPowerConsumption: updatedPowerConsumption
+  };
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/fusion-reactor-stage', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as SetFusionReactorStageRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const selectedStage = parseBodyNonNegativeInt(body?.selectedStage);
+
+  if (x === null || y === null || z === null || selectedStage === null) {
+    return res.status(400).json({ error: 'Invalid fusion reactor stage payload.' });
+  }
+
+  const system = currentGalaxy.stars[y]?.[x];
+  if (!system) {
+    return res.status(404).json({ error: 'Star system not found.' });
+  }
+
+  const planet = system.planets[z];
+  if (!planet) {
+    return res.status(404).json({ error: 'Planet not found.' });
+  }
+
+  if (planet.info.ownerId !== playerId) {
+    return res.status(403).json({ error: 'Only your own planets can be modified.' });
+  }
+
+  const maxStage = planet.getMaxFusionReactorStage();
+  if (selectedStage > maxStage) {
+    return res.status(400).json({ error: 'Invalid fusion reactor stage for current building level.' });
+  }
+
+  const response: SetFusionReactorStageResponse = {
+    selectedStage: planet.setFusionReactorSelectedStage(selectedStage)
   };
   return res.status(200).json(response);
 });
@@ -7129,6 +7182,16 @@ function toBuildingPowerConsumptionEntries(clientPlanet: ClientPlanet): Building
   return entries;
 }
 
+function toFusionReactorStageEntry(clientPlanet: ClientPlanet): FusionReactorStageEntry | null {
+  if (clientPlanet.getMaxFusionReactorStage() <= 0) {
+    return null;
+  }
+
+  return {
+    selectedStage: clientPlanet.getFusionReactorSelectedStage()
+  };
+}
+
 function toBuildingStructuralPointsEntries(clientPlanet: ClientPlanet): BuildingStructuralPointsEntry[] {
   const entries: BuildingStructuralPointsEntry[] = [];
   for (const [type] of clientPlanet.rBDSFTQ.buildingsLevels.entries()) {
@@ -7260,6 +7323,7 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       resources: toResourcesPackDto(clientPlanet.rBDSFTQ.resources),
       buildingsLevels: toBuildingLevelEntries(clientPlanet.rBDSFTQ.buildingsLevels),
       buildingsCurrentPowerConsumption: toBuildingPowerConsumptionEntries(clientPlanet),
+      fusionReactorStage: toFusionReactorStageEntry(clientPlanet),
       buildingsCurrentStructuralPoints: toBuildingStructuralPointsEntries(clientPlanet),
       defences: clientPlanet.rBDSFTQ.defences,
       ships: clientPlanet.rBDSFTQ.ships,

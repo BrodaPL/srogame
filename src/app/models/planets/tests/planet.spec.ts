@@ -49,6 +49,7 @@ describe('Planet', () => {
         new ResourcesPack(0, 0, 0),
         new Map(),
         new Map(),
+        null,
         new Map(),
         ManyDefences.empty(),
         ManyShips.empty(),
@@ -106,6 +107,23 @@ describe('Planet', () => {
     expect(metalGain).toBe(Math.floor(90 * multiplier * 1.2));
     expect(crystalGain).toBe(Math.floor(40 * multiplier * 0.8));
     expect(deuteriumGain).toBe(Math.floor(40 * multiplier * 1.1));
+  });
+
+  it('clamps fusion reactor effective stage by gross deuterium income while keeping the selected stage', () => {
+    const planet = createPlanet({ deuteriumModifier: 0.1 });
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 10);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+    planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 4);
+
+    const operation = planet.resolveFusionReactorOperation(0, 0);
+
+    expect(planet.getFusionReactorSelectedStage()).toBe(4);
+    expect(operation.selectedStage).toBe(4);
+    expect(operation.effectiveStage).toBe(3);
+    expect(operation.deuteriumUpkeep).toBe(6);
+    expect(operation.grossDeuteriumIncome).toBe(6);
+    expect(operation.netDeuteriumIncome).toBe(0);
+    expect(operation.isClamped).toBe(true);
   });
 
   it('scales building production by current power utilization and floors results', () => {

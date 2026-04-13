@@ -18,6 +18,7 @@ import type {
   StartBuildingConstructionRequest
 } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
+import { resolveFusionReactorOperation, type FusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
@@ -637,6 +638,7 @@ export class BuildingsViewComponent implements OnInit {
     const adaptiveTechLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const resources = planet.objects.resources;
     const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+    const fusionOperation = this.currentFusionReactorOperation();
     const energyEfficiency = energyDeficitEfficiencyMultiplier(energy.available, energy.used);
 
     const metalCapacity = this.storageCapacity(BuildingType.METAL_STORAGE);
@@ -655,7 +657,7 @@ export class BuildingsViewComponent implements OnInit {
     };
     this.deuteriumDisplay = {
       current: resources.deuterium,
-      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.DEUTERIUM_SYNTHESIZER, adaptiveTechLevel, planet.info.planetaryParameters.deuteriumModifier) * energyEfficiency, 2),
+      productionPerTurn: this.roundNumber(fusionOperation.netDeuteriumIncome, 2),
       capacityPercent: this.capacityPercent(resources.deuterium, deuteriumCapacity)
     };
 
@@ -699,10 +701,7 @@ export class BuildingsViewComponent implements OnInit {
       BuildingType.NUCLEAR_PLANT,
       levels.get(BuildingType.NUCLEAR_PLANT) ?? 0
     );
-    const fusionProduction = this.getProductionAtLevelByType(
-      BuildingType.FUSION_REACTOR,
-      levels.get(BuildingType.FUSION_REACTOR) ?? 0
-    );
+    const fusionProduction = this.resolveFusionReactorOperationForCurrentState(levels, currentPowerByType).powerOutput;
 
     const parameters = this.selectedPlanet()?.info.planetaryParameters;
     const energyModifierRES = parameters?.energyModifierRES ?? 1;
@@ -774,6 +773,97 @@ export class BuildingsViewComponent implements OnInit {
 
   private currentTotalIndustryPower(): number {
     return this.currentIndustryPower() + this.currentDroneIndustryPower();
+  }
+
+  private currentFusionReactorSelectedStage(): number {
+    const level = this.buildingLevel(BuildingType.FUSION_REACTOR);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const stored = this.selectedPlanet()?.objects.fusionReactorStage?.selectedStage;
+    if (stored === null || stored === undefined || !Number.isFinite(stored)) {
+      return level;
+    }
+
+    return Math.min(level, Math.max(0, Math.floor(stored)));
+  }
+
+  private currentFusionReactorOperation(): FusionReactorOperation {
+    return this.resolveFusionReactorOperationForCurrentState(
+      this.buildingLevelsByType,
+      this.buildingCurrentPowerByType
+    );
+  }
+
+  private resolveFusionReactorOperationForCurrentState(
+    levels: Map<BuildingType, number>,
+    currentPowerByType: Map<BuildingType, number>
+  ): FusionReactorOperation {
+    const fusionLevel = levels.get(BuildingType.FUSION_REACTOR) ?? 0;
+    if (fusionLevel <= 0) {
+      return resolveFusionReactorOperation({
+        selectedStage: 0,
+        maxStage: 0,
+        structuralUtilization: 0,
+        energyTechnologyLevel: this.techLevel(TechnologyType.ENERGY_TECHNOLOGY),
+        adaptiveTechnologyLevel: this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
+        solarProduction: 0,
+        nuclearProduction: 0,
+        otherEnergyUsed: 0,
+        energyModifierRES: this.selectedPlanet()?.info.planetaryParameters.energyModifierRES ?? 1,
+        energyModifierNuclear: this.selectedPlanet()?.info.planetaryParameters.energyModifierNuclear ?? 1,
+        deuteriumSynthesizerProduction: 0,
+        deuteriumModifier: this.selectedPlanet()?.info.planetaryParameters.deuteriumModifier ?? 1,
+        fusionPowerAtStage: () => 0,
+        fusionDeuteriumAtStage: () => 0
+      });
+    }
+
+    let otherEnergyUsed = 0;
+    for (const [buildingType, level] of levels.entries()) {
+      if (buildingType === BuildingType.FUSION_REACTOR || level <= 0) {
+        continue;
+      }
+
+      const blueprint = this.buildingBlueprintsByType.get(buildingType);
+      if (!blueprint) {
+        continue;
+      }
+
+      const maxConsumption = Math.max(0, level * (blueprint.powerConsumption ?? 0));
+      const selectedConsumption = currentPowerByType.get(buildingType);
+      const normalizedConsumption = selectedConsumption === undefined
+        ? maxConsumption
+        : Math.min(maxConsumption, Math.max(0, selectedConsumption));
+      otherEnergyUsed += normalizedConsumption;
+    }
+
+    return resolveFusionReactorOperation({
+      selectedStage: this.currentFusionReactorSelectedStage(),
+      maxStage: fusionLevel,
+      structuralUtilization: this.structuralUtilizationAtLevel(BuildingType.FUSION_REACTOR, fusionLevel),
+      energyTechnologyLevel: this.techLevel(TechnologyType.ENERGY_TECHNOLOGY),
+      adaptiveTechnologyLevel: this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
+      solarProduction: this.getProductionAtLevelByType(
+        BuildingType.SOLAR_WIND_GEOTHERMAL,
+        levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0
+      ),
+      nuclearProduction: this.getProductionAtLevelByType(
+        BuildingType.NUCLEAR_PLANT,
+        levels.get(BuildingType.NUCLEAR_PLANT) ?? 0
+      ),
+      otherEnergyUsed,
+      energyModifierRES: this.selectedPlanet()?.info.planetaryParameters.energyModifierRES ?? 1,
+      energyModifierNuclear: this.selectedPlanet()?.info.planetaryParameters.energyModifierNuclear ?? 1,
+      deuteriumSynthesizerProduction: this.getProductionAtLevelByType(
+        BuildingType.DEUTERIUM_SYNTHESIZER,
+        levels.get(BuildingType.DEUTERIUM_SYNTHESIZER) ?? 0
+      ),
+      deuteriumModifier: this.selectedPlanet()?.info.planetaryParameters.deuteriumModifier ?? 1,
+      fusionPowerAtStage: (stage) => this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
+      fusionDeuteriumAtStage: (stage) => this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2')
+    });
   }
 
   private currentShipyardPower(): number {
@@ -852,6 +942,9 @@ export class BuildingsViewComponent implements OnInit {
     const currentLevel = this.buildingLevel(building.type);
     const maxPower = this.maxBuildingPowerConsumption(building.type);
     const currentPower = this.buildingCurrentPowerByType.get(building.type) ?? maxPower;
+    const fusionOperation = building.type === BuildingType.FUSION_REACTOR
+      ? this.currentFusionReactorOperation()
+      : null;
     const summaryRows: PlanetObjectDetailRow[] = [
       {
         label: 'Category',
@@ -874,7 +967,18 @@ export class BuildingsViewComponent implements OnInit {
       });
     }
 
-    if (building.powerConsumption > 0) {
+    if (fusionOperation) {
+      summaryRows.push(
+        {
+          label: 'Selected stage',
+          value: String(fusionOperation.selectedStage)
+        },
+        {
+          label: 'Deuterium upkeep',
+          value: String(fusionOperation.deuteriumUpkeep)
+        }
+      );
+    } else if (building.powerConsumption > 0) {
       summaryRows.push({
         label: 'Power per level',
         value: String(building.powerConsumption)
@@ -923,7 +1027,23 @@ export class BuildingsViewComponent implements OnInit {
         }
       );
 
-      if (maxPower > 0) {
+      if (fusionOperation) {
+        stateRows.push(
+          {
+            label: 'Effective stage',
+            value: String(fusionOperation.effectiveStage),
+            tone: fusionOperation.isClamped ? 'warn' : 'default'
+          },
+          {
+            label: 'Gross deuterium income',
+            value: String(fusionOperation.grossDeuteriumIncome)
+          },
+          {
+            label: 'Net deuterium income',
+            value: String(fusionOperation.netDeuteriumIncome)
+          }
+        );
+      } else if (maxPower > 0) {
         stateRows.push({
           label: 'Power usage',
           value: `${currentPower} / ${maxPower}`,
@@ -1129,6 +1249,10 @@ export class BuildingsViewComponent implements OnInit {
   }
 
   private currentBuildingDetailProduction(building: Building): number {
+    if (building.type === BuildingType.FUSION_REACTOR) {
+      return this.currentFusionReactorOperation().powerOutput;
+    }
+
     return this.detailProductionAtLevel(building, this.buildingLevel(building.type));
   }
 
@@ -1138,6 +1262,24 @@ export class BuildingsViewComponent implements OnInit {
     }
 
     const value = building.production1[level - 1];
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  private getRawBuildingProductionAtStage(
+    buildingType: BuildingType,
+    stage: number,
+    key: 'production1' | 'production2'
+  ): number {
+    if (stage <= 0) {
+      return 0;
+    }
+
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const value = blueprint[key][stage - 1];
     return Number.isFinite(value) ? value : 0;
   }
 

@@ -165,9 +165,15 @@
                     <p class="planet-building-card__meta">
                       Structural efficiency: {{ buildingStructuralUtilizationPercent(building) }}% (Floor {{ buildingMinimumStructuralUtilizationPercent(building) }}%)
                     </p>
-                    <p class="planet-building-card__meta">
-                      Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
-                    </p>
+                    @if (building.type === BuildingType.FUSION_REACTOR) {
+                      <p class="planet-building-card__meta">
+                        Fusion stage: {{ selectedFusionReactorStage(building) }} (effective {{ effectiveFusionReactorStage(building) }})
+                      </p>
+                    } @else {
+                      <p class="planet-building-card__meta">
+                        Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
+                      </p>
+                    }
                   }
                   @if (shouldShowPowerManagement(building)) {
                     <label class="planet-building-card__power-management">
@@ -183,6 +189,27 @@
                         }
                       </select>
                     </label>
+                    @if (powerManagementError(building); as error) {
+                      <p class="planet-building-card__power-error">{{ error }}</p>
+                    }
+                  }
+                  @if (shouldShowFusionReactorManagement(building)) {
+                    <label class="planet-building-card__power-management">
+                      <span>Current deuterium stage:</span>
+                      <select
+                        class="planet-building-card__power-select"
+                        [disabled]="isFusionReactorManagementDisabled(building)"
+                        [ngModel]="selectedFusionReactorStage(building)"
+                        (ngModelChange)="onFusionReactorStageChange(building, $event)"
+                      >
+                        @for (option of fusionReactorStageOptions(building); track option) {
+                          <option [ngValue]="option">{{ option }}</option>
+                        }
+                      </select>
+                    </label>
+                    @if (fusionReactorStageWarning(building); as warning) {
+                      <p class="planet-building-card__power-error">{{ warning }}</p>
+                    }
                     @if (powerManagementError(building); as error) {
                       <p class="planet-building-card__power-error">{{ error }}</p>
                     }
@@ -256,9 +283,15 @@
                     <p class="planet-building-card__meta">
                       Structural efficiency: {{ buildingStructuralUtilizationPercent(building) }}% (Floor {{ buildingMinimumStructuralUtilizationPercent(building) }}%)
                     </p>
-                    <p class="planet-building-card__meta">
-                      Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
-                    </p>
+                    @if (building.type === BuildingType.FUSION_REACTOR) {
+                      <p class="planet-building-card__meta">
+                        Fusion stage: {{ selectedFusionReactorStage(building) }} (effective {{ effectiveFusionReactorStage(building) }})
+                      </p>
+                    } @else {
+                      <p class="planet-building-card__meta">
+                        Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
+                      </p>
+                    }
                   }
                   @if (shouldShowPowerManagement(building)) {
                     <label class="planet-building-card__power-management">
@@ -274,6 +307,27 @@
                         }
                       </select>
                     </label>
+                    @if (powerManagementError(building); as error) {
+                      <p class="planet-building-card__power-error">{{ error }}</p>
+                    }
+                  }
+                  @if (shouldShowFusionReactorManagement(building)) {
+                    <label class="planet-building-card__power-management">
+                      <span>Current deuterium stage:</span>
+                      <select
+                        class="planet-building-card__power-select"
+                        [disabled]="isFusionReactorManagementDisabled(building)"
+                        [ngModel]="selectedFusionReactorStage(building)"
+                        (ngModelChange)="onFusionReactorStageChange(building, $event)"
+                      >
+                        @for (option of fusionReactorStageOptions(building); track option) {
+                          <option [ngValue]="option">{{ option }}</option>
+                        }
+                      </select>
+                    </label>
+                    @if (fusionReactorStageWarning(building); as warning) {
+                      <p class="planet-building-card__power-error">{{ warning }}</p>
+                    }
                     @if (powerManagementError(building); as error) {
                       <p class="planet-building-card__power-error">{{ error }}</p>
                     }

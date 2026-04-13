@@ -37,6 +37,7 @@ describe('EspionageReportGenerator', () => {
         [BuildingType.SHIPYARD, 2]
       ]),
       new Map<BuildingType, number>(),
+      null,
       new Map<BuildingType, number>(),
       ManyDefences.fromData({
         undamagedDefencesCount: {

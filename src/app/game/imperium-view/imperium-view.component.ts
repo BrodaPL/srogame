@@ -21,6 +21,7 @@ import type {
   TechnologyQueueEntryDto
 } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
+import { resolveFusionReactorOperation, type FusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
@@ -736,10 +737,7 @@ export class ImperiumViewComponent implements OnInit {
       * energyEfficiency
     );
     const deuterium = Math.floor(
-      this.currentBuildingProduction(planet, BuildingType.DEUTERIUM_SYNTHESIZER)
-      * adaptiveMultiplier
-      * planetaryParameters.deuteriumModifier
-      * energyEfficiency
+      this.resolveFusionReactorOperationForPlanet(planet, techLevels).netDeuteriumIncome
     );
 
     return { metal, crystal, deuterium };
@@ -754,7 +752,7 @@ export class ImperiumViewComponent implements OnInit {
 
     const solarProduction = this.currentBuildingProduction(planet, BuildingType.SOLAR_WIND_GEOTHERMAL);
     const nuclearProduction = this.currentBuildingProduction(planet, BuildingType.NUCLEAR_PLANT);
-    const fusionProduction = this.currentBuildingProduction(planet, BuildingType.FUSION_REACTOR);
+    const fusionProduction = this.resolveFusionReactorOperationForPlanet(planet, techLevels).powerOutput;
 
     const available = (
       (solarProduction * planetaryParameters.energyModifierRES)
@@ -847,6 +845,10 @@ export class ImperiumViewComponent implements OnInit {
   }
 
   private currentBuildingProduction(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    if (buildingType === BuildingType.FUSION_REACTOR) {
+      return this.resolveFusionReactorOperationForPlanet(planet, this.extractGlobalTechLevels([planet])).powerOutput;
+    }
+
     const blueprint = this.buildingByType.get(buildingType);
     const level = this.buildingLevel(planet, buildingType);
     if (!blueprint || level <= 0) {
@@ -862,6 +864,10 @@ export class ImperiumViewComponent implements OnInit {
   }
 
   private currentBuildingProductionExact(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    if (buildingType === BuildingType.FUSION_REACTOR) {
+      return this.resolveFusionReactorOperationForPlanet(planet, this.extractGlobalTechLevels([planet])).powerOutput;
+    }
+
     const blueprint = this.buildingByType.get(buildingType);
     const level = this.buildingLevel(planet, buildingType);
     if (!blueprint || level <= 0) {
@@ -1040,6 +1046,119 @@ export class ImperiumViewComponent implements OnInit {
         && coordinates.y === planet.coordinates.y
         && coordinates.z === planet.coordinates.z;
     });
+  }
+
+  private resolveFusionReactorOperationForPlanet(
+    planet: ClientPlanetDto,
+    techLevels: Map<TechnologyType, number>
+  ): FusionReactorOperation {
+    const fusionLevel = this.buildingLevel(planet, BuildingType.FUSION_REACTOR);
+    if (fusionLevel <= 0) {
+      return resolveFusionReactorOperation({
+        selectedStage: 0,
+        maxStage: 0,
+        structuralUtilization: 0,
+        energyTechnologyLevel: techLevels.get(TechnologyType.ENERGY_TECHNOLOGY) ?? 0,
+        adaptiveTechnologyLevel: techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? 0,
+        solarProduction: 0,
+        nuclearProduction: 0,
+        otherEnergyUsed: 0,
+        energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
+        energyModifierNuclear: planet.info.planetaryParameters.energyModifierNuclear,
+        deuteriumSynthesizerProduction: 0,
+        deuteriumModifier: planet.info.planetaryParameters.deuteriumModifier,
+        fusionPowerAtStage: () => 0,
+        fusionDeuteriumAtStage: () => 0
+      });
+    }
+
+    let otherEnergyUsed = 0;
+    for (const entry of planet.objects.buildingsLevels) {
+      const buildingType = entry.type as BuildingType;
+      if (entry.level <= 0 || buildingType === BuildingType.FUSION_REACTOR) {
+        continue;
+      }
+
+      otherEnergyUsed += this.currentPowerConsumption(planet, buildingType);
+    }
+
+    return resolveFusionReactorOperation({
+      selectedStage: this.selectedFusionReactorStage(planet),
+      maxStage: fusionLevel,
+      structuralUtilization: this.structuralUtilization(planet, BuildingType.FUSION_REACTOR),
+      energyTechnologyLevel: techLevels.get(TechnologyType.ENERGY_TECHNOLOGY) ?? 0,
+      adaptiveTechnologyLevel: techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? 0,
+      solarProduction: this.baseEffectiveBuildingProduction(planet, BuildingType.SOLAR_WIND_GEOTHERMAL),
+      nuclearProduction: this.baseEffectiveBuildingProduction(planet, BuildingType.NUCLEAR_PLANT),
+      otherEnergyUsed,
+      energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
+      energyModifierNuclear: planet.info.planetaryParameters.energyModifierNuclear,
+      deuteriumSynthesizerProduction: this.baseEffectiveBuildingProduction(planet, BuildingType.DEUTERIUM_SYNTHESIZER),
+      deuteriumModifier: planet.info.planetaryParameters.deuteriumModifier,
+      fusionPowerAtStage: (stage) => this.rawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
+      fusionDeuteriumAtStage: (stage) => this.rawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2')
+    });
+  }
+
+  private selectedFusionReactorStage(planet: ClientPlanetDto): number {
+    const level = this.buildingLevel(planet, BuildingType.FUSION_REACTOR);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const stored = planet.objects.fusionReactorStage?.selectedStage;
+    if (stored === null || stored === undefined || !Number.isFinite(stored)) {
+      return level;
+    }
+
+    return Math.min(level, Math.max(0, Math.floor(stored)));
+  }
+
+  private rawBuildingProductionAtStage(
+    buildingType: BuildingType,
+    stage: number,
+    key: 'production1' | 'production2'
+  ): number {
+    if (stage <= 0) {
+      return 0;
+    }
+
+    const blueprint = this.buildingByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const value = blueprint[key][stage - 1];
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  private baseEffectiveBuildingProduction(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    const blueprint = this.buildingByType.get(buildingType);
+    const level = this.buildingLevel(planet, buildingType);
+    if (!blueprint || level <= 0) {
+      return 0;
+    }
+
+    const rawProduction = blueprint.production1[level - 1];
+    if (!Number.isFinite(rawProduction) || rawProduction <= 0) {
+      return 0;
+    }
+
+    return Math.floor(rawProduction * this.powerUtilization(planet, buildingType));
+  }
+
+  private structuralUtilization(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    const level = this.buildingLevel(planet, buildingType);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const structuralEntry = planet.objects.buildingsCurrentStructuralPoints.find((entry) => entry.type === buildingType);
+    if (!structuralEntry || structuralEntry.maxStructuralPoints <= 0) {
+      return 1;
+    }
+
+    return Math.min(1, Math.max(0, structuralEntry.currentStructuralPoints / structuralEntry.maxStructuralPoints));
   }
 
   private buildingLevel(planet: ClientPlanetDto, buildingType: BuildingType): number {

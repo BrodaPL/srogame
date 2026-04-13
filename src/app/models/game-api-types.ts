@@ -709,6 +709,10 @@ export type BuildingPowerConsumptionEntry = {
   currentPowerConsumption: number;
 };
 
+export type FusionReactorStageEntry = {
+  selectedStage: number;
+};
+
 export type BuildingStructuralPointsEntry = {
   type: BuildingType;
   currentStructuralPoints: number;
@@ -958,6 +962,7 @@ export type ClientPlanetDto = {
     resources: ResourcesPackDto;
     buildingsLevels: BuildingLevelEntry[];
     buildingsCurrentPowerConsumption: BuildingPowerConsumptionEntry[];
+    fusionReactorStage?: FusionReactorStageEntry | null;
     buildingsCurrentStructuralPoints: BuildingStructuralPointsEntry[];
     defences: ManyDefencesDto;
     ships: ManyShipsDto;
@@ -1209,6 +1214,17 @@ export type SetBuildingPowerConsumptionRequest = {
 export type SetBuildingPowerConsumptionResponse = {
   buildingType: BuildingType;
   currentPowerConsumption: number;
+};
+
+export type SetFusionReactorStageRequest = {
+  x: number;
+  y: number;
+  z: number;
+  selectedStage: number;
+};
+
+export type SetFusionReactorStageResponse = {
+  selectedStage: number;
 };
 
 export type UseTradePortOfferRequest = {

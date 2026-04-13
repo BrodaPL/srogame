@@ -21,6 +21,7 @@ import {
   calculateSensorPhalanxScansPerTurn
 } from '../sensor-phalanx/sensor-phalanx';
 import type { TradePortOffer } from '../trade/trade-port-offer';
+import { resolveFusionReactorOperation, type FusionReactorOperation } from './fusion-reactor-operation';
 
 type ModifierKey = keyof Omit<PlanetaryParameters, 'copy'>;
 
@@ -59,6 +60,7 @@ export class rBDSFTQ {
     public resources: ResourcesPack,
     public buildingsLevels: Map<BuildingType, number>,
     public buildingsCurrentPowerConsumption: Map<BuildingType, number>,
+    public fusionReactorSelectedStage: number | null,
     public buildingsCurrentStructuralPoints: Map<BuildingType, number>,
     public defences: ManyDefences,
     public ships: ManyShips,
@@ -132,6 +134,7 @@ export class Planet {
         new ResourcesPack(0, 0, 0),
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
+        null,
         new Map<BuildingType, number>(),
         ManyDefences.empty(),
         ManyShips.empty(),
@@ -188,6 +191,7 @@ export class Planet {
         new ResourcesPack(0, 0, 0),
         new Map<BuildingType, number>(),
         new Map<BuildingType, number>(),
+        null,
         new Map<BuildingType, number>(),
         ManyDefences.empty(),
         ManyShips.empty(),
@@ -243,6 +247,7 @@ export class Planet {
 
     this.rBDSFTQ.buildingsLevels.set(type, normalized);
     this.normalizeCurrentPowerConsumption(type);
+    this.normalizeFusionReactorSelectedStage(type);
     this.normalizeCurrentStructuralPoints(type, previousLevel, previousMaxStructuralPoints);
     this.normalizeTerraformerSizeBonus(type, previousTerraformerSizeBonus, normalized);
   }
@@ -307,6 +312,69 @@ export class Planet {
     }
 
     return level * powerPerLevel;
+  }
+
+  public getFusionReactorSelectedStage(): number {
+    const maxStage = this.getMaxFusionReactorStage();
+    if (maxStage <= 0) {
+      return 0;
+    }
+
+    const stored = this.rBDSFTQ.fusionReactorSelectedStage;
+    if (stored === null || stored === undefined || !Number.isFinite(stored)) {
+      return maxStage;
+    }
+
+    return Math.min(maxStage, Math.max(0, Math.floor(stored)));
+  }
+
+  public setFusionReactorSelectedStage(stage: number): number {
+    const maxStage = this.getMaxFusionReactorStage();
+    if (maxStage <= 0) {
+      this.rBDSFTQ.fusionReactorSelectedStage = null;
+      return 0;
+    }
+
+    const normalizedStage = Number.isFinite(stage) ? Math.floor(stage) : maxStage;
+    const clamped = Math.min(maxStage, Math.max(0, normalizedStage));
+    this.rBDSFTQ.fusionReactorSelectedStage = clamped;
+    return clamped;
+  }
+
+  public getMaxFusionReactorStage(): number {
+    return Math.max(0, this.getBuildingLevel(BuildingType.FUSION_REACTOR));
+  }
+
+  public resolveFusionReactorOperation(
+    adaptiveTechnologyLevel: number,
+    energyTechnologyLevel: number
+  ): FusionReactorOperation {
+    const structuralUtilization = this.getBuildingStructuralUtilization(BuildingType.FUSION_REACTOR);
+    let otherEnergyUsed = 0;
+    for (const [buildingType, level] of this.rBDSFTQ.buildingsLevels.entries()) {
+      if (buildingType === BuildingType.FUSION_REACTOR || level <= 0) {
+        continue;
+      }
+
+      otherEnergyUsed += this.getCurrentBuildingPowerConsumption(buildingType);
+    }
+
+    return resolveFusionReactorOperation({
+      selectedStage: this.getFusionReactorSelectedStage(),
+      maxStage: this.getMaxFusionReactorStage(),
+      structuralUtilization,
+      energyTechnologyLevel,
+      adaptiveTechnologyLevel,
+      solarProduction: this.getBuildingProductionValue1(BuildingType.SOLAR_WIND_GEOTHERMAL),
+      nuclearProduction: this.getBuildingProductionValue1(BuildingType.NUCLEAR_PLANT),
+      otherEnergyUsed,
+      energyModifierRES: this.info.planetaryParameters.energyModifierRES,
+      energyModifierNuclear: this.info.planetaryParameters.energyModifierNuclear,
+      deuteriumSynthesizerProduction: this.getBuildingProductionValue1(BuildingType.DEUTERIUM_SYNTHESIZER),
+      deuteriumModifier: this.getEffectivePlanetaryParameters().deuteriumModifier,
+      fusionPowerAtStage: (stage) => this.getFusionReactorRawProductionValue1(stage),
+      fusionDeuteriumAtStage: (stage) => this.getFusionReactorRawProductionValue2(stage)
+    });
   }
 
   public getBuildingProductionValue1(type: BuildingType): number {
@@ -568,12 +636,16 @@ export class Planet {
     return Number.isFinite(gain) ? Math.floor(gain) : 0;
   }
 
-  public getDeuteriumGain(adaptiveTechnologyLevel: number): number {
+  public getGrossDeuteriumGain(adaptiveTechnologyLevel: number): number {
     const parameters = this.getEffectivePlanetaryParameters();
     const gain = this.getBuildingProductionValue1(BuildingType.DEUTERIUM_SYNTHESIZER)
       * Planet.adaptiveTechnologyMultiplier(adaptiveTechnologyLevel)
       * parameters.deuteriumModifier;
     return Number.isFinite(gain) ? Math.floor(gain) : 0;
+  }
+
+  public getDeuteriumGain(adaptiveTechnologyLevel: number): number {
+    return this.getGrossDeuteriumGain(adaptiveTechnologyLevel);
   }
 
   public getEffectivePlanetaryParameters(): PlanetaryParameters {
@@ -649,6 +721,34 @@ export class Planet {
     return Number.isFinite(production) ? production : 0;
   }
 
+  private getFusionReactorRawProductionValue1(stage: number): number {
+    return this.getRawBuildingStageProductionValue(BuildingType.FUSION_REACTOR, stage, 'production1');
+  }
+
+  private getFusionReactorRawProductionValue2(stage: number): number {
+    return this.getRawBuildingStageProductionValue(BuildingType.FUSION_REACTOR, stage, 'production2');
+  }
+
+  private getRawBuildingStageProductionValue(
+    type: BuildingType,
+    stage: number,
+    key: 'production1' | 'production2' | 'production3'
+  ): number {
+    const normalizedStage = Math.max(0, Math.floor(stage));
+    if (normalizedStage <= 0) {
+      return 0;
+    }
+
+    const blueprint = Planet.buildingBlueprints.get(type);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const values = blueprint[key];
+    const production = values[normalizedStage - 1];
+    return Number.isFinite(production) ? production : 0;
+  }
+
   private static adaptiveTechnologyMultiplier(adaptiveTechnologyLevel: number): number {
     const normalized = Number.isFinite(adaptiveTechnologyLevel)
       ? adaptiveTechnologyLevel
@@ -670,6 +770,26 @@ export class Planet {
     }
 
     this.rBDSFTQ.buildingsCurrentPowerConsumption.set(type, Math.min(max, Math.max(0, existing)));
+  }
+
+  private normalizeFusionReactorSelectedStage(type: BuildingType): void {
+    if (type !== BuildingType.FUSION_REACTOR) {
+      return;
+    }
+
+    const maxStage = this.getMaxFusionReactorStage();
+    if (maxStage <= 0) {
+      this.rBDSFTQ.fusionReactorSelectedStage = null;
+      return;
+    }
+
+    const existing = this.rBDSFTQ.fusionReactorSelectedStage;
+    if (existing === null || existing === undefined || !Number.isFinite(existing)) {
+      this.rBDSFTQ.fusionReactorSelectedStage = maxStage;
+      return;
+    }
+
+    this.rBDSFTQ.fusionReactorSelectedStage = Math.min(maxStage, Math.max(0, Math.floor(existing)));
   }
 
   private getBuildingQueueEntryRequiredIndustryPower(type: BuildingType, nextLevel: number): number {

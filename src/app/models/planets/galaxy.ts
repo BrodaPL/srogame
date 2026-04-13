@@ -100,6 +100,7 @@ export class Galaxy {
         new ResourcesPack(0, 0, 0),
         new Map(),
         new Map(),
+        null,
         new Map(),
         ManyDefences.empty(),
         ManyShips.empty(),

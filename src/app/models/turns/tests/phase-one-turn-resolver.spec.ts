@@ -986,6 +986,31 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(61);
   });
 
+  it('uses fusion reactor upkeep against turn income only and never spends stored deuterium', () => {
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        const homePlanet = solarSystem.planets[0];
+        homePlanet.info.ownerId = 1;
+        homePlanet.info.planetaryParameters.deuteriumModifier = 0.1;
+        homePlanet.info.planetaryParameters.energyModifierRES = 1;
+        homePlanet.info.planetaryParameters.energyModifierNuclear = 1;
+        homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 100);
+        homePlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 10);
+        homePlanet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+        homePlanet.setBuildingLevel(BuildingType.FUSION_REACTOR, 4);
+        homePlanet.setFusionReactorSelectedStage(4);
+      },
+      (solarSystem) => ([new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER)])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(system.planets[0].getFusionReactorSelectedStage()).toBe(4);
+    expect(system.planets[0].resolveFusionReactorOperation(0, 0).effectiveStage).toBe(3);
+    expect(system.planets[0].rBDSFTQ.resources.deuterium).toBe(100);
+  });
+
   it('prioritizes non-small damaged ships for strong repair equipment', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
 

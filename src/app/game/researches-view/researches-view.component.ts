@@ -14,12 +14,14 @@ import { TechnologyType } from '../../models/enums/technology-type';
 import type {
   BuildingLevelEntry,
   BuildingPowerConsumptionEntry,
+  BuildingStructuralPointsEntry,
   ClientCoordinates,
   ClientPlanetDto,
   StartTechnologyResearchRequest,
   TechnologyQueueEntryDto
 } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier } from '../../models/planets/energy-deficit';
+import { resolveFusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { Technology } from '../../models/tech/technology';
@@ -920,11 +922,7 @@ export class ResearchesViewComponent implements OnInit {
       BuildingType.NUCLEAR_PLANT,
       this.buildingLevel(planet, BuildingType.NUCLEAR_PLANT)
     );
-    const fusionProduction = this.buildingProductionValue(
-      planet,
-      BuildingType.FUSION_REACTOR,
-      this.buildingLevel(planet, BuildingType.FUSION_REACTOR)
-    );
+    const fusionProduction = this.resolveFusionReactorOperationForPlanet(planet).powerOutput;
 
     const energyModifierRES = planet.info.planetaryParameters.energyModifierRES;
     const energyModifierNuclear = planet.info.planetaryParameters.energyModifierNuclear;
@@ -1020,6 +1018,99 @@ export class ResearchesViewComponent implements OnInit {
     return Math.min(maxConsumption, Math.max(0, entry.currentPowerConsumption));
   }
 
+  private resolveFusionReactorOperationForPlanet(planet: ClientPlanetDto) {
+    const fusionLevel = this.buildingLevel(planet, BuildingType.FUSION_REACTOR);
+    if (fusionLevel <= 0) {
+      return resolveFusionReactorOperation({
+        selectedStage: 0,
+        maxStage: 0,
+        structuralUtilization: 0,
+        energyTechnologyLevel: this.currentTechnologyLevel(TechnologyType.ENERGY_TECHNOLOGY),
+        adaptiveTechnologyLevel: this.currentTechnologyLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
+        solarProduction: 0,
+        nuclearProduction: 0,
+        otherEnergyUsed: 0,
+        energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
+        energyModifierNuclear: planet.info.planetaryParameters.energyModifierNuclear,
+        deuteriumSynthesizerProduction: 0,
+        deuteriumModifier: planet.info.planetaryParameters.deuteriumModifier,
+        fusionPowerAtStage: () => 0,
+        fusionDeuteriumAtStage: () => 0
+      });
+    }
+
+    let otherEnergyUsed = 0;
+    for (const entry of planet.objects.buildingsLevels) {
+      const buildingType = entry.type as BuildingType;
+      if (entry.level <= 0 || buildingType === BuildingType.FUSION_REACTOR) {
+        continue;
+      }
+
+      otherEnergyUsed += this.currentPowerConsumption(planet, buildingType);
+    }
+
+    return resolveFusionReactorOperation({
+      selectedStage: this.selectedFusionReactorStageForPlanet(planet),
+      maxStage: fusionLevel,
+      structuralUtilization: this.structuralUtilizationForPlanet(planet, BuildingType.FUSION_REACTOR),
+      energyTechnologyLevel: this.currentTechnologyLevel(TechnologyType.ENERGY_TECHNOLOGY),
+      adaptiveTechnologyLevel: this.currentTechnologyLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
+      solarProduction: this.buildingProductionValue(
+        planet,
+        BuildingType.SOLAR_WIND_GEOTHERMAL,
+        this.buildingLevel(planet, BuildingType.SOLAR_WIND_GEOTHERMAL)
+      ),
+      nuclearProduction: this.buildingProductionValue(
+        planet,
+        BuildingType.NUCLEAR_PLANT,
+        this.buildingLevel(planet, BuildingType.NUCLEAR_PLANT)
+      ),
+      otherEnergyUsed,
+      energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
+      energyModifierNuclear: planet.info.planetaryParameters.energyModifierNuclear,
+      deuteriumSynthesizerProduction: this.buildingProductionValue(
+        planet,
+        BuildingType.DEUTERIUM_SYNTHESIZER,
+        this.buildingLevel(planet, BuildingType.DEUTERIUM_SYNTHESIZER)
+      ),
+      deuteriumModifier: planet.info.planetaryParameters.deuteriumModifier,
+      fusionPowerAtStage: (stage) => this.rawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
+      fusionDeuteriumAtStage: (stage) => this.rawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2')
+    });
+  }
+
+  private selectedFusionReactorStageForPlanet(planet: ClientPlanetDto): number {
+    const level = this.buildingLevel(planet, BuildingType.FUSION_REACTOR);
+    if (level <= 0) {
+      return 0;
+    }
+
+    const stored = planet.objects.fusionReactorStage?.selectedStage;
+    if (stored === null || stored === undefined || !Number.isFinite(stored)) {
+      return level;
+    }
+
+    return Math.min(level, Math.max(0, Math.floor(stored)));
+  }
+
+  private rawBuildingProductionAtStage(
+    buildingType: BuildingType,
+    stage: number,
+    key: 'production1' | 'production2'
+  ): number {
+    if (stage <= 0) {
+      return 0;
+    }
+
+    const blueprint = this.buildingBlueprintsByType.get(buildingType);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const value = blueprint[key][stage - 1];
+    return Number.isFinite(value) ? value : 0;
+  }
+
   private buildingLevel(planet: ClientPlanetDto, buildingType: BuildingType): number {
     const entry = this.findBuildingLevelEntry(planet.objects.buildingsLevels, buildingType);
     return entry?.level ?? 0;
@@ -1042,6 +1133,28 @@ export class ResearchesViewComponent implements OnInit {
     entries: BuildingPowerConsumptionEntry[],
     buildingType: BuildingType
   ): BuildingPowerConsumptionEntry | null {
+    for (const entry of entries) {
+      if ((entry.type as BuildingType) === buildingType) {
+        return entry;
+      }
+    }
+
+    return null;
+  }
+
+  private structuralUtilizationForPlanet(planet: ClientPlanetDto, buildingType: BuildingType): number {
+    const entry = this.findStructuralPointsEntry(planet.objects.buildingsCurrentStructuralPoints, buildingType);
+    if (!entry || entry.maxStructuralPoints <= 0) {
+      return 1;
+    }
+
+    return Math.min(1, Math.max(0, entry.currentStructuralPoints / entry.maxStructuralPoints));
+  }
+
+  private findStructuralPointsEntry(
+    entries: BuildingStructuralPointsEntry[],
+    buildingType: BuildingType
+  ): BuildingStructuralPointsEntry | null {
     for (const entry of entries) {
       if ((entry.type as BuildingType) === buildingType) {
         return entry;

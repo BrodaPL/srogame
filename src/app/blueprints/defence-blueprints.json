@@ -82,8 +82,7 @@
       ],
       "cost": { "metal": 30, "crystal": 0, "deuterium": 0 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 1 },
-        { "building": "BOMB_DEPOT", "level": 1 }
+        { "building": "SHIPYARD", "level": 1 }
       ],
       "techRequirements": [
         { "tech": "MISSILES_WEAPONS", "level": 1 }
@@ -104,8 +103,7 @@
       ],
       "cost": { "metal": 60, "crystal": 30, "deuterium": 10 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 2 },
-        { "building": "BOMB_DEPOT", "level": 1 }
+        { "building": "SHIPYARD", "level": 2 }
       ],
       "techRequirements": [
         { "tech": "MISSILES_WEAPONS", "level": 2 },
@@ -127,8 +125,7 @@
       ],
       "cost": { "metal": 200, "crystal": 80, "deuterium": 60 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 4 },
-        { "building": "BOMB_DEPOT", "level": 2 }
+        { "building": "SHIPYARD", "level": 4 }
       ],
       "techRequirements": [
         { "tech": "MISSILES_WEAPONS", "level": 4 },
@@ -244,7 +241,7 @@
       "cost": { "metal": 500, "crystal": 100, "deuterium": 100 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 5 },
-        { "building": "BOMB_DEPOT", "level": 4 }
+        { "building": "BOMB_DEPOT", "level": 5 }
       ],
       "techRequirements": [
         { "tech": "MISSILES_WEAPONS", "level": 6 },

@@ -254,6 +254,7 @@ type SavedPlanet = {
     resources: SavedResourcesPack;
     buildingsLevels: Record<string, number>;
     buildingsCurrentPowerConsumption: Record<string, number>;
+    fusionReactorSelectedStage?: number | null;
     buildingsCurrentStructuralPoints: Record<string, number>;
     defences: SavedManyDefences;
     ships: SavedManyShips;
@@ -799,6 +800,9 @@ function hydrateSavedPlanet(savedPlanet: SavedPlanet, system: SolarSystemModel):
       hydrateSavedResourcesPack(savedPlanet.rBDSFTQ.resources),
       mapFromNumericRecord(savedPlanet.rBDSFTQ.buildingsLevels),
       mapFromNumericRecord(savedPlanet.rBDSFTQ.buildingsCurrentPowerConsumption),
+      typeof savedPlanet.rBDSFTQ.fusionReactorSelectedStage === 'number'
+        ? savedPlanet.rBDSFTQ.fusionReactorSelectedStage
+        : null,
       mapFromNumericRecord(savedPlanet.rBDSFTQ.buildingsCurrentStructuralPoints),
       ManyDefences.fromData(savedPlanet.rBDSFTQ.defences),
       ManyShips.fromData(savedPlanet.rBDSFTQ.ships),
@@ -1036,6 +1040,7 @@ function serializePlanet(planet: PlanetModel): SavedPlanet {
       resources: serializeResourcesPack(planet.rBDSFTQ.resources),
       buildingsLevels: mapToNumericRecord(planet.rBDSFTQ.buildingsLevels),
       buildingsCurrentPowerConsumption: mapToNumericRecord(planet.rBDSFTQ.buildingsCurrentPowerConsumption),
+      fusionReactorSelectedStage: planet.getFusionReactorSelectedStage(),
       buildingsCurrentStructuralPoints: mapToNumericRecord(planet.rBDSFTQ.buildingsCurrentStructuralPoints),
       defences: serializeManyDefences(planet.rBDSFTQ.defences),
       ships: serializeManyShips(planet.rBDSFTQ.ships),

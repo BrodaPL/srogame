@@ -213,7 +213,8 @@ function createPlanetTurnSnapshot(
   const computerTechnologyLevel = techLevels?.get(TechnologyType.COMPUTER_TECHNOLOGY) ?? 0;
   const energyTechnologyLevel = techLevels?.get(TechnologyType.ENERGY_TECHNOLOGY) ?? 0;
   const intergalacticResearchNetworkLevel = techLevels?.get(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK) ?? 0;
-  const energyState = calculateEnergyState(planet, energyTechnologyLevel);
+  const fusionOperation = planet.resolveFusionReactorOperation(adaptiveTechnologyLevel, energyTechnologyLevel);
+  const energyState = calculateEnergyState(planet, energyTechnologyLevel, fusionOperation.powerOutput);
   const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
   const effectiveParameters = planet.getEffectivePlanetaryParameters();
   const naniteMultiplier = planet.getBuildingLevel(BuildingType.NANITE_FACTORY) <= 0
@@ -266,8 +267,7 @@ function createPlanetTurnSnapshot(
       * botDifficultyMultiplier
     ),
     deuteriumIncome: Math.floor(
-      planet.getDeuteriumGain(adaptiveTechnologyLevel)
-      * energyEfficiency
+      fusionOperation.netDeuteriumIncome
       * botDifficultyMultiplier
     ),
     metalCapacity: planet.getBuildingProductionValue1(BuildingType.METAL_STORAGE),
@@ -329,16 +329,16 @@ function resolveBotDifficultyMultiplier(
 
 function calculateEnergyState(
   planet: Planet,
-  energyTechnologyLevel: number
+  energyTechnologyLevel: number,
+  fusionPowerOutput: number
 ): { used: number; available: number } {
   const solarProduction = planet.getBuildingProductionValue1(BuildingType.SOLAR_WIND_GEOTHERMAL);
   const nuclearProduction = planet.getBuildingProductionValue1(BuildingType.NUCLEAR_PLANT);
-  const fusionProduction = planet.getBuildingProductionValue1(BuildingType.FUSION_REACTOR);
   const parameters = planet.info.planetaryParameters;
   const available = roundNumber((
     (solarProduction * parameters.energyModifierRES)
     + (nuclearProduction * parameters.energyModifierNuclear)
-    + fusionProduction
+    + fusionPowerOutput
   ) * (1 + ((energyTechnologyLevel * 2) / 100)), 2);
 
   let used = 0;
