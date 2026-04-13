@@ -41,7 +41,7 @@
         </div>
         <div class="overview-stat">
           <span class="overview-stat__label">Discovered contacts</span>
-          <span class="overview-stat__value">{{ contacts.length }}</span>
+          <span class="overview-stat__value">{{ visibleContactCountLabel() }}</span>
         </div>
         <div class="overview-stat">
           <span class="overview-stat__label">Pending proposals</span>
@@ -61,12 +61,20 @@
             {{ outgoingProposalSentThisTurn ? 'Proposal used this turn' : 'Proposal available' }}
           </span>
         </div>
+        <label class="diplomacy-view__filter-toggle">
+          <input
+            type="checkbox"
+            [ngModel]="filterOutNeutral"
+            (ngModelChange)="onFilterOutNeutralChange(!!$event)"
+          />
+          <span>Filter out neutral</span>
+        </label>
 
-        @if (contacts.length === 0) {
+        @if (visibleContacts().length === 0) {
           <p class="overview-muted">No discovered diplomatic contacts yet.</p>
         } @else {
           <div class="diplomacy-view__contact-list">
-            @for (contact of contacts; track contact.playerId) {
+            @for (contact of visibleContacts(); track contact.playerId) {
               <button
                 type="button"
                 class="diplomacy-view__contact-row"

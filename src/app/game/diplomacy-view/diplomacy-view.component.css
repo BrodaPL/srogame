@@ -46,6 +46,18 @@
   overflow-y: auto;
 }
 
+.diplomacy-view__filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.diplomacy-view__filter-toggle input {
+  margin: 0;
+}
+
 .diplomacy-view__contact-row {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.1);

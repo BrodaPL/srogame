@@ -26,6 +26,7 @@ import { MessageComposeDialogComponent } from '../ui/message-compose-dialog/mess
 })
 export class DiplomacyViewComponent implements OnInit {
   protected readonly playerType = PlayerType;
+  protected filterOutNeutral = true;
 
   protected isLoading = false;
   protected loadError: string | null = null;
@@ -60,12 +61,33 @@ export class DiplomacyViewComponent implements OnInit {
       return null;
     }
 
-    return this.contacts.find((contact) => contact.playerId === this.selectedPlayerId) ?? null;
+    return this.visibleContacts().find((contact) => contact.playerId === this.selectedPlayerId) ?? null;
+  }
+
+  protected visibleContacts(): DiplomacyContactDto[] {
+    if (!this.filterOutNeutral) {
+      return this.contacts;
+    }
+
+    return this.contacts.filter((contact) => contact.currentStatus !== DiplomaticStatus.NEUTRAL);
+  }
+
+  protected visibleContactCount(): number {
+    return this.visibleContacts().length;
+  }
+
+  protected visibleContactCountLabel(): string {
+    return `${this.visibleContactCount()}/${this.contacts.length}`;
   }
 
   protected selectContact(contact: DiplomacyContactDto): void {
     this.selectedPlayerId = contact.playerId;
     this.actionSuccess = null;
+  }
+
+  protected onFilterOutNeutralChange(value: boolean): void {
+    this.filterOutNeutral = value;
+    this.ensureVisibleSelection();
   }
 
   protected selectedProposalStatus(contact: DiplomacyContactDto): DiplomaticStatus {
@@ -229,13 +251,13 @@ export class DiplomacyViewComponent implements OnInit {
     this.outgoingProposalSentThisTurn = response.outgoingProposalSentThisTurn;
     this.syncProposalSelections();
 
-    if (previousSelectedPlayerId !== null && this.contacts.some((contact) => contact.playerId === previousSelectedPlayerId)) {
+    if (previousSelectedPlayerId !== null && this.visibleContacts().some((contact) => contact.playerId === previousSelectedPlayerId)) {
       this.selectedPlayerId = previousSelectedPlayerId;
       this.openTutorialAfterRender();
       return;
     }
 
-    this.selectedPlayerId = this.contacts[0]?.playerId ?? null;
+    this.ensureVisibleSelection();
     this.openTutorialAfterRender();
   }
 
@@ -267,6 +289,15 @@ export class DiplomacyViewComponent implements OnInit {
       this.cdr.detectChanges();
       this.tutorialService.autoOpenTutorial('diplomacyView');
     });
+  }
+
+  private ensureVisibleSelection(): void {
+    const visibleContacts = this.visibleContacts();
+    if (this.selectedPlayerId !== null && visibleContacts.some((contact) => contact.playerId === this.selectedPlayerId)) {
+      return;
+    }
+
+    this.selectedPlayerId = visibleContacts[0]?.playerId ?? null;
   }
 
 }
