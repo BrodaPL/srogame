@@ -257,7 +257,7 @@ export class EncyclopediaMechanicsComponent {
         'Fleet composition splits launch selection into Ready and Damaged counters, and damaged hull entries can still be launched for now.',
         'Fleet lifecycle states are meaningful: fleets can be PENDING_JUMP_GATE, MOVING_TO_TARGET, ORBITING, RETURNING, MISSION_FAILURE_RETURNING, or MISSION_FAILURE_IDLE.',
         'Move to owned planets merges into the target planet, Move to non-hostile foreign or unowned orbit can stay in orbit, Transport delivers cargo then returns, and Spy creates structured espionage reports.',
-        'Attack can target WAR and PASSIVE owned planets, resolves hostile arrival combat, and steals metal, crystal, and deuterium after successful arrival resolution if cargo space remains.',
+        'Attack can target WAR, NEUTRAL, and PASSIVE owned planets, resolves hostile arrival combat, and steals metal, crystal, and deuterium after successful arrival resolution if cargo space remains.',
         'Bombard and Siege can store optional Main, Secondary, and Tertiary bombard priorities, which persist on the fleet for later siege turns.',
         'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn.',
         'Foreign Jump Gate targets require known gate intel from the latest espionage report and create a Mail request for the target owner unless diplomacy auto-approves it.',
