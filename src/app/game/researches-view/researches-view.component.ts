@@ -150,10 +150,6 @@ export class ResearchesViewComponent implements OnInit {
     return this.currentTechnologyLevel(technologyType) + 1;
   }
 
-  protected technologyEnergyRequiredForTargetLevel(technology: Technology): number {
-    return this.technologyEnergyRequired(technology, this.technologyTargetLevel(technology.type));
-  }
-
   protected technologyResearchTimeForTargetLevel(technology: Technology): number {
     const targetLevel = this.technologyTargetLevel(technology.type);
     const index = targetLevel - 1;
@@ -330,10 +326,6 @@ export class ResearchesViewComponent implements OnInit {
     const targetLevel = this.technologyTargetLevel(technology.type);
     const cost = technology.getCostForLevel(targetLevel);
     if (!this.hasEnoughResources(firstLab.planet, cost)) {
-      return false;
-    }
-
-    if (!this.hasEnoughEnergy(firstLab.planet, technology, targetLevel)) {
       return false;
     }
 
@@ -889,16 +881,6 @@ export class ResearchesViewComponent implements OnInit {
     );
   }
 
-  private hasEnoughEnergy(planet: ClientPlanetDto, technology: Technology, targetLevel: number): boolean {
-    const energyRequired = this.technologyEnergyRequired(technology, targetLevel);
-    if (energyRequired <= 0) {
-      return true;
-    }
-
-    const energyState = this.calculateEnergyState(planet);
-    return (energyState.available - energyState.used) >= energyRequired;
-  }
-
   private hasBuildingRequirements(
     planet: ClientPlanetDto,
     requirements: BuildingRequirement[],
@@ -925,17 +907,6 @@ export class ResearchesViewComponent implements OnInit {
     }
 
     return true;
-  }
-
-  private technologyEnergyRequired(technology: Technology, targetLevel: number): number {
-    const index = targetLevel - 1;
-    const direct = technology.energyRequired[index];
-    if (Number.isFinite(direct)) {
-      return Math.max(0, Math.floor(direct));
-    }
-
-    const fallback = technology.energyRequired[technology.energyRequired.length - 1] ?? 0;
-    return Number.isFinite(fallback) ? Math.max(0, Math.floor(fallback)) : 0;
   }
 
   private calculateEnergyState(planet: ClientPlanetDto): EnergyState {
@@ -1118,10 +1089,6 @@ export class ResearchesViewComponent implements OnInit {
       {
         label: 'Target level',
         value: `L${targetLevel}`
-      },
-      {
-        label: 'Energy required',
-        value: String(this.technologyEnergyRequiredForTargetLevel(technology))
       },
       {
         label: 'Research time',
