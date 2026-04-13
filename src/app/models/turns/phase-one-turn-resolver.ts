@@ -423,7 +423,7 @@ function advanceBuildingQueue(planet: Planet, industryPower: number): void {
       blueprint.getCostForLevel(queueEntry.nextLevel).getTotalResourceAmount()
     ));
     if (totalRequiredPower <= 0) {
-      planet.setBuildingLevel(queueEntry.buildingType, queueEntry.nextLevel);
+      finalizeCompletedBuildingQueueEntry(planet, queueEntry.buildingType, queueEntry.nextLevel);
       planet.rBDSFTQ.buildingQueue.shift();
       continue;
     }
@@ -441,9 +441,29 @@ function advanceBuildingQueue(planet: Planet, industryPower: number): void {
       break;
     }
 
-    planet.setBuildingLevel(queueEntry.buildingType, queueEntry.nextLevel);
+    finalizeCompletedBuildingQueueEntry(planet, queueEntry.buildingType, queueEntry.nextLevel);
     planet.rBDSFTQ.buildingQueue.shift();
   }
+}
+
+function finalizeCompletedBuildingQueueEntry(
+  planet: Planet,
+  buildingType: BuildingType,
+  nextLevel: number
+): void {
+  const previousLevel = planet.getBuildingLevel(buildingType);
+  const previousMaxPowerConsumption = planet.getMaxBuildingPowerConsumption(buildingType);
+  const wasAtFullPower = previousLevel > 0
+    && previousMaxPowerConsumption > 0
+    && planet.getCurrentBuildingPowerConsumption(buildingType) >= previousMaxPowerConsumption;
+
+  planet.setBuildingLevel(buildingType, nextLevel);
+
+  if (!wasAtFullPower || nextLevel <= previousLevel) {
+    return;
+  }
+
+  planet.setCurrentBuildingPowerConsumption(buildingType, planet.getMaxBuildingPowerConsumption(buildingType));
 }
 
 function advanceShipyardQueue(planet: Planet, shipyardPower: number): void {

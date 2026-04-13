@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BuildingBlueprintsFactory } from '../../../factories/building-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
 import { BuildingQueueEntry } from '../../buildings/building-queue-entry';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
@@ -22,6 +23,7 @@ import { TechnologyQueueEntry } from '../../tech/technology-queue-entry';
 import { resolvePhaseOneTurn } from '../phase-one-turn-resolver';
 
 const blueprints = ShipBlueprintsFactory.fromDefaultJson();
+const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson().buildingsMap;
 
 function point(x: number, y: number, z: number) {
   return { x, y, z };
@@ -1610,5 +1612,55 @@ describe('resolvePhaseOneTurn battle integration', () => {
       .toBeGreaterThan(humanPlanet.rBDSFTQ.shipyardQueue[0]?.investedShipyardPower ?? 0);
     expect(botPlanet.rBDSFTQ.currentResearchQueue?.investedResearchPower ?? 0)
       .toBeGreaterThan(humanPlanet.rBDSFTQ.currentResearchQueue?.investedResearchPower ?? 0);
+  });
+
+  it('restores full power after a building upgrade only when that building was already at full power', () => {
+    const metalMineUpgradeCost = buildingBlueprints.get(BuildingType.METAL_MINE)?.getCostForLevel(2).getTotalResourceAmount();
+    const crystalMineUpgradeCost = buildingBlueprints.get(BuildingType.CRYSTAL_MINE)?.getCostForLevel(2).getTotalResourceAmount();
+
+    expect(metalMineUpgradeCost).toBeTypeOf('number');
+    expect(crystalMineUpgradeCost).toBeTypeOf('number');
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        const fullPowerPlanet = solarSystem.planets[0];
+        fullPowerPlanet.info.ownerId = 1;
+        fullPowerPlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 13);
+        fullPowerPlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+        fullPowerPlanet.setBuildingLevel(BuildingType.METAL_MINE, 1);
+        fullPowerPlanet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(
+          BuildingType.METAL_MINE,
+          2,
+          Math.max(0, Math.floor(metalMineUpgradeCost!) - 1)
+        ));
+
+        const throttledPlanet = solarSystem.planets[1];
+        throttledPlanet.info.ownerId = 2;
+        throttledPlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 13);
+        throttledPlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+        throttledPlanet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 1);
+        throttledPlanet.setCurrentBuildingPowerConsumption(BuildingType.CRYSTAL_MINE, 0);
+        throttledPlanet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(
+          BuildingType.CRYSTAL_MINE,
+          2,
+          Math.max(0, Math.floor(crystalMineUpgradeCost!) - 1)
+        ));
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(system.planets[0].getBuildingLevel(BuildingType.METAL_MINE)).toBe(2);
+    expect(system.planets[0].getCurrentBuildingPowerConsumption(BuildingType.METAL_MINE))
+      .toBe(system.planets[0].getMaxBuildingPowerConsumption(BuildingType.METAL_MINE));
+
+    expect(system.planets[1].getBuildingLevel(BuildingType.CRYSTAL_MINE)).toBe(2);
+    expect(system.planets[1].getCurrentBuildingPowerConsumption(BuildingType.CRYSTAL_MINE)).toBe(0);
+    expect(system.planets[1].getMaxBuildingPowerConsumption(BuildingType.CRYSTAL_MINE)).toBeGreaterThan(0);
   });
 });
