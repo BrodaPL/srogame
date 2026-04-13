@@ -141,6 +141,7 @@
                 >
                   <img
                     class="buildings-view__building-image"
+                    [class.buildings-view__building-image--empty]="buildingLevel(building.type) <= 0"
                     [src]="building.imagePath"
                     [alt]="building.type + ' image'"
                   />

@@ -150,7 +150,12 @@
                   [attr.aria-label]="'Open details for ' + building.type"
                   (click)="openBuildingDetails(building)"
                 >
-                  <img class="planet-building-card__image" [src]="building.imagePath" [alt]="building.type + ' image'" />
+                  <img
+                    class="planet-building-card__image"
+                    [class.planet-building-card__image--empty]="buildingLevel(building.type) <= 0"
+                    [src]="building.imagePath"
+                    [alt]="building.type + ' image'"
+                  />
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ building.type }}</h4>
@@ -268,7 +273,12 @@
                   [attr.aria-label]="'Open details for ' + building.type"
                   (click)="openBuildingDetails(building)"
                 >
-                  <img class="planet-building-card__image" [src]="building.imagePath" [alt]="building.type + ' image'" />
+                  <img
+                    class="planet-building-card__image"
+                    [class.planet-building-card__image--empty]="buildingLevel(building.type) <= 0"
+                    [src]="building.imagePath"
+                    [alt]="building.type + ' image'"
+                  />
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ building.type }}</h4>

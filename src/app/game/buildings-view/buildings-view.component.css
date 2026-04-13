@@ -32,6 +32,11 @@
   object-fit: contain;
 }
 
+.buildings-view__building-image--empty {
+  filter: grayscale(1) brightness(0.72);
+  opacity: 0.55;
+}
+
 .buildings-view__image-button {
   display: inline-flex;
   align-items: center;
