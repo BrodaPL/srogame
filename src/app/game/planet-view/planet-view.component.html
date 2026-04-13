@@ -381,14 +381,22 @@
           @if (filteredShipBlueprints().length > 0) {
           <div class="planet-building-list">
             @for (ship of filteredShipBlueprints(); track ship.type) {
-              <article class="planet-building-card planet-building-card--ship">
+              <article
+                class="planet-building-card planet-building-card--ship"
+                [class.planet-building-card--unavailable]="shipHasUnmetRequirements(ship)"
+              >
                 <button
                   type="button"
                   class="planet-building-card__image-button"
                   [attr.aria-label]="'Open details for ' + ship.type"
                   (click)="openShipDetails(ship)"
                 >
-                  <img class="planet-building-card__image" [src]="ship.imagePath" [alt]="ship.type + ' image'" />
+                  <img
+                    class="planet-building-card__image"
+                    [class.planet-building-card__image--empty]="shipHasZeroOwnedCount(ship)"
+                    [src]="ship.imagePath"
+                    [alt]="ship.type + ' image'"
+                  />
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ ship.type }}</h4>
@@ -543,14 +551,22 @@
           @if (filteredDefenceBlueprints().length > 0) {
           <div class="planet-building-list">
             @for (defence of filteredDefenceBlueprints(); track defence.type) {
-              <article class="planet-building-card planet-building-card--ship">
+              <article
+                class="planet-building-card planet-building-card--ship"
+                [class.planet-building-card--unavailable]="defenceHasUnmetRequirements(defence)"
+              >
                 <button
                   type="button"
                   class="planet-building-card__image-button"
                   [attr.aria-label]="'Open details for ' + defence.type"
                   (click)="openDefenceDetails(defence)"
                 >
-                  <img class="planet-building-card__image" [src]="defence.imagePath" [alt]="defence.type + ' image'" />
+                  <img
+                    class="planet-building-card__image"
+                    [class.planet-building-card__image--empty]="defenceHasZeroOwnedCount(defence)"
+                    [src]="defence.imagePath"
+                    [alt]="defence.type + ' image'"
+                  />
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ defence.type }}</h4>

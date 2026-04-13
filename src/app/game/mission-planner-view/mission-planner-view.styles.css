@@ -171,7 +171,7 @@
 
 .mission-planner__ship-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
   gap: 0.7rem;
   align-items: center;
   padding: 0.55rem 0.65rem;
@@ -188,6 +188,27 @@
 .mission-planner__ship-row--required {
   border-color: rgba(246, 180, 76, 0.68);
   background: rgba(246, 180, 76, 0.12);
+}
+
+.mission-planner__ship-row--unavailable {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.015);
+  opacity: 0.5;
+}
+
+.mission-planner__ship-visual {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+}
+
+.mission-planner__ship-image {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.2));
 }
 
 .mission-planner__ship-main {

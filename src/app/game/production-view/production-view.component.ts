@@ -381,6 +381,22 @@ export class ProductionViewComponent implements OnInit {
     return unmetRows.map((row) => row.label).join('\n');
   }
 
+  protected shipHasUnmetRequirements(ship: Ship): boolean {
+    return this.unmetRequirementRows(ship).length > 0;
+  }
+
+  protected defenceHasUnmetRequirements(defence: Defence): boolean {
+    return this.unmetDefenceRequirementRows(defence).length > 0;
+  }
+
+  protected shipHasZeroOwnedCount(ship: Ship): boolean {
+    return this.currentShipAmount(ship.type) <= 0;
+  }
+
+  protected defenceHasZeroOwnedCount(defence: Defence): boolean {
+    return this.currentDefenceAmount(defence.type) <= 0;
+  }
+
   protected shipBuildLabel(ship: Ship): string {
     return this.isHeadShipQueueType(ship.type) ? 'Order more' : 'Build';
   }

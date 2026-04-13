@@ -149,14 +149,23 @@
           @if (currentMode() === 'shipyard') {
             <div class="production-view__ship-list">
               @for (ship of shipBlueprints; track ship.type; let isFirst = $first) {
-                <article class="production-view__ship-row" [attr.data-tutorial-id]="isFirst ? 'production-primary-row' : null">
+                <article
+                  class="production-view__ship-row"
+                  [class.production-view__ship-row--unavailable]="shipHasUnmetRequirements(ship)"
+                  [attr.data-tutorial-id]="isFirst ? 'production-primary-row' : null"
+                >
                   <button
                     type="button"
                     class="production-view__image-button"
                     [attr.aria-label]="'Open details for ' + ship.type"
                     (click)="openShipDetails(ship)"
                   >
-                    <img class="production-view__ship-image" [src]="ship.imagePath" [alt]="ship.type + ' image'" />
+                    <img
+                      class="production-view__ship-image"
+                      [class.production-view__ship-image--empty]="shipHasZeroOwnedCount(ship)"
+                      [src]="ship.imagePath"
+                      [alt]="ship.type + ' image'"
+                    />
                   </button>
 
                   <div class="production-view__ship-main">
@@ -249,14 +258,22 @@
           } @else {
             <div class="production-view__ship-list">
               @for (defence of defenceBlueprints; track defence.type) {
-                <article class="production-view__ship-row">
+                <article
+                  class="production-view__ship-row"
+                  [class.production-view__ship-row--unavailable]="defenceHasUnmetRequirements(defence)"
+                >
                   <button
                     type="button"
                     class="production-view__image-button"
                     [attr.aria-label]="'Open details for ' + defence.type"
                     (click)="openDefenceDetails(defence)"
                   >
-                    <img class="production-view__ship-image" [src]="defence.imagePath" [alt]="defence.type + ' image'" />
+                    <img
+                      class="production-view__ship-image"
+                      [class.production-view__ship-image--empty]="defenceHasZeroOwnedCount(defence)"
+                      [src]="defence.imagePath"
+                      [alt]="defence.type + ' image'"
+                    />
                   </button>
 
                   <div class="production-view__ship-main">

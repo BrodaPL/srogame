@@ -1003,6 +1003,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return rows;
   }
 
+  protected shipHasUnmetRequirements(ship: Ship): boolean {
+    return this.shipRequirementRows(ship).some((row) => !row.isMet);
+  }
+
+  protected defenceHasUnmetRequirements(defence: Defence): boolean {
+    return this.defenceRequirementRows(defence).some((row) => !row.isMet);
+  }
+
+  protected shipHasZeroOwnedCount(ship: Ship): boolean {
+    return this.currentShipAmount(ship.type) <= 0;
+  }
+
+  protected defenceHasZeroOwnedCount(defence: Defence): boolean {
+    return this.currentDefenceAmount(defence.type) <= 0;
+  }
+
   protected canBuildShip(ship: Ship): boolean {
     if (!this.planet || this.planet.info.ownerId === null) {
       return false;

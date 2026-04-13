@@ -31,6 +31,12 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+.production-view__ship-row--unavailable {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.015);
+  opacity: 0.56;
+}
+
 .production-view__image-button {
   width: 100px;
   height: 100px;
@@ -57,6 +63,11 @@
   height: 100px;
   object-fit: contain;
   display: block;
+}
+
+.production-view__ship-image--empty {
+  filter: grayscale(1) brightness(0.72);
+  opacity: 0.55;
 }
 
 .production-view__ship-action {

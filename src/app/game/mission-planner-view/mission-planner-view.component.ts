@@ -56,6 +56,7 @@ type MissionOption = {
 type ShipSelectionRowVm = {
   type: ShipType;
   label: string;
+  imagePath: string;
   purposes: ShipPurpose[];
   available: number;
   availableUndamaged: number;
@@ -69,6 +70,7 @@ type ShipSelectionRowVm = {
   canJump: boolean;
   isRelevant: boolean;
   isRequired: boolean;
+  isUnavailable: boolean;
 };
 
 type MissionWarningVm = {
@@ -305,6 +307,7 @@ export class MissionPlannerViewComponent implements OnInit {
       rows.push({
         type: shipType,
         label: ship.getName(),
+        imagePath: ship.imagePath,
         purposes: Array.from(ship.purposes.values()),
         available,
         availableUndamaged,
@@ -317,7 +320,8 @@ export class MissionPlannerViewComponent implements OnInit {
         hasWeapons: ship.weapons.length > 0,
         canJump: ship.canJump,
         isRelevant: this.currentMission().isShipRelevant(shipType, ship),
-        isRequired: this.currentMission().isShipRequired(shipType)
+        isRequired: this.currentMission().isShipRequired(shipType),
+        isUnavailable: available <= 0
       });
     }
 

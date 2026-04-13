@@ -360,7 +360,11 @@
                 class="mission-planner__ship-row"
                 [class.mission-planner__ship-row--relevant]="row.isRelevant"
                 [class.mission-planner__ship-row--required]="row.isRequired"
+                [class.mission-planner__ship-row--unavailable]="row.isUnavailable"
               >
+                <div class="mission-planner__ship-visual">
+                  <img class="mission-planner__ship-image" [src]="row.imagePath" [alt]="row.label + ' image'" />
+                </div>
                 <div class="mission-planner__ship-main">
                   <div class="mission-planner__ship-head">
                     <h4 class="mission-planner__ship-title">{{ row.label }}</h4>
