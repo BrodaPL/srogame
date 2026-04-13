@@ -1347,8 +1347,11 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       const buildingType = this.queueEntryBuildingType(entry);
       const toLevel = this.queueEntryNextLevel(entry);
       const fromLevel = Math.max(0, toLevel - 1);
-      const investedIndustryPower = this.queueEntryInvestedIndustryPower(entry);
       const baseTotalConstructionTime = this.baseConstructionTime(buildingType, toLevel);
+      const investedIndustryPower = Math.min(
+        this.queueEntryInvestedIndustryPower(entry),
+        baseTotalConstructionTime
+      );
       const remaining = Math.max(0, baseTotalConstructionTime - investedIndustryPower);
       cumulativeRemaining += remaining;
       const estimatedTurnsForCompletion = industryPower > 0

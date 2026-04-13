@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { BuildingBlueprintsFactory } from '../../src/app/factories/building-blueprints.factory.js';
 import { BuildingQueueEntry } from '../../src/app/models/buildings/building-queue-entry.js';
 import { BuildingType } from '../../src/app/models/enums/building-type.js';
 import { DefenceType } from '../../src/app/models/enums/defence-type.js';
@@ -48,6 +49,8 @@ import {
 } from './game-save.js';
 
 describe('game-save', () => {
+  const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson().buildingsMap;
+
   it('serializes the live galaxy state into a save DTO without circular references', () => {
     const save = buildTestSave();
 
@@ -146,6 +149,22 @@ describe('game-save', () => {
     expect(fleet.origin.x).toBe(0);
     expect(fleet.pendingJumpGateRequestId).toBe(13);
     expect(fleet.bombardmentPriorities?.main).toBe(BuildingType.METAL_MINE);
+  });
+
+  it('clamps over-invested building queue progress when hydrating a saved game', () => {
+    const save = buildTestSave();
+    save.galaxy.stars[0][0].planets[0].rBDSFTQ.buildingQueue[0].investedIndustryPower = 9999;
+
+    const hydrated = hydrateGameSave(save);
+    const planet = hydrated.galaxy.stars[0][0].planets[0];
+    const entry = planet.rBDSFTQ.buildingQueue[0];
+    const expectedMax = Math.floor(
+      (buildingBlueprints.get(BuildingType.CRYSTAL_MINE)?.getCostForLevel(entry!.nextLevel).getTotalResourceAmount()) ?? 0
+    );
+
+    expect(entry).toBeTruthy();
+    expect(entry!.investedIndustryPower).toBe(expectedMax);
+    expect(entry!.investedIndustryPower).toBeLessThanOrEqual(expectedMax);
   });
 
   it('calculates autosave cadence from successful end-turn count', () => {

@@ -7238,6 +7238,7 @@ function toPlayerReportDto(report: PlayerReport): PlayerReportDto {
 }
 
 function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordinates): ClientPlanetDto {
+  clientPlanet.normalizeBuildingQueueProgress();
   return {
     coordinates,
     basicInfo: {

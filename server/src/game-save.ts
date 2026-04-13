@@ -825,6 +825,8 @@ function hydrateSavedPlanet(savedPlanet: SavedPlanet, system: SolarSystemModel):
     )
   );
 
+  planet.normalizeBuildingQueueProgress();
+
   return planet;
 }
 

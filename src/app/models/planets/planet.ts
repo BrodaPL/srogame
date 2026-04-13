@@ -253,6 +253,16 @@ export class Planet {
     return this.getBuildingLevel(type);
   }
 
+  public normalizeBuildingQueueProgress(): void {
+    for (const entry of this.rBDSFTQ.buildingQueue) {
+      const requiredPower = this.getBuildingQueueEntryRequiredIndustryPower(entry.buildingType, entry.nextLevel);
+      const normalizedInvested = Number.isFinite(entry.investedIndustryPower)
+        ? Math.max(0, Math.floor(entry.investedIndustryPower))
+        : 0;
+      entry.investedIndustryPower = Math.min(requiredPower, normalizedInvested);
+    }
+  }
+
   public getCurrentBuildingPowerConsumption(type: BuildingType): number {
     const max = this.getMaxBuildingPowerConsumption(type);
     if (max <= 0) {
@@ -660,6 +670,15 @@ export class Planet {
     }
 
     this.rBDSFTQ.buildingsCurrentPowerConsumption.set(type, Math.min(max, Math.max(0, existing)));
+  }
+
+  private getBuildingQueueEntryRequiredIndustryPower(type: BuildingType, nextLevel: number): number {
+    const blueprint = Planet.buildingBlueprints.get(type);
+    if (!blueprint || nextLevel < 1) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(blueprint.getCostForLevel(nextLevel).getTotalResourceAmount()));
   }
 
   private normalizeCurrentStructuralPoints(
