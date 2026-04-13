@@ -14,6 +14,7 @@ import { RngResourceGenerator } from '../../generators/rng-resource-generator';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { BuildingType } from '../enums/building-type';
 import { DefenceType } from '../enums/defence-type';
+import { NAMES_LIST } from '../enums/names-list';
 import { StartingHomeworldPreset } from '../enums/starting-homeworld-preset';
 import { TechnologyType } from '../enums/technology-type';
 import { ShipType } from '../enums/ship-type';
@@ -25,6 +26,7 @@ import { createTutorialReadState } from '../../tutorial/tutorial-types';
 
 
 export class GalaxyCreator {
+  private static readonly BOT_NAME_POOL_SIZE = 24;
   private static readonly TEST_RANDOM_PLANETS_COUNT = 3;
   private static readonly TEST_STARTING_SHIPS_PER_TYPE = 10;
   private static readonly HOME_SYSTEM_NEUTRAL_LEVEL = 3;
@@ -438,7 +440,7 @@ export class GalaxyCreator {
       const candidateIndex = this.randomInt(0, availablePlanets.length - 1);
       const slot = availablePlanets.splice(candidateIndex, 1)[0];
       const playerId = this.nextAvailablePlayerId(galaxy);
-      const botName = `Bot-${index + 1}`;
+      const botName = this.buildBotName(index, playerId);
 
       const startingPlanet = Planet.createStartingPlanet(
         slot.planet.basicInfo.name,
@@ -646,6 +648,17 @@ export class GalaxyCreator {
     }
 
     return map;
+  }
+
+  private buildBotName(botIndex: number, playerId: number): string {
+    const botNamePool = NAMES_LIST.slice(0, GalaxyCreator.BOT_NAME_POOL_SIZE);
+    if (botNamePool.length === 0) {
+      return `AI_${playerId}`;
+    }
+
+    const normalizedIndex = Math.max(0, Math.floor(botIndex));
+    const name = botNamePool[normalizedIndex % botNamePool.length] ?? botNamePool[0];
+    return `AI_${name}_${playerId}`;
   }
 
   private createStartingTechLevels(): Map<TechnologyType, number> {

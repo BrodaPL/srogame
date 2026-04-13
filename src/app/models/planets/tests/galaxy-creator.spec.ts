@@ -4,6 +4,7 @@ import { DefenceType } from '../../enums/defence-type';
 import { GalaxyCreator } from '../galaxy-creator';
 import { GameType } from '../../enums/game-type';
 import { StartingHomeworldPreset } from '../../enums/starting-homeworld-preset';
+import { NAMES_LIST } from '../../enums/names-list';
 import { PlayerType } from '../../enums/player-type';
 import { PlanetType } from '../../enums/planet-type';
 import { ShipType } from '../../enums/ship-type';
@@ -109,6 +110,23 @@ describe('GalaxyCreator', () => {
       'AGGRESSOR',
       'MINER'
     ]);
+  });
+
+  it('names bots from the first 24 list entries with AI prefix and player id suffix, wrapping after 24', () => {
+    const galaxy = new GalaxyCreator(createSetup({
+      galaxyWidth: 20,
+      galaxyHeight: 20,
+      playerAmount: 1,
+      botsAmount: 25,
+      neutralBotsAmount: 0
+    })).createGalaxy(['Human']);
+
+    const bots = galaxy.players.filter((entry) => entry.type === PlayerType.BOT);
+
+    expect(bots).toHaveLength(25);
+    expect(bots[0]?.playerName).toBe(`AI_${NAMES_LIST[0]}_${bots[0]?.playerId}`);
+    expect(bots[23]?.playerName).toBe(`AI_${NAMES_LIST[23]}_${bots[23]?.playerId}`);
+    expect(bots[24]?.playerName).toBe(`AI_${NAMES_LIST[0]}_${bots[24]?.playerId}`);
   });
 
   it('applies the configured homeworld preset to both human and bot starts', () => {
