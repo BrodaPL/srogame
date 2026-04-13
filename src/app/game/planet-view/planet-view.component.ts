@@ -1340,7 +1340,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected buildingQueueRows(): BuildingQueueRowVm[] {
     const queueEntries = this.planet?.objects.buildingQueue ?? [];
-    const industryPower = this.currentIndustryPower();
+    const industryPower = this.currentTotalIndustryPower();
     let cumulativeRemaining = 0;
 
     return queueEntries.map((entry, index) => {
@@ -2599,6 +2599,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     this.powersDisplay = {
       industryPower: this.currentIndustryPower(),
+      droneIndustryPower: this.currentDroneIndustryPower(),
+      totalIndustryPower: this.currentTotalIndustryPower(),
       shipyardPower: this.currentShipyardPower(),
       researchPower: this.currentResearchPower(),
       shipRepair: this.currentShipRepairCapability(),
@@ -3052,6 +3054,24 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     return Math.max(0, Math.floor(industryPower * this.currentEnergyEfficiency()));
+  }
+
+  private currentDroneIndustryPower(): number {
+    const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
+    const repairDroneCount = ManyShips.countByType(this.planet?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
+    const droneIndustryPower = repairDroneCount
+      * industryModifier
+      * industryPowerMultiplier(adaptiveTechnologyLevel);
+    if (!Number.isFinite(droneIndustryPower) || droneIndustryPower <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(droneIndustryPower * this.currentEnergyEfficiency()));
+  }
+
+  private currentTotalIndustryPower(): number {
+    return this.currentIndustryPower() + this.currentDroneIndustryPower();
   }
 
   private currentShipyardPower(): number {

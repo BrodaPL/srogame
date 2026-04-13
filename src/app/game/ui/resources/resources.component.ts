@@ -11,6 +11,8 @@ export type ResourceDisplay = {
 
 export type PlanetPowersDisplay = {
   industryPower: number;
+  droneIndustryPower?: number | null;
+  totalIndustryPower?: number | null;
   shipyardPower: number;
   researchPower: number;
   industryPowerLimited: boolean;

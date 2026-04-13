@@ -124,7 +124,11 @@
         class="resource__power-line"
         [class.resource__power-line--limited]="powers?.industryPowerLimited"
       >
-        Industry: {{ formatPower(powers?.industryPower) }}
+        @if (powers?.droneIndustryPower !== null && powers?.droneIndustryPower !== undefined && powers?.totalIndustryPower !== null && powers?.totalIndustryPower !== undefined) {
+          Industry: {{ formatPower(powers?.industryPower) }} + {{ formatPower(powers?.droneIndustryPower) }} = {{ formatPower(powers?.totalIndustryPower) }}
+        } @else {
+          Industry: {{ formatPower(powers?.industryPower) }}
+        }
       </span>
       <span
         class="resource__power-line"

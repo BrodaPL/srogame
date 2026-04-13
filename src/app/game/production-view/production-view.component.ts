@@ -1112,6 +1112,8 @@ export class ProductionViewComponent implements OnInit {
     this.energyTooltip = this.energyPenaltyTooltip(energy.available, energy.used);
     this.powersDisplay = {
       industryPower: this.currentIndustryPower(),
+      droneIndustryPower: this.currentDroneIndustryPower(),
+      totalIndustryPower: this.currentTotalIndustryPower(),
       shipyardPower: this.currentShipyardPower(),
       researchPower: this.currentResearchPower(),
       industryPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
@@ -1181,6 +1183,22 @@ export class ProductionViewComponent implements OnInit {
       * industryModifier
       * industryPowerMultiplier(adaptiveTechnologyLevel);
     return !Number.isFinite(industryPower) || industryPower <= 0 ? 0 : Math.floor(industryPower * this.currentEnergyEfficiency());
+  }
+
+  private currentDroneIndustryPower(): number {
+    const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const industryModifier = this.selectedPlanet()?.info.planetaryParameters.industryModifier ?? 1;
+    const repairDroneCount = ManyShips.countByType(this.selectedPlanet()?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
+    const droneIndustryPower = repairDroneCount
+      * industryModifier
+      * industryPowerMultiplier(adaptiveTechnologyLevel);
+    return !Number.isFinite(droneIndustryPower) || droneIndustryPower <= 0
+      ? 0
+      : Math.floor(droneIndustryPower * this.currentEnergyEfficiency());
+  }
+
+  private currentTotalIndustryPower(): number {
+    return this.currentIndustryPower() + this.currentDroneIndustryPower();
   }
 
   private currentShipyardPower(): number {

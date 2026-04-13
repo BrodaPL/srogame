@@ -949,6 +949,43 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[0].rBDSFTQ.shipyardQueue[0]?.investedShipyardPower).toBe(52);
   });
 
+  it('adds parked repair-drone industry separately from nanite-amplified base industry', () => {
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        const controlPlanet = solarSystem.planets[0];
+        controlPlanet.info.ownerId = 1;
+        controlPlanet.info.planetaryParameters.industryModifier = 1;
+        controlPlanet.info.planetaryParameters.energyModifierRES = 1;
+        controlPlanet.info.planetaryParameters.energyModifierNuclear = 1;
+        controlPlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+        controlPlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+        controlPlanet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+        controlPlanet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(BuildingType.FUSION_REACTOR, 1, 0));
+
+        const dronePlanet = solarSystem.planets[1];
+        dronePlanet.info.ownerId = 2;
+        dronePlanet.info.planetaryParameters.industryModifier = 1;
+        dronePlanet.info.planetaryParameters.energyModifierRES = 1;
+        dronePlanet.info.planetaryParameters.energyModifierNuclear = 1;
+        dronePlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+        dronePlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+        dronePlanet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+        dronePlanet.rBDSFTQ.ships = manyShips({ type: ShipType.REPAIR_DRONE, amount: 1 });
+        dronePlanet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(BuildingType.FUSION_REACTOR, 1, 0));
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(60);
+    expect(system.planets[1].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(61);
+  });
+
   it('prioritizes non-small damaged ships for strong repair equipment', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
 

@@ -74,6 +74,8 @@ type PlanetTurnSnapshot = {
   crystalCapacity: number;
   deuteriumCapacity: number;
   industryPower: number;
+  droneIndustryPower: number;
+  totalIndustryPower: number;
   shipyardPower: number;
   researchPower: number;
   currentResearchQueue: {
@@ -158,7 +160,7 @@ export function resolvePhaseOneTurn(
       continue;
     }
 
-    advanceBuildingQueue(planet, snapshot.industryPower);
+    advanceBuildingQueue(planet, snapshot.totalIndustryPower);
     advanceShipyardQueue(planet, snapshot.shipyardPower);
   }
 
@@ -224,6 +226,7 @@ function createPlanetTurnSnapshot(
     ? 0
     : planet.getBuildingProductionValue1(BuildingType.SHIPYARD);
   const researchLabBasePower = planet.getBuildingProductionValue1(BuildingType.RESEARCH_LAB);
+  const repairDroneCount = ManyShips.countByType(planet.rBDSFTQ.ships).get(ShipType.REPAIR_DRONE) ?? 0;
   const industryModifier = effectiveParameters.industryModifier;
   const scienceModifier = effectiveParameters.scienceModifier;
   const adaptiveIndustryMultiplier = industryPowerMultiplier(adaptiveTechnologyLevel);
@@ -233,6 +236,21 @@ function createPlanetTurnSnapshot(
     intergalacticResearchNetworkLevel
   );
   const botDifficultyMultiplier = resolveBotDifficultyMultiplier(owner, difficultyConfig);
+  const industryPower = Math.max(0, Math.floor(
+    roboticsPower
+    * naniteMultiplier
+    * industryModifier
+    * adaptiveIndustryMultiplier
+    * energyEfficiency
+    * botDifficultyMultiplier
+  ));
+  const droneIndustryPower = Math.max(0, Math.floor(
+    repairDroneCount
+    * industryModifier
+    * adaptiveIndustryMultiplier
+    * energyEfficiency
+    * botDifficultyMultiplier
+  ));
 
   return {
     coordinatesId,
@@ -255,14 +273,9 @@ function createPlanetTurnSnapshot(
     metalCapacity: planet.getBuildingProductionValue1(BuildingType.METAL_STORAGE),
     crystalCapacity: planet.getBuildingProductionValue1(BuildingType.CRYSTAL_STORAGE),
     deuteriumCapacity: planet.getBuildingProductionValue1(BuildingType.DEUTERIUM_TANK),
-    industryPower: Math.max(0, Math.floor(
-      roboticsPower
-      * naniteMultiplier
-      * industryModifier
-      * adaptiveIndustryMultiplier
-      * energyEfficiency
-      * botDifficultyMultiplier
-    )),
+    industryPower,
+    droneIndustryPower,
+    totalIndustryPower: industryPower + droneIndustryPower,
     shipyardPower: Math.max(0, Math.floor(
       shipyardBasePower
       * naniteMultiplier

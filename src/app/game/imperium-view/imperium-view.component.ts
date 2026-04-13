@@ -48,6 +48,8 @@ type EnergyState = {
 
 type PlanetPowerState = {
   industryPower: number;
+  droneIndustryPower: number;
+  totalIndustryPower: number;
   shipyardPower: number;
   researchPower: number;
   shipRepair: number;
@@ -359,6 +361,7 @@ export class ImperiumViewComponent implements OnInit {
     let totalEnergyAvailable = 0;
     let totalEnergyPenalty = 0;
     let totalIndustryPower = 0;
+    let totalDroneIndustryPower = 0;
     let totalShipyardPower = 0;
     let totalResearchPower = 0;
     let totalShipRepair = 0;
@@ -391,7 +394,8 @@ export class ImperiumViewComponent implements OnInit {
       totalEnergyUsed += planetVm.energy.used;
       totalEnergyAvailable += planetVm.energy.available;
       totalEnergyPenalty += energyDeficitPenaltyPercent(planetVm.energy.available, planetVm.energy.used);
-      totalIndustryPower += planetVm.powers.industryPower;
+      totalIndustryPower += planetVm.powers.totalIndustryPower;
+      totalDroneIndustryPower += planetVm.powers.droneIndustryPower;
       totalShipyardPower += planetVm.powers.shipyardPower;
       totalResearchPower += planetVm.powers.researchPower;
       totalShipRepair += planetVm.powers.shipRepair;
@@ -439,7 +443,9 @@ export class ImperiumViewComponent implements OnInit {
       : this.roundNumber(totalEnergyPenalty / this.ownedPlanets.length, 2);
     this.energyTooltip = `Average energy penalty: ${averageEnergyPenalty}%.`;
     this.powersDisplay = {
-      industryPower: this.roundNumber(totalIndustryPower, 2),
+      industryPower: this.roundNumber(totalIndustryPower - totalDroneIndustryPower, 2),
+      droneIndustryPower: this.roundNumber(totalDroneIndustryPower, 2),
+      totalIndustryPower: this.roundNumber(totalIndustryPower, 2),
       shipyardPower: this.roundNumber(totalShipyardPower, 2),
       researchPower: this.roundNumber(totalResearchPower, 2),
       shipRepair: this.roundNumber(totalShipRepair, 2),
@@ -803,6 +809,12 @@ export class ImperiumViewComponent implements OnInit {
     const industryPower = Math.max(0, Math.floor(
       roboticsPower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency
     ));
+    const droneIndustryPower = Math.max(0, Math.floor(
+      (ManyShips.countByType(planet.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0)
+      * industryModifier
+      * adaptiveIndustryMultiplier
+      * energyEfficiency
+    ));
     const shipyardPower = Math.max(0, Math.floor(
       shipyardBasePower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency
     ));
@@ -819,6 +831,8 @@ export class ImperiumViewComponent implements OnInit {
 
     return {
       industryPower,
+      droneIndustryPower,
+      totalIndustryPower: industryPower + droneIndustryPower,
       shipyardPower,
       researchPower,
       shipRepair,
@@ -1049,7 +1063,7 @@ export class ImperiumViewComponent implements OnInit {
     }
 
     if (this.selectedSort === 'industryPower') {
-      return right.powers.industryPower - left.powers.industryPower
+      return right.powers.totalIndustryPower - left.powers.totalIndustryPower
         || left.coordinatesLabel.localeCompare(right.coordinatesLabel);
     }
 
