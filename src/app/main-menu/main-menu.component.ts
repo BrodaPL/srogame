@@ -1,4 +1,4 @@
-import { Component, effect } from '@angular/core';
+import { ChangeDetectorRef, Component, effect } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
@@ -29,7 +29,8 @@ export class MainMenuComponent {
     private readonly gameApi: GameApiService,
     private readonly gameState: GameStateService,
     private readonly i18n: I18nService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly cdr: ChangeDetectorRef
   ) {
     this.session = this.authState.session;
     effect(() => {
@@ -40,6 +41,7 @@ export class MainMenuComponent {
         this.isClosingCurrentGame = false;
         this.resumeError = null;
         this.closeError = null;
+        this.cdr.markForCheck();
         return;
       }
 
@@ -172,6 +174,7 @@ export class MainMenuComponent {
           ...nextSession,
           currentGameId: status.currentGameId
         });
+        this.cdr.markForCheck();
         this.router.navigate(['/game/imperium']);
       },
       error: (error) => {
@@ -180,6 +183,7 @@ export class MainMenuComponent {
           error,
           this.i18n.t('mainMenu.currentGame.resumeUnavailable')
         );
+        this.cdr.markForCheck();
         this.loadCurrentGameStatus(session.token);
       }
     });
@@ -207,6 +211,7 @@ export class MainMenuComponent {
           });
         }
         this.gameState.clearGalaxy();
+        this.cdr.markForCheck();
       },
       error: (error) => {
         this.isClosingCurrentGame = false;
@@ -215,6 +220,7 @@ export class MainMenuComponent {
           error,
           this.i18n.t('mainMenu.currentGame.closeUnavailable')
         );
+        this.cdr.markForCheck();
         this.loadCurrentGameStatus(session.token);
       }
     });
@@ -245,10 +251,15 @@ export class MainMenuComponent {
         this.isClosingCurrentGame = false;
         this.resumeError = null;
         this.closeError = null;
+        this.cdr.markForCheck();
       },
-      error: () => {
+      error: (error) => {
+        if (error?.status === 401) {
+          this.authState.clearSession();
+        }
         this.currentGameStatus = null;
         this.isLoadingCurrentGameStatus = false;
+        this.cdr.markForCheck();
       }
     });
   }

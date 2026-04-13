@@ -1,5 +1,5 @@
 import '@angular/compiler';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { MainMenuComponent } from './main-menu.component';
@@ -33,6 +33,9 @@ describe('MainMenuComponent', () => {
   let i18n: {
     t: ReturnType<typeof vi.fn>;
   };
+  let cdr: {
+    markForCheck: ReturnType<typeof vi.fn>;
+  };
   let sessionSignal: ReturnType<typeof signal<PlayerSession | null>>;
 
   beforeEach(() => {
@@ -64,10 +67,13 @@ describe('MainMenuComponent', () => {
     i18n = {
       t: vi.fn((key: string) => translationForKey(key))
     };
+    cdr = {
+      markForCheck: vi.fn()
+    };
   });
 
   it('enables resume for a running current game', () => {
-    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n);
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n, cdr);
 
     component['loadCurrentGameStatus']('token');
 
@@ -82,7 +88,7 @@ describe('MainMenuComponent', () => {
       canResume: false,
       unavailableReason: 'You do not currently have access to resume this game.'
     })));
-    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n);
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n, cdr);
 
     component['loadCurrentGameStatus']('token');
 
@@ -100,7 +106,7 @@ describe('MainMenuComponent', () => {
       canResume: false,
       unavailableReason: null
     } satisfies CurrentGameStatusResponse));
-    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n);
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n, cdr);
 
     component['loadCurrentGameStatus']('token');
 
@@ -118,7 +124,7 @@ describe('MainMenuComponent', () => {
         kind: 'SINGLEPLAYER'
       }
     })));
-    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n);
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n, cdr);
 
     component['loadCurrentGameStatus']('token');
 
@@ -132,6 +138,19 @@ describe('MainMenuComponent', () => {
     }));
     expect(gameState.clearGalaxy).toHaveBeenCalled();
   });
+
+  it('clears the stored session when current-game status returns unauthorized', () => {
+    gameApi.getCurrentGameStatus.mockReturnValue(throwError(() => ({
+      status: 401
+    })));
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n, cdr);
+
+    component['loadCurrentGameStatus']('token');
+
+    expect(authState.clearSession).toHaveBeenCalled();
+    expect(component.currentGameStatus).toBeNull();
+    expect(component.isLoadingCurrentGameStatus).toBe(false);
+  });
 });
 
 function createBareComponent(
@@ -140,7 +159,8 @@ function createBareComponent(
   gameApi: Pick<GameApiService, 'getCurrentGameStatus' | 'selectGame' | 'closeCurrentGame'>,
   gameState: Pick<GameStateService, 'clearGalaxy'>,
   router: { navigate: (commands: string[]) => Promise<boolean> },
-  i18n: Pick<I18nService, 't'>
+  i18n: Pick<I18nService, 't'>,
+  cdr: { markForCheck: () => void }
 ): MainMenuComponent & {
   currentGameStatus: CurrentGameStatusResponse | null;
   isLoadingCurrentGameStatus: boolean;
@@ -178,6 +198,7 @@ function createBareComponent(
   (component as never as { gameState: typeof gameState }).gameState = gameState;
   (component as never as { router: typeof router }).router = router;
   (component as never as { i18n: typeof i18n }).i18n = i18n;
+  (component as never as { cdr: typeof cdr }).cdr = cdr;
   component.session = authState.session;
   component.currentGameStatus = null;
   component.isLoadingCurrentGameStatus = false;

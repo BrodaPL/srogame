@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../core/auth-api.service';
@@ -29,7 +29,8 @@ export class LoadGameComponent {
     private readonly authApi: AuthApiService,
     private readonly authState: AuthStateService,
     private readonly gameApi: GameApiService,
-    private readonly gameState: GameStateService
+    private readonly gameState: GameStateService,
+    private readonly cdr: ChangeDetectorRef
   ) {
     this.session = this.authState.session;
     this.loadSaves();
@@ -39,21 +40,44 @@ export class LoadGameComponent {
     this.isSummaryLoading = true;
     this.summaryError = null;
 
+    const hadStoredSession = this.session() !== null;
     const token = this.session()?.token;
     this.selectedGameId = this.session()?.currentGameId ?? null;
     this.gameApi.getGameSaves(token).subscribe({
       next: (response) => {
+        if (hadStoredSession && response.isLoggedIn !== true) {
+          this.authState.clearSession();
+          this.response = response;
+          this.selectedGameId = null;
+          this.summaryError = 'Session expired. Please log in again.';
+          this.isSummaryLoading = false;
+          this.confirmReplaceActiveGame = false;
+          this.cdr.markForCheck();
+          return;
+        }
+
         this.response = response;
         this.selectedGameId = response.currentSelectedGameId;
         this.isSummaryLoading = false;
         if (!response.activeGame) {
           this.confirmReplaceActiveGame = false;
         }
+        this.cdr.markForCheck();
       },
       error: (error) => {
+        if (error?.status === 401) {
+          this.authState.clearSession();
+          this.selectedGameId = null;
+          this.summaryError = 'Session expired. Please log in again.';
+          this.isSummaryLoading = false;
+          this.cdr.markForCheck();
+          return;
+        }
+
         this.response = null;
         this.summaryError = error?.error?.error ?? 'Unable to load save summary.';
         this.isSummaryLoading = false;
+        this.cdr.markForCheck();
       }
     });
   }
@@ -108,12 +132,14 @@ export class LoadGameComponent {
         this.gameState.setGalaxy(response.galaxy);
         this.pendingAction = null;
         this.pendingSaveId = null;
+        this.cdr.markForCheck();
         this.router.navigate(['/game/imperium']);
       },
       error: (error) => {
         this.actionError = error?.error?.error ?? 'Unable to load saved game.';
         this.pendingAction = null;
         this.pendingSaveId = null;
+        this.cdr.markForCheck();
         this.loadSaves();
       }
     });
@@ -138,12 +164,14 @@ export class LoadGameComponent {
       next: () => {
         this.pendingAction = null;
         this.pendingSaveId = null;
+        this.cdr.markForCheck();
         this.loadSaves();
       },
       error: (error) => {
         this.actionError = error?.error?.error ?? 'Unable to delete saved game.';
         this.pendingAction = null;
         this.pendingSaveId = null;
+        this.cdr.markForCheck();
         this.loadSaves();
       }
     });
