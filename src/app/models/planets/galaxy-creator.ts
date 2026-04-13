@@ -27,6 +27,8 @@ import { createTutorialReadState } from '../../tutorial/tutorial-types';
 
 export class GalaxyCreator {
   private static readonly BOT_NAME_POOL_SIZE = 24;
+  private static readonly HOMEWORLD_INDUSTRY_MODIFIER = 1.25;
+  private static readonly HOMEWORLD_SCIENCE_MODIFIER = 0.75;
   private static readonly TEST_RANDOM_PLANETS_COUNT = 3;
   private static readonly TEST_STARTING_SHIPS_PER_TYPE = 10;
   private static readonly HOME_SYSTEM_NEUTRAL_LEVEL = 3;
@@ -397,6 +399,7 @@ export class GalaxyCreator {
         slot.planet.basicInfo.order,
         startingPlanet.basicInfo.type
       );
+      this.applyHomeworldPlanetaryModifiers(startingPlanet);
       this.applyStartingHomeworldPreset(startingPlanet);
 
       slot.system.planets[slot.index] = startingPlanet;
@@ -453,6 +456,7 @@ export class GalaxyCreator {
         slot.planet.basicInfo.order,
         startingPlanet.basicInfo.type
       );
+      this.applyHomeworldPlanetaryModifiers(startingPlanet);
       this.applyStartingHomeworldPreset(startingPlanet);
 
       slot.system.planets[slot.index] = startingPlanet;
@@ -659,6 +663,11 @@ export class GalaxyCreator {
     const normalizedIndex = Math.max(0, Math.floor(botIndex));
     const name = botNamePool[normalizedIndex % botNamePool.length] ?? botNamePool[0];
     return `AI_${name}_${playerId}`;
+  }
+
+  private applyHomeworldPlanetaryModifiers(planet: Planet): void {
+    planet.info.planetaryParameters.industryModifier = GalaxyCreator.HOMEWORLD_INDUSTRY_MODIFIER;
+    planet.info.planetaryParameters.scienceModifier = GalaxyCreator.HOMEWORLD_SCIENCE_MODIFIER;
   }
 
   private createStartingTechLevels(): Map<TechnologyType, number> {

@@ -175,6 +175,23 @@ describe('GalaxyCreator', () => {
     expect(bot!.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY)).toBe(2);
   });
 
+  it('applies fixed homeworld industry and science modifiers to both human and bot starts', () => {
+    const galaxy = new GalaxyCreator(createSetup({
+      botsAmount: 1,
+      neutralBotsAmount: 0
+    })).createGalaxy(['Human']);
+
+    const human = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER);
+    const bot = galaxy.players.find((entry) => entry.type === PlayerType.BOT);
+
+    expect(human).toBeTruthy();
+    expect(bot).toBeTruthy();
+    expect(human!.planets[0].info.planetaryParameters.industryModifier).toBe(1.25);
+    expect(human!.planets[0].info.planetaryParameters.scienceModifier).toBe(0.75);
+    expect(bot!.planets[0].info.planetaryParameters.industryModifier).toBe(1.25);
+    expect(bot!.planets[0].info.planetaryParameters.scienceModifier).toBe(0.75);
+  });
+
   it('adds Energy Technology 1 to medium preset starts for both humans and bots', () => {
     const galaxy = new GalaxyCreator(createSetup({
       botsAmount: 1,
