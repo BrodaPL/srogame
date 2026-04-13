@@ -3268,24 +3268,6 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     currentPowerByType: Map<BuildingType, number>
   ): FusionReactorOperation {
     const fusionLevel = levels.get(BuildingType.FUSION_REACTOR) ?? 0;
-    if (fusionLevel <= 0) {
-      return resolveFusionReactorOperation({
-        selectedStage: 0,
-        maxStage: 0,
-        structuralUtilization: 0,
-        energyTechnologyLevel: this.techLevel(TechnologyType.ENERGY_TECHNOLOGY),
-        adaptiveTechnologyLevel: this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
-        solarProduction: 0,
-        nuclearProduction: 0,
-        otherEnergyUsed: 0,
-        energyModifierRES: this.planet?.info.planetaryParameters.energyModifierRES ?? 1,
-        energyModifierNuclear: this.planet?.info.planetaryParameters.energyModifierNuclear ?? 1,
-        deuteriumSynthesizerProduction: 0,
-        deuteriumModifier: this.planet?.info.planetaryParameters.deuteriumModifier ?? 1,
-        fusionPowerAtStage: () => 0,
-        fusionDeuteriumAtStage: () => 0
-      });
-    }
 
     let otherEnergyUsed = 0;
     for (const [buildingType, level] of levels.entries()) {
@@ -3868,24 +3850,6 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   private resolveFusionReactorOperationForPlanet(planet: ClientPlanetDto): FusionReactorOperation {
     const fusionLevel = this.buildingLevelForPlanet(planet, BuildingType.FUSION_REACTOR);
-    if (fusionLevel <= 0) {
-      return resolveFusionReactorOperation({
-        selectedStage: 0,
-        maxStage: 0,
-        structuralUtilization: 0,
-        energyTechnologyLevel: this.techLevelForPlanet(planet, TechnologyType.ENERGY_TECHNOLOGY),
-        adaptiveTechnologyLevel: this.techLevelForPlanet(planet, TechnologyType.ADAPTIVE_TECHNOLOGY),
-        solarProduction: 0,
-        nuclearProduction: 0,
-        otherEnergyUsed: 0,
-        energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
-        energyModifierNuclear: planet.info.planetaryParameters.energyModifierNuclear,
-        deuteriumSynthesizerProduction: 0,
-        deuteriumModifier: planet.info.planetaryParameters.deuteriumModifier,
-        fusionPowerAtStage: () => 0,
-        fusionDeuteriumAtStage: () => 0
-      });
-    }
 
     let otherEnergyUsed = 0;
     for (const entry of planet.objects.buildingsLevels) {

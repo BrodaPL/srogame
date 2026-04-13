@@ -1229,24 +1229,6 @@ export class ProductionViewComponent implements OnInit {
     currentPowerByType: Map<BuildingType, number>
   ): FusionReactorOperation {
     const fusionLevel = levels.get(BuildingType.FUSION_REACTOR) ?? 0;
-    if (fusionLevel <= 0) {
-      return resolveFusionReactorOperation({
-        selectedStage: 0,
-        maxStage: 0,
-        structuralUtilization: 0,
-        energyTechnologyLevel: this.techLevel(TechnologyType.ENERGY_TECHNOLOGY),
-        adaptiveTechnologyLevel: this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
-        solarProduction: 0,
-        nuclearProduction: 0,
-        otherEnergyUsed: 0,
-        energyModifierRES: this.selectedPlanet()?.info.planetaryParameters.energyModifierRES ?? 1,
-        energyModifierNuclear: this.selectedPlanet()?.info.planetaryParameters.energyModifierNuclear ?? 1,
-        deuteriumSynthesizerProduction: 0,
-        deuteriumModifier: this.selectedPlanet()?.info.planetaryParameters.deuteriumModifier ?? 1,
-        fusionPowerAtStage: () => 0,
-        fusionDeuteriumAtStage: () => 0
-      });
-    }
 
     let otherEnergyUsed = 0;
     for (const [buildingType, level] of levels.entries()) {

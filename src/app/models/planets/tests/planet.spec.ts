@@ -126,6 +126,21 @@ describe('Planet', () => {
     expect(operation.isClamped).toBe(true);
   });
 
+  it('preserves deuterium synthesizer income when fusion reactor is absent', () => {
+    const planet = createPlanet();
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 10);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 1);
+
+    const operation = planet.resolveFusionReactorOperation(0, 0);
+
+    expect(operation.selectedStage).toBe(0);
+    expect(operation.effectiveStage).toBe(0);
+    expect(operation.grossDeuteriumIncome).toBe(20);
+    expect(operation.netDeuteriumIncome).toBe(20);
+    expect(operation.deuteriumUpkeep).toBe(0);
+    expect(operation.powerOutput).toBe(0);
+  });
+
   it('scales building production by current power utilization and floors results', () => {
     const planet = createPlanet();
     planet.setBuildingLevel(BuildingType.METAL_MINE, 5);

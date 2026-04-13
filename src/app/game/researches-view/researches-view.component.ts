@@ -1020,24 +1020,6 @@ export class ResearchesViewComponent implements OnInit {
 
   private resolveFusionReactorOperationForPlanet(planet: ClientPlanetDto) {
     const fusionLevel = this.buildingLevel(planet, BuildingType.FUSION_REACTOR);
-    if (fusionLevel <= 0) {
-      return resolveFusionReactorOperation({
-        selectedStage: 0,
-        maxStage: 0,
-        structuralUtilization: 0,
-        energyTechnologyLevel: this.currentTechnologyLevel(TechnologyType.ENERGY_TECHNOLOGY),
-        adaptiveTechnologyLevel: this.currentTechnologyLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
-        solarProduction: 0,
-        nuclearProduction: 0,
-        otherEnergyUsed: 0,
-        energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
-        energyModifierNuclear: planet.info.planetaryParameters.energyModifierNuclear,
-        deuteriumSynthesizerProduction: 0,
-        deuteriumModifier: planet.info.planetaryParameters.deuteriumModifier,
-        fusionPowerAtStage: () => 0,
-        fusionDeuteriumAtStage: () => 0
-      });
-    }
 
     let otherEnergyUsed = 0;
     for (const entry of planet.objects.buildingsLevels) {

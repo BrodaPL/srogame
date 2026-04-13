@@ -1053,24 +1053,6 @@ export class ImperiumViewComponent implements OnInit {
     techLevels: Map<TechnologyType, number>
   ): FusionReactorOperation {
     const fusionLevel = this.buildingLevel(planet, BuildingType.FUSION_REACTOR);
-    if (fusionLevel <= 0) {
-      return resolveFusionReactorOperation({
-        selectedStage: 0,
-        maxStage: 0,
-        structuralUtilization: 0,
-        energyTechnologyLevel: techLevels.get(TechnologyType.ENERGY_TECHNOLOGY) ?? 0,
-        adaptiveTechnologyLevel: techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? 0,
-        solarProduction: 0,
-        nuclearProduction: 0,
-        otherEnergyUsed: 0,
-        energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
-        energyModifierNuclear: planet.info.planetaryParameters.energyModifierNuclear,
-        deuteriumSynthesizerProduction: 0,
-        deuteriumModifier: planet.info.planetaryParameters.deuteriumModifier,
-        fusionPowerAtStage: () => 0,
-        fusionDeuteriumAtStage: () => 0
-      });
-    }
 
     let otherEnergyUsed = 0;
     for (const entry of planet.objects.buildingsLevels) {
