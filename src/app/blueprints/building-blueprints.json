@@ -341,8 +341,104 @@
                     "description":  "Planetary METAL storages.",
                     "imagePath":  "images/buildings/normal/METAL_STORAGE.jpg",
                     "basicCost":  {
-                                      "metal":  20,
+                                      "metal":  30,
                                       "crystal":  0,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  0,
+                    "buildingRequirements":  [
+
+                                             ],
+                    "techRequirements":  [
+
+                                         ],
+                    "production1":  [
+                                        400,
+                                        800,
+                                        1600,
+                                        3200,
+                                        6400,
+                                        12800,
+                                        25600,
+                                        51200,
+                                        102400,
+                                        204800,
+                                        409600,
+                                        819200,
+                                        1638400,
+                                        3276800,
+                                        6553600,
+                                        13107200,
+                                        26214400,
+                                        52428800,
+                                        104857600,
+                                        200000000
+                                    ],
+                    "production2":  [
+
+                                    ],
+                    "production3":  [
+
+                                    ],
+                    "isFacility":  false
+                },
+                {
+                    "type":  "CRYSTAL_STORAGE",
+                    "description":  "Planetary CRYSTAL deposits.",
+                    "imagePath":  "images/buildings/normal/CRYSTAL_STORAGE.jpg",
+                    "basicCost":  {
+                                      "metal":  20,
+                                      "crystal":  10,
+                                      "deuterium":  0
+                                  },
+                    "level":  0,
+                    "currentPowerConsumption":  0,
+                    "powerConsumption":  0,
+                    "buildingRequirements":  [
+
+                                             ],
+                    "techRequirements":  [
+
+                                         ],
+                    "production1":  [
+                                        300,
+                                        600,
+                                        1200,
+                                        2400,
+                                        4800,
+                                        9600,
+                                        19200,
+                                        38400,
+                                        76800,
+                                        153600,
+                                        307200,
+                                        614400,
+                                        1228800,
+                                        2457600,
+                                        4915200,
+                                        9830400,
+                                        19660800,
+                                        39321600,
+                                        78643200,
+                                        160000000
+                                    ],
+                    "production2":  [
+
+                                    ],
+                    "production3":  [
+
+                                    ],
+                    "isFacility":  false
+                },
+                {
+                    "type":  "DEUTERIUM_TANK",
+                    "description":  "Planetary DEUTERIUM tanks.",
+                    "imagePath":  "images/buildings/normal/DEUTERIUM_TANK.jpg",
+                    "basicCost":  {
+                                      "metal":  15,
+                                      "crystal":  15,
                                       "deuterium":  0
                                   },
                     "level":  0,
@@ -374,103 +470,7 @@
                                         13107200,
                                         26214400,
                                         52428800,
-                                        104857600
-                                    ],
-                    "production2":  [
-
-                                    ],
-                    "production3":  [
-
-                                    ],
-                    "isFacility":  false
-                },
-                {
-                    "type":  "CRYSTAL_STORAGE",
-                    "description":  "Planetary CRYSTAL deposits.",
-                    "imagePath":  "images/buildings/normal/CRYSTAL_STORAGE.jpg",
-                    "basicCost":  {
-                                      "metal":  15,
-                                      "crystal":  5,
-                                      "deuterium":  0
-                                  },
-                    "level":  0,
-                    "currentPowerConsumption":  0,
-                    "powerConsumption":  0,
-                    "buildingRequirements":  [
-
-                                             ],
-                    "techRequirements":  [
-
-                                         ],
-                    "production1":  [
-                                        150,
-                                        300,
-                                        600,
-                                        1200,
-                                        2400,
-                                        4800,
-                                        9600,
-                                        19200,
-                                        38400,
-                                        76800,
-                                        153600,
-                                        307200,
-                                        614400,
-                                        1228800,
-                                        2457600,
-                                        4915200,
-                                        9830400,
-                                        19660800,
-                                        39321600,
-                                        78643200
-                                    ],
-                    "production2":  [
-
-                                    ],
-                    "production3":  [
-
-                                    ],
-                    "isFacility":  false
-                },
-                {
-                    "type":  "DEUTERIUM_TANK",
-                    "description":  "Planetary DEUTERIUM tanks.",
-                    "imagePath":  "images/buildings/normal/DEUTERIUM_TANK.jpg",
-                    "basicCost":  {
-                                      "metal":  10,
-                                      "crystal":  10,
-                                      "deuterium":  0
-                                  },
-                    "level":  0,
-                    "currentPowerConsumption":  0,
-                    "powerConsumption":  0,
-                    "buildingRequirements":  [
-
-                                             ],
-                    "techRequirements":  [
-
-                                         ],
-                    "production1":  [
-                                        100,
-                                        200,
-                                        400,
-                                        800,
-                                        1600,
-                                        3200,
-                                        6400,
-                                        12800,
-                                        25600,
-                                        51200,
-                                        102400,
-                                        204800,
-                                        409600,
-                                        819200,
-                                        1638400,
-                                        3276800,
-                                        6553600,
-                                        13107200,
-                                        26214400,
-                                        52428800
+                                        100000000
                                     ],
                     "production2":  [
 

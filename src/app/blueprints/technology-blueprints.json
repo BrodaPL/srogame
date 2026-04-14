@@ -115,7 +115,7 @@
       "type": "GRAVITON_TECHNOLOGY",
       "imagePath": "images/technologies/normal/GRAVITON_TECHNOLOGY.jpg",
       "description": "Gives 5% ship bonus evasion bonus. Increases jump range by 1. Increses Jump Gate and Interstellar Trade Port capacity by 25%. Increase Sensor Phlanx base range by 0.5",
-      "basicCost": { "metal": 0, "crystal": 5000, "deuterium": 5000 },
+      "basicCost": { "metal": 0, "crystal": 5000, "deuterium": 50000 },
       "energyRequired": [110],
       "researchTime": [0.1],
       "buildingRequirements": [
@@ -216,7 +216,7 @@
       "type": "HYPERSPACE_DRIVE",
       "imagePath": "images/technologies/normal/HYPERSPACE_DRIVE.jpg",
       "description": "Increases jump range by 1.",
-      "basicCost": { "metal": 50, "crystal": 250, "deuterium": 250 },
+      "basicCost": { "metal": 30, "crystal": 150, "deuterium": 150 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
