@@ -72,6 +72,7 @@ describe('resolvePhaseOneTurn colonize integration', () => {
     expect(targetPlanet.getBuildingLevel(BuildingType.DEUTERIUM_TANK)).toBe(1);
     expect(targetPlanet.getBuildingLevel(BuildingType.METAL_MINE)).toBe(1);
     expect(targetPlanet.getBuildingLevel(BuildingType.CRYSTAL_MINE)).toBe(1);
+    expect(ManyShips.undamagedCountByType(targetPlanet.rBDSFTQ.ships).get(ShipType.COLONIZER) ?? 0).toBe(0);
   });
 
   it('lets Colonize reclaim a passive neutral planet and removes the temporary neutral owner', () => {
@@ -132,7 +133,7 @@ describe('resolvePhaseOneTurn colonize integration', () => {
     expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.DEUTERIUM_TANK)).toBe(1);
     expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.METAL_MINE)).toBe(1);
     expect(passiveNeutralPlanet.getBuildingLevel(BuildingType.CRYSTAL_MINE)).toBe(1);
-    expect(ManyShips.undamagedCountByType(passiveNeutralPlanet.rBDSFTQ.ships).get(ShipType.COLONIZER) ?? 0).toBe(1);
+    expect(ManyShips.undamagedCountByType(passiveNeutralPlanet.rBDSFTQ.ships).get(ShipType.COLONIZER) ?? 0).toBe(0);
     expect(ManyShips.undamagedCountByType(passiveNeutralPlanet.rBDSFTQ.ships).get(ShipType.FIGHTER) ?? 0).toBe(2);
     expect(passiveNeutralPlanet.rBDSFTQ.resources.metal).toBe(350);
     expect(passiveNeutralPlanet.rBDSFTQ.resources.crystal).toBe(140);

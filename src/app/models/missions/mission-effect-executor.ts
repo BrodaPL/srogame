@@ -1,5 +1,6 @@
 import { EspionageReportGenerator } from '../../generators/espionage-report-generator';
 import { BuildingType } from '../enums/building-type';
+import { FleetMissionType } from '../enums/fleet-mission-type';
 import { ShipType } from '../enums/ship-type';
 import { ManyShips } from '../fleets/many-ships';
 import { ResourcesPack } from '../resources-pack';
@@ -65,7 +66,9 @@ export class MissionEffectExecutor {
         }
         break;
       case 'mergeFleetToPlanet':
-        this.resolvePlanet(effect.planetRef, context)?.rBDSFTQ.ships.addManyShips(context.fleet.ships);
+        this.resolvePlanet(effect.planetRef, context)?.rBDSFTQ.ships.addManyShips(
+          this.resolveMergedFleetShips(effect.planetRef, context)
+        );
         this.resolvePlanet(effect.planetRef, context)?.rBDSFTQ.defences.addManyDefences(context.fleet.carriedBombs);
         break;
       case 'transferFleetCargoToPlanet':
@@ -105,6 +108,18 @@ export class MissionEffectExecutor {
     context: MissionEffectExecutionContext
   ): Planet | null {
     return planetRef === 'origin' ? context.originPlanet : context.targetPlanet;
+  }
+
+  private resolveMergedFleetShips(
+    planetRef: 'origin' | 'target',
+    context: MissionEffectExecutionContext
+  ): ManyShips {
+    const mergedShips = ManyShips.fromData(context.fleet.ships);
+    if (planetRef === 'target' && context.fleet.missionType === FleetMissionType.COLONIZE) {
+      mergedShips.removeShipsByType([{ type: ShipType.COLONIZER, amount: 1 }]);
+    }
+
+    return mergedShips;
   }
 
   private generateEspionageReport(context: MissionEffectExecutionContext): void {
