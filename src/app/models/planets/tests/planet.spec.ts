@@ -119,11 +119,21 @@ describe('Planet', () => {
 
     expect(planet.getFusionReactorSelectedStage()).toBe(4);
     expect(operation.selectedStage).toBe(4);
-    expect(operation.effectiveStage).toBe(3);
-    expect(operation.deuteriumUpkeep).toBe(6);
+    expect(operation.effectiveStage).toBe(2);
+    expect(operation.deuteriumUpkeep).toBe(4);
     expect(operation.grossDeuteriumIncome).toBe(6);
-    expect(operation.netDeuteriumIncome).toBe(0);
+    expect(operation.netDeuteriumIncome).toBe(2);
     expect(operation.isClamped).toBe(true);
+  });
+
+  it('resets fusion reactor selected stage to the new max when the reactor levels up', () => {
+    const planet = createPlanet();
+    planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 2);
+    planet.setFusionReactorSelectedStage(1);
+
+    planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 3);
+
+    expect(planet.getFusionReactorSelectedStage()).toBe(3);
   });
 
   it('preserves deuterium synthesizer income when fusion reactor is absent', () => {

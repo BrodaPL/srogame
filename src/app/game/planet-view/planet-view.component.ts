@@ -385,12 +385,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return this.currentFusionReactorSelectedStage();
   }
 
-  protected effectiveFusionReactorStage(building: Building): number {
+  protected fusionReactorDeuteriumUsage(building: Building): number {
     if (building.type !== BuildingType.FUSION_REACTOR) {
       return 0;
     }
 
-    return this.currentFusionReactorOperation().effectiveStage;
+    return this.currentFusionReactorOperation().deuteriumUpkeep;
   }
 
   protected fusionReactorStageWarning(building: Building): string | null {

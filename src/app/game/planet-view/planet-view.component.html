@@ -172,7 +172,7 @@
                     </p>
                     @if (building.type === BuildingType.FUSION_REACTOR) {
                       <p class="planet-building-card__meta">
-                        Fusion stage: {{ selectedFusionReactorStage(building) }} (effective {{ effectiveFusionReactorStage(building) }})
+                        Fusion stage: {{ selectedFusionReactorStage(building) }} (deuterium usage {{ fusionReactorDeuteriumUsage(building) }})
                       </p>
                     } @else {
                       <p class="planet-building-card__meta">
@@ -295,7 +295,7 @@
                     </p>
                     @if (building.type === BuildingType.FUSION_REACTOR) {
                       <p class="planet-building-card__meta">
-                        Fusion stage: {{ selectedFusionReactorStage(building) }} (effective {{ effectiveFusionReactorStage(building) }})
+                        Fusion stage: {{ selectedFusionReactorStage(building) }} (deuterium usage {{ fusionReactorDeuteriumUsage(building) }})
                       </p>
                     } @else {
                       <p class="planet-building-card__meta">

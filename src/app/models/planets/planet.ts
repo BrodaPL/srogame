@@ -247,7 +247,7 @@ export class Planet {
 
     this.rBDSFTQ.buildingsLevels.set(type, normalized);
     this.normalizeCurrentPowerConsumption(type);
-    this.normalizeFusionReactorSelectedStage(type);
+    this.normalizeFusionReactorSelectedStage(type, previousLevel, normalized);
     this.normalizeCurrentStructuralPoints(type, previousLevel, previousMaxStructuralPoints);
     this.normalizeTerraformerSizeBonus(type, previousTerraformerSizeBonus, normalized);
   }
@@ -772,7 +772,11 @@ export class Planet {
     this.rBDSFTQ.buildingsCurrentPowerConsumption.set(type, Math.min(max, Math.max(0, existing)));
   }
 
-  private normalizeFusionReactorSelectedStage(type: BuildingType): void {
+  private normalizeFusionReactorSelectedStage(
+    type: BuildingType,
+    previousLevel: number,
+    currentLevel: number
+  ): void {
     if (type !== BuildingType.FUSION_REACTOR) {
       return;
     }
@@ -785,6 +789,11 @@ export class Planet {
 
     const existing = this.rBDSFTQ.fusionReactorSelectedStage;
     if (existing === null || existing === undefined || !Number.isFinite(existing)) {
+      this.rBDSFTQ.fusionReactorSelectedStage = maxStage;
+      return;
+    }
+
+    if (currentLevel > previousLevel) {
       this.rBDSFTQ.fusionReactorSelectedStage = maxStage;
       return;
     }

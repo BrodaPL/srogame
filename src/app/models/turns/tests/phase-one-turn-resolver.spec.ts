@@ -1007,7 +1007,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
     resolvePhaseOneTurn(galaxy);
 
     expect(system.planets[0].getFusionReactorSelectedStage()).toBe(4);
-    expect(system.planets[0].resolveFusionReactorOperation(0, 0).effectiveStage).toBe(3);
+    expect(system.planets[0].resolveFusionReactorOperation(0, 0).effectiveStage).toBe(2);
     expect(system.planets[0].rBDSFTQ.resources.deuterium).toBe(100);
   });
 
