@@ -95,6 +95,8 @@ type AttackPlunderSummary = {
   availableLoot: ResourcesPack;
   stolenResources: ResourcesPack;
   freeCargoCapacity: number;
+  currentCargoCapacity: number;
+  totalCargoCapacity: number;
 };
 
 export type TurnDifficultyConfig = {
@@ -1576,7 +1578,9 @@ function resolveAttackPlunder(
     bunkerReductionPercent,
     availableLoot,
     stolenResources,
-    freeCargoCapacity
+    freeCargoCapacity,
+    currentCargoCapacity: fleet.usedCargoCapacity,
+    totalCargoCapacity: fleet.totalCargoCapacity
   };
 }
 
@@ -1679,13 +1683,15 @@ function appendAttackPlunderToBattleReports(
     `Base plunder: 80%`,
     `Bunker reduction: ${summary.bunkerReductionPercent}%`,
     `Effective plunder: ${effectivePercent}%`,
-    `Free cargo space before looting: ${summary.freeCargoCapacity}`
+    `Free cargo space before looting: ${summary.freeCargoCapacity}`,
+    `Fleet cargo after looting: ${summary.currentCargoCapacity}/${summary.totalCargoCapacity}`
   ];
   const defenderLines = [
     'Enemy plunder summary:',
     `Base plunder: 80%`,
     `Bunker reduction: ${summary.bunkerReductionPercent}%`,
-    `Effective plunder: ${effectivePercent}%`
+    `Effective plunder: ${effectivePercent}%`,
+    `Attacking fleet cargo after looting: ${summary.currentCargoCapacity}/${summary.totalCargoCapacity}`
   ];
 
   if (availableTotal <= 0) {
@@ -1725,7 +1731,8 @@ function addAttackPlunderSummaryReport(
     `Attack mission reached ${targetPlanet.basicInfo.name}.`,
     `Base plunder: 80%`,
     `Bunker reduction: ${summary.bunkerReductionPercent}%`,
-    `Effective plunder: ${effectivePercent}%`
+    `Effective plunder: ${effectivePercent}%`,
+    `Fleet cargo after looting: ${summary.currentCargoCapacity}/${summary.totalCargoCapacity}`
   ];
 
   if (availableTotal <= 0) {

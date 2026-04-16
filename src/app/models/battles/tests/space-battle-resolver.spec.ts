@@ -598,6 +598,8 @@ describe('SpaceBattleResolver', () => {
     expect(attacker.reports[0].show()).toContain('Perspective: Attacker');
     expect(defender.reports[0].show()).toContain('Perspective: Defender');
     expect(attacker.reports[0].show()).toContain('Battle result: Attacker');
+    expect(attacker.reports[0].show()).toContain('Enemy ship losses by type: Cruiser x1');
+    expect(defender.reports[0].show()).toContain('Own ship losses by type: Cruiser x1');
   });
 
   it('resolves carried size-1 planetary bombs after the normal round fire against planetary defences', () => {
@@ -637,6 +639,8 @@ describe('SpaceBattleResolver', () => {
     expect(result.roundSummaries[0].planetaryBombActions[0].bombHullAfter).toBe(0);
     expect(result.roundSummaries[0].planetaryBombActions[0].damage).toBeGreaterThan(0);
     expect(result.defender.survivingDefenceCount).toBe(0);
+    expect(result.reports.attacker.show()).toContain('Enemy defense losses by type: Light Beam Cannon x1');
+    expect(result.reports.defender.show()).toContain('Own defense losses by type: Light Beam Cannon x1');
   });
 
   it('simulates a full 4-round battle when armor prevents all hull damage', () => {

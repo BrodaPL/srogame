@@ -157,6 +157,10 @@ describe('resolvePhaseOneTurn battle integration', () => {
       report.title.startsWith('Battle Report:')
     )).toBe(true);
     expect(attacker.reports.some((report) =>
+      report.title.startsWith('Battle Report:')
+      && report.show().includes('Enemy ship losses by type: Spy Probe x1')
+    )).toBe(true);
+    expect(attacker.reports.some((report) =>
       report.title.startsWith('Fleet Failed: Move')
     )).toBe(true);
     expect(defender.reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
@@ -1226,7 +1230,10 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].rBDSFTQ.resources.metal).toBe(100);
     expect(system.planets[1].rBDSFTQ.resources.crystal).toBe(100);
     expect(system.planets[1].rBDSFTQ.resources.deuterium).toBe(100);
-    expect(attacker.reports.some((report) => report.title.startsWith('Plunder Report: Beta Storehouse'))).toBe(true);
+    expect(attacker.reports.some((report) =>
+      report.title.startsWith('Plunder Report: Beta Storehouse')
+      && report.show().includes('Fleet cargo after looting: 600/600')
+    )).toBe(true);
   });
 
   it('reduces Attack plunder efficiency by raw Bunker Network production1 value', () => {
@@ -1313,10 +1320,14 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(galaxy.activeFleets[0].cargo.metal).toBe(titanCargoCapacity);
     expect(system.planets[1].rBDSFTQ.resources.metal).toBe(200);
     expect(attacker.reports.some((report) =>
-      report.title.startsWith('Battle Report:') && report.show().includes('No free cargo space remained, so no resources were stolen.')
+      report.title.startsWith('Battle Report:')
+      && report.show().includes('No free cargo space remained, so no resources were stolen.')
+      && report.show().includes(`Fleet cargo after looting: ${titanCargoCapacity}/${titanCargoCapacity}`)
     )).toBe(true);
     expect(defender.reports.some((report) =>
-      report.title.startsWith('Battle Report:') && report.show().includes('Attacking fleet had no free cargo space, so no resources were stolen.')
+      report.title.startsWith('Battle Report:')
+      && report.show().includes('Attacking fleet had no free cargo space, so no resources were stolen.')
+      && report.show().includes(`Attacking fleet cargo after looting: ${titanCargoCapacity}/${titanCargoCapacity}`)
     )).toBe(true);
   });
 
