@@ -172,6 +172,10 @@ import {
   rejectFleetMaintenanceRequest,
   resolveFleetMaintenanceOptions
 } from './game-commands/maintenance-commands.js';
+import {
+  collectSensorPhalanxPassiveDetections,
+  type SensorPhalanxPassiveDetection
+} from './sensor-phalanx-passive.js';
 import { startShipyardConstruction } from './game-commands/shipyard-commands.js';
 import { startTechnologyResearch } from './game-commands/research-commands.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
@@ -6971,13 +6975,6 @@ function buildSensorPhalanxScanResponse(
   };
 }
 
-type SensorPhalanxPassiveDetection = {
-  fleetId: number;
-  targetCoordinates: ClientCoordinates;
-  targetPlanetName: string;
-  contact: SensorPhalanxFleetContactDto;
-};
-
 function processSensorPhalanxTurnStart(galaxy: Galaxy, currentTurn: number): void {
   const diplomacyResolver = createDiplomacyResolver(galaxy);
 
@@ -7015,54 +7012,6 @@ function processSensorPhalanxTurnStart(galaxy: Galaxy, currentTurn: number): voi
     }
   }
 }
-
-function collectSensorPhalanxPassiveDetections(
-  galaxy: Galaxy,
-  viewerPlayerId: number,
-  detectorCoordinates: ClientCoordinates,
-  normalRange: number,
-  diplomacyResolver: InstanceType<typeof DiplomacyResolver>
-): SensorPhalanxPassiveDetection[] {
-  const detections: SensorPhalanxPassiveDetection[] = [];
-
-  for (const fleet of galaxy.activeFleets) {
-    if (fleet.state !== FleetState.MOVING_TO_TARGET) {
-      continue;
-    }
-
-    const targetPlanet = resolvePlanetAtCoordinates(galaxy, fleet.target);
-    if (!targetPlanet) {
-      continue;
-    }
-
-    if (calculateTravelDistance(detectorCoordinates, fleet.target) > normalRange) {
-      continue;
-    }
-
-    detections.push({
-      fleetId: fleet.fleetId,
-      targetCoordinates: { ...fleet.target },
-      targetPlanetName: targetPlanet.basicInfo.name,
-      contact: toSensorPhalanxFleetContactDto(
-        fleet,
-        'INCOMING',
-        galaxy.currentTurn,
-        isAlliedSensorPhalanxContact(diplomacyResolver, viewerPlayerId, fleet.ownerId)
-      )
-    });
-  }
-
-  detections.sort((left, right) =>
-    compareSensorPhalanxContacts(left.contact, right.contact)
-      || left.targetCoordinates.x - right.targetCoordinates.x
-      || left.targetCoordinates.y - right.targetCoordinates.y
-      || left.targetCoordinates.z - right.targetCoordinates.z
-      || left.fleetId - right.fleetId
-  );
-
-  return detections;
-}
-
 function createSensorPhalanxPassiveReport(
   player: Player,
   detectorPlanet: Planet,
