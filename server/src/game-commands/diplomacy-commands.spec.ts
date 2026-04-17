@@ -33,6 +33,19 @@ describe('diplomacy commands', () => {
     expect(galaxy.diplomaticProposals[0].requestedStatus).toBe(DiplomaticStatus.PEACE);
   });
 
+  it('allows NEUTRAL to WAR proposals', () => {
+    const galaxy = createDiplomacyTestGalaxy();
+
+    const result = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1 },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.WAR }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(galaxy.diplomaticProposals).toHaveLength(1);
+    expect(galaxy.diplomaticProposals[0].requestedStatus).toBe(DiplomaticStatus.WAR);
+  });
+
   it('allows proposals without prior espionage visibility', () => {
     const galaxy = createDiplomacyTestGalaxy();
 
@@ -83,6 +96,67 @@ describe('diplomacy commands', () => {
 
     expect(allianceProposalResult.ok).toBe(true);
     expect(galaxy.diplomaticProposals.at(-1)?.requestedStatus).toBe(DiplomaticStatus.ALLIED);
+  });
+
+  it('allows WAR to NEUTRAL proposals', () => {
+    const galaxy = createDiplomacyTestGalaxy();
+    galaxy.diplomaticRelations = [{
+      playerAId: 1,
+      playerBId: 2,
+      status: DiplomaticStatus.WAR
+    }];
+
+    const result = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1 },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.NEUTRAL }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(galaxy.diplomaticProposals.at(-1)?.requestedStatus).toBe(DiplomaticStatus.NEUTRAL);
+  });
+
+  it('allows PEACE to NEUTRAL proposals', () => {
+    const galaxy = createDiplomacyTestGalaxy();
+    galaxy.diplomaticRelations = [{
+      playerAId: 1,
+      playerBId: 2,
+      status: DiplomaticStatus.PEACE
+    }];
+
+    const result = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1 },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.NEUTRAL }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(galaxy.diplomaticProposals.at(-1)?.requestedStatus).toBe(DiplomaticStatus.NEUTRAL);
+  });
+
+  it('allows ALLIED to PEACE but still rejects direct ALLIED to NEUTRAL proposals', () => {
+    const galaxy = createDiplomacyTestGalaxy();
+    galaxy.diplomaticRelations = [{
+      playerAId: 1,
+      playerBId: 2,
+      status: DiplomaticStatus.ALLIED
+    }];
+
+    const peaceResult = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1 },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.PEACE }
+    );
+
+    expect(peaceResult.ok).toBe(true);
+    galaxy.diplomaticProposals = [];
+
+    const neutralResult = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1 },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.NEUTRAL }
+    );
+
+    expect(neutralResult.ok).toBe(false);
+    if (!neutralResult.ok) {
+      expect(neutralResult.error.status).toBe(409);
+    }
   });
 
   it('allows proposals to bot empires but still rejects neutral empires', () => {

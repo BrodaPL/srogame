@@ -7662,7 +7662,7 @@ function buildDiplomacyContactDtos(galaxy: Galaxy, viewer: Player): DiplomacyCon
       if (candidate.type === 'NEUTRAL') {
         proposalBlockedReason = 'Neutral factions do not participate in treaty proposals.';
       } else if (availableStatuses.length <= 0) {
-        proposalBlockedReason = 'No higher treaty proposal is available from the current diplomacy status.';
+        proposalBlockedReason = 'No diplomacy proposal is available from the current diplomacy status.';
       } else if (pendingPairProposal) {
         proposalBlockedReason = 'A diplomacy proposal for this player pair is already pending.';
       } else if (outgoingProposalSentThisTurn) {

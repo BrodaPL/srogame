@@ -115,10 +115,10 @@ export class DiplomacyViewComponent implements OnInit {
 
   protected proposalAvailabilityCopy(contact: DiplomacyContactDto): string {
     if (contact.canSendProposal) {
-      return 'Send one treaty proposal to this player this turn. It applies immediately if they accept.';
+      return 'Send one diplomacy proposal to this player this turn. It applies immediately if they accept.';
     }
 
-    return contact.proposalBlockedReason ?? 'Treaty proposals are unavailable for this contact.';
+    return contact.proposalBlockedReason ?? 'Diplomacy proposals are unavailable for this contact.';
   }
 
   protected mailRecipients(): MailRecipientDto[] {
