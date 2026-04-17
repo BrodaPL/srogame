@@ -58,6 +58,19 @@ describe('diplomacy commands', () => {
     expect(galaxy.diplomaticProposals).toHaveLength(1);
   });
 
+  it('creates human proposals with the normal one-turn expiry window', () => {
+    const galaxy = createDiplomacyTestGalaxy();
+
+    const result = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1 },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.PEACE }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(galaxy.diplomaticProposals[0]?.createdTurn).toBe(galaxy.currentTurn);
+    expect(galaxy.diplomaticProposals[0]?.expiresOnTurn).toBe(galaxy.currentTurn + 1);
+  });
+
   it('rejects direct NEUTRAL to ALLIED proposals', () => {
     const galaxy = createDiplomacyTestGalaxy();
 

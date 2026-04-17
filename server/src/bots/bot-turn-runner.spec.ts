@@ -352,10 +352,19 @@ describe('bot-turn-runner', () => {
 
     runBotTurnPhase(galaxy);
 
-    expect(galaxy.diplomaticProposals.some((proposal) =>
-      proposal.fromPlayerId === bot.playerId
-      && proposal.toPlayerId === targetOwner.playerId
-      && proposal.requestedStatus === DiplomaticStatus.PEACE
+    const proposal = galaxy.diplomaticProposals.find((entry) =>
+      entry.fromPlayerId === bot.playerId
+      && entry.toPlayerId === targetOwner.playerId
+      && entry.requestedStatus === DiplomaticStatus.PEACE
+    );
+
+    expect(proposal).toBeTruthy();
+    expect(proposal?.createdTurn).toBe(galaxy.currentTurn);
+    expect(proposal?.expiresOnTurn).toBe(galaxy.currentTurn + 2);
+    expect(galaxy.diplomaticProposals.some((entry) =>
+      entry.fromPlayerId === bot.playerId
+      && entry.toPlayerId === targetOwner.playerId
+      && entry.requestedStatus === DiplomaticStatus.PEACE
     )).toBe(true);
     expect(getBotDecisionTraces(bot.playerId)[0]?.chosenActions.some((entry) => entry.kind === 'propose-peace')).toBe(true);
   });

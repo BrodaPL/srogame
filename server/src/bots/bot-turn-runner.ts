@@ -668,6 +668,10 @@ function resolveOutgoingBotDiplomacyProposal(
     return;
   }
 
+  // Bot proposals are created during end-turn resolution, so they need one
+  // extra expiry turn to remain visible for the receiving human player.
+  result.value.proposal.expiresOnTurn += 1;
+
   appendRecentDiplomacyTarget(
     player,
     candidate.targetPlayerId,
