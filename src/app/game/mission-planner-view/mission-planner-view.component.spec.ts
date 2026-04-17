@@ -82,11 +82,74 @@ describe('MissionPlannerViewComponent', () => {
     );
 
     (component as { ownedPlanets: ClientPlanetDto[] }).ownedPlanets = [
-      createOwnedPlanet('Origin', { x: 3, y: 4, z: 5 }, 2)
+      createOwnedPlanet('Origin', { x: 3, y: 4, z: 5 }, { computerTechnologyLevel: 2 })
     ];
     (component as { activeFleets: Array<unknown> }).activeFleets = [{}, {}, {}];
 
     expect((component as { activeFleetCountLabel(): string }).activeFleetCountLabel()).toBe('3/6');
+  });
+
+  it('applies drive technologies to the travel-time preview and keeps Jump Gate at one turn', () => {
+    const component = new MissionPlannerViewComponent(
+      {
+        snapshot: {
+          queryParamMap: {
+            get: () => null
+          }
+        }
+      } as never,
+      {
+        getOwnedPlanets: vi.fn().mockReturnValue(of([])),
+        getActiveFleets: vi.fn().mockReturnValue(of([]))
+      } as never,
+      {
+        diplomacyResolver: vi.fn()
+      } as never,
+      {
+        load: vi.fn().mockReturnValue(createPlayerSession())
+      } as never,
+      {
+        markForCheck: vi.fn()
+      } as never,
+      {
+        autoOpenTutorial: vi.fn()
+      } as never,
+      {
+        t: vi.fn((key: string) => key)
+      } as never
+    );
+
+    const originPlanet = createOwnedPlanet('Origin', { x: 1, y: 1, z: 1 }, {
+      computerTechnologyLevel: 0,
+      fusionDriveLevel: 4,
+      hyperspaceDriveLevel: 10,
+      gravitonTechnologyLevel: 2
+    });
+    const targetPlanet = createOwnedPlanet('Target', { x: 7, y: 1, z: 1 });
+
+    (component as { selectedOriginPlanet: ClientPlanetDto | null }).selectedOriginPlanet = originPlanet;
+    (component as { selectedTargetPlanet: ClientPlanetDto | null }).selectedTargetPlanet = targetPlanet;
+
+    expect((component as { travelTurnsPreview(): number }).travelTurnsPreview()).toBe(3);
+    expect((component as { travelFormulaLabel(): string }).travelFormulaLabel()).toBe(
+      'ETA formula: ceil(3 / (1 + Fusion Drive / 4) + distance / (1 + Hyperspace Drive / 10) - Graviton Technology)'
+    );
+    expect((component as { travelFormulaDetailLabel(): string }).travelFormulaDetailLabel()).toBe(
+      'Current: ceil(1.5 + 3 - 2) = 3 turns'
+    );
+    expect((component as { travelTechSummaryLabel(): string }).travelTechSummaryLabel()).toBe(
+      'Tech levels: Fusion Drive 4 | Hyperspace Drive 10 | Graviton Technology 2'
+    );
+
+    (component as { useJumpGate: boolean }).useJumpGate = true;
+
+    expect((component as { travelTurnsPreview(): number }).travelTurnsPreview()).toBe(1);
+    expect((component as { travelFormulaLabel(): string }).travelFormulaLabel()).toBe(
+      'Jump Gate override: travel time is fixed at 1 turn.'
+    );
+    expect((component as { travelFormulaDetailLabel(): string }).travelFormulaDetailLabel()).toBe(
+      'Drive technologies do not change Jump Gate travel time.'
+    );
   });
 });
 
@@ -104,7 +167,23 @@ function createPlayerSession(): PlayerSession {
   };
 }
 
-function createOwnedPlanet(name: string, coordinates: ClientCoordinates, computerTechnologyLevel = 0): ClientPlanetDto {
+function createOwnedPlanet(
+  name: string,
+  coordinates: ClientCoordinates,
+  technologyLevels: {
+    computerTechnologyLevel?: number;
+    fusionDriveLevel?: number;
+    hyperspaceDriveLevel?: number;
+    gravitonTechnologyLevel?: number;
+  } = {}
+): ClientPlanetDto {
+  const {
+    computerTechnologyLevel = 0,
+    fusionDriveLevel = 0,
+    hyperspaceDriveLevel = 0,
+    gravitonTechnologyLevel = 0
+  } = technologyLevels;
+
   return {
     coordinates,
     basicInfo: {
@@ -178,10 +257,24 @@ function createOwnedPlanet(name: string, coordinates: ClientCoordinates, compute
       totalShipsAmount: 1,
       buildingsLevels: [],
       resourcesAmount: { metal: 0, crystal: 0, deuterium: 0 },
-      techLevels: [{
-        type: TechnologyType.COMPUTER_TECHNOLOGY,
-        level: computerTechnologyLevel
-      }],
+      techLevels: [
+        {
+          type: TechnologyType.COMPUTER_TECHNOLOGY,
+          level: computerTechnologyLevel
+        },
+        {
+          type: TechnologyType.FUSION_DRIVE,
+          level: fusionDriveLevel
+        },
+        {
+          type: TechnologyType.HYPERSPACE_DRIVE,
+          level: hyperspaceDriveLevel
+        },
+        {
+          type: TechnologyType.GRAVITON_TECHNOLOGY,
+          level: gravitonTechnologyLevel
+        }
+      ],
       defences: [],
       ships: [],
       shipyardProduction: {},

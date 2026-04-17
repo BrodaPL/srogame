@@ -261,11 +261,18 @@ export class EncyclopediaMechanicsComponent {
         'Bombard and Siege can store optional Main, Secondary, and Tertiary bombard priorities, which persist on the fleet for later siege turns.',
         'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn.',
         'Foreign Jump Gate targets require known gate intel from the latest espionage report and create a Mail request for the target owner unless diplomacy auto-approves it.',
-        'Mission Planner can also be prefilled from other screens, for example Spy Planet actions from reports or planet previews.'
+        'Mission Planner can also be prefilled from other screens, for example Spy Planet actions from reports or planet previews.',
+        'The Travel Summary now shows the live ETA formula, the current substituted values, and the relevant drive-tech levels taken from the selected origin player.'
       ],
       formulas: [
         'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2',
+        'travelTurns = ceil(3 / (1 + FUSION_DRIVE / 4) + distance / (1 + HYPERSPACE_DRIVE / 10) - GRAVITON_TECHNOLOGY), minimum 1',
+        'Jump Gate travelTurns = 1',
         'fuelCost = sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves'
+      ],
+      notes: [
+        'Distance is still the raw coordinate delta sum abs(dx) + abs(dy) + abs(dz).',
+        'Fuel cost still uses raw distance only; drive technologies change ETA but do not reduce deuterium reserve cost.'
       ]
     },
     {

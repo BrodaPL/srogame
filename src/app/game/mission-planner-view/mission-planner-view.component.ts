@@ -42,7 +42,7 @@ import { calculateJumpGateCapacity } from '../../models/jump-gates/jump-gate-cap
 import { FleetMissionRegistry } from '../../models/missions/fleet-mission-registry';
 import type { MissionPlannerContext } from '../../models/missions/mission-context';
 import { calculateRepairCapabilityFromEntries } from '../../models/repairs/ship-repair-capability';
-import { maxActiveFleets } from '../../models/tech/technology-effects';
+import { fleetTravelTurnsForDistance, maxActiveFleets } from '../../models/tech/technology-effects';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
@@ -570,7 +570,38 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected travelTurnsPreview(): number {
-    return this.useJumpGate ? 1 : Math.max(1, this.distancePreview());
+    return this.useJumpGate
+      ? 1
+      : fleetTravelTurnsForDistance(
+        this.distancePreview(),
+        this.techLevel(TechnologyType.FUSION_DRIVE),
+        this.techLevel(TechnologyType.HYPERSPACE_DRIVE),
+        this.techLevel(TechnologyType.GRAVITON_TECHNOLOGY)
+      );
+  }
+
+  protected travelFormulaLabel(): string {
+    if (this.useJumpGate) {
+      return 'Jump Gate override: travel time is fixed at 1 turn.';
+    }
+
+    return 'ETA formula: ceil(3 / (1 + Fusion Drive / 4) + distance / (1 + Hyperspace Drive / 10) - Graviton Technology)';
+  }
+
+  protected travelFormulaDetailLabel(): string {
+    if (this.useJumpGate) {
+      return 'Drive technologies do not change Jump Gate travel time.';
+    }
+
+    const startupComponent = 3 / (1 + (this.techLevel(TechnologyType.FUSION_DRIVE) / 4));
+    const distanceComponent = this.distancePreview() / (1 + (this.techLevel(TechnologyType.HYPERSPACE_DRIVE) / 10));
+    const gravitonTechnologyLevel = this.techLevel(TechnologyType.GRAVITON_TECHNOLOGY);
+
+    return `Current: ceil(${this.formatTravelFormulaValue(startupComponent)} + ${this.formatTravelFormulaValue(distanceComponent)} - ${gravitonTechnologyLevel}) = ${this.travelTurnsPreview()} turns`;
+  }
+
+  protected travelTechSummaryLabel(): string {
+    return `Tech levels: Fusion Drive ${this.techLevel(TechnologyType.FUSION_DRIVE)} | Hyperspace Drive ${this.techLevel(TechnologyType.HYPERSPACE_DRIVE)} | Graviton Technology ${this.techLevel(TechnologyType.GRAVITON_TECHNOLOGY)}`;
   }
 
   protected fuelCostPreview(): number {
@@ -1033,6 +1064,13 @@ export class MissionPlannerViewComponent implements OnInit {
 
   private coordinatesLabel(coordinates: ClientCoordinates): string {
     return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+  }
+
+  private formatTravelFormulaValue(value: number): string {
+    const rounded = Math.round(value * 100) / 100;
+    return Number.isInteger(rounded)
+      ? String(rounded)
+      : rounded.toFixed(2).replace(/\.?0+$/, '');
   }
 
   private techLevel(technologyType: TechnologyType): number {

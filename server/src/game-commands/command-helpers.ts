@@ -62,7 +62,7 @@ const { calculateJumpGateCapacity } = resolveModule(jumpGateCapacityModule) as t
 const { createJumpGateRequest } = resolveModule(jumpGateRequestModule) as typeof import('../../../src/app/models/requests/jump-gate-request.js');
 const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
 const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../../src/app/models/tech/research-helper-for.js');
-const { maxActiveFleets } = resolveModule(technologyEffectsModule) as typeof import('../../../src/app/models/tech/technology-effects.js');
+const { fleetTravelTurnsForDistance, maxActiveFleets } = resolveModule(technologyEffectsModule) as typeof import('../../../src/app/models/tech/technology-effects.js');
 const { ShipyardQueueEntry } = resolveModule(shipyardQueueEntryModule) as typeof import('../../../src/app/models/fleets/shipyard-queue-entry.js');
 const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as typeof import('../../../src/app/models/tech/technology-queue-entry.js');
 const { countPlanetaryBombs, isPlanetaryBombDefenceType } = resolveModule(planetaryBombModule) as typeof import('../../../src/app/models/defences/planetary-bomb.js');
@@ -381,6 +381,15 @@ export function calculateFleetCargoCapacity(ships: Array<{ type: ShipTypeType; a
 
 export function calculateTravelDistance(origin: ClientCoordinates, target: ClientCoordinates): number {
   return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
+}
+
+export function calculateFleetTravelTurns(distance: number, player: Player): number {
+  return fleetTravelTurnsForDistance(
+    distance,
+    player.getTechLevel(TechnologyType.FUSION_DRIVE as TechnologyTypeType),
+    player.getTechLevel(TechnologyType.HYPERSPACE_DRIVE as TechnologyTypeType),
+    player.getTechLevel(TechnologyType.GRAVITON_TECHNOLOGY as TechnologyTypeType)
+  );
 }
 
 export function calculateFuelCost(
