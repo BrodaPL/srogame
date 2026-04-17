@@ -146,9 +146,6 @@ export function applyBuildingBombardment(
         if (missionType === FleetMissionType.SIEGE && Math.random() < 0.5) {
           continue;
         }
-        if (Math.random() < 0.5) {
-          continue;
-        }
 
         const target = selectBombardmentTarget(
           planet,

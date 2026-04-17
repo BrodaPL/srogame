@@ -189,7 +189,7 @@ const COMBAT_WEAPON_TYPES = new Set<WeaponType>([
   WeaponType.RAIL_GUN,
   WeaponType.BOMBARDMENT_WEAPONS
 ]);
-const BOMBARDMENT_SPACE_MISS_CHANCE = 2 / 3;
+const BOMBARDMENT_SHIP_HIT_CHANCE = 0.1;
 
 const mathRandomSource: BattleRandomSource = {
   nextFloat: () => Math.random()
@@ -555,9 +555,8 @@ export class SpaceBattleResolver {
   ): BattleShotSummary {
     const shieldBefore = target.combatant.shield;
     const hullBefore = target.combatant.hull;
-    const evaded = weapon.type === WeaponType.BOMBARDMENT_WEAPONS
-      ? this.rollBombardmentMiss(randomSource)
-      : this.rollEvade(target.effectiveEvasionChance, randomSource);
+    const targetAvoidanceChance = this.resolveTargetAvoidanceChance(weapon.type, target);
+    const evaded = this.rollEvade(targetAvoidanceChance, randomSource);
     let shieldDamage = 0;
     let hullDamage = 0;
 
@@ -591,7 +590,7 @@ export class SpaceBattleResolver {
       weaponType: weapon.type,
       weaponDamage: weapon.dmg,
       evaded,
-      targetEvasionChance: weapon.type === WeaponType.BOMBARDMENT_WEAPONS ? BOMBARDMENT_SPACE_MISS_CHANCE : target.effectiveEvasionChance,
+      targetEvasionChance: targetAvoidanceChance,
       shieldBefore,
       shieldAfter: target.combatant.shield,
       hullBefore,
@@ -697,8 +696,15 @@ export class SpaceBattleResolver {
     return this.nextRandomFloat(randomSource) < evasionChance;
   }
 
-  private rollBombardmentMiss(randomSource: BattleRandomSource): boolean {
-    return this.nextRandomFloat(randomSource) < BOMBARDMENT_SPACE_MISS_CHANCE;
+  private resolveTargetAvoidanceChance(
+    weaponType: WeaponType,
+    target: BattleCombatantState
+  ): number {
+    if (weaponType !== WeaponType.BOMBARDMENT_WEAPONS) {
+      return target.effectiveEvasionChance;
+    }
+
+    return target.kind === 'ship' ? 1 - BOMBARDMENT_SHIP_HIT_CHANCE : 0;
   }
 
   private refillRoundWeapons(side: BattleSideState): number {

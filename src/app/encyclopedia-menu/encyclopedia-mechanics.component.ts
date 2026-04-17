@@ -259,6 +259,7 @@ export class EncyclopediaMechanicsComponent {
         'Move to owned planets merges into the target planet, Move to non-hostile foreign or unowned orbit can stay in orbit, Transport delivers cargo then returns, and Spy creates structured espionage reports.',
         'Attack can target WAR, NEUTRAL, and PASSIVE owned planets, resolves hostile arrival combat, and steals metal, crystal, and deuterium after successful arrival resolution if cargo space remains.',
         'Bombard and Siege can store optional Main, Secondary, and Tertiary bombard priorities, which persist on the fleet for later siege turns.',
+        'Ship-mounted BOMBARDMENT_WEAPONS now always hit buildings and planetary defences once a bombardment shot actually fires; Siege still keeps its separate 50 percent per-shot trigger failure before that hit step.',
         'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn.',
         'Foreign Jump Gate targets require known gate intel from the latest espionage report and create a Mail request for the target owner unless diplomacy auto-approves it.',
         'Mission Planner can also be prefilled from other screens, for example Spy Planet actions from reports or planet previews.',
@@ -313,6 +314,7 @@ export class EncyclopediaMechanicsComponent {
         'Allied defenders merge into one side, PEACE prevents automatic hostilities, and guarding orbit contributes differently than passive orbit.',
         'Planetary defences join the same defender side as orbit fleets, persist hull damage between turns, and can be repaired later.',
         'Only BOMBARDMENT_WEAPONS can damage planetary defences, and atmosphere-only defences can target only SMALL bombardment ships.',
+        'BOMBARDMENT_WEAPONS use target-type accuracy: against ships they have only a flat 10 percent final hit chance, while against planetary defences they hit automatically once selected.',
         'True multi-faction combat and deeper mission-specific post-battle actions are still planned.'
       ],
       formulas: [

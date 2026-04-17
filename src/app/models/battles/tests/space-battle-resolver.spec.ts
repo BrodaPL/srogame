@@ -557,6 +557,75 @@ describe('SpaceBattleResolver', () => {
     expect(result.defender.ships[0].hull).toBe(100);
   });
 
+  it('lets bombardment weapons miss ships unless the final 10 percent hit window succeeds', () => {
+    const resolver = new SpaceBattleResolver();
+    const attacker = createPlayer(1, 'Attacker');
+    const defender = createPlayer(2, 'Defender');
+    const bombardmentShip = createShip(
+      ShipType.ATMOSPHERIC_BOMBER,
+      [new Weapon(WeaponType.BOMBARDMENT_WEAPONS, 60, 1)]
+    );
+    const evasiveTarget = createShip(
+      ShipType.CRUISER,
+      [],
+      { hullPointsCapacity: 100, shieldCapacity: 20, armor: 0 }
+    );
+    evasiveTarget.evasionChance = 1;
+
+    const result = resolver.resolve({
+      attacker: { player: attacker, ships: [createShipInstance(bombardmentShip)] },
+      defender: { player: defender, ships: [createShipInstance(evasiveTarget)] },
+      reportContext: { createdTurn: 7 },
+      maxRounds: 1,
+      randomSource: new SequenceRandomSource([0.8])
+    });
+
+    expect(result.roundSummaries[0].shots).toHaveLength(1);
+    expect(result.roundSummaries[0].shots[0].weaponType).toBe(WeaponType.BOMBARDMENT_WEAPONS);
+    expect(result.roundSummaries[0].shots[0].targetUnitKind).toBe('ship');
+    expect(result.roundSummaries[0].shots[0].targetEvasionChance).toBeCloseTo(0.9);
+    expect(result.roundSummaries[0].shots[0].evaded).toBe(true);
+    expect(result.roundSummaries[0].shots[0].hullDamage).toBe(0);
+    expect(result.defender.ships[0].hull).toBe(100);
+  });
+
+  it('lets bombardment weapons always hit defence targets in battle', () => {
+    const resolver = new SpaceBattleResolver();
+    const attacker = createPlayer(1, 'Attacker');
+    const defender = createPlayer(2, 'Defender');
+    const bombardmentShip = createShip(
+      ShipType.ATMOSPHERIC_BOMBER,
+      [new Weapon(WeaponType.BOMBARDMENT_WEAPONS, 60, 1)]
+    );
+    const screenShip = createShip(ShipType.FIGHTER, []);
+    const targetDefence = createDefence(
+      DefenceType.LIGHT_BEAM_CANNON,
+      HullClass.SMALL,
+      [],
+      { hullPointsCapacity: 50, shieldCapacity: 10, armor: 0 }
+    );
+
+    const result = resolver.resolve({
+      attacker: { player: attacker, ships: [createShipInstance(bombardmentShip)] },
+      defender: {
+        player: defender,
+        ships: [createShipInstance(screenShip)],
+        defences: [createDefenceInstance(targetDefence)]
+      },
+      reportContext: { createdTurn: 7 },
+      maxRounds: 1,
+      randomSource: new SequenceRandomSource([0.6])
+    });
+
+    expect(result.roundSummaries[0].shots).toHaveLength(1);
+    expect(result.roundSummaries[0].shots[0].weaponType).toBe(WeaponType.BOMBARDMENT_WEAPONS);
+    expect(result.roundSummaries[0].shots[0].targetUnitKind).toBe('defence');
+    expect(result.roundSummaries[0].shots[0].targetEvasionChance).toBe(0);
+    expect(result.roundSummaries[0].shots[0].evaded).toBe(false);
+    expect(result.roundSummaries[0].shots[0].hullDamage).toBeGreaterThan(0);
+    expect(result.defender.defences[0].hull).toBeLessThan(targetDefence.hullPointsCapacity);
+  });
+
   it('creates battle fleet reports for both players', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
