@@ -155,13 +155,39 @@ describe('bot-turn-runner', () => {
       -1.08
     );
 
-    expect(minerBuildingFallback.allowed).toBe(true);
-    expect(minerBuildingFallback.used).toBe(true);
-    expect(minerBuildingFallback.floor).toBe(0.5);
+      expect(minerBuildingFallback.allowed).toBe(true);
+      expect(minerBuildingFallback.used).toBe(true);
+      expect(minerBuildingFallback.floor).toBe(0.25);
 
-    expect(aggressorResearchFallback.allowed).toBe(true);
-    expect(aggressorResearchFallback.used).toBe(true);
-    expect(aggressorResearchFallback.floor).toBe(-1.25);
+      expect(aggressorResearchFallback.allowed).toBe(true);
+      expect(aggressorResearchFallback.used).toBe(true);
+      expect(aggressorResearchFallback.floor).toBe(-1.5);
+
+    const balancedResearchFallback = evaluateIdleEconomyFallbackDecision(
+      'research',
+      BOT_PROFILES.BALANCED,
+      0,
+      0,
+      false,
+      -1
+    );
+
+    expect(balancedResearchFallback.allowed).toBe(true);
+    expect(balancedResearchFallback.used).toBe(true);
+    expect(balancedResearchFallback.floor).toBe(-1.25);
+
+    const minerLateGameBuildingFallback = evaluateIdleEconomyFallbackDecision(
+      'building',
+      BOT_PROFILES.MINER,
+      0,
+      0,
+      false,
+      0.27
+    );
+
+    expect(minerLateGameBuildingFallback.allowed).toBe(true);
+    expect(minerLateGameBuildingFallback.used).toBe(true);
+    expect(minerLateGameBuildingFallback.floor).toBe(0.25);
 
     const bunkererBuildingFallback = evaluateIdleEconomyFallbackDecision(
       'building',

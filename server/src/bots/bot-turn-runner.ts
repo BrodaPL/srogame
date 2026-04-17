@@ -521,10 +521,10 @@ function calculateIdleEconomyFallbackFloor(
   candidateKind: 'building' | 'research'
 ): number {
   if (candidateKind === 'research') {
-    return Math.max(-1.25, profile.minUtilityThreshold - 3.75);
+    return Math.max(-1.5, profile.minUtilityThreshold - 4.25);
   }
 
-  return Math.max(0, profile.minUtilityThreshold - 3);
+  return Math.max(0, profile.minUtilityThreshold - 3.25);
 }
 
 function resolveIncomingBotRequests(
