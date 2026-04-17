@@ -32,6 +32,8 @@ export class GalaxyCreator {
   private static readonly TEST_RANDOM_PLANETS_COUNT = 3;
   private static readonly TEST_STARTING_SHIPS_PER_TYPE = 10;
   private static readonly HOME_SYSTEM_NEUTRAL_LEVEL = 3;
+  private static readonly EXTRA_NEUTRAL_LEVEL_MIN = 2;
+  private static readonly EXTRA_NEUTRAL_LEVEL_MAX = 6;
   private static readonly TEST_RANDOM_PLANET_LEVEL_MIN = 4;
   private static readonly TEST_RANDOM_PLANET_LEVEL_MAX = 12;
   private static readonly TEST_RANDOM_TECH_LEVEL_MIN = 4;
@@ -139,70 +141,7 @@ export class GalaxyCreator {
     this.assignStartingPlayers(galaxy, playerNames);
     this.assignStartingBots(galaxy);
     this.applyTestingSetupOptions(galaxy, playerNames);
-
-    //5. GameType specific modifications
-    if (this.setup.gameType === GameType.SANDBOX) {
-      const neutralChance = Math.max(0, Math.min(1, this.setup.neutralBotsAmount / 100));
-      const minLevelRaw = 1 * (1 + (this.setup.neutralBotsDifficulty * 2) / 100);
-      const maxLevelRaw = 12 * (1 + this.setup.neutralBotsDifficulty / 100);
-      const minLevel = Math.max(1, Math.floor(minLevelRaw));
-      const maxLevel = Math.max(minLevel, Math.floor(maxLevelRaw));
-
-      const buildingGenerator = new RngBuildingGenerator();
-      const techGenerator = new RngTechnologyGenerator();
-      const shipGenerator = new RngShipsGenerator();
-      const resourceGenerator = new RngResourceGenerator();
-
-      let nextPlayerId = galaxy.players.reduce(
-        (maxId, player) => Math.max(maxId, player.playerId),
-        0
-      ) + 1;
-
-      for (const row of galaxy.stars) {
-        for (const system of row) {
-          if (system.isVoid) {
-            continue;
-          }
-
-          for (const planet of system.planets) {
-            if (planet.info.ownerId !== null) {
-              continue;
-            }
-
-            if (neutralChance <= 0 || Math.random() >= neutralChance) {
-              continue;
-            }
-
-            const level = this.randomInt(minLevel, maxLevel);
-            const playerName = `N-${nextPlayerId}`;
-            const tech = techGenerator.generate(level);
-            const targetShipsValue = resourceGenerator
-              .generateSimple(level)
-              .getTotalValuedResourceAmount();
-            const ships = shipGenerator.generate(level, targetShipsValue);
-
-            planet.info.ownerId = nextPlayerId;
-            this.applyBuildingLevelsToPlanet(planet, buildingGenerator.generate(level));
-            planet.rBDSFTQ.ships = ManyShips.fromShipInstances(ships);
-
-            const player = new Player(
-              nextPlayerId,
-              playerName,
-              [planet],
-              tech,
-              [],
-              PlayerType.NEUTRAL,
-              createTutorialReadState(true)
-            );
-
-            galaxy.players.push(player);
-            galaxy.neutralPlayerMap.set(player.playerId, player);
-            galaxy.playerNameMap.set(player.playerName, player.playerId);
-            nextPlayerId += 1;
-          }
-        }
-      }
-    }
+    this.seedExtraNeutralPlanets(galaxy);
 
     return galaxy;
   }
@@ -504,6 +443,40 @@ export class GalaxyCreator {
 
     const neutralPlanet = this.findOrCreateSecondaryHomeSystemPlanet(homeSystem, homePlanet);
     this.assignNeutralOwnerToPlanet(galaxy, neutralPlanet, GalaxyCreator.HOME_SYSTEM_NEUTRAL_LEVEL);
+  }
+
+  private seedExtraNeutralPlanets(galaxy: Galaxy): void {
+    const neutralChance = Math.max(0, Math.min(1, this.setup.neutralBotsAmount / 100));
+    if (neutralChance <= 0) {
+      return;
+    }
+
+    for (const row of galaxy.stars) {
+      for (const system of row) {
+        if (system.isVoid) {
+          continue;
+        }
+
+        for (const planet of system.planets) {
+          if (planet.info.ownerId !== null) {
+            continue;
+          }
+
+          if (Math.random() >= neutralChance) {
+            continue;
+          }
+
+          this.assignNeutralOwnerToPlanet(
+            galaxy,
+            planet,
+            this.randomInt(
+              GalaxyCreator.EXTRA_NEUTRAL_LEVEL_MIN,
+              GalaxyCreator.EXTRA_NEUTRAL_LEVEL_MAX
+            )
+          );
+        }
+      }
+    }
   }
 
   private findOrCreateSecondaryHomeSystemPlanet(system: SolarSystem, homePlanet: Planet): Planet {

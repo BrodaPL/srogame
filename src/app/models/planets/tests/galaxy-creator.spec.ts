@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BuildingType } from '../../enums/building-type';
 import { DefenceType } from '../../enums/defence-type';
 import { GalaxyCreator } from '../galaxy-creator';
@@ -14,6 +14,10 @@ import { ManyShips } from '../../fleets/many-ships';
 import type { GalaxySetup } from '../../game-api-types';
 
 describe('GalaxyCreator', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   const createSetup = (overrides?: Partial<GalaxySetup>): GalaxySetup => ({
     gameType: GameType.PVE,
     galaxyName: 'Test Galaxy',
@@ -85,6 +89,40 @@ describe('GalaxyCreator', () => {
 
     expect(homeSystem.planets.length).toBe(1);
     expect(homeSystemNeutralPlanets.length).toBe(0);
+  });
+
+  it('adds extra random neutral planets outside home systems in normal games and keeps their levels in the extra range', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const assignNeutralSpy = vi.spyOn(GalaxyCreator.prototype as never, 'assignNeutralOwnerToPlanet' as never);
+
+    const galaxy = new GalaxyCreator(createSetup({
+      gameType: GameType.PVE,
+      neutralBotsAmount: 10
+    })).createGalaxy(['Human']);
+
+    const human = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER);
+    expect(human).toBeTruthy();
+
+    const homeSystem = human!.planets[0].basicInfo.solarSystem;
+    const neutralPlayers = galaxy.players.filter((entry) => entry.type === PlayerType.NEUTRAL);
+    const extraNeutralPlanets = galaxy.stars
+      .flatMap((row) => row.flatMap((system) =>
+        system.planets.filter((planet) =>
+          planet.info.ownerId !== null
+          && neutralPlayers.some((player) => player.playerId === planet.info.ownerId)
+          && system !== homeSystem
+        )
+      ));
+
+    expect(neutralPlayers.length).toBeGreaterThan(1);
+    expect(extraNeutralPlanets.length).toBeGreaterThan(0);
+    expect(extraNeutralPlanets.every((planet) => planet.rBDSFTQ.resources.getTotalResourceAmount() > 0)).toBe(true);
+    expect(extraNeutralPlanets.every((planet) => planet.rBDSFTQ.ships.totalShipsCount() > 0)).toBe(true);
+
+    const assignedLevels = assignNeutralSpy.mock.calls.map((call) => call[2] as number);
+    expect(assignedLevels).toContain(3);
+    expect(assignedLevels).toContain(2);
+    expect(assignedLevels.filter((level) => level !== 3).every((level) => level >= 2 && level <= 6)).toBe(true);
   });
 
   it('assigns requested bot profile counts exactly for fresh-game bots', () => {
