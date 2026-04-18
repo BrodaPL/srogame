@@ -280,7 +280,7 @@
                     "buildingRequirements":  [
                                                  {
                                                      "building":  "NUCLEAR_PLANT",
-                                                     "level":  0.5
+                                                     "level":  0.25
                                                  },
                                                  {
                                                      "building":  "DEUTERIUM_SYNTHESIZER",
@@ -294,7 +294,7 @@
                     "techRequirements":  [
                                              {
                                                  "tech":  "ENERGY_TECHNOLOGY",
-                                                 "level":  1
+                                                 "level":  0.66
                                              }
                                          ],
                     "production1":  [
@@ -621,15 +621,15 @@
                     "techRequirements":  [
                                              {
                                                  "tech":  "ENERGY_TECHNOLOGY",
-                                                 "level":  1
+                                                 "level":  0.75
                                              },
                                              {
                                                  "tech":  "COMPUTER_TECHNOLOGY",
-                                                 "level":  1.5
+                                                 "level":  1
                                              },
                                              {
                                                  "tech":  "MATERIAL_TECHNOLOGY",
-                                                 "level":  1
+                                                 "level":  0.75
                                              }
                                          ],
                     "production1":  [
@@ -728,11 +728,11 @@
                     "buildingRequirements":  [
                                               {
                                                 "building":  "ROBOTICS_FACTORY",
-                                                "level":  0.5
+                                                "level":  0.3
                                               },
                                               {
                                                 "building":  "SHIPYARD",
-                                                "level":  0.5
+                                                "level":  0.3
                                               },
                                               {
                                                 "building":  "BOMB_DEPOT",
@@ -740,7 +740,7 @@
                                               },
                                               {
                                                 "building":  "BUNKER_NETWORK",
-                                                "level":  0.5
+                                                "level":  0.25
                                               }
                     ],
                     "techRequirements":  [
@@ -824,11 +824,11 @@
                     "techRequirements":  [
                                              {
                                                  "tech":  "ENERGY_TECHNOLOGY",
-                                                 "level":  0.5
+                                                 "level":  0.25
                                              },
                                              {
                                                  "tech":  "MISSILES_WEAPONS",
-                                                 "level":  0.5
+                                                 "level":  0.33
                                              }
                                          ],
                     "production1":  [
