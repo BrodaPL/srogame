@@ -17,6 +17,7 @@ import type { DiplomaticRelation } from '../diplomacy/diplomatic-relation';
 import type { DiplomaticProposal } from '../diplomacy/diplomatic-proposal';
 import type { JumpGateRequest } from '../requests/jump-gate-request';
 import type { MaintenanceRequest } from '../requests/maintenance-request';
+import type { SupportRequest } from '../requests/support-request';
 
 export class Galaxy {
   public static buildSolarSystemNamePool(shuffle = true): string[] {
@@ -57,7 +58,9 @@ export class Galaxy {
     public jumpGateRequests: JumpGateRequest[] = [],
     public nextJumpGateRequestId = 1,
     public maintenanceRequests: MaintenanceRequest[] = [],
-    public nextMaintenanceRequestId = 1
+    public nextMaintenanceRequestId = 1,
+    public supportRequests: SupportRequest[] = [],
+    public nextSupportRequestId = 1
   ) {}
 
   public createClientPlanet(

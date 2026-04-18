@@ -364,6 +364,9 @@ Diplomacy command ownership note:
 - `server/src/index.ts` owns auth/session checks, request parsing, and diplomacy view/mail DTO projection
 - `server/src/game-commands/diplomacy-commands.ts` owns treaty-proposal create/accept/reject/cancel validation + mutation, diplomacy-contact visibility checks, human/bot proposal eligibility, and shared one-outgoing-per-turn / pending-pair enforcement
 - `src/app/models/diplomacy/diplomatic-proposal-rules.ts` owns the shared treaty ladder used by both server and Angular UI (`NEUTRAL` / `WAR` -> `PEACE`, `PEACE` -> `ALLIED`)
+- `src/app/models/requests/support-request.ts` owns the shared phase-1 diplomacy support-request model and resource-payload normalization used by the server, save layer, and Angular UI
+- diplomacy support-request creation, Mail projection, expiry/synchronization, and support execution currently live in `server/src/index.ts` rather than `server/src/game-commands/`
+- phase-2 offensive support requests (`ATTACK_TARGET`, `BOMBARD_TARGET`, `SIEGE_TARGET`) currently auto-launch via the shared `createFleetMission(...)` command path after acceptance, so mission legality still resolves through the normal fleet-command layer
 
 Bot runtime ownership note:
 - `server/src/index.ts` owns the end-turn hook and runs bot planning immediately before `resolvePhaseOneTurn(...)`
@@ -388,6 +391,9 @@ Reports and tutorials:
 - `/api/game/mail/jump-gate-requests/:requestId/reject`
 - `/api/game/mail/jump-gate-requests/:requestId/cancel`
 - `/api/game/mail/maintenance-requests/:requestId/approve`
+- `/api/game/mail/support-requests/:requestId/approve`
+- `/api/game/mail/support-requests/:requestId/reject`
+- `/api/game/mail/support-requests/:requestId/cancel`
 - `/api/game/mail/maintenance-requests/:requestId/reject`
 - `/api/game/mail/maintenance-requests/:requestId/cancel`
 - `/api/game/mail/messages/send`
@@ -400,6 +406,7 @@ Diplomacy and messages:
 - `/api/game/diplomacy/proposals/:proposalId/accept`
 - `/api/game/diplomacy/proposals/:proposalId/reject`
 - `/api/game/diplomacy/proposals/:proposalId/cancel`
+- `/api/game/diplomacy/support-requests`
 
 Primary API contracts:
 - `src/app/models/game-api-types.ts`
@@ -504,6 +511,8 @@ Owns:
 - diplomacy proposal actions in Mail
 - Jump Gate approval/reject/cancel flow
 - Alliance Depot maintenance request flow
+- diplomacy support-request approval/reject/cancel flow, including partial approval for `RESOURCE_SUPPORT`
+- offensive support auto-launch scheduling, target invalidation auto-cancel, and 3-turn waiting-window auto-reject
 
 ### Trade and local exchange
 

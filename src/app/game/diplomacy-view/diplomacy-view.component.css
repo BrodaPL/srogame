@@ -9,7 +9,11 @@
 .diplomacy-view__detail-stats,
 .diplomacy-view__action-grid,
 .diplomacy-view__planet-grid,
-.diplomacy-view__proposal-list {
+.diplomacy-view__proposal-list,
+.diplomacy-view__support-resources,
+.diplomacy-view__support-offensive,
+.diplomacy-view__support-bombardment,
+.diplomacy-view__support-ships-grid {
   display: grid;
   gap: 1rem;
 }
@@ -95,7 +99,7 @@
 }
 
 .diplomacy-view__action-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .diplomacy-view__field {
@@ -166,6 +170,10 @@
 .diplomacy-view__proposal-copy {
   display: grid;
   gap: 0.35rem;
+}
+
+.diplomacy-view__support-ships-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 @media (max-width: 1024px) {

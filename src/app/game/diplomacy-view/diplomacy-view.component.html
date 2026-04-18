@@ -47,6 +47,10 @@
           <span class="overview-stat__label">Pending proposals</span>
           <span class="overview-stat__value">{{ activeProposals.length }}</span>
         </div>
+        <div class="overview-stat">
+          <span class="overview-stat__label">Owned planets</span>
+          <span class="overview-stat__value">{{ ownedPlanets.length }}</span>
+        </div>
       </div>
     </header>
 
@@ -151,6 +155,149 @@
                 [disabled]="!contact.canSendMessage"
                 (click)="openMessageComposer(contact)">
                 Send message
+              </button>
+            </section>
+
+            <section class="diplomacy-view__action-card">
+              <h4>Support Request</h4>
+              <p class="overview-muted">{{ supportAvailabilityCopy(contact) }}</p>
+              <div class="diplomacy-view__field">
+                <span>Support type</span>
+                <select
+                  class="diplomacy-view__select"
+                  [disabled]="availableSupportTypes(contact).length === 0 || isContactActionPending(contact)"
+                  [ngModel]="selectedSupportType(contact)"
+                  (ngModelChange)="setSelectedSupportType(contact, $event)">
+                  @for (supportType of availableSupportTypes(contact); track supportType) {
+                    <option [value]="supportType">{{ supportType }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="diplomacy-view__field">
+                <span>{{ supportTargetPrompt(contact) }}</span>
+                <select
+                  class="diplomacy-view__select"
+                  [disabled]="availableSupportTargetPlanets(contact).length === 0 || isContactActionPending(contact)"
+                  [ngModel]="selectedSupportTargetPlanetKey(contact)"
+                  (ngModelChange)="setSelectedSupportTargetPlanet(contact, $event)">
+                  @for (planet of availableSupportTargetPlanets(contact); track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z) {
+                    <option [value]="planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z">
+                      {{ supportTargetLabel(planet) }}
+                    </option>
+                  }
+                </select>
+              </div>
+
+              @if (supportNeedsResources(contact)) {
+                <div class="diplomacy-view__support-resources">
+                  <label class="diplomacy-view__field">
+                    <span>Metal</span>
+                    <input
+                      type="number"
+                      min="0"
+                      class="diplomacy-view__input"
+                      [ngModel]="requestedSupportMetal(contact)"
+                      (ngModelChange)="updateRequestedSupportMetal(contact, $event)" />
+                  </label>
+                  <label class="diplomacy-view__field">
+                    <span>Crystal</span>
+                    <input
+                      type="number"
+                      min="0"
+                      class="diplomacy-view__input"
+                      [ngModel]="requestedSupportCrystal(contact)"
+                      (ngModelChange)="updateRequestedSupportCrystal(contact, $event)" />
+                  </label>
+                  <label class="diplomacy-view__field">
+                    <span>Deuterium</span>
+                    <input
+                      type="number"
+                      min="0"
+                      class="diplomacy-view__input"
+                      [ngModel]="requestedSupportDeuterium(contact)"
+                      (ngModelChange)="updateRequestedSupportDeuterium(contact, $event)" />
+                  </label>
+                </div>
+              }
+
+              @if (supportNeedsOffensiveTarget(contact)) {
+                <div class="diplomacy-view__support-offensive">
+                  <div class="diplomacy-view__field">
+                    <span>Minimum desired ships</span>
+                    <p class="overview-muted">The ally will auto-launch only when they can meet at least this exact ship mix.</p>
+                  </div>
+
+                  <div class="diplomacy-view__support-ships-grid">
+                    @for (shipType of supportShipTypes(); track shipType) {
+                      <label class="diplomacy-view__field">
+                        <span>{{ shipType }}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          class="diplomacy-view__input"
+                          [ngModel]="requestedSupportShipAmount(contact, shipType)"
+                          (ngModelChange)="updateRequestedSupportShipAmount(contact, shipType, $event)" />
+                      </label>
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (supportUsesBombardmentPriorities(contact)) {
+                <div class="diplomacy-view__support-bombardment">
+                  <div class="diplomacy-view__field">
+                    <span>Bombardment priorities</span>
+                    <p class="overview-muted">Optional priorities are applied if the mission is auto-launched.</p>
+                  </div>
+
+                  <div class="diplomacy-view__support-resources">
+                    <label class="diplomacy-view__field">
+                      <span>Main</span>
+                      <select
+                        class="diplomacy-view__select"
+                        [ngModel]="selectedSupportBombardmentPriorities(contact).main ?? ''"
+                        (ngModelChange)="setSupportBombardmentPriority(contact, 'main', $event)">
+                        <option value="">Random</option>
+                        @for (priority of bombardmentPriorityOptions(); track priority) {
+                          <option [value]="priority">{{ supportPriorityLabel(priority) }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label class="diplomacy-view__field">
+                      <span>Secondary</span>
+                      <select
+                        class="diplomacy-view__select"
+                        [ngModel]="selectedSupportBombardmentPriorities(contact).secondary ?? ''"
+                        (ngModelChange)="setSupportBombardmentPriority(contact, 'secondary', $event)">
+                        <option value="">Random</option>
+                        @for (priority of bombardmentPriorityOptions(); track priority) {
+                          <option [value]="priority">{{ supportPriorityLabel(priority) }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label class="diplomacy-view__field">
+                      <span>Tertiary</span>
+                      <select
+                        class="diplomacy-view__select"
+                        [ngModel]="selectedSupportBombardmentPriorities(contact).tertiary ?? ''"
+                        (ngModelChange)="setSupportBombardmentPriority(contact, 'tertiary', $event)">
+                        <option value="">Random</option>
+                        @for (priority of bombardmentPriorityOptions(); track priority) {
+                          <option [value]="priority">{{ supportPriorityLabel(priority) }}</option>
+                        }
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              }
+
+              <button
+                type="button"
+                class="diplomacy-view__action-button"
+                [disabled]="!canSendSupportRequest(contact)"
+                (click)="sendSupportRequest(contact)">
+                {{ isContactActionPending(contact) ? 'Sending...' : 'Send support request' }}
               </button>
             </section>
           </div>

@@ -11,7 +11,8 @@ import {
   MailViewResponse,
   MaintenanceMailRequestDto,
   MaintenanceTransferPayloadDto,
-  PlayerMailMessageDto
+  PlayerMailMessageDto,
+  SupportMailRequestDto
 } from '../../models/game-api-types';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -42,6 +43,9 @@ export class MailViewComponent implements OnInit {
   protected partialApprovalFuel = 0;
   protected partialApprovalShipAmounts: Partial<Record<string, number>> = {};
   protected partialApprovalBombAmounts: Partial<Record<string, number>> = {};
+  protected partialApprovalMetal = 0;
+  protected partialApprovalCrystal = 0;
+  protected partialApprovalDeuterium = 0;
   protected composerOpen = false;
   protected composerLockedTargetPlayerId: number | null = null;
   protected composerLockedTargetPlayerName: string | null = null;
@@ -167,6 +171,10 @@ export class MailViewComponent implements OnInit {
       return request.direction === 'incoming' ? 'Incoming Maintenance Request' : 'Outgoing Maintenance Request';
     }
 
+    if (request.requestType === 'SUPPORT') {
+      return request.direction === 'incoming' ? 'Incoming Support Request' : 'Outgoing Support Request';
+    }
+
     return request.direction === 'incoming' ? 'Incoming Request' : 'Outgoing Request';
   }
 
@@ -177,6 +185,10 @@ export class MailViewComponent implements OnInit {
 
     if (request.requestType === 'MAINTENANCE') {
       return request.state === 'PENDING' ? 'MAINTENANCE' : request.state;
+    }
+
+    if (request.requestType === 'SUPPORT') {
+      return request.state === 'PENDING' ? request.supportType : request.state;
     }
 
     return request.state === 'PENDING' ? request.requestedStatus : request.state;
@@ -197,6 +209,14 @@ export class MailViewComponent implements OnInit {
       }
 
       return `Fleet #${request.fleetId} requested maintenance from ${request.counterpartyPlayerName} at ${request.targetPlanetName}.`;
+    }
+
+    if (request.requestType === 'SUPPORT') {
+      if (request.direction === 'incoming') {
+        return `${request.counterpartyPlayerName} requested ${this.supportTypeLabel(request)} for ${request.targetPlanetName}.`;
+      }
+
+      return `You requested ${this.supportTypeLabel(request)} from ${request.counterpartyPlayerName} for ${request.targetPlanetName}.`;
     }
 
     if (request.direction === 'incoming') {
@@ -221,12 +241,45 @@ export class MailViewComponent implements OnInit {
       return `Requested: ${requestedSummary}`;
     }
 
+    if (request.requestType === 'SUPPORT') {
+      if (request.supportType === 'RESOURCE_SUPPORT') {
+        const requestedSummary = request.requestedResources ? this.resourcesSummary(request.requestedResources) : 'nothing';
+        const approvedSummary = request.approvedResources ? this.resourcesSummary(request.approvedResources) : null;
+        const sourceSummary = request.reservedSourcePlanetName ? ` | Reserved at ${request.reservedSourcePlanetName}` : '';
+        if (approvedSummary) {
+          return `Requested: ${requestedSummary} | Approved: ${approvedSummary}${sourceSummary}`;
+        }
+
+        return `Requested: ${requestedSummary}${sourceSummary}`;
+      }
+
+      if (request.minimumShips && request.minimumShips.length > 0) {
+        const shipsSummary = request.minimumShips.map((entry) => `${entry.type} x${entry.amount}`).join(', ');
+        const targetOwnerSummary = request.targetOwnerPlayerName ? ` | Target owner: ${request.targetOwnerPlayerName}` : '';
+        const prioritySummary = request.bombardmentPriorities
+          ? ` | Priorities: ${request.bombardmentPriorities.main ?? 'Random'} / ${request.bombardmentPriorities.secondary ?? 'Random'} / ${request.bombardmentPriorities.tertiary ?? 'Random'}`
+          : '';
+        const launchSummary = request.launchedFleetId !== null
+          ? ` | Launched Fleet #${request.launchedFleetId}${request.launchOriginPlanetName ? ` from ${request.launchOriginPlanetName}` : ''}`
+          : '';
+        return `Mission ${request.missionType ?? 'Unknown'} | Minimum: ${shipsSummary}${targetOwnerSummary}${prioritySummary}${launchSummary}`;
+      }
+
+      return request.resolutionNote ?? `Target ${request.targetPlanetName}`;
+    }
+
     return `Requested status ${request.requestedStatus}`;
   }
 
   protected requestTimingLine(request: MailRequestDto): string {
     if (request.requestType === 'JUMP_GATE' && request.state === 'PENDING') {
       return `Created on turn ${request.createdTurn} | Awaiting response`;
+    }
+
+    if (request.requestType === 'SUPPORT' && request.executionDueTurn !== null) {
+      const fulfilledLabel = request.fulfilledTurn !== null ? ` | Fulfilled on turn ${request.fulfilledTurn}` : '';
+      const expiryLabel = request.executionExpiresOnTurn !== null ? ` | Wait until turn ${request.executionExpiresOnTurn}` : '';
+      return `Created on turn ${request.createdTurn} | Due on turn ${request.executionDueTurn}${expiryLabel}${fulfilledLabel}`;
     }
 
     return `Created on turn ${request.createdTurn} | Expires on turn ${request.expiresOnTurn}`;
@@ -244,8 +297,9 @@ export class MailViewComponent implements OnInit {
     return request.state === 'PENDING' && request.direction === 'outgoing' && !this.isRequestActionPending(request);
   }
 
-  protected canPartialApprove(request: MailRequestDto): request is MaintenanceMailRequestDto {
-    return request.requestType === 'MAINTENANCE'
+  protected canPartialApprove(request: MailRequestDto): request is MaintenanceMailRequestDto | SupportMailRequestDto {
+    return (request.requestType === 'MAINTENANCE'
+      || (request.requestType === 'SUPPORT' && request.supportType === 'RESOURCE_SUPPORT'))
       && request.state === 'PENDING'
       && request.direction === 'incoming'
       && !this.isRequestActionPending(request);
@@ -263,7 +317,7 @@ export class MailViewComponent implements OnInit {
     return this.activeRequestDeleteKey === this.requestKey(request);
   }
 
-  protected isPartialApprovalOpen(request: MailRequestDto): request is MaintenanceMailRequestDto {
+  protected isPartialApprovalOpen(request: MailRequestDto): request is MaintenanceMailRequestDto | SupportMailRequestDto {
     return this.canPartialApprove(request) && this.partialApprovalRequestKey === this.requestKey(request);
   }
 
@@ -275,15 +329,26 @@ export class MailViewComponent implements OnInit {
     return request.requestType === 'JUMP_GATE' ? request : null;
   }
 
-  protected openPartialApproval(request: MaintenanceMailRequestDto): void {
+  protected supportRequest(request: MailRequestDto): SupportMailRequestDto | null {
+    return request.requestType === 'SUPPORT' ? request : null;
+  }
+
+  protected openPartialApproval(request: MaintenanceMailRequestDto | SupportMailRequestDto): void {
     this.partialApprovalRequestKey = this.requestKey(request);
-    this.partialApprovalFuel = request.requested.fuel;
-    this.partialApprovalShipAmounts = Object.fromEntries(
-      request.requested.ships.map((entry) => [entry.type, entry.amount])
-    );
-    this.partialApprovalBombAmounts = Object.fromEntries(
-      request.requested.bombs.map((entry) => [entry.type, entry.amount])
-    );
+    if (request.requestType === 'MAINTENANCE') {
+      this.partialApprovalFuel = request.requested.fuel;
+      this.partialApprovalShipAmounts = Object.fromEntries(
+        request.requested.ships.map((entry) => [entry.type, entry.amount])
+      );
+      this.partialApprovalBombAmounts = Object.fromEntries(
+        request.requested.bombs.map((entry) => [entry.type, entry.amount])
+      );
+      return;
+    }
+
+    this.partialApprovalMetal = request.requestedResources?.metal ?? 0;
+    this.partialApprovalCrystal = request.requestedResources?.crystal ?? 0;
+    this.partialApprovalDeuterium = request.requestedResources?.deuterium ?? 0;
   }
 
   protected closePartialApproval(): void {
@@ -291,6 +356,9 @@ export class MailViewComponent implements OnInit {
     this.partialApprovalFuel = 0;
     this.partialApprovalShipAmounts = {};
     this.partialApprovalBombAmounts = {};
+    this.partialApprovalMetal = 0;
+    this.partialApprovalCrystal = 0;
+    this.partialApprovalDeuterium = 0;
   }
 
   protected updatePartialApprovalFuel(value: number | string): void {
@@ -305,7 +373,28 @@ export class MailViewComponent implements OnInit {
     this.partialApprovalBombAmounts[type] = this.normalizeAmount(value);
   }
 
-  protected submitPartialApproval(request: MaintenanceMailRequestDto): void {
+  protected updatePartialResourceMetal(value: number | string): void {
+    this.partialApprovalMetal = this.normalizeAmount(value);
+  }
+
+  protected updatePartialResourceCrystal(value: number | string): void {
+    this.partialApprovalCrystal = this.normalizeAmount(value);
+  }
+
+  protected updatePartialResourceDeuterium(value: number | string): void {
+    this.partialApprovalDeuterium = this.normalizeAmount(value);
+  }
+
+  protected submitPartialApproval(request: MaintenanceMailRequestDto | SupportMailRequestDto): void {
+    if (request.requestType === 'SUPPORT') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.approveSupportRequest(request.requestId, this.buildPartialSupportPayload(request), token),
+        'Unable to partially approve request.'
+      );
+      return;
+    }
+
     this.runRequestAction(
       request,
       (token) => this.gameApi.approveMaintenanceRequest(request.requestId, this.buildPartialApprovalPayload(request), token),
@@ -391,6 +480,15 @@ export class MailViewComponent implements OnInit {
       return;
     }
 
+    if (request.requestType === 'SUPPORT') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.approveSupportRequest(request.requestId, null, token),
+        'Unable to approve request.'
+      );
+      return;
+    }
+
     this.runRequestAction(
       request,
       (token) => this.gameApi.acceptDiplomaticProposal(request.requestId, token),
@@ -417,6 +515,15 @@ export class MailViewComponent implements OnInit {
       return;
     }
 
+    if (request.requestType === 'SUPPORT') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.rejectSupportRequest(request.requestId, token),
+        'Unable to reject request.'
+      );
+      return;
+    }
+
     this.runRequestAction(
       request,
       (token) => this.gameApi.rejectDiplomaticProposal(request.requestId, token),
@@ -438,6 +545,15 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.cancelMaintenanceRequest(request.requestId, token),
+        'Unable to cancel request.'
+      );
+      return;
+    }
+
+    if (request.requestType === 'SUPPORT') {
+      this.runRequestAction(
+        request,
+        (token) => this.gameApi.cancelSupportRequest(request.requestId, token),
         'Unable to cancel request.'
       );
       return;
@@ -569,6 +685,50 @@ export class MailViewComponent implements OnInit {
         }))
         .filter((entry) => entry.amount > 0)
     };
+  }
+
+  private buildPartialSupportPayload(request: SupportMailRequestDto): { approvedResources: { metal: number; crystal: number; deuterium: number } } {
+    return {
+      approvedResources: {
+        metal: Math.min(this.partialApprovalMetal, request.requestedResources?.metal ?? 0),
+        crystal: Math.min(this.partialApprovalCrystal, request.requestedResources?.crystal ?? 0),
+        deuterium: Math.min(this.partialApprovalDeuterium, request.requestedResources?.deuterium ?? 0)
+      }
+    };
+  }
+
+  private supportTypeLabel(request: SupportMailRequestDto): string {
+    switch (request.supportType) {
+      case 'RESOURCE_SUPPORT':
+        return 'resource support';
+      case 'PLANET_REPAIR':
+        return 'planet repairs';
+      case 'PLANET_DEFENSE':
+        return 'planet defense';
+      case 'ATTACK_TARGET':
+        return 'attack support';
+      case 'BOMBARD_TARGET':
+        return 'bombardment support';
+      case 'SIEGE_TARGET':
+        return 'siege support';
+      default:
+        return request.supportType;
+    }
+  }
+
+  private resourcesSummary(payload: { metal: number; crystal: number; deuterium: number }): string {
+    const parts: string[] = [];
+    if (payload.metal > 0) {
+      parts.push(`${payload.metal} metal`);
+    }
+    if (payload.crystal > 0) {
+      parts.push(`${payload.crystal} crystal`);
+    }
+    if (payload.deuterium > 0) {
+      parts.push(`${payload.deuterium} deuterium`);
+    }
+
+    return parts.length > 0 ? parts.join(' | ') : 'nothing';
   }
 
   private normalizeAmount(value: number | string): number {

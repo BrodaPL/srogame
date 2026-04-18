@@ -1038,7 +1038,41 @@ export type JumpGateMailRequestDto = {
   totalShips: number;
 };
 
-export type MailRequestDto = DiplomacyMailRequestDto | MaintenanceMailRequestDto | JumpGateMailRequestDto;
+export type SupportMailRequestDto = {
+  requestId: number;
+  requestType: 'SUPPORT';
+  supportType: SupportRequestType;
+  createdTurn: number;
+  expiresOnTurn: number;
+  state: DiplomaticProposalState;
+  direction: 'incoming' | 'outgoing';
+  counterpartyPlayerId: number;
+  counterpartyPlayerName: string;
+  targetPlanetName: string;
+  targetCoordinates: ClientCoordinates;
+  acceptedTurn: number | null;
+  executionDueTurn: number | null;
+  executionExpiresOnTurn: number | null;
+  fulfilledTurn: number | null;
+  resolutionNote: string | null;
+  requestedResources?: ResourcesPackDto | null;
+  approvedResources?: ResourcesPackDto | null;
+  reservedSourcePlanetName?: string | null;
+  reservedSourceCoordinates?: ClientCoordinates | null;
+  missionType?: FleetMissionType | null;
+  minimumShips?: ShipAmountEntry[] | null;
+  bombardmentPriorities?: BombardmentPriorities | null;
+  targetOwnerPlayerName?: string | null;
+  launchedFleetId?: number | null;
+  launchOriginPlanetName?: string | null;
+  launchOriginCoordinates?: ClientCoordinates | null;
+};
+
+export type MailRequestDto =
+  | DiplomacyMailRequestDto
+  | MaintenanceMailRequestDto
+  | JumpGateMailRequestDto
+  | SupportMailRequestDto;
 
 export type MailRecipientDto = {
   playerId: number;
@@ -1075,6 +1109,7 @@ export type DiplomacyViewResponse = {
   currentTurn: number;
   currentPlayerId: number;
   outgoingProposalSentThisTurn: boolean;
+  ownedPlanets: ClientPlanetDto[];
   contacts: DiplomacyContactDto[];
   activeProposals: DiplomaticProposalDto[];
 };
@@ -1175,6 +1210,28 @@ export type CreateMaintenanceRequestResponse = {
 };
 
 export type ResolveMaintenanceRequestRequest = MaintenanceTransferPayloadDto;
+
+export type SupportRequestType =
+  | 'RESOURCE_SUPPORT'
+  | 'PLANET_REPAIR'
+  | 'PLANET_DEFENSE'
+  | 'ATTACK_TARGET'
+  | 'BOMBARD_TARGET'
+  | 'SIEGE_TARGET';
+
+export type CreateSupportRequestRequest = {
+  targetPlayerId: number;
+  supportType: SupportRequestType;
+  targetCoordinates: ClientCoordinates;
+  requestedResources?: ResourcesPackDto | null;
+  missionType?: FleetMissionType | null;
+  minimumShips?: ShipAmountEntry[] | null;
+  bombardmentPriorities?: BombardmentPriorities | null;
+};
+
+export type ResolveSupportRequestRequest = {
+  approvedResources?: ResourcesPackDto | null;
+};
 
 export type MarkPlayerReportReadRequest = {
   reportId: number;

@@ -32,6 +32,7 @@ import bombardmentPriorityModule from '../../src/app/models/bombardment/bombardm
 import jumpGateCapacityModule from '../../src/app/models/jump-gates/jump-gate-capacity.js';
 import jumpGateRequestModule from '../../src/app/models/requests/jump-gate-request.js';
 import maintenanceRequestModule from '../../src/app/models/requests/maintenance-request.js';
+import supportRequestModule from '../../src/app/models/requests/support-request.js';
 import tradePortOffersModule from '../../src/app/models/trade/trade-port-offers.js';
 import tutorialTypesModule from '../../src/app/tutorial/tutorial-types.js';
 import buildingBlueprintsFactoryModule from '../../src/app/factories/building-blueprints.factory.js';
@@ -264,6 +265,7 @@ import type {
   DiplomacyContactDto,
   DiplomaticProposalDto,
   CreateDiplomaticProposalRequest,
+  CreateSupportRequestRequest,
   MailViewResponse,
   MailRequestDto,
   MailRecipientDto,
@@ -277,10 +279,13 @@ import type {
   CreateMaintenanceRequestResponse,
   FleetMaintenanceBombOptionDto,
   ResolveMaintenanceRequestRequest,
+  ResolveSupportRequestRequest,
   JumpGateMailRequestDto,
+  SupportMailRequestDto,
   FleetMaintenanceShipOptionDto,
   FleetMaintenanceOptionsDto,
   MaintenanceTransferPayloadDto,
+  SupportRequestType as SupportRequestTypeDto,
   SendMailMessageRequest,
   SendMailMessageResponse,
   MultiplayerGameBrowserResponse,
@@ -337,6 +342,7 @@ import type {
 } from '../../src/app/models/bombardment/bombardment-priority.ts';
 import type { MaintenanceRequest } from '../../src/app/models/requests/maintenance-request.ts';
 import type { JumpGateRequest } from '../../src/app/models/requests/jump-gate-request.ts';
+import type { SupportRequest } from '../../src/app/models/requests/support-request.ts';
 import type { MissionLaunchContext } from '../../src/app/models/missions/mission-context.ts';
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { DiplomaticRelation } from '../../src/app/models/diplomacy/diplomatic-relation.ts';
@@ -438,6 +444,14 @@ const {
   createMaintenanceRequest,
   normalizeMaintenanceTransferPayload
 } = maintenanceRequestModule as typeof import('../../src/app/models/requests/maintenance-request.js');
+const {
+  clampSupportResourcesToRequested,
+  createSupportRequest,
+  normalizeSupportResources,
+  normalizeSupportShipAmounts,
+  supportShipAmountsHaveAnyValue,
+  supportResourcesHasAnyValue
+} = supportRequestModule as typeof import('../../src/app/models/requests/support-request.js');
 const { synchronizeTradePortOffers } = tradePortOffersModule as typeof import('../../src/app/models/trade/trade-port-offers.js');
 const { TUTORIAL_VIEW_KEYS, createTutorialReadState } = tutorialTypesModule as typeof import('../../src/app/tutorial/tutorial-types.js');
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
@@ -2201,6 +2215,51 @@ app.post('/api/game/diplomacy/proposals/:proposalId/cancel', (req, res) => {
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
+app.post('/api/game/diplomacy/support-requests', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return sendApiRouteError(res, authPlayer);
+  }
+
+  const body = req.body as CreateSupportRequestRequest | undefined;
+  const targetPlayerId = parseBodyPositiveInt(body?.targetPlayerId);
+  const supportType = normalizeSupportRequestType(body?.supportType);
+  const targetCoordinates = parseBodyCoordinates(body?.targetCoordinates);
+  const missionType = normalizeFleetMissionType(body?.missionType);
+  const minimumShips = parseSupportShipAmounts(body?.minimumShips);
+  const bombardmentPriorities = parseBombardmentPriorities(body?.bombardmentPriorities);
+  const requestedResources = normalizeSupportResources(body?.requestedResources);
+  if (
+    targetPlayerId === null
+    || supportType === null
+    || targetCoordinates === null
+    || (body?.missionType !== undefined && missionType === null)
+    || (body?.minimumShips !== undefined && minimumShips === null)
+    || (body?.bombardmentPriorities !== undefined
+      && body?.bombardmentPriorities !== null
+      && bombardmentPriorities === null)
+  ) {
+    return res.status(400).json({ error: 'Invalid support request payload.' });
+  }
+
+  const result = createSupportRequestCommand(
+    authPlayer.galaxy,
+    authPlayer.player.playerId,
+    targetPlayerId,
+    supportType,
+    targetCoordinates,
+    requestedResources,
+    missionType,
+    minimumShips ?? [],
+    bombardmentPriorities
+  );
+  if ('error' in result) {
+    return res.status(result.status).json({ error: result.error });
+  }
+
+  return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
 app.get('/api/game/mail', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
@@ -2274,6 +2333,11 @@ app.post('/api/game/mail/requests/delete', (req, res) => {
       .filter((entry) => entry.requestType === 'JUMP_GATE')
       .map((entry) => entry.requestId)
   );
+  const supportRequestIds = new Set(
+    requestRefs
+      .filter((entry) => entry.requestType === 'SUPPORT')
+      .map((entry) => entry.requestId)
+  );
 
   const deletableDiplomacyIds = new Set(
     authPlayer.galaxy.diplomaticProposals
@@ -2319,6 +2383,21 @@ app.post('/api/game/mail/requests/delete', (req, res) => {
     !deletableJumpGateIds.has(request.requestId)
   );
   deletedCount += jumpGateBefore - authPlayer.galaxy.jumpGateRequests.length;
+
+  const deletableSupportIds = new Set(
+    authPlayer.galaxy.supportRequests
+      .filter((request) =>
+        supportRequestIds.has(request.requestId)
+        && request.state !== DiplomaticProposalState.PENDING
+        && (request.fromPlayerId === authPlayer.player.playerId || request.toPlayerId === authPlayer.player.playerId)
+      )
+      .map((request) => request.requestId)
+  );
+  const supportBefore = authPlayer.galaxy.supportRequests.length;
+  authPlayer.galaxy.supportRequests = authPlayer.galaxy.supportRequests.filter((request) =>
+    !deletableSupportIds.has(request.requestId)
+  );
+  deletedCount += supportBefore - authPlayer.galaxy.supportRequests.length;
 
   const response: DeleteMailRequestsResponse = {
     deletedCount
@@ -2532,6 +2611,106 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/cancel', (req, res) => {
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
   }
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
+app.post('/api/game/mail/support-requests/:requestId/approve', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return sendApiRouteError(res, authPlayer);
+  }
+
+  const requestId = parseRoutePositiveInt(req.params.requestId);
+  if (requestId === null) {
+    return res.status(400).json({ error: 'Invalid support request id.' });
+  }
+
+  const request = authPlayer.galaxy.supportRequests.find((entry) => entry.requestId === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Support request not found.' });
+  }
+
+  if (request.toPlayerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Only the target player can approve this request.' });
+  }
+
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return res.status(409).json({ error: 'Support request is no longer pending.' });
+  }
+
+  const body = req.body as ResolveSupportRequestRequest | undefined;
+  const approvedResources = normalizeSupportResources(body?.approvedResources);
+  const result = approveSupportRequest(authPlayer.galaxy, request, approvedResources);
+  if ('error' in result) {
+    return res.status(result.status).json({ error: result.error });
+  }
+
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
+app.post('/api/game/mail/support-requests/:requestId/reject', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return sendApiRouteError(res, authPlayer);
+  }
+
+  const requestId = parseRoutePositiveInt(req.params.requestId);
+  if (requestId === null) {
+    return res.status(400).json({ error: 'Invalid support request id.' });
+  }
+
+  const request = authPlayer.galaxy.supportRequests.find((entry) => entry.requestId === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Support request not found.' });
+  }
+
+  if (request.toPlayerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Only the target player can reject this request.' });
+  }
+
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return res.status(409).json({ error: 'Support request is no longer pending.' });
+  }
+
+  rejectSupportRequest(
+    authPlayer.galaxy,
+    request,
+    'Support request rejected.',
+    'You rejected the support request.'
+  );
+  return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
+});
+
+app.post('/api/game/mail/support-requests/:requestId/cancel', (req, res) => {
+  const authPlayer = resolveAuthenticatedGamePlayer(req);
+  if ('error' in authPlayer) {
+    return sendApiRouteError(res, authPlayer);
+  }
+
+  const requestId = parseRoutePositiveInt(req.params.requestId);
+  if (requestId === null) {
+    return res.status(400).json({ error: 'Invalid support request id.' });
+  }
+
+  const request = authPlayer.galaxy.supportRequests.find((entry) => entry.requestId === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Support request not found.' });
+  }
+
+  if (request.fromPlayerId !== authPlayer.player.playerId) {
+    return res.status(403).json({ error: 'Only the requesting player can cancel this request.' });
+  }
+
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return res.status(409).json({ error: 'Support request is no longer pending.' });
+  }
+
+  cancelSupportRequest(
+    authPlayer.galaxy,
+    request,
+    'Support request cancelled.',
+    'The support request was cancelled by the requester.'
+  );
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
@@ -3780,6 +3959,7 @@ app.post('/api/game/active-fleets/:fleetId/return', (req, res) => {
 
   synchronizeJumpGateRequests(currentGalaxy);
   synchronizeMaintenanceRequests(currentGalaxy);
+  synchronizeSupportRequests(currentGalaxy);
   return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
 });
 
@@ -5866,6 +6046,7 @@ function resolveAuthenticatedGameAccess(
 
   synchronizeJumpGateRequests(refreshedRuntime.galaxy);
   synchronizeMaintenanceRequests(refreshedRuntime.galaxy);
+  synchronizeSupportRequests(refreshedRuntime.galaxy);
   if (synchronizeTradePortState(refreshedRuntime.galaxy)) {
     const nextPresentation = buildPresentationDataByPlayer(refreshedRuntime.galaxy);
     updateGameRuntime(refreshedRuntime.gameId, { presentationByPlayer: nextPresentation });
@@ -5942,6 +6123,7 @@ function resolveAuthenticatedGameAccessForGame(
 
   synchronizeJumpGateRequests(refreshedRuntime.galaxy);
   synchronizeMaintenanceRequests(refreshedRuntime.galaxy);
+  synchronizeSupportRequests(refreshedRuntime.galaxy);
   if (synchronizeTradePortState(refreshedRuntime.galaxy)) {
     const nextPresentation = buildPresentationDataByPlayer(refreshedRuntime.galaxy);
     updateGameRuntime(gameId, { presentationByPlayer: nextPresentation });
@@ -6047,6 +6229,7 @@ function handleEndTurnRequest(
   const playerId = player.playerId;
   synchronizeJumpGateRequests(access.galaxy);
   synchronizeMaintenanceRequests(access.galaxy);
+  synchronizeSupportRequests(access.galaxy);
   const pendingRequestCount = countPendingMailRequestsForPlayer(access.galaxy, playerId);
   const unreadMailCount = countUnreadMailMessagesForPlayer(access.galaxy, playerId);
   if (pendingRequestCount > 0 || unreadMailCount > 0) {
@@ -6111,6 +6294,7 @@ function handleEndTurnRequest(
     expirePendingDiplomaticProposals(access.galaxy, access.galaxy.currentTurn);
     synchronizeJumpGateRequests(access.galaxy);
     synchronizeMaintenanceRequests(access.galaxy);
+    synchronizeSupportRequests(access.galaxy);
     synchronizeTradePortState(access.galaxy);
     refreshOwnedPlanetSelfReportsForHumanPlayers(access.galaxy, access.galaxy.currentTurn);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(access.galaxy);
@@ -6519,6 +6703,17 @@ function normalizeDiplomaticStatus(value: unknown): DiplomaticStatusType | null 
   return value as DiplomaticStatusType;
 }
 
+function normalizeSupportRequestType(value: unknown): SupportRequestTypeDto | null {
+  return value === 'RESOURCE_SUPPORT'
+    || value === 'PLANET_REPAIR'
+    || value === 'PLANET_DEFENSE'
+    || value === 'ATTACK_TARGET'
+    || value === 'BOMBARD_TARGET'
+    || value === 'SIEGE_TARGET'
+    ? value
+    : null;
+}
+
 function parseBodyReportIds(value: unknown): number[] | null {
   if (!Array.isArray(value)) {
     return null;
@@ -6558,7 +6753,7 @@ function parseDeleteMailRequestRefs(
     const requestType = candidate.requestType;
     if (
       requestId === null
-      || (requestType !== 'DIPLOMACY_PROPOSAL' && requestType !== 'MAINTENANCE' && requestType !== 'JUMP_GATE')
+      || (requestType !== 'DIPLOMACY_PROPOSAL' && requestType !== 'MAINTENANCE' && requestType !== 'JUMP_GATE' && requestType !== 'SUPPORT')
     ) {
       return null;
     }
@@ -6788,6 +6983,40 @@ function parseFleetShipSelections(value: unknown): CreateFleetShipSelectionEntry
     type,
     undamagedAmount: amounts.undamagedAmount,
     damagedAmount: amounts.damagedAmount
+  }));
+}
+
+function parseSupportShipAmounts(value: unknown): ShipAmountEntry[] | null {
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const combined = new Map<ShipTypeType, number>();
+  for (const item of value) {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const candidate = item as {
+      type?: unknown;
+      amount?: unknown;
+    };
+    const shipType = normalizeShipType(candidate.type);
+    const amount = parseBodyIntInRange(candidate.amount ?? 0, 0, 100000);
+    if (!shipType || amount === null || amount <= 0) {
+      return null;
+    }
+
+    combined.set(shipType, (combined.get(shipType) ?? 0) + amount);
+  }
+
+  return Array.from(combined.entries()).map(([type, amount]) => ({
+    type,
+    amount
   }));
 }
 
@@ -7672,6 +7901,7 @@ function buildDiplomacyViewResponse(galaxy: Galaxy, viewer: Player): DiplomacyVi
     currentTurn: galaxy.currentTurn,
     currentPlayerId: viewer.playerId,
     outgoingProposalSentThisTurn: hasOutgoingProposalSentThisTurn(galaxy, viewer.playerId, galaxy.currentTurn),
+    ownedPlanets: buildOwnedPlanetsForPlayer(galaxy, viewer.playerId),
     contacts: buildDiplomacyContactDtos(galaxy, viewer),
     activeProposals: buildActiveDiplomaticProposalDtos(galaxy, viewer.playerId)
   };
@@ -7680,6 +7910,7 @@ function buildDiplomacyViewResponse(galaxy: Galaxy, viewer: Player): DiplomacyVi
 function buildMailViewResponse(galaxy: Galaxy, viewer: Player): MailViewResponse {
   synchronizeJumpGateRequests(galaxy);
   synchronizeMaintenanceRequests(galaxy);
+  synchronizeSupportRequests(galaxy);
   const messages = [...viewer.messages]
     .sort((left, right) => right.createdTurn - left.createdTurn || right.messageId - left.messageId)
     .map((message) => toPlayerMailMessageDto(message));
@@ -7766,6 +7997,28 @@ function buildKnownPlanetsForDiplomacyContact(
   );
 }
 
+function buildOwnedPlanetsForPlayer(galaxy: Galaxy, playerId: number): ClientPlanetDto[] {
+  const planets: ClientPlanetDto[] = [];
+
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (planet.info.ownerId !== playerId) {
+          continue;
+        }
+
+        planets.push(toClientPlanetDtoFromClientPlanet(galaxy.createClientPlanet(planet, playerId)));
+      }
+    }
+  }
+
+  return planets.sort((left, right) =>
+    left.coordinates.x - right.coordinates.x
+    || left.coordinates.y - right.coordinates.y
+    || left.coordinates.z - right.coordinates.z
+  );
+}
+
 function buildActiveDiplomaticProposalDtos(
   galaxy: Galaxy,
   viewerPlayerId: number
@@ -7794,8 +8047,11 @@ function buildMailRequestDtos(
   const maintenanceRequests = galaxy.maintenanceRequests
     .filter((request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId)
     .map((request) => toMaintenanceMailRequestDto(galaxy, request, viewerPlayerId));
+  const supportRequests = galaxy.supportRequests
+    .filter((request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId)
+    .map((request) => toSupportMailRequestDto(galaxy, request, viewerPlayerId));
 
-  return [...diplomacyRequests, ...jumpGateRequests, ...maintenanceRequests]
+  return [...diplomacyRequests, ...jumpGateRequests, ...maintenanceRequests, ...supportRequests]
     .sort((left, right) =>
       mailRequestGroupOrder(left.state) - mailRequestGroupOrder(right.state)
       || proposalDirectionOrder(left.direction) - proposalDirectionOrder(right.direction)
@@ -7899,6 +8155,50 @@ function toJumpGateMailRequestDto(
   };
 }
 
+function toSupportMailRequestDto(
+  galaxy: Galaxy,
+  request: SupportRequest,
+  viewerPlayerId: number
+): SupportMailRequestDto {
+  const direction = request.toPlayerId === viewerPlayerId ? 'incoming' : 'outgoing';
+  const counterpartyPlayerId = direction === 'incoming' ? request.fromPlayerId : request.toPlayerId;
+  const counterpartyPlayerName = resolvePlayerById(galaxy, counterpartyPlayerId)?.playerName ?? `Player ${counterpartyPlayerId}`;
+
+  return {
+    requestId: request.requestId,
+    requestType: 'SUPPORT',
+    supportType: request.supportType,
+    createdTurn: request.createdTurn,
+    expiresOnTurn: request.expiresOnTurn,
+    state: request.state,
+    direction,
+    counterpartyPlayerId,
+    counterpartyPlayerName,
+    targetPlanetName: request.targetPlanetName,
+    targetCoordinates: { ...request.targetCoordinates },
+    acceptedTurn: request.acceptedTurn,
+    executionDueTurn: request.executionDueTurn,
+    executionExpiresOnTurn: request.executionExpiresOnTurn,
+    fulfilledTurn: request.fulfilledTurn,
+    resolutionNote: request.resolutionNote,
+    requestedResources: 'requestedResources' in request ? toResourcesPackDto(request.requestedResources) : null,
+    approvedResources: 'approvedResources' in request && request.approvedResources ? toResourcesPackDto(request.approvedResources) : null,
+    reservedSourcePlanetName: 'reservedSourcePlanetName' in request ? request.reservedSourcePlanetName : null,
+    reservedSourceCoordinates: 'reservedSourceCoordinates' in request && request.reservedSourceCoordinates
+      ? { ...request.reservedSourceCoordinates }
+      : null,
+    missionType: 'missionType' in request ? request.missionType : null,
+    minimumShips: 'minimumShips' in request ? request.minimumShips.map((entry) => ({ ...entry })) : null,
+    bombardmentPriorities: 'bombardmentPriorities' in request ? request.bombardmentPriorities : null,
+    targetOwnerPlayerName: 'targetOwnerPlayerName' in request ? request.targetOwnerPlayerName : null,
+    launchedFleetId: 'launchedFleetId' in request ? request.launchedFleetId : null,
+    launchOriginPlanetName: 'launchOriginPlanetName' in request ? request.launchOriginPlanetName : null,
+    launchOriginCoordinates: 'launchOriginCoordinates' in request && request.launchOriginCoordinates
+      ? { ...request.launchOriginCoordinates }
+      : null
+  };
+}
+
 function buildMailRecipientDtos(
   galaxy: Galaxy,
   viewerPlayerId: number
@@ -7962,8 +8262,12 @@ function countPendingMailRequestsForPlayer(galaxy: Galaxy, playerId: number): nu
     request.state === DiplomaticProposalState.PENDING
     && request.toPlayerId === playerId
   ).length;
+  const supportPending = galaxy.supportRequests.filter((request) =>
+    request.state === DiplomaticProposalState.PENDING
+    && request.toPlayerId === playerId
+  ).length;
 
-  return diplomacyPending + jumpGatePending + maintenancePending;
+  return diplomacyPending + jumpGatePending + maintenancePending + supportPending;
 }
 
 function countUnreadMailMessagesForPlayer(galaxy: Galaxy, playerId: number): number {
@@ -8136,6 +8440,7 @@ function isExplicitMaintenancePayload(value: unknown): value is ResolveMaintenan
 function buildOwnedActiveFleetsResponse(galaxy: Galaxy, playerId: number): Fleet[] {
   synchronizeJumpGateRequests(galaxy);
   synchronizeMaintenanceRequests(galaxy);
+  synchronizeSupportRequests(galaxy);
 
   return galaxy.activeFleets
     .filter((fleet) => fleet.ownerId === playerId)
@@ -8725,6 +9030,638 @@ function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
       );
     }
   }
+}
+
+function createSupportRequestCommand(
+  galaxy: Galaxy,
+  requesterPlayerId: number,
+  targetPlayerId: number,
+  supportType: SupportRequestTypeDto,
+  targetCoordinates: ClientCoordinates,
+  requestedResources: ResourcesPackType,
+  missionType: FleetMissionTypeType | null,
+  minimumShips: ShipAmountEntry[],
+  bombardmentPriorities: BombardmentPrioritiesType | null
+): { ok: true } | { status: number; error: string } {
+  const normalizedMinimumShips = normalizeSupportShipAmounts(minimumShips);
+  if (requesterPlayerId === targetPlayerId) {
+    return { status: 400, error: 'Support requests cannot target yourself.' };
+  }
+
+  const targetPlayer = resolvePlayerById(galaxy, targetPlayerId);
+  if (!targetPlayer || targetPlayer.type === PLAYER_TYPE_NEUTRAL) {
+    return { status: 404, error: 'Support target not found.' };
+  }
+
+  const status = resolveDiplomaticStatus(galaxy, requesterPlayerId, targetPlayerId);
+  if (!isSupportRequestAllowedForStatus(supportType, status)) {
+    return { status: 403, error: 'Current diplomacy status does not allow this support request.' };
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, targetCoordinates);
+  if (!targetPlanet) {
+    return { status: 404, error: 'Support target planet not found.' };
+  }
+
+  if (supportType === 'RESOURCE_SUPPORT' || supportType === 'PLANET_REPAIR' || supportType === 'PLANET_DEFENSE') {
+    if (targetPlanet.info.ownerId !== requesterPlayerId) {
+      return { status: 409, error: 'Support requests must target one of your own planets.' };
+    }
+  } else {
+    if (!isKnownHostileSupportTarget(galaxy, requesterPlayerId, targetPlanet, supportType)) {
+      return { status: 409, error: 'Offensive support requests require a known hostile target planet.' };
+    }
+
+    if (!isOffensiveSupportMissionTypeValid(supportType, missionType)) {
+      return { status: 400, error: 'Offensive support request mission type is invalid.' };
+    }
+
+    if (!supportShipAmountsHaveAnyValue(normalizedMinimumShips)) {
+      return { status: 400, error: 'Select at least one minimum ship requirement.' };
+    }
+
+    if (supportType === 'ATTACK_TARGET' && bombardmentPriorities !== null) {
+      return { status: 400, error: 'Bombardment priorities are valid only for bombard and siege support requests.' };
+    }
+
+    const targetOwnerId = targetPlanet.info.ownerId;
+    if (targetOwnerId === null || !isSupportMissionLegalForProvider(galaxy, targetPlayerId, targetOwnerId, supportType)) {
+      return { status: 409, error: 'Requested offensive target is not currently valid for the selected ally.' };
+    }
+  }
+
+  if (supportType === 'RESOURCE_SUPPORT' && !supportResourcesHasAnyValue(requestedResources)) {
+    return { status: 400, error: 'Select at least one requested resource amount.' };
+  }
+
+  const duplicatePending = galaxy.supportRequests.some((request) =>
+    request.state === DiplomaticProposalState.PENDING
+    && request.fromPlayerId === requesterPlayerId
+    && request.toPlayerId === targetPlayerId
+    && request.supportType === supportType
+    && sameCoordinates(request.targetCoordinates, targetCoordinates)
+  );
+  if (duplicatePending) {
+    return { status: 409, error: 'A matching support request is already pending for this planet.' };
+  }
+
+  galaxy.supportRequests.push(createSupportRequest(
+    galaxy.nextSupportRequestId,
+    requesterPlayerId,
+    targetPlayerId,
+    supportType,
+    targetPlanet.basicInfo.name,
+    targetCoordinates,
+    galaxy.currentTurn,
+    galaxy.currentTurn + 2,
+    supportType === 'RESOURCE_SUPPORT' ? requestedResources : null,
+    isOffensiveSupportRequestType(supportType)
+      ? {
+        missionType,
+        minimumShips: normalizedMinimumShips,
+        bombardmentPriorities,
+        targetOwnerPlayerId: targetPlanet.info.ownerId,
+        targetOwnerPlayerName: targetPlanet.info.ownerId !== null
+          ? resolvePlayerById(galaxy, targetPlanet.info.ownerId)?.playerName ?? null
+          : null
+      }
+      : undefined
+  ));
+  galaxy.nextSupportRequestId += 1;
+  return { ok: true };
+}
+
+function approveSupportRequest(
+  galaxy: Galaxy,
+  request: SupportRequest,
+  requestedApproval: ResourcesPackType
+): { ok: true } | { status: number; error: string } {
+  if (request.supportType === 'RESOURCE_SUPPORT') {
+    const approval = supportResourcesHasAnyValue(requestedApproval)
+      ? clampSupportResourcesToRequested(requestedApproval, request.requestedResources)
+      : request.requestedResources;
+    if (!supportResourcesHasAnyValue(approval)) {
+      return { status: 400, error: 'Approved support must include at least one resource.' };
+    }
+
+    const sourcePlanet = resolveBestResourceSupportSourcePlanet(galaxy, request.toPlayerId, approval);
+    if (!sourcePlanet) {
+      return { status: 409, error: 'No owned planet currently has enough resources to reserve this support.' };
+    }
+
+    sourcePlanet.rBDSFTQ.resources.subtractResourcePack(approval);
+    request.approvedResources = approval;
+    request.reservedSourcePlanetName = sourcePlanet.basicInfo.name;
+    request.reservedSourceCoordinates = toPlanetCoordinates(sourcePlanet);
+    request.acceptedTurn = galaxy.currentTurn;
+    request.executionDueTurn = galaxy.currentTurn + 1;
+    request.executionExpiresOnTurn = galaxy.currentTurn + 1;
+    request.state = DiplomaticProposalState.ACCEPTED;
+    request.resolutionNote = `Reserved on ${sourcePlanet.basicInfo.name}. Delivery scheduled for turn ${request.executionDueTurn}.`;
+    addSupportRequestMessages(
+      galaxy,
+      request,
+      `Resource support accepted`,
+      `${resolvePlayerById(galaxy, request.toPlayerId)?.playerName ?? 'Support provider'} reserved ${formatResourcesPackInline(approval)} for ${request.targetPlanetName}. Delivery is scheduled for turn ${request.executionDueTurn}.`,
+      `You reserved ${formatResourcesPackInline(approval)} for delivery to ${request.targetPlanetName} on turn ${request.executionDueTurn}.`
+    );
+    return { ok: true };
+  }
+
+  if (isOffensiveSupportRequest(request)) {
+    if (!isOffensiveSupportTargetStillValid(galaxy, request)) {
+      return { status: 409, error: 'Offensive support target is no longer valid.' };
+    }
+
+    request.acceptedTurn = galaxy.currentTurn;
+    request.executionDueTurn = galaxy.currentTurn + 1;
+    request.executionExpiresOnTurn = galaxy.currentTurn + 3;
+    request.state = DiplomaticProposalState.ACCEPTED;
+    request.resolutionNote = `Offensive support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`;
+    addSupportRequestMessages(
+      galaxy,
+      request,
+      'Offensive support accepted',
+      `${resolvePlayerById(galaxy, request.toPlayerId)?.playerName ?? 'Support provider'} accepted the ${request.missionType} support request for ${request.targetPlanetName}. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`,
+      `You accepted the ${request.missionType} support request for ${request.targetPlanetName}. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`
+    );
+    return { ok: true };
+  }
+
+  request.acceptedTurn = galaxy.currentTurn;
+  request.executionDueTurn = galaxy.currentTurn + 1;
+  request.executionExpiresOnTurn = galaxy.currentTurn + 1;
+  request.state = DiplomaticProposalState.ACCEPTED;
+  request.resolutionNote = request.supportType === 'PLANET_REPAIR'
+    ? `Repair support acknowledged for ${request.targetPlanetName}.`
+    : `Defense support acknowledged for ${request.targetPlanetName}.`;
+  addSupportRequestMessages(
+    galaxy,
+    request,
+    'Support request accepted',
+    request.resolutionNote,
+    request.resolutionNote
+  );
+  return { ok: true };
+}
+
+function rejectSupportRequest(
+  galaxy: Galaxy,
+  request: SupportRequest,
+  requesterBody: string,
+  ownerBody: string
+): void {
+  request.state = DiplomaticProposalState.REJECTED;
+  request.resolutionNote = requesterBody;
+  addSupportRequestMessages(galaxy, request, 'Support request rejected', requesterBody, ownerBody);
+}
+
+function cancelSupportRequest(
+  galaxy: Galaxy,
+  request: SupportRequest,
+  requesterBody: string,
+  ownerBody: string
+): void {
+  request.state = DiplomaticProposalState.CANCELLED;
+  request.resolutionNote = requesterBody;
+  addSupportRequestMessages(galaxy, request, 'Support request cancelled', requesterBody, ownerBody);
+}
+
+function synchronizeSupportRequests(galaxy: Galaxy): void {
+  for (const request of galaxy.supportRequests) {
+    if (request.state === DiplomaticProposalState.PENDING) {
+      const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+      const invalidDefensiveTarget = (
+        (request.supportType === 'RESOURCE_SUPPORT' || request.supportType === 'PLANET_REPAIR' || request.supportType === 'PLANET_DEFENSE')
+        && (!targetPlanet || targetPlanet.info.ownerId !== request.fromPlayerId)
+      );
+      const invalidOffensiveTarget = (
+        isOffensiveSupportRequest(request)
+        && !isKnownHostileSupportTarget(galaxy, request.fromPlayerId, targetPlanet, request.supportType)
+      );
+      if (invalidDefensiveTarget || invalidOffensiveTarget) {
+        request.state = DiplomaticProposalState.CANCELLED;
+        request.resolutionNote = 'Support request auto-cancelled because the target is no longer valid.';
+        continue;
+      }
+
+      if (request.expiresOnTurn <= galaxy.currentTurn) {
+        request.state = DiplomaticProposalState.EXPIRED;
+        request.resolutionNote = 'Support request expired before it was answered.';
+        addSupportRequestMessages(
+          galaxy,
+          request,
+          'Support request expired',
+          'Your support request expired before it was answered.',
+          `Support request for ${request.targetPlanetName} expired.`
+        );
+      }
+      continue;
+    }
+
+    if (request.state !== DiplomaticProposalState.ACCEPTED || request.fulfilledTurn !== null || request.executionDueTurn === null) {
+      continue;
+    }
+
+    if (request.supportType === 'RESOURCE_SUPPORT') {
+      if (galaxy.currentTurn >= request.executionDueTurn) {
+        executeAcceptedResourceSupportRequest(galaxy, request);
+      }
+      continue;
+    }
+
+    if (!isOffensiveSupportRequest(request)) {
+      continue;
+    }
+
+    if (!isOffensiveSupportTargetStillValid(galaxy, request)) {
+      request.state = DiplomaticProposalState.CANCELLED;
+      request.fulfilledTurn = galaxy.currentTurn;
+      request.resolutionNote = 'Offensive support was auto-cancelled because the target is no longer a valid hostile target.';
+      addSupportRequestMessages(
+        galaxy,
+        request,
+        'Offensive support cancelled',
+        request.resolutionNote,
+        request.resolutionNote
+      );
+      continue;
+    }
+
+    if (galaxy.currentTurn < request.executionDueTurn) {
+      continue;
+    }
+
+    const launchResult = tryLaunchAcceptedOffensiveSupportRequest(galaxy, request);
+    if (launchResult.ok) {
+      continue;
+    }
+
+    if (request.executionExpiresOnTurn !== null && galaxy.currentTurn >= request.executionExpiresOnTurn) {
+      request.state = DiplomaticProposalState.REJECTED;
+      request.fulfilledTurn = galaxy.currentTurn;
+      request.resolutionNote = 'Offensive support auto-rejected after 3 turns because no valid fleet met the requested minimum.';
+      addSupportRequestMessages(
+        galaxy,
+        request,
+        'Offensive support auto-rejected',
+        request.resolutionNote,
+        request.resolutionNote
+      );
+      continue;
+    }
+
+    request.resolutionNote = `Waiting for a valid ${request.missionType} fleet that meets the requested minimum.`;
+  }
+}
+
+function executeAcceptedResourceSupportRequest(galaxy: Galaxy, request: Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' }>): void {
+  if (!request.approvedResources || !supportResourcesHasAnyValue(request.approvedResources)) {
+    request.fulfilledTurn = galaxy.currentTurn;
+    request.resolutionNote = 'No approved resources were reserved for this support request.';
+    return;
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+  if (!targetPlanet || targetPlanet.info.ownerId !== request.fromPlayerId) {
+    refundReservedSupportResources(galaxy, request);
+    request.state = DiplomaticProposalState.CANCELLED;
+    request.fulfilledTurn = galaxy.currentTurn;
+    request.resolutionNote = 'Delivery failed because the target planet is no longer valid. Reserved resources were refunded.';
+    addSupportRequestMessages(
+      galaxy,
+      request,
+      'Support delivery cancelled',
+      request.resolutionNote,
+      request.resolutionNote
+    );
+    return;
+  }
+
+  targetPlanet.rBDSFTQ.resources.addResourcePack(request.approvedResources);
+  request.fulfilledTurn = galaxy.currentTurn;
+  request.resolutionNote = `Delivered ${formatResourcesPackInline(request.approvedResources)} to ${request.targetPlanetName} on turn ${galaxy.currentTurn}.`;
+  addSupportRequestMessages(
+    galaxy,
+    request,
+    'Support delivered',
+    request.resolutionNote,
+    request.resolutionNote
+  );
+}
+
+function refundReservedSupportResources(
+  galaxy: Galaxy,
+  request: Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' }>
+): void {
+  if (!request.approvedResources || !supportResourcesHasAnyValue(request.approvedResources) || !request.reservedSourceCoordinates) {
+    return;
+  }
+
+  const sourcePlanet = resolvePlanetAtCoordinates(galaxy, request.reservedSourceCoordinates);
+  if (!sourcePlanet || sourcePlanet.info.ownerId !== request.toPlayerId) {
+    return;
+  }
+
+  sourcePlanet.rBDSFTQ.resources.addResourcePack(request.approvedResources);
+}
+
+function isOffensiveSupportRequestType(
+  supportType: SupportRequestTypeDto
+): supportType is Extract<SupportRequestTypeDto, 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET'> {
+  return supportType === 'ATTACK_TARGET' || supportType === 'BOMBARD_TARGET' || supportType === 'SIEGE_TARGET';
+}
+
+function isOffensiveSupportRequest(
+  request: SupportRequest
+): request is Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }> {
+  return isOffensiveSupportRequestType(request.supportType);
+}
+
+function isOffensiveSupportMissionTypeValid(
+  supportType: Extract<SupportRequestTypeDto, 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET'>,
+  missionType: FleetMissionTypeType | null
+): boolean {
+  switch (supportType) {
+    case 'ATTACK_TARGET':
+      return missionType === FleetMissionType.ATTACK;
+    case 'BOMBARD_TARGET':
+      return missionType === FleetMissionType.BOMBARD;
+    case 'SIEGE_TARGET':
+      return missionType === FleetMissionType.SIEGE;
+  }
+}
+
+function isKnownHostileSupportTarget(
+  galaxy: Galaxy,
+  viewerPlayerId: number,
+  targetPlanet: Planet | null,
+  supportType: SupportRequestTypeDto
+): boolean {
+  if (!targetPlanet || targetPlanet.info.ownerId === null || targetPlanet.info.ownerId === viewerPlayerId) {
+    return false;
+  }
+
+  if (!targetPlanet.lastReportData.has(viewerPlayerId)) {
+    return false;
+  }
+
+  return isSupportMissionLegalForProvider(galaxy, viewerPlayerId, targetPlanet.info.ownerId, supportType);
+}
+
+function isSupportMissionLegalForProvider(
+  galaxy: Galaxy,
+  providerPlayerId: number,
+  targetOwnerPlayerId: number,
+  supportType: SupportRequestTypeDto
+): boolean {
+  const status = resolveDiplomaticStatus(galaxy, providerPlayerId, targetOwnerPlayerId);
+  if (supportType === 'ATTACK_TARGET') {
+    return status === DiplomaticStatus.WAR
+      || status === DiplomaticStatus.NEUTRAL
+      || status === DiplomaticStatus.PASSIVE;
+  }
+
+  if (supportType === 'BOMBARD_TARGET' || supportType === 'SIEGE_TARGET') {
+    return status === DiplomaticStatus.WAR;
+  }
+
+  return isSupportRequestAllowedForStatus(supportType, status);
+}
+
+function isOffensiveSupportTargetStillValid(
+  galaxy: Galaxy,
+  request: Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }>
+): boolean {
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+  if (!targetPlanet || targetPlanet.info.ownerId === null) {
+    return false;
+  }
+
+  return isSupportMissionLegalForProvider(galaxy, request.toPlayerId, targetPlanet.info.ownerId, request.supportType);
+}
+
+function tryLaunchAcceptedOffensiveSupportRequest(
+  galaxy: Galaxy,
+  request: Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }>
+): { ok: true } | { ok: false } {
+  const candidates = resolveOffensiveSupportLaunchCandidates(galaxy, request);
+  for (const candidate of candidates) {
+    const result = createFleetMission(
+      { galaxy, playerId: request.toPlayerId },
+      {
+        missionType: request.missionType,
+        origin: candidate.originCoordinates,
+        target: request.targetCoordinates,
+        ships: candidate.ships,
+        carriedBombs: [],
+        cargo: { metal: 0, crystal: 0, deuterium: 0 },
+        useJumpGate: false,
+        bombardmentPriorities: request.bombardmentPriorities
+      }
+    );
+    if (!result.ok) {
+      continue;
+    }
+
+    request.fulfilledTurn = galaxy.currentTurn;
+    request.launchedFleetId = result.value.fleet.fleetId;
+    request.launchOriginPlanetName = candidate.originPlanet.basicInfo.name;
+    request.launchOriginCoordinates = candidate.originCoordinates;
+    request.resolutionNote = `Auto-launched Fleet #${result.value.fleet.fleetId} from ${candidate.originPlanet.basicInfo.name} toward ${request.targetPlanetName}.`;
+    addSupportRequestMessages(
+      galaxy,
+      request,
+      'Offensive support launched',
+      request.resolutionNote,
+      request.resolutionNote
+    );
+    return { ok: true };
+  }
+
+  return { ok: false };
+}
+
+function resolveOffensiveSupportLaunchCandidates(
+  galaxy: Galaxy,
+  request: Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }>
+): Array<{
+  originPlanet: Planet;
+  originCoordinates: ClientCoordinates;
+  ships: CreateFleetShipSelectionEntry[];
+}> {
+  const candidates: Array<{
+    originPlanet: Planet;
+    originCoordinates: ClientCoordinates;
+    ships: CreateFleetShipSelectionEntry[];
+    distance: number;
+  }> = [];
+
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (planet.info.ownerId !== request.toPlayerId) {
+          continue;
+        }
+
+        const ships = buildMinimumSupportShipSelection(planet, request.minimumShips);
+        if (!ships) {
+          continue;
+        }
+
+        const originCoordinates = toPlanetCoordinates(planet);
+        candidates.push({
+          originPlanet: planet,
+          originCoordinates,
+          ships,
+          distance: calculateTravelDistance(originCoordinates, request.targetCoordinates)
+        });
+      }
+    }
+  }
+
+  candidates.sort((left, right) =>
+    left.distance - right.distance
+    || comparePlanetCoordinates(left.originPlanet, right.originPlanet)
+  );
+
+  return candidates.map(({ originPlanet, originCoordinates, ships }) => ({
+    originPlanet,
+    originCoordinates,
+    ships
+  }));
+}
+
+function buildMinimumSupportShipSelection(
+  planet: Planet,
+  minimumShips: ShipAmountEntry[]
+): CreateFleetShipSelectionEntry[] | null {
+  const availableUndamaged = ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
+  const availableDamaged = ManyShips.damagedCountByType(planet.rBDSFTQ.ships);
+  const selections: CreateFleetShipSelectionEntry[] = [];
+
+  for (const minimum of minimumShips) {
+    const undamagedAvailable = availableUndamaged.get(minimum.type as ShipTypeType) ?? 0;
+    const damagedAvailable = availableDamaged.get(minimum.type as ShipTypeType) ?? 0;
+    if (undamagedAvailable + damagedAvailable < minimum.amount) {
+      return null;
+    }
+
+    const undamagedAmount = Math.min(undamagedAvailable, minimum.amount);
+    const damagedAmount = Math.max(0, minimum.amount - undamagedAmount);
+    selections.push({
+      type: minimum.type,
+      undamagedAmount,
+      damagedAmount
+    });
+  }
+
+  return selections;
+}
+
+function resolveBestResourceSupportSourcePlanet(
+  galaxy: Galaxy,
+  ownerPlayerId: number,
+  requiredResources: ResourcesPackType
+): Planet | null {
+  let bestPlanet: Planet | null = null;
+
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (planet.info.ownerId !== ownerPlayerId) {
+          continue;
+        }
+
+        if (!planet.rBDSFTQ.resources.isSufficient(requiredResources)) {
+          continue;
+        }
+
+        if (!bestPlanet) {
+          bestPlanet = planet;
+          continue;
+        }
+
+        const currentValue = planet.rBDSFTQ.resources.getTotalValuedResourceAmount();
+        const bestValue = bestPlanet.rBDSFTQ.resources.getTotalValuedResourceAmount();
+        if (currentValue > bestValue) {
+          bestPlanet = planet;
+          continue;
+        }
+
+        if (
+          currentValue === bestValue
+          && comparePlanetCoordinates(planet, bestPlanet) < 0
+        ) {
+          bestPlanet = planet;
+        }
+      }
+    }
+  }
+
+  return bestPlanet;
+}
+
+function isSupportRequestAllowedForStatus(
+  supportType: SupportRequestTypeDto,
+  status: DiplomaticStatusType
+): boolean {
+  if (
+    supportType === 'RESOURCE_SUPPORT'
+    || supportType === 'ATTACK_TARGET'
+    || supportType === 'BOMBARD_TARGET'
+    || supportType === 'SIEGE_TARGET'
+  ) {
+    return status === DiplomaticStatus.ALLIED;
+  }
+
+  return status === DiplomaticStatus.ALLIED || status === DiplomaticStatus.PEACE;
+}
+
+function comparePlanetCoordinates(left: Planet, right: Planet): number {
+  return left.basicInfo.solarSystem.coordinates.x - right.basicInfo.solarSystem.coordinates.x
+    || left.basicInfo.solarSystem.coordinates.y - right.basicInfo.solarSystem.coordinates.y
+    || left.basicInfo.order - right.basicInfo.order;
+}
+
+function addSupportRequestMessages(
+  galaxy: Galaxy,
+  request: SupportRequest,
+  title: string,
+  requesterBody: string,
+  providerBody: string
+): void {
+  const requester = resolvePlayerById(galaxy, request.fromPlayerId);
+  const provider = resolvePlayerById(galaxy, request.toPlayerId);
+  if (requester) {
+    addPlayerMessage(
+      requester,
+      galaxy.currentTurn,
+      title,
+      requesterBody,
+      request.toPlayerId,
+      provider?.playerName ?? null
+    );
+  }
+  if (provider) {
+    addPlayerMessage(
+      provider,
+      galaxy.currentTurn,
+      title,
+      providerBody,
+      request.fromPlayerId,
+      requester?.playerName ?? null
+    );
+  }
+}
+
+function formatResourcesPackInline(pack: ResourcesPackType): string {
+  const entries = [
+    pack.metal > 0 ? `${pack.metal} metal` : null,
+    pack.crystal > 0 ? `${pack.crystal} crystal` : null,
+    pack.deuterium > 0 ? `${pack.deuterium} deuterium` : null
+  ].filter((entry): entry is string => !!entry);
+  return entries.length > 0 ? entries.join(', ') : 'no resources';
 }
 
 function synchronizeTradePortState(galaxy: Galaxy): boolean {

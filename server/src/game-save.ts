@@ -13,6 +13,7 @@ import * as planetModule from '../../src/app/models/planets/planet.js';
 import * as planetaryParametersModule from '../../src/app/models/planets/planetary-parameters.js';
 import * as solarSystemModule from '../../src/app/models/planets/solar-system.js';
 import * as starSystemNoteModule from '../../src/app/models/planets/star-system-note.js';
+import * as supportRequestModule from '../../src/app/models/requests/support-request.js';
 import * as buildingQueueModule from '../../src/app/models/reports/building-queue.js';
 import * as buildingsReportModule from '../../src/app/models/reports/buildings-report.js';
 import * as colonizationReportModule from '../../src/app/models/reports/colonization-report.js';
@@ -76,6 +77,7 @@ const { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ } = resolveModule(planetMod
 const { PlanetaryParameters: PlanetaryParametersModel } = resolveModule(planetaryParametersModule) as typeof import('../../src/app/models/planets/planetary-parameters.js');
 const { SolarSystem } = resolveModule(solarSystemModule) as typeof import('../../src/app/models/planets/solar-system.js');
 const { StarSystemNote: StarSystemNoteModel } = resolveModule(starSystemNoteModule) as typeof import('../../src/app/models/planets/star-system-note.js');
+const { normalizeSupportResources } = resolveModule(supportRequestModule) as typeof import('../../src/app/models/requests/support-request.js');
 const { BuildingQueue } = resolveModule(buildingQueueModule) as typeof import('../../src/app/models/reports/building-queue.js');
 const { BuildingsReport } = resolveModule(buildingsReportModule) as typeof import('../../src/app/models/reports/buildings-report.js');
 const { ColonizationReport } = resolveModule(colonizationReportModule) as typeof import('../../src/app/models/reports/colonization-report.js');
@@ -99,7 +101,7 @@ const { ShipyardQueueEntry } = resolveModule(shipyardQueueEntryModule) as typeof
 const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as typeof import('../../src/app/models/tech/technology-queue-entry.js');
 const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../src/app/models/tech/research-helper-for.js');
 
-export const GAME_SAVE_VERSION = 2;
+export const GAME_SAVE_VERSION = 3;
 export const AUTO_SAVE_ROTATION_LIMIT = 5;
 export const MAX_GAME_SAVE_FILES = 100;
 
@@ -293,6 +295,7 @@ type SavedGalaxy = {
   nextDiplomaticProposalId: number;
   nextJumpGateRequestId: number;
   nextMaintenanceRequestId: number;
+  nextSupportRequestId: number;
   players: SavedPlayer[];
   stars: SavedSolarSystem[][];
   activeFleets: SavedFleet[];
@@ -300,6 +303,7 @@ type SavedGalaxy = {
   diplomaticProposals: GalaxyModel['diplomaticProposals'];
   jumpGateRequests: GalaxyModel['jumpGateRequests'];
   maintenanceRequests: GalaxyModel['maintenanceRequests'];
+  supportRequests: GalaxyModel['supportRequests'];
 };
 
 export type SavedGameFile = {
@@ -360,6 +364,7 @@ export function createGameSave(
       nextDiplomaticProposalId: galaxy.nextDiplomaticProposalId,
       nextJumpGateRequestId: galaxy.nextJumpGateRequestId,
       nextMaintenanceRequestId: galaxy.nextMaintenanceRequestId,
+      nextSupportRequestId: galaxy.nextSupportRequestId,
       players: galaxy.players.map((player) => serializePlayer(player, planetCoordinatesByReference)),
       stars: galaxy.stars.map((row) => row.map((system) => ({
         name: system.name,
@@ -395,6 +400,30 @@ export function createGameSave(
             ships: request.approved.ships.map((entry) => ({ ...entry })),
             bombs: request.approved.bombs.map((entry) => ({ ...entry }))
           }
+          : null
+      })),
+      supportRequests: galaxy.supportRequests.map((request) => ({
+        ...request,
+        targetCoordinates: serializeCoordinates(request.targetCoordinates),
+        requestedResources: 'requestedResources' in request
+          ? {
+            metal: request.requestedResources.metal,
+            crystal: request.requestedResources.crystal,
+            deuterium: request.requestedResources.deuterium
+          }
+          : undefined,
+        approvedResources: 'approvedResources' in request && request.approvedResources
+          ? {
+            metal: request.approvedResources.metal,
+            crystal: request.approvedResources.crystal,
+            deuterium: request.approvedResources.deuterium
+          }
+          : null,
+        launchOriginCoordinates: 'launchOriginCoordinates' in request && request.launchOriginCoordinates
+          ? serializeCoordinates(request.launchOriginCoordinates)
+          : null,
+        reservedSourceCoordinates: 'reservedSourceCoordinates' in request && request.reservedSourceCoordinates
+          ? serializeCoordinates(request.reservedSourceCoordinates)
           : null
       }))
     }
@@ -653,13 +682,13 @@ export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
     save.galaxy.diplomaticRelations.map((relation) => ({ ...relation })),
     save.galaxy.diplomaticProposals.map((proposal) => ({ ...proposal })),
     save.galaxy.nextDiplomaticProposalId,
-    save.galaxy.jumpGateRequests.map((request) => ({
+    (save.galaxy.jumpGateRequests ?? []).map((request) => ({
       ...request,
       originCoordinates: serializeCoordinates(request.originCoordinates),
       targetCoordinates: serializeCoordinates(request.targetCoordinates)
     })),
-    save.galaxy.nextJumpGateRequestId,
-    save.galaxy.maintenanceRequests.map((request) => ({
+    save.galaxy.nextJumpGateRequestId ?? 1,
+    (save.galaxy.maintenanceRequests ?? []).map((request) => ({
       ...request,
       targetCoordinates: serializeCoordinates(request.targetCoordinates),
       requested: {
@@ -675,7 +704,24 @@ export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
         }
         : null
     })),
-    save.galaxy.nextMaintenanceRequestId
+    save.galaxy.nextMaintenanceRequestId ?? 1,
+    (save.galaxy.supportRequests ?? []).map((request) => ({
+      ...request,
+      targetCoordinates: serializeCoordinates(request.targetCoordinates),
+      requestedResources: 'requestedResources' in request
+        ? normalizeSupportResources(request.requestedResources)
+        : undefined,
+      approvedResources: 'approvedResources' in request
+        ? normalizeSupportResources(request.approvedResources)
+        : null,
+      launchOriginCoordinates: 'launchOriginCoordinates' in request && request.launchOriginCoordinates
+        ? serializeCoordinates(request.launchOriginCoordinates)
+        : null,
+      reservedSourceCoordinates: 'reservedSourceCoordinates' in request && request.reservedSourceCoordinates
+        ? serializeCoordinates(request.reservedSourceCoordinates)
+        : null
+    })),
+    save.galaxy.nextSupportRequestId ?? 1
   );
 
   return {

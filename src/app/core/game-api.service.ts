@@ -39,6 +39,7 @@ import {
   CreateStarSystemSpyResponse,
   CreateMaintenanceRequestRequest,
   CreateMaintenanceRequestResponse,
+  CreateSupportRequestRequest,
   DeletePlayerReportsRequest,
   DeletePlayerReportsResponse,
   FleetMaintenanceOptionsDto,
@@ -57,6 +58,7 @@ import {
   CreateDiplomaticProposalRequest,
   MailViewResponse,
   ResolveMaintenanceRequestRequest,
+  ResolveSupportRequestRequest,
   SendMailMessageRequest,
   SendMailMessageResponse,
   AbandonPlanetRequest,
@@ -714,6 +716,14 @@ export class GameApiService {
     );
   }
 
+  public createSupportRequest(request: CreateSupportRequestRequest, token: string) {
+    return this.http.post<DiplomacyViewResponse>(
+      `${API_BASE_URL}/game/diplomacy/support-requests`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
   public acceptDiplomaticProposal(proposalId: number, token: string) {
     return this.http.post<DiplomacyViewResponse>(
       `${API_BASE_URL}/game/diplomacy/proposals/${proposalId}/accept`,
@@ -733,6 +743,34 @@ export class GameApiService {
   public cancelDiplomaticProposal(proposalId: number, token: string) {
     return this.http.post<DiplomacyViewResponse>(
       `${API_BASE_URL}/game/diplomacy/proposals/${proposalId}/cancel`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public approveSupportRequest(
+    requestId: number,
+    request: ResolveSupportRequestRequest | null,
+    token: string
+  ) {
+    return this.http.post<MailViewResponse>(
+      `${API_BASE_URL}/game/mail/support-requests/${requestId}/approve`,
+      request ?? {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public rejectSupportRequest(requestId: number, token: string) {
+    return this.http.post<MailViewResponse>(
+      `${API_BASE_URL}/game/mail/support-requests/${requestId}/reject`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public cancelSupportRequest(requestId: number, token: string) {
+    return this.http.post<MailViewResponse>(
+      `${API_BASE_URL}/game/mail/support-requests/${requestId}/cancel`,
       {},
       { headers: this.authHeaders(token) }
     );
