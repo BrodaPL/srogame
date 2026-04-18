@@ -15,6 +15,7 @@ import { ManyDefences } from '../models/defences/many-defences';
 
 export type EspionageReportOptions = {
   forcedReportLevel?: number;
+  reportLevelBonus?: number;
   reportId?: number;
   createdTurn?: number;
   title?: string;
@@ -139,7 +140,11 @@ export class EspionageReportGenerator {
       return Math.max(0, Math.floor(forcedReportLevel as number));
     }
 
-    return this.calculateReportLevel(player, planetOwner, planet, probeAmount);
+    const bonus = Number.isFinite(options?.reportLevelBonus)
+      ? Math.floor(options?.reportLevelBonus as number)
+      : 0;
+
+    return Math.max(0, this.calculateReportLevel(player, planetOwner, planet, probeAmount) + bonus);
   }
 
   private resolveCreatedTurn(options?: EspionageReportOptions): number {

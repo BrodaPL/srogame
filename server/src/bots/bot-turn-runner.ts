@@ -8,6 +8,7 @@ import * as playerTypeEnumModule from '../../../src/app/models/enums/player-type
 import * as shipPurposeEnumModule from '../../../src/app/models/enums/ship-purpose.js';
 import * as shipTypeEnumModule from '../../../src/app/models/enums/ship-type.js';
 import * as technologyTypeEnumModule from '../../../src/app/models/enums/technology-type.js';
+import * as weaponTypeEnumModule from '../../../src/app/models/enums/weapon-type.js';
 import * as resourcesPackModule from '../../../src/app/models/resources-pack.js';
 import * as playerModule from '../../../src/app/models/player.js';
 import * as bombardmentPriorityModule from '../../../src/app/models/bombardment/bombardment-priority.js';
@@ -95,6 +96,7 @@ const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../
 const { ShipPurpose } = resolveModule(shipPurposeEnumModule) as typeof import('../../../src/app/models/enums/ship-purpose.js');
 const { ShipType } = resolveModule(shipTypeEnumModule) as typeof import('../../../src/app/models/enums/ship-type.js');
 const { TechnologyType } = resolveModule(technologyTypeEnumModule) as typeof import('../../../src/app/models/enums/technology-type.js');
+const { WeaponType } = resolveModule(weaponTypeEnumModule) as typeof import('../../../src/app/models/enums/weapon-type.js');
 const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
 const { defaultBotProfileIdForPlayerId } = resolveModule(playerModule) as typeof import('../../../src/app/models/player.js');
 const { BombardmentPriorityTarget } = resolveModule(bombardmentPriorityModule) as typeof import('../../../src/app/models/bombardment/bombardment-priority.js');
@@ -1026,6 +1028,7 @@ function buildSpyCandidates(
   }
 
   const candidates: BotCandidate[] = [];
+  const farmAttackUnlocked = isFarmAttackUnlocked(player, profile);
   for (const originPlanet of player.planets) {
     const availableProbes = planetUndamagedAmount(originPlanet, ShipType.SPY_PROBE);
     if (availableProbes <= 0) {
@@ -1039,15 +1042,28 @@ function buildSpyCandidates(
         continue;
       }
 
+      const targetOwner = targetPlanet.info.ownerId === null
+        ? null
+        : resolvePlayerById(galaxy, targetPlanet.info.ownerId);
+      const targetStatus = targetOwner
+        ? resolveDiplomaticStatus(galaxy, player.playerId, targetOwner.playerId)
+        : null;
+      const farmTarget = isFarmTarget(targetOwner, targetStatus);
       const distance = calculateTravelDistance(originCoordinates, targetCoordinates);
       const report = targetPlanet.lastReportData.get(player.playerId) ?? null;
       const stalenessTurns = report === null
         ? 6
         : Math.max(0, galaxy.currentTurn - report.createdTurn);
+      if (farmTarget && report && report.totalDefencesAmount <= 0) {
+        continue;
+      }
       if (report && stalenessTurns < 2) {
         continue;
       }
-      if (!report && distance > 2) {
+      const unseenDistanceLimit = farmTarget && farmAttackUnlocked
+        ? profile.preferredMaxTravelDistance + 1
+        : 2;
+      if (!report && distance > unseenDistanceLimit) {
         continue;
       }
 
@@ -1073,7 +1089,10 @@ function buildSpyCandidates(
 
       const interest = estimateSpyTargetInterest(galaxy, player, targetPlanet, report, diplomacyContexts);
       const recentlySpiedPenalty = hasRecentTarget(player.botMemory?.lastSpyTargets ?? [], targetCoordinates) ? 3 : 0;
-      const base = (8 * profile.spyWeight) + interest + stalenessTurns - distance - recentlySpiedPenalty;
+      const farmInterestBonus = farmTarget
+        ? 4 + (targetStatus === DiplomaticStatus.PASSIVE ? 1.5 : 0)
+        : 0;
+      const base = (8 * profile.spyWeight) + interest + farmInterestBonus + stalenessTurns - distance - recentlySpiedPenalty;
       const utility = applyGoalBonus(player.botMemory, 'REFRESH_INTEL', base, targetCoordinates);
       candidates.push({
         kind: 'spy',
@@ -1186,6 +1205,7 @@ function buildAttackCandidates(
   }
 
   const candidates: BotCandidate[] = [];
+  const farmAttackUnlocked = isFarmAttackUnlocked(player, profile);
   for (const targetPlanet of collectForeignPlanets(galaxy, player.playerId)) {
     if (targetPlanet.info.ownerId === null) {
       continue;
@@ -1197,11 +1217,15 @@ function buildAttackCandidates(
     }
 
     const targetStatus = resolveDiplomaticStatus(galaxy, player.playerId, targetOwner.playerId);
+    const farmTarget = isFarmTarget(targetOwner, targetStatus);
     if (
       targetStatus !== DiplomaticStatus.WAR
       && targetStatus !== DiplomaticStatus.NEUTRAL
       && targetStatus !== DiplomaticStatus.PASSIVE
     ) {
+      continue;
+    }
+    if (farmTarget && !farmAttackUnlocked) {
       continue;
     }
 
@@ -1214,6 +1238,8 @@ function buildAttackCandidates(
 
     const defenderStrength = Math.max(1, estimateReportCombatStrength(report));
     const stalenessTurns = Math.max(0, galaxy.currentTurn - report.createdTurn);
+    const clearedFarm = farmTarget && report.totalDefencesAmount <= 0;
+    const effectiveStalenessTurns = clearedFarm ? 0 : stalenessTurns;
     const targetCoordinates = coordinatesOfPlanet(targetPlanet);
     for (const originPlanet of player.planets) {
       const originCoordinates = coordinatesOfPlanet(originPlanet);
@@ -1226,7 +1252,9 @@ function buildAttackCandidates(
         continue;
       }
 
-      const attackShips = buildAttackShipSelection(originPlanet, report, profile);
+      const attackShips = buildAttackShipSelection(originPlanet, report, profile, {
+        requireBombardmentBreaker: farmTarget && report.totalDefencesAmount > 0
+      });
       if (attackShips.length === 0) {
         continue;
       }
@@ -1256,12 +1284,16 @@ function buildAttackCandidates(
       }
 
       const attackerStrength = estimateShipSelectionCombatStrength(request.ships);
-      const relationRiskPenalty = targetStatus === DiplomaticStatus.NEUTRAL
+      const relationRiskPenalty = farmTarget
+        ? 0
+        : targetStatus === DiplomaticStatus.NEUTRAL
         ? 0.2
         : targetStatus === DiplomaticStatus.PASSIVE
           ? 0.05
           : 0;
-      const requiredRatio = profile.minAttackStrengthRatio + (stalenessTurns * profile.staleIntelPenaltyScale) + relationRiskPenalty;
+      const requiredRatio = profile.minAttackStrengthRatio
+        + (effectiveStalenessTurns * profile.staleIntelPenaltyScale)
+        + relationRiskPenalty;
       const ratio = attackerStrength / defenderStrength;
       if (ratio < requiredRatio) {
         continue;
@@ -1269,24 +1301,28 @@ function buildAttackCandidates(
 
       const lootValue = estimateResourceValue(report.resourcesAmount);
       const bombardValue = estimateBombardTargetValue(report);
-      const recentAttackPenalty = hasRecentTarget(player.botMemory?.lastAttackTargets ?? [], targetCoordinates) ? 3 : 0;
+      const recentAttackPenalty = farmTarget
+        ? (hasRecentTargetWithinWindow(player.botMemory?.lastAttackTargets ?? [], targetCoordinates, 3) ? 1.5 : 0)
+        : (hasRecentTarget(player.botMemory?.lastAttackTargets ?? [], targetCoordinates) ? 3 : 0);
       const effectiveRatio = Math.min(ratio, 4);
       const infrastructurePressurePenalty = targetStatus === DiplomaticStatus.WAR && bombardValue >= 80
         ? bombardValue / 18
         : 0;
-      const relationUtilityBonus = targetStatus === DiplomaticStatus.WAR
+      const relationUtilityBonus = farmTarget
+        ? (6 + (targetStatus === DiplomaticStatus.PASSIVE ? 1.5 : 0))
+        : targetStatus === DiplomaticStatus.WAR
         ? 5
         : targetStatus === DiplomaticStatus.PASSIVE
           ? 2.5
           : 1.5;
-      const borderThreatBonus = diplomacyContext ? (diplomacyContext.borderPressure * 0.6) : 0;
+      const borderThreatBonus = !farmTarget && diplomacyContext ? (diplomacyContext.borderPressure * 0.6) : 0;
       const base = (12 * profile.militaryWeight)
         + (effectiveRatio * 6)
         + relationUtilityBonus
         + borderThreatBonus
         + (lootValue / 150)
         - (distance * 1.5)
-        - (stalenessTurns * profile.staleIntelPenaltyScale * 8)
+        - (effectiveStalenessTurns * profile.staleIntelPenaltyScale * 8)
         - infrastructurePressurePenalty
         - recentAttackPenalty;
       const utility = applyGoalBonus(player.botMemory, 'PREPARE_SAFE_ATTACK', base, targetCoordinates);
@@ -2671,6 +2707,40 @@ function isOptionalBuildingSpend(buildingType: BuildingTypeType): boolean {
   );
 }
 
+function isFarmAttackUnlocked(player: Player, profile: BotProfile): boolean {
+  if (
+    player.getTechLevel(TechnologyType.FUSION_DRIVE) < 3
+    || player.getTechLevel(TechnologyType.HYPERSPACE_DRIVE) < 2
+  ) {
+    return false;
+  }
+  if (player.planets.length <= 0) {
+    return false;
+  }
+
+  const economyTargets = BOT_ECONOMY_TARGETS[profile.id];
+  const averageMineLevel = player.planets.reduce((sum, planet) => (
+    sum + averageBuildingLevels(planet, [
+      BuildingType.METAL_MINE,
+      BuildingType.CRYSTAL_MINE,
+      BuildingType.DEUTERIUM_SYNTHESIZER
+    ])
+  ), 0) / player.planets.length;
+  const maxRoboticsLevel = Math.max(...player.planets.map((planet) => planet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY)));
+  const maxResearchLabLevel = Math.max(...player.planets.map((planet) => planet.getBuildingLevel(BuildingType.RESEARCH_LAB)));
+  const maxShipyardLevel = Math.max(...player.planets.map((planet) => planet.getBuildingLevel(BuildingType.SHIPYARD)));
+  const hasEnergyRecoveryPlanet = player.planets.some((planet) => buildPlanetEconomyState(planet, player, profile).stage === 'energy_recovery');
+
+  return (
+    averageMineLevel >= economyTargets.mineLevel
+    && maxRoboticsLevel >= economyTargets.roboticsLevel
+    && maxResearchLabLevel >= economyTargets.researchLabLevel
+    && maxShipyardLevel >= economyTargets.shipyardLevel
+    && !hasEnergyRecoveryPlanet
+    && player.planets.some((planet) => planetHasJumpCombatShip(planet))
+  );
+}
+
 function isFusionReactorUpgradeDeuteriumSafe(
   planet: Planet,
   player: Player,
@@ -2716,6 +2786,28 @@ function isFusionReactorUpgradeDeuteriumSafe(
   return projected.effectiveStage === nextLevel && !projected.isClamped && projected.netDeuteriumIncome >= 0;
 }
 
+function isFarmTarget(owner: Player | null, status: string | null): boolean {
+  return Boolean(
+    (owner && owner.type === PlayerType.NEUTRAL)
+    || status === DiplomaticStatus.PASSIVE
+  );
+}
+
+function planetHasJumpCombatShip(planet: Planet): boolean {
+  for (const [shipType, amount] of planet.rBDSFTQ.ships.undamagedCountByType().entries()) {
+    if (amount <= 0) {
+      continue;
+    }
+
+    const blueprint = SHIP_BLUEPRINTS.get(shipType);
+    if (blueprint && blueprint.canJump && blueprint.weapons.length > 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function estimateSpyTargetInterest(
   galaxy: Galaxy,
   player: Player,
@@ -2727,8 +2819,11 @@ function estimateSpyTargetInterest(
     ? null
     : resolvePlayerById(galaxy, targetPlanet.info.ownerId);
   const status = owner ? resolveDiplomaticStatus(galaxy, player.playerId, owner.playerId) : null;
+  const farmTarget = isFarmTarget(owner, status);
   const diplomacyContext = owner ? (diplomacyContexts.get(owner.playerId) ?? null) : null;
-  const ownerBias = status === DiplomaticStatus.WAR
+  const ownerBias = farmTarget
+    ? (status === DiplomaticStatus.PASSIVE ? 4.5 : 4)
+    : status === DiplomaticStatus.WAR
     ? 4
     : status === DiplomaticStatus.NEUTRAL
       ? 2.5
@@ -2884,7 +2979,10 @@ function estimateDefenceCombatPower(type: string): number {
 function buildAttackShipSelection(
   originPlanet: Planet,
   report: EspionageReportData,
-  profile: BotProfile
+  profile: BotProfile,
+  options?: {
+    requireBombardmentBreaker?: boolean;
+  }
 ): CreateFleetShipSelectionEntry[] {
   const availableCounts = originPlanet.rBDSFTQ.ships.undamagedCountByType();
   const combatShips = [...availableCounts.entries()]
@@ -2911,6 +3009,21 @@ function buildAttackShipSelection(
   }
 
   const selection: CreateFleetShipSelectionEntry[] = [];
+  if (options?.requireBombardmentBreaker) {
+    const bombardmentShip = combatShips.find((entry) => shipTypeHasBombardmentWeapons(entry.type)) ?? null;
+    if (!bombardmentShip || (totalCombatPower - bombardmentShip.power) < reservePower) {
+      return [];
+    }
+
+    selection.push({
+      type: bombardmentShip.type,
+      undamagedAmount: 1,
+      damagedAmount: 0
+    });
+    remainingLaunchPower -= bombardmentShip.power;
+    bombardmentShip.amount -= 1;
+  }
+
   for (const entry of combatShips) {
     if (remainingLaunchPower <= 0) {
       break;
@@ -2952,6 +3065,11 @@ function buildAttackShipSelection(
   }
 
   return selection;
+}
+
+function shipTypeHasBombardmentWeapons(shipType: ShipTypeType): boolean {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  return Boolean(blueprint?.weapons.some((weapon) => weapon.type === WeaponType.BOMBARDMENT_WEAPONS));
 }
 
 function buildGuardShipSelection(
@@ -3532,6 +3650,21 @@ function appendRecentTarget(targets: BotMemoryCoordinates[], coordinates: BotMem
 
 function hasRecentTarget(targets: BotMemoryCoordinates[], coordinates: BotMemoryCoordinates): boolean {
   return targets.some((entry) => sameCoordinates(entry, coordinates));
+}
+
+function hasRecentTargetWithinWindow(
+  targets: BotMemoryCoordinates[],
+  coordinates: BotMemoryCoordinates,
+  windowSize: number
+): boolean {
+  const normalizedWindowSize = Math.max(0, Math.floor(windowSize));
+  if (normalizedWindowSize <= 0) {
+    return false;
+  }
+
+  return targets
+    .slice(Math.max(0, targets.length - normalizedWindowSize))
+    .some((entry) => sameCoordinates(entry, coordinates));
 }
 
 function requestCoordinates(candidate: BotCandidate): BotMemoryCoordinates {

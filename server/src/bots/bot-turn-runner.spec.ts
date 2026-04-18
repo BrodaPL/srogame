@@ -21,6 +21,7 @@ import { createJumpGateRequest } from '../../../src/app/models/requests/jump-gat
 import { createMaintenanceRequest } from '../../../src/app/models/requests/maintenance-request.js';
 import { ResourcesPack } from '../../../src/app/models/resources-pack.js';
 import { BuildingType } from '../../../src/app/models/enums/building-type.js';
+import { DefenceType } from '../../../src/app/models/enums/defence-type.js';
 import { ShipType } from '../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../src/app/models/enums/technology-type.js';
 import { createTutorialReadState } from '../../../src/app/tutorial/tutorial-types.js';
@@ -298,7 +299,7 @@ describe('bot-turn-runner', () => {
   });
 
   it('launches a spy mission when nearby intel is stale and a probe is available', () => {
-    const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
+    const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.PLAYER);
     homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 20);
     homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
     galaxy.diplomaticRelations = [
@@ -332,6 +333,7 @@ describe('bot-turn-runner', () => {
 
   it('launches a conservative attack when known intel shows a very weak passive target', () => {
     const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
+    makeBotFarmReady(bot, homePlanet);
     homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 120);
     homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 3);
     homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
@@ -350,6 +352,83 @@ describe('bot-turn-runner', () => {
     runBotTurnPhase(galaxy);
 
     expect(galaxy.activeFleets.some((fleet) => fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.ATTACK)).toBe(true);
+  });
+
+  it('does not launch farm attacks before drive and economy milestones are met', () => {
+    const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
+    homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 120);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 3);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
+    targetPlanet.rBDSFTQ.resources = new ResourcesPack(300, 150, 50);
+    galaxy.currentTurn = 8;
+    targetPlanet.lastReportData.set(
+      bot.playerId,
+      new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+        forcedReportLevel: 12,
+        createdTurn: 1
+      })
+    );
+
+    runBotTurnPhase(galaxy);
+
+    expect(galaxy.activeFleets.some((fleet) => fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.ATTACK)).toBe(false);
+  });
+
+  it('still farms a cleared neutral target even when the last intel is stale', () => {
+    const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
+    makeBotFarmReady(bot, homePlanet);
+    homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 220);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 3);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
+    targetPlanet.rBDSFTQ.resources = new ResourcesPack(360, 180, 60);
+    galaxy.currentTurn = 8;
+    targetPlanet.lastReportData.set(
+      bot.playerId,
+      new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+        forcedReportLevel: 12,
+        createdTurn: 1
+      })
+    );
+
+    runBotTurnPhase(galaxy);
+
+    expect(galaxy.activeFleets.some((fleet) => fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.ATTACK)).toBe(true);
+  });
+
+  it('prefers a passive farm target over an equally weak neutral farm target', () => {
+    const { galaxy, bot, passivePlanet } = createPassiveAndNeutralFarmGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    const attackFleet = galaxy.activeFleets.find((fleet) =>
+      fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.ATTACK
+    ) ?? null;
+    expect(attackFleet).not.toBeNull();
+    expect(attackFleet?.target.x).toBe(passivePlanet.basicInfo.solarSystem.coordinates.x);
+    expect(attackFleet?.target.y).toBe(passivePlanet.basicInfo.solarSystem.coordinates.y);
+    expect(attackFleet?.target.z).toBe(passivePlanet.basicInfo.order - 1);
+  });
+
+  it('requires a bombardment-weapon ship before attacking a defended farm target', () => {
+    const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
+    makeBotFarmReady(bot, homePlanet);
+    homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 220);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 4);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
+    targetPlanet.rBDSFTQ.resources = new ResourcesPack(360, 180, 60);
+    targetPlanet.rBDSFTQ.defences.addUndamaged(DefenceType.SAM_SITE, 1);
+    galaxy.currentTurn = 8;
+    targetPlanet.lastReportData.set(
+      bot.playerId,
+      new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+        forcedReportLevel: 12,
+        createdTurn: 6
+      })
+    );
+
+    runBotTurnPhase(galaxy);
+
+    expect(galaxy.activeFleets.some((fleet) => fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.ATTACK)).toBe(false);
   });
 
   it('launches a transport mission from a rich world to a poorer owned planet', () => {
@@ -1252,6 +1331,68 @@ function createWarAndNeutralTargetGalaxy(): {
   return { galaxy, bot, warPlanet };
 }
 
+function createPassiveAndNeutralFarmGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  passivePlanet: Planet;
+} {
+  const system = new SolarSystem('FarmSys', 3, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const homePlanet = Planet.createStartingPlanet('FarmSys I', 1, system, 1);
+  const passivePlanet = Planet.createStartingPlanet('FarmSys II', 2, system, 2);
+  const neutralPlanet = Planet.createStartingPlanet('FarmSys III', 3, system, 3);
+  system.planets[0] = homePlanet;
+  system.planets[1] = passivePlanet;
+  system.planets[2] = neutralPlanet;
+
+  const bot = new Player(1, 'Bot-1', [homePlanet], new Map(), [], PlayerType.BOT, createTutorialReadState(true));
+  const passiveOwner = new Player(2, 'PassiveTarget', [passivePlanet], new Map(), [], PlayerType.PLAYER, createTutorialReadState(true));
+  const neutralOwner = new Player(3, 'NeutralTarget', [neutralPlanet], new Map(), [], PlayerType.NEUTRAL, createTutorialReadState(true));
+
+  initializePlanet(homePlanet, bot.playerId);
+  initializePlanet(passivePlanet, passiveOwner.playerId);
+  initializePlanet(neutralPlanet, neutralOwner.playerId);
+  makeBotFarmReady(bot, homePlanet);
+  homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 220);
+  homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 4);
+  homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
+  passivePlanet.rBDSFTQ.resources = new ResourcesPack(240, 100, 50);
+  neutralPlanet.rBDSFTQ.resources = new ResourcesPack(240, 100, 50);
+  passivePlanet.lastReportData.set(
+    bot.playerId,
+    new EspionageReportGenerator().createEspionageReport(bot, passiveOwner, passivePlanet, 4, {
+      forcedReportLevel: 12,
+      createdTurn: 6
+    })
+  );
+  neutralPlanet.lastReportData.set(
+    bot.playerId,
+    new EspionageReportGenerator().createEspionageReport(bot, neutralOwner, neutralPlanet, 4, {
+      forcedReportLevel: 12,
+      createdTurn: 6
+    })
+  );
+
+  const galaxy = new Galaxy(
+    'Bot Test',
+    [bot, passiveOwner, neutralOwner],
+    [[system]],
+    6,
+    [],
+    1,
+    new Map(),
+    new Map([[bot.playerId, bot]]),
+    new Map([[neutralOwner.playerId, neutralOwner]]),
+    new Map([
+      [bot.playerName, bot.playerId],
+      [passiveOwner.playerName, passiveOwner.playerId],
+      [neutralOwner.playerName, neutralOwner.playerId]
+    ]),
+    [{ playerAId: bot.playerId, playerBId: passiveOwner.playerId, status: DiplomaticStatus.PASSIVE }]
+  );
+
+  return { galaxy, bot, passivePlanet };
+}
+
 function createOutgoingPeaceProposalGalaxy(): {
   galaxy: Galaxy;
   bot: Player;
@@ -1438,4 +1579,27 @@ function initializePlanet(planet: Planet, ownerId: number): void {
   planet.rBDSFTQ.resources = new ResourcesPack(0, 0, 0);
   planet.rBDSFTQ.ships = ManyShips.empty();
   planet.lastReportData.clear();
+}
+
+function makeBotFarmReady(bot: Player, planet: Planet): void {
+  bot.botProfileId = 'BALANCED';
+  bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 5);
+  bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 3);
+  bot.setTechLevel(TechnologyType.COMPUTER_TECHNOLOGY, 2);
+  bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 2);
+  bot.setTechLevel(TechnologyType.FUSION_DRIVE, 3);
+  bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 2);
+  bot.setTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY, 2);
+
+  planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
+  planet.setBuildingLevel(BuildingType.METAL_MINE, 6);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 6);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 6);
+  planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 12);
+  planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 4);
+  planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 4);
+  planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 2);
+  planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
 }

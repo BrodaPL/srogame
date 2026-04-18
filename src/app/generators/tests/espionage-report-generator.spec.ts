@@ -186,5 +186,31 @@ describe('EspionageReportGenerator', () => {
     expect(report.techLevels.size).toBe(0);
     expect(report.ships.size).toBe(0);
   });
+
+  it('applies an explicit report level bonus when requested', () => {
+    const generator = new EspionageReportGenerator();
+    const system = SolarSystem.createVoid({ x: 0, y: 0 });
+    const planet = createPlanet(system, []);
+    const attacker = createPlayer(1, 'Attacker', new Map<TechnologyType, number>([
+      [TechnologyType.ESPIONAGE_TECHNOLOGY, 2]
+    ]));
+    const defender = createPlayer(2, 'Defender', new Map<TechnologyType, number>([
+      [TechnologyType.ESPIONAGE_TECHNOLOGY, 0]
+    ]));
+
+    const baseReport = generator.createEspionageReport(attacker, defender, planet, 1);
+    const boostedReport = generator.createEspionageReport(attacker, defender, planet, 1, {
+      reportLevelBonus: 10
+    });
+
+    expect(baseReport.totalDefencesAmount).toBe(0);
+    expect(baseReport.resourcesAmount.getTotalResourceAmount()).toBe(0);
+    expect(boostedReport.totalDefencesAmount).toBe(5);
+    expect(boostedReport.resourcesAmount.getTotalResourceAmount()).toBe(600);
+    expect(boostedReport.defences.map((entry) => [entry.type, entry.amount])).toEqual([
+      [DefenceType.LIGHT_BEAM_CANNON, 3],
+      [DefenceType.SAM_SITE, 2]
+    ]);
+  });
 });
 

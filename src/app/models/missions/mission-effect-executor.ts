@@ -1,6 +1,9 @@
 import { EspionageReportGenerator } from '../../generators/espionage-report-generator';
+import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
+import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
 import { BuildingType } from '../enums/building-type';
 import { FleetMissionType } from '../enums/fleet-mission-type';
+import { PlayerType } from '../enums/player-type';
 import { ShipType } from '../enums/ship-type';
 import { ManyShips } from '../fleets/many-ships';
 import { ResourcesPack } from '../resources-pack';
@@ -23,6 +26,7 @@ export type MissionEffectExecutionContext = {
 };
 
 export class MissionEffectExecutor {
+  private static readonly FARM_TARGET_ESPIONAGE_REPORT_BONUS = 10;
   private static readonly COLONY_STARTING_BUILDING_LEVELS: ReadonlyArray<{
     type: BuildingType;
     level: number;
@@ -139,11 +143,29 @@ export class MissionEffectExecutor {
       probeAmount,
       {
         reportId: context.owner.createReportId(),
-        createdTurn: context.resolvedTurnNumber
+        createdTurn: context.resolvedTurnNumber,
+        reportLevelBonus: this.resolveEspionageReportBonus(context)
       }
     );
     context.owner.addReport(report.copy());
     context.targetPlanet.lastReportData.set(context.owner.playerId, report.copy());
+  }
+
+  private resolveEspionageReportBonus(context: MissionEffectExecutionContext): number {
+    if (!context.owner || !context.targetOwner) {
+      return 0;
+    }
+
+    if (context.targetOwner.type === PlayerType.NEUTRAL) {
+      return MissionEffectExecutor.FARM_TARGET_ESPIONAGE_REPORT_BONUS;
+    }
+
+    const status = new DiplomacyResolver(context.galaxy.diplomaticRelations)
+      .getStatus(context.owner.playerId, context.targetOwner.playerId);
+
+    return status === DiplomaticStatus.PASSIVE
+      ? MissionEffectExecutor.FARM_TARGET_ESPIONAGE_REPORT_BONUS
+      : 0;
   }
 
   private collectPlanetDebrisToFleetCargo(
