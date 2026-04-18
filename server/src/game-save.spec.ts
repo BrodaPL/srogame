@@ -54,7 +54,7 @@ describe('game-save', () => {
   it('serializes the live galaxy state into a save DTO without circular references', () => {
     const save = buildTestSave();
 
-    expect(save.version).toBe(2);
+    expect(save.version).toBe(3);
     expect(save.gameId).toBe('game-save-test');
     expect(save.ownerAccountId).toBe(42);
     expect(save.savedAt).toBe('2026-04-01T12:00:00.000Z');

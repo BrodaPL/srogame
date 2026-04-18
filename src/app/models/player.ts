@@ -4,6 +4,7 @@ import { Fleet } from './fleets/fleet';
 import { PlayerType } from './enums/player-type';
 import { PlayerReport } from './reports/player-report';
 import { PlayerMessage } from './mail/player-message';
+import { SupportRequestType } from './requests/support-request';
 import {
   TutorialReadState,
   TutorialViewKey,
@@ -63,6 +64,19 @@ export type BotMemoryDiplomacyTarget = {
   turn: number;
 };
 
+export type BotMemoryGoodwillEntry = {
+  playerId: number;
+  score: number;
+  updatedTurn: number;
+};
+
+export type BotMemorySupportRequestRecord = {
+  playerId: number;
+  supportType: SupportRequestType;
+  targetCoordinates: BotMemoryCoordinates;
+  turn: number;
+};
+
 export type BotMemory = {
   currentGoal: BotGoalType | null;
   goalTarget: BotMemoryCoordinates | null;
@@ -71,6 +85,9 @@ export type BotMemory = {
   lastSpyTargets: BotMemoryCoordinates[];
   lastAttackTargets: BotMemoryCoordinates[];
   recentDiplomacyTargets: BotMemoryDiplomacyTarget[];
+  goodwillByPlayer?: BotMemoryGoodwillEntry[];
+  recentSupportRequests?: BotMemorySupportRequestRecord[];
+  processedSupportOutcomeIds?: number[];
 };
 
 export type PlayerExtras = {
@@ -268,7 +285,10 @@ export class Player {
       reservedResources: Player.normalizeBotMemoryResources(memory.reservedResources),
       lastSpyTargets: Player.normalizeBotMemoryCoordinatesList(memory.lastSpyTargets),
       lastAttackTargets: Player.normalizeBotMemoryCoordinatesList(memory.lastAttackTargets),
-      recentDiplomacyTargets: Player.normalizeBotMemoryDiplomacyTargets(memory.recentDiplomacyTargets)
+      recentDiplomacyTargets: Player.normalizeBotMemoryDiplomacyTargets(memory.recentDiplomacyTargets),
+      goodwillByPlayer: Player.normalizeBotMemoryGoodwillEntries(memory.goodwillByPlayer),
+      recentSupportRequests: Player.normalizeBotMemorySupportRequestRecords(memory.recentSupportRequests),
+      processedSupportOutcomeIds: Player.normalizeBotMemorySupportOutcomeIds(memory.processedSupportOutcomeIds)
     };
   }
 
@@ -342,5 +362,70 @@ export class Player {
         turn: entry.turn
       }))
       .slice(-20);
+  }
+
+  private static normalizeBotMemoryGoodwillEntries(
+    entries: BotMemoryGoodwillEntry[] | null | undefined
+  ): BotMemoryGoodwillEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .filter((entry) =>
+        !!entry
+        && Number.isInteger(entry.playerId)
+        && Number.isFinite(entry.score)
+        && Number.isInteger(entry.updatedTurn)
+      )
+      .map((entry) => ({
+        playerId: entry.playerId,
+        score: Math.max(-100, Math.min(100, Math.round(entry.score))),
+        updatedTurn: entry.updatedTurn
+      }))
+      .slice(-40);
+  }
+
+  private static normalizeBotMemorySupportRequestRecords(
+    entries: BotMemorySupportRequestRecord[] | null | undefined
+  ): BotMemorySupportRequestRecord[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const targetCoordinates = Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates);
+        if (
+          !entry
+          || !Number.isInteger(entry.playerId)
+          || !targetCoordinates
+          || !Number.isInteger(entry.turn)
+        ) {
+          return null;
+        }
+
+        return {
+          playerId: entry.playerId,
+          supportType: entry.supportType,
+          targetCoordinates,
+          turn: entry.turn
+        };
+      })
+      .filter((entry): entry is BotMemorySupportRequestRecord => entry !== null)
+      .slice(-40);
+  }
+
+  private static normalizeBotMemorySupportOutcomeIds(
+    entries: number[] | null | undefined
+  ): number[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .filter((entry) => Number.isInteger(entry) && entry > 0)
+      .map((entry) => Math.floor(entry))
+      .slice(-80);
   }
 }

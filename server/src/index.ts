@@ -9175,7 +9175,7 @@ function approveSupportRequest(
 
     request.acceptedTurn = galaxy.currentTurn;
     request.executionDueTurn = galaxy.currentTurn + 1;
-    request.executionExpiresOnTurn = galaxy.currentTurn + 3;
+    request.executionExpiresOnTurn = galaxy.currentTurn + 5;
     request.state = DiplomaticProposalState.ACCEPTED;
     request.resolutionNote = `Offensive support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`;
     addSupportRequestMessages(
@@ -9300,7 +9300,7 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
     if (request.executionExpiresOnTurn !== null && galaxy.currentTurn >= request.executionExpiresOnTurn) {
       request.state = DiplomaticProposalState.REJECTED;
       request.fulfilledTurn = galaxy.currentTurn;
-      request.resolutionNote = 'Offensive support auto-rejected after 3 turns because no valid fleet met the requested minimum.';
+      request.resolutionNote = 'Offensive support auto-rejected after 5 turns because no valid fleet met the requested minimum.';
       addSupportRequestMessages(
         galaxy,
         request,

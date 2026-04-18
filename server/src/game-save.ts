@@ -1049,7 +1049,13 @@ function serializePlayer(
         reservedResources: { ...player.botMemory.reservedResources },
         lastSpyTargets: player.botMemory.lastSpyTargets.map((entry) => ({ ...entry })),
         lastAttackTargets: player.botMemory.lastAttackTargets.map((entry) => ({ ...entry })),
-        recentDiplomacyTargets: player.botMemory.recentDiplomacyTargets.map((entry) => ({ ...entry }))
+        recentDiplomacyTargets: player.botMemory.recentDiplomacyTargets.map((entry) => ({ ...entry })),
+        goodwillByPlayer: (player.botMemory.goodwillByPlayer ?? []).map((entry) => ({ ...entry })),
+        recentSupportRequests: (player.botMemory.recentSupportRequests ?? []).map((entry) => ({
+          ...entry,
+          targetCoordinates: { ...entry.targetCoordinates }
+        })),
+        processedSupportOutcomeIds: [...(player.botMemory.processedSupportOutcomeIds ?? [])]
       }
       : null
   };

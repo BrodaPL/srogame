@@ -29,7 +29,8 @@ The current server-side bot runtime covers:
 - `Siege`
 - self-owned Jump Gate logistics for selected logistics missions
 - maintenance request creation
-- incoming maintenance / Jump Gate request resolution
+- incoming maintenance / Jump Gate / support request resolution
+- outgoing support request creation
 - incoming diplomacy proposal resolution
 - conservative outgoing diplomacy proposal creation
 
@@ -53,8 +54,16 @@ Current high-level order:
 1. resolve incoming support requests
 2. resolve incoming diplomacy proposals
 3. optionally create one outgoing diplomacy proposal
-4. plan and launch bot actions through shared server commands
-5. hand off to shared turn resolution
+4. optionally create one outgoing support request
+5. plan and launch bot actions through shared server commands
+6. hand off to shared turn resolution
+
+Support-request notes:
+- bots keep directional goodwill toward other players in `botMemory`
+- goodwill is updated from observed support-request outcomes
+- outgoing support asks are capped to 1 per turn and 2 unresolved total
+- repeat asks to the same player for the same support type / target planet use a 3-turn cooldown
+- offensive support acceptance now assumes a 5-turn launch window, matching the runtime support-request expiry
 
 Bots do not use separate engine-only cheats for combat. The current explicit bot edge is:
 - `botDifficulty` economy scaling

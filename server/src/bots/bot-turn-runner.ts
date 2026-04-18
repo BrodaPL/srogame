@@ -12,6 +12,7 @@ import * as technologyTypeEnumModule from '../../../src/app/models/enums/technol
 import * as weaponTypeEnumModule from '../../../src/app/models/enums/weapon-type.js';
 import * as resourcesPackModule from '../../../src/app/models/resources-pack.js';
 import * as playerModule from '../../../src/app/models/player.js';
+import * as supportRequestModule from '../../../src/app/models/requests/support-request.js';
 import * as bombardmentPriorityModule from '../../../src/app/models/bombardment/bombardment-priority.js';
 import * as energyDeficitModule from '../../../src/app/models/planets/energy-deficit.js';
 import * as fusionReactorOperationModule from '../../../src/app/models/planets/fusion-reactor-operation.js';
@@ -29,6 +30,12 @@ import type { Planet } from '../../../src/app/models/planets/planet.ts';
 import type { EspionageReportData } from '../../../src/app/models/reports/espionage-report-data.ts';
 import type { ResourcesPack as ResourcesPackType } from '../../../src/app/models/resources-pack.ts';
 import type { ManyShips as ManyShipsType } from '../../../src/app/models/fleets/many-ships.ts';
+import type {
+  OffensiveSupportRequest,
+  SupportRequest,
+  SupportRequestType,
+  SupportShipAmount
+} from '../../../src/app/models/requests/support-request.ts';
 import type { BotGoalType, BotMemory, BotMemoryCoordinates, BotProfileId, Player } from '../../../src/app/models/player.ts';
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { StartBuildingConstructionCommand } from '../game-commands/building-commands.ts';
@@ -103,6 +110,13 @@ const { TechnologyType } = resolveModule(technologyTypeEnumModule) as typeof imp
 const { WeaponType } = resolveModule(weaponTypeEnumModule) as typeof import('../../../src/app/models/enums/weapon-type.js');
 const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
 const { defaultBotProfileIdForPlayerId } = resolveModule(playerModule) as typeof import('../../../src/app/models/player.js');
+const {
+  createSupportRequest,
+  normalizeSupportResources,
+  normalizeSupportShipAmounts,
+  supportResourcesHasAnyValue,
+  supportShipAmountsHaveAnyValue
+} = resolveModule(supportRequestModule) as typeof import('../../../src/app/models/requests/support-request.js');
 const { BombardmentPriorityTarget } = resolveModule(bombardmentPriorityModule) as typeof import('../../../src/app/models/bombardment/bombardment-priority.js');
 const { energyDeficitEfficiencyMultiplier } = resolveModule(energyDeficitModule) as typeof import('../../../src/app/models/planets/energy-deficit.js');
 const { resolveFusionReactorOperation } = resolveModule(fusionReactorOperationModule) as typeof import('../../../src/app/models/planets/fusion-reactor-operation.js');
@@ -168,6 +182,18 @@ type BotCandidate =
   | FleetCandidate
   | MaintenanceCandidate
   | StarSystemSpyCandidate;
+
+type BotSupportRequestCandidate = {
+  supportType: SupportRequestType;
+  utility: number;
+  reason: string;
+  targetPlayerId: number;
+  targetCoordinates: ClientCoordinates;
+  requestedResources: ResourcesPackType;
+  missionType: FleetMissionTypeType | null;
+  minimumShips: SupportShipAmount[];
+  bombardmentPriorities: BombardmentPriorities | null;
+};
 
 type BotTurnCounters = {
   total: number;
@@ -312,6 +338,7 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
   const blockedKeys = new Set<string>();
 
   ensureBotMemory(player, galaxy.currentTurn);
+  processSupportRequestOutcomes(galaxy, player, profile);
   const trace: BotDecisionTrace = {
     playerId: player.playerId,
     playerName: player.playerName,
@@ -332,6 +359,7 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
 
   resolveIncomingBotRequests(galaxy, player, profile, trace);
   resolveOutgoingBotDiplomacyProposal(galaxy, player, profile, trace);
+  resolveOutgoingBotSupportRequest(galaxy, player, profile, trace);
 
   while (counters.total < profile.maxActionsPerTurn) {
     const candidates = buildBotCandidates(galaxy, player, profile, counters, blockedKeys)
@@ -706,6 +734,42 @@ function resolveIncomingBotRequests(
     });
   }
 
+  const pendingSupportRequests = [...galaxy.supportRequests]
+    .filter((request) =>
+      request.state === DiplomaticProposalState.PENDING
+      && request.toPlayerId === player.playerId
+    );
+  for (const request of pendingSupportRequests) {
+    const decision = decideIncomingSupportRequest(galaxy, player, profile, request);
+    const applied = decision.approve
+      ? approveSupportRequestForBot(galaxy, request, decision.approvedResources)
+      : rejectSupportRequestForBot(request, decision.reason);
+    if (!applied.ok) {
+      trace.rejectedActions.push({
+        kind: decision.approve ? 'approve-support' : 'reject-support',
+        reason: decision.reason,
+        rejectionType: 'command_failed',
+        expectedUtility: null,
+        details: { message: applied.error, requestSummary: `Support request #${request.requestId}` }
+      });
+      continue;
+    }
+
+    trace.chosenActions.push({
+      kind: decision.approve ? 'approve-support' : 'reject-support',
+      reason: decision.reason,
+      expectedUtility: decision.utility,
+      goalType: null,
+      requestSummary: `Support request #${request.requestId} ${request.supportType} @ ${request.targetPlanetName}`,
+      details: {
+        requestId: request.requestId,
+        approved: decision.approve,
+        supportType: request.supportType,
+        targetCoordinates: `${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}`
+      }
+    });
+  }
+
   const pendingDiplomaticProposals = [...galaxy.diplomaticProposals]
     .filter((proposal) =>
       proposal.state === DiplomaticProposalState.PENDING
@@ -801,6 +865,1319 @@ function resolveOutgoingBotDiplomacyProposal(
       proposalId: result.value.proposal.proposalId
     }
   });
+}
+
+function resolveOutgoingBotSupportRequest(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile,
+  trace: BotDecisionTrace
+): void {
+  if (hasBotCreatedSupportRequestThisTurn(galaxy, player.playerId)) {
+    return;
+  }
+  if (countBotUnresolvedSupportRequests(galaxy, player.playerId) >= 2) {
+    return;
+  }
+
+  const candidate = buildBestBotSupportRequestCandidate(galaxy, player, profile);
+  if (!candidate) {
+    return;
+  }
+
+  const created = createBotSupportRequest(galaxy, player, candidate);
+  if (!created.ok) {
+    trace.rejectedActions.push({
+      kind: 'request-support',
+      reason: candidate.reason,
+      rejectionType: 'command_failed',
+      expectedUtility: candidate.utility,
+      details: {
+        message: created.error,
+        requestSummary: `${candidate.supportType} -> player ${candidate.targetPlayerId}`
+      }
+    });
+    return;
+  }
+
+  trace.chosenActions.push({
+    kind: 'request-support',
+    reason: candidate.reason,
+    expectedUtility: candidate.utility,
+    goalType: null,
+    requestSummary: `${candidate.supportType} -> player ${candidate.targetPlayerId} @ ${candidate.targetCoordinates.x}:${candidate.targetCoordinates.y}:${candidate.targetCoordinates.z}`,
+    details: {
+      supportType: candidate.supportType,
+      targetPlayerId: candidate.targetPlayerId,
+      requestId: created.request.requestId
+    }
+  });
+}
+
+function processSupportRequestOutcomes(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile
+): void {
+  const memory = player.botMemory;
+  if (!memory) {
+    return;
+  }
+
+  const processedIds = new Set(memory.processedSupportOutcomeIds ?? []);
+  for (const request of galaxy.supportRequests) {
+    if (request.fromPlayerId !== player.playerId && request.toPlayerId !== player.playerId) {
+      continue;
+    }
+    if (processedIds.has(request.requestId)) {
+      continue;
+    }
+
+    const terminal = request.fulfilledTurn !== null
+      || request.state === DiplomaticProposalState.REJECTED
+      || request.state === DiplomaticProposalState.CANCELLED
+      || request.state === DiplomaticProposalState.EXPIRED;
+    const acceptedMilestone = request.state === DiplomaticProposalState.ACCEPTED
+      && request.acceptedTurn !== null
+      && request.fulfilledTurn === null;
+    if (!terminal && !acceptedMilestone) {
+      continue;
+    }
+
+    const counterpartId = request.fromPlayerId === player.playerId
+      ? request.toPlayerId
+      : request.fromPlayerId;
+    const baseMagnitude = calculateSupportGoodwillMagnitude(galaxy, player, profile, request);
+    let delta = 0;
+
+    if (request.fromPlayerId === player.playerId) {
+      if (request.fulfilledTurn !== null) {
+        delta = baseMagnitude;
+      } else if (request.state === DiplomaticProposalState.ACCEPTED) {
+        delta = Math.max(1, Math.ceil(baseMagnitude * 0.5));
+      } else if (request.state === DiplomaticProposalState.REJECTED || request.state === DiplomaticProposalState.EXPIRED) {
+        delta = -Math.max(1, Math.ceil(baseMagnitude * 0.75));
+      }
+    } else if (request.toPlayerId === player.playerId) {
+      if (request.fulfilledTurn !== null) {
+        delta = Math.max(1, Math.ceil(baseMagnitude * 0.3));
+      } else if (request.state === DiplomaticProposalState.REJECTED && request.resolutionNote?.startsWith('Rejected') === false) {
+        delta = -1;
+      }
+    }
+
+    if (delta !== 0) {
+      adjustBotGoodwill(player, counterpartId, delta, galaxy.currentTurn);
+    }
+
+    appendProcessedSupportOutcome(player, request.requestId);
+  }
+}
+
+function decideIncomingSupportRequest(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile,
+  request: SupportRequest
+): {
+  approve: boolean;
+  approvedResources: ResourcesPackType | null;
+  reason: string;
+  utility: number;
+} {
+  const requester = resolvePlayerById(galaxy, request.fromPlayerId);
+  if (!requester) {
+    return {
+      approve: false,
+      approvedResources: null,
+      reason: 'Rejected support request because the requester no longer exists.',
+      utility: 0
+    };
+  }
+
+  const status = resolveDiplomaticStatus(galaxy, player.playerId, requester.playerId);
+  const goodwill = getBotGoodwill(player, requester.playerId);
+  if (!isSupportStatusAllowed(request.supportType, status)) {
+    return {
+      approve: false,
+      approvedResources: null,
+      reason: 'Rejected support request from a non-eligible diplomatic relation.',
+      utility: 0
+    };
+  }
+
+  if (goodwill <= -40) {
+    return {
+      approve: false,
+      approvedResources: null,
+      reason: 'Rejected support request because trust is too low.',
+      utility: 0
+    };
+  }
+
+  if (request.supportType === 'RESOURCE_SUPPORT') {
+    const approval = resolveBotResourceSupportApproval(galaxy, player, profile, request);
+    if (!approval || !supportResourcesHasAnyValue(approval)) {
+      return {
+        approve: false,
+        approvedResources: null,
+        reason: 'Rejected resource support request because current reserves are too tight.',
+        utility: 0
+      };
+    }
+
+    const approvedValue = estimateResourceValue(approval);
+    return {
+      approve: true,
+      approvedResources: approval,
+      reason: approvedValue >= estimateResourceValue(request.requestedResources)
+        ? 'Approved full resource support request.'
+        : 'Approved partial resource support request.',
+      utility: approvedValue / 100
+    };
+  }
+
+  if (request.supportType === 'PLANET_REPAIR') {
+    const targetPlanet = flattenPlanets(galaxy).find((planet) => sameCoordinates(coordinatesOfPlanet(planet), request.targetCoordinates)) ?? null;
+    const repairNeed = targetPlanet ? estimateRepairNeed(galaxy, requester, targetPlanet) : 0;
+    const helpWindow = resolveFastestFriendlyPlanetDistance(player, request.targetCoordinates, canPlanetProvideRepairSupport);
+    const selfThreat = hasCriticalEconomyPressure(player, profile);
+    if (repairNeed <= 0 || helpWindow === null || helpWindow > 10 || selfThreat) {
+      return {
+        approve: false,
+        approvedResources: null,
+        reason: 'Rejected repair support request because timely help is not realistic.',
+        utility: 0
+      };
+    }
+
+    return {
+      approve: true,
+      approvedResources: null,
+      reason: 'Accepted repair support request for a reachable damaged planet.',
+      utility: Math.max(1, repairNeed / 150)
+    };
+  }
+
+  if (request.supportType === 'PLANET_DEFENSE') {
+    const targetPlanet = flattenPlanets(galaxy).find((planet) => sameCoordinates(coordinatesOfPlanet(planet), request.targetCoordinates)) ?? null;
+    const helpWindow = resolveFastestFriendlyPlanetDistance(player, request.targetCoordinates, planetHasJumpCombatShip);
+    const safeDefenseCapacity = calculateAvailableDefenseSupportPower(player);
+    const threat = targetPlanet ? estimateNearbyThreat(galaxy, requester, targetPlanet) : null;
+    if (helpWindow === null || helpWindow > 5 || safeDefenseCapacity <= 0 || !canBotSpareDefenseSupport(galaxy, player, profile)) {
+      return {
+        approve: false,
+        approvedResources: null,
+        reason: 'Rejected defense support request because local defense reserves are insufficient.',
+        utility: 0
+      };
+    }
+
+    return {
+      approve: true,
+      approvedResources: null,
+      reason: threat
+        ? 'Accepted defense support request for a threatened allied planet.'
+        : 'Accepted defense support request for a reachable allied planet.',
+      utility: threat ? threat.pressure / 4 : 2
+    };
+  }
+
+  if (!isOffensiveSupportTargetValidForBot(galaxy, player, request)) {
+    return {
+      approve: false,
+      approvedResources: null,
+      reason: 'Rejected offensive support request because the target is no longer valid.',
+      utility: 0
+    };
+  }
+
+  const launchCandidate = resolveOffensiveSupportLaunchReadiness(galaxy, player, profile, request);
+  if (!launchCandidate) {
+    return {
+      approve: false,
+      approvedResources: null,
+      reason: 'Rejected offensive support request because no likely 5-turn launch exists.',
+      utility: 0
+    };
+  }
+
+  return {
+    approve: true,
+    approvedResources: null,
+    reason: `Accepted offensive support request with likely ${request.missionType} launch readiness.`,
+    utility: Math.max(2, launchCandidate.selectionStrength / 20)
+  };
+}
+
+function approveSupportRequestForBot(
+  galaxy: Galaxy,
+  request: SupportRequest,
+  approvedResources: ResourcesPackType | null
+): { ok: true } | { ok: false; error: string } {
+  if (request.state !== DiplomaticProposalState.PENDING) {
+    return { ok: false, error: 'Support request is no longer pending.' };
+  }
+
+  if (request.supportType === 'RESOURCE_SUPPORT') {
+    const approval = normalizeSupportResources(approvedResources ?? request.requestedResources);
+    if (!supportResourcesHasAnyValue(approval)) {
+      return { ok: false, error: 'Approved support must include at least one resource.' };
+    }
+
+    const sourcePlanet = resolveBotBestResourceSupportSourcePlanet(galaxy, request.toPlayerId, approval);
+    if (!sourcePlanet) {
+      return { ok: false, error: 'No valid planet can reserve the approved support.' };
+    }
+
+    sourcePlanet.rBDSFTQ.resources.subtractResourcePack(approval);
+    request.approvedResources = approval;
+    request.reservedSourcePlanetName = sourcePlanet.basicInfo.name;
+    request.reservedSourceCoordinates = coordinatesOfPlanet(sourcePlanet);
+    request.acceptedTurn = galaxy.currentTurn;
+    request.executionDueTurn = galaxy.currentTurn + 1;
+    request.executionExpiresOnTurn = galaxy.currentTurn + 1;
+    request.state = DiplomaticProposalState.ACCEPTED;
+    request.resolutionNote = `Reserved on ${sourcePlanet.basicInfo.name}. Delivery scheduled for turn ${request.executionDueTurn}.`;
+    return { ok: true };
+  }
+
+  request.acceptedTurn = galaxy.currentTurn;
+  request.executionDueTurn = galaxy.currentTurn + 1;
+  request.executionExpiresOnTurn = isOffensiveSupportRequest(request)
+    ? galaxy.currentTurn + 5
+    : galaxy.currentTurn + 1;
+  request.state = DiplomaticProposalState.ACCEPTED;
+  request.resolutionNote = isOffensiveSupportRequest(request)
+    ? `Offensive support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`
+    : request.supportType === 'PLANET_REPAIR'
+      ? `Repair support acknowledged for ${request.targetPlanetName}.`
+      : `Defense support acknowledged for ${request.targetPlanetName}.`;
+  return { ok: true };
+}
+
+function rejectSupportRequestForBot(request: SupportRequest, reason: string): { ok: true } {
+  request.state = DiplomaticProposalState.REJECTED;
+  request.resolutionNote = reason;
+  return { ok: true };
+}
+
+function buildBestBotSupportRequestCandidate(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile
+): BotSupportRequestCandidate | null {
+  const candidates = [
+    ...buildBotResourceSupportRequestCandidates(galaxy, player, profile),
+    ...buildBotRepairSupportRequestCandidates(galaxy, player, profile),
+    ...buildBotDefenseSupportRequestCandidates(galaxy, player, profile),
+    ...buildBotOffensiveSupportRequestCandidates(galaxy, player, profile)
+  ].sort((left, right) => right.utility - left.utility);
+
+  return candidates[0] ?? null;
+}
+
+function buildBotResourceSupportRequestCandidates(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile
+): BotSupportRequestCandidate[] {
+  const candidates: BotSupportRequestCandidate[] = [];
+  const economyTargets = BOT_ECONOMY_TARGETS[profile.id];
+
+  for (const planet of player.planets) {
+    const economyState = buildPlanetEconomyState(planet, player, profile);
+    const criticalBuildingType = resolveCriticalEconomySupportBuildingType(planet, player, economyState, economyTargets);
+    if (!criticalBuildingType) {
+      continue;
+    }
+
+    const blueprint = BUILDING_BLUEPRINTS.get(criticalBuildingType);
+    if (!blueprint) {
+      continue;
+    }
+
+    const nextLevel = planet.getBuildingLevel(criticalBuildingType) + 1;
+    const targetCost = blueprint.getCostForLevel(nextLevel);
+    const missing = new ResourcesPack(
+      Math.max(0, targetCost.metal - planet.rBDSFTQ.resources.metal),
+      Math.max(0, targetCost.crystal - planet.rBDSFTQ.resources.crystal),
+      Math.max(0, targetCost.deuterium - planet.rBDSFTQ.resources.deuterium)
+    );
+    if (!supportResourcesHasAnyValue(missing)) {
+      continue;
+    }
+
+    const localIncomeValue = Math.max(1, estimatePlanetIncomeValue(planet, player, profile));
+    const missingTurns = estimateResourceValue(missing) / localIncomeValue;
+    if (missingTurns <= 10) {
+      continue;
+    }
+
+    const provider = resolvePreferredSupportProvider(
+      galaxy,
+      player,
+      'RESOURCE_SUPPORT',
+      coordinatesOfPlanet(planet),
+      (ally, allyProfile) => estimateAllyResourceSupportScore(ally, allyProfile, planet, missing)
+    );
+    if (!provider) {
+      continue;
+    }
+
+    candidates.push({
+      supportType: 'RESOURCE_SUPPORT',
+      utility: 18 + missingTurns + provider.score,
+      reason: `Request resource support to unblock ${criticalBuildingType} on ${planet.basicInfo.name}`,
+      targetPlayerId: provider.player.playerId,
+      targetCoordinates: coordinatesOfPlanet(planet),
+      requestedResources: missing,
+      missionType: null,
+      minimumShips: [],
+      bombardmentPriorities: null
+    });
+  }
+
+  return candidates;
+}
+
+function buildBotRepairSupportRequestCandidates(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile
+): BotSupportRequestCandidate[] {
+  const candidates: BotSupportRequestCandidate[] = [];
+
+  for (const planet of player.planets) {
+    const repairNeed = estimateRepairNeed(galaxy, player, planet);
+    if (repairNeed <= 0) {
+      continue;
+    }
+
+    const localRepairCapability = estimateLocalRepairCapability(galaxy, player, planet);
+    if (repairNeed <= Math.max(100, localRepairCapability * 6)) {
+      continue;
+    }
+
+    const provider = resolvePreferredSupportProvider(
+      galaxy,
+      player,
+      'PLANET_REPAIR',
+      coordinatesOfPlanet(planet),
+      (ally) => estimateAllyRepairSupportScore(ally, planet)
+    );
+    if (!provider || provider.distance === null || provider.distance > 10) {
+      continue;
+    }
+
+    candidates.push({
+      supportType: 'PLANET_REPAIR',
+      utility: (repairNeed / 120) + provider.score,
+      reason: `Request repair support for ${planet.basicInfo.name}`,
+      targetPlayerId: provider.player.playerId,
+      targetCoordinates: coordinatesOfPlanet(planet),
+      requestedResources: new ResourcesPack(0, 0, 0),
+      missionType: null,
+      minimumShips: [],
+      bombardmentPriorities: null
+    });
+  }
+
+  return candidates;
+}
+
+function buildBotDefenseSupportRequestCandidates(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile
+): BotSupportRequestCandidate[] {
+  const candidates: BotSupportRequestCandidate[] = [];
+
+  for (const planet of player.planets) {
+    const threat = estimateNearbyThreat(galaxy, player, planet);
+    const localDefense = estimatePlanetCombatStrength(planet);
+    if (!threat || threat.pressure < Math.max(18, localDefense * 0.5)) {
+      continue;
+    }
+
+    const provider = resolvePreferredSupportProvider(
+      galaxy,
+      player,
+      'PLANET_DEFENSE',
+      coordinatesOfPlanet(planet),
+      (ally) => estimateAllyDefenseSupportScore(ally, planet)
+    );
+    if (!provider || provider.distance === null || provider.distance > 5) {
+      continue;
+    }
+
+    candidates.push({
+      supportType: 'PLANET_DEFENSE',
+      utility: (threat.pressure / 3) + provider.score,
+      reason: `Request defense support for threatened planet ${planet.basicInfo.name}`,
+      targetPlayerId: provider.player.playerId,
+      targetCoordinates: coordinatesOfPlanet(planet),
+      requestedResources: new ResourcesPack(0, 0, 0),
+      missionType: null,
+      minimumShips: [],
+      bombardmentPriorities: null
+    });
+  }
+
+  return candidates;
+}
+
+function buildBotOffensiveSupportRequestCandidates(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile
+): BotSupportRequestCandidate[] {
+  const candidates: BotSupportRequestCandidate[] = [];
+  const farmAttackUnlocked = isFarmAttackUnlocked(player, profile);
+
+  for (const targetPlanet of collectForeignPlanets(galaxy, player.playerId)) {
+    if (targetPlanet.info.ownerId === null) {
+      continue;
+    }
+
+    const targetOwner = resolvePlayerById(galaxy, targetPlanet.info.ownerId);
+    if (!targetOwner) {
+      continue;
+    }
+
+    const status = resolveDiplomaticStatus(galaxy, player.playerId, targetOwner.playerId);
+    if (status !== DiplomaticStatus.WAR && status !== DiplomaticStatus.NEUTRAL && status !== DiplomaticStatus.PASSIVE) {
+      continue;
+    }
+
+    const farmTarget = isFarmTarget(targetOwner, status);
+    if (farmTarget && !farmAttackUnlocked) {
+      continue;
+    }
+
+    const report = targetPlanet.lastReportData.get(player.playerId) ?? null;
+    if (!report) {
+      continue;
+    }
+
+    const ownBestAttack = estimateBestOwnOffensiveStrength(player, profile, targetPlanet, report);
+    const defenderStrength = Math.max(1, estimateReportCombatStrength(report));
+    if (ownBestAttack >= defenderStrength * 0.95) {
+      continue;
+    }
+
+    const requestType = resolveBotOffensiveSupportType(status, report, farmTarget);
+    const provider = resolvePreferredSupportProvider(
+      galaxy,
+      player,
+      requestType,
+      coordinatesOfPlanet(targetPlanet),
+      (ally, allyProfile) => estimateAllyOffensiveSupportScore(ally, allyProfile, targetPlanet, report, requestType)
+    );
+    if (!provider || !provider.offensiveSelection || provider.distance === null) {
+      continue;
+    }
+
+    candidates.push({
+      supportType: requestType,
+      utility: 10 + (provider.selectionStrength / 18) + provider.score + (estimateBombardTargetValue(report) / 40),
+      reason: `Request ${provider.missionType} support against ${targetPlanet.basicInfo.name}`,
+      targetPlayerId: provider.player.playerId,
+      targetCoordinates: coordinatesOfPlanet(targetPlanet),
+      requestedResources: new ResourcesPack(0, 0, 0),
+      missionType: provider.missionType,
+      minimumShips: provider.offensiveSelection.map((entry) => ({
+        type: entry.type,
+        amount: entry.undamagedAmount + entry.damagedAmount
+      })),
+      bombardmentPriorities: requestType === 'ATTACK_TARGET'
+        ? null
+        : defaultBombardmentPrioritiesForProfile(profile, requestType === 'SIEGE_TARGET')
+    });
+  }
+
+  return candidates;
+}
+
+function createBotSupportRequest(
+  galaxy: Galaxy,
+  player: Player,
+  candidate: BotSupportRequestCandidate
+): { ok: true; request: SupportRequest } | { ok: false; error: string } {
+  const targetPlayer = resolvePlayerById(galaxy, candidate.targetPlayerId);
+  if (!targetPlayer || targetPlayer.type === PlayerType.NEUTRAL) {
+    return { ok: false, error: 'Support target not found.' };
+  }
+
+  const status = resolveDiplomaticStatus(galaxy, player.playerId, candidate.targetPlayerId);
+  if (!isSupportStatusAllowed(candidate.supportType, status)) {
+    return { ok: false, error: 'Current diplomacy status does not allow this support request.' };
+  }
+
+  const targetPlanet = flattenPlanets(galaxy).find((planet) => sameCoordinates(coordinatesOfPlanet(planet), candidate.targetCoordinates)) ?? null;
+  if (!targetPlanet) {
+    return { ok: false, error: 'Support target planet not found.' };
+  }
+
+  if ((candidate.supportType === 'RESOURCE_SUPPORT' || candidate.supportType === 'PLANET_REPAIR' || candidate.supportType === 'PLANET_DEFENSE')
+    && targetPlanet.info.ownerId !== player.playerId) {
+    return { ok: false, error: 'Defensive support requests must target one of the bot planets.' };
+  }
+
+  if (isOffensiveSupportType(candidate.supportType) && !supportShipAmountsHaveAnyValue(candidate.minimumShips)) {
+    return { ok: false, error: 'Offensive support requests require minimum ships.' };
+  }
+
+  const duplicatePending = galaxy.supportRequests.some((request) =>
+    request.state === DiplomaticProposalState.PENDING
+    && request.fromPlayerId === player.playerId
+    && request.toPlayerId === candidate.targetPlayerId
+    && request.supportType === candidate.supportType
+    && sameCoordinates(request.targetCoordinates, candidate.targetCoordinates)
+  );
+  if (duplicatePending) {
+    return { ok: false, error: 'A matching support request is already pending for this planet.' };
+  }
+
+  const request = createSupportRequest(
+    galaxy.nextSupportRequestId,
+    player.playerId,
+    candidate.targetPlayerId,
+    candidate.supportType,
+    targetPlanet.basicInfo.name,
+    candidate.targetCoordinates,
+    galaxy.currentTurn,
+    galaxy.currentTurn + 3,
+    candidate.supportType === 'RESOURCE_SUPPORT' ? candidate.requestedResources : null,
+    isOffensiveSupportType(candidate.supportType)
+      ? {
+        missionType: candidate.missionType,
+        minimumShips: normalizeSupportShipAmounts(candidate.minimumShips),
+        bombardmentPriorities: candidate.bombardmentPriorities,
+        targetOwnerPlayerId: targetPlanet.info.ownerId,
+        targetOwnerPlayerName: targetPlanet.info.ownerId !== null
+          ? resolvePlayerById(galaxy, targetPlanet.info.ownerId)?.playerName ?? null
+          : null
+      }
+      : undefined
+  );
+  galaxy.nextSupportRequestId += 1;
+  galaxy.supportRequests.push(request);
+  appendRecentSupportRequest(player, candidate.targetPlayerId, candidate.supportType, candidate.targetCoordinates, galaxy.currentTurn);
+  return { ok: true, request };
+}
+
+function hasBotCreatedSupportRequestThisTurn(galaxy: Galaxy, playerId: number): boolean {
+  return galaxy.supportRequests.some((request) =>
+    request.fromPlayerId === playerId
+    && request.createdTurn === galaxy.currentTurn
+  );
+}
+
+function countBotUnresolvedSupportRequests(galaxy: Galaxy, playerId: number): number {
+  return galaxy.supportRequests.filter((request) =>
+    request.fromPlayerId === playerId
+    && (request.state === DiplomaticProposalState.PENDING
+      || (request.state === DiplomaticProposalState.ACCEPTED && request.fulfilledTurn === null))
+  ).length;
+}
+
+function calculateSupportGoodwillMagnitude(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile,
+  request: SupportRequest
+): number {
+  const equivalentValue = estimateSupportRequestEquivalentValue(galaxy, request);
+  const turnIncome = Math.max(1, estimatePlayerIncomeValue(player, profile));
+  return Math.max(1, Math.min(12, Math.round((equivalentValue / turnIncome) * 6)));
+}
+
+function estimateSupportRequestEquivalentValue(galaxy: Galaxy, request: SupportRequest): number {
+  if (request.supportType === 'RESOURCE_SUPPORT') {
+    return estimateResourceValue(request.approvedResources ?? request.requestedResources);
+  }
+
+  const targetPlanet = flattenPlanets(galaxy).find((planet) => sameCoordinates(coordinatesOfPlanet(planet), request.targetCoordinates)) ?? null;
+  if (request.supportType === 'PLANET_REPAIR') {
+    return targetPlanet ? Math.max(100, estimatePlanetEconomicValue(targetPlanet) * 0.2) : 120;
+  }
+  if (request.supportType === 'PLANET_DEFENSE') {
+    return targetPlanet ? Math.max(140, estimatePlanetEconomicValue(targetPlanet) * 0.3) : 160;
+  }
+
+  let shipValue = 0;
+  for (const minimum of request.minimumShips) {
+    const blueprint = SHIP_BLUEPRINTS.get(minimum.type as ShipTypeType);
+    if (!blueprint) {
+      continue;
+    }
+
+    shipValue += estimateResourceValue(blueprint.cost) * minimum.amount;
+  }
+  return Math.max(shipValue, targetPlanet ? estimatePlanetEconomicValue(targetPlanet) * 0.4 : shipValue);
+}
+
+function getBotGoodwill(player: Player, targetPlayerId: number): number {
+  return player.botMemory?.goodwillByPlayer?.find((entry) => entry.playerId === targetPlayerId)?.score ?? 0;
+}
+
+function adjustBotGoodwill(
+  player: Player,
+  targetPlayerId: number,
+  delta: number,
+  currentTurn: number
+): void {
+  const memory = player.botMemory;
+  if (!memory || !Number.isInteger(targetPlayerId)) {
+    return;
+  }
+
+  const goodwillEntries = memory.goodwillByPlayer ?? [];
+  const existing = goodwillEntries.find((entry) => entry.playerId === targetPlayerId) ?? null;
+  if (!existing) {
+    goodwillEntries.push({
+      playerId: targetPlayerId,
+      score: Math.max(-100, Math.min(100, Math.round(delta))),
+      updatedTurn: currentTurn
+    });
+  } else {
+    existing.score = Math.max(-100, Math.min(100, existing.score + Math.round(delta)));
+    existing.updatedTurn = currentTurn;
+  }
+
+  while (goodwillEntries.length > 40) {
+    goodwillEntries.shift();
+  }
+  memory.goodwillByPlayer = goodwillEntries;
+}
+
+function appendRecentSupportRequest(
+  player: Player,
+  targetPlayerId: number,
+  supportType: SupportRequestType,
+  targetCoordinates: ClientCoordinates,
+  currentTurn: number
+): void {
+  const memory = player.botMemory;
+  if (!memory) {
+    return;
+  }
+
+  const recent = memory.recentSupportRequests ?? [];
+  recent.push({
+    playerId: targetPlayerId,
+    supportType,
+    targetCoordinates: { ...targetCoordinates },
+    turn: currentTurn
+  });
+  while (recent.length > 40) {
+    recent.shift();
+  }
+  memory.recentSupportRequests = recent;
+}
+
+function hasRecentSupportRequest(
+  player: Player,
+  targetPlayerId: number,
+  supportType: SupportRequestType,
+  targetCoordinates: ClientCoordinates,
+  currentTurn: number,
+  cooldownTurns = 3
+): boolean {
+  return (player.botMemory?.recentSupportRequests ?? []).some((entry) =>
+    entry.playerId === targetPlayerId
+    && entry.supportType === supportType
+    && sameCoordinates(entry.targetCoordinates, targetCoordinates)
+    && (currentTurn - entry.turn) < cooldownTurns
+  );
+}
+
+function appendProcessedSupportOutcome(player: Player, requestId: number): void {
+  const memory = player.botMemory;
+  if (!memory) {
+    return;
+  }
+
+  const processed = memory.processedSupportOutcomeIds ?? [];
+  processed.push(requestId);
+  while (processed.length > 80) {
+    processed.shift();
+  }
+  memory.processedSupportOutcomeIds = processed;
+}
+
+function isSupportStatusAllowed(
+  supportType: SupportRequestType,
+  status: string
+): boolean {
+  if (
+    supportType === 'RESOURCE_SUPPORT'
+    || supportType === 'ATTACK_TARGET'
+    || supportType === 'BOMBARD_TARGET'
+    || supportType === 'SIEGE_TARGET'
+  ) {
+    return status === DiplomaticStatus.ALLIED;
+  }
+
+  return status === DiplomaticStatus.ALLIED || status === DiplomaticStatus.PEACE;
+}
+
+function isOffensiveSupportType(
+  supportType: SupportRequestType
+): supportType is OffensiveSupportRequest['supportType'] {
+  return supportType === 'ATTACK_TARGET' || supportType === 'BOMBARD_TARGET' || supportType === 'SIEGE_TARGET';
+}
+
+function isOffensiveSupportRequest(
+  request: SupportRequest
+): request is OffensiveSupportRequest {
+  return isOffensiveSupportType(request.supportType);
+}
+
+function resolveBotResourceSupportApproval(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile,
+  request: Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' }>
+): ResourcesPackType | null {
+  const providerCriticalPressure = hasCriticalEconomyPressure(player, profile);
+  const reserveRatio = providerCriticalPressure ? 0.92 : 0.78;
+  let bestApproval: ResourcesPackType | null = null;
+  let bestValue = 0;
+
+  for (const planet of player.planets) {
+    const approval = new ResourcesPack(
+      Math.min(
+        Math.max(0, planet.rBDSFTQ.resources.metal - Math.floor(planet.rBDSFTQ.resources.metal * reserveRatio)),
+        request.requestedResources.metal
+      ),
+      Math.min(
+        Math.max(0, planet.rBDSFTQ.resources.crystal - Math.floor(planet.rBDSFTQ.resources.crystal * reserveRatio)),
+        request.requestedResources.crystal
+      ),
+      Math.min(
+        Math.max(0, planet.rBDSFTQ.resources.deuterium - Math.floor(planet.rBDSFTQ.resources.deuterium * reserveRatio)),
+        request.requestedResources.deuterium
+      )
+    );
+    const value = estimateResourceValue(approval);
+    if (value > bestValue) {
+      bestApproval = approval;
+      bestValue = value;
+    }
+  }
+
+  return bestApproval && supportResourcesHasAnyValue(bestApproval) ? bestApproval : null;
+}
+
+function resolveBotBestResourceSupportSourcePlanet(
+  galaxy: Galaxy,
+  ownerPlayerId: number,
+  requiredResources: ResourcesPackType
+): Planet | null {
+  let bestPlanet: Planet | null = null;
+  let bestValue = -1;
+
+  for (const planet of flattenPlanets(galaxy)) {
+    if (planet.info.ownerId !== ownerPlayerId) {
+      continue;
+    }
+    if (!planet.rBDSFTQ.resources.isSufficient(requiredResources)) {
+      continue;
+    }
+
+    const resourceValue = planet.rBDSFTQ.resources.getTotalValuedResourceAmount();
+    if (resourceValue > bestValue) {
+      bestPlanet = planet;
+      bestValue = resourceValue;
+    }
+  }
+
+  return bestPlanet;
+}
+
+function hasCriticalEconomyPressure(player: Player, profile: BotProfile): boolean {
+  return player.planets.some((planet) => buildPlanetEconomyState(planet, player, profile).stage === 'energy_recovery');
+}
+
+function resolveCriticalEconomySupportBuildingType(
+  planet: Planet,
+  player: Player,
+  economyState: BotPlanetEconomyState,
+  targets: BotEconomyTargets
+): BuildingTypeType | null {
+  if (economyState.stage === 'energy_recovery') {
+    const energyTypes: BuildingTypeType[] = [
+      BuildingType.SOLAR_WIND_GEOTHERMAL,
+      BuildingType.NUCLEAR_PLANT,
+      BuildingType.FUSION_REACTOR
+    ];
+    for (const type of energyTypes) {
+      const blueprint = BUILDING_BLUEPRINTS.get(type);
+      const nextLevel = planet.getBuildingLevel(type) + 1;
+      if (!blueprint || !hasBuildingRequirements(planet, blueprint, nextLevel) || !hasTechnologyRequirements(player, blueprint, nextLevel)) {
+        continue;
+      }
+      if (type === BuildingType.FUSION_REACTOR && !isFusionReactorUpgradeDeuteriumSafe(planet, player, nextLevel)) {
+        continue;
+      }
+      return type;
+    }
+  }
+
+  const mineLevels = [
+    { type: BuildingType.METAL_MINE, level: planet.getBuildingLevel(BuildingType.METAL_MINE) },
+    { type: BuildingType.CRYSTAL_MINE, level: planet.getBuildingLevel(BuildingType.CRYSTAL_MINE) },
+    { type: BuildingType.DEUTERIUM_SYNTHESIZER, level: planet.getBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER) }
+  ].sort((left, right) => left.level - right.level);
+  if (economyState.avgMineLevel < targets.mineLevel) {
+    return mineLevels[0]?.type ?? null;
+  }
+  if (planet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY) < targets.roboticsLevel) {
+    return BuildingType.ROBOTICS_FACTORY;
+  }
+  if (planet.getBuildingLevel(BuildingType.RESEARCH_LAB) < targets.researchLabLevel) {
+    return BuildingType.RESEARCH_LAB;
+  }
+  if (estimateStoragePressure(planet) >= 0.8) {
+    return BuildingType.METAL_STORAGE;
+  }
+
+  return null;
+}
+
+function estimatePlayerIncomeValue(player: Player, profile: BotProfile): number {
+  return player.planets.reduce((sum, planet) => sum + estimatePlanetIncomeValue(planet, player, profile), 0);
+}
+
+function estimatePlanetIncomeValue(planet: Planet, player: Player, profile: BotProfile): number {
+  const adaptiveTechnologyLevel = player.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+  const economyState = buildPlanetEconomyState(planet, player, profile);
+  const metalIncome = Math.max(0, Math.floor(planet.getMetalGain(adaptiveTechnologyLevel) * economyState.energyEfficiency));
+  const crystalIncome = Math.max(0, Math.floor(planet.getCrystalGain(adaptiveTechnologyLevel) * economyState.energyEfficiency));
+  const deuteriumIncome = Math.max(0, Math.floor(planet.getDeuteriumGain(adaptiveTechnologyLevel)));
+  return estimateResourceValue(new ResourcesPack(metalIncome, crystalIncome, deuteriumIncome));
+}
+
+function estimateLocalRepairCapability(galaxy: Galaxy, player: Player, targetPlanet: Planet): number {
+  const targetCoordinates = coordinatesOfPlanet(targetPlanet);
+  let total = Math.max(0, Math.floor(targetPlanet.getBuildingProductionValue1(BuildingType.SHIPYARD)));
+  total += estimatePlanetRepairTools(targetPlanet);
+
+  for (const fleet of galaxy.activeFleets) {
+    if (fleet.ownerId !== player.playerId || fleet.state !== FleetState.ORBITING || !sameCoordinates(fleet.target, targetCoordinates)) {
+      continue;
+    }
+    total += Math.max(0, Math.floor(fleet.shipRepairCapability ?? 0));
+    total += Math.max(0, Math.floor(fleet.droneRepairCapability ?? 0));
+  }
+
+  return total;
+}
+
+function resolveFastestFriendlyPlanetDistance(
+  player: Player,
+  targetCoordinates: ClientCoordinates,
+  predicate: (planet: Planet) => boolean
+): number | null {
+  let best: number | null = null;
+
+  for (const planet of player.planets) {
+    if (!predicate(planet)) {
+      continue;
+    }
+
+    const distance = calculateTravelDistance(coordinatesOfPlanet(planet), targetCoordinates);
+    if (best === null || distance < best) {
+      best = distance;
+    }
+  }
+
+  return best;
+}
+
+function canPlanetProvideRepairSupport(planet: Planet): boolean {
+  return estimatePlanetRepairTools(planet) > 0;
+}
+
+function estimatePlanetRepairTools(planet: Planet): number {
+  const repairDrones = planet.rBDSFTQ.ships.countByType().get(ShipType.REPAIR_DRONE) ?? 0;
+  return Math.max(0, Math.floor(planet.getBuildingProductionValue1(BuildingType.SHIPYARD))) + repairDrones;
+}
+
+function calculateAvailableDefenseSupportPower(player: Player): number {
+  return player.planets.reduce((sum, planet) => {
+    if (!planetHasJumpCombatShip(planet)) {
+      return sum;
+    }
+    return sum + estimatePlanetCombatStrength(planet);
+  }, 0);
+}
+
+function canBotSpareDefenseSupport(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile
+): boolean {
+  const valuablePlanets = [...player.planets]
+    .sort((left, right) => estimatePlanetStrategicValue(galaxy, player, right) - estimatePlanetStrategicValue(galaxy, player, left));
+  const protectedCount = Math.max(1, Math.ceil(valuablePlanets.length / 2));
+  const protectedSet = new Set(valuablePlanets.slice(0, protectedCount));
+
+  return player.planets.every((planet) => {
+    if (!protectedSet.has(planet)) {
+      return true;
+    }
+
+    const threat = estimateNearbyThreat(galaxy, player, planet);
+    if (!threat) {
+      return true;
+    }
+
+    return threat.pressure <= Math.max(20, estimatePlanetCombatStrength(planet) * (1 + (profile.defenseWeight * 0.25)));
+  });
+}
+
+function estimatePlanetStrategicValue(
+  galaxy: Galaxy,
+  player: Player,
+  planet: Planet
+): number {
+  const economyValue = estimatePlanetEconomicValue(planet);
+  const productionValue = averageBuildingLevels(planet, [
+    BuildingType.METAL_MINE,
+    BuildingType.CRYSTAL_MINE,
+    BuildingType.DEUTERIUM_SYNTHESIZER,
+    BuildingType.ROBOTICS_FACTORY,
+    BuildingType.RESEARCH_LAB
+  ]) * 24;
+  const threat = estimateNearbyThreat(galaxy, player, planet)?.pressure ?? 0;
+  return economyValue + productionValue + (threat * 12);
+}
+
+function resolvePreferredSupportProvider(
+  galaxy: Galaxy,
+  player: Player,
+  supportType: SupportRequestType,
+  targetCoordinates: ClientCoordinates,
+  scoreResolver: (
+    ally: Player,
+    allyProfile: BotProfile
+  ) => {
+    score: number;
+    distance?: number | null;
+    offensiveSelection?: CreateFleetShipSelectionEntry[] | null;
+    missionType?: FleetMissionTypeType | null;
+    selectionStrength?: number;
+  } | null
+): {
+  player: Player;
+  score: number;
+  distance: number | null;
+  offensiveSelection: CreateFleetShipSelectionEntry[] | null;
+  missionType: FleetMissionTypeType | null;
+  selectionStrength: number;
+} | null {
+  let best: {
+    player: Player;
+    score: number;
+    distance: number | null;
+    offensiveSelection: CreateFleetShipSelectionEntry[] | null;
+    missionType: FleetMissionTypeType | null;
+    selectionStrength: number;
+  } | null = null;
+
+  for (const ally of galaxy.players) {
+    if (ally.playerId === player.playerId || ally.type === PlayerType.NEUTRAL || ally.planets.length <= 0) {
+      continue;
+    }
+
+    const status = resolveDiplomaticStatus(galaxy, player.playerId, ally.playerId);
+    if (!isSupportStatusAllowed(supportType, status)) {
+      continue;
+    }
+    if (hasRecentSupportRequest(player, ally.playerId, supportType, targetCoordinates, galaxy.currentTurn)) {
+      continue;
+    }
+
+    const allyProfile = BOT_PROFILES[ally.botProfileId ?? defaultBotProfileIdForPlayerId(ally.playerId)];
+    const resolved = scoreResolver(ally, allyProfile);
+    if (!resolved) {
+      continue;
+    }
+
+    const sameTrustedAllyBonus = getBotGoodwill(player, ally.playerId) > 0 ? 1.5 : 0;
+    const totalScore = resolved.score + (getBotGoodwill(player, ally.playerId) / 20) + sameTrustedAllyBonus;
+    if (!best || totalScore > best.score) {
+      best = {
+        player: ally,
+        score: totalScore,
+        distance: resolved.distance ?? null,
+        offensiveSelection: resolved.offensiveSelection ?? null,
+        missionType: resolved.missionType ?? null,
+        selectionStrength: resolved.selectionStrength ?? 0
+      };
+    }
+  }
+
+  return best;
+}
+
+function estimateAllyResourceSupportScore(
+  ally: Player,
+  allyProfile: BotProfile,
+  targetPlanet: Planet,
+  missing: ResourcesPackType
+): { score: number; distance: number | null } | null {
+  const reservePenalty = hasCriticalEconomyPressure(ally, allyProfile) ? 6 : 0;
+  const bestPlanet = ally.planets.find((planet) =>
+    estimateResourceValue(planet.rBDSFTQ.resources) >= (estimateResourceValue(missing) * 0.4)
+  ) ?? null;
+  if (!bestPlanet) {
+    return null;
+  }
+
+  const distance = calculateTravelDistance(coordinatesOfPlanet(bestPlanet), coordinatesOfPlanet(targetPlanet));
+  const spareRatio = estimatePlayerIncomeValue(ally, allyProfile) / Math.max(1, estimateResourceValue(missing));
+  return {
+    score: (spareRatio * 5) - reservePenalty - (distance * 0.5),
+    distance
+  };
+}
+
+function estimateAllyRepairSupportScore(
+  ally: Player,
+  targetPlanet: Planet
+): { score: number; distance: number | null } | null {
+  const distance = resolveFastestFriendlyPlanetDistance(ally, coordinatesOfPlanet(targetPlanet), canPlanetProvideRepairSupport);
+  if (distance === null) {
+    return null;
+  }
+
+  const repairTools = ally.planets.reduce((sum, planet) => sum + estimatePlanetRepairTools(planet), 0);
+  if (repairTools <= 0) {
+    return null;
+  }
+
+  return {
+    score: (repairTools / 4) - distance,
+    distance
+  };
+}
+
+function estimateAllyDefenseSupportScore(
+  ally: Player,
+  targetPlanet: Planet
+): { score: number; distance: number | null } | null {
+  const distance = resolveFastestFriendlyPlanetDistance(ally, coordinatesOfPlanet(targetPlanet), planetHasJumpCombatShip);
+  if (distance === null) {
+    return null;
+  }
+
+  const supportPower = calculateAvailableDefenseSupportPower(ally);
+  if (supportPower <= 0) {
+    return null;
+  }
+
+  return {
+    score: (supportPower / 25) - (distance * 1.5),
+    distance
+  };
+}
+
+function estimateAllyOffensiveSupportScore(
+  ally: Player,
+  allyProfile: BotProfile,
+  targetPlanet: Planet,
+  report: EspionageReportData,
+  supportType: OffensiveSupportRequest['supportType']
+): {
+  score: number;
+  distance: number | null;
+  offensiveSelection: CreateFleetShipSelectionEntry[] | null;
+  missionType: FleetMissionTypeType | null;
+  selectionStrength: number;
+} | null {
+  let best: {
+    score: number;
+    distance: number | null;
+    offensiveSelection: CreateFleetShipSelectionEntry[] | null;
+    missionType: FleetMissionTypeType | null;
+    selectionStrength: number;
+  } | null = null;
+
+  for (const originPlanet of ally.planets) {
+    const originCoordinates = coordinatesOfPlanet(originPlanet);
+    const targetCoordinates = coordinatesOfPlanet(targetPlanet);
+    if (sameCoordinates(originCoordinates, targetCoordinates)) {
+      continue;
+    }
+
+    const distance = calculateTravelDistance(originCoordinates, targetCoordinates);
+    let selection: CreateFleetShipSelectionEntry[] = [];
+    let missionType: FleetMissionTypeType = FleetMissionType.ATTACK;
+    if (supportType === 'ATTACK_TARGET') {
+      selection = buildAttackShipSelection(originPlanet, report, allyProfile, {
+        requireBombardmentBreaker: report.totalDefencesAmount > 0
+      });
+      missionType = FleetMissionType.ATTACK;
+    } else if (supportType === 'BOMBARD_TARGET') {
+      selection = buildBombardShipSelection(originPlanet, allyProfile, report.totalDefencesAmount >= 10);
+      missionType = FleetMissionType.BOMBARD;
+    } else {
+      selection = buildBombardShipSelection(originPlanet, allyProfile, true);
+      missionType = FleetMissionType.SIEGE;
+    }
+
+    if (selection.length <= 0) {
+      continue;
+    }
+
+    const selectionStrength = estimateShipSelectionCombatStrength(selection);
+    const score = (selectionStrength / 20) - (distance * 1.25);
+    if (!best || score > best.score) {
+      best = {
+        score,
+        distance,
+        offensiveSelection: selection,
+        missionType,
+        selectionStrength
+      };
+    }
+  }
+
+  return best;
+}
+
+function estimateBestOwnOffensiveStrength(
+  player: Player,
+  profile: BotProfile,
+  targetPlanet: Planet,
+  report: EspionageReportData
+): number {
+  let best = 0;
+
+  for (const originPlanet of player.planets) {
+    if (sameCoordinates(coordinatesOfPlanet(originPlanet), coordinatesOfPlanet(targetPlanet))) {
+      continue;
+    }
+
+    const selection = buildAttackShipSelection(originPlanet, report, profile, {
+      requireBombardmentBreaker: report.totalDefencesAmount > 0
+    });
+    best = Math.max(best, estimateShipSelectionCombatStrength(selection));
+  }
+
+  return best;
+}
+
+function resolveBotOffensiveSupportType(
+  status: string,
+  report: EspionageReportData,
+  farmTarget: boolean
+): OffensiveSupportRequest['supportType'] {
+  if (farmTarget) {
+    return 'ATTACK_TARGET';
+  }
+  if (status === DiplomaticStatus.WAR && report.totalDefencesAmount >= 14) {
+    return 'SIEGE_TARGET';
+  }
+  if (status === DiplomaticStatus.WAR && report.totalDefencesAmount >= 8) {
+    return 'BOMBARD_TARGET';
+  }
+  return 'ATTACK_TARGET';
+}
+
+function isOffensiveSupportTargetValidForBot(
+  galaxy: Galaxy,
+  player: Player,
+  request: OffensiveSupportRequest
+): boolean {
+  const targetPlanet = flattenPlanets(galaxy).find((planet) => sameCoordinates(coordinatesOfPlanet(planet), request.targetCoordinates)) ?? null;
+  if (!targetPlanet || targetPlanet.info.ownerId === null || targetPlanet.info.ownerId === player.playerId) {
+    return false;
+  }
+
+  if (!targetPlanet.lastReportData.has(request.fromPlayerId)) {
+    return false;
+  }
+
+  const status = resolveDiplomaticStatus(galaxy, request.toPlayerId, targetPlanet.info.ownerId);
+  if (request.supportType === 'ATTACK_TARGET') {
+    return status === DiplomaticStatus.WAR || status === DiplomaticStatus.NEUTRAL || status === DiplomaticStatus.PASSIVE;
+  }
+
+  return status === DiplomaticStatus.WAR;
+}
+
+function resolveOffensiveSupportLaunchReadiness(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile,
+  request: OffensiveSupportRequest
+): { selectionStrength: number } | null {
+  const targetPlanet = flattenPlanets(galaxy).find((planet) => sameCoordinates(coordinatesOfPlanet(planet), request.targetCoordinates)) ?? null;
+  if (!targetPlanet) {
+    return null;
+  }
+
+  for (const planet of player.planets) {
+    const distance = calculateTravelDistance(coordinatesOfPlanet(planet), request.targetCoordinates);
+    if (distance > 5) {
+      continue;
+    }
+
+    const selection = buildMinimumShipSelection(planet, request.minimumShips);
+    if (!selection) {
+      continue;
+    }
+
+    if (request.supportType === 'ATTACK_TARGET') {
+      const report = targetPlanet.lastReportData.get(request.fromPlayerId) ?? null;
+      const expectedStrength = report ? estimateReportCombatStrength(report) : 0;
+      if (estimateShipSelectionCombatStrength(selection) < expectedStrength * 0.75) {
+        continue;
+      }
+    }
+
+    if (!canBotSpareDefenseSupport(galaxy, player, profile) && request.supportType !== 'ATTACK_TARGET') {
+      continue;
+    }
+
+    return {
+      selectionStrength: estimateShipSelectionCombatStrength(selection)
+    };
+  }
+
+  return null;
+}
+
+function buildMinimumShipSelection(
+  planet: Planet,
+  minimumShips: SupportShipAmount[]
+): CreateFleetShipSelectionEntry[] | null {
+  const availableUndamaged = ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
+  const availableDamaged = ManyShips.damagedCountByType(planet.rBDSFTQ.ships);
+  const selections: CreateFleetShipSelectionEntry[] = [];
+
+  for (const minimum of minimumShips) {
+    const undamagedAvailable = availableUndamaged.get(minimum.type as ShipTypeType) ?? 0;
+    const damagedAvailable = availableDamaged.get(minimum.type as ShipTypeType) ?? 0;
+    if (undamagedAvailable + damagedAvailable < minimum.amount) {
+      return null;
+    }
+
+    const undamagedAmount = Math.min(undamagedAvailable, minimum.amount);
+    const damagedAmount = Math.max(0, minimum.amount - undamagedAmount);
+    selections.push({
+      type: minimum.type,
+      undamagedAmount,
+      damagedAmount
+    });
+  }
+
+  return selections;
 }
 
 function buildBuildingCandidates(
@@ -2366,7 +3743,10 @@ function ensureBotMemory(player: Player, currentTurn: number): void {
       reservedResources: { metal: 0, crystal: 0, deuterium: 0 },
       lastSpyTargets: memory?.lastSpyTargets ?? [],
       lastAttackTargets: memory?.lastAttackTargets ?? [],
-      recentDiplomacyTargets: memory?.recentDiplomacyTargets ?? []
+      recentDiplomacyTargets: memory?.recentDiplomacyTargets ?? [],
+      goodwillByPlayer: memory?.goodwillByPlayer ?? [],
+      recentSupportRequests: memory?.recentSupportRequests ?? [],
+      processedSupportOutcomeIds: memory?.processedSupportOutcomeIds ?? []
     };
   }
 }
@@ -2396,7 +3776,10 @@ function updateBotMemoryAfterAction(player: Player, currentTurn: number, candida
     reservedResources: { metal: 0, crystal: 0, deuterium: 0 },
     lastSpyTargets: nextSpyTargets,
     lastAttackTargets: nextAttackTargets,
-    recentDiplomacyTargets: previousMemory?.recentDiplomacyTargets ?? []
+    recentDiplomacyTargets: previousMemory?.recentDiplomacyTargets ?? [],
+    goodwillByPlayer: previousMemory?.goodwillByPlayer ?? [],
+    recentSupportRequests: previousMemory?.recentSupportRequests ?? [],
+    processedSupportOutcomeIds: previousMemory?.processedSupportOutcomeIds ?? []
   };
 }
 
