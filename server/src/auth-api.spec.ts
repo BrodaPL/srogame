@@ -433,6 +433,60 @@ describe.sequential('auth api', () => {
     });
   });
 
+  it('launches star-system espionage from one origin to each eligible non-owned planet in the selected system', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'SpySystemAdmin',
+      email: 'spy-system-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.69');
+    activateAccount('SpySystemAdmin', { localAdmin: true });
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'SpySystemAdmin',
+      password: 'secret-123'
+    }, '10.0.0.69');
+    expect(loginResponse.status).toBe(200);
+    const token = loginResponse.json?.token as string;
+
+    const startResponse = await request('POST', '/api/game/start', {
+      setup: createSingleplayerSetup('Spy System Sector')
+    }, '10.0.0.69', token);
+    expect(startResponse.status).toBe(200);
+
+    const ownedPlanetsResponse = await request('GET', '/api/game/owned-planets', undefined, '10.0.0.69', token);
+    expect(ownedPlanetsResponse.status).toBe(200);
+    const ownedPlanets = Array.isArray(ownedPlanetsResponse.json) ? ownedPlanetsResponse.json : [];
+    const originCoordinates = (ownedPlanets[0] as { coordinates?: { x?: number; y?: number; z?: number } } | undefined)?.coordinates;
+    expect(originCoordinates).toBeDefined();
+
+    const systemResponse = await request(
+      'GET',
+      `/api/game/client-star-system?x=${originCoordinates?.x}&y=${originCoordinates?.y}`,
+      undefined,
+      '10.0.0.69',
+      token
+    );
+    expect(systemResponse.status).toBe(200);
+    const planets = Array.isArray(systemResponse.json?.planets) ? systemResponse.json.planets : [];
+    const eligibleTargets = planets.filter((planet) =>
+      planet?.basicInfo?.type !== 'Asteroids' && planet?.info?.isOwnedByViewer === false
+    );
+    expect(eligibleTargets.length).toBeGreaterThan(0);
+
+    const spyResponse = await request('POST', '/api/game/star-system-spy', {
+      systemCoordinates: {
+        x: originCoordinates?.x,
+        y: originCoordinates?.y
+      },
+      origin: originCoordinates
+    }, '10.0.0.69', token);
+    expect(spyResponse.status).toBe(201);
+    expect(spyResponse.json?.launchedFleetCount).toBe(eligibleTargets.length);
+    expect(Array.isArray(spyResponse.json?.activeFleets)).toBe(true);
+    expect((spyResponse.json?.activeFleets as Array<Record<string, unknown>>).length).toBe(eligibleTargets.length);
+    expect(spyResponse.json?.message).toContain(`${originCoordinates?.x}:${originCoordinates?.y}`);
+  });
+
   it('closes the current loaded single-player game, saves it, and clears the current game pointer', async () => {
     await request('POST', '/api/auth/register', {
       playerName: 'SingleplayerAdmin',

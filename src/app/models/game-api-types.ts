@@ -1152,6 +1152,20 @@ export type CreateFleetMissionResponse = {
   message?: string | null;
 };
 
+export type CreateStarSystemSpyRequest = {
+  systemCoordinates: {
+    x: number;
+    y: number;
+  };
+  origin: ClientCoordinates;
+};
+
+export type CreateStarSystemSpyResponse = {
+  activeFleets: Fleet[];
+  launchedFleetCount: number;
+  message: string;
+};
+
 export type CreateMaintenanceRequestRequest = MaintenanceTransferPayloadDto;
 
 export type CreateMaintenanceRequestResponse = {

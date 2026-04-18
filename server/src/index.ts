@@ -159,6 +159,7 @@ import {
   rejectDiplomaticProposalCommand
 } from './game-commands/diplomacy-commands.js';
 import { createFleetMission } from './game-commands/fleet-commands.js';
+import { createStarSystemSpyMissions } from './game-commands/star-system-spy-commands.js';
 import {
   approveJumpGateRequestCommand,
   cancelJumpGateRequestCommand,
@@ -224,6 +225,8 @@ import type {
   CreateFleetShipSelectionEntry,
   ClientInfoDto,
   PlayerNameEntry,
+  CreateStarSystemSpyRequest,
+  CreateStarSystemSpyResponse,
   LoginRequest,
   RegisterRequest,
   RegisterConfigResponse,
@@ -3881,6 +3884,48 @@ app.post('/api/game/active-fleets', (req, res) => {
   return res.status(201).json(response);
 });
 
+app.post('/api/game/star-system-spy', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (!canSessionAccessCurrentGame(currentGalaxy, auth.session)) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as CreateStarSystemSpyRequest | undefined;
+  const systemCoordinates = parseStarSystemCoordinates(body?.systemCoordinates);
+  const origin = parseMissionCoordinates(body?.origin);
+  if (!systemCoordinates || !origin) {
+    return res.status(400).json({ error: 'Invalid star system spy payload.' });
+  }
+
+  const result = createStarSystemSpyMissions(
+    { galaxy: currentGalaxy, playerId },
+    { systemX: systemCoordinates.x, systemY: systemCoordinates.y, origin }
+  );
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
+  }
+
+  const response: CreateStarSystemSpyResponse = {
+    activeFleets: buildOwnedActiveFleetsResponse(currentGalaxy, playerId),
+    launchedFleetCount: result.value.launchedFleetCount,
+    message: `Launched ${result.value.launchedFleetCount} espionage probe${result.value.launchedFleetCount === 1 ? '' : 's'} across system ${systemCoordinates.x}:${systemCoordinates.y}.`
+  };
+  return res.status(201).json(response);
+});
+
 app.get('/api/health', (_req, res) => {
   return res.status(200).json({ status: 'ok' });
 });
@@ -6669,6 +6714,21 @@ function parseMissionCoordinates(value: unknown): ClientCoordinates | null {
   }
 
   return { x, y, z };
+}
+
+function parseStarSystemCoordinates(value: unknown): { x: number; y: number } | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as { x?: unknown; y?: unknown };
+  const x = parseBodyNonNegativeInt(candidate.x);
+  const y = parseBodyNonNegativeInt(candidate.y);
+  if (x === null || y === null) {
+    return null;
+  }
+
+  return { x, y };
 }
 
 function parseResourcesPackPayload(value: unknown): ResourcesPackType | null {

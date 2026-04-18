@@ -1,0 +1,110 @@
+@if (isOpen && starSystem) {
+  <div class="spy-solar-system-dialog__backdrop" (click)="close()"></div>
+  <section
+    class="spy-solar-system-dialog"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'Spy solar system ' + starSystem.name"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="spy-solar-system-dialog__header">
+      <div>
+        <p class="eyebrow">Spy</p>
+        <h3>Spy Solar System</h3>
+        <p class="spy-solar-system-dialog__subtitle">
+          System: {{ starSystem.name }} ({{ systemCoordinatesLabel() }})
+        </p>
+        @if (!isLoading && targetPlanets.length > 0) {
+          <p class="spy-solar-system-dialog__fleet-cap overview-muted">
+            Active fleets {{ activeFleetCountLabel() }}
+          </p>
+        }
+      </div>
+      <button type="button" class="spy-solar-system-dialog__close" (click)="close()">Close</button>
+    </div>
+
+    @if (error) {
+      <section class="status status--error">
+        <h3>Star system espionage unavailable</h3>
+        <p>{{ error }}</p>
+      </section>
+    }
+
+    <div class="spy-solar-system-dialog__body">
+      @if (isLoading) {
+        <p class="overview-muted">Loading owned planets with enough probes.</p>
+      } @else {
+        <section class="spy-solar-system-dialog__summary">
+          <div class="spy-solar-system-dialog__summary-grid">
+            <article class="spy-solar-system-dialog__summary-card">
+              <span class="spy-solar-system-dialog__summary-label">Targets</span>
+              <strong>{{ targetPlanets.length }}</strong>
+            </article>
+            <article class="spy-solar-system-dialog__summary-card">
+              <span class="spy-solar-system-dialog__summary-label">Required probes</span>
+              <strong>{{ requiredProbeCount() }}</strong>
+            </article>
+            <article class="spy-solar-system-dialog__summary-card">
+              <span class="spy-solar-system-dialog__summary-label">Required fleet slots</span>
+              <strong>{{ requiredFleetSlots() }}</strong>
+            </article>
+            <article class="spy-solar-system-dialog__summary-card">
+              <span class="spy-solar-system-dialog__summary-label">Free fleet slots</span>
+              <strong>{{ fleetSlotsRemaining() }}</strong>
+            </article>
+          </div>
+          @if (targetPlanets.length > 0) {
+            <p class="overview-muted" [attr.title]="targetListLabel()">
+              Targets: {{ targetListLabel() }}
+            </p>
+          }
+          @if (fleetSlotBlockerMessage(); as fleetSlotBlocker) {
+            <p class="form-error">{{ fleetSlotBlocker }}</p>
+          }
+        </section>
+
+        @if (targetPlanets.length <= 0 || eligibleOrigins.length === 0) {
+          <p class="overview-muted">{{ originAvailabilityMessage() }}</p>
+        } @else {
+          <fieldset class="spy-solar-system-dialog__fieldset">
+            <legend>Mission origin</legend>
+            <div class="spy-solar-system-dialog__origin-list">
+              @for (origin of eligibleOrigins; track origin.coordinatesLabel) {
+                <label class="spy-solar-system-dialog__origin-option">
+                  <input
+                    type="radio"
+                    name="spy-solar-system-origin"
+                    [value]="origin.coordinatesLabel"
+                    [(ngModel)]="selectedOriginCoordinates"
+                    (ngModelChange)="setSelectedOrigin($event)"
+                  />
+                  <span class="spy-solar-system-dialog__origin-copy">
+                    <strong>{{ origin.label }}</strong>
+                    <span>
+                      Total distance: {{ origin.totalDistance }} | Max distance: {{ origin.maxDistance }}
+                      @if (origin.damagedProbes > 0) {
+                        <span> | Damaged: {{ origin.damagedProbes }}</span>
+                      }
+                    </span>
+                  </span>
+                </label>
+              }
+            </div>
+          </fieldset>
+        }
+      }
+    </div>
+
+    <div class="spy-solar-system-dialog__actions">
+      <button type="button" class="top-menu__button" (click)="close()">Cancel</button>
+      <button
+        type="button"
+        class="top-menu__button top-menu__button--end-turn"
+        [disabled]="!canLaunch()"
+        (click)="launch()"
+      >
+        {{ isLaunching ? 'Launching...' : 'Launch' }}
+      </button>
+    </div>
+  </section>
+}

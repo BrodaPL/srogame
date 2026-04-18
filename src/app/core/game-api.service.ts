@@ -35,6 +35,8 @@ import {
   StartTechnologyResearchRequest,
   CreateFleetMissionRequest,
   CreateFleetMissionResponse,
+  CreateStarSystemSpyRequest,
+  CreateStarSystemSpyResponse,
   CreateMaintenanceRequestRequest,
   CreateMaintenanceRequestResponse,
   DeletePlayerReportsRequest,
@@ -520,6 +522,14 @@ export class GameApiService {
   public createFleetMission(request: CreateFleetMissionRequest, token: string) {
     return this.http.post<CreateFleetMissionResponse>(
       `${API_BASE_URL}/game/active-fleets`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public createStarSystemSpyMission(request: CreateStarSystemSpyRequest, token: string) {
+    return this.http.post<CreateStarSystemSpyResponse>(
+      `${API_BASE_URL}/game/star-system-spy`,
       request,
       { headers: this.authHeaders(token) }
     );

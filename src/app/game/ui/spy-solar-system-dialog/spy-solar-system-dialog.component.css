@@ -1,0 +1,160 @@
+.spy-solar-system-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 14, 0.76);
+  backdrop-filter: blur(4px);
+  z-index: 34;
+}
+
+.spy-solar-system-dialog {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: min(620px, calc(100vw - 2rem));
+  max-height: min(82vh, 760px);
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(23, 29, 38, 0.98), rgba(14, 18, 24, 0.98));
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.42);
+  z-index: 35;
+}
+
+.spy-solar-system-dialog__header,
+.spy-solar-system-dialog__actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.spy-solar-system-dialog__subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-family: var(--font-mono), serif;
+}
+
+.spy-solar-system-dialog__fleet-cap {
+  margin: 0.35rem 0 0;
+}
+
+.spy-solar-system-dialog__close {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  padding: 0.46rem 0.92rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.spy-solar-system-dialog__body {
+  display: grid;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.spy-solar-system-dialog__summary {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.spy-solar-system-dialog__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.55rem;
+}
+
+.spy-solar-system-dialog__summary-card {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.spy-solar-system-dialog__summary-card strong {
+  font-size: 1rem;
+}
+
+.spy-solar-system-dialog__summary-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.spy-solar-system-dialog__fieldset {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  min-height: 0;
+}
+
+.spy-solar-system-dialog__fieldset legend {
+  padding: 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.spy-solar-system-dialog__origin-list {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.spy-solar-system-dialog__origin-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+
+.spy-solar-system-dialog__origin-option input {
+  margin-top: 0.18rem;
+  accent-color: var(--accent);
+}
+
+.spy-solar-system-dialog__origin-copy {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.82rem;
+}
+
+.spy-solar-system-dialog__origin-copy span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-family: var(--font-mono), serif;
+}
+
+@media (max-width: 640px) {
+  .spy-solar-system-dialog {
+    width: calc(100vw - 1rem);
+    padding: 0.85rem;
+  }
+
+  .spy-solar-system-dialog__header,
+  .spy-solar-system-dialog__actions {
+    flex-direction: column;
+  }
+
+  .spy-solar-system-dialog__close {
+    justify-self: start;
+  }
+}

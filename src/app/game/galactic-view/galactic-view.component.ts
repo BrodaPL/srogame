@@ -25,7 +25,9 @@ import { finalize } from 'rxjs';
 import { GameStateService } from '../../core/game-state.service';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { NoteBorderColor } from '../../models/enums/note-border-color';
+import { PlanetType } from '../../models/enums/planet-type';
 import { TutorialService } from '../../tutorial/tutorial.service';
+import { SpySolarSystemDialogComponent } from '../ui/spy-solar-system-dialog/spy-solar-system-dialog.component';
 
 type CellFillKind =
   | 'void'
@@ -68,11 +70,18 @@ type GalacticRouteVm = {
 
 type SelectCellOptions = {
   onSettled?: () => void;
+  preserveSpyNotice?: boolean;
+};
+
+type ReloadGalaxyPresentationOptions = {
+  restoreSelectedCell?: boolean;
+  autoSelectHomeSystem?: boolean;
+  spyLaunchNotice?: string | null;
 };
 
 @Component({
   selector: 'app-galactic-view',
-  imports: [TopMenuComponent, MiniPlanetPreviewComponent, FormsModule],
+  imports: [TopMenuComponent, MiniPlanetPreviewComponent, SpySolarSystemDialogComponent, FormsModule],
   templateUrl: './galactic-view.component.html',
   styleUrl: './galactic-view.styles.css'
 })
@@ -114,6 +123,8 @@ export class GalacticViewComponent implements OnInit {
   protected selectedSystemOwnFleets: GalaxyOwnFleetMovementDto[] = [];
   protected ownFleetRoutes: GalacticRouteVm[] = [];
   protected noteActionError: string | null = null;
+  protected isSpySolarSystemDialogOpen = false;
+  protected spySolarSystemNotice: string | null = null;
   protected isNoteActionLoading = false;
   protected isNoteEditorOpen = false;
   protected noteEditorMode: 'add' | 'modify' = 'add';
@@ -139,43 +150,7 @@ export class GalacticViewComponent implements OnInit {
 
   public ngOnInit(): void {
     this.galaxyName = this.resolveGalaxyName();
-
-    const session = this.playerSession.load();
-    if (!session) {
-      this.loadError = 'No player session found. Start a new game.';
-      return;
-    }
-
-    this.isLoading = true;
-    this.loadError = null;
-
-    this.gameApi.getGalaxyPresentationData(session.token)
-      .pipe(finalize(() => {
-        this.isLoading = false;
-        this.cdr.markForCheck();
-      }))
-      .subscribe({
-        next: (response) => {
-          this.galaxyPresentation = response;
-          this.starSystemNotesByCoordinates = this.buildStarSystemNotesMap(response.starSystemNotes);
-          this.ownFleetPresenceBySystemKey = this.buildOwnFleetPresenceBySystemKey(response);
-          this.ownFleetRoutes = this.buildOwnFleetRoutes(response.ownFleetMovements);
-          this.starSystemCache.clear();
-          this.grid = this.buildGrid(response);
-          this.gridHeight = this.grid.length;
-          this.gridWidth = this.grid[0]?.length ?? 0;
-          this.homeSystemCoordinates = this.resolveHomeSystemCoordinates(response.ownedPlanets);
-          this.syncScrollbars();
-          this.autoSelectHomeSystem(() => {
-            this.tutorialService.autoOpenTutorial('galacticView');
-          });
-          this.cdr.markForCheck();
-        },
-        error: () => {
-          this.loadError = 'Unable to load galaxy from server.';
-          this.cdr.markForCheck();
-        }
-      });
+    this.loadGalaxyPresentation({ autoSelectHomeSystem: true });
   }
 
   @HostListener('window:resize')
@@ -229,6 +204,10 @@ export class GalacticViewComponent implements OnInit {
     this.selectedSystemPlanets = [];
     this.selectedSystemError = null;
     this.noteActionError = null;
+    if (!options.preserveSpyNotice) {
+      this.spySolarSystemNotice = null;
+    }
+    this.isSpySolarSystemDialogOpen = false;
     this.noteEditorError = null;
     this.isNoteEditorOpen = false;
     this.isDeleteNoteConfirmOpen = false;
@@ -414,6 +393,57 @@ export class GalacticViewComponent implements OnInit {
     return !this.selectedCell || this.isSpecialSelectedCell() || this.isNoteActionLoading;
   }
 
+  protected canOpenSpySolarSystemDialog(): boolean {
+    return !!this.selectedSystem
+      && !this.selectedSystemLoading
+      && this.selectedSystemSpyTargets().length > 0;
+  }
+
+  protected spySolarSystemButtonTitle(): string {
+    if (this.selectedSystemLoading) {
+      return 'Wait for the selected system to finish loading.';
+    }
+    if (!this.selectedSystem) {
+      return 'Select a star system first.';
+    }
+    if (this.selectedSystemSpyTargets().length <= 0) {
+      return 'No non-owned, non-asteroid planets are available in this star system.';
+    }
+
+    return `Launch one probe per eligible planet in ${this.selectedStarSystemNameLabel()}.`;
+  }
+
+  protected openSpySolarSystemDialog(): void {
+    if (!this.canOpenSpySolarSystemDialog()) {
+      return;
+    }
+
+    this.spySolarSystemNotice = null;
+    this.isSpySolarSystemDialogOpen = true;
+  }
+
+  protected closeSpySolarSystemDialog(): void {
+    this.isSpySolarSystemDialogOpen = false;
+  }
+
+  protected handleSpySolarSystemLaunched(event: { message: string }): void {
+    this.isSpySolarSystemDialogOpen = false;
+    this.loadGalaxyPresentation({
+      restoreSelectedCell: true,
+      spyLaunchNotice: event.message
+    });
+  }
+
+  protected selectedSystemSpyTargets(): ClientPlanetDto[] {
+    if (!this.selectedSystem) {
+      return [];
+    }
+
+    return this.selectedSystem.planets.filter((planet) =>
+      planet.basicInfo.type !== PlanetType.ASTEROIDS && !planet.info.isOwnedByViewer
+    );
+  }
+
   protected openAddNoteDialog(): void {
     if (this.areNoteActionsDisabled() || this.selectedStarSystemNote()) {
       return;
@@ -550,6 +580,65 @@ export class GalacticViewComponent implements OnInit {
 
   protected noteEditorTitleLabel(): string {
     return this.noteEditorMode === 'add' ? 'Add Note' : 'Modify Note';
+  }
+
+  private loadGalaxyPresentation(options: ReloadGalaxyPresentationOptions = {}): void {
+    const session = this.playerSession.load();
+    if (!session) {
+      this.loadError = 'No player session found. Start a new game.';
+      return;
+    }
+
+    const selectedCoordinates = options.restoreSelectedCell && this.selectedCell
+      ? { x: this.selectedCell.x, y: this.selectedCell.y }
+      : null;
+
+    this.isLoading = true;
+    this.loadError = null;
+
+    this.gameApi.getGalaxyPresentationData(session.token)
+      .pipe(finalize(() => {
+        this.isLoading = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (response) => {
+          this.galaxyPresentation = response;
+          this.starSystemNotesByCoordinates = this.buildStarSystemNotesMap(response.starSystemNotes);
+          this.ownFleetPresenceBySystemKey = this.buildOwnFleetPresenceBySystemKey(response);
+          this.ownFleetRoutes = this.buildOwnFleetRoutes(response.ownFleetMovements);
+          this.starSystemCache.clear();
+          this.grid = this.buildGrid(response);
+          this.gridHeight = this.grid.length;
+          this.gridWidth = this.grid[0]?.length ?? 0;
+          this.homeSystemCoordinates = this.resolveHomeSystemCoordinates(response.ownedPlanets);
+          this.syncScrollbars();
+
+          if (selectedCoordinates) {
+            const selectedCell = this.grid[selectedCoordinates.y]?.[selectedCoordinates.x] ?? null;
+            if (selectedCell) {
+              this.selectCell(selectedCell, {
+                preserveSpyNotice: !!options.spyLaunchNotice,
+                onSettled: () => {
+                  if (options.spyLaunchNotice) {
+                    this.spySolarSystemNotice = options.spyLaunchNotice;
+                  }
+                }
+              });
+            }
+          } else if (options.autoSelectHomeSystem) {
+            this.autoSelectHomeSystem(() => {
+              this.tutorialService.autoOpenTutorial('galacticView');
+            });
+          }
+
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.loadError = 'Unable to load galaxy from server.';
+          this.cdr.markForCheck();
+        }
+      });
   }
 
   private syncScrollbars(): void {

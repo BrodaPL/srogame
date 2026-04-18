@@ -162,8 +162,14 @@
       </div>
 
       <div class="star-system-preview__actions" data-tutorial-id="galactic-note-action">
-        <button type="button" class="star-system-preview__button" disabled title="Coming in future session">
-          Send spy probes
+        <button
+          type="button"
+          class="star-system-preview__button"
+          [disabled]="!canOpenSpySolarSystemDialog()"
+          [attr.title]="spySolarSystemButtonTitle()"
+          (click)="openSpySolarSystemDialog()"
+        >
+          Spy solar system
         </button>
 
         @if (selectedStarSystemNote()) {
@@ -197,6 +203,10 @@
 
       @if (noteActionError) {
         <p class="form-error">{{ noteActionError }}</p>
+      }
+
+      @if (spySolarSystemNotice) {
+        <p class="overview-success">{{ spySolarSystemNotice }}</p>
       }
 
       @if (selectedSpecialInfoLabel(); as selectedSpecialInfo) {
@@ -255,6 +265,13 @@
     }
   </aside>
 </div>
+
+<app-spy-solar-system-dialog
+  [isOpen]="isSpySolarSystemDialogOpen"
+  [starSystem]="selectedSystem"
+  (closed)="closeSpySolarSystemDialog()"
+  (launched)="handleSpySolarSystemLaunched($event)"
+></app-spy-solar-system-dialog>
 
 @if (isNoteEditorOpen) {
   <div class="note-modal-backdrop" (click)="closeNoteEditor()"></div>

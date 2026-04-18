@@ -192,6 +192,16 @@
   font-size: 0.86rem;
 }
 
+.overview-success {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(93, 201, 126, 0.28);
+  background: rgba(31, 77, 48, 0.16);
+  color: #c7f3d3;
+  font-size: 0.85rem;
+}
+
 .star-system-preview__planets {
   display: grid;
   gap: 0.5rem;
