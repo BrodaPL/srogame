@@ -38,6 +38,10 @@
   font-family: var(--font-mono), serif;
 }
 
+.spy-launch-dialog__fleet-cap {
+  margin: 0.35rem 0 0;
+}
+
 .spy-launch-dialog__close {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);

@@ -6,6 +6,7 @@ import type { ClientCoordinates, ClientPlanetDto, CreateFleetMissionResponse, Pl
 import { PlanetType } from '../../../models/enums/planet-type';
 import { PlayerType } from '../../../models/enums/player-type';
 import { ShipType } from '../../../models/enums/ship-type';
+import { TechnologyType } from '../../../models/enums/technology-type';
 
 describe('SpyLaunchDialogComponent', () => {
   it('sorts eligible origin planets by distance to the target', () => {
@@ -15,7 +16,8 @@ describe('SpyLaunchDialogComponent', () => {
         createPlanet('Near', { x: 3, y: 3, z: 3 }, 1),
         createPlanet('No Probes', { x: 2, y: 2, z: 2 }, 0),
         createPlanet('Middle', { x: 5, y: 5, z: 5 }, 1)
-      ]))
+      ])),
+      getActiveFleets: vi.fn().mockReturnValue(of([]))
     };
     const component = new SpyLaunchDialogComponent(
       gameApi as never,
@@ -46,6 +48,7 @@ describe('SpyLaunchDialogComponent', () => {
         getOwnedPlanets: vi.fn().mockReturnValue(of([
           createPlanet('Origin', { x: 2, y: 2, z: 2 }, 3, 2, 1)
         ])),
+        getActiveFleets: vi.fn().mockReturnValue(of([])),
         createFleetMission
       } as never,
       createPlayerSessionService() as never,
@@ -80,6 +83,32 @@ describe('SpyLaunchDialogComponent', () => {
     );
     expect(launched).toHaveBeenCalledWith({ message: 'Spy launched.' });
     expect(closed).toHaveBeenCalled();
+  });
+
+  it('shows active fleet count against the maximum fleet cap', () => {
+    const component = new SpyLaunchDialogComponent(
+      {
+        getOwnedPlanets: vi.fn().mockReturnValue(of([
+          createPlanet('Origin', { x: 2, y: 2, z: 2 }, 2, 2, 0, 1)
+        ])),
+        getActiveFleets: vi.fn().mockReturnValue(of([
+          { fleetId: 1 },
+          { fleetId: 2 },
+          { fleetId: 3 }
+        ]))
+      } as never,
+      createPlayerSessionService() as never,
+      createChangeDetectorRef() as never,
+      createI18nService() as never
+    );
+
+    component.isOpen = true;
+    component.targetPlanet = createForeignPlanet('Target', { x: 7, y: 7, z: 7 });
+    component.ngOnChanges({
+      isOpen: createSimpleChange(false, true)
+    });
+
+    expect((component as { activeFleetCountLabel(): string }).activeFleetCountLabel()).toBe('3/4');
   });
 });
 
@@ -125,7 +154,8 @@ function createPlanet(
   coordinates: ClientCoordinates,
   totalProbes: number,
   undamagedProbes = totalProbes,
-  damagedProbes = Math.max(0, totalProbes - undamagedProbes)
+  damagedProbes = Math.max(0, totalProbes - undamagedProbes),
+  computerTechnologyLevel = 0
 ): ClientPlanetDto {
   return {
     coordinates,
@@ -172,7 +202,35 @@ function createPlanet(
       spaceDebris: { metal: 0, crystal: 0, deuterium: 0 },
       tradePortOffers: []
     },
-    reportData: null
+    reportData: {
+      resourcesAmount: { metal: 0, crystal: 0, deuterium: 0 },
+      averageTotalResources: 0,
+      averageBuildingLevel: 0,
+      averageTechLevel: 0,
+      totalDefencesAmount: 0,
+      totalShipsAmount: 0,
+      planetaryParameters: {
+        metalModifier: 100,
+        crystalModifier: 100,
+        deuteriumModifier: 100,
+        energyModifierRES: 100,
+        energyModifierNuclear: 100,
+        scienceModifier: 100,
+        industryModifier: 100,
+        anomaliesAndNoise: 0,
+        hyperspaceParameters: 100
+      },
+      defences: [],
+      ships: [],
+      buildingsLevels: [],
+      techLevels: computerTechnologyLevel > 0
+        ? [{ type: TechnologyType.COMPUTER_TECHNOLOGY, level: computerTechnologyLevel }]
+        : [],
+      shipyardProduction: null,
+      defencesProduction: null,
+      researchProduction: null,
+      buildingProduction: null
+    }
   };
 }
 

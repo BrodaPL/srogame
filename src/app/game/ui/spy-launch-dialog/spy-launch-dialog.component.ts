@@ -1,14 +1,16 @@
 import { ChangeDetectorRef, Component, EventEmitter, HostListener, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../../core/game-api.service';
 import { PlayerSessionService } from '../../../core/player-session.service';
 import { resolveApiErrorMessage } from '../../../i18n/api-message.utils';
 import { I18nService } from '../../../i18n/i18n.service';
 import { ShipType } from '../../../models/enums/ship-type';
+import { TechnologyType } from '../../../models/enums/technology-type';
 import type { ClientCoordinates, ClientPlanetDto, CreateFleetMissionRequest } from '../../../models/game-api-types';
 import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
 import { ManyShips } from '../../../models/fleets/many-ships';
+import { maxActiveFleets } from '../../../models/tech/technology-effects';
 
 type SpyLaunchOriginVm = {
   planet: ClientPlanetDto;
@@ -39,6 +41,8 @@ export class SpyLaunchDialogComponent implements OnChanges {
   protected eligibleOrigins: SpyLaunchOriginVm[] = [];
   protected selectedOriginCoordinates = '';
   protected probeAmount = 1;
+  protected activeFleetCount = 0;
+  protected maxActiveFleetCount = maxActiveFleets(0);
 
   constructor(
     private readonly gameApi: GameApiService,
@@ -95,6 +99,10 @@ export class SpyLaunchDialogComponent implements OnChanges {
       && !!this.selectedOrigin()
       && this.probeAmount >= 1
       && this.probeAmount <= this.selectedOriginMaxProbeAmount();
+  }
+
+  protected activeFleetCountLabel(): string {
+    return `${this.activeFleetCount}/${this.maxActiveFleetCount}`;
   }
 
   protected setSelectedOrigin(coordinatesLabel: string): void {
@@ -185,14 +193,21 @@ export class SpyLaunchDialogComponent implements OnChanges {
     this.eligibleOrigins = [];
     this.selectedOriginCoordinates = '';
     this.probeAmount = 1;
+    this.activeFleetCount = 0;
+    this.maxActiveFleetCount = maxActiveFleets(0);
 
-    this.gameApi.getOwnedPlanets(session.token)
+    forkJoin({
+      ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
+      activeFleets: this.gameApi.getActiveFleets(session.token)
+    })
       .pipe(finalize(() => {
         this.isLoading = false;
         this.changeDetectorRef.markForCheck();
       }))
       .subscribe({
-        next: (ownedPlanets) => {
+        next: ({ ownedPlanets, activeFleets }) => {
+          this.activeFleetCount = activeFleets.length;
+          this.maxActiveFleetCount = maxActiveFleets(this.techLevel(ownedPlanets, TechnologyType.COMPUTER_TECHNOLOGY));
           this.eligibleOrigins = ownedPlanets
             .map((planet) => this.buildEligibleOriginVm(planet, this.targetPlanet!.coordinates))
             .filter((entry): entry is SpyLaunchOriginVm => entry !== null)
@@ -213,6 +228,12 @@ export class SpyLaunchDialogComponent implements OnChanges {
           this.error = resolveApiErrorMessage(this.i18n, error, 'Unable to load spy launch origins.');
         }
       });
+  }
+
+  private techLevel(ownedPlanets: ClientPlanetDto[], technologyType: TechnologyType): number {
+    const techLevels = ownedPlanets[0]?.reportData?.techLevels ?? [];
+    const matchingEntry = techLevels.find((entry) => entry.type === technologyType);
+    return matchingEntry?.level ?? 0;
   }
 
   private buildEligibleOriginVm(

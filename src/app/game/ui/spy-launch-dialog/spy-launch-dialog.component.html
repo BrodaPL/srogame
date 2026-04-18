@@ -14,6 +14,11 @@
         <p class="spy-launch-dialog__subtitle">
           Target: {{ targetPlanet.basicInfo.name }} ({{ targetCoordinatesLabel() }})
         </p>
+        @if (!isLoading && eligibleOrigins.length > 0) {
+          <p class="spy-launch-dialog__fleet-cap overview-muted">
+            Active fleets {{ activeFleetCountLabel() }}
+          </p>
+        }
       </div>
       <button type="button" class="spy-launch-dialog__close" (click)="close()">Close</button>
     </div>
