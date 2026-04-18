@@ -203,6 +203,100 @@ describe('bot-turn-runner', () => {
     expect(bunkererBuildingFallback.floor).toBe(0);
   });
 
+  it('prioritizes a real energy recovery action on an underpowered economy planet', () => {
+    const system = new SolarSystem('PowerSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+    const planet = Planet.createStartingPlanet('PowerSys I', 1, system, 1);
+    system.planets[0] = planet;
+
+    const bot = new Player(
+      1,
+      'Bot-1',
+      [planet],
+      new Map(),
+      [],
+      PlayerType.BOT,
+      createTutorialReadState(true)
+    );
+
+    initializePlanet(planet, bot.playerId);
+    bot.botProfileId = 'BALANCED';
+    bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 3);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 3);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 3);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 3);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 1);
+    planet.rBDSFTQ.resources = new ResourcesPack(1200, 900, 300);
+
+    const galaxy = new Galaxy(
+      'Bot Test',
+      [bot],
+      [[system]],
+      12,
+      [],
+      1,
+      new Map(),
+      new Map([[bot.playerId, bot]]),
+      new Map(),
+      new Map([[bot.playerName, bot.playerId]])
+    );
+
+    runBotTurnPhase(galaxy);
+
+    const queuedBuildingType = planet.rBDSFTQ.buildingQueue[0]?.buildingType ?? null;
+    const queuedResearchType = planet.rBDSFTQ.currentResearchQueue?.technologyType ?? null;
+    expect(
+      queuedBuildingType === BuildingType.SOLAR_WIND_GEOTHERMAL
+      || queuedBuildingType === BuildingType.NUCLEAR_PLANT
+      || queuedBuildingType === BuildingType.FUSION_REACTOR
+      || queuedResearchType === TechnologyType.ENERGY_TECHNOLOGY
+    ).toBe(true);
+  });
+
+  it('does not queue a fusion reactor upgrade when the projected net deuterium would go negative', () => {
+    const system = new SolarSystem('FusionSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+    const planet = Planet.createStartingPlanet('FusionSys I', 1, system, 1);
+    system.planets[0] = planet;
+
+    const bot = new Player(
+      1,
+      'Bot-1',
+      [planet],
+      new Map(),
+      [],
+      PlayerType.BOT,
+      createTutorialReadState(true)
+    );
+
+    initializePlanet(planet, bot.playerId);
+    bot.botProfileId = 'BALANCED';
+    bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 4);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 1);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 2);
+    planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 4);
+    planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 1);
+    planet.setCurrentBuildingPowerConsumption(BuildingType.FUSION_REACTOR, 1);
+    planet.rBDSFTQ.resources = new ResourcesPack(1800, 1400, 400);
+
+    const galaxy = new Galaxy(
+      'Bot Test',
+      [bot],
+      [[system]],
+      18,
+      [],
+      1,
+      new Map(),
+      new Map([[bot.playerId, bot]]),
+      new Map(),
+      new Map([[bot.playerName, bot.playerId]])
+    );
+
+    runBotTurnPhase(galaxy);
+
+    expect(planet.rBDSFTQ.buildingQueue.some((entry) => entry.buildingType === BuildingType.FUSION_REACTOR)).toBe(false);
+  });
+
   it('launches a spy mission when nearby intel is stale and a probe is available', () => {
     const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
     homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 20);

@@ -11,6 +11,8 @@ import * as technologyTypeEnumModule from '../../../src/app/models/enums/technol
 import * as resourcesPackModule from '../../../src/app/models/resources-pack.js';
 import * as playerModule from '../../../src/app/models/player.js';
 import * as bombardmentPriorityModule from '../../../src/app/models/bombardment/bombardment-priority.js';
+import * as energyDeficitModule from '../../../src/app/models/planets/energy-deficit.js';
+import * as fusionReactorOperationModule from '../../../src/app/models/planets/fusion-reactor-operation.js';
 import type {
   ClientCoordinates,
   CreateFleetShipSelectionEntry,
@@ -96,6 +98,8 @@ const { TechnologyType } = resolveModule(technologyTypeEnumModule) as typeof imp
 const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
 const { defaultBotProfileIdForPlayerId } = resolveModule(playerModule) as typeof import('../../../src/app/models/player.js');
 const { BombardmentPriorityTarget } = resolveModule(bombardmentPriorityModule) as typeof import('../../../src/app/models/bombardment/bombardment-priority.js');
+const { energyDeficitEfficiencyMultiplier } = resolveModule(energyDeficitModule) as typeof import('../../../src/app/models/planets/energy-deficit.js');
+const { resolveFusionReactorOperation } = resolveModule(fusionReactorOperationModule) as typeof import('../../../src/app/models/planets/fusion-reactor-operation.js');
 
 type BuildingCandidate = {
   kind: 'building';
@@ -166,15 +170,67 @@ type BotTurnCounters = {
   move: number;
 };
 
+type BotEconomyStage = 'energy_recovery' | 'throughput' | 'infrastructure' | 'open';
+
+type BotPlanetEconomyState = {
+  stage: BotEconomyStage;
+  availableEnergy: number;
+  usedEnergy: number;
+  energyEfficiency: number;
+  targetAvailableEnergy: number;
+  energyGap: number;
+  avgMineLevel: number;
+  avgStorageLevel: number;
+  roboticsLevel: number;
+  shipyardLevel: number;
+  researchLabLevel: number;
+  naniteLevel: number;
+  targetMineLevel: number;
+};
+
+type BotEconomyTargets = {
+  mineLevel: number;
+  roboticsLevel: number;
+  researchLabLevel: number;
+  shipyardLevel: number;
+};
+
+type ResearchTargetDefinition = {
+  type: TechnologyTypeType;
+  targetLevel: number;
+};
+
+const TARGET_ENERGY_SURPLUS = 3;
+
+const BOT_ECONOMY_TARGETS: Record<BotProfile['id'], BotEconomyTargets> = {
+  BALANCED: { mineLevel: 6, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
+  AGGRESSOR: { mineLevel: 5, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
+  TURTLE: { mineLevel: 6, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
+  MINER: { mineLevel: 7, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
+  AVOIDER: { mineLevel: 7, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
+  BUNKERER: { mineLevel: 8, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 }
+};
+
+const FOUNDATIONAL_RESEARCH_TARGETS: ResearchTargetDefinition[] = [
+  { type: TechnologyType.ENERGY_TECHNOLOGY, targetLevel: 3 },
+  { type: TechnologyType.MATERIAL_TECHNOLOGY, targetLevel: 3 },
+  { type: TechnologyType.COMPUTER_TECHNOLOGY, targetLevel: 2 },
+  { type: TechnologyType.ADAPTIVE_TECHNOLOGY, targetLevel: 2 },
+  { type: TechnologyType.FUSION_DRIVE, targetLevel: 3 },
+  { type: TechnologyType.HYPERSPACE_DRIVE, targetLevel: 2 }
+];
+
 const BUILDING_PRIORITY_TYPES: BuildingTypeType[] = [
   BuildingType.METAL_MINE,
   BuildingType.CRYSTAL_MINE,
   BuildingType.DEUTERIUM_SYNTHESIZER,
   BuildingType.SOLAR_WIND_GEOTHERMAL,
   BuildingType.NUCLEAR_PLANT,
+  BuildingType.FUSION_REACTOR,
   BuildingType.ROBOTICS_FACTORY,
-  BuildingType.RESEARCH_LAB,
+  BuildingType.NANITE_FACTORY,
   BuildingType.SHIPYARD,
+  BuildingType.RESEARCH_LAB,
   BuildingType.METAL_STORAGE,
   BuildingType.CRYSTAL_STORAGE,
   BuildingType.DEUTERIUM_TANK,
@@ -187,7 +243,10 @@ const RESEARCH_PRIORITY_TYPES: TechnologyTypeType[] = [
   TechnologyType.ASTROPHYSICS_TECHNOLOGY,
   TechnologyType.COMPUTER_TECHNOLOGY,
   TechnologyType.ADAPTIVE_TECHNOLOGY,
-  TechnologyType.INTERGALACTIC_RESEARCH_NETWORK
+  TechnologyType.INTERGALACTIC_RESEARCH_NETWORK,
+  TechnologyType.FUSION_DRIVE,
+  TechnologyType.HYPERSPACE_DRIVE,
+  TechnologyType.HYPERSPACE_TECHNOLOGY
 ];
 
 const SHIPYARD_PRIORITY_TYPES: Array<{ type: ShipTypeType; amount: number }> = [
@@ -564,7 +623,12 @@ function resolveIncomingBotRequests(
       reason: shouldApprove ? 'Approved incoming Jump Gate request.' : 'Rejected risky incoming Jump Gate request.',
       expectedUtility: 0,
       goalType: null,
-      requestSummary: `Jump Gate request #${request.requestId} -> ${request.targetPlanetName}`
+      requestSummary: `Jump Gate request #${request.requestId} -> ${request.targetPlanetName}`,
+      details: {
+        requestId: request.requestId,
+        approved: shouldApprove,
+        targetCoordinates: `${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}`
+      }
     });
   }
 
@@ -597,7 +661,12 @@ function resolveIncomingBotRequests(
       reason: decision.reason,
       expectedUtility: 0,
       goalType: null,
-      requestSummary: `Maintenance request #${request.requestId} @ ${request.targetPlanetName}`
+      requestSummary: `Maintenance request #${request.requestId} @ ${request.targetPlanetName}`,
+      details: {
+        requestId: request.requestId,
+        approved: decision.approve,
+        targetCoordinates: `${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}`
+      }
     });
   }
 
@@ -631,7 +700,13 @@ function resolveIncomingBotRequests(
       reason: decision.reason,
       expectedUtility: Number.isFinite(decision.utility) ? decision.utility : 0,
       goalType: null,
-      requestSummary: `${proposal.requestedStatus} proposal #${proposal.proposalId} from player ${proposal.fromPlayerId}`
+      requestSummary: `${proposal.requestedStatus} proposal #${proposal.proposalId} from player ${proposal.fromPlayerId}`,
+      details: {
+        proposalId: proposal.proposalId,
+        approved: decision.approve,
+        requestedStatus: proposal.requestedStatus,
+        fromPlayerId: proposal.fromPlayerId
+      }
     });
   }
 }
@@ -683,7 +758,12 @@ function resolveOutgoingBotDiplomacyProposal(
     reason: candidate.reason,
     expectedUtility: candidate.utility,
     goalType: null,
-    requestSummary: `${candidate.requestedStatus} proposal -> player ${candidate.targetPlayerId}`
+    requestSummary: `${candidate.requestedStatus} proposal -> player ${candidate.targetPlayerId}`,
+    details: {
+      requestedStatus: candidate.requestedStatus,
+      targetPlayerId: candidate.targetPlayerId,
+      proposalId: result.value.proposal.proposalId
+    }
   });
 }
 
@@ -698,12 +778,13 @@ function buildBuildingCandidates(
   }
 
   const candidates: BotCandidate[] = [];
+  const spendableRatio = calculateSpendableResourceRatio(player, profile);
   for (const planet of player.planets) {
     if (planet.rBDSFTQ.buildingQueue.length >= calculateMaxBuildingQueueLength(planet, player)) {
       continue;
     }
 
-    const energyNeed = estimateEnergyNeed(planet);
+    const economyState = buildPlanetEconomyState(planet, player, profile);
     const storagePressure = estimateStoragePressure(planet);
 
     for (const buildingType of BUILDING_PRIORITY_TYPES) {
@@ -723,6 +804,15 @@ function buildBuildingCandidates(
       if (!hasTechnologyRequirements(player, building, nextLevel)) {
         continue;
       }
+      if (!isBuildingAllowedForEconomyStage(buildingType, economyState)) {
+        continue;
+      }
+      if (
+        buildingType === BuildingType.FUSION_REACTOR
+        && !isFusionReactorUpgradeDeuteriumSafe(planet, player, nextLevel)
+      ) {
+        continue;
+      }
 
       const request = coordinatesOfPlanet(planet, { buildingType });
       const key = candidateKey({ kind: 'building', utility: 0, reason: '', goalType: null, request });
@@ -734,8 +824,15 @@ function buildBuildingCandidates(
       if (!planet.rBDSFTQ.resources.isSufficient(cost)) {
         continue;
       }
+      if (
+        economyState.stage === 'open'
+        && isOptionalBuildingSpend(buildingType)
+        && !isCostWithinSpendableRatio(planet.rBDSFTQ.resources, cost, spendableRatio)
+      ) {
+        continue;
+      }
 
-      const base = estimateBuildingBaseScore(buildingType, planet, player, profile, energyNeed, storagePressure);
+      const base = estimateBuildingBaseScore(buildingType, planet, player, profile, economyState, storagePressure);
       const utility = scoreUtility(base, cost);
       candidates.push({
         kind: 'building',
@@ -766,6 +863,7 @@ function buildResearchCandidates(
 
   const candidates: BotCandidate[] = [];
   for (const planet of player.planets) {
+    const economyState = buildPlanetEconomyState(planet, player, profile);
     if (planet.getBuildingLevel(BuildingType.RESEARCH_LAB) <= 0) {
       continue;
     }
@@ -773,7 +871,9 @@ function buildResearchCandidates(
       continue;
     }
 
-    for (const technologyType of RESEARCH_PRIORITY_TYPES) {
+    const localThreeTurnIncomeBudget = calculateLocalThreeTurnResearchBudget(planet, player, economyState);
+    const orderedResearchTypes = buildOrderedResearchPriorityTypes(player, planet, profile, economyState, localThreeTurnIncomeBudget);
+    for (const technologyType of orderedResearchTypes) {
       const technology = TECHNOLOGY_BLUEPRINTS.get(technologyType);
       if (!technology) {
         continue;
@@ -793,6 +893,9 @@ function buildResearchCandidates(
       if (!hasResearchTechnologyRequirements(player, technology, nextLevel)) {
         continue;
       }
+      if (!isResearchAllowedForEconomyStage(technologyType, economyState)) {
+        continue;
+      }
 
       const request = coordinatesOfPlanet(planet, {
         technologyType,
@@ -808,7 +911,14 @@ function buildResearchCandidates(
         continue;
       }
 
-      const base = estimateResearchBaseScore(technologyType, profile, player);
+      const base = estimateResearchBaseScore(
+        technologyType,
+        profile,
+        player,
+        economyState,
+        localThreeTurnIncomeBudget,
+        cost
+      );
       const utility = scoreUtility(base, cost);
       candidates.push({
         kind: 'research',
@@ -834,8 +944,13 @@ function buildShipyardCandidates(
   }
 
   const currentShipCounts = countOwnedShipsByType(player);
+  const spendableRatio = calculateSpendableResourceRatio(player, profile);
   const candidates: BotCandidate[] = [];
   for (const planet of player.planets) {
+    const economyState = buildPlanetEconomyState(planet, player, profile);
+    if (economyState.stage === 'energy_recovery') {
+      continue;
+    }
     if (planet.getBuildingLevel(BuildingType.SHIPYARD) <= 0) {
       continue;
     }
@@ -872,12 +987,16 @@ function buildShipyardCandidates(
       if (!planet.rBDSFTQ.resources.isSufficient(totalCost)) {
         continue;
       }
+      if (!isCostWithinSpendableRatio(planet.rBDSFTQ.resources, totalCost, spendableRatio)) {
+        continue;
+      }
 
       const base = estimateShipyardBaseScore(
         shipEntry.type,
         currentShipCounts.get(shipEntry.type) ?? 0,
         player.planets.length,
-        profile
+        profile,
+        economyState
       );
       const utility = scoreUtility(base, totalCost);
       const goalType = shipEntry.type === ShipType.COLONIZER ? 'COLONIZE_NEARBY' : 'FORTIFY_BORDER';
@@ -2098,33 +2217,47 @@ function estimateBuildingBaseScore(
   planet: Planet,
   player: Player,
   profile: BotProfile,
-  energyNeed: number,
+  economyState: BotPlanetEconomyState,
   storagePressure: number
 ): number {
   const effectiveParameters = planet.getEffectivePlanetaryParameters();
+  const energyRecoveryBonus = 18 + (economyState.energyGap * 3.5);
+  const throughputBonus = 10 + Math.max(0, economyState.targetMineLevel - economyState.avgMineLevel);
+  const infrastructureBonus = 8;
 
   switch (buildingType) {
     case BuildingType.METAL_MINE:
-      return 16 * effectiveParameters.metalModifier * profile.economyWeight;
+      return (16 * effectiveParameters.metalModifier * profile.economyWeight)
+        + (economyState.stage === 'throughput' ? throughputBonus : 0);
     case BuildingType.CRYSTAL_MINE:
-      return 15 * effectiveParameters.crystalModifier * profile.economyWeight;
+      return (15 * effectiveParameters.crystalModifier * profile.economyWeight)
+        + (economyState.stage === 'throughput' ? throughputBonus : 0);
     case BuildingType.DEUTERIUM_SYNTHESIZER:
-      return 14 * effectiveParameters.deuteriumModifier * profile.economyWeight;
+      return (14 * effectiveParameters.deuteriumModifier * profile.economyWeight)
+        + (economyState.stage === 'throughput' ? throughputBonus : 0);
     case BuildingType.SOLAR_WIND_GEOTHERMAL:
-      return 6 + (18 * energyNeed);
+      return 8 + (economyState.stage === 'energy_recovery' ? energyRecoveryBonus : 0);
     case BuildingType.NUCLEAR_PLANT:
-      return 4 + (14 * energyNeed);
+      return 7 + (economyState.stage === 'energy_recovery' ? energyRecoveryBonus - 1 : 0);
+    case BuildingType.FUSION_REACTOR:
+      return 6 + (economyState.stage === 'energy_recovery' ? energyRecoveryBonus - 2 : 0);
     case BuildingType.ROBOTICS_FACTORY:
-      return 9 * profile.economyWeight;
+      return (10 * profile.economyWeight)
+        + (economyState.stage === 'throughput' ? throughputBonus + 4 : 0);
+    case BuildingType.NANITE_FACTORY:
+      return (12 * profile.economyWeight)
+        + (economyState.stage === 'throughput' ? throughputBonus + 6 : 0);
     case BuildingType.RESEARCH_LAB:
-      return 8 * profile.economyWeight
-        + (player.planets.some((entry) => entry.getBuildingLevel(BuildingType.RESEARCH_LAB) > 0) ? 0 : 4);
+      return (8 * profile.economyWeight)
+        + (player.planets.some((entry) => entry.getBuildingLevel(BuildingType.RESEARCH_LAB) > 0) ? 0 : 4)
+        + (economyState.stage === 'infrastructure' ? infrastructureBonus : 0);
     case BuildingType.SHIPYARD:
-      return 6 + (profile.militaryWeight * 4);
+      return (4 + (profile.militaryWeight * 3))
+        + (economyState.stage === 'throughput' ? throughputBonus - 2 : 0);
     case BuildingType.METAL_STORAGE:
     case BuildingType.CRYSTAL_STORAGE:
     case BuildingType.DEUTERIUM_TANK:
-      return 2 + (10 * storagePressure);
+      return 2 + (10 * storagePressure) + (economyState.stage === 'infrastructure' ? infrastructureBonus : 0);
     case BuildingType.BUNKER_NETWORK:
       return 3 + (6 * profile.defenseWeight);
     default:
@@ -2135,23 +2268,39 @@ function estimateBuildingBaseScore(
 function estimateResearchBaseScore(
   technologyType: TechnologyTypeType,
   profile: BotProfile,
-  player: Player
+  player: Player,
+  economyState: BotPlanetEconomyState,
+  localThreeTurnIncomeBudget: number,
+  cost: ResourcesPackType
 ): number {
+  const cheapResearchBonus = estimateResourceValue(cost) <= localThreeTurnIncomeBudget ? 10 : 0;
   switch (technologyType) {
     case TechnologyType.ADAPTIVE_TECHNOLOGY:
-      return 18 * profile.economyWeight;
+      return (18 * profile.economyWeight) + (economyState.stage === 'infrastructure' ? 7 : 0) + cheapResearchBonus;
     case TechnologyType.COMPUTER_TECHNOLOGY:
-      return 15 * Math.max(profile.economyWeight, profile.militaryWeight);
+      return (15 * Math.max(profile.economyWeight, profile.militaryWeight))
+        + (economyState.stage === 'infrastructure' ? 8 : 0)
+        + cheapResearchBonus;
     case TechnologyType.ASTROPHYSICS_TECHNOLOGY:
-      return 12 * profile.colonizeWeight;
+      return (12 * profile.colonizeWeight) + cheapResearchBonus;
     case TechnologyType.ENERGY_TECHNOLOGY:
-      return 11 * profile.economyWeight;
+      return (11 * profile.economyWeight)
+        + (economyState.stage === 'energy_recovery' ? 20 + (economyState.energyGap * 3.25) : 0)
+        + cheapResearchBonus;
     case TechnologyType.MATERIAL_TECHNOLOGY:
-      return 9 * Math.max(profile.economyWeight, profile.defenseWeight);
+      return (9 * Math.max(profile.economyWeight, profile.defenseWeight))
+        + (economyState.stage === 'infrastructure' ? 6 : 0)
+        + cheapResearchBonus;
     case TechnologyType.INTERGALACTIC_RESEARCH_NETWORK:
-      return calculateMaxLabsPerTechnology(player) > 1 ? 10 * profile.economyWeight : 5;
+      return (calculateMaxLabsPerTechnology(player) > 1 ? 10 * profile.economyWeight : 5)
+        + (economyState.stage === 'infrastructure' ? 4 : 0)
+        + cheapResearchBonus;
+    case TechnologyType.FUSION_DRIVE:
+    case TechnologyType.HYPERSPACE_DRIVE:
+    case TechnologyType.HYPERSPACE_TECHNOLOGY:
+      return (14 * Math.max(profile.economyWeight, profile.militaryWeight)) + cheapResearchBonus;
     default:
-      return 4;
+      return 4 + cheapResearchBonus;
   }
 }
 
@@ -2159,34 +2308,26 @@ function estimateShipyardBaseScore(
   shipType: ShipTypeType,
   existingAmount: number,
   ownedPlanetCount: number,
-  profile: BotProfile
+  profile: BotProfile,
+  economyState: BotPlanetEconomyState
 ): number {
+  const stagePenalty = economyState.stage === 'throughput' ? 1.5 : 0;
   switch (shipType) {
     case ShipType.SPY_PROBE:
-      return existingAmount <= 0 ? 12 * profile.spyWeight : 5 * profile.spyWeight;
+      return (existingAmount <= 0 ? 12 * profile.spyWeight : 5 * profile.spyWeight) - stagePenalty;
     case ShipType.TRANSPORTER:
-      return existingAmount <= 0 ? 11 * profile.economyWeight : 6 * profile.economyWeight;
+      return (existingAmount <= 0 ? 11 * profile.economyWeight : 6 * profile.economyWeight) - stagePenalty;
     case ShipType.FIGHTER:
       return existingAmount <= 0
-        ? 9 * Math.max(profile.militaryWeight, profile.defenseWeight)
-        : 5 * profile.militaryWeight;
+        ? (9 * Math.max(profile.militaryWeight, profile.defenseWeight)) - stagePenalty
+        : (5 * profile.militaryWeight) - stagePenalty;
     case ShipType.COLONIZER:
       return existingAmount <= 0
-        ? (10 * profile.colonizeWeight) + Math.max(0, 4 - ownedPlanetCount)
-        : 4 * profile.colonizeWeight;
+        ? ((10 * profile.colonizeWeight) + Math.max(0, 4 - ownedPlanetCount)) - stagePenalty
+        : (4 * profile.colonizeWeight) - stagePenalty;
     default:
       return 3;
   }
-}
-
-function estimateEnergyNeed(planet: Planet): number {
-  const utilization = [
-    planet.getBuildingPowerUtilization(BuildingType.METAL_MINE),
-    planet.getBuildingPowerUtilization(BuildingType.CRYSTAL_MINE),
-    planet.getBuildingPowerUtilization(BuildingType.DEUTERIUM_SYNTHESIZER)
-  ];
-  const average = utilization.reduce((sum, value) => sum + value, 0) / utilization.length;
-  return Math.max(0, 1 - average);
 }
 
 function estimateStoragePressure(planet: Planet): number {
@@ -2204,6 +2345,375 @@ function estimateStoragePressure(planet: Planet): number {
     capacity > 0 ? Math.min(1, resources[index] / capacity) : 0
   );
   return Math.max(...ratios, 0);
+}
+
+function buildPlanetEconomyState(planet: Planet, player: Player, profile: BotProfile): BotPlanetEconomyState {
+  const targets = BOT_ECONOMY_TARGETS[profile.id];
+  const adaptiveTechnologyLevel = player.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+  const energyTechnologyLevel = player.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY);
+  const fusionOperation = planet.resolveFusionReactorOperation(adaptiveTechnologyLevel, energyTechnologyLevel);
+  const solarProduction = planet.getBuildingProductionValue1(BuildingType.SOLAR_WIND_GEOTHERMAL);
+  const nuclearProduction = planet.getBuildingProductionValue1(BuildingType.NUCLEAR_PLANT);
+  const parameters = planet.info.planetaryParameters;
+  const availableEnergy = (
+    (solarProduction * parameters.energyModifierRES)
+    + (nuclearProduction * parameters.energyModifierNuclear)
+    + fusionOperation.powerOutput
+  ) * (1 + ((energyTechnologyLevel * 2) / 100));
+  let usedEnergy = 0;
+  for (const buildingType of BUILDING_PRIORITY_TYPES) {
+    usedEnergy += planet.getCurrentBuildingPowerConsumption(buildingType);
+  }
+
+  const avgMineLevel = averageBuildingLevels(planet, [
+    BuildingType.METAL_MINE,
+    BuildingType.CRYSTAL_MINE,
+    BuildingType.DEUTERIUM_SYNTHESIZER
+  ]);
+  const avgStorageLevel = averageBuildingLevels(planet, [
+    BuildingType.METAL_STORAGE,
+    BuildingType.CRYSTAL_STORAGE,
+    BuildingType.DEUTERIUM_TANK
+  ]);
+  const roboticsLevel = planet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY);
+  const shipyardLevel = planet.getBuildingLevel(BuildingType.SHIPYARD);
+  const researchLabLevel = planet.getBuildingLevel(BuildingType.RESEARCH_LAB);
+  const naniteLevel = planet.getBuildingLevel(BuildingType.NANITE_FACTORY);
+  const targetAvailableEnergy = usedEnergy + TARGET_ENERGY_SURPLUS;
+  const energyGap = Math.max(0, targetAvailableEnergy - availableEnergy);
+  let stage: BotEconomyStage = 'open';
+  if (availableEnergy < targetAvailableEnergy || energyDeficitEfficiencyMultiplier(availableEnergy, usedEnergy) < 1) {
+    stage = 'energy_recovery';
+  } else if (
+    avgMineLevel < targets.mineLevel
+    || roboticsLevel < targets.roboticsLevel
+    || shipyardLevel < targets.shipyardLevel
+  ) {
+    stage = 'throughput';
+  } else if (
+    avgStorageLevel < Math.max(4, Math.floor(avgMineLevel / 2))
+    || researchLabLevel < targets.researchLabLevel
+  ) {
+    stage = 'infrastructure';
+  }
+
+  return {
+    stage,
+    availableEnergy,
+    usedEnergy,
+    energyEfficiency: energyDeficitEfficiencyMultiplier(availableEnergy, usedEnergy),
+    targetAvailableEnergy,
+    energyGap,
+    avgMineLevel,
+    avgStorageLevel,
+    roboticsLevel,
+    shipyardLevel,
+    researchLabLevel,
+    naniteLevel,
+    targetMineLevel: targets.mineLevel
+  };
+}
+
+function averageBuildingLevels(planet: Planet, buildingTypes: BuildingTypeType[]): number {
+  if (buildingTypes.length <= 0) {
+    return 0;
+  }
+
+  const total = buildingTypes.reduce((sum, buildingType) => sum + planet.getBuildingLevel(buildingType), 0);
+  return total / buildingTypes.length;
+}
+
+function isBuildingAllowedForEconomyStage(
+  buildingType: BuildingTypeType,
+  economyState: BotPlanetEconomyState
+): boolean {
+  if (economyState.stage === 'energy_recovery') {
+    return (
+      buildingType === BuildingType.SOLAR_WIND_GEOTHERMAL
+      || buildingType === BuildingType.NUCLEAR_PLANT
+      || buildingType === BuildingType.FUSION_REACTOR
+    );
+  }
+
+  if (economyState.stage === 'throughput') {
+    return (
+      buildingType === BuildingType.METAL_MINE
+      || buildingType === BuildingType.CRYSTAL_MINE
+      || buildingType === BuildingType.DEUTERIUM_SYNTHESIZER
+      || buildingType === BuildingType.ROBOTICS_FACTORY
+      || buildingType === BuildingType.NANITE_FACTORY
+      || buildingType === BuildingType.SHIPYARD
+    );
+  }
+
+  if (economyState.stage === 'infrastructure') {
+    return (
+      buildingType === BuildingType.METAL_STORAGE
+      || buildingType === BuildingType.CRYSTAL_STORAGE
+      || buildingType === BuildingType.DEUTERIUM_TANK
+      || buildingType === BuildingType.RESEARCH_LAB
+      || buildingType === BuildingType.BUNKER_NETWORK
+    );
+  }
+
+  return true;
+}
+
+function isResearchAllowedForEconomyStage(
+  technologyType: TechnologyTypeType,
+  economyState: BotPlanetEconomyState
+): boolean {
+  if (economyState.stage === 'energy_recovery') {
+    return technologyType === TechnologyType.ENERGY_TECHNOLOGY;
+  }
+
+  if (economyState.stage === 'throughput') {
+    return false;
+  }
+
+  if (economyState.stage === 'infrastructure') {
+    return (
+      technologyType === TechnologyType.COMPUTER_TECHNOLOGY
+      || technologyType === TechnologyType.MATERIAL_TECHNOLOGY
+      || technologyType === TechnologyType.ADAPTIVE_TECHNOLOGY
+      || technologyType === TechnologyType.INTERGALACTIC_RESEARCH_NETWORK
+    );
+  }
+
+  return true;
+}
+
+function calculateSpendableResourceRatio(player: Player, profile: BotProfile): number {
+  const avgMineLevel = player.planets.length <= 0
+    ? 0
+    : player.planets.reduce((sum, planet) => (
+      sum + averageBuildingLevels(planet, [
+        BuildingType.METAL_MINE,
+        BuildingType.CRYSTAL_MINE,
+        BuildingType.DEUTERIUM_SYNTHESIZER
+      ])
+    ), 0) / player.planets.length;
+
+  const baseRatioByProfile: Record<BotProfile['id'], number> = {
+    BALANCED: 0.05,
+    AGGRESSOR: 0.08,
+    TURTLE: 0.05,
+    MINER: 0.04,
+    AVOIDER: 0.05,
+    BUNKERER: 0.05
+  };
+  const perLevelRatioByProfile: Record<BotProfile['id'], number> = {
+    BALANCED: 0.04,
+    AGGRESSOR: 0.05,
+    TURTLE: 0.03,
+    MINER: 0.03,
+    AVOIDER: 0.035,
+    BUNKERER: 0.03
+  };
+
+  let ratio = baseRatioByProfile[profile.id] + (avgMineLevel * perLevelRatioByProfile[profile.id]);
+  if (player.planets.length >= 2) {
+    ratio += 0.05;
+  }
+
+  switch (player.botMemory?.currentGoal ?? null) {
+    case 'PREPARE_SAFE_ATTACK':
+    case 'FORTIFY_BORDER':
+      ratio += 0.12;
+      break;
+    case 'COLONIZE_NEARBY':
+      ratio += 0.08;
+      break;
+    case 'REFRESH_INTEL':
+      ratio += 0.03;
+      break;
+    case 'KEY_BUILDING_UP':
+    case 'ECONOMY_TECH_UP':
+      ratio -= 0.04;
+      break;
+    default:
+      break;
+  }
+
+  return Math.min(0.75, Math.max(baseRatioByProfile[profile.id], ratio));
+}
+
+function calculateLocalThreeTurnResearchBudget(
+  planet: Planet,
+  player: Player,
+  economyState: BotPlanetEconomyState
+): number {
+  const adaptiveTechnologyLevel = player.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+  const metalIncome = Math.max(0, Math.floor(planet.getMetalGain(adaptiveTechnologyLevel) * economyState.energyEfficiency));
+  const crystalIncome = Math.max(0, Math.floor(planet.getCrystalGain(adaptiveTechnologyLevel) * economyState.energyEfficiency));
+  const deuteriumIncome = Math.max(0, Math.floor(planet.getDeuteriumGain(adaptiveTechnologyLevel)));
+  return estimateResourceValue(new ResourcesPack(metalIncome * 3, crystalIncome * 3, deuteriumIncome * 3));
+}
+
+function buildOrderedResearchPriorityTypes(
+  player: Player,
+  planet: Planet,
+  profile: BotProfile,
+  economyState: BotPlanetEconomyState,
+  localThreeTurnIncomeBudget: number
+): TechnologyTypeType[] {
+  const orderedTypes: TechnologyTypeType[] = [];
+  const seenTypes = new Set<TechnologyTypeType>();
+
+  for (const target of FOUNDATIONAL_RESEARCH_TARGETS) {
+    const nextType = resolveNextResearchGoalType(player, target.type, target.targetLevel);
+    if (!nextType || seenTypes.has(nextType)) {
+      continue;
+    }
+
+    const technology = TECHNOLOGY_BLUEPRINTS.get(nextType);
+    if (!technology) {
+      continue;
+    }
+    const nextLevel = player.getTechLevel(nextType) + 1;
+    if (!hasResearchBuildingRequirements(planet, technology, nextLevel)) {
+      continue;
+    }
+
+    orderedTypes.push(nextType);
+    seenTypes.add(nextType);
+  }
+
+  for (const technologyType of RESEARCH_PRIORITY_TYPES) {
+    if (seenTypes.has(technologyType)) {
+      continue;
+    }
+    orderedTypes.push(technologyType);
+    seenTypes.add(technologyType);
+  }
+
+  for (const [technologyType, technology] of TECHNOLOGY_BLUEPRINTS.techByType.entries()) {
+    if (seenTypes.has(technologyType)) {
+      continue;
+    }
+
+    const nextLevel = player.getTechLevel(technologyType) + 1;
+    if (!hasResearchBuildingRequirements(planet, technology, nextLevel)) {
+      continue;
+    }
+    if (!hasResearchTechnologyRequirements(player, technology, nextLevel)) {
+      continue;
+    }
+
+    const cost = technology.getCostForLevel(nextLevel);
+    if (estimateResourceValue(cost) > localThreeTurnIncomeBudget) {
+      continue;
+    }
+
+    orderedTypes.push(technologyType);
+    seenTypes.add(technologyType);
+  }
+
+  return orderedTypes;
+}
+
+function resolveNextResearchGoalType(
+  player: Player,
+  technologyType: TechnologyTypeType,
+  targetLevel: number,
+  visitedTypes = new Set<TechnologyTypeType>()
+): TechnologyTypeType | null {
+  if (visitedTypes.has(technologyType)) {
+    return null;
+  }
+  visitedTypes.add(technologyType);
+
+  const currentLevel = player.getTechLevel(technologyType);
+  if (currentLevel >= targetLevel) {
+    return null;
+  }
+
+  const technology = TECHNOLOGY_BLUEPRINTS.get(technologyType);
+  if (!technology) {
+    return null;
+  }
+
+  const nextLevel = currentLevel + 1;
+  for (const requirement of technology.techRequirements) {
+    const requiredLevel = Math.ceil(nextLevel * requirement.level);
+    const prerequisiteType = requirement.tech as TechnologyTypeType;
+    if (player.getTechLevel(prerequisiteType) >= requiredLevel) {
+      continue;
+    }
+
+    const prerequisiteNext = resolveNextResearchGoalType(player, prerequisiteType, requiredLevel, visitedTypes);
+    if (prerequisiteNext) {
+      return prerequisiteNext;
+    }
+  }
+
+  return technologyType;
+}
+
+function isCostWithinSpendableRatio(
+  resources: ResourcesPackType,
+  cost: ResourcesPackType,
+  spendableRatio: number
+): boolean {
+  const ratio = Math.max(0, Math.min(1, spendableRatio));
+  return (
+    cost.metal <= Math.floor(resources.metal * ratio)
+    && cost.crystal <= Math.floor(resources.crystal * ratio)
+    && cost.deuterium <= Math.floor(resources.deuterium * ratio)
+  );
+}
+
+function isOptionalBuildingSpend(buildingType: BuildingTypeType): boolean {
+  return (
+    buildingType === BuildingType.BUNKER_NETWORK
+    || buildingType === BuildingType.NANITE_FACTORY
+    || buildingType === BuildingType.SHIPYARD
+  );
+}
+
+function isFusionReactorUpgradeDeuteriumSafe(
+  planet: Planet,
+  player: Player,
+  nextLevel: number
+): boolean {
+  const fusionBlueprint = BUILDING_BLUEPRINTS.get(BuildingType.FUSION_REACTOR);
+  if (!fusionBlueprint || nextLevel <= 0) {
+    return false;
+  }
+
+  let otherEnergyUsed = 0;
+  for (const [buildingType, level] of planet.rBDSFTQ.buildingsLevels.entries()) {
+    if (buildingType === BuildingType.FUSION_REACTOR || level <= 0) {
+      continue;
+    }
+
+    otherEnergyUsed += planet.getCurrentBuildingPowerConsumption(buildingType);
+  }
+
+  const projected = resolveFusionReactorOperation({
+    selectedStage: nextLevel,
+    maxStage: nextLevel,
+    structuralUtilization: 1,
+    energyTechnologyLevel: player.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY),
+    adaptiveTechnologyLevel: player.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
+    solarProduction: planet.getBuildingProductionValue1(BuildingType.SOLAR_WIND_GEOTHERMAL),
+    nuclearProduction: planet.getBuildingProductionValue1(BuildingType.NUCLEAR_PLANT),
+    otherEnergyUsed,
+    energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
+    energyModifierNuclear: planet.info.planetaryParameters.energyModifierNuclear,
+    deuteriumSynthesizerProduction: planet.getBuildingProductionValue1(BuildingType.DEUTERIUM_SYNTHESIZER),
+    deuteriumModifier: planet.getEffectivePlanetaryParameters().deuteriumModifier,
+    fusionPowerAtStage: (stage) => {
+      const value = fusionBlueprint.production1[stage - 1] ?? 0;
+      return Number.isFinite(value) ? value : 0;
+    },
+    fusionDeuteriumAtStage: (stage) => {
+      const value = fusionBlueprint.production2[stage - 1] ?? 0;
+      return Number.isFinite(value) ? value : 0;
+    }
+  });
+
+  return projected.effectiveStage === nextLevel && !projected.isClamped && projected.netDeuteriumIncome >= 0;
 }
 
 function estimateSpyTargetInterest(
