@@ -7703,25 +7703,20 @@ function buildDiplomacyContactDtos(galaxy: Galaxy, viewer: Player): DiplomacyCon
   const outgoingProposalSentThisTurn = hasOutgoingProposalSentThisTurn(galaxy, viewer.playerId, galaxy.currentTurn);
 
   return galaxy.players
-    .filter((candidate) => candidate.playerId !== viewer.playerId)
+    .filter((candidate) => candidate.playerId !== viewer.playerId && candidate.type !== PLAYER_TYPE_NEUTRAL)
     .map((candidate) => {
       const currentStatus = diplomacyResolver.getStatus(viewer.playerId, candidate.playerId);
-      const availableStatuses = candidate.type !== PLAYER_TYPE_NEUTRAL
-        ? allowedDiplomaticProposalStatuses(currentStatus)
-        : [];
+      const availableStatuses = allowedDiplomaticProposalStatuses(currentStatus);
       const pendingPairProposal = galaxy.diplomaticProposals.some((proposal) =>
         isPendingDiplomaticProposalForPair(proposal, viewer.playerId, candidate.playerId)
       );
-      const isReadOnly = candidate.type === 'NEUTRAL' || availableStatuses.length <= 0;
-      const canSendProposal = candidate.type !== 'NEUTRAL'
-        && availableStatuses.length > 0
+      const isReadOnly = availableStatuses.length <= 0;
+      const canSendProposal = availableStatuses.length > 0
         && !pendingPairProposal
         && !outgoingProposalSentThisTurn;
 
       let proposalBlockedReason: string | null = null;
-      if (candidate.type === 'NEUTRAL') {
-        proposalBlockedReason = 'Neutral factions do not participate in treaty proposals.';
-      } else if (availableStatuses.length <= 0) {
+      if (availableStatuses.length <= 0) {
         proposalBlockedReason = 'No diplomacy proposal is available from the current diplomacy status.';
       } else if (pendingPairProposal) {
         proposalBlockedReason = 'A diplomacy proposal for this player pair is already pending.';

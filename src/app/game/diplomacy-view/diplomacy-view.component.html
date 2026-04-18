@@ -55,23 +55,15 @@
         <div class="diplomacy-view__panel-head">
           <div>
             <h3>Discovered Contacts</h3>
-            <p class="overview-muted">Only players with active espionage intel on at least one owned planet appear here.</p>
+            <p class="overview-muted">Only human and bot powers appear here. Neutral resource factions are excluded from diplomacy.</p>
           </div>
           <span class="badge" [class.badge--jump]="outgoingProposalSentThisTurn">
             {{ outgoingProposalSentThisTurn ? 'Proposal used this turn' : 'Proposal available' }}
           </span>
         </div>
-        <label class="diplomacy-view__filter-toggle">
-          <input
-            type="checkbox"
-            [ngModel]="filterOutNeutral"
-            (ngModelChange)="onFilterOutNeutralChange(!!$event)"
-          />
-          <span>Filter out neutral</span>
-        </label>
 
         @if (visibleContacts().length === 0) {
-          <p class="overview-muted">No discovered diplomatic contacts yet.</p>
+          <p class="overview-muted">No human or bot diplomatic contacts are available yet.</p>
         } @else {
           <div class="diplomacy-view__contact-list">
             @for (contact of visibleContacts(); track contact.playerId) {

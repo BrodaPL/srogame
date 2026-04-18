@@ -12,7 +12,6 @@ import {
 } from '../../models/game-api-types';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { allowedDiplomaticProposalStatuses } from '../../models/diplomacy/diplomatic-proposal-rules';
-import { PlayerType } from '../../models/enums/player-type';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
@@ -25,9 +24,6 @@ import { MessageComposeDialogComponent } from '../ui/message-compose-dialog/mess
   styleUrl: './diplomacy-view.component.css'
 })
 export class DiplomacyViewComponent implements OnInit {
-  protected readonly playerType = PlayerType;
-  protected filterOutNeutral = true;
-
   protected isLoading = false;
   protected loadError: string | null = null;
   protected actionError: string | null = null;
@@ -61,15 +57,11 @@ export class DiplomacyViewComponent implements OnInit {
       return null;
     }
 
-    return this.visibleContacts().find((contact) => contact.playerId === this.selectedPlayerId) ?? null;
+    return this.contacts.find((contact) => contact.playerId === this.selectedPlayerId) ?? null;
   }
 
   protected visibleContacts(): DiplomacyContactDto[] {
-    if (!this.filterOutNeutral) {
-      return this.contacts;
-    }
-
-    return this.contacts.filter((contact) => contact.currentStatus !== DiplomaticStatus.NEUTRAL);
+    return this.contacts;
   }
 
   protected visibleContactCount(): number {
@@ -83,11 +75,6 @@ export class DiplomacyViewComponent implements OnInit {
   protected selectContact(contact: DiplomacyContactDto): void {
     this.selectedPlayerId = contact.playerId;
     this.actionSuccess = null;
-  }
-
-  protected onFilterOutNeutralChange(value: boolean): void {
-    this.filterOutNeutral = value;
-    this.ensureVisibleSelection();
   }
 
   protected selectedProposalStatus(contact: DiplomacyContactDto): DiplomaticStatus {

@@ -487,6 +487,48 @@ describe.sequential('auth api', () => {
     expect(spyResponse.json?.message).toContain(`${originCoordinates?.x}:${originCoordinates?.y}`);
   });
 
+  it('excludes neutral players from diplomacy view contacts while still showing bot contacts', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'DiplomacyAdmin',
+      email: 'diplomacy-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.70');
+    activateAccount('DiplomacyAdmin', { localAdmin: true });
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'DiplomacyAdmin',
+      password: 'secret-123'
+    }, '10.0.0.70');
+    expect(loginResponse.status).toBe(200);
+    const token = loginResponse.json?.token as string;
+
+    const startResponse = await request('POST', '/api/game/start', {
+      setup: {
+        ...createSingleplayerSetup('Diplomacy Contact Sector'),
+        botsAmount: 1,
+        botProfileCounts: {
+          TURTLE: 0,
+          BALANCED: 1,
+          RUSHER: 0,
+          RECYCLER: 0,
+          TECHNOLOGIST: 0
+        },
+        neutralBotsAmount: 1
+      }
+    }, '10.0.0.70', token);
+    expect(startResponse.status).toBe(200);
+
+    const diplomacyResponse = await request('GET', '/api/game/diplomacy-view', undefined, '10.0.0.70', token);
+    expect(diplomacyResponse.status).toBe(200);
+    const contacts = Array.isArray(diplomacyResponse.json?.contacts)
+      ? diplomacyResponse.json.contacts as Array<Record<string, unknown>>
+      : [];
+
+    expect(contacts.length).toBeGreaterThan(0);
+    expect(contacts.some((contact) => contact.playerType === 'BOT')).toBe(true);
+    expect(contacts.some((contact) => contact.playerType === 'NEUTRAL')).toBe(false);
+  });
+
   it('closes the current loaded single-player game, saves it, and clears the current game pointer', async () => {
     await request('POST', '/api/auth/register', {
       playerName: 'SingleplayerAdmin',
