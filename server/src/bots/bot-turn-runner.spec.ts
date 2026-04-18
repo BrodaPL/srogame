@@ -22,6 +22,7 @@ import { createMaintenanceRequest } from '../../../src/app/models/requests/maint
 import { ResourcesPack } from '../../../src/app/models/resources-pack.js';
 import { BuildingType } from '../../../src/app/models/enums/building-type.js';
 import { DefenceType } from '../../../src/app/models/enums/defence-type.js';
+import { PlanetType } from '../../../src/app/models/enums/planet-type.js';
 import { ShipType } from '../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../src/app/models/enums/technology-type.js';
 import { createTutorialReadState } from '../../../src/app/tutorial/tutorial-types.js';
@@ -317,6 +318,38 @@ describe('bot-turn-runner', () => {
     runBotTurnPhase(galaxy);
 
     expect(galaxy.activeFleets.some((fleet) => fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.SPY)).toBe(true);
+  });
+
+  it('uses star-system espionage when an entire nearby system has no intel at all', () => {
+    const { galaxy, bot } = createStarSystemSpyBotGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    expect(galaxy.activeFleets.filter((fleet) =>
+      fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.SPY
+    )).toHaveLength(2);
+    const traces = getBotDecisionTraces(bot.playerId);
+    expect(traces[0]?.chosenActions.some((entry) => entry.kind === 'system_spy')).toBe(true);
+  });
+
+  it('does not use star-system espionage when the system already contains fresh intel on one target', () => {
+    const { galaxy, bot, enemyPlanet, enemyOwner } = createStarSystemSpyBotGalaxy();
+    enemyPlanet.lastReportData.set(
+      bot.playerId,
+      new EspionageReportGenerator().createEspionageReport(bot, enemyOwner, enemyPlanet, 4, {
+        forcedReportLevel: 12,
+        createdTurn: galaxy.currentTurn
+      })
+    );
+
+    runBotTurnPhase(galaxy);
+
+    expect(galaxy.activeFleets.filter((fleet) =>
+      fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.SPY
+    )).toHaveLength(1);
+    const traces = getBotDecisionTraces(bot.playerId);
+    expect(traces[0]?.chosenActions.some((entry) => entry.kind === 'system_spy')).toBe(false);
+    expect(traces[0]?.chosenActions.some((entry) => entry.kind === 'spy')).toBe(true);
   });
 
   it('launches a colonize mission when a nearby colonizable planet and colonizer are available', () => {
@@ -1391,6 +1424,59 @@ function createPassiveAndNeutralFarmGalaxy(): {
   );
 
   return { galaxy, bot, passivePlanet };
+}
+
+function createStarSystemSpyBotGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  enemyPlanet: Planet;
+  enemyOwner: Player;
+} {
+  const system = new SolarSystem('SpySweep', 4, false, false, { x: 2, y: 3 }, new Set(), new Map());
+  const [homePlanet, enemyPlanet, asteroidField, neutralPlanet] = system.planets;
+
+  homePlanet.basicInfo.name = 'SpySweep I';
+  homePlanet.info.ownerId = 1;
+  enemyPlanet.basicInfo.name = 'SpySweep II';
+  enemyPlanet.info.ownerId = 2;
+  asteroidField.basicInfo.type = PlanetType.ASTEROIDS;
+  asteroidField.info.ownerId = null;
+  neutralPlanet.basicInfo.name = 'SpySweep IV';
+  neutralPlanet.info.ownerId = 3;
+
+  const bot = new Player(1, 'Bot-1', [homePlanet], new Map(), [], PlayerType.BOT, createTutorialReadState(true));
+  const enemyOwner = new Player(2, 'Enemy', [enemyPlanet], new Map(), [], PlayerType.PLAYER, createTutorialReadState(true));
+  const neutralOwner = new Player(3, 'Neutral', [neutralPlanet], new Map(), [], PlayerType.NEUTRAL, createTutorialReadState(true));
+
+  initializePlanet(homePlanet, bot.playerId);
+  initializePlanet(enemyPlanet, enemyOwner.playerId);
+  initializePlanet(neutralPlanet, neutralOwner.playerId);
+  bot.botProfileId = 'BALANCED';
+  bot.setTechLevel(TechnologyType.COMPUTER_TECHNOLOGY, 2);
+  bot.setTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY, 2);
+  homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 40);
+  homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 2);
+  const stars = Array.from({ length: 4 }, () => Array.from({ length: 3 }, () => SolarSystem.createVoid({ x: 0, y: 0 })));
+  stars[3]![2] = system;
+
+  const galaxy = new Galaxy(
+    'Bot Test',
+    [bot, enemyOwner, neutralOwner],
+    stars,
+    6,
+    [],
+    1,
+    new Map(),
+    new Map([[bot.playerId, bot]]),
+    new Map([[neutralOwner.playerId, neutralOwner]]),
+    new Map([
+      [bot.playerName, bot.playerId],
+      [enemyOwner.playerName, enemyOwner.playerId],
+      [neutralOwner.playerName, neutralOwner.playerId]
+    ])
+  );
+
+  return { galaxy, bot, enemyPlanet, enemyOwner };
 }
 
 function createOutgoingPeaceProposalGalaxy(): {

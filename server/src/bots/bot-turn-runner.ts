@@ -5,6 +5,7 @@ import * as fleetMissionTypeEnumModule from '../../../src/app/models/enums/fleet
 import * as manyShipsModule from '../../../src/app/models/fleets/many-ships.js';
 import * as fleetModelModule from '../../../src/app/models/fleets/fleet.js';
 import * as playerTypeEnumModule from '../../../src/app/models/enums/player-type.js';
+import * as planetTypeEnumModule from '../../../src/app/models/enums/planet-type.js';
 import * as shipPurposeEnumModule from '../../../src/app/models/enums/ship-purpose.js';
 import * as shipTypeEnumModule from '../../../src/app/models/enums/ship-type.js';
 import * as technologyTypeEnumModule from '../../../src/app/models/enums/technology-type.js';
@@ -35,6 +36,7 @@ import type { CreateFleetMaintenanceRequestCommand } from '../game-commands/main
 import type { CreateFleetMissionCommand } from '../game-commands/fleet-commands.ts';
 import type { StartTechnologyResearchCommand } from '../game-commands/research-commands.ts';
 import type { StartShipyardConstructionCommand } from '../game-commands/shipyard-commands.ts';
+import type { CreateStarSystemSpyCommand } from '../game-commands/star-system-spy-commands.ts';
 import { startBuildingConstruction } from '../game-commands/building-commands.js';
 import {
   approveDiplomaticProposalCommand,
@@ -74,6 +76,7 @@ import {
 } from '../game-commands/maintenance-commands.js';
 import { startTechnologyResearch } from '../game-commands/research-commands.js';
 import { startShipyardConstruction } from '../game-commands/shipyard-commands.js';
+import { createStarSystemSpyMissions } from '../game-commands/star-system-spy-commands.js';
 import { buildBotDiplomacyContexts, type BotDiplomacyContext } from './bot-diplomacy-awareness.js';
 import { buildBotDiplomacyProposalCandidate } from './bot-diplomacy-planner.js';
 import { decideIncomingDiplomaticProposal } from './bot-diplomacy-resolver.js';
@@ -93,6 +96,7 @@ const { FleetMissionType } = resolveModule(fleetMissionTypeEnumModule) as typeof
 const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../../src/app/models/fleets/many-ships.js');
 const { FleetState } = resolveModule(fleetModelModule) as typeof import('../../../src/app/models/fleets/fleet.js');
 const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../../../src/app/models/enums/player-type.js');
+const { PlanetType } = resolveModule(planetTypeEnumModule) as typeof import('../../../src/app/models/enums/planet-type.js');
 const { ShipPurpose } = resolveModule(shipPurposeEnumModule) as typeof import('../../../src/app/models/enums/ship-purpose.js');
 const { ShipType } = resolveModule(shipTypeEnumModule) as typeof import('../../../src/app/models/enums/ship-type.js');
 const { TechnologyType } = resolveModule(technologyTypeEnumModule) as typeof import('../../../src/app/models/enums/technology-type.js');
@@ -147,12 +151,23 @@ type MaintenanceCandidate = {
   request: CreateFleetMaintenanceRequestCommand;
 };
 
+type StarSystemSpyCandidate = {
+  kind: 'system_spy';
+  utility: number;
+  reason: string;
+  goalType: BotGoalType | null;
+  request: CreateStarSystemSpyCommand;
+  primaryTargetCoordinates: BotMemoryCoordinates;
+  targetCoordinates: BotMemoryCoordinates[];
+};
+
 type BotCandidate =
   | BuildingCandidate
   | ResearchCandidate
   | ShipyardCandidate
   | FleetCandidate
-  | MaintenanceCandidate;
+  | MaintenanceCandidate
+  | StarSystemSpyCandidate;
 
 type BotTurnCounters = {
   total: number;
@@ -313,6 +328,7 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
     rejectedActions: []
   };
   let stopReason: BotTraceStopReason | null = null;
+  let appliedCandidateDetails: Record<string, string | number | boolean | null> | null = null;
 
   resolveIncomingBotRequests(galaxy, player, profile, trace);
   resolveOutgoingBotDiplomacyProposal(galaxy, player, profile, trace);
@@ -351,6 +367,7 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
     const context = { galaxy, playerId: player.playerId };
     let applied = false;
     let commandFailureMessage: string | null = null;
+    appliedCandidateDetails = null;
 
     switch (best.kind) {
       case 'building': {
@@ -381,6 +398,7 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
         break;
       }
       case 'spy':
+      case 'system_spy':
       case 'colonize':
       case 'attack':
       case 'transport':
@@ -397,6 +415,20 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
           commandFailureMessage = result.ok ? null : result.error.message;
           if (applied) {
             counters.maintenance += 1;
+          }
+          break;
+        }
+
+        if (best.kind === 'system_spy') {
+          const result = createStarSystemSpyMissions(context, best.request);
+          applied = result.ok;
+          commandFailureMessage = result.ok ? null : result.error.message;
+          if (applied) {
+            counters.spy += 1;
+            appliedCandidateDetails = {
+              launchedFleetCount: result.value.launchedFleetCount,
+              systemCoordinates: `${best.request.systemX}:${best.request.systemY}`
+            };
           }
           break;
         }
@@ -448,7 +480,8 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
       details: {
         idleFallbackApplied: idleFallback.used,
         idleFallbackFloor: idleFallback.floor,
-        threshold: profile.minUtilityThreshold
+        threshold: profile.minUtilityThreshold,
+        ...(appliedCandidateDetails ?? {})
       }
     });
   }
@@ -475,6 +508,7 @@ function buildBotCandidates(
     ...buildResearchCandidates(player, profile, counters, blockedKeys),
     ...buildBuildingCandidates(player, profile, counters, blockedKeys),
     ...buildShipyardCandidates(player, profile, counters, blockedKeys),
+    ...buildStarSystemSpyCandidates(galaxy, player, profile, counters, blockedKeys, diplomacyContexts),
     ...buildSpyCandidates(galaxy, player, profile, counters, blockedKeys, diplomacyContexts),
     ...buildColonizeCandidates(galaxy, player, profile, counters, blockedKeys),
     ...buildAttackCandidates(galaxy, player, profile, counters, blockedKeys, diplomacyContexts),
@@ -1101,6 +1135,140 @@ function buildSpyCandidates(
         goalType: 'REFRESH_INTEL',
         request
       });
+    }
+  }
+
+  return candidates;
+}
+
+function buildStarSystemSpyCandidates(
+  galaxy: Galaxy,
+  player: Player,
+  profile: BotProfile,
+  counters: BotTurnCounters,
+  blockedKeys: Set<string>,
+  diplomacyContexts: Map<number, BotDiplomacyContext>
+): BotCandidate[] {
+  if (counters.spy >= profile.maxSpyActionsPerTurn) {
+    return [];
+  }
+
+  const candidates: BotCandidate[] = [];
+  const systems = galaxy.stars.flatMap((row) => row);
+  for (const originPlanet of player.planets) {
+    const availableProbes = originPlanet.rBDSFTQ.ships.countByType().get(ShipType.SPY_PROBE) ?? 0;
+    if (availableProbes < 2) {
+      continue;
+    }
+
+    const originCoordinates = coordinatesOfPlanet(originPlanet);
+    for (const system of systems) {
+      const eligiblePlanets = system.planets.filter((planet) =>
+        planet.basicInfo.type !== PlanetType.ASTEROIDS
+        && planet.info.ownerId !== player.playerId
+      );
+      if (eligiblePlanets.length < 2 || eligiblePlanets.length > availableProbes) {
+        continue;
+      }
+
+      const candidateTargets: Array<{
+        planet: Planet;
+        report: EspionageReportData | null;
+        stalenessTurns: number;
+        distance: number;
+        interest: number;
+        targetCoordinates: BotMemoryCoordinates;
+        unknown: boolean;
+      }> = [];
+      let skipSystem = false;
+      let requiredFuel = 0;
+      for (const targetPlanet of eligiblePlanets) {
+        const targetCoordinates = coordinatesOfPlanet(targetPlanet);
+        if (sameCoordinates(originCoordinates, targetCoordinates)) {
+          continue;
+        }
+
+        const targetOwner = targetPlanet.info.ownerId === null
+          ? null
+          : resolvePlayerById(galaxy, targetPlanet.info.ownerId);
+        const targetStatus = targetOwner
+          ? resolveDiplomaticStatus(galaxy, player.playerId, targetOwner.playerId)
+          : null;
+        const farmTarget = isFarmTarget(targetOwner, targetStatus);
+        const report = targetPlanet.lastReportData.get(player.playerId) ?? null;
+        if (farmTarget && report && report.totalDefencesAmount <= 0) {
+          skipSystem = true;
+          break;
+        }
+
+        const stalenessTurns = report === null
+          ? 6
+          : Math.max(0, galaxy.currentTurn - report.createdTurn);
+        if (report && stalenessTurns < 2) {
+          skipSystem = true;
+          break;
+        }
+
+        const distance = calculateTravelDistance(originCoordinates, targetCoordinates);
+        requiredFuel += calculateFuelCost([{ type: ShipType.SPY_PROBE, amount: 1 }], distance);
+        candidateTargets.push({
+          planet: targetPlanet,
+          report,
+          stalenessTurns,
+          distance,
+          interest: estimateSpyTargetInterest(galaxy, player, targetPlanet, report, diplomacyContexts),
+          targetCoordinates,
+          unknown: report === null
+        });
+      }
+
+      if (skipSystem || candidateTargets.length < 2 || candidateTargets.length !== eligiblePlanets.length) {
+        continue;
+      }
+      if (originPlanet.rBDSFTQ.resources.deuterium < requiredFuel) {
+        continue;
+      }
+
+      const allUnknown = candidateTargets.every((entry) => entry.unknown);
+      const unknownCount = candidateTargets.filter((entry) => entry.unknown).length;
+      const staleCount = candidateTargets.length - unknownCount;
+      const recentPenalty = candidateTargets.reduce((sum, entry) => (
+        sum + (hasRecentTarget(player.botMemory?.lastSpyTargets ?? [], entry.targetCoordinates) ? 1.5 : 0)
+      ), 0);
+      const totalInterest = candidateTargets.reduce((sum, entry) => sum + entry.interest, 0);
+      const avgDistance = candidateTargets.reduce((sum, entry) => sum + entry.distance, 0) / candidateTargets.length;
+      const allUnknownBonus = allUnknown ? 12 : 0;
+      const base = (9 * profile.spyWeight)
+        + totalInterest
+        + (candidateTargets.length * 2.5)
+        + (unknownCount * 3.5)
+        + (staleCount * 1.25)
+        + allUnknownBonus
+        - avgDistance
+        - recentPenalty;
+      const primaryTargetCoordinates = candidateTargets[0]?.targetCoordinates ?? coordinatesOfPlanet(originPlanet);
+      const request: CreateStarSystemSpyCommand = {
+        systemX: system.coordinates.x,
+        systemY: system.coordinates.y,
+        origin: originCoordinates
+      };
+      const candidate: StarSystemSpyCandidate = {
+        kind: 'system_spy',
+        utility: applyGoalBonus(player.botMemory, 'REFRESH_INTEL', base, primaryTargetCoordinates),
+        reason: allUnknown
+          ? `Sweep unknown system ${system.coordinates.x}:${system.coordinates.y} from ${originPlanet.basicInfo.name}`
+          : `Sweep stale intel in system ${system.coordinates.x}:${system.coordinates.y} from ${originPlanet.basicInfo.name}`,
+        goalType: 'REFRESH_INTEL',
+        request,
+        primaryTargetCoordinates,
+        targetCoordinates: candidateTargets.map((entry) => entry.targetCoordinates)
+      };
+      const key = candidateKey(candidate);
+      if (blockedKeys.has(key)) {
+        continue;
+      }
+
+      candidates.push(candidate);
     }
   }
 
@@ -2211,6 +2379,11 @@ function updateBotMemoryAfterAction(player: Player, currentTurn: number, candida
 
   if (candidate.kind === 'spy') {
     appendRecentTarget(nextSpyTargets, targetCoordinates);
+  }
+  if (candidate.kind === 'system_spy') {
+    for (const coordinates of candidate.targetCoordinates) {
+      appendRecentTarget(nextSpyTargets, coordinates);
+    }
   }
   if (candidate.kind === 'attack') {
     appendRecentTarget(nextAttackTargets, targetCoordinates);
@@ -3673,6 +3846,8 @@ function requestCoordinates(candidate: BotCandidate): BotMemoryCoordinates {
     case 'research':
     case 'shipyard':
       return { x: candidate.request.x, y: candidate.request.y, z: candidate.request.z };
+    case 'system_spy':
+      return { ...candidate.primaryTargetCoordinates };
     case 'spy':
     case 'colonize':
     case 'attack':
@@ -3722,6 +3897,8 @@ function summarizeCandidateRequest(candidate: BotCandidate): string {
       return `${candidate.request.technologyType} @ ${candidate.request.x}:${candidate.request.y}:${candidate.request.z}`;
     case 'shipyard':
       return `${candidate.request.shipType ?? candidate.request.defenceType ?? candidate.request.itemKind} x${candidate.request.amount} @ ${candidate.request.x}:${candidate.request.y}:${candidate.request.z}`;
+    case 'system_spy':
+      return `SYSTEM_SPY ${candidate.request.origin.x}:${candidate.request.origin.y}:${candidate.request.origin.z} -> ${candidate.request.systemX}:${candidate.request.systemY} (${candidate.targetCoordinates.length} targets)`;
     case 'spy':
     case 'colonize':
     case 'attack':
