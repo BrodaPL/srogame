@@ -18,13 +18,14 @@ import { ManyShips } from '../../models/fleets/many-ships';
 import { DefenceBuildingInstances } from '../../models/reports/defence-building-instances';
 import { DefenceType } from '../../models/enums/defence-type';
 import { ManyDefences } from '../../models/defences/many-defences';
+import { createTutorialReadState } from '../../tutorial/tutorial-types';
 
 describe('EspionageReportGenerator', () => {
   const createPlayer = (
     playerId: number,
     playerName: string,
     techLevels: Map<TechnologyType, number>
-  ): Player => new Player(playerId, playerName, [], techLevels, [], PlayerType.PLAYER, []);
+  ): Player => new Player(playerId, playerName, [], techLevels, [], PlayerType.PLAYER, createTutorialReadState(true));
 
   const createPlanet = (system: SolarSystem, ships: ShipInstance[]): Planet => new Planet(
     new PlanetBasicInfo('Test', PlanetType.JUNGLE, 1, 1, system, '', 100),
