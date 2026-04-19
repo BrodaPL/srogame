@@ -157,7 +157,7 @@
       "type": "RAILGUNS_WEAPONS",
       "imagePath": "images/technologies/normal/RAILGUNS_WEAPONS.jpg",
       "description": "Give +10% to every RAILGUNS weapon damage.",
-      "basicCost": { "metal": 10, "crystal": 10, "deuterium":10 },
+      "basicCost": { "metal": 15, "crystal": 5, "deuterium":5 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
@@ -172,7 +172,7 @@
       "type": "BEAMS_WEAPONS",
       "imagePath": "images/technologies/normal/BEAMS_WEAPONS.jpg",
       "description": "Give +10% to every BEAM weapon damage.",
-      "basicCost": { "metal": 10, "crystal": 10, "deuterium": 20 },
+      "basicCost": { "metal": 5, "crystal": 15, "deuterium": 5 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
@@ -186,7 +186,7 @@
       "type": "MISSILES_WEAPONS",
       "imagePath": "images/technologies/normal/MISSILES_WEAPONS.jpg",
       "description": "Give +10% to every MISSILE weapon damage.",
-      "basicCost": { "metal": 10, "crystal": 0, "deuterium": 10 },
+      "basicCost": { "metal": 10, "crystal": 5, "deuterium": 10 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
@@ -216,7 +216,7 @@
       "type": "HYPERSPACE_DRIVE",
       "imagePath": "images/technologies/normal/HYPERSPACE_DRIVE.jpg",
       "description": "Increases jump range by 1.",
-      "basicCost": { "metal": 30, "crystal": 150, "deuterium": 150 },
+      "basicCost": { "metal": 20, "crystal": 120, "deuterium": 120 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [

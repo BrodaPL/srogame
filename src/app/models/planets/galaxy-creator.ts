@@ -532,10 +532,32 @@ export class GalaxyCreator {
       PlayerType.NEUTRAL,
       createTutorialReadState(true)
     );
+    this.applyNeutralStorageBonus(player);
 
     galaxy.players.push(player);
     galaxy.neutralPlayerMap.set(player.playerId, player);
     galaxy.playerNameMap.set(player.playerName, player.playerId);
+  }
+
+  private applyNeutralStorageBonus(player: Player): void {
+    if (player.type !== PlayerType.NEUTRAL) {
+      return;
+    }
+
+    for (const planet of player.planets) {
+      planet.setBuildingLevel(
+        BuildingType.METAL_STORAGE,
+        planet.getBuildingLevel(BuildingType.METAL_STORAGE) + 1
+      );
+      planet.setBuildingLevel(
+        BuildingType.CRYSTAL_STORAGE,
+        planet.getBuildingLevel(BuildingType.CRYSTAL_STORAGE) + 1
+      );
+      planet.setBuildingLevel(
+        BuildingType.DEUTERIUM_TANK,
+        planet.getBuildingLevel(BuildingType.DEUTERIUM_TANK) + 1
+      );
+    }
   }
 
   private nextAvailablePlayerId(galaxy: Galaxy): number {

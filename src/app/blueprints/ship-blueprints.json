@@ -376,7 +376,7 @@
       "jumpCost": 10,
       "cost": { "metal": 600, "crystal": 400, "deuterium": 100 },
       "buildingRequirements": [
-        { "building": "SHIPYARD", "level": 4 }
+        { "building": "SHIPYARD", "level": 3 }
       ],
       "techRequirements": [
         { "tech": "FUSION_DRIVE", "level": 2 },

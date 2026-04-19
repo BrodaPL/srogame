@@ -76,6 +76,7 @@
       <div class="research-tech-list" data-tutorial-id="researches-tech-list">
         @for (technology of technologies; track technology.type; let isFirst = $first) {
           <article class="research-tech-card" [attr.data-tutorial-id]="isFirst ? 'researches-primary-tech-card' : null">
+            <h4 class="research-tech-card__title">{{ technology.type }}</h4>
             <button
               type="button"
               class="research-tech-card__image-button"
@@ -85,7 +86,6 @@
             </button>
 
             <div class="research-tech-card__main">
-              <h4 class="research-tech-card__title">{{ technology.type }}</h4>
               @if (currentTechnologyLevel(technology.type) > 0) {
                 <p class="research-tech-card__meta">Level: {{ currentTechnologyLevel(technology.type) }}</p>
               } @else {

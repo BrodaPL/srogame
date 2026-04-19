@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RngBuildingGenerator } from '../../../generators/rng-building-generator';
 import { BuildingType } from '../../enums/building-type';
 import { DefenceType } from '../../enums/defence-type';
 import { GalaxyCreator } from '../galaxy-creator';
@@ -66,6 +67,26 @@ describe('GalaxyCreator', () => {
     expect(neutralPlanets[0].rBDSFTQ.resources.crystal).toBeGreaterThan(0);
     expect(neutralPlanets[0].rBDSFTQ.resources.deuterium).toBeGreaterThan(0);
     expect(neutralPlanets[0].rBDSFTQ.ships.totalShipsCount()).toBeGreaterThan(0);
+  });
+
+  it('adds +1 storage level to newly created neutral planets after their RNG setup is applied', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    vi.spyOn(RngBuildingGenerator.prototype, 'generate').mockReturnValue(new Map([
+      [BuildingType.METAL_STORAGE, 4],
+      [BuildingType.CRYSTAL_STORAGE, 5],
+      [BuildingType.DEUTERIUM_TANK, 6],
+      [BuildingType.METAL_MINE, 7]
+    ]));
+
+    const galaxy = new GalaxyCreator(createSetup()).createGalaxy(['Human']);
+    const neutral = galaxy.players.find((entry) => entry.type === PlayerType.NEUTRAL);
+
+    expect(neutral).toBeTruthy();
+    expect(neutral!.planets).toHaveLength(1);
+    expect(neutral!.planets[0].getBuildingLevel(BuildingType.METAL_STORAGE)).toBe(5);
+    expect(neutral!.planets[0].getBuildingLevel(BuildingType.CRYSTAL_STORAGE)).toBe(6);
+    expect(neutral!.planets[0].getBuildingLevel(BuildingType.DEUTERIUM_TANK)).toBe(7);
+    expect(neutral!.planets[0].getBuildingLevel(BuildingType.METAL_MINE)).toBe(7);
   });
 
   it('does not add a guaranteed home-system neutral when neutral planets are disabled', () => {
