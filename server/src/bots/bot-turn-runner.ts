@@ -17,6 +17,7 @@ import * as supportRequestModule from '../../../src/app/models/requests/support-
 import * as bombardmentPriorityModule from '../../../src/app/models/bombardment/bombardment-priority.js';
 import * as energyDeficitModule from '../../../src/app/models/planets/energy-deficit.js';
 import * as fusionReactorOperationModule from '../../../src/app/models/planets/fusion-reactor-operation.js';
+import * as shipRepairCapabilityModule from '../../../src/app/models/repairs/ship-repair-capability.js';
 import type {
   ClientCoordinates,
   CreateFleetShipSelectionEntry,
@@ -96,7 +97,7 @@ import { createStarSystemSpyMissions } from '../game-commands/star-system-spy-co
 import { buildBotDiplomacyContexts, type BotDiplomacyContext } from './bot-diplomacy-awareness.js';
 import { buildBotDiplomacyProposalCandidate } from './bot-diplomacy-planner.js';
 import { decideIncomingDiplomaticProposal } from './bot-diplomacy-resolver.js';
-import { recordBotDecisionTrace } from './bot-debug-store.js';
+import { getBotDecisionTraces, recordBotDecisionTrace } from './bot-debug-store.js';
 import type { BotDecisionTrace, BotRejectedActionTrace, BotTraceStopReason } from './bot-debug.ts';
 import { isBotPaused } from './bot-admin.js';
 import { BOT_PROFILES, type BotProfile } from './bot-profile.js';
@@ -130,6 +131,7 @@ const {
 const { BombardmentPriorityTarget } = resolveModule(bombardmentPriorityModule) as typeof import('../../../src/app/models/bombardment/bombardment-priority.js');
 const { energyDeficitEfficiencyMultiplier } = resolveModule(energyDeficitModule) as typeof import('../../../src/app/models/planets/energy-deficit.js');
 const { resolveFusionReactorOperation } = resolveModule(fusionReactorOperationModule) as typeof import('../../../src/app/models/planets/fusion-reactor-operation.js');
+const { calculateRepairCapabilityForManyShips } = resolveModule(shipRepairCapabilityModule) as typeof import('../../../src/app/models/repairs/ship-repair-capability.js');
 
 type BuildingCandidate = {
   kind: 'building';
@@ -240,6 +242,37 @@ type BotPlanetEconomyState = {
   naniteLevel: number;
   targetMineLevel: number;
 };
+
+type BootstrapDeadlockState = {
+  active: boolean;
+  recentThresholdStallCount: number;
+  maxStoragePressure: number;
+  queueOverrideAllowed: boolean;
+};
+
+const INACTIVE_BOOTSTRAP_DEADLOCK_STATE: BootstrapDeadlockState = {
+  active: false,
+  recentThresholdStallCount: 0,
+  maxStoragePressure: 0,
+  queueOverrideAllowed: false
+};
+
+const BOOTSTRAP_RECOVERY_BUILDING_TYPES: BuildingTypeType[] = [
+  BuildingType.METAL_MINE,
+  BuildingType.CRYSTAL_MINE,
+  BuildingType.DEUTERIUM_SYNTHESIZER,
+  BuildingType.ROBOTICS_FACTORY,
+  BuildingType.RESEARCH_LAB,
+  BuildingType.SHIPYARD,
+  BuildingType.METAL_STORAGE,
+  BuildingType.CRYSTAL_STORAGE,
+  BuildingType.DEUTERIUM_TANK
+];
+
+const BOOTSTRAP_RECOVERY_RESEARCH_TYPES: TechnologyTypeType[] = [
+  TechnologyType.MATERIAL_TECHNOLOGY,
+  TechnologyType.ENERGY_TECHNOLOGY
+];
 
 type BotEconomyTargets = {
   mineLevel: number;
@@ -378,16 +411,63 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
   resolveOutgoingBotSupportRequest(galaxy, player, profile, trace);
 
   while (counters.total < profile.maxActionsPerTurn) {
-    const candidates = buildBotCandidates(galaxy, player, profile, counters, blockedKeys)
+    const bootstrapDeadlockState = evaluateBootstrapDeadlockState(player, profile);
+    const baseCandidates = buildBotCandidates(galaxy, player, profile, counters, blockedKeys);
+    const effectiveBootstrapDeadlockState = (
+      bootstrapDeadlockState.active
+      && !baseCandidates.some((candidate) => candidate.utility >= profile.minUtilityThreshold)
+    )
+      ? bootstrapDeadlockState
+      : INACTIVE_BOOTSTRAP_DEADLOCK_STATE;
+    const candidates = applyBootstrapDeadlockUtilityAdjustments(
+      baseCandidates,
+      player,
+      profile,
+      effectiveBootstrapDeadlockState
+    )
       .sort((left, right) => right.utility - left.utility || left.kind.localeCompare(right.kind));
-    const best = candidates[0];
+    let best = candidates[0];
     if (!best) {
       stopReason = 'no_candidates';
       break;
     }
-    const idleFallback = getIdleEconomyFallbackDecision(player, profile, counters, best);
+
+    let effectiveThreshold = resolveCandidateUtilityThreshold(profile, best, effectiveBootstrapDeadlockState);
+    let idleFallback = getIdleEconomyFallbackDecision(
+      player,
+      profile,
+      counters,
+      best,
+      effectiveBootstrapDeadlockState,
+      effectiveThreshold
+    );
     if (
-      best.utility < profile.minUtilityThreshold
+      best.utility < effectiveThreshold
+      && !idleFallback.allowed
+    ) {
+      const deadlockRecovery = applyBootstrapDeadlockUtilityAdjustments(
+        buildBotDeadlockRecoveryCandidates(player, profile, counters, blockedKeys),
+        player,
+        profile,
+        effectiveBootstrapDeadlockState
+      )
+        .sort((left, right) => right.utility - left.utility || left.kind.localeCompare(right.kind))[0];
+      if (deadlockRecovery) {
+        best = deadlockRecovery;
+        effectiveThreshold = resolveCandidateUtilityThreshold(profile, best, effectiveBootstrapDeadlockState);
+        idleFallback = getIdleEconomyFallbackDecision(
+          player,
+          profile,
+          counters,
+          best,
+          effectiveBootstrapDeadlockState,
+          effectiveThreshold
+        );
+      }
+    }
+
+    if (
+      best.utility < effectiveThreshold
       && !idleFallback.allowed
     ) {
       trace.rejectedActions.push({
@@ -396,11 +476,14 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
         rejectionType: 'threshold',
         expectedUtility: best.utility,
         details: {
-          threshold: profile.minUtilityThreshold,
+          threshold: effectiveThreshold,
           requestSummary: summarizeCandidateRequest(best),
           idleFallbackEligible: idleFallback.eligible,
           idleFallbackFloor: idleFallback.floor,
-          idleFallbackReason: idleFallback.reason
+          idleFallbackReason: idleFallback.reason,
+          bootstrapDeadlockActive: effectiveBootstrapDeadlockState.active,
+          bootstrapDeadlockRecentStalls: effectiveBootstrapDeadlockState.recentThresholdStallCount,
+          bootstrapDeadlockStoragePressure: roundToTwoDecimals(effectiveBootstrapDeadlockState.maxStoragePressure)
         }
       });
       stopReason = 'below_threshold';
@@ -469,8 +552,9 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
           commandFailureMessage = result.ok ? null : result.error.message;
           if (applied) {
             counters.spy += 1;
+            const launchedFleetCount = result.ok ? result.value.launchedFleetCount : 0;
             appliedCandidateDetails = {
-              launchedFleetCount: result.value.launchedFleetCount,
+              launchedFleetCount,
               systemCoordinates: `${best.request.systemX}:${best.request.systemY}`
             };
           }
@@ -516,6 +600,12 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
     counters.total += 1;
     rememberFarmAttackLaunchFromCandidate(galaxy, player, best, galaxy.currentTurn);
     updateBotMemoryAfterAction(player, galaxy.currentTurn, best);
+    const bootstrapDeadlockBonus = estimateBootstrapDeadlockUtilityAdjustment(
+      best,
+      player,
+      profile,
+      effectiveBootstrapDeadlockState
+    );
     trace.chosenActions.push({
       kind: best.kind,
       reason: best.reason,
@@ -525,7 +615,11 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
       details: {
         idleFallbackApplied: idleFallback.used,
         idleFallbackFloor: idleFallback.floor,
-        threshold: profile.minUtilityThreshold,
+        threshold: effectiveThreshold,
+        bootstrapDeadlockActive: effectiveBootstrapDeadlockState.active,
+        bootstrapDeadlockRecentStalls: effectiveBootstrapDeadlockState.recentThresholdStallCount,
+        bootstrapDeadlockStoragePressure: roundToTwoDecimals(effectiveBootstrapDeadlockState.maxStoragePressure),
+        bootstrapDeadlockBonus: bootstrapDeadlockBonus > 0 ? roundToTwoDecimals(bootstrapDeadlockBonus) : null,
         ...(appliedCandidateDetails ?? {})
       }
     });
@@ -621,7 +715,9 @@ function getIdleEconomyFallbackDecision(
   player: Player,
   profile: BotProfile,
   counters: BotTurnCounters,
-  candidate: BotCandidate
+  candidate: BotCandidate,
+  bootstrapDeadlockState: BootstrapDeadlockState,
+  effectiveThreshold: number
 ): IdleEconomyFallbackDecision {
   const hasQueuedWork = player.planets.some((planet) =>
     planet.rBDSFTQ.buildingQueue.length > 0
@@ -634,7 +730,13 @@ function getIdleEconomyFallbackDecision(
     counters.total,
     player.fleets.length,
     hasQueuedWork,
-    candidate.utility
+    candidate.utility,
+    {
+      bootstrapDeadlockActive: bootstrapDeadlockState.active,
+      bootstrapRecoveryCandidate: isBootstrapRecoveryCandidate(candidate),
+      allowQueuedWorkOverride: bootstrapDeadlockState.queueOverrideAllowed,
+      effectiveThreshold
+    }
   );
 }
 
@@ -644,7 +746,13 @@ export function evaluateIdleEconomyFallbackDecision(
   actionsUsed: number,
   fleetsCount: number,
   hasQueuedWork: boolean,
-  utility: number
+  utility: number,
+  options: {
+    bootstrapDeadlockActive?: boolean;
+    bootstrapRecoveryCandidate?: boolean;
+    allowQueuedWorkOverride?: boolean;
+    effectiveThreshold?: number;
+  } = {}
 ): IdleEconomyFallbackDecision {
   if (candidateKind !== 'building' && candidateKind !== 'research') {
     return {
@@ -676,7 +784,11 @@ export function evaluateIdleEconomyFallbackDecision(
     };
   }
 
-  if (hasQueuedWork) {
+  const bootstrapRecoveryCandidate = options.bootstrapDeadlockActive === true
+    && options.bootstrapRecoveryCandidate === true;
+  const allowQueuedWorkOverride = bootstrapRecoveryCandidate && options.allowQueuedWorkOverride === true;
+
+  if (hasQueuedWork && !allowQueuedWorkOverride) {
     return {
       eligible: false,
       allowed: false,
@@ -686,14 +798,21 @@ export function evaluateIdleEconomyFallbackDecision(
     };
   }
 
-  const floor = calculateIdleEconomyFallbackFloor(profile, candidateKind);
+  const floor = bootstrapRecoveryCandidate
+    ? calculateBootstrapDeadlockFallbackFloor(profile, candidateKind)
+    : calculateIdleEconomyFallbackFloor(profile, candidateKind);
+  const threshold = Number.isFinite(options.effectiveThreshold)
+    ? Number(options.effectiveThreshold)
+    : profile.minUtilityThreshold;
   const allowed = utility >= floor;
   return {
     eligible: true,
     allowed,
-    used: allowed && utility < profile.minUtilityThreshold,
+    used: allowed && utility < threshold,
     floor,
-    reason: allowed ? 'within_fallback_window' : 'below_fallback_floor'
+    reason: allowed
+      ? (allowQueuedWorkOverride ? 'bootstrap_queue_override' : 'within_fallback_window')
+      : 'below_fallback_floor'
   };
 }
 
@@ -706,6 +825,198 @@ function calculateIdleEconomyFallbackFloor(
   }
 
   return Math.max(0, profile.minUtilityThreshold - 3.25);
+}
+
+function calculateBootstrapDeadlockFallbackFloor(
+  profile: BotProfile,
+  candidateKind: 'building' | 'research'
+): number {
+  if (candidateKind === 'research') {
+    return Math.max(-1.25, profile.minUtilityThreshold - 4.5);
+  }
+
+  return Math.max(0, profile.minUtilityThreshold - 3.5);
+}
+
+function evaluateBootstrapDeadlockState(
+  player: Player,
+  profile: BotProfile
+): BootstrapDeadlockState {
+  const recentThresholdStallCount = getBotDecisionTraces(player.playerId)
+    .slice(-4)
+    .filter((trace) => isBootstrapThresholdStallTrace(trace))
+    .length;
+  const maxStoragePressure = player.planets.reduce((best, planet) => (
+    Math.max(best, estimateStoragePressure(planet))
+  ), 0);
+  const hasBootstrapEconomyPlanet = player.planets.some((planet) => {
+    const economyState = buildPlanetEconomyState(planet, player, profile);
+    return economyState.stage === 'throughput' || economyState.stage === 'infrastructure';
+  });
+
+  return {
+    active: player.planets.length === 1
+      && player.fleets.length === 0
+      && hasBootstrapEconomyPlanet
+      && (maxStoragePressure >= 0.78 || recentThresholdStallCount >= 2),
+    recentThresholdStallCount,
+    maxStoragePressure,
+    queueOverrideAllowed: recentThresholdStallCount >= 2
+  };
+}
+
+function isBootstrapThresholdStallTrace(trace: BotDecisionTrace): boolean {
+  if (trace.actionBudget.stopReason !== 'below_threshold') {
+    return false;
+  }
+
+  return trace.rejectedActions.some((action) => (
+    action.rejectionType === 'threshold'
+    && (action.kind === 'building' || action.kind === 'research')
+    && isBootstrapRecoveryReason(action.reason)
+  ));
+}
+
+function applyBootstrapDeadlockUtilityAdjustments(
+  candidates: BotCandidate[],
+  player: Player,
+  profile: BotProfile,
+  bootstrapDeadlockState: BootstrapDeadlockState
+): BotCandidate[] {
+  if (!bootstrapDeadlockState.active) {
+    return candidates;
+  }
+
+  return candidates.map((candidate) => {
+    const utilityAdjustment = estimateBootstrapDeadlockUtilityAdjustment(
+      candidate,
+      player,
+      profile,
+      bootstrapDeadlockState
+    );
+    if (utilityAdjustment <= 0) {
+      return candidate;
+    }
+
+    return {
+      ...candidate,
+      utility: candidate.utility + utilityAdjustment
+    };
+  });
+}
+
+function estimateBootstrapDeadlockUtilityAdjustment(
+  candidate: BotCandidate,
+  player: Player,
+  profile: BotProfile,
+  bootstrapDeadlockState: BootstrapDeadlockState
+): number {
+  if (!bootstrapDeadlockState.active || !isBootstrapRecoveryCandidate(candidate)) {
+    return 0;
+  }
+
+  const targetPlanet = resolveCandidatePlanet(player, candidate);
+  if (!targetPlanet) {
+    return 0;
+  }
+
+  const economyState = buildPlanetEconomyState(targetPlanet, player, profile);
+  const targets = BOT_ECONOMY_TARGETS[profile.id];
+  const stallPressureBonus = bootstrapDeadlockState.recentThresholdStallCount * 0.7;
+  if (candidate.kind === 'building') {
+    switch (candidate.request.buildingType) {
+      case BuildingType.METAL_STORAGE:
+      case BuildingType.CRYSTAL_STORAGE:
+      case BuildingType.DEUTERIUM_TANK:
+        return (bootstrapDeadlockState.maxStoragePressure * 4) + stallPressureBonus;
+      case BuildingType.METAL_MINE:
+      case BuildingType.CRYSTAL_MINE:
+      case BuildingType.DEUTERIUM_SYNTHESIZER: {
+        const currentLevel = targetPlanet.getBuildingLevel(candidate.request.buildingType);
+        const mineDeficit = Math.max(0, economyState.targetMineLevel - currentLevel);
+        return 2 + (mineDeficit * 1.35) + stallPressureBonus;
+      }
+      case BuildingType.ROBOTICS_FACTORY: {
+        const roboticsDeficit = Math.max(0, targets.roboticsLevel - economyState.roboticsLevel);
+        return 2 + (roboticsDeficit * 1.9) + stallPressureBonus;
+      }
+      case BuildingType.RESEARCH_LAB: {
+        const labDeficit = Math.max(0, targets.researchLabLevel - economyState.researchLabLevel);
+        return 1.5 + (labDeficit * 1.6) + stallPressureBonus;
+      }
+      case BuildingType.SHIPYARD: {
+        const shipyardDeficit = Math.max(0, targets.shipyardLevel - economyState.shipyardLevel);
+        return 1.75 + (shipyardDeficit * 1.7) + stallPressureBonus;
+      }
+      default:
+        return 0;
+    }
+  }
+
+  if (candidate.kind === 'research') {
+    switch (candidate.request.technologyType) {
+      case TechnologyType.MATERIAL_TECHNOLOGY: {
+        const shipyardBlueprint = BUILDING_BLUEPRINTS.get(BuildingType.SHIPYARD);
+        const nextShipyardLevel = targetPlanet.getBuildingLevel(BuildingType.SHIPYARD) + 1;
+        const materialBlocked = shipyardBlueprint?.techRequirements.some((requirement) => (
+          requirement.tech === TechnologyType.MATERIAL_TECHNOLOGY
+          && player.getTechLevel(TechnologyType.MATERIAL_TECHNOLOGY) < Math.ceil(nextShipyardLevel * requirement.level)
+        )) === true;
+        return 2 + (materialBlocked ? 2.75 : 0.75) + stallPressureBonus;
+      }
+      case TechnologyType.ENERGY_TECHNOLOGY:
+        return 1.5 + Math.min(4, economyState.energyGap * 0.2) + stallPressureBonus;
+      default:
+        return 0;
+    }
+  }
+
+  return 0;
+}
+
+function resolveCandidateUtilityThreshold(
+  profile: BotProfile,
+  candidate: BotCandidate,
+  bootstrapDeadlockState: BootstrapDeadlockState
+): number {
+  if (!bootstrapDeadlockState.active || !isBootstrapRecoveryCandidate(candidate)) {
+    return profile.minUtilityThreshold;
+  }
+
+  if (candidate.kind === 'research') {
+    return Math.max(-0.5, profile.minUtilityThreshold - 3.25);
+  }
+
+  return Math.max(0.25, profile.minUtilityThreshold - 2.75);
+}
+
+function isBootstrapRecoveryCandidate(candidate: BotCandidate): boolean {
+  if (candidate.kind === 'building') {
+    return isBootstrapRecoveryBuildingType(candidate.request.buildingType);
+  }
+  if (candidate.kind === 'research') {
+    return isBootstrapRecoveryResearchType(candidate.request.technologyType);
+  }
+
+  return false;
+}
+
+function isBootstrapRecoveryReason(reason: string): boolean {
+  return BOOTSTRAP_RECOVERY_BUILDING_TYPES.some((buildingType) => reason.startsWith(`${buildingType} `))
+    || BOOTSTRAP_RECOVERY_RESEARCH_TYPES.some((technologyType) => reason.startsWith(`${technologyType} `));
+}
+
+function isBootstrapRecoveryBuildingType(buildingType: BuildingTypeType): boolean {
+  return BOOTSTRAP_RECOVERY_BUILDING_TYPES.includes(buildingType);
+}
+
+function isBootstrapRecoveryResearchType(technologyType: TechnologyTypeType): boolean {
+  return BOOTSTRAP_RECOVERY_RESEARCH_TYPES.includes(technologyType);
+}
+
+function resolveCandidatePlanet(player: Player, candidate: BotCandidate): Planet | null {
+  const coordinates = requestCoordinates(candidate);
+  return player.planets.find((planet) => sameCoordinates(coordinatesOfPlanet(planet), coordinates)) ?? null;
 }
 
 function resolveIncomingBotRequests(
@@ -2055,8 +2366,9 @@ function estimateLocalRepairCapability(galaxy: Galaxy, player: Player, targetPla
     if (fleet.ownerId !== player.playerId || fleet.state !== FleetState.ORBITING || !sameCoordinates(fleet.target, targetCoordinates)) {
       continue;
     }
-    total += Math.max(0, Math.floor(fleet.shipRepairCapability ?? 0));
-    total += Math.max(0, Math.floor(fleet.droneRepairCapability ?? 0));
+    const repairCapability = calculateRepairCapabilityForManyShips(fleet.ships);
+    total += Math.max(0, Math.floor(repairCapability.shipRepair));
+    total += Math.max(0, Math.floor(repairCapability.droneRepair));
   }
 
   return total;
@@ -5833,6 +6145,10 @@ function countOwnedShipsByType(player: Player): Map<ShipTypeType, number> {
 function scoreUtility(base: number, cost: ResourcesPackType): number {
   const valuedCost = cost.metal + (cost.crystal * 2) + (cost.deuterium * 3);
   return base - (valuedCost / 30);
+}
+
+function roundToTwoDecimals(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function applyGoalBonus(

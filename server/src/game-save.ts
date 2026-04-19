@@ -60,6 +60,7 @@ import type { StarSystemNote } from '../../src/app/models/planets/star-system-no
 import type { DefenceType } from '../../src/app/models/enums/defence-type.ts';
 import type { TechnologyQueueEntry as TechnologyQueueEntryModel } from '../../src/app/models/tech/technology-queue-entry.ts';
 import type { ResearchHelperFor as ResearchHelperForModel } from '../../src/app/models/tech/research-helper-for.ts';
+import type { SupportRequest } from '../../src/app/models/requests/support-request.ts';
 
 function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
   return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
@@ -240,6 +241,39 @@ type SavedFleet = {
   remainingFuelReserve: number;
 };
 
+type SavedResourceSupportRequest = Omit<
+  Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' }>,
+  'targetCoordinates' | 'requestedResources' | 'approvedResources' | 'reservedSourceCoordinates'
+> & {
+  targetCoordinates: SavedCoordinates;
+  requestedResources: SavedResourcesPack;
+  approvedResources: SavedResourcesPack | null;
+  reservedSourceCoordinates: SavedCoordinates | null;
+};
+
+type SavedOffensiveSupportRequest = Omit<
+  Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }>,
+  'targetCoordinates' | 'launchOriginCoordinates'
+> & {
+  targetCoordinates: SavedCoordinates;
+  launchOriginCoordinates: SavedCoordinates | null;
+};
+
+type SavedPassiveSupportRequest = Omit<
+  Exclude<
+    SupportRequest,
+    Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' | 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }>
+  >,
+  'targetCoordinates'
+> & {
+  targetCoordinates: SavedCoordinates;
+};
+
+type SavedSupportRequest =
+  | SavedResourceSupportRequest
+  | SavedOffensiveSupportRequest
+  | SavedPassiveSupportRequest;
+
 type SavedPlanet = {
   basicInfo: {
     name: string;
@@ -305,7 +339,7 @@ type SavedGalaxy = {
   diplomaticProposals: GalaxyModel['diplomaticProposals'];
   jumpGateRequests: GalaxyModel['jumpGateRequests'];
   maintenanceRequests: GalaxyModel['maintenanceRequests'];
-  supportRequests: GalaxyModel['supportRequests'];
+  supportRequests: SavedSupportRequest[];
 };
 
 export type SavedGameFile = {
@@ -404,30 +438,7 @@ export function createGameSave(
           }
           : null
       })),
-      supportRequests: galaxy.supportRequests.map((request) => ({
-        ...request,
-        targetCoordinates: serializeCoordinates(request.targetCoordinates),
-        requestedResources: 'requestedResources' in request
-          ? {
-            metal: request.requestedResources.metal,
-            crystal: request.requestedResources.crystal,
-            deuterium: request.requestedResources.deuterium
-          }
-          : undefined,
-        approvedResources: 'approvedResources' in request && request.approvedResources
-          ? {
-            metal: request.approvedResources.metal,
-            crystal: request.approvedResources.crystal,
-            deuterium: request.approvedResources.deuterium
-          }
-          : null,
-        launchOriginCoordinates: 'launchOriginCoordinates' in request && request.launchOriginCoordinates
-          ? serializeCoordinates(request.launchOriginCoordinates)
-          : null,
-        reservedSourceCoordinates: 'reservedSourceCoordinates' in request && request.reservedSourceCoordinates
-          ? serializeCoordinates(request.reservedSourceCoordinates)
-          : null
-      }))
+      supportRequests: galaxy.supportRequests.map((request) => serializeSupportRequest(request))
     }
   };
 }
@@ -707,22 +718,7 @@ export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
         : null
     })),
     save.galaxy.nextMaintenanceRequestId ?? 1,
-    (save.galaxy.supportRequests ?? []).map((request) => ({
-      ...request,
-      targetCoordinates: serializeCoordinates(request.targetCoordinates),
-      requestedResources: 'requestedResources' in request
-        ? normalizeSupportResources(request.requestedResources)
-        : undefined,
-      approvedResources: 'approvedResources' in request
-        ? normalizeSupportResources(request.approvedResources)
-        : null,
-      launchOriginCoordinates: 'launchOriginCoordinates' in request && request.launchOriginCoordinates
-        ? serializeCoordinates(request.launchOriginCoordinates)
-        : null,
-      reservedSourceCoordinates: 'reservedSourceCoordinates' in request && request.reservedSourceCoordinates
-        ? serializeCoordinates(request.reservedSourceCoordinates)
-        : null
-    })),
+    (save.galaxy.supportRequests ?? []).map((request) => hydrateSupportRequest(request)),
     save.galaxy.nextSupportRequestId ?? 1
   );
 
@@ -1146,6 +1142,84 @@ function serializePlanet(planet: PlanetModel): SavedPlanet {
         report: serializeEspionageReport(report)
       }))
       .sort((left, right) => left.playerId - right.playerId)
+  };
+}
+
+function serializeSupportRequest(request: SupportRequest): SavedSupportRequest {
+  if (request.supportType === 'RESOURCE_SUPPORT') {
+    return {
+      ...request,
+      targetCoordinates: serializeCoordinates(request.targetCoordinates),
+      requestedResources: {
+        metal: request.requestedResources.metal,
+        crystal: request.requestedResources.crystal,
+        deuterium: request.requestedResources.deuterium
+      },
+      approvedResources: request.approvedResources
+        ? {
+          metal: request.approvedResources.metal,
+          crystal: request.approvedResources.crystal,
+          deuterium: request.approvedResources.deuterium
+        }
+        : null,
+      reservedSourceCoordinates: request.reservedSourceCoordinates
+        ? serializeCoordinates(request.reservedSourceCoordinates)
+        : null
+    };
+  }
+
+  if (
+    request.supportType === 'ATTACK_TARGET'
+    || request.supportType === 'BOMBARD_TARGET'
+    || request.supportType === 'SIEGE_TARGET'
+  ) {
+    return {
+      ...request,
+      targetCoordinates: serializeCoordinates(request.targetCoordinates),
+      launchOriginCoordinates: request.launchOriginCoordinates
+        ? serializeCoordinates(request.launchOriginCoordinates)
+        : null
+    };
+  }
+
+  return {
+    ...request,
+    targetCoordinates: serializeCoordinates(request.targetCoordinates)
+  };
+}
+
+function hydrateSupportRequest(request: SavedSupportRequest): SupportRequest {
+  if (request.supportType === 'RESOURCE_SUPPORT') {
+    return {
+      ...request,
+      targetCoordinates: serializeCoordinates(request.targetCoordinates),
+      requestedResources: normalizeSupportResources(request.requestedResources),
+      approvedResources: request.approvedResources
+        ? normalizeSupportResources(request.approvedResources)
+        : null,
+      reservedSourceCoordinates: request.reservedSourceCoordinates
+        ? serializeCoordinates(request.reservedSourceCoordinates)
+        : null
+    };
+  }
+
+  if (
+    request.supportType === 'ATTACK_TARGET'
+    || request.supportType === 'BOMBARD_TARGET'
+    || request.supportType === 'SIEGE_TARGET'
+  ) {
+    return {
+      ...request,
+      targetCoordinates: serializeCoordinates(request.targetCoordinates),
+      launchOriginCoordinates: request.launchOriginCoordinates
+        ? serializeCoordinates(request.launchOriginCoordinates)
+        : null
+    };
+  }
+
+  return {
+    ...request,
+    targetCoordinates: serializeCoordinates(request.targetCoordinates)
   };
 }
 

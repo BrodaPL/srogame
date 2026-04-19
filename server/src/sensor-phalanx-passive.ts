@@ -1,16 +1,15 @@
 import * as diplomaticStatusModule from '../../src/app/models/diplomacy/diplomatic-status.js';
-import * as diplomacyResolverModule from '../../src/app/models/diplomacy/diplomacy-resolver.js';
 import * as fleetModule from '../../src/app/models/fleets/fleet.js';
 import * as manyShipsModule from '../../src/app/models/fleets/many-ships.js';
 import type {
   ClientCoordinates,
   SensorPhalanxFleetContactDto
 } from '../../src/app/models/game-api-types.ts';
+import type { DiplomacyResolver } from '../../src/app/models/diplomacy/diplomacy-resolver.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 
 const { DiplomaticStatus } = diplomaticStatusModule as typeof import('../../src/app/models/diplomacy/diplomatic-status.js');
-const { DiplomacyResolver } = diplomacyResolverModule as typeof import('../../src/app/models/diplomacy/diplomacy-resolver.js');
 const { FleetState } = fleetModule as typeof import('../../src/app/models/fleets/fleet.js');
 const { ManyShips } = manyShipsModule as typeof import('../../src/app/models/fleets/many-ships.js');
 

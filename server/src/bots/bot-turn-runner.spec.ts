@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { evaluateIdleEconomyFallbackDecision, runBotTurnPhase } from './bot-turn-runner.js';
 import { BOT_PROFILES } from './bot-profile.js';
-import { clearBotDecisionTraces, getBotDecisionTraces } from './bot-debug-store.js';
+import { clearBotDecisionTraces, getBotDecisionTraces, recordBotDecisionTrace } from './bot-debug-store.js';
 import { pauseBot, resetBotAdminRuntimeState } from './bot-admin.js';
 import { EspionageReportGenerator } from '../../../src/app/generators/espionage-report-generator.js';
 import { createDiplomaticProposal } from '../../../src/app/models/diplomacy/diplomatic-proposal.js';
@@ -207,6 +207,29 @@ describe('bot-turn-runner', () => {
     expect(bunkererBuildingFallback.floor).toBe(0);
   });
 
+  it('allows one narrow queued-work fallback for bootstrap deadlock recovery candidates', () => {
+    const deadlockOverride = evaluateIdleEconomyFallbackDecision(
+      'building',
+      BOT_PROFILES.BALANCED,
+      0,
+      0,
+      true,
+      0.1,
+      {
+        bootstrapDeadlockActive: true,
+        bootstrapRecoveryCandidate: true,
+        allowQueuedWorkOverride: true,
+        effectiveThreshold: 0.25
+      }
+    );
+
+    expect(deadlockOverride.eligible).toBe(true);
+    expect(deadlockOverride.allowed).toBe(true);
+    expect(deadlockOverride.used).toBe(true);
+    expect(deadlockOverride.reason).toBe('bootstrap_queue_override');
+    expect(deadlockOverride.floor).toBe(0);
+  });
+
   it('prioritizes a real energy recovery action on an underpowered economy planet', () => {
     const system = new SolarSystem('PowerSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
     const planet = Planet.createStartingPlanet('PowerSys I', 1, system, 1);
@@ -366,6 +389,113 @@ describe('bot-turn-runner', () => {
     runBotTurnPhase(galaxy);
 
     expect(planet.rBDSFTQ.currentResearchQueue?.technologyType).toBe(TechnologyType.MATERIAL_TECHNOLOGY);
+  });
+
+  it('uses deadlock-aware scoring to keep a stalled bootstrap economy progressing', () => {
+    const system = new SolarSystem('StallRecoverSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+    const planet = Planet.createStartingPlanet('StallRecoverSys I', 1, system, 1);
+    system.planets[0] = planet;
+
+    const bot = new Player(
+      1,
+      'Bot-1',
+      [planet],
+      new Map(),
+      [],
+      PlayerType.BOT,
+      createTutorialReadState(true)
+    );
+
+    initializePlanet(planet, bot.playerId);
+    bot.botProfileId = 'BALANCED';
+    bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 4);
+    bot.setTechLevel(TechnologyType.FUSION_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 2);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 3);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 3);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 4);
+    planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 4);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 3);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 2);
+    planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 1);
+    planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 2);
+    planet.rBDSFTQ.resources = new ResourcesPack(1740, 1310, 616);
+    planet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
+
+    const galaxy = new Galaxy(
+      'Bot Test',
+      [bot],
+      [[system]],
+      174,
+      [],
+      1,
+      new Map(),
+      new Map([[bot.playerId, bot]]),
+      new Map(),
+      new Map([[bot.playerName, bot.playerId]])
+    );
+
+    recordBotDecisionTrace({
+      playerId: bot.playerId,
+      playerName: bot.playerName,
+      turn: 172,
+      profileId: bot.botProfileId,
+      startingGoal: null,
+      endingGoal: null,
+      actionBudget: { max: 10, used: 0, stopReason: 'below_threshold' },
+      chosenActions: [],
+      rejectedActions: [{
+        kind: 'building',
+        reason: 'Robotics Factory upgrade on StallRecoverSys I',
+        rejectionType: 'threshold',
+        expectedUtility: -1.33,
+        details: {}
+      }]
+    });
+    recordBotDecisionTrace({
+      playerId: bot.playerId,
+      playerName: bot.playerName,
+      turn: 173,
+      profileId: bot.botProfileId,
+      startingGoal: null,
+      endingGoal: null,
+      actionBudget: { max: 10, used: 0, stopReason: 'below_threshold' },
+      chosenActions: [],
+      rejectedActions: [{
+        kind: 'building',
+        reason: 'Robotics Factory upgrade on StallRecoverSys I',
+        rejectionType: 'threshold',
+        expectedUtility: -1.33,
+        details: {}
+      }]
+    });
+
+    runBotTurnPhase(galaxy);
+
+    const trace = getBotDecisionTraces(bot.playerId).slice(-1)[0];
+    const chosenBuildingType = planet.rBDSFTQ.buildingQueue[0]?.buildingType ?? null;
+
+    expect(trace?.actionBudget.used).toBeGreaterThan(0);
+    expect(trace?.chosenActions[0]?.details['bootstrapDeadlockActive']).toBe(true);
+    expect(trace?.chosenActions[0]?.details['bootstrapDeadlockBonus']).not.toBeNull();
+    expect(
+      chosenBuildingType === BuildingType.ROBOTICS_FACTORY
+      || chosenBuildingType === BuildingType.METAL_MINE
+      || chosenBuildingType === BuildingType.CRYSTAL_MINE
+      || chosenBuildingType === BuildingType.DEUTERIUM_SYNTHESIZER
+      || chosenBuildingType === BuildingType.SHIPYARD
+      || chosenBuildingType === BuildingType.METAL_STORAGE
+      || chosenBuildingType === BuildingType.CRYSTAL_STORAGE
+      || chosenBuildingType === BuildingType.DEUTERIUM_TANK
+      || planet.rBDSFTQ.currentResearchQueue?.technologyType === TechnologyType.MATERIAL_TECHNOLOGY
+      || planet.rBDSFTQ.currentResearchQueue?.technologyType === TechnologyType.ENERGY_TECHNOLOGY
+    ).toBe(true);
   });
 
   it('does not queue a fusion reactor upgrade when the projected net deuterium would go negative', () => {
