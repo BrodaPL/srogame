@@ -46,25 +46,64 @@
         @for (fleet of activeFleets; track fleet.fleetId; let isFirst = $first) {
           <article
             class="overview-card operations-view__card"
+            [class.operations-view__card--attack]="isAttackMission(fleet)"
+            [class.operations-view__card--repair]="isRepairMission(fleet)"
+            [class.operations-view__card--transport]="isTransportMission(fleet)"
+            [class.operations-view__card--colonize]="isColonizeMission(fleet)"
+            [class.operations-view__card--movement]="isMovementMission(fleet)"
+            [class.operations-view__card--spy]="isSpyMission(fleet)"
+            [class.operations-view__card--bombard]="isBombardMission(fleet)"
+            [class.operations-view__card--defend]="isDefendMission(fleet)"
             [attr.data-tutorial-id]="isFirst ? 'operations-primary-card' : null">
             <div class="operations-view__card-head">
-              <div>
-                <h3>Fleet #{{ fleet.fleetId }}</h3>
-                <p class="overview-muted">{{ missionLabel(fleet) }} | {{ stateLabel(fleet) }}</p>
+              <div class="operations-view__fleet-meta">
+                <span class="operations-view__fleet-meta-line">
+                  Fleet #{{ fleet.fleetId }} | {{ missionLabel(fleet) }} | {{ stateLabel(fleet) }}
+                </span>
               </div>
-              <span class="badge badge--jump">{{ totalShips(fleet) }} ships</span>
+              <div class="operations-view__card-head-actions">
+                <span class="badge badge--jump">{{ totalShips(fleet) }} ships</span>
+                @if (canReturn(fleet)) {
+                  <button
+                    type="button"
+                    class="operations-view__action operations-view__action--header"
+                    [disabled]="isActionPending(fleet)"
+                    (click)="returnFleet(fleet)">
+                    Return now
+                  </button>
+                }
+                @if (canDelay(fleet)) {
+                  <button
+                    type="button"
+                    class="operations-view__action operations-view__action--header"
+                    [disabled]="isActionPending(fleet)"
+                    (click)="delayFleet(fleet)">
+                    Delay +1
+                  </button>
+                }
+              </div>
             </div>
 
             <div class="overview-stats">
               <div class="overview-stat">
                 <span class="overview-stat__label">Current Position</span>
                 <span class="overview-stat__value">{{ currentLocationPlanetName(fleet) }}</span>
-                <span class="overview-muted">{{ currentLocationCoordinates(fleet) }}</span>
+                <span
+                  class="overview-muted operations-view__coordinate-line"
+                  [attr.data-relation]="currentLocationRelation(fleet)"
+                >
+                  {{ currentLocationCoordinates(fleet) }}
+                </span>
               </div>
               <div class="overview-stat">
                 <span class="overview-stat__label">Destination</span>
                 <span class="overview-stat__value">{{ destinationPlanetName(fleet) }}</span>
-                <span class="overview-muted">{{ destinationCoordinates(fleet) }}</span>
+                <span
+                  class="overview-muted operations-view__coordinate-line"
+                  [attr.data-relation]="destinationRelation(fleet)"
+                >
+                  {{ destinationCoordinates(fleet) }}
+                </span>
               </div>
               <div class="overview-stat">
                 <span class="overview-stat__label">ETA</span>
@@ -83,38 +122,15 @@
 
             <p class="operations-view__ships">{{ shipSummary(fleet) }}</p>
             <p class="overview-muted">
-              Repair capability: Ship {{ shipRepairCapability(fleet) }} | Drone {{ droneRepairCapability(fleet) }}
+              Repair capability: Ship {{ shipRepairCapability(fleet) }} | Drone {{ droneRepairCapability(fleet) }} | Cargo manifest: M {{ fleet.cargo.metal }}, C {{ fleet.cargo.crystal }}, D {{ fleet.cargo.deuterium }}
             </p>
             @if (operationDetail(fleet); as detail) {
               <p class="overview-muted">{{ detail }}</p>
             }
-            <p class="overview-muted">
-              Cargo manifest: M {{ fleet.cargo.metal }}, C {{ fleet.cargo.crystal }}, D {{ fleet.cargo.deuterium }}
-            </p>
 
             <div
               class="operations-view__actions"
               [attr.data-tutorial-id]="isFirst ? 'operations-card-actions' : null">
-              @if (canReturn(fleet)) {
-                <button
-                  type="button"
-                  class="operations-view__action"
-                  [disabled]="isActionPending(fleet)"
-                  (click)="returnFleet(fleet)">
-                  Return now
-                </button>
-              }
-
-              @if (canDelay(fleet)) {
-                <button
-                  type="button"
-                  class="operations-view__action"
-                  [disabled]="isActionPending(fleet)"
-                  (click)="delayFleet(fleet)">
-                  Delay +1
-                </button>
-              }
-
               @if (canRequestMaintenance(fleet)) {
                 <button
                   type="button"

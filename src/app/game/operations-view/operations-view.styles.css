@@ -33,9 +33,94 @@
 }
 
 .operations-view__card {
+  --operations-row-accent: rgba(255, 255, 255, 0.12);
+  --operations-row-tint: transparent;
   display: grid;
   gap: 0.7rem;
   align-content: start;
+  padding-top: 0.5rem;
+  padding-bottom: 0.1rem;
+  border-left: 4px solid var(--operations-row-accent);
+  background:
+    linear-gradient(90deg, var(--operations-row-tint), transparent 30%),
+    var(--panel);
+}
+
+.operations-view__fleet-meta {
+  min-width: 0;
+}
+
+.operations-view__card-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.operations-view__fleet-meta-line {
+  display: block;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.operations-view__coordinate-line[data-relation='own'] {
+  color: #63c874;
+}
+
+.operations-view__coordinate-line[data-relation='war'] {
+  color: #e45b5b;
+}
+
+.operations-view__coordinate-line[data-relation='allied'] {
+  color: #5f92e8;
+}
+
+.operations-view__coordinate-line[data-relation='peace'] {
+  color: #d8bf46;
+}
+
+.operations-view__card--attack {
+  --operations-row-accent: #f08c2f;
+  --operations-row-tint: rgba(240, 140, 47, 0.18);
+}
+
+.operations-view__card--repair {
+  --operations-row-accent: #d8bf46;
+  --operations-row-tint: rgba(216, 191, 70, 0.18);
+}
+
+.operations-view__card--transport {
+  --operations-row-accent: #3e86e8;
+  --operations-row-tint: rgba(62, 134, 232, 0.18);
+}
+
+.operations-view__card--colonize {
+  --operations-row-accent: #84d66d;
+  --operations-row-tint: rgba(132, 214, 109, 0.18);
+}
+
+.operations-view__card--movement {
+  --operations-row-accent: #1f7a48;
+  --operations-row-tint: rgba(31, 122, 72, 0.2);
+}
+
+.operations-view__card--spy {
+  --operations-row-accent: #8a63d2;
+  --operations-row-tint: rgba(138, 99, 210, 0.2);
+}
+
+.operations-view__card--bombard {
+  --operations-row-accent: #c93b3b;
+  --operations-row-tint: rgba(201, 59, 59, 0.22);
+}
+
+.operations-view__card--defend {
+  --operations-row-accent: #214f9a;
+  --operations-row-tint: rgba(33, 79, 154, 0.2);
 }
 
 .operations-view__modal,
@@ -66,6 +151,10 @@
 .operations-view__action:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.operations-view__action--header {
+  padding: 0.35rem 0.75rem;
 }
 
 .operations-view__modal-backdrop {

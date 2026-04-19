@@ -237,11 +237,11 @@
                   <span class="overview-stat__label">Distance</span>
                   <span class="overview-stat__value">{{ distancePreview() }}</span>
                 </div>
-                <div class="overview-stat">
+                <div class="overview-stat" [attr.title]="travelFormulaTooltipLabel()">
                   <span class="overview-stat__label">ETA</span>
                   <span class="overview-stat__value">{{ travelTurnsPreview() }}</span>
                 </div>
-                <div class="overview-stat">
+                <div class="overview-stat" [attr.title]="travelFormulaTooltipLabel()">
                   <span class="overview-stat__label">Return ETA</span>
                   <span class="overview-stat__value">{{ travelTurnsPreview() }}</span>
                 </div>
@@ -276,15 +276,6 @@
                   <span class="overview-stat__value">{{ usedBombHangarCapacity() }} / {{ totalBomberHangarCapacity() }}</span>
                 </div>
               </div>
-            </div>
-            <div class="mission-planner__travel-formula">
-              <p class="mission-planner__travel-formula-line">{{ travelFormulaLabel() }}</p>
-              <p class="mission-planner__travel-formula-line mission-planner__travel-formula-line--detail">
-                {{ travelFormulaDetailLabel() }}
-              </p>
-              <p class="mission-planner__travel-formula-line mission-planner__travel-formula-line--muted">
-                {{ travelTechSummaryLabel() }}
-              </p>
             </div>
           </article>
         </section>

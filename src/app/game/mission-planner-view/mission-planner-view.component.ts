@@ -604,6 +604,14 @@ export class MissionPlannerViewComponent implements OnInit {
     return `Tech levels: Fusion Drive ${this.techLevel(TechnologyType.FUSION_DRIVE)} | Hyperspace Drive ${this.techLevel(TechnologyType.HYPERSPACE_DRIVE)} | Graviton Technology ${this.techLevel(TechnologyType.GRAVITON_TECHNOLOGY)}`;
   }
 
+  protected travelFormulaTooltipLabel(): string {
+    return [
+      this.travelFormulaLabel(),
+      this.travelFormulaDetailLabel(),
+      this.travelTechSummaryLabel()
+    ].join('\n');
+  }
+
   protected fuelCostPreview(): number {
     const distance = this.distancePreview();
     const fuelMultiplier = this.currentMission().minimumFuelReserves;

@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { finalize, forkJoin } from 'rxjs';
+import { catchError, finalize, forkJoin, of } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
@@ -14,6 +14,7 @@ import {
   FleetMaintenanceShipOptionDto,
   MaintenanceTransferPayloadDto
 } from '../../models/game-api-types';
+import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import { WeaponType } from '../../models/enums/weapon-type';
@@ -51,6 +52,7 @@ export class OperationsViewComponent implements OnInit {
   protected requestedFuel = 0;
   protected requestedShipAmounts: Partial<Record<string, number>> = {};
   protected requestedBombAmounts: Partial<Record<string, number>> = {};
+  private readonly ownerInfoByCoordinates = new Map<string, { ownerId: number | null; ownerName: string | null }>();
 
   private readonly shipBlueprints = ShipBlueprintsFactory.fromDefaultJson();
 
@@ -103,15 +105,28 @@ export class OperationsViewComponent implements OnInit {
 
   protected currentLocationCoordinates(fleet: Fleet): string {
     if (fleet.state === FleetState.PENDING_JUMP_GATE) {
-      return this.coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z);
+      return this.coordinatesWithOwnerLabel(fleet.origin);
     }
 
     if (this.isRecalledInTransit(fleet)) {
-      return `${this.coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z)} -> ${this.coordinatesLabel(fleet.target.x, fleet.target.y, fleet.target.z)}`;
+      return `${this.coordinatesWithOwnerLabel(fleet.origin)} -> ${this.coordinatesWithOwnerLabel(fleet.target)}`;
     }
 
     const coordinates = this.usesOriginCoordinates(fleet.state) ? fleet.origin : fleet.target;
-    return this.coordinatesLabel(coordinates.x, coordinates.y, coordinates.z);
+    return this.coordinatesWithOwnerLabel(coordinates);
+  }
+
+  protected currentLocationRelation(fleet: Fleet): string {
+    if (fleet.state === FleetState.PENDING_JUMP_GATE) {
+      return this.coordinatesRelation(fleet.origin);
+    }
+
+    if (this.isRecalledInTransit(fleet)) {
+      return this.coordinatesRelation(fleet.target);
+    }
+
+    const coordinates = this.usesOriginCoordinates(fleet.state) ? fleet.origin : fleet.target;
+    return this.coordinatesRelation(coordinates);
   }
 
   protected destinationPlanetName(fleet: Fleet): string {
@@ -131,19 +146,73 @@ export class OperationsViewComponent implements OnInit {
   protected destinationCoordinates(fleet: Fleet): string {
     switch (fleet.state) {
       case FleetState.PENDING_JUMP_GATE:
-        return this.coordinatesLabel(fleet.target.x, fleet.target.y, fleet.target.z);
+        return this.coordinatesWithOwnerLabel(fleet.target);
       case FleetState.RETURNING:
       case FleetState.MISSION_FAILURE_RETURNING:
-        return this.coordinatesLabel(fleet.origin.x, fleet.origin.y, fleet.origin.z);
+        return this.coordinatesWithOwnerLabel(fleet.origin);
       case FleetState.ORBITING:
         return this.currentLocationCoordinates(fleet);
       default:
-        return this.coordinatesLabel(fleet.target.x, fleet.target.y, fleet.target.z);
+        return this.coordinatesWithOwnerLabel(fleet.target);
+    }
+  }
+
+  protected destinationRelation(fleet: Fleet): string {
+    switch (fleet.state) {
+      case FleetState.PENDING_JUMP_GATE:
+        return this.coordinatesRelation(fleet.target);
+      case FleetState.RETURNING:
+      case FleetState.MISSION_FAILURE_RETURNING:
+        return this.coordinatesRelation(fleet.origin);
+      case FleetState.ORBITING:
+        return this.currentLocationRelation(fleet);
+      default:
+        return this.coordinatesRelation(fleet.target);
     }
   }
 
   protected missionLabel(fleet: Fleet): string {
     return fleet.missionType === FleetMissionType.DEFEND ? 'Guard' : fleet.missionType;
+  }
+
+  protected isAttackMission(fleet: Fleet): boolean {
+    return fleet.missionType === FleetMissionType.ATTACK
+      || fleet.missionType === FleetMissionType.PLUNDER
+      || fleet.missionType === FleetMissionType.INVADE
+      || fleet.missionType === FleetMissionType.INTERCEPT
+      || fleet.missionType === FleetMissionType.BLOCK;
+  }
+
+  protected isRepairMission(fleet: Fleet): boolean {
+    return fleet.missionType === FleetMissionType.REPAIR;
+  }
+
+  protected isTransportMission(fleet: Fleet): boolean {
+    return fleet.missionType === FleetMissionType.TRANSPORT;
+  }
+
+  protected isColonizeMission(fleet: Fleet): boolean {
+    return fleet.missionType === FleetMissionType.COLONIZE;
+  }
+
+  protected isMovementMission(fleet: Fleet): boolean {
+    return fleet.missionType === FleetMissionType.MOVE
+      || fleet.missionType === FleetMissionType.HOLD
+      || fleet.missionType === FleetMissionType.RECYCLE;
+  }
+
+  protected isSpyMission(fleet: Fleet): boolean {
+    return fleet.missionType === FleetMissionType.SPY
+      || fleet.missionType === FleetMissionType.STAR_SYSTEM_SPY;
+  }
+
+  protected isBombardMission(fleet: Fleet): boolean {
+    return fleet.missionType === FleetMissionType.BOMBARD
+      || fleet.missionType === FleetMissionType.SIEGE;
+  }
+
+  protected isDefendMission(fleet: Fleet): boolean {
+    return fleet.missionType === FleetMissionType.DEFEND;
   }
 
   protected stateLabel(fleet: Fleet): string {
@@ -473,7 +542,7 @@ export class OperationsViewComponent implements OnInit {
       .subscribe({
         next: ({ activeFleets, ownedPlanets }) => {
           this.ownedPlanets = [...ownedPlanets];
-          this.applyActiveFleetUpdate(activeFleets);
+          this.applyActiveFleetUpdate(activeFleets, session.token);
           if (this.activeFleets.length > 0) {
             this.tutorialService.autoOpenTutorial('operationsView');
           }
@@ -494,8 +563,11 @@ export class OperationsViewComponent implements OnInit {
       && fleet.returnTurns < fleet.travelTurns;
   }
 
-  private applyActiveFleetUpdate(activeFleets: Fleet[]): void {
+  private applyActiveFleetUpdate(activeFleets: Fleet[], token?: string): void {
     this.activeFleets = [...activeFleets].sort((left, right) => left.fleetId - right.fleetId);
+    if (token) {
+      this.refreshCoordinateOwnerNames(token, this.activeFleets);
+    }
   }
 
   private runFleetAction(
@@ -519,7 +591,7 @@ export class OperationsViewComponent implements OnInit {
       }))
       .subscribe({
         next: (activeFleets) => {
-          this.applyActiveFleetUpdate(activeFleets);
+          this.applyActiveFleetUpdate(activeFleets, session.token);
           if (this.maintenanceDialogFleetId === fleetId) {
             this.closeMaintenanceRequest();
           }
@@ -549,9 +621,108 @@ export class OperationsViewComponent implements OnInit {
   }
 
   private handleMaintenanceResponse(response: CreateMaintenanceRequestResponse): void {
-    this.applyActiveFleetUpdate(response.activeFleets);
+    const session = this.playerSession.load();
+    this.applyActiveFleetUpdate(response.activeFleets, session?.token);
     this.actionSuccess = response.message;
     this.closeMaintenanceRequest();
+  }
+
+  private refreshCoordinateOwnerNames(token: string, activeFleets: Fleet[]): void {
+    const ownerInfoByCoordinates = new Map<string, { ownerId: number | null; ownerName: string | null }>();
+    for (const planet of this.ownedPlanets) {
+      ownerInfoByCoordinates.set(
+        this.coordinatesKey(planet.coordinates),
+        {
+          ownerId: planet.info.ownerId,
+          ownerName: planet.info.ownerPlayerName ?? null
+        }
+      );
+    }
+
+    const coordinatesToFetch = new Map<string, { x: number; y: number; z: number }>();
+    for (const fleet of activeFleets) {
+      for (const coordinates of [fleet.origin, fleet.target]) {
+        const key = this.coordinatesKey(coordinates);
+        if (!ownerInfoByCoordinates.has(key) && !coordinatesToFetch.has(key)) {
+          coordinatesToFetch.set(key, coordinates);
+        }
+      }
+    }
+
+    if (coordinatesToFetch.size <= 0) {
+      this.replaceCoordinateOwnerInfos(ownerInfoByCoordinates);
+      return;
+    }
+
+    const coordinateEntries = [...coordinatesToFetch.entries()];
+    forkJoin(
+      coordinateEntries.map(([_, coordinates]) =>
+        this.gameApi.getClientPlanet(coordinates.x, coordinates.y, coordinates.z, token).pipe(
+          catchError(() => of(null))
+        )
+      )
+    ).subscribe({
+      next: (planets) => {
+        planets.forEach((planet, index) => {
+          const [key] = coordinateEntries[index] ?? [];
+          if (!key) {
+            return;
+          }
+          ownerInfoByCoordinates.set(key, {
+            ownerId: planet?.info.ownerId ?? null,
+            ownerName: planet?.info.ownerPlayerName ?? null
+          });
+        });
+        this.replaceCoordinateOwnerInfos(ownerInfoByCoordinates);
+      },
+      error: () => {
+        this.replaceCoordinateOwnerInfos(ownerInfoByCoordinates);
+      }
+    });
+  }
+
+  private replaceCoordinateOwnerInfos(entries: Map<string, { ownerId: number | null; ownerName: string | null }>): void {
+    this.ownerInfoByCoordinates.clear();
+    for (const [key, ownerInfo] of entries.entries()) {
+      this.ownerInfoByCoordinates.set(key, ownerInfo);
+    }
+    this.cdr.markForCheck();
+  }
+
+  private coordinatesWithOwnerLabel(coordinates: { x: number; y: number; z: number }): string {
+    const coordinatesLabel = this.coordinatesLabel(coordinates.x, coordinates.y, coordinates.z);
+    const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
+    return ownerInfo?.ownerName ? `${coordinatesLabel} - ${ownerInfo.ownerName}` : coordinatesLabel;
+  }
+
+  private coordinatesRelation(coordinates: { x: number; y: number; z: number }): string {
+    const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
+    if (!ownerInfo?.ownerId) {
+      return 'none';
+    }
+
+    const ownPlayerId = this.ownedPlanets[0]?.info.ownerId ?? null;
+    if (ownPlayerId === null) {
+      return 'none';
+    }
+
+    const status = this.gameState.diplomacyResolver().getStatus(ownPlayerId, ownerInfo.ownerId);
+    switch (status) {
+      case DiplomaticStatus.SELF:
+        return 'own';
+      case DiplomaticStatus.WAR:
+        return 'war';
+      case DiplomaticStatus.ALLIED:
+        return 'allied';
+      case DiplomaticStatus.PEACE:
+        return 'peace';
+      default:
+        return 'none';
+    }
+  }
+
+  private coordinatesKey(coordinates: { x: number; y: number; z: number }): string {
+    return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
   }
 
   private normalizeAmount(value: number | string): number {
