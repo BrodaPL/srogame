@@ -261,12 +261,12 @@ const ENEMY_DEFENCE_SURVIVOR_REGEX = /Enemy defenses \([^)]+\): (\d+)\/(\d+) sur
 const ENEMY_SHIP_SURVIVOR_REGEX = /Enemy ships \([^)]+\): (\d+)\/(\d+) survived, (\d+) lost\./;
 
 const BOT_ECONOMY_TARGETS: Record<BotProfile['id'], BotEconomyTargets> = {
-  BALANCED: { mineLevel: 6, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
-  AGGRESSOR: { mineLevel: 5, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
-  TURTLE: { mineLevel: 6, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
-  MINER: { mineLevel: 7, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
-  AVOIDER: { mineLevel: 7, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
-  BUNKERER: { mineLevel: 8, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 }
+  BALANCED: { mineLevel: 5, roboticsLevel: 4, researchLabLevel: 4, shipyardLevel: 3 },
+  AGGRESSOR: { mineLevel: 4, roboticsLevel: 4, researchLabLevel: 4, shipyardLevel: 3 },
+  TURTLE: { mineLevel: 5, roboticsLevel: 4, researchLabLevel: 4, shipyardLevel: 3 },
+  MINER: { mineLevel: 6, roboticsLevel: 4, researchLabLevel: 4, shipyardLevel: 3 },
+  AVOIDER: { mineLevel: 6, roboticsLevel: 4, researchLabLevel: 4, shipyardLevel: 3 },
+  BUNKERER: { mineLevel: 5, roboticsLevel: 4, researchLabLevel: 4, shipyardLevel: 3 }
 };
 
 const FOUNDATIONAL_RESEARCH_TARGETS: ResearchTargetDefinition[] = [
