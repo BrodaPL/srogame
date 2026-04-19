@@ -23,7 +23,7 @@ import type {
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
 import { resolveFusionReactorOperation, type FusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
-import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
+import { industryPowerMultiplier, maxOwnedPlanets, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -160,6 +160,7 @@ export class ImperiumViewComponent implements OnInit {
   protected powersDisplay: PlanetPowersDisplay | null = null;
 
   protected totalPlanets = 0;
+  protected maxPlanets = 1;
   protected totalShips = 0;
   protected activeBuildingQueues = 0;
   protected activeShipyardQueues = 0;
@@ -333,7 +334,7 @@ export class ImperiumViewComponent implements OnInit {
     this.attentionItems = this.createAttentionItems(this.planetVms);
     this.shipSummaries = this.createShipSummaries(this.ownedPlanets);
     this.buildingStats = this.createBuildingStats(this.ownedPlanets);
-    this.rebuildSummaryDisplays(this.planetVms);
+    this.rebuildSummaryDisplays(this.planetVms, techLevels);
   }
 
   private applyAbandonPlanetResponse(response: AbandonPlanetResponse): void {
@@ -342,7 +343,10 @@ export class ImperiumViewComponent implements OnInit {
     this.rebuildDashboardState();
   }
 
-  private rebuildSummaryDisplays(planetVms: ImperiumPlanetVm[]): void {
+  private rebuildSummaryDisplays(
+    planetVms: ImperiumPlanetVm[],
+    techLevels: Map<TechnologyType, number>
+  ): void {
     const totalResources = {
       metal: 0,
       crystal: 0,
@@ -373,6 +377,7 @@ export class ImperiumViewComponent implements OnInit {
     let hasResearchLimit = false;
 
     this.totalPlanets = planetVms.length;
+    this.maxPlanets = maxOwnedPlanets(techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? 0);
     this.totalShips = this.shipSummaries.reduce((sum, entry) => sum + entry.amount, 0);
     this.activeBuildingQueues = 0;
     this.activeShipyardQueues = 0;

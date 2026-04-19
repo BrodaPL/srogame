@@ -39,6 +39,7 @@ export type MissionPlannerContext = MissionSelectionContext & {
 
 export type MissionLaunchContext = MissionSelectionContext & {
   playerId: number;
+  owner?: Player | null;
   originPlanet: Planet;
   targetPlanet: Planet;
   targetOwner?: Player | null;

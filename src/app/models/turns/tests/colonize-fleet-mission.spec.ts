@@ -6,6 +6,7 @@ import { FleetMissionType } from '../../enums/fleet-mission-type';
 import { FleetState } from '../../fleets/fleet';
 import { ManyShips } from '../../fleets/many-ships';
 import { ShipType } from '../../enums/ship-type';
+import { TechnologyType } from '../../enums/technology-type';
 import { Fleet } from '../../fleets/fleet';
 import { Galaxy } from '../../planets/galaxy';
 import { Player } from '../../player';
@@ -38,6 +39,7 @@ describe('resolvePhaseOneTurn colonize integration', () => {
     targetPlanet.info.ownerId = null;
 
     const player = new Player(1, 'Alpha', [originPlanet], new Map(), [], PlayerType.PLAYER);
+    player.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 1);
     const fleet = new Fleet(
       10,
       1,
@@ -88,6 +90,7 @@ describe('resolvePhaseOneTurn colonize integration', () => {
     passiveNeutralPlanet.rBDSFTQ.ships = manyShips({ type: ShipType.FIGHTER, amount: 2 });
 
     const player = new Player(1, 'Alpha', [originPlanet], new Map(), [], PlayerType.PLAYER);
+    player.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 1);
     const neutralOwner = new Player(2, 'N-2', [passiveNeutralPlanet], new Map(), [], PlayerType.NEUTRAL);
     const fleet = new Fleet(
       1,
@@ -177,5 +180,53 @@ describe('resolvePhaseOneTurn colonize integration', () => {
     expect(galaxy.activeFleets[0].state).toBe(FleetState.MISSION_FAILURE_RETURNING);
     expect(hostileNeutralPlanet.info.ownerId).toBe(neutralOwner.playerId);
     expect(player.planets).not.toContain(hostileNeutralPlanet);
+  });
+
+  it('fails Colonize when the owner already reached the Adaptive Technology planet cap', () => {
+    const homeSystem = new SolarSystem('Cap Home', 1, false, false, { x: 6, y: 6 }, new Set<number>(), new Map());
+    const targetSystem = new SolarSystem('Cap Target', 1, false, false, { x: 6, y: 7 }, new Set<number>(), new Map());
+    const reserveSystem = new SolarSystem('Cap Reserve', 1, false, false, { x: 7, y: 6 }, new Set<number>(), new Map());
+    const originPlanet = homeSystem.planets[0];
+    const reservePlanet = reserveSystem.planets[0];
+    const targetPlanet = targetSystem.planets[0];
+
+    originPlanet.info.ownerId = 1;
+    reservePlanet.info.ownerId = 1;
+    targetPlanet.info.ownerId = null;
+    originPlanet.basicInfo.name = 'Alpha Prime';
+    reservePlanet.basicInfo.name = 'Beta Prime';
+    targetPlanet.basicInfo.name = 'Cap Target';
+
+    const player = new Player(1, 'Alpha', [originPlanet, reservePlanet], new Map(), [], PlayerType.PLAYER);
+    player.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 1);
+    const fleet = new Fleet(
+      3,
+      1,
+      FleetMissionType.COLONIZE,
+      point(6, 6, 0),
+      point(6, 7, 0),
+      'Alpha Prime',
+      'Cap Target',
+      manyShips({ type: ShipType.COLONIZER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      1000,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      8
+    );
+
+    const galaxy = new Galaxy('Colonize Cap Galaxy', [player], [[homeSystem, targetSystem], [reserveSystem]], 8, [fleet], 4);
+    galaxy.humanPlayerMap.set(player.playerId, player);
+    galaxy.playerNameMap.set(player.playerName, player.playerId);
+
+    resolvePhaseOneTurn(galaxy, 9);
+
+    expect(galaxy.activeFleets).toHaveLength(1);
+    expect(galaxy.activeFleets[0].state).toBe(FleetState.MISSION_FAILURE_RETURNING);
+    expect(targetPlanet.info.ownerId).toBeNull();
+    expect(player.planets).not.toContain(targetPlanet);
   });
 });

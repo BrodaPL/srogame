@@ -359,12 +359,16 @@ export class EncyclopediaMechanicsComponent {
       title: 'Planet Abandonment and Recolonization',
       category: 'Planets',
       status: 'Live',
-      summary: 'Planets can now be abandoned with immediate ownership transfer to a fresh neutral, and some passive neutral worlds can be recolonized later.',
+      summary: 'Planets can now be abandoned with immediate ownership transfer to a fresh neutral, and colonization is limited by Adaptive Technology.',
       details: [
         'A planet can be abandoned only if it is not the player\'s last owned planet.',
         'Abandoning removes the world from the player, assigns a fresh neutral owner, applies PASSIVE relation to the old owner, and cancels building, shipyard, and research queues.',
         'Local resources, ships, defences, and active fleets remain in place on the abandoned world.',
-        'Colonize can still claim unowned planets and can also reclaim PASSIVE neutral abandoned planets, merging arriving ships and cargo into the recolonized world.'
+        'Colonize can still claim unowned planets and can also reclaim PASSIVE neutral abandoned planets, merging arriving ships and cargo into the recolonized world.',
+        'Colonize launch and arrival both fail once the player already owns their current maximum number of planets.'
+      ],
+      formulas: [
+        'maxOwnedPlanets = floor(sqrt(ADAPTIVE_TECHNOLOGY * 2)) + 1'
       ]
     },
     {

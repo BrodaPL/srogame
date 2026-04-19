@@ -246,6 +246,7 @@ export function createFleetMission(
       cargo: command.cargo
     },
     playerId: context.playerId,
+    owner: player,
     originPlanet,
     targetPlanet,
     targetOwner: targetPlanet.info.ownerId === null

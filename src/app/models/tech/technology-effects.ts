@@ -2,6 +2,10 @@ export function maxActiveFleets(computerTechnologyLevel: number): number {
   return 2 + (sanitizeTechLevel(computerTechnologyLevel) * 2);
 }
 
+export function maxOwnedPlanets(adaptiveTechnologyLevel: number): number {
+  return Math.floor(Math.sqrt(sanitizeTechLevel(adaptiveTechnologyLevel) * 2)) + 1;
+}
+
 export function industryPowerMultiplier(adaptiveTechnologyLevel: number): number {
   return 1 + (sanitizeTechLevel(adaptiveTechnologyLevel) / 100);
 }

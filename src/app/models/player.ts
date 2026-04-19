@@ -475,8 +475,12 @@ export class Player {
           lastSentCombatStrength: Number.isFinite(entry?.lastSentCombatStrength)
             ? Math.max(0, Number(entry.lastSentCombatStrength))
             : null,
-          lastKnownDefenceCount: Number.isInteger(entry?.lastKnownDefenceCount) ? Math.max(0, entry.lastKnownDefenceCount) : null,
-          lastKnownShipCount: Number.isInteger(entry?.lastKnownShipCount) ? Math.max(0, entry.lastKnownShipCount) : null,
+          lastKnownDefenceCount: Number.isInteger(entry?.lastKnownDefenceCount)
+            ? Math.max(0, Number(entry?.lastKnownDefenceCount ?? 0))
+            : null,
+          lastKnownShipCount: Number.isInteger(entry?.lastKnownShipCount)
+            ? Math.max(0, Number(entry?.lastKnownShipCount ?? 0))
+            : null,
           lastKnownOpened: entry?.lastKnownOpened === true,
           nextForceMultiplier: Number.isFinite(entry?.nextForceMultiplier)
             ? Math.max(1, Number(entry.nextForceMultiplier))

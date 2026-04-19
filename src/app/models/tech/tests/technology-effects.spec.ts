@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   industryPowerMultiplier,
   maxActiveFleets,
+  maxOwnedPlanets,
   researchPowerMultiplier
 } from '../technology-effects';
 
@@ -10,6 +11,13 @@ describe('technology effects', () => {
     expect(maxActiveFleets(0)).toBe(2);
     expect(maxActiveFleets(1)).toBe(4);
     expect(maxActiveFleets(4)).toBe(10);
+  });
+
+  it('calculates the owned planet cap from Adaptive Technology', () => {
+    expect(maxOwnedPlanets(0)).toBe(1);
+    expect(maxOwnedPlanets(1)).toBe(2);
+    expect(maxOwnedPlanets(2)).toBe(3);
+    expect(maxOwnedPlanets(8)).toBe(5);
   });
 
   it('calculates the industry multiplier from Adaptive Technology', () => {
