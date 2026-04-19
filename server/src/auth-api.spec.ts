@@ -598,6 +598,55 @@ describe.sequential('auth api', () => {
     });
   });
 
+  it('allows closing a selected single-player save even after the runtime is already unloaded', async () => {
+    await request('POST', '/api/auth/register', {
+      playerName: 'CloseInactiveAdmin',
+      email: 'close-inactive-singleplayer-admin@example.com',
+      password: 'secret-123'
+    }, '10.0.0.72');
+    activateAccount('CloseInactiveAdmin', { localAdmin: true });
+
+    const loginResponse = await request('POST', '/api/auth/login', {
+      playerName: 'CloseInactiveAdmin',
+      password: 'secret-123'
+    }, '10.0.0.72');
+    expect(loginResponse.status).toBe(200);
+    const token = loginResponse.json?.token as string;
+
+    const startResponse = await request('POST', '/api/game/start', {
+      setup: createSingleplayerSetup('Close Inactive Sector')
+    }, '10.0.0.72', token);
+    expect(startResponse.status).toBe(200);
+    const startedPlayer = startResponse.json?.player as Record<string, unknown> | undefined;
+    const gameId = typeof startedPlayer?.currentGameId === 'string' ? startedPlayer.currentGameId : null;
+    expect(typeof gameId).toBe('string');
+
+    const firstCloseResponse = await request('POST', `/api/games/${gameId}/close-current`, {}, '10.0.0.72', token);
+    expect(firstCloseResponse.status).toBe(200);
+
+    const authData = readAuthData();
+    authData.accounts[0]!.currentGameId = gameId;
+    authData.sessions[0]!.currentGameId = gameId;
+    writeAuthData(authData);
+
+    const secondCloseResponse = await request('POST', `/api/games/${gameId}/close-current`, {}, '10.0.0.72', token);
+    expect(secondCloseResponse.status).toBe(200);
+    expect(secondCloseResponse.json).toMatchObject({
+      currentGameId: null,
+      game: null,
+      canResume: false,
+      unavailableReason: null,
+      unavailableReasonKey: null,
+      unavailableReasonParams: null
+    });
+
+    const updatedAuthData = readAuthData();
+    expect(updatedAuthData.accounts[0]?.currentGameId).toBeNull();
+    expect(updatedAuthData.sessions[0]?.currentGameId).toBeNull();
+    expect(updatedAuthData.accounts[0]?.lastClosedGameId).toBe(gameId);
+    expect(updatedAuthData.sessions[0]?.lastClosedGameId).toBe(gameId);
+  });
+
   it('resumes a selected single-player game from its current save when the runtime is inactive', async () => {
     await request('POST', '/api/auth/register', {
       playerName: 'ResumeSingleplayerAdmin',

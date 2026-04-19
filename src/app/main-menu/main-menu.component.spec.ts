@@ -121,7 +121,8 @@ describe('MainMenuComponent', () => {
     gameApi.getCurrentGameStatus.mockReturnValue(of(createCurrentGameStatus({
       game: {
         ...createCurrentGameStatus().game!,
-        kind: 'SINGLEPLAYER'
+        kind: 'SINGLEPLAYER',
+        isLoaded: true
       }
     })));
     const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n, cdr);
@@ -137,6 +138,23 @@ describe('MainMenuComponent', () => {
       currentGameId: null
     }));
     expect(gameState.clearGalaxy).toHaveBeenCalled();
+  });
+
+  it('hides close-current-game for selected singleplayer saves that are not currently loaded', () => {
+    gameApi.getCurrentGameStatus.mockReturnValue(of(createCurrentGameStatus({
+      game: {
+        ...createCurrentGameStatus().game!,
+        kind: 'SINGLEPLAYER',
+        isLoaded: false
+      }
+    })));
+    const component = createBareComponent(authApi, authState, gameApi, gameState, router, i18n, cdr);
+
+    component['loadCurrentGameStatus']('token');
+    component.closeCurrentGame();
+
+    expect(component.shouldShowCloseCurrentGame()).toBe(false);
+    expect(gameApi.closeCurrentGame).not.toHaveBeenCalled();
   });
 
   it('clears the stored session when current-game status returns unauthorized', () => {
@@ -260,6 +278,7 @@ function createCurrentGameStatus(overrides: Partial<CurrentGameStatusResponse> =
       currentTurn: 7,
       updatedAt: '2026-04-10T08:00:00.000Z',
       isCurrentGame: true,
+      isLoaded: true,
       canResume: true,
       canJoin: true,
       canManage: true

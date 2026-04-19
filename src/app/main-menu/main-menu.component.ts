@@ -74,6 +74,7 @@ export class MainMenuComponent {
     return this.session()?.localAdmin === true
       && !!game
       && game.kind === 'SINGLEPLAYER'
+      && game.isLoaded === true
       && this.currentGameStatus?.canResume === true;
   }
 
