@@ -77,6 +77,25 @@ export type BotMemorySupportRequestRecord = {
   turn: number;
 };
 
+export type BotFarmLossBracket =
+  | 'NONE'
+  | 'LIGHT'
+  | 'MEDIUM'
+  | 'HEAVY'
+  | 'DEFEAT';
+
+export type BotFarmTargetRecord = {
+  targetCoordinates: BotMemoryCoordinates;
+  lastAttackTurn: number | null;
+  nextAllowedAttackTurn: number | null;
+  lastSentCombatStrength: number | null;
+  lastKnownDefenceCount: number | null;
+  lastKnownShipCount: number | null;
+  lastKnownOpened: boolean;
+  nextForceMultiplier: number;
+  lastLossBracket: BotFarmLossBracket | null;
+};
+
 export type BotMemory = {
   currentGoal: BotGoalType | null;
   goalTarget: BotMemoryCoordinates | null;
@@ -88,6 +107,8 @@ export type BotMemory = {
   goodwillByPlayer?: BotMemoryGoodwillEntry[];
   recentSupportRequests?: BotMemorySupportRequestRecord[];
   processedSupportOutcomeIds?: number[];
+  farmTargets?: BotFarmTargetRecord[];
+  lastProcessedFleetReportId?: number | null;
 };
 
 export type PlayerExtras = {
@@ -288,7 +309,11 @@ export class Player {
       recentDiplomacyTargets: Player.normalizeBotMemoryDiplomacyTargets(memory.recentDiplomacyTargets),
       goodwillByPlayer: Player.normalizeBotMemoryGoodwillEntries(memory.goodwillByPlayer),
       recentSupportRequests: Player.normalizeBotMemorySupportRequestRecords(memory.recentSupportRequests),
-      processedSupportOutcomeIds: Player.normalizeBotMemorySupportOutcomeIds(memory.processedSupportOutcomeIds)
+      processedSupportOutcomeIds: Player.normalizeBotMemorySupportOutcomeIds(memory.processedSupportOutcomeIds),
+      farmTargets: Player.normalizeBotFarmTargetRecords(memory.farmTargets),
+      lastProcessedFleetReportId: Number.isInteger(memory.lastProcessedFleetReportId)
+        ? memory.lastProcessedFleetReportId
+        : null
     };
   }
 
@@ -427,5 +452,54 @@ export class Player {
       .filter((entry) => Number.isInteger(entry) && entry > 0)
       .map((entry) => Math.floor(entry))
       .slice(-80);
+  }
+
+  private static normalizeBotFarmTargetRecords(
+    entries: BotFarmTargetRecord[] | null | undefined
+  ): BotFarmTargetRecord[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const targetCoordinates = Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates);
+        if (!targetCoordinates) {
+          return null;
+        }
+
+        return {
+          targetCoordinates,
+          lastAttackTurn: Number.isInteger(entry?.lastAttackTurn) ? entry.lastAttackTurn : null,
+          nextAllowedAttackTurn: Number.isInteger(entry?.nextAllowedAttackTurn) ? entry.nextAllowedAttackTurn : null,
+          lastSentCombatStrength: Number.isFinite(entry?.lastSentCombatStrength)
+            ? Math.max(0, Number(entry.lastSentCombatStrength))
+            : null,
+          lastKnownDefenceCount: Number.isInteger(entry?.lastKnownDefenceCount) ? Math.max(0, entry.lastKnownDefenceCount) : null,
+          lastKnownShipCount: Number.isInteger(entry?.lastKnownShipCount) ? Math.max(0, entry.lastKnownShipCount) : null,
+          lastKnownOpened: entry?.lastKnownOpened === true,
+          nextForceMultiplier: Number.isFinite(entry?.nextForceMultiplier)
+            ? Math.max(1, Number(entry.nextForceMultiplier))
+            : 1,
+          lastLossBracket: Player.normalizeBotFarmLossBracket(entry?.lastLossBracket)
+        };
+      })
+      .filter((entry): entry is BotFarmTargetRecord => entry !== null)
+      .slice(-40);
+  }
+
+  private static normalizeBotFarmLossBracket(
+    bracket: BotFarmLossBracket | null | undefined
+  ): BotFarmLossBracket | null {
+    switch (bracket) {
+      case 'NONE':
+      case 'LIGHT':
+      case 'MEDIUM':
+      case 'HEAVY':
+      case 'DEFEAT':
+        return bracket;
+      default:
+        return null;
+    }
   }
 }

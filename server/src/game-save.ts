@@ -1055,7 +1055,12 @@ function serializePlayer(
           ...entry,
           targetCoordinates: { ...entry.targetCoordinates }
         })),
-        processedSupportOutcomeIds: [...(player.botMemory.processedSupportOutcomeIds ?? [])]
+        processedSupportOutcomeIds: [...(player.botMemory.processedSupportOutcomeIds ?? [])],
+        farmTargets: (player.botMemory.farmTargets ?? []).map((entry) => ({
+          ...entry,
+          targetCoordinates: { ...entry.targetCoordinates }
+        })),
+        lastProcessedFleetReportId: player.botMemory.lastProcessedFleetReportId ?? null
       }
       : null
   };

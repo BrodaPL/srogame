@@ -63,6 +63,8 @@ Support-request notes:
 - goodwill is updated from observed support-request outcomes
 - outgoing support asks are capped to 1 per turn and 2 unresolved total
 - repeat asks to the same player for the same support type / target planet use a 3-turn cooldown
+- accepted `PLANET_REPAIR` now expects a real `Repair` helper launch, not acknowledge-only state
+- accepted `PLANET_DEFENSE` now expects a real `Guard` helper launch, not acknowledge-only state
 - offensive support acceptance now assumes a 5-turn launch window, matching the runtime support-request expiry
 
 Bots do not use separate engine-only cheats for combat. The current explicit bot edge is:

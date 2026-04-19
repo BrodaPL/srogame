@@ -10,6 +10,7 @@ import * as shipPurposeEnumModule from '../../../src/app/models/enums/ship-purpo
 import * as shipTypeEnumModule from '../../../src/app/models/enums/ship-type.js';
 import * as technologyTypeEnumModule from '../../../src/app/models/enums/technology-type.js';
 import * as weaponTypeEnumModule from '../../../src/app/models/enums/weapon-type.js';
+import * as reportTypeEnumModule from '../../../src/app/models/enums/report-type.js';
 import * as resourcesPackModule from '../../../src/app/models/resources-pack.js';
 import * as playerModule from '../../../src/app/models/player.js';
 import * as supportRequestModule from '../../../src/app/models/requests/support-request.js';
@@ -36,7 +37,15 @@ import type {
   SupportRequestType,
   SupportShipAmount
 } from '../../../src/app/models/requests/support-request.ts';
-import type { BotGoalType, BotMemory, BotMemoryCoordinates, BotProfileId, Player } from '../../../src/app/models/player.ts';
+import type {
+  BotFarmLossBracket,
+  BotFarmTargetRecord,
+  BotGoalType,
+  BotMemory,
+  BotMemoryCoordinates,
+  BotProfileId,
+  Player
+} from '../../../src/app/models/player.ts';
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { StartBuildingConstructionCommand } from '../game-commands/building-commands.ts';
 import type { CreateFleetMaintenanceRequestCommand } from '../game-commands/maintenance-commands.ts';
@@ -104,6 +113,7 @@ const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../../
 const { FleetState } = resolveModule(fleetModelModule) as typeof import('../../../src/app/models/fleets/fleet.js');
 const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../../../src/app/models/enums/player-type.js');
 const { PlanetType } = resolveModule(planetTypeEnumModule) as typeof import('../../../src/app/models/enums/planet-type.js');
+const { ReportType } = resolveModule(reportTypeEnumModule) as typeof import('../../../src/app/models/enums/report-type.js');
 const { ShipPurpose } = resolveModule(shipPurposeEnumModule) as typeof import('../../../src/app/models/enums/ship-purpose.js');
 const { ShipType } = resolveModule(shipTypeEnumModule) as typeof import('../../../src/app/models/enums/ship-type.js');
 const { TechnologyType } = resolveModule(technologyTypeEnumModule) as typeof import('../../../src/app/models/enums/technology-type.js');
@@ -244,6 +254,11 @@ type ResearchTargetDefinition = {
 };
 
 const TARGET_ENERGY_SURPLUS = 3;
+const FARM_ATTACK_COOLDOWN_TURNS = 10;
+const MAX_BOT_FARM_TARGETS = 40;
+const OWN_SHIP_LOSS_REGEX = /Own ships \([^)]+\): (\d+)\/(\d+) survived, (\d+) lost\./;
+const ENEMY_DEFENCE_SURVIVOR_REGEX = /Enemy defenses \([^)]+\): (\d+)\/(\d+) survived, (\d+) lost\./;
+const ENEMY_SHIP_SURVIVOR_REGEX = /Enemy ships \([^)]+\): (\d+)\/(\d+) survived, (\d+) lost\./;
 
 const BOT_ECONOMY_TARGETS: Record<BotProfile['id'], BotEconomyTargets> = {
   BALANCED: { mineLevel: 6, roboticsLevel: 4, researchLabLevel: 2, shipyardLevel: 3 },
@@ -338,6 +353,7 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
   const blockedKeys = new Set<string>();
 
   ensureBotMemory(player, galaxy.currentTurn);
+  processFarmAttackOutcomes(galaxy, player);
   processSupportRequestOutcomes(galaxy, player, profile);
   const trace: BotDecisionTrace = {
     playerId: player.playerId,
@@ -498,6 +514,7 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
     }
 
     counters.total += 1;
+    rememberFarmAttackLaunchFromCandidate(galaxy, player, best, galaxy.currentTurn);
     updateBotMemoryAfterAction(player, galaxy.currentTurn, best);
     trace.chosenActions.push({
       kind: best.kind,
@@ -521,6 +538,41 @@ function runSingleBotTurn(galaxy: Galaxy, player: Player, profile: BotProfile): 
   trace.actionBudget.stopReason = stopReason;
   trace.endingGoal = player.botMemory?.currentGoal ?? null;
   recordBotDecisionTrace(trace);
+}
+
+function rememberFarmAttackLaunchFromCandidate(
+  galaxy: Galaxy,
+  player: Player,
+  candidate: BotCandidate,
+  currentTurn: number
+): void {
+  if (candidate.kind !== 'attack') {
+    return;
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, candidate.request.target);
+  if (!targetPlanet || targetPlanet.info.ownerId === null) {
+    return;
+  }
+
+  const targetOwner = resolvePlayerById(galaxy, targetPlanet.info.ownerId);
+  if (!targetOwner) {
+    return;
+  }
+
+  const targetStatus = resolveDiplomaticStatus(galaxy, player.playerId, targetOwner.playerId);
+  if (!isFarmTarget(targetOwner, targetStatus)) {
+    return;
+  }
+
+  const report = targetPlanet.lastReportData.get(player.playerId) ?? null;
+  rememberFarmAttackLaunch(
+    player,
+    candidate.request.target,
+    currentTurn,
+    estimateShipSelectionCombatStrength(candidate.request.ships),
+    report
+  );
 }
 
 function buildBotCandidates(
@@ -974,6 +1026,230 @@ function processSupportRequestOutcomes(
   }
 }
 
+function processFarmAttackOutcomes(galaxy: Galaxy, player: Player): void {
+  const memory = player.botMemory;
+  if (!memory) {
+    return;
+  }
+
+  let lastProcessedFleetReportId = memory.lastProcessedFleetReportId ?? 0;
+  const reports = player.reports
+    .filter((report) => report.reportType === ReportType.FLEET_REPORT && report.reportId > lastProcessedFleetReportId)
+    .sort((left, right) => left.reportId - right.reportId);
+
+  for (const report of reports) {
+    lastProcessedFleetReportId = Math.max(lastProcessedFleetReportId, report.reportId);
+    if (!report.sourceCoordinates || !('body' in report) || typeof report.body !== 'string') {
+      continue;
+    }
+
+    const targetCoordinates = report.sourceCoordinates;
+    const targetPlanet = resolvePlanetAtCoordinates(galaxy, targetCoordinates);
+    if (!targetPlanet || targetPlanet.info.ownerId === null) {
+      continue;
+    }
+
+    const targetOwner = resolvePlayerById(galaxy, targetPlanet.info.ownerId);
+    if (!targetOwner) {
+      continue;
+    }
+    const targetStatus = resolveDiplomaticStatus(galaxy, player.playerId, targetOwner.playerId);
+    if (!isFarmTarget(targetOwner, targetStatus)) {
+      continue;
+    }
+
+    const parsedOutcome = parseFarmAttackReportBody(report.body);
+    if (!parsedOutcome) {
+      continue;
+    }
+
+    rememberFarmAttackOutcome(player, targetCoordinates, report.createdTurn, parsedOutcome);
+  }
+
+  memory.lastProcessedFleetReportId = lastProcessedFleetReportId > 0 ? lastProcessedFleetReportId : null;
+}
+
+function parseFarmAttackReportBody(body: string): {
+  enemyDefenceSurvivors: number;
+  enemyShipSurvivors: number;
+  lastLossBracket: BotFarmLossBracket;
+  nextForceMultiplier: number;
+} | null {
+  const ownShipMatch = body.match(OWN_SHIP_LOSS_REGEX);
+  const enemyDefenceMatch = body.match(ENEMY_DEFENCE_SURVIVOR_REGEX);
+  const enemyShipMatch = body.match(ENEMY_SHIP_SURVIVOR_REGEX);
+  if (!ownShipMatch || !enemyDefenceMatch || !enemyShipMatch) {
+    return null;
+  }
+
+  const survivingOwnShips = Number(ownShipMatch[1]);
+  const initialOwnShips = Number(ownShipMatch[2]);
+  const destroyedOwnShips = Number(ownShipMatch[3]);
+  const enemyShipSurvivors = Number(enemyShipMatch[1]);
+  const enemyDefenceSurvivors = Number(enemyDefenceMatch[1]);
+  if (
+    !Number.isFinite(survivingOwnShips)
+    || !Number.isFinite(initialOwnShips)
+    || !Number.isFinite(destroyedOwnShips)
+    || !Number.isFinite(enemyShipSurvivors)
+    || !Number.isFinite(enemyDefenceSurvivors)
+    || initialOwnShips <= 0
+  ) {
+    return null;
+  }
+
+  const battleResultMatch = body.match(/Battle result: ([A-Za-z_]+)/);
+  const battleResult = battleResultMatch?.[1]?.toLowerCase() ?? '';
+  const defeat = battleResult === 'defender' || survivingOwnShips <= 0;
+  const lossRatio = defeat
+    ? 1
+    : Math.max(0, Math.min(1, destroyedOwnShips / initialOwnShips));
+  const lastLossBracket = resolveFarmLossBracket(lossRatio, defeat);
+
+  return {
+    enemyDefenceSurvivors: Math.max(0, Math.floor(enemyDefenceSurvivors)),
+    enemyShipSurvivors: Math.max(0, Math.floor(enemyShipSurvivors)),
+    lastLossBracket,
+    nextForceMultiplier: resolveFarmForceMultiplier(lastLossBracket)
+  };
+}
+
+function resolveFarmLossBracket(
+  lossRatio: number,
+  defeat: boolean
+): BotFarmLossBracket {
+  if (defeat) {
+    return 'DEFEAT';
+  }
+  if (lossRatio <= 0) {
+    return 'NONE';
+  }
+  if (lossRatio <= 0.25) {
+    return 'LIGHT';
+  }
+  if (lossRatio <= 0.6) {
+    return 'MEDIUM';
+  }
+  return 'HEAVY';
+}
+
+function resolveFarmForceMultiplier(lossBracket: BotFarmLossBracket | null): number {
+  switch (lossBracket) {
+    case 'NONE':
+      return 1.2;
+    case 'LIGHT':
+      return 1.5;
+    case 'MEDIUM':
+      return 2;
+    case 'HEAVY':
+    case 'DEFEAT':
+      return 4;
+    default:
+      return 1;
+  }
+}
+
+function rememberFarmAttackOutcome(
+  player: Player,
+  targetCoordinates: BotMemoryCoordinates,
+  createdTurn: number,
+  outcome: {
+    enemyDefenceSurvivors: number;
+    enemyShipSurvivors: number;
+    lastLossBracket: BotFarmLossBracket;
+    nextForceMultiplier: number;
+  }
+): void {
+  const record = getOrCreateFarmTargetRecord(player, targetCoordinates);
+  if (!record) {
+    return;
+  }
+
+  record.lastAttackTurn = Number.isInteger(createdTurn) ? createdTurn : record.lastAttackTurn;
+  record.lastKnownDefenceCount = outcome.enemyDefenceSurvivors;
+  record.lastKnownShipCount = outcome.enemyShipSurvivors;
+  record.lastKnownOpened = outcome.enemyDefenceSurvivors <= 0 && outcome.enemyShipSurvivors <= 0;
+  record.lastLossBracket = outcome.lastLossBracket;
+  record.nextForceMultiplier = record.lastKnownOpened ? 1 : outcome.nextForceMultiplier;
+}
+
+function rememberFarmAttackLaunch(
+  player: Player,
+  targetCoordinates: BotMemoryCoordinates,
+  currentTurn: number,
+  sentCombatStrength: number,
+  report: EspionageReportData | null
+): void {
+  const record = getOrCreateFarmTargetRecord(player, targetCoordinates);
+  if (!record) {
+    return;
+  }
+
+  record.lastAttackTurn = currentTurn;
+  record.nextAllowedAttackTurn = currentTurn + FARM_ATTACK_COOLDOWN_TURNS;
+  record.lastSentCombatStrength = Math.max(0, sentCombatStrength);
+  if (report) {
+    record.lastKnownDefenceCount = report.totalDefencesAmount;
+    record.lastKnownShipCount = report.totalShipsAmount;
+    record.lastKnownOpened = report.totalDefencesAmount <= 0 && report.totalShipsAmount <= 0;
+    if (record.lastKnownOpened) {
+      record.nextForceMultiplier = 1;
+    }
+  }
+}
+
+function getOrCreateFarmTargetRecord(
+  player: Player,
+  targetCoordinates: BotMemoryCoordinates
+): BotFarmTargetRecord | null {
+  const memory = player.botMemory;
+  if (!memory) {
+    return null;
+  }
+
+  const existing = memory.farmTargets?.find((entry) => sameCoordinates(entry.targetCoordinates, targetCoordinates)) ?? null;
+  if (existing) {
+    return existing;
+  }
+
+  const nextRecord: BotFarmTargetRecord = {
+    targetCoordinates: { ...targetCoordinates },
+    lastAttackTurn: null,
+    nextAllowedAttackTurn: null,
+    lastSentCombatStrength: null,
+    lastKnownDefenceCount: null,
+    lastKnownShipCount: null,
+    lastKnownOpened: false,
+    nextForceMultiplier: 1,
+    lastLossBracket: null
+  };
+  const records = memory.farmTargets ?? [];
+  records.push(nextRecord);
+  while (records.length > MAX_BOT_FARM_TARGETS) {
+    records.shift();
+  }
+  memory.farmTargets = records;
+  return nextRecord;
+}
+
+function getFarmTargetRecord(
+  memory: BotMemory | null,
+  targetCoordinates: BotMemoryCoordinates
+): BotFarmTargetRecord | null {
+  if (!memory) {
+    return null;
+  }
+
+  return memory.farmTargets?.find((entry) => sameCoordinates(entry.targetCoordinates, targetCoordinates)) ?? null;
+}
+
+function resolvePlanetAtCoordinates(
+  galaxy: Galaxy,
+  coordinates: BotMemoryCoordinates
+): Planet | null {
+  return flattenPlanets(galaxy).find((planet) => sameCoordinates(coordinatesOfPlanet(planet), coordinates)) ?? null;
+}
+
 function decideIncomingSupportRequest(
   galaxy: Galaxy,
   player: Player,
@@ -1040,9 +1316,8 @@ function decideIncomingSupportRequest(
   if (request.supportType === 'PLANET_REPAIR') {
     const targetPlanet = flattenPlanets(galaxy).find((planet) => sameCoordinates(coordinatesOfPlanet(planet), request.targetCoordinates)) ?? null;
     const repairNeed = targetPlanet ? estimateRepairNeed(galaxy, requester, targetPlanet) : 0;
-    const helpWindow = resolveFastestFriendlyPlanetDistance(player, request.targetCoordinates, canPlanetProvideRepairSupport);
-    const selfThreat = hasCriticalEconomyPressure(player, profile);
-    if (repairNeed <= 0 || helpWindow === null || helpWindow > 10 || selfThreat) {
+    const launchReadiness = resolveRepairSupportLaunchReadiness(player, request.targetCoordinates);
+    if (repairNeed <= 0 || !launchReadiness || launchReadiness.distance > 10) {
       return {
         approve: false,
         approvedResources: null,
@@ -1061,10 +1336,17 @@ function decideIncomingSupportRequest(
 
   if (request.supportType === 'PLANET_DEFENSE') {
     const targetPlanet = flattenPlanets(galaxy).find((planet) => sameCoordinates(coordinatesOfPlanet(planet), request.targetCoordinates)) ?? null;
-    const helpWindow = resolveFastestFriendlyPlanetDistance(player, request.targetCoordinates, planetHasJumpCombatShip);
     const safeDefenseCapacity = calculateAvailableDefenseSupportPower(player);
     const threat = targetPlanet ? estimateNearbyThreat(galaxy, requester, targetPlanet) : null;
-    if (helpWindow === null || helpWindow > 5 || safeDefenseCapacity <= 0 || !canBotSpareDefenseSupport(galaxy, player, profile)) {
+    const targetDefenseStrength = targetPlanet ? estimatePlanetCombatStrength(targetPlanet) : 0;
+    const launchReadiness = resolveDefenseSupportLaunchReadiness(
+      player,
+      profile,
+      request.targetCoordinates,
+      threat?.reportStrength ?? 0,
+      targetDefenseStrength
+    );
+    if (!launchReadiness || launchReadiness.distance > 5 || safeDefenseCapacity <= 0 || !canBotSpareDefenseSupport(galaxy, player, profile)) {
       return {
         approve: false,
         approvedResources: null,
@@ -1144,9 +1426,7 @@ function approveSupportRequestForBot(
 
   request.acceptedTurn = galaxy.currentTurn;
   request.executionDueTurn = galaxy.currentTurn + 1;
-  request.executionExpiresOnTurn = isOffensiveSupportRequest(request)
-    ? galaxy.currentTurn + 5
-    : galaxy.currentTurn + 1;
+  request.executionExpiresOnTurn = galaxy.currentTurn + 5;
   request.state = DiplomaticProposalState.ACCEPTED;
   request.resolutionNote = isOffensiveSupportRequest(request)
     ? `Offensive support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`
@@ -1776,6 +2056,27 @@ function estimateLocalRepairCapability(galaxy: Galaxy, player: Player, targetPla
   return total;
 }
 
+function resolveRepairSupportLaunchReadiness(
+  player: Player,
+  targetCoordinates: ClientCoordinates
+): { distance: number; ships: CreateFleetShipSelectionEntry[] } | null {
+  let best: { distance: number; ships: CreateFleetShipSelectionEntry[] } | null = null;
+
+  for (const planet of player.planets) {
+    const ships = buildRepairShipSelection(planet);
+    if (ships.length <= 0) {
+      continue;
+    }
+
+    const distance = calculateTravelDistance(coordinatesOfPlanet(planet), targetCoordinates);
+    if (!best || distance < best.distance) {
+      best = { distance, ships };
+    }
+  }
+
+  return best;
+}
+
 function resolveFastestFriendlyPlanetDistance(
   player: Player,
   targetCoordinates: ClientCoordinates,
@@ -1795,6 +2096,36 @@ function resolveFastestFriendlyPlanetDistance(
   }
 
   return best;
+}
+
+function resolveDefenseSupportLaunchReadiness(
+  player: Player,
+  profile: BotProfile,
+  targetCoordinates: ClientCoordinates,
+  nearbyThreatStrength: number,
+  targetDefenseStrength: number
+): { distance: number; ships: CreateFleetShipSelectionEntry[] } | null {
+  let best: { distance: number; ships: CreateFleetShipSelectionEntry[]; strength: number } | null = null;
+
+  for (const planet of player.planets) {
+    const ships = buildGuardShipSelection(
+      planet,
+      Math.max(24, nearbyThreatStrength),
+      targetDefenseStrength,
+      profile
+    );
+    if (ships.length <= 0) {
+      continue;
+    }
+
+    const distance = calculateTravelDistance(coordinatesOfPlanet(planet), targetCoordinates);
+    const strength = estimateShipSelectionCombatStrength(ships);
+    if (!best || distance < best.distance || (distance === best.distance && strength > best.strength)) {
+      best = { distance, ships, strength };
+    }
+  }
+
+  return best ? { distance: best.distance, ships: best.ships } : null;
 }
 
 function canPlanetProvideRepairSupport(planet: Planet): boolean {
@@ -2477,6 +2808,9 @@ function buildSpyCandidates(
       if (!report && distance > unseenDistanceLimit) {
         continue;
       }
+      if (!report && shouldPreferAllUnknownSystemSweep(galaxy, player, originPlanet, targetPlanet, availableProbes)) {
+        continue;
+      }
 
       const request: CreateFleetMissionCommand = {
         missionType: FleetMissionType.SPY,
@@ -2516,6 +2850,41 @@ function buildSpyCandidates(
   }
 
   return candidates;
+}
+
+function shouldPreferAllUnknownSystemSweep(
+  galaxy: Galaxy,
+  player: Player,
+  originPlanet: Planet,
+  targetPlanet: Planet,
+  availableProbes: number
+): boolean {
+  const eligiblePlanets = targetPlanet.basicInfo.solarSystem.planets.filter((planet) =>
+    planet.basicInfo.type !== PlanetType.ASTEROIDS
+    && planet.info.ownerId !== player.playerId
+  );
+  if (eligiblePlanets.length < 2 || eligiblePlanets.length > availableProbes) {
+    return false;
+  }
+
+  const originCoordinates = coordinatesOfPlanet(originPlanet);
+  let requiredFuel = 0;
+  for (const candidatePlanet of eligiblePlanets) {
+    const candidateCoordinates = coordinatesOfPlanet(candidatePlanet);
+    if (sameCoordinates(originCoordinates, candidateCoordinates)) {
+      return false;
+    }
+
+    const report = candidatePlanet.lastReportData.get(player.playerId) ?? null;
+    if (report !== null) {
+      return false;
+    }
+
+    const distance = calculateTravelDistance(originCoordinates, candidateCoordinates);
+    requiredFuel += calculateFuelCost([{ type: ShipType.SPY_PROBE, amount: 1 }], distance);
+  }
+
+  return originPlanet.rBDSFTQ.resources.deuterium >= requiredFuel;
 }
 
 function buildStarSystemSpyCandidates(
@@ -2614,7 +2983,7 @@ function buildStarSystemSpyCandidates(
       ), 0);
       const totalInterest = candidateTargets.reduce((sum, entry) => sum + entry.interest, 0);
       const avgDistance = candidateTargets.reduce((sum, entry) => sum + entry.distance, 0) / candidateTargets.length;
-      const allUnknownBonus = allUnknown ? 12 : 0;
+      const allUnknownBonus = allUnknown ? 20 : 0;
       const base = (9 * profile.spyWeight)
         + totalInterest
         + (candidateTargets.length * 2.5)
@@ -2760,7 +3129,6 @@ function buildAttackCandidates(
     if (!targetOwner) {
       continue;
     }
-
     const targetStatus = resolveDiplomaticStatus(galaxy, player.playerId, targetOwner.playerId);
     const farmTarget = isFarmTarget(targetOwner, targetStatus);
     if (
@@ -2783,9 +3151,27 @@ function buildAttackCandidates(
 
     const defenderStrength = Math.max(1, estimateReportCombatStrength(report));
     const stalenessTurns = Math.max(0, galaxy.currentTurn - report.createdTurn);
-    const clearedFarm = farmTarget && report.totalDefencesAmount <= 0;
-    const effectiveStalenessTurns = clearedFarm ? 0 : stalenessTurns;
     const targetCoordinates = coordinatesOfPlanet(targetPlanet);
+    const farmRecord = getFarmTargetRecord(player.botMemory, targetCoordinates);
+    if (
+      farmTarget
+      && Number.isInteger(farmRecord?.nextAllowedAttackTurn)
+      && galaxy.currentTurn < (farmRecord?.nextAllowedAttackTurn ?? 0)
+    ) {
+      continue;
+    }
+
+    const knownDefenceCount = report.totalDefencesAmount;
+    const knownShipCount = report.totalShipsAmount;
+    const openedFarm = farmTarget && (
+      (knownDefenceCount <= 0 && knownShipCount <= 0)
+      || farmRecord?.lastKnownOpened === true
+    );
+    const defenselessFarm = farmTarget && (
+      knownDefenceCount <= 0
+      || (farmRecord?.lastKnownDefenceCount ?? 1) <= 0
+    );
+    const effectiveStalenessTurns = defenselessFarm ? 0 : stalenessTurns;
     for (const originPlanet of player.planets) {
       const originCoordinates = coordinatesOfPlanet(originPlanet);
       if (sameCoordinates(originCoordinates, targetCoordinates)) {
@@ -2797,9 +3183,11 @@ function buildAttackCandidates(
         continue;
       }
 
-      const attackShips = buildAttackShipSelection(originPlanet, report, profile, {
-        requireBombardmentBreaker: farmTarget && report.totalDefencesAmount > 0
-      });
+      const attackShips = openedFarm
+        ? buildOpenedFarmRaidShipSelection(originPlanet, report)
+        : buildAttackShipSelection(originPlanet, report, profile, {
+          requireBombardmentBreaker: farmTarget && knownDefenceCount > 0
+        });
       if (attackShips.length === 0) {
         continue;
       }
@@ -2829,6 +3217,15 @@ function buildAttackCandidates(
       }
 
       const attackerStrength = estimateShipSelectionCombatStrength(request.ships);
+      const retryStrengthFloor = farmTarget && !openedFarm && Number.isFinite(farmRecord?.lastSentCombatStrength)
+        ? Math.max(
+          defenderStrength * profile.minAttackStrengthRatio,
+          (farmRecord?.lastSentCombatStrength ?? 0) * Math.max(1, farmRecord?.nextForceMultiplier ?? 1)
+        )
+        : 0;
+      if (retryStrengthFloor > 0 && attackerStrength < retryStrengthFloor) {
+        continue;
+      }
       const relationRiskPenalty = farmTarget
         ? 0
         : targetStatus === DiplomaticStatus.NEUTRAL
@@ -2874,7 +3271,9 @@ function buildAttackCandidates(
       candidates.push({
         kind: 'attack',
         utility,
-        reason: `Attack ${targetPlanet.basicInfo.name} (${targetStatus}) with favorable ${ratio.toFixed(2)} ratio`,
+        reason: openedFarm
+          ? `Raid opened farm ${targetPlanet.basicInfo.name} (${targetStatus})`
+          : `Attack ${targetPlanet.basicInfo.name} (${targetStatus}) with favorable ${ratio.toFixed(2)} ratio`,
         goalType: 'PREPARE_SAFE_ATTACK',
         request
       });
@@ -3746,7 +4145,9 @@ function ensureBotMemory(player: Player, currentTurn: number): void {
       recentDiplomacyTargets: memory?.recentDiplomacyTargets ?? [],
       goodwillByPlayer: memory?.goodwillByPlayer ?? [],
       recentSupportRequests: memory?.recentSupportRequests ?? [],
-      processedSupportOutcomeIds: memory?.processedSupportOutcomeIds ?? []
+      processedSupportOutcomeIds: memory?.processedSupportOutcomeIds ?? [],
+      farmTargets: memory?.farmTargets ?? [],
+      lastProcessedFleetReportId: memory?.lastProcessedFleetReportId ?? null
     };
   }
 }
@@ -3779,7 +4180,9 @@ function updateBotMemoryAfterAction(player: Player, currentTurn: number, candida
     recentDiplomacyTargets: previousMemory?.recentDiplomacyTargets ?? [],
     goodwillByPlayer: previousMemory?.goodwillByPlayer ?? [],
     recentSupportRequests: previousMemory?.recentSupportRequests ?? [],
-    processedSupportOutcomeIds: previousMemory?.processedSupportOutcomeIds ?? []
+    processedSupportOutcomeIds: previousMemory?.processedSupportOutcomeIds ?? [],
+    farmTargets: previousMemory?.farmTargets ?? [],
+    lastProcessedFleetReportId: previousMemory?.lastProcessedFleetReportId ?? null
   };
 }
 
@@ -4344,8 +4747,9 @@ function isFusionReactorUpgradeDeuteriumSafe(
 
 function isFarmTarget(owner: Player | null, status: string | null): boolean {
   return Boolean(
-    (owner && owner.type === PlayerType.NEUTRAL)
-    || status === DiplomaticStatus.PASSIVE
+    owner
+    && owner.type === PlayerType.NEUTRAL
+    && (status === DiplomaticStatus.NEUTRAL || status === DiplomaticStatus.PASSIVE)
   );
 }
 
@@ -4618,6 +5022,89 @@ function buildAttackShipSelection(
       undamagedAmount: 1,
       damagedAmount: 0
     });
+  }
+
+  return selection;
+}
+
+function buildOpenedFarmRaidShipSelection(
+  originPlanet: Planet,
+  report: EspionageReportData
+): CreateFleetShipSelectionEntry[] {
+  const availableCounts = originPlanet.rBDSFTQ.ships.undamagedCountByType();
+  const cargoCandidates = [...availableCounts.entries()]
+    .filter(([shipType, amount]) => {
+      if (amount <= 0) {
+        return false;
+      }
+
+      const blueprint = SHIP_BLUEPRINTS.get(shipType);
+      return Boolean(blueprint && blueprint.canJump && blueprint.cargoCapacity > 0);
+    })
+    .map(([shipType, amount]) => {
+      const blueprint = SHIP_BLUEPRINTS.get(shipType)!;
+      return {
+        type: shipType,
+        amount,
+        cargoCapacity: blueprint.cargoCapacity,
+        power: estimateShipCombatPower(shipType)
+      };
+    })
+    .sort((left, right) =>
+      right.cargoCapacity - left.cargoCapacity
+      || right.power - left.power
+      || left.type.localeCompare(right.type)
+    );
+  if (cargoCandidates.length === 0) {
+    return [];
+  }
+
+  const selection: CreateFleetShipSelectionEntry[] = [];
+  let remainingCargoNeed = Math.max(1, Math.floor(estimateResourceValue(report.resourcesAmount) * 0.8));
+  for (const entry of cargoCandidates) {
+    if (remainingCargoNeed <= 0) {
+      break;
+    }
+
+    const amountToSend = Math.min(entry.amount, Math.max(1, Math.ceil(remainingCargoNeed / entry.cargoCapacity)));
+    selection.push({
+      type: entry.type,
+      undamagedAmount: amountToSend,
+      damagedAmount: 0
+    });
+    remainingCargoNeed -= entry.cargoCapacity * amountToSend;
+  }
+
+  const hasCombatEscort = selection.some((entry) => estimateShipCombatPower(entry.type) > 0);
+  if (!hasCombatEscort) {
+    const escort = [...availableCounts.entries()]
+      .filter(([shipType, amount]) => {
+        if (amount <= 0) {
+          return false;
+        }
+
+        const blueprint = SHIP_BLUEPRINTS.get(shipType);
+        return Boolean(blueprint && blueprint.canJump && blueprint.weapons.length > 0);
+      })
+      .map(([shipType]) => ({
+        type: shipType,
+        power: estimateShipCombatPower(shipType)
+      }))
+      .sort((left, right) => right.power - left.power || left.type.localeCompare(right.type))[0] ?? null;
+    if (!escort) {
+      return [];
+    }
+
+    const existingEscort = selection.find((entry) => entry.type === escort.type) ?? null;
+    if (existingEscort) {
+      existingEscort.undamagedAmount += 1;
+    } else {
+      selection.push({
+        type: escort.type,
+        undamagedAmount: 1,
+        damagedAmount: 0
+      });
+    }
   }
 
   return selection;

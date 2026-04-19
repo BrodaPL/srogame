@@ -19,12 +19,14 @@ import { Fleet, FleetOrbitActivity, FleetState } from '../../../src/app/models/f
 import { ManyShips } from '../../../src/app/models/fleets/many-ships.js';
 import { createJumpGateRequest } from '../../../src/app/models/requests/jump-gate-request.js';
 import { createMaintenanceRequest } from '../../../src/app/models/requests/maintenance-request.js';
+import { createSupportRequest } from '../../../src/app/models/requests/support-request.js';
 import { ResourcesPack } from '../../../src/app/models/resources-pack.js';
 import { BuildingType } from '../../../src/app/models/enums/building-type.js';
 import { DefenceType } from '../../../src/app/models/enums/defence-type.js';
 import { PlanetType } from '../../../src/app/models/enums/planet-type.js';
 import { ShipType } from '../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../src/app/models/enums/technology-type.js';
+import { FleetReport } from '../../../src/app/models/reports/fleet-report.js';
 import { createTutorialReadState } from '../../../src/app/tutorial/tutorial-types.js';
 
 describe('bot-turn-runner', () => {
@@ -442,6 +444,130 @@ describe('bot-turn-runner', () => {
     expect(attackFleet?.target.z).toBe(passivePlanet.basicInfo.order - 1);
   });
 
+  it('does not refarm the same neutral target before the 10-turn cooldown expires', () => {
+    const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
+    makeBotFarmReady(bot, homePlanet);
+    homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 220);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 4);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    targetPlanet.rBDSFTQ.resources = new ResourcesPack(360, 180, 60);
+    galaxy.currentTurn = 12;
+    targetPlanet.lastReportData.set(
+      bot.playerId,
+      new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+        forcedReportLevel: 12,
+        createdTurn: 10
+      })
+    );
+    bot.botMemory = Player.normalizeBotMemory({
+      currentGoal: null,
+      goalTarget: null,
+      goalExpiresTurn: null,
+      reservedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      lastSpyTargets: [],
+      lastAttackTargets: [],
+      recentDiplomacyTargets: [],
+      farmTargets: [{
+        targetCoordinates: { x: 0, y: 0, z: 1 },
+        lastAttackTurn: 10,
+        nextAllowedAttackTurn: 20,
+        lastSentCombatStrength: 40,
+        lastKnownDefenceCount: 0,
+        lastKnownShipCount: 0,
+        lastKnownOpened: true,
+        nextForceMultiplier: 1,
+        lastLossBracket: 'NONE'
+      }]
+    });
+
+    runBotTurnPhase(galaxy);
+
+    expect(galaxy.activeFleets.some((fleet) => fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.ATTACK)).toBe(false);
+  });
+
+  it('uses a cargo-heavy raid composition for an opened neutral farm', () => {
+    const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
+    makeBotFarmReady(bot, homePlanet);
+    homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 220);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 4);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 3);
+    targetPlanet.rBDSFTQ.resources = new ResourcesPack(360, 180, 60);
+    galaxy.currentTurn = 18;
+    targetPlanet.lastReportData.set(
+      bot.playerId,
+      new EspionageReportGenerator().createEspionageReport(bot, targetOwner, targetPlanet, 4, {
+        forcedReportLevel: 12,
+        createdTurn: 8
+      })
+    );
+
+    runBotTurnPhase(galaxy);
+
+    const attackFleet = galaxy.activeFleets.find((fleet) =>
+      fleet.ownerId === bot.playerId && fleet.missionType === FleetMissionType.ATTACK
+    ) ?? null;
+    expect(attackFleet).not.toBeNull();
+    const counts = attackFleet?.ships.countByType() ?? new Map();
+    expect(counts.get(ShipType.TRANSPORTER) ?? 0).toBeGreaterThan(0);
+    expect(counts.get(ShipType.CRUISER) ?? 0).toBeLessThanOrEqual(1);
+  });
+
+  it('updates farm retry memory from battle fleet reports', () => {
+    const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
+    makeBotFarmReady(bot, homePlanet);
+    homePlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 0);
+    galaxy.currentTurn = 14;
+    bot.botMemory = Player.normalizeBotMemory({
+      currentGoal: null,
+      goalTarget: null,
+      goalExpiresTurn: null,
+      reservedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      lastSpyTargets: [],
+      lastAttackTargets: [],
+      recentDiplomacyTargets: [],
+      farmTargets: [{
+        targetCoordinates: { x: 0, y: 0, z: 1 },
+        lastAttackTurn: 12,
+        nextAllowedAttackTurn: 22,
+        lastSentCombatStrength: 30,
+        lastKnownDefenceCount: 2,
+        lastKnownShipCount: 1,
+        lastKnownOpened: false,
+        nextForceMultiplier: 1.2,
+        lastLossBracket: 'NONE'
+      }]
+    });
+    bot.addReport(new FleetReport(
+      {
+        reportId: 1,
+        createdTurn: 13,
+        title: 'Battle Report: BotSys II',
+        sourceCoordinates: { x: 0, y: 0, z: 1 },
+        sourcePlanetName: targetPlanet.basicInfo.name,
+        sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+        senderPlayerName: targetOwner.playerName
+      },
+      [
+        'Battle result: defender',
+        'Own ships (attacker): 0/4 survived, 4 lost.',
+        'Own defenses (attacker): 0/0 survived, 0 lost.',
+        'Enemy ships (defender): 1/1 survived, 0 lost.',
+        'Enemy defenses (defender): 2/2 survived, 0 lost.'
+      ].join('\n')
+    ));
+
+    runBotTurnPhase(galaxy);
+
+    expect(bot.botMemory?.farmTargets?.[0]).toMatchObject({
+      lastKnownDefenceCount: 2,
+      lastKnownShipCount: 1,
+      lastKnownOpened: false,
+      nextForceMultiplier: 4,
+      lastLossBracket: 'DEFEAT'
+    });
+    expect(bot.botMemory?.lastProcessedFleetReportId).toBe(1);
+  });
+
   it('requires a bombardment-weapon ship before attacking a defended farm target', () => {
     const { galaxy, bot, homePlanet, targetPlanet, targetOwner } = createTwoPlanetGalaxy(PlayerType.NEUTRAL);
     makeBotFarmReady(bot, homePlanet);
@@ -546,6 +672,26 @@ describe('bot-turn-runner', () => {
     expect(request.approved?.fuel ?? 0).toBeGreaterThan(0);
     expect(fleet.cargo.deuterium).toBeGreaterThan(0);
     expect(fleet.pendingMaintenanceRequestId).toBeNull();
+  });
+
+  it('approves an incoming allied repair support request when it can launch a real repair fleet', () => {
+    const { galaxy, request } = createIncomingRepairSupportRequestGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    expect(request.state).toBe(DiplomaticProposalState.ACCEPTED);
+    expect(request.executionExpiresOnTurn).toBe(10);
+    expect(getBotDecisionTraces(2)[0]?.chosenActions.some((entry) => entry.kind === 'approve-support')).toBe(true);
+  });
+
+  it('approves an incoming allied defense support request when it can launch a real guard fleet', () => {
+    const { galaxy, request } = createIncomingDefenseSupportRequestGalaxy();
+
+    runBotTurnPhase(galaxy);
+
+    expect(request.state).toBe(DiplomaticProposalState.ACCEPTED);
+    expect(request.executionExpiresOnTurn).toBe(10);
+    expect(getBotDecisionTraces(2)[0]?.chosenActions.some((entry) => entry.kind === 'approve-support')).toBe(true);
   });
 
   it('approves an incoming peace proposal when the bot is pressured on the border', () => {
@@ -1201,6 +1347,121 @@ function createIncomingMaintenanceRequestGalaxy(): {
   return { galaxy, bot, request, fleet };
 }
 
+function createIncomingRepairSupportRequestGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  request: ReturnType<typeof createSupportRequest>;
+} {
+  const allySystem = new SolarSystem('RepairAlly', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const botSystem = new SolarSystem('RepairBot', 1, false, false, { x: 1, y: 0 }, new Set(), new Map());
+  const allyPlanet = Planet.createStartingPlanet('RepairAlly I', 1, allySystem, 1);
+  const botPlanet = Planet.createStartingPlanet('RepairBot I', 1, botSystem, 1);
+  allySystem.planets[0] = allyPlanet;
+  botSystem.planets[0] = botPlanet;
+
+  const ally = new Player(1, 'Ally', [allyPlanet], new Map(), [], PlayerType.PLAYER, createTutorialReadState(true));
+  const bot = new Player(2, 'Bot-1', [botPlanet], new Map(), [], PlayerType.BOT, createTutorialReadState(true));
+
+  initializePlanet(allyPlanet, ally.playerId);
+  initializePlanet(botPlanet, bot.playerId);
+  allyPlanet.rBDSFTQ.ships.addDamaged(ShipType.CORVETTE, 4);
+  botPlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 140);
+  botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CARRIER, 1);
+  botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 1);
+
+  const request = createSupportRequest(
+    1,
+    ally.playerId,
+    bot.playerId,
+    'PLANET_REPAIR',
+    allyPlanet.basicInfo.name,
+    { x: 0, y: 0, z: 0 },
+    5,
+    7
+  );
+
+  const galaxy = new Galaxy(
+    'Bot Test',
+    [ally, bot],
+    [[allySystem, botSystem]],
+    5,
+    [],
+    1,
+    new Map([[ally.playerId, ally]]),
+    new Map([[bot.playerId, bot]]),
+    new Map(),
+    new Map([[ally.playerName, ally.playerId], [bot.playerName, bot.playerId]]),
+    [{ playerAId: ally.playerId, playerBId: bot.playerId, status: DiplomaticStatus.ALLIED }],
+    [],
+    1,
+    [],
+    1,
+    [],
+    1,
+    [request],
+    2
+  );
+
+  return { galaxy, bot, request };
+}
+
+function createIncomingDefenseSupportRequestGalaxy(): {
+  galaxy: Galaxy;
+  bot: Player;
+  request: ReturnType<typeof createSupportRequest>;
+} {
+  const allySystem = new SolarSystem('DefenseAlly', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const botSystem = new SolarSystem('DefenseBot', 1, false, false, { x: 1, y: 0 }, new Set(), new Map());
+  const allyPlanet = Planet.createStartingPlanet('DefenseAlly I', 1, allySystem, 1);
+  const botPlanet = Planet.createStartingPlanet('DefenseBot I', 1, botSystem, 1);
+  allySystem.planets[0] = allyPlanet;
+  botSystem.planets[0] = botPlanet;
+
+  const ally = new Player(1, 'Ally', [allyPlanet], new Map(), [], PlayerType.PLAYER, createTutorialReadState(true));
+  const bot = new Player(2, 'Bot-1', [botPlanet], new Map(), [], PlayerType.BOT, createTutorialReadState(true));
+
+  initializePlanet(allyPlanet, ally.playerId);
+  initializePlanet(botPlanet, bot.playerId);
+  botPlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 180);
+  botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 4);
+  botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CORVETTE, 2);
+
+  const request = createSupportRequest(
+    1,
+    ally.playerId,
+    bot.playerId,
+    'PLANET_DEFENSE',
+    allyPlanet.basicInfo.name,
+    { x: 0, y: 0, z: 0 },
+    5,
+    7
+  );
+
+  const galaxy = new Galaxy(
+    'Bot Test',
+    [ally, bot],
+    [[allySystem, botSystem]],
+    5,
+    [],
+    1,
+    new Map([[ally.playerId, ally]]),
+    new Map([[bot.playerId, bot]]),
+    new Map(),
+    new Map([[ally.playerName, ally.playerId], [bot.playerName, bot.playerId]]),
+    [{ playerAId: ally.playerId, playerBId: bot.playerId, status: DiplomaticStatus.ALLIED }],
+    [],
+    1,
+    [],
+    1,
+    [],
+    1,
+    [request],
+    2
+  );
+
+  return { galaxy, bot, request };
+}
+
 function createIncomingPeaceProposalGalaxy(): {
   galaxy: Galaxy;
   bot: Player;
@@ -1378,7 +1639,7 @@ function createPassiveAndNeutralFarmGalaxy(): {
   system.planets[2] = neutralPlanet;
 
   const bot = new Player(1, 'Bot-1', [homePlanet], new Map(), [], PlayerType.BOT, createTutorialReadState(true));
-  const passiveOwner = new Player(2, 'PassiveTarget', [passivePlanet], new Map(), [], PlayerType.PLAYER, createTutorialReadState(true));
+  const passiveOwner = new Player(2, 'PassiveTarget', [passivePlanet], new Map(), [], PlayerType.NEUTRAL, createTutorialReadState(true));
   const neutralOwner = new Player(3, 'NeutralTarget', [neutralPlanet], new Map(), [], PlayerType.NEUTRAL, createTutorialReadState(true));
 
   initializePlanet(homePlanet, bot.playerId);

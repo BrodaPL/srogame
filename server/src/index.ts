@@ -16,6 +16,7 @@ import buildingTypeEnumModule from '../../src/app/models/enums/building-type.js'
 import defenceTypeEnumModule from '../../src/app/models/enums/defence-type.js';
 import technologyTypeEnumModule from '../../src/app/models/enums/technology-type.js';
 import shipTypeEnumModule from '../../src/app/models/enums/ship-type.js';
+import shipPurposeEnumModule from '../../src/app/models/enums/ship-purpose.js';
 import fleetMissionTypeEnumModule from '../../src/app/models/enums/fleet-mission-type.js';
 import hullClassEnumModule from '../../src/app/models/enums/hull-class.js';
 import fleetModelModule from '../../src/app/models/fleets/fleet.js';
@@ -394,6 +395,9 @@ const { TechnologyType } = technologyTypeEnumModule as {
 };
 const { ShipType } = shipTypeEnumModule as {
   ShipType: typeof import('../../src/app/models/enums/ship-type.js').ShipType;
+};
+const { ShipPurpose } = shipPurposeEnumModule as {
+  ShipPurpose: typeof import('../../src/app/models/enums/ship-purpose.js').ShipPurpose;
 };
 const { FleetMissionType } = fleetMissionTypeEnumModule as {
   FleetMissionType: typeof import('../../src/app/models/enums/fleet-mission-type.js').FleetMissionType;
@@ -9190,11 +9194,11 @@ function approveSupportRequest(
 
   request.acceptedTurn = galaxy.currentTurn;
   request.executionDueTurn = galaxy.currentTurn + 1;
-  request.executionExpiresOnTurn = galaxy.currentTurn + 1;
+  request.executionExpiresOnTurn = galaxy.currentTurn + 5;
   request.state = DiplomaticProposalState.ACCEPTED;
   request.resolutionNote = request.supportType === 'PLANET_REPAIR'
-    ? `Repair support acknowledged for ${request.targetPlanetName}.`
-    : `Defense support acknowledged for ${request.targetPlanetName}.`;
+    ? `Repair support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`
+    : `Defense support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`;
   addSupportRequestMessages(
     galaxy,
     request,
@@ -9267,6 +9271,92 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
       if (galaxy.currentTurn >= request.executionDueTurn) {
         executeAcceptedResourceSupportRequest(galaxy, request);
       }
+      continue;
+    }
+
+    if (request.supportType === 'PLANET_REPAIR') {
+      const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+      if (!targetPlanet || targetPlanet.info.ownerId !== request.fromPlayerId) {
+        request.state = DiplomaticProposalState.CANCELLED;
+        request.fulfilledTurn = galaxy.currentTurn;
+        request.resolutionNote = 'Repair support was auto-cancelled because the target is no longer valid.';
+        addSupportRequestMessages(
+          galaxy,
+          request,
+          'Repair support cancelled',
+          request.resolutionNote,
+          request.resolutionNote
+        );
+        continue;
+      }
+
+      if (galaxy.currentTurn < request.executionDueTurn) {
+        continue;
+      }
+
+      const launchResult = tryLaunchAcceptedRepairSupportRequest(galaxy, request);
+      if (launchResult.ok) {
+        continue;
+      }
+
+      if (request.executionExpiresOnTurn !== null && galaxy.currentTurn >= request.executionExpiresOnTurn) {
+        request.state = DiplomaticProposalState.REJECTED;
+        request.fulfilledTurn = galaxy.currentTurn;
+        request.resolutionNote = 'Repair support auto-rejected after 5 turns because no valid repair fleet was available.';
+        addSupportRequestMessages(
+          galaxy,
+          request,
+          'Repair support auto-rejected',
+          request.resolutionNote,
+          request.resolutionNote
+        );
+        continue;
+      }
+
+      request.resolutionNote = `Waiting for a valid repair fleet to assist ${request.targetPlanetName}.`;
+      continue;
+    }
+
+    if (request.supportType === 'PLANET_DEFENSE') {
+      const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+      if (!targetPlanet || targetPlanet.info.ownerId !== request.fromPlayerId) {
+        request.state = DiplomaticProposalState.CANCELLED;
+        request.fulfilledTurn = galaxy.currentTurn;
+        request.resolutionNote = 'Defense support was auto-cancelled because the target is no longer valid.';
+        addSupportRequestMessages(
+          galaxy,
+          request,
+          'Defense support cancelled',
+          request.resolutionNote,
+          request.resolutionNote
+        );
+        continue;
+      }
+
+      if (galaxy.currentTurn < request.executionDueTurn) {
+        continue;
+      }
+
+      const launchResult = tryLaunchAcceptedDefenseSupportRequest(galaxy, request);
+      if (launchResult.ok) {
+        continue;
+      }
+
+      if (request.executionExpiresOnTurn !== null && galaxy.currentTurn >= request.executionExpiresOnTurn) {
+        request.state = DiplomaticProposalState.REJECTED;
+        request.fulfilledTurn = galaxy.currentTurn;
+        request.resolutionNote = 'Defense support auto-rejected after 5 turns because no valid guard fleet was available.';
+        addSupportRequestMessages(
+          galaxy,
+          request,
+          'Defense support auto-rejected',
+          request.resolutionNote,
+          request.resolutionNote
+        );
+        continue;
+      }
+
+      request.resolutionNote = `Waiting for a valid guard fleet to assist ${request.targetPlanetName}.`;
       continue;
     }
 
@@ -9482,6 +9572,135 @@ function tryLaunchAcceptedOffensiveSupportRequest(
   return { ok: false };
 }
 
+function tryLaunchAcceptedRepairSupportRequest(
+  galaxy: Galaxy,
+  request: Extract<SupportRequest, { supportType: 'PLANET_REPAIR' }>
+): { ok: true } | { ok: false } {
+  const existingFleet = findExistingSupportFleet(
+    galaxy,
+    request.toPlayerId,
+    FleetMissionType.REPAIR,
+    request.targetCoordinates
+  );
+  if (existingFleet) {
+    request.fulfilledTurn = galaxy.currentTurn;
+    request.resolutionNote = `Repair support is already being handled by Fleet #${existingFleet.fleetId}.`;
+    addSupportRequestMessages(
+      galaxy,
+      request,
+      'Repair support in progress',
+      request.resolutionNote,
+      request.resolutionNote
+    );
+    return { ok: true };
+  }
+
+  const candidates = resolveRepairSupportLaunchCandidates(galaxy, request);
+  for (const candidate of candidates) {
+    const result = createFleetMission(
+      { galaxy, playerId: request.toPlayerId },
+      {
+        missionType: FleetMissionType.REPAIR,
+        origin: candidate.originCoordinates,
+        target: request.targetCoordinates,
+        ships: candidate.ships,
+        carriedBombs: [],
+        cargo: { metal: 0, crystal: 0, deuterium: 0 },
+        useJumpGate: false,
+        bombardmentPriorities: null
+      }
+    );
+    if (!result.ok) {
+      continue;
+    }
+
+    request.fulfilledTurn = galaxy.currentTurn;
+    request.resolutionNote = `Auto-launched repair Fleet #${result.value.fleet.fleetId} from ${candidate.originPlanet.basicInfo.name} toward ${request.targetPlanetName}.`;
+    addSupportRequestMessages(
+      galaxy,
+      request,
+      'Repair support launched',
+      request.resolutionNote,
+      request.resolutionNote
+    );
+    return { ok: true };
+  }
+
+  return { ok: false };
+}
+
+function tryLaunchAcceptedDefenseSupportRequest(
+  galaxy: Galaxy,
+  request: Extract<SupportRequest, { supportType: 'PLANET_DEFENSE' }>
+): { ok: true } | { ok: false } {
+  const existingFleet = findExistingSupportFleet(
+    galaxy,
+    request.toPlayerId,
+    FleetMissionType.DEFEND,
+    request.targetCoordinates
+  );
+  if (existingFleet) {
+    request.fulfilledTurn = galaxy.currentTurn;
+    request.resolutionNote = `Defense support is already being handled by Fleet #${existingFleet.fleetId}.`;
+    addSupportRequestMessages(
+      galaxy,
+      request,
+      'Defense support in progress',
+      request.resolutionNote,
+      request.resolutionNote
+    );
+    return { ok: true };
+  }
+
+  const candidates = resolveDefenseSupportLaunchCandidates(galaxy, request);
+  for (const candidate of candidates) {
+    const result = createFleetMission(
+      { galaxy, playerId: request.toPlayerId },
+      {
+        missionType: FleetMissionType.DEFEND,
+        origin: candidate.originCoordinates,
+        target: request.targetCoordinates,
+        ships: candidate.ships,
+        carriedBombs: [],
+        cargo: { metal: 0, crystal: 0, deuterium: 0 },
+        useJumpGate: false,
+        bombardmentPriorities: null
+      }
+    );
+    if (!result.ok) {
+      continue;
+    }
+
+    request.fulfilledTurn = galaxy.currentTurn;
+    request.resolutionNote = `Auto-launched guard Fleet #${result.value.fleet.fleetId} from ${candidate.originPlanet.basicInfo.name} toward ${request.targetPlanetName}.`;
+    addSupportRequestMessages(
+      galaxy,
+      request,
+      'Defense support launched',
+      request.resolutionNote,
+      request.resolutionNote
+    );
+    return { ok: true };
+  }
+
+  return { ok: false };
+}
+
+function findExistingSupportFleet(
+  galaxy: Galaxy,
+  providerPlayerId: number,
+  missionType: FleetMissionTypeType,
+  targetCoordinates: ClientCoordinates
+): Fleet | null {
+  return galaxy.activeFleets.find((fleet) =>
+    fleet.ownerId === providerPlayerId
+    && fleet.missionType === missionType
+    && sameCoordinates(fleet.target, targetCoordinates)
+    && fleet.state !== FleetState.RETURNING
+    && fleet.state !== FleetState.MISSION_FAILURE_RETURNING
+  ) ?? null;
+}
+
 function resolveOffensiveSupportLaunchCandidates(
   galaxy: Galaxy,
   request: Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }>
@@ -9532,6 +9751,118 @@ function resolveOffensiveSupportLaunchCandidates(
   }));
 }
 
+function resolveRepairSupportLaunchCandidates(
+  galaxy: Galaxy,
+  request: Extract<SupportRequest, { supportType: 'PLANET_REPAIR' }>
+): Array<{
+  originPlanet: Planet;
+  originCoordinates: ClientCoordinates;
+  ships: CreateFleetShipSelectionEntry[];
+}> {
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+  const targetRepairNeed = targetPlanet ? estimateSupportRepairNeed(targetPlanet) : 0;
+  const candidates: Array<{
+    originPlanet: Planet;
+    originCoordinates: ClientCoordinates;
+    ships: CreateFleetShipSelectionEntry[];
+    distance: number;
+  }> = [];
+
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (planet.info.ownerId !== request.toPlayerId) {
+          continue;
+        }
+
+        const ships = buildRepairSupportShipSelection(planet, targetRepairNeed);
+        if (!ships) {
+          continue;
+        }
+
+        const originCoordinates = toPlanetCoordinates(planet);
+        candidates.push({
+          originPlanet: planet,
+          originCoordinates,
+          ships,
+          distance: calculateTravelDistance(originCoordinates, request.targetCoordinates)
+        });
+      }
+    }
+  }
+
+  candidates.sort((left, right) =>
+    left.distance - right.distance
+    || comparePlanetCoordinates(left.originPlanet, right.originPlanet)
+  );
+
+  return candidates.map(({ originPlanet, originCoordinates, ships }) => ({
+    originPlanet,
+    originCoordinates,
+    ships
+  }));
+}
+
+function resolveDefenseSupportLaunchCandidates(
+  galaxy: Galaxy,
+  request: Extract<SupportRequest, { supportType: 'PLANET_DEFENSE' }>
+): Array<{
+  originPlanet: Planet;
+  originCoordinates: ClientCoordinates;
+  ships: CreateFleetShipSelectionEntry[];
+}> {
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
+  if (!targetPlanet) {
+    return [];
+  }
+
+  const targetDefenseStrength = estimatePlanetSupportCombatStrength(targetPlanet);
+  const nearbyThreatStrength = estimateNearbySupportThreatStrength(galaxy, request.fromPlayerId, targetPlanet);
+  const candidates: Array<{
+    originPlanet: Planet;
+    originCoordinates: ClientCoordinates;
+    ships: CreateFleetShipSelectionEntry[];
+    distance: number;
+    selectedStrength: number;
+  }> = [];
+
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (planet.info.ownerId !== request.toPlayerId) {
+          continue;
+        }
+
+        const ships = buildDefenseSupportShipSelection(planet, nearbyThreatStrength, targetDefenseStrength);
+        if (!ships) {
+          continue;
+        }
+
+        const originCoordinates = toPlanetCoordinates(planet);
+        candidates.push({
+          originPlanet: planet,
+          originCoordinates,
+          ships,
+          distance: calculateTravelDistance(originCoordinates, request.targetCoordinates),
+          selectedStrength: estimateSupportShipSelectionCombatStrength(ships)
+        });
+      }
+    }
+  }
+
+  candidates.sort((left, right) =>
+    left.distance - right.distance
+    || right.selectedStrength - left.selectedStrength
+    || comparePlanetCoordinates(left.originPlanet, right.originPlanet)
+  );
+
+  return candidates.map(({ originPlanet, originCoordinates, ships }) => ({
+    originPlanet,
+    originCoordinates,
+    ships
+  }));
+}
+
 function buildMinimumSupportShipSelection(
   planet: Planet,
   minimumShips: ShipAmountEntry[]
@@ -9557,6 +9888,241 @@ function buildMinimumSupportShipSelection(
   }
 
   return selections;
+}
+
+function buildRepairSupportShipSelection(
+  planet: Planet,
+  repairNeed: number
+): CreateFleetShipSelectionEntry[] | null {
+  const repairDroneBlueprint = SHIP_BLUEPRINTS.get(ShipType.REPAIR_DRONE);
+  if (!repairDroneBlueprint) {
+    return null;
+  }
+
+  const availableUndamaged = ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
+  const availableRepairDrones = availableUndamaged.get(ShipType.REPAIR_DRONE) ?? 0;
+  if (availableRepairDrones <= 0) {
+    return null;
+  }
+
+  const carrierCandidates = [...availableUndamaged.entries()]
+    .filter(([shipType, amount]) => {
+      if (amount <= 0 || shipType === ShipType.REPAIR_DRONE) {
+        return false;
+      }
+
+      const blueprint = SHIP_BLUEPRINTS.get(shipType as ShipTypeType);
+      return Boolean(
+        blueprint
+        && blueprint.canJump
+        && blueprint.hangarCapacity >= repairDroneBlueprint.size
+      );
+    })
+    .map(([shipType]) => SHIP_BLUEPRINTS.get(shipType as ShipTypeType)!)
+    .sort((left, right) =>
+      left.hangarCapacity - right.hangarCapacity
+      || left.type.localeCompare(right.type)
+    );
+
+  const carrier = carrierCandidates[0];
+  if (!carrier) {
+    return null;
+  }
+
+  const desiredRepairDrones = repairNeed >= 200 ? 2 : 1;
+  const selectedRepairDrones = Math.max(1, Math.min(availableRepairDrones, desiredRepairDrones));
+  return [
+    {
+      type: carrier.type,
+      undamagedAmount: 1,
+      damagedAmount: 0
+    },
+    {
+      type: ShipType.REPAIR_DRONE,
+      undamagedAmount: selectedRepairDrones,
+      damagedAmount: 0
+    }
+  ];
+}
+
+function buildDefenseSupportShipSelection(
+  planet: Planet,
+  nearbyThreatStrength: number,
+  targetDefenseStrength: number
+): CreateFleetShipSelectionEntry[] | null {
+  const availableUndamaged = ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
+  const combatShips = [...availableUndamaged.entries()]
+    .filter(([shipType, amount]) => {
+      if (amount <= 0) {
+        return false;
+      }
+
+      const blueprint = SHIP_BLUEPRINTS.get(shipType as ShipTypeType);
+      return Boolean(
+        blueprint
+        && blueprint.weapons.length > 0
+        && !blueprint.purposes.has(ShipPurpose.CARGO)
+      );
+    })
+    .map(([shipType, amount]) => ({
+      type: shipType as ShipTypeType,
+      amount,
+      power: estimateSupportShipCombatPower(shipType as ShipTypeType)
+    }))
+    .sort((left, right) => right.power - left.power || left.type.localeCompare(right.type));
+
+  const totalCombatPower = combatShips.reduce((sum, entry) => sum + (entry.power * entry.amount), 0);
+  const reservePower = totalCombatPower * 0.45;
+  const availableLaunchPower = totalCombatPower - reservePower;
+  if (availableLaunchPower <= 0) {
+    return null;
+  }
+
+  const desiredLaunchPower = Math.min(
+    availableLaunchPower,
+    Math.max(
+      nearbyThreatStrength - targetDefenseStrength,
+      nearbyThreatStrength * 0.45,
+      18
+    )
+  );
+  if (desiredLaunchPower <= 0) {
+    return null;
+  }
+
+  const selection: CreateFleetShipSelectionEntry[] = [];
+  let selectedPower = 0;
+  for (const entry of combatShips) {
+    if (selectedPower >= desiredLaunchPower) {
+      break;
+    }
+
+    const remainingPower = desiredLaunchPower - selectedPower;
+    let amountToSend = Math.min(entry.amount, Math.max(1, Math.ceil(remainingPower / entry.power)));
+    while (
+      amountToSend > 0
+      && (totalCombatPower - (selectedPower + (amountToSend * entry.power))) < reservePower
+    ) {
+      amountToSend -= 1;
+    }
+
+    if (amountToSend <= 0) {
+      continue;
+    }
+
+    selection.push({
+      type: entry.type,
+      undamagedAmount: amountToSend,
+      damagedAmount: 0
+    });
+    selectedPower += entry.power * amountToSend;
+  }
+
+  return selection.length > 0 ? selection : null;
+}
+
+function estimateSupportRepairNeed(planet: Planet): number {
+  let totalMissingHull = 0;
+  for (const damagedShip of planet.rBDSFTQ.ships.damagedShips) {
+    const blueprint = SHIP_BLUEPRINTS.get(damagedShip.type as ShipTypeType);
+    if (!blueprint) {
+      continue;
+    }
+
+    totalMissingHull += Math.max(0, blueprint.hullPointsCapacity - damagedShip.hull);
+  }
+
+  return totalMissingHull;
+}
+
+function estimateNearbySupportThreatStrength(
+  galaxy: Galaxy,
+  viewerPlayerId: number,
+  targetPlanet: Planet
+): number {
+  const targetCoordinates = toPlanetCoordinates(targetPlanet);
+  let bestStrength = 0;
+
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (planet === targetPlanet || planet.info.ownerId === null || planet.info.ownerId === viewerPlayerId) {
+          continue;
+        }
+
+        if (calculateTravelDistance(targetCoordinates, toPlanetCoordinates(planet)) > 3) {
+          continue;
+        }
+
+        const report = planet.lastReportData.get(viewerPlayerId);
+        if (!report) {
+          continue;
+        }
+
+        bestStrength = Math.max(bestStrength, estimateSupportReportCombatStrength(report));
+      }
+    }
+  }
+
+  return Math.max(24, bestStrength);
+}
+
+function estimateSupportReportCombatStrength(report: EspionageReportData): number {
+  let total = 0;
+  for (const [shipType, amount] of report.ships.entries()) {
+    total += estimateSupportShipCombatPower(shipType as ShipTypeType) * amount;
+  }
+  for (const defenceEntry of report.defences) {
+    total += estimateSupportDefenceCombatPower(defenceEntry.type as DefenceTypeType) * defenceEntry.amount;
+  }
+
+  if (total <= 0) {
+    total += report.totalShipsAmount * 6;
+    total += report.totalDefencesAmount * 5;
+  }
+
+  return total;
+}
+
+function estimatePlanetSupportCombatStrength(planet: Planet): number {
+  let total = 0;
+  for (const [shipType, amount] of planet.rBDSFTQ.ships.countByType().entries()) {
+    total += estimateSupportShipCombatPower(shipType as ShipTypeType) * amount;
+  }
+  for (const [defenceType, amount] of planet.rBDSFTQ.defences.countByType().entries()) {
+    total += estimateSupportDefenceCombatPower(defenceType as DefenceTypeType) * amount;
+  }
+  return total;
+}
+
+function estimateSupportShipSelectionCombatStrength(
+  ships: CreateFleetShipSelectionEntry[]
+): number {
+  let total = 0;
+  for (const entry of ships) {
+    total += estimateSupportShipCombatPower(entry.type as ShipTypeType) * (entry.undamagedAmount + entry.damagedAmount);
+  }
+  return total;
+}
+
+function estimateSupportShipCombatPower(shipType: ShipTypeType): number {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return 0;
+  }
+
+  const weaponPower = blueprint.weapons.reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
+  return weaponPower + (blueprint.hullPointsCapacity / 15) + (blueprint.shieldCapacity / 10);
+}
+
+function estimateSupportDefenceCombatPower(defenceType: DefenceTypeType): number {
+  const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+  if (!blueprint) {
+    return 0;
+  }
+
+  const weaponPower = blueprint.weapons.reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
+  return weaponPower + (blueprint.hullPointsCapacity / 18) + (blueprint.shieldCapacity / 12);
 }
 
 function resolveBestResourceSupportSourcePlanet(
