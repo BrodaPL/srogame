@@ -256,6 +256,118 @@ describe('bot-turn-runner', () => {
     ).toBe(true);
   });
 
+  it('queues storage relief during throughput when capped resources block further mine growth', () => {
+    const system = new SolarSystem('CapSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+    const planet = Planet.createStartingPlanet('CapSys I', 1, system, 1);
+    system.planets[0] = planet;
+
+    const bot = new Player(
+      1,
+      'Bot-1',
+      [planet],
+      new Map(),
+      [],
+      PlayerType.BOT,
+      createTutorialReadState(true)
+    );
+
+    initializePlanet(planet, bot.playerId);
+    bot.botProfileId = 'BALANCED';
+    bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 3);
+    bot.setTechLevel(TechnologyType.FUSION_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 3);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 3);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 3);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 1);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 1);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 1);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 3);
+    planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 3);
+    planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 1);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 4);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
+    planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 0);
+    planet.rBDSFTQ.resources = new ResourcesPack(400, 300, 200);
+
+    const galaxy = new Galaxy(
+      'Bot Test',
+      [bot],
+      [[system]],
+      12,
+      [],
+      1,
+      new Map(),
+      new Map([[bot.playerId, bot]]),
+      new Map(),
+      new Map([[bot.playerName, bot.playerId]])
+    );
+
+    runBotTurnPhase(galaxy);
+
+    const queuedBuildingType = planet.rBDSFTQ.buildingQueue[0]?.buildingType ?? null;
+    expect(
+      queuedBuildingType === BuildingType.METAL_STORAGE
+      || queuedBuildingType === BuildingType.CRYSTAL_STORAGE
+      || queuedBuildingType === BuildingType.DEUTERIUM_TANK
+    ).toBe(true);
+  });
+
+  it('allows throughput-stage material research to unlock blocked shipyard progression', () => {
+    const system = new SolarSystem('UnlockSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+    const planet = Planet.createStartingPlanet('UnlockSys I', 1, system, 1);
+    system.planets[0] = planet;
+
+    const bot = new Player(
+      1,
+      'Bot-1',
+      [planet],
+      new Map(),
+      [],
+      PlayerType.BOT,
+      createTutorialReadState(true)
+    );
+
+    initializePlanet(planet, bot.playerId);
+    bot.botProfileId = 'BALANCED';
+    bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 3);
+    bot.setTechLevel(TechnologyType.FUSION_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY, 1);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 3);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 3);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 3);
+    planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 3);
+    planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 1);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 3);
+    planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 1);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+    planet.rBDSFTQ.resources = new ResourcesPack(100, 100, 50);
+
+    const galaxy = new Galaxy(
+      'Bot Test',
+      [bot],
+      [[system]],
+      12,
+      [],
+      1,
+      new Map(),
+      new Map([[bot.playerId, bot]]),
+      new Map(),
+      new Map([[bot.playerName, bot.playerId]])
+    );
+
+    runBotTurnPhase(galaxy);
+
+    expect(planet.rBDSFTQ.currentResearchQueue?.technologyType).toBe(TechnologyType.MATERIAL_TECHNOLOGY);
+  });
+
   it('does not queue a fusion reactor upgrade when the projected net deuterium would go negative', () => {
     const system = new SolarSystem('FusionSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
     const planet = Planet.createStartingPlanet('FusionSys I', 1, system, 1);

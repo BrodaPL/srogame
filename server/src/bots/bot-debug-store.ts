@@ -35,7 +35,7 @@ class BotDebugStore {
   }
 }
 
-export const BOT_DEBUG_STORE = new BotDebugStore(50);
+export const BOT_DEBUG_STORE = new BotDebugStore(100);
 
 export function recordBotDecisionTrace(trace: BotDecisionTrace): void {
   BOT_DEBUG_STORE.addTrace(trace);
