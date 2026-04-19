@@ -146,6 +146,31 @@ describe('GalaxyCreator', () => {
     expect(assignedLevels.filter((level) => level !== 3).every((level) => level >= 2 && level <= 6)).toBe(true);
   });
 
+  it('treats neutral planet amount as a real 0..100 percentage when seeding extra neutrals', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+    const galaxy = new GalaxyCreator(createSetup({
+      gameType: GameType.PVE,
+      neutralBotsAmount: 100
+    })).createGalaxy(['Human']);
+
+    const human = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER);
+    expect(human).toBeTruthy();
+
+    const homeSystem = human!.planets[0].basicInfo.solarSystem;
+    const neutralPlayers = galaxy.players.filter((entry) => entry.type === PlayerType.NEUTRAL);
+    const extraNeutralPlanets = galaxy.stars
+      .flatMap((row) => row.flatMap((system) =>
+        system.planets.filter((planet) =>
+          planet.info.ownerId !== null
+          && neutralPlayers.some((player) => player.playerId === planet.info.ownerId)
+          && system !== homeSystem
+        )
+      ));
+
+    expect(extraNeutralPlanets.length).toBeGreaterThan(0);
+  });
+
   it('assigns requested bot profile counts exactly for fresh-game bots', () => {
     const galaxy = new GalaxyCreator(createSetup({
       botsAmount: 4,

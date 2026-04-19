@@ -59,6 +59,9 @@ export const DEFAULT_AUTO_SAVE_TURNS = 5;
 export const MIN_AUTO_SAVE_TURNS = 0;
 export const MAX_AUTO_SAVE_TURNS = 999;
 export const DEFAULT_STARTING_HOMEWORLD_PRESET = StartingHomeworldPreset.MEDIUM;
+export const MIN_NEUTRAL_PLANET_PERCENT = 0;
+export const MAX_NEUTRAL_PLANET_PERCENT = 100;
+export const DEFAULT_NEUTRAL_PLANET_PERCENT = 10;
 
 export type GalaxySetupWithOptionalAutoSaveTurns = Omit<
   GalaxySetup,
@@ -227,6 +230,7 @@ export type GameSummary = {
   currentTurn: number | null;
   updatedAt: string;
   isCurrentGame: boolean;
+  isLoaded: boolean;
   canResume: boolean;
   canJoin: boolean;
   canManage: boolean;

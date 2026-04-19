@@ -1102,20 +1102,13 @@ app.post('/api/games/:gameId/close-current', (req, res) => {
     );
   }
 
-  const runtime = getGameRuntime(gameId);
-  if (!runtime) {
-    return sendApiError(
-      res,
-      409,
-      'This single-player game is not currently loaded.',
-      'api.games.closeCurrent.notLoaded'
-    );
-  }
-
   try {
-    saveRuntimeSnapshot(gameId, runtime, record.ownerAccountId ?? auth.session.accountId);
-    deleteGameRuntime(gameId);
-    moveMountedRuntimeAwayFromGame(gameId);
+    const runtime = getGameRuntime(gameId);
+    if (runtime) {
+      saveRuntimeSnapshot(gameId, runtime, record.ownerAccountId ?? auth.session.accountId);
+      deleteGameRuntime(gameId);
+      moveMountedRuntimeAwayFromGame(gameId);
+    }
     setLastClosedGameInfo(auth.data, auth.session.accountId, gameId, new Date().toISOString());
     setAccountCurrentGameId(auth.data, auth.session.accountId, null);
     auth.session.currentGameId = null;
@@ -5207,11 +5200,12 @@ function buildAccountSettingsResponse(account: AuthAccount): AccountSettingsResp
 function buildGameSummary(record: ReturnType<typeof listGames>[number], session: AuthSession | null): GameSummary {
   const canView = !!session && canSessionViewGameRecord(record.gameId, session);
   const isCurrentGame = session?.currentGameId === record.gameId;
+  const isLoaded = hasGameRuntime(record.gameId);
   const canResume = canView
     && isCurrentGame
     && record.status === 'RUNNING'
     && (
-      hasGameRuntime(record.gameId)
+      isLoaded
       || canResumeSingleplayerGameRecord(record)
     );
   return {
@@ -5226,6 +5220,7 @@ function buildGameSummary(record: ReturnType<typeof listGames>[number], session:
     currentTurn: record.currentTurn,
     updatedAt: record.updatedAt,
     isCurrentGame,
+    isLoaded,
     canResume,
     canJoin: canView && record.status === 'RUNNING',
     canManage: session?.localAdmin === true
@@ -10809,7 +10804,7 @@ function isValidSetup(setup: GalaxySetup): boolean {
     hasExactBotProfileCountMatch(setup.botProfileCounts, setup.botsAmount) &&
     Number.isInteger(setup.neutralBotsAmount) &&
     setup.neutralBotsAmount >= 0 &&
-    setup.neutralBotsAmount <= 10 &&
+    setup.neutralBotsAmount <= 100 &&
     Number.isInteger(setup.neutralBotsDifficulty) &&
     setup.neutralBotsDifficulty >= -100 &&
     setup.neutralBotsDifficulty <= 200 &&

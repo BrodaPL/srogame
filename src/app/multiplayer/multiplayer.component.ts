@@ -14,11 +14,14 @@ import {
 import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
 import {
   type BotProfileCountMap,
+  DEFAULT_NEUTRAL_PLANET_PERCENT,
   DEFAULT_STARTING_HOMEWORLD_PRESET,
   type GameSaveSummary,
   type GalaxySetup,
   type GameSavesResponse,
+  MAX_NEUTRAL_PLANET_PERCENT,
   MAX_AUTO_SAVE_TURNS,
+  MIN_NEUTRAL_PLANET_PERCENT,
   type MultiplayerGameBrowserResponse,
   type MultiplayerGameDetailResponse,
   type MultiplayerGameListItem,
@@ -858,7 +861,11 @@ export class MultiplayerComponent implements OnDestroy {
     const starsMax = this.parseIntegerInRange(this.setupForm.starsAmountModifierMax, 1, 9);
     const botsAmount = this.parseIntegerInRange(this.setupForm.botsAmount, 0, 12);
     const botDifficulty = this.parseIntegerInRange(this.setupForm.botDifficulty, -75, 200);
-    const neutralBotsAmount = this.parseIntegerInRange(this.setupForm.neutralBotsAmount, 0, 10);
+    const neutralBotsAmount = this.parseIntegerInRange(
+      this.setupForm.neutralBotsAmount,
+      MIN_NEUTRAL_PLANET_PERCENT,
+      MAX_NEUTRAL_PLANET_PERCENT
+    );
     const neutralBotsDifficulty = this.parseIntegerInRange(this.setupForm.neutralBotsDifficulty, -100, 200);
     const autoSaveTurns = this.parseIntegerInRange(this.setupForm.autoSaveTurns, 0, MAX_AUTO_SAVE_TURNS);
     const botProfileCounts = botsAmount === 0
@@ -982,7 +989,7 @@ export class MultiplayerComponent implements OnDestroy {
       botsAmount: 0,
       botDifficulty: 0,
       botProfileCounts: createDefaultBotProfileCounts(0),
-      neutralBotsAmount: 1,
+      neutralBotsAmount: DEFAULT_NEUTRAL_PLANET_PERCENT,
       neutralBotsDifficulty: 0,
       autoSaveTurns: 5,
       startingHomeworldPreset: DEFAULT_STARTING_HOMEWORLD_PRESET,

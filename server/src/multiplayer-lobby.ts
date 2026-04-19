@@ -64,7 +64,7 @@ export function createDefaultMultiplayerLobbySetup(): GalaxySetup {
     playerAmount: 2,
     botsAmount: 0,
     botDifficulty: 0,
-    neutralBotsAmount: 1,
+    neutralBotsAmount: 10,
     neutralBotsDifficulty: 0,
     autoSaveTurns: DEFAULT_AUTO_SAVE_TURNS,
     createRandomPlanets: false,

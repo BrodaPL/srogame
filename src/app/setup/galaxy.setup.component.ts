@@ -14,9 +14,12 @@ import {
 } from '../models/enums/starting-homeworld-preset';
 import {
   BotProfileCountMap,
+  DEFAULT_NEUTRAL_PLANET_PERCENT,
   DEFAULT_STARTING_HOMEWORLD_PRESET,
   GalaxySetup,
+  MAX_NEUTRAL_PLANET_PERCENT,
   MAX_AUTO_SAVE_TURNS,
+  MIN_NEUTRAL_PLANET_PERCENT,
   createDefaultBotProfileCounts,
   hasExactBotProfileCountMatch,
   normalizeGalaxySetup
@@ -103,7 +106,11 @@ export class GalaxySetupComponent {
     const playerAmount = this.parseIntegerInRange(this.form.playerAmount, 1, 4);
     const botsAmount = this.parseIntegerInRange(this.form.botsAmount, 0, 12);
     const botDifficulty = this.parseIntegerInRange(this.form.botDifficulty, -75, 200);
-    const neutralBotsAmount = this.parseIntegerInRange(this.form.neutralBotsAmount, 0, 10);
+    const neutralBotsAmount = this.parseIntegerInRange(
+      this.form.neutralBotsAmount,
+      MIN_NEUTRAL_PLANET_PERCENT,
+      MAX_NEUTRAL_PLANET_PERCENT
+    );
     const neutralBotsDifficulty = this.parseIntegerInRange(
       this.form.neutralBotsDifficulty,
       -100,
@@ -220,7 +227,7 @@ export class GalaxySetupComponent {
       playerAmount: '1',
       botsAmount: '0',
       botDifficulty: '0',
-      neutralBotsAmount: '1',
+      neutralBotsAmount: String(DEFAULT_NEUTRAL_PLANET_PERCENT),
       neutralBotsDifficulty: '0',
       autoSaveTurns: '5',
       startingHomeworldPreset: DEFAULT_STARTING_HOMEWORLD_PRESET,
@@ -324,8 +331,8 @@ export class GalaxySetupComponent {
       config.botDifficulty <= 200 &&
       hasExactBotProfileCountMatch(config.botProfileCounts, config.botsAmount) &&
       Number.isInteger(config.neutralBotsAmount) &&
-      config.neutralBotsAmount >= 0 &&
-      config.neutralBotsAmount <= 10 &&
+      config.neutralBotsAmount >= MIN_NEUTRAL_PLANET_PERCENT &&
+      config.neutralBotsAmount <= MAX_NEUTRAL_PLANET_PERCENT &&
       Number.isInteger(config.neutralBotsDifficulty) &&
       config.neutralBotsDifficulty >= -100 &&
       config.neutralBotsDifficulty <= 200 &&
