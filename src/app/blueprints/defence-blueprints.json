@@ -6,9 +6,9 @@
       "hullClass": "SMALL",
       "canShootToOrbit": false,
       "size": 1,
-      "hullPointsCapacity": 25,
+      "hullPointsCapacity": 20,
       "criticalThreshold": 25,
-      "shieldCapacity": 0,
+      "shieldCapacity": 20,
       "armor": 1,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 1 }
@@ -18,7 +18,8 @@
         { "building": "SHIPYARD", "level": 1 }
       ],
       "techRequirements": [
-        { "tech": "BEAMS_WEAPONS", "level": 1 }
+        { "tech": "BEAMS_WEAPONS", "level": 1 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 1 }
       ]
     },
     {
@@ -29,19 +30,19 @@
       "size": 2,
       "hullPointsCapacity": 60,
       "criticalThreshold": 22,
-      "shieldCapacity": 10,
+      "shieldCapacity": 30,
       "armor": 2,
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 1 }
       ],
-      "cost": { "metal": 50, "crystal": 30, "deuterium": 0 },
+      "cost": { "metal": 40, "crystal": 30, "deuterium": 0 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 2 }
       ],
       "techRequirements": [
         { "tech": "BEAMS_WEAPONS", "level": 2 },
         { "tech": "ARMOUR_TECHNOLOGY", "level": 1 },
-        { "tech": "SHIELDING_TECHNOLOGY", "level": 1 }
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 }
       ]
     },
     {
@@ -63,8 +64,8 @@
       ],
       "techRequirements": [
         { "tech": "BEAMS_WEAPONS", "level": 4 },
-        { "tech": "SHIELDING_TECHNOLOGY", "level": 2 },
-        { "tech": "ARMOUR_TECHNOLOGY", "level": 1 }
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 3 },
+        { "tech": "ARMOUR_TECHNOLOGY", "level": 3 }
       ]
     },
     {
@@ -94,14 +95,14 @@
       "hullClass": "MEDIUM",
       "canShootToOrbit": true,
       "size": 2,
-      "hullPointsCapacity": 60,
+      "hullPointsCapacity": 70,
       "criticalThreshold": 24,
       "shieldCapacity": 0,
       "armor": 2,
       "weapons": [
         { "type": "MISSILE", "dmg": 30, "shots": 1 }
       ],
-      "cost": { "metal": 60, "crystal": 30, "deuterium": 10 },
+      "cost": { "metal": 70, "crystal": 20, "deuterium": 10 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 2 }
       ],
@@ -142,12 +143,12 @@
       "size": 3,
       "hullPointsCapacity": 160,
       "criticalThreshold": 16,
-      "shieldCapacity": 40,
+      "shieldCapacity": 80,
       "armor": 5,
       "weapons": [
         { "type": "RAIL_GUN", "dmg": 30, "shots": 1 }
       ],
-      "cost": { "metal": 140, "crystal": 80, "deuterium": 10 },
+      "cost": { "metal": 160, "crystal": 80, "deuterium": 10 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 5 }
       ],

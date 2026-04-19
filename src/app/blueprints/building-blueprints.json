@@ -800,9 +800,9 @@
                     "description":  "Stores planetary bombs for future bombardment missions.",
                     "imagePath":  "images/buildings/normal/BOMB_DEPOT.jpg",
                     "basicCost":  {
-                                      "metal":  80,
-                                      "crystal":  160,
-                                      "deuterium":  160
+                                      "metal":  100,
+                                      "crystal":  80,
+                                      "deuterium":  60
                                   },
                     "level":  0,
                     "currentPowerConsumption":  0,
@@ -935,7 +935,7 @@
                     "imagePath":  "images/buildings/normal/SENSOR_PHALANX.jpg",
                     "basicCost":  {
                                       "metal":  300,
-                                      "crystal":  760,
+                                      "crystal":  600,
                                       "deuterium":  180
                                   },
                     "level":  0,
@@ -1011,9 +1011,9 @@
                     "description":  "Makes possible to jump between systems. Every level increases Interstellar Trade Port capacity by 20%, and decreases its trade cost by 1%.",
                     "imagePath":  "images/buildings/normal/JUMP_GATE.jpg",
                     "basicCost":  {
-                                      "metal":  1000,
+                                      "metal":  800,
                                       "crystal":  1000,
-                                      "deuterium":  1000
+                                      "deuterium":  1200
                                   },
                     "level":  0,
                     "currentPowerConsumption":  0,
@@ -1094,9 +1094,9 @@
                     "description":  "Makes possible to exchange resources in ratio 3:2:1 with 5-40% operational cost. Every level above 1 decreases op. cost by 1%.",
                     "imagePath":  "images/buildings/normal/INTERSTELLAR_TRADE_PORT.jpg",
                     "basicCost":  {
-                                      "metal":  1200,
-                                      "crystal":  600,
-                                      "deuterium":  400
+                                      "metal":  1000,
+                                      "crystal":  500,
+                                      "deuterium":  300
                                   },
                     "level":  0,
                     "currentPowerConsumption":  0,

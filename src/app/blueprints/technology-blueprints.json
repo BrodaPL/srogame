@@ -119,7 +119,7 @@
       "energyRequired": [110],
       "researchTime": [0.1],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 3 }
+        { "building": "RESEARCH_LAB", "level": 2 }
       ],
       "techRequirements": [
         { "tech": "ENERGY_TECHNOLOGY", "level": 3 }
@@ -208,8 +208,8 @@
         { "building": "RESEARCH_LAB", "level": 0.25 }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 1 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 1 }
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 0.75 },
+        { "tech": "ENERGY_TECHNOLOGY", "level": 0.75 }
       ]
     },
     {
@@ -220,13 +220,13 @@
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 2 }
+        { "building": "RESEARCH_LAB", "level": 1.0}
       ],
       "techRequirements": [
-        { "tech": "HYPERSPACE_TECHNOLOGY", "level": 1.5 },
-        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 0.5 },
-        { "tech": "COMPUTER_TECHNOLOGY", "level": 1 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 1.5 }
+        { "tech": "HYPERSPACE_TECHNOLOGY", "level": 1.25 },
+        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 0.75 },
+        { "tech": "COMPUTER_TECHNOLOGY", "level": 0.75 },
+        { "tech": "ENERGY_TECHNOLOGY", "level": 1.0 }
       ]
     }
   ]
