@@ -301,6 +301,8 @@ export class ReportsViewComponent implements OnInit {
     const parameters = report.planetaryParameters;
 
     return [
+      { label: 'Size', value: this.formatMetricValue(report.size) },
+      { label: 'Diff.', value: this.formatMetricValue(report.diff) },
       { label: 'Metal modifier', value: this.formatPlanetaryParameterPercent(parameters.metalModifier), tone: this.parameterTone(parameters.metalModifier) },
       { label: 'Crystal modifier', value: this.formatPlanetaryParameterPercent(parameters.crystalModifier), tone: this.parameterTone(parameters.crystalModifier) },
       { label: 'Deuterium modifier', value: this.formatPlanetaryParameterPercent(parameters.deuteriumModifier), tone: this.parameterTone(parameters.deuteriumModifier) },

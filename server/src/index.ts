@@ -7487,6 +7487,8 @@ function toPlayerReportBaseDto(report: PlayerReport): PlayerReportDtoBase {
 function toClientReportDataDto(reportData: EspionageReportData): ClientReportDataDto {
   return {
     ...toPlayerReportBaseDto(reportData),
+    diff: reportData.diff,
+    size: reportData.size,
     planetaryParameters: toPlanetaryParametersDto(reportData.planetaryParameters),
     averageBuildingLevel: reportData.averageBuildingLevel,
     averageTotalResources: reportData.averageTotalResources,
@@ -7515,6 +7517,8 @@ function toTextPlayerReportDto(report: PlayerReport & { body: string }): TextPla
 function toEspionagePlayerReportDto(report: EspionageReportData): EspionagePlayerReportDto {
   return {
     ...toPlayerReportBaseDto(report),
+    diff: report.diff,
+    size: report.size,
     planetaryParameters: toPlanetaryParametersDto(report.planetaryParameters),
     averageBuildingLevel: report.averageBuildingLevel,
     averageTotalResources: report.averageTotalResources,

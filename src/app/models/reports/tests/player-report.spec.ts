@@ -50,6 +50,8 @@ describe('PlayerReport domain', () => {
         sourcePlanetName: 'Test',
         sourceSystemName: 'System'
       },
+      3,
+      160,
       new PlanetaryParameters(1, 1, 1, 1, 1, 1, 1, 1, 1),
       2,
       300,
@@ -70,8 +72,10 @@ describe('PlayerReport domain', () => {
     const copy = report.copy();
     copy.resourcesAmount.metal = 999;
     copy.buildingsLevels.set(BuildingType.METAL_MINE, 10);
+    copy.size = 220;
 
     expect(report.resourcesAmount.metal).toBe(100);
     expect(report.buildingsLevels.get(BuildingType.METAL_MINE)).toBe(4);
+    expect(report.size).toBe(160);
   });
 });

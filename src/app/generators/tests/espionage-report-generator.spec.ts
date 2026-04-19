@@ -114,6 +114,8 @@ describe('EspionageReportGenerator', () => {
     });
 
     expect(report.planetaryParameters).not.toBe(planet.info.planetaryParameters);
+    expect(report.size).toBe(100);
+    expect(report.diff).toBe(1);
     expect(report.planetaryParameters.metalModifier).toBe(0);
     expect(report.planetaryParameters.anomaliesAndNoise).toBe(0);
     expect(report.averageBuildingLevel).toBeCloseTo((4 + 9 + 2) / 3, 6);
@@ -170,6 +172,8 @@ describe('EspionageReportGenerator', () => {
     });
 
     expect(report.planetaryParameters).not.toBe(planet.info.planetaryParameters);
+    expect(report.size).toBe(140);
+    expect(report.diff).toBe(1);
     expect(report.planetaryParameters.metalModifier).toBeCloseTo(0.9, 8);
     expect(report.planetaryParameters.crystalModifier).toBe(1);
     expect(report.planetaryParameters.deuteriumModifier).toBe(1.1);

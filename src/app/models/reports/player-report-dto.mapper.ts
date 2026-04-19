@@ -63,6 +63,8 @@ function fromTextReportDto(report: TextPlayerReportDto): PlayerReport {
 function fromEspionageReportDto(report: EspionagePlayerReportDto): EspionageReportData {
   return new EspionageReportData(
     toBaseData(report),
+    report.diff,
+    report.size,
     new PlanetaryParameters(
       report.planetaryParameters.metalModifier,
       report.planetaryParameters.crystalModifier,

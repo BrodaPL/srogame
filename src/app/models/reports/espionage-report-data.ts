@@ -16,6 +16,8 @@ import { PlayerReport, type PlayerReportBaseData } from './player-report';
 export class EspionageReportData extends PlayerReport {
   constructor(
     data: PlayerReportBaseData,
+    public diff: number,
+    public size: number,
     public planetaryParameters: PlanetaryParameters,
     public averageBuildingLevel: number,
     public averageTotalResources: number,
@@ -73,6 +75,8 @@ export class EspionageReportData extends PlayerReport {
         sourceSystemName: this.sourceSystemName,
         senderPlayerName: this.senderPlayerName
       },
+      this.diff,
+      this.size,
       this.planetaryParameters.copy(),
       this.averageBuildingLevel,
       this.averageTotalResources,

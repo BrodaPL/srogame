@@ -106,6 +106,8 @@ export class EspionageReportGenerator {
         sourceSystemName,
         senderPlayerName: options?.senderPlayerName ?? planetOwner?.playerName ?? null
       },
+      planet.basicInfo.colonizationDifficulty,
+      planet.basicInfo.size,
       planetaryParameters,
       buildingsAverage,
       totalResources,

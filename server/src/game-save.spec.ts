@@ -159,6 +159,10 @@ describe('game-save', () => {
     expect(planet.basicInfo.solarSystem).toBe(system);
     expect(planet.rBDSFTQ.fleets[0]).toBe(fleet);
     expect(planet.lastReportData.get(player.playerId)?.reportType).toBe('Espionage Report');
+    expect(planet.lastReportData.get(player.playerId)).toMatchObject({
+      diff: 4,
+      size: 172
+    });
     expect(planet.rBDSFTQ.currentResearchQueue?.technologyType).toBe(TechnologyType.COMPUTER_TECHNOLOGY);
     expect(planet.rBDSFTQ.researchHelperFor?.mainResearchCoordinates).toEqual({ x: 0, y: 0, z: 0 });
     expect(planet.getFusionReactorSelectedStage()).toBe(1);
@@ -377,6 +381,8 @@ function buildTestSave() {
       sourceSystemName: 'Helios',
       senderPlayerName: 'Scout'
     },
+    4,
+    172,
     new PlanetaryParameters(1, 1, 1, 1, 1, 1, 1, 1, 1),
     3,
     200,

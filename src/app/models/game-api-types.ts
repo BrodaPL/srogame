@@ -877,6 +877,8 @@ export type ClientReportDataDto = {
   sourcePlanetName: string | null;
   sourceSystemName: string | null;
   senderPlayerName: string | null;
+  diff: number;
+  size: number;
   planetaryParameters: PlanetaryParametersDto;
   averageBuildingLevel: number;
   averageTotalResources: number;
@@ -913,6 +915,8 @@ export type TextPlayerReportDto = PlayerReportDtoBase & {
 
 export type EspionagePlayerReportDto = PlayerReportDtoBase & {
   reportType: ReportType;
+  diff: number;
+  size: number;
   planetaryParameters: PlanetaryParametersDto;
   averageBuildingLevel: number;
   averageTotalResources: number;
