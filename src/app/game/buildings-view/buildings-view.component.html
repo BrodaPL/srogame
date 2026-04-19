@@ -35,7 +35,7 @@
                 type="button"
                 class="game-dashboard__toggle"
                 [class.game-dashboard__toggle--active]="selectedMode === mode.value"
-                (click)="selectedMode = mode.value"
+                (click)="setMode(mode.value)"
               >
                 {{ mode.label }}
               </button>
@@ -125,7 +125,7 @@
         <section class="overview-card" data-tutorial-id="buildings-list">
           <div class="game-dashboard__section-head">
             <div>
-              <h3>{{ selectedMode === 'resources' ? 'Resources Infrastructure' : 'Facilities' }}</h3>
+              <h3>{{ selectedMode === 'r' ? 'Resources Infrastructure' : 'Facilities' }}</h3>
               <p class="overview-muted">Compact construction rows with next-level costs and unmet requirements only.</p>
             </div>
           </div>

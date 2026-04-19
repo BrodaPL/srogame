@@ -40,7 +40,7 @@ import {
 } from '../ui/resources/resources.component';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
-type BuildingsMode = 'resources' | 'facilities';
+type BuildingsMode = 'r' | 'f';
 
 type EnergyState = {
   used: number;
@@ -87,13 +87,13 @@ type BuildingQueueRowVm = {
 export class BuildingsViewComponent implements OnInit {
   private readonly i18n = inject(I18nService);
   protected readonly modeOptions: Array<{ value: BuildingsMode; label: string }> = [
-    { value: 'resources', label: 'Resources infrastructure' },
-    { value: 'facilities', label: 'Facilities' }
+    { value: 'r', label: 'Resources infrastructure' },
+    { value: 'f', label: 'Facilities' }
   ];
 
   protected isLoading = false;
   protected loadError: string | null = null;
-  protected selectedMode: BuildingsMode = 'resources';
+  protected selectedMode: BuildingsMode = 'r';
   protected ownedPlanets: ClientPlanetDto[] = [];
   protected selectedPlanetId: string | null = null;
   protected metalDisplay: ResourceDisplay | null = null;
@@ -131,6 +131,7 @@ export class BuildingsViewComponent implements OnInit {
   }
 
   public ngOnInit(): void {
+    this.selectedMode = location.search === '?m=f' ? 'f' : 'r';
     this.loadOwnedPlanets();
   }
 
@@ -143,7 +144,12 @@ export class BuildingsViewComponent implements OnInit {
   }
 
   protected visibleBuildings(): Building[] {
-    return this.selectedMode === 'resources' ? this.resourceBuildings : this.facilityBuildings;
+    return this.selectedMode === 'r' ? this.resourceBuildings : this.facilityBuildings;
+  }
+
+  protected setMode(mode: BuildingsMode): void {
+    this.selectedMode = mode;
+    history.replaceState(history.state, '', location.pathname + (mode === 'f' ? '?m=f' : ''));
   }
 
   protected trackPlanet(_index: number, planet: ClientPlanetDto): string {
@@ -1465,4 +1471,5 @@ export class BuildingsViewComponent implements OnInit {
     const multiplier = 10 ** precision;
     return Math.round(value * multiplier) / multiplier;
   }
+
 }

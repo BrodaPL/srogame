@@ -52,7 +52,7 @@ import type {
   PlanetObjectDetailSection
 } from '../planet-view/planet-object-dialog.component';
 
-type ProductionMode = 'shipyard' | 'defences';
+type ProductionMode = 's' | 'd';
 type EnergyState = { used: number; available: number };
 type ShipCostRowVm = { label: string; amount: number | null; isEnough: boolean; isPlaceholder: boolean };
 type ShipRequirementRowVm = { label: string; isMet: boolean };
@@ -93,15 +93,15 @@ export class ProductionViewComponent implements OnInit {
   @Input() public forcedMode: ProductionMode | null = null;
 
   protected readonly modeOptions: Array<{ value: ProductionMode; label: string }> = [
-    { value: 'shipyard', label: 'Shipyard' },
-    { value: 'defences', label: 'Defences' }
+    { value: 's', label: 'Shipyard' },
+    { value: 'd', label: 'Defences' }
   ];
   protected readonly shipBlueprints: Ship[];
   protected readonly defenceBlueprints: Defence[];
 
   protected isLoading = false;
   protected loadError: string | null = null;
-  protected selectedMode: ProductionMode = 'shipyard';
+  protected selectedMode: ProductionMode = 's';
   protected ownedPlanets: ClientPlanetDto[] = [];
   protected selectedPlanetId: string | null = null;
   protected metalDisplay: ResourceDisplay | null = null;
@@ -149,12 +149,24 @@ export class ProductionViewComponent implements OnInit {
   public ngOnInit(): void {
     if (this.forcedMode) {
       this.selectedMode = this.forcedMode;
+    } else {
+      this.selectedMode = location.search === '?m=d' ? 'd' : 's';
     }
+
     this.loadOwnedPlanets();
   }
 
   protected currentMode(): ProductionMode {
     return this.forcedMode ?? this.selectedMode;
+  }
+
+  protected setMode(mode: ProductionMode): void {
+    this.selectedMode = mode;
+    if (this.forcedMode) {
+      return;
+    }
+
+    history.replaceState(history.state, '', location.pathname + (mode === 'd' ? '?m=d' : ''));
   }
 
   protected selectedPlanet(): ClientPlanetDto | null {
@@ -1740,4 +1752,5 @@ export class ProductionViewComponent implements OnInit {
     const multiplier = 10 ** precision;
     return Math.round(value * multiplier) / multiplier;
   }
+
 }

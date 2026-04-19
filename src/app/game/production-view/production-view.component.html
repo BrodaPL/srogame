@@ -38,7 +38,7 @@
                   type="button"
                   class="game-dashboard__toggle"
                   [class.game-dashboard__toggle--active]="currentMode() === mode.value"
-                  (click)="selectedMode = mode.value"
+                  (click)="setMode(mode.value)"
                 >
                   {{ mode.label }}
                 </button>
@@ -137,16 +137,16 @@
         <section class="overview-card" data-tutorial-id="production-list">
           <div class="game-dashboard__section-head">
             <div>
-              <h3>{{ currentMode() === 'shipyard' ? 'Shipyard' : 'Defences' }}</h3>
+              <h3>{{ currentMode() === 's' ? 'Shipyard' : 'Defences' }}</h3>
               <p class="overview-muted">
-                {{ currentMode() === 'shipyard'
+                {{ currentMode() === 's'
                   ? 'Compact ship-production rows with amount input, costs, and unmet requirements only.'
                   : 'Compact defence-production rows with amount input, costs, and unmet requirements only.' }}
               </p>
             </div>
           </div>
 
-          @if (currentMode() === 'shipyard') {
+          @if (currentMode() === 's') {
             <div class="production-view__ship-list">
               @for (ship of shipBlueprints; track ship.type; let isFirst = $first) {
                 <article

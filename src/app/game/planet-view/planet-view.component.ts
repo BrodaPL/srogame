@@ -250,6 +250,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       const x = this.parseNonNegativeInt(params.get('x'));
       const y = this.parseNonNegativeInt(params.get('y'));
       const z = this.parseNonNegativeInt(params.get('z'));
+      const tab = this.parsePlanetTab(params.get('tab')) ?? 'resources';
       this.updateAttentionHighlight(params.get('highlight') === 'attention');
 
       if (x === null || y === null || z === null) {
@@ -261,7 +262,13 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         return;
       }
 
+      this.applyActiveTab(tab);
       this.coordinatesLabel = `${x}:${y}:${z}`;
+      if (this.planet && this.planet.coordinates.x === x && this.planet.coordinates.y === y && this.planet.coordinates.z === z) {
+        this.cdr.markForCheck();
+        return;
+      }
+
       this.loadPlanet(x, y, z);
       this.cdr.markForCheck();
     });
@@ -284,13 +291,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.activeTab = tab;
-    if (tab === 'queues') {
-      this.startQueueTabAutoRefresh();
-      return;
-    }
-
-    this.stopQueueTabAutoRefresh();
+    this.applyActiveTab(tab);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab },
+      queryParamsHandling: 'merge'
+    });
   }
 
   protected isActiveTab(tab: PlanetTab): boolean {
@@ -2021,7 +2027,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       queryParams: {
         x: planet.coordinates.x,
         y: planet.coordinates.y,
-        z: planet.coordinates.z
+        z: planet.coordinates.z,
+        tab: this.activeTab
       },
       title: `${planet.basicInfo.name} (${this.coordinatesLabelForPlanet(planet)})`
     }));
@@ -2037,7 +2044,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       queryParams: {
         x: target.coordinates.x,
         y: target.coordinates.y,
-        z: target.coordinates.z
+        z: target.coordinates.z,
+        tab: this.activeTab
       }
     });
   }
@@ -2052,7 +2060,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       queryParams: {
         x: target.coordinates.x,
         y: target.coordinates.y,
-        z: target.coordinates.z
+        z: target.coordinates.z,
+        tab: this.activeTab
       }
     });
   }
@@ -2613,7 +2622,6 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
             this.ownedPlanets = this.sortOwnedPlanets(ownedPlanets);
             this.activeFleets = [...activeFleets];
             this.coordinatesLabel = `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`;
-            this.activeTab = 'resources';
             this.shipAmountInputs.clear();
             this.rebuildPlanetState();
             this.tutorialService.autoOpenTutorial('planetView');
@@ -4297,6 +4305,30 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     return parsed;
+  }
+
+  private parsePlanetTab(value: string | null): PlanetTab | null {
+    switch (value) {
+      case 'resources':
+      case 'facilities':
+      case 'ships':
+      case 'defences':
+      case 'operations':
+      case 'queues':
+        return value;
+      default:
+        return null;
+    }
+  }
+
+  private applyActiveTab(tab: PlanetTab): void {
+    this.activeTab = tab;
+    if (tab === 'queues') {
+      this.startQueueTabAutoRefresh();
+      return;
+    }
+
+    this.stopQueueTabAutoRefresh();
   }
 
   private coordinatesToLabel(coordinates: ClientCoordinates): string {
