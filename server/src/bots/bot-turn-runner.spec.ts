@@ -498,6 +498,101 @@ describe('bot-turn-runner', () => {
     ).toBe(true);
   });
 
+  it('recovers from a capped deuterium bootstrap stall without falling back to zero-action turns', () => {
+    const system = new SolarSystem('KurvixLike', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+    const planet = Planet.createStartingPlanet('KurvixLike I', 1, system, 1);
+    system.planets[0] = planet;
+
+    const bot = new Player(
+      1,
+      'Bot-1',
+      [planet],
+      new Map(),
+      [],
+      PlayerType.BOT,
+      createTutorialReadState(true)
+    );
+
+    initializePlanet(planet, bot.playerId);
+    bot.botProfileId = 'BALANCED';
+    bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 4);
+    bot.setTechLevel(TechnologyType.FUSION_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 2);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 4);
+    planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 4);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 4);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 2);
+    planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 1);
+    planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 2);
+    planet.rBDSFTQ.resources = new ResourcesPack(5220, 2790, 1600);
+    planet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
+
+    const galaxy = new Galaxy(
+      'Bot Test',
+      [bot],
+      [[system]],
+      206,
+      [],
+      1,
+      new Map(),
+      new Map([[bot.playerId, bot]]),
+      new Map(),
+      new Map([[bot.playerName, bot.playerId]])
+    );
+
+    for (let turn = 202; turn <= 205; turn += 1) {
+      recordBotDecisionTrace({
+        playerId: bot.playerId,
+        playerName: bot.playerName,
+        turn,
+        profileId: bot.botProfileId,
+        startingGoal: null,
+        endingGoal: null,
+        actionBudget: { max: 10, used: 0, stopReason: 'below_threshold' },
+        chosenActions: [],
+        rejectedActions: [{
+          kind: 'building',
+          reason: 'Deuterium Tank deadlock relief on KurvixLike I',
+          rejectionType: 'threshold',
+          expectedUtility: -2.2,
+          details: {
+            bootstrapRecoveryCandidate: true
+          }
+        }]
+      });
+    }
+
+    runBotTurnPhase(galaxy);
+
+    const trace = getBotDecisionTraces(bot.playerId).slice(-1)[0];
+    const chosenBuildingType = planet.rBDSFTQ.buildingQueue[0]?.buildingType ?? null;
+    const chosenResearchType = planet.rBDSFTQ.currentResearchQueue?.technologyType ?? null;
+
+    expect(trace?.actionBudget.used).toBeGreaterThan(0);
+    expect(trace?.chosenActions[0]?.details['bootstrapRecoveryCandidate']).toBe(true);
+    expect(
+      chosenBuildingType === BuildingType.METAL_MINE
+      || chosenBuildingType === BuildingType.CRYSTAL_MINE
+      || chosenBuildingType === BuildingType.DEUTERIUM_SYNTHESIZER
+      || chosenBuildingType === BuildingType.ROBOTICS_FACTORY
+      || chosenBuildingType === BuildingType.RESEARCH_LAB
+      || chosenBuildingType === BuildingType.SHIPYARD
+      || chosenBuildingType === BuildingType.METAL_STORAGE
+      || chosenBuildingType === BuildingType.CRYSTAL_STORAGE
+      || chosenBuildingType === BuildingType.DEUTERIUM_TANK
+      || chosenResearchType === TechnologyType.MATERIAL_TECHNOLOGY
+      || chosenResearchType === TechnologyType.ENERGY_TECHNOLOGY
+    ).toBe(true);
+  });
+
   it('does not queue a fusion reactor upgrade when the projected net deuterium would go negative', () => {
     const system = new SolarSystem('FusionSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
     const planet = Planet.createStartingPlanet('FusionSys I', 1, system, 1);
