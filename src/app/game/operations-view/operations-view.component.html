@@ -28,7 +28,6 @@
 
     <header class="overview-card operations-view__header" data-tutorial-id="operations-header">
       <div>
-        <p class="eyebrow">Fleet Control</p>
         <h1 class="operations-view__title">Operations</h1>
         <p class="overview-muted">Active fleets and launched missions with live turn-based ETA progress.</p>
         <p class="overview-muted">Active fleets: {{ activeFleetCountLabel() }}</p>
@@ -58,7 +57,7 @@
             <div class="operations-view__card-head">
               <div class="operations-view__fleet-meta">
                 <span class="operations-view__fleet-meta-line">
-                  Fleet #{{ fleet.fleetId }} | {{ missionLabel(fleet) }} | {{ stateLabel(fleet) }}
+                  {{ missionLabel(fleet) }} | {{ stateLabel(fleet) }} | Fleet #{{ fleet.fleetId }}
                 </span>
               </div>
               <div class="operations-view__card-head-actions">
