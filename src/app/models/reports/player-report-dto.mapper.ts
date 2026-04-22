@@ -87,6 +87,11 @@ function fromEspionageReportDto(report: EspionagePlayerReportDto): EspionageRepo
       report.resourcesAmount.crystal,
       report.resourcesAmount.deuterium
     ),
+    new ResourcesPack(
+      report.spaceDebrisAmount.metal,
+      report.spaceDebrisAmount.crystal,
+      report.spaceDebrisAmount.deuterium
+    ),
     new Map(report.techLevels.map((entry) => [entry.type, entry.level])),
     report.defences.map((entry) => new DefenceBuildingInstances(entry.type, entry.amount)),
     new Map(report.ships.map((entry) => [entry.type, entry.amount])),

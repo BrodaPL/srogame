@@ -60,6 +60,7 @@ describe('PlayerReport domain', () => {
       1,
       new Map([[BuildingType.METAL_MINE, 4]]),
       new ResourcesPack(100, 200, 300),
+      new ResourcesPack(10, 20, 30),
       new Map(),
       [],
       new Map(),
@@ -71,10 +72,12 @@ describe('PlayerReport domain', () => {
 
     const copy = report.copy();
     copy.resourcesAmount.metal = 999;
+    copy.spaceDebrisAmount.crystal = 999;
     copy.buildingsLevels.set(BuildingType.METAL_MINE, 10);
     copy.size = 220;
 
     expect(report.resourcesAmount.metal).toBe(100);
+    expect(report.spaceDebrisAmount.crystal).toBe(20);
     expect(report.buildingsLevels.get(BuildingType.METAL_MINE)).toBe(4);
     expect(report.size).toBe(160);
   });

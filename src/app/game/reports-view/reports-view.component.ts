@@ -271,11 +271,21 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected espionageResourceRows(report: EspionageReportData): ReportDossierRow[] {
-    return [
+    const rows: ReportDossierRow[] = [
       { label: 'Metal', value: this.formatMetricValue(report.resourcesAmount.metal) },
       { label: 'Crystal', value: this.formatMetricValue(report.resourcesAmount.crystal) },
       { label: 'Deuterium', value: this.formatMetricValue(report.resourcesAmount.deuterium) }
     ];
+
+    if (report.spaceDebrisAmount.getTotalResourceAmount() > 0) {
+      rows.push(
+        { label: 'Debris Metal', value: this.formatMetricValue(report.spaceDebrisAmount.metal) },
+        { label: 'Debris Crystal', value: this.formatMetricValue(report.spaceDebrisAmount.crystal) },
+        { label: 'Debris Deuterium', value: this.formatMetricValue(report.spaceDebrisAmount.deuterium) }
+      );
+    }
+
+    return rows;
   }
 
   protected espionageBuildingRows(report: EspionageReportData): ReportDossierRow[] {

@@ -81,6 +81,13 @@ export class EspionageReportGenerator {
         planet.rBDSFTQ.resources.deuterium
       )
       : new ResourcesPack(0, 0, 0);
+    const detailedSpaceDebris = includeDetailedResources
+      ? new ResourcesPack(
+        planet.rBDSFTQ.spaceDebris.metal,
+        planet.rBDSFTQ.spaceDebris.crystal,
+        planet.rBDSFTQ.spaceDebris.deuterium
+      )
+      : new ResourcesPack(0, 0, 0);
     const detailedTech = includeDetailedTech
       ? new Map(planetOwner?.tech ?? new Map())
       : new Map();
@@ -116,6 +123,7 @@ export class EspionageReportGenerator {
       totalShips,
       detailedBuildings,
       detailedResources,
+      detailedSpaceDebris,
       detailedTech,
       detailedDefences,
       detailedShips,

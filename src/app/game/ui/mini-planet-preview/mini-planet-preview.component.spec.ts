@@ -64,6 +64,21 @@ describe('MiniPlanetPreviewComponent', () => {
       }
     );
   });
+
+  it('shows a separate debris tag only when report debris is non-zero', () => {
+    const component = new MiniPlanetPreviewComponent(createRouter() as never);
+    component.planet = createRevealedForeignPlanet('Foreign', { x: 4, y: 4, z: 4 });
+
+    component.ngOnChanges();
+    expect((component as { tags: Array<{ label: string; tooltip: string }> }).tags.map((tag) => tag.label)).not.toContain('Debris');
+
+    component.planet.reportData!.spaceDebrisAmount = { metal: 7, crystal: 8, deuterium: 9 };
+    component.ngOnChanges();
+
+    const debrisTag = (component as { tags: Array<{ label: string; tooltip: string }> }).tags.find((tag) => tag.label === 'Debris');
+    expect(debrisTag).toBeTruthy();
+    expect(debrisTag?.tooltip).toBe('Metal: 7, Crystal: 8, Deuterium: 9');
+  });
 });
 
 function createRouter() {
@@ -190,6 +205,7 @@ function createRevealedForeignPlanet(name: string, coordinates: ClientCoordinate
       totalShipsAmount: 0,
       buildingsLevels: [],
       resourcesAmount: { metal: 0, crystal: 0, deuterium: 0 },
+      spaceDebrisAmount: { metal: 0, crystal: 0, deuterium: 0 },
       techLevels: [],
       defences: [],
       ships: [],

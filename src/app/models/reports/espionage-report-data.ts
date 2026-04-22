@@ -26,6 +26,7 @@ export class EspionageReportData extends PlayerReport {
     public totalShipsAmount: number,
     public buildingsLevels: Map<BuildingType, number>,
     public resourcesAmount: ResourcesPack,
+    public spaceDebrisAmount: ResourcesPack,
     public techLevels: Map<TechnologyType, number>,
     public defences: DefenceBuildingInstances[],
     public ships: Map<ShipType, number>,
@@ -46,6 +47,9 @@ export class EspionageReportData extends PlayerReport {
     lines.push(`Total ships amount: ${this.totalShipsAmount}`);
     lines.push(
       `Resources: M ${this.resourcesAmount.metal}, C ${this.resourcesAmount.crystal}, D ${this.resourcesAmount.deuterium}`
+    );
+    lines.push(
+      `Debris: M ${this.spaceDebrisAmount.metal}, C ${this.spaceDebrisAmount.crystal}, D ${this.spaceDebrisAmount.deuterium}`
     );
 
     if (this.buildingsLevels.size > 0) {
@@ -88,6 +92,11 @@ export class EspionageReportData extends PlayerReport {
         this.resourcesAmount.metal,
         this.resourcesAmount.crystal,
         this.resourcesAmount.deuterium
+      ),
+      new ResourcesPack(
+        this.spaceDebrisAmount.metal,
+        this.spaceDebrisAmount.crystal,
+        this.spaceDebrisAmount.deuterium
       ),
       new Map(this.techLevels),
       this.defences.map((entry) => entry.copy()),

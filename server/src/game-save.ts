@@ -167,6 +167,7 @@ type SavedEspionagePlayerReport = SavedPlayerReportBase & {
   totalShipsAmount: number;
   buildingsLevels: Record<string, number>;
   resourcesAmount: SavedResourcesPack;
+  spaceDebrisAmount?: SavedResourcesPack;
   techLevels: Record<string, number>;
   defences: Array<{ type: DefenceType; amount: number }>;
   ships: Record<string, number>;
@@ -954,6 +955,7 @@ function hydrateSavedPlayerReport(savedReport: SavedPlayerReport): PlayerReport 
         savedReport.totalShipsAmount,
         mapFromNumericRecord(savedReport.buildingsLevels),
         hydrateSavedResourcesPack(savedReport.resourcesAmount),
+        hydrateSavedResourcesPack(savedReport.spaceDebrisAmount ?? { metal: 0, crystal: 0, deuterium: 0 }),
         mapFromNumericRecord(savedReport.techLevels),
         savedReport.defences.map((entry) => new DefenceBuildingInstances(entry.type, entry.amount)),
         mapFromNumericRecord(savedReport.ships),
@@ -1295,6 +1297,7 @@ function serializeEspionageReport(report: EspionageReportData): SavedEspionagePl
     totalShipsAmount: report.totalShipsAmount,
     buildingsLevels: mapToNumericRecord(report.buildingsLevels),
     resourcesAmount: serializeResourcesPack(report.resourcesAmount),
+    spaceDebrisAmount: serializeResourcesPack(report.spaceDebrisAmount),
     techLevels: mapToNumericRecord(report.techLevels),
     defences: report.defences.map((entry) => ({
       type: entry.type,

@@ -261,6 +261,7 @@ function createOwnedPlanet(
       totalShipsAmount: 1,
       buildingsLevels: [],
       resourcesAmount: { metal: 0, crystal: 0, deuterium: 0 },
+      spaceDebrisAmount: { metal: 0, crystal: 0, deuterium: 0 },
       techLevels: [
         {
           type: TechnologyType.COMPUTER_TECHNOLOGY,

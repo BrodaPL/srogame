@@ -161,7 +161,12 @@ describe('game-save', () => {
     expect(planet.lastReportData.get(player.playerId)?.reportType).toBe('Espionage Report');
     expect(planet.lastReportData.get(player.playerId)).toMatchObject({
       diff: 4,
-      size: 172
+      size: 172,
+      spaceDebrisAmount: {
+        metal: 3,
+        crystal: 4,
+        deuterium: 5
+      }
     });
     expect(planet.rBDSFTQ.currentResearchQueue?.technologyType).toBe(TechnologyType.COMPUTER_TECHNOLOGY);
     expect(planet.rBDSFTQ.researchHelperFor?.mainResearchCoordinates).toEqual({ x: 0, y: 0, z: 0 });
@@ -391,6 +396,7 @@ function buildTestSave() {
     6,
     new Map([[BuildingType.METAL_MINE, 4]]),
     new ResourcesPack(10, 20, 30),
+    new ResourcesPack(3, 4, 5),
     new Map([[TechnologyType.COMPUTER_TECHNOLOGY, 2]]),
     [new DefenceBuildingInstances(DefenceType.LIGHT_BEAM_CANNON, 5)],
     new Map([[ShipType.FIGHTER, 3]]),

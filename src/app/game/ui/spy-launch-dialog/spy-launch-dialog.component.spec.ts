@@ -204,6 +204,7 @@ function createPlanet(
     },
     reportData: {
       resourcesAmount: { metal: 0, crystal: 0, deuterium: 0 },
+      spaceDebrisAmount: { metal: 0, crystal: 0, deuterium: 0 },
       averageTotalResources: 0,
       averageBuildingLevel: 0,
       averageTechLevel: 0,

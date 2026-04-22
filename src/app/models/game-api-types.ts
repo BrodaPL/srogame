@@ -891,6 +891,7 @@ export type ClientReportDataDto = {
   totalShipsAmount: number;
   buildingsLevels: BuildingLevelEntry[];
   resourcesAmount: ResourcesPackDto;
+  spaceDebrisAmount: ResourcesPackDto;
   techLevels: TechLevelEntry[];
   defences: DefenceBuildingInstances[];
   ships: ShipAmountEntry[];
@@ -929,6 +930,7 @@ export type EspionagePlayerReportDto = PlayerReportDtoBase & {
   totalShipsAmount: number;
   buildingsLevels: BuildingLevelEntry[];
   resourcesAmount: ResourcesPackDto;
+  spaceDebrisAmount: ResourcesPackDto;
   techLevels: TechLevelEntry[];
   defences: DefenceBuildingInstances[];
   ships: ShipAmountEntry[];

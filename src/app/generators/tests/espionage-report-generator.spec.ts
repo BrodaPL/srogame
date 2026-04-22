@@ -53,7 +53,7 @@ describe('EspionageReportGenerator', () => {
       [],
       [],
       [],
-      new ResourcesPack(0, 0, 0)
+      new ResourcesPack(10, 20, 30)
     ),
     new Map()
   );
@@ -108,6 +108,7 @@ describe('EspionageReportGenerator', () => {
       totalShipsAmount: report.totalShipsAmount,
       buildingsLevels: Array.from(report.buildingsLevels.entries()),
       resourcesAmount: report.resourcesAmount,
+      spaceDebrisAmount: report.spaceDebrisAmount,
       techLevels: Array.from(report.techLevels.entries()),
       defences: report.defences,
       ships: Array.from(report.ships.entries())
@@ -125,6 +126,7 @@ describe('EspionageReportGenerator', () => {
     expect(report.totalShipsAmount).toBe(2);
     expect(report.buildingsLevels.size).toBe(3);
     expect(report.resourcesAmount.getTotalResourceAmount()).toBe(600);
+    expect(report.spaceDebrisAmount.getTotalResourceAmount()).toBe(60);
     expect(report.techLevels.get(TechnologyType.ENERGY_TECHNOLOGY)).toBe(2);
     expect(report.defences.map((entry) => [entry.type, entry.amount])).toEqual([
       [DefenceType.LIGHT_BEAM_CANNON, 3],
@@ -166,6 +168,7 @@ describe('EspionageReportGenerator', () => {
       totalShipsAmount: report.totalShipsAmount,
       buildingsLevels: Array.from(report.buildingsLevels.entries()),
       resourcesAmount: report.resourcesAmount,
+      spaceDebrisAmount: report.spaceDebrisAmount,
       techLevels: Array.from(report.techLevels.entries()),
       defences: report.defences,
       ships: Array.from(report.ships.entries())
@@ -188,6 +191,7 @@ describe('EspionageReportGenerator', () => {
     expect(report.totalShipsAmount).toBe(0);
     expect(report.buildingsLevels.size).toBe(0);
     expect(report.resourcesAmount.getTotalResourceAmount()).toBe(0);
+    expect(report.spaceDebrisAmount.getTotalResourceAmount()).toBe(0);
     expect(report.techLevels.size).toBe(0);
     expect(report.ships.size).toBe(0);
   });
@@ -210,8 +214,10 @@ describe('EspionageReportGenerator', () => {
 
     expect(baseReport.totalDefencesAmount).toBe(0);
     expect(baseReport.resourcesAmount.getTotalResourceAmount()).toBe(0);
+    expect(baseReport.spaceDebrisAmount.getTotalResourceAmount()).toBe(0);
     expect(boostedReport.totalDefencesAmount).toBe(5);
     expect(boostedReport.resourcesAmount.getTotalResourceAmount()).toBe(600);
+    expect(boostedReport.spaceDebrisAmount.getTotalResourceAmount()).toBe(60);
     expect(boostedReport.defences.map((entry) => [entry.type, entry.amount])).toEqual([
       [DefenceType.LIGHT_BEAM_CANNON, 3],
       [DefenceType.SAM_SITE, 2]

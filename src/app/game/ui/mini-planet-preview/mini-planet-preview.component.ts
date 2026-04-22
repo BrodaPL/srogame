@@ -244,6 +244,11 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       tags.push(resourcesTag);
     }
 
+    const debrisTag = this.buildDebrisTag(report);
+    if (debrisTag) {
+      tags.push(debrisTag);
+    }
+
     const defencesTag = this.buildDefencesTag(report);
     if (defencesTag) {
       tags.push(defencesTag);
@@ -313,6 +318,19 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     return {
       label: 'Resources',
       tooltip
+    };
+  }
+
+  private buildDebrisTag(report: ClientReportDataDto): MiniPlanetTagVm | null {
+    const debris = report.spaceDebrisAmount;
+    const hasDebris = debris.metal > 0 || debris.crystal > 0 || debris.deuterium > 0;
+    if (!hasDebris) {
+      return null;
+    }
+
+    return {
+      label: 'Debris',
+      tooltip: `Metal: ${debris.metal}, Crystal: ${debris.crystal}, Deuterium: ${debris.deuterium}`
     };
   }
 
