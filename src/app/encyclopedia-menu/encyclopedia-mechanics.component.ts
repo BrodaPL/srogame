@@ -267,7 +267,7 @@ export class EncyclopediaMechanicsComponent {
       ],
       formulas: [
         'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2',
-        'travelTurns = ceil(3 / (1 + FUSION_DRIVE / 4) + distance / (1 + HYPERSPACE_DRIVE / 10) - GRAVITON_TECHNOLOGY), minimum 1',
+        'travelTurns = ceil(4 / (1 + FUSION_DRIVE / 3) + distance / (1 + HYPERSPACE_DRIVE / 6) - GRAVITON_TECHNOLOGY), minimum 1',
         'Jump Gate travelTurns = 1',
         'fuelCost = sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves'
       ],

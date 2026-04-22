@@ -130,12 +130,12 @@ describe('MissionPlannerViewComponent', () => {
     (component as { selectedOriginPlanet: ClientPlanetDto | null }).selectedOriginPlanet = originPlanet;
     (component as { selectedTargetPlanet: ClientPlanetDto | null }).selectedTargetPlanet = targetPlanet;
 
-    expect((component as { travelTurnsPreview(): number }).travelTurnsPreview()).toBe(3);
+    expect((component as { travelTurnsPreview(): number }).travelTurnsPreview()).toBe(2);
     expect((component as { travelFormulaLabel(): string }).travelFormulaLabel()).toBe(
-      'ETA formula: ceil(3 / (1 + Fusion Drive / 4) + distance / (1 + Hyperspace Drive / 10) - Graviton Technology)'
+      'ETA formula: ceil(4 / (1 + Fusion Drive / 3) + distance / (1 + Hyperspace Drive / 6) - Graviton Technology)'
     );
     expect((component as { travelFormulaDetailLabel(): string }).travelFormulaDetailLabel()).toBe(
-      'Current: ceil(1.5 + 3 - 2) = 3 turns'
+      'Current: ceil(1.71 + 2.25 - 2) = 2 turns'
     );
     expect((component as { travelTechSummaryLabel(): string }).travelTechSummaryLabel()).toBe(
       'Tech levels: Fusion Drive 4 | Hyperspace Drive 10 | Graviton Technology 2'

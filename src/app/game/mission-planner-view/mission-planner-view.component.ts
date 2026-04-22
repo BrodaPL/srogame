@@ -585,7 +585,7 @@ export class MissionPlannerViewComponent implements OnInit {
       return 'Jump Gate override: travel time is fixed at 1 turn.';
     }
 
-    return 'ETA formula: ceil(3 / (1 + Fusion Drive / 4) + distance / (1 + Hyperspace Drive / 10) - Graviton Technology)';
+    return 'ETA formula: ceil(4 / (1 + Fusion Drive / 3) + distance / (1 + Hyperspace Drive / 6) - Graviton Technology)';
   }
 
   protected travelFormulaDetailLabel(): string {
@@ -593,8 +593,8 @@ export class MissionPlannerViewComponent implements OnInit {
       return 'Drive technologies do not change Jump Gate travel time.';
     }
 
-    const startupComponent = 3 / (1 + (this.techLevel(TechnologyType.FUSION_DRIVE) / 4));
-    const distanceComponent = this.distancePreview() / (1 + (this.techLevel(TechnologyType.HYPERSPACE_DRIVE) / 10));
+    const startupComponent = 4 / (1 + (this.techLevel(TechnologyType.FUSION_DRIVE) / 3));
+    const distanceComponent = this.distancePreview() / (1 + (this.techLevel(TechnologyType.HYPERSPACE_DRIVE) / 6));
     const gravitonTechnologyLevel = this.techLevel(TechnologyType.GRAVITON_TECHNOLOGY);
 
     return `Current: ceil(${this.formatTravelFormulaValue(startupComponent)} + ${this.formatTravelFormulaValue(distanceComponent)} - ${gravitonTechnologyLevel}) = ${this.travelTurnsPreview()} turns`;

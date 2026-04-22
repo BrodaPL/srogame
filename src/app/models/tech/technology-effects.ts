@@ -35,8 +35,8 @@ export function fleetTravelTurnsForDistance(
   const sanitizedHyperspaceDriveLevel = sanitizeTechLevel(hyperspaceDriveLevel);
   const sanitizedGravitonTechnologyLevel = sanitizeTechLevel(gravitonTechnologyLevel);
   const rawTurns = (
-    3 / (1 + (sanitizedFusionDriveLevel / 4))
-    + sanitizedDistance / (1 + (sanitizedHyperspaceDriveLevel / 10))
+    4 / (1 + (sanitizedFusionDriveLevel / 3))
+    + sanitizedDistance / (1 + (sanitizedHyperspaceDriveLevel / 6))
     - sanitizedGravitonTechnologyLevel
   );
 

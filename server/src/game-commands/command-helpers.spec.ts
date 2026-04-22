@@ -11,7 +11,7 @@ describe('command helpers', () => {
     player.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 10);
     player.setTechLevel(TechnologyType.GRAVITON_TECHNOLOGY, 2);
 
-    expect(calculateFleetTravelTurns(8, player)).toBe(4);
+    expect(calculateFleetTravelTurns(8, player)).toBe(3);
   });
 
   it('clamps travel turns to at least one turn', () => {
