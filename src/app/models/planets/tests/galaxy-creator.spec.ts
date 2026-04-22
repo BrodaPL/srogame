@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RngBuildingGenerator } from '../../../generators/rng-building-generator';
+import { RngResourceGenerator } from '../../../generators/rng-resource-generator';
+import { RngShipsGenerator } from '../../../generators/rng-ships-generator';
 import { BuildingType } from '../../enums/building-type';
 import { DefenceType } from '../../enums/defence-type';
 import { GalaxyCreator } from '../galaxy-creator';
@@ -11,6 +13,7 @@ import { PlanetType } from '../../enums/planet-type';
 import { ShipType } from '../../enums/ship-type';
 import { TechnologyType } from '../../enums/technology-type';
 import { ManyDefences } from '../../defences/many-defences';
+import { isPlanetaryBombDefenceType } from '../../defences/planetary-bomb';
 import { ManyShips } from '../../fleets/many-ships';
 import type { GalaxySetup } from '../../game-api-types';
 
@@ -41,7 +44,7 @@ describe('GalaxyCreator', () => {
     ...overrides
   });
 
-  it('adds a level-three neutral neighbor to the home system when neutral planets are enabled', () => {
+  it('adds a level-two neutral neighbor to the home system when neutral planets are enabled', () => {
     const galaxy = new GalaxyCreator(createSetup()).createGalaxy(['Human']);
     const player = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER);
 
@@ -67,6 +70,7 @@ describe('GalaxyCreator', () => {
     expect(neutralPlanets[0].rBDSFTQ.resources.crystal).toBeGreaterThan(0);
     expect(neutralPlanets[0].rBDSFTQ.resources.deuterium).toBeGreaterThan(0);
     expect(neutralPlanets[0].rBDSFTQ.ships.totalShipsCount()).toBeGreaterThan(0);
+    expect(ManyDefences.totalDefencesCount(neutralPlanets[0].rBDSFTQ.defences)).toBe(0);
   });
 
   it('adds +1 storage level to newly created neutral planets after their RNG setup is applied', () => {
@@ -112,6 +116,33 @@ describe('GalaxyCreator', () => {
     expect(homeSystemNeutralPlanets.length).toBe(0);
   });
 
+  it('does not seed extra random neutrals inside home systems', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const galaxy = new GalaxyCreator(createSetup({
+      starsAmountModifier: [3, 3],
+      neutralBotsAmount: 100
+    })).createGalaxy(['Human']);
+
+    const player = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER);
+    expect(player).toBeTruthy();
+
+    const homeSystem = player!.planets[0].basicInfo.solarSystem;
+    const neutralOwnerIds = new Set(
+      galaxy.players
+        .filter((entry) => entry.type === PlayerType.NEUTRAL)
+        .map((entry) => entry.playerId)
+    );
+    const homeSystemNeutralPlanets = homeSystem.planets.filter((planet) =>
+      planet.info.ownerId !== null
+      && neutralOwnerIds.has(planet.info.ownerId)
+    );
+
+    expect(homeSystem.planets.length).toBe(3);
+    expect(homeSystemNeutralPlanets).toHaveLength(1);
+    expect(ManyDefences.totalDefencesCount(homeSystemNeutralPlanets[0].rBDSFTQ.defences)).toBe(0);
+  });
+
   it('adds extra random neutral planets outside home systems in normal games and keeps their levels in the extra range', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const assignNeutralSpy = vi.spyOn(GalaxyCreator.prototype as never, 'assignNeutralOwnerToPlanet' as never);
@@ -141,9 +172,60 @@ describe('GalaxyCreator', () => {
     expect(extraNeutralPlanets.every((planet) => planet.rBDSFTQ.ships.totalShipsCount() > 0)).toBe(true);
 
     const assignedLevels = assignNeutralSpy.mock.calls.map((call) => call[2] as number);
-    expect(assignedLevels).toContain(3);
     expect(assignedLevels).toContain(2);
-    expect(assignedLevels.filter((level) => level !== 3).every((level) => level >= 2 && level <= 6)).toBe(true);
+    expect(assignedLevels).toContain(3);
+    expect(assignedLevels.filter((level) => level !== 2).every((level) => level >= 3 && level <= 6)).toBe(true);
+  });
+
+  it('seeds extra neutral planets with non-bomb planetary defences only', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const galaxy = new GalaxyCreator(createSetup({
+      gameType: GameType.PVE,
+      neutralBotsAmount: 100
+    })).createGalaxy(['Human']);
+
+    const human = galaxy.players.find((entry) => entry.type === PlayerType.PLAYER);
+    expect(human).toBeTruthy();
+
+    const homeSystem = human!.planets[0].basicInfo.solarSystem;
+    const neutralPlayers = galaxy.players.filter((entry) => entry.type === PlayerType.NEUTRAL);
+    const extraNeutralPlanets = galaxy.stars
+      .flatMap((row) => row.flatMap((system) =>
+        system.planets.filter((planet) =>
+          system !== homeSystem
+          && planet.info.ownerId !== null
+          && neutralPlayers.some((player) => player.playerId === planet.info.ownerId)
+        )
+      ));
+
+    expect(extraNeutralPlanets.length).toBeGreaterThan(0);
+    expect(extraNeutralPlanets.every((planet) => ManyDefences.totalDefencesCount(planet.rBDSFTQ.defences) > 0)).toBe(true);
+    expect(extraNeutralPlanets.every((planet) =>
+      [...ManyDefences.countByType(planet.rBDSFTQ.defences).keys()].every((type) => !isPlanetaryBombDefenceType(type))
+    )).toBe(true);
+  });
+
+  it('scales neutral fleet budget from neutralBotsDifficulty and uses half of it for extra-neutral defences', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const shipGenerateSpy = vi.spyOn(RngShipsGenerator.prototype, 'generate');
+    const defenceSeedSpy = vi.spyOn(GalaxyCreator.prototype as never, 'seedNeutralPlanetaryDefences' as never);
+    const resourceGenerator = new RngResourceGenerator();
+
+    new GalaxyCreator(createSetup({
+      gameType: GameType.PVE,
+      neutralBotsAmount: 100,
+      neutralBotsDifficulty: 100
+    })).createGalaxy(['Human']);
+
+    const expectedExtraFleetBudget = resourceGenerator.generateSimple(3).getTotalValuedResourceAmount() * 2;
+    const extraFleetBudgetCall = shipGenerateSpy.mock.calls.find((call) => call[0] === 3);
+    expect(extraFleetBudgetCall).toBeTruthy();
+    expect(extraFleetBudgetCall?.[1]).toBe(expectedExtraFleetBudget);
+
+    const expectedExtraDefenceBudget = expectedExtraFleetBudget / 2;
+    const extraDefenceBudgetCall = defenceSeedSpy.mock.calls.find((call) => call[2] === expectedExtraDefenceBudget);
+    expect(extraDefenceBudgetCall).toBeTruthy();
   });
 
   it('treats neutral planet amount as a real 0..100 percentage when seeding extra neutrals', () => {

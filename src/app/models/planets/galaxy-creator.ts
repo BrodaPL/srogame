@@ -12,6 +12,7 @@ import { RngTechnologyGenerator } from '../../generators/rng-technology-generato
 import { RngShipsGenerator } from '../../generators/rng-ships-generator';
 import { RngResourceGenerator } from '../../generators/rng-resource-generator';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
+import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { BuildingType } from '../enums/building-type';
 import { DefenceType } from '../enums/defence-type';
 import { NAMES_LIST } from '../enums/names-list';
@@ -22,8 +23,11 @@ import { ManyShips } from '../fleets/many-ships';
 import { ResourcesPack } from '../resources-pack';
 import { ShipInstance } from '../fleets/ship-instance';
 import { ManyDefences } from '../defences/many-defences';
+import { isPlanetaryBombDefenceType } from '../defences/planetary-bomb';
+import { Defence } from '../defences/defence';
 import { createTutorialReadState } from '../../tutorial/tutorial-types';
 
+const DEFENCE_BLUEPRINTS = DefenceBlueprintsFactory.fromDefaultJson();
 
 export class GalaxyCreator {
   private static readonly BOT_NAME_POOL_SIZE = 24;
@@ -31,8 +35,8 @@ export class GalaxyCreator {
   private static readonly HOMEWORLD_SCIENCE_MODIFIER = 0.75;
   private static readonly TEST_RANDOM_PLANETS_COUNT = 3;
   private static readonly TEST_STARTING_SHIPS_PER_TYPE = 10;
-  private static readonly HOME_SYSTEM_NEUTRAL_LEVEL = 3;
-  private static readonly EXTRA_NEUTRAL_LEVEL_MIN = 2;
+  private static readonly HOME_SYSTEM_NEUTRAL_LEVEL = 2;
+  private static readonly EXTRA_NEUTRAL_LEVEL_MIN = 3;
   private static readonly EXTRA_NEUTRAL_LEVEL_MAX = 6;
   private static readonly TEST_RANDOM_PLANET_LEVEL_MIN = 4;
   private static readonly TEST_RANDOM_PLANET_LEVEL_MAX = 12;
@@ -442,7 +446,12 @@ export class GalaxyCreator {
     }
 
     const neutralPlanet = this.findOrCreateSecondaryHomeSystemPlanet(homeSystem, homePlanet);
-    this.assignNeutralOwnerToPlanet(galaxy, neutralPlanet, GalaxyCreator.HOME_SYSTEM_NEUTRAL_LEVEL);
+    this.assignNeutralOwnerToPlanet(
+      galaxy,
+      neutralPlanet,
+      GalaxyCreator.HOME_SYSTEM_NEUTRAL_LEVEL,
+      false
+    );
   }
 
   private seedExtraNeutralPlanets(galaxy: Galaxy): void {
@@ -454,6 +463,10 @@ export class GalaxyCreator {
     for (const row of galaxy.stars) {
       for (const system of row) {
         if (system.isVoid) {
+          continue;
+        }
+
+        if (this.isHomeSystem(galaxy, system)) {
           continue;
         }
 
@@ -472,7 +485,8 @@ export class GalaxyCreator {
             this.randomInt(
               GalaxyCreator.EXTRA_NEUTRAL_LEVEL_MIN,
               GalaxyCreator.EXTRA_NEUTRAL_LEVEL_MAX
-            )
+            ),
+            true
           );
         }
       }
@@ -505,29 +519,45 @@ export class GalaxyCreator {
     return createdPlanet;
   }
 
-  private assignNeutralOwnerToPlanet(galaxy: Galaxy, planet: Planet, level: number): void {
+  private isHomeSystem(galaxy: Galaxy, system: SolarSystem): boolean {
+    return galaxy.players.some((player) =>
+      (player.type === PlayerType.PLAYER || player.type === PlayerType.BOT)
+      && player.planets[0]?.basicInfo.solarSystem === system
+    );
+  }
+
+  private assignNeutralOwnerToPlanet(
+    galaxy: Galaxy,
+    planet: Planet,
+    level: number,
+    seedPlanetaryDefences = false
+  ): void {
     const normalizedLevel = Math.max(1, Math.floor(level));
     const buildingGenerator = new RngBuildingGenerator();
     const techGenerator = new RngTechnologyGenerator();
     const shipGenerator = new RngShipsGenerator();
     const resourceGenerator = new RngResourceGenerator();
-    const targetShipsValue = resourceGenerator
-      .generateSimple(normalizedLevel)
-      .getTotalValuedResourceAmount();
+    const buildingLevels = buildingGenerator.generate(normalizedLevel);
+    const techLevels = techGenerator.generate(normalizedLevel);
+    const resources = resourceGenerator.generateSimple(normalizedLevel);
+    const targetShipsValue = this.resolveNeutralFleetBudget(resources.getTotalValuedResourceAmount());
     const ships = shipGenerator.generate(normalizedLevel, targetShipsValue);
     const playerId = this.nextAvailablePlayerId(galaxy);
     const playerName = `N-${playerId}`;
 
     planet.info.ownerId = playerId;
-    this.applyBuildingLevelsToPlanet(planet, buildingGenerator.generate(normalizedLevel));
-    planet.rBDSFTQ.resources = resourceGenerator.generateSimple(normalizedLevel);
+    this.applyBuildingLevelsToPlanet(planet, buildingLevels);
+    planet.rBDSFTQ.resources = resources;
     planet.rBDSFTQ.ships = ManyShips.fromShipInstances(ships);
+    planet.rBDSFTQ.defences = seedPlanetaryDefences
+      ? this.seedNeutralPlanetaryDefences(buildingLevels, techLevels, targetShipsValue / 2)
+      : ManyDefences.empty();
 
     const player = new Player(
       playerId,
       playerName,
       [planet],
-      techGenerator.generate(normalizedLevel),
+      techLevels,
       [],
       PlayerType.NEUTRAL,
       createTutorialReadState(true)
@@ -537,6 +567,76 @@ export class GalaxyCreator {
     galaxy.players.push(player);
     galaxy.neutralPlayerMap.set(player.playerId, player);
     galaxy.playerNameMap.set(player.playerName, player.playerId);
+  }
+
+  private resolveNeutralFleetBudget(baseBudget: number): number {
+    const configuredPercent = typeof this.setup.neutralBotsDifficulty === 'number'
+      && Number.isFinite(this.setup.neutralBotsDifficulty)
+      ? this.setup.neutralBotsDifficulty
+      : 0;
+    const multiplier = Math.max(0, 1 + (configuredPercent / 100));
+    return Math.max(0, baseBudget * multiplier);
+  }
+
+  private seedNeutralPlanetaryDefences(
+    buildingLevels: Map<BuildingType, number>,
+    techLevels: Map<TechnologyType, number>,
+    targetBudget: number
+  ): ManyDefences {
+    const normalizedBudget = Math.max(0, targetBudget);
+    const defences = ManyDefences.empty();
+    if (normalizedBudget <= 0) {
+      return defences;
+    }
+
+    const eligibleDefences = Array.from(DEFENCE_BLUEPRINTS.defencesMap.values())
+      .filter((defence) => !isPlanetaryBombDefenceType(defence.type))
+      .filter((defence) => this.hasNeutralDefenceBuildingRequirements(buildingLevels, defence))
+      .filter((defence) => this.hasNeutralDefenceTechnologyRequirements(techLevels, defence));
+
+    if (eligibleDefences.length === 0) {
+      return defences;
+    }
+
+    let totalValue = 0;
+    while (totalValue < normalizedBudget) {
+      const remainingBudget = normalizedBudget - totalValue;
+      const affordableDefences = eligibleDefences.filter((defence) =>
+        defence.cost.getTotalValuedResourceAmount() <= remainingBudget
+      );
+      const defencePool = affordableDefences.length > 0 ? affordableDefences : eligibleDefences;
+      const defence = defencePool[this.randomInt(0, defencePool.length - 1)];
+      defences.addUndamaged(defence.type, 1);
+      totalValue += defence.cost.getTotalValuedResourceAmount();
+    }
+
+    return defences;
+  }
+
+  private hasNeutralDefenceBuildingRequirements(
+    buildingLevels: Map<BuildingType, number>,
+    defence: Defence
+  ): boolean {
+    for (const requirement of defence.buildingRequirements) {
+      if ((buildingLevels.get(requirement.building) ?? 0) < requirement.level) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private hasNeutralDefenceTechnologyRequirements(
+    techLevels: Map<TechnologyType, number>,
+    defence: Defence
+  ): boolean {
+    for (const requirement of defence.techRequirements) {
+      if ((techLevels.get(requirement.tech) ?? 0) < requirement.level) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   private applyNeutralStorageBonus(player: Player): void {
