@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fleetTravelTurnsForDistance,
+  fleetTravelWorstShipModifier,
   industryPowerMultiplier,
   maxActiveFleets,
   maxOwnedPlanets,
   researchPowerMultiplier
 } from '../technology-effects';
+import { ShipType } from '../../enums/ship-type';
 
 describe('technology effects', () => {
   it('calculates the active fleet cap from Computer Technology', () => {
@@ -29,5 +32,27 @@ describe('technology effects', () => {
     expect(researchPowerMultiplier(0, 0, 0)).toBe(1);
     expect(researchPowerMultiplier(2, 1, 3)).toBe(1.17);
     expect(researchPowerMultiplier(4, 0, 2)).toBe(1.24);
+  });
+
+  it('uses the worst ship-class modifier for fleet travel ETA', () => {
+    expect(fleetTravelWorstShipModifier([{ type: ShipType.FIGHTER, amount: 1 }])).toBe(0.5);
+    expect(fleetTravelWorstShipModifier([{ type: ShipType.CRUISER, amount: 1 }])).toBe(0.25);
+    expect(fleetTravelWorstShipModifier([{ type: ShipType.BATTLE_CRUISER, amount: 1 }])).toBe(0);
+    expect(fleetTravelWorstShipModifier([{ type: ShipType.TITAN, amount: 1 }])).toBe(-0.35);
+    expect(fleetTravelWorstShipModifier([{ type: ShipType.MOTHER_SHIP, amount: 1 }])).toBe(1);
+    expect(fleetTravelWorstShipModifier([
+      { type: ShipType.TITAN, amount: 1 },
+      { type: ShipType.MOTHER_SHIP, amount: 1 }
+    ])).toBe(1);
+  });
+
+  it('applies the fleet modifier to the full raw travel ETA before ceil', () => {
+    expect(fleetTravelTurnsForDistance(8, 4, 10, 2, [{ type: ShipType.BATTLE_CRUISER, amount: 1 }])).toBe(3);
+    expect(fleetTravelTurnsForDistance(8, 4, 10, 2, [{ type: ShipType.FIGHTER, amount: 1 }])).toBe(5);
+    expect(fleetTravelTurnsForDistance(8, 4, 10, 2, [{ type: ShipType.MOTHER_SHIP, amount: 1 }])).toBe(6);
+    expect(fleetTravelTurnsForDistance(8, 4, 10, 2, [
+      { type: ShipType.TITAN, amount: 1 },
+      { type: ShipType.CRUISER, amount: 1 }
+    ])).toBe(4);
   });
 });

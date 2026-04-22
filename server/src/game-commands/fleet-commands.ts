@@ -232,7 +232,7 @@ export function createFleetMission(
   }
 
   const travelDistance = calculateTravelDistance(command.origin, command.target);
-  const travelTurns = command.useJumpGate ? 1 : calculateFleetTravelTurns(travelDistance, player);
+  const travelTurns = command.useJumpGate ? 1 : calculateFleetTravelTurns(travelDistance, player, totalShipAmounts);
   const fuelCost = calculateFuelCost(totalShipAmounts, travelDistance, mission.minimumFuelReserves);
 
   const hasMilitaryShips = totalShipAmounts.some((entry) => {

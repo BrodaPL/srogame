@@ -42,7 +42,11 @@ import { calculateJumpGateCapacity } from '../../models/jump-gates/jump-gate-cap
 import { FleetMissionRegistry } from '../../models/missions/fleet-mission-registry';
 import type { MissionPlannerContext } from '../../models/missions/mission-context';
 import { calculateRepairCapabilityFromEntries } from '../../models/repairs/ship-repair-capability';
-import { fleetTravelTurnsForDistance, maxActiveFleets } from '../../models/tech/technology-effects';
+import {
+  fleetTravelTurnsForDistance,
+  fleetTravelWorstShipModifier,
+  maxActiveFleets
+} from '../../models/tech/technology-effects';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
@@ -576,7 +580,8 @@ export class MissionPlannerViewComponent implements OnInit {
         this.distancePreview(),
         this.techLevel(TechnologyType.FUSION_DRIVE),
         this.techLevel(TechnologyType.HYPERSPACE_DRIVE),
-        this.techLevel(TechnologyType.GRAVITON_TECHNOLOGY)
+        this.techLevel(TechnologyType.GRAVITON_TECHNOLOGY),
+        this.selectedTravelShipAmounts()
       );
   }
 
@@ -585,7 +590,7 @@ export class MissionPlannerViewComponent implements OnInit {
       return 'Jump Gate override: travel time is fixed at 1 turn.';
     }
 
-    return 'ETA formula: ceil(4 / (1 + Fusion Drive / 3) + distance / (1 + Hyperspace Drive / 6) - Graviton Technology)';
+    return 'ETA formula: ceil((4 / (1 + Fusion Drive / 3) + distance / (1 + Hyperspace Drive / 6) - Graviton Technology) * worst-ship multiplier)';
   }
 
   protected travelFormulaDetailLabel(): string {
@@ -596,18 +601,31 @@ export class MissionPlannerViewComponent implements OnInit {
     const startupComponent = 4 / (1 + (this.techLevel(TechnologyType.FUSION_DRIVE) / 3));
     const distanceComponent = this.distancePreview() / (1 + (this.techLevel(TechnologyType.HYPERSPACE_DRIVE) / 6));
     const gravitonTechnologyLevel = this.techLevel(TechnologyType.GRAVITON_TECHNOLOGY);
+    const multiplier = 1 + this.travelShipModifier();
 
-    return `Current: ceil(${this.formatTravelFormulaValue(startupComponent)} + ${this.formatTravelFormulaValue(distanceComponent)} - ${gravitonTechnologyLevel}) = ${this.travelTurnsPreview()} turns`;
+    return `Current: ceil((${this.formatTravelFormulaValue(startupComponent)} + ${this.formatTravelFormulaValue(distanceComponent)} - ${gravitonTechnologyLevel}) * ${this.formatTravelFormulaValue(multiplier)}) = ${this.travelTurnsPreview()} turns`;
   }
 
   protected travelTechSummaryLabel(): string {
     return `Tech levels: Fusion Drive ${this.techLevel(TechnologyType.FUSION_DRIVE)} | Hyperspace Drive ${this.techLevel(TechnologyType.HYPERSPACE_DRIVE)} | Graviton Technology ${this.techLevel(TechnologyType.GRAVITON_TECHNOLOGY)}`;
   }
 
+  protected travelShipModifierSummaryLabel(): string {
+    const modifier = this.travelShipModifier();
+    if (modifier === 0) {
+      return 'Fleet speed modifier: Big hull baseline 0% (or no ships selected yet).';
+    }
+
+    const percent = Math.round(modifier * 100);
+    const sign = percent > 0 ? '+' : '';
+    return `Fleet speed modifier: worst selected ship applies ${sign}${percent}% to the full ETA.`;
+  }
+
   protected travelFormulaTooltipLabel(): string {
     return [
       this.travelFormulaLabel(),
       this.travelFormulaDetailLabel(),
+      this.travelShipModifierSummaryLabel(),
       this.travelTechSummaryLabel()
     ].join('\n');
   }
@@ -1079,6 +1097,19 @@ export class MissionPlannerViewComponent implements OnInit {
     return Number.isInteger(rounded)
       ? String(rounded)
       : rounded.toFixed(2).replace(/\.?0+$/, '');
+  }
+
+  private selectedTravelShipAmounts(): Array<{ type: ShipType; amount: number }> {
+    return this.selectedShipEntries()
+      .map((entry) => ({
+        type: entry.type,
+        amount: this.selectedShipSelectionAmount(entry)
+      }))
+      .filter((entry) => entry.amount > 0);
+  }
+
+  private travelShipModifier(): number {
+    return fleetTravelWorstShipModifier(this.selectedTravelShipAmounts());
   }
 
   private techLevel(technologyType: TechnologyType): number {

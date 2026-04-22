@@ -263,16 +263,17 @@ export class EncyclopediaMechanicsComponent {
         'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn.',
         'Foreign Jump Gate targets require known gate intel from the latest espionage report and create a Mail request for the target owner unless diplomacy auto-approves it.',
         'Mission Planner can also be prefilled from other screens, for example Spy Planet actions from reports or planet previews.',
-        'The Travel Summary now shows the live ETA formula, the current substituted values, and the relevant drive-tech levels taken from the selected origin player.'
+        'The Travel Summary now shows the live ETA formula, the current substituted values, the worst-ship fleet modifier, and the relevant drive-tech levels taken from the selected origin player.'
       ],
       formulas: [
         'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2',
-        'travelTurns = ceil(4 / (1 + FUSION_DRIVE / 3) + distance / (1 + HYPERSPACE_DRIVE / 6) - GRAVITON_TECHNOLOGY), minimum 1',
+        'travelTurns = ceil((4 / (1 + FUSION_DRIVE / 3) + distance / (1 + HYPERSPACE_DRIVE / 6) - GRAVITON_TECHNOLOGY) * worstShipMultiplier), minimum 1',
         'Jump Gate travelTurns = 1',
         'fuelCost = sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves'
       ],
       notes: [
         'Distance is still the raw coordinate delta sum abs(dx) + abs(dy) + abs(dz).',
+        'worstShipMultiplier uses the slowest selected hull class in the fleet: Small 1.5, Medium 1.25, Big 1, Titan 0.65, Station 2.',
         'Fuel cost still uses raw distance only; drive technologies change ETA but do not reduce deuterium reserve cost.'
       ]
     },

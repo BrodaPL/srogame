@@ -383,12 +383,17 @@ export function calculateTravelDistance(origin: ClientCoordinates, target: Clien
   return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
 }
 
-export function calculateFleetTravelTurns(distance: number, player: Player): number {
+export function calculateFleetTravelTurns(
+  distance: number,
+  player: Player,
+  ships: Array<{ type: ShipTypeType; amount: number }>
+): number {
   return fleetTravelTurnsForDistance(
     distance,
     player.getTechLevel(TechnologyType.FUSION_DRIVE as TechnologyTypeType),
     player.getTechLevel(TechnologyType.HYPERSPACE_DRIVE as TechnologyTypeType),
-    player.getTechLevel(TechnologyType.GRAVITON_TECHNOLOGY as TechnologyTypeType)
+    player.getTechLevel(TechnologyType.GRAVITON_TECHNOLOGY as TechnologyTypeType),
+    ships
   );
 }
 
