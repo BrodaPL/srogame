@@ -895,7 +895,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
   });
 
   it('uses terraformer-adjusted industry and science modifiers during turn-resolution queue progress', () => {
-    const { galaxy, system } = createGalaxyWithPlayers(
+    const { galaxy, players, system } = createGalaxyWithPlayers(
       [],
       (solarSystem) => {
         const homePlanet = solarSystem.planets[0];
@@ -924,8 +924,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     resolvePhaseOneTurn(galaxy);
 
-    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(23);
-    expect(system.planets[0].rBDSFTQ.currentResearchQueue?.investedResearchPower).toBe(32);
+    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(34);
+    expect(system.planets[0].rBDSFTQ.currentResearchQueue).toBeNull();
+    expect(players[0]?.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY)).toBe(1);
   });
 
   it('applies fractional nanite multipliers to industry and shipyard power', () => {
@@ -1089,6 +1090,60 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(ManyShips.hasDamagedShips(system.planets[0].rBDSFTQ.ships)).toBe(false);
     expect(ManyShips.hasDamagedShips(galaxy.activeFleets[0].ships)).toBe(false);
     expect(ManyShips.undamagedCountByType(galaxy.activeFleets[0].ships).get(ShipType.CRUISER) ?? 0).toBe(1);
+  });
+
+  it('does not auto-repair fresh battle damage in the same turn after fleet resolution', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const attackFleet = new Fleet(
+      202,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Dock',
+      manyShips({ type: ShipType.FIGHTER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [attackFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Dock';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].info.planetaryParameters.industryModifier = 1;
+        solarSystem.planets[1].info.planetaryParameters.energyModifierRES = 1;
+        solarSystem.planets[1].info.planetaryParameters.energyModifierNuclear = 1;
+        solarSystem.planets[1].setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 3);
+        solarSystem.planets[1].setBuildingLevel(BuildingType.SHIPYARD, 1);
+        solarSystem.planets[1].rBDSFTQ.ships = manyShips({ type: ShipType.TRANSPORTER, amount: 1 });
+        solarSystem.planets[2].info.ownerId = 1;
+        solarSystem.planets[3].info.ownerId = 2;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0], solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1], solarSystem.planets[3]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(ManyShips.undamagedCountByType(system.planets[1].rBDSFTQ.ships).get(ShipType.TRANSPORTER) ?? 0).toBe(0);
+    expect(ManyShips.damagedCountByType(system.planets[1].rBDSFTQ.ships).get(ShipType.TRANSPORTER) ?? 0).toBe(1);
+    expect(ManyShips.totalMissingHull(system.planets[1].rBDSFTQ.ships)).toBe(3);
   });
 
   it('repairs allied idle fleets in orbit with the host planet shipyard power', () => {

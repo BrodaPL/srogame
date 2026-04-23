@@ -14,6 +14,8 @@ import {
   hasAnyBombardmentPriority
 } from '../bombardment/bombardment-priority';
 import {
+  createPersistentManyDefencesFromBattleSurvivors,
+  createPersistentManyShipsFromBattleSurvivors,
   SpaceBattleResolver,
   type SpaceBattleReports,
   type SpaceBattleResult
@@ -194,6 +196,7 @@ export function resolvePhaseOneTurn(
   const diplomacyResolver = new DiplomacyResolver(galaxy.diplomaticRelations);
   const encounterResolver = new EncounterResolver(diplomacyResolver);
 
+  resolveShipRepairs(galaxy, playersById, planetById, snapshotsByPlanetId, diplomacyResolver, resolvedTurnNumber);
   resolveActiveFleets(
     galaxy,
     playersById,
@@ -202,7 +205,6 @@ export function resolvePhaseOneTurn(
     diplomacyResolver,
     encounterResolver
   );
-  resolveShipRepairs(galaxy, playersById, planetById, snapshotsByPlanetId, diplomacyResolver, resolvedTurnNumber);
 }
 
 function createPlanetTurnSnapshot(
@@ -1997,11 +1999,14 @@ function resolvePlanetBattle(
     maxRounds
   });
 
-  fleet.ships = ManyShips.fromShipInstances(battleResult.attacker.survivingShips);
+  fleet.ships = createPersistentManyShipsFromBattleSurvivors(battleResult.attacker.survivingShips, attacker);
   fleet.carriedBombs = ManyDefences.fromDefenceInstances(attackerBombs);
   const overflowShips = fleet.ships.trimNonJumpShipsToTravelHangarCapacity();
-  targetPlanet.rBDSFTQ.ships = ManyShips.fromShipInstances(battleResult.defender.survivingShips);
-  targetPlanet.rBDSFTQ.defences = ManyDefences.fromDefenceInstances(battleResult.defender.survivingDefences);
+  targetPlanet.rBDSFTQ.ships = createPersistentManyShipsFromBattleSurvivors(battleResult.defender.survivingShips, defender);
+  targetPlanet.rBDSFTQ.defences = createPersistentManyDefencesFromBattleSurvivors(
+    battleResult.defender.survivingDefences,
+    defender
+  );
   targetPlanet.rBDSFTQ.defences.addManyDefences(splitDefences.planetaryBombs);
   // TODO: Surface `spaceDebris` in the UI and add recycler/recovery gameplay once that layer is implemented.
   targetPlanet.rBDSFTQ.spaceDebris.addResourcePack(calculateBattleDebris(battleResult, fleet, overflowShips));

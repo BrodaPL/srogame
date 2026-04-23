@@ -1,4 +1,6 @@
 import {
+  createPersistentManyDefencesFromBattleSurvivors,
+  createPersistentManyShipsFromBattleSurvivors,
   SpaceBattleResolver,
   type SpaceBattleReports,
   type SpaceBattleResult
@@ -398,10 +400,19 @@ export class EncounterResolver {
       maxRounds: arrivals[0].mission.getBattleRounds()
     });
 
-    const coalitionSurvivors = ManyShips.fromShipInstances(battleResult.attacker.survivingShips);
+    const coalitionSurvivors = createPersistentManyShipsFromBattleSurvivors(
+      battleResult.attacker.survivingShips,
+      attacker
+    );
     const overflowShips = coalitionSurvivors.trimNonJumpShipsToTravelHangarCapacity();
-    const defenderSurvivorPool = ManyShips.fromShipInstances(battleResult.defender.survivingShips);
-    const defenderDefenceSurvivorPool = ManyDefences.fromDefenceInstances(battleResult.defender.survivingDefences);
+    const defenderSurvivorPool = createPersistentManyShipsFromBattleSurvivors(
+      battleResult.defender.survivingShips,
+      defender
+    );
+    const defenderDefenceSurvivorPool = createPersistentManyDefencesFromBattleSurvivors(
+      battleResult.defender.survivingDefences,
+      defender
+    );
 
     for (const defenderEntry of defenderInitialForces) {
       const requested = this.toShipAmountRequests(defenderEntry.ships);

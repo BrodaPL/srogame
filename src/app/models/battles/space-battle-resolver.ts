@@ -4,7 +4,9 @@ import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
 import { WeaponType } from '../enums/weapon-type';
 import { DefenceInstance } from '../defences/defence-instance';
+import { ManyDefences } from '../defences/many-defences';
 import { isPlanetaryBombDefenceType } from '../defences/planetary-bomb';
+import { ManyShips } from '../fleets/many-ships';
 import { ShipInstance } from '../fleets/ship-instance';
 import { Player } from '../player';
 import { FleetReport } from '../reports/fleet-report';
@@ -194,6 +196,90 @@ const BOMBARDMENT_SHIP_HIT_CHANCE = 0.1;
 const mathRandomSource: BattleRandomSource = {
   nextFloat: () => Math.random()
 };
+
+function resolveBattleHullCapacityMultiplier(player: Player): number {
+  return 1 + (player.getTechLevel(TechnologyType.ARMOUR_TECHNOLOGY) * 10) / 100;
+}
+
+function normalizeBattleHullForPersistence(
+  currentHull: number,
+  baseHullCapacity: number,
+  effectiveHullCapacity: number
+): number {
+  if (!Number.isFinite(currentHull) || currentHull <= 0) {
+    return 0;
+  }
+
+  if (!Number.isFinite(baseHullCapacity) || baseHullCapacity <= 0) {
+    return Math.max(0, currentHull);
+  }
+
+  if (!Number.isFinite(effectiveHullCapacity) || effectiveHullCapacity <= 0) {
+    return Math.max(0, Math.min(baseHullCapacity, currentHull));
+  }
+
+  if (currentHull >= effectiveHullCapacity) {
+    return baseHullCapacity;
+  }
+
+  return Math.max(0, Math.min(baseHullCapacity, (currentHull / effectiveHullCapacity) * baseHullCapacity));
+}
+
+export function createPersistentManyShipsFromBattleSurvivors(
+  ships: ShipInstance[],
+  player: Player
+): ManyShips {
+  const manyShips = ManyShips.empty();
+  const hullCapacityMultiplier = resolveBattleHullCapacityMultiplier(player);
+
+  for (const ship of ships) {
+    const normalizedHull = normalizeBattleHullForPersistence(
+      ship.hull,
+      ship.type.hullPointsCapacity,
+      ship.type.hullPointsCapacity * hullCapacityMultiplier
+    );
+    if (normalizedHull <= 0) {
+      continue;
+    }
+
+    if (normalizedHull >= ship.type.hullPointsCapacity) {
+      manyShips.addUndamaged(ship.type.type, 1);
+      continue;
+    }
+
+    manyShips.addDamaged(ship.type.type, normalizedHull);
+  }
+
+  return manyShips;
+}
+
+export function createPersistentManyDefencesFromBattleSurvivors(
+  defences: DefenceInstance[],
+  player: Player
+): ManyDefences {
+  const manyDefences = ManyDefences.empty();
+  const hullCapacityMultiplier = resolveBattleHullCapacityMultiplier(player);
+
+  for (const defence of defences) {
+    const normalizedHull = normalizeBattleHullForPersistence(
+      defence.hull,
+      defence.type.hullPointsCapacity,
+      defence.type.hullPointsCapacity * hullCapacityMultiplier
+    );
+    if (normalizedHull <= 0) {
+      continue;
+    }
+
+    if (normalizedHull >= defence.type.hullPointsCapacity) {
+      manyDefences.addUndamaged(defence.type.type, 1);
+      continue;
+    }
+
+    manyDefences.addDamaged(defence.type.type, normalizedHull);
+  }
+
+  return manyDefences;
+}
 
 export class SpaceBattleResolver {
   public static readonly DEFAULT_MAX_ROUNDS = 4;
@@ -1055,14 +1141,6 @@ export class SpaceBattleResolver {
     }
 
     if (defenderSurvivors > 0 && attackerSurvivors === 0) {
-      return 'Defender';
-    }
-
-    if (attackerSurvivors > defenderSurvivors) {
-      return 'Attacker';
-    }
-
-    if (defenderSurvivors > attackerSurvivors) {
       return 'Defender';
     }
 
