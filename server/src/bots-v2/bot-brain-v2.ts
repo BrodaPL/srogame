@@ -1,0 +1,114 @@
+import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
+import type { Player } from '../../../src/app/models/player.ts';
+import { defaultBotProfileIdForPlayerId } from '../../../src/app/models/player.js';
+import { isBotPaused } from '../bots/bot-admin.js';
+import { ensureBotMemoryV2 } from './bot-v2-memory.js';
+import type {
+  BotDecisionTraceV2,
+  BotExecutionOutcome,
+  BotSubsystem,
+  BotV2FeatureFlags
+} from './bot-v2-types.ts';
+import { recordBotDecisionTraceV2 } from './bot-v2-trace.js';
+import { buildBotWorldSnapshot } from './snapshot/build-bot-world-snapshot.js';
+import { NoopBotExecutor } from './execution/bot-executor.js';
+import { BotEconomicSubsystem } from './subsystems/economic/bot-economic-subsystem.js';
+import { ShadowBotSupervisor } from './supervisor/bot-supervisor.js';
+
+export class BotBrainV2 {
+  private readonly supervisor;
+  private readonly executor;
+  private readonly subsystems;
+
+  constructor(private readonly flags: BotV2FeatureFlags) {
+    this.supervisor = new ShadowBotSupervisor(flags);
+    this.executor = new NoopBotExecutor();
+    this.subsystems = buildEnabledSubsystems(flags);
+  }
+
+  public runShadowTurn(galaxy: Galaxy): void {
+    if (!this.flags.enabled || !this.flags.shadowMode) {
+      return;
+    }
+
+    const bots = [...galaxy.botPlayerMap.values()]
+      .sort((left, right) => left.playerId - right.playerId);
+
+    for (const bot of bots) {
+      if (bot.planets.length === 0 || isBotPaused(bot.playerId)) {
+        continue;
+      }
+
+      this.runShadowTurnForBot(galaxy, bot);
+    }
+  }
+
+  private runShadowTurnForBot(galaxy: Galaxy, player: Player): void {
+    player.botProfileId = player.botProfileId ?? defaultBotProfileIdForPlayerId(player.playerId);
+    const memory = ensureBotMemoryV2(player);
+    const snapshot = buildBotWorldSnapshot(galaxy, player, this.flags);
+    const subsystemResults = this.subsystems.map((subsystem) => subsystem.generate({ snapshot, memory }));
+    const proposals = subsystemResults.flatMap((result) => result.proposals);
+    const supervisorDecision = this.supervisor.decide(snapshot, memory, proposals);
+    const executionOutcomes = resolveExecutionOutcomes(this.flags, this.executor.executeAcceptedTasks(
+      supervisorDecision.accepted
+    ));
+    const trace: BotDecisionTraceV2 = {
+      playerId: player.playerId,
+      playerName: player.playerName,
+      turn: galaxy.currentTurn,
+      shadowMode: true,
+      snapshotSummary: {
+        planetCount: snapshot.planets.length,
+        totalResources: { ...snapshot.empire.totalResources },
+        atWar: snapshot.empire.atWar
+      },
+      subsystemResults: subsystemResults.map((result) => ({
+        subsystemId: result.subsystemId,
+        proposalCount: result.proposals.length,
+        debug: { ...result.debug }
+      })),
+      proposals: proposals.map((proposal) => ({
+        proposalId: proposal.proposalId,
+        subsystemId: proposal.subsystemId,
+        summary: proposal.summary,
+        expectedValue: proposal.expectedValue,
+        urgency: proposal.urgency,
+        risk: proposal.risk,
+        confidence: proposal.confidence,
+        dedupeKey: proposal.dedupeKey
+      })),
+      supervisorDecision: {
+        acceptedProposalIds: supervisorDecision.accepted.map((proposal) => proposal.proposalId),
+        rejectedCount: supervisorDecision.rejected.length,
+        mode: 'SHADOW'
+      },
+      executionOutcomes
+    };
+    recordBotDecisionTraceV2(trace);
+  }
+}
+
+function buildEnabledSubsystems(flags: BotV2FeatureFlags): BotSubsystem[] {
+  const subsystems: BotSubsystem[] = [];
+  if (flags.enabledSubsystems.economic) {
+    subsystems.push(new BotEconomicSubsystem());
+  }
+  return subsystems;
+}
+
+function resolveExecutionOutcomes(
+  flags: BotV2FeatureFlags,
+  outcomes: BotExecutionOutcome[]
+): BotExecutionOutcome[] {
+  if (flags.allowExecution) {
+    return outcomes;
+  }
+
+  return outcomes.map((outcome) => ({
+    ...outcome,
+    executed: false,
+    success: false,
+    message: outcome.message ?? 'Execution disabled in shadow mode.'
+  }));
+}

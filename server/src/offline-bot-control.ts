@@ -88,6 +88,7 @@ export function reconcileOfflineBotControlledSeats(
       player.type = PlayerType.BOT;
       player.botProfileId = account.logoutBotProfileId ?? player.botProfileId ?? defaultBotProfileIdForPlayerId(player.playerId);
       player.botMemory = null;
+      player.botMemoryV2 = null;
       continue;
     }
 

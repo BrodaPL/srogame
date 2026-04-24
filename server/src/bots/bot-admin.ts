@@ -42,6 +42,7 @@ export function setBotProfile(player: Player, profileId: BotProfileId): void {
 
 export function clearBotMemory(player: Player): void {
   player.botMemory = null;
+  player.botMemoryV2 = null;
 }
 
 export function pauseBot(playerId: number): void {

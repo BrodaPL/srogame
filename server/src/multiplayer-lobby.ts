@@ -361,6 +361,7 @@ export function applyLobbyLoadSeatsToGalaxy(
       player.type = PlayerType.BOT;
       player.botProfileId = player.botProfileId ?? defaultBotProfileIdForPlayerId(player.playerId);
       player.botMemory = null;
+      player.botMemoryV2 = null;
       continue;
     }
 
@@ -369,6 +370,7 @@ export function applyLobbyLoadSeatsToGalaxy(
       player.type = PlayerType.BOT;
       player.botProfileId = player.botProfileId ?? defaultBotProfileIdForPlayerId(player.playerId);
       player.botMemory = null;
+      player.botMemoryV2 = null;
       continue;
     }
 

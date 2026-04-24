@@ -522,6 +522,7 @@ function createSimulationGalaxy(preset: SimulationPreset): {
     player.type = PlayerType.BOT;
     player.botProfileId = preset.profileOrder[index % preset.profileOrder.length] ?? 'BALANCED';
     player.botMemory = null;
+    player.botMemoryV2 = null;
     galaxy.botPlayerMap.set(player.playerId, player);
     seedPlayerPlanets(
       player,

@@ -102,7 +102,7 @@ const { ShipyardQueueEntry } = resolveModule(shipyardQueueEntryModule) as typeof
 const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as typeof import('../../src/app/models/tech/technology-queue-entry.js');
 const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../src/app/models/tech/research-helper-for.js');
 
-export const GAME_SAVE_VERSION = 3;
+export const GAME_SAVE_VERSION = 4;
 export const AUTO_SAVE_ROTATION_LIMIT = 5;
 export const MAX_GAME_SAVE_FILES = 100;
 
@@ -202,6 +202,7 @@ type SavedPlayer = {
   messages: SavedPlayerMessage[];
   botProfileId: PlayerModel['botProfileId'];
   botMemory: PlayerModel['botMemory'];
+  botMemoryV2: PlayerModel['botMemoryV2'];
 };
 
 type SavedStarSystemNote = {
@@ -756,11 +757,12 @@ function hydrateSavedPlayer(savedPlayer: SavedPlayer): PlayerModel {
     savedPlayer.nextReportId,
     savedPlayer.messages.map((message) => hydrateSavedPlayerMessage(message)),
     savedPlayer.nextMessageId,
-    {
-      botProfileId: savedPlayer.botProfileId ?? null,
-      botMemory: Player.normalizeBotMemory(savedPlayer.botMemory ?? null)
-    }
-  );
+      {
+        botProfileId: savedPlayer.botProfileId ?? null,
+        botMemory: Player.normalizeBotMemory(savedPlayer.botMemory ?? null),
+        botMemoryV2: Player.normalizeBotMemoryV2(savedPlayer.botMemoryV2 ?? null)
+      }
+    );
 
   player.nextReportId = savedPlayer.nextReportId;
   player.nextMessageId = savedPlayer.nextMessageId;
@@ -1061,6 +1063,22 @@ function serializePlayer(
           targetCoordinates: { ...entry.targetCoordinates }
         })),
         lastProcessedFleetReportId: player.botMemory.lastProcessedFleetReportId ?? null
+      }
+      : null,
+    botMemoryV2: player.botMemoryV2
+      ? {
+        version: 1,
+        currentStance: player.botMemoryV2.currentStance,
+        antiOscillation: {
+          lastMajorFocus: player.botMemoryV2.antiOscillation.lastMajorFocus,
+          lastMajorFocusTurn: player.botMemoryV2.antiOscillation.lastMajorFocusTurn,
+          doNotReplaceBeforeTurn: player.botMemoryV2.antiOscillation.doNotReplaceBeforeTurn
+        },
+        cooldowns: { ...player.botMemoryV2.cooldowns },
+        recentTargets: player.botMemoryV2.recentTargets.map((entry) => ({ ...entry })),
+        acceptedLongTermCommitments: player.botMemoryV2.acceptedLongTermCommitments.map((entry) => ({
+          ...entry
+        }))
       }
       : null
   };

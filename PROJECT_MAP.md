@@ -371,12 +371,15 @@ Diplomacy command ownership note:
 Bot runtime ownership note:
 - `server/src/index.ts` owns the end-turn hook and runs bot planning immediately before `resolvePhaseOneTurn(...)`
 - `server/src/bots/bot-turn-runner.ts` owns current server-side bot turn planning and action application
+- `server/src/bots-v2/` now owns the shadow-only Bot AI V2 scaffold: feature flags, minimal persisted V2 memory contract, snapshot builder, V2 trace store, stub supervisor/executor, and the first `Economic` proposal subsystem
+- `server/src/bots-v2/bot-v2-shadow-runner.ts` owns the Phase 0 shadow-runner hook that builds V2 snapshots/proposals after the current live bot turn runner without executing V2 commands
 - `server/src/bots/bot-profile.ts` owns fixed bot personality weights, military thresholds, and per-turn soft caps
 - `server/src/bots/bot-diplomacy-awareness.ts` owns lightweight per-contact diplomacy context building for bot planning
 - `server/src/bots/bot-diplomacy-planner.ts` owns outgoing bot `PEACE` / `ALLIED` proposal candidate generation plus proposal cooldown heuristics
 - `server/src/bots/bot-diplomacy-resolver.ts` owns bot treaty-response heuristics for incoming `PEACE` / `ALLIED` proposals
 - `server/src/bots/bot-admin.ts` owns controller-only runtime bot controls and paused-bot state
 - `server/src/bots/bot-debug.ts` and `server/src/bots/bot-debug-store.ts` own the in-memory bot decision trace model and ring buffer used for controller-side AI inspection
+- `server/src/bots-v2/bot-v2-trace.ts` owns the separate in-memory V2 shadow-trace ring buffer used for Phase 0 inspection and tests
 - bot actions currently reuse the shared command layer in `server/src/game-commands/` for buildings, research, shipyard, spy, colonize, attack, transport, maintenance, recycle, repair, bombard, siege, guard, and move launches; self-owned move/transport/guard routes can now opt into Jump Gate travel when access is valid and the distance benefit is meaningful, orbiting self-owned fleets can request auto-approved Alliance Depot maintenance support, bots now resolve incoming allied/peace maintenance + Jump Gate requests plus incoming `PEACE` / `ALLIED` diplomacy proposals before normal action planning, can initiate one conservative outgoing `PEACE` / `ALLIED` proposal per turn using cooldown memory, owned planets can trigger conservative recycle/repair support launches, high-infrastructure hostile worlds can trigger bombard/siege plans instead of default raids, and current diplomacy status now feeds back into bot attack/spy/border-defense scoring
 
 Reports and tutorials:

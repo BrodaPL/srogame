@@ -151,6 +151,7 @@ import { BOT_PROFILE_IDS } from './bots/bot-profile.js';
 import { buildRegisterConfigResponse, verifyTurnstileToken } from './turnstile.js';
 import { startBuildingConstruction } from './game-commands/building-commands.js';
 import { runBotTurnPhase } from './bots/bot-turn-runner.js';
+import { runBotTurnPhaseV2Shadow } from './bots-v2/bot-v2-shadow-runner.js';
 import {
   approveDiplomaticProposalCommand,
   cancelDiplomaticProposalCommand,
@@ -6285,6 +6286,7 @@ function handleEndTurnRequest(
   try {
     const resolvedTurnNumber = access.galaxy.currentTurn + 1;
     runBotTurnPhase(access.galaxy);
+    runBotTurnPhaseV2Shadow(access.galaxy);
     resolvePhaseOneTurn(access.galaxy, resolvedTurnNumber, {
       botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0
     });

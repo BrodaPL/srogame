@@ -111,9 +111,44 @@ export type BotMemory = {
   lastProcessedFleetReportId?: number | null;
 };
 
+export type BotV2SubsystemId =
+  | 'ECONOMIC'
+  | 'DEFENSIVE'
+  | 'WARFARE'
+  | 'CRITICAL'
+  | 'STRATEGIC_DEVELOPMENT'
+  | 'STRATEGIC_MILITARY'
+  | 'STRATEGIC_DIPLOMATIC';
+
+export type BotMemoryV2RecentTarget = {
+  key: string;
+  turn: number;
+};
+
+export type BotMemoryV2LongTermCommitment = {
+  commitmentKey: string;
+  subsystemId: BotV2SubsystemId;
+  createdTurn: number;
+  expiresOnTurn: number | null;
+};
+
+export type BotMemoryV2 = {
+  version: 1;
+  currentStance: string | null;
+  antiOscillation: {
+    lastMajorFocus: string | null;
+    lastMajorFocusTurn: number | null;
+    doNotReplaceBeforeTurn: number | null;
+  };
+  cooldowns: Record<string, number>;
+  recentTargets: BotMemoryV2RecentTarget[];
+  acceptedLongTermCommitments: BotMemoryV2LongTermCommitment[];
+};
+
 export type PlayerExtras = {
   botProfileId?: BotProfileId | null;
   botMemory?: BotMemory | null;
+  botMemoryV2?: BotMemoryV2 | null;
 };
 
 export function defaultBotProfileIdForPlayerId(playerId: number): BotProfileId {
@@ -124,6 +159,7 @@ export function defaultBotProfileIdForPlayerId(playerId: number): BotProfileId {
 export class Player {
   public botProfileId: BotProfileId | null;
   public botMemory: BotMemory | null;
+  public botMemoryV2: BotMemoryV2 | null;
 
   constructor(
     public playerId: number,
@@ -141,6 +177,7 @@ export class Player {
   ) {
     this.botProfileId = extras.botProfileId ?? null;
     this.botMemory = Player.normalizeBotMemory(extras.botMemory);
+    this.botMemoryV2 = Player.normalizeBotMemoryV2(extras.botMemoryV2);
   }
 
   public getTechLevel(type: TechnologyType): number {
@@ -314,6 +351,31 @@ export class Player {
       lastProcessedFleetReportId: Number.isInteger(memory.lastProcessedFleetReportId)
         ? memory.lastProcessedFleetReportId
         : null
+    };
+  }
+
+  public static normalizeBotMemoryV2(memory: BotMemoryV2 | null | undefined): BotMemoryV2 | null {
+    if (!memory) {
+      return null;
+    }
+
+    return {
+      version: 1,
+      currentStance: Player.normalizeBotMemoryV2String(memory.currentStance, 80),
+      antiOscillation: {
+        lastMajorFocus: Player.normalizeBotMemoryV2String(memory.antiOscillation?.lastMajorFocus, 80),
+        lastMajorFocusTurn: Number.isInteger(memory.antiOscillation?.lastMajorFocusTurn)
+          ? memory.antiOscillation.lastMajorFocusTurn
+          : null,
+        doNotReplaceBeforeTurn: Number.isInteger(memory.antiOscillation?.doNotReplaceBeforeTurn)
+          ? memory.antiOscillation.doNotReplaceBeforeTurn
+          : null
+      },
+      cooldowns: Player.normalizeBotMemoryV2Cooldowns(memory.cooldowns),
+      recentTargets: Player.normalizeBotMemoryV2RecentTargets(memory.recentTargets),
+      acceptedLongTermCommitments: Player.normalizeBotMemoryV2LongTermCommitments(
+        memory.acceptedLongTermCommitments
+      )
     };
   }
 
@@ -504,6 +566,109 @@ export class Player {
         return bracket;
       default:
         return null;
+    }
+  }
+
+  private static normalizeBotMemoryV2String(
+    value: string | null | undefined,
+    maxLength: number
+  ): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+
+    return trimmed.slice(0, maxLength);
+  }
+
+  private static normalizeBotMemoryV2Cooldowns(
+    cooldowns: Record<string, number> | null | undefined
+  ): Record<string, number> {
+    const normalized: Record<string, number> = {};
+    if (!cooldowns || typeof cooldowns !== 'object') {
+      return normalized;
+    }
+
+    for (const [key, value] of Object.entries(cooldowns)) {
+      const trimmedKey = key.trim();
+      if (trimmedKey.length === 0 || !Number.isInteger(value)) {
+        continue;
+      }
+
+      normalized[trimmedKey.slice(0, 80)] = Math.max(0, value);
+    }
+
+    return normalized;
+  }
+
+  private static normalizeBotMemoryV2RecentTargets(
+    recentTargets: BotMemoryV2RecentTarget[] | null | undefined
+  ): BotMemoryV2RecentTarget[] {
+    if (!Array.isArray(recentTargets)) {
+      return [];
+    }
+
+    return recentTargets
+      .map((entry) => {
+        const key = Player.normalizeBotMemoryV2String(entry?.key, 120);
+        if (!key || !Number.isInteger(entry?.turn)) {
+          return null;
+        }
+
+        return {
+          key,
+          turn: entry.turn
+        };
+      })
+      .filter((entry): entry is BotMemoryV2RecentTarget => entry !== null)
+      .slice(-40);
+  }
+
+  private static normalizeBotMemoryV2LongTermCommitments(
+    commitments: BotMemoryV2LongTermCommitment[] | null | undefined
+  ): BotMemoryV2LongTermCommitment[] {
+    if (!Array.isArray(commitments)) {
+      return [];
+    }
+
+    return commitments
+      .map((entry) => {
+        const commitmentKey = Player.normalizeBotMemoryV2String(entry?.commitmentKey, 120);
+        if (
+          !commitmentKey
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Number.isInteger(entry?.createdTurn)
+        ) {
+          return null;
+        }
+
+        return {
+          commitmentKey,
+          subsystemId: entry.subsystemId,
+          createdTurn: entry.createdTurn,
+          expiresOnTurn: Number.isInteger(entry.expiresOnTurn) ? entry.expiresOnTurn : null
+        };
+      })
+      .filter((entry): entry is BotMemoryV2LongTermCommitment => entry !== null)
+      .slice(-40);
+  }
+
+  private static isBotV2SubsystemId(value: unknown): value is BotV2SubsystemId {
+    switch (value) {
+      case 'ECONOMIC':
+      case 'DEFENSIVE':
+      case 'WARFARE':
+      case 'CRITICAL':
+      case 'STRATEGIC_DEVELOPMENT':
+      case 'STRATEGIC_MILITARY':
+      case 'STRATEGIC_DIPLOMATIC':
+        return true;
+      default:
+        return false;
     }
   }
 }
