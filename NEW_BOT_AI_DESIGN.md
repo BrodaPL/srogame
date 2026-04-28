@@ -102,13 +102,50 @@ Planetary development should usually be handled before global strategic activity
 
 **Purpose:** develop and sustain the local economy of a planet.
 
-**Goal amount:** Main goal, secondary goal, short-term goals that lead to the main goal.
+**Current implemented goal model:** per planet, one `Primary goal`, one `Secondary goal`, and one immediate request for each selected goal.
 
 ### Responsibilities
 
 * **Construction:** mines, energy, storage facilities, robot factory, nanite factory.
 * **Production:** repair drones.
-* **Local optimization:** balance economy growth, energy stability, and industrial power.
+* **Research:** only strict prerequisite research that is required to progress an in-scope economic building goal.
+* **Local optimization:** balance economy growth, energy stability, storage sufficiency, and industrial power.
+
+### Current implemented planning rules
+
+* It evaluates all in-scope local economic candidates independently for one planet.
+* It expands prerequisite building chains and strict prerequisite research chains.
+* It uses a branch-first local planner:
+
+  * **Energy branch** when local energy is below target,
+  * **Storage branch** when storage is insufficient,
+  * **Economy branch** otherwise.
+
+* It ranks candidates primarily by full-goal `Estimated Time Completion`.
+* Current Economic `ETC` is **narrow ETC**:
+
+  * throughput-only completion time,
+  * no resource-wait simulation,
+  * no future mine-income simulation.
+
+* Throughput-affecting intermediate steps immediately change the ETC of later steps in the same dependency chain.
+* It uses positive-only priority bonuses on top of ETC:
+
+  * planetary production modifiers,
+  * energy urgency inside the energy branch,
+  * storage deficiency inside the storage branch,
+  * explicit throughput bonus for `ROBOTICS_FACTORY` and `NANITE_FACTORY`.
+
+* It sorts candidates best-to-worst.
+* Top 1 becomes the planet `Primary goal`.
+* Top 2 becomes the planet `Secondary goal`.
+* It emits:
+
+  * `Primary request`: immediate next actionable step toward the `Primary goal`
+  * `Secondary request`: immediate next actionable step toward the `Secondary goal`
+
+* If both goals share the same immediate next step, it emits one outward request and keeps both goal links in metadata.
+* It also emits a first-class per-planet no-action / blocker result when no request can be made.
 
 ### Primary goal examples
 
@@ -369,16 +406,31 @@ This system sees proposals from all subsystems and decides what is actually exec
 # Goal model
 
 
-Subsystems 1,2,3 are supposed to have one current main goal. Goal is optimal from its current perspective. And are exposing only one short-term goal upward, which is a task necessary for compleaign the current main goal.
+Subsystems 1,2,3 are supposed to have one current main goal. Goal is optimal from its current perspective.
 Subsystems 1,2,3 can have some secondary goals, for occasions when the main goal is blocked or currently ongoing.
+
+Current implementation note:
+
+* `Economic` already uses a slightly richer outward contract than this older wording.
+* It exposes:
+
+  * `Primary goal`
+  * `Secondary goal`
+  * `Primary request`
+  * `Secondary request`
+
+* The requests are immediate actionable steps toward those goals.
+* This was chosen because the `Supervisory` layer benefits from seeing both the current action and the larger local goal it advances.
+* If both goals share one immediate step, `Economic` emits one request with both goal links.
 
 Example:
 
 * **Primary goal:** upgrade fusion reactor.
 * **Blocker:** missing energy technology.
-* **Short-term goal:** upgrade energy technology.
-* **Short-term goal:** is being already in progress.
-* **Secondary goal proposal:** improve mines if energy is enough or upgrade other type energy buildings.
+* **Primary request:** upgrade energy technology.
+* **Primary request:** is being already in progress.
+* **Secondary goal:** improve mines if energy is enough or upgrade other type energy buildings.
+* **Secondary request:** immediate next actionable step toward that secondary goal.
 
 ---
 
@@ -387,6 +439,15 @@ Example:
 All specialist subsystems should produce proposals in a common format.
 
 For building, production, fleet operations and technological research.
+
+Current Economic implementation note:
+
+* it additionally records per-planet local result metadata:
+
+  * active branch,
+  * emitted request count,
+  * selected goal keys,
+  * explicit no-action reason when blocked.
 
 ---
 
