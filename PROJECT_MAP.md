@@ -371,8 +371,10 @@ Diplomacy command ownership note:
 Bot runtime ownership note:
 - `server/src/index.ts` owns the end-turn hook and runs bot planning immediately before `resolvePhaseOneTurn(...)`
 - `server/src/bots/bot-turn-runner.ts` owns current server-side bot turn planning and action application
-- `server/src/bots-v2/` now owns the shadow-only Bot AI V2 scaffold: feature flags, minimal persisted V2 memory contract, snapshot builder, V2 trace store, stub supervisor/executor, and the first `Economic` proposal subsystem
+- `server/src/bots-v2/` now owns the shadow-only Bot AI V2 scaffold: feature flags, minimal persisted V2 memory contract, snapshot builder, V2 trace store, stub supervisor/executor, and the Phase 0 `Economic` subsystem
 - `server/src/bots-v2/bot-v2-shadow-runner.ts` owns the Phase 0 shadow-runner hook that builds V2 snapshots/proposals after the current live bot turn runner without executing V2 commands
+- `server/src/bots-v2/snapshot/build-bot-world-snapshot.ts` now owns the enriched V2 economic read model: local incomes/capacities, industry/research power, queue ETC estimates, and the tech/modifier fields required by the Economic planner
+- `server/src/bots-v2/subsystems/economic/bot-economic-subsystem.ts` now owns the branch-first local Economic planner: per-planet energy/storage/economy branch selection, dependency-chain expansion, narrow ETC-first goal ranking with stepwise throughput re-simulation, prerequisite research support, deduped shared-request emission, and first-class per-planet goal/no-action results
 - `server/src/bots/bot-profile.ts` owns fixed bot personality weights, military thresholds, and per-turn soft caps
 - `server/src/bots/bot-diplomacy-awareness.ts` owns lightweight per-contact diplomacy context building for bot planning
 - `server/src/bots/bot-diplomacy-planner.ts` owns outgoing bot `PEACE` / `ALLIED` proposal candidate generation plus proposal cooldown heuristics

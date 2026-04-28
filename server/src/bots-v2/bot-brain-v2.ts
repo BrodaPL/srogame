@@ -66,6 +66,8 @@ export class BotBrainV2 {
       subsystemResults: subsystemResults.map((result) => ({
         subsystemId: result.subsystemId,
         proposalCount: result.proposals.length,
+        goalCount: result.goals?.length,
+        planetResultCount: result.planetResults?.length,
         debug: { ...result.debug }
       })),
       proposals: proposals.map((proposal) => ({
@@ -78,6 +80,29 @@ export class BotBrainV2 {
         confidence: proposal.confidence,
         dedupeKey: proposal.dedupeKey
       })),
+      goals: subsystemResults.flatMap((result) =>
+        (result.goals ?? []).map((goal) => ({
+          goalKey: goal.goalKey,
+          branch: goal.branch,
+          finalBuildingType: goal.finalBuildingType,
+          finalBuildingLevel: goal.finalBuildingLevel,
+          weightedEtc: goal.weightedEtc,
+          totalEtc: goal.totalEtc,
+          bonusFactor: goal.bonusFactor,
+          blockers: [...goal.blockers]
+        }))
+      ),
+      planetResults: subsystemResults.flatMap((result) =>
+        (result.planetResults ?? []).map((planetResult) => ({
+          branch: planetResult.branch,
+          targetCoordinates: { ...planetResult.targetCoordinates },
+          emittedRequestCount: planetResult.emittedRequestCount,
+          primaryGoalKey: planetResult.primaryGoalKey,
+          secondaryGoalKey: planetResult.secondaryGoalKey,
+          noActionReason: planetResult.noActionReason,
+          blockedGoalCount: planetResult.blockedGoalCount
+        }))
+      ),
       supervisorDecision: {
         acceptedProposalIds: supervisorDecision.accepted.map((proposal) => proposal.proposalId),
         rejectedCount: supervisorDecision.rejected.length,

@@ -263,6 +263,13 @@ export type BotPlanetMaturityStage =
 
 Every V2 subsystem must emit the same proposal structure.
 
+This is the shared transport envelope between subsystems and the supervisor.
+Subsystem-specific planning docs may use more domain-specific naming on top of it.
+For `Economic`, the naming is:
+- `goal` = the ranked economic target the subsystem wants to pursue on one planet
+- `request` = the immediate next actionable step toward that goal
+- the outward `Primary request` / `Secondary request` are still carried in the shared `BotProposal` envelope
+
 ```ts
 export type BotProposal = {
   proposalId: string;
@@ -295,6 +302,7 @@ Rules:
 - cross-subsystem normalization can stay simple in Phase 0
 - `dedupeKey` is mandatory from day one
 - `requestPayload` is command-shaped but not executed yet
+- the common transport type remains `BotProposal` even when a subsystem uses local naming such as `goal` and `request`
 
 ### Subsystem interface
 
@@ -421,22 +429,50 @@ Recommended initial maturity heuristic for Phase 0:
 
 The first real subsystem should stay narrow.
 
-Allowed proposal domains:
+Allowed request domains:
 - mine upgrades
 - energy building upgrades
 - storage upgrades
 - robotics factory upgrades
 - nanite factory upgrades
+- prerequisite research upgrades that are strictly required to progress an in-scope economic building goal
 
 Not yet allowed in Phase 0:
-- research proposals
+- unrelated research planning
 - shipyard production
 - fleet missions
 - diplomacy
 - transport planning
 
+Economic naming lock for Phase 0:
+- the subsystem evaluates all candidate economic goals independently for each planet
+- candidate goals are sorted from best to worst
+- the best candidate becomes that planet's `Primary goal`
+- the second-best candidate becomes that planet's `Secondary goal`
+- the subsystem emits exactly two outward requests per viable planet:
+  - `Primary request`: the immediate next actionable step toward the `Primary goal`
+  - `Secondary request`: the immediate next actionable step toward the `Secondary goal`
+- each outward request must include final-goal metadata, so the supervisor can see both:
+  - the immediate action being requested now
+  - the longer-term goal that request is advancing
+- if the `Primary goal` and `Secondary goal` share the same immediate next step:
+  - emit one outward request
+  - keep both goal links in that request metadata
+
 Economic subsystem output expectations:
-- at least one proposal per viable planet when reasonable
+- up to two outward requests per viable planet when at least two valid candidates exist
+- if only one valid candidate exists for a planet, emit one request and record why no valid secondary candidate exists
+- if no valid candidate exists for a planet, emit no request for that planet and record explicit blockers
+- emit a first-class per-planet result even when no request is emitted, including:
+  - active branch
+  - emitted request count
+  - selected goal keys when present
+  - explicit no-action reason
+- requests are per-planet, not empire-global
+- all requests must be derived from a full local economic evaluation of in-scope goals and their requirements
+- request selection must not be based on old V1 bot logic
+- goal ranking should use a composite utility model with `Estimated Time Completion` as the main factor
+- the subsystem should avoid trying to normalize all economic effects into one shared cross-resource expected-benefit number
 - explicit blockers when no valid economic action exists
 - no direct scheduling logic
 - no direct mutation
@@ -448,6 +484,122 @@ Examples of valid Phase 0 economic goals:
 - improve crystal production
 - improve deuterium production
 - improve industrial throughput
+- unlock an energy building prerequisite through required research
+
+Economic algorithm expectations for Phase 0:
+- for each planet, evaluate all in-scope economic goals from scratch
+- each goal evaluation should account for:
+  - direct building requirements
+  - required prerequisite research
+  - full immediate-next-step feasibility
+  - total dependency-chain cost of progression toward the chosen goal
+  - total `Estimated Time Completion` for the full dependency chain
+- after a chosen request is fulfilled, the subsystem should recompute the goal ranking from the updated state instead of following a fixed script
+- research prerequisites may contribute to a goal chain and may be executed in parallel where the game rules allow it
+
+Locked branch-first algorithm for Phase 0:
+- `Economic` should branch on the local planet state before ranking candidate goals
+- if multiple branch conditions are true at the same time, branch precedence is:
+  - energy first
+  - storage second
+  - economy / industry third
+- Branch 1: if energy is inside the target threshold and storage is sufficient:
+  - consider only:
+    - mines
+    - `ROBOTICS_FACTORY`
+    - `NANITE_FACTORY`
+  - rank those candidates by `ETC` plus positive priority modifiers
+- Branch 2: if energy is below the local target threshold:
+  - consider only energy-building goals
+  - rank those candidates by `ETC` plus positive priority modifiers
+- Branch 3: if storage capacity is insufficient for some resource type:
+  - consider only storage for that resource type
+  - if more than one storage goal is valid, rank those candidates by `ETC` plus positive priority modifiers
+- after ranking candidates inside the active branch:
+  - best candidate becomes `Primary goal`
+  - second-best candidate becomes `Secondary goal`
+  - the subsystem emits the immediate next step for each selected goal as `Primary request` and `Secondary request`
+
+Economic scoring lock for Phase 0:
+- scoring is a `composite utility` model
+- lower final goal score is better
+- the main ranking value is full-goal `Estimated Time Completion` (`ETC`)
+- the visible request cost sent to the supervisor is only the immediate request cost
+- the internal goal evaluation must still reason about the total dependency-chain cost and total dependency-chain ETC
+- hard-lock handling belongs to `Critical`, not to `Economic`
+- energy and storage prioritization should happen primarily through branch selection, not through cross-domain absolute overrides
+- inside `Economic`, `ETC` is `Narrow ETC`:
+  - throughput-only completion time
+  - no resource-wait simulation
+  - no future mine-income simulation
+- when prerequisite research can run in parallel with other required progression, full-goal ETC should be:
+  - goal-building ETC
+  - plus mutual ETC of required prerequisite buildings
+  - plus prerequisite-research ETC only if that research ETC exceeds the building-side path above
+- throughput-affecting intermediate steps should immediately update the ETC of later steps in the same chain
+
+Recommended conceptual model:
+- Step 1: build all valid local economic goals for the planet
+- Step 2: expand each goal into its dependency chain
+- Step 3: determine which branch is active for the current planet state
+- Step 4: estimate the chain's total ETC for candidates in that branch using:
+  - building-side ETC = goal-building ETC + mutual ETC of prerequisite buildings
+  - research-side ETC = ETC of prerequisite research that can run in parallel
+  - full-goal ETC = building-side ETC, unless research-side ETC is longer
+- Step 5: apply only positive priority bonuses to ETC to get the final ranked goal score
+- Step 6: sort all goals in the active branch by final ranked goal score and select:
+  - `Primary goal`
+  - `Secondary goal`
+- Step 7: emit the immediate next step for each selected goal as:
+  - `Primary request`
+  - `Secondary request`
+
+ETC-first ranking guidance:
+- the first comparison axis between goals is their full dependency-chain ETC
+- positive priority bonuses then reduce the effective ETC
+- goals that improve build throughput should naturally become more competitive because they reduce time-to-completion for future progress
+- throughput-improving goals should also receive an explicit built-in priority improvement
+- inside `Economic`, this ETC-first ranking is preferred over trying to compare unlike outcomes such as `+energy` versus `+metal income` through one shared expected-benefit formula
+
+Recommended weighted-ETC shape:
+- `weightedEtc = totalEtc / bonusFactor`
+- lower `weightedEtc` is better
+- positive effects should increase `bonusFactor`
+- do not use negative penalties that reduce `bonusFactor` below the neutral baseline inside `Economic`
+- positive priority bonuses should stack multiplicatively
+- `bonusFactor` should have a hard upper ceiling of `2.0`
+
+Locked Economic priority modifiers for Phase 0:
+- goals whose completed effect improves throughput by reducing future ETC should receive a built-in `10%` priority improvement
+- planetary positive efficiency modifiers should improve the priority of matching goals
+- example:
+  - if a planet has `160%` crystal mining efficiency, a crystal-mine goal should receive a positive priority improvement relative to neutral goals
+  - if that improvement is `15%`, then `bonusFactor = 1.15`
+- for mine goals, prefer positive planetary-parameter-based weighting rather than a separate mine-balance rule
+- the intended mine-parameter mapping is:
+  - compute only the positive production bonus above the neutral baseline
+  - reduce that positive bonus by `4`
+  - use the result as the mine's priority improvement
+  - example:
+    - `160%` normal production means a `+60%` positive bonus
+    - `+60% / 4 = 15%` priority improvement
+    - therefore `bonusFactor = 1.15`
+- priority improvements should only be added for positive effects
+
+Locked energy-priority behavior for Phase 0:
+- define the local energy target as `current used energy + 5`
+- energy buildings should be considered only when energy is below the local target threshold
+- when energy-building goals are being ranked, lower projected energy relative to target should improve their priority by `10%` per energy below target
+- energy goals should also receive positive planetary-parameter-based priority improvements when the planet favors that energy source
+
+Locked storage-priority behavior for Phase 0:
+- storage should be evaluated separately for `metal`, `crystal`, and `deuterium`
+- the local storage target for each resource should be at least `1.5x` the highest relevant immediate next-cost requirement for that resource among:
+  - the highest-level in-scope mine goal
+  - the highest-level in-scope energy goal
+  - the highest-level in-scope industry goal
+- storage goals should be considered only for resource types that are below those resource-specific storage targets
+- if multiple resource types are below target at the same time, pick the most deficient resource type first and activate only that storage branch
 
 ## Trace contract
 
@@ -498,7 +650,7 @@ Phase 0 trace goals:
 - inspect snapshot quality
 - inspect proposal volume
 - inspect duplicate proposal patterns
-- compare V2 economic proposals with current bot behavior later
+- inspect whether the emitted primary/secondary requests and their goal metadata are mathematically coherent
 
 ## Integration with current runtime
 

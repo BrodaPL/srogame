@@ -1,5 +1,6 @@
 import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
 import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
+import { industryPowerMultiplier, researchPowerMultiplier } from '../../../../src/app/models/tech/technology-effects.js';
 import type { Galaxy } from '../../../../src/app/models/planets/galaxy.ts';
 import type { Planet } from '../../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../../src/app/models/player.ts';
@@ -11,6 +12,8 @@ import type {
   BotWorldSnapshot
 } from '../bot-v2-types.ts';
 import {
+  BUILDING_BLUEPRINTS,
+  TECHNOLOGY_BLUEPRINTS,
   calculateMaxBuildingQueueLength
 } from '../../game-commands/command-helpers.js';
 
@@ -70,20 +73,30 @@ function buildPlanetSnapshot(
   player: Player
 ): BotPlanetSnapshot {
   const energyTechnologyLevel = player.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY);
+  const materialTechnologyLevel = player.getTechLevel(TechnologyType.MATERIAL_TECHNOLOGY);
   const adaptiveTechnologyLevel = player.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+  const computerTechnologyLevel = player.getTechLevel(TechnologyType.COMPUTER_TECHNOLOGY);
+  const intergalacticResearchNetworkLevel = player.getTechLevel(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK);
+  const effectiveParameters = planet.getEffectivePlanetaryParameters();
   const fusionOperation = planet.resolveFusionReactorOperation(adaptiveTechnologyLevel, energyTechnologyLevel);
   const availableEnergy = resolveAvailableEnergy(planet, energyTechnologyLevel, fusionOperation.powerOutput);
   const usedEnergy = resolveUsedEnergy(planet);
   const energyGap = Math.max(0, usedEnergy - availableEnergy);
+  const energyEfficiency = resolveEnergyEfficiency(availableEnergy, usedEnergy);
+  const storageCapacity = {
+    metal: Math.max(1, planet.getBuildingProductionValue1(BuildingType.METAL_STORAGE)),
+    crystal: Math.max(1, planet.getBuildingProductionValue1(BuildingType.CRYSTAL_STORAGE)),
+    deuterium: Math.max(1, planet.getBuildingProductionValue1(BuildingType.DEUTERIUM_TANK))
+  };
   const storagePressure = {
-    metal: resolveStoragePressure(planet.rBDSFTQ.resources.metal, planet.getBuildingProductionValue1(BuildingType.METAL_STORAGE)),
+    metal: resolveStoragePressure(planet.rBDSFTQ.resources.metal, storageCapacity.metal),
     crystal: resolveStoragePressure(
       planet.rBDSFTQ.resources.crystal,
-      planet.getBuildingProductionValue1(BuildingType.CRYSTAL_STORAGE)
+      storageCapacity.crystal
     ),
     deuterium: resolveStoragePressure(
       planet.rBDSFTQ.resources.deuterium,
-      planet.getBuildingProductionValue1(BuildingType.DEUTERIUM_TANK)
+      storageCapacity.deuterium
     )
   };
   const averageMineLevel = (
@@ -91,7 +104,22 @@ function buildPlanetSnapshot(
     + planet.getBuildingLevel(BuildingType.CRYSTAL_MINE)
     + planet.getBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER)
   ) / 3;
-  const queueSaturated = planet.rBDSFTQ.buildingQueue.length >= calculateMaxBuildingQueueLength(planet, player);
+  const maxBuildingQueueLength = calculateMaxBuildingQueueLength(planet, player);
+  const queueSaturated = planet.rBDSFTQ.buildingQueue.length >= maxBuildingQueueLength;
+  const industryPower = resolveIndustryPower(planet, effectiveParameters.industryModifier, adaptiveTechnologyLevel, energyEfficiency);
+  const researchPower = resolveResearchPower(
+    planet,
+    effectiveParameters.scienceModifier,
+    computerTechnologyLevel,
+    adaptiveTechnologyLevel,
+    intergalacticResearchNetworkLevel,
+    energyEfficiency
+  );
+  const income = {
+    metal: Math.max(0, Math.floor(planet.getMetalGain(adaptiveTechnologyLevel) * energyEfficiency)),
+    crystal: Math.max(0, Math.floor(planet.getCrystalGain(adaptiveTechnologyLevel) * energyEfficiency)),
+    deuterium: Math.max(0, Math.floor(fusionOperation.netDeuteriumIncome))
+  };
 
   return {
     planetId: null,
@@ -102,6 +130,13 @@ function buildPlanetSnapshot(
       z: planet.basicInfo.order
     },
     maturityStage: resolveMaturityStage(averageMineLevel),
+    tech: {
+      energyTechnologyLevel,
+      materialTechnologyLevel,
+      adaptiveTechnologyLevel,
+      computerTechnologyLevel,
+      intergalacticResearchNetworkLevel
+    },
     economy: {
       metalMineLevel: planet.getBuildingLevel(BuildingType.METAL_MINE),
       crystalMineLevel: planet.getBuildingLevel(BuildingType.CRYSTAL_MINE),
@@ -112,6 +147,7 @@ function buildPlanetSnapshot(
       roboticsLevel: planet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY),
       naniteLevel: planet.getBuildingLevel(BuildingType.NANITE_FACTORY),
       shipyardLevel: planet.getBuildingLevel(BuildingType.SHIPYARD),
+      researchLabLevel: planet.getBuildingLevel(BuildingType.RESEARCH_LAB),
       metalStorageLevel: planet.getBuildingLevel(BuildingType.METAL_STORAGE),
       crystalStorageLevel: planet.getBuildingLevel(BuildingType.CRYSTAL_STORAGE),
       deuteriumTankLevel: planet.getBuildingLevel(BuildingType.DEUTERIUM_TANK),
@@ -119,13 +155,32 @@ function buildPlanetSnapshot(
       availableEnergy,
       usedEnergy,
       energyGap,
-      storagePressure
+      storagePressure,
+      storageCapacity,
+      income
+    },
+    modifiers: {
+      metal: effectiveParameters.metalModifier,
+      crystal: effectiveParameters.crystalModifier,
+      deuterium: effectiveParameters.deuteriumModifier,
+      solarEnergy: effectiveParameters.energyModifierRES,
+      nuclearEnergy: effectiveParameters.energyModifierNuclear,
+      science: effectiveParameters.scienceModifier,
+      industry: effectiveParameters.industryModifier
+    },
+    power: {
+      industryPower,
+      researchPower,
+      buildingQueueRemainingEtc: resolveBuildingQueueRemainingEtc(planet, industryPower),
+      researchQueueRemainingEtc: resolveResearchQueueRemainingEtc(planet, researchPower),
+      maxBuildingQueueLength
     },
     queues: {
       buildingQueueLength: planet.rBDSFTQ.buildingQueue.length,
       shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length,
       hasActiveResearch: planet.rBDSFTQ.currentResearchQueue !== null,
-      queuedBuildingTypes: planet.rBDSFTQ.buildingQueue.map((entry) => entry.buildingType)
+      queuedBuildingTypes: planet.rBDSFTQ.buildingQueue.map((entry) => entry.buildingType),
+      currentResearchType: planet.rBDSFTQ.currentResearchQueue?.technologyType ?? null
     },
     localResources: {
       metal: Math.max(0, Math.floor(planet.rBDSFTQ.resources.metal)),
@@ -166,6 +221,99 @@ function resolveUsedEnergy(planet: Planet): number {
   }
 
   return Math.max(0, Math.floor(usedEnergy));
+}
+
+function resolveEnergyEfficiency(availableEnergy: number, usedEnergy: number): number {
+  if (usedEnergy <= 0 || availableEnergy >= usedEnergy) {
+    return 1;
+  }
+
+  return Math.max(0, Math.min(1, availableEnergy / usedEnergy));
+}
+
+function resolveIndustryPower(
+  planet: Planet,
+  industryModifier: number,
+  adaptiveTechnologyLevel: number,
+  energyEfficiency: number
+): number {
+  const naniteMultiplier = planet.getBuildingLevel(BuildingType.NANITE_FACTORY) <= 0
+    ? 1
+    : planet.getBuildingProductionValue1Exact(BuildingType.NANITE_FACTORY);
+  const roboticsPower = planet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY) <= 0
+    ? 5
+    : planet.getBuildingProductionValue1(BuildingType.ROBOTICS_FACTORY);
+
+  return Math.max(0, Math.floor(
+    roboticsPower
+    * naniteMultiplier
+    * industryModifier
+    * industryPowerMultiplier(adaptiveTechnologyLevel)
+    * energyEfficiency
+  ));
+}
+
+function resolveResearchPower(
+  planet: Planet,
+  scienceModifier: number,
+  computerTechnologyLevel: number,
+  adaptiveTechnologyLevel: number,
+  intergalacticResearchNetworkLevel: number,
+  energyEfficiency: number
+): number {
+  const researchLabBasePower = planet.getBuildingProductionValue1(BuildingType.RESEARCH_LAB);
+  return Math.max(0, Math.floor(
+    researchLabBasePower
+    * scienceModifier
+    * researchPowerMultiplier(
+      computerTechnologyLevel,
+      adaptiveTechnologyLevel,
+      intergalacticResearchNetworkLevel
+    )
+    * energyEfficiency
+  ));
+}
+
+function resolveBuildingQueueRemainingEtc(planet: Planet, industryPower: number): number {
+  if (industryPower <= 0) {
+    return planet.rBDSFTQ.buildingQueue.length > 0 ? Number.MAX_SAFE_INTEGER : 0;
+  }
+
+  let remainingPower = 0;
+  for (const entry of planet.rBDSFTQ.buildingQueue) {
+    const blueprint = BUILDING_BLUEPRINTS.get(entry.buildingType);
+    if (!blueprint) {
+      continue;
+    }
+
+    const totalRequiredPower = Math.max(0, Math.floor(
+      blueprint.getCostForLevel(entry.nextLevel).getTotalResourceAmount()
+    ));
+    remainingPower += Math.max(0, totalRequiredPower - entry.investedIndustryPower);
+  }
+
+  return remainingPower <= 0 ? 0 : Math.ceil(remainingPower / industryPower);
+}
+
+function resolveResearchQueueRemainingEtc(planet: Planet, researchPower: number): number {
+  const entry = planet.rBDSFTQ.currentResearchQueue;
+  if (!entry) {
+    return 0;
+  }
+  if (researchPower <= 0) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  const technology = TECHNOLOGY_BLUEPRINTS.get(entry.technologyType);
+  if (!technology) {
+    return 0;
+  }
+
+  const totalRequiredPower = Math.max(0, Math.floor(
+    technology.getCostForLevel(entry.nextLevel).getTotalResourceAmount()
+  ));
+  const remainingPower = Math.max(0, totalRequiredPower - entry.investedResearchPower);
+  return remainingPower <= 0 ? 0 : Math.ceil(remainingPower / researchPower);
 }
 
 function resolveStoragePressure(currentAmount: number, capacity: number): number {

@@ -3,6 +3,8 @@ import type {
   BotProfileId,
   BotV2SubsystemId
 } from '../../../src/app/models/player.ts';
+import type { BuildingType } from '../../../src/app/models/enums/building-type.ts';
+import type { TechnologyType } from '../../../src/app/models/enums/technology-type.ts';
 
 export type BotProposalKind =
   | 'BUILDING'
@@ -69,6 +71,13 @@ export type BotPlanetSnapshot = {
   name: string;
   coordinates: { x: number; y: number; z: number };
   maturityStage: BotPlanetMaturityStage;
+  tech: {
+    energyTechnologyLevel: number;
+    materialTechnologyLevel: number;
+    adaptiveTechnologyLevel: number;
+    computerTechnologyLevel: number;
+    intergalacticResearchNetworkLevel: number;
+  };
   economy: {
     metalMineLevel: number;
     crystalMineLevel: number;
@@ -79,6 +88,7 @@ export type BotPlanetSnapshot = {
     roboticsLevel: number;
     naniteLevel: number;
     shipyardLevel: number;
+    researchLabLevel: number;
     metalStorageLevel: number;
     crystalStorageLevel: number;
     deuteriumTankLevel: number;
@@ -91,12 +101,39 @@ export type BotPlanetSnapshot = {
       crystal: number;
       deuterium: number;
     };
+    storageCapacity: {
+      metal: number;
+      crystal: number;
+      deuterium: number;
+    };
+    income: {
+      metal: number;
+      crystal: number;
+      deuterium: number;
+    };
+  };
+  modifiers: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+    solarEnergy: number;
+    nuclearEnergy: number;
+    science: number;
+    industry: number;
+  };
+  power: {
+    industryPower: number;
+    researchPower: number;
+    buildingQueueRemainingEtc: number;
+    researchQueueRemainingEtc: number;
+    maxBuildingQueueLength: number;
   };
   queues: {
     buildingQueueLength: number;
     shipyardQueueLength: number;
     hasActiveResearch: boolean;
-    queuedBuildingTypes: string[];
+    queuedBuildingTypes: BuildingType[];
+    currentResearchType: TechnologyType | null;
   };
   localResources: {
     metal: number;
@@ -141,6 +178,38 @@ export type BotProposal = {
   debug: Record<string, string | number | boolean | null>;
 };
 
+export type BotEconomicBranch =
+  | 'ENERGY'
+  | 'STORAGE'
+  | 'ECONOMY';
+
+export type BotEconomicGoal = {
+  goalKey: string;
+  branch: BotEconomicBranch;
+  planetId: number | null;
+  targetCoordinates: { x: number; y: number; z: number };
+  finalBuildingType: BuildingType;
+  finalBuildingLevel: number;
+  weightedEtc: number;
+  totalEtc: number;
+  buildingSideEtc: number;
+  researchSideEtc: number;
+  bonusFactor: number;
+  blockers: string[];
+  debug: Record<string, string | number | boolean | null>;
+};
+
+export type BotEconomicPlanetResult = {
+  planetId: number | null;
+  targetCoordinates: { x: number; y: number; z: number };
+  branch: BotEconomicBranch;
+  emittedRequestCount: number;
+  primaryGoalKey: string | null;
+  secondaryGoalKey: string | null;
+  noActionReason: string | null;
+  blockedGoalCount: number;
+};
+
 export type BotAcceptedTask = BotProposal & {
   status: 'ACCEPTED';
 };
@@ -153,6 +222,8 @@ export type BotSubsystemContext = {
 export type BotSubsystemResult = {
   subsystemId: BotV2SubsystemId;
   proposals: BotProposal[];
+  goals?: BotEconomicGoal[];
+  planetResults?: BotEconomicPlanetResult[];
   debug: Record<string, string | number | boolean | null>;
 };
 
@@ -205,6 +276,8 @@ export type BotDecisionTraceV2 = {
   subsystemResults: Array<{
     subsystemId: BotV2SubsystemId;
     proposalCount: number;
+    goalCount?: number;
+    planetResultCount?: number;
     debug: Record<string, string | number | boolean | null>;
   }>;
   proposals: Array<{
@@ -216,6 +289,25 @@ export type BotDecisionTraceV2 = {
     risk: number;
     confidence: number;
     dedupeKey: string;
+  }>;
+  goals?: Array<{
+    goalKey: string;
+    branch: BotEconomicBranch;
+    finalBuildingType: BuildingType;
+    finalBuildingLevel: number;
+    weightedEtc: number;
+    totalEtc: number;
+    bonusFactor: number;
+    blockers: string[];
+  }>;
+  planetResults?: Array<{
+    branch: BotEconomicBranch;
+    targetCoordinates: { x: number; y: number; z: number };
+    emittedRequestCount: number;
+    primaryGoalKey: string | null;
+    secondaryGoalKey: string | null;
+    noActionReason: string | null;
+    blockedGoalCount: number;
   }>;
   supervisorDecision: {
     acceptedProposalIds: string[];
