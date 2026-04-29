@@ -12,6 +12,7 @@ import type {
 import { recordBotDecisionTraceV2 } from './bot-v2-trace.js';
 import { buildBotWorldSnapshot } from './snapshot/build-bot-world-snapshot.js';
 import { NoopBotExecutor } from './execution/bot-executor.js';
+import { BotDefensiveSubsystem } from './subsystems/defensive/bot-defensive-subsystem.js';
 import { BotEconomicSubsystem } from './subsystems/economic/bot-economic-subsystem.js';
 import { ShadowBotSupervisor } from './supervisor/bot-supervisor.js';
 
@@ -83,9 +84,15 @@ export class BotBrainV2 {
       goals: subsystemResults.flatMap((result) =>
         (result.goals ?? []).map((goal) => ({
           goalKey: goal.goalKey,
+          subsystemId: goal.subsystemId,
+          goalFamily: goal.goalFamily,
           branch: goal.branch,
+          finalTargetKind: goal.finalTargetKind,
           finalBuildingType: goal.finalBuildingType,
-          finalBuildingLevel: goal.finalBuildingLevel,
+          finalTechnologyType: goal.finalTechnologyType,
+          finalDefenceType: goal.finalDefenceType,
+          finalLevel: goal.finalLevel,
+          finalAmount: goal.finalAmount,
           weightedEtc: goal.weightedEtc,
           totalEtc: goal.totalEtc,
           bonusFactor: goal.bonusFactor,
@@ -94,6 +101,7 @@ export class BotBrainV2 {
       ),
       planetResults: subsystemResults.flatMap((result) =>
         (result.planetResults ?? []).map((planetResult) => ({
+          subsystemId: planetResult.subsystemId,
           branch: planetResult.branch,
           targetCoordinates: { ...planetResult.targetCoordinates },
           emittedRequestCount: planetResult.emittedRequestCount,
@@ -118,6 +126,9 @@ function buildEnabledSubsystems(flags: BotV2FeatureFlags): BotSubsystem[] {
   const subsystems: BotSubsystem[] = [];
   if (flags.enabledSubsystems.economic) {
     subsystems.push(new BotEconomicSubsystem());
+  }
+  if (flags.enabledSubsystems.defensive) {
+    subsystems.push(new BotDefensiveSubsystem());
   }
   return subsystems;
 }

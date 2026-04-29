@@ -154,6 +154,7 @@ function buildPlanetEconomicResult(
     proposals,
     goals: rankedGoals.map(stripImmediateRequest),
     planetResult: {
+      subsystemId: 'ECONOMIC',
       planetId: planet.planetId,
       targetCoordinates: { ...planet.coordinates },
       branch,
@@ -249,11 +250,17 @@ function evaluateGoalForBuilding(
 
   return {
     goalKey: `economic:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${finalBuildingType}:${finalBuildingLevel}`,
+    subsystemId: 'ECONOMIC',
+    goalFamily: 'ECONOMIC',
     branch,
     planetId: planet.planetId,
     targetCoordinates: { ...planet.coordinates },
+    finalTargetKind: 'BUILDING',
     finalBuildingType,
-    finalBuildingLevel,
+    finalTechnologyType: null,
+    finalDefenceType: null,
+    finalLevel: finalBuildingLevel,
+    finalAmount: null,
     weightedEtc,
     totalEtc,
     buildingSideEtc,
@@ -692,7 +699,7 @@ function createPlanetProposals(
       existing.debug.requestRole = 'Primary+Secondary';
       existing.debug.secondaryGoalKey = goal.goalKey;
       existing.debug.secondaryGoalBuildingType = goal.finalBuildingType;
-      existing.debug.secondaryGoalBuildingLevel = goal.finalBuildingLevel;
+      existing.debug.secondaryGoalBuildingLevel = goal.finalLevel;
       existing.debug.sharedImmediateRequest = true;
       continue;
     }
@@ -775,7 +782,7 @@ function createProposalFromGoal(
       ...goal.debug,
       bonusFactor: roundToTwoDecimals(goal.bonusFactor),
       finalGoalBuildingType: goal.finalBuildingType,
-      finalGoalBuildingLevel: goal.finalBuildingLevel,
+      finalGoalBuildingLevel: goal.finalLevel,
       goalRole: goalLabel,
       immediateRequestKind: request.kind,
       immediateRequestLabel: requestLabel,
@@ -827,11 +834,17 @@ function createBlockedGoal(
 ): EconomicGoalEvaluation {
   return {
     goalKey: `economic:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${finalBuildingType}:${finalBuildingLevel}`,
+    subsystemId: 'ECONOMIC',
+    goalFamily: 'ECONOMIC',
     branch,
     planetId: planet.planetId,
     targetCoordinates: { ...planet.coordinates },
+    finalTargetKind: 'BUILDING',
     finalBuildingType,
-    finalBuildingLevel,
+    finalTechnologyType: null,
+    finalDefenceType: null,
+    finalLevel: finalBuildingLevel,
+    finalAmount: null,
     weightedEtc: Number.MAX_SAFE_INTEGER,
     totalEtc: Number.MAX_SAFE_INTEGER,
     buildingSideEtc: Number.MAX_SAFE_INTEGER,
@@ -851,11 +864,17 @@ function createBlockedGoal(
 function stripImmediateRequest(goal: EconomicGoalEvaluation): BotEconomicGoal {
   return {
     goalKey: goal.goalKey,
+    subsystemId: goal.subsystemId,
+    goalFamily: goal.goalFamily,
     branch: goal.branch,
     planetId: goal.planetId,
     targetCoordinates: goal.targetCoordinates,
+    finalTargetKind: goal.finalTargetKind,
     finalBuildingType: goal.finalBuildingType,
-    finalBuildingLevel: goal.finalBuildingLevel,
+    finalTechnologyType: goal.finalTechnologyType,
+    finalDefenceType: goal.finalDefenceType,
+    finalLevel: goal.finalLevel,
+    finalAmount: goal.finalAmount,
     weightedEtc: goal.weightedEtc,
     totalEtc: goal.totalEtc,
     buildingSideEtc: goal.buildingSideEtc,

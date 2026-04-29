@@ -601,6 +601,218 @@ Locked storage-priority behavior for Phase 0:
 - storage goals should be considered only for resource types that are below those resource-specific storage targets
 - if multiple resource types are below target at the same time, pick the most deficient resource type first and activate only that storage branch
 
+## Defensive subsystem scope in the next phase
+
+`Defensive` is the next specialist subsystem after `Economic`.
+
+Its scope is strictly local to one planet.
+
+Allowed request domains:
+- `BUNKER_NETWORK` upgrades
+- `SHIPYARD` upgrades when required for defensive unlock progression
+- defense production orders, excluding bombs
+- prerequisite research upgrades that are strictly required to progress an in-scope defensive building or defense-production goal
+- prerequisite building upgrades that are strictly required to progress an in-scope defensive building or defense-production goal
+
+Not yet allowed in this phase:
+- interplanetary movement
+- resource management
+- defensive fleet logistics
+- empire-global military planning
+- `Critical` emergency overrides inside the subsystem itself
+
+Defensive naming lock:
+- use the same outward model as `Economic`
+- per planet, rank candidates and select:
+  - `Primary goal`
+  - `Secondary goal`
+- emit:
+  - `Primary request`
+  - `Secondary request`
+- each request is the immediate next actionable step toward the linked goal
+- if both goals share the same immediate request, emit one outward request and keep both goal links in metadata
+- emit a first-class per-planet local result even when no outward request is emitted
+
+### Defensive goal families
+
+`Defensive` uses one mixed candidate pool containing three goal families:
+
+- `UNLOCK`
+  - unlock new defense tiers through required buildings or technologies
+- `BUILDING`
+  - mostly `BUNKER_NETWORK`
+  - occasionally `SHIPYARD` when required to unlock defenses
+- `PRODUCTION`
+  - produce already unlocked local defenses in sized local batches
+
+### Defensive local progress model
+
+`Defensive` should use a dedicated per-planet metric called `avg_industry`.
+
+`avg_industry` rules:
+- use a simple average after pre-multiplying selected building levels
+- include only buildings with current level `> 0`
+- do not count missing buildings in the divisor
+- included building set:
+  - `METAL_MINE`
+  - `CRYSTAL_MINE`
+  - `DEUTERIUM_SYNTHESIZER`
+  - `METAL_STORAGE`
+  - `CRYSTAL_STORAGE`
+  - `DEUTERIUM_TANK`
+  - `SOLAR_WIND_GEOTHERMAL`
+  - `NUCLEAR_PLANT`
+  - `FUSION_REACTOR`
+  - `ROBOTICS_FACTORY`
+  - `SHIPYARD`
+  - `NANITE_FACTORY`
+- weighted building multipliers:
+  - `FUSION_REACTOR * 1.25`
+  - `NANITE_FACTORY * 2`
+
+Conceptual formula:
+
+```text
+avg_industry =
+  sum(weightedBuiltLevels)
+  / count(builtBuildingsIncludedInTheSet)
+```
+
+Example:
+
+```text
+METAL_MINE = 2
+METAL_STORAGE = 1
+NANITE_FACTORY = 1
+SOLAR_WIND_GEOTHERMAL = 5
+
+avg_industry = (2 + 1 + (1 * 2) + 5) / 4 = 2.5
+```
+
+### Defensive unlock progression
+
+Unlocking is derived only from current planet state.
+
+Rules:
+- if a defense is already unlocked on that planet, it cannot become locked again
+- if multiple unlock goals open in the same threshold band, compare them by current `ETC`
+
+Current unlock thresholds:
+- `SAM` when `avg_industry >= 2`
+- `LIGHT_BEAM` when `avg_industry >= 2.5`
+- `ORBITAL_MISSILE_LAUNCHER` and `MEDIUM_BEAM` when `avg_industry >= 3.5`
+- `HEAVY_ORBITAL_MISSILE_LAUNCHER`, `HEAVY_BEAM`, and `RAIL_GUN_CANNON` when `avg_industry >= 5`
+
+### Defensive bunker rules
+
+`BUNKER_NETWORK` should usually remain around `1-2` levels below the current local industry development.
+
+It should also obey an explicit local max target.
+
+Base bunker max from planet size:
+- planet size `<= 100` -> max bunker level `2`
+- then `+1` bunker max level for each `10` size above `100`
+
+Attack-history additions from completed hostile arrivals/battles in the last `100` turns:
+- `1-2` attacks -> `+1` max bunker level
+- `3-5` attacks -> `+2` max bunker levels
+- `6-15` attacks -> `+3` max bunker levels
+- `>15` attacks -> `+4` max bunker levels
+
+Attack history should also increase bunker priority:
+- each attack-history step above adds `+50%` priority bonus to bunker-upgrade goals
+
+### Defensive bunker-vs-defense equilibrium
+
+The subsystem should compare:
+- `total_bunker_val` = total raw resource value invested into completed bunker improvements
+- `total_def_val` = total raw resource value of currently installed planetary defenses
+
+Scaled imbalance rule:
+- for every `20%` imbalance, the other side gets `+10%` priority bonus
+- if bunker value is ahead, defense-production goals gain priority
+- if defense value is ahead, bunker goals gain priority
+
+### Defensive distribution rule
+
+Defense production should not collapse into one dominant unlocked defense type only.
+
+Use a light floor system:
+- consider only currently unlocked defenses on that planet
+- compare them by installed raw resource value, not by count
+- production goals should favor unlocked defenses that have fallen too far below the others
+- this should be a soft bonus, not a rigid equalization rule
+
+### Defensive production-order sizing
+
+One defense production order should target about `1.0` to `2.0` turns of that planet local income.
+
+Rules:
+- use that planet local income only, not empire-wide income
+- choose a randomized sizing target inside the `1.0 - 2.0` range
+- the result is still only a proposed order size; `Supervisor` remains responsible for actual funding and scheduling
+
+### Defensive ETC and prerequisite handling
+
+Use the same narrow-ETC and dependency-expansion style as `Economic`:
+- throughput-only `ETC`
+- no resource-wait simulation
+- no empire-level resource logic
+- strict prerequisite building goals allowed
+- strict prerequisite research goals allowed
+- throughput-affecting intermediate steps should immediately update later chain ETC where relevant
+
+### Defensive selection behavior
+
+`Defensive` should keep one mixed candidate pool, but final selection should follow explicit local behavior rules instead of pure global top-2 scoring.
+
+When the planet cannot currently build defenses:
+- select structural goals only
+- normally:
+  - best structural goal first
+  - second-best structural fallback second
+- structural goals may be:
+  - bunker upgrade
+  - unlock goal
+  - prerequisite building/research for an unlock goal
+
+When the planet can currently build defenses:
+- use one structural slot and one production slot
+- select:
+  - best structural goal (`BUNKER_NETWORK` or unlock path)
+  - best defense-production goal
+
+When bunker upgrade is unavailable and no unlock goal is currently valid:
+- select two defense-production goals
+
+### Defensive ranking guidance
+
+The subsystem purpose is local defensive optimization only.
+It should not manage resources directly.
+
+Candidate comparison should be based on:
+- `ETC` as the base completion measure
+- positive priority modifiers on top of ETC
+- unlock thresholds from `avg_industry`
+- bunker under-target pressure
+- bunker-vs-defense imbalance
+- attack-history pressure
+- light distribution-floor pressure across unlocked defenses
+
+Like `Economic`, lower final score is better.
+
+Recommended weighted shape:
+
+```text
+weightedEtc = totalEtc / bonusFactor
+```
+
+Where:
+- `bonusFactor` uses positive-only multiplicative bonuses
+- no negative penalty factors below neutral baseline
+- use raw resource value for bunker-vs-defense comparisons
+- use completed hostile arrivals/battles in the last `100` turns as the local attack-history signal
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

@@ -1,5 +1,8 @@
 import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
+import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
+import { ReportType } from '../../../../src/app/models/enums/report-type.js';
 import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
+import { ManyDefences } from '../../../../src/app/models/defences/many-defences.js';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../../../src/app/models/tech/technology-effects.js';
 import type { Galaxy } from '../../../../src/app/models/planets/galaxy.ts';
 import type { Planet } from '../../../../src/app/models/planets/planet.ts';
@@ -13,8 +16,11 @@ import type {
 } from '../bot-v2-types.ts';
 import {
   BUILDING_BLUEPRINTS,
+  DEFENCE_BLUEPRINTS,
+  SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS,
-  calculateMaxBuildingQueueLength
+  calculateMaxBuildingQueueLength,
+  calculateMaxShipyardQueueLength
 } from '../../game-commands/command-helpers.js';
 
 export function buildBotWorldSnapshot(
@@ -22,7 +28,7 @@ export function buildBotWorldSnapshot(
   player: Player,
   flags: BotV2FeatureFlags
 ): BotWorldSnapshot {
-  const planets = player.planets.map((planet) => buildPlanetSnapshot(planet, player));
+  const planets = player.planets.map((planet) => buildPlanetSnapshot(planet, player, galaxy.currentTurn));
   const empire = buildEmpireSnapshot(galaxy, player, planets);
 
   return {
@@ -70,13 +76,19 @@ function buildEmpireSnapshot(
 
 function buildPlanetSnapshot(
   planet: Planet,
-  player: Player
+  player: Player,
+  currentTurn: number
 ): BotPlanetSnapshot {
   const energyTechnologyLevel = player.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY);
   const materialTechnologyLevel = player.getTechLevel(TechnologyType.MATERIAL_TECHNOLOGY);
   const adaptiveTechnologyLevel = player.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
   const computerTechnologyLevel = player.getTechLevel(TechnologyType.COMPUTER_TECHNOLOGY);
   const intergalacticResearchNetworkLevel = player.getTechLevel(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK);
+  const shieldingTechnologyLevel = player.getTechLevel(TechnologyType.SHIELDING_TECHNOLOGY);
+  const armourTechnologyLevel = player.getTechLevel(TechnologyType.ARMOUR_TECHNOLOGY);
+  const railgunsWeaponsLevel = player.getTechLevel(TechnologyType.RAILGUNS_WEAPONS);
+  const beamsWeaponsLevel = player.getTechLevel(TechnologyType.BEAMS_WEAPONS);
+  const missilesWeaponsLevel = player.getTechLevel(TechnologyType.MISSILES_WEAPONS);
   const effectiveParameters = planet.getEffectivePlanetaryParameters();
   const fusionOperation = planet.resolveFusionReactorOperation(adaptiveTechnologyLevel, energyTechnologyLevel);
   const availableEnergy = resolveAvailableEnergy(planet, energyTechnologyLevel, fusionOperation.powerOutput);
@@ -105,8 +117,10 @@ function buildPlanetSnapshot(
     + planet.getBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER)
   ) / 3;
   const maxBuildingQueueLength = calculateMaxBuildingQueueLength(planet, player);
+  const maxShipyardQueueLength = calculateMaxShipyardQueueLength(planet, player);
   const queueSaturated = planet.rBDSFTQ.buildingQueue.length >= maxBuildingQueueLength;
   const industryPower = resolveIndustryPower(planet, effectiveParameters.industryModifier, adaptiveTechnologyLevel, energyEfficiency);
+  const shipyardPower = resolveShipyardPower(planet, effectiveParameters.industryModifier, adaptiveTechnologyLevel, energyEfficiency);
   const researchPower = resolveResearchPower(
     planet,
     effectiveParameters.scienceModifier,
@@ -120,6 +134,18 @@ function buildPlanetSnapshot(
     crystal: Math.max(0, Math.floor(planet.getCrystalGain(adaptiveTechnologyLevel) * energyEfficiency)),
     deuterium: Math.max(0, Math.floor(fusionOperation.netDeuteriumIncome))
   };
+  const defenseCounts = ManyDefences.countByType(planet.rBDSFTQ.defences);
+  const installedCountByType = Object.fromEntries(defenseCounts.entries()) as Partial<Record<DefenceType, number>>;
+  const installedValueByType = resolveInstalledDefenseValues(defenseCounts);
+  const totalInstalledDefenseValue = Object.values(installedValueByType)
+    .reduce((sum, value) => sum + value, 0);
+  const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
+  const recentHostileAttackCountLast100Turns = resolveRecentHostileAttackCountLast100Turns(
+    player,
+    planet,
+    currentTurn,
+    100
+  );
 
   return {
     planetId: null,
@@ -135,7 +161,12 @@ function buildPlanetSnapshot(
       materialTechnologyLevel,
       adaptiveTechnologyLevel,
       computerTechnologyLevel,
-      intergalacticResearchNetworkLevel
+      intergalacticResearchNetworkLevel,
+      shieldingTechnologyLevel,
+      armourTechnologyLevel,
+      railgunsWeaponsLevel,
+      beamsWeaponsLevel,
+      missilesWeaponsLevel
     },
     economy: {
       metalMineLevel: planet.getBuildingLevel(BuildingType.METAL_MINE),
@@ -173,14 +204,31 @@ function buildPlanetSnapshot(
       researchPower,
       buildingQueueRemainingEtc: resolveBuildingQueueRemainingEtc(planet, industryPower),
       researchQueueRemainingEtc: resolveResearchQueueRemainingEtc(planet, researchPower),
-      maxBuildingQueueLength
+      maxBuildingQueueLength,
+      shipyardPower,
+      shipyardQueueRemainingEtc: resolveShipyardQueueRemainingEtc(planet, shipyardPower),
+      maxShipyardQueueLength
     },
     queues: {
       buildingQueueLength: planet.rBDSFTQ.buildingQueue.length,
       shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length,
       hasActiveResearch: planet.rBDSFTQ.currentResearchQueue !== null,
       queuedBuildingTypes: planet.rBDSFTQ.buildingQueue.map((entry) => entry.buildingType),
+      queuedDefenceTypes: planet.rBDSFTQ.shipyardQueue
+        .filter((entry) => entry.itemKind === 'defence' && entry.defenceType !== null)
+        .map((entry) => entry.defenceType as DefenceType),
       currentResearchType: planet.rBDSFTQ.currentResearchQueue?.technologyType ?? null
+    },
+    defense: {
+      bunkerLevel,
+      avgIndustryLevel: resolveAverageIndustryLevel(planet),
+      planetSize: planet.basicInfo.size,
+      recentHostileAttackCountLast100Turns,
+      recentHostileAttackStep: resolveHostileAttackStep(recentHostileAttackCountLast100Turns),
+      totalBunkerValue: resolveCompletedBuildingInvestment(BuildingType.BUNKER_NETWORK, bunkerLevel),
+      totalInstalledDefenseValue,
+      installedCountByType,
+      installedValueByType
     },
     localResources: {
       metal: Math.max(0, Math.floor(planet.rBDSFTQ.resources.metal)),
@@ -253,6 +301,28 @@ function resolveIndustryPower(
   ));
 }
 
+function resolveShipyardPower(
+  planet: Planet,
+  industryModifier: number,
+  adaptiveTechnologyLevel: number,
+  energyEfficiency: number
+): number {
+  const shipyardBasePower = planet.getBuildingLevel(BuildingType.SHIPYARD) <= 0
+    ? 0
+    : planet.getBuildingProductionValue1(BuildingType.SHIPYARD);
+  const naniteMultiplier = planet.getBuildingLevel(BuildingType.NANITE_FACTORY) <= 0
+    ? 1
+    : planet.getBuildingProductionValue1Exact(BuildingType.NANITE_FACTORY);
+
+  return Math.max(0, Math.floor(
+    shipyardBasePower
+    * naniteMultiplier
+    * industryModifier
+    * industryPowerMultiplier(adaptiveTechnologyLevel)
+    * energyEfficiency
+  ));
+}
+
 function resolveResearchPower(
   planet: Planet,
   scienceModifier: number,
@@ -316,6 +386,29 @@ function resolveResearchQueueRemainingEtc(planet: Planet, researchPower: number)
   return remainingPower <= 0 ? 0 : Math.ceil(remainingPower / researchPower);
 }
 
+function resolveShipyardQueueRemainingEtc(planet: Planet, shipyardPower: number): number {
+  if (shipyardPower <= 0) {
+    return planet.rBDSFTQ.shipyardQueue.length > 0 ? Number.MAX_SAFE_INTEGER : 0;
+  }
+
+  let remainingPower = 0;
+  for (const entry of planet.rBDSFTQ.shipyardQueue) {
+    const blueprint = entry.itemKind === 'defence'
+      ? (entry.defenceType ? DEFENCE_BLUEPRINTS.get(entry.defenceType) : null)
+      : (entry.shipType ? SHIP_BLUEPRINTS.get(entry.shipType) : null);
+    if (!blueprint) {
+      continue;
+    }
+
+    const totalRequiredPower = Math.max(0, Math.floor(
+      blueprint.cost.getTotalResourceAmount() * Math.max(0, Math.floor(entry.amount))
+    ));
+    remainingPower += Math.max(0, totalRequiredPower - entry.investedShipyardPower);
+  }
+
+  return remainingPower <= 0 ? 0 : Math.ceil(remainingPower / shipyardPower);
+}
+
 function resolveStoragePressure(currentAmount: number, capacity: number): number {
   const normalizedCapacity = Math.max(1, Number.isFinite(capacity) ? Math.floor(capacity) : 0);
   const normalizedAmount = Math.max(0, Number.isFinite(currentAmount) ? Math.floor(currentAmount) : 0);
@@ -336,4 +429,112 @@ function resolveMaturityStage(averageMineLevel: number): BotPlanetMaturityStage 
     return 'MILITARY_CAPABLE';
   }
   return 'STRATEGIC_HUB';
+}
+
+function resolveAverageIndustryLevel(planet: Planet): number {
+  const includedBuildings: Array<{ buildingType: BuildingType; weight: number }> = [
+    { buildingType: BuildingType.METAL_MINE, weight: 1 },
+    { buildingType: BuildingType.CRYSTAL_MINE, weight: 1 },
+    { buildingType: BuildingType.DEUTERIUM_SYNTHESIZER, weight: 1 },
+    { buildingType: BuildingType.METAL_STORAGE, weight: 1 },
+    { buildingType: BuildingType.CRYSTAL_STORAGE, weight: 1 },
+    { buildingType: BuildingType.DEUTERIUM_TANK, weight: 1 },
+    { buildingType: BuildingType.SOLAR_WIND_GEOTHERMAL, weight: 1 },
+    { buildingType: BuildingType.NUCLEAR_PLANT, weight: 1 },
+    { buildingType: BuildingType.FUSION_REACTOR, weight: 1.25 },
+    { buildingType: BuildingType.ROBOTICS_FACTORY, weight: 1 },
+    { buildingType: BuildingType.SHIPYARD, weight: 1 },
+    { buildingType: BuildingType.NANITE_FACTORY, weight: 2 }
+  ];
+
+  let weightedSum = 0;
+  let includedCount = 0;
+  for (const entry of includedBuildings) {
+    const level = planet.getBuildingLevel(entry.buildingType);
+    if (level <= 0) {
+      continue;
+    }
+
+    weightedSum += level * entry.weight;
+    includedCount += 1;
+  }
+
+  if (includedCount <= 0) {
+    return 0;
+  }
+
+  return weightedSum / includedCount;
+}
+
+function resolveInstalledDefenseValues(
+  counts: Map<DefenceType, number>
+): Partial<Record<DefenceType, number>> {
+  const values: Partial<Record<DefenceType, number>> = {};
+
+  for (const [defenceType, amount] of counts.entries()) {
+    const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+    if (!blueprint || amount <= 0) {
+      continue;
+    }
+
+    values[defenceType] = Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount() * amount));
+  }
+
+  return values;
+}
+
+function resolveCompletedBuildingInvestment(buildingType: BuildingType, level: number): number {
+  const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
+  if (!blueprint || level <= 0) {
+    return 0;
+  }
+
+  let total = 0;
+  for (let currentLevel = 1; currentLevel <= level; currentLevel += 1) {
+    total += Math.max(0, Math.floor(blueprint.getCostForLevel(currentLevel).getTotalResourceAmount()));
+  }
+
+  return total;
+}
+
+function resolveRecentHostileAttackCountLast100Turns(
+  player: Player,
+  planet: Planet,
+  currentTurn: number,
+  windowTurns: number
+): number {
+  const minTurn = Math.max(0, currentTurn - Math.max(0, Math.floor(windowTurns)));
+  const targetCoordinates = {
+    x: planet.basicInfo.solarSystem.coordinates.x,
+    y: planet.basicInfo.solarSystem.coordinates.y,
+    z: planet.basicInfo.order
+  };
+
+  return player.reports.filter((report) =>
+    report.reportType === ReportType.FLEET_REPORT
+    && report.createdTurn >= minTurn
+    && report.sourceCoordinates?.x === targetCoordinates.x
+    && report.sourceCoordinates?.y === targetCoordinates.y
+    && report.sourceCoordinates?.z === targetCoordinates.z
+    && (
+      report.title.startsWith('Battle Report:')
+      || report.title.startsWith('Bombardment Report:')
+    )
+  ).length;
+}
+
+function resolveHostileAttackStep(attackCount: number): number {
+  if (attackCount <= 0) {
+    return 0;
+  }
+  if (attackCount <= 2) {
+    return 1;
+  }
+  if (attackCount <= 5) {
+    return 2;
+  }
+  if (attackCount <= 15) {
+    return 3;
+  }
+  return 4;
 }

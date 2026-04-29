@@ -4,6 +4,7 @@ import type {
   BotV2SubsystemId
 } from '../../../src/app/models/player.ts';
 import type { BuildingType } from '../../../src/app/models/enums/building-type.ts';
+import type { DefenceType } from '../../../src/app/models/enums/defence-type.ts';
 import type { TechnologyType } from '../../../src/app/models/enums/technology-type.ts';
 
 export type BotProposalKind =
@@ -77,6 +78,11 @@ export type BotPlanetSnapshot = {
     adaptiveTechnologyLevel: number;
     computerTechnologyLevel: number;
     intergalacticResearchNetworkLevel: number;
+    shieldingTechnologyLevel: number;
+    armourTechnologyLevel: number;
+    railgunsWeaponsLevel: number;
+    beamsWeaponsLevel: number;
+    missilesWeaponsLevel: number;
   };
   economy: {
     metalMineLevel: number;
@@ -127,13 +133,28 @@ export type BotPlanetSnapshot = {
     buildingQueueRemainingEtc: number;
     researchQueueRemainingEtc: number;
     maxBuildingQueueLength: number;
+    shipyardPower: number;
+    shipyardQueueRemainingEtc: number;
+    maxShipyardQueueLength: number;
   };
   queues: {
     buildingQueueLength: number;
     shipyardQueueLength: number;
     hasActiveResearch: boolean;
     queuedBuildingTypes: BuildingType[];
+    queuedDefenceTypes: DefenceType[];
     currentResearchType: TechnologyType | null;
+  };
+  defense: {
+    bunkerLevel: number;
+    avgIndustryLevel: number;
+    planetSize: number;
+    recentHostileAttackCountLast100Turns: number;
+    recentHostileAttackStep: number;
+    totalBunkerValue: number;
+    totalInstalledDefenseValue: number;
+    installedCountByType: Partial<Record<DefenceType, number>>;
+    installedValueByType: Partial<Record<DefenceType, number>>;
   };
   localResources: {
     metal: number;
@@ -183,13 +204,35 @@ export type BotEconomicBranch =
   | 'STORAGE'
   | 'ECONOMY';
 
-export type BotEconomicGoal = {
+export type BotDefensiveBranch =
+  | 'STRUCTURAL_ONLY'
+  | 'STRUCTURE_AND_PRODUCTION'
+  | 'PRODUCTION_ONLY';
+
+export type BotGoalFamily =
+  | 'ECONOMIC'
+  | 'UNLOCK'
+  | 'BUILDING'
+  | 'PRODUCTION';
+
+export type BotGoalTargetKind =
+  | 'BUILDING'
+  | 'RESEARCH'
+  | 'DEFENCE';
+
+type BotGoalBase = {
   goalKey: string;
-  branch: BotEconomicBranch;
+  subsystemId: BotV2SubsystemId;
+  goalFamily: BotGoalFamily;
+  branch: string;
   planetId: number | null;
   targetCoordinates: { x: number; y: number; z: number };
-  finalBuildingType: BuildingType;
-  finalBuildingLevel: number;
+  finalTargetKind: BotGoalTargetKind;
+  finalBuildingType: BuildingType | null;
+  finalTechnologyType: TechnologyType | null;
+  finalDefenceType: DefenceType | null;
+  finalLevel: number | null;
+  finalAmount: number | null;
   weightedEtc: number;
   totalEtc: number;
   buildingSideEtc: number;
@@ -199,15 +242,44 @@ export type BotEconomicGoal = {
   debug: Record<string, string | number | boolean | null>;
 };
 
-export type BotEconomicPlanetResult = {
-  planetId: number | null;
-  targetCoordinates: { x: number; y: number; z: number };
+export type BotEconomicGoal = BotGoalBase & {
+  subsystemId: 'ECONOMIC';
+  goalFamily: 'ECONOMIC';
   branch: BotEconomicBranch;
+  finalTargetKind: 'BUILDING';
+  finalBuildingType: BuildingType;
+  finalTechnologyType: null;
+  finalDefenceType: null;
+  finalLevel: number;
+  finalAmount: null;
+};
+
+export type BotDefensiveGoal = BotGoalBase & {
+  subsystemId: 'DEFENSIVE';
+  goalFamily: 'UNLOCK' | 'BUILDING' | 'PRODUCTION';
+  branch: BotDefensiveBranch;
+};
+
+type BotPlanetResultBase = {
+  planetId: number | null;
+  subsystemId: BotV2SubsystemId;
+  targetCoordinates: { x: number; y: number; z: number };
+  branch: string;
   emittedRequestCount: number;
   primaryGoalKey: string | null;
   secondaryGoalKey: string | null;
   noActionReason: string | null;
   blockedGoalCount: number;
+};
+
+export type BotEconomicPlanetResult = BotPlanetResultBase & {
+  subsystemId: 'ECONOMIC';
+  branch: BotEconomicBranch;
+};
+
+export type BotDefensivePlanetResult = BotPlanetResultBase & {
+  subsystemId: 'DEFENSIVE';
+  branch: BotDefensiveBranch;
 };
 
 export type BotAcceptedTask = BotProposal & {
@@ -222,8 +294,8 @@ export type BotSubsystemContext = {
 export type BotSubsystemResult = {
   subsystemId: BotV2SubsystemId;
   proposals: BotProposal[];
-  goals?: BotEconomicGoal[];
-  planetResults?: BotEconomicPlanetResult[];
+  goals?: Array<BotEconomicGoal | BotDefensiveGoal>;
+  planetResults?: Array<BotEconomicPlanetResult | BotDefensivePlanetResult>;
   debug: Record<string, string | number | boolean | null>;
 };
 
@@ -292,16 +364,23 @@ export type BotDecisionTraceV2 = {
   }>;
   goals?: Array<{
     goalKey: string;
-    branch: BotEconomicBranch;
-    finalBuildingType: BuildingType;
-    finalBuildingLevel: number;
+    subsystemId: BotV2SubsystemId;
+    goalFamily: BotGoalFamily;
+    branch: string;
+    finalTargetKind: BotGoalTargetKind;
+    finalBuildingType: BuildingType | null;
+    finalTechnologyType: TechnologyType | null;
+    finalDefenceType: DefenceType | null;
+    finalLevel: number | null;
+    finalAmount: number | null;
     weightedEtc: number;
     totalEtc: number;
     bonusFactor: number;
     blockers: string[];
   }>;
   planetResults?: Array<{
-    branch: BotEconomicBranch;
+    subsystemId: BotV2SubsystemId;
+    branch: string;
     targetCoordinates: { x: number; y: number; z: number };
     emittedRequestCount: number;
     primaryGoalKey: string | null;

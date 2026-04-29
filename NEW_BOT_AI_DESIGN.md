@@ -161,13 +161,159 @@ Planetary development should usually be handled before global strategic activity
 
 **Purpose:** secure a planet against attack and increase defensive resilience.
 
-**Goal amount:** Main goal, secondary goal, short-term goals that lead to the main goal.
+**Planned goal model:** per planet, one `Primary goal`, one `Secondary goal`, and one immediate request for each selected goal.
 
 ### Responsibilities
 
-* **Construction:** shipyard, bunker network.
-* **Production:** defenses, excluding bombs.
+* **Construction:** `SHIPYARD`, `BUNKER_NETWORK`.
+* **Production:** planetary defenses, excluding bombs.
+* **Research:** only strict prerequisite research that is required to progress an in-scope defensive building or defense-production goal.
 * **Local optimization:** maintain sufficient static defense and defensive infrastructure.
+
+### Planned goal families
+
+* **Unlocking goals**
+
+  * unlock new defense tiers through prerequisite buildings or technologies,
+  * derived from current planet unlock state only,
+  * once a defense is unlocked on that planet, it cannot become locked again.
+
+* **Building goals**
+
+  * primarily `BUNKER_NETWORK`,
+  * occasionally `SHIPYARD` when required for unlock progression.
+
+* **Production goals**
+
+  * produce already unlocked defenses in local batches.
+
+### Planned local progress model
+
+`Defensive` should use a dedicated local progress metric called `avg_industry`.
+
+`avg_industry` rules:
+
+* simple average after pre-multiplying selected building levels,
+* include only buildings currently built on the planet,
+* do not count missing buildings in the divisor,
+* weighted buildings:
+
+  * `FUSION_REACTOR * 1.25`
+  * `NANITE_FACTORY * 2`
+
+* included building set:
+
+  * `METAL_MINE`
+  * `CRYSTAL_MINE`
+  * `DEUTERIUM_SYNTHESIZER`
+  * `METAL_STORAGE`
+  * `CRYSTAL_STORAGE`
+  * `DEUTERIUM_TANK`
+  * `SOLAR_WIND_GEOTHERMAL`
+  * `NUCLEAR_PLANT`
+  * `FUSION_REACTOR`
+  * `ROBOTICS_FACTORY`
+  * `SHIPYARD`
+  * `NANITE_FACTORY`
+
+Example:
+
+* `METAL_MINE = 2`
+* `METAL_STORAGE = 1`
+* `NANITE_FACTORY = 1`
+* `SOLAR_WIND_GEOTHERMAL = 5`
+
+Then:
+
+* `avg_industry = (2 + 1 + (1 * 2) + 5) / 4 = 2.5`
+
+### Planned unlock order
+
+Unlocking should be gated by `avg_industry`.
+
+* `SAM` when `avg_industry >= 2`
+* `LIGHT_BEAM` when `avg_industry >= 2.5`
+* `ORBITAL_MISSILE_LAUNCHER` / `MEDIUM_BEAM` when `avg_industry >= 3.5`
+* `HEAVY_ORBITAL_MISSILE_LAUNCHER` / `HEAVY_BEAM` / `RAIL_GUN_CANNON` when `avg_industry >= 5`
+
+If multiple unlock goals open in the same `avg_industry` range, they should compete by current `ETC`.
+
+### Planned bunker rules
+
+`BUNKER_NETWORK` should usually stay around `1-2` levels below the planet local industry average.
+
+It should also have an explicit maximum target level, influenced mainly by:
+
+* planet size,
+* amount of enemy attacks in the last `100` turns.
+
+Base bunker max from planet size:
+
+* planet size `<= 100` -> max level `2`
+* then `+1` bunker max level for each `10` size above `100`
+
+Attack-history additions in last `100` turns:
+
+* `1-2` attacks -> `+1` max level
+* `3-5` attacks -> `+2` max levels
+* `6-15` attacks -> `+3` max levels
+* `>15` attacks -> `+4` max levels
+
+The same recent-attack signal should also increase bunker priority:
+
+* each attack-history `+1` step gives `+50%` priority bonus to bunker-upgrade goals
+
+### Planned bunker-vs-defense equilibrium
+
+The subsystem should compare:
+
+* `total_bunker_val` = total raw resource value invested into bunker improvements
+* `total_def_val` = total raw resource value of currently installed local defenses
+
+This should create an equilibrium between bunker investment and defense investment.
+
+Scaled imbalance rule:
+
+* for every `20%` imbalance, the other side gets `+10%` priority bonus
+* if bunker value is too far ahead, defense-production goals gain priority
+* if defense value is too far ahead, bunker goals gain priority
+
+### Planned defense distribution rule
+
+The subsystem should avoid degenerating into one dominant defense type only.
+
+Distribution should:
+
+* consider only currently unlocked defenses on that planet,
+* use a light floor system,
+* compare unlocked defenses by total installed raw resource value rather than by count.
+
+### Planned production-order sizing
+
+One defense production order should target roughly `1.0` to `2.0` turns of that planet local income.
+
+This should be randomized inside that range, so local orders do not all collapse to one rigid size.
+
+### Planned branch behavior
+
+`Defensive` should use one mixed candidate pool, but choose final outputs through explicit local behavior rules:
+
+* if the planet cannot currently build defenses:
+
+  * propose one structural goal (`BUNKER_NETWORK` upgrade or unlock goal)
+  * propose a second structural fallback goal
+
+* if the planet can build defenses:
+
+  * propose the best structural goal (`BUNKER_NETWORK` or unlock)
+  * propose one defense-production goal
+
+* if bunker upgrade is not available and unlock goals are not available:
+
+  * propose two defense-production goals
+
+Like `Economic`, `Defensive` should not manage resources itself.
+It should only determine locally optimal defensive goals and immediate requests.
 
 ### Primary goal examples
 
@@ -422,6 +568,7 @@ Current implementation note:
 * The requests are immediate actionable steps toward those goals.
 * This was chosen because the `Supervisory` layer benefits from seeing both the current action and the larger local goal it advances.
 * If both goals share one immediate step, `Economic` emits one request with both goal links.
+* `Defensive` is planned to follow the same outward contract as `Economic`.
 
 Example:
 
