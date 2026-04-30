@@ -325,24 +325,123 @@ It should only determine locally optimal defensive goals and immediate requests.
 
 **Scope:** strictly tied to one planet.
 
-**Purpose:** act as the **local military production executor** for a planet.
+**Purpose:** act as the **local military-production planner** for a planet.
 
 **Goal amount:** Main goal, secondary goal, short-term goals that lead to the main goal.
 
 This subsystem should not define global war strategy.
-Its role is to decide what the planet can efficiently build when military production quota is assigned to it.
+Its role is to decide what the planet should build locally to improve military production capacity, unlock new ships, and maintain steady ship output.
 
 ### Responsibilities
 
 * **Construction:** shipyard, nanite factory.
-* **Production:** military ships, transport ships.
+* **Production:** combat ships and cargo ships.
 * **Local optimization:** convert local shipyard power into military output.
+
+Like `Economic` and `Defensive`, this subsystem is self-sufficient.
+It does not wait for a military-production quota from the Supervisory System.
+
+### Goal families
+
+`Warfare` should use three local goal families:
+
+* `CAPACITY`
+* `UNLOCK`
+* `PRODUCTION`
+
+`CAPACITY` means improving local ship-production throughput through:
+
+* `SHIPYARD`
+* `NANITE_FACTORY`
+
+`UNLOCK` means unlocking additional ship types for future production.
+
+`PRODUCTION` means immediate ship-production orders for already unlocked ships.
+
+### Local readiness and progression
+
+For now, `Warfare` should reuse `avg_industry` as its local progression metric.
+
+Ship unlock progression should be hardcoded by threshold bands:
+
+* the unlock threshold for a ship should equal that ship's `SHIPYARD` requirement
+* if multiple ships open inside the same threshold band, they should compete by local `weightedEtc`
+
+Capacity targets:
+
+* `targetShipyard = round(avg_industry)`
+* `targetNanite = targetShipyard / 2`
+
+`NANITE_FACTORY` should remain in scope, but because it is much more expensive it should carry a permanent `20%` priority penalty.
+
+### Production scope
+
+Include:
+
+* all combat ships
+* cargo ships:
+  * `TRANSPORTER`
+  * `MASS_HAULER`
+  * `CARGO_SUPPORT`
+
+Exclude:
+
+* everything else
+
+Implementation should use explicit included ship-enum lists grouped by category:
+
+* `combatShips`
+* `cargoShips`
+
+### Production distribution and order sizing
+
+Ship production should use a soft distribution rule:
+
+* compare current production balance by total invested ship value
+* do not let one already unlocked ship type dominate forever unless it keeps winning clearly
+
+One ship-production order should be sized from local income:
+
+* choose a random target budget in the range:
+  * `1 .. (1 + avg_industry)` turns of that planet income
+* then:
+  * `amount = floor(targetBudget / unitCost)`
+
+### Output model
+
+Unlike `Economic` and `Defensive`, `Warfare` should expose a wider immediate menu upward:
+
+* `5 goals`
+* `5 immediate requests`
+
+Selection shape:
+
+* up to `2` structural goals:
+  * `CAPACITY`
+  * `UNLOCK`
+* fill the rest with `PRODUCTION` goals if possible
+* if production cannot fully fill the list, more `UNLOCK` goals may appear
+
+If at least one cargo ship is unlocked:
+
+* reserve exactly `1` cargo production request in the visible list
+
+### Structural visibility rule
+
+If not all in-scope ships are unlocked yet, `Warfare` should not collapse into pure production too early.
+
+Structural visibility should therefore remain allowed when:
+
+* `bestStructuralWeightedEtc <= bestProductionWeightedEtc * 1.5`
+* or no valid production goal exists
+
+This keeps unlock/capacity progress visible without forcing obviously weak structural goals every turn.
 
 ### Primary goal examples
 
 * increase local ship production capacity,
-* fulfill military production quota assigned by the Supervisory System,
-* unlocking new ships for production.
+* unlock additional ships for production,
+* produce a balanced local military and cargo roster.
 
 ---
 

@@ -5,6 +5,7 @@ import type {
 } from '../../../src/app/models/player.ts';
 import type { BuildingType } from '../../../src/app/models/enums/building-type.ts';
 import type { DefenceType } from '../../../src/app/models/enums/defence-type.ts';
+import type { ShipType } from '../../../src/app/models/enums/ship-type.ts';
 import type { TechnologyType } from '../../../src/app/models/enums/technology-type.ts';
 
 export type BotProposalKind =
@@ -83,6 +84,11 @@ export type BotPlanetSnapshot = {
     railgunsWeaponsLevel: number;
     beamsWeaponsLevel: number;
     missilesWeaponsLevel: number;
+    fusionDriveLevel: number;
+    hyperspaceDriveLevel: number;
+    hyperspaceTechnologyLevel: number;
+    espionageTechnologyLevel: number;
+    astrophysicsTechnologyLevel: number;
   };
   economy: {
     metalMineLevel: number;
@@ -143,6 +149,7 @@ export type BotPlanetSnapshot = {
     hasActiveResearch: boolean;
     queuedBuildingTypes: BuildingType[];
     queuedDefenceTypes: DefenceType[];
+    queuedShipTypes: ShipType[];
     currentResearchType: TechnologyType | null;
   };
   defense: {
@@ -155,6 +162,11 @@ export type BotPlanetSnapshot = {
     totalInstalledDefenseValue: number;
     installedCountByType: Partial<Record<DefenceType, number>>;
     installedValueByType: Partial<Record<DefenceType, number>>;
+  };
+  ships: {
+    installedCountByType: Partial<Record<ShipType, number>>;
+    installedValueByType: Partial<Record<ShipType, number>>;
+    totalInstalledShipValue: number;
   };
   localResources: {
     metal: number;
@@ -209,16 +221,23 @@ export type BotDefensiveBranch =
   | 'STRUCTURE_AND_PRODUCTION'
   | 'PRODUCTION_ONLY';
 
+export type BotWarfareBranch =
+  | 'CAPACITY'
+  | 'UNLOCK'
+  | 'PRODUCTION';
+
 export type BotGoalFamily =
   | 'ECONOMIC'
   | 'UNLOCK'
   | 'BUILDING'
-  | 'PRODUCTION';
+  | 'PRODUCTION'
+  | 'CAPACITY';
 
 export type BotGoalTargetKind =
   | 'BUILDING'
   | 'RESEARCH'
-  | 'DEFENCE';
+  | 'DEFENCE'
+  | 'SHIP';
 
 type BotGoalBase = {
   goalKey: string;
@@ -231,6 +250,7 @@ type BotGoalBase = {
   finalBuildingType: BuildingType | null;
   finalTechnologyType: TechnologyType | null;
   finalDefenceType: DefenceType | null;
+  finalShipType: ShipType | null;
   finalLevel: number | null;
   finalAmount: number | null;
   weightedEtc: number;
@@ -250,6 +270,7 @@ export type BotEconomicGoal = BotGoalBase & {
   finalBuildingType: BuildingType;
   finalTechnologyType: null;
   finalDefenceType: null;
+  finalShipType: null;
   finalLevel: number;
   finalAmount: null;
 };
@@ -258,6 +279,12 @@ export type BotDefensiveGoal = BotGoalBase & {
   subsystemId: 'DEFENSIVE';
   goalFamily: 'UNLOCK' | 'BUILDING' | 'PRODUCTION';
   branch: BotDefensiveBranch;
+};
+
+export type BotWarfareGoal = BotGoalBase & {
+  subsystemId: 'WARFARE';
+  goalFamily: 'CAPACITY' | 'UNLOCK' | 'PRODUCTION';
+  branch: BotWarfareBranch;
 };
 
 type BotPlanetResultBase = {
@@ -282,6 +309,11 @@ export type BotDefensivePlanetResult = BotPlanetResultBase & {
   branch: BotDefensiveBranch;
 };
 
+export type BotWarfarePlanetResult = BotPlanetResultBase & {
+  subsystemId: 'WARFARE';
+  branch: BotWarfareBranch;
+};
+
 export type BotAcceptedTask = BotProposal & {
   status: 'ACCEPTED';
 };
@@ -294,8 +326,8 @@ export type BotSubsystemContext = {
 export type BotSubsystemResult = {
   subsystemId: BotV2SubsystemId;
   proposals: BotProposal[];
-  goals?: Array<BotEconomicGoal | BotDefensiveGoal>;
-  planetResults?: Array<BotEconomicPlanetResult | BotDefensivePlanetResult>;
+  goals?: Array<BotEconomicGoal | BotDefensiveGoal | BotWarfareGoal>;
+  planetResults?: Array<BotEconomicPlanetResult | BotDefensivePlanetResult | BotWarfarePlanetResult>;
   debug: Record<string, string | number | boolean | null>;
 };
 
@@ -371,6 +403,7 @@ export type BotDecisionTraceV2 = {
     finalBuildingType: BuildingType | null;
     finalTechnologyType: TechnologyType | null;
     finalDefenceType: DefenceType | null;
+    finalShipType: ShipType | null;
     finalLevel: number | null;
     finalAmount: number | null;
     weightedEtc: number;

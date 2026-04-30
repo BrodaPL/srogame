@@ -39,9 +39,10 @@ The main runtime lives in:
 
 Bot AI V2 note:
 - `server/src/bots-v2/` is still shadow-only and does not execute live commands
-- its current implemented subsystems are `Economic` and `Defensive`
+- its current implemented subsystems are `Economic`, `Defensive`, and `Warfare`
 - the current Economic shadow planner is local-per-planet, branch-first (`ENERGY` / `STORAGE` / `ECONOMY`), expands building + strict prerequisite-research chains, uses narrow throughput-only `ETC` with stepwise throughput re-simulation, deduplicates shared immediate requests, and emits per-planet goal/no-action metadata for later supervisory work
 - the current Defensive shadow planner is also local-per-planet, mixes `UNLOCK` / `BUILDING` / `PRODUCTION` goals, uses `avg_industry`, bunker-vs-defense value balance, local shipyard throughput, and explicit selection modes (`STRUCTURAL_ONLY`, `STRUCTURE_AND_PRODUCTION`, `PRODUCTION_ONLY`), and emits the same primary/secondary goal-request contract as Economic
+- the current Warfare shadow planner is also local-per-planet, mixes `CAPACITY` / `UNLOCK` / `PRODUCTION` goals, uses `avg_industry` for unlock and shipyard/nanite targets, ranks by `weightedEtc = totalEtc / bonusFactor`, emits up to five visible requests per planet with category-aware structural/cargo shaping, and currently scopes ship production to combat ships plus `TRANSPORTER` / `MASS_HAULER` / `CARGO_SUPPORT`
 
 Supporting bot modules:
 - `server/src/bots/bot-profile.ts`

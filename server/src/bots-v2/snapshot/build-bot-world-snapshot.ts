@@ -1,8 +1,10 @@
 import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
 import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
 import { ReportType } from '../../../../src/app/models/enums/report-type.js';
+import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
 import { ManyDefences } from '../../../../src/app/models/defences/many-defences.js';
+import { ManyShips } from '../../../../src/app/models/fleets/many-ships.js';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../../../src/app/models/tech/technology-effects.js';
 import type { Galaxy } from '../../../../src/app/models/planets/galaxy.ts';
 import type { Planet } from '../../../../src/app/models/planets/planet.ts';
@@ -89,6 +91,11 @@ function buildPlanetSnapshot(
   const railgunsWeaponsLevel = player.getTechLevel(TechnologyType.RAILGUNS_WEAPONS);
   const beamsWeaponsLevel = player.getTechLevel(TechnologyType.BEAMS_WEAPONS);
   const missilesWeaponsLevel = player.getTechLevel(TechnologyType.MISSILES_WEAPONS);
+  const fusionDriveLevel = player.getTechLevel(TechnologyType.FUSION_DRIVE);
+  const hyperspaceDriveLevel = player.getTechLevel(TechnologyType.HYPERSPACE_DRIVE);
+  const hyperspaceTechnologyLevel = player.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY);
+  const espionageTechnologyLevel = player.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY);
+  const astrophysicsTechnologyLevel = player.getTechLevel(TechnologyType.ASTROPHYSICS_TECHNOLOGY);
   const effectiveParameters = planet.getEffectivePlanetaryParameters();
   const fusionOperation = planet.resolveFusionReactorOperation(adaptiveTechnologyLevel, energyTechnologyLevel);
   const availableEnergy = resolveAvailableEnergy(planet, energyTechnologyLevel, fusionOperation.powerOutput);
@@ -139,6 +146,11 @@ function buildPlanetSnapshot(
   const installedValueByType = resolveInstalledDefenseValues(defenseCounts);
   const totalInstalledDefenseValue = Object.values(installedValueByType)
     .reduce((sum, value) => sum + value, 0);
+  const shipCounts = ManyShips.countByType(planet.rBDSFTQ.ships);
+  const installedShipCountByType = Object.fromEntries(shipCounts.entries()) as Partial<Record<ShipType, number>>;
+  const installedShipValueByType = resolveInstalledShipValues(shipCounts);
+  const totalInstalledShipValue = Object.values(installedShipValueByType)
+    .reduce((sum, value) => sum + value, 0);
   const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
   const recentHostileAttackCountLast100Turns = resolveRecentHostileAttackCountLast100Turns(
     player,
@@ -166,7 +178,12 @@ function buildPlanetSnapshot(
       armourTechnologyLevel,
       railgunsWeaponsLevel,
       beamsWeaponsLevel,
-      missilesWeaponsLevel
+      missilesWeaponsLevel,
+      fusionDriveLevel,
+      hyperspaceDriveLevel,
+      hyperspaceTechnologyLevel,
+      espionageTechnologyLevel,
+      astrophysicsTechnologyLevel
     },
     economy: {
       metalMineLevel: planet.getBuildingLevel(BuildingType.METAL_MINE),
@@ -217,6 +234,9 @@ function buildPlanetSnapshot(
       queuedDefenceTypes: planet.rBDSFTQ.shipyardQueue
         .filter((entry) => entry.itemKind === 'defence' && entry.defenceType !== null)
         .map((entry) => entry.defenceType as DefenceType),
+      queuedShipTypes: planet.rBDSFTQ.shipyardQueue
+        .filter((entry) => entry.itemKind === 'ship' && entry.shipType !== null)
+        .map((entry) => entry.shipType as ShipType),
       currentResearchType: planet.rBDSFTQ.currentResearchQueue?.technologyType ?? null
     },
     defense: {
@@ -229,6 +249,11 @@ function buildPlanetSnapshot(
       totalInstalledDefenseValue,
       installedCountByType,
       installedValueByType
+    },
+    ships: {
+      installedCountByType: installedShipCountByType,
+      installedValueByType: installedShipValueByType,
+      totalInstalledShipValue
     },
     localResources: {
       metal: Math.max(0, Math.floor(planet.rBDSFTQ.resources.metal)),
@@ -478,6 +503,23 @@ function resolveInstalledDefenseValues(
     }
 
     values[defenceType] = Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount() * amount));
+  }
+
+  return values;
+}
+
+function resolveInstalledShipValues(
+  counts: Map<ShipType, number>
+): Partial<Record<ShipType, number>> {
+  const values: Partial<Record<ShipType, number>> = {};
+
+  for (const [shipType, amount] of counts.entries()) {
+    const blueprint = SHIP_BLUEPRINTS.get(shipType);
+    if (!blueprint || amount <= 0) {
+      continue;
+    }
+
+    values[shipType] = Math.max(0, Math.floor(blueprint.cost.getTotalResourceAmount() * amount));
   }
 
   return values;

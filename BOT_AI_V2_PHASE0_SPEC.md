@@ -813,6 +813,205 @@ Where:
 - use raw resource value for bunker-vs-defense comparisons
 - use completed hostile arrivals/battles in the last `100` turns as the local attack-history signal
 
+## Warfare subsystem scope in the next phase
+
+`Warfare` is the third local-first V2 subsystem.
+
+Scope rules:
+- strictly tied to one planet
+- local military-production planner only
+- no mission launches
+- no target selection
+- no empire-wide allocation
+- no diplomacy-driven production logic
+- no direct resource management
+
+Outward contract:
+- emit `5 goals`
+- emit `5 immediate requests`
+- keep first-class per-planet result output even when no request is emitted
+
+The current high-level design wording about Supervisor-assigned production quota should be treated as obsolete.
+`Warfare` is self-sufficient.
+
+### Warfare goal families
+
+`Warfare` uses three local goal families:
+
+- `CAPACITY`
+- `UNLOCK`
+- `PRODUCTION`
+
+Meaning:
+- `CAPACITY`
+  - improve local ship-production throughput
+  - primarily `SHIPYARD`
+  - secondarily `NANITE_FACTORY`
+- `UNLOCK`
+  - unlock additional ship types for future production
+- `PRODUCTION`
+  - immediate ship-production orders for already unlocked ships
+
+### Warfare construction and prerequisite scope
+
+In-scope construction targets:
+- `SHIPYARD`
+- `NANITE_FACTORY`
+
+Prerequisites:
+- prerequisite building goals are allowed only to remove obstacles
+- prerequisite research goals are allowed only to remove obstacles
+- this should mirror the local dependency-expansion style already used by `Economic` and `Defensive`
+
+### Warfare ship scope
+
+Implementation should use explicit included ship-enum lists grouped by category:
+
+- `combatShips`
+- `cargoShips`
+
+Cargo ships:
+- `TRANSPORTER`
+- `MASS_HAULER`
+- `CARGO_SUPPORT`
+
+Excluded:
+- everything else
+
+This means Phase 0 `Warfare` should include:
+- all combat ships
+- exactly the three cargo ship types listed above
+
+And exclude:
+- probes
+- colonizers
+- repair ships
+- logistics/support specials outside the three cargo types above
+
+### Warfare local progression and unlock gating
+
+For now, `Warfare` should reuse `avg_industry`.
+
+Unlock progression rules:
+- ship unlock progression is hardcoded by threshold bands
+- the unlock threshold for a ship equals that ship's `SHIPYARD` requirement
+- if multiple ships open inside the same threshold band, they compete by `weightedEtc`
+
+This subsystem should not infer or invent a separate strategic quota model in Phase 0.
+
+### Warfare capacity targets
+
+Capacity target rules:
+
+```text
+targetShipyard = round(avg_industry)
+targetNanite = targetShipyard / 2
+```
+
+`SHIPYARD` and `NANITE_FACTORY` both compete under `CAPACITY` rules.
+
+`NANITE_FACTORY` should have a permanent `20%` priority penalty.
+Recommended implementation:
+
+```text
+weightedEtc *= 1.2
+```
+
+This is intentionally explicit instead of folding the penalty into the same positive `bonusFactor` bucket.
+
+### Warfare production distribution
+
+`Warfare` should not spam one already unlocked ship forever unless it keeps clearly winning.
+
+Use a soft distribution rule:
+- compare ship mix by total invested ship value
+- not by raw count
+- apply only a soft bonus, never rigid equalization
+
+### Warfare production-order sizing
+
+One ship-production order should use local income as its target budget.
+
+Recommended exact rule:
+
+```text
+targetBudget =
+  random(1 .. (1 + avg_industry)) turns of local income
+
+amount =
+  floor(targetBudget / unitCost)
+```
+
+This is per ship type and per local planet only.
+
+### Warfare ranking guidance
+
+Use the same general ETC-first mathematical shape as the other local subsystems:
+
+```text
+weightedEtc = totalEtc / bonusFactor
+```
+
+Where:
+- lower score is better
+- positive modifiers stay multiplicative where applicable
+- `NANITE_FACTORY` receives its extra explicit `weightedEtc *= 1.2` penalty after normal scoring
+
+### Warfare selection behavior
+
+The output list is not a pure global top-5.
+It should reserve slots by category.
+
+Target visible list shape:
+- up to `2` structural goals
+  - `CAPACITY`
+  - `UNLOCK`
+- fill the rest with `PRODUCTION` goals if possible
+- if production cannot fill all remaining slots, additional `UNLOCK` goals may appear
+
+If at least one cargo ship is unlocked:
+- reserve exactly `1` cargo production request in the visible list
+
+If no cargo ship is unlocked:
+- do not force a cargo slot
+- let another military production goal fill it
+
+### Warfare structural-visibility rule
+
+If not all in-scope ships are unlocked yet, `Warfare` should not degenerate into production-only output too early.
+
+Structural visibility should remain allowed only when:
+
+```text
+bestStructuralWeightedEtc <= bestProductionWeightedEtc * 1.5
+```
+
+or:
+- no valid production goal exists
+
+Additional shaping rule:
+- if both structural slots are weak, still allow only `1` structural slot and `4` production slots
+
+This keeps progression visible without forcing obviously weak capacity/unlock requests.
+
+### Warfare production-goal rule
+
+For already unlocked ships:
+- the production goal is the immediate production request itself
+
+This should mirror how already unlocked defences are handled in `Defensive`.
+
+### Warfare per-planet no-action result
+
+Like `Economic` and `Defensive`, `Warfare` should emit a first-class per-planet local result even when no outward request is emitted.
+
+That result should include:
+- emitted request count
+- primary goal key
+- secondary goal key
+- no-action reason
+- blocked goal count
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

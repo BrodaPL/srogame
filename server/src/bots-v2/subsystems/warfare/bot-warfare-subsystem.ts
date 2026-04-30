@@ -1,23 +1,22 @@
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
-import { DefenceType } from '../../../../../src/app/models/enums/defence-type.js';
+import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
-import { resolveFusionReactorOperation } from '../../../../../src/app/models/planets/fusion-reactor-operation.js';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../../../../src/app/models/tech/technology-effects.js';
 import type { Technology } from '../../../../../src/app/models/tech/technology.ts';
 import type {
-  BotDefensiveBranch,
-  BotDefensiveGoal,
-  BotDefensivePlanetResult,
   BotPlanetSnapshot,
   BotProposal,
   BotProposalKind,
   BotSubsystem,
   BotSubsystemContext,
-  BotSubsystemResult
+  BotSubsystemResult,
+  BotWarfareBranch,
+  BotWarfareGoal,
+  BotWarfarePlanetResult
 } from '../../bot-v2-types.ts';
 import {
   BUILDING_BLUEPRINTS,
-  DEFENCE_BLUEPRINTS,
+  SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
 
@@ -31,8 +30,6 @@ type SimulatedState = {
 };
 
 type SimulatedThroughput = {
-  availableEnergy: number;
-  usedEnergy: number;
   energyEfficiency: number;
   industryPower: number;
   researchPower: number;
@@ -57,62 +54,87 @@ type ResearchStep = {
 
 type ProductionStep = {
   kind: 'SHIPYARD';
-  defenceType: DefenceType;
+  shipType: ShipType;
   amount: number;
   cost: ResourceAmounts;
   blockers: string[];
 };
 
-type DefensiveGoalEvaluation = BotDefensiveGoal & {
+type WarfareGoalEvaluation = BotWarfareGoal & {
   immediateRequest: BuildingStep | ResearchStep | ProductionStep | null;
   selectedRequestKind: BotProposalKind;
 };
 
-type PlanetDefensiveEvaluationResult = {
+type PlanetWarfareEvaluationResult = {
   proposals: BotProposal[];
-  goals: BotDefensiveGoal[];
-  planetResult: BotDefensivePlanetResult;
+  goals: BotWarfareGoal[];
+  planetResult: BotWarfarePlanetResult;
 };
 
-const NON_BOMB_DEFENCE_TYPES = [
-  DefenceType.SAM_SITE,
-  DefenceType.LIGHT_BEAM_CANNON,
-  DefenceType.ORBITAL_MISSILE_LAUNCHER,
-  DefenceType.BEAM_CANNON,
-  DefenceType.HEAVY_ORBITAL_MISSILE_LAUNCHER,
-  DefenceType.HEAVY_BEAM_CANNON,
-  DefenceType.RAIL_GUN_CANNON
+const CARGO_SHIP_TYPES = [
+  ShipType.TRANSPORTER,
+  ShipType.MASS_HAULER,
+  ShipType.CARGO_SUPPORT
 ] as const;
 
-const ALLOWED_DEFENSIVE_BUILDING_SCOPE = new Set<BuildingType>([
-  BuildingType.BUNKER_NETWORK,
+const COMBAT_SHIP_TYPES = [
+  ShipType.FIGHTER,
+  ShipType.ASSAULT_FIGHTER,
+  ShipType.ATMOSPHERIC_FIGHTER,
+  ShipType.ATMOSPHERIC_BOMBER,
+  ShipType.CORVETTE,
+  ShipType.CRUISER,
+  ShipType.BATTLE_SHIP,
+  ShipType.FRIGATE,
+  ShipType.BATTLE_CRUISER,
+  ShipType.DESTROYER,
+  ShipType.DREADNOUGHT,
+  ShipType.ORBITAL_BOMBER,
+  ShipType.CARRIER,
+  ShipType.TITAN,
+  ShipType.ARMAGEDDON_BOMBER,
+  ShipType.BEHEMOTH,
+  ShipType.FLEET_CARRIER,
+  ShipType.MOTHER_SHIP
+] as const;
+
+const EXCLUDED_WARFARE_SHIP_TYPES = [
+  ShipType.SPY_PROBE,
+  ShipType.REPAIR_DRONE,
+  ShipType.RECYCLER,
+  ShipType.COLONIZER
+] as const;
+
+const INCLUDED_WARFARE_SHIP_TYPES = [
+  ...COMBAT_SHIP_TYPES,
+  ...CARGO_SHIP_TYPES
+] as const;
+// TODO: Add dedicated production-goal handling for MOTHER_SHIP if its order sizing
+// or unlock/selection rules need to differ from the generic ship-production flow.
+
+const ALLOWED_WARFARE_BUILDING_SCOPE = new Set<BuildingType>([
+  BuildingType.ROBOTICS_FACTORY,
+  BuildingType.RESEARCH_LAB,
   BuildingType.SHIPYARD,
-  BuildingType.RESEARCH_LAB
+  BuildingType.NANITE_FACTORY
 ]);
 
 const BONUS_FACTOR_CEILING = 3;
+const NANITE_WEIGHTED_ETC_PENALTY = 1.2;
+const MAX_VISIBLE_GOALS = 5;
+const STRUCTURAL_VISIBILITY_THRESHOLD = 1.5;
 
-const UNLOCK_THRESHOLDS: Array<{ defenceType: DefenceType; threshold: number }> = [
-  { defenceType: DefenceType.SAM_SITE, threshold: 2 },
-  { defenceType: DefenceType.LIGHT_BEAM_CANNON, threshold: 2.5 },
-  { defenceType: DefenceType.ORBITAL_MISSILE_LAUNCHER, threshold: 3.5 },
-  { defenceType: DefenceType.BEAM_CANNON, threshold: 3.5 },
-  { defenceType: DefenceType.HEAVY_ORBITAL_MISSILE_LAUNCHER, threshold: 5 },
-  { defenceType: DefenceType.HEAVY_BEAM_CANNON, threshold: 5 },
-  { defenceType: DefenceType.RAIL_GUN_CANNON, threshold: 5 }
-] as const;
-
-export class BotDefensiveSubsystem implements BotSubsystem {
-  public readonly subsystemId = 'DEFENSIVE' as const;
+export class BotWarfareSubsystem implements BotSubsystem {
+  public readonly subsystemId = 'WARFARE' as const;
 
   public generate(context: BotSubsystemContext): BotSubsystemResult {
     const proposals: BotProposal[] = [];
-    const goals: BotDefensiveGoal[] = [];
-    const planetResults: BotDefensivePlanetResult[] = [];
+    const goals: BotWarfareGoal[] = [];
+    const planetResults: BotWarfarePlanetResult[] = [];
     let blockedPlanetCount = 0;
 
     for (const planet of context.snapshot.planets) {
-      const planetResult = buildPlanetDefensiveResult(context, planet);
+      const planetResult = buildPlanetWarfareResult(context, planet);
       if (planetResult.proposals.length === 0) {
         blockedPlanetCount += 1;
       }
@@ -129,6 +151,7 @@ export class BotDefensiveSubsystem implements BotSubsystem {
       planetResults,
       debug: {
         blockedPlanetCount,
+        excludedShipTypeCount: EXCLUDED_WARFARE_SHIP_TYPES.length,
         goalCount: goals.length,
         planetCount: context.snapshot.planets.length,
         planetResultCount: planetResults.length
@@ -137,23 +160,27 @@ export class BotDefensiveSubsystem implements BotSubsystem {
   }
 }
 
-function buildPlanetDefensiveResult(
+function buildPlanetWarfareResult(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot
-): PlanetDefensiveEvaluationResult {
-  const structuralGoals = [
-    evaluateBunkerGoal(context, planet),
-    ...resolveUnlockCandidates(planet).map((entry) =>
-      evaluateUnlockGoal(context, planet, entry.defenceType, entry.threshold)
-    )
-  ].filter((goal): goal is DefensiveGoalEvaluation => goal !== null)
+): PlanetWarfareEvaluationResult {
+  const capacityGoals = [
+    evaluateCapacityGoal(context, planet, BuildingType.SHIPYARD, resolveTargetShipyardLevel(planet)),
+    evaluateCapacityGoal(context, planet, BuildingType.NANITE_FACTORY, resolveTargetNaniteLevel(planet))
+  ].filter((goal): goal is WarfareGoalEvaluation => goal !== null)
     .sort(compareGoals);
-  const productionGoals = NON_BOMB_DEFENCE_TYPES
-    .map((defenceType) => evaluateProductionGoal(context, planet, defenceType))
-    .filter((goal): goal is DefensiveGoalEvaluation => goal !== null)
+  const unlockGoals = INCLUDED_WARFARE_SHIP_TYPES
+    .filter((shipType) => isShipUnlockBandOpen(planet, shipType) && !isShipUnlocked(planet, shipType))
+    .map((shipType) => evaluateUnlockGoal(context, planet, shipType))
+    .filter((goal): goal is WarfareGoalEvaluation => goal !== null)
+    .sort(compareGoals);
+  const structuralGoals = [...capacityGoals, ...unlockGoals].sort(compareGoals);
+  const productionGoals = INCLUDED_WARFARE_SHIP_TYPES
+    .map((shipType) => evaluateProductionGoal(context, planet, shipType))
+    .filter((goal): goal is WarfareGoalEvaluation => goal !== null)
     .sort(compareGoals);
 
-  const selectedGoals = resolveSelectedGoals(structuralGoals, productionGoals);
+  const selectedGoals = resolveSelectedGoals(planet, structuralGoals, productionGoals);
   const proposals = createPlanetProposals(context, planet, selectedGoals.selectedGoals);
   const blockedGoalCount = [...structuralGoals, ...productionGoals]
     .filter((goal) => goal.blockers.length > 0)
@@ -163,7 +190,7 @@ function buildPlanetDefensiveResult(
     proposals,
     goals: [...structuralGoals, ...productionGoals].map(stripImmediateRequest).sort(compareGoals),
     planetResult: {
-      subsystemId: 'DEFENSIVE',
+      subsystemId: 'WARFARE',
       planetId: planet.planetId,
       targetCoordinates: { ...planet.coordinates },
       branch: selectedGoals.branch,
@@ -178,22 +205,23 @@ function buildPlanetDefensiveResult(
   };
 }
 
-function evaluateBunkerGoal(
+function evaluateCapacityGoal(
   context: BotSubsystemContext,
-  planet: BotPlanetSnapshot
-): DefensiveGoalEvaluation | null {
-  const currentLevel = planet.defense.bunkerLevel;
-  const desiredLevel = resolveDesiredBunkerLevel(planet);
+  planet: BotPlanetSnapshot,
+  buildingType: BuildingType.SHIPYARD | BuildingType.NANITE_FACTORY,
+  desiredLevel: number
+): WarfareGoalEvaluation | null {
+  const currentLevel = getBuildingLevel(planet, buildingType);
   if (desiredLevel <= currentLevel) {
     return null;
   }
 
+  const dependencyState = createSimulationState(planet);
+  const requiredTechLevels = new Map<TechnologyType, number>();
   const buildingSteps: BuildingStep[] = [];
   const blockers: string[] = [];
-  const requiredTechLevels = new Map<TechnologyType, number>();
-  const dependencyState = createSimulationState(planet);
   collectBuildingGoalDependencies(
-    BuildingType.BUNKER_NETWORK,
+    buildingType,
     desiredLevel,
     dependencyState,
     requiredTechLevels,
@@ -203,26 +231,28 @@ function evaluateBunkerGoal(
   );
 
   if (blockers.length > 0 || buildingSteps.length === 0) {
-    return createBlockedGoal(planet, 'BUILDING', currentLevel + 1, blockers, {
+    return createBlockedGoal(planet, 'CAPACITY', currentLevel + 1, blockers, {
       finalTargetKind: 'BUILDING',
-      finalBuildingType: BuildingType.BUNKER_NETWORK,
+      finalBuildingType: buildingType,
       finalTechnologyType: null,
-      finalDefenceType: null,
+      finalShipType: null,
       finalLevel: desiredLevel,
-      finalAmount: null
+      finalAmount: null,
+      branch: 'CAPACITY'
     });
   }
 
   const researchSteps = resolveResearchSteps(planet, requiredTechLevels, buildingSteps);
   const researchBlockers = researchSteps.flatMap((step) => step.blockers);
   if (researchBlockers.length > 0) {
-    return createBlockedGoal(planet, 'BUILDING', currentLevel + 1, researchBlockers, {
+    return createBlockedGoal(planet, 'CAPACITY', currentLevel + 1, researchBlockers, {
       finalTargetKind: 'BUILDING',
-      finalBuildingType: BuildingType.BUNKER_NETWORK,
+      finalBuildingType: buildingType,
       finalTechnologyType: null,
-      finalDefenceType: null,
+      finalShipType: null,
       finalLevel: desiredLevel,
-      finalAmount: null
+      finalAmount: null,
+      branch: 'CAPACITY'
     });
   }
 
@@ -232,28 +262,32 @@ function evaluateBunkerGoal(
   const totalEtc = Math.max(buildingSideEtc, researchSideEtc);
   const immediateRequest = selectImmediateStructuralRequest(planet, buildingSteps, buildingSideEtc, researchSteps, researchSideEtc);
   if (!immediateRequest || !Number.isFinite(totalEtc) || totalEtc <= 0) {
-    return createBlockedGoal(planet, 'BUILDING', currentLevel + 1, ['NO_ACTIONABLE_REQUEST'], {
+    return createBlockedGoal(planet, 'CAPACITY', currentLevel + 1, ['NO_ACTIONABLE_REQUEST'], {
       finalTargetKind: 'BUILDING',
-      finalBuildingType: BuildingType.BUNKER_NETWORK,
+      finalBuildingType: buildingType,
       finalTechnologyType: null,
-      finalDefenceType: null,
+      finalShipType: null,
       finalLevel: desiredLevel,
-      finalAmount: null
+      finalAmount: null,
+      branch: 'CAPACITY'
     });
   }
 
-  const bonusFactor = resolveBunkerBonusFactor(planet, desiredLevel);
-  const weightedEtc = totalEtc / bonusFactor;
+  const bonusFactor = resolveCapacityBonusFactor(planet, buildingType, desiredLevel);
+  let weightedEtc = totalEtc / bonusFactor;
+  if (buildingType === BuildingType.NANITE_FACTORY) {
+    weightedEtc *= NANITE_WEIGHTED_ETC_PENALTY;
+  }
 
   return {
-    goalKey: `defensive:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:bunker:${desiredLevel}`,
-    subsystemId: 'DEFENSIVE',
-    goalFamily: 'BUILDING',
-    branch: 'STRUCTURAL_ONLY',
+    goalKey: `warfare:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:capacity:${buildingType}:${desiredLevel}`,
+    subsystemId: 'WARFARE',
+    goalFamily: 'CAPACITY',
+    branch: 'CAPACITY',
     planetId: planet.planetId,
     targetCoordinates: { ...planet.coordinates },
     finalTargetKind: 'BUILDING',
-    finalBuildingType: BuildingType.BUNKER_NETWORK,
+    finalBuildingType: buildingType,
     finalTechnologyType: null,
     finalDefenceType: null,
     finalShipType: null,
@@ -269,9 +303,10 @@ function evaluateBunkerGoal(
     immediateRequest,
     debug: {
       bonusFactor: roundToTwoDecimals(bonusFactor),
-      bunkerCurrentLevel: currentLevel,
-      bunkerDesiredLevel: desiredLevel,
-      goalFamily: 'BUILDING',
+      currentLevel,
+      desiredLevel,
+      goalFamily: 'CAPACITY',
+      nanitePenaltyApplied: buildingType === BuildingType.NANITE_FACTORY,
       totalEtc: roundToTwoDecimals(totalEtc),
       weightedEtc: roundToTwoDecimals(weightedEtc)
     }
@@ -281,10 +316,9 @@ function evaluateBunkerGoal(
 function evaluateUnlockGoal(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
-  defenceType: DefenceType,
-  threshold: number
-): DefensiveGoalEvaluation | null {
-  const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+  shipType: ShipType
+): WarfareGoalEvaluation | null {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return null;
   }
@@ -295,7 +329,7 @@ function evaluateUnlockGoal(
   const blockers: string[] = [];
 
   for (const requirement of blueprint.buildingRequirements) {
-    if (!ALLOWED_DEFENSIVE_BUILDING_SCOPE.has(requirement.building)) {
+    if (!ALLOWED_WARFARE_BUILDING_SCOPE.has(requirement.building)) {
       blockers.push(`OUT_OF_SCOPE_BUILDING_REQUIREMENT:${requirement.building}`);
       continue;
     }
@@ -325,12 +359,13 @@ function evaluateUnlockGoal(
 
   if (blockers.length > 0) {
     return createBlockedGoal(planet, 'UNLOCK', 1, blockers, {
-      finalTargetKind: 'DEFENCE',
+      finalTargetKind: 'SHIP',
       finalBuildingType: null,
       finalTechnologyType: null,
-      finalDefenceType: defenceType,
+      finalShipType: shipType,
       finalLevel: null,
-      finalAmount: 1
+      finalAmount: 1,
+      branch: 'UNLOCK'
     });
   }
 
@@ -338,12 +373,13 @@ function evaluateUnlockGoal(
   const researchBlockers = researchSteps.flatMap((step) => step.blockers);
   if (researchBlockers.length > 0) {
     return createBlockedGoal(planet, 'UNLOCK', 1, researchBlockers, {
-      finalTargetKind: 'DEFENCE',
+      finalTargetKind: 'SHIP',
       finalBuildingType: null,
       finalTechnologyType: null,
-      finalDefenceType: defenceType,
+      finalShipType: shipType,
       finalLevel: null,
-      finalAmount: 1
+      finalAmount: 1,
+      branch: 'UNLOCK'
     });
   }
 
@@ -354,12 +390,13 @@ function evaluateUnlockGoal(
   const immediateRequest = selectImmediateStructuralRequest(planet, buildingSteps, buildingSideEtc, researchSteps, researchSideEtc);
   if (!immediateRequest || !Number.isFinite(totalEtc) || totalEtc <= 0) {
     return createBlockedGoal(planet, 'UNLOCK', 1, ['NO_ACTIONABLE_REQUEST'], {
-      finalTargetKind: 'DEFENCE',
+      finalTargetKind: 'SHIP',
       finalBuildingType: null,
       finalTechnologyType: null,
-      finalDefenceType: defenceType,
+      finalShipType: shipType,
       finalLevel: null,
-      finalAmount: 1
+      finalAmount: 1,
+      branch: 'UNLOCK'
     });
   }
 
@@ -367,17 +404,17 @@ function evaluateUnlockGoal(
   const weightedEtc = totalEtc / bonusFactor;
 
   return {
-    goalKey: `defensive:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:unlock:${defenceType}`,
-    subsystemId: 'DEFENSIVE',
+    goalKey: `warfare:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:unlock:${shipType}`,
+    subsystemId: 'WARFARE',
     goalFamily: 'UNLOCK',
-    branch: 'STRUCTURAL_ONLY',
+    branch: 'UNLOCK',
     planetId: planet.planetId,
     targetCoordinates: { ...planet.coordinates },
-    finalTargetKind: 'DEFENCE',
+    finalTargetKind: 'SHIP',
     finalBuildingType: null,
     finalTechnologyType: null,
-    finalDefenceType: defenceType,
-    finalShipType: null,
+    finalDefenceType: null,
+    finalShipType: shipType,
     finalLevel: null,
     finalAmount: 1,
     weightedEtc,
@@ -390,9 +427,8 @@ function evaluateUnlockGoal(
     immediateRequest,
     debug: {
       avgIndustryLevel: roundToTwoDecimals(planet.defense.avgIndustryLevel),
-      bonusFactor,
       goalFamily: 'UNLOCK',
-      threshold,
+      shipyardRequirement: resolveShipyardUnlockThreshold(shipType),
       totalEtc: roundToTwoDecimals(totalEtc),
       weightedEtc: roundToTwoDecimals(weightedEtc)
     }
@@ -402,56 +438,58 @@ function evaluateUnlockGoal(
 function evaluateProductionGoal(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
-  defenceType: DefenceType
-): DefensiveGoalEvaluation | null {
-  if (!isDefenseUnlocked(planet, defenceType)) {
+  shipType: ShipType
+): WarfareGoalEvaluation | null {
+  if (!isShipUnlocked(planet, shipType)) {
     return null;
   }
 
-  const immediateRequest = resolveProductionRequest(planet, defenceType);
-  const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+  const immediateRequest = resolveProductionRequest(planet, shipType);
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return null;
   }
 
   if (!immediateRequest) {
     return createBlockedGoal(planet, 'PRODUCTION', 1, ['NO_ACTIONABLE_REQUEST'], {
-      finalTargetKind: 'DEFENCE',
+      finalTargetKind: 'SHIP',
       finalBuildingType: null,
       finalTechnologyType: null,
-      finalDefenceType: defenceType,
+      finalShipType: shipType,
       finalLevel: null,
-      finalAmount: 1
+      finalAmount: 1,
+      branch: 'PRODUCTION'
     });
   }
 
   const totalEtc = estimateProductionEtc(planet, immediateRequest);
   if (!Number.isFinite(totalEtc) || totalEtc <= 0) {
     return createBlockedGoal(planet, 'PRODUCTION', immediateRequest.amount, ['ETC_NOT_FINITE'], {
-      finalTargetKind: 'DEFENCE',
+      finalTargetKind: 'SHIP',
       finalBuildingType: null,
       finalTechnologyType: null,
-      finalDefenceType: defenceType,
+      finalShipType: shipType,
       finalLevel: null,
-      finalAmount: immediateRequest.amount
+      finalAmount: immediateRequest.amount,
+      branch: 'PRODUCTION'
     });
   }
 
-  const bonusFactor = resolveProductionBonusFactor(planet, defenceType);
+  const bonusFactor = resolveProductionBonusFactor(planet, shipType);
   const weightedEtc = totalEtc / bonusFactor;
 
   return {
-    goalKey: `defensive:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:produce:${defenceType}:${immediateRequest.amount}`,
-    subsystemId: 'DEFENSIVE',
+    goalKey: `warfare:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:produce:${shipType}:${immediateRequest.amount}`,
+    subsystemId: 'WARFARE',
     goalFamily: 'PRODUCTION',
-    branch: 'PRODUCTION_ONLY',
+    branch: 'PRODUCTION',
     planetId: planet.planetId,
     targetCoordinates: { ...planet.coordinates },
-    finalTargetKind: 'DEFENCE',
+    finalTargetKind: 'SHIP',
     finalBuildingType: null,
     finalTechnologyType: null,
-    finalDefenceType: defenceType,
-    finalShipType: null,
+    finalDefenceType: null,
+    finalShipType: shipType,
     finalLevel: null,
     finalAmount: immediateRequest.amount,
     weightedEtc,
@@ -465,6 +503,7 @@ function evaluateProductionGoal(
     debug: {
       bonusFactor: roundToTwoDecimals(bonusFactor),
       goalFamily: 'PRODUCTION',
+      isCargoShip: isCargoShipType(shipType),
       orderAmount: immediateRequest.amount,
       queueRemainingEtc: planet.power.shipyardQueueRemainingEtc,
       totalEtc: roundToTwoDecimals(totalEtc),
@@ -474,59 +513,139 @@ function evaluateProductionGoal(
 }
 
 function resolveSelectedGoals(
-  structuralGoals: DefensiveGoalEvaluation[],
-  productionGoals: DefensiveGoalEvaluation[]
+  planet: BotPlanetSnapshot,
+  structuralGoals: WarfareGoalEvaluation[],
+  productionGoals: WarfareGoalEvaluation[]
 ): {
-  branch: BotDefensiveBranch;
-  selectedGoals: DefensiveGoalEvaluation[];
+  branch: BotWarfareBranch;
+  selectedGoals: WarfareGoalEvaluation[];
 } {
   const actionableStructuralGoals = structuralGoals.filter(isActionableGoal);
   const actionableProductionGoals = productionGoals.filter(isActionableGoal);
+  const selectedGoals: WarfareGoalEvaluation[] = [];
+  const selectedRequestKeys = new Set<string>();
+  const selectedShipTypes = new Set<ShipType>();
 
-  if (actionableProductionGoals.length <= 0) {
-    return {
-      branch: 'STRUCTURAL_ONLY',
-      selectedGoals: actionableStructuralGoals.slice(0, 2)
-    };
+  const bestStructural = actionableStructuralGoals[0] ?? null;
+  const bestProduction = actionableProductionGoals[0] ?? null;
+  const allowStructural = bestStructural !== null
+    && (
+      bestProduction === null
+      || bestStructural.weightedEtc <= (bestProduction.weightedEtc * STRUCTURAL_VISIBILITY_THRESHOLD)
+    );
+  const initialStructuralLimit = allowStructural
+    ? Math.min(2, actionableStructuralGoals.length)
+    : 0;
+
+  pushUniqueGoals(planet, actionableStructuralGoals, selectedGoals, selectedRequestKeys, selectedShipTypes, initialStructuralLimit);
+
+  const cargoProductionGoals = actionableProductionGoals.filter((goal) => isCargoShipType(goal.finalShipType));
+  if (cargoProductionGoals.length > 0) {
+    pushUniqueGoals(planet, cargoProductionGoals, selectedGoals, selectedRequestKeys, selectedShipTypes, 1);
   }
 
-  if (actionableStructuralGoals.length <= 0) {
-    return {
-      branch: 'PRODUCTION_ONLY',
-      selectedGoals: actionableProductionGoals.slice(0, 2)
-    };
-  }
+  const nonCargoProductionGoals = actionableProductionGoals.filter((goal) => !isCargoShipType(goal.finalShipType));
+  pushUniqueGoals(
+    planet,
+    nonCargoProductionGoals,
+    selectedGoals,
+    selectedRequestKeys,
+    selectedShipTypes,
+    Math.max(0, MAX_VISIBLE_GOALS - selectedGoals.length)
+  );
 
+  pushUniqueGoals(
+    planet,
+    cargoProductionGoals,
+    selectedGoals,
+    selectedRequestKeys,
+    selectedShipTypes,
+    Math.max(0, MAX_VISIBLE_GOALS - selectedGoals.length)
+  );
+
+  pushUniqueGoals(
+    planet,
+    actionableStructuralGoals.slice(initialStructuralLimit),
+    selectedGoals,
+    selectedRequestKeys,
+    selectedShipTypes,
+    Math.max(0, MAX_VISIBLE_GOALS - selectedGoals.length)
+  );
+
+  const branch = selectedGoals[0]?.branch ?? resolveFallbackBranch(actionableStructuralGoals, actionableProductionGoals);
   return {
-    branch: 'STRUCTURE_AND_PRODUCTION',
-    selectedGoals: [
-      actionableStructuralGoals[0],
-      actionableProductionGoals[0]
-    ].filter((goal): goal is DefensiveGoalEvaluation => goal !== undefined)
+    branch,
+    selectedGoals
   };
 }
 
-function resolveUnlockCandidates(
-  planet: BotPlanetSnapshot
-): Array<{ defenceType: DefenceType; threshold: number }> {
-  return UNLOCK_THRESHOLDS.filter((entry) =>
-    planet.defense.avgIndustryLevel >= entry.threshold
-    && !isDefenseUnlocked(planet, entry.defenceType)
-  );
+function pushUniqueGoals(
+  planet: BotPlanetSnapshot,
+  candidates: WarfareGoalEvaluation[],
+  selectedGoals: WarfareGoalEvaluation[],
+  selectedRequestKeys: Set<string>,
+  selectedShipTypes: Set<ShipType>,
+  limit: number
+): void {
+  if (limit <= 0) {
+    return;
+  }
+
+  for (const candidate of candidates) {
+    if (selectedGoals.length >= MAX_VISIBLE_GOALS || limit <= 0) {
+      break;
+    }
+    if (!candidate.immediateRequest) {
+      continue;
+    }
+    if (candidate.finalShipType && candidate.goalFamily === 'PRODUCTION' && selectedShipTypes.has(candidate.finalShipType)) {
+      continue;
+    }
+
+    const requestKey = resolveRequestKey(planet, candidate.immediateRequest);
+    if (selectedRequestKeys.has(requestKey)) {
+      continue;
+    }
+
+    selectedGoals.push(candidate);
+    selectedRequestKeys.add(requestKey);
+    if (candidate.finalShipType && candidate.goalFamily === 'PRODUCTION') {
+      selectedShipTypes.add(candidate.finalShipType);
+    }
+    limit -= 1;
+  }
 }
 
-function isDefenseUnlocked(planet: BotPlanetSnapshot, defenceType: DefenceType): boolean {
-  const installedCount = planet.defense.installedCountByType[defenceType] ?? 0;
-  if (installedCount > 0 || planet.queues.queuedDefenceTypes.includes(defenceType)) {
+function resolveFallbackBranch(
+  structuralGoals: WarfareGoalEvaluation[],
+  productionGoals: WarfareGoalEvaluation[]
+): BotWarfareBranch {
+  if (structuralGoals.length <= 0) {
+    return 'PRODUCTION';
+  }
+  if (productionGoals.length <= 0) {
+    return structuralGoals[0]?.branch ?? 'CAPACITY';
+  }
+  return structuralGoals[0]?.weightedEtc <= productionGoals[0]?.weightedEtc
+    ? structuralGoals[0].branch
+    : 'PRODUCTION';
+}
+
+function isShipUnlockBandOpen(planet: BotPlanetSnapshot, shipType: ShipType): boolean {
+  return planet.defense.avgIndustryLevel >= resolveShipyardUnlockThreshold(shipType);
+}
+
+function isShipUnlocked(planet: BotPlanetSnapshot, shipType: ShipType): boolean {
+  const installedCount = planet.ships.installedCountByType[shipType] ?? 0;
+  if (installedCount > 0 || planet.queues.queuedShipTypes.includes(shipType)) {
     return true;
   }
 
-  const threshold = UNLOCK_THRESHOLDS.find((entry) => entry.defenceType === defenceType)?.threshold ?? Number.MAX_SAFE_INTEGER;
-  if (planet.defense.avgIndustryLevel < threshold) {
+  if (!isShipUnlockBandOpen(planet, shipType)) {
     return false;
   }
 
-  const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return false;
   }
@@ -538,16 +657,22 @@ function isDefenseUnlocked(planet: BotPlanetSnapshot, defenceType: DefenceType):
   );
 }
 
-function resolveDesiredBunkerLevel(planet: BotPlanetSnapshot): number {
-  const baseTarget = Math.max(0, Math.floor(planet.defense.avgIndustryLevel - 1));
-  return Math.min(resolveMaxBunkerLevel(planet), baseTarget);
+function resolveTargetShipyardLevel(planet: BotPlanetSnapshot): number {
+  return Math.max(0, Math.round(planet.defense.avgIndustryLevel));
 }
 
-function resolveMaxBunkerLevel(planet: BotPlanetSnapshot): number {
-  const sizeBonus = planet.defense.planetSize <= 100
-    ? 0
-    : Math.floor((planet.defense.planetSize - 100) / 10);
-  return 2 + sizeBonus + planet.defense.recentHostileAttackStep;
+function resolveTargetNaniteLevel(planet: BotPlanetSnapshot): number {
+  return Math.max(0, Math.floor(resolveTargetShipyardLevel(planet) / 2));
+}
+
+function resolveShipyardUnlockThreshold(shipType: ShipType): number {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  const shipyardRequirement = blueprint.buildingRequirements.find((requirement) => requirement.building === BuildingType.SHIPYARD);
+  return shipyardRequirement ? Math.ceil(shipyardRequirement.level) : Number.MAX_SAFE_INTEGER;
 }
 
 function collectBuildingGoalDependencies(
@@ -578,15 +703,14 @@ function collectBuildingGoalDependencies(
     const nextLevel = currentLevel + 1;
 
     for (const requirement of blueprint.buildingRequirements) {
-      if (!ALLOWED_DEFENSIVE_BUILDING_SCOPE.has(requirement.building)) {
-        const requiredLevel = Math.ceil(nextLevel * requirement.level);
+      const requiredLevel = Math.ceil(nextLevel * requirement.level);
+      if (!ALLOWED_WARFARE_BUILDING_SCOPE.has(requirement.building)) {
         if ((state.buildingLevels.get(requirement.building) ?? 0) < requiredLevel) {
           blockers.push(`OUT_OF_SCOPE_BUILDING_REQUIREMENT:${requirement.building}`);
         }
         continue;
       }
 
-      const requiredLevel = Math.ceil(nextLevel * requirement.level);
       if ((state.buildingLevels.get(requirement.building) ?? 0) >= requiredLevel) {
         continue;
       }
@@ -696,12 +820,7 @@ function collectResearchDependencies(
   while (currentLevel < targetLevel) {
     const nextLevel = currentLevel + 1;
 
-    ensureResearchBuildingRequirements(
-      technology,
-      nextLevel,
-      state,
-      buildingSteps
-    );
+    ensureResearchBuildingRequirements(technology, nextLevel, state, buildingSteps);
     for (const requirement of technology.techRequirements) {
       const requiredLevel = Math.ceil(nextLevel * requirement.level);
       if ((state.techLevels.get(requirement.tech) ?? 0) < requiredLevel) {
@@ -731,7 +850,7 @@ function ensureResearchBuildingRequirements(
   buildingSteps: BuildingStep[]
 ): void {
   for (const requirement of technology.buildingRequirements) {
-    if (!ALLOWED_DEFENSIVE_BUILDING_SCOPE.has(requirement.building)) {
+    if (!ALLOWED_WARFARE_BUILDING_SCOPE.has(requirement.building)) {
       continue;
     }
 
@@ -881,21 +1000,21 @@ function resolveActionableResearchRequest(
 
 function resolveProductionRequest(
   planet: BotPlanetSnapshot,
-  defenceType: DefenceType
+  shipType: ShipType
 ): ProductionStep | null {
   if (planet.queues.shipyardQueueLength >= planet.power.maxShipyardQueueLength) {
     return null;
   }
 
-  const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return null;
   }
 
-  const amount = resolveProductionOrderAmount(planet, defenceType);
+  const amount = resolveProductionOrderAmount(planet, shipType);
   return {
     kind: 'SHIPYARD',
-    defenceType,
+    shipType,
     amount,
     cost: multiplyResources(normalizeResources(blueprint.cost), amount),
     blockers: []
@@ -904,77 +1023,72 @@ function resolveProductionRequest(
 
 function resolveProductionOrderAmount(
   planet: BotPlanetSnapshot,
-  defenceType: DefenceType
+  shipType: ShipType
 ): number {
-  const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return 1;
   }
 
   const localIncomeTotal = planet.economy.income.metal + planet.economy.income.crystal + planet.economy.income.deuterium;
-  const orderFactor = resolveDeterministicOrderFactor(planet, defenceType);
+  const targetBudget = Math.max(
+    1,
+    Math.floor(localIncomeTotal * resolveDeterministicOrderFactor(planet, shipType))
+  );
   const totalCost = Math.max(1, Math.floor(blueprint.cost.getTotalResourceAmount()));
-  const targetBudget = Math.max(totalCost, Math.floor(localIncomeTotal * orderFactor));
 
   return Math.max(1, Math.floor(targetBudget / totalCost));
 }
 
-function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, defenceType: DefenceType): number {
-  const seed = `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${planet.name}:${defenceType}`;
+function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, shipType: ShipType): number {
+  const seed = `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${planet.name}:${shipType}`;
   let hash = 0;
   for (const character of seed) {
     hash = ((hash * 31) + character.charCodeAt(0)) % 100000;
   }
 
-  return 1 + ((hash % 11) / 10);
+  const maxExtraFactor = Math.max(0, planet.defense.avgIndustryLevel);
+  return 1 + (((hash % 1000) / 1000) * maxExtraFactor);
 }
 
-function resolveBunkerBonusFactor(planet: BotPlanetSnapshot, desiredLevel: number): number {
+function resolveCapacityBonusFactor(
+  planet: BotPlanetSnapshot,
+  buildingType: BuildingType.SHIPYARD | BuildingType.NANITE_FACTORY,
+  desiredLevel: number
+): number {
+  const currentLevel = getBuildingLevel(planet, buildingType);
+  const gap = Math.max(0, desiredLevel - currentLevel);
+  const gapBonus = buildingType === BuildingType.SHIPYARD
+    ? gap * 0.15
+    : gap * 0.1;
+  return Math.min(BONUS_FACTOR_CEILING, Math.max(1, 1 + gapBonus));
+}
+
+function resolveProductionBonusFactor(
+  planet: BotPlanetSnapshot,
+  shipType: ShipType
+): number {
   let bonusFactor = 1;
-  bonusFactor *= 1 + (planet.defense.recentHostileAttackStep * 0.5);
-  bonusFactor *= 1 + (Math.max(0, desiredLevel - planet.defense.bunkerLevel) * 0.1);
-  bonusFactor *= 1 + resolveEquilibriumBonusRatio(
-    planet.defense.totalInstalledDefenseValue,
-    planet.defense.totalBunkerValue
-  );
+  bonusFactor *= 1 + resolveDistributionBonusRatio(planet, shipType);
   return Math.min(BONUS_FACTOR_CEILING, Math.max(1, bonusFactor));
-}
-
-function resolveProductionBonusFactor(planet: BotPlanetSnapshot, defenceType: DefenceType): number {
-  let bonusFactor = 1;
-  bonusFactor *= 1 + resolveEquilibriumBonusRatio(
-    planet.defense.totalBunkerValue,
-    planet.defense.totalInstalledDefenseValue
-  );
-  bonusFactor *= 1 + resolveDistributionBonusRatio(planet, defenceType);
-  return Math.min(BONUS_FACTOR_CEILING, Math.max(1, bonusFactor));
-}
-
-function resolveEquilibriumBonusRatio(leadingValue: number, trailingValue: number): number {
-  if (leadingValue <= trailingValue) {
-    return 0;
-  }
-
-  const trailingBase = Math.max(1, trailingValue);
-  return Math.max(0, (leadingValue - trailingValue) / trailingBase) / 2;
 }
 
 function resolveDistributionBonusRatio(
   planet: BotPlanetSnapshot,
-  defenceType: DefenceType
+  shipType: ShipType
 ): number {
-  const unlockedTypes = NON_BOMB_DEFENCE_TYPES.filter((type) => isDefenseUnlocked(planet, type));
+  const unlockedTypes = INCLUDED_WARFARE_SHIP_TYPES.filter((type) => isShipUnlocked(planet, type));
   if (unlockedTypes.length <= 1) {
     return 0;
   }
 
   const maxInstalledValue = unlockedTypes.reduce((maxValue, type) =>
-    Math.max(maxValue, planet.defense.installedValueByType[type] ?? 0), 0);
+    Math.max(maxValue, planet.ships.installedValueByType[type] ?? 0), 0);
   if (maxInstalledValue <= 0) {
     return 0;
   }
 
-  const candidateValue = planet.defense.installedValueByType[defenceType] ?? 0;
+  const candidateValue = planet.ships.installedValueByType[shipType] ?? 0;
   const missingRatio = Math.max(0, (maxInstalledValue - candidateValue) / maxInstalledValue);
   return missingRatio * 0.35;
 }
@@ -982,10 +1096,9 @@ function resolveDistributionBonusRatio(
 function createPlanetProposals(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
-  goals: DefensiveGoalEvaluation[]
+  goals: WarfareGoalEvaluation[]
 ): BotProposal[] {
   const proposals: BotProposal[] = [];
-  const proposalsByRequest = new Map<string, BotProposal>();
 
   for (const [index, goal] of goals.entries()) {
     const request = goal.immediateRequest;
@@ -993,66 +1106,39 @@ function createPlanetProposals(
       continue;
     }
 
-    const requestKey = resolveRequestKey(planet, request);
-    const existing = proposalsByRequest.get(requestKey);
-    if (existing) {
-      existing.summary = `${existing.summary} Also advances secondary goal ${resolveGoalTargetLabel(goal)}.`;
-      existing.debug.requestRole = 'Primary+Secondary';
-      existing.debug.secondaryGoalKey = goal.goalKey;
-      existing.debug.secondaryGoalTarget = resolveGoalTargetLabel(goal);
-      existing.debug.sharedImmediateRequest = true;
-      continue;
-    }
-
-    const proposal = createProposalFromGoal(context, planet, goal, index);
-    proposalsByRequest.set(requestKey, proposal);
-    proposals.push(proposal);
+    proposals.push(createProposalFromGoal(context, planet, goal, index));
   }
 
   return proposals;
 }
 
-function resolveRequestKey(
-  planet: BotPlanetSnapshot,
-  request: BuildingStep | ResearchStep | ProductionStep
-): string {
-  if (request.kind === 'BUILDING') {
-    return `building:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.buildingType}:${request.nextLevel}`;
-  }
-  if (request.kind === 'RESEARCH') {
-    return `research:${request.technologyType}:${request.nextLevel}`;
-  }
-
-  return `shipyard:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.defenceType}:${request.amount}`;
-}
-
 function createProposalFromGoal(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
-  goal: DefensiveGoalEvaluation,
+  goal: WarfareGoalEvaluation,
   selectedIndex: number
 ): BotProposal {
   const request = goal.immediateRequest;
   if (!request) {
-    throw new Error(`Defensive goal ${goal.goalKey} has no immediate request.`);
+    throw new Error(`Warfare goal ${goal.goalKey} has no immediate request.`);
   }
 
-  const requestLabel = selectedIndex === 0 ? 'Primary request' : 'Secondary request';
-  const goalLabel = selectedIndex === 0 ? 'Primary goal' : 'Secondary goal';
+  const requestLabel = resolveRankLabel(selectedIndex, 'request');
+  const goalLabel = resolveRankLabel(selectedIndex, 'goal');
   const summary = request.kind === 'BUILDING'
     ? `${requestLabel}: queue ${request.buildingType} for ${goalLabel} ${resolveGoalTargetLabel(goal)} on ${planet.name}.`
     : request.kind === 'RESEARCH'
       ? `${requestLabel}: research ${request.technologyType} for ${goalLabel} ${resolveGoalTargetLabel(goal)} on ${planet.name}.`
-      : `${requestLabel}: produce ${request.amount} ${request.defenceType} for ${goalLabel} on ${planet.name}.`;
-  const urgency = goal.goalFamily === 'BUILDING'
-    ? 78
+      : `${requestLabel}: produce ${request.amount} ${request.shipType} for ${goalLabel} on ${planet.name}.`;
+  const urgency = goal.goalFamily === 'CAPACITY'
+    ? 74
     : goal.goalFamily === 'UNLOCK'
-      ? 72
-      : 65;
+      ? 70
+      : 66;
 
   return {
     proposalId: `${goal.goalKey}:${selectedIndex}:${context.snapshot.turn}`,
-    subsystemId: 'DEFENSIVE',
+    subsystemId: 'WARFARE',
     kind: goal.selectedRequestKind,
     status: 'PROPOSED',
     goalKey: goal.goalKey,
@@ -1062,8 +1148,8 @@ function createProposalFromGoal(
     targetCoordinates: { ...planet.coordinates },
     expectedValue: Math.max(1, Math.round((1000 / Math.max(1, goal.weightedEtc)) * 100)),
     urgency,
-    risk: 8,
-    confidence: 76,
+    risk: 10,
+    confidence: 74,
     requestedResources: { ...request.cost },
     requestPayload: request.kind === 'BUILDING'
       ? {
@@ -1083,8 +1169,8 @@ function createProposalFromGoal(
           x: planet.coordinates.x,
           y: planet.coordinates.y,
           z: planet.coordinates.z,
-          itemKind: 'defence',
-          defenceType: request.defenceType,
+          itemKind: 'ship',
+          shipType: request.shipType,
           amount: request.amount
         },
     blockers: [],
@@ -1105,10 +1191,10 @@ function createProposalFromGoal(
         ? request.buildingType
         : request.kind === 'RESEARCH'
           ? request.technologyType
-          : request.defenceType,
+          : request.shipType,
       immediateRequestAmount: request.kind === 'SHIPYARD' ? request.amount : null,
       primaryGoalKey: goal.goalKey,
-      secondaryGoalKey: null,
+      secondaryGoalKey: selectedIndex === 1 ? goal.goalKey : null,
       selectedIndex: selectedIndex + 1,
       sharedImmediateRequest: false
     }
@@ -1120,20 +1206,20 @@ function resolveDedupeKey(
   request: BuildingStep | ResearchStep | ProductionStep
 ): string {
   if (request.kind === 'BUILDING') {
-    return `defensive:building:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.buildingType}`;
+    return `warfare:building:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.buildingType}`;
   }
   if (request.kind === 'RESEARCH') {
-    return `defensive:research:${request.technologyType}`;
+    return `warfare:research:${request.technologyType}`;
   }
 
-  return `defensive:shipyard:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.defenceType}`;
+  return `warfare:shipyard:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.shipType}`;
 }
 
 function resolvePlanetNoActionReason(
   planet: BotPlanetSnapshot,
-  structuralGoals: DefensiveGoalEvaluation[],
-  productionGoals: DefensiveGoalEvaluation[],
-  branch: BotDefensiveBranch
+  structuralGoals: WarfareGoalEvaluation[],
+  productionGoals: WarfareGoalEvaluation[],
+  branch: BotWarfareBranch
 ): string {
   const allGoals = [...structuralGoals, ...productionGoals];
   if (allGoals.length <= 0) {
@@ -1144,14 +1230,11 @@ function resolvePlanetNoActionReason(
     return allGoals[0]?.blockers[0] ?? 'ALL_GOALS_BLOCKED';
   }
 
-  if (branch === 'STRUCTURAL_ONLY' && planet.queues.buildingQueueLength >= planet.power.maxBuildingQueueLength && planet.queues.hasActiveResearch) {
+  if (branch !== 'PRODUCTION' && planet.queues.buildingQueueLength >= planet.power.maxBuildingQueueLength && planet.queues.hasActiveResearch) {
     return 'STRUCTURAL_QUEUES_BLOCKED';
   }
-  if (branch === 'PRODUCTION_ONLY' && planet.queues.shipyardQueueLength >= planet.power.maxShipyardQueueLength) {
+  if (branch === 'PRODUCTION' && planet.queues.shipyardQueueLength >= planet.power.maxShipyardQueueLength) {
     return 'SHIPYARD_QUEUE_SATURATED';
-  }
-  if (branch === 'STRUCTURE_AND_PRODUCTION' && planet.queues.shipyardQueueLength >= planet.power.maxShipyardQueueLength) {
-    return 'PRODUCTION_QUEUE_SATURATED';
   }
 
   return 'NO_ACTIONABLE_REQUEST';
@@ -1159,31 +1242,31 @@ function resolvePlanetNoActionReason(
 
 function createBlockedGoal(
   planet: BotPlanetSnapshot,
-  goalFamily: 'UNLOCK' | 'BUILDING' | 'PRODUCTION',
+  goalFamily: 'CAPACITY' | 'UNLOCK' | 'PRODUCTION',
   fallbackAmount: number,
   blockers: string[],
   finalTarget: {
-    finalTargetKind: 'BUILDING' | 'DEFENCE';
+    finalTargetKind: 'BUILDING' | 'SHIP';
     finalBuildingType: BuildingType | null;
     finalTechnologyType: TechnologyType | null;
-    finalDefenceType: DefenceType | null;
-    finalShipType?: null;
+    finalShipType: ShipType | null;
     finalLevel: number | null;
     finalAmount: number | null;
+    branch: BotWarfareBranch;
   }
-): DefensiveGoalEvaluation {
+): WarfareGoalEvaluation {
   return {
-    goalKey: `defensive:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${goalFamily}:${finalTarget.finalBuildingType ?? finalTarget.finalDefenceType ?? fallbackAmount}`,
-    subsystemId: 'DEFENSIVE',
+    goalKey: `warfare:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${goalFamily}:${finalTarget.finalBuildingType ?? finalTarget.finalShipType ?? fallbackAmount}`,
+    subsystemId: 'WARFARE',
     goalFamily,
-    branch: goalFamily === 'PRODUCTION' ? 'PRODUCTION_ONLY' : 'STRUCTURAL_ONLY',
+    branch: finalTarget.branch,
     planetId: planet.planetId,
     targetCoordinates: { ...planet.coordinates },
     finalTargetKind: finalTarget.finalTargetKind,
     finalBuildingType: finalTarget.finalBuildingType,
     finalTechnologyType: finalTarget.finalTechnologyType,
-    finalDefenceType: finalTarget.finalDefenceType,
-    finalShipType: null,
+    finalDefenceType: null,
+    finalShipType: finalTarget.finalShipType,
     finalLevel: finalTarget.finalLevel,
     finalAmount: finalTarget.finalAmount,
     weightedEtc: Number.MAX_SAFE_INTEGER,
@@ -1202,7 +1285,7 @@ function createBlockedGoal(
   };
 }
 
-function stripImmediateRequest(goal: DefensiveGoalEvaluation): BotDefensiveGoal {
+function stripImmediateRequest(goal: WarfareGoalEvaluation): BotWarfareGoal {
   return {
     goalKey: goal.goalKey,
     subsystemId: goal.subsystemId,
@@ -1227,11 +1310,11 @@ function stripImmediateRequest(goal: DefensiveGoalEvaluation): BotDefensiveGoal 
   };
 }
 
-function isActionableGoal(goal: DefensiveGoalEvaluation): boolean {
+function isActionableGoal(goal: WarfareGoalEvaluation): boolean {
   return goal.immediateRequest !== null && goal.blockers.length === 0;
 }
 
-function compareGoals(left: DefensiveGoalEvaluation | BotDefensiveGoal, right: DefensiveGoalEvaluation | BotDefensiveGoal): number {
+function compareGoals(left: WarfareGoalEvaluation | BotWarfareGoal, right: WarfareGoalEvaluation | BotWarfareGoal): number {
   return left.weightedEtc - right.weightedEtc
     || left.totalEtc - right.totalEtc
     || resolveGoalTargetLabel(left).localeCompare(resolveGoalTargetLabel(right));
@@ -1239,19 +1322,19 @@ function compareGoals(left: DefensiveGoalEvaluation | BotDefensiveGoal, right: D
 
 function resolveGoalTargetLabel(
   goal: Pick<
-    BotDefensiveGoal,
-    'goalFamily' | 'finalBuildingType' | 'finalTechnologyType' | 'finalDefenceType' | 'finalShipType' | 'finalAmount'
+    BotWarfareGoal,
+    'goalFamily' | 'finalBuildingType' | 'finalTechnologyType' | 'finalShipType' | 'finalAmount'
   >
 ): string {
-  if (goal.goalFamily === 'BUILDING') {
-    return goal.finalBuildingType ?? 'Building';
+  if (goal.goalFamily === 'CAPACITY') {
+    return goal.finalBuildingType ?? 'capacity';
   }
   if (goal.goalFamily === 'UNLOCK') {
-    return goal.finalDefenceType ? `unlock ${goal.finalDefenceType}` : 'unlock';
+    return goal.finalShipType ? `unlock ${goal.finalShipType}` : 'unlock';
   }
-  return goal.finalDefenceType
-    ? `${goal.finalAmount ?? 1} ${goal.finalDefenceType}`
-    : 'defence production';
+  return goal.finalShipType
+    ? `${goal.finalAmount ?? 1} ${goal.finalShipType}`
+    : 'ship production';
 }
 
 function createSimulationState(planet: BotPlanetSnapshot): SimulatedState {
@@ -1267,10 +1350,9 @@ function createSimulationState(planet: BotPlanetSnapshot): SimulatedState {
       [BuildingType.CRYSTAL_STORAGE, planet.economy.crystalStorageLevel],
       [BuildingType.DEUTERIUM_TANK, planet.economy.deuteriumTankLevel],
       [BuildingType.ROBOTICS_FACTORY, planet.economy.roboticsLevel],
-      [BuildingType.NANITE_FACTORY, planet.economy.naniteLevel],
       [BuildingType.SHIPYARD, planet.economy.shipyardLevel],
       [BuildingType.RESEARCH_LAB, planet.economy.researchLabLevel],
-      [BuildingType.BUNKER_NETWORK, planet.defense.bunkerLevel]
+      [BuildingType.NANITE_FACTORY, planet.economy.naniteLevel]
     ]),
     techLevels: new Map<TechnologyType, number>([
       [TechnologyType.ENERGY_TECHNOLOGY, planet.tech.energyTechnologyLevel],
@@ -1282,7 +1364,12 @@ function createSimulationState(planet: BotPlanetSnapshot): SimulatedState {
       [TechnologyType.ARMOUR_TECHNOLOGY, planet.tech.armourTechnologyLevel],
       [TechnologyType.RAILGUNS_WEAPONS, planet.tech.railgunsWeaponsLevel],
       [TechnologyType.BEAMS_WEAPONS, planet.tech.beamsWeaponsLevel],
-      [TechnologyType.MISSILES_WEAPONS, planet.tech.missilesWeaponsLevel]
+      [TechnologyType.MISSILES_WEAPONS, planet.tech.missilesWeaponsLevel],
+      [TechnologyType.FUSION_DRIVE, planet.tech.fusionDriveLevel],
+      [TechnologyType.HYPERSPACE_DRIVE, planet.tech.hyperspaceDriveLevel],
+      [TechnologyType.HYPERSPACE_TECHNOLOGY, planet.tech.hyperspaceTechnologyLevel],
+      [TechnologyType.ESPIONAGE_TECHNOLOGY, planet.tech.espionageTechnologyLevel],
+      [TechnologyType.ASTROPHYSICS_TECHNOLOGY, planet.tech.astrophysicsTechnologyLevel]
     ])
   };
 }
@@ -1298,60 +1385,16 @@ function resolveSimulatedThroughput(
   planet: BotPlanetSnapshot,
   state: SimulatedState
 ): SimulatedThroughput {
-  const energyTechnologyLevel = state.techLevels.get(TechnologyType.ENERGY_TECHNOLOGY) ?? 0;
-  const adaptiveTechnologyLevel = state.techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? 0;
-  const computerTechnologyLevel = state.techLevels.get(TechnologyType.COMPUTER_TECHNOLOGY) ?? 0;
-  const intergalacticResearchNetworkLevel = state.techLevels.get(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK) ?? 0;
-  const usedEnergy = resolveSimulatedUsedEnergy(state);
-  const solarProduction = getRawBuildingProductionValue(BuildingType.SOLAR_WIND_GEOTHERMAL, state);
-  const nuclearProduction = getRawBuildingProductionValue(BuildingType.NUCLEAR_PLANT, state);
-  const deuteriumSynthesizerProduction = getRawBuildingProductionValue(BuildingType.DEUTERIUM_SYNTHESIZER, state);
-  const fusionLevel = state.buildingLevels.get(BuildingType.FUSION_REACTOR) ?? 0;
-  const fusionOperation = resolveFusionReactorOperation({
-    selectedStage: fusionLevel,
-    maxStage: fusionLevel,
-    structuralUtilization: 1,
-    energyTechnologyLevel,
-    adaptiveTechnologyLevel,
-    solarProduction,
-    nuclearProduction,
-    otherEnergyUsed: usedEnergy,
-    energyModifierRES: planet.modifiers.solarEnergy,
-    energyModifierNuclear: planet.modifiers.nuclearEnergy,
-    deuteriumSynthesizerProduction,
-    deuteriumModifier: planet.modifiers.deuterium,
-    fusionPowerAtStage: (stage) => getRawBuildingStageProductionValue(BuildingType.FUSION_REACTOR, stage, 'production1'),
-    fusionDeuteriumAtStage: (stage) => getRawBuildingStageProductionValue(BuildingType.FUSION_REACTOR, stage, 'production2')
-  });
-  const availableEnergy = Math.max(0, Math.floor(
-    (
-      (solarProduction * planet.modifiers.solarEnergy)
-      + (nuclearProduction * planet.modifiers.nuclearEnergy)
-      + fusionOperation.powerOutput
-    )
-    * (1 + ((Math.max(0, energyTechnologyLevel) * 2) / 100))
-  ));
-  const energyEfficiency = resolveEnergyEfficiency(availableEnergy, usedEnergy);
-  const roboticsLevel = state.buildingLevels.get(BuildingType.ROBOTICS_FACTORY) ?? 0;
-  const naniteLevel = state.buildingLevels.get(BuildingType.NANITE_FACTORY) ?? 0;
-  const researchLabLevel = state.buildingLevels.get(BuildingType.RESEARCH_LAB) ?? 0;
-  const shipyardLevel = state.buildingLevels.get(BuildingType.SHIPYARD) ?? 0;
-  const roboticsPower = roboticsLevel <= 0
-    ? 5
-    : getRawBuildingStageProductionValue(BuildingType.ROBOTICS_FACTORY, roboticsLevel, 'production1');
-  const naniteMultiplier = naniteLevel <= 0
-    ? 1
-    : getRawBuildingStageProductionValue(BuildingType.NANITE_FACTORY, naniteLevel, 'production1');
-  const researchLabPower = researchLabLevel <= 0
-    ? 0
-    : getRawBuildingStageProductionValue(BuildingType.RESEARCH_LAB, researchLabLevel, 'production1');
-  const shipyardBasePower = shipyardLevel <= 0
-    ? 0
-    : getRawBuildingStageProductionValue(BuildingType.SHIPYARD, shipyardLevel, 'production1');
+  const adaptiveTechnologyLevel = state.techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? planet.tech.adaptiveTechnologyLevel;
+  const computerTechnologyLevel = state.techLevels.get(TechnologyType.COMPUTER_TECHNOLOGY) ?? planet.tech.computerTechnologyLevel;
+  const intergalacticResearchNetworkLevel = state.techLevels.get(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK) ?? planet.tech.intergalacticResearchNetworkLevel;
+  const energyEfficiency = resolveEnergyEfficiency(planet);
+  const naniteMultiplier = resolveBuildingProductionValue1Exact(BuildingType.NANITE_FACTORY, state.buildingLevels) || 1;
+  const roboticsPower = resolveBuildingProductionValue1(BuildingType.ROBOTICS_FACTORY, state.buildingLevels) || 5;
+  const shipyardBasePower = resolveBuildingProductionValue1(BuildingType.SHIPYARD, state.buildingLevels);
+  const researchLabBasePower = resolveBuildingProductionValue1(BuildingType.RESEARCH_LAB, state.buildingLevels);
 
   return {
-    availableEnergy,
-    usedEnergy,
     energyEfficiency,
     industryPower: Math.max(0, Math.floor(
       roboticsPower
@@ -1361,7 +1404,7 @@ function resolveSimulatedThroughput(
       * energyEfficiency
     )),
     researchPower: Math.max(0, Math.floor(
-      researchLabPower
+      researchLabBasePower
       * planet.modifiers.science
       * researchPowerMultiplier(
         computerTechnologyLevel,
@@ -1380,63 +1423,42 @@ function resolveSimulatedThroughput(
   };
 }
 
-function resolveSimulatedUsedEnergy(state: SimulatedState): number {
-  let usedEnergy = 0;
-  for (const [buildingType, level] of state.buildingLevels.entries()) {
-    if (level <= 0 || buildingType === BuildingType.FUSION_REACTOR) {
-      continue;
-    }
-
-    usedEnergy += getMaxPowerConsumption(buildingType, level);
+function resolveEnergyEfficiency(planet: BotPlanetSnapshot): number {
+  const usedEnergy = Math.max(0, planet.economy.usedEnergy);
+  const availableEnergy = Math.max(0, planet.economy.availableEnergy);
+  if (usedEnergy <= 0) {
+    return 1;
   }
 
-  return Math.max(0, Math.floor(usedEnergy));
+  return Math.max(0, Math.min(1, availableEnergy / usedEnergy));
 }
 
-function getMaxPowerConsumption(buildingType: BuildingType, level: number): number {
-  const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
-  if (!blueprint || level <= 0) {
-    return 0;
-  }
-
-  return Math.max(0, level * (blueprint.powerConsumption ?? 0));
-}
-
-function getRawBuildingProductionValue(
+function resolveBuildingProductionValue1(
   buildingType: BuildingType,
-  state: SimulatedState
+  buildingLevels: Map<BuildingType, number>
 ): number {
-  return getRawBuildingStageProductionValue(
-    buildingType,
-    state.buildingLevels.get(buildingType) ?? 0,
-    'production1'
-  );
-}
-
-function getRawBuildingStageProductionValue(
-  buildingType: BuildingType,
-  level: number,
-  key: 'production1' | 'production2'
-): number {
+  const level = buildingLevels.get(buildingType) ?? 0;
   if (level <= 0) {
     return 0;
   }
 
   const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
-  if (!blueprint) {
+  const value = blueprint?.production1[level - 1] ?? 0;
+  return Number.isFinite(value) ? Math.floor(value) : 0;
+}
+
+function resolveBuildingProductionValue1Exact(
+  buildingType: BuildingType,
+  buildingLevels: Map<BuildingType, number>
+): number {
+  const level = buildingLevels.get(buildingType) ?? 0;
+  if (level <= 0) {
     return 0;
   }
 
-  const value = blueprint[key][level - 1];
+  const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
+  const value = blueprint?.production1[level - 1] ?? 0;
   return Number.isFinite(value) ? value : 0;
-}
-
-function resolveEnergyEfficiency(availableEnergy: number, usedEnergy: number): number {
-  if (usedEnergy <= 0 || availableEnergy >= usedEnergy) {
-    return 1;
-  }
-
-  return Math.max(0, Math.min(1, availableEnergy / usedEnergy));
 }
 
 function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingType): number {
@@ -1453,12 +1475,6 @@ function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingType)
       return planet.economy.nuclearLevel;
     case BuildingType.FUSION_REACTOR:
       return planet.economy.fusionLevel;
-    case BuildingType.METAL_STORAGE:
-      return planet.economy.metalStorageLevel;
-    case BuildingType.CRYSTAL_STORAGE:
-      return planet.economy.crystalStorageLevel;
-    case BuildingType.DEUTERIUM_TANK:
-      return planet.economy.deuteriumTankLevel;
     case BuildingType.ROBOTICS_FACTORY:
       return planet.economy.roboticsLevel;
     case BuildingType.NANITE_FACTORY:
@@ -1467,8 +1483,12 @@ function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingType)
       return planet.economy.shipyardLevel;
     case BuildingType.RESEARCH_LAB:
       return planet.economy.researchLabLevel;
-    case BuildingType.BUNKER_NETWORK:
-      return planet.defense.bunkerLevel;
+    case BuildingType.METAL_STORAGE:
+      return planet.economy.metalStorageLevel;
+    case BuildingType.CRYSTAL_STORAGE:
+      return planet.economy.crystalStorageLevel;
+    case BuildingType.DEUTERIUM_TANK:
+      return planet.economy.deuteriumTankLevel;
     default:
       return 0;
   }
@@ -1496,6 +1516,16 @@ function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: Technolog
       return planet.tech.beamsWeaponsLevel;
     case TechnologyType.MISSILES_WEAPONS:
       return planet.tech.missilesWeaponsLevel;
+    case TechnologyType.FUSION_DRIVE:
+      return planet.tech.fusionDriveLevel;
+    case TechnologyType.HYPERSPACE_DRIVE:
+      return planet.tech.hyperspaceDriveLevel;
+    case TechnologyType.HYPERSPACE_TECHNOLOGY:
+      return planet.tech.hyperspaceTechnologyLevel;
+    case TechnologyType.ESPIONAGE_TECHNOLOGY:
+      return planet.tech.espionageTechnologyLevel;
+    case TechnologyType.ASTROPHYSICS_TECHNOLOGY:
+      return planet.tech.astrophysicsTechnologyLevel;
     default:
       return 0;
   }
@@ -1503,14 +1533,14 @@ function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: Technolog
 
 function normalizeResources(resources: { metal: number; crystal: number; deuterium: number }): ResourceAmounts {
   return {
-    metal: Math.max(0, Math.floor(resources.metal)),
-    crystal: Math.max(0, Math.floor(resources.crystal)),
-    deuterium: Math.max(0, Math.floor(resources.deuterium))
+    metal: Math.max(0, Math.floor(resources.metal ?? 0)),
+    crystal: Math.max(0, Math.floor(resources.crystal ?? 0)),
+    deuterium: Math.max(0, Math.floor(resources.deuterium ?? 0))
   };
 }
 
 function multiplyResources(resources: ResourceAmounts, multiplier: number): ResourceAmounts {
-  const normalizedMultiplier = Math.max(1, Math.floor(multiplier));
+  const normalizedMultiplier = Math.max(0, Math.floor(multiplier));
   return {
     metal: resources.metal * normalizedMultiplier,
     crystal: resources.crystal * normalizedMultiplier,
@@ -1523,13 +1553,37 @@ function getTotalResourceAmount(resources: ResourceAmounts): number {
 }
 
 function normalizeFiniteEtc(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    return 0;
-  }
-
-  return Math.floor(value);
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : Number.MAX_SAFE_INTEGER;
 }
 
 function roundToTwoDecimals(value: number): number {
+  if (!Number.isFinite(value)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
   return Math.round(value * 100) / 100;
+}
+
+function isCargoShipType(shipType: ShipType | null): shipType is typeof CARGO_SHIP_TYPES[number] {
+  return shipType !== null && (CARGO_SHIP_TYPES as readonly ShipType[]).includes(shipType);
+}
+
+function resolveRequestKey(
+  planet: BotPlanetSnapshot,
+  request: BuildingStep | ResearchStep | ProductionStep
+): string {
+  if (request.kind === 'BUILDING') {
+    return `building:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.buildingType}:${request.nextLevel}`;
+  }
+  if (request.kind === 'RESEARCH') {
+    return `research:${request.technologyType}:${request.nextLevel}`;
+  }
+
+  return `shipyard:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.shipType}:${request.amount}`;
+}
+
+function resolveRankLabel(index: number, noun: 'goal' | 'request'): string {
+  const labels = ['Primary', 'Secondary', 'Tertiary', 'Quaternary', 'Quinary'];
+  const prefix = labels[index] ?? `#${index + 1}`;
+  return `${prefix} ${noun}`;
 }
