@@ -575,28 +575,167 @@ based on:
 
 * the same planetary factors that affect jump-gate capacity.
 
-### Future mission note
+### Phase 2 global mission scope
 
-Phase 2 of this subsystem should later own development missions.
+Phase 2 should add executable global mission output for:
 
-It will need a new mission type:
+* `LOGISTICS`
+* `INTEL`
 
+`COLONIZATION` remains planned, but actual colonization launches should still be deferred until a later focused pass.
+
+The local phase-1 building/production output should remain intact.
+Phase 2 should add a **separate global mission-output section** instead of mixing missions into local per-planet queue outputs.
+
+### Phase 2 executable mission types
+
+Phase 2 executable mission types:
+
+* `TRANSPORT`
 * `ARMAMENT_DELIVERY`
+* `SPY`
 
-Definition:
+In this subsystem:
 
-* works like `TRANSPORT`,
-* can also leave `PLANETARY_BOMB`s and small ships on the target planet,
-* requires hangar capacity to start the mission.
+* `TRANSPORT` is used for resource-only support,
+* `ARMAMENT_DELIVERY` is used when `REPAIR_DRONE`s are included and may also carry resources,
+* `SPY` is used only for colonization-intel maintenance on unoccupied planets.
 
-### Intel / colonization loop
+Important:
 
-Future colonization support should follow this loop:
+* `ARMAMENT_DELIVERY` already exists as a mission type and should be reused here.
+* In `Strategic Development`, `ARMAMENT_DELIVERY` should carry only:
 
-1. for all owned planets, scan planets in radius at least `2 + P`, where `P` is current owned planet count,
-2. choose the best unoccupied colonization target,
-3. colonize it,
-4. when technology allows new planets again, repeat from step 1.
+  * resources,
+  * `REPAIR_DRONE`.
+
+* `PLANETARY_BOMB`s and small-ship reinforcement should be handled by a different strategic subsystem.
+
+### Phase 2 mission-output cap
+
+The global mission section should use a soft cap:
+
+```text
+missionRequestCap =
+  imperiumFleetCap * currentAvailabilityForThisSubsystem
+  + ownedPlanetAmount
+```
+
+Where:
+
+```text
+imperiumFleetCap = 4 + COMPUTER_TECHNOLOGY
+```
+
+The intended default availability target for this subsystem is up to `40%` of fleet cap.
+
+### Phase 2 logistics-source qualification
+
+A planet should qualify as a support/logistics source only if:
+
+* `avg_industry >= 4`,
+* it has local surplus,
+* it has a valid cargo or hangar-capacity fleet available.
+
+Recently colonized or undeveloped planets are targets only, not sources.
+
+For this subsystem, `recently colonized` means:
+
+* `avg_industry < 2`
+
+### Phase 2 repair-drone delivery priority
+
+Repair-drone delivery should use hard priority bands:
+
+1. planets with damaged buildings,
+2. recently colonized / undeveloped planets,
+3. planets with negative industry or shipyard planetary modifiers.
+
+Target need should consider:
+
+* missing building HP / repair workload,
+* industry-capacity penalty modifiers,
+* recently colonized status.
+
+### Phase 2 resource shortage / surplus model
+
+Target shortage should combine:
+
+* queued building / production costs,
+* modifier-adjusted local scarcity.
+
+Source surplus should combine:
+
+* modifier-adjusted resource dominance,
+* reserve-floor safety.
+
+Recommended reserve floor:
+
+```text
+reserveFloor = max(3 turns of local income, 25% of storage)
+```
+
+Undeveloped planets may always be intentionally oversupplied beyond storage capacity.
+
+### Phase 2 payload rules
+
+Resource payload:
+
+```text
+resourcePayload =
+  min(targetShortage, sourceSurplus, fleetCargoCapacity)
+```
+
+Repair-drone payload rules:
+
+* when drones are sent, use `ARMAMENT_DELIVERY`,
+* one mission may carry both resources and `REPAIR_DRONE`s,
+* send all available drones, limited by ship hangar capacity,
+* do not drain the source if:
+
+```text
+sourceIndustryPower <= targetIndustryPower * 2
+```
+
+When both `TRANSPORT` and `ARMAMENT_DELIVERY` are valid:
+
+* prefer `ARMAMENT_DELIVERY` whenever drones are included.
+
+Overlapping logistics requests should merge by:
+
+* source-target pair,
+* mission type.
+
+Mission generation should be mixed:
+
+* source-first for exporting abundance,
+* target-first for shortage / repair / industry-penalty support.
+
+### Phase 2 intel / colonization loop
+
+Colonization-intel maintenance should follow this loop:
+
+1. scan all eligible unoccupied planets in radius `2 + P`, where `P` is current owned planet count,
+2. treat a planet as needing scan when:
+
+   * no relevant espionage report exists,
+   * or the latest relevant report is older than `200` turns,
+
+3. prefer never-scanned planets over stale-refresh scans,
+4. rank colonization candidates by:
+
+   * planet size,
+   * positive planetary modifiers,
+   * industry modifier weighted `x2.0`,
+   * resource modifiers weighted `x1.5`,
+
+5. reject colonization candidates smaller than `140`,
+6. choose the best unoccupied colonization target later,
+7. actual `COLONIZE` mission launch remains deferred to a later planning/implementation pass.
+
+Spy origin for this loop:
+
+* any valid probe source may be used.
 
 ### Architecture TODO
 

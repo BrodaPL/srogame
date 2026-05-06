@@ -1143,32 +1143,174 @@ When possible:
 
 This is intentionally not a single mixed top-4 list.
 
-### Strategic Development future mission note
+### Strategic Development phase-2 global mission scope
 
-Phase 2 should later add executable global mission goals for:
+Phase 2 should add executable global mission output for:
 
 - `LOGISTICS`
-- `COLONIZATION`
 - `INTEL`
 
-That phase will also require a new mission type:
+`COLONIZATION` remains planned, but actual colonization launches should stay deferred until a later focused pass.
 
+The current local phase-1 building/production output should remain intact.
+Phase 2 should add a separate global mission-output section instead of mixing missions into local per-planet queue results.
+
+### Strategic Development phase-2 executable mission types
+
+Executable mission types:
+
+- `TRANSPORT`
 - `ARMAMENT_DELIVERY`
+- `SPY`
 
-Definition:
+Meaning:
 
-- behaves like `TRANSPORT`
-- can also leave `PLANETARY_BOMB`s and small ships on the target planet
-- requires hangar capacity to start
+- `TRANSPORT`
+  - resource-only support
+- `ARMAMENT_DELIVERY`
+  - used when `REPAIR_DRONE`s are included
+  - may also carry resources
+- `SPY`
+  - colonization-intel maintenance on unoccupied planets only
 
-### Strategic Development future intel / colonization loop
+Important:
 
-Future colonization support should follow this loop:
+- `ARMAMENT_DELIVERY` already exists and should be reused
+- in this subsystem it should carry only:
+  - resources
+  - `REPAIR_DRONE`
+- `PLANETARY_BOMB`s and small-ship reinforcement stay out of scope here and belong to a different strategic subsystem
 
-1. for all owned planets, scan planets in radius at least `2 + P`, where `P` is current owned planet count
-2. choose the best unoccupied colonization target
-3. colonize it
-4. when technology allows new planets again, repeat from step 1
+### Strategic Development phase-2 mission-output cap
+
+The global mission-output section should use a soft cap:
+
+```text
+missionRequestCap =
+  imperiumFleetCap * currentAvailabilityForThisSubsystem
+  + ownedPlanetAmount
+```
+
+Where:
+
+```text
+imperiumFleetCap = 4 + COMPUTER_TECHNOLOGY
+```
+
+The intended default availability target for this subsystem is up to `40%` of fleet cap.
+
+### Strategic Development phase-2 logistics-source qualification
+
+A planet may act as a support/logistics source only if:
+
+- `avg_industry >= 4`
+- it has local surplus
+- it has a valid cargo or ship-hangar-capacity fleet available
+
+Recently colonized / undeveloped planets are targets only, not sources.
+
+For this subsystem:
+
+```text
+recentlyColonized = avg_industry < 2
+```
+
+### Strategic Development phase-2 repair-drone delivery priority
+
+Repair-drone delivery should use hard target-priority bands:
+
+1. planets with damaged buildings
+2. recently colonized / undeveloped planets
+3. planets with negative industry or shipyard planetary modifiers
+
+Target need should consider:
+
+- missing building HP / repair workload
+- industry-capacity penalty modifiers
+- recently colonized status
+
+### Strategic Development phase-2 shortage / surplus model
+
+Target shortage should combine:
+
+- queued building / production costs
+- modifier-adjusted local scarcity
+
+Source surplus should combine:
+
+- modifier-adjusted resource dominance
+- reserve-floor safety
+
+Reserve floor:
+
+```text
+reserveFloor = max(3 turns of local income, 25% of storage)
+```
+
+Undeveloped planets may always be intentionally oversupplied beyond storage capacity.
+
+### Strategic Development phase-2 payload rules
+
+Resource payload:
+
+```text
+resourcePayload =
+  min(targetShortage, sourceSurplus, fleetCargoCapacity)
+```
+
+Repair-drone payload rules:
+
+- when drones are included, use `ARMAMENT_DELIVERY`
+- one mission may carry both resources and `REPAIR_DRONE`s
+- send all available drones, limited by ship hangar capacity
+- do not drain the source if:
+
+```text
+sourceIndustryPower <= targetIndustryPower * 2
+```
+
+When both `TRANSPORT` and `ARMAMENT_DELIVERY` are otherwise valid:
+
+- prefer `ARMAMENT_DELIVERY` whenever drones are included
+
+Overlapping logistics requests should merge by:
+
+- source-target pair
+- mission type
+
+Mission generation should be mixed:
+
+- source-first for exporting abundance
+- target-first for shortage / repair / industry-penalty support
+
+### Strategic Development phase-2 intel / colonization loop
+
+Intel maintenance rules:
+
+- scan all eligible unoccupied planets in radius `2 + P`, where `P` is current owned planet count
+- treat a planet as needing scan when:
+  - no relevant espionage report exists
+  - or the latest relevant report is older than `200` turns
+- prefer never-scanned planets over stale-refresh scans
+- allow any valid probe source
+
+Colonization candidate ranking basis:
+
+- planet size
+- positive planetary modifiers
+- industry modifier weighted `x2.0`
+- resource modifiers weighted `x1.5`
+
+Reject colonization candidates smaller than:
+
+```text
+140
+```
+
+Actual colonization execution stays deferred:
+
+- pick best colonization candidates through intel first
+- do not launch `COLONIZE` from this phase yet
 
 ### Strategic Development architecture TODO
 

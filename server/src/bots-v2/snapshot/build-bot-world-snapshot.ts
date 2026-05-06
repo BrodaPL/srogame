@@ -15,6 +15,7 @@ import type { Planet } from '../../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../../src/app/models/player.ts';
 import type {
   BotEmpireSnapshot,
+  BotIntelCandidateSnapshot,
   BotPlanetMaturityStage,
   BotPlanetSnapshot,
   BotV2FeatureFlags,
@@ -70,13 +71,17 @@ function buildEmpireSnapshot(
     relation.status === 'WAR'
     && (relation.playerAId === player.playerId || relation.playerBId === player.playerId)
   );
+  const computerTechnologyLevel = player.getTechLevel(TechnologyType.COMPUTER_TECHNOLOGY);
 
   return {
     ownedPlanetCount: planets.length,
+    computerTechnologyLevel,
+    imperiumFleetCap: 4 + Math.max(0, computerTechnologyLevel),
     totalResources,
     atWar,
     hasCriticalEnergyProblem: planets.some((planet) => planet.blockers.energyStarved),
-    hasCriticalStorageProblem: planets.some((planet) => planet.blockers.storageBlocked)
+    hasCriticalStorageProblem: planets.some((planet) => planet.blockers.storageBlocked),
+    intelCandidates: resolveIntelCandidates(galaxy, player, planets.length)
   };
 }
 
@@ -165,10 +170,15 @@ function buildPlanetSnapshot(
   const totalInstalledDefenseValue = Object.values(installedValueByType)
     .reduce((sum, value) => sum + value, 0);
   const shipCounts = ManyShips.countByType(planet.rBDSFTQ.ships);
+  const undamagedShipCounts = ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
+  const damagedShipCounts = ManyShips.damagedCountByType(planet.rBDSFTQ.ships);
   const installedShipCountByType = Object.fromEntries(shipCounts.entries()) as Partial<Record<ShipType, number>>;
+  const undamagedShipCountByType = Object.fromEntries(undamagedShipCounts.entries()) as Partial<Record<ShipType, number>>;
+  const damagedShipCountByType = Object.fromEntries(damagedShipCounts.entries()) as Partial<Record<ShipType, number>>;
   const installedShipValueByType = resolveInstalledShipValues(shipCounts);
   const totalInstalledShipValue = Object.values(installedShipValueByType)
     .reduce((sum, value) => sum + value, 0);
+  const buildingDamageSummary = resolveBuildingDamageSummary(planet);
   const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
   const recentHostileAttackCountLast100Turns = resolveRecentHostileAttackCountLast100Turns(
     player,
@@ -274,10 +284,13 @@ function buildPlanetSnapshot(
       installedValueByType
     },
     ships: {
+      undamagedCountByType: undamagedShipCountByType,
+      damagedCountByType: damagedShipCountByType,
       installedCountByType: installedShipCountByType,
       installedValueByType: installedShipValueByType,
       totalInstalledShipValue
     },
+    infrastructure: buildingDamageSummary,
     localResources: {
       metal: Math.max(0, Math.floor(planet.rBDSFTQ.resources.metal)),
       crystal: Math.max(0, Math.floor(planet.rBDSFTQ.resources.crystal)),
@@ -548,6 +561,38 @@ function resolveInstalledShipValues(
   return values;
 }
 
+function resolveBuildingDamageSummary(planet: Planet): {
+  damagedBuildingCount: number;
+  missingBuildingStructuralPoints: number;
+} {
+  let damagedBuildingCount = 0;
+  let missingBuildingStructuralPoints = 0;
+
+  for (const [buildingType, level] of planet.rBDSFTQ.buildingsLevels.entries()) {
+    if (level <= 0) {
+      continue;
+    }
+
+    const maxStructuralPoints = planet.getMaxBuildingStructuralPoints(buildingType);
+    if (maxStructuralPoints <= 0) {
+      continue;
+    }
+
+    const currentStructuralPoints = planet.getCurrentBuildingStructuralPoints(buildingType);
+    if (currentStructuralPoints >= maxStructuralPoints) {
+      continue;
+    }
+
+    damagedBuildingCount += 1;
+    missingBuildingStructuralPoints += Math.max(0, maxStructuralPoints - currentStructuralPoints);
+  }
+
+  return {
+    damagedBuildingCount,
+    missingBuildingStructuralPoints
+  };
+}
+
 function resolveCompletedBuildingInvestment(buildingType: BuildingType, level: number): number {
   const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
   if (!blueprint || level <= 0) {
@@ -602,4 +647,92 @@ function resolveHostileAttackStep(attackCount: number): number {
     return 3;
   }
   return 4;
+}
+
+function resolveIntelCandidates(
+  galaxy: Galaxy,
+  player: Player,
+  ownedPlanetCount: number
+): BotIntelCandidateSnapshot[] {
+  const scanRadius = 2 + Math.max(0, ownedPlanetCount);
+  const ownedCoordinates = player.planets.map((planet) => ({
+    x: planet.basicInfo.solarSystem.coordinates.x,
+    y: planet.basicInfo.solarSystem.coordinates.y
+  }));
+  const candidates: BotIntelCandidateSnapshot[] = [];
+
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (planet.info.ownerId !== null) {
+          continue;
+        }
+
+        if (!ownedCoordinates.some((coordinates) =>
+          resolveSystemScanRadiusDistance(coordinates, system.coordinates) <= scanRadius
+        )) {
+          continue;
+        }
+
+        if (planet.basicInfo.size < 140) {
+          continue;
+        }
+
+        const report = planet.lastReportData.get(player.playerId) ?? null;
+        const lastRelevantReportAge = report === null
+          ? null
+          : Math.max(0, galaxy.currentTurn - report.createdTurn);
+        const neverScanned = report === null;
+        const needsScan = neverScanned || lastRelevantReportAge === null || lastRelevantReportAge > 200;
+        if (!needsScan) {
+          continue;
+        }
+
+        const effectiveParameters = planet.getEffectivePlanetaryParameters();
+        candidates.push({
+          coordinates: {
+            x: system.coordinates.x,
+            y: system.coordinates.y,
+            z: planet.basicInfo.order
+          },
+          size: planet.basicInfo.size,
+          industryModifier: effectiveParameters.industryModifier,
+          metalModifier: effectiveParameters.metalModifier,
+          crystalModifier: effectiveParameters.crystalModifier,
+          deuteriumModifier: effectiveParameters.deuteriumModifier,
+          neverScanned,
+          lastRelevantReportAge,
+          colonizationScore: resolveColonizationScore(planet)
+        });
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function resolveSystemScanRadiusDistance(
+  left: { x: number; y: number },
+  right: { x: number; y: number }
+): number {
+  return Math.max(
+    Math.abs(left.x - right.x),
+    Math.abs(left.y - right.y)
+  );
+}
+
+function resolveColonizationScore(planet: Planet): number {
+  const effectiveParameters = planet.getEffectivePlanetaryParameters();
+  const positiveIndustry = Math.max(0, effectiveParameters.industryModifier - 1);
+  const positiveResourceSpread = (
+    Math.max(0, effectiveParameters.metalModifier - 1)
+    + Math.max(0, effectiveParameters.crystalModifier - 1)
+    + Math.max(0, effectiveParameters.deuteriumModifier - 1)
+  );
+
+  return (
+    planet.basicInfo.size
+    + (positiveIndustry * 200)
+    + (positiveResourceSpread * 150)
+  );
 }

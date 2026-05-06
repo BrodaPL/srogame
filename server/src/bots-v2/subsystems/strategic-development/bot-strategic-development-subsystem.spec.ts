@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
+import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
 import { PlayerType } from '../../../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
@@ -109,6 +110,41 @@ describe('BotStrategicDevelopmentSubsystem', () => {
       && goal.finalShipType === ShipType.REPAIR_DRONE
     )).toBe(true);
   });
+
+  it('emits an armament-delivery mission for repair support from a developed planet', () => {
+    const { galaxy, bot, sourcePlanet, targetPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    configureLowIndustrySupportTarget(targetPlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 2);
+    targetPlanet.setCurrentBuildingStructuralPoints(BuildingType.METAL_MINE, 1);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+    const missionProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ARMAMENT_DELIVERY
+    );
+
+    expect(missionProposal).toBeDefined();
+    expect(missionProposal?.requestPayload.origin).toEqual({ x: 0, y: 0, z: 1 });
+    expect(missionProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 2 });
+  });
+
+  it('emits spy missions for eligible unscanned colonization targets', () => {
+    const { galaxy, bot, sourcePlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 2);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SPY
+    )).toBe(true);
+  });
 });
 
 function runStrategicDevelopmentSubsystem(galaxy: Galaxy, bot: Player) {
@@ -164,6 +200,41 @@ function createBotWorld() {
   return { galaxy, bot, planet };
 }
 
+function createSupportWorld() {
+  const system = new SolarSystem('BotSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const sourcePlanet = Planet.createStartingPlanet('BotSys I', 1, system, 1);
+  const targetPlanet = Planet.createStartingPlanet('BotSys II', 2, system, 1);
+  const unownedPlanet = Planet.createRandomEmpty('BotSys III', 3, system, null);
+  unownedPlanet.basicInfo.baseSize = 160;
+  system.planets[0] = sourcePlanet;
+  system.planets[1] = targetPlanet;
+  system.planets[2] = unownedPlanet;
+
+  const bot = new Player(
+    1,
+    'Bot-1',
+    [sourcePlanet, targetPlanet],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+  const galaxy = new Galaxy(
+    'Bot Test',
+    [bot],
+    [[system]],
+    1,
+    [],
+    1,
+    new Map(),
+    new Map([[1, bot]]),
+    new Map(),
+    new Map([[bot.playerName, bot.playerId]])
+  );
+
+  return { galaxy, bot, sourcePlanet, targetPlanet, unownedPlanet };
+}
+
 function configureBaseStrategicDevelopmentPlanet(planet: Planet): void {
   planet.setBuildingLevel(BuildingType.METAL_MINE, 1);
   planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 1);
@@ -181,6 +252,38 @@ function configureBaseStrategicDevelopmentPlanet(planet: Planet): void {
   planet.rBDSFTQ.buildingQueue = [];
   planet.rBDSFTQ.shipyardQueue = [];
   planet.rBDSFTQ.currentResearchQueue = null;
+}
+
+function configureDevelopedSupportSource(planet: Planet): void {
+  configureBaseStrategicDevelopmentPlanet(planet);
+  planet.setBuildingLevel(BuildingType.METAL_MINE, 5);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 5);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 5);
+  planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
+  planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 6);
+  planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 3);
+  planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+  planet.setBuildingLevel(BuildingType.SHIPYARD, 4);
+  planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 2);
+  planet.rBDSFTQ.resources = new ResourcesPack(60000, 50000, 40000);
+  planet.info.planetaryParameters.industryModifier = 1.5;
+}
+
+function configureLowIndustrySupportTarget(planet: Planet): void {
+  configureBaseStrategicDevelopmentPlanet(planet);
+  planet.setBuildingLevel(BuildingType.METAL_MINE, 1);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 1);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 1);
+  planet.setBuildingLevel(BuildingType.METAL_STORAGE, 1);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 1);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 1);
+  planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 3);
+  planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+  planet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+  planet.rBDSFTQ.resources = new ResourcesPack(50, 50, 50);
+  planet.info.planetaryParameters.industryModifier = 0.4;
 }
 
 function setSupportShipTech(bot: Player): void {

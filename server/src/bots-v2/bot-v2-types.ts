@@ -58,6 +58,8 @@ export type BotWorldSnapshot = {
 
 export type BotEmpireSnapshot = {
   ownedPlanetCount: number;
+  computerTechnologyLevel: number;
+  imperiumFleetCap: number;
   totalResources: {
     metal: number;
     crystal: number;
@@ -66,6 +68,19 @@ export type BotEmpireSnapshot = {
   atWar: boolean;
   hasCriticalEnergyProblem: boolean;
   hasCriticalStorageProblem: boolean;
+  intelCandidates: BotIntelCandidateSnapshot[];
+};
+
+export type BotIntelCandidateSnapshot = {
+  coordinates: { x: number; y: number; z: number };
+  size: number;
+  industryModifier: number;
+  metalModifier: number;
+  crystalModifier: number;
+  deuteriumModifier: number;
+  neverScanned: boolean;
+  lastRelevantReportAge: number | null;
+  colonizationScore: number;
 };
 
 export type BotPlanetSnapshot = {
@@ -169,9 +184,15 @@ export type BotPlanetSnapshot = {
     installedValueByType: Partial<Record<DefenceType, number>>;
   };
   ships: {
+    undamagedCountByType: Partial<Record<ShipType, number>>;
+    damagedCountByType: Partial<Record<ShipType, number>>;
     installedCountByType: Partial<Record<ShipType, number>>;
     installedValueByType: Partial<Record<ShipType, number>>;
     totalInstalledShipValue: number;
+  };
+  infrastructure: {
+    damagedBuildingCount: number;
+    missingBuildingStructuralPoints: number;
   };
   localResources: {
     metal: number;
