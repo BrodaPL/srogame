@@ -133,6 +133,9 @@ Game child routes:
 - `/game/operations` -> `src/app/game/operations-view/`
 - `/game/mission-planner` -> `src/app/game/mission-planner-view/`
 
+Researches route note:
+- `src/app/game/researches-view/` owns both technology start flow and active helper-lab reassignment for queued research; the technology cards remain the start surface, while the queued-technologies table now owns live helper assignment with a fixed main lab
+
 Shared game UI components:
 - `src/app/game/ui/`
 - `src/app/game/ui/top-menu/` owns the shared in-game navigation, including the local-admin `Bot AI` link
@@ -303,7 +306,7 @@ Lifecycle persistence note:
 - `/api/game/end-turn` now also runs the server-side bot planning phase before shared turn resolution; for active games with more than one human player it first records per-player readiness and resolves only after every human has clicked End Turn for that turn
 - `/api/game/turn-status` and `/api/games/:gameId/turn-status` now also carry optional `progressionBlockedReasonKey` + `progressionBlockedReasonParams` metadata for localization-ready active-play blockers
 - `/api/game/end-turn`, `/api/games/:gameId/end-turn`, and `/api/multiplayer/games/:gameId/auto-skip-turn` now also return keyed error metadata for the common active-play blockers and validation failures used by the top menu / game shell
-- `/api/game/building-queue`, `/api/game/shipyard-queue`, `/api/game/technology-queue`, and `/api/game/fleet` now also return keyed metadata for the mapped common `GameCommandError` cases, while still falling back to raw English for dynamic or not-yet-mapped command messages
+- `/api/game/building-queue`, `/api/game/shipyard-queue`, `/api/game/technology-queue`, `/api/game/technology-queue/helpers`, and `/api/game/fleet` now also return keyed metadata for the mapped common `GameCommandError` cases, while still falling back to raw English for dynamic or not-yet-mapped command messages
 - `/api/admin/bots*` exposes local-admin/controller-only bot inspection and live runtime controls for profile, pause/resume, and memory clearing
 
 Galaxy and planet reads:
@@ -336,12 +339,13 @@ Queues and production:
 - `/api/game/shipyard-queue/reorder`
 - `/api/game/shipyard-queue/cancel`
 - `/api/game/technology-queue`
+- `/api/game/technology-queue/helpers`
 
 Queue command ownership note:
-- `server/src/index.ts` owns auth/session checks, request parsing, and HTTP DTO responses for queue-start endpoints
+- `server/src/index.ts` owns auth/session checks, request parsing, and HTTP DTO responses for queue-start/update endpoints
 - `server/src/game-commands/building-commands.ts` owns building-queue validation + mutation
 - `server/src/game-commands/shipyard-commands.ts` owns shipyard-queue validation + mutation
-- `server/src/game-commands/research-commands.ts` owns technology-queue validation + mutation
+- `server/src/game-commands/research-commands.ts` owns technology-queue validation + mutation, including active helper-lab replacement for ongoing research
 - `server/src/game-commands/command-helpers.ts` owns shared player/planet resolution plus queue/research requirement helpers
 - `server/src/game-commands/command-result.ts` defines the shared internal command result/error shape used by those modules
 

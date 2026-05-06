@@ -44,10 +44,11 @@
                     <th>Status</th>
                     <th>Invested / base</th>
                     <th>ETA (turns)</th>
+                    <th>Lab Assignment</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (queuedResearch of researchQueueRows(); track queuedResearch.position) {
+                  @for (queuedResearch of researchQueueRows(); track queuedResearch.mainPlanetId) {
                     <tr>
                       <td>{{ queuedResearch.position }}</td>
                       <td>{{ queuedResearch.planetLabel }}</td>
@@ -57,6 +58,39 @@
                       <td>{{ queuedResearch.status }}</td>
                       <td>{{ queuedResearch.investedResearchPower }} / {{ queuedResearch.baseTotalResearchTime }}</td>
                       <td>{{ queuedResearch.estimatedTurnsForCompletion ?? '--' }}</td>
+                      <td>
+                        <div class="research-tech-card__labs">
+                          <div class="research-tech-card__lab-row">
+                            <span class="research-tech-card__lab-label">Main Lab:</span>
+                            <span>{{ queuedResearch.mainLabLabel }}</span>
+                          </div>
+                          @for (slotIndex of helperSlotIndexes; track slotIndex) {
+                            <div class="research-tech-card__lab-row">
+                              <span class="research-tech-card__lab-label">Helper:</span>
+                              <select
+                                class="research-tech-card__lab-select"
+                                [disabled]="isQueuedHelperDropdownDisabled(queuedResearch.mainPlanetId, slotIndex)"
+                                [ngModel]="queuedHelperSelectedLabId(queuedResearch.mainPlanetId, slotIndex) ?? ''"
+                                (ngModelChange)="onQueuedHelperSelectionChange(queuedResearch.mainPlanetId, slotIndex, $event)"
+                              >
+                                <option [ngValue]="''">Select helper lab</option>
+                                @for (lab of queuedHelperOptionsForSlot(queuedResearch, slotIndex); track lab.id) {
+                                  <option [ngValue]="lab.id">{{ lab.label }}</option>
+                                }
+                              </select>
+                            </div>
+                          }
+                          <button
+                            type="button"
+                            class="research-tech-card__action"
+                            [class.research-tech-card__action--ready]="canApplyQueuedHelperChanges(queuedResearch)"
+                            [disabled]="!canApplyQueuedHelperChanges(queuedResearch)"
+                            (click)="onApplyQueuedHelperChanges(queuedResearch)"
+                          >
+                            {{ applyQueuedHelperButtonLabel(queuedResearch) }}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   }
                 </tbody>
@@ -70,6 +104,10 @@
 
       @if (startResearchError) {
         <p class="planet-building-card__power-error">{{ startResearchError }}</p>
+      }
+
+      @if (updateResearchHelpersError) {
+        <p class="planet-building-card__power-error">{{ updateResearchHelpersError }}</p>
       }
 
       <h3 class="planet-view__section-title">Technologies</h3>

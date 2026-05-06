@@ -181,7 +181,7 @@ import {
   type SensorPhalanxPassiveDetection
 } from './sensor-phalanx-passive.js';
 import { startShipyardConstruction } from './game-commands/shipyard-commands.js';
-import { startTechnologyResearch } from './game-commands/research-commands.js';
+import { startTechnologyResearch, updateResearchHelpers } from './game-commands/research-commands.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
 import fleetReportModule from '../../src/app/models/reports/fleet-report.js';
 import sensorPhalanxReportModule from '../../src/app/models/reports/sensor-phalanx-report.js';
@@ -251,6 +251,7 @@ import type {
   ReorderShipyardQueueRequest,
   CancelShipyardQueueEntryRequest,
   StartTechnologyResearchRequest,
+  UpdateResearchHelpersRequest,
   CreateFleetMissionRequest,
   CreateFleetBombSelectionEntry,
   CreateFleetMissionResponse,
@@ -3523,6 +3524,52 @@ app.post('/api/game/technology-queue', (req, res) => {
   const result = startTechnologyResearch(
     { galaxy: currentGalaxy, playerId },
     { x, y, z, technologyType, helperPlanets: helperCoordinates }
+  );
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
+  }
+
+  const presentation = getPresentationData(currentGalaxy, playerId);
+  const response = presentation.ownedPlanets.map((entry) => toClientPlanetDtoFromClientPlanet(entry));
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/technology-queue/helpers', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (!canSessionAccessCurrentGame(currentGalaxy, auth.session)) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as UpdateResearchHelpersRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const helperCoordinates = parseResearchHelperCoordinates(body?.helperPlanets);
+  if (x === null || y === null || z === null || helperCoordinates === null) {
+    return res.status(400).json({ error: 'Invalid research helper payload.' });
+  }
+
+  const result = updateResearchHelpers(
+    { galaxy: currentGalaxy, playerId },
+    { x, y, z, helperPlanets: helperCoordinates }
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);

@@ -1177,6 +1177,13 @@ export type StartTechnologyResearchRequest = {
   helperPlanets: ClientCoordinates[];
 };
 
+export type UpdateResearchHelpersRequest = {
+  x: number;
+  y: number;
+  z: number;
+  helperPlanets: ClientCoordinates[];
+};
+
 export type CreateFleetMissionRequest = {
   missionType: FleetMissionType;
   origin: ClientCoordinates;
