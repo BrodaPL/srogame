@@ -1,8 +1,13 @@
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
 import { DefenceType } from '../../../../../src/app/models/enums/defence-type.js';
+import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
 import { resolveFusionReactorOperation } from '../../../../../src/app/models/planets/fusion-reactor-operation.js';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../../../../src/app/models/tech/technology-effects.js';
+import {
+  calculateRepairDroneProductionBasePower,
+  routeRepairDroneProduction
+} from '../../../../../src/app/models/turns/repair-drone-production.js';
 import type { Technology } from '../../../../../src/app/models/tech/technology.ts';
 import type {
   BotDefensiveBranch,
@@ -1348,6 +1353,18 @@ function resolveSimulatedThroughput(
   const shipyardBasePower = shipyardLevel <= 0
     ? 0
     : getRawBuildingStageProductionValue(BuildingType.SHIPYARD, shipyardLevel, 'production1');
+  const droneProductionRouting = routeRepairDroneProduction(
+    calculateRepairDroneProductionBasePower({
+      repairDroneCount: planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0,
+      industryModifier: planet.modifiers.industry,
+      adaptiveIndustryMultiplier: industryPowerMultiplier(adaptiveTechnologyLevel),
+      energyEfficiency
+    }),
+    {
+      hasBuildingQueueWork: true,
+      hasShipyardQueueWork: false
+    }
+  );
 
   return {
     availableEnergy,
@@ -1359,7 +1376,7 @@ function resolveSimulatedThroughput(
       * planet.modifiers.industry
       * industryPowerMultiplier(adaptiveTechnologyLevel)
       * energyEfficiency
-    )),
+    )) + droneProductionRouting.droneIndustryPower,
     researchPower: Math.max(0, Math.floor(
       researchLabPower
       * planet.modifiers.science

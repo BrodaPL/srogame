@@ -59,6 +59,10 @@ import {
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { tradeResourceLabel } from '../../models/trade/trade-resource-type';
 import type { TradeResourceType } from '../../models/trade/trade-resource-type';
+import {
+  calculateRepairDroneProductionBasePower,
+  routeRepairDroneProduction
+} from '../../models/turns/repair-drone-production';
 import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
 import { PlanetObjectDialogComponent } from './planet-object-dialog.component';
 import type {
@@ -1514,7 +1518,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected shipyardQueueRows(): ShipyardQueueRowVm[] {
     const queueEntries = this.planet?.objects.shipyardQueue ?? [];
-    const shipyardPower = this.currentShipyardPower();
+    const shipyardPower = this.currentTotalShipyardPower();
     let cumulativeRemaining = 0;
     const rows: ShipyardQueueRowVm[] = [];
 
@@ -2770,7 +2774,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       industryPower: this.currentIndustryPower(),
       droneIndustryPower: this.currentDroneIndustryPower(),
       totalIndustryPower: this.currentTotalIndustryPower(),
-      shipyardPower: this.currentShipyardPower(),
+      shipyardPower: this.currentBaseShipyardPower(),
+      droneShipyardPower: this.currentDroneShipyardPower(),
+      totalShipyardPower: this.currentTotalShipyardPower(),
       researchPower: this.currentResearchPower(),
       shipRepair: this.currentShipRepairCapability(),
       industryRepair: this.currentIndustryRepairCapability(),
@@ -3223,21 +3229,19 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   private currentDroneIndustryPower(): number {
-    const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
-    const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
-    const repairDroneCount = ManyShips.countByType(this.planet?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
-    const droneIndustryPower = repairDroneCount
-      * industryModifier
-      * industryPowerMultiplier(adaptiveTechnologyLevel);
-    if (!Number.isFinite(droneIndustryPower) || droneIndustryPower <= 0) {
-      return 0;
-    }
+    return this.currentDroneProductionRouting().droneIndustryPower;
+  }
 
-    return Math.max(0, Math.floor(droneIndustryPower * this.currentEnergyEfficiency()));
+  private currentDroneShipyardPower(): number {
+    return this.currentDroneProductionRouting().droneShipyardPower;
   }
 
   private currentTotalIndustryPower(): number {
     return this.currentIndustryPower() + this.currentDroneIndustryPower();
+  }
+
+  private currentTotalShipyardPower(): number {
+    return this.currentBaseShipyardPower() + this.currentDroneShipyardPower();
   }
 
   private currentFusionReactorSelectedStage(): number {
@@ -3323,7 +3327,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     });
   }
 
-  private currentShipyardPower(): number {
+  private currentBaseShipyardPower(): number {
     const shipyardLevel = this.buildingLevel(BuildingType.SHIPYARD);
     const naniteFactoryLevel = this.buildingLevel(BuildingType.NANITE_FACTORY);
     const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
@@ -3345,6 +3349,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     return Math.max(0, Math.floor(shipyardPower * this.currentEnergyEfficiency()));
+  }
+
+  private currentDroneProductionRouting(): ReturnType<typeof routeRepairDroneProduction> {
+    const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
+    const repairDroneCount = ManyShips.countByType(this.planet?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
+
+    return routeRepairDroneProduction(
+      calculateRepairDroneProductionBasePower({
+        repairDroneCount,
+        industryModifier,
+        adaptiveIndustryMultiplier: industryPowerMultiplier(adaptiveTechnologyLevel),
+        energyEfficiency: this.currentEnergyEfficiency()
+      }),
+      {
+        hasBuildingQueueWork: (this.planet?.objects.buildingQueue?.length ?? 0) > 0,
+        hasShipyardQueueWork: (this.planet?.objects.shipyardQueue?.length ?? 0) > 0
+      }
+    );
   }
 
   private currentResearchPower(): number {
@@ -3375,7 +3398,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     let total = calculateRepairCapabilityForManyShips(planet.objects.ships, {
-      shipyardPower: this.currentShipyardPower()
+      shipyardPower: this.currentBaseShipyardPower()
     }).shipRepair;
     for (const fleet of this.currentPlanetIdleRepairFleets()) {
       total += calculateRepairCapabilityForManyShips(fleet.ships).shipRepair;
@@ -3402,7 +3425,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return total;
   }
 
-  private shipyardPowerForPlanet(planet: ClientPlanetDto): number {
+  private baseShipyardPowerForPlanet(planet: ClientPlanetDto): number {
     const shipyardLevel = this.buildingLevelForPlanet(planet, BuildingType.SHIPYARD);
     const naniteFactoryLevel = this.buildingLevelForPlanet(planet, BuildingType.NANITE_FACTORY);
     const adaptiveTechnologyLevel = this.techLevelForPlanet(planet, TechnologyType.ADAPTIVE_TECHNOLOGY);
@@ -3669,7 +3692,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   private shipRepairCapabilityForPlanet(planet: ClientPlanetDto): number {
     let total = calculateRepairCapabilityForManyShips(planet.objects.ships, {
-      shipyardPower: this.shipyardPowerForPlanet(planet)
+      shipyardPower: this.baseShipyardPowerForPlanet(planet)
     }).shipRepair;
     for (const fleet of this.idleRepairFleetsForPlanet(planet)) {
       total += calculateRepairCapabilityForManyShips(fleet.ships).shipRepair;

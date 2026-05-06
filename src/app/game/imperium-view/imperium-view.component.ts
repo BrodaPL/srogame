@@ -24,6 +24,10 @@ import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '
 import { resolveFusionReactorOperation, type FusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { industryPowerMultiplier, maxOwnedPlanets, researchPowerMultiplier } from '../../models/tech/technology-effects';
+import {
+  calculateRepairDroneProductionBasePower,
+  routeRepairDroneProduction
+} from '../../models/turns/repair-drone-production';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -52,6 +56,8 @@ type PlanetPowerState = {
   droneIndustryPower: number;
   totalIndustryPower: number;
   shipyardPower: number;
+  droneShipyardPower: number;
+  totalShipyardPower: number;
   researchPower: number;
   shipRepair: number;
   industryRepair: number;
@@ -368,6 +374,7 @@ export class ImperiumViewComponent implements OnInit {
     let totalIndustryPower = 0;
     let totalDroneIndustryPower = 0;
     let totalShipyardPower = 0;
+    let totalDroneShipyardPower = 0;
     let totalResearchPower = 0;
     let totalShipRepair = 0;
     let totalIndustryRepair = 0;
@@ -402,7 +409,8 @@ export class ImperiumViewComponent implements OnInit {
       totalEnergyPenalty += energyDeficitPenaltyPercent(planetVm.energy.available, planetVm.energy.used);
       totalIndustryPower += planetVm.powers.totalIndustryPower;
       totalDroneIndustryPower += planetVm.powers.droneIndustryPower;
-      totalShipyardPower += planetVm.powers.shipyardPower;
+      totalShipyardPower += planetVm.powers.totalShipyardPower;
+      totalDroneShipyardPower += planetVm.powers.droneShipyardPower;
       totalResearchPower += planetVm.powers.researchPower;
       totalShipRepair += planetVm.powers.shipRepair;
       totalIndustryRepair += planetVm.powers.industryRepair;
@@ -452,7 +460,9 @@ export class ImperiumViewComponent implements OnInit {
       industryPower: this.roundNumber(totalIndustryPower - totalDroneIndustryPower, 2),
       droneIndustryPower: this.roundNumber(totalDroneIndustryPower, 2),
       totalIndustryPower: this.roundNumber(totalIndustryPower, 2),
-      shipyardPower: this.roundNumber(totalShipyardPower, 2),
+      shipyardPower: this.roundNumber(totalShipyardPower - totalDroneShipyardPower, 2),
+      droneShipyardPower: this.roundNumber(totalDroneShipyardPower, 2),
+      totalShipyardPower: this.roundNumber(totalShipyardPower, 2),
       researchPower: this.roundNumber(totalResearchPower, 2),
       shipRepair: this.roundNumber(totalShipRepair, 2),
       industryRepair: this.roundNumber(totalIndustryRepair, 2),
@@ -812,12 +822,18 @@ export class ImperiumViewComponent implements OnInit {
     const industryPower = Math.max(0, Math.floor(
       roboticsPower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency
     ));
-    const droneIndustryPower = Math.max(0, Math.floor(
-      (ManyShips.countByType(planet.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0)
-      * industryModifier
-      * adaptiveIndustryMultiplier
-      * energyEfficiency
-    ));
+    const droneProductionRouting = routeRepairDroneProduction(
+      calculateRepairDroneProductionBasePower({
+        repairDroneCount: ManyShips.countByType(planet.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0,
+        industryModifier,
+        adaptiveIndustryMultiplier,
+        energyEfficiency
+      }),
+      {
+        hasBuildingQueueWork: planet.objects.buildingQueue.length > 0,
+        hasShipyardQueueWork: planet.objects.shipyardQueue.length > 0
+      }
+    );
     const shipyardPower = Math.max(0, Math.floor(
       shipyardBasePower * naniteMultiplier * industryModifier * adaptiveIndustryMultiplier * energyEfficiency
     ));
@@ -834,9 +850,11 @@ export class ImperiumViewComponent implements OnInit {
 
     return {
       industryPower,
-      droneIndustryPower,
-      totalIndustryPower: industryPower + droneIndustryPower,
+      droneIndustryPower: droneProductionRouting.droneIndustryPower,
+      totalIndustryPower: industryPower + droneProductionRouting.droneIndustryPower,
       shipyardPower,
+      droneShipyardPower: droneProductionRouting.droneShipyardPower,
+      totalShipyardPower: shipyardPower + droneProductionRouting.droneShipyardPower,
       researchPower,
       shipRepair,
       industryRepair: industryPower,

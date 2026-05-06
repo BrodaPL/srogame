@@ -6,6 +6,10 @@ import { TechnologyType } from '../../../../src/app/models/enums/technology-type
 import { ManyDefences } from '../../../../src/app/models/defences/many-defences.js';
 import { ManyShips } from '../../../../src/app/models/fleets/many-ships.js';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../../../src/app/models/tech/technology-effects.js';
+import {
+  calculateRepairDroneProductionBasePower,
+  routeRepairDroneProduction
+} from '../../../../src/app/models/turns/repair-drone-production.js';
 import type { Galaxy } from '../../../../src/app/models/planets/galaxy.ts';
 import type { Planet } from '../../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../../src/app/models/player.ts';
@@ -126,8 +130,22 @@ function buildPlanetSnapshot(
   const maxBuildingQueueLength = calculateMaxBuildingQueueLength(planet, player);
   const maxShipyardQueueLength = calculateMaxShipyardQueueLength(planet, player);
   const queueSaturated = planet.rBDSFTQ.buildingQueue.length >= maxBuildingQueueLength;
-  const industryPower = resolveIndustryPower(planet, effectiveParameters.industryModifier, adaptiveTechnologyLevel, energyEfficiency);
-  const shipyardPower = resolveShipyardPower(planet, effectiveParameters.industryModifier, adaptiveTechnologyLevel, energyEfficiency);
+  const baseIndustryPower = resolveIndustryPower(planet, effectiveParameters.industryModifier, adaptiveTechnologyLevel, energyEfficiency);
+  const baseShipyardPower = resolveShipyardPower(planet, effectiveParameters.industryModifier, adaptiveTechnologyLevel, energyEfficiency);
+  const droneProductionRouting = routeRepairDroneProduction(
+    calculateRepairDroneProductionBasePower({
+      repairDroneCount: ManyShips.countByType(planet.rBDSFTQ.ships).get(ShipType.REPAIR_DRONE) ?? 0,
+      industryModifier: effectiveParameters.industryModifier,
+      adaptiveIndustryMultiplier: industryPowerMultiplier(adaptiveTechnologyLevel),
+      energyEfficiency
+    }),
+    {
+      hasBuildingQueueWork: planet.rBDSFTQ.buildingQueue.length > 0,
+      hasShipyardQueueWork: planet.rBDSFTQ.shipyardQueue.length > 0
+    }
+  );
+  const industryPower = baseIndustryPower + droneProductionRouting.droneIndustryPower;
+  const shipyardPower = baseShipyardPower + droneProductionRouting.droneShipyardPower;
   const researchPower = resolveResearchPower(
     planet,
     effectiveParameters.scienceModifier,
