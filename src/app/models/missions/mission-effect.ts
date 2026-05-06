@@ -16,6 +16,14 @@ export type MissionEffect =
     planetRef: MissionPlanetReference;
   }
   | {
+    type: 'transferFleetBombsToPlanet';
+    planetRef: MissionPlanetReference;
+  }
+  | {
+    type: 'transferArmamentDeliveryShipsToPlanet';
+    planetRef: MissionPlanetReference;
+  }
+  | {
     type: 'clearFleetCargo';
   }
   | {

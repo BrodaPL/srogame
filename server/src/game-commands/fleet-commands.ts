@@ -64,6 +64,7 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
   FleetMissionType.RECYCLE,
   FleetMissionType.DEFEND,
   FleetMissionType.TRANSPORT,
+  FleetMissionType.ARMAMENT_DELIVERY,
   FleetMissionType.BOMBARD,
   FleetMissionType.SIEGE,
   FleetMissionType.REPAIR,

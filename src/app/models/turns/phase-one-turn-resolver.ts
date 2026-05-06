@@ -59,6 +59,10 @@ import { ResearchReport } from '../reports/research-report';
 import { ResourcesPack } from '../resources-pack';
 import { energyDeficitEfficiencyMultiplier } from '../planets/energy-deficit';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../tech/technology-effects';
+import {
+  calculateRepairDroneProductionBasePower,
+  routeRepairDroneProduction
+} from './repair-drone-production';
 
 type ResourceSnapshot = {
   metal: number;
@@ -78,8 +82,10 @@ type PlanetTurnSnapshot = {
   industryPower: number;
   buildingRepairPower: number;
   droneIndustryPower: number;
+  droneShipyardPower: number;
   totalIndustryPower: number;
   shipyardPower: number;
+  totalShipyardPower: number;
   researchPower: number;
   currentResearchQueue: {
     technologyType: TechnologyType;
@@ -166,7 +172,7 @@ export function resolvePhaseOneTurn(
     }
 
     advanceBuildingQueue(planet, snapshot.totalIndustryPower);
-    advanceShipyardQueue(planet, snapshot.shipyardPower);
+    advanceShipyardQueue(planet, snapshot.totalShipyardPower);
   }
 
   for (const [coordinatesId, planet] of planetById.entries()) {
@@ -257,8 +263,22 @@ function createPlanetTurnSnapshot(
     * energyEfficiency
     * botDifficultyMultiplier
   ));
-  const droneIndustryPower = Math.max(0, Math.floor(
-    repairDroneCount
+  const droneProductionRouting = routeRepairDroneProduction(
+    calculateRepairDroneProductionBasePower({
+      repairDroneCount,
+      industryModifier,
+      adaptiveIndustryMultiplier,
+      energyEfficiency,
+      difficultyMultiplier: botDifficultyMultiplier
+    }),
+    {
+      hasBuildingQueueWork: planet.rBDSFTQ.buildingQueue.length > 0,
+      hasShipyardQueueWork: planet.rBDSFTQ.shipyardQueue.length > 0
+    }
+  );
+  const shipyardPower = Math.max(0, Math.floor(
+    shipyardBasePower
+    * naniteMultiplier
     * industryModifier
     * adaptiveIndustryMultiplier
     * energyEfficiency
@@ -287,16 +307,11 @@ function createPlanetTurnSnapshot(
     deuteriumCapacity: planet.getBuildingProductionValue1(BuildingType.DEUTERIUM_TANK),
     industryPower,
     buildingRepairPower,
-    droneIndustryPower,
-    totalIndustryPower: industryPower + droneIndustryPower,
-    shipyardPower: Math.max(0, Math.floor(
-      shipyardBasePower
-      * naniteMultiplier
-      * industryModifier
-      * adaptiveIndustryMultiplier
-      * energyEfficiency
-      * botDifficultyMultiplier
-    )),
+    droneIndustryPower: droneProductionRouting.droneIndustryPower,
+    droneShipyardPower: droneProductionRouting.droneShipyardPower,
+    totalIndustryPower: industryPower + droneProductionRouting.droneIndustryPower,
+    shipyardPower,
+    totalShipyardPower: shipyardPower + droneProductionRouting.droneShipyardPower,
     researchPower: Math.max(0, Math.floor(
       researchLabBasePower
       * totalResearchMultiplier
@@ -2407,14 +2422,15 @@ function compareEncounterArrivalPriority(
     [FleetMissionType.SIEGE]: 4,
     [FleetMissionType.MOVE]: 5,
     [FleetMissionType.TRANSPORT]: 6,
-    [FleetMissionType.SPY]: 7,
-    [FleetMissionType.COLONIZE]: 8,
-    [FleetMissionType.INVADE]: 9,
-    [FleetMissionType.BLOCK]: 10,
-    [FleetMissionType.INTERCEPT]: 11,
-    [FleetMissionType.STAR_SYSTEM_SPY]: 12,
-    [FleetMissionType.RECYCLE]: 13,
-    [FleetMissionType.REPAIR]: 14
+    [FleetMissionType.ARMAMENT_DELIVERY]: 7,
+    [FleetMissionType.SPY]: 8,
+    [FleetMissionType.COLONIZE]: 9,
+    [FleetMissionType.INVADE]: 10,
+    [FleetMissionType.BLOCK]: 11,
+    [FleetMissionType.INTERCEPT]: 12,
+    [FleetMissionType.STAR_SYSTEM_SPY]: 13,
+    [FleetMissionType.RECYCLE]: 14,
+    [FleetMissionType.REPAIR]: 15
   };
   const leftPriority = priorityByMissionType[left.fleet.missionType] ?? 999;
   const rightPriority = priorityByMissionType[right.fleet.missionType] ?? 999;

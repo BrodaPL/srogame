@@ -73,6 +73,24 @@
       }
     },
     {
+      "type": "ARMAMENT_DELIVERY",
+      "name": "Armament Delivery",
+      "description": "Deliver resources, PLANETARY_BOMB units, and carried small ships to your own or allied planets, then return automatically.",
+      "battleRoundsModifier": -1,
+      "minimumFuelReserves": 2,
+      "encounterLocationKinds": ["planetOrbit"],
+      "targetRules": {
+        "allowedDiplomaticStatuses": ["SELF", "ALLIED"],
+        "allowUnowned": false
+      },
+      "shipRules": {
+        "requiredShipTypes": [],
+        "exclusiveShipTypes": [],
+        "allowCargo": true,
+        "requiresCargo": false
+      }
+    },
+    {
       "type": "SPY",
       "name": "Spy",
       "description": "Send only Spy Probes. Cargo is disabled for this mission.",

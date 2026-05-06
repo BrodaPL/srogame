@@ -587,6 +587,7 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
   FleetMissionType.MOVE as FleetMissionTypeType,
   FleetMissionType.DEFEND as FleetMissionTypeType,
   FleetMissionType.TRANSPORT as FleetMissionTypeType,
+  FleetMissionType.ARMAMENT_DELIVERY as FleetMissionTypeType,
   FleetMissionType.SPY as FleetMissionTypeType,
   FleetMissionType.BOMBARD as FleetMissionTypeType,
   FleetMissionType.SIEGE as FleetMissionTypeType,

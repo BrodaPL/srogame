@@ -188,7 +188,8 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected isTransportMission(fleet: Fleet): boolean {
-    return fleet.missionType === FleetMissionType.TRANSPORT;
+    return fleet.missionType === FleetMissionType.TRANSPORT
+      || fleet.missionType === FleetMissionType.ARMAMENT_DELIVERY;
   }
 
   protected isColonizeMission(fleet: Fleet): boolean {
