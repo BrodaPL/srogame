@@ -101,6 +101,9 @@ export type BotPlanetSnapshot = {
     naniteLevel: number;
     shipyardLevel: number;
     researchLabLevel: number;
+    sensorPhalanxLevel: number;
+    jumpGateLevel: number;
+    interstellarTradePortLevel: number;
     metalStorageLevel: number;
     crystalStorageLevel: number;
     deuteriumTankLevel: number;
@@ -132,6 +135,8 @@ export type BotPlanetSnapshot = {
     nuclearEnergy: number;
     science: number;
     industry: number;
+    anomaliesAndNoise: number;
+    hyperspaceParameters: number;
   };
   power: {
     industryPower: number;
@@ -226,6 +231,9 @@ export type BotWarfareBranch =
   | 'UNLOCK'
   | 'PRODUCTION';
 
+export type BotStrategicDevelopmentBranch =
+  | 'LOCAL_DEVELOPMENT';
+
 export type BotGoalFamily =
   | 'ECONOMIC'
   | 'UNLOCK'
@@ -287,6 +295,12 @@ export type BotWarfareGoal = BotGoalBase & {
   branch: BotWarfareBranch;
 };
 
+export type BotStrategicDevelopmentGoal = BotGoalBase & {
+  subsystemId: 'STRATEGIC_DEVELOPMENT';
+  goalFamily: 'BUILDING' | 'PRODUCTION';
+  branch: BotStrategicDevelopmentBranch;
+};
+
 type BotPlanetResultBase = {
   planetId: number | null;
   subsystemId: BotV2SubsystemId;
@@ -314,6 +328,15 @@ export type BotWarfarePlanetResult = BotPlanetResultBase & {
   branch: BotWarfareBranch;
 };
 
+export type BotStrategicDevelopmentPlanetResult = BotPlanetResultBase & {
+  subsystemId: 'STRATEGIC_DEVELOPMENT';
+  branch: BotStrategicDevelopmentBranch;
+  emittedBuildingRequestCount: number;
+  emittedProductionRequestCount: number;
+  buildingGoalKeys: string[];
+  productionGoalKeys: string[];
+};
+
 export type BotAcceptedTask = BotProposal & {
   status: 'ACCEPTED';
 };
@@ -326,8 +349,8 @@ export type BotSubsystemContext = {
 export type BotSubsystemResult = {
   subsystemId: BotV2SubsystemId;
   proposals: BotProposal[];
-  goals?: Array<BotEconomicGoal | BotDefensiveGoal | BotWarfareGoal>;
-  planetResults?: Array<BotEconomicPlanetResult | BotDefensivePlanetResult | BotWarfarePlanetResult>;
+  goals?: Array<BotEconomicGoal | BotDefensiveGoal | BotWarfareGoal | BotStrategicDevelopmentGoal>;
+  planetResults?: Array<BotEconomicPlanetResult | BotDefensivePlanetResult | BotWarfarePlanetResult | BotStrategicDevelopmentPlanetResult>;
   debug: Record<string, string | number | boolean | null>;
 };
 

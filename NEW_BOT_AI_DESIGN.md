@@ -467,6 +467,150 @@ This subsystem is responsible for peaceful or infrastructure-driven expansion an
   * plan colonization,
   * maintain spy missions on unoccupied planets.
 
+### Phase split
+
+For now this subsystem should stay as **one subsystem with two internal sections**:
+
+* local development/planning,
+* future global development missions.
+
+Phase 1 should implement the local section first.
+Global mission management should remain deferred, but can already emit analysis/debug-only output.
+
+### Goal families
+
+This subsystem should use:
+
+* `BUILDING`
+* `PRODUCTION`
+* `LOGISTICS`
+* `COLONIZATION`
+* `INTEL`
+
+For phase 1:
+
+* `BUILDING` and `PRODUCTION` are the executable local families,
+* `LOGISTICS`, `COLONIZATION`, and `INTEL` remain analysis/debug-only.
+
+### Phase 1 local scope
+
+Phase 1 should focus on **planet building/production/research** only.
+
+The local building target set is:
+
+* `INTERSTELLAR_TRADE_PORT`
+* `JUMP_GATE`
+* `RESEARCH_LAB`
+* `SENSOR_PHALANX`
+
+plus:
+
+* any facility prerequisite chain required to reach those targets.
+
+`RESEARCH_LAB` should be treated as just another building target.
+
+Strict prerequisite research requests are allowed in the same style as the local subsystems.
+
+### Phase 1 production scope
+
+The local production target set is:
+
+* `COLONIZER`
+* `TRANSPORTER`
+* `MASS_HAULER`
+* `CARGO_SUPPORT`
+* `REPAIR_DRONE`
+
+Readiness gating should reuse `avg_industry`.
+
+Per-ship readiness threshold should match the ship's `SHIPYARD` requirement.
+
+Additional production rules:
+
+* `COLONIZER` should only compete when the empire is below colony cap.
+* `REPAIR_DRONE` should only be considered on low-industry or recently colonized planets, once those planets are actually capable of producing it.
+
+### Phase 1 local output shape
+
+Per planet, this subsystem should expose:
+
+* up to `2` building goals,
+* up to `2` production goals.
+
+The building-side and production-side outputs should stay **separate**.
+
+Reason:
+
+* they use separate planet queues,
+* they usually differ by an order of magnitude in resource cost,
+* that separation should make later Supervisory decisions easier.
+
+### Local priority notes
+
+`Trade Port` should gain a local priority bonus in range:
+
+* `0% .. 20%`
+
+based on:
+
+* high asymmetry between planetary resource modifiers.
+
+Recommended first implementation:
+
+* use `maxModifier - minModifier`.
+
+`Sensor Phalanx` should gain a local priority bonus in range:
+
+* `0% .. 30%`
+
+based on:
+
+* the same planetary factors that affect phalanx range / scan quality.
+
+`Jump Gate` should gain a local priority bonus in range:
+
+* `0% .. 30%`
+
+based on:
+
+* the same planetary factors that affect jump-gate capacity.
+
+### Future mission note
+
+Phase 2 of this subsystem should later own development missions.
+
+It will need a new mission type:
+
+* `ARMAMENT_DELIVERY`
+
+Definition:
+
+* works like `TRANSPORT`,
+* can also leave `PLANETARY_BOMB`s and small ships on the target planet,
+* requires hangar capacity to start the mission.
+
+### Intel / colonization loop
+
+Future colonization support should follow this loop:
+
+1. for all owned planets, scan planets in radius at least `2 + P`, where `P` is current owned planet count,
+2. choose the best unoccupied colonization target,
+3. colonize it,
+4. when technology allows new planets again, repeat from step 1.
+
+### Architecture TODO
+
+TODO:
+
+Planet building requests and planet production requests already live on separate local queues.
+
+Later strategic work will need a cleaner shared contract for:
+
+* per-planet building queue,
+* per-planet production queue,
+* empire-wide research constraints,
+* empire-wide fleet-cap constraints.
+
 ### Indicative fleet allocation
 
 **10–30%**, treated as a soft target.
@@ -543,6 +687,8 @@ This system does not consider neutral type players (farms).
 **Goal amount:** Many goals (up to N goals, where N is the number of planets),
 
 This subsystem has override priority in emergencies, but it still submits proposals to the Supervisory System like the others.
+
+It requests production of spy probes in small amounts (2-10), on developed planets so they always have few spy probes.
 
 ### Responsibilities
 

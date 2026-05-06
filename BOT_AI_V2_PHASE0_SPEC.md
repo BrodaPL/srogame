@@ -1012,6 +1012,179 @@ That result should include:
 - no-action reason
 - blocked goal count
 
+## Strategic Development subsystem scope in the next phase
+
+`Strategic Development` remains a single subsystem, but for implementation it should be treated as:
+
+- a local phase-1 development section
+- a future global mission-management section
+
+Phase 1 should implement only local executable work and keep the global mission side analysis/debug-only.
+
+### Strategic Development goal families
+
+The subsystem should use:
+
+- `BUILDING`
+- `PRODUCTION`
+- `LOGISTICS`
+- `COLONIZATION`
+- `INTEL`
+
+Phase-1 execution scope:
+
+- `BUILDING`
+- `PRODUCTION`
+
+Phase-1 analysis/debug-only scope:
+
+- `LOGISTICS`
+- `COLONIZATION`
+- `INTEL`
+
+### Strategic Development phase-1 local building scope
+
+Local building targets:
+
+- `INTERSTELLAR_TRADE_PORT`
+- `JUMP_GATE`
+- `RESEARCH_LAB`
+- `SENSOR_PHALANX`
+
+Allowed prerequisite scope:
+
+- any facility prerequisite chain required to reach those targets
+
+`RESEARCH_LAB` should be treated as a normal building target, not as a special branch.
+
+Like the other local subsystems, strict prerequisite research may be emitted when needed to unblock a valid final local goal.
+
+### Strategic Development phase-1 local production scope
+
+Local production targets:
+
+- `COLONIZER`
+- `TRANSPORTER`
+- `MASS_HAULER`
+- `CARGO_SUPPORT`
+- `REPAIR_DRONE`
+
+Readiness gating:
+
+- reuse `avg_industry`
+- per-ship readiness threshold should match the ship's `SHIPYARD` requirement
+
+Additional production rules:
+
+- `COLONIZER` should only compete when the empire is below colony cap
+- `REPAIR_DRONE` should only be considered on low-industry or recently colonized planets, once those planets are actually capable of producing it
+
+### Strategic Development phase-1 local output shape
+
+Per planet, the local executable output should stay split by queue type.
+
+Per planet:
+
+- up to `2` building goals
+- up to `2` production goals
+
+The subsystem contract should reflect that these are separate result sections, not one mixed list.
+
+Reason:
+
+- planets have separate building and production queues
+- building and production requests usually differ by an order of magnitude in cost
+- this separation should make later Supervisor decisions easier
+
+### Strategic Development phase-1 ranking guidance
+
+Use the same general ETC-first mathematical shape as the other local subsystems:
+
+```text
+weightedEtc = totalEtc / bonusFactor
+```
+
+Where:
+
+- lower score is better
+- positive modifiers stay multiplicative where applicable
+- ranking should primarily reward unblock/development value, with ETC acting as the timing discriminator
+
+### Strategic Development local priority bonuses
+
+`INTERSTELLAR_TRADE_PORT`:
+
+- bonus range: `0% .. 20%`
+- based on local asymmetry between planetary resource modifiers
+- recommended first implementation:
+
+```text
+modifierSpread = maxModifier - minModifier
+```
+
+`SENSOR_PHALANX`:
+
+- bonus range: `0% .. 30%`
+- based on the same planetary factors used by actual phalanx range / scan-quality formulas
+
+`JUMP_GATE`:
+
+- bonus range: `0% .. 30%`
+- based on the same planetary factors used by actual jump-gate-capacity formulas
+
+### Strategic Development phase-1 local selection behavior
+
+Per planet, selection should prefer balance between structure and readiness.
+
+When possible:
+
+- emit up to `2` building goals
+- emit up to `2` production goals
+
+This is intentionally not a single mixed top-4 list.
+
+### Strategic Development future mission note
+
+Phase 2 should later add executable global mission goals for:
+
+- `LOGISTICS`
+- `COLONIZATION`
+- `INTEL`
+
+That phase will also require a new mission type:
+
+- `ARMAMENT_DELIVERY`
+
+Definition:
+
+- behaves like `TRANSPORT`
+- can also leave `PLANETARY_BOMB`s and small ships on the target planet
+- requires hangar capacity to start
+
+### Strategic Development future intel / colonization loop
+
+Future colonization support should follow this loop:
+
+1. for all owned planets, scan planets in radius at least `2 + P`, where `P` is current owned planet count
+2. choose the best unoccupied colonization target
+3. colonize it
+4. when technology allows new planets again, repeat from step 1
+
+### Strategic Development architecture TODO
+
+TODO:
+
+After all strategic subsystems exist, revisit the cross-subsystem queue/resource contract.
+
+This is needed because the game already has several separate constraints:
+
+- per-planet building queue
+- per-planet production queue
+- empire-wide fleet-cap constraints
+- research throughput constrained by available research labs
+
+The phase-1 subsystem should keep building requests and production requests separate so this future cleanup stays tractable.
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

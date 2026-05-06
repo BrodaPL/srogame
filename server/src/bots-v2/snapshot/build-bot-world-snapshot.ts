@@ -196,6 +196,9 @@ function buildPlanetSnapshot(
       naniteLevel: planet.getBuildingLevel(BuildingType.NANITE_FACTORY),
       shipyardLevel: planet.getBuildingLevel(BuildingType.SHIPYARD),
       researchLabLevel: planet.getBuildingLevel(BuildingType.RESEARCH_LAB),
+      sensorPhalanxLevel: planet.getBuildingLevel(BuildingType.SENSOR_PHALANX),
+      jumpGateLevel: planet.getBuildingLevel(BuildingType.JUMP_GATE),
+      interstellarTradePortLevel: planet.getBuildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT),
       metalStorageLevel: planet.getBuildingLevel(BuildingType.METAL_STORAGE),
       crystalStorageLevel: planet.getBuildingLevel(BuildingType.CRYSTAL_STORAGE),
       deuteriumTankLevel: planet.getBuildingLevel(BuildingType.DEUTERIUM_TANK),
@@ -214,7 +217,9 @@ function buildPlanetSnapshot(
       solarEnergy: effectiveParameters.energyModifierRES,
       nuclearEnergy: effectiveParameters.energyModifierNuclear,
       science: effectiveParameters.scienceModifier,
-      industry: effectiveParameters.industryModifier
+      industry: effectiveParameters.industryModifier,
+      anomaliesAndNoise: effectiveParameters.anomaliesAndNoise,
+      hyperspaceParameters: effectiveParameters.hyperspaceParameters
     },
     power: {
       industryPower,
