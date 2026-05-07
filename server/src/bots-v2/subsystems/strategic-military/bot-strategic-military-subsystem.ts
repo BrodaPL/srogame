@@ -1,0 +1,1241 @@
+import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
+import { DefenceType } from '../../../../../src/app/models/enums/defence-type.js';
+import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
+import { ShipPurpose } from '../../../../../src/app/models/enums/ship-purpose.js';
+import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
+import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
+import { WeaponType } from '../../../../../src/app/models/enums/weapon-type.js';
+import { fleetTravelTurnsForDistance } from '../../../../../src/app/models/tech/technology-effects.js';
+import type { BotMemoryV2StrategicMilitaryFarmLedgerEntry } from '../../../../../src/app/models/player.ts';
+import type {
+  BotPlanetSnapshot,
+  BotProposal,
+  BotStrategicMilitaryTargetSnapshot,
+  BotSubsystem,
+  BotSubsystemContext,
+  BotSubsystemResult
+} from '../../bot-v2-types.ts';
+import {
+  calculateFuelCost,
+  calculateTravelDistance,
+  DEFENCE_BLUEPRINTS,
+  SHIP_BLUEPRINTS
+} from '../../../game-commands/command-helpers.js';
+
+type ResourceKey = 'metal' | 'crystal' | 'deuterium';
+type ResourceAmounts = Record<ResourceKey, number>;
+
+type MissionRequest = {
+  kind: 'MISSION';
+  phase: 'INTEL' | 'BREAK' | 'PLUNDER';
+  missionType: FleetMissionType;
+  target: BotStrategicMilitaryTargetSnapshot;
+  originPlanet: BotPlanetSnapshot;
+  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
+  expectedLoot: number;
+  travelDistance: number;
+  travelTurns: number;
+  score: number;
+};
+
+type ShipNeedRequest = {
+  kind: 'SHIP_NEED';
+  shipType: ShipType;
+  amount: number;
+  shortageKind: 'BOMBARDMENT' | 'COMBAT' | 'CARGO';
+  targetCoordinates: { x: number; y: number; z: number };
+  preferredOrigin: { x: number; y: number; z: number } | null;
+  score: number;
+  reason: string;
+};
+
+type BreakSelection = {
+  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
+  combatStrength: number;
+};
+
+type PlunderSelection = {
+  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
+  cargoCapacity: number;
+  combatEscortCount: number;
+};
+
+type FarmLedgerMap = Map<string, BotMemoryV2StrategicMilitaryFarmLedgerEntry>;
+
+const STRATEGIC_MILITARY_AVAILABILITY = 0.4;
+const BREAK_FORCE_MULTIPLIER = 1.5;
+const MIN_PLUNDER_ESCORTS = 1;
+const MAX_PLUNDER_ESCORTS = 2;
+const DEFAULT_ESCORT_SHIP_NEED = 1;
+const MAX_SHIP_NEED_PROPOSALS = 6;
+
+export class BotStrategicMilitarySubsystem implements BotSubsystem {
+  public readonly subsystemId = 'STRATEGIC_MILITARY' as const;
+
+  public generate(context: BotSubsystemContext): BotSubsystemResult {
+    const missionRequests: MissionRequest[] = [];
+    const shipNeeds: ShipNeedRequest[] = [];
+    const missionCap = resolveMissionRequestCap(context);
+    const targets = context.snapshot.empire.strategicMilitaryTargets;
+    const farmLedger = createFarmLedgerMap(context.memory.strategicMilitary.farmLedger);
+
+    missionRequests.push(...createSpyMissionRequests(context, targets));
+
+    for (const target of targets) {
+      if (target.isNeutral) {
+        updateFarmLedgerEntryFromTarget(context, farmLedger, target);
+      }
+
+      if (!target.hasEspionageReport || !target.isNeutral) {
+        continue;
+      }
+
+      const farmEntry = resolveFarmLedgerEntry(farmLedger, target.coordinates);
+      if (!farmEntry) {
+        continue;
+      }
+
+      if (!farmEntry.initialDefenseBroken) {
+        const breakPlan = createBreakMissionRequest(context, target, farmEntry);
+        if (breakPlan.request) {
+          missionRequests.push(breakPlan.request);
+          farmEntry.preferredOriginCoordinates = { ...breakPlan.request.originPlanet.coordinates };
+        }
+        if (breakPlan.shipNeed) {
+          shipNeeds.push(breakPlan.shipNeed);
+          if (breakPlan.shipNeed.preferredOrigin) {
+            farmEntry.preferredOriginCoordinates = { ...breakPlan.shipNeed.preferredOrigin };
+          }
+        }
+        continue;
+      }
+
+      const plunderPlan = createPlunderMissionRequest(context, target, farmEntry);
+      if (plunderPlan.request) {
+        missionRequests.push(plunderPlan.request);
+        farmEntry.preferredOriginCoordinates = { ...plunderPlan.request.originPlanet.coordinates };
+      }
+      if (plunderPlan.shipNeed) {
+        shipNeeds.push(plunderPlan.shipNeed);
+        if (plunderPlan.shipNeed.preferredOrigin) {
+          farmEntry.preferredOriginCoordinates = { ...plunderPlan.shipNeed.preferredOrigin };
+        }
+      }
+    }
+
+    context.memory.strategicMilitary.farmLedger = [...farmLedger.values()]
+      .sort(compareFarmLedgerEntries);
+
+    const proposals = [
+      ...missionRequests
+        .sort(compareMissionRequests)
+        .slice(0, missionCap)
+        .map((request, index) => createMissionProposal(context, request, index)),
+      ...selectTopShipNeedsPerPlanet(shipNeeds)
+        .sort((left, right) => right.score - left.score || left.shipType.localeCompare(right.shipType))
+        .slice(0, MAX_SHIP_NEED_PROPOSALS)
+        .map((request, index) => createShipNeedProposal(context, request, index))
+    ];
+
+    return {
+      subsystemId: this.subsystemId,
+      proposals,
+      debug: {
+        targetCount: targets.length,
+        neutralTargetCount: targets.filter((target) => target.isNeutral).length,
+        unscannedTargetCount: targets.filter((target) => target.neverScanned).length,
+        missionRequestCap: missionCap,
+        missionRequestCount: missionRequests.length,
+        shipNeedCount: shipNeeds.length,
+        availabilityTarget: STRATEGIC_MILITARY_AVAILABILITY,
+        // TODO: Critical should maintain a minimum stock of 5 Spy Probes on every planet.
+        spyProbeStockOwnedByCritical: true
+      }
+    };
+  }
+}
+
+function createSpyMissionRequests(
+  context: BotSubsystemContext,
+  targets: BotStrategicMilitaryTargetSnapshot[]
+): MissionRequest[] {
+  const unscannedTargets = targets.filter((target) => target.neverScanned);
+  const scanPool = unscannedTargets.length > 0
+    ? unscannedTargets
+    : [...targets].sort((left, right) =>
+      (right.reportAge ?? -1) - (left.reportAge ?? -1)
+      || left.coordinates.x - right.coordinates.x
+      || left.coordinates.y - right.coordinates.y
+      || left.coordinates.z - right.coordinates.z
+    );
+  const phase = unscannedTargets.length > 0 ? 'INTEL' as const : 'INTEL' as const;
+
+  return scanPool
+    .map((target) => {
+      const request = selectSpyOrigin(context, target);
+      if (!request) {
+        return null;
+      }
+
+      const priorityBase = target.neverScanned ? 260 : 80;
+      return {
+        kind: 'MISSION',
+        phase,
+        missionType: FleetMissionType.SPY,
+        target,
+        originPlanet: request.originPlanet,
+        ships: [{
+          type: ShipType.SPY_PROBE,
+          undamagedAmount: 1,
+          damagedAmount: 0
+        }],
+        expectedLoot: 0,
+        travelDistance: request.travelDistance,
+        travelTurns: request.travelTurns,
+        score: priorityBase - request.travelTurns
+      } satisfies MissionRequest;
+    })
+    .filter((request): request is MissionRequest => request !== null);
+}
+
+function createBreakMissionRequest(
+  context: BotSubsystemContext,
+  target: BotStrategicMilitaryTargetSnapshot,
+  farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry
+): {
+  request: MissionRequest | null;
+  shipNeed: ShipNeedRequest | null;
+} {
+  const targetStrength = estimateTargetCombatStrength(farmEntry);
+  const requiredStrength = Math.max(1, Math.ceil(targetStrength * BREAK_FORCE_MULTIPLIER));
+  const validPlans: MissionRequest[] = [];
+  let bestAvailableStrength = 0;
+  let closestOrigin: BotPlanetSnapshot | null = null;
+  let hasBombardmentPresence = false;
+
+  for (const originPlanet of context.snapshot.planets) {
+    const distance = calculateTravelDistance(originPlanet.coordinates, target.coordinates);
+    const travelTurns = resolveTravelTurns(originPlanet, distance);
+    const selection = buildBreakSelection(originPlanet, requiredStrength, (target.currentDefencesCount ?? 0) > 0);
+    if (selection.combatStrength > bestAvailableStrength) {
+      bestAvailableStrength = selection.combatStrength;
+      closestOrigin = originPlanet;
+    }
+    if (selection.ships.some((ship) => shipTypeHasBombardmentWeapons(ship.type))) {
+      hasBombardmentPresence = true;
+    }
+    if (selection.ships.length <= 0 || selection.combatStrength < requiredStrength) {
+      continue;
+    }
+
+    const fuelCost = calculateFuelCost(
+      selection.ships.map((ship) => ({
+        type: ship.type,
+        amount: ship.undamagedAmount + ship.damagedAmount
+      })),
+      distance
+    );
+    if (originPlanet.localResources.deuterium < fuelCost) {
+      continue;
+    }
+
+    validPlans.push({
+      kind: 'MISSION',
+      phase: 'BREAK',
+      missionType: FleetMissionType.ATTACK,
+      target,
+      originPlanet,
+      ships: selection.ships,
+      expectedLoot: 0,
+      travelDistance: distance,
+      travelTurns,
+      score: Math.max(1, 600 + Math.round((targetStrength * 2) - (travelTurns * 8) - Math.max(0, selection.combatStrength - requiredStrength)))
+    });
+  }
+
+  const request = validPlans.sort(compareMissionRequests)[0] ?? null;
+  if (request) {
+    return { request, shipNeed: null };
+  }
+
+  return {
+    request: null,
+    shipNeed: createBreakShipNeed(context, target, requiredStrength, bestAvailableStrength, hasBombardmentPresence, closestOrigin)
+  };
+}
+
+function createPlunderMissionRequest(
+  context: BotSubsystemContext,
+  target: BotStrategicMilitaryTargetSnapshot,
+  farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry
+): {
+  request: MissionRequest | null;
+  shipNeed: ShipNeedRequest | null;
+} {
+  if (!hasFarmResourceModel(farmEntry)) {
+    return { request: null, shipNeed: null };
+  }
+
+  const validPlans: MissionRequest[] = [];
+  let bestCargoCapacity = 0;
+  let bestEscortCount = 0;
+  let closestOrigin: BotPlanetSnapshot | null = null;
+
+  for (const originPlanet of context.snapshot.planets) {
+    const distance = calculateTravelDistance(originPlanet.coordinates, target.coordinates);
+    const travelTurns = resolveTravelTurns(originPlanet, distance);
+    const selection = buildPlunderSelection(originPlanet, farmEntry, context.snapshot.turn, travelTurns);
+    if (selection.cargoCapacity > bestCargoCapacity) {
+      bestCargoCapacity = selection.cargoCapacity;
+      closestOrigin = originPlanet;
+    }
+    bestEscortCount = Math.max(bestEscortCount, selection.combatEscortCount);
+    if (selection.ships.length <= 0 || selection.cargoCapacity <= 0 || selection.combatEscortCount <= 0) {
+      continue;
+    }
+
+    const fuelCost = calculateFuelCost(
+      selection.ships.map((ship) => ({
+        type: ship.type,
+        amount: ship.undamagedAmount + ship.damagedAmount
+      })),
+      distance
+    );
+    if (originPlanet.localResources.deuterium < fuelCost) {
+      continue;
+    }
+
+    const estimatedLoot = resolveLootAtArrival(farmEntry, context.snapshot.turn, travelTurns);
+    const maxFullLoot = resolveMaxFullLoot(farmEntry);
+    const readyThreshold = Math.min(Math.ceil(selection.cargoCapacity * 0.5), maxFullLoot);
+    if (estimatedLoot < readyThreshold) {
+      continue;
+    }
+
+    validPlans.push({
+      kind: 'MISSION',
+      phase: 'PLUNDER',
+      missionType: FleetMissionType.ATTACK,
+      target,
+      originPlanet,
+      ships: selection.ships,
+      expectedLoot: estimatedLoot,
+      travelDistance: distance,
+      travelTurns,
+      score: Math.max(1, Math.round(estimatedLoot - (travelTurns * 6)))
+    });
+  }
+
+  const request = validPlans.sort(compareMissionRequests)[0] ?? null;
+  farmEntry.estimatedNextGoodAttackTurn = resolveEstimatedNextGoodAttackTurn(
+    farmEntry,
+    context.snapshot.turn,
+    Math.max(1, bestCargoCapacity)
+  );
+  if (request) {
+    return { request, shipNeed: null };
+  }
+
+  return {
+    request: null,
+    shipNeed: createPlunderShipNeed(context, target, farmEntry, bestCargoCapacity, bestEscortCount, closestOrigin)
+  };
+}
+
+function selectSpyOrigin(
+  context: BotSubsystemContext,
+  target: BotStrategicMilitaryTargetSnapshot
+): {
+  originPlanet: BotPlanetSnapshot;
+  travelDistance: number;
+  travelTurns: number;
+} | null {
+  const candidates = context.snapshot.planets
+    .filter((planet) => (planet.ships.undamagedCountByType[ShipType.SPY_PROBE] ?? 0) > 0)
+    .map((originPlanet) => {
+      const travelDistance = calculateTravelDistance(originPlanet.coordinates, target.coordinates);
+      const travelTurns = resolveTravelTurns(originPlanet, travelDistance);
+      const fuelCost = calculateFuelCost([{ type: ShipType.SPY_PROBE, amount: 1 }], travelDistance);
+      return {
+        originPlanet,
+        travelDistance,
+        travelTurns,
+        canFuel: originPlanet.localResources.deuterium >= fuelCost
+      };
+    })
+    .filter((entry) => entry.canFuel)
+    .sort((left, right) =>
+      left.travelTurns - right.travelTurns
+      || left.travelDistance - right.travelDistance
+      || left.originPlanet.coordinates.x - right.originPlanet.coordinates.x
+      || left.originPlanet.coordinates.y - right.originPlanet.coordinates.y
+      || left.originPlanet.coordinates.z - right.originPlanet.coordinates.z
+    );
+
+  return candidates[0] ?? null;
+}
+
+function buildBreakSelection(
+  originPlanet: BotPlanetSnapshot,
+  requiredStrength: number,
+  requireBombardmentBreaker: boolean
+): BreakSelection {
+  const combatCandidates = resolveOriginCombatCandidates(originPlanet);
+  const selection: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> = [];
+  let totalStrength = 0;
+
+  if (requireBombardmentBreaker) {
+    const bombardmentShip = combatCandidates.find((candidate) => candidate.hasBombardmentWeapons) ?? null;
+    if (!bombardmentShip) {
+      return { ships: [], combatStrength: 0 };
+    }
+
+    selection.push({
+      type: bombardmentShip.type,
+      undamagedAmount: 1,
+      damagedAmount: 0
+    });
+    totalStrength += bombardmentShip.power;
+    bombardmentShip.amount -= 1;
+  }
+
+  for (const candidate of combatCandidates) {
+    if (candidate.amount <= 0 || candidate.power <= 0) {
+      continue;
+    }
+    if (totalStrength >= requiredStrength) {
+      break;
+    }
+
+    const amountToSend = Math.min(
+      candidate.amount,
+      Math.max(1, Math.ceil((requiredStrength - totalStrength) / candidate.power))
+    );
+    selection.push({
+      type: candidate.type,
+      undamagedAmount: amountToSend,
+      damagedAmount: 0
+    });
+    totalStrength += candidate.power * amountToSend;
+  }
+
+  return totalStrength >= requiredStrength
+    ? { ships: selection, combatStrength: totalStrength }
+    : { ships: [], combatStrength: totalStrength };
+}
+
+function buildPlunderSelection(
+  originPlanet: BotPlanetSnapshot,
+  farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry,
+  currentTurn: number,
+  travelTurns: number
+): PlunderSelection {
+  const cargoCandidates = resolveOriginCargoCandidates(originPlanet);
+  const escortCandidates = resolveOriginCombatCandidates(originPlanet)
+    .filter((candidate) => candidate.power > 0);
+  if (cargoCandidates.length <= 0 || escortCandidates.length <= 0) {
+    return { ships: [], cargoCapacity: 0, combatEscortCount: 0 };
+  }
+
+  const lootAtArrival = resolveLootAtArrival(farmEntry, currentTurn, travelTurns);
+  const maxFullLoot = resolveMaxFullLoot(farmEntry);
+  const desiredCargo = Math.max(1, Math.min(maxFullLoot, lootAtArrival));
+  const selection: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> = [];
+  let cargoCapacity = 0;
+
+  for (const cargoCandidate of cargoCandidates) {
+    if (cargoCapacity >= desiredCargo) {
+      break;
+    }
+
+    const amountToSend = Math.min(
+      cargoCandidate.amount,
+      Math.max(1, Math.ceil((desiredCargo - cargoCapacity) / Math.max(1, cargoCandidate.cargoCapacity)))
+    );
+    selection.push({
+      type: cargoCandidate.type,
+      undamagedAmount: amountToSend,
+      damagedAmount: 0
+    });
+    cargoCapacity += cargoCandidate.cargoCapacity * amountToSend;
+  }
+
+  let combatEscortCount = 0;
+  for (const escort of escortCandidates) {
+    if (combatEscortCount >= MAX_PLUNDER_ESCORTS) {
+      break;
+    }
+    if (selection.some((entry) => entry.type === escort.type)) {
+      continue;
+    }
+
+    selection.push({
+      type: escort.type,
+      undamagedAmount: 1,
+      damagedAmount: 0
+    });
+    combatEscortCount += 1;
+    if (combatEscortCount >= MIN_PLUNDER_ESCORTS) {
+      break;
+    }
+  }
+
+  return {
+    ships: combatEscortCount >= MIN_PLUNDER_ESCORTS ? selection : [],
+    cargoCapacity,
+    combatEscortCount
+  };
+}
+
+function resolveOriginCombatCandidates(originPlanet: BotPlanetSnapshot): Array<{
+  type: ShipType;
+  amount: number;
+  power: number;
+  hasBombardmentWeapons: boolean;
+}> {
+  return Object.entries(originPlanet.ships.undamagedCountByType)
+    .map(([type, amount]) => ({
+      type: type as ShipType,
+      amount: amount ?? 0,
+      blueprint: SHIP_BLUEPRINTS.get(type as ShipType) ?? null
+    }))
+    .filter((entry) =>
+      entry.amount > 0
+      && entry.blueprint !== null
+      && entry.blueprint.weapons.length > 0
+      && entry.type !== ShipType.SPY_PROBE
+      && entry.type !== ShipType.REPAIR_DRONE
+      && entry.type !== ShipType.COLONIZER
+    )
+    .map((entry) => ({
+      type: entry.type,
+      amount: entry.amount,
+      power: estimateShipCombatPower(entry.type),
+      hasBombardmentWeapons: shipTypeHasBombardmentWeapons(entry.type)
+    }))
+    .sort((left, right) =>
+      right.power - left.power
+      || Number(right.hasBombardmentWeapons) - Number(left.hasBombardmentWeapons)
+      || left.type.localeCompare(right.type)
+    );
+}
+
+function resolveOriginCargoCandidates(originPlanet: BotPlanetSnapshot): Array<{
+  type: ShipType;
+  amount: number;
+  cargoCapacity: number;
+}> {
+  return Object.entries(originPlanet.ships.undamagedCountByType)
+    .map(([type, amount]) => ({
+      type: type as ShipType,
+      amount: amount ?? 0,
+      blueprint: SHIP_BLUEPRINTS.get(type as ShipType) ?? null
+    }))
+    .filter((entry) =>
+      entry.amount > 0
+      && entry.blueprint !== null
+      && entry.blueprint.cargoCapacity > 0
+      && entry.type !== ShipType.SPY_PROBE
+      && entry.type !== ShipType.REPAIR_DRONE
+      && entry.type !== ShipType.COLONIZER
+      && entry.blueprint.purposes.has(ShipPurpose.CARGO)
+    )
+    .map((entry) => ({
+      type: entry.type,
+      amount: entry.amount,
+      cargoCapacity: entry.blueprint?.cargoCapacity ?? 0
+    }))
+    .sort((left, right) =>
+      right.cargoCapacity - left.cargoCapacity
+      || left.type.localeCompare(right.type)
+    );
+}
+
+function createBreakShipNeed(
+  context: BotSubsystemContext,
+  target: BotStrategicMilitaryTargetSnapshot,
+  requiredStrength: number,
+  bestAvailableStrength: number,
+  hasBombardmentPresence: boolean,
+  closestOrigin: BotPlanetSnapshot | null
+): ShipNeedRequest | null {
+  if ((target.currentDefencesCount ?? 0) > 0 && !hasBombardmentPresence) {
+    const bombardmentType = resolveBestProducibleShipType(context, 'BOMBARDMENT');
+    if (!bombardmentType) {
+      return null;
+    }
+    return {
+      kind: 'SHIP_NEED',
+      shipType: bombardmentType,
+      amount: 1,
+      shortageKind: 'BOMBARDMENT',
+      targetCoordinates: { ...target.coordinates },
+      preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
+      score: 500 + requiredStrength,
+      reason: 'Need a bombardment-capable ship to break neutral defenses.'
+    };
+  }
+
+  const combatType = resolveBestProducibleShipType(context, 'COMBAT');
+  if (!combatType) {
+    return null;
+  }
+  const combatPower = Math.max(1, estimateShipCombatPower(combatType));
+  return {
+    kind: 'SHIP_NEED',
+    shipType: combatType,
+    amount: Math.max(1, Math.ceil(Math.max(0, requiredStrength - bestAvailableStrength) / combatPower)),
+    shortageKind: 'COMBAT',
+    targetCoordinates: { ...target.coordinates },
+    preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
+    score: 420 + requiredStrength,
+    reason: 'Need more combat ships to clear neutral defenders.'
+  };
+}
+
+function createPlunderShipNeed(
+  context: BotSubsystemContext,
+  target: BotStrategicMilitaryTargetSnapshot,
+  farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry,
+  bestCargoCapacity: number,
+  bestEscortCount: number,
+  closestOrigin: BotPlanetSnapshot | null
+): ShipNeedRequest | null {
+  const maxFullLoot = resolveMaxFullLoot(farmEntry);
+  if (maxFullLoot <= 0) {
+    return null;
+  }
+
+  if (bestEscortCount < MIN_PLUNDER_ESCORTS) {
+    const combatType = resolveBestProducibleShipType(context, 'COMBAT');
+    if (!combatType) {
+      return null;
+    }
+    return {
+      kind: 'SHIP_NEED',
+      shipType: combatType,
+      amount: DEFAULT_ESCORT_SHIP_NEED,
+      shortageKind: 'COMBAT',
+      targetCoordinates: { ...target.coordinates },
+      preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
+      score: 260 + maxFullLoot,
+      reason: 'Need an escort ship for repeatable neutral-farm plunder.'
+    };
+  }
+
+  const cargoType = resolveBestProducibleShipType(context, 'CARGO');
+  if (!cargoType) {
+    return null;
+  }
+  const cargoCapacity = SHIP_BLUEPRINTS.get(cargoType)?.cargoCapacity ?? 0;
+  if (cargoCapacity <= 0 || bestCargoCapacity >= maxFullLoot) {
+    return null;
+  }
+
+  return {
+    kind: 'SHIP_NEED',
+    shipType: cargoType,
+    amount: Math.max(1, Math.ceil((maxFullLoot - bestCargoCapacity) / cargoCapacity)),
+    shortageKind: 'CARGO',
+    targetCoordinates: { ...target.coordinates },
+    preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
+    score: 240 + maxFullLoot,
+    reason: 'Need more cargo capacity to plunder opened neutral farms efficiently.'
+  };
+}
+
+function resolveBestProducibleShipType(
+  context: BotSubsystemContext,
+  role: 'BOMBARDMENT' | 'COMBAT' | 'CARGO'
+): ShipType | null {
+  const candidates = new Map<ShipType, number>();
+
+  for (const planet of context.snapshot.planets) {
+    for (const [shipType, blueprint] of SHIP_BLUEPRINTS.shipsMap.entries()) {
+      if (!snapshotHasShipBuildingRequirements(planet, blueprint) || !snapshotHasShipTechnologyRequirements(planet, blueprint)) {
+        continue;
+      }
+
+      if (!isShipTypeEligibleForRole(shipType, role)) {
+        continue;
+      }
+
+      const score = role === 'CARGO'
+        ? blueprint.cargoCapacity
+        : estimateShipCombatPower(shipType);
+      const previous = candidates.get(shipType) ?? -1;
+      if (score > previous) {
+        candidates.set(shipType, score);
+      }
+    }
+  }
+
+  return [...candidates.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] ?? null;
+}
+
+function isShipTypeEligibleForRole(
+  shipType: ShipType,
+  role: 'BOMBARDMENT' | 'COMBAT' | 'CARGO'
+): boolean {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return false;
+  }
+
+  if (role === 'BOMBARDMENT') {
+    return shipTypeHasBombardmentWeapons(shipType);
+  }
+  if (role === 'COMBAT') {
+    return blueprint.weapons.length > 0
+      && shipType !== ShipType.SPY_PROBE
+      && shipType !== ShipType.REPAIR_DRONE
+      && shipType !== ShipType.COLONIZER;
+  }
+  return blueprint.cargoCapacity > 0
+    && blueprint.purposes.has(ShipPurpose.CARGO)
+    && shipType !== ShipType.SPY_PROBE
+    && shipType !== ShipType.REPAIR_DRONE
+    && shipType !== ShipType.COLONIZER;
+}
+
+function estimateTargetCombatStrength(farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry): number {
+  let total = 0;
+
+  for (const [shipType, amount] of Object.entries(farmEntry.knownShipCountsByType)) {
+    total += estimateShipCombatPower(shipType as ShipType) * (amount ?? 0);
+  }
+  for (const [defenceType, amount] of Object.entries(farmEntry.knownDefenceCountsByType)) {
+    total += estimateDefenceCombatPower(defenceType as DefenceType) * (amount ?? 0);
+  }
+
+  if (total <= 0) {
+    total += sumRecordCounts(farmEntry.knownShipCountsByType) * 6;
+    total += sumRecordCounts(farmEntry.knownDefenceCountsByType) * 5;
+  }
+
+  return total;
+}
+
+function estimateShipCombatPower(shipType: ShipType): number {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return 0;
+  }
+
+  const weaponPower = blueprint.weapons.reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
+  return weaponPower + (blueprint.hullPointsCapacity / 15) + (blueprint.shieldCapacity / 10);
+}
+
+function estimateDefenceCombatPower(defenceType: DefenceType): number {
+  const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+  if (!blueprint) {
+    return 0;
+  }
+
+  const weaponPower = blueprint.weapons.reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
+  return weaponPower + (blueprint.hullPointsCapacity / 15) + (blueprint.shieldCapacity / 10);
+}
+
+function shipTypeHasBombardmentWeapons(shipType: ShipType): boolean {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  return Boolean(blueprint?.weapons.some((weapon) => weapon.type === WeaponType.BOMBARDMENT_WEAPONS));
+}
+
+function resolveLootAtArrival(
+  farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry,
+  currentTurn: number,
+  travelTurns: number
+): number {
+  if (!hasFarmResourceModel(farmEntry)) {
+    return 0;
+  }
+
+  const estimatedResources = estimateFarmResourcesAtTurn(
+    farmEntry,
+    currentTurn + Math.max(0, travelTurns)
+  );
+  const plunderPercent = Math.max(0, 80 - farmEntry.knownBunkerReductionPercent) / 100;
+
+  return Math.floor(
+    (estimatedResources.metal * plunderPercent)
+    + (estimatedResources.crystal * plunderPercent)
+    + (estimatedResources.deuterium * plunderPercent)
+  );
+}
+
+function resolveMaxFullLoot(farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry): number {
+  if (!hasFarmResourceModel(farmEntry)) {
+    return 0;
+  }
+
+  const plunderPercent = Math.max(0, 80 - farmEntry.knownBunkerReductionPercent) / 100;
+  return Math.floor(
+    ((farmEntry.knownStorageCapacity.metal + farmEntry.knownStorageCapacity.crystal + farmEntry.knownStorageCapacity.deuterium) * plunderPercent)
+  );
+}
+
+function selectTopShipNeedsPerPlanet(requests: ShipNeedRequest[]): ShipNeedRequest[] {
+  const merged = new Map<string, ShipNeedRequest>();
+
+  for (const request of requests) {
+    const preferredOrigin = request.preferredOrigin;
+    const key = preferredOrigin
+      ? `${preferredOrigin.x}:${preferredOrigin.y}:${preferredOrigin.z}`
+      : `target:${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}`;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, request);
+      continue;
+    }
+
+    if (request.score > existing.score) {
+      merged.set(key, request);
+    }
+  }
+
+  return [...merged.values()];
+}
+
+function createMissionProposal(
+  context: BotSubsystemContext,
+  request: MissionRequest,
+  index: number
+): BotProposal {
+  const missionLabel = request.phase === 'INTEL'
+    ? 'spy'
+    : request.phase === 'BREAK'
+      ? 'break neutral defenses'
+      : 'plunder neutral farm';
+  const summary = `Mission request #${index + 1}: ${missionLabel} at ${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z} from ${request.originPlanet.name}.`;
+
+  return {
+    proposalId: `strategic-military:mission:${request.phase}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}:${context.snapshot.turn}`,
+    subsystemId: 'STRATEGIC_MILITARY',
+    kind: 'FLEET_MISSION',
+    status: 'PROPOSED',
+    goalKey: `strategic-military:${request.phase}:${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}`,
+    dedupeKey: `strategic-military:mission:${request.phase}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}`,
+    summary,
+    planetId: request.originPlanet.planetId,
+    targetCoordinates: { ...request.target.coordinates },
+    expectedValue: Math.max(1, Math.round(request.expectedLoot + request.score)),
+    urgency: request.phase === 'INTEL' ? 52 : request.phase === 'BREAK' ? 81 : 88,
+    risk: request.phase === 'INTEL' ? 6 : request.phase === 'BREAK' ? 24 : 15,
+    confidence: request.phase === 'INTEL' ? 78 : request.phase === 'BREAK' ? 67 : 73,
+    requestedResources: emptyResources(),
+    requestPayload: {
+      missionType: request.missionType,
+      origin: { ...request.originPlanet.coordinates },
+      target: { ...request.target.coordinates },
+      ships: request.ships.map((ship) => ({ ...ship })),
+      carriedBombs: [],
+      cargo: emptyResources(),
+      useJumpGate: false,
+      bombardmentPriorities: null
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 1,
+    debug: {
+      missionSection: 'GLOBAL',
+      missionPhase: request.phase,
+      missionType: request.missionType,
+      originPlanet: request.originPlanet.name,
+      travelDistance: request.travelDistance,
+      travelTurns: request.travelTurns,
+      expectedLoot: request.expectedLoot,
+      neutralTarget: request.target.isNeutral
+    }
+  };
+}
+
+function createShipNeedProposal(
+  context: BotSubsystemContext,
+  request: ShipNeedRequest,
+  index: number
+): BotProposal {
+  const summary = `Ship need #${index + 1}: ${request.amount} ${request.shipType} for ${request.shortageKind.toLowerCase()} near ${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}.`;
+
+  return {
+    proposalId: `strategic-military:ship-need:${request.shipType}:${request.shortageKind}:${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}:${context.snapshot.turn}`,
+    subsystemId: 'STRATEGIC_MILITARY',
+    kind: 'SHIPYARD',
+    status: 'PROPOSED',
+    goalKey: `strategic-military:ship-need:${request.shipType}:${request.shortageKind}`,
+    dedupeKey: `strategic-military:ship-need:${request.shipType}:${request.shortageKind}`,
+    summary,
+    planetId: null,
+    targetCoordinates: { ...request.targetCoordinates },
+    expectedValue: Math.max(1, Math.round(request.score)),
+    urgency: request.shortageKind === 'CARGO' ? 66 : 74,
+    risk: 9,
+    confidence: 64,
+    requestedResources: emptyResources(),
+    requestPayload: {
+      demandOnly: true,
+      shortageKind: request.shortageKind,
+      shipType: request.shipType,
+      amount: request.amount,
+      preferredOrigin: request.preferredOrigin ? { ...request.preferredOrigin } : null
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 2,
+    debug: {
+      queueType: 'SHIP_NEED',
+      shortageKind: request.shortageKind,
+      shipType: request.shipType,
+      amount: request.amount,
+      reason: request.reason
+    }
+  };
+}
+
+function compareMissionRequests(left: MissionRequest, right: MissionRequest): number {
+  return right.score - left.score
+    || right.expectedLoot - left.expectedLoot
+    || left.travelTurns - right.travelTurns
+    || left.target.coordinates.x - right.target.coordinates.x
+    || left.target.coordinates.y - right.target.coordinates.y
+    || left.target.coordinates.z - right.target.coordinates.z;
+}
+
+function resolveMissionRequestCap(context: BotSubsystemContext): number {
+  return Math.max(
+    0,
+    Math.floor(context.snapshot.empire.imperiumFleetCap * STRATEGIC_MILITARY_AVAILABILITY)
+      + context.snapshot.empire.ownedPlanetCount
+  );
+}
+
+function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: TechnologyType): number {
+  switch (technologyType) {
+    case TechnologyType.ENERGY_TECHNOLOGY:
+      return planet.tech.energyTechnologyLevel;
+    case TechnologyType.MATERIAL_TECHNOLOGY:
+      return planet.tech.materialTechnologyLevel;
+    case TechnologyType.ADAPTIVE_TECHNOLOGY:
+      return planet.tech.adaptiveTechnologyLevel;
+    case TechnologyType.COMPUTER_TECHNOLOGY:
+      return planet.tech.computerTechnologyLevel;
+    case TechnologyType.INTERGALACTIC_RESEARCH_NETWORK:
+      return planet.tech.intergalacticResearchNetworkLevel;
+    case TechnologyType.SHIELDING_TECHNOLOGY:
+      return planet.tech.shieldingTechnologyLevel;
+    case TechnologyType.ARMOUR_TECHNOLOGY:
+      return planet.tech.armourTechnologyLevel;
+    case TechnologyType.RAILGUNS_WEAPONS:
+      return planet.tech.railgunsWeaponsLevel;
+    case TechnologyType.BEAMS_WEAPONS:
+      return planet.tech.beamsWeaponsLevel;
+    case TechnologyType.MISSILES_WEAPONS:
+      return planet.tech.missilesWeaponsLevel;
+    case TechnologyType.FUSION_DRIVE:
+      return planet.tech.fusionDriveLevel;
+    case TechnologyType.HYPERSPACE_DRIVE:
+      return planet.tech.hyperspaceDriveLevel;
+    case TechnologyType.HYPERSPACE_TECHNOLOGY:
+      return planet.tech.hyperspaceTechnologyLevel;
+    case TechnologyType.ESPIONAGE_TECHNOLOGY:
+      return planet.tech.espionageTechnologyLevel;
+    case TechnologyType.ASTROPHYSICS_TECHNOLOGY:
+      return planet.tech.astrophysicsTechnologyLevel;
+    default:
+      return 0;
+  }
+}
+
+function snapshotHasShipBuildingRequirements(planet: BotPlanetSnapshot, blueprint: NonNullable<ReturnType<typeof SHIP_BLUEPRINTS.get>>): boolean {
+  for (const requirement of blueprint.buildingRequirements) {
+    const currentLevel = getBuildingLevel(planet, requirement.building);
+    if (currentLevel < Math.ceil(requirement.level)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function snapshotHasShipTechnologyRequirements(planet: BotPlanetSnapshot, blueprint: NonNullable<ReturnType<typeof SHIP_BLUEPRINTS.get>>): boolean {
+  for (const requirement of blueprint.techRequirements) {
+    const currentLevel = getTechnologyLevel(planet, requirement.tech);
+    if (currentLevel < Math.ceil(requirement.level)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingType): number {
+  switch (buildingType) {
+    case BuildingType.METAL_MINE:
+      return planet.economy.metalMineLevel;
+    case BuildingType.CRYSTAL_MINE:
+      return planet.economy.crystalMineLevel;
+    case BuildingType.DEUTERIUM_SYNTHESIZER:
+      return planet.economy.deuteriumSynthesizerLevel;
+    case BuildingType.SOLAR_WIND_GEOTHERMAL:
+      return planet.economy.solarLevel;
+    case BuildingType.NUCLEAR_PLANT:
+      return planet.economy.nuclearLevel;
+    case BuildingType.FUSION_REACTOR:
+      return planet.economy.fusionLevel;
+    case BuildingType.ROBOTICS_FACTORY:
+      return planet.economy.roboticsLevel;
+    case BuildingType.NANITE_FACTORY:
+      return planet.economy.naniteLevel;
+    case BuildingType.SHIPYARD:
+      return planet.economy.shipyardLevel;
+    case BuildingType.RESEARCH_LAB:
+      return planet.economy.researchLabLevel;
+    case BuildingType.SENSOR_PHALANX:
+      return planet.economy.sensorPhalanxLevel;
+    case BuildingType.JUMP_GATE:
+      return planet.economy.jumpGateLevel;
+    case BuildingType.INTERSTELLAR_TRADE_PORT:
+      return planet.economy.interstellarTradePortLevel;
+    case BuildingType.METAL_STORAGE:
+      return planet.economy.metalStorageLevel;
+    case BuildingType.CRYSTAL_STORAGE:
+      return planet.economy.crystalStorageLevel;
+    case BuildingType.DEUTERIUM_TANK:
+      return planet.economy.deuteriumTankLevel;
+    default:
+      return 0;
+  }
+}
+
+function resolveTravelTurns(originPlanet: BotPlanetSnapshot, distance: number): number {
+  return fleetTravelTurnsForDistance(
+    distance,
+    originPlanet.tech.fusionDriveLevel,
+    originPlanet.tech.hyperspaceDriveLevel,
+    0
+  );
+}
+
+function emptyResources(): ResourceAmounts {
+  return {
+    metal: 0,
+    crystal: 0,
+    deuterium: 0
+  };
+}
+
+function createFarmLedgerMap(
+  entries: BotMemoryV2StrategicMilitaryFarmLedgerEntry[]
+): FarmLedgerMap {
+  const map: FarmLedgerMap = new Map();
+  for (const entry of entries) {
+    map.set(toCoordinatesKey(entry.coordinates), {
+      ...entry,
+      coordinates: { ...entry.coordinates },
+      knownMineLevels: { ...entry.knownMineLevels },
+      knownStorageCapacity: { ...entry.knownStorageCapacity },
+      knownIncome: { ...entry.knownIncome },
+      knownPlanetaryModifiers: { ...entry.knownPlanetaryModifiers },
+      knownShipCountsByType: { ...entry.knownShipCountsByType },
+      knownDefenceCountsByType: { ...entry.knownDefenceCountsByType },
+      lastObservedResources: { ...entry.lastObservedResources },
+      preferredOriginCoordinates: entry.preferredOriginCoordinates
+        ? { ...entry.preferredOriginCoordinates }
+        : null
+    });
+  }
+  return map;
+}
+
+function resolveFarmLedgerEntry(
+  farmLedger: FarmLedgerMap,
+  coordinates: { x: number; y: number; z: number }
+): BotMemoryV2StrategicMilitaryFarmLedgerEntry | null {
+  return farmLedger.get(toCoordinatesKey(coordinates)) ?? null;
+}
+
+function updateFarmLedgerEntryFromTarget(
+  context: BotSubsystemContext,
+  farmLedger: FarmLedgerMap,
+  target: BotStrategicMilitaryTargetSnapshot
+): BotMemoryV2StrategicMilitaryFarmLedgerEntry {
+  const key = toCoordinatesKey(target.coordinates);
+  const existing = farmLedger.get(key);
+  const entry = existing ?? createEmptyFarmLedgerEntry(target.coordinates);
+
+  if (target.reportTurn !== null) {
+    if (entry.lastSpyTurn === null || target.reportTurn > entry.lastSpyTurn) {
+      entry.lastSpyTurn = target.reportTurn;
+    }
+    if (target.mineLevels) {
+      entry.knownMineLevels = { ...target.mineLevels };
+    }
+    if (target.storageCapacity) {
+      entry.knownStorageCapacity = { ...target.storageCapacity };
+    }
+    if (target.income) {
+      entry.knownIncome = { ...target.income };
+    }
+    entry.knownBunkerReductionPercent = Math.max(0, target.bunkerReductionPercent ?? 0);
+    entry.knownPlanetaryModifiers = {
+      industryModifier: Math.max(0, target.industryModifier ?? 1),
+      metalModifier: Math.max(0, target.metalModifier ?? 1),
+      crystalModifier: Math.max(0, target.crystalModifier ?? 1),
+      deuteriumModifier: Math.max(0, target.deuteriumModifier ?? 1)
+    };
+
+    if (
+      target.currentResources
+      && (entry.lastResourceObservationTurn === null || target.reportTurn > entry.lastResourceObservationTurn)
+    ) {
+      entry.lastObservedResources = { ...target.currentResources };
+      entry.lastResourceObservationTurn = target.reportTurn;
+    }
+  }
+
+  if (
+    target.combatObservationTurn !== null
+    && (entry.lastCombatObservationTurn === null || target.combatObservationTurn > entry.lastCombatObservationTurn)
+  ) {
+    entry.knownShipCountsByType = { ...target.knownShipCountsByType };
+    entry.knownDefenceCountsByType = { ...target.knownDefenceCountsByType };
+    entry.lastCombatObservationTurn = target.combatObservationTurn;
+  }
+
+  if (
+    target.lastAttackTurn !== null
+    && (entry.lastAttackTurn === null || target.lastAttackTurn > entry.lastAttackTurn)
+  ) {
+    entry.lastAttackTurn = target.lastAttackTurn;
+  }
+
+  if (
+    target.lastPlunderTurn !== null
+    && (entry.lastSuccessfulPlunderTurn === null || target.lastPlunderTurn > entry.lastSuccessfulPlunderTurn)
+  ) {
+    const estimatedResourcesAtPlunder = estimateFarmResourcesAtTurn(entry, target.lastPlunderTurn);
+    const stolenResources = target.latestPlunderedResources ?? emptyResources();
+    entry.lastObservedResources = subtractResources(estimatedResourcesAtPlunder, stolenResources);
+    entry.lastResourceObservationTurn = target.lastPlunderTurn;
+    entry.lastSuccessfulPlunderTurn = target.lastPlunderTurn;
+  }
+
+  entry.initialDefenseBroken = sumRecordCounts(entry.knownShipCountsByType) <= 0
+    && sumRecordCounts(entry.knownDefenceCountsByType) <= 0;
+
+  farmLedger.set(key, entry);
+  return entry;
+}
+
+function createEmptyFarmLedgerEntry(
+  coordinates: { x: number; y: number; z: number }
+): BotMemoryV2StrategicMilitaryFarmLedgerEntry {
+  return {
+    coordinates: { ...coordinates },
+    lastSpyTurn: null,
+    lastAttackTurn: null,
+    lastSuccessfulPlunderTurn: null,
+    knownMineLevels: {
+      metalMineLevel: 0,
+      crystalMineLevel: 0,
+      deuteriumSynthesizerLevel: 0
+    },
+    knownStorageCapacity: emptyResources(),
+    knownIncome: emptyResources(),
+    knownBunkerReductionPercent: 0,
+    knownPlanetaryModifiers: {
+      industryModifier: 1,
+      metalModifier: 1,
+      crystalModifier: 1,
+      deuteriumModifier: 1
+    },
+    knownShipCountsByType: {},
+    knownDefenceCountsByType: {},
+    initialDefenseBroken: false,
+    lastObservedResources: emptyResources(),
+    lastResourceObservationTurn: null,
+    lastCombatObservationTurn: null,
+    estimatedNextGoodAttackTurn: null,
+    preferredOriginCoordinates: null
+  };
+}
+
+function hasFarmResourceModel(entry: BotMemoryV2StrategicMilitaryFarmLedgerEntry): boolean {
+  return entry.lastResourceObservationTurn !== null
+    && (entry.knownStorageCapacity.metal + entry.knownStorageCapacity.crystal + entry.knownStorageCapacity.deuterium) > 0
+    && (entry.knownIncome.metal + entry.knownIncome.crystal + entry.knownIncome.deuterium) >= 0;
+}
+
+function estimateFarmResourcesAtTurn(
+  entry: BotMemoryV2StrategicMilitaryFarmLedgerEntry,
+  targetTurn: number
+): ResourceAmounts {
+  const observationTurn = entry.lastResourceObservationTurn ?? targetTurn;
+  const deltaTurns = Math.max(0, targetTurn - observationTurn);
+  return {
+    metal: Math.min(entry.knownStorageCapacity.metal, entry.lastObservedResources.metal + (entry.knownIncome.metal * deltaTurns)),
+    crystal: Math.min(entry.knownStorageCapacity.crystal, entry.lastObservedResources.crystal + (entry.knownIncome.crystal * deltaTurns)),
+    deuterium: Math.min(entry.knownStorageCapacity.deuterium, entry.lastObservedResources.deuterium + (entry.knownIncome.deuterium * deltaTurns))
+  };
+}
+
+function resolveEstimatedNextGoodAttackTurn(
+  entry: BotMemoryV2StrategicMilitaryFarmLedgerEntry,
+  currentTurn: number,
+  availableCargoCapacity: number
+): number | null {
+  const maxLoot = resolveMaxFullLoot(entry);
+  if (maxLoot <= 0) {
+    return null;
+  }
+
+  const targetLootThreshold = Math.min(maxLoot, Math.ceil(Math.max(1, availableCargoCapacity) * 0.5));
+  const plunderPercent = Math.max(0.01, Math.max(0, 80 - entry.knownBunkerReductionPercent) / 100);
+  const targetResourceThreshold = Math.ceil(targetLootThreshold / plunderPercent);
+  const maxStoredResources = entry.knownStorageCapacity.metal
+    + entry.knownStorageCapacity.crystal
+    + entry.knownStorageCapacity.deuterium;
+
+  if (maxStoredResources <= 0) {
+    return null;
+  }
+
+  const cappedThreshold = Math.min(maxStoredResources, targetResourceThreshold);
+  for (let turn = currentTurn; turn <= currentTurn + 400; turn += 1) {
+    const estimatedResources = estimateFarmResourcesAtTurn(entry, turn);
+    const totalResources = estimatedResources.metal + estimatedResources.crystal + estimatedResources.deuterium;
+    if (totalResources >= cappedThreshold) {
+      return turn;
+    }
+  }
+
+  return null;
+}
+
+function subtractResources(
+  base: ResourceAmounts,
+  taken: ResourceAmounts
+): ResourceAmounts {
+  return {
+    metal: Math.max(0, base.metal - taken.metal),
+    crystal: Math.max(0, base.crystal - taken.crystal),
+    deuterium: Math.max(0, base.deuterium - taken.deuterium)
+  };
+}
+
+function sumRecordCounts<T extends string>(counts: Partial<Record<T, number>>): number {
+  return Object.values(counts).reduce((sum, value) => sum + Math.max(0, value ?? 0), 0);
+}
+
+function toCoordinatesKey(
+  coordinates: { x: number; y: number; z: number }
+): string {
+  return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+}
+
+function compareFarmLedgerEntries(
+  left: BotMemoryV2StrategicMilitaryFarmLedgerEntry,
+  right: BotMemoryV2StrategicMilitaryFarmLedgerEntry
+): number {
+  return left.coordinates.x - right.coordinates.x
+    || left.coordinates.y - right.coordinates.y
+    || left.coordinates.z - right.coordinates.z;
+}

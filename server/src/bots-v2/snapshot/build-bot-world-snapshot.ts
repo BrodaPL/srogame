@@ -1,6 +1,8 @@
 import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
 import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
 import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
+import { PlanetType } from '../../../../src/app/models/enums/planet-type.js';
+import { PlayerType } from '../../../../src/app/models/enums/player-type.js';
 import { ReportType } from '../../../../src/app/models/enums/report-type.js';
 import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
@@ -23,6 +25,7 @@ import type {
   BotIntelCandidateSnapshot,
   BotPlanetMaturityStage,
   BotPlanetSnapshot,
+  BotStrategicMilitaryTargetSnapshot,
   BotV2FeatureFlags,
   BotWorldSnapshot
 } from '../bot-v2-types.ts';
@@ -90,7 +93,8 @@ function buildEmpireSnapshot(
     atWar,
     hasCriticalEnergyProblem: planets.some((planet) => planet.blockers.energyStarved),
     hasCriticalStorageProblem: planets.some((planet) => planet.blockers.storageBlocked),
-    intelCandidates: resolveIntelCandidates(galaxy, player, planets.length)
+    intelCandidates: resolveIntelCandidates(galaxy, player, planets.length),
+    strategicMilitaryTargets: resolveStrategicMilitaryTargets(galaxy, player)
   };
 }
 
@@ -726,6 +730,102 @@ function resolveIntelCandidates(
   return candidates;
 }
 
+function resolveStrategicMilitaryTargets(
+  galaxy: Galaxy,
+  player: Player
+): BotStrategicMilitaryTargetSnapshot[] {
+  const targets: BotStrategicMilitaryTargetSnapshot[] = [];
+
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (
+          planet.basicInfo.type === PlanetType.ASTEROIDS
+          || planet.info.ownerId === player.playerId
+        ) {
+          continue;
+        }
+
+        const report = planet.lastReportData.get(player.playerId) ?? null;
+        const reportAge = report === null
+          ? null
+          : Math.max(0, galaxy.currentTurn - report.createdTurn);
+        const owner = planet.info.ownerId === null
+          ? null
+          : galaxy.players.find((entry) => entry.playerId === planet.info.ownerId) ?? null;
+        const reportTurn = report?.createdTurn ?? null;
+        const mineLevels = report === null
+          ? null
+          : {
+            metalMineLevel: report.buildingsLevels.get(BuildingType.METAL_MINE) ?? 0,
+            crystalMineLevel: report.buildingsLevels.get(BuildingType.CRYSTAL_MINE) ?? 0,
+            deuteriumSynthesizerLevel: report.buildingsLevels.get(BuildingType.DEUTERIUM_SYNTHESIZER) ?? 0
+          };
+        const currentResources = report === null
+          ? null
+          : {
+            metal: Math.max(0, Math.floor(report.resourcesAmount.metal)),
+            crystal: Math.max(0, Math.floor(report.resourcesAmount.crystal)),
+            deuterium: Math.max(0, Math.floor(report.resourcesAmount.deuterium))
+          };
+        const adaptiveTechnologyLevel = report?.techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY)
+          ?? owner?.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY)
+          ?? 0;
+        const storageCapacity = report === null
+          ? null
+          : resolveReportedStorageCapacity(report);
+        const bunkerReductionPercent = report === null
+          ? null
+          : resolveReportedBunkerReductionPercent(report);
+        const latestBattleObservation = resolveLatestBattleObservation(player, planet);
+        const latestPlunderObservation = resolveLatestPlunderObservation(player, planet);
+        const knownShipCountsByType = report === null
+          ? {}
+          : resolveKnownShipCountsForStrategicMilitary(report, latestBattleObservation);
+        const knownDefenceCountsByType = report === null
+          ? {}
+          : resolveKnownDefenceCountsForStrategicMilitary(report, latestBattleObservation);
+
+        targets.push({
+          coordinates: {
+            x: system.coordinates.x,
+            y: system.coordinates.y,
+            z: planet.basicInfo.order
+          },
+          neverScanned: report === null,
+          hasEspionageReport: report !== null,
+          reportAge,
+          reportTurn,
+          needsScan: report === null,
+          isNeutral: owner?.type === PlayerType.NEUTRAL,
+          mineLevels,
+          currentShipsCount: report === null ? null : sumCountsByType(knownShipCountsByType),
+          currentDefencesCount: report === null ? null : sumCountsByType(knownDefenceCountsByType),
+          knownShipCountsByType,
+          knownDefenceCountsByType,
+          currentResources,
+          storageCapacity,
+          income: report === null
+            ? null
+            : resolveReportedIncome(report, adaptiveTechnologyLevel),
+          bunkerReductionPercent,
+          size: report?.size ?? null,
+          industryModifier: report?.planetaryParameters.industryModifier ?? null,
+          metalModifier: report?.planetaryParameters.metalModifier ?? null,
+          crystalModifier: report?.planetaryParameters.crystalModifier ?? null,
+          deuteriumModifier: report?.planetaryParameters.deuteriumModifier ?? null,
+          lastAttackTurn: latestBattleObservation?.turn ?? null,
+          lastPlunderTurn: latestPlunderObservation?.turn ?? null,
+          latestPlunderedResources: latestPlunderObservation?.stolenResources ?? null,
+          combatObservationTurn: latestBattleObservation?.turn ?? reportTurn
+        });
+      }
+    }
+  }
+
+  return targets;
+}
+
 function resolveSystemScanRadiusDistance(
   left: { x: number; y: number },
   right: { x: number; y: number }
@@ -755,4 +855,291 @@ function resolveColonizationScore(candidate: {
     + (positiveIndustry * 200)
     + (positiveResourceSpread * 150)
   );
+}
+
+function resolveLastFleetReportTurn(
+  player: Player,
+  planet: Planet,
+  titlePrefix: string
+): number | null {
+  const coordinates = {
+    x: planet.basicInfo.solarSystem.coordinates.x,
+    y: planet.basicInfo.solarSystem.coordinates.y,
+    z: planet.basicInfo.order
+  };
+  let latestTurn: number | null = null;
+
+  for (const report of player.reports) {
+    if (
+      report.reportType !== ReportType.FLEET_REPORT
+      || !report.title.startsWith(titlePrefix)
+      || report.sourceCoordinates?.x !== coordinates.x
+      || report.sourceCoordinates?.y !== coordinates.y
+      || report.sourceCoordinates?.z !== coordinates.z
+    ) {
+      continue;
+    }
+
+    if (latestTurn === null || report.createdTurn > latestTurn) {
+      latestTurn = report.createdTurn;
+    }
+  }
+
+  return latestTurn;
+}
+
+function resolveLatestBattleObservation(
+  player: Player,
+  planet: Planet
+): {
+  turn: number;
+  survivingShipsByType: Partial<Record<ShipType, number>>;
+  survivingDefencesByType: Partial<Record<DefenceType, number>>;
+} | null {
+  const latestReport = resolveLatestFleetReport(player, planet, 'Battle Report:');
+  if (!latestReport?.body) {
+    return null;
+  }
+
+  const survivingShipsLine = latestReport.body.split('\n')
+    .find((line) => line.startsWith('Enemy survivors by type:'))
+    ?? null;
+  const survivingDefencesLine = latestReport.body.split('\n')
+    .find((line) => line.startsWith('Enemy defense survivors by type:'))
+    ?? null;
+
+  return {
+    turn: latestReport.createdTurn,
+    survivingShipsByType: parseTypedCountSummary<ShipType>(survivingShipsLine, 'Enemy survivors by type:'),
+    survivingDefencesByType: parseTypedCountSummary<DefenceType>(survivingDefencesLine, 'Enemy defense survivors by type:')
+  };
+}
+
+function resolveLatestPlunderObservation(
+  player: Player,
+  planet: Planet
+): {
+  turn: number;
+  stolenResources: { metal: number; crystal: number; deuterium: number };
+} | null {
+  const latestReport = resolveLatestFleetReport(player, planet, 'Plunder Report:');
+  if (!latestReport?.body) {
+    return null;
+  }
+
+  const resourcesLine = latestReport.body.split('\n')
+    .find((line) => line.startsWith('Resources stolen: '))
+    ?? null;
+  if (!resourcesLine) {
+    return {
+      turn: latestReport.createdTurn,
+      stolenResources: {
+        metal: 0,
+        crystal: 0,
+        deuterium: 0
+      }
+    };
+  }
+
+  const match = resourcesLine.match(/Resources stolen: Metal (\d+), Crystal (\d+), Deuterium (\d+)\./);
+  if (!match) {
+    return {
+      turn: latestReport.createdTurn,
+      stolenResources: {
+        metal: 0,
+        crystal: 0,
+        deuterium: 0
+      }
+    };
+  }
+
+  return {
+    turn: latestReport.createdTurn,
+    stolenResources: {
+      metal: Math.max(0, Number.parseInt(match[1] ?? '0', 10)),
+      crystal: Math.max(0, Number.parseInt(match[2] ?? '0', 10)),
+      deuterium: Math.max(0, Number.parseInt(match[3] ?? '0', 10))
+    }
+  };
+}
+
+function resolveLatestFleetReport(
+  player: Player,
+  planet: Planet,
+  titlePrefix: string
+): { createdTurn: number; body: string } | null {
+  const coordinates = {
+    x: planet.basicInfo.solarSystem.coordinates.x,
+    y: planet.basicInfo.solarSystem.coordinates.y,
+    z: planet.basicInfo.order
+  };
+  let latestReport: { createdTurn: number; body: string } | null = null;
+
+  for (const report of player.reports) {
+    if (
+      report.reportType !== ReportType.FLEET_REPORT
+      || !report.title.startsWith(titlePrefix)
+      || report.sourceCoordinates?.x !== coordinates.x
+      || report.sourceCoordinates?.y !== coordinates.y
+      || report.sourceCoordinates?.z !== coordinates.z
+      || typeof (report as { body?: unknown }).body !== 'string'
+    ) {
+      continue;
+    }
+
+    if (latestReport === null || report.createdTurn > latestReport.createdTurn) {
+      latestReport = {
+        createdTurn: report.createdTurn,
+        body: (report as { body: string }).body
+      };
+    }
+  }
+
+  return latestReport;
+}
+
+function parseTypedCountSummary<T extends string>(
+  line: string | null,
+  prefix: string
+): Partial<Record<T, number>> {
+  if (!line || !line.startsWith(prefix)) {
+    return {};
+  }
+
+  const summary = line.slice(prefix.length).trim();
+  if (summary === 'none') {
+    return {};
+  }
+
+  const counts: Partial<Record<T, number>> = {};
+  for (const entry of summary.split(', ')) {
+    const match = entry.match(/^(.*) x(\d+)$/);
+    if (!match) {
+      continue;
+    }
+
+    const key = (match[1] ?? '').trim() as T;
+    const amount = Number.parseInt(match[2] ?? '0', 10);
+    if (!key || !Number.isFinite(amount) || amount <= 0) {
+      continue;
+    }
+
+    counts[key] = amount;
+  }
+
+  return counts;
+}
+
+function resolveKnownShipCountsForStrategicMilitary(
+  report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
+  latestBattleObservation: ReturnType<typeof resolveLatestBattleObservation>
+): Partial<Record<ShipType, number>> {
+  if (latestBattleObservation && latestBattleObservation.turn > report.createdTurn) {
+    return latestBattleObservation.survivingShipsByType;
+  }
+
+  return Object.fromEntries(report.ships.entries()) as Partial<Record<ShipType, number>>;
+}
+
+function resolveKnownDefenceCountsForStrategicMilitary(
+  report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
+  latestBattleObservation: ReturnType<typeof resolveLatestBattleObservation>
+): Partial<Record<DefenceType, number>> {
+  if (latestBattleObservation && latestBattleObservation.turn > report.createdTurn) {
+    return latestBattleObservation.survivingDefencesByType;
+  }
+
+  return Object.fromEntries(
+    report.defences.map((entry) => [entry.type, entry.amount] satisfies [DefenceType, number])
+  ) as Partial<Record<DefenceType, number>>;
+}
+
+function sumCountsByType<T extends string>(counts: Partial<Record<T, number>>): number {
+  return Object.values(counts).reduce((sum, value) => sum + Math.max(0, value ?? 0), 0);
+}
+
+function resolveReportedStorageCapacity(
+  report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>
+): {
+  metal: number;
+  crystal: number;
+  deuterium: number;
+} {
+  return {
+    metal: Math.max(1, resolveReportedBuildingProductionValue1(report, BuildingType.METAL_STORAGE)),
+    crystal: Math.max(1, resolveReportedBuildingProductionValue1(report, BuildingType.CRYSTAL_STORAGE)),
+    deuterium: Math.max(1, resolveReportedBuildingProductionValue1(report, BuildingType.DEUTERIUM_TANK))
+  };
+}
+
+function resolveReportedBunkerReductionPercent(
+  report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>
+): number {
+  return Math.max(0, resolveReportedBuildingProductionValue1(report, BuildingType.BUNKER_NETWORK));
+}
+
+function resolveReportedIncome(
+  report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
+  adaptiveTechnologyLevel: number
+): {
+  metal: number;
+  crystal: number;
+  deuterium: number;
+} {
+  const adaptiveMultiplier = 1 + (Math.max(0, adaptiveTechnologyLevel) / 100);
+  return {
+    metal: Math.max(
+      0,
+      Math.floor(
+        resolveReportedBuildingProductionValue1(report, BuildingType.METAL_MINE)
+        * adaptiveMultiplier
+        * report.planetaryParameters.metalModifier
+      )
+    ),
+    crystal: Math.max(
+      0,
+      Math.floor(
+        resolveReportedBuildingProductionValue1(report, BuildingType.CRYSTAL_MINE)
+        * adaptiveMultiplier
+        * report.planetaryParameters.crystalModifier
+      )
+    ),
+    deuterium: Math.max(
+      0,
+      Math.floor(
+        resolveReportedBuildingProductionValue1(report, BuildingType.DEUTERIUM_SYNTHESIZER)
+        * adaptiveMultiplier
+        * report.planetaryParameters.deuteriumModifier
+      )
+    )
+  };
+}
+
+function resolveReportedBuildingProductionValue1(
+  report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
+  buildingType: BuildingType
+): number {
+  const level = report.buildingsLevels.get(buildingType) ?? 0;
+  if (level <= 0) {
+    return 0;
+  }
+
+  const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
+  if (!blueprint) {
+    return 0;
+  }
+
+  const value = blueprint.production1[level - 1];
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+
+function resolveBunkerReductionPercent(planet: Planet): number {
+  const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
+  if (bunkerLevel <= 0) {
+    return 0;
+  }
+
+  const bunkerBlueprint = BUILDING_BLUEPRINTS.get(BuildingType.BUNKER_NETWORK);
+  const rawValue = bunkerBlueprint?.production1[bunkerLevel - 1] ?? 0;
+  return Number.isFinite(rawValue) ? Math.max(0, Math.floor(rawValue)) : 0;
 }

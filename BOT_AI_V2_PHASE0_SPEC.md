@@ -1351,6 +1351,189 @@ This is needed because the game already has several separate constraints:
 
 The phase-1 subsystem should keep building requests and production requests separate so this future cleanup stays tractable.
 
+## Strategic Military phase-1 scope
+
+`Strategic Military` is a global neutral-farm operations subsystem.
+
+It does **not** own the local `UNLOCK` / `BUILDING` / `PRODUCTION` combat-ship planner.
+That remains the responsibility of the planetary-focused `Warfare` subsystem.
+
+`Strategic Military` should instead:
+
+- discover neutral planets,
+- classify planets only as `neutral` vs `not-neutral`,
+- maintain a farm ledger for discovered neutral planets,
+- plan initial defense-break attacks,
+- plan repeatable plunder attacks,
+- emit ship-shortage demand when current fleets are insufficient for good farm plans.
+
+### Strategic Military phase-1 outputs
+
+This subsystem should emit:
+
+- immediate mission requests
+- ship-shortage demand requests
+
+It should not emit local production/building requests directly.
+
+### Strategic Military goal families
+
+- `INTEL`
+- `BREAK`
+- `PLUNDER`
+- `SHIP_NEED`
+
+### Strategic Military phase-1 mission scope
+
+Executable mission types:
+
+- `SPY`
+- `ATTACK`
+
+Out of scope:
+
+- `BOMBARD`
+- `SIEGE`
+- multi-origin raid coordination
+- `MOVE`-based military relocation
+- local ship unlock/building management
+
+### Strategic Military intel model
+
+Scanning rules:
+
+- try to scan every planet in the galaxy
+- classify only:
+  - `neutral`
+  - `not-neutral`
+- after the whole galaxy is scanned, low-priority refresh should walk the oldest known intel first
+
+`SPY_PROBE` stock management stays with `Critical`.
+`Strategic Military` only consumes probes for discovery and refresh.
+
+### Strategic Military farm memory
+
+For every discovered neutral farm, subsystem memory should keep at least:
+
+- coordinates
+- last spy turn
+- last attack turn
+- last successful plunder turn
+- known mine levels
+- known storage capacity
+- known bunker level
+- known planetary modifiers
+- known neutral ships
+- known neutral defenses
+- `initialDefenseBroken`
+- estimated current stored resources
+- estimated next good attack turn
+- nearest / preferred owned source planets
+
+Implementation boundary:
+
+- snapshot data for `Strategic Military` should hold only current visible facts
+- persistent farm-ledger state should live in `BotMemoryV2`
+- the implemented memory-backed model must not fall back to hidden live neutral state
+
+Farm-ledger update sources:
+
+- espionage reports
+- battle reports
+- plunder reports
+
+Farm-ledger truth rule:
+
+- use only remembered / reported neutral state for:
+  - ships
+  - defenses
+  - resources
+- do not use hidden live neutral planet state for planning
+
+### Strategic Military target-state transition
+
+Neutral farm states:
+
+- `BREAK`
+- `PLUNDER`
+
+Transition rule:
+
+- a neutral farm becomes `PLUNDER`-ready only when known ships and known defenses are both gone
+- `initialDefenseBroken = true` only under that same condition
+
+### Strategic Military phase-1 firepower rule
+
+For initial defense-break attacks:
+
+- estimate required firepower from known neutral ships and defenses
+- scale that estimate by:
+
+```text
+1.5
+```
+
+Phase-1 origin rule:
+
+- use the best single valid origin only
+- do not combine ships from multiple origins yet
+
+### Strategic Military phase-1 plunder rule
+
+Repeatable plunder fleets should use:
+
+- cargo ships
+- plus `1-2` military ships
+
+### Strategic Military farm-regrowth model
+
+Use existing in-game formulas to estimate regrowth:
+
+- derive passive resource growth from known mine levels and planetary modifiers
+- cap estimated stored resources by known storage capacity
+- update the estimate every turn
+
+Post-plunder baseline rule:
+
+- after successful plunder, use exact reported leftover resources when available
+
+Target timing rule:
+
+- use both:
+  - storage-regrowth timing
+  - cargo-usefulness timing
+- launch at the earlier useful turn
+- planets should become valid attack targets `N` turns before the ideal resource state, where `N` is travel time
+
+Useful-cargo threshold:
+
+- a farm is already worth reattacking when estimated loot reaches at least `50%` of currently available cargo capacity
+
+Fuel cost is not a dominant ranking factor here and should matter only lightly, mainly for early defense-break attacks.
+
+### Strategic Military ship-shortage demand
+
+When current fleets are insufficient, emit `SHIP_NEED` requests as:
+
+- one request per exact ship type
+- with minimal additional amount required
+- do not emit blocked mission proposals instead of these demand requests
+- cap outward `SHIP_NEED` to:
+  - max `1` shortage request per planet
+  - only the highest-priority shortage for that planet
+
+Typical shortage cases:
+
+- need more ships with `ATMOSPHERIC_BOMBARDMENT` weapons for defense breaking
+- need more standard combat ships to defeat neutral ships
+- need more cargo ships to carry expected plunder
+
+### Strategic Military phase-2 follow-up
+
+The next major slice after phase 1 should be:
+
+- `MOVE`-based military relocation so larger defense-break fleets can be assembled on the best raid origin planets
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

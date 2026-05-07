@@ -793,18 +793,122 @@ Later strategic work will need a cleaner shared contract for:
 
 This is the **global aggression planner** for non-bot or non-human type player targets.
 
+This subsystem is not another local ship-building planner.
+Local `UNLOCK` / `BUILDING` / `PRODUCTION` for combat fleets stays in the planetary-focused `Warfare` subsystem.
+`Strategic Military` consumes already available fleets, discovers neutral farms, remembers them, breaks their initial defenses, and then schedules repeatable plunder runs.
+
 ### Responsibilities
 
-* **Construction:** shipyard, nanite factory.
-* **Production:** military ships, bomber ships, spy probes, transport ships.
 * **Operations:**
 
   * send probes,
+  * scan every planet in the galaxy and classify only `neutral` vs `not-neutral`,
   * search for planets owned by neutral type players (farms),
-  * evaluate raid targets,
-  * destroy farm defenses,
-  * plunder farms,
+  * maintain a farm ledger for each discovered neutral planet,
+  * evaluate neutral raid targets,
+  * plan initial defense-break attacks,
+  * plan repeatable plunder attacks after defenses are cleared,
+  * emit ship-shortage demand when current fleets are insufficient for planned raids,
   * maintain intelligence on neutral planets.
+
+### Current phase-1 operating model
+
+Goal families:
+
+* `INTEL`
+* `BREAK`
+* `PLUNDER`
+* `SHIP_NEED`
+
+Phase-1 mission scope:
+
+* `SPY`
+* `ATTACK`
+
+Out of scope for this subsystem:
+
+* `BOMBARD`
+* `SIEGE`
+* local ship unlock/building management
+* multi-origin raid coordination
+* military relocation by `MOVE` mission
+
+Neutral-farm loop:
+
+1. scan planets,
+2. when a neutral-type planet is found, store it in subsystem memory,
+3. if its initial ships or defenses still exist, treat it as a `BREAK` target,
+4. once ships and defenses are both gone, treat it as a repeatable `PLUNDER` target,
+5. estimate when it is worth attacking again and schedule farming attacks before storage is fully capped if travel time requires it.
+
+Defense-break rule:
+
+* estimate required firepower from known neutral ships and defenses,
+* scale the requirement by `x1.5` for safety.
+
+Repeatable plunder rule:
+
+* use cargo ships plus `1-2` military ships,
+* prioritize targets by expected current gain and readiness timing rather than by fresh repeated spy spam.
+
+Farm memory should keep at least:
+
+* coordinates,
+* last spy turn,
+* last attack turn,
+* last successful plunder turn,
+* known mine levels,
+* known storage capacity,
+* known bunker level,
+* known planetary modifiers,
+* known neutral ships,
+* known neutral defenses,
+* whether initial defense is already broken,
+* estimated current stored resources,
+* estimated next good attack turn,
+* nearest / preferred owned source planets.
+
+Current implementation note:
+
+* the first executable `Strategic Military` slice already emits `SPY`, `BREAK`, `PLUNDER`, and `SHIP_NEED`,
+* snapshot data for this subsystem should hold only currently visible facts,
+* persistent remembered farm state now lives in `BotMemoryV2`.
+
+Follow-up ledger rules:
+
+* update farm memory from espionage reports, battle reports, and plunder reports,
+* use only remembered / reported state for neutral ships, defenses, and resources,
+* do not use hidden live neutral planet state for farming decisions,
+* set `initialDefenseBroken` only when known ships and known defenses are both zero,
+* keep `preferredOriginCoordinates` as a soft remembered recommendation until a clearly better origin appears.
+
+Follow-up regrowth / timing rules:
+
+* estimate farm regrowth from known mine levels and known planetary modifiers using existing in-game formulas,
+* cap estimated stored resources by known storage capacity,
+* after successful plunder, use exact reported leftover resources when available,
+* reattack timing should use the earlier of:
+  * storage-regrowth timing,
+  * useful-cargo timing,
+* useful-cargo timing means at least `50%` of currently available cargo capacity would be worth sending.
+
+Follow-up `SHIP_NEED` rules:
+
+* do not emit blocked mission proposals,
+* emit `SHIP_NEED` instead when the best current farm action cannot launch,
+* cap `SHIP_NEED` to:
+  * maximum `1` shortage request per planet,
+  * only the highest-priority shortage for that planet.
+
+Priority notes:
+
+* probe-stock management itself stays with `Critical`,
+* this subsystem only consumes probes for farm discovery and refresh,
+* after the whole galaxy is scanned, low-priority intel refresh should walk the oldest known intel first.
+
+Phase-2 note:
+
+* fleet relocation by `MOVE` should be the next major follow-up so larger neutral-defense break fleets can be assembled on the best raid origin planets.
 
 ### Indicative fleet allocation
 

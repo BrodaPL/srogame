@@ -4,6 +4,8 @@ import { Fleet } from './fleets/fleet';
 import { PlayerType } from './enums/player-type';
 import { PlayerReport } from './reports/player-report';
 import { PlayerMessage } from './mail/player-message';
+import type { DefenceType } from './enums/defence-type';
+import type { ShipType } from './enums/ship-type';
 import { SupportRequestType } from './requests/support-request';
 import {
   TutorialReadState,
@@ -132,6 +134,39 @@ export type BotMemoryV2LongTermCommitment = {
   expiresOnTurn: number | null;
 };
 
+export type BotMemoryV2StrategicMilitaryFarmLedgerEntry = {
+  coordinates: BotMemoryCoordinates;
+  lastSpyTurn: number | null;
+  lastAttackTurn: number | null;
+  lastSuccessfulPlunderTurn: number | null;
+  knownMineLevels: {
+    metalMineLevel: number;
+    crystalMineLevel: number;
+    deuteriumSynthesizerLevel: number;
+  };
+  knownStorageCapacity: BotMemoryResources;
+  knownIncome: BotMemoryResources;
+  knownBunkerReductionPercent: number;
+  knownPlanetaryModifiers: {
+    industryModifier: number;
+    metalModifier: number;
+    crystalModifier: number;
+    deuteriumModifier: number;
+  };
+  knownShipCountsByType: Partial<Record<ShipType, number>>;
+  knownDefenceCountsByType: Partial<Record<DefenceType, number>>;
+  initialDefenseBroken: boolean;
+  lastObservedResources: BotMemoryResources;
+  lastResourceObservationTurn: number | null;
+  lastCombatObservationTurn: number | null;
+  estimatedNextGoodAttackTurn: number | null;
+  preferredOriginCoordinates: BotMemoryCoordinates | null;
+};
+
+export type BotMemoryV2StrategicMilitary = {
+  farmLedger: BotMemoryV2StrategicMilitaryFarmLedgerEntry[];
+};
+
 export type BotMemoryV2 = {
   version: 1;
   currentStance: string | null;
@@ -143,6 +178,7 @@ export type BotMemoryV2 = {
   cooldowns: Record<string, number>;
   recentTargets: BotMemoryV2RecentTarget[];
   acceptedLongTermCommitments: BotMemoryV2LongTermCommitment[];
+  strategicMilitary: BotMemoryV2StrategicMilitary;
 };
 
 export type PlayerExtras = {
@@ -375,7 +411,8 @@ export class Player {
       recentTargets: Player.normalizeBotMemoryV2RecentTargets(memory.recentTargets),
       acceptedLongTermCommitments: Player.normalizeBotMemoryV2LongTermCommitments(
         memory.acceptedLongTermCommitments
-      )
+      ),
+      strategicMilitary: Player.normalizeBotMemoryV2StrategicMilitary(memory.strategicMilitary)
     };
   }
 
@@ -655,6 +692,105 @@ export class Player {
       })
       .filter((entry): entry is BotMemoryV2LongTermCommitment => entry !== null)
       .slice(-40);
+  }
+
+  private static normalizeBotMemoryV2StrategicMilitary(
+    strategicMilitary: BotMemoryV2StrategicMilitary | null | undefined
+  ): BotMemoryV2StrategicMilitary {
+    return {
+      farmLedger: Player.normalizeBotMemoryV2StrategicMilitaryFarmLedger(strategicMilitary?.farmLedger)
+    };
+  }
+
+  private static normalizeBotMemoryV2StrategicMilitaryFarmLedger(
+    entries: BotMemoryV2StrategicMilitaryFarmLedgerEntry[] | null | undefined
+  ): BotMemoryV2StrategicMilitaryFarmLedgerEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const coordinates = Player.normalizeBotMemoryCoordinates(entry?.coordinates);
+        if (!coordinates) {
+          return null;
+        }
+
+        return {
+          coordinates,
+          lastSpyTurn: Number.isInteger(entry?.lastSpyTurn) ? entry.lastSpyTurn : null,
+          lastAttackTurn: Number.isInteger(entry?.lastAttackTurn) ? entry.lastAttackTurn : null,
+          lastSuccessfulPlunderTurn: Number.isInteger(entry?.lastSuccessfulPlunderTurn)
+            ? entry.lastSuccessfulPlunderTurn
+            : null,
+          knownMineLevels: {
+            metalMineLevel: Number.isInteger(entry?.knownMineLevels?.metalMineLevel)
+              ? Math.max(0, entry.knownMineLevels.metalMineLevel)
+              : 0,
+            crystalMineLevel: Number.isInteger(entry?.knownMineLevels?.crystalMineLevel)
+              ? Math.max(0, entry.knownMineLevels.crystalMineLevel)
+              : 0,
+            deuteriumSynthesizerLevel: Number.isInteger(entry?.knownMineLevels?.deuteriumSynthesizerLevel)
+              ? Math.max(0, entry.knownMineLevels.deuteriumSynthesizerLevel)
+              : 0
+          },
+          knownStorageCapacity: Player.normalizeBotMemoryResources(entry?.knownStorageCapacity),
+          knownIncome: Player.normalizeBotMemoryResources(entry?.knownIncome),
+          knownBunkerReductionPercent: Number.isFinite(entry?.knownBunkerReductionPercent)
+            ? Math.max(0, Math.floor(entry.knownBunkerReductionPercent))
+            : 0,
+          knownPlanetaryModifiers: {
+            industryModifier: Number.isFinite(entry?.knownPlanetaryModifiers?.industryModifier)
+              ? Math.max(0, Number(entry.knownPlanetaryModifiers.industryModifier))
+              : 1,
+            metalModifier: Number.isFinite(entry?.knownPlanetaryModifiers?.metalModifier)
+              ? Math.max(0, Number(entry.knownPlanetaryModifiers.metalModifier))
+              : 1,
+            crystalModifier: Number.isFinite(entry?.knownPlanetaryModifiers?.crystalModifier)
+              ? Math.max(0, Number(entry.knownPlanetaryModifiers.crystalModifier))
+              : 1,
+            deuteriumModifier: Number.isFinite(entry?.knownPlanetaryModifiers?.deuteriumModifier)
+              ? Math.max(0, Number(entry.knownPlanetaryModifiers.deuteriumModifier))
+              : 1
+          },
+          knownShipCountsByType: Player.normalizeBotMemoryV2CountByType(entry?.knownShipCountsByType),
+          knownDefenceCountsByType: Player.normalizeBotMemoryV2CountByType(entry?.knownDefenceCountsByType),
+          initialDefenseBroken: entry?.initialDefenseBroken === true,
+          lastObservedResources: Player.normalizeBotMemoryResources(entry?.lastObservedResources),
+          lastResourceObservationTurn: Number.isInteger(entry?.lastResourceObservationTurn)
+            ? entry.lastResourceObservationTurn
+            : null,
+          lastCombatObservationTurn: Number.isInteger(entry?.lastCombatObservationTurn)
+            ? entry.lastCombatObservationTurn
+            : null,
+          estimatedNextGoodAttackTurn: Number.isInteger(entry?.estimatedNextGoodAttackTurn)
+            ? entry.estimatedNextGoodAttackTurn
+            : null,
+          preferredOriginCoordinates: Player.normalizeBotMemoryCoordinates(entry?.preferredOriginCoordinates)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicMilitaryFarmLedgerEntry => entry !== null)
+      .slice(-400);
+  }
+
+  private static normalizeBotMemoryV2CountByType(
+    counts: Record<string, number> | null | undefined
+  ): Record<string, number> {
+    const normalized: Record<string, number> = {};
+    if (!counts || typeof counts !== 'object') {
+      return normalized;
+    }
+
+    for (const [key, value] of Object.entries(counts)) {
+      const trimmedKey = key.trim();
+      if (trimmedKey.length === 0 || !Number.isFinite(value)) {
+        continue;
+      }
+
+      normalized[trimmedKey.slice(0, 80)] = Math.max(0, Math.floor(value));
+    }
+
+    return normalized;
   }
 
   private static isBotV2SubsystemId(value: unknown): value is BotV2SubsystemId {

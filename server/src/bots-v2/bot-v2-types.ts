@@ -72,6 +72,7 @@ export type BotEmpireSnapshot = {
   hasCriticalEnergyProblem: boolean;
   hasCriticalStorageProblem: boolean;
   intelCandidates: BotIntelCandidateSnapshot[];
+  strategicMilitaryTargets: BotStrategicMilitaryTargetSnapshot[];
 };
 
 export type BotIntelCandidateSnapshot = {
@@ -86,6 +87,54 @@ export type BotIntelCandidateSnapshot = {
   needsScan: boolean;
   lastRelevantReportAge: number | null;
   colonizationScore: number;
+};
+
+export type BotStrategicMilitaryTargetSnapshot = {
+  coordinates: { x: number; y: number; z: number };
+  neverScanned: boolean;
+  hasEspionageReport: boolean;
+  reportAge: number | null;
+  reportTurn: number | null;
+  needsScan: boolean;
+  isNeutral: boolean;
+  mineLevels: {
+    metalMineLevel: number;
+    crystalMineLevel: number;
+    deuteriumSynthesizerLevel: number;
+  } | null;
+  currentShipsCount: number | null;
+  currentDefencesCount: number | null;
+  knownShipCountsByType: Partial<Record<ShipType, number>>;
+  knownDefenceCountsByType: Partial<Record<DefenceType, number>>;
+  currentResources: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  } | null;
+  storageCapacity: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  } | null;
+  income: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  } | null;
+  bunkerReductionPercent: number | null;
+  size: number | null;
+  industryModifier: number | null;
+  metalModifier: number | null;
+  crystalModifier: number | null;
+  deuteriumModifier: number | null;
+  lastAttackTurn: number | null;
+  lastPlunderTurn: number | null;
+  latestPlunderedResources: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  } | null;
+  combatObservationTurn: number | null;
 };
 
 export type BotPlanetSnapshot = {

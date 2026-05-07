@@ -12,7 +12,10 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
     },
     cooldowns: {},
     recentTargets: [],
-    acceptedLongTermCommitments: []
+    acceptedLongTermCommitments: [],
+    strategicMilitary: {
+      farmLedger: []
+    }
   };
 }
 
