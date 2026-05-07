@@ -546,6 +546,14 @@ export class GalaxyCreator {
 
     for (const planet of player.planets) {
       planet.setBuildingLevel(
+        BuildingType.SOLAR_WIND_GEOTHERMAL,
+        planet.getBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL) + 1
+      );
+      planet.setBuildingLevel(
+        BuildingType.NUCLEAR_PLANT,
+        planet.getBuildingLevel(BuildingType.NUCLEAR_PLANT) + 1
+      );
+      planet.setBuildingLevel(
         BuildingType.METAL_STORAGE,
         planet.getBuildingLevel(BuildingType.METAL_STORAGE) + 1
       );

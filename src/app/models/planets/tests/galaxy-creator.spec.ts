@@ -69,9 +69,11 @@ describe('GalaxyCreator', () => {
     expect(neutralPlanets[0].rBDSFTQ.ships.totalShipsCount()).toBeGreaterThan(0);
   });
 
-  it('adds +1 storage level to newly created neutral planets after their RNG setup is applied', () => {
+  it('adds +1 storage and energy-building levels to newly created neutral planets after their RNG setup is applied', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     vi.spyOn(RngBuildingGenerator.prototype, 'generate').mockReturnValue(new Map([
+      [BuildingType.SOLAR_WIND_GEOTHERMAL, 2],
+      [BuildingType.NUCLEAR_PLANT, 3],
       [BuildingType.METAL_STORAGE, 4],
       [BuildingType.CRYSTAL_STORAGE, 5],
       [BuildingType.DEUTERIUM_TANK, 6],
@@ -83,6 +85,8 @@ describe('GalaxyCreator', () => {
 
     expect(neutral).toBeTruthy();
     expect(neutral!.planets).toHaveLength(1);
+    expect(neutral!.planets[0].getBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL)).toBe(3);
+    expect(neutral!.planets[0].getBuildingLevel(BuildingType.NUCLEAR_PLANT)).toBe(4);
     expect(neutral!.planets[0].getBuildingLevel(BuildingType.METAL_STORAGE)).toBe(5);
     expect(neutral!.planets[0].getBuildingLevel(BuildingType.CRYSTAL_STORAGE)).toBe(6);
     expect(neutral!.planets[0].getBuildingLevel(BuildingType.DEUTERIUM_TANK)).toBe(7);
