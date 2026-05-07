@@ -1,11 +1,16 @@
 import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
 import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
+import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
 import { ReportType } from '../../../../src/app/models/enums/report-type.js';
 import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
 import { ManyDefences } from '../../../../src/app/models/defences/many-defences.js';
 import { ManyShips } from '../../../../src/app/models/fleets/many-ships.js';
-import { industryPowerMultiplier, researchPowerMultiplier } from '../../../../src/app/models/tech/technology-effects.js';
+import {
+  industryPowerMultiplier,
+  maxActiveFleets,
+  researchPowerMultiplier
+} from '../../../../src/app/models/tech/technology-effects.js';
 import {
   calculateRepairDroneProductionBasePower,
   routeRepairDroneProduction
@@ -72,11 +77,15 @@ function buildEmpireSnapshot(
     && (relation.playerAId === player.playerId || relation.playerBId === player.playerId)
   );
   const computerTechnologyLevel = player.getTechLevel(TechnologyType.COMPUTER_TECHNOLOGY);
+  const activeFleets = galaxy.activeFleets.filter((fleet) => fleet.ownerId === player.playerId);
 
   return {
     ownedPlanetCount: planets.length,
     computerTechnologyLevel,
     imperiumFleetCap: 4 + Math.max(0, computerTechnologyLevel),
+    activeFleetCount: activeFleets.length,
+    maxActiveFleetCount: maxActiveFleets(computerTechnologyLevel),
+    activeColonizeFleetCount: activeFleets.filter((fleet) => fleet.missionType === FleetMissionType.COLONIZE).length,
     totalResources,
     atWar,
     hasCriticalEnergyProblem: planets.some((planet) => planet.blockers.energyStarved),
@@ -684,25 +693,31 @@ function resolveIntelCandidates(
           : Math.max(0, galaxy.currentTurn - report.createdTurn);
         const neverScanned = report === null;
         const needsScan = neverScanned || lastRelevantReportAge === null || lastRelevantReportAge > 200;
-        if (!needsScan) {
-          continue;
-        }
-
-        const effectiveParameters = planet.getEffectivePlanetaryParameters();
+        const reportedParameters = report?.planetaryParameters ?? planet.getEffectivePlanetaryParameters();
+        const reportedSize = report?.size ?? planet.basicInfo.size;
+        const reportedColonizationDifficulty = report?.diff ?? null;
         candidates.push({
           coordinates: {
             x: system.coordinates.x,
             y: system.coordinates.y,
             z: planet.basicInfo.order
           },
-          size: planet.basicInfo.size,
-          industryModifier: effectiveParameters.industryModifier,
-          metalModifier: effectiveParameters.metalModifier,
-          crystalModifier: effectiveParameters.crystalModifier,
-          deuteriumModifier: effectiveParameters.deuteriumModifier,
+          size: reportedSize,
+          colonizationDifficulty: reportedColonizationDifficulty,
+          industryModifier: reportedParameters.industryModifier,
+          metalModifier: reportedParameters.metalModifier,
+          crystalModifier: reportedParameters.crystalModifier,
+          deuteriumModifier: reportedParameters.deuteriumModifier,
           neverScanned,
+          needsScan,
           lastRelevantReportAge,
-          colonizationScore: resolveColonizationScore(planet)
+          colonizationScore: resolveColonizationScore({
+            size: reportedSize,
+            industryModifier: reportedParameters.industryModifier,
+            metalModifier: reportedParameters.metalModifier,
+            crystalModifier: reportedParameters.crystalModifier,
+            deuteriumModifier: reportedParameters.deuteriumModifier
+          })
         });
       }
     }
@@ -721,17 +736,22 @@ function resolveSystemScanRadiusDistance(
   );
 }
 
-function resolveColonizationScore(planet: Planet): number {
-  const effectiveParameters = planet.getEffectivePlanetaryParameters();
-  const positiveIndustry = Math.max(0, effectiveParameters.industryModifier - 1);
+function resolveColonizationScore(candidate: {
+  size: number;
+  industryModifier: number;
+  metalModifier: number;
+  crystalModifier: number;
+  deuteriumModifier: number;
+}): number {
+  const positiveIndustry = Math.max(0, candidate.industryModifier - 1);
   const positiveResourceSpread = (
-    Math.max(0, effectiveParameters.metalModifier - 1)
-    + Math.max(0, effectiveParameters.crystalModifier - 1)
-    + Math.max(0, effectiveParameters.deuteriumModifier - 1)
+    Math.max(0, candidate.metalModifier - 1)
+    + Math.max(0, candidate.crystalModifier - 1)
+    + Math.max(0, candidate.deuteriumModifier - 1)
   );
 
   return (
-    planet.basicInfo.size
+    candidate.size
     + (positiveIndustry * 200)
     + (positiveResourceSpread * 150)
   );

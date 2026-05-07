@@ -60,6 +60,9 @@ export type BotEmpireSnapshot = {
   ownedPlanetCount: number;
   computerTechnologyLevel: number;
   imperiumFleetCap: number;
+  activeFleetCount: number;
+  maxActiveFleetCount: number;
+  activeColonizeFleetCount: number;
   totalResources: {
     metal: number;
     crystal: number;
@@ -74,11 +77,13 @@ export type BotEmpireSnapshot = {
 export type BotIntelCandidateSnapshot = {
   coordinates: { x: number; y: number; z: number };
   size: number;
+  colonizationDifficulty: number | null;
   industryModifier: number;
   metalModifier: number;
   crystalModifier: number;
   deuteriumModifier: number;
   neverScanned: boolean;
+  needsScan: boolean;
   lastRelevantReportAge: number | null;
   colonizationScore: number;
 };

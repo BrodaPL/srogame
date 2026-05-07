@@ -24,6 +24,7 @@ import type {
 } from '../../bot-v2-types.ts';
 import {
   BUILDING_BLUEPRINTS,
+  calculateFuelCost,
   calculateTravelDistance,
   SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS
@@ -261,6 +262,7 @@ function createGlobalMissionProposals(
     requests.push(...exportRequests);
   }
 
+  requests.push(...createColonizationRequests(context));
   requests.push(...createIntelScanRequests(context));
 
   return mergeFleetMissionRequests(requests)
@@ -456,6 +458,10 @@ function createIntelScanRequests(
   const requests: FleetMissionImmediateRequest[] = [];
 
   for (const candidate of context.snapshot.empire.intelCandidates) {
+    if (!candidate.needsScan) {
+      continue;
+    }
+
     const source = context.snapshot.planets
       .filter((planet) => (planet.ships.undamagedCountByType[ShipType.SPY_PROBE] ?? 0) > 0)
       .sort((left, right) =>
@@ -485,6 +491,159 @@ function createIntelScanRequests(
   }
 
   return requests;
+}
+
+function createColonizationRequests(
+  context: BotSubsystemContext
+): FleetMissionImmediateRequest[] {
+  if (!canEmpireColonizeMorePlanets(context)) {
+    return [];
+  }
+  if (hasPendingColonizationPlan(context)) {
+    return [];
+  }
+
+  const eligibleCandidates = context.snapshot.empire.intelCandidates
+    .filter((candidate) =>
+      !candidate.needsScan
+      && candidate.colonizationDifficulty !== null
+      && candidate.colonizationDifficulty <= resolveAdaptiveTechnologyLevel(context)
+    )
+    .sort((left, right) =>
+      right.colonizationScore - left.colonizationScore
+      || (left.lastRelevantReportAge ?? Number.MAX_SAFE_INTEGER) - (right.lastRelevantReportAge ?? Number.MAX_SAFE_INTEGER)
+      || left.coordinates.x - right.coordinates.x
+      || left.coordinates.y - right.coordinates.y
+      || left.coordinates.z - right.coordinates.z
+    );
+  if (eligibleCandidates.length <= 0) {
+    return [];
+  }
+
+  const topCandidatePool = eligibleCandidates.slice(0, Math.min(2, eligibleCandidates.length));
+  const chosenCandidate = topCandidatePool[Math.min(
+    topCandidatePool.length - 1,
+    Math.floor(Math.random() * topCandidatePool.length)
+  )] ?? null;
+  if (!chosenCandidate) {
+    return [];
+  }
+
+  const source = selectColonizerSource(context, chosenCandidate);
+  if (!source) {
+    return [];
+  }
+
+  return [source.request];
+}
+
+function canEmpireColonizeMorePlanets(context: BotSubsystemContext): boolean {
+  return context.snapshot.empire.ownedPlanetCount < maxOwnedPlanets(resolveAdaptiveTechnologyLevel(context));
+}
+
+function hasPendingColonizationPlan(context: BotSubsystemContext): boolean {
+  return context.snapshot.empire.activeColonizeFleetCount > 0;
+}
+
+function resolveAdaptiveTechnologyLevel(context: BotSubsystemContext): number {
+  return Math.max(
+    0,
+    ...context.snapshot.planets.map((planet) => planet.tech.adaptiveTechnologyLevel)
+  );
+}
+
+function selectColonizerSource(
+  context: BotSubsystemContext,
+  candidate: { coordinates: { x: number; y: number; z: number } }
+): {
+  request: FleetMissionImmediateRequest;
+} | null {
+  if (context.snapshot.empire.activeFleetCount >= context.snapshot.empire.maxActiveFleetCount) {
+    return null;
+  }
+
+  const sources = context.snapshot.planets
+    .map((planet) => createColonizeMissionRequest(planet, candidate.coordinates))
+    .filter((entry): entry is { request: FleetMissionImmediateRequest; cargoAmount: number } => entry !== null)
+    .sort((left, right) =>
+      right.cargoAmount - left.cargoAmount
+      || left.request.sourceDistance - right.request.sourceDistance
+      || left.request.originPlanet.coordinates.x - right.request.originPlanet.coordinates.x
+      || left.request.originPlanet.coordinates.y - right.request.originPlanet.coordinates.y
+      || left.request.originPlanet.coordinates.z - right.request.originPlanet.coordinates.z
+    );
+
+  return sources[0] ? { request: sources[0].request } : null;
+}
+
+function createColonizeMissionRequest(
+  originPlanet: BotPlanetSnapshot,
+  targetCoordinates: { x: number; y: number; z: number }
+): {
+  request: FleetMissionImmediateRequest;
+  cargoAmount: number;
+} | null {
+  const availableColonizers = originPlanet.ships.undamagedCountByType[ShipType.COLONIZER] ?? 0;
+  if (availableColonizers <= 0) {
+    return null;
+  }
+
+  const distance = calculateTravelDistance(originPlanet.coordinates, targetCoordinates);
+  const fuelCost = calculateFuelCost([{ type: ShipType.COLONIZER, amount: 1 }], distance, 2);
+  if (originPlanet.localResources.deuterium < fuelCost) {
+    return null;
+  }
+
+  const cargo = resolveColonizerBootstrapCargo(originPlanet, fuelCost);
+  const cargoAmount = getTotalResourceAmount(cargo);
+
+  return {
+    request: {
+      kind: 'FLEET_MISSION',
+      missionType: FleetMissionType.COLONIZE,
+      originPlanet,
+      targetCoordinates: { ...targetCoordinates },
+      ships: [{
+        type: ShipType.COLONIZER,
+        undamagedAmount: 1,
+        damagedAmount: 0
+      }],
+      cargo,
+      repairDroneAmount: 0,
+      priorityBand: 3,
+      sourceDistance: distance,
+      summaryLabel: cargoAmount > 0 ? 'colony establishment with bootstrap cargo' : 'colony establishment'
+    },
+    cargoAmount
+  };
+}
+
+function resolveColonizerBootstrapCargo(
+  originPlanet: BotPlanetSnapshot,
+  fuelCost: number
+): ResourceAmounts {
+  // TODO: Split this into richer optional Strategic Development goals later.
+  // For now colonization uses only the agreed simple bootstrap-cargo heuristic.
+  // TODO: Future Strategic Development follow-ups:
+  // 1. smarter bootstrap cargo planning
+  // 2. post-colony follow-up support goals
+  // 3. richer colonizer-source selection
+  // 4. longer-run trace tuning on real saves
+  const colonizerCargoCapacity = SHIP_BLUEPRINTS.get(ShipType.COLONIZER)?.cargoCapacity ?? 0;
+  const bootstrapCargoCapacity = Math.min(400, Math.max(0, colonizerCargoCapacity));
+  if (bootstrapCargoCapacity <= 0) {
+    return emptyResources();
+  }
+
+  const perResourceAmount = Math.floor(bootstrapCargoCapacity / 3);
+  return {
+    metal: Math.min(perResourceAmount, originPlanet.localResources.metal),
+    crystal: Math.min(perResourceAmount, originPlanet.localResources.crystal),
+    deuterium: Math.min(
+      perResourceAmount,
+      Math.max(0, originPlanet.localResources.deuterium - fuelCost)
+    )
+  };
 }
 
 function evaluateBuildingGoal(

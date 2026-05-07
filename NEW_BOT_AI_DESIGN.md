@@ -730,12 +730,39 @@ Colonization-intel maintenance should follow this loop:
    * resource modifiers weighted `x1.5`,
 
 5. reject colonization candidates smaller than `140`,
-6. choose the best unoccupied colonization target later,
-7. actual `COLONIZE` mission launch remains deferred to a later planning/implementation pass.
+6. choose the best unoccupied colonization target later.
 
 Spy origin for this loop:
 
 * any valid probe source may be used.
+
+### Phase 3 colonization execution
+
+Once colonization intel is fresh enough, `Strategic Development` may emit one immediate `COLONIZE` mission request.
+
+Rules:
+
+* launch only when colony cap is free,
+* launch only when there is no active pending colonization plan,
+* choose from scanned candidates only,
+* reject targets whose reported colonization difficulty exceeds current `ADAPTIVE_TECHNOLOGY`,
+* rank valid targets by pure `colonizationScore`,
+* take the top `2` valid targets and choose randomly between them,
+* source may be any ready colonizer source,
+* if possible, include bootstrap cargo inside the colonizer mission itself.
+
+Current bootstrap cargo heuristic:
+
+* use the agreed simple `400`-cargo split,
+* try `133 metal`, `133 crystal`, `133 deuterium`,
+* still allow the mission when no extra cargo can be loaded.
+
+Deferred TODOs for this subsystem:
+
+1. smarter bootstrap cargo planning,
+2. post-colony follow-up support goals,
+3. richer colonizer-source selection,
+4. longer-run trace tuning on real saves.
 
 ### Architecture TODO
 

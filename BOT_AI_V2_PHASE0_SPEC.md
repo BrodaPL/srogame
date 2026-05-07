@@ -1307,10 +1307,34 @@ Reject colonization candidates smaller than:
 140
 ```
 
-Actual colonization execution stays deferred:
+### Strategic Development phase-3 colonization execution
 
-- pick best colonization candidates through intel first
-- do not launch `COLONIZE` from this phase yet
+Current executable colonization rules:
+
+- emit immediate mission requests only
+- emit at most `1` visible `COLONIZE` request
+- launch only when colony cap is free
+- launch only when no active own `COLONIZE` fleet already exists
+- use scanned targets only
+- reject targets when reported colonization difficulty exceeds current `ADAPTIVE_TECHNOLOGY`
+- rank valid targets by pure `colonizationScore`
+- take the top `2` valid targets and choose randomly between them
+- ignore distance in target scoring
+- choose any ready colonizer source that can launch now and has enough deuterium for fuel
+- include bootstrap cargo when possible
+
+Current bootstrap cargo heuristic:
+
+- use the agreed simple `400`-cargo bootstrap budget
+- try `133 metal`, `133 crystal`, `133 deuterium`
+- still emit `COLONIZE` even when extra cargo cannot be loaded
+
+Deferred Strategic Development follow-ups:
+
+1. smarter bootstrap cargo planning
+2. post-colony follow-up support goals
+3. richer colonizer-source selection
+4. longer-run trace tuning on real saves
 
 ### Strategic Development architecture TODO
 

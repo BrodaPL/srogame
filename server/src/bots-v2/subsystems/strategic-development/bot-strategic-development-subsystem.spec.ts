@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
 import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
 import { PlayerType } from '../../../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
+import { EspionageReportGenerator } from '../../../../../src/app/generators/espionage-report-generator.js';
+import { ManyDefences } from '../../../../../src/app/models/defences/many-defences.js';
+import { Destination } from '../../../../../src/app/models/fleets/destination.js';
+import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../../../../src/app/models/fleets/fleet.js';
 import { ManyShips } from '../../../../../src/app/models/fleets/many-ships.js';
 import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
 import { Player } from '../../../../../src/app/models/player.js';
@@ -144,6 +148,74 @@ describe('BotStrategicDevelopmentSubsystem', () => {
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.SPY
     )).toBe(true);
+  });
+
+  it('emits one colonize mission with bootstrap cargo for a fresh valid scanned target', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+    const colonizeProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
+    );
+
+    expect(colonizeProposal).toBeDefined();
+    expect(colonizeProposal?.requestPayload.origin).toEqual({ x: 0, y: 0, z: 1 });
+    expect(colonizeProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 3 });
+    expect(colonizeProposal?.requestPayload.cargo).toEqual({ metal: 133, crystal: 133, deuterium: 133 });
+    randomSpy.mockRestore();
+  });
+
+  it('does not emit a colonize mission while an active colonize fleet already exists', () => {
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+    galaxy.activeFleets.push(createActiveColonizeFleet(bot.playerId, sourcePlanet));
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
+    )).toBe(false);
+  });
+
+  it('chooses randomly between the top two valid scanned colonization targets', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 80000);
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    unownedPlanet.info.planetaryParameters.industryModifier = 1.2;
+    unownedPlanet.basicInfo.baseSize = 170;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const secondTarget = Planet.createRandomEmpty('BotSys IV', 4, sourcePlanet.basicInfo.solarSystem, null);
+    secondTarget.basicInfo.baseSize = 165;
+    secondTarget.basicInfo.colonizationDifficulty = 1;
+    secondTarget.info.planetaryParameters.industryModifier = 1.15;
+    sourcePlanet.basicInfo.solarSystem.planets[3] = secondTarget;
+    markPlanetScanned(bot, secondTarget, galaxy.currentTurn);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+    const colonizeProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
+    );
+
+    expect(colonizeProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 4 });
+    randomSpy.mockRestore();
   });
 });
 
@@ -298,4 +370,35 @@ function setSupportShipTech(bot: Player): void {
   bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 3);
   bot.setTechLevel(TechnologyType.COMPUTER_TECHNOLOGY, 2);
   bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 2);
+  bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 2);
+}
+
+function markPlanetScanned(bot: Player, planet: Planet, createdTurn: number): void {
+  const report = new EspionageReportGenerator().createEspionageReport(bot, null, planet, 1, { createdTurn });
+  planet.lastReportData.set(bot.playerId, report);
+}
+
+function createActiveColonizeFleet(ownerId: number, originPlanet: Planet): Fleet {
+  return new Fleet(
+    99,
+    ownerId,
+    FleetMissionType.COLONIZE,
+    new Destination(0, 0, 1),
+    new Destination(0, 0, 3),
+    originPlanet.basicInfo.name,
+    'Target',
+    ManyShips.empty(),
+    new ResourcesPack(0, 0, 0),
+    1,
+    0,
+    0,
+    2,
+    2,
+    FleetState.MOVING_TO_TARGET,
+    1,
+    ManyDefences.empty(),
+    FleetOrbitActivity.IDLE,
+    null,
+    FleetReturnReason.NORMAL
+  );
 }
