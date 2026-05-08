@@ -155,6 +155,74 @@ describe('BotStrategicMilitarySubsystem', () => {
     )).toBe(false);
   });
 
+  it('keeps BREAK as a hard gate before PLUNDER is considered', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 2);
+    neutralPlanet.rBDSFTQ.resources = new ResourcesPack(900, 900, 900);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.debug.missionPhase === 'PLUNDER'
+    )).toBe(false);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.debug.missionPhase === 'BREAK'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+    )).toBe(true);
+  });
+
+  it('emits MOVE relocation requests before SHIP_NEED when multiple origins can satisfy BREAK together', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    const supportPlanet = addOwnedSupportPlanet(galaxy, bot, 'BotSupport', { x: 0, y: 1 }, 1);
+    configureOriginPlanet(supportPlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const moveProposals = result.proposals.filter((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.MOVE
+      && proposal.debug.missionPhase === 'BREAK'
+    );
+
+    expect(moveProposals.length).toBeGreaterThan(0);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.demandOnly === true
+    )).toBe(false);
+  });
+
+  it('falls back to SHIP_NEED when relocation still cannot satisfy BREAK', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    const supportPlanet = addOwnedSupportPlanet(galaxy, bot, 'BotSupport', { x: 0, y: 1 }, 1);
+    configureOriginPlanet(supportPlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 4);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.MOVE
+    )).toBe(false);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.demandOnly === true
+    )).toBe(true);
+  });
+
   it('caps ship-need output to one shortage request per origin planet', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet, foreignPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
@@ -258,6 +326,22 @@ function createStrategicMilitaryWorld() {
   );
 
   return { galaxy, bot, humanEnemy, neutralOwner, homePlanet, neutralPlanet, foreignPlanet };
+}
+
+function addOwnedSupportPlanet(
+  galaxy: Galaxy,
+  bot: Player,
+  systemName: string,
+  coordinates: { x: number; y: number },
+  order: number
+): Planet {
+  const system = new SolarSystem(systemName, 1, false, false, coordinates, new Set(), new Map());
+  const supportPlanet = Planet.createStartingPlanet(`${systemName} I`, order, system, 1);
+  system.planets[0] = supportPlanet;
+  supportPlanet.info.ownerId = bot.playerId;
+  bot.planets.push(supportPlanet);
+  galaxy.stars.push([system]);
+  return supportPlanet;
 }
 
 function configureOriginPlanet(planet: Planet): void {

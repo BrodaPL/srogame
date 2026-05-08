@@ -30,12 +30,15 @@ type MissionRequest = {
   phase: 'INTEL' | 'BREAK' | 'PLUNDER';
   missionType: FleetMissionType;
   target: BotStrategicMilitaryTargetSnapshot;
+  destinationCoordinates: { x: number; y: number; z: number };
   originPlanet: BotPlanetSnapshot;
   ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
   expectedLoot: number;
   travelDistance: number;
   travelTurns: number;
   score: number;
+  stagingPlanet: BotPlanetSnapshot | null;
+  moveRole: 'RELOCATION' | null;
 };
 
 type ShipNeedRequest = {
@@ -54,6 +57,14 @@ type BreakSelection = {
   combatStrength: number;
 };
 
+type RelocationBreakPlan = {
+  requests: MissionRequest[];
+  stagingPlanet: BotPlanetSnapshot;
+  combinedStrength: number;
+  totalEtaScore: number;
+  hasBombardmentPresence: boolean;
+};
+
 type PlunderSelection = {
   ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
   cargoCapacity: number;
@@ -68,6 +79,7 @@ const MIN_PLUNDER_ESCORTS = 1;
 const MAX_PLUNDER_ESCORTS = 2;
 const DEFAULT_ESCORT_SHIP_NEED = 1;
 const MAX_SHIP_NEED_PROPOSALS = 6;
+const BREAK_MISSION_SHARE = 0.6;
 
 export class BotStrategicMilitarySubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_MILITARY' as const;
@@ -97,9 +109,11 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
 
       if (!farmEntry.initialDefenseBroken) {
         const breakPlan = createBreakMissionRequest(context, target, farmEntry);
-        if (breakPlan.request) {
-          missionRequests.push(breakPlan.request);
-          farmEntry.preferredOriginCoordinates = { ...breakPlan.request.originPlanet.coordinates };
+        if (breakPlan.requests.length > 0) {
+          missionRequests.push(...breakPlan.requests);
+        }
+        if (breakPlan.preferredOriginCoordinates) {
+          farmEntry.preferredOriginCoordinates = { ...breakPlan.preferredOriginCoordinates };
         }
         if (breakPlan.shipNeed) {
           shipNeeds.push(breakPlan.shipNeed);
@@ -126,10 +140,9 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
     context.memory.strategicMilitary.farmLedger = [...farmLedger.values()]
       .sort(compareFarmLedgerEntries);
 
+    const selectedMissionRequests = selectMissionRequestsForCap(missionRequests, missionCap);
     const proposals = [
-      ...missionRequests
-        .sort(compareMissionRequests)
-        .slice(0, missionCap)
+      ...selectedMissionRequests
         .map((request, index) => createMissionProposal(context, request, index)),
       ...selectTopShipNeedsPerPlanet(shipNeeds)
         .sort((left, right) => right.score - left.score || left.shipType.localeCompare(right.shipType))
@@ -146,6 +159,7 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
         unscannedTargetCount: targets.filter((target) => target.neverScanned).length,
         missionRequestCap: missionCap,
         missionRequestCount: missionRequests.length,
+        selectedMissionRequestCount: selectedMissionRequests.length,
         shipNeedCount: shipNeeds.length,
         availabilityTarget: STRATEGIC_MILITARY_AVAILABILITY,
         // TODO: Critical should maintain a minimum stock of 5 Spy Probes on every planet.
@@ -183,6 +197,7 @@ function createSpyMissionRequests(
         phase,
         missionType: FleetMissionType.SPY,
         target,
+        destinationCoordinates: { ...target.coordinates },
         originPlanet: request.originPlanet,
         ships: [{
           type: ShipType.SPY_PROBE,
@@ -192,7 +207,9 @@ function createSpyMissionRequests(
         expectedLoot: 0,
         travelDistance: request.travelDistance,
         travelTurns: request.travelTurns,
-        score: priorityBase - request.travelTurns
+        score: priorityBase - request.travelTurns,
+        stagingPlanet: null,
+        moveRole: null
       } satisfies MissionRequest;
     })
     .filter((request): request is MissionRequest => request !== null);
@@ -203,8 +220,9 @@ function createBreakMissionRequest(
   target: BotStrategicMilitaryTargetSnapshot,
   farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry
 ): {
-  request: MissionRequest | null;
+  requests: MissionRequest[];
   shipNeed: ShipNeedRequest | null;
+  preferredOriginCoordinates: { x: number; y: number; z: number } | null;
 } {
   const targetStrength = estimateTargetCombatStrength(farmEntry);
   const requiredStrength = Math.max(1, Math.ceil(targetStrength * BREAK_FORCE_MULTIPLIER));
@@ -244,23 +262,52 @@ function createBreakMissionRequest(
       phase: 'BREAK',
       missionType: FleetMissionType.ATTACK,
       target,
+      destinationCoordinates: { ...target.coordinates },
       originPlanet,
       ships: selection.ships,
       expectedLoot: 0,
       travelDistance: distance,
       travelTurns,
-      score: Math.max(1, 600 + Math.round((targetStrength * 2) - (travelTurns * 8) - Math.max(0, selection.combatStrength - requiredStrength)))
+      score: Math.max(1, 600 + Math.round((targetStrength * 2) - (travelTurns * 8) - Math.max(0, selection.combatStrength - requiredStrength))),
+      stagingPlanet: null,
+      moveRole: null
     });
   }
 
   const request = validPlans.sort(compareMissionRequests)[0] ?? null;
   if (request) {
-    return { request, shipNeed: null };
+    return {
+      requests: [request],
+      shipNeed: null,
+      preferredOriginCoordinates: { ...request.originPlanet.coordinates }
+    };
+  }
+
+  const relocationPlan = createBreakRelocationPlan(
+    context,
+    target,
+    requiredStrength,
+    (target.currentDefencesCount ?? 0) > 0
+  );
+  if (relocationPlan) {
+    return {
+      requests: relocationPlan.requests,
+      shipNeed: null,
+      preferredOriginCoordinates: { ...relocationPlan.stagingPlanet.coordinates }
+    };
   }
 
   return {
-    request: null,
-    shipNeed: createBreakShipNeed(context, target, requiredStrength, bestAvailableStrength, hasBombardmentPresence, closestOrigin)
+    requests: [],
+    shipNeed: createBreakShipNeed(
+      context,
+      target,
+      requiredStrength,
+      Math.max(bestAvailableStrength, relocationPlan?.combinedStrength ?? 0),
+      hasBombardmentPresence || Boolean(relocationPlan?.hasBombardmentPresence),
+      closestOrigin
+    ),
+    preferredOriginCoordinates: closestOrigin ? { ...closestOrigin.coordinates } : null
   };
 }
 
@@ -317,12 +364,15 @@ function createPlunderMissionRequest(
       phase: 'PLUNDER',
       missionType: FleetMissionType.ATTACK,
       target,
+      destinationCoordinates: { ...target.coordinates },
       originPlanet,
       ships: selection.ships,
       expectedLoot: estimatedLoot,
       travelDistance: distance,
       travelTurns,
-      score: Math.max(1, Math.round(estimatedLoot - (travelTurns * 6)))
+      score: Math.max(1, Math.round(estimatedLoot - (travelTurns * 6))),
+      stagingPlanet: null,
+      moveRole: null
     });
   }
 
@@ -422,6 +472,186 @@ function buildBreakSelection(
   return totalStrength >= requiredStrength
     ? { ships: selection, combatStrength: totalStrength }
     : { ships: [], combatStrength: totalStrength };
+}
+
+function createBreakRelocationPlan(
+  context: BotSubsystemContext,
+  target: BotStrategicMilitaryTargetSnapshot,
+  requiredStrength: number,
+  requireBombardmentBreaker: boolean
+): RelocationBreakPlan | null {
+  const stagePlans = context.snapshot.planets
+    .map((stagingPlanet) => buildBreakRelocationPlanForStage(
+      context,
+      target,
+      stagingPlanet,
+      requiredStrength,
+      requireBombardmentBreaker
+    ))
+    .filter((plan): plan is RelocationBreakPlan => plan !== null)
+    .sort((left, right) =>
+      left.totalEtaScore - right.totalEtaScore
+      || left.requests.length - right.requests.length
+      || left.stagingPlanet.coordinates.x - right.stagingPlanet.coordinates.x
+      || left.stagingPlanet.coordinates.y - right.stagingPlanet.coordinates.y
+      || left.stagingPlanet.coordinates.z - right.stagingPlanet.coordinates.z
+    );
+
+  return stagePlans[0] ?? null;
+}
+
+function buildBreakRelocationPlanForStage(
+  context: BotSubsystemContext,
+  target: BotStrategicMilitaryTargetSnapshot,
+  stagingPlanet: BotPlanetSnapshot,
+  requiredStrength: number,
+  requireBombardmentBreaker: boolean
+): RelocationBreakPlan | null {
+  const originCandidates = context.snapshot.planets
+    .map((originPlanet) => {
+      const distanceToStage = calculateTravelDistance(originPlanet.coordinates, stagingPlanet.coordinates);
+      const travelTurnsToStage = resolveTravelTurns(originPlanet, distanceToStage);
+      return {
+        originPlanet,
+        distanceToStage,
+        travelTurnsToStage,
+        combatCandidates: resolveOriginCombatCandidates(originPlanet).map((candidate) => ({ ...candidate }))
+      };
+    })
+    .filter((candidate) => candidate.combatCandidates.length > 0)
+    .sort((left, right) =>
+      left.travelTurnsToStage - right.travelTurnsToStage
+      || left.distanceToStage - right.distanceToStage
+      || left.originPlanet.coordinates.x - right.originPlanet.coordinates.x
+      || left.originPlanet.coordinates.y - right.originPlanet.coordinates.y
+      || left.originPlanet.coordinates.z - right.originPlanet.coordinates.z
+    );
+
+  if (originCandidates.length <= 1) {
+    return null;
+  }
+
+  const selections = new Map<string, Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>>();
+  let combinedStrength = 0;
+  let hasBombardmentPresence = originCandidates.some((origin) =>
+    origin.combatCandidates.some((candidate) => candidate.hasBombardmentWeapons)
+  );
+
+  if (requireBombardmentBreaker) {
+    let selectedBombardment = false;
+    for (const origin of originCandidates) {
+      const bombardmentCandidate = origin.combatCandidates.find((candidate) =>
+        candidate.amount > 0 && candidate.hasBombardmentWeapons
+      );
+      if (!bombardmentCandidate) {
+        continue;
+      }
+
+      const added = tryAddShipsToSelection(
+        selections,
+        origin.originPlanet,
+        bombardmentCandidate.type,
+        1,
+        origin.distanceToStage
+      );
+      if (added <= 0) {
+        continue;
+      }
+
+      combinedStrength += estimateShipCombatPower(bombardmentCandidate.type) * added;
+      bombardmentCandidate.amount -= added;
+      selectedBombardment = true;
+      break;
+    }
+
+    if (!selectedBombardment) {
+      return null;
+    }
+  }
+
+  for (const origin of originCandidates) {
+    if (combinedStrength >= requiredStrength) {
+      break;
+    }
+
+    for (const candidate of origin.combatCandidates) {
+      if (candidate.amount <= 0 || candidate.power <= 0) {
+        continue;
+      }
+      if (combinedStrength >= requiredStrength) {
+        break;
+      }
+
+      const neededAmount = Math.min(
+        candidate.amount,
+        Math.max(1, Math.ceil((requiredStrength - combinedStrength) / candidate.power))
+      );
+      const added = tryAddShipsToSelection(
+        selections,
+        origin.originPlanet,
+        candidate.type,
+        neededAmount,
+        origin.distanceToStage
+      );
+      if (added <= 0) {
+        continue;
+      }
+
+      combinedStrength += candidate.power * added;
+      candidate.amount -= added;
+    }
+  }
+
+  if (combinedStrength < requiredStrength) {
+    return null;
+  }
+
+  const requests: MissionRequest[] = [];
+  let totalMoveTurns = 0;
+  const attackDistance = calculateTravelDistance(stagingPlanet.coordinates, target.coordinates);
+  const attackTurns = resolveTravelTurns(stagingPlanet, attackDistance);
+
+  for (const origin of originCandidates) {
+    const key = toCoordinatesKey(origin.originPlanet.coordinates);
+    const selectedShips = selections.get(key);
+    if (!selectedShips || selectedShips.length <= 0) {
+      continue;
+    }
+    if (origin.originPlanet.coordinates.x === stagingPlanet.coordinates.x
+      && origin.originPlanet.coordinates.y === stagingPlanet.coordinates.y
+      && origin.originPlanet.coordinates.z === stagingPlanet.coordinates.z) {
+      continue;
+    }
+
+    totalMoveTurns += origin.travelTurnsToStage;
+    requests.push({
+      kind: 'MISSION',
+      phase: 'BREAK',
+      missionType: FleetMissionType.MOVE,
+      target,
+      destinationCoordinates: { ...stagingPlanet.coordinates },
+      originPlanet: origin.originPlanet,
+      ships: selectedShips.map((ship) => ({ ...ship })),
+      expectedLoot: 0,
+      travelDistance: origin.distanceToStage,
+      travelTurns: origin.travelTurnsToStage,
+      score: Math.max(1, 560 - (origin.travelTurnsToStage * 6) - (attackTurns * 4)),
+      stagingPlanet,
+      moveRole: 'RELOCATION'
+    });
+  }
+
+  if (requests.length <= 0) {
+    return null;
+  }
+
+  return {
+    requests,
+    stagingPlanet,
+    combinedStrength,
+    totalEtaScore: totalMoveTurns + attackTurns,
+    hasBombardmentPresence
+  };
 }
 
 function buildPlunderSelection(
@@ -802,32 +1032,33 @@ function createMissionProposal(
   request: MissionRequest,
   index: number
 ): BotProposal {
-  const missionLabel = request.phase === 'INTEL'
-    ? 'spy'
-    : request.phase === 'BREAK'
-      ? 'break neutral defenses'
-      : 'plunder neutral farm';
-  const summary = `Mission request #${index + 1}: ${missionLabel} at ${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z} from ${request.originPlanet.name}.`;
+  const summary = request.missionType === FleetMissionType.MOVE
+    ? `Mission request #${index + 1}: relocate BREAK ships from ${request.originPlanet.name} to ${request.destinationCoordinates.x}:${request.destinationCoordinates.y}:${request.destinationCoordinates.z} for farm ${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}.`
+    : request.phase === 'INTEL'
+      ? `Mission request #${index + 1}: spy ${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z} from ${request.originPlanet.name}.`
+      : request.phase === 'BREAK'
+        ? `Mission request #${index + 1}: break neutral defenses at ${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z} from ${request.originPlanet.name}.`
+        : `Mission request #${index + 1}: plunder neutral farm at ${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z} from ${request.originPlanet.name}.`;
 
   return {
-    proposalId: `strategic-military:mission:${request.phase}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}:${context.snapshot.turn}`,
+    proposalId: `strategic-military:mission:${request.phase}:${request.missionType}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.destinationCoordinates.x}:${request.destinationCoordinates.y}:${request.destinationCoordinates.z}:${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}:${context.snapshot.turn}`,
     subsystemId: 'STRATEGIC_MILITARY',
     kind: 'FLEET_MISSION',
     status: 'PROPOSED',
     goalKey: `strategic-military:${request.phase}:${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}`,
-    dedupeKey: `strategic-military:mission:${request.phase}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}`,
+    dedupeKey: `strategic-military:mission:${request.phase}:${request.missionType}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.destinationCoordinates.x}:${request.destinationCoordinates.y}:${request.destinationCoordinates.z}:${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}`,
     summary,
     planetId: request.originPlanet.planetId,
-    targetCoordinates: { ...request.target.coordinates },
+    targetCoordinates: { ...request.destinationCoordinates },
     expectedValue: Math.max(1, Math.round(request.expectedLoot + request.score)),
-    urgency: request.phase === 'INTEL' ? 52 : request.phase === 'BREAK' ? 81 : 88,
-    risk: request.phase === 'INTEL' ? 6 : request.phase === 'BREAK' ? 24 : 15,
-    confidence: request.phase === 'INTEL' ? 78 : request.phase === 'BREAK' ? 67 : 73,
+    urgency: request.phase === 'INTEL' ? 52 : request.missionType === FleetMissionType.MOVE ? 79 : request.phase === 'BREAK' ? 81 : 88,
+    risk: request.phase === 'INTEL' ? 6 : request.missionType === FleetMissionType.MOVE ? 12 : request.phase === 'BREAK' ? 24 : 15,
+    confidence: request.phase === 'INTEL' ? 78 : request.missionType === FleetMissionType.MOVE ? 71 : request.phase === 'BREAK' ? 67 : 73,
     requestedResources: emptyResources(),
     requestPayload: {
       missionType: request.missionType,
       origin: { ...request.originPlanet.coordinates },
-      target: { ...request.target.coordinates },
+      target: { ...request.destinationCoordinates },
       ships: request.ships.map((ship) => ({ ...ship })),
       carriedBombs: [],
       cargo: emptyResources(),
@@ -841,6 +1072,10 @@ function createMissionProposal(
       missionPhase: request.phase,
       missionType: request.missionType,
       originPlanet: request.originPlanet.name,
+      farmTarget: `${request.target.coordinates.x}:${request.target.coordinates.y}:${request.target.coordinates.z}`,
+      missionTarget: `${request.destinationCoordinates.x}:${request.destinationCoordinates.y}:${request.destinationCoordinates.z}`,
+      moveRole: request.moveRole,
+      stagingPlanet: request.stagingPlanet?.name ?? null,
       travelDistance: request.travelDistance,
       travelTurns: request.travelTurns,
       expectedLoot: request.expectedLoot,
@@ -893,10 +1128,52 @@ function createShipNeedProposal(
 function compareMissionRequests(left: MissionRequest, right: MissionRequest): number {
   return right.score - left.score
     || right.expectedLoot - left.expectedLoot
+    || Number(right.missionType === FleetMissionType.MOVE) - Number(left.missionType === FleetMissionType.MOVE)
     || left.travelTurns - right.travelTurns
     || left.target.coordinates.x - right.target.coordinates.x
     || left.target.coordinates.y - right.target.coordinates.y
     || left.target.coordinates.z - right.target.coordinates.z;
+}
+
+function selectMissionRequestsForCap(
+  requests: MissionRequest[],
+  missionCap: number
+): MissionRequest[] {
+  if (missionCap <= 0) {
+    return [];
+  }
+
+  const intelRequests = requests
+    .filter((request) => request.phase === 'INTEL')
+    .sort(compareMissionRequests);
+  if (intelRequests.length >= missionCap) {
+    return intelRequests.slice(0, missionCap);
+  }
+
+  const selected = [...intelRequests];
+  let remainingCap = missionCap - selected.length;
+  const breakRequests = requests
+    .filter((request) => request.phase === 'BREAK')
+    .sort(compareMissionRequests);
+  const plunderRequests = requests
+    .filter((request) => request.phase === 'PLUNDER')
+    .sort(compareMissionRequests);
+
+  const breakCap = Math.min(breakRequests.length, Math.ceil(remainingCap * BREAK_MISSION_SHARE));
+  const plunderCap = Math.min(plunderRequests.length, Math.max(0, remainingCap - breakCap));
+  selected.push(...breakRequests.slice(0, breakCap));
+  selected.push(...plunderRequests.slice(0, plunderCap));
+
+  remainingCap = missionCap - selected.length;
+  if (remainingCap <= 0) {
+    return selected;
+  }
+
+  const remainingBreak = breakRequests.slice(breakCap);
+  const remainingPlunder = plunderRequests.slice(plunderCap);
+  const overflow = [...remainingBreak, ...remainingPlunder].sort(compareMissionRequests);
+  selected.push(...overflow.slice(0, remainingCap));
+  return selected;
 }
 
 function resolveMissionRequestCap(context: BotSubsystemContext): number {
@@ -1012,6 +1289,65 @@ function resolveTravelTurns(originPlanet: BotPlanetSnapshot, distance: number): 
     originPlanet.tech.hyperspaceDriveLevel,
     0
   );
+}
+
+function tryAddShipsToSelection(
+  selections: Map<string, Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>>,
+  originPlanet: BotPlanetSnapshot,
+  shipType: ShipType,
+  maxWanted: number,
+  distance: number
+): number {
+  if (maxWanted <= 0) {
+    return 0;
+  }
+
+  const key = toCoordinatesKey(originPlanet.coordinates);
+  const existingSelection = selections.get(key) ?? [];
+  const currentEntry = existingSelection.find((entry) => entry.type === shipType);
+  const currentAmount = currentEntry ? currentEntry.undamagedAmount + currentEntry.damagedAmount : 0;
+
+  for (let amount = maxWanted; amount >= 1; amount -= 1) {
+    const nextSelection = existingSelection.map((entry) => ({ ...entry }));
+    const nextEntry = nextSelection.find((entry) => entry.type === shipType);
+    if (nextEntry) {
+      nextEntry.undamagedAmount = currentAmount + amount;
+    } else {
+      nextSelection.push({
+        type: shipType,
+        undamagedAmount: amount,
+        damagedAmount: 0
+      });
+    }
+
+    if (!hasEnoughDeuteriumForSelection(originPlanet, nextSelection, distance)) {
+      continue;
+    }
+
+    selections.set(key, nextSelection);
+    return amount;
+  }
+
+  return 0;
+}
+
+function hasEnoughDeuteriumForSelection(
+  originPlanet: BotPlanetSnapshot,
+  selection: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>,
+  distance: number
+): boolean {
+  if (distance <= 0) {
+    return true;
+  }
+
+  const fuelCost = calculateFuelCost(
+    selection.map((ship) => ({
+      type: ship.type,
+      amount: ship.undamagedAmount + ship.damagedAmount
+    })),
+    distance
+  );
+  return originPlanet.localResources.deuterium >= fuelCost;
 }
 
 function emptyResources(): ResourceAmounts {

@@ -1530,9 +1530,68 @@ Typical shortage cases:
 
 ### Strategic Military phase-2 follow-up
 
-The next major slice after phase 1 should be:
+The next major slice after phase 1 should be relocation-assisted `BREAK`.
 
-- `MOVE`-based military relocation so larger defense-break fleets can be assembled on the best raid origin planets
+Hard gate:
+
+- `BREAK` must be completed before `PLUNDER` is even considered
+- if known ships or known defenses still remain, that neutral target stays in the `BREAK` / `SHIP_NEED` world only
+
+Next-phase executable mission types:
+
+- `SPY`
+- `ATTACK`
+- `MOVE`
+
+Current relocation scope:
+
+- focus only on military ships required for `BREAK`
+- broader relocation for cargo / mixed `PLUNDER` fleets stays for a later phase
+
+Relocation trigger:
+
+- trigger when no single origin can satisfy the required `BREAK` force
+- also trigger when regrouping to a nearer staging planet is better
+
+Primary relocation use case:
+
+- gather a `BREAK` fleet on one nearby owned planet
+
+Staging-planet rule:
+
+- choose the owned planet minimizing total ETA from contributing fleets to the target
+
+Origin-composition rule:
+
+- a blocked `BREAK` target may gather ships from multiple origins by `MOVE`
+- the eventual `ATTACK` can still remain single-origin after regrouping
+
+`SHIP_NEED` interaction:
+
+- try relocation first
+- emit `SHIP_NEED` only if regrouping still cannot satisfy `BREAK`
+
+Stable carry-over rules:
+
+- keep `BREAK` force sizing at estimated minimum `* 1.5`
+- keep explicit distinction between:
+  - `BREAK` intel
+  - `PLUNDER` intel
+
+`BREAK` vs `PLUNDER` budget split after relocation:
+
+- `60% BREAK`
+- `40% PLUNDER`
+
+Intel refresh follow-up:
+
+- after the whole galaxy is scanned, refresh all known planets uniformly by oldest-first
+
+Explicit non-goals for this relocation phase:
+
+- no multi-target coordinated attack waves
+- no cross-turn fleet reservation system
+- no escort-loss adaptive composition
 
 ## Trace contract
 

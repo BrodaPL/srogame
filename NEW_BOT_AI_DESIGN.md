@@ -906,9 +906,53 @@ Priority notes:
 * this subsystem only consumes probes for farm discovery and refresh,
 * after the whole galaxy is scanned, low-priority intel refresh should walk the oldest known intel first.
 
-Phase-2 note:
+### Next phase: relocation-assisted `BREAK`
 
-* fleet relocation by `MOVE` should be the next major follow-up so larger neutral-defense break fleets can be assembled on the best raid origin planets.
+`BREAK` is a hard gate before `PLUNDER` is even considered.
+
+That means:
+
+* if a neutral planet still has known ships or known defenses, it must stay in `BREAK`,
+* it must not compete in the `PLUNDER` pool yet,
+* the subsystem should think only in `INTEL`, `BREAK`, or `SHIP_NEED` terms until that gate is cleared.
+
+The next major slice after the current phase-1 implementation should be relocation-assisted `BREAK` preparation.
+
+Next-phase mission scope:
+
+* `SPY`
+* `ATTACK`
+* `MOVE`
+
+Next-phase relocation rules:
+
+* relocation should trigger when:
+  * no single origin can satisfy the required `BREAK` force,
+  * or regrouping to a nearer staging planet is better,
+* current relocation scope should focus only on military ships required for `BREAK`,
+* the main relocation use case should be:
+  * gather a `BREAK` fleet on one nearby owned planet,
+* the staging planet should be the owned planet minimizing total ETA from contributing fleets to the target,
+* one blocked `BREAK` target may gather ships from multiple origins by `MOVE`,
+* `SHIP_NEED` should be emitted only if regrouping still cannot satisfy `BREAK`.
+
+Next-phase balancing rules:
+
+* keep `BREAK` force sizing at estimated minimum `* 1.5`,
+* after relocation is available, `BREAK` and `PLUNDER` should compete under a reserved split:
+  * `60% BREAK`
+  * `40% PLUNDER`,
+* intel refresh should walk all known planets uniformly by oldest-first,
+* keep separate confidence / reasoning for:
+  * `BREAK` intel
+  * `PLUNDER` intel.
+
+Next-phase explicit non-goals:
+
+* no multi-target coordinated attack waves,
+* no cross-turn fleet reservation system,
+* no escort-loss adaptive composition,
+* no cargo-ship relocation yet; broader `PLUNDER` relocation remains a later follow-up.
 
 ### Indicative fleet allocation
 
