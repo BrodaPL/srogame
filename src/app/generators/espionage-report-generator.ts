@@ -26,6 +26,25 @@ export type EspionageReportOptions = {
   isRead?: boolean;
 };
 
+export function calculateProbeEspionageLevelBonus(probeAmount: number): number {
+  const normalizedProbes = Math.max(0, Math.floor(probeAmount));
+  if (normalizedProbes <= 0) {
+    return 0;
+  }
+
+  let nextThreshold = 1;
+  let currentStep = 1;
+  let bonus = 0;
+
+  while (nextThreshold <= normalizedProbes && bonus < 14) {
+    bonus = currentStep - 1;
+    currentStep += 1;
+    nextThreshold += currentStep;
+  }
+
+  return Math.min(14, bonus);
+}
+
 export class EspionageReportGenerator {
   public createEspionageReport(
     player: Player,
@@ -168,10 +187,9 @@ export class EspionageReportGenerator {
     const defenderTech = planetOwner?.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY) ?? 0;
     const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
     const planetModifier = 1 + (planet.info.planetaryParameters.anomaliesAndNoise / 100);
-    const normalizedProbes = Math.max(0, Math.floor(probeAmount));
 
     return Math.floor(attackerTech * planetModifier)
-      + Math.floor(Math.sqrt(normalizedProbes))
+      + calculateProbeEspionageLevelBonus(probeAmount)
       - Math.floor(Math.sqrt(defenderTech) * 2)
       - Math.ceil(Math.sqrt(Math.max(0, bunkerLevel)));
   }
