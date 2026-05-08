@@ -6,6 +6,9 @@ import { PlayerType } from '../../../../src/app/models/enums/player-type.js';
 import { ReportType } from '../../../../src/app/models/enums/report-type.js';
 import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
+import { DiplomaticProposalState } from '../../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
+import { DiplomacyResolver } from '../../../../src/app/models/diplomacy/diplomacy-resolver.js';
 import { ManyDefences } from '../../../../src/app/models/defences/many-defences.js';
 import { ManyShips } from '../../../../src/app/models/fleets/many-ships.js';
 import {
@@ -25,10 +28,12 @@ import type {
   BotIntelCandidateSnapshot,
   BotPlanetMaturityStage,
   BotPlanetSnapshot,
+  BotStrategicDiplomaticFactionSnapshot,
   BotStrategicMilitaryTargetSnapshot,
   BotV2FeatureFlags,
   BotWorldSnapshot
 } from '../bot-v2-types.ts';
+import type { EspionageReportData } from '../../../../src/app/models/reports/espionage-report-data.ts';
 import {
   BUILDING_BLUEPRINTS,
   DEFENCE_BLUEPRINTS,
@@ -94,7 +99,8 @@ function buildEmpireSnapshot(
     hasCriticalEnergyProblem: planets.some((planet) => planet.blockers.energyStarved),
     hasCriticalStorageProblem: planets.some((planet) => planet.blockers.storageBlocked),
     intelCandidates: resolveIntelCandidates(galaxy, player, planets.length),
-    strategicMilitaryTargets: resolveStrategicMilitaryTargets(galaxy, player)
+    strategicMilitaryTargets: resolveStrategicMilitaryTargets(galaxy, player),
+    strategicDiplomaticFactions: resolveStrategicDiplomaticFactions(galaxy, player)
   };
 }
 
@@ -826,6 +832,69 @@ function resolveStrategicMilitaryTargets(
   return targets;
 }
 
+function resolveStrategicDiplomaticFactions(
+  galaxy: Galaxy,
+  player: Player
+): BotStrategicDiplomaticFactionSnapshot[] {
+  const diplomacyResolver = new DiplomacyResolver(galaxy.diplomaticRelations);
+
+  return galaxy.players
+    .filter((foreignPlayer) =>
+      foreignPlayer.playerId !== player.playerId
+      && foreignPlayer.type !== PlayerType.NEUTRAL
+    )
+    .map((foreignPlayer) => {
+      const knownReports = foreignPlayer.planets
+        .map((planet) => planet.lastReportData.get(player.playerId) ?? null)
+        .filter((report): report is EspionageReportData => report !== null);
+      if (knownReports.length <= 0) {
+        return null;
+      }
+
+      const pendingIncomingRequestedStatuses = galaxy.diplomaticProposals
+        .filter((proposal) =>
+          proposal.state === DiplomaticProposalState.PENDING
+          && proposal.fromPlayerId === foreignPlayer.playerId
+          && proposal.toPlayerId === player.playerId
+        )
+        .map((proposal) => proposal.requestedStatus);
+      const pendingOutgoingRequestedStatuses = galaxy.diplomaticProposals
+        .filter((proposal) =>
+          proposal.state === DiplomaticProposalState.PENDING
+          && proposal.fromPlayerId === player.playerId
+          && proposal.toPlayerId === foreignPlayer.playerId
+        )
+        .map((proposal) => proposal.requestedStatus);
+
+      return {
+        playerId: foreignPlayer.playerId,
+        playerName: foreignPlayer.playerName,
+        playerType: foreignPlayer.type,
+        currentStatus: diplomacyResolver.getStatus(player.playerId, foreignPlayer.playerId),
+        totalPlanetCount: foreignPlayer.planets.length,
+        knownPlanetCount: knownReports.length,
+        averageKnownBuildingLevel: averageNumber(knownReports.map((report) => report.averageBuildingLevel)),
+        averageKnownTechLevel: averageNumber(knownReports.map((report) => report.averageTechLevel)),
+        averageKnownShipsAmount: averageNumber(knownReports.map((report) => report.totalShipsAmount)),
+        averageKnownDefencesAmount: averageNumber(knownReports.map((report) => report.totalDefencesAmount)),
+        bestIntelDepth: knownReports.reduce((best, report) => Math.max(best, resolveEspionageIntelDepth(report)), 0),
+        lastRelevantReportAge: knownReports.reduce<number | null>((best, report) => {
+          const age = Math.max(0, galaxy.currentTurn - report.createdTurn);
+          return best === null ? age : Math.min(best, age);
+        }, null),
+        recentBattleReportCount: countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 80),
+        pendingIncomingRequestedStatuses,
+        pendingOutgoingRequestedStatuses
+      } satisfies BotStrategicDiplomaticFactionSnapshot;
+    })
+    .filter((entry): entry is BotStrategicDiplomaticFactionSnapshot => entry !== null)
+    .sort((left, right) =>
+      left.currentStatus.localeCompare(right.currentStatus)
+      || right.totalPlanetCount - left.totalPlanetCount
+      || left.playerId - right.playerId
+    );
+}
+
 function resolveSystemScanRadiusDistance(
   left: { x: number; y: number },
   right: { x: number; y: number }
@@ -855,6 +924,81 @@ function resolveColonizationScore(candidate: {
     + (positiveIndustry * 200)
     + (positiveResourceSpread * 150)
   );
+}
+
+function resolveEspionageIntelDepth(report: EspionageReportData): number {
+  let depth = 0;
+  if (report.averageBuildingLevel > 0) {
+    depth += 1;
+  }
+  if (report.averageTotalResources > 0) {
+    depth += 1;
+  }
+  if (report.averageTechLevel > 0) {
+    depth += 1;
+  }
+  if (report.totalDefencesAmount > 0 || report.totalShipsAmount > 0) {
+    depth += 1;
+  }
+  if (report.buildingsLevels.size > 0) {
+    depth += 2;
+  }
+  if (report.resourcesAmount.getTotalResourceAmount() > 0) {
+    depth += 2;
+  }
+  if (report.techLevels.size > 0) {
+    depth += 2;
+  }
+  if (report.defences.length > 0) {
+    depth += 2;
+  }
+  if (report.ships.size > 0) {
+    depth += 2;
+  }
+  return Math.max(0, Math.min(14, depth));
+}
+
+function countRecentBattleReportsForFaction(
+  player: Player,
+  foreignPlayer: Player,
+  currentTurn: number,
+  windowTurns: number
+): number {
+  const factionCoordinates = new Set(
+    foreignPlayer.planets.map((planet) =>
+      `${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}:${planet.basicInfo.order}`
+    )
+  );
+  let count = 0;
+
+  for (const report of player.reports) {
+    if (
+      report.reportType !== ReportType.FLEET_REPORT
+      || !report.title.startsWith('Battle Report:')
+      || !report.sourceCoordinates
+      || Math.max(0, currentTurn - report.createdTurn) > windowTurns
+    ) {
+      continue;
+    }
+
+    const key = `${report.sourceCoordinates.x}:${report.sourceCoordinates.y}:${report.sourceCoordinates.z}`;
+    if (factionCoordinates.has(key)) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function averageNumber(values: number[]): number {
+  if (values.length <= 0) {
+    return 0;
+  }
+
+  const sum = values.reduce((accumulator, value) =>
+    accumulator + (Number.isFinite(value) ? value : 0), 0
+  );
+  return sum / values.length;
 }
 
 function resolveLastFleetReportTurn(

@@ -1593,6 +1593,187 @@ Explicit non-goals for this relocation phase:
 - no cross-turn fleet reservation system
 - no escort-loss adaptive composition
 
+## Strategic Diplomatic phase-1 scope
+
+`Strategic Diplomatic` is a global geopolitical-management subsystem.
+
+It does **not** target neutral farms.
+It does **not** start as a mission subsystem in phase 1.
+
+Phase-1 focus:
+
+- manage diplomatic relations with discovered non-neutral players and bots
+- estimate geopolitical situation
+- decide preferred diplomatic directions
+- propose diplomatic-state changes
+- expose the diplomatic situation upward to `Supervisor` and the future weight-management subsystem
+
+### Strategic Diplomatic phase-1 outputs
+
+Phase-1 should emit:
+
+- diplomatic action proposals
+- global diplomatic situation summary
+- per-faction diplomatic summary
+
+Phase-1 should **not** yet emit:
+
+- fleet-mission requests
+- direct building requests
+- direct `SHIP_NEED` / bomb / probe pressure
+
+### Strategic Diplomatic phase-1 proposal scope
+
+Allowed proposal families:
+
+- relation-change proposals
+- proposal-management preferences
+- retaliation flags
+
+### Strategic Diplomatic relation ladder
+
+Use adjacent-only diplomatic-state changes.
+
+Escalation:
+
+- `ALLIED -> PEACE`
+- `PEACE -> NEUTRAL`
+- `NEUTRAL -> WAR`
+
+Deescalation:
+
+- `WAR -> NEUTRAL`
+- `NEUTRAL -> PEACE`
+- `PEACE -> ALLIED`
+
+### Strategic Diplomatic phase-1 target scope
+
+Track only:
+
+- discovered non-neutral human players
+- discovered non-neutral bot players
+
+Do not track neutral-planet-type empires here.
+
+### Strategic Diplomatic per-faction model
+
+For each discovered faction, maintain at least:
+
+- current diplomatic status
+- strength estimate
+- stance score
+- hostility score
+- confidence score
+
+### Strategic Diplomatic strength-estimate inputs
+
+Per-faction strength estimate should include:
+
+- planet count
+- average development
+- espionage quality gap
+- battle reports
+- recent hostile-action history
+
+Winning / losing estimation should include:
+
+- relative strength estimate
+- recent battle outcomes
+- recent hostile actions
+
+### Strategic Diplomatic stance math
+
+Build stance score with a layered model:
+
+- personality bias
+- relative strength bias
+- recent hostility
+- current relation tension
+- ally / network pressure
+- confidence penalty
+
+Recommended compact utility form:
+
+```text
+actionUtility =
+  personalityPressure
+  + relationPressure
+  + threatOrOpportunity
+  + eventPressure
+  + networkPressure
+  - uncertaintyPenalty
+```
+
+### Strategic Diplomatic personality target-state model
+
+Use a hybrid model:
+
+- `aggressive` wants at least one active war most of the time
+- `miner` prefers alliance and peace over war
+- `diplomat` prefers alliance-building first and selective war later
+- `isolationist` prefers neutrality or peace
+- `balanced` prefers war mainly against weaker opponents
+
+Phase-1 diplomatic proposal priority should be based on:
+
+- stance score
+- confidence
+- personality target deficit
+
+### Strategic Diplomatic hostility-escalation rule
+
+Do not escalate to `WAR` from one small hostile event alone.
+
+Use accumulated hostility:
+
+- hostile actions add escalation pressure
+- repeated hostility adds more pressure
+- only sufficient accumulated hostility should make `WAR` a top diplomatic action
+
+### Strategic Diplomatic upward summary contract
+
+Expose both:
+
+- global diplomatic summary
+- per-faction diplomatic summary
+
+Recommended global summary fields:
+
+- count of `WAR`
+- count of `ALLIED`
+- count of `PEACE`
+- count of `NEUTRAL`
+- strongest enemy estimate
+- weakest enemy estimate
+- whether we are winning any war
+- whether we are losing any war
+- whether we lack allies
+- top escalation target
+- top deescalation target
+- top alliance target
+- overall diplomatic pressure score
+
+### Strategic Diplomatic phase-1 non-goals
+
+Explicitly out of scope:
+
+- attack missions
+- support missions
+- bombardment missions
+- siege missions
+- direct building requests
+- direct `SHIP_NEED` / bomb / probe pressure
+
+### Strategic Diplomatic deferred future notes
+
+Later phases should add:
+
+- special multi-probe espionage planning against real players
+- attack / support / bombard / siege mission planning
+- direct building pressure for `BOMB_DEPOT`, `ALLIANCE_DEPOT`, and `JUMP_GATE`
+- direct `SHIP_NEED` / probe / bomb pressure
+- tributes / bribes / negotiated payments to influence diplomatic-state changes
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

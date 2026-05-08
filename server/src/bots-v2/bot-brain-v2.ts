@@ -15,6 +15,7 @@ import { NoopBotExecutor } from './execution/bot-executor.js';
 import { BotDefensiveSubsystem } from './subsystems/defensive/bot-defensive-subsystem.js';
 import { BotEconomicSubsystem } from './subsystems/economic/bot-economic-subsystem.js';
 import { BotStrategicDevelopmentSubsystem } from './subsystems/strategic-development/bot-strategic-development-subsystem.js';
+import { BotStrategicDiplomaticSubsystem } from './subsystems/strategic-diplomatic/bot-strategic-diplomatic-subsystem.js';
 import { BotStrategicMilitarySubsystem } from './subsystems/strategic-military/bot-strategic-military-subsystem.js';
 import { BotWarfareSubsystem } from './subsystems/warfare/bot-warfare-subsystem.js';
 import { ShadowBotSupervisor } from './supervisor/bot-supervisor.js';
@@ -142,6 +143,9 @@ function buildEnabledSubsystems(flags: BotV2FeatureFlags): BotSubsystem[] {
   }
   if (flags.enabledSubsystems.strategicMilitary) {
     subsystems.push(new BotStrategicMilitarySubsystem());
+  }
+  if (flags.enabledSubsystems.strategicDiplomatic) {
+    subsystems.push(new BotStrategicDiplomaticSubsystem());
   }
   return subsystems;
 }

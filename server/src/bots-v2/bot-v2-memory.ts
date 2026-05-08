@@ -15,6 +15,9 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
     acceptedLongTermCommitments: [],
     strategicMilitary: {
       farmLedger: []
+    },
+    strategicDiplomatic: {
+      factionLedger: []
     }
   };
 }

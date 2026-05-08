@@ -966,7 +966,7 @@ Next-phase explicit non-goals:
 
 **Purpose:** manage wars against other players, support allies, and conduct military-diplomatic planning.
 
-**Goal amount:** Many goals. TODO: it needs more detail.
+**Goal amount:** Many goals.
 
 This subsystem deals with real geopolitical conflict rather than simple raiding.
 This system does not consider neutral type players (farms).
@@ -985,6 +985,148 @@ This system does not consider neutral type players (farms).
   * plan sieges,
   * plan planetary defense,
   * maintain intelligence on other players’ planets.
+
+### Phase-1 scope: diplomatic management first
+
+The first executable `Strategic Diplomatic` slice should **not** be a mission subsystem yet.
+
+Phase 1 should focus on:
+
+* managing diplomatic relations with discovered non-neutral players and bots,
+* estimating the current geopolitical situation,
+* evaluating strength / weakness / winning / losing status against each discovered faction,
+* deciding preferred diplomatic directions,
+* proposing diplomatic-state changes,
+* exposing the diplomatic situation upward to `Supervisor` and the later weight-management subsystem.
+
+Phase-1 should **not** yet execute:
+
+* attack missions,
+* support missions,
+* bombardment missions,
+* siege missions,
+* direct building requests,
+* direct `SHIP_NEED` / bomb / probe production pressure.
+
+### Phase-1 outputs
+
+Phase-1 should emit:
+
+* diplomatic action proposals,
+* global diplomatic situation summary,
+* per-faction diplomatic summary.
+
+### Phase-1 action scope
+
+Allowed proposal families:
+
+* diplomatic relation changes,
+* proposal-management preferences,
+* retaliation flags.
+
+Relation changes should stay adjacent-only:
+
+* escalation:
+  * `ALLIED -> PEACE -> NEUTRAL -> WAR`
+* deescalation:
+  * `WAR -> NEUTRAL -> PEACE -> ALLIED`
+
+### Phase-1 target scope
+
+Track only:
+
+* discovered non-neutral human players,
+* discovered non-neutral bot players.
+
+Do not track neutral-planet-type empires here.
+
+### Phase-1 evaluation model
+
+Per discovered faction, subsystem should maintain:
+
+* a strength estimate,
+* a stance score,
+* a hostility score,
+* a confidence level.
+
+Strength estimate inputs should include:
+
+* planet count,
+* average development,
+* espionage quality gap,
+* battle reports,
+* recent hostile-action history.
+
+Stance-score math should be layered:
+
+* personality bias,
+* relative strength bias,
+* recent hostility,
+* current relation tension,
+* ally / network pressure,
+* confidence penalty.
+
+Winning / losing estimation should include:
+
+* relative strength estimate,
+* recent battle outcomes,
+* recent hostile actions.
+
+### Personality target-state model
+
+Use a hybrid model:
+
+* `aggressive` wants at least one active war most of the time,
+* `miner` prefers alliance and peace over war,
+* `diplomat` prefers alliance-building first and selective war later,
+* `isolationist` prefers neutrality or peace,
+* `balanced` prefers war mainly against weaker opponents.
+
+Phase-1 diplomatic proposal priority should be based on:
+
+* stance score,
+* confidence,
+* personality target deficit.
+
+### Hostility escalation rule
+
+Do not escalate to `WAR` from one small hostile event alone.
+
+Use accumulated hostility:
+
+* hostile actions should add escalation pressure,
+* repeated hostility should increase it further,
+* only sufficient accumulated hostility should make `WAR` a top diplomatic action.
+
+### Upward summary contract
+
+This subsystem should expose enough summary data for `Supervisor` and the future weight-management subsystem.
+
+Recommended global summary fields:
+
+* count of `WAR`,
+* count of `ALLIED`,
+* count of `PEACE`,
+* count of `NEUTRAL`,
+* strongest enemy estimate,
+* weakest enemy estimate,
+* whether we are winning any war,
+* whether we are losing any war,
+* whether we lack allies,
+* top escalation target,
+* top deescalation target,
+* top alliance target,
+* overall diplomatic pressure score.
+
+### Deferred future notes
+
+Later phases should add:
+
+* special multi-probe espionage planning against real players,
+* attack / support / bombard / siege mission planning,
+* direct building pressure for `BOMB_DEPOT`, `ALLIANCE_DEPOT`, and `JUMP_GATE`,
+* direct `SHIP_NEED` / probe / bomb pressure,
+* tributes / bribes / negotiated payments to influence diplomatic-state changes.
 
 ### Indicative fleet allocation
 

@@ -7,6 +7,8 @@ import type { BuildingType } from '../../../src/app/models/enums/building-type.t
 import type { DefenceType } from '../../../src/app/models/enums/defence-type.ts';
 import type { ShipType } from '../../../src/app/models/enums/ship-type.ts';
 import type { TechnologyType } from '../../../src/app/models/enums/technology-type.ts';
+import type { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
+import type { PlayerType } from '../../../src/app/models/enums/player-type.ts';
 
 export type BotProposalKind =
   | 'BUILDING'
@@ -73,6 +75,25 @@ export type BotEmpireSnapshot = {
   hasCriticalStorageProblem: boolean;
   intelCandidates: BotIntelCandidateSnapshot[];
   strategicMilitaryTargets: BotStrategicMilitaryTargetSnapshot[];
+  strategicDiplomaticFactions: BotStrategicDiplomaticFactionSnapshot[];
+};
+
+export type BotStrategicDiplomaticFactionSnapshot = {
+  playerId: number;
+  playerName: string;
+  playerType: PlayerType;
+  currentStatus: DiplomaticStatus;
+  totalPlanetCount: number;
+  knownPlanetCount: number;
+  averageKnownBuildingLevel: number;
+  averageKnownTechLevel: number;
+  averageKnownShipsAmount: number;
+  averageKnownDefencesAmount: number;
+  bestIntelDepth: number;
+  lastRelevantReportAge: number | null;
+  recentBattleReportCount: number;
+  pendingIncomingRequestedStatuses: DiplomaticStatus[];
+  pendingOutgoingRequestedStatuses: DiplomaticStatus[];
 };
 
 export type BotIntelCandidateSnapshot = {

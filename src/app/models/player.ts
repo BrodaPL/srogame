@@ -6,6 +6,7 @@ import { PlayerReport } from './reports/player-report';
 import { PlayerMessage } from './mail/player-message';
 import type { DefenceType } from './enums/defence-type';
 import type { ShipType } from './enums/ship-type';
+import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
 import { SupportRequestType } from './requests/support-request';
 import {
   TutorialReadState,
@@ -167,6 +168,19 @@ export type BotMemoryV2StrategicMilitary = {
   farmLedger: BotMemoryV2StrategicMilitaryFarmLedgerEntry[];
 };
 
+export type BotMemoryV2StrategicDiplomaticFactionEntry = {
+  playerId: number;
+  hostilityScore: number;
+  lastComputedStanceScore: number;
+  lastComputedStrengthEstimate: number;
+  lastKnownStatus: DiplomaticStatus | null;
+  lastSeenTurn: number | null;
+};
+
+export type BotMemoryV2StrategicDiplomatic = {
+  factionLedger: BotMemoryV2StrategicDiplomaticFactionEntry[];
+};
+
 export type BotMemoryV2 = {
   version: 1;
   currentStance: string | null;
@@ -179,6 +193,7 @@ export type BotMemoryV2 = {
   recentTargets: BotMemoryV2RecentTarget[];
   acceptedLongTermCommitments: BotMemoryV2LongTermCommitment[];
   strategicMilitary: BotMemoryV2StrategicMilitary;
+  strategicDiplomatic: BotMemoryV2StrategicDiplomatic;
 };
 
 export type PlayerExtras = {
@@ -412,7 +427,8 @@ export class Player {
       acceptedLongTermCommitments: Player.normalizeBotMemoryV2LongTermCommitments(
         memory.acceptedLongTermCommitments
       ),
-      strategicMilitary: Player.normalizeBotMemoryV2StrategicMilitary(memory.strategicMilitary)
+      strategicMilitary: Player.normalizeBotMemoryV2StrategicMilitary(memory.strategicMilitary),
+      strategicDiplomatic: Player.normalizeBotMemoryV2StrategicDiplomatic(memory.strategicDiplomatic)
     };
   }
 
@@ -773,6 +789,48 @@ export class Player {
       .slice(-400);
   }
 
+  private static normalizeBotMemoryV2StrategicDiplomatic(
+    strategicDiplomatic: BotMemoryV2StrategicDiplomatic | null | undefined
+  ): BotMemoryV2StrategicDiplomatic {
+    return {
+      factionLedger: Player.normalizeBotMemoryV2StrategicDiplomaticFactionLedger(
+        strategicDiplomatic?.factionLedger
+      )
+    };
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticFactionLedger(
+    entries: BotMemoryV2StrategicDiplomaticFactionEntry[] | null | undefined
+  ): BotMemoryV2StrategicDiplomaticFactionEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        if (!entry || !Number.isInteger(entry.playerId)) {
+          return null;
+        }
+
+        return {
+          playerId: entry.playerId,
+          hostilityScore: Number.isFinite(entry.hostilityScore)
+            ? Math.max(0, Number(entry.hostilityScore))
+            : 0,
+          lastComputedStanceScore: Number.isFinite(entry.lastComputedStanceScore)
+            ? Number(entry.lastComputedStanceScore)
+            : 0,
+          lastComputedStrengthEstimate: Number.isFinite(entry.lastComputedStrengthEstimate)
+            ? Math.max(0, Number(entry.lastComputedStrengthEstimate))
+            : 0,
+          lastKnownStatus: Player.normalizeDiplomaticStatus(entry.lastKnownStatus),
+          lastSeenTurn: Number.isInteger(entry.lastSeenTurn) ? entry.lastSeenTurn : null
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicDiplomaticFactionEntry => entry !== null)
+      .slice(-120);
+  }
+
   private static normalizeBotMemoryV2CountByType(
     counts: Record<string, number> | null | undefined
   ): Record<string, number> {
@@ -805,6 +863,22 @@ export class Player {
         return true;
       default:
         return false;
+    }
+  }
+
+  private static normalizeDiplomaticStatus(
+    status: DiplomaticStatus | null | undefined
+  ): DiplomaticStatus | null {
+    switch (status) {
+      case 'SELF':
+      case 'ALLIED':
+      case 'PEACE':
+      case 'NEUTRAL':
+      case 'PASSIVE':
+      case 'WAR':
+        return status;
+      default:
+        return null;
     }
   }
 }
