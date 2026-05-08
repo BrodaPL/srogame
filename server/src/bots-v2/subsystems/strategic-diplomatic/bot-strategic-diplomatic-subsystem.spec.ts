@@ -13,6 +13,7 @@ import { Galaxy } from '../../../../../src/app/models/planets/galaxy.js';
 import { Planet } from '../../../../../src/app/models/planets/planet.js';
 import { SolarSystem } from '../../../../../src/app/models/planets/solar-system.js';
 import { Player } from '../../../../../src/app/models/player.js';
+import { createSupportRequest } from '../../../../../src/app/models/requests/support-request.js';
 import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
@@ -142,6 +143,88 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(probeNeeds.length).toBeLessThanOrEqual(2);
     expect(totalRequested).toBeLessThanOrEqual(Number(result.result.debug.globalProbeNeedCap));
     expect(Number(result.result.debug.globalProbeNeedCap)).toBeGreaterThan(0);
+  });
+
+  it('emits diplomatic attack mission proposals against war targets with valid intel', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 2);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const attackProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.requestPayload.target.x === playerEnemyPlanet.basicInfo.solarSystem.coordinates.x
+      && proposal.requestPayload.target.y === playerEnemyPlanet.basicInfo.solarSystem.coordinates.y
+      && proposal.requestPayload.target.z === playerEnemyPlanet.basicInfo.order
+    );
+
+    expect(attackProposal).toBeDefined();
+    expect(attackProposal?.debug.attackKind).toBe('FULL');
+  });
+
+  it('emits allied repair support missions for explicit repair requests', () => {
+    const { galaxy, bot, botPlanet, botEnemy, botEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, botEnemy.playerId, DiplomaticStatus.ALLIED)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 2);
+    markPlanetScanned(bot, botEnemy, botEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 10 });
+    galaxy.supportRequests.push(createSupportRequest(
+      1,
+      botEnemy.playerId,
+      bot.playerId,
+      'PLANET_REPAIR',
+      botEnemyPlanet.basicInfo.name,
+      {
+        x: botEnemyPlanet.basicInfo.solarSystem.coordinates.x,
+        y: botEnemyPlanet.basicInfo.solarSystem.coordinates.y,
+        z: botEnemyPlanet.basicInfo.order
+      },
+      galaxy.currentTurn,
+      galaxy.currentTurn + 5
+    ));
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const repairProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.REPAIR
+    );
+
+    expect(repairProposal).toBeDefined();
+    expect(repairProposal?.debug.supportReason).toBe('EXPLICIT_REQUEST');
+  });
+
+  it('emits exact-ship-type war ship need when attack planning is blocked by fleet shortage', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.removeShipsByType([
+      { type: ShipType.CRUISER, amount: 999 },
+      { type: ShipType.FIGHTER, amount: 999 },
+      { type: ShipType.FRIGATE, amount: 999 },
+      { type: ShipType.BATTLE_SHIP, amount: 999 }
+    ]);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 8);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 4);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const shipNeed = result.result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.shipType !== ShipType.SPY_PROBE
+    );
+
+    expect(shipNeed).toBeDefined();
+    expect(shipNeed?.debug.needKind).toBe('ATTACK');
   });
 });
 
@@ -276,4 +359,19 @@ function setBasicShipTech(player: Player): void {
   player.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 2);
   player.setTechLevel(TechnologyType.BEAMS_WEAPONS, 2);
   player.setTechLevel(TechnologyType.MISSILES_WEAPONS, 2);
+}
+
+function enableAdvancedWarProduction(planet: Planet, player: Player): void {
+  planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 8);
+  planet.setBuildingLevel(BuildingType.SHIPYARD, 10);
+  planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 8);
+  player.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 8);
+  player.setTechLevel(TechnologyType.COMPUTER_TECHNOLOGY, 8);
+  player.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 8);
+  player.setTechLevel(TechnologyType.BEAMS_WEAPONS, 8);
+  player.setTechLevel(TechnologyType.MISSILES_WEAPONS, 8);
+  player.setTechLevel(TechnologyType.RAILGUNS_WEAPONS, 8);
+  player.setTechLevel(TechnologyType.FUSION_DRIVE, 8);
+  player.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 8);
+  player.setTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY, 8);
 }

@@ -1871,6 +1871,145 @@ After this spy-planning slice, the next major phase should be:
 
 - combined enemy-attack and allied-support planning
 
+## Strategic Diplomatic phase-3 follow-up
+
+The next `Strategic Diplomatic` slice should add direct enemy-attack planning plus allied-support planning.
+
+### Strategic Diplomatic phase-3 outputs
+
+Phase 3 should emit:
+
+- immediate mission requests
+- exact-ship-type `SHIP_NEED`
+
+It should still avoid:
+
+- direct building requests
+- direct probe-demand ownership outside the phase-2 spy layer
+
+### Strategic Diplomatic phase-3 mission scope
+
+Executable mission types:
+
+- `ATTACK`
+- `GUARD`
+- `REPAIR`
+
+Still out of scope:
+
+- `BOMBARD`
+- `SIEGE`
+- `MOVE`
+- `ARMAMENT_DELIVERY`
+
+### Strategic Diplomatic phase-3 offensive target scope
+
+Allow offensive planning against:
+
+- `WAR`
+- hostile `NEUTRAL` factions with high hostility
+- `NEUTRAL` factions significantly weaker than us
+
+Concrete first-pass rules:
+
+- high hostility means `hostilityScore >= 50`
+- significantly weaker means `ourStrength >= theirStrength * 1.5`
+
+### Strategic Diplomatic phase-3 offensive intel requirement
+
+Attack targets must have:
+
+- espionage data
+- or battle data
+
+Do not attack blindly.
+
+### Strategic Diplomatic phase-3 scout-by-battle rule
+
+This phase should support a special reconnaissance-by-battle attack.
+
+Allow it when:
+
+- target is `WAR`, or hostile/weaker `NEUTRAL`
+- espionage exists
+- but military-state confidence is still low
+
+Use one medium combat ship with fixed preference:
+
+- `CRUISER`
+- then `BATTLE_SHIP`
+- then `FRIGATE`
+
+### Strategic Diplomatic phase-3 offensive force sizing
+
+Normal `ATTACK` force sizing should be based on estimated minimum required force, but should allow a wider aggression band:
+
+- roughly `0.8 .. 2.0`
+
+This wider band coexists with the dedicated one-medium-ship battle-scout case.
+
+### Strategic Diplomatic phase-3 allied-support scope
+
+Support planning should target:
+
+- `ALLIED` factions only
+
+Support targets become valid through:
+
+- explicit support requests
+- visible need
+
+Visible need should prioritize:
+
+- damaged allied planets
+- recently attacked allied planets
+
+`REPAIR` priority should combine both, with damaged buildings first.
+
+### Strategic Diplomatic phase-3 attack / support split
+
+Do not use one fixed split.
+
+Use a dynamic split driven by:
+
+- global war state
+- ally distress
+
+First-pass targets:
+
+- winning: `70 / 30`
+- balanced: `60 / 40`
+- losing: `40 / 60`
+
+### Strategic Diplomatic phase-3 war-state inputs
+
+`winning / balanced / losing` should consider:
+
+- relative strength
+- recent battle outcomes
+- active hostile pressure
+- recent building damage on our side or hostile side
+
+### Strategic Diplomatic phase-3 ship-need model
+
+`SHIP_NEED` should be:
+
+- per exact ship type
+- emitted only for blocked `ATTACK` / `SUPPORT` plans
+
+Cap:
+
+- max `1` per origin planet
+
+Probe shortage should remain owned by the phase-2 spy layer.
+
+### Strategic Diplomatic deferred shared-intel note
+
+Later phases should add allied / peace hostile-activity information sharing:
+
+- `ALLIED` and `PEACE` bots should automatically share attack knowledge
+- human allies / peace contacts should receive copied hostile battle / attack reports
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

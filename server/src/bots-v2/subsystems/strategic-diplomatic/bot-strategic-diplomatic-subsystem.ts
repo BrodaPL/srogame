@@ -1,3 +1,4 @@
+import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
 import { allowedDiplomaticProposalStatuses } from '../../../../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
 import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
 import { calculateProbeEspionageLevelBonus } from '../../../../../src/app/generators/espionage-report-generator.js';
@@ -71,11 +72,63 @@ type ProbeShipNeedRequest = {
   reason: string;
 };
 
+type DiplomaticWarState = 'WINNING' | 'BALANCED' | 'LOSING';
+
+type CombatShipSelection = {
+  ships: Array<{
+    type: ShipType;
+    undamagedAmount: number;
+    damagedAmount: number;
+  }>;
+  combatStrength: number;
+};
+
+type AttackMissionRequest = {
+  kind: 'ATTACK';
+  faction: EvaluatedFaction;
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number];
+  originPlanet: BotPlanetSnapshot;
+  ships: CombatShipSelection['ships'];
+  requiredStrength: number;
+  selectedStrength: number;
+  travelDistance: number;
+  travelTurns: number;
+  score: number;
+  scoutOnly: boolean;
+};
+
+type SupportMissionRequest = {
+  kind: 'SUPPORT';
+  supportMissionType: FleetMissionType.DEFEND | FleetMissionType.REPAIR;
+  faction: EvaluatedFaction;
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number];
+  originPlanet: BotPlanetSnapshot;
+  ships: CombatShipSelection['ships'];
+  requiredStrength: number;
+  selectedStrength: number;
+  travelDistance: number;
+  travelTurns: number;
+  score: number;
+  needReason: 'EXPLICIT_REQUEST' | 'RECENT_ATTACK';
+};
+
+type WarShipNeedRequest = {
+  originPlanet: BotPlanetSnapshot;
+  shipType: ShipType;
+  amount: number;
+  score: number;
+  reason: string;
+  targetCoordinates: { x: number; y: number; z: number };
+  needKind: 'ATTACK' | 'GUARD' | 'REPAIR';
+};
+
 const STRATEGIC_DIPLOMATIC_AVAILABILITY = 0.4;
 const WAR_HOSTILITY_THRESHOLD = 35;
 const RETALIATION_THRESHOLD = 18;
 const RELATION_PROPOSAL_MIN_UTILITY = 8;
 const MAX_PROBE_SHIP_NEED_REQUESTS = 2;
+const HOSTILE_NEUTRAL_ATTACK_THRESHOLD = 50;
+const WEAKER_NEUTRAL_ATTACK_RATIO = 1.5;
 
 export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DIPLOMATIC' as const;
@@ -112,13 +165,19 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
       spyPlanning.globalProbeDeficit,
       spyPlanning.blockedDueToProbeShortage
     );
+    const warState = resolveDiplomaticWarState(context, evaluatedFactions);
+    const remainingFleetSlots = Math.max(0, availableFleetSlots - spyPlanning.requests.length);
+    const combatPlanning = createCombatMissionRequests(context, evaluatedFactions, remainingFleetSlots, warState);
 
     const proposals = [
       ...createRelationChangeProposals(context, evaluatedFactions),
       ...createProposalManagementPreferences(context, evaluatedFactions),
       ...createRetaliationFlagProposals(context, evaluatedFactions),
       ...spyPlanning.requests.map((request, index) => createSpyMissionProposal(context, request, index)),
-      ...diplomaticProbeNeedRequests.map((request, index) => createProbeShipNeedProposal(context, request, index))
+      ...diplomaticProbeNeedRequests.map((request, index) => createProbeShipNeedProposal(context, request, index)),
+      ...combatPlanning.attackRequests.map((request, index) => createAttackMissionProposal(context, request, index)),
+      ...combatPlanning.supportRequests.map((request, index) => createSupportMissionProposal(context, request, index)),
+      ...combatPlanning.shipNeeds.map((request, index) => createWarShipNeedProposal(context, request, index))
     ]
       .sort(compareDiplomaticProposals)
       .slice(0, proposalCap);
@@ -173,7 +232,14 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         globalProbeNeedCap: resolveGlobalDiplomaticProbeNeedCap(context),
         globalProbeDeficit: spyPlanning.globalProbeDeficit,
         enemyEspionageSuperiorityCount: evaluatedFactions.filter((faction) => faction.enemyEspionageSuperiority).length,
+        warState,
+        diplomaticAttackMissionCount: combatPlanning.attackRequests.length,
+        diplomaticSupportMissionCount: combatPlanning.supportRequests.length,
+        diplomaticWarShipNeedCount: combatPlanning.shipNeeds.length,
+        attackSharePercent: resolveAttackShareForWarState(warState),
+        supportSharePercent: 100 - resolveAttackShareForWarState(warState),
         // TODO: Later phases should add tributes / bribes / negotiated payments to influence diplomacy.
+        // TODO: Allied / peace empires should share hostile-activity intel automatically, and human allies should receive copied hostile battle reports.
         futureTributePressure: false
       }
     };
@@ -845,6 +911,579 @@ function createRetaliationFlagProposals(
     }));
 }
 
+function resolveDiplomaticWarState(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[]
+): DiplomaticWarState {
+  const warFactions = factions.filter((faction) => faction.faction.currentStatus === DiplomaticStatus.WAR);
+  const relativeStrengthScore = warFactions.reduce((sum, faction) => sum + faction.relativeStrength, 0);
+  const hostilePressure = warFactions.reduce((sum, faction) => sum + faction.hostilityScore, 0);
+  const ownDamage = context.snapshot.planets.reduce((sum, planet) =>
+    sum + (planet.infrastructure.damagedBuildingCount * 8) + Math.ceil(planet.infrastructure.missingBuildingStructuralPoints / 100), 0);
+  const allyDistress = factions
+    .filter((faction) => faction.faction.currentStatus === DiplomaticStatus.ALLIED)
+    .reduce((sum, faction) =>
+      sum
+      + faction.faction.pendingIncomingSupportRequests.length * 18
+      + faction.faction.knownPlanets.reduce((planetSum, planet) =>
+        planetSum + (planet.recentBattleReportCount * 10), 0), 0);
+  const totalPressure = hostilePressure + ownDamage + allyDistress;
+
+  if (warFactions.length <= 0) {
+    return ownDamage > 0 || allyDistress > 24 ? 'BALANCED' : 'WINNING';
+  }
+  if (relativeStrengthScore < -25 || totalPressure > 80) {
+    return 'LOSING';
+  }
+  if (relativeStrengthScore > 25 && totalPressure < 45) {
+    return 'WINNING';
+  }
+  return 'BALANCED';
+}
+
+function resolveAttackShareForWarState(warState: DiplomaticWarState): number {
+  switch (warState) {
+    case 'WINNING':
+      return 70;
+    case 'LOSING':
+      return 40;
+    case 'BALANCED':
+    default:
+      return 60;
+  }
+}
+
+function createCombatMissionRequests(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[],
+  availableFleetSlots: number,
+  warState: DiplomaticWarState
+): {
+  attackRequests: AttackMissionRequest[];
+  supportRequests: SupportMissionRequest[];
+  shipNeeds: WarShipNeedRequest[];
+} {
+  if (availableFleetSlots <= 0) {
+    return {
+      attackRequests: [],
+      supportRequests: [],
+      shipNeeds: []
+    };
+  }
+
+  const attackShare = resolveAttackShareForWarState(warState);
+  const attackCap = Math.min(
+    availableFleetSlots,
+    Math.max(0, Math.round((availableFleetSlots * attackShare) / 100))
+  );
+  const supportCap = Math.max(0, availableFleetSlots - attackCap);
+  const attackCandidates = createAttackMissionCandidates(context, factions)
+    .sort((left, right) => right.score - left.score || left.travelTurns - right.travelTurns);
+  const supportCandidates = createSupportMissionCandidates(context, factions)
+    .sort((left, right) => right.score - left.score || left.travelTurns - right.travelTurns);
+
+  const attackRequests = attackCandidates.slice(0, Math.max(0, attackCap));
+  const supportRequests = supportCandidates.slice(0, Math.max(0, supportCap));
+  const blockedNeeds = [
+    ...createBlockedAttackShipNeeds(context, factions, attackRequests),
+    ...createBlockedSupportShipNeeds(context, factions, supportRequests)
+  ];
+
+  return {
+    attackRequests,
+    supportRequests,
+    shipNeeds: selectTopWarShipNeedsPerPlanet(blockedNeeds)
+  };
+}
+
+function createAttackMissionCandidates(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[]
+): AttackMissionRequest[] {
+  const requests: AttackMissionRequest[] = [];
+
+  for (const faction of factions) {
+    if (!isFactionEligibleForDiplomaticAttack(faction)) {
+      continue;
+    }
+
+    for (const targetPlanet of faction.faction.knownPlanets) {
+      if (!hasAttackableIntel(targetPlanet)) {
+        continue;
+      }
+
+      const attackPlan = createAttackPlanForTarget(context, faction, targetPlanet);
+      if (attackPlan) {
+        requests.push(attackPlan);
+      }
+    }
+  }
+
+  return requests;
+}
+
+function isFactionEligibleForDiplomaticAttack(faction: EvaluatedFaction): boolean {
+  return faction.faction.currentStatus === DiplomaticStatus.WAR
+    || (faction.faction.currentStatus === DiplomaticStatus.NEUTRAL && faction.hostilityScore >= HOSTILE_NEUTRAL_ATTACK_THRESHOLD)
+    || (faction.faction.currentStatus === DiplomaticStatus.NEUTRAL && faction.relativeStrength >= faction.strengthEstimate * (WEAKER_NEUTRAL_ATTACK_RATIO - 1));
+}
+
+function hasAttackableIntel(
+  planet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): boolean {
+  return planet.intelDepth > 0 && (planet.totalShipsAmount > 0 || planet.totalDefencesAmount > 0 || planet.recentBattleReportCount > 0);
+}
+
+function createAttackPlanForTarget(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): AttackMissionRequest | null {
+  const lowConfidence = faction.confidence < 0.55 || targetPlanet.intelDepth < 8;
+  if (lowConfidence) {
+    return createScoutAttackPlanForTarget(context, faction, targetPlanet);
+  }
+
+  const targetStrength = estimateDiplomaticTargetStrength(targetPlanet);
+  const requiredStrengthMultiplier = resolveDiplomaticAttackMultiplier(faction, targetPlanet);
+  const requiredStrength = Math.max(1, Math.ceil(targetStrength * requiredStrengthMultiplier));
+  const validPlans = context.snapshot.planets
+    .map((originPlanet) => {
+      const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+      const travelTurns = resolveTravelTurns(originPlanet, distance);
+      const selection = selectCombatShipsForStrength(originPlanet, requiredStrength, distance);
+      if (selection.ships.length <= 0 || selection.combatStrength < requiredStrength) {
+        return null;
+      }
+
+      return {
+        faction,
+        targetPlanet,
+        originPlanet,
+        ships: selection.ships,
+        requiredStrength,
+        selectedStrength: selection.combatStrength,
+        travelDistance: distance,
+        travelTurns,
+        score: Math.max(
+          1,
+          500
+          + Math.round((requiredStrength * 1.4) - (travelTurns * 9) + (Math.min(24, faction.relativeStrength)))
+        ),
+        scoutOnly: false
+      } satisfies AttackMissionRequest;
+    })
+    .filter((entry): entry is AttackMissionRequest => entry !== null)
+    .sort((left, right) =>
+      right.score - left.score
+      || left.travelTurns - right.travelTurns
+      || right.selectedStrength - left.selectedStrength
+    );
+
+  return validPlans[0] ?? null;
+}
+
+function createScoutAttackPlanForTarget(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): AttackMissionRequest | null {
+  for (const shipType of [ShipType.CRUISER, ShipType.BATTLE_SHIP, ShipType.FRIGATE]) {
+    const validPlans = context.snapshot.planets
+      .map((originPlanet) => {
+        const available = originPlanet.ships.undamagedCountByType[shipType] ?? 0;
+        if (available <= 0) {
+          return null;
+        }
+
+        const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+        if (!hasEnoughDeuteriumForShips(originPlanet, [{
+          type: shipType,
+          undamagedAmount: 1,
+          damagedAmount: 0
+        }], distance)) {
+          return null;
+        }
+
+        return {
+          kind: 'ATTACK',
+          faction,
+          targetPlanet,
+          originPlanet,
+          ships: [{
+            type: shipType,
+            undamagedAmount: 1,
+            damagedAmount: 0
+          }],
+          requiredStrength: Math.max(1, estimateShipCombatPower(shipType)),
+          selectedStrength: Math.max(1, estimateShipCombatPower(shipType)),
+          travelDistance: distance,
+          travelTurns: resolveTravelTurns(originPlanet, distance),
+          score: Math.max(1, 360 + Math.round(faction.statusPriorityWeight * 2.5) - Math.round(distance * 0.8)),
+          scoutOnly: true
+        } satisfies AttackMissionRequest;
+      })
+      .filter((entry): entry is AttackMissionRequest => entry !== null)
+      .sort((left, right) =>
+        right.score - left.score
+        || left.travelTurns - right.travelTurns
+      );
+
+    if (validPlans[0]) {
+      return validPlans[0];
+    }
+  }
+
+  return null;
+}
+
+function resolveDiplomaticAttackMultiplier(
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): number {
+  if (faction.faction.currentStatus === DiplomaticStatus.WAR) {
+    return targetPlanet.recentBattleReportCount > 0 ? 1.1 : 1.3;
+  }
+  if (faction.hostilityScore >= HOSTILE_NEUTRAL_ATTACK_THRESHOLD) {
+    return 1.2;
+  }
+  return 0.8;
+}
+
+function createSupportMissionCandidates(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[]
+): SupportMissionRequest[] {
+  const requests: SupportMissionRequest[] = [];
+
+  for (const faction of factions) {
+    if (faction.faction.currentStatus !== DiplomaticStatus.ALLIED) {
+      continue;
+    }
+
+    for (const supportRequest of faction.faction.pendingIncomingSupportRequests) {
+      const targetPlanet = faction.faction.knownPlanets.find((planet) =>
+        planet.coordinates.x === supportRequest.targetCoordinates.x
+        && planet.coordinates.y === supportRequest.targetCoordinates.y
+        && planet.coordinates.z === supportRequest.targetCoordinates.z
+      );
+      if (!targetPlanet) {
+        continue;
+      }
+
+      const supportPlan = supportRequest.supportType === 'PLANET_REPAIR'
+        ? createRepairSupportPlan(context, faction, targetPlanet, 'EXPLICIT_REQUEST')
+        : createGuardSupportPlan(context, faction, targetPlanet, 'EXPLICIT_REQUEST');
+      if (supportPlan) {
+        requests.push(supportPlan);
+      }
+    }
+
+    for (const targetPlanet of faction.faction.knownPlanets) {
+      if (targetPlanet.recentBattleReportCount <= 0) {
+        continue;
+      }
+      const alreadyCovered = requests.some((request) =>
+        request.targetPlanet.coordinates.x === targetPlanet.coordinates.x
+        && request.targetPlanet.coordinates.y === targetPlanet.coordinates.y
+        && request.targetPlanet.coordinates.z === targetPlanet.coordinates.z
+      );
+      if (alreadyCovered) {
+        continue;
+      }
+
+      const supportPlan = createGuardSupportPlan(context, faction, targetPlanet, 'RECENT_ATTACK');
+      if (supportPlan) {
+        requests.push(supportPlan);
+      }
+    }
+  }
+
+  return requests;
+}
+
+function createRepairSupportPlan(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  needReason: SupportMissionRequest['needReason']
+): SupportMissionRequest | null {
+  const candidates = context.snapshot.planets
+    .map((originPlanet) => {
+      const availableDrones = originPlanet.ships.undamagedCountByType[ShipType.REPAIR_DRONE] ?? 0;
+      if (availableDrones <= 0) {
+        return null;
+      }
+
+      const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+      const amount = Math.min(3, availableDrones);
+      const ships = [{
+        type: ShipType.REPAIR_DRONE,
+        undamagedAmount: Math.max(1, amount),
+        damagedAmount: 0
+      }];
+      if (!hasEnoughDeuteriumForShips(originPlanet, ships, distance)) {
+        return null;
+      }
+
+      return {
+        kind: 'SUPPORT',
+        supportMissionType: FleetMissionType.REPAIR,
+        faction,
+        targetPlanet,
+        originPlanet,
+        ships,
+        requiredStrength: 1,
+        selectedStrength: amount,
+        travelDistance: distance,
+        travelTurns: resolveTravelTurns(originPlanet, distance),
+        score: 380 + (targetPlanet.recentBattleReportCount * 18) + (needReason === 'EXPLICIT_REQUEST' ? 36 : 0),
+        needReason
+      } satisfies SupportMissionRequest;
+    })
+    .filter((entry): entry is SupportMissionRequest => entry !== null)
+    .sort((left, right) =>
+      right.score - left.score
+      || left.travelTurns - right.travelTurns
+    );
+
+  return candidates[0] ?? null;
+}
+
+function createGuardSupportPlan(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  needReason: SupportMissionRequest['needReason']
+): SupportMissionRequest | null {
+  const requiredStrength = Math.max(1, estimateDiplomaticTargetStrength(targetPlanet));
+  const validPlans = context.snapshot.planets
+    .map((originPlanet) => {
+      const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+      const travelTurns = resolveTravelTurns(originPlanet, distance);
+      const selection = selectCombatShipsForStrength(originPlanet, requiredStrength, distance);
+      if (selection.ships.length <= 0 || selection.combatStrength < requiredStrength) {
+        return null;
+      }
+
+      return {
+        kind: 'SUPPORT',
+        supportMissionType: FleetMissionType.DEFEND,
+        faction,
+        targetPlanet,
+        originPlanet,
+        ships: selection.ships,
+        requiredStrength,
+        selectedStrength: selection.combatStrength,
+        travelDistance: distance,
+        travelTurns,
+        score: 420 + (targetPlanet.recentBattleReportCount * 22) + (needReason === 'EXPLICIT_REQUEST' ? 28 : 0),
+        needReason
+      } satisfies SupportMissionRequest;
+    })
+    .filter((entry): entry is SupportMissionRequest => entry !== null)
+    .sort((left, right) =>
+      right.score - left.score
+      || left.travelTurns - right.travelTurns
+    );
+
+  return validPlans[0] ?? null;
+}
+
+function createBlockedAttackShipNeeds(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[],
+  acceptedRequests: AttackMissionRequest[]
+): WarShipNeedRequest[] {
+  const acceptedTargets = new Set(acceptedRequests.map((request) =>
+    `${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`
+  ));
+  const requests: WarShipNeedRequest[] = [];
+
+  for (const faction of factions) {
+    if (!isFactionEligibleForDiplomaticAttack(faction)) {
+      continue;
+    }
+
+    for (const targetPlanet of faction.faction.knownPlanets) {
+      const targetKey = `${targetPlanet.coordinates.x}:${targetPlanet.coordinates.y}:${targetPlanet.coordinates.z}`;
+      if (acceptedTargets.has(targetKey) || !hasAttackableIntel(targetPlanet)) {
+        continue;
+      }
+
+      const blockedNeed = createBlockedAttackShipNeed(context, faction, targetPlanet);
+      if (blockedNeed) {
+        requests.push(blockedNeed);
+      }
+    }
+
+    for (const targetPlanet of faction.faction.knownPlanets) {
+      if (targetPlanet.recentBattleReportCount <= 0) {
+        continue;
+      }
+      const key = `${FleetMissionType.DEFEND}:${targetPlanet.coordinates.x}:${targetPlanet.coordinates.y}:${targetPlanet.coordinates.z}`;
+      if (acceptedTargets.has(key)) {
+        continue;
+      }
+
+      const blockedNeed = createBlockedGuardShipNeed(context, targetPlanet);
+      if (blockedNeed) {
+        requests.push(blockedNeed);
+      }
+    }
+  }
+
+  return requests;
+}
+
+function createBlockedAttackShipNeed(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): WarShipNeedRequest | null {
+  const preferredOrigin = resolveBestMilitaryOrigin(context, targetPlanet.coordinates);
+  if (!preferredOrigin) {
+    return null;
+  }
+
+  const scoutType = resolvePreferredScoutShipType(preferredOrigin);
+  if ((faction.confidence < 0.55 || targetPlanet.intelDepth < 8) && !scoutType) {
+    const combatType = resolveBestProducibleCombatShipType(context);
+    if (!combatType) {
+      return null;
+    }
+    return {
+      originPlanet: preferredOrigin,
+      shipType: combatType,
+      amount: 1,
+      score: 340 + faction.statusPriorityWeight,
+      reason: 'Need one medium war ship for battle-scout pressure against a real-player target.',
+      targetCoordinates: { ...targetPlanet.coordinates },
+      needKind: 'ATTACK'
+    };
+  }
+
+  const targetStrength = estimateDiplomaticTargetStrength(targetPlanet);
+  const requiredStrength = Math.max(1, Math.ceil(targetStrength * resolveDiplomaticAttackMultiplier(faction, targetPlanet)));
+  const bestAvailableStrength = estimateBestAvailableCombatStrength(context, targetPlanet.coordinates);
+  const combatType = resolveBestProducibleCombatShipType(context);
+  if (!combatType) {
+    return null;
+  }
+
+  return {
+    originPlanet: preferredOrigin,
+    shipType: combatType,
+    amount: Math.max(1, Math.ceil(Math.max(0, requiredStrength - bestAvailableStrength) / Math.max(1, estimateShipCombatPower(combatType)))),
+    score: 430 + requiredStrength,
+    reason: 'Need more combat ships for diplomatic attack pressure.',
+    targetCoordinates: { ...targetPlanet.coordinates },
+    needKind: 'ATTACK'
+  };
+}
+
+function createBlockedSupportShipNeeds(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[],
+  acceptedRequests: SupportMissionRequest[]
+): WarShipNeedRequest[] {
+  const acceptedTargets = new Set(acceptedRequests.map((request) =>
+    `${request.supportMissionType}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`
+  ));
+  const requests: WarShipNeedRequest[] = [];
+
+  for (const faction of factions) {
+    if (faction.faction.currentStatus !== DiplomaticStatus.ALLIED) {
+      continue;
+    }
+
+    for (const supportRequest of faction.faction.pendingIncomingSupportRequests) {
+      const targetPlanet = faction.faction.knownPlanets.find((planet) =>
+        planet.coordinates.x === supportRequest.targetCoordinates.x
+        && planet.coordinates.y === supportRequest.targetCoordinates.y
+        && planet.coordinates.z === supportRequest.targetCoordinates.z
+      );
+      if (!targetPlanet) {
+        continue;
+      }
+
+      const supportMissionType = supportRequest.supportType === 'PLANET_REPAIR'
+        ? FleetMissionType.REPAIR
+        : FleetMissionType.DEFEND;
+      const key = `${supportMissionType}:${targetPlanet.coordinates.x}:${targetPlanet.coordinates.y}:${targetPlanet.coordinates.z}`;
+      if (acceptedTargets.has(key)) {
+        continue;
+      }
+
+      const blockedNeed = supportRequest.supportType === 'PLANET_REPAIR'
+        ? createBlockedRepairShipNeed(context, targetPlanet)
+        : createBlockedGuardShipNeed(context, targetPlanet);
+      if (blockedNeed) {
+        requests.push(blockedNeed);
+      }
+    }
+  }
+
+  return requests;
+}
+
+function createBlockedRepairShipNeed(
+  context: BotSubsystemContext,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): WarShipNeedRequest | null {
+  const originPlanet = resolveFallbackOrigin(context);
+  if (!originPlanet) {
+    return null;
+  }
+
+  return {
+    originPlanet,
+    shipType: ShipType.REPAIR_DRONE,
+    amount: 1,
+    score: 360 + (targetPlanet.recentBattleReportCount * 18),
+    reason: 'Need a repair drone to support an allied planet under pressure.',
+    targetCoordinates: { ...targetPlanet.coordinates },
+    needKind: 'REPAIR'
+  };
+}
+
+function createBlockedGuardShipNeed(
+  context: BotSubsystemContext,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): WarShipNeedRequest | null {
+  const originPlanet = resolveBestMilitaryOrigin(context, targetPlanet.coordinates) ?? resolveFallbackOrigin(context);
+  const combatType = resolveBestProducibleCombatShipType(context);
+  if (!originPlanet || !combatType) {
+    return null;
+  }
+
+  const requiredStrength = Math.max(1, estimateDiplomaticTargetStrength(targetPlanet));
+  return {
+    originPlanet,
+    shipType: combatType,
+    amount: Math.max(1, Math.ceil(requiredStrength / Math.max(1, estimateShipCombatPower(combatType)))),
+    score: 390 + requiredStrength,
+    reason: 'Need more combat ships to guard an allied planet.',
+    targetCoordinates: { ...targetPlanet.coordinates },
+    needKind: 'GUARD'
+  };
+}
+
+function selectTopWarShipNeedsPerPlanet(requests: WarShipNeedRequest[]): WarShipNeedRequest[] {
+  const bestByPlanet = new Map<string, WarShipNeedRequest>();
+
+  for (const request of requests) {
+    const key = `${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}`;
+    const existing = bestByPlanet.get(key);
+    if (!existing || request.score > existing.score) {
+      bestByPlanet.set(key, request);
+    }
+  }
+
+  return [...bestByPlanet.values()]
+    .sort((left, right) => right.score - left.score || left.originPlanet.name.localeCompare(right.originPlanet.name));
+}
+
 function createSpyMissionRequests(
   context: BotSubsystemContext,
   factions: EvaluatedFaction[],
@@ -1083,6 +1722,296 @@ function createProbeShipNeedProposal(
   };
 }
 
+function createAttackMissionProposal(
+  context: BotSubsystemContext,
+  request: AttackMissionRequest,
+  index: number
+): BotProposal {
+  return {
+    proposalId: `strategic-diplomatic:attack:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}:${context.snapshot.turn}`,
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'FLEET_MISSION',
+    status: 'PROPOSED',
+    goalKey: `strategic-diplomatic:attack:${request.faction.faction.playerId}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`,
+    dedupeKey: `strategic-diplomatic:attack:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`,
+    summary: request.scoutOnly
+      ? `Attack scout #${index + 1}: send one medium ship from ${request.originPlanet.name} to ${request.faction.faction.playerName} at ${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}.`
+      : `Attack request #${index + 1}: strike ${request.faction.faction.playerName} at ${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z} from ${request.originPlanet.name}.`,
+    planetId: request.originPlanet.planetId,
+    targetCoordinates: { ...request.targetPlanet.coordinates },
+    expectedValue: Math.max(1, Math.round(request.score)),
+    urgency: request.faction.faction.currentStatus === DiplomaticStatus.WAR ? 84 : 72,
+    risk: request.scoutOnly ? 14 : 28,
+    confidence: Math.round(request.faction.confidence * 100),
+    requestedResources: emptyResources(),
+    requestPayload: {
+      missionType: FleetMissionType.ATTACK,
+      origin: { ...request.originPlanet.coordinates },
+      target: { ...request.targetPlanet.coordinates },
+      ships: request.ships.map((ship) => ({ ...ship })),
+      carriedBombs: [],
+      cargo: emptyResources(),
+      useJumpGate: false,
+      bombardmentPriorities: null
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 1,
+    debug: {
+      missionSection: 'GLOBAL',
+      missionType: FleetMissionType.ATTACK,
+      attackKind: request.scoutOnly ? 'SCOUT' : 'FULL',
+      targetPlayerId: request.faction.faction.playerId,
+      targetStatus: request.faction.faction.currentStatus,
+      requiredStrength: request.requiredStrength,
+      selectedStrength: Math.round(request.selectedStrength),
+      travelDistance: request.travelDistance,
+      travelTurns: request.travelTurns
+    }
+  };
+}
+
+function createSupportMissionProposal(
+  context: BotSubsystemContext,
+  request: SupportMissionRequest,
+  index: number
+): BotProposal {
+  const supportLabel = request.supportMissionType === FleetMissionType.REPAIR ? 'repair' : 'guard';
+  return {
+    proposalId: `strategic-diplomatic:support:${request.supportMissionType}:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}:${context.snapshot.turn}`,
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'FLEET_MISSION',
+    status: 'PROPOSED',
+    goalKey: `strategic-diplomatic:support:${request.supportMissionType}:${request.faction.faction.playerId}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`,
+    dedupeKey: `strategic-diplomatic:support:${request.supportMissionType}:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`,
+    summary: `Support ${supportLabel} #${index + 1}: send aid from ${request.originPlanet.name} to allied planet ${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}.`,
+    planetId: request.originPlanet.planetId,
+    targetCoordinates: { ...request.targetPlanet.coordinates },
+    expectedValue: Math.max(1, Math.round(request.score)),
+    urgency: request.supportMissionType === FleetMissionType.REPAIR ? 76 : 74,
+    risk: request.supportMissionType === FleetMissionType.REPAIR ? 10 : 18,
+    confidence: Math.round(request.faction.confidence * 100),
+    requestedResources: emptyResources(),
+    requestPayload: {
+      missionType: request.supportMissionType,
+      origin: { ...request.originPlanet.coordinates },
+      target: { ...request.targetPlanet.coordinates },
+      ships: request.ships.map((ship) => ({ ...ship })),
+      carriedBombs: [],
+      cargo: emptyResources(),
+      useJumpGate: false,
+      bombardmentPriorities: null
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 1,
+    debug: {
+      missionSection: 'GLOBAL',
+      missionType: request.supportMissionType,
+      targetPlayerId: request.faction.faction.playerId,
+      supportReason: request.needReason,
+      requiredStrength: request.requiredStrength,
+      selectedStrength: Math.round(request.selectedStrength),
+      travelDistance: request.travelDistance,
+      travelTurns: request.travelTurns
+    }
+  };
+}
+
+function createWarShipNeedProposal(
+  context: BotSubsystemContext,
+  request: WarShipNeedRequest,
+  index: number
+): BotProposal {
+  return {
+    proposalId: `strategic-diplomatic:war-need:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.shipType}:${context.snapshot.turn}`,
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'SHIPYARD',
+    status: 'PROPOSED',
+    goalKey: `strategic-diplomatic:war-need:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}`,
+    dedupeKey: `strategic-diplomatic:war-need:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}`,
+    summary: `War ship need #${index + 1}: produce ${request.amount} ${request.shipType} on ${request.originPlanet.name}.`,
+    planetId: request.originPlanet.planetId,
+    targetCoordinates: { ...request.originPlanet.coordinates },
+    expectedValue: Math.max(1, Math.round(request.score)),
+    urgency: 71,
+    risk: 9,
+    confidence: 68,
+    requestedResources: emptyResources(),
+    requestPayload: {
+      demandOnly: true,
+      shipType: request.shipType,
+      amount: request.amount,
+      reason: request.needKind
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 2,
+    debug: {
+      queueType: 'SHIP_NEED',
+      shipType: request.shipType,
+      amount: request.amount,
+      needKind: request.needKind,
+      reason: request.reason,
+      targetCoordinates: `${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}`
+    }
+  };
+}
+
+function estimateDiplomaticTargetStrength(
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): number {
+  return Math.max(
+    1,
+    Math.round((targetPlanet.totalShipsAmount * 1.4) + (targetPlanet.totalDefencesAmount * 1.0))
+  );
+}
+
+function estimateBestAvailableCombatStrength(
+  context: BotSubsystemContext,
+  targetCoordinates: { x: number; y: number; z: number }
+): number {
+  return context.snapshot.planets.reduce((best, originPlanet) => {
+    const distance = calculateTravelDistance(originPlanet.coordinates, targetCoordinates);
+    const selection = selectCombatShipsForStrength(originPlanet, Number.MAX_SAFE_INTEGER, distance);
+    return Math.max(best, selection.combatStrength);
+  }, 0);
+}
+
+function resolveBestMilitaryOrigin(
+  context: BotSubsystemContext,
+  targetCoordinates: { x: number; y: number; z: number }
+): BotPlanetSnapshot | null {
+  return context.snapshot.planets
+    .slice()
+    .sort((left, right) => {
+      const leftDistance = calculateTravelDistance(left.coordinates, targetCoordinates);
+      const rightDistance = calculateTravelDistance(right.coordinates, targetCoordinates);
+      const leftStrength = selectCombatShipsForStrength(left, Number.MAX_SAFE_INTEGER, leftDistance).combatStrength;
+      const rightStrength = selectCombatShipsForStrength(right, Number.MAX_SAFE_INTEGER, rightDistance).combatStrength;
+      return leftDistance - rightDistance
+        || rightStrength - leftStrength
+        || right.defense.avgIndustryLevel - left.defense.avgIndustryLevel;
+    })[0] ?? null;
+}
+
+function resolvePreferredScoutShipType(planet: BotPlanetSnapshot): ShipType | null {
+  for (const shipType of [ShipType.CRUISER, ShipType.BATTLE_SHIP, ShipType.FRIGATE]) {
+    if ((planet.ships.undamagedCountByType[shipType] ?? 0) > 0) {
+      return shipType;
+    }
+  }
+  return null;
+}
+
+function resolveBestProducibleCombatShipType(context: BotSubsystemContext): ShipType | null {
+  const candidates = new Map<ShipType, number>();
+
+  for (const planet of context.snapshot.planets) {
+    for (const [shipType, blueprint] of SHIP_BLUEPRINTS.shipsMap.entries()) {
+      if (!snapshotHasShipBuildingRequirements(planet, blueprint) || !snapshotHasShipTechnologyRequirements(planet, blueprint)) {
+        continue;
+      }
+      if (shipType === ShipType.SPY_PROBE || shipType === ShipType.REPAIR_DRONE || shipType === ShipType.COLONIZER) {
+        continue;
+      }
+      if (blueprint.weapons.length <= 0) {
+        continue;
+      }
+
+      const score = estimateShipCombatPower(shipType);
+      const previous = candidates.get(shipType) ?? -1;
+      if (score > previous) {
+        candidates.set(shipType, score);
+      }
+    }
+  }
+
+  return [...candidates.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] ?? null;
+}
+
+function selectCombatShipsForStrength(
+  originPlanet: BotPlanetSnapshot,
+  requiredStrength: number,
+  distance: number
+): CombatShipSelection {
+  const combatCandidates = Object.entries(originPlanet.ships.undamagedCountByType)
+    .map(([type, amount]) => ({
+      type: type as ShipType,
+      amount: Math.max(0, amount ?? 0),
+      power: estimateShipCombatPower(type as ShipType)
+    }))
+    .filter((entry) =>
+      entry.amount > 0
+      && entry.power > 0
+      && entry.type !== ShipType.SPY_PROBE
+      && entry.type !== ShipType.REPAIR_DRONE
+      && entry.type !== ShipType.COLONIZER
+    )
+    .sort((left, right) =>
+      right.power - left.power
+      || left.type.localeCompare(right.type)
+    );
+  if (combatCandidates.length <= 0) {
+    return { ships: [], combatStrength: 0 };
+  }
+
+  const selection: CombatShipSelection['ships'] = [];
+  let totalStrength = 0;
+  for (const candidate of combatCandidates) {
+    for (let used = 0; used < candidate.amount; used += 1) {
+      const nextSelection = selection.map((ship) => ({ ...ship }));
+      const current = nextSelection.find((ship) => ship.type === candidate.type);
+      if (current) {
+        current.undamagedAmount += 1;
+      } else {
+        nextSelection.push({
+          type: candidate.type,
+          undamagedAmount: 1,
+          damagedAmount: 0
+        });
+      }
+      if (!hasEnoughDeuteriumForShips(originPlanet, nextSelection, distance)) {
+        break;
+      }
+      selection.splice(0, selection.length, ...nextSelection);
+      totalStrength += candidate.power;
+      if (totalStrength >= requiredStrength) {
+        return { ships: selection, combatStrength: totalStrength };
+      }
+    }
+  }
+
+  return { ships: selection, combatStrength: totalStrength };
+}
+
+function estimateShipCombatPower(shipType: ShipType): number {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return 0;
+  }
+
+  const weaponPower = blueprint.weapons.reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
+  return weaponPower + (blueprint.hullPointsCapacity / 15) + (blueprint.shieldCapacity / 10);
+}
+
+function hasEnoughDeuteriumForShips(
+  originPlanet: BotPlanetSnapshot,
+  ships: CombatShipSelection['ships'],
+  distance: number
+): boolean {
+  if (distance <= 0) {
+    return true;
+  }
+
+  const fuelCost = calculateFuelCost(
+    ships.map((ship) => ({
+      type: ship.type,
+      amount: ship.undamagedAmount + ship.damagedAmount
+    })),
+    distance
+  );
+  return originPlanet.localResources.deuterium >= fuelCost;
+}
+
 function selectSpyOrigin(
   context: BotSubsystemContext,
   targetCoordinates: { x: number; y: number; z: number },
@@ -1255,6 +2184,108 @@ function resolveFallbackOrigin(context: BotSubsystemContext): BotPlanetSnapshot 
       || left.coordinates.y - right.coordinates.y
       || left.coordinates.z - right.coordinates.z
     )[0] ?? null;
+}
+
+function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: TechnologyType): number {
+  switch (technologyType) {
+    case TechnologyType.ENERGY_TECHNOLOGY:
+      return planet.tech.energyTechnologyLevel;
+    case TechnologyType.MATERIAL_TECHNOLOGY:
+      return planet.tech.materialTechnologyLevel;
+    case TechnologyType.ADAPTIVE_TECHNOLOGY:
+      return planet.tech.adaptiveTechnologyLevel;
+    case TechnologyType.COMPUTER_TECHNOLOGY:
+      return planet.tech.computerTechnologyLevel;
+    case TechnologyType.INTERGALACTIC_RESEARCH_NETWORK:
+      return planet.tech.intergalacticResearchNetworkLevel;
+    case TechnologyType.SHIELDING_TECHNOLOGY:
+      return planet.tech.shieldingTechnologyLevel;
+    case TechnologyType.ARMOUR_TECHNOLOGY:
+      return planet.tech.armourTechnologyLevel;
+    case TechnologyType.RAILGUNS_WEAPONS:
+      return planet.tech.railgunsWeaponsLevel;
+    case TechnologyType.BEAMS_WEAPONS:
+      return planet.tech.beamsWeaponsLevel;
+    case TechnologyType.MISSILES_WEAPONS:
+      return planet.tech.missilesWeaponsLevel;
+    case TechnologyType.FUSION_DRIVE:
+      return planet.tech.fusionDriveLevel;
+    case TechnologyType.HYPERSPACE_DRIVE:
+      return planet.tech.hyperspaceDriveLevel;
+    case TechnologyType.HYPERSPACE_TECHNOLOGY:
+      return planet.tech.hyperspaceTechnologyLevel;
+    case TechnologyType.ESPIONAGE_TECHNOLOGY:
+      return planet.tech.espionageTechnologyLevel;
+    case TechnologyType.ASTROPHYSICS_TECHNOLOGY:
+      return planet.tech.astrophysicsTechnologyLevel;
+    default:
+      return 0;
+  }
+}
+
+function snapshotHasShipBuildingRequirements(
+  planet: BotPlanetSnapshot,
+  blueprint: NonNullable<ReturnType<typeof SHIP_BLUEPRINTS.get>>
+): boolean {
+  for (const requirement of blueprint.buildingRequirements) {
+    const currentLevel = getBuildingLevel(planet, requirement.building);
+    if (currentLevel < Math.ceil(requirement.level)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function snapshotHasShipTechnologyRequirements(
+  planet: BotPlanetSnapshot,
+  blueprint: NonNullable<ReturnType<typeof SHIP_BLUEPRINTS.get>>
+): boolean {
+  for (const requirement of blueprint.techRequirements) {
+    const currentLevel = getTechnologyLevel(planet, requirement.tech);
+    if (currentLevel < Math.ceil(requirement.level)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingType): number {
+  switch (buildingType) {
+    case BuildingType.METAL_MINE:
+      return planet.economy.metalMineLevel;
+    case BuildingType.CRYSTAL_MINE:
+      return planet.economy.crystalMineLevel;
+    case BuildingType.DEUTERIUM_SYNTHESIZER:
+      return planet.economy.deuteriumSynthesizerLevel;
+    case BuildingType.SOLAR_WIND_GEOTHERMAL:
+      return planet.economy.solarLevel;
+    case BuildingType.NUCLEAR_PLANT:
+      return planet.economy.nuclearLevel;
+    case BuildingType.FUSION_REACTOR:
+      return planet.economy.fusionLevel;
+    case BuildingType.ROBOTICS_FACTORY:
+      return planet.economy.roboticsLevel;
+    case BuildingType.NANITE_FACTORY:
+      return planet.economy.naniteLevel;
+    case BuildingType.SHIPYARD:
+      return planet.economy.shipyardLevel;
+    case BuildingType.RESEARCH_LAB:
+      return planet.economy.researchLabLevel;
+    case BuildingType.SENSOR_PHALANX:
+      return planet.economy.sensorPhalanxLevel;
+    case BuildingType.JUMP_GATE:
+      return planet.economy.jumpGateLevel;
+    case BuildingType.INTERSTELLAR_TRADE_PORT:
+      return planet.economy.interstellarTradePortLevel;
+    case BuildingType.METAL_STORAGE:
+      return planet.economy.metalStorageLevel;
+    case BuildingType.CRYSTAL_STORAGE:
+      return planet.economy.crystalStorageLevel;
+    case BuildingType.DEUTERIUM_TANK:
+      return planet.economy.deuteriumTankLevel;
+    default:
+      return 0;
+  }
 }
 
 function emptyResources(): { metal: number; crystal: number; deuterium: number } {

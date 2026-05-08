@@ -94,6 +94,7 @@ export type BotStrategicDiplomaticFactionSnapshot = {
   recentBattleReportCount: number;
   pendingIncomingRequestedStatuses: DiplomaticStatus[];
   pendingOutgoingRequestedStatuses: DiplomaticStatus[];
+  pendingIncomingSupportRequests: BotStrategicDiplomaticSupportRequestSnapshot[];
   knownPlanets: BotStrategicDiplomaticKnownPlanetSnapshot[];
 };
 
@@ -107,6 +108,14 @@ export type BotStrategicDiplomaticKnownPlanetSnapshot = {
   totalShipsAmount: number;
   totalDefencesAmount: number;
   bunkerLevel: number | null;
+  recentBattleReportCount: number;
+};
+
+export type BotStrategicDiplomaticSupportRequestSnapshot = {
+  supportType: 'PLANET_REPAIR' | 'PLANET_DEFENSE';
+  targetCoordinates: { x: number; y: number; z: number };
+  createdTurn: number;
+  expiresOnTurn: number;
 };
 
 export type BotIntelCandidateSnapshot = {

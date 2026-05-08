@@ -1226,6 +1226,149 @@ Later phases should add:
 * direct `SHIP_NEED` / probe / bomb pressure,
 * tributes / bribes / negotiated payments to influence diplomatic-state changes.
 
+### Phase-2 scope: real-player espionage planning
+
+The next `Strategic Diplomatic` slice should add real-player espionage planning, but still avoid war/support execution.
+
+Phase 2 should add:
+
+* weighted `SPY` mission planning against all discovered factions,
+* probe `SHIP_NEED` pressure,
+* diplomatic-summary refinement from fresher / deeper reports,
+* explicit estimation of enemy espionage superiority.
+
+Status priority weights:
+
+* `ALLIED 5%`
+* `PEACE 10%`
+* `NEUTRAL 25%`
+* `WAR 60%`
+
+Probe planning should:
+
+* optimize for intel gain per probe spent,
+* use minimum probes needed plus safety margin,
+* stay affordability-aware,
+* cap total planned diplomatic probe pressure by:
+
+```text
+2 * highestAvgIndustry + highestAvgIndustry^2
+```
+
+Probe shortage should still be outwarded per planet, but derived from global diplomatic need.
+
+### Phase-3 scope: attack and allied support planning
+
+After espionage planning, the next major `Strategic Diplomatic` slice should add:
+
+* `ATTACK`
+* `GUARD`
+* `REPAIR`
+
+This phase should emit:
+
+* immediate mission requests,
+* exact-ship-type `SHIP_NEED`
+
+It should not yet add:
+
+* `BOMBARD`
+* `SIEGE`
+* relocation `MOVE`
+* `ARMAMENT_DELIVERY`
+
+#### Offensive target scope
+
+Allow attack planning for:
+
+* `WAR`
+* hostile `NEUTRAL` with high hostility
+* `NEUTRAL` clearly weaker than us
+
+Concrete first-pass rules:
+
+* high hostility means `hostilityScore >= 50`
+* clearly weaker means `ourStrength >= theirStrength * 1.5`
+
+Attack targets must have:
+
+* espionage data, or
+* battle data
+
+No blind attacks.
+
+#### Scout-by-battle
+
+Before a full attack, subsystem may perform a special battle-scout attack when:
+
+* target is `WAR`, or hostile/weaker `NEUTRAL`
+* espionage exists
+* but military-state confidence is still low
+
+Use exactly one medium combat ship, with fixed preference:
+
+* `CRUISER`
+* then `BATTLE_SHIP`
+* then `FRIGATE`
+
+#### Offensive force sizing
+
+Normal attack force should be based on estimated minimum force, but allow a wider aggression band:
+
+* roughly `0.8 .. 2.0`
+
+This phase should therefore support both:
+
+* very small battle-scout attacks
+* stronger confidence attacks with larger margins
+
+#### Allied support scope
+
+Support planning should target:
+
+* `ALLIED` factions only
+
+Support targets become valid through:
+
+* explicit support requests
+* visible need
+
+Visible need should strongly favor:
+
+* damaged allied planets
+* recently attacked allied planets
+
+`REPAIR` priority should combine both, with damaged buildings first.
+
+#### Dynamic attack / support split
+
+Static percentage split is too crude here.
+
+Use a dynamic split driven by:
+
+* global war state
+* ally distress
+
+First-pass split targets:
+
+* winning: `70 / 30`
+* balanced: `60 / 40`
+* losing: `40 / 60`
+
+`winning / balanced / losing` should consider:
+
+* relative strength
+* recent battle outcomes
+* active hostile pressure
+* recent building damage on our side or hostile side
+
+#### TODO: allied / peace hostile-activity intel sharing
+
+Later strategic-diplomatic phases should add shared hostile-activity awareness:
+
+* `ALLIED` and `PEACE` bots should automatically share attack knowledge
+* human allies / peace contacts should receive copies of hostile battle / attack reports
+
 ### Indicative fleet allocation
 
 **10–50%**, treated as a soft target.

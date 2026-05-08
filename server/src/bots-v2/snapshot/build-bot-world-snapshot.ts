@@ -30,6 +30,7 @@ import type {
   BotPlanetSnapshot,
   BotStrategicDiplomaticFactionSnapshot,
   BotStrategicDiplomaticKnownPlanetSnapshot,
+  BotStrategicDiplomaticSupportRequestSnapshot,
   BotStrategicMilitaryTargetSnapshot,
   BotV2FeatureFlags,
   BotWorldSnapshot
@@ -866,6 +867,26 @@ function resolveStrategicDiplomaticFactions(
           && proposal.toPlayerId === foreignPlayer.playerId
         )
         .map((proposal) => proposal.requestedStatus);
+      const pendingIncomingSupportRequests = galaxy.supportRequests
+        .filter((request) =>
+          request.state === DiplomaticProposalState.PENDING
+          && request.fromPlayerId === foreignPlayer.playerId
+          && request.toPlayerId === player.playerId
+          && (request.supportType === 'PLANET_REPAIR' || request.supportType === 'PLANET_DEFENSE')
+        )
+        .map((request) => ({
+          supportType: request.supportType,
+          targetCoordinates: { ...request.targetCoordinates },
+          createdTurn: request.createdTurn,
+          expiresOnTurn: request.expiresOnTurn
+        } satisfies BotStrategicDiplomaticSupportRequestSnapshot))
+        .sort((left, right) =>
+          left.supportType.localeCompare(right.supportType)
+          || left.createdTurn - right.createdTurn
+          || left.targetCoordinates.x - right.targetCoordinates.x
+          || left.targetCoordinates.y - right.targetCoordinates.y
+          || left.targetCoordinates.z - right.targetCoordinates.z
+        );
       const knownPlanets = foreignPlayer.planets
         .map((planet) => {
           const report = planet.lastReportData.get(player.playerId) ?? null;
@@ -886,7 +907,17 @@ function resolveStrategicDiplomaticFactions(
             averageTechLevel: report.averageTechLevel,
             totalShipsAmount: report.totalShipsAmount,
             totalDefencesAmount: report.totalDefencesAmount,
-            bunkerLevel: report.buildingsLevels.get(BuildingType.BUNKER_NETWORK) ?? null
+            bunkerLevel: report.buildingsLevels.get(BuildingType.BUNKER_NETWORK) ?? null,
+            recentBattleReportCount: countRecentBattleReportsForCoordinates(
+              player,
+              {
+                x: planet.basicInfo.solarSystem.coordinates.x,
+                y: planet.basicInfo.solarSystem.coordinates.y,
+                z: planet.basicInfo.order
+              },
+              galaxy.currentTurn,
+              80
+            )
           } satisfies BotStrategicDiplomaticKnownPlanetSnapshot;
         })
         .filter((entry): entry is BotStrategicDiplomaticKnownPlanetSnapshot => entry !== null)
@@ -917,6 +948,7 @@ function resolveStrategicDiplomaticFactions(
         recentBattleReportCount: countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 80),
         pendingIncomingRequestedStatuses,
         pendingOutgoingRequestedStatuses,
+        pendingIncomingSupportRequests,
         knownPlanets
       } satisfies BotStrategicDiplomaticFactionSnapshot;
     })
@@ -1016,6 +1048,36 @@ function countRecentBattleReportsForFaction(
 
     const key = `${report.sourceCoordinates.x}:${report.sourceCoordinates.y}:${report.sourceCoordinates.z}`;
     if (factionCoordinates.has(key)) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function countRecentBattleReportsForCoordinates(
+  player: Player,
+  coordinates: { x: number; y: number; z: number },
+  currentTurn: number,
+  windowTurns: number
+): number {
+  let count = 0;
+
+  for (const report of player.reports) {
+    if (
+      report.reportType !== ReportType.FLEET_REPORT
+      || !report.title.startsWith('Battle Report:')
+      || !report.sourceCoordinates
+      || Math.max(0, currentTurn - report.createdTurn) > windowTurns
+    ) {
+      continue;
+    }
+
+    if (
+      report.sourceCoordinates.x === coordinates.x
+      && report.sourceCoordinates.y === coordinates.y
+      && report.sourceCoordinates.z === coordinates.z
+    ) {
       count += 1;
     }
   }
