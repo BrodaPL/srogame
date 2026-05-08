@@ -29,6 +29,7 @@ import type {
   BotPlanetMaturityStage,
   BotPlanetSnapshot,
   BotStrategicDiplomaticFactionSnapshot,
+  BotStrategicDiplomaticKnownPlanetSnapshot,
   BotStrategicMilitaryTargetSnapshot,
   BotV2FeatureFlags,
   BotWorldSnapshot
@@ -865,6 +866,37 @@ function resolveStrategicDiplomaticFactions(
           && proposal.toPlayerId === foreignPlayer.playerId
         )
         .map((proposal) => proposal.requestedStatus);
+      const knownPlanets = foreignPlayer.planets
+        .map((planet) => {
+          const report = planet.lastReportData.get(player.playerId) ?? null;
+          if (!report) {
+            return null;
+          }
+
+          return {
+            coordinates: {
+              x: planet.basicInfo.solarSystem.coordinates.x,
+              y: planet.basicInfo.solarSystem.coordinates.y,
+              z: planet.basicInfo.order
+            },
+            intelDepth: resolveEspionageIntelDepth(report),
+            lastRelevantReportAge: Math.max(0, galaxy.currentTurn - report.createdTurn),
+            anomaliesAndNoise: report.planetaryParameters.anomaliesAndNoise,
+            averageBuildingLevel: report.averageBuildingLevel,
+            averageTechLevel: report.averageTechLevel,
+            totalShipsAmount: report.totalShipsAmount,
+            totalDefencesAmount: report.totalDefencesAmount,
+            bunkerLevel: report.buildingsLevels.get(BuildingType.BUNKER_NETWORK) ?? null
+          } satisfies BotStrategicDiplomaticKnownPlanetSnapshot;
+        })
+        .filter((entry): entry is BotStrategicDiplomaticKnownPlanetSnapshot => entry !== null)
+        .sort((left, right) =>
+          left.lastRelevantReportAge - right.lastRelevantReportAge
+          || right.intelDepth - left.intelDepth
+          || left.coordinates.x - right.coordinates.x
+          || left.coordinates.y - right.coordinates.y
+          || left.coordinates.z - right.coordinates.z
+        );
 
       return {
         playerId: foreignPlayer.playerId,
@@ -884,7 +916,8 @@ function resolveStrategicDiplomaticFactions(
         }, null),
         recentBattleReportCount: countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 80),
         pendingIncomingRequestedStatuses,
-        pendingOutgoingRequestedStatuses
+        pendingOutgoingRequestedStatuses,
+        knownPlanets
       } satisfies BotStrategicDiplomaticFactionSnapshot;
     })
     .filter((entry): entry is BotStrategicDiplomaticFactionSnapshot => entry !== null)

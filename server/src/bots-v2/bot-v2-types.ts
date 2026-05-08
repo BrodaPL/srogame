@@ -94,6 +94,19 @@ export type BotStrategicDiplomaticFactionSnapshot = {
   recentBattleReportCount: number;
   pendingIncomingRequestedStatuses: DiplomaticStatus[];
   pendingOutgoingRequestedStatuses: DiplomaticStatus[];
+  knownPlanets: BotStrategicDiplomaticKnownPlanetSnapshot[];
+};
+
+export type BotStrategicDiplomaticKnownPlanetSnapshot = {
+  coordinates: { x: number; y: number; z: number };
+  intelDepth: number;
+  lastRelevantReportAge: number;
+  anomaliesAndNoise: number;
+  averageBuildingLevel: number;
+  averageTechLevel: number;
+  totalShipsAmount: number;
+  totalDefencesAmount: number;
+  bunkerLevel: number | null;
 };
 
 export type BotIntelCandidateSnapshot = {

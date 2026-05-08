@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
+import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
 import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
 import { PlayerType } from '../../../../../src/app/models/enums/player-type.js';
+import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
+import { createDiplomaticRelation } from '../../../../../src/app/models/diplomacy/diplomatic-relation.js';
 import { createDiplomaticProposal } from '../../../../../src/app/models/diplomacy/diplomatic-proposal.js';
 import { FleetReport } from '../../../../../src/app/models/reports/fleet-report.js';
 import { EspionageReportGenerator } from '../../../../../src/app/generators/espionage-report-generator.js';
@@ -89,6 +92,57 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(preferenceProposal).toBeDefined();
     expect(preferenceProposal?.requestPayload.preference).toBe('APPROVE');
   });
+
+  it('prioritizes war espionage over allied coverage when intel is insufficient', () => {
+    const { galaxy, bot, playerEnemy, botEnemy, botPlanet, playerEnemyPlanet, botEnemyPlanet } = createStrategicDiplomaticWorld();
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 24);
+    galaxy.currentTurn = 220;
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR),
+      createDiplomaticRelation(bot.playerId, botEnemy.playerId, DiplomaticStatus.ALLIED)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 0, { forcedReportLevel: 4 });
+    markPlanetScanned(bot, botEnemy, botEnemyPlanet, 0, { forcedReportLevel: 4 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const spyProposals = result.result.proposals.filter((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SPY
+    );
+
+    expect(spyProposals.length).toBeGreaterThan(0);
+    expect(spyProposals[0]?.requestPayload.target).toEqual({ x: 0, y: 0, z: 2 });
+    expect(spyProposals[0]?.debug.targetStatus).toBe(DiplomaticStatus.WAR);
+  });
+
+  it('emits up to two per-planet probe ship-need requests from global diplomatic deficit', () => {
+    const { galaxy, bot, playerEnemy, botPlanet, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const secondSystem = new SolarSystem('DipAux', 4, false, false, { x: 1, y: 0 }, new Set(), new Map());
+    const secondBotPlanet = Planet.createStartingPlanet('DipAux I', 1, secondSystem, 1);
+    secondSystem.planets[0] = secondBotPlanet;
+    secondBotPlanet.info.ownerId = bot.playerId;
+    configureKnownPlanet(secondBotPlanet);
+    bot.planets.push(secondBotPlanet);
+    galaxy.stars[0]?.push(secondSystem);
+    galaxy.currentTurn = 220;
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 0, { forcedReportLevel: 3 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const probeNeeds = result.result.proposals.filter((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.shipType === ShipType.SPY_PROBE
+    );
+    const totalRequested = probeNeeds.reduce((sum, proposal) =>
+      sum + Number(proposal.requestPayload.amount ?? 0), 0);
+
+    expect(probeNeeds.length).toBeGreaterThan(0);
+    expect(probeNeeds.length).toBeLessThanOrEqual(2);
+    expect(totalRequested).toBeLessThanOrEqual(Number(result.result.debug.globalProbeNeedCap));
+    expect(Number(result.result.debug.globalProbeNeedCap)).toBeGreaterThan(0);
+  });
 });
 
 function runStrategicDiplomaticSubsystem(
@@ -160,7 +214,7 @@ function createStrategicDiplomaticWorld() {
     ])
   );
 
-  return { galaxy, bot, playerEnemy, botEnemy, playerEnemyPlanet, botEnemyPlanet };
+  return { galaxy, bot, botPlanet, playerEnemy, botEnemy, playerEnemyPlanet, botEnemyPlanet };
 }
 
 function configureKnownPlanet(planet: Planet): void {
@@ -177,11 +231,13 @@ function markPlanetScanned(
   bot: Player,
   owner: Player,
   planet: Planet,
-  createdTurn: number
+  createdTurn: number,
+  options: { forcedReportLevel?: number; reportLevelBonus?: number } = {}
 ): void {
   const report = new EspionageReportGenerator().createEspionageReport(bot, owner, planet, 6, {
     createdTurn,
-    reportLevelBonus: 10
+    reportLevelBonus: options.reportLevelBonus ?? 10,
+    forcedReportLevel: options.forcedReportLevel
   });
   planet.lastReportData.set(bot.playerId, report);
 }

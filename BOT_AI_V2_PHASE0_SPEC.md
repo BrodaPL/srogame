@@ -1774,6 +1774,103 @@ Later phases should add:
 - direct `SHIP_NEED` / probe / bomb pressure
 - tributes / bribes / negotiated payments to influence diplomatic-state changes
 
+## Strategic Diplomatic phase-2 follow-up
+
+The next `Strategic Diplomatic` slice should add real-player espionage planning, but still avoid war/support execution.
+
+### Strategic Diplomatic phase-2 outputs
+
+Phase-2 should emit:
+
+- immediate `SPY` mission requests
+- probe `SHIP_NEED` requests
+- refined diplomatic summaries
+
+### Strategic Diplomatic phase-2 mission scope
+
+Executable mission types:
+
+- `SPY`
+
+Still out of scope:
+
+- `ATTACK`
+- `SUPPORT`
+- `BOMBARD`
+- `SIEGE`
+
+### Strategic Diplomatic phase-2 target priorities
+
+All discovered factions remain in scope, with status-based priority weights:
+
+- `ALLIED`: `5%`
+- `PEACE`: `10%`
+- `NEUTRAL`: `25%`
+- `WAR`: `60%`
+
+### Strategic Diplomatic phase-2 spy-planning rule
+
+Optimize for:
+
+- best intel gain per probe spent
+
+Probe count should use:
+
+- minimum probes needed to reach intended report depth
+- plus a safety margin
+
+Also enforce affordability:
+
+- phase 2 should not blindly send extremely large probe swarms when the cost is poor relative to the expected information gain
+
+### Strategic Diplomatic phase-2 intel targets
+
+Desired report depth should vary by diplomatic status.
+
+Intel should count as insufficient when it is:
+
+- too old
+- too shallow
+- too sparse across that faction's planets
+
+Staleness windows should differ by diplomatic status and should stay fairly long-term.
+
+### Strategic Diplomatic phase-2 espionage-superiority signal
+
+Phase 2 should explicitly estimate enemy espionage superiority.
+
+One important signal is:
+
+- even large probe groups still fail to produce sufficiently deep reports
+
+This signal should feed later war/support planning.
+
+### Strategic Diplomatic phase-2 probe-demand model
+
+Probe `SHIP_NEED` should be:
+
+- outwarded per planet
+- but derived from a global diplomatic probe deficit
+
+Global planned diplomatic probe need should be capped by:
+
+- let `highestAvgIndustry` be the highest owned-planet `avg_industry`
+- cap total planned probe demand at:
+
+```text
+2 * highestAvgIndustry + highestAvgIndustry^2
+```
+
+Separate outward probe-demand requests should be capped to:
+
+- max `2` per-planet requests
+
+### Strategic Diplomatic phase-3 note
+
+After this spy-planning slice, the next major phase should be:
+
+- combined enemy-attack and allied-support planning
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

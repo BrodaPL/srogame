@@ -777,6 +777,104 @@ Later strategic work will need a cleaner shared contract for:
 * empire-wide research constraints,
 * empire-wide fleet-cap constraints.
 
+### Phase-2 scope: real-player espionage planning
+
+The next `Strategic Diplomatic` slice should still avoid real war missions.
+
+Phase 2 should add:
+
+* direct `SPY` mission planning against discovered non-neutral factions,
+* probe-demand planning,
+* refinement of phase-1 diplomatic judgments from improved espionage coverage.
+
+### Phase-2 outputs
+
+Phase-2 should emit:
+
+* immediate `SPY` mission requests,
+* probe `SHIP_NEED` requests,
+* updated diplomatic summaries.
+
+### Phase-2 target priorities
+
+All discovered factions stay in scope, but with weighted priority:
+
+* `ALLIED`: `5%`
+* `PEACE`: `10%`
+* `NEUTRAL`: `25%`
+* `WAR`: `60%`
+
+### Phase-2 spy-planning rules
+
+Spy missions should optimize for:
+
+* best intel gain per probe spent.
+
+Probe count should use:
+
+* minimum probes needed to reach the intended report depth,
+* plus a safety margin,
+* while still respecting affordability.
+
+This means:
+
+* phase 2 should not blindly throw `120` probes at technically difficult targets if that is a poor trade,
+* desired report depth must stay constrained by actual empire capacity.
+
+### Phase-2 target-depth model
+
+Use different desired report depth by diplomatic status.
+
+Also treat intel as insufficient when it is:
+
+* too old,
+* too shallow,
+* or too sparse across that faction's planets.
+
+Staleness windows should differ by diplomatic status and should be fairly long-term rather than overly aggressive.
+
+### Enemy espionage-superiority signal
+
+Phase 2 should explicitly estimate when an enemy appears to have espionage superiority.
+
+Example signal:
+
+* even large probe groups still fail to produce sufficiently deep reports.
+
+That should feed later diplomatic and military planning.
+
+### Probe-demand model
+
+Probe `SHIP_NEED` should be:
+
+* outwarded per planet,
+* but derived from a global diplomatic probe deficit.
+
+Total planned probe need should be capped by the strongest production base currently available:
+
+* let `highestAvgIndustry` be the highest owned-planet `avg_industry`,
+* cap planned diplomatic probe need at:
+  * `2 * highestAvgIndustry + highestAvgIndustry^2`
+
+Separate outward probe-demand requests should be capped to:
+
+* maximum `2` per-planet requests.
+
+### Phase-2 non-goals
+
+Still out of scope:
+
+* `ATTACK`
+* `SUPPORT`
+* `BOMBARD`
+* `SIEGE`
+
+### Phase-3 note
+
+After this espionage-planning slice, the next major phase should be:
+
+* combined enemy-attack and allied-support planning.
+
 ### Indicative fleet allocation
 
 **10–30%**, treated as a soft target.
