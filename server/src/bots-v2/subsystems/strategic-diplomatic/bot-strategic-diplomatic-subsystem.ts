@@ -11,6 +11,7 @@ import { isPlanetaryBombDefenceType } from '../../../../../src/app/models/defenc
 import { isArmamentDeliveryShipType } from '../../../../../src/app/models/missions/armament-delivery.js';
 import { fleetTravelTurnsForDistance } from '../../../../../src/app/models/tech/technology-effects.js';
 import type {
+  BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget,
   BotMemoryV2StrategicDiplomaticFactionEntry,
   BotProfileId
 } from '../../../../../src/app/models/player.ts';
@@ -149,7 +150,7 @@ type BombardmentMissionRequest = {
 
 type RelocationMissionRequest = {
   missionType: FleetMissionType.MOVE;
-  phase: 'BOMBARDMENT_RELOCATION';
+  phase: 'BOMBARDMENT_RELOCATION' | 'PRE_BREAK_CONCENTRATION';
   faction: EvaluatedFaction;
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number];
   originPlanet: BotPlanetSnapshot;
@@ -158,8 +159,17 @@ type RelocationMissionRequest = {
   travelDistance: number;
   travelTurns: number;
   score: number;
-  moveRole: 'BOMBARDMENT_STAGING';
+  moveRole: 'BOMBARDMENT_STAGING' | 'WAR_BREAK_STAGING';
   useJumpGate: boolean;
+};
+
+type PreBreakTargetSelection = {
+  faction: EvaluatedFaction;
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number];
+  targetValue: number;
+  expectedLosses: number;
+  requiredStrength: number;
+  targetStrength: number;
 };
 
 type ArmamentDeliveryMissionRequest = {
@@ -203,6 +213,11 @@ const BOMBARDMENT_ATTACK_THRESHOLD = 0.65;
 const STRATEGIC_HUB_BOMB_STOCK_RATIO_AT_WAR = 0.9;
 const STRATEGIC_HUB_BOMB_STOCK_RATIO_ALLIED = 0.4;
 const STRATEGIC_HUB_BOMB_STOCK_RATIO_PEACE = 0.15;
+const PRIMARY_WAR_BREAK_MIN_HOLD_TURNS = 3;
+const PRIMARY_WAR_BREAK_MAX_HOLD_TURNS = 10;
+const PRIMARY_WAR_BREAK_MIN_VALUE_MULTIPLIER = 1.25;
+const PRIMARY_WAR_BREAK_MAX_VALUE_MULTIPLIER = 1.5;
+const PRIMARY_WAR_BREAK_NEAR_EQUAL_IMPROVEMENT_RATIO = 0.1;
 
 export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DIPLOMATIC' as const;
@@ -245,7 +260,13 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
     const forceProjectionPlanning = createForceProjectionRequests(
       context,
       evaluatedFactions,
-      Math.max(0, remainingFleetSlots - combatPlanning.attackRequests.length - combatPlanning.supportRequests.length),
+      Math.max(
+        0,
+        remainingFleetSlots
+        - combatPlanning.attackRequests.length
+        - combatPlanning.supportRequests.length
+        - combatPlanning.relocationRequests.length
+      ),
       warState
     );
 
@@ -255,6 +276,7 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
       ...createRetaliationFlagProposals(context, evaluatedFactions),
       ...spyPlanning.requests.map((request, index) => createSpyMissionProposal(context, request, index)),
       ...diplomaticProbeNeedRequests.map((request, index) => createProbeShipNeedProposal(context, request, index)),
+      ...combatPlanning.relocationRequests.map((request, index) => createRelocationMissionProposal(context, request, index)),
       ...combatPlanning.attackRequests.map((request, index) => createAttackMissionProposal(context, request, index)),
       ...combatPlanning.supportRequests.map((request, index) => createSupportMissionProposal(context, request, index)),
       ...combatPlanning.shipNeeds.map((request, index) => createWarShipNeedProposal(context, request, index)),
@@ -1051,12 +1073,14 @@ function createCombatMissionRequests(
   availableFleetSlots: number,
   warState: DiplomaticWarState
 ): {
+  relocationRequests: RelocationMissionRequest[];
   attackRequests: AttackMissionRequest[];
   supportRequests: SupportMissionRequest[];
   shipNeeds: WarShipNeedRequest[];
 } {
   if (availableFleetSlots <= 0) {
     return {
+      relocationRequests: [],
       attackRequests: [],
       supportRequests: [],
       shipNeeds: []
@@ -1064,24 +1088,46 @@ function createCombatMissionRequests(
   }
 
   const attackShare = resolveAttackShareForWarState(warState);
-  const attackCap = Math.min(
+  let attackCap = Math.min(
     availableFleetSlots,
     Math.max(0, Math.round((availableFleetSlots * attackShare) / 100))
   );
-  const supportCap = Math.max(0, availableFleetSlots - attackCap);
-  const attackCandidates = createAttackMissionCandidates(context, factions)
+  const relocationRequests: RelocationMissionRequest[] = [];
+  const preBreakPlanning = attackCap > 0
+    ? createPrimaryWarBreakCombatPlanning(context, factions)
+    : null;
+  const attackRequests: AttackMissionRequest[] = [];
+  const blockedNeeds: WarShipNeedRequest[] = [];
+  if (preBreakPlanning?.relocationRequest && relocationRequests.length <= 0) {
+    relocationRequests.push(preBreakPlanning.relocationRequest);
+  }
+  if (preBreakPlanning?.attackRequest && attackRequests.length < attackCap) {
+    attackRequests.push(preBreakPlanning.attackRequest);
+  }
+  if (preBreakPlanning?.shipNeed) {
+    blockedNeeds.push(preBreakPlanning.shipNeed);
+  }
+
+  attackCap = Math.max(0, attackCap - attackRequests.length);
+  const supportCap = Math.max(
+    0,
+    availableFleetSlots - attackRequests.length - relocationRequests.length - attackCap
+  );
+  const reservedTargetKey = preBreakPlanning?.reservedTargetKey ?? null;
+  const attackCandidates = createAttackMissionCandidates(context, factions, reservedTargetKey)
     .sort((left, right) => right.score - left.score || left.travelTurns - right.travelTurns);
   const supportCandidates = createSupportMissionCandidates(context, factions)
     .sort((left, right) => right.score - left.score || left.travelTurns - right.travelTurns);
 
-  const attackRequests = attackCandidates.slice(0, Math.max(0, attackCap));
+  attackRequests.push(...attackCandidates.slice(0, Math.max(0, attackCap)));
   const supportRequests = supportCandidates.slice(0, Math.max(0, supportCap));
-  const blockedNeeds = [
-    ...createBlockedAttackShipNeeds(context, factions, attackRequests),
+  blockedNeeds.push(
+    ...createBlockedAttackShipNeeds(context, factions, attackRequests, reservedTargetKey),
     ...createBlockedSupportShipNeeds(context, factions, supportRequests)
-  ];
+  );
 
   return {
+    relocationRequests,
     attackRequests,
     supportRequests,
     shipNeeds: selectTopWarShipNeedsPerPlanet(blockedNeeds)
@@ -1948,9 +1994,527 @@ function toCoordinatesKey(coordinates: { x: number; y: number; z: number }): str
   return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
 }
 
-function createAttackMissionCandidates(
+function resolveDeterministicHash(seed: string): number {
+  let hash = 0;
+  for (const character of seed) {
+    hash = ((hash * 31) + character.charCodeAt(0)) % 1000003;
+  }
+  return hash;
+}
+
+function resolveDeterministicFloatInRange(seed: string, min: number, max: number): number {
+  const normalizedMin = Math.min(min, max);
+  const normalizedMax = Math.max(min, max);
+  if (normalizedMin === normalizedMax) {
+    return normalizedMin;
+  }
+  const hash = resolveDeterministicHash(seed);
+  const fraction = (hash % 10000) / 10000;
+  return normalizedMin + ((normalizedMax - normalizedMin) * fraction);
+}
+
+function resolveDeterministicIntInRange(seed: string, min: number, max: number): number {
+  const normalizedMin = Math.min(min, max);
+  const normalizedMax = Math.max(min, max);
+  if (normalizedMin === normalizedMax) {
+    return normalizedMin;
+  }
+  const span = Math.max(1, (normalizedMax - normalizedMin) + 1);
+  return normalizedMin + (resolveDeterministicHash(seed) % span);
+}
+
+function resolveDeterministicTieDecision(seed: string, threshold = 0.5): boolean {
+  const normalizedThreshold = Math.max(0, Math.min(1, threshold));
+  const roll = resolveDeterministicFloatInRange(seed, 0, 1);
+  return roll <= normalizedThreshold;
+}
+
+function createPrimaryWarBreakCombatPlanning(
   context: BotSubsystemContext,
   factions: EvaluatedFaction[]
+): {
+  reservedTargetKey: string | null;
+  relocationRequest: RelocationMissionRequest | null;
+  attackRequest: AttackMissionRequest | null;
+  shipNeed: WarShipNeedRequest | null;
+} | null {
+  const selection = resolvePrimaryWarBreakTargetSelection(context, factions);
+  if (!selection) {
+    context.memory.strategicDiplomatic.primaryWarBreakTarget = null;
+    return null;
+  }
+
+  const directAttackPlan = createConcentratedDirectAttackPlan(context, selection);
+  const relocationPlan = createPreBreakRelocationPlan(context, selection);
+  const reservedTargetKey = toCoordinatesKey(selection.targetPlanet.coordinates);
+  const attackRequest = resolvePrimaryWarBreakAttackRequest(selection, directAttackPlan, relocationPlan);
+  if (attackRequest) {
+    return {
+      reservedTargetKey,
+      relocationRequest: null,
+      attackRequest,
+      shipNeed: null
+    };
+  }
+
+  if (relocationPlan) {
+    return {
+      reservedTargetKey,
+      relocationRequest: relocationPlan,
+      attackRequest: null,
+      shipNeed: null
+    };
+  }
+
+  const fallbackRelocationPlan = createAnyPreBreakRelocationPlan(context, selection);
+  if (fallbackRelocationPlan) {
+    return {
+      reservedTargetKey,
+      relocationRequest: fallbackRelocationPlan,
+      attackRequest: null,
+      shipNeed: null
+    };
+  }
+
+  return {
+    reservedTargetKey,
+    relocationRequest: null,
+    attackRequest: null,
+    shipNeed: createPrimaryWarBreakShipNeed(context, selection)
+  };
+}
+
+function resolvePrimaryWarBreakTargetSelection(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[]
+): PreBreakTargetSelection | null {
+  const candidates = factions
+    .filter((faction) => faction.faction.currentStatus === DiplomaticStatus.WAR)
+    .flatMap((faction) =>
+      faction.faction.knownPlanets
+        .filter((planet) => hasPreBreakAttackableIntel(planet))
+        .map((targetPlanet) => createPreBreakTargetSelection(context, faction, targetPlanet))
+        .filter((entry): entry is PreBreakTargetSelection => entry !== null)
+    )
+    .sort((left, right) =>
+      (right.targetValue - right.expectedLosses) - (left.targetValue - left.expectedLosses)
+      || right.targetValue - left.targetValue
+      || left.targetPlanet.coordinates.x - right.targetPlanet.coordinates.x
+      || left.targetPlanet.coordinates.y - right.targetPlanet.coordinates.y
+      || left.targetPlanet.coordinates.z - right.targetPlanet.coordinates.z
+    );
+  if (candidates.length <= 0) {
+    context.memory.strategicDiplomatic.primaryWarBreakTarget = null;
+    return null;
+  }
+
+  const existing = context.memory.strategicDiplomatic.primaryWarBreakTarget;
+  const persisted = existing
+    ? candidates.find((candidate) => isPrimaryWarBreakTargetStillValid(context, existing, candidate))
+    : null;
+  if (persisted) {
+    return persisted;
+  }
+
+  const selected = candidates[0] ?? null;
+  if (!selected) {
+    context.memory.strategicDiplomatic.primaryWarBreakTarget = null;
+    return null;
+  }
+
+  const holdTurns = resolveDeterministicIntInRange(
+    `war-break-hold:${selected.faction.faction.playerId}:${reservedPrimaryTargetKey(selected.targetPlanet)}`,
+    PRIMARY_WAR_BREAK_MIN_HOLD_TURNS,
+    PRIMARY_WAR_BREAK_MAX_HOLD_TURNS
+  );
+  const valueLossMultiplier = resolveDeterministicFloatInRange(
+    `war-break-margin:${selected.faction.faction.playerId}:${reservedPrimaryTargetKey(selected.targetPlanet)}`,
+    PRIMARY_WAR_BREAK_MIN_VALUE_MULTIPLIER,
+    PRIMARY_WAR_BREAK_MAX_VALUE_MULTIPLIER
+  );
+  context.memory.strategicDiplomatic.primaryWarBreakTarget = {
+    targetPlayerId: selected.faction.faction.playerId,
+    coordinates: { ...selected.targetPlanet.coordinates },
+    holdUntilTurn: context.snapshot.turn + holdTurns,
+    valueLossMultiplier
+  };
+  return selected;
+}
+
+function createPreBreakTargetSelection(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): PreBreakTargetSelection | null {
+  const targetStrength = estimateDiplomaticTargetStrength(targetPlanet);
+  const requiredStrength = Math.max(1, Math.ceil(targetStrength * resolveDiplomaticAttackMultiplier(faction, targetPlanet)));
+  const targetValue = estimatePreBreakTargetValue(faction, targetPlanet);
+  const expectedLosses = estimatePreBreakExpectedLosses(context, faction, targetPlanet, requiredStrength);
+  if (expectedLosses <= 0) {
+    return {
+      faction,
+      targetPlanet,
+      targetValue,
+      expectedLosses: 1,
+      requiredStrength,
+      targetStrength
+    };
+  }
+  const thresholdMultiplier = context.memory.strategicDiplomatic.primaryWarBreakTarget
+    && context.memory.strategicDiplomatic.primaryWarBreakTarget.targetPlayerId === faction.faction.playerId
+    && toCoordinatesKey(context.memory.strategicDiplomatic.primaryWarBreakTarget.coordinates) === toCoordinatesKey(targetPlanet.coordinates)
+    ? context.memory.strategicDiplomatic.primaryWarBreakTarget.valueLossMultiplier
+    : resolveDeterministicFloatInRange(
+      `war-break-margin:${faction.faction.playerId}:${reservedPrimaryTargetKey(targetPlanet)}`,
+      PRIMARY_WAR_BREAK_MIN_VALUE_MULTIPLIER,
+      PRIMARY_WAR_BREAK_MAX_VALUE_MULTIPLIER
+    );
+  return targetValue >= (expectedLosses * thresholdMultiplier)
+    ? {
+      faction,
+      targetPlanet,
+      targetValue,
+      expectedLosses,
+      requiredStrength,
+      targetStrength
+    }
+    : null;
+}
+
+function isPrimaryWarBreakTargetStillValid(
+  context: BotSubsystemContext,
+  existing: BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget,
+  candidate: PreBreakTargetSelection
+): boolean {
+  if (context.snapshot.turn > existing.holdUntilTurn) {
+    return false;
+  }
+  if (existing.targetPlayerId !== candidate.faction.faction.playerId) {
+    return false;
+  }
+  if (toCoordinatesKey(existing.coordinates) !== toCoordinatesKey(candidate.targetPlanet.coordinates)) {
+    return false;
+  }
+  if (candidate.faction.faction.currentStatus !== DiplomaticStatus.WAR) {
+    return false;
+  }
+
+  const reachableStrength = estimateReachableConcentratedStrength(context, candidate);
+  if (reachableStrength < candidate.requiredStrength) {
+    return false;
+  }
+
+  return candidate.targetValue >= (candidate.expectedLosses * existing.valueLossMultiplier);
+}
+
+function estimatePreBreakTargetValue(
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): number {
+  const shipsValue = targetPlanet.totalShipsAmount * 32;
+  const defencesValue = targetPlanet.totalDefencesAmount * 26;
+  const developmentValue = targetPlanet.averageBuildingLevel * 42;
+  const diplomaticPressure = (faction.hostilityScore * 2.2)
+    + (faction.faction.recentBattleReportCount * 18)
+    + (faction.statusPriorityWeight * 3.5);
+  return Math.max(1, Math.round(shipsValue + defencesValue + developmentValue + diplomaticPressure));
+}
+
+function estimatePreBreakExpectedLosses(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  requiredStrength: number
+): number {
+  const bestAvailableStrength = Math.max(1, estimateBestAvailableCombatStrength(context, targetPlanet.coordinates));
+  const targetStrength = Math.max(1, estimateDiplomaticTargetStrength(targetPlanet));
+  const ratioPenalty = Math.max(0.55, Math.min(1.8, targetStrength / bestAvailableStrength));
+  const intelPenalty = Math.max(0.75, 1.15 - (Math.min(14, targetPlanet.intelDepth) / 28));
+  const confidencePenalty = Math.max(0.8, 1.1 - (faction.confidence / 4));
+  const battlePressure = 1 + Math.min(0.35, targetPlanet.recentBattleReportCount * 0.04);
+  return Math.max(
+    1,
+    Math.round(requiredStrength * ratioPenalty * intelPenalty * confidencePenalty * battlePressure * 0.58)
+  );
+}
+
+function estimateReachableConcentratedStrength(
+  context: BotSubsystemContext,
+  selection: PreBreakTargetSelection
+): number {
+  const stagingPlanet = resolveBestDiplomaticStagingPlanet(context, selection.targetPlanet.coordinates);
+  if (!stagingPlanet) {
+    return 0;
+  }
+
+  const directDistance = calculateTravelDistance(stagingPlanet.coordinates, selection.targetPlanet.coordinates);
+  let totalStrength = selectCombatShipsForStrength(stagingPlanet, Number.MAX_SAFE_INTEGER, directDistance).combatStrength;
+  for (const originPlanet of context.snapshot.planets) {
+    if (toCoordinatesKey(originPlanet.coordinates) === toCoordinatesKey(stagingPlanet.coordinates)) {
+      continue;
+    }
+    const moveDistance = calculateTravelDistance(originPlanet.coordinates, stagingPlanet.coordinates);
+    totalStrength += selectCombatShipsForStrength(originPlanet, Number.MAX_SAFE_INTEGER, moveDistance).combatStrength;
+  }
+  return totalStrength;
+}
+
+function createConcentratedDirectAttackPlan(
+  context: BotSubsystemContext,
+  selection: PreBreakTargetSelection
+): AttackMissionRequest | null {
+  const validPlans = context.snapshot.planets
+    .map((originPlanet) => {
+      const distance = calculateTravelDistance(originPlanet.coordinates, selection.targetPlanet.coordinates);
+      const travelTurns = resolveTravelTurns(originPlanet, distance);
+      const combatSelection = selectCombatShipsForStrength(originPlanet, selection.requiredStrength, distance);
+      if (combatSelection.ships.length <= 0 || combatSelection.combatStrength < selection.requiredStrength) {
+        return null;
+      }
+
+      return {
+        kind: 'ATTACK',
+        faction: selection.faction,
+        targetPlanet: selection.targetPlanet,
+        originPlanet,
+        ships: combatSelection.ships,
+        requiredStrength: selection.requiredStrength,
+        selectedStrength: combatSelection.combatStrength,
+        travelDistance: distance,
+        travelTurns,
+        score: Math.max(
+          1,
+          560
+          + Math.round(selection.targetValue / 6)
+          - Math.round(selection.expectedLosses / 8)
+          - (travelTurns * 10)
+        ),
+        scoutOnly: false
+      } satisfies AttackMissionRequest;
+    })
+    .filter((entry): entry is AttackMissionRequest => entry !== null)
+    .sort((left, right) =>
+      right.selectedStrength - left.selectedStrength
+      || right.score - left.score
+      || left.travelTurns - right.travelTurns
+    );
+  return validPlans[0] ?? null;
+}
+
+function createPreBreakRelocationPlan(
+  context: BotSubsystemContext,
+  selection: PreBreakTargetSelection
+): RelocationMissionRequest | null {
+  const stagingPlanet = resolveBestDiplomaticStagingPlanet(context, selection.targetPlanet.coordinates);
+  if (!stagingPlanet) {
+    return null;
+  }
+  const stagingDistance = calculateTravelDistance(stagingPlanet.coordinates, selection.targetPlanet.coordinates);
+  const stagingSelection = selectCombatShipsForStrength(stagingPlanet, selection.requiredStrength, stagingDistance);
+  if (stagingSelection.combatStrength >= selection.requiredStrength) {
+    return null;
+  }
+
+  const relocationCandidates = createPreBreakRelocationCandidates(context, selection, stagingPlanet);
+  if (relocationCandidates[0]) {
+    return relocationCandidates[0];
+  }
+
+  const fallbackStagingPlanets = context.snapshot.planets
+    .filter((planet) => toCoordinatesKey(planet.coordinates) !== toCoordinatesKey(stagingPlanet.coordinates))
+    .sort((left, right) =>
+      calculateTravelDistance(left.coordinates, selection.targetPlanet.coordinates)
+      - calculateTravelDistance(right.coordinates, selection.targetPlanet.coordinates)
+      || right.defense.avgIndustryLevel - left.defense.avgIndustryLevel
+    );
+  for (const fallbackStagingPlanet of fallbackStagingPlanets) {
+    const fallbackCandidates = createPreBreakRelocationCandidates(context, selection, fallbackStagingPlanet);
+    if (fallbackCandidates[0]) {
+      return fallbackCandidates[0];
+    }
+  }
+
+  return null;
+}
+
+function createPreBreakRelocationCandidates(
+  context: BotSubsystemContext,
+  selection: PreBreakTargetSelection,
+  stagingPlanet: BotPlanetSnapshot
+): RelocationMissionRequest[] {
+  return context.snapshot.planets
+    .filter((originPlanet) => toCoordinatesKey(originPlanet.coordinates) !== toCoordinatesKey(stagingPlanet.coordinates))
+    .map((originPlanet) => {
+      const moveDistance = calculateTravelDistance(originPlanet.coordinates, stagingPlanet.coordinates);
+      const moveSelection = selectCombatShipsForStrength(originPlanet, Number.MAX_SAFE_INTEGER, moveDistance);
+      if (moveSelection.ships.length <= 0 || moveSelection.combatStrength <= 0) {
+        return null;
+      }
+      const useJumpGate = canUseOwnJumpGate(originPlanet, stagingPlanet.coordinates, context.snapshot.planets);
+      const travelTurns = useJumpGate ? 1 : resolveTravelTurns(originPlanet, moveDistance);
+      return {
+        missionType: FleetMissionType.MOVE,
+        phase: 'PRE_BREAK_CONCENTRATION',
+        faction: selection.faction,
+        targetPlanet: selection.targetPlanet,
+        originPlanet,
+        stagingPlanet,
+        ships: moveSelection.ships,
+        travelDistance: moveDistance,
+        travelTurns,
+        score: Math.max(
+          1,
+          540
+          + Math.round(selection.targetValue / 8)
+          + Math.round(moveSelection.combatStrength / 2.5)
+          - (travelTurns * 12)
+          - (calculateTravelDistance(stagingPlanet.coordinates, selection.targetPlanet.coordinates) * 5)
+        ),
+        moveRole: 'WAR_BREAK_STAGING',
+        useJumpGate
+      } satisfies RelocationMissionRequest;
+    })
+    .filter((entry): entry is RelocationMissionRequest => entry !== null)
+    .sort((left, right) =>
+      right.ships.reduce((sum, ship) => sum + (estimateShipCombatPower(ship.type) * ship.undamagedAmount), 0)
+      - left.ships.reduce((sum, ship) => sum + (estimateShipCombatPower(ship.type) * ship.undamagedAmount), 0)
+      || right.score - left.score
+      || left.travelTurns - right.travelTurns
+    );
+}
+
+function createAnyPreBreakRelocationPlan(
+  context: BotSubsystemContext,
+  selection: PreBreakTargetSelection
+): RelocationMissionRequest | null {
+  const stagingCandidates = context.snapshot.planets
+    .slice()
+    .sort((left, right) =>
+      calculateTravelDistance(left.coordinates, selection.targetPlanet.coordinates)
+      - calculateTravelDistance(right.coordinates, selection.targetPlanet.coordinates)
+      || right.defense.avgIndustryLevel - left.defense.avgIndustryLevel
+      || left.name.localeCompare(right.name)
+    );
+
+  for (const stagingPlanet of stagingCandidates) {
+    const candidate = context.snapshot.planets
+      .filter((originPlanet) => toCoordinatesKey(originPlanet.coordinates) !== toCoordinatesKey(stagingPlanet.coordinates))
+      .map((originPlanet) => {
+        const moveDistance = calculateTravelDistance(originPlanet.coordinates, stagingPlanet.coordinates);
+        const moveSelection = selectCombatShipsForStrength(originPlanet, Number.MAX_SAFE_INTEGER, moveDistance);
+        if (moveSelection.ships.length <= 0 || moveSelection.combatStrength <= 0) {
+          return null;
+        }
+        const useJumpGate = canUseOwnJumpGate(originPlanet, stagingPlanet.coordinates, context.snapshot.planets);
+        const travelTurns = useJumpGate ? 1 : resolveTravelTurns(originPlanet, moveDistance);
+        return {
+          missionType: FleetMissionType.MOVE,
+          phase: 'PRE_BREAK_CONCENTRATION',
+          faction: selection.faction,
+          targetPlanet: selection.targetPlanet,
+          originPlanet,
+          stagingPlanet,
+          ships: moveSelection.ships,
+          travelDistance: moveDistance,
+          travelTurns,
+          score: Math.max(1, 500 + Math.round(moveSelection.combatStrength / 2) - (travelTurns * 10)),
+          moveRole: 'WAR_BREAK_STAGING',
+          useJumpGate
+        } satisfies RelocationMissionRequest;
+      })
+      .filter((entry): entry is RelocationMissionRequest => entry !== null)
+      .sort((left, right) =>
+        right.score - left.score
+        || left.travelTurns - right.travelTurns
+      )[0] ?? null;
+
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function resolvePrimaryWarBreakAttackRequest(
+  selection: PreBreakTargetSelection,
+  directAttackPlan: AttackMissionRequest | null,
+  relocationPlan: RelocationMissionRequest | null
+): AttackMissionRequest | null {
+  if (!directAttackPlan) {
+    return null;
+  }
+  if (!relocationPlan) {
+    return directAttackPlan;
+  }
+
+  const directOutcome = directAttackPlan.selectedStrength - selection.expectedLosses;
+  const relocationStrength = relocationPlan.ships
+    .reduce((sum, ship) => sum + (estimateShipCombatPower(ship.type) * ship.undamagedAmount), 0);
+  const improvedOutcome = Math.max(directOutcome, (directAttackPlan.selectedStrength + relocationStrength) - selection.expectedLosses);
+  const improvementRatio = directOutcome > 0
+    ? Math.max(0, (improvedOutcome - directOutcome) / directOutcome)
+    : 1;
+  if (improvementRatio >= PRIMARY_WAR_BREAK_NEAR_EQUAL_IMPROVEMENT_RATIO) {
+    return null;
+  }
+
+  return resolveDeterministicTieDecision(
+    `war-break-direct-vs-move:${selection.faction.faction.playerId}:${reservedPrimaryTargetKey(selection.targetPlanet)}`,
+    0.5
+  )
+    ? directAttackPlan
+    : null;
+}
+
+function createPrimaryWarBreakShipNeed(
+  context: BotSubsystemContext,
+  selection: PreBreakTargetSelection
+): WarShipNeedRequest | null {
+  const preferredOrigin = resolveBestMilitaryOrigin(context, selection.targetPlanet.coordinates);
+  if (!preferredOrigin) {
+    return null;
+  }
+  const combatType = resolveBestProducibleCombatShipType(context);
+  if (!combatType) {
+    return null;
+  }
+
+  const reachableStrength = estimateReachableConcentratedStrength(context, selection);
+  return {
+    originPlanet: preferredOrigin,
+    shipType: combatType,
+    amount: Math.max(
+      1,
+      Math.ceil(
+        Math.max(0, selection.requiredStrength - reachableStrength)
+        / Math.max(1, estimateShipCombatPower(combatType))
+      )
+    ),
+    score: 520 + selection.requiredStrength,
+    reason: 'Need more concentrated war ships for a primary diplomatic war-break target.',
+    targetCoordinates: { ...selection.targetPlanet.coordinates },
+    needKind: 'MOVE'
+  };
+}
+
+function reservedPrimaryTargetKey(
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): string {
+  return toCoordinatesKey(targetPlanet.coordinates);
+}
+
+function hasPreBreakAttackableIntel(
+  planet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): boolean {
+  return planet.intelDepth > 0
+    && (planet.totalShipsAmount > 0 || planet.totalDefencesAmount > 0);
+}
+
+function createAttackMissionCandidates(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[],
+  reservedTargetKey: string | null = null
 ): AttackMissionRequest[] {
   const requests: AttackMissionRequest[] = [];
 
@@ -1960,6 +2524,9 @@ function createAttackMissionCandidates(
     }
 
     for (const targetPlanet of faction.faction.knownPlanets) {
+      if (reservedTargetKey && reservedTargetKey === toCoordinatesKey(targetPlanet.coordinates)) {
+        continue;
+      }
       if (!hasAttackableIntel(targetPlanet)) {
         continue;
       }
@@ -2245,7 +2812,8 @@ function createGuardSupportPlan(
 function createBlockedAttackShipNeeds(
   context: BotSubsystemContext,
   factions: EvaluatedFaction[],
-  acceptedRequests: AttackMissionRequest[]
+  acceptedRequests: AttackMissionRequest[],
+  reservedTargetKey: string | null = null
 ): WarShipNeedRequest[] {
   const acceptedTargets = new Set(acceptedRequests.map((request) =>
     `${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`
@@ -2259,7 +2827,7 @@ function createBlockedAttackShipNeeds(
 
     for (const targetPlanet of faction.faction.knownPlanets) {
       const targetKey = `${targetPlanet.coordinates.x}:${targetPlanet.coordinates.y}:${targetPlanet.coordinates.z}`;
-      if (acceptedTargets.has(targetKey) || !hasAttackableIntel(targetPlanet)) {
+      if (acceptedTargets.has(targetKey) || targetKey === reservedTargetKey || !hasAttackableIntel(targetPlanet)) {
         continue;
       }
 
@@ -2862,6 +3430,7 @@ function createRelocationMissionProposal(
   request: RelocationMissionRequest,
   index: number
 ): BotProposal {
+  const isWarBreakMove = request.moveRole === 'WAR_BREAK_STAGING';
   return {
     proposalId: `strategic-diplomatic:move:${request.faction.faction.playerId}:${toCoordinatesKey(request.originPlanet.coordinates)}:${toCoordinatesKey(request.stagingPlanet.coordinates)}:${context.snapshot.turn}`,
     subsystemId: 'STRATEGIC_DIPLOMATIC',
@@ -2869,12 +3438,14 @@ function createRelocationMissionProposal(
     status: 'PROPOSED',
     goalKey: `strategic-diplomatic:move:${request.faction.faction.playerId}:${toCoordinatesKey(request.stagingPlanet.coordinates)}`,
     dedupeKey: `strategic-diplomatic:move:${request.moveRole}:${toCoordinatesKey(request.originPlanet.coordinates)}:${toCoordinatesKey(request.stagingPlanet.coordinates)}`,
-    summary: `Move request #${index + 1}: regroup bombardment fleet from ${request.originPlanet.name} to ${request.stagingPlanet.name}.`,
+    summary: isWarBreakMove
+      ? `Move request #${index + 1}: regroup war-break fleet from ${request.originPlanet.name} to ${request.stagingPlanet.name}.`
+      : `Move request #${index + 1}: regroup bombardment fleet from ${request.originPlanet.name} to ${request.stagingPlanet.name}.`,
     planetId: request.originPlanet.planetId,
     targetCoordinates: { ...request.stagingPlanet.coordinates },
     expectedValue: Math.max(1, Math.round(request.score)),
-    urgency: 74,
-    risk: 16,
+    urgency: isWarBreakMove ? 82 : 74,
+    risk: isWarBreakMove ? 18 : 16,
     confidence: Math.round(request.faction.confidence * 100),
     requestedResources: emptyResources(),
     requestPayload: {

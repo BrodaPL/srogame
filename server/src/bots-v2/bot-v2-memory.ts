@@ -17,7 +17,8 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
       farmLedger: []
     },
     strategicDiplomatic: {
-      factionLedger: []
+      factionLedger: [],
+      primaryWarBreakTarget: null
     }
   };
 }

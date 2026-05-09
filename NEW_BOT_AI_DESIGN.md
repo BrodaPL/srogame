@@ -1481,6 +1481,121 @@ Still out of scope:
 * no multi-target synchronized waves yet
 * no allied / peace hostile-activity auto-sharing execution yet
 
+### Phase-5 scope: pre-break concentration
+
+After force projection and escalation tools, the next major `Strategic Diplomatic` slice should be a **tight pre-break concentration phase**.
+
+This phase should focus only on:
+
+* gathering one bigger war-breaking fleet
+* choosing one primary hostile target
+* preferring one concentrated strike over several smaller pre-break attacks
+
+This phase should execute:
+
+* `MOVE`
+* `ATTACK`
+
+It should **not** expand `BOMBARD` / `SIEGE` further here.
+
+#### Phase-5 campaign sequence
+
+Campaign order should be:
+
+1. pre-break concentration
+2. try to break the target
+3. only later, in another phase, switch to smaller repeat attacks after the target is opened
+
+That later post-break phase may use:
+
+* smaller mixed war fleets
+* some cargo ships
+* both ship-fight-capable and bombardment-capable pressure
+
+But that belongs to a separate later slice.
+
+#### Phase-5 primary target rule
+
+This phase should keep:
+
+* one global primary war-break target for the subsystem
+
+That target should persist for:
+
+* a randomized `3 .. 10` turns
+* unless invalidated earlier
+
+Immediate invalidation triggers:
+
+* fresh intel shows it is no longer favorable
+* required concentrated force is no longer reachable
+* diplomatic status changed
+
+#### Phase-5 target evaluation
+
+A target should only be worth concentrated pre-break pressure when:
+
+* `targetValue >= expectedLosses * V`
+
+Where:
+
+* `V` is randomized in range `1.25 .. 1.5`
+* not one fixed hardcoded constant
+
+Target value should consider:
+
+* known ships value
+* known defenses value
+* planet development value
+* diplomatic pressure
+
+Expected losses should use:
+
+* actual battle-simulator estimate if available
+
+#### Phase-5 concentration rule
+
+Pre-break planning should:
+
+* prefer one concentrated attack
+* only fall back when concentration is not good enough
+
+If a direct `ATTACK` is already possible without relocation:
+
+* choose randomly only among near-equal options between attacking now and concentrating more
+
+#### Phase-5 relocation rule
+
+Relocation should trigger when:
+
+* no single origin can satisfy the preferred pre-break attack
+* or a regrouped nearer hub produces a better concentrated strike
+
+Staging choice should still use:
+
+* best owned hub by contributor ETA
+* plus `JUMP_GATE` / `ALLIANCE_DEPOT` readiness
+
+#### Phase-5 output cap
+
+This phase should outward at most:
+
+* one primary `MOVE` bundle
+* one primary `ATTACK`
+
+`SHIP_NEED` should be emitted:
+
+* only after relocation options are exhausted
+
+#### Phase-5 deferred follow-up
+
+Still defer to the following phase:
+
+* post-break smaller repeat attacks
+* cargo-supported war raids
+* ambush-risk control
+* opened-target pacing
+
 #### TODO: allied / peace hostile-activity intel sharing
 
 Later strategic-diplomatic phases should add shared hostile-activity awareness:

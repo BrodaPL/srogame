@@ -2152,6 +2152,122 @@ Later phases should add allied / peace hostile-activity information sharing:
 - `ALLIED` and `PEACE` bots should automatically share attack knowledge
 - human allies / peace contacts should receive copied hostile battle / attack reports
 
+### Strategic Diplomatic phase-5 note
+
+After phase 4 force projection, the next `Strategic Diplomatic` slice should be a tight pre-break concentration phase:
+
+- `MOVE`
+- `ATTACK`
+- one primary war-break target
+- concentration before smaller post-break pressure
+
+## Strategic Diplomatic phase-5 follow-up
+
+The next `Strategic Diplomatic` slice should add pre-break concentration and a primary war-break target model.
+
+### Strategic Diplomatic phase-5 outputs
+
+Phase 5 should emit:
+
+- one primary `MOVE` bundle
+- one primary `ATTACK`
+- exact-ship-type `SHIP_NEED` only after relocation options are exhausted
+
+### Strategic Diplomatic phase-5 mission scope
+
+Executable mission types:
+
+- `MOVE`
+- `ATTACK`
+
+Do not expand `BOMBARD` / `SIEGE` further in this phase.
+
+### Strategic Diplomatic phase-5 campaign order
+
+The intended order is:
+
+1. concentrate force
+2. try to break the target
+3. only later, in another phase, switch to smaller repeat attacks after the target is opened
+
+### Strategic Diplomatic phase-5 primary target rule
+
+Keep:
+
+- one global primary war-break target for the whole subsystem
+
+Primary-target persistence:
+
+- randomized `3 .. 10` turns
+- not one fixed constant
+
+Immediate invalidation:
+
+- fresh intel shows the target is no longer favorable
+- required concentrated force is no longer reachable
+- diplomatic status changed
+
+### Strategic Diplomatic phase-5 target-value rule
+
+A target should be worth concentration only when:
+
+- `targetValue >= expectedLosses * V`
+
+Where:
+
+- `V` is randomized in range `1.25 .. 1.5`
+- not a fixed hardcoded constant
+
+Target value should combine:
+
+- known ships value
+- known defenses value
+- planet development value
+- diplomatic pressure
+
+### Strategic Diplomatic phase-5 loss-estimate rule
+
+Expected losses should use:
+
+- actual battle-simulator estimate if available
+
+### Strategic Diplomatic phase-5 concentration rule
+
+Before target defenses are broken:
+
+- prefer one concentrated strike over several smaller attacks
+
+If a direct `ATTACK` is already possible without relocation:
+
+- choose randomly only among near-equal options between immediate attack and further concentration
+
+### Strategic Diplomatic phase-5 relocation rule
+
+`MOVE` should trigger when:
+
+- no single origin can satisfy the preferred pre-break attack
+- or regrouping on a nearer hub creates a better concentrated strike
+
+Staging choice should still use:
+
+- best owned hub by contributor ETA
+- plus `JUMP_GATE` / `ALLIANCE_DEPOT` readiness
+
+### Strategic Diplomatic phase-5 ship-need rule
+
+`SHIP_NEED` should be emitted:
+
+- only after relocation options are exhausted
+
+### Strategic Diplomatic phase-5 explicit non-goals
+
+Still defer to the following phase:
+
+- post-break smaller repeat attacks
+- cargo-supported war raids
+- ambush-risk control
+- opened-target pacing
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

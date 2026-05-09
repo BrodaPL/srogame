@@ -169,6 +169,31 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(attackProposal?.debug.attackKind).toBe('FULL');
   });
 
+  it('persists one primary war-break target across turns while it stays valid', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 4);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 6);
+    playerEnemyPlanet.rBDSFTQ.defences.addUndamaged(DefenceType.SAM_SITE, 3);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const firstResult = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const firstTarget = firstResult.memory.strategicDiplomatic.primaryWarBreakTarget;
+    expect(firstTarget).not.toBeNull();
+
+    galaxy.currentTurn += 1;
+    const secondResult = runStrategicDiplomaticSubsystem(galaxy, bot, firstResult.memory);
+    const secondTarget = secondResult.memory.strategicDiplomatic.primaryWarBreakTarget;
+
+    expect(secondTarget).not.toBeNull();
+    expect(secondTarget?.targetPlayerId).toBe(playerEnemy.playerId);
+    expect(secondTarget?.coordinates).toEqual(firstTarget?.coordinates);
+    expect(secondTarget?.holdUntilTurn).toBe(firstTarget?.holdUntilTurn);
+  });
+
   it('emits allied repair support missions for explicit repair requests', () => {
     const { galaxy, bot, botPlanet, botEnemy, botEnemyPlanet } = createStrategicDiplomaticWorld();
     galaxy.diplomaticRelations.push(
@@ -202,7 +227,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(repairProposal?.debug.supportReason).toBe('EXPLICIT_REQUEST');
   });
 
-  it('emits exact-ship-type war ship need when attack planning is blocked by fleet shortage', () => {
+  it('emits exact-ship-type war-break ship need when direct attack and relocation are both unavailable', () => {
     const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     galaxy.diplomaticRelations.push(
       createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
@@ -222,11 +247,41 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     const shipNeed = result.result.proposals.find((proposal) =>
       proposal.kind === 'SHIPYARD'
       && proposal.requestPayload.shipType !== ShipType.SPY_PROBE
-      && proposal.debug.needKind === 'ATTACK'
+      && proposal.debug.needKind === 'MOVE'
     );
 
     expect(shipNeed).toBeDefined();
-    expect(shipNeed?.debug.needKind).toBe('ATTACK');
+    expect(shipNeed?.debug.needKind).toBe('MOVE');
+  });
+
+  it('emits a pre-break relocation move before war-break ship need when concentration can improve a war target', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const reservePlanet = addOwnedPlanet(galaxy, bot, 'DipWarReserve', { x: 1, y: 0 }, 1);
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    enableAdvancedWarProduction(reservePlanet, bot);
+    reservePlanet.rBDSFTQ.resources.deuterium = 20000;
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    reservePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 80);
+    playerEnemyPlanet.rBDSFTQ.defences.addUndamaged(DefenceType.SAM_SITE, 60);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const moveProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.MOVE
+      && proposal.debug.moveRole === 'WAR_BREAK_STAGING'
+    );
+    const shipNeed = result.result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.debug.needKind === 'MOVE'
+    );
+
+    expect(moveProposal).toBeDefined();
+    expect(shipNeed).toBeUndefined();
   });
 
   it('emits bombardment mission proposals for war targets when bombardment pressure is available', () => {

@@ -177,8 +177,16 @@ export type BotMemoryV2StrategicDiplomaticFactionEntry = {
   lastSeenTurn: number | null;
 };
 
+export type BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget = {
+  targetPlayerId: number;
+  coordinates: BotMemoryCoordinates;
+  holdUntilTurn: number;
+  valueLossMultiplier: number;
+};
+
 export type BotMemoryV2StrategicDiplomatic = {
   factionLedger: BotMemoryV2StrategicDiplomaticFactionEntry[];
+  primaryWarBreakTarget: BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null;
 };
 
 export type BotMemoryV2 = {
@@ -795,7 +803,32 @@ export class Player {
     return {
       factionLedger: Player.normalizeBotMemoryV2StrategicDiplomaticFactionLedger(
         strategicDiplomatic?.factionLedger
+      ),
+      primaryWarBreakTarget: Player.normalizeBotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget(
+        strategicDiplomatic?.primaryWarBreakTarget
       )
+    };
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget(
+    target: BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null | undefined
+  ): BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null {
+    if (!target || !Number.isInteger(target.targetPlayerId)) {
+      return null;
+    }
+
+    const coordinates = Player.normalizeBotMemoryCoordinates(target.coordinates);
+    if (!coordinates) {
+      return null;
+    }
+
+    return {
+      targetPlayerId: target.targetPlayerId,
+      coordinates,
+      holdUntilTurn: Number.isInteger(target.holdUntilTurn) ? target.holdUntilTurn : 0,
+      valueLossMultiplier: Number.isFinite(target.valueLossMultiplier)
+        ? Math.max(1, Number(target.valueLossMultiplier))
+        : 1.25
     };
   }
 
