@@ -896,6 +896,14 @@ function resolveStrategicDiplomaticFactions(
             return null;
           }
 
+          const latestBattleObservation = resolveLatestBattleObservation(player, planet);
+          const latestPlunderObservation = resolveLatestPlunderObservation(player, planet);
+          const adaptiveTechnologyLevel = report.techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY)
+            ?? foreignPlayer.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY)
+            ?? 0;
+          const knownShipCountsByType = resolveKnownShipCountsForStrategicMilitary(report, latestBattleObservation);
+          const knownDefenceCountsByType = resolveKnownDefenceCountsForStrategicMilitary(report, latestBattleObservation);
+
           return {
             coordinates: {
               x: planet.basicInfo.solarSystem.coordinates.x,
@@ -907,8 +915,17 @@ function resolveStrategicDiplomaticFactions(
             anomaliesAndNoise: report.planetaryParameters.anomaliesAndNoise,
             averageBuildingLevel: report.averageBuildingLevel,
             averageTechLevel: report.averageTechLevel,
-            totalShipsAmount: report.totalShipsAmount,
-            totalDefencesAmount: report.totalDefencesAmount,
+            totalShipsAmount: sumCountsByType(knownShipCountsByType),
+            totalDefencesAmount: sumCountsByType(knownDefenceCountsByType),
+            knownShipCountsByType,
+            knownDefenceCountsByType,
+            currentResources: {
+              metal: Math.max(0, Math.floor(report.resourcesAmount.metal)),
+              crystal: Math.max(0, Math.floor(report.resourcesAmount.crystal)),
+              deuterium: Math.max(0, Math.floor(report.resourcesAmount.deuterium))
+            },
+            storageCapacity: resolveReportedStorageCapacity(report),
+            income: resolveReportedIncome(report, adaptiveTechnologyLevel),
             bunkerLevel: report.buildingsLevels.get(BuildingType.BUNKER_NETWORK) ?? null,
             recentBattleReportCount: countRecentBattleReportsForCoordinates(
               player,
@@ -919,7 +936,10 @@ function resolveStrategicDiplomaticFactions(
               },
               galaxy.currentTurn,
               80
-            )
+            ),
+            lastCombatObservationTurn: latestBattleObservation?.turn ?? null,
+            lastPlunderTurn: latestPlunderObservation?.turn ?? null,
+            latestPlunderedResources: latestPlunderObservation?.stolenResources ?? null
           } satisfies BotStrategicDiplomaticKnownPlanetSnapshot;
         })
         .filter((entry): entry is BotStrategicDiplomaticKnownPlanetSnapshot => entry !== null)

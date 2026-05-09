@@ -1596,6 +1596,136 @@ Still defer to the following phase:
 * ambush-risk control
 * opened-target pacing
 
+### Phase-6 scope: post-break war pressure
+
+After pre-break concentration, the next `Strategic Diplomatic` slice should be a **post-break war-pressure phase**.
+
+This phase should focus on:
+
+* repeated post-break `ATTACK`
+* cargo-supported war raids
+* ambush-risk control
+
+This phase should execute:
+
+* `ATTACK`
+
+It should not re-expand `MOVE`, `BOMBARD`, or `SIEGE` here.
+
+#### Phase-6 opened-target gate
+
+This phase may attack a target only after the subsystem is sure the target planet is opened.
+
+Opened means:
+
+* known ships on the targeted planet are `0`
+* known defenses on the targeted planet are `0`
+
+That certainty may come from:
+
+* the latest battle report
+* or the latest fresh spy report
+
+Either source is sufficient if it clearly confirms zero ships and zero defenses.
+
+#### Phase-6 raid fleet shape
+
+Post-break raid fleets should use:
+
+* cargo ships
+* plus variable military cover
+
+Military cover should be sized by:
+
+* minimum combat package per target-risk band
+
+Cargo should be brought only up to:
+
+* estimated plunder
+
+More cargo than that does not increase reward.
+
+#### Phase-6 raid scoring
+
+Repeated post-break attacks should optimize:
+
+* `plunder - travel churn - ambush risk`
+
+High-hostility `NEUTRAL` targets may still be attacked, but while any active `WAR` exists they should receive:
+
+* a large `-40%` score penalty
+
+So they stay low priority relative to real war fronts.
+
+#### Phase-6 ambush-risk model
+
+Ambush risk should be driven by:
+
+* enemy overall strength
+* attack frequency
+* nearby hostile planet coverage
+
+Risk should rise fastest from:
+
+* many recent raids on the same target
+* recent hostile battle activity near the target
+* strong nearby enemy planets
+
+Risk should decay by:
+
+* fixed `-10` per quiet turn
+* plus bumps from new hostile evidence
+
+When ambush risk reaches:
+
+* `>= 70`
+
+The subsystem should:
+
+* pause raids on that target
+
+If no valid post-break raid targets remain, it should fall back to:
+
+* `SPY` on current `WAR` targets
+* plus high-hostility `NEUTRAL` targets only when already part of current operations
+
+#### Phase-6 break-vs-raid caps
+
+This phase should keep separate caps for:
+
+* `BREAK`
+* opened-target raids
+
+`BREAK` attempts should still be capped at:
+
+* max `2`
+
+Opened-war raid targets may be active up to:
+
+* `floor(sqrt(ownedPlanetsCount)) + 1`
+
+But concentrated `BREAK` attempts should still preferably stay at:
+
+* only `1` or `2`
+
+#### Phase-6 operational memory
+
+This phase should introduce an opened-target operational ledger per target with fields such as:
+
+* target coordinates
+* target player id
+* last post-break attack turn
+* recent raid count in a rolling window
+* current ambush-risk score
+* `pausedUntilTurn`
+* last known preferred raid origin
+* last known estimated plunder value
+
+The recent-raid rolling window should depend on solar-system distance:
+
+* linearly from `5` turns at distance `1`
+* up to `25` turns at maximum galaxy distance
+
 #### TODO: allied / peace hostile-activity intel sharing
 
 Later strategic-diplomatic phases should add shared hostile-activity awareness:

@@ -4,6 +4,7 @@ import { allowedDiplomaticProposalStatuses } from '../../../../../src/app/models
 import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
 import { calculateProbeEspionageLevelBonus } from '../../../../../src/app/generators/espionage-report-generator.js';
 import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
+import { ShipPurpose } from '../../../../../src/app/models/enums/ship-purpose.js';
 import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
 import { WeaponType } from '../../../../../src/app/models/enums/weapon-type.js';
@@ -13,6 +14,7 @@ import { fleetTravelTurnsForDistance } from '../../../../../src/app/models/tech/
 import type {
   BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget,
   BotMemoryV2StrategicDiplomaticFactionEntry,
+  BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry,
   BotProfileId
 } from '../../../../../src/app/models/player.ts';
 import type {
@@ -32,6 +34,7 @@ import {
 } from '../../../game-commands/command-helpers.js';
 
 type FactionLedgerMap = Map<number, BotMemoryV2StrategicDiplomaticFactionEntry>;
+type OpenedWarTargetLedgerMap = Map<string, BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry>;
 
 type EvaluatedFaction = {
   faction: BotStrategicDiplomaticFactionSnapshot;
@@ -96,6 +99,7 @@ type BombardmentShipSelection = CombatShipSelection & {
 
 type AttackMissionRequest = {
   kind: 'ATTACK';
+  phase: 'DIRECT' | 'POST_BREAK_RAID';
   faction: EvaluatedFaction;
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number];
   originPlanet: BotPlanetSnapshot;
@@ -106,6 +110,9 @@ type AttackMissionRequest = {
   travelTurns: number;
   score: number;
   scoutOnly: boolean;
+  estimatedPlunder: number;
+  cargoCapacity: number;
+  ambushRisk: number;
 };
 
 type SupportMissionRequest = {
@@ -218,12 +225,19 @@ const PRIMARY_WAR_BREAK_MAX_HOLD_TURNS = 10;
 const PRIMARY_WAR_BREAK_MIN_VALUE_MULTIPLIER = 1.25;
 const PRIMARY_WAR_BREAK_MAX_VALUE_MULTIPLIER = 1.5;
 const PRIMARY_WAR_BREAK_NEAR_EQUAL_IMPROVEMENT_RATIO = 0.1;
+const POST_BREAK_ATTACK_CONFIRMATION_REPORT_MAX_AGE = 10;
+const POST_BREAK_ATTACK_AMBUSH_RISK_DECAY_PER_TURN = 10;
+const POST_BREAK_ATTACK_AMBUSH_PAUSE_THRESHOLD = 70;
+const ACTIVE_BREAK_TARGET_CAP = 2;
+const ACTIVE_OPENED_WAR_TARGET_BASE = 1;
+const ACTIVE_WAR_NEUTRAL_ATTACK_SCORE_MULTIPLIER = 0.6;
 
 export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DIPLOMATIC' as const;
 
   public generate(context: BotSubsystemContext): BotSubsystemResult {
     const ledger = createFactionLedgerMap(context.memory.strategicDiplomatic.factionLedger);
+    const openedWarTargetLedger = createOpenedWarTargetLedgerMap(context.memory.strategicDiplomatic.openedWarTargets);
     const ownStrengthEstimate = resolveOwnStrengthEstimate(context);
     const statusCounts = resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions);
     const proposalCap = resolveDiplomaticProposalCap(context);
@@ -256,7 +270,13 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
     );
     const warState = resolveDiplomaticWarState(context, evaluatedFactions);
     const remainingFleetSlots = Math.max(0, availableFleetSlots - spyPlanning.requests.length);
-    const combatPlanning = createCombatMissionRequests(context, evaluatedFactions, remainingFleetSlots, warState);
+    const combatPlanning = createCombatMissionRequests(
+      context,
+      evaluatedFactions,
+      remainingFleetSlots,
+      warState,
+      openedWarTargetLedger
+    );
     const forceProjectionPlanning = createForceProjectionRequests(
       context,
       evaluatedFactions,
@@ -292,6 +312,8 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
 
     context.memory.strategicDiplomatic.factionLedger = [...ledger.values()]
       .sort((left, right) => left.playerId - right.playerId);
+    context.memory.strategicDiplomatic.openedWarTargets = [...openedWarTargetLedger.values()]
+      .sort(compareOpenedWarTargetLedgerEntries);
 
     const strongestEnemy = evaluatedFactions.reduce<EvaluatedFaction | null>((best, faction) =>
       !best || faction.strengthEstimate > best.strengthEstimate ? faction : best, null);
@@ -342,6 +364,7 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         enemyEspionageSuperiorityCount: evaluatedFactions.filter((faction) => faction.enemyEspionageSuperiority).length,
         warState,
         diplomaticAttackMissionCount: combatPlanning.attackRequests.length,
+        diplomaticPostBreakRaidMissionCount: combatPlanning.attackRequests.filter((request) => request.phase === 'POST_BREAK_RAID').length,
         diplomaticSupportMissionCount: combatPlanning.supportRequests.length,
         diplomaticWarShipNeedCount: combatPlanning.shipNeeds.length,
         diplomaticBombardmentMissionCount: forceProjectionPlanning.bombardmentRequests.length,
@@ -366,6 +389,23 @@ function createFactionLedgerMap(
   const map: FactionLedgerMap = new Map();
   for (const entry of entries) {
     map.set(entry.playerId, { ...entry });
+  }
+  return map;
+}
+
+function createOpenedWarTargetLedgerMap(
+  entries: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[]
+): OpenedWarTargetLedgerMap {
+  const map: OpenedWarTargetLedgerMap = new Map();
+  for (const entry of entries) {
+    map.set(toCoordinatesKey(entry.coordinates), {
+      ...entry,
+      coordinates: { ...entry.coordinates },
+      recentRaidTurns: [...entry.recentRaidTurns],
+      preferredRaidOriginCoordinates: entry.preferredRaidOriginCoordinates
+        ? { ...entry.preferredRaidOriginCoordinates }
+        : null
+    });
   }
   return map;
 }
@@ -1071,7 +1111,8 @@ function createCombatMissionRequests(
   context: BotSubsystemContext,
   factions: EvaluatedFaction[],
   availableFleetSlots: number,
-  warState: DiplomaticWarState
+  warState: DiplomaticWarState,
+  openedWarTargetLedger: OpenedWarTargetLedgerMap
 ): {
   relocationRequests: RelocationMissionRequest[];
   attackRequests: AttackMissionRequest[];
@@ -1088,12 +1129,13 @@ function createCombatMissionRequests(
   }
 
   const attackShare = resolveAttackShareForWarState(warState);
-  let attackCap = Math.min(
+  const hasActiveWar = factions.some((faction) => faction.faction.currentStatus === DiplomaticStatus.WAR);
+  let attackBudget = Math.min(
     availableFleetSlots,
     Math.max(0, Math.round((availableFleetSlots * attackShare) / 100))
   );
   const relocationRequests: RelocationMissionRequest[] = [];
-  const preBreakPlanning = attackCap > 0
+  const preBreakPlanning = attackBudget > 0
     ? createPrimaryWarBreakCombatPlanning(context, factions)
     : null;
   const attackRequests: AttackMissionRequest[] = [];
@@ -1101,28 +1143,42 @@ function createCombatMissionRequests(
   if (preBreakPlanning?.relocationRequest && relocationRequests.length <= 0) {
     relocationRequests.push(preBreakPlanning.relocationRequest);
   }
-  if (preBreakPlanning?.attackRequest && attackRequests.length < attackCap) {
+  if (preBreakPlanning?.attackRequest && attackRequests.length < attackBudget) {
     attackRequests.push(preBreakPlanning.attackRequest);
   }
   if (preBreakPlanning?.shipNeed) {
     blockedNeeds.push(preBreakPlanning.shipNeed);
   }
 
-  attackCap = Math.max(0, attackCap - attackRequests.length);
+  attackBudget = Math.max(0, attackBudget - attackRequests.length);
   const supportCap = Math.max(
     0,
-    availableFleetSlots - attackRequests.length - relocationRequests.length - attackCap
+    availableFleetSlots - attackRequests.length - relocationRequests.length - attackBudget
   );
   const reservedTargetKey = preBreakPlanning?.reservedTargetKey ?? null;
-  const attackCandidates = createAttackMissionCandidates(context, factions, reservedTargetKey)
+  const attackCandidates = createAttackMissionCandidates(context, factions, hasActiveWar, reservedTargetKey)
     .sort((left, right) => right.score - left.score || left.travelTurns - right.travelTurns);
+  const existingBreakAttackCount = attackRequests.filter((request) => request.phase === 'DIRECT').length;
+  const breakAttackCap = Math.min(
+    Math.max(0, ACTIVE_BREAK_TARGET_CAP - existingBreakAttackCount),
+    Math.max(0, attackBudget)
+  );
+  attackRequests.push(...attackCandidates.slice(0, breakAttackCap));
+  attackBudget = Math.max(0, attackBudget - breakAttackCap);
+
+  const postBreakRaidCandidates = createPostBreakRaidMissionRequests(
+    context,
+    factions,
+    openedWarTargetLedger,
+    hasActiveWar
+  ).sort((left, right) => right.score - left.score || left.travelTurns - right.travelTurns);
+  const postBreakRaidCap = Math.min(resolveActiveOpenedWarTargetCap(context), Math.max(0, attackBudget));
+  attackRequests.push(...postBreakRaidCandidates.slice(0, postBreakRaidCap));
   const supportCandidates = createSupportMissionCandidates(context, factions)
     .sort((left, right) => right.score - left.score || left.travelTurns - right.travelTurns);
-
-  attackRequests.push(...attackCandidates.slice(0, Math.max(0, attackCap)));
   const supportRequests = supportCandidates.slice(0, Math.max(0, supportCap));
   blockedNeeds.push(
-    ...createBlockedAttackShipNeeds(context, factions, attackRequests, reservedTargetKey),
+    ...createBlockedAttackShipNeeds(context, factions, attackRequests, hasActiveWar, reservedTargetKey),
     ...createBlockedSupportShipNeeds(context, factions, supportRequests)
   );
 
@@ -2274,6 +2330,7 @@ function createConcentratedDirectAttackPlan(
 
       return {
         kind: 'ATTACK',
+        phase: 'DIRECT',
         faction: selection.faction,
         targetPlanet: selection.targetPlanet,
         originPlanet,
@@ -2289,7 +2346,10 @@ function createConcentratedDirectAttackPlan(
           - Math.round(selection.expectedLosses / 8)
           - (travelTurns * 10)
         ),
-        scoutOnly: false
+        scoutOnly: false,
+        estimatedPlunder: 0,
+        cargoCapacity: resolveSelectionCargoCapacity(combatSelection.ships),
+        ambushRisk: 0
       } satisfies AttackMissionRequest;
     })
     .filter((entry): entry is AttackMissionRequest => entry !== null)
@@ -2514,6 +2574,7 @@ function hasPreBreakAttackableIntel(
 function createAttackMissionCandidates(
   context: BotSubsystemContext,
   factions: EvaluatedFaction[],
+  hasActiveWar: boolean,
   reservedTargetKey: string | null = null
 ): AttackMissionRequest[] {
   const requests: AttackMissionRequest[] = [];
@@ -2527,11 +2588,11 @@ function createAttackMissionCandidates(
       if (reservedTargetKey && reservedTargetKey === toCoordinatesKey(targetPlanet.coordinates)) {
         continue;
       }
-      if (!hasAttackableIntel(targetPlanet)) {
+      if (!hasPreBreakAttackableIntel(targetPlanet)) {
         continue;
       }
 
-      const attackPlan = createAttackPlanForTarget(context, faction, targetPlanet);
+      const attackPlan = createAttackPlanForTarget(context, faction, targetPlanet, hasActiveWar);
       if (attackPlan) {
         requests.push(attackPlan);
       }
@@ -2556,11 +2617,12 @@ function hasAttackableIntel(
 function createAttackPlanForTarget(
   context: BotSubsystemContext,
   faction: EvaluatedFaction,
-  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  hasActiveWar: boolean
 ): AttackMissionRequest | null {
   const lowConfidence = faction.confidence < 0.55 || targetPlanet.intelDepth < 8;
   if (lowConfidence) {
-    return createScoutAttackPlanForTarget(context, faction, targetPlanet);
+    return createScoutAttackPlanForTarget(context, faction, targetPlanet, hasActiveWar);
   }
 
   const targetStrength = estimateDiplomaticTargetStrength(targetPlanet);
@@ -2577,6 +2639,7 @@ function createAttackPlanForTarget(
 
       return {
         faction,
+        phase: 'DIRECT',
         targetPlanet,
         originPlanet,
         ships: selection.ships,
@@ -2584,12 +2647,19 @@ function createAttackPlanForTarget(
         selectedStrength: selection.combatStrength,
         travelDistance: distance,
         travelTurns,
-        score: Math.max(
-          1,
-          500
-          + Math.round((requiredStrength * 1.4) - (travelTurns * 9) + (Math.min(24, faction.relativeStrength)))
+        score: applyActiveWarNeutralPenalty(
+          Math.max(
+            1,
+            500
+            + Math.round((requiredStrength * 1.4) - (travelTurns * 9) + (Math.min(24, faction.relativeStrength)))
+          ),
+          faction,
+          hasActiveWar
         ),
-        scoutOnly: false
+        scoutOnly: false,
+        estimatedPlunder: 0,
+        cargoCapacity: resolveSelectionCargoCapacity(selection.ships),
+        ambushRisk: 0
       } satisfies AttackMissionRequest;
     })
     .filter((entry): entry is AttackMissionRequest => entry !== null)
@@ -2605,7 +2675,8 @@ function createAttackPlanForTarget(
 function createScoutAttackPlanForTarget(
   context: BotSubsystemContext,
   faction: EvaluatedFaction,
-  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  hasActiveWar: boolean
 ): AttackMissionRequest | null {
   for (const shipType of [ShipType.CRUISER, ShipType.BATTLE_SHIP, ShipType.FRIGATE]) {
     const validPlans = context.snapshot.planets
@@ -2626,6 +2697,7 @@ function createScoutAttackPlanForTarget(
 
         return {
           kind: 'ATTACK',
+          phase: 'DIRECT',
           faction,
           targetPlanet,
           originPlanet,
@@ -2638,8 +2710,15 @@ function createScoutAttackPlanForTarget(
           selectedStrength: Math.max(1, estimateShipCombatPower(shipType)),
           travelDistance: distance,
           travelTurns: resolveTravelTurns(originPlanet, distance),
-          score: Math.max(1, 360 + Math.round(faction.statusPriorityWeight * 2.5) - Math.round(distance * 0.8)),
-          scoutOnly: true
+          score: applyActiveWarNeutralPenalty(
+            Math.max(1, 360 + Math.round(faction.statusPriorityWeight * 2.5) - Math.round(distance * 0.8)),
+            faction,
+            hasActiveWar
+          ),
+          scoutOnly: true,
+          estimatedPlunder: 0,
+          cargoCapacity: SHIP_BLUEPRINTS.get(shipType)?.cargoCapacity ?? 0,
+          ambushRisk: 0
         } satisfies AttackMissionRequest;
       })
       .filter((entry): entry is AttackMissionRequest => entry !== null)
@@ -2654,6 +2733,493 @@ function createScoutAttackPlanForTarget(
   }
 
   return null;
+}
+
+function applyActiveWarNeutralPenalty(
+  score: number,
+  faction: EvaluatedFaction,
+  hasActiveWar: boolean
+): number {
+  if (faction.faction.currentStatus !== DiplomaticStatus.NEUTRAL || !hasActiveWar) {
+    return Math.max(1, Math.round(score));
+  }
+
+  return Math.max(1, Math.round(score * ACTIVE_WAR_NEUTRAL_ATTACK_SCORE_MULTIPLIER));
+}
+
+function createPostBreakRaidMissionRequests(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[],
+  openedWarTargetLedger: OpenedWarTargetLedgerMap,
+  hasActiveWar: boolean
+): AttackMissionRequest[] {
+  const requests: AttackMissionRequest[] = [];
+  const activeKeys = new Set<string>();
+
+  for (const faction of factions) {
+    if (!isFactionEligibleForDiplomaticAttack(faction)) {
+      continue;
+    }
+
+    for (const targetPlanet of faction.faction.knownPlanets) {
+      const targetKey = toCoordinatesKey(targetPlanet.coordinates);
+      if (!isConfirmedOpenedWarTarget(targetPlanet)) {
+        openedWarTargetLedger.delete(targetKey);
+        continue;
+      }
+
+      const ledgerEntry = updateOpenedWarTargetLedgerEntry(
+        context,
+        openedWarTargetLedger,
+        faction,
+        targetPlanet
+      );
+      activeKeys.add(targetKey);
+      const request = createOpenedWarRaidPlanForTarget(context, faction, targetPlanet, ledgerEntry, hasActiveWar);
+      if (!request) {
+        continue;
+      }
+      ledgerEntry.preferredRaidOriginCoordinates = { ...request.originPlanet.coordinates };
+      ledgerEntry.lastEstimatedPlunderValue = request.estimatedPlunder;
+      requests.push(request);
+    }
+  }
+
+  for (const key of [...openedWarTargetLedger.keys()]) {
+    if (!activeKeys.has(key)) {
+      openedWarTargetLedger.delete(key);
+    }
+  }
+
+  return requests;
+}
+
+function isConfirmedOpenedWarTarget(
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): boolean {
+  const battleConfirmed = targetPlanet.lastCombatObservationTurn !== null
+    && sumTypedCounts(targetPlanet.knownShipCountsByType) <= 0
+    && sumTypedCounts(targetPlanet.knownDefenceCountsByType) <= 0;
+  const freshSpyConfirmed = targetPlanet.lastRelevantReportAge <= POST_BREAK_ATTACK_CONFIRMATION_REPORT_MAX_AGE
+    && targetPlanet.totalShipsAmount <= 0
+    && targetPlanet.totalDefencesAmount <= 0;
+  return battleConfirmed || freshSpyConfirmed;
+}
+
+function updateOpenedWarTargetLedgerEntry(
+  context: BotSubsystemContext,
+  openedWarTargetLedger: OpenedWarTargetLedgerMap,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry {
+  const key = toCoordinatesKey(targetPlanet.coordinates);
+  const existing = openedWarTargetLedger.get(key);
+  const entry: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry = existing ?? {
+    targetPlayerId: faction.faction.playerId,
+    coordinates: { ...targetPlanet.coordinates },
+    lastPostBreakAttackTurn: null,
+    recentRaidCount: 0,
+    recentRaidTurns: [],
+    currentAmbushRiskScore: 0,
+    pausedUntilTurn: null,
+    preferredRaidOriginCoordinates: null,
+    lastEstimatedPlunderValue: 0
+  };
+
+  const observedRaidTurn = Math.max(
+    targetPlanet.lastCombatObservationTurn ?? 0,
+    targetPlanet.lastPlunderTurn ?? 0
+  );
+  if (observedRaidTurn > 0 && (entry.lastPostBreakAttackTurn === null || observedRaidTurn > entry.lastPostBreakAttackTurn)) {
+    entry.lastPostBreakAttackTurn = observedRaidTurn;
+    if (!entry.recentRaidTurns.includes(observedRaidTurn)) {
+      entry.recentRaidTurns.push(observedRaidTurn);
+      entry.recentRaidTurns.sort((left, right) => left - right);
+    }
+  }
+
+  const windowTurns = resolveOpenedWarRaidWindowTurns(context, entry);
+  entry.recentRaidTurns = entry.recentRaidTurns
+    .filter((turn) => turn >= context.snapshot.turn - windowTurns)
+    .slice(-40);
+  entry.recentRaidCount = entry.recentRaidTurns.length;
+  entry.currentAmbushRiskScore = resolveOpenedWarTargetAmbushRisk(
+    context,
+    faction,
+    targetPlanet,
+    entry
+  );
+  if (entry.currentAmbushRiskScore >= POST_BREAK_ATTACK_AMBUSH_PAUSE_THRESHOLD) {
+    const quietTurnRecovery = Math.max(
+      1,
+      Math.ceil(
+        (entry.currentAmbushRiskScore - POST_BREAK_ATTACK_AMBUSH_PAUSE_THRESHOLD + 1)
+        / Math.max(1, POST_BREAK_ATTACK_AMBUSH_RISK_DECAY_PER_TURN)
+      )
+    );
+    entry.pausedUntilTurn = Math.max(entry.pausedUntilTurn ?? 0, context.snapshot.turn + quietTurnRecovery);
+  } else if (entry.pausedUntilTurn !== null && context.snapshot.turn >= entry.pausedUntilTurn) {
+    entry.pausedUntilTurn = null;
+  }
+
+  openedWarTargetLedger.set(key, entry);
+  return entry;
+}
+
+function createOpenedWarRaidPlanForTarget(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  ledgerEntry: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry,
+  hasActiveWar: boolean
+): AttackMissionRequest | null {
+  if (ledgerEntry.pausedUntilTurn !== null && context.snapshot.turn < ledgerEntry.pausedUntilTurn) {
+    return null;
+  }
+
+  const validPlans = context.snapshot.planets
+    .map((originPlanet) => createOpenedWarRaidPlanFromOrigin(
+      context,
+      faction,
+      targetPlanet,
+      ledgerEntry,
+      originPlanet,
+      hasActiveWar
+    ))
+    .filter((entry): entry is AttackMissionRequest => entry !== null)
+    .sort((left, right) =>
+      right.score - left.score
+      || left.travelTurns - right.travelTurns
+      || right.estimatedPlunder - left.estimatedPlunder
+    );
+
+  return validPlans[0] ?? null;
+}
+
+function createOpenedWarRaidPlanFromOrigin(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  ledgerEntry: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry,
+  originPlanet: BotPlanetSnapshot,
+  hasActiveWar: boolean
+): AttackMissionRequest | null {
+  const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+  const travelTurns = resolveTravelTurns(originPlanet, distance);
+  const riskBand = resolveOpenedWarTargetRiskBand(ledgerEntry.currentAmbushRiskScore);
+  const requiredCoverStrength = resolveOpenedWarRaidCoverStrength(riskBand);
+  const combatSelection = selectCombatShipsForStrength(originPlanet, requiredCoverStrength, distance);
+  if (combatSelection.ships.length <= 0 || combatSelection.combatStrength < requiredCoverStrength) {
+    return null;
+  }
+
+  const estimatedPlunder = resolveEstimatedOpenedWarPlunder(
+    ledgerEntry,
+    targetPlanet,
+    context.snapshot.turn,
+    context.snapshot.turn + travelTurns
+  );
+  if (estimatedPlunder <= 0) {
+    return null;
+  }
+
+  const selectionWithCargo = addCargoShipsForOpenedWarRaid(
+    originPlanet,
+    combatSelection.ships,
+    distance,
+    estimatedPlunder
+  );
+  if (selectionWithCargo.cargoCapacity <= 0) {
+    return null;
+  }
+
+  const totalScore = applyActiveWarNeutralPenalty(
+    Math.max(
+      1,
+      470
+      + estimatedPlunder
+      - (travelTurns * 10)
+      - Math.round(ledgerEntry.currentAmbushRiskScore * 1.5)
+      - Math.round(distance * 2)
+    ),
+    faction,
+    hasActiveWar
+  );
+
+  return {
+    kind: 'ATTACK',
+    phase: 'POST_BREAK_RAID',
+    faction,
+    targetPlanet,
+    originPlanet,
+    ships: selectionWithCargo.ships,
+    requiredStrength: requiredCoverStrength,
+    selectedStrength: combatSelection.combatStrength,
+    travelDistance: distance,
+    travelTurns,
+    score: totalScore,
+    scoutOnly: false,
+    estimatedPlunder,
+    cargoCapacity: selectionWithCargo.cargoCapacity,
+    ambushRisk: ledgerEntry.currentAmbushRiskScore
+  };
+}
+
+function resolveOpenedWarTargetRiskBand(ambushRisk: number): 'LOW' | 'MEDIUM' | 'HIGH' {
+  if (ambushRisk >= 55) {
+    return 'HIGH';
+  }
+  if (ambushRisk >= 30) {
+    return 'MEDIUM';
+  }
+  return 'LOW';
+}
+
+function resolveOpenedWarRaidCoverStrength(
+  riskBand: 'LOW' | 'MEDIUM' | 'HIGH'
+): number {
+  const cruiserPower = Math.max(1, estimateShipCombatPower(ShipType.CRUISER));
+  switch (riskBand) {
+    case 'HIGH':
+      return cruiserPower * 4;
+    case 'MEDIUM':
+      return cruiserPower * 2;
+    case 'LOW':
+    default:
+      return cruiserPower;
+  }
+}
+
+function resolveEstimatedOpenedWarPlunder(
+  ledgerEntry: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  currentTurn: number,
+  targetTurn: number
+): number {
+  const estimatedResources = estimateOpenedWarTargetResourcesAtTurn(ledgerEntry, targetPlanet, currentTurn, targetTurn);
+  const plunderPercent = Math.max(0.01, 0.8 - resolveBunkerReductionPercentForLevel(targetPlanet.bunkerLevel));
+  return Math.max(
+    0,
+    Math.floor(
+      (estimatedResources.metal * plunderPercent)
+      + (estimatedResources.crystal * plunderPercent)
+      + (estimatedResources.deuterium * plunderPercent)
+    )
+  );
+}
+
+function estimateOpenedWarTargetResourcesAtTurn(
+  ledgerEntry: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  currentTurn: number,
+  targetTurn: number
+): { metal: number; crystal: number; deuterium: number } {
+  const baseResources = resolveOpenedWarTargetBaseResources(ledgerEntry, targetPlanet, currentTurn);
+  const storageCapacity = targetPlanet.storageCapacity ?? baseResources;
+  const income = targetPlanet.income ?? emptyResources();
+  const lastObservationTurn = resolveOpenedWarTargetLastObservationTurn(targetPlanet, currentTurn);
+  const deltaTurns = Math.max(0, targetTurn - lastObservationTurn);
+  return {
+    metal: Math.min(storageCapacity.metal, baseResources.metal + (income.metal * deltaTurns)),
+    crystal: Math.min(storageCapacity.crystal, baseResources.crystal + (income.crystal * deltaTurns)),
+    deuterium: Math.min(storageCapacity.deuterium, baseResources.deuterium + (income.deuterium * deltaTurns))
+  };
+}
+
+function resolveOpenedWarTargetBaseResources(
+  ledgerEntry: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  currentTurn: number
+): { metal: number; crystal: number; deuterium: number } {
+  const reportedResources = targetPlanet.currentResources ?? emptyResources();
+  const stolenResources = targetPlanet.latestPlunderedResources ?? emptyResources();
+  const storageCapacity = targetPlanet.storageCapacity ?? reportedResources;
+  const income = targetPlanet.income ?? emptyResources();
+  const reportTurn = resolveOpenedWarTargetReportTurn(targetPlanet, currentTurn);
+  if (targetPlanet.lastPlunderTurn !== null && targetPlanet.lastPlunderTurn >= resolveOpenedWarTargetReportTurn(targetPlanet, currentTurn)) {
+    const turnsUntilPlunder = Math.max(0, targetPlanet.lastPlunderTurn - reportTurn);
+    const estimatedResourcesAtPlunder = {
+      metal: Math.min(storageCapacity.metal, reportedResources.metal + (income.metal * turnsUntilPlunder)),
+      crystal: Math.min(storageCapacity.crystal, reportedResources.crystal + (income.crystal * turnsUntilPlunder)),
+      deuterium: Math.min(storageCapacity.deuterium, reportedResources.deuterium + (income.deuterium * turnsUntilPlunder))
+    };
+    return {
+      metal: Math.max(0, estimatedResourcesAtPlunder.metal - stolenResources.metal),
+      crystal: Math.max(0, estimatedResourcesAtPlunder.crystal - stolenResources.crystal),
+      deuterium: Math.max(0, estimatedResourcesAtPlunder.deuterium - stolenResources.deuterium)
+    };
+  }
+
+  if (ledgerEntry.lastEstimatedPlunderValue > 0 && ledgerEntry.lastPostBreakAttackTurn !== null) {
+    return reportedResources;
+  }
+
+  return reportedResources;
+}
+
+function resolveOpenedWarTargetReportTurn(
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  currentTurn: number
+): number {
+  return Math.max(0, currentTurn - Math.max(0, targetPlanet.lastRelevantReportAge));
+}
+
+function resolveOpenedWarTargetLastObservationTurn(
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  currentTurn: number
+): number {
+  if (targetPlanet.lastPlunderTurn !== null) {
+    return targetPlanet.lastPlunderTurn;
+  }
+  if (targetPlanet.lastCombatObservationTurn !== null) {
+    return targetPlanet.lastCombatObservationTurn;
+  }
+  return resolveOpenedWarTargetReportTurn(targetPlanet, currentTurn);
+}
+
+function addCargoShipsForOpenedWarRaid(
+  originPlanet: BotPlanetSnapshot,
+  baseShips: CombatShipSelection['ships'],
+  distance: number,
+  targetCargoCapacity: number
+): { ships: CombatShipSelection['ships']; cargoCapacity: number } {
+  const selection = baseShips.map((ship) => ({ ...ship }));
+  let currentCargoCapacity = resolveSelectionCargoCapacity(selection);
+  if (currentCargoCapacity >= targetCargoCapacity) {
+    return {
+      ships: selection,
+      cargoCapacity: currentCargoCapacity
+    };
+  }
+
+  const cargoCandidates = Object.entries(originPlanet.ships.undamagedCountByType)
+    .map(([type, amount]) => {
+      const shipType = type as ShipType;
+      const blueprint = SHIP_BLUEPRINTS.get(shipType);
+      const alreadySelected = selection.find((ship) => ship.type === shipType)?.undamagedAmount ?? 0;
+      return {
+        type: shipType,
+        amount: Math.max(0, (amount ?? 0) - alreadySelected),
+        cargoCapacity: blueprint?.cargoCapacity ?? 0,
+        isCargo: blueprint?.purposes.has(ShipPurpose.CARGO) ?? false
+      };
+    })
+    .filter((entry) => entry.amount > 0 && entry.cargoCapacity > 0 && entry.isCargo)
+    .sort((left, right) =>
+      right.cargoCapacity - left.cargoCapacity
+      || left.type.localeCompare(right.type)
+    );
+
+  for (const candidate of cargoCandidates) {
+    while (candidate.amount > 0 && currentCargoCapacity < targetCargoCapacity) {
+      const nextSelection = selection.map((ship) => ({ ...ship }));
+      const existing = nextSelection.find((ship) => ship.type === candidate.type);
+      if (existing) {
+        existing.undamagedAmount += 1;
+      } else {
+        nextSelection.push({
+          type: candidate.type,
+          undamagedAmount: 1,
+          damagedAmount: 0
+        });
+      }
+      if (!hasEnoughDeuteriumForShips(originPlanet, nextSelection, distance)) {
+        break;
+      }
+      selection.splice(0, selection.length, ...nextSelection);
+      currentCargoCapacity += candidate.cargoCapacity;
+      candidate.amount -= 1;
+    }
+  }
+
+  return {
+    ships: selection,
+    cargoCapacity: currentCargoCapacity
+  };
+}
+
+function resolveOpenedWarRaidWindowTurns(
+  context: BotSubsystemContext,
+  entry: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry
+): number {
+  const preferredOrigin = entry.preferredRaidOriginCoordinates
+    ? context.snapshot.planets.find((planet) =>
+      toCoordinatesKey(planet.coordinates) === toCoordinatesKey(entry.preferredRaidOriginCoordinates!)
+    ) ?? null
+    : null;
+  const referenceOrigin = preferredOrigin ?? resolveBestMilitaryOrigin(context, entry.coordinates);
+  if (!referenceOrigin) {
+    return 10;
+  }
+  const distance = Math.max(
+    1,
+    calculateTravelDistance(referenceOrigin.coordinates, entry.coordinates)
+  );
+  const normalizedDistance = Math.max(1, Math.min(11, distance));
+  return Math.max(5, Math.min(25, Math.round(5 + (((normalizedDistance - 1) / 10) * 20))));
+}
+
+function resolveOpenedWarTargetAmbushRisk(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  entry: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry
+): number {
+  const quietTurns = entry.lastPostBreakAttackTurn === null
+    ? 0
+    : Math.max(0, context.snapshot.turn - entry.lastPostBreakAttackTurn);
+  const decayedRisk = Math.max(0, entry.currentAmbushRiskScore - (quietTurns * POST_BREAK_ATTACK_AMBUSH_RISK_DECAY_PER_TURN));
+  const nearbyCoverage = resolveNearbyHostileCoverage(faction, targetPlanet);
+  const evidenceRisk = Math.max(
+    0,
+    Math.round(faction.strengthEstimate / 12)
+    + (entry.recentRaidCount * 12)
+    + (targetPlanet.recentBattleReportCount * 9)
+    + (nearbyCoverage * 8)
+  );
+  return Math.max(decayedRisk, evidenceRisk);
+}
+
+function resolveNearbyHostileCoverage(
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): number {
+  return faction.faction.knownPlanets.reduce((sum, planet) => {
+    if (toCoordinatesKey(planet.coordinates) === toCoordinatesKey(targetPlanet.coordinates)) {
+      return sum;
+    }
+    const distance = calculateTravelDistance(planet.coordinates, targetPlanet.coordinates);
+    return distance <= 3 ? sum + 1 : sum;
+  }, 0);
+}
+
+function resolveActiveOpenedWarTargetCap(context: BotSubsystemContext): number {
+  return Math.max(
+    ACTIVE_OPENED_WAR_TARGET_BASE,
+    Math.floor(Math.sqrt(Math.max(1, context.snapshot.empire.ownedPlanetCount))) + 1
+  );
+}
+
+function compareOpenedWarTargetLedgerEntries(
+  left: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry,
+  right: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry
+): number {
+  return left.coordinates.x - right.coordinates.x
+    || left.coordinates.y - right.coordinates.y
+    || left.coordinates.z - right.coordinates.z;
+}
+
+function sumTypedCounts<T extends string>(counts: Partial<Record<T, number>>): number {
+  return Object.values(counts).reduce((sum, amount) => sum + Math.max(0, amount ?? 0), 0);
+}
+
+function resolveBunkerReductionPercentForLevel(level: number | null): number {
+  if (!level || level <= 0) {
+    return 0;
+  }
+  const blueprint = BUILDING_BLUEPRINTS.get(BuildingType.BUNKER_NETWORK);
+  const raw = blueprint?.production1[level - 1] ?? 0;
+  return Math.max(0, raw) / 100;
 }
 
 function resolveDiplomaticAttackMultiplier(
@@ -2813,6 +3379,7 @@ function createBlockedAttackShipNeeds(
   context: BotSubsystemContext,
   factions: EvaluatedFaction[],
   acceptedRequests: AttackMissionRequest[],
+  hasActiveWar: boolean,
   reservedTargetKey: string | null = null
 ): WarShipNeedRequest[] {
   const acceptedTargets = new Set(acceptedRequests.map((request) =>
@@ -2827,11 +3394,11 @@ function createBlockedAttackShipNeeds(
 
     for (const targetPlanet of faction.faction.knownPlanets) {
       const targetKey = `${targetPlanet.coordinates.x}:${targetPlanet.coordinates.y}:${targetPlanet.coordinates.z}`;
-      if (acceptedTargets.has(targetKey) || targetKey === reservedTargetKey || !hasAttackableIntel(targetPlanet)) {
+      if (acceptedTargets.has(targetKey) || targetKey === reservedTargetKey || !hasPreBreakAttackableIntel(targetPlanet)) {
         continue;
       }
 
-      const blockedNeed = createBlockedAttackShipNeed(context, faction, targetPlanet);
+      const blockedNeed = createBlockedAttackShipNeed(context, faction, targetPlanet, hasActiveWar);
       if (blockedNeed) {
         requests.push(blockedNeed);
       }
@@ -2859,7 +3426,8 @@ function createBlockedAttackShipNeeds(
 function createBlockedAttackShipNeed(
   context: BotSubsystemContext,
   faction: EvaluatedFaction,
-  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  hasActiveWar: boolean
 ): WarShipNeedRequest | null {
   const preferredOrigin = resolveBestMilitaryOrigin(context, targetPlanet.coordinates);
   if (!preferredOrigin) {
@@ -2876,7 +3444,7 @@ function createBlockedAttackShipNeed(
       originPlanet: preferredOrigin,
       shipType: combatType,
       amount: 1,
-      score: 340 + faction.statusPriorityWeight,
+      score: applyActiveWarNeutralPenalty(340 + faction.statusPriorityWeight, faction, hasActiveWar),
       reason: 'Need one medium war ship for battle-scout pressure against a real-player target.',
       targetCoordinates: { ...targetPlanet.coordinates },
       needKind: 'ATTACK'
@@ -2895,7 +3463,7 @@ function createBlockedAttackShipNeed(
     originPlanet: preferredOrigin,
     shipType: combatType,
     amount: Math.max(1, Math.ceil(Math.max(0, requiredStrength - bestAvailableStrength) / Math.max(1, estimateShipCombatPower(combatType)))),
-    score: 430 + requiredStrength,
+    score: applyActiveWarNeutralPenalty(430 + requiredStrength, faction, hasActiveWar),
     reason: 'Need more combat ships for diplomatic attack pressure.',
     targetCoordinates: { ...targetPlanet.coordinates },
     needKind: 'ATTACK'
@@ -3160,6 +3728,7 @@ function createSpyMissionProposal(
   request: SpyMissionRequest,
   index: number
 ): BotProposal {
+  const isPostBreakRaid = request.phase === 'POST_BREAK_RAID';
   return {
     proposalId: `strategic-diplomatic:spy:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}:${context.snapshot.turn}`,
     subsystemId: 'STRATEGIC_DIPLOMATIC',
@@ -3247,21 +3816,24 @@ function createAttackMissionProposal(
   request: AttackMissionRequest,
   index: number
 ): BotProposal {
+  const isPostBreakRaid = request.phase === 'POST_BREAK_RAID';
   return {
-    proposalId: `strategic-diplomatic:attack:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}:${context.snapshot.turn}`,
+    proposalId: `strategic-diplomatic:attack:${request.phase}:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}:${context.snapshot.turn}`,
     subsystemId: 'STRATEGIC_DIPLOMATIC',
     kind: 'FLEET_MISSION',
     status: 'PROPOSED',
     goalKey: `strategic-diplomatic:attack:${request.faction.faction.playerId}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`,
-    dedupeKey: `strategic-diplomatic:attack:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`,
+    dedupeKey: `strategic-diplomatic:attack:${request.phase}:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}`,
     summary: request.scoutOnly
       ? `Attack scout #${index + 1}: send one medium ship from ${request.originPlanet.name} to ${request.faction.faction.playerName} at ${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z}.`
+      : isPostBreakRaid
+        ? `Raid request #${index + 1}: pressure opened war target ${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z} from ${request.originPlanet.name}.`
       : `Attack request #${index + 1}: strike ${request.faction.faction.playerName} at ${request.targetPlanet.coordinates.x}:${request.targetPlanet.coordinates.y}:${request.targetPlanet.coordinates.z} from ${request.originPlanet.name}.`,
     planetId: request.originPlanet.planetId,
     targetCoordinates: { ...request.targetPlanet.coordinates },
     expectedValue: Math.max(1, Math.round(request.score)),
-    urgency: request.faction.faction.currentStatus === DiplomaticStatus.WAR ? 84 : 72,
-    risk: request.scoutOnly ? 14 : 28,
+    urgency: request.faction.faction.currentStatus === DiplomaticStatus.WAR ? (isPostBreakRaid ? 80 : 84) : 72,
+    risk: request.scoutOnly ? 14 : isPostBreakRaid ? 22 : 28,
     confidence: Math.round(request.faction.confidence * 100),
     requestedResources: emptyResources(),
     requestPayload: {
@@ -3279,13 +3851,17 @@ function createAttackMissionProposal(
     debug: {
       missionSection: 'GLOBAL',
       missionType: FleetMissionType.ATTACK,
-      attackKind: request.scoutOnly ? 'SCOUT' : 'FULL',
+      attackKind: request.scoutOnly ? 'SCOUT' : isPostBreakRaid ? 'RAID' : 'FULL',
+      attackPhase: request.phase,
       targetPlayerId: request.faction.faction.playerId,
       targetStatus: request.faction.faction.currentStatus,
       requiredStrength: request.requiredStrength,
       selectedStrength: Math.round(request.selectedStrength),
       travelDistance: request.travelDistance,
-      travelTurns: request.travelTurns
+      travelTurns: request.travelTurns,
+      estimatedPlunder: request.estimatedPlunder,
+      cargoCapacity: request.cargoCapacity,
+      ambushRisk: request.ambushRisk
     }
   };
 }
@@ -3779,6 +4355,13 @@ function hasEnoughDeuteriumForShips(
     distance
   );
   return originPlanet.localResources.deuterium >= fuelCost;
+}
+
+function resolveSelectionCargoCapacity(
+  ships: CombatShipSelection['ships']
+): number {
+  return ships.reduce((total, ship) =>
+    total + ((SHIP_BLUEPRINTS.get(ship.type)?.cargoCapacity ?? 0) * (ship.undamagedAmount + ship.damagedAmount)), 0);
 }
 
 function resolveSelectionHangarCapacity(

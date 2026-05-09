@@ -284,6 +284,61 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(shipNeed).toBeUndefined();
   });
 
+  it('emits post-break raid attack proposals for opened war targets with cargo support', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 3);
+    playerEnemyPlanet.rBDSFTQ.resources = new ResourcesPack(12000, 9000, 6000);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const raidProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.attackKind === 'RAID'
+    );
+
+    expect(raidProposal).toBeDefined();
+    expect(Number(raidProposal?.debug.estimatedPlunder)).toBeGreaterThan(0);
+    expect(Number(raidProposal?.debug.cargoCapacity)).toBeGreaterThan(0);
+  });
+
+  it('pauses repeated post-break raids when ambush risk grows too high', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    playerEnemyPlanet.rBDSFTQ.resources = new ResourcesPack(12000, 9000, 6000);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 0, { forcedReportLevel: 12 });
+
+    let memory = createDefaultBotMemoryV2();
+    for (let turn = 1; turn <= 4; turn += 1) {
+      galaxy.currentTurn = turn;
+      addBattleReport(bot, playerEnemyPlanet, turn);
+      memory = runStrategicDiplomaticSubsystem(galaxy, bot, memory).memory;
+    }
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const raidProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.attackKind === 'RAID'
+    );
+    const openedTarget = result.memory.strategicDiplomatic.openedWarTargets[0] ?? null;
+
+    expect(raidProposal).toBeUndefined();
+    expect(openedTarget).not.toBeNull();
+    expect((openedTarget?.currentAmbushRiskScore ?? 0)).toBeGreaterThanOrEqual(70);
+    expect((openedTarget?.pausedUntilTurn ?? 0)).toBeGreaterThan(galaxy.currentTurn);
+  });
+
   it('emits bombardment mission proposals for war targets when bombardment pressure is available', () => {
     const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     galaxy.diplomaticRelations.push(

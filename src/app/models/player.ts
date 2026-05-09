@@ -184,9 +184,22 @@ export type BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget = {
   valueLossMultiplier: number;
 };
 
+export type BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry = {
+  targetPlayerId: number;
+  coordinates: BotMemoryCoordinates;
+  lastPostBreakAttackTurn: number | null;
+  recentRaidCount: number;
+  recentRaidTurns: number[];
+  currentAmbushRiskScore: number;
+  pausedUntilTurn: number | null;
+  preferredRaidOriginCoordinates: BotMemoryCoordinates | null;
+  lastEstimatedPlunderValue: number;
+};
+
 export type BotMemoryV2StrategicDiplomatic = {
   factionLedger: BotMemoryV2StrategicDiplomaticFactionEntry[];
   primaryWarBreakTarget: BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null;
+  openedWarTargets: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[];
 };
 
 export type BotMemoryV2 = {
@@ -806,6 +819,9 @@ export class Player {
       ),
       primaryWarBreakTarget: Player.normalizeBotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget(
         strategicDiplomatic?.primaryWarBreakTarget
+      ),
+      openedWarTargets: Player.normalizeBotMemoryV2StrategicDiplomaticOpenedWarTargets(
+        strategicDiplomatic?.openedWarTargets
       )
     };
   }
@@ -862,6 +878,55 @@ export class Player {
       })
       .filter((entry): entry is BotMemoryV2StrategicDiplomaticFactionEntry => entry !== null)
       .slice(-120);
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticOpenedWarTargets(
+    entries: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[] | null | undefined
+  ): BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        if (!entry || !Number.isInteger(entry.targetPlayerId)) {
+          return null;
+        }
+
+        const coordinates = Player.normalizeBotMemoryCoordinates(entry.coordinates);
+        if (!coordinates) {
+          return null;
+        }
+
+        return {
+          targetPlayerId: entry.targetPlayerId,
+          coordinates,
+          lastPostBreakAttackTurn: Number.isInteger(entry.lastPostBreakAttackTurn)
+            ? entry.lastPostBreakAttackTurn
+            : null,
+          recentRaidCount: Number.isInteger(entry.recentRaidCount)
+            ? Math.max(0, entry.recentRaidCount)
+            : 0,
+          recentRaidTurns: Array.isArray(entry.recentRaidTurns)
+            ? entry.recentRaidTurns
+              .filter((turn): turn is number => Number.isInteger(turn))
+              .map((turn) => Math.max(0, turn))
+              .slice(-40)
+            : [],
+          currentAmbushRiskScore: Number.isFinite(entry.currentAmbushRiskScore)
+            ? Math.max(0, Number(entry.currentAmbushRiskScore))
+            : 0,
+          pausedUntilTurn: Number.isInteger(entry.pausedUntilTurn)
+            ? entry.pausedUntilTurn
+            : null,
+          preferredRaidOriginCoordinates: Player.normalizeBotMemoryCoordinates(entry.preferredRaidOriginCoordinates),
+          lastEstimatedPlunderValue: Number.isFinite(entry.lastEstimatedPlunderValue)
+            ? Math.max(0, Math.floor(entry.lastEstimatedPlunderValue))
+            : 0
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry => entry !== null)
+      .slice(-160);
   }
 
   private static normalizeBotMemoryV2CountByType(

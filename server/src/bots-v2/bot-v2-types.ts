@@ -107,8 +107,32 @@ export type BotStrategicDiplomaticKnownPlanetSnapshot = {
   averageTechLevel: number;
   totalShipsAmount: number;
   totalDefencesAmount: number;
+  knownShipCountsByType: Partial<Record<ShipType, number>>;
+  knownDefenceCountsByType: Partial<Record<DefenceType, number>>;
+  currentResources: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  } | null;
+  storageCapacity: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  } | null;
+  income: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  } | null;
   bunkerLevel: number | null;
   recentBattleReportCount: number;
+  lastCombatObservationTurn: number | null;
+  lastPlunderTurn: number | null;
+  latestPlunderedResources: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  } | null;
 };
 
 export type BotStrategicDiplomaticSupportRequestSnapshot = {
