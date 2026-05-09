@@ -2610,6 +2610,105 @@ It should not:
 - create new mission-legality rules
 - unlock new diplomatic target classes
 
+## Strategic Diplomatic phase-9 follow-up
+
+The next `Strategic Diplomatic` slice should be the **allied-cooperation execution phase**.
+
+### Strategic Diplomatic phase-9 outputs
+
+This phase should add:
+
+- outgoing support requests
+- `ALLIANCE_DEPOT` usage
+- better incoming-request acceptance
+- request-driven cooperation instead of multi-front orchestration
+
+### Strategic Diplomatic phase-9 request scope
+
+This phase should outward:
+
+- `PLANET_DEFENSE`
+- `PLANET_REPAIR`
+- `ATTACK_TARGET`
+- `BOMBARD_TARGET`
+- `SIEGE_TARGET`
+- extreme-case `RESOURCE_SUPPORT`
+
+### Strategic Diplomatic phase-9 recipient rule
+
+Recipients should be:
+
+- offensive requests: `ALLIED` only
+- defensive / repair / resource requests: `ALLIED`, `PEACE`, and `NEUTRAL`
+
+Answering non-offensive requests should:
+
+- improve friendliness
+- reduce hostility
+
+### Strategic Diplomatic phase-9 trigger rules
+
+`PLANET_DEFENSE` should trigger when:
+
+- the planet suffered recent hostile attack
+- there is no valid local guard fleet
+- local defense is below estimated hostile pressure
+- and the planet is an important strategic hub
+
+`PLANET_REPAIR` should trigger when:
+
+- total structural HP loss is greater than `35%`
+- local repair capability cannot restore more than `15%` of missing HP within `5` turns
+- and other own planets cannot deliver enough repair drones
+
+Offensive support should trigger when:
+
+- `ATTACK` / `BOMBARD` / `SIEGE` plans are blocked
+- and current intel says enemy fleet / defenses are weak enough that allied help is worthwhile
+
+`RESOURCE_SUPPORT` should trigger only for extreme shortages:
+
+- the planet cannot afford current queue plus fuel baseline
+- or near-zero deuterium / emergency resource state is reached
+
+### Strategic Diplomatic phase-9 request cap
+
+This phase should emit:
+
+- max `1` outgoing support request total per turn
+
+### Strategic Diplomatic phase-9 helper selection
+
+For non-offensive requests, helper selection priority should be:
+
+1. known capability
+2. relation strength
+3. distance
+
+For offensive requests, helper selection priority should be:
+
+1. known capability
+2. distance
+3. relation strength
+
+### Strategic Diplomatic phase-9 alliance-depot rule
+
+`ALLIANCE_DEPOT` should:
+
+- improve support and maintenance attractiveness
+- increase the chance that support requests are worth sending
+- increase the chance that support requests are worth accepting
+
+### Strategic Diplomatic phase-9 explicit non-goals
+
+This phase should explicitly exclude:
+
+- no multi-front global allocator now
+- no synchronized ally war waves
+- no ally-to-ally autonomous campaign planner
+
+Add only a far-future TODO note that a **multi-front global allocator** may be considered later.
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

@@ -9,6 +9,7 @@ import type { ShipType } from '../../../src/app/models/enums/ship-type.ts';
 import type { TechnologyType } from '../../../src/app/models/enums/technology-type.ts';
 import type { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { PlayerType } from '../../../src/app/models/enums/player-type.ts';
+import type { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.ts';
 import type { BotMemoryV2StrategicDiplomaticSharedHostileEventType } from '../../../src/app/models/player.ts';
 
 export type BotProposalKind =
@@ -148,6 +149,8 @@ export type BotStrategicDiplomaticKnownPlanetSnapshot = {
     deuterium: number;
   } | null;
   bunkerLevel: number | null;
+  allianceDepotLevel: number | null;
+  jumpGateLevel: number | null;
   recentBattleReportCount: number;
   lastCombatObservationTurn: number | null;
   lastPlunderTurn: number | null;
@@ -159,10 +162,27 @@ export type BotStrategicDiplomaticKnownPlanetSnapshot = {
 };
 
 export type BotStrategicDiplomaticSupportRequestSnapshot = {
-  supportType: 'PLANET_REPAIR' | 'PLANET_DEFENSE';
+  requestId: number;
+  supportType:
+    | 'RESOURCE_SUPPORT'
+    | 'PLANET_REPAIR'
+    | 'PLANET_DEFENSE'
+    | 'ATTACK_TARGET'
+    | 'BOMBARD_TARGET'
+    | 'SIEGE_TARGET';
   targetCoordinates: { x: number; y: number; z: number };
   createdTurn: number;
   expiresOnTurn: number;
+  requestedResources: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  } | null;
+  missionType: FleetMissionType | null;
+  minimumShips: Array<{
+    type: ShipType;
+    amount: number;
+  }>;
 };
 
 export type BotIntelCandidateSnapshot = {
@@ -339,6 +359,7 @@ export type BotPlanetSnapshot = {
   infrastructure: {
     damagedBuildingCount: number;
     missingBuildingStructuralPoints: number;
+    totalBuildingStructuralPoints: number;
   };
   localResources: {
     metal: number;

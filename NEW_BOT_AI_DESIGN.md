@@ -1925,6 +1925,83 @@ but only as score modifiers.
 
 It should not unlock new mission-legality rules yet.
 
+#### Next phase: allied-cooperation execution
+
+After shared war awareness, the next `Strategic Diplomatic` slice should add **allied-cooperation execution**.
+
+This phase should focus on:
+
+* outgoing support requests,
+* `ALLIANCE_DEPOT` usage,
+* better incoming-request acceptance,
+* and request-driven cooperation instead of global multi-front orchestration.
+
+It should outward:
+
+* `PLANET_DEFENSE`,
+* `PLANET_REPAIR`,
+* `ATTACK_TARGET`,
+* `BOMBARD_TARGET`,
+* `SIEGE_TARGET`,
+* and only extreme-case `RESOURCE_SUPPORT`.
+
+Recipient scope should be:
+
+* offensive requests: `ALLIED` only,
+* defensive / repair / resource requests: `ALLIED`, `PEACE`, and `NEUTRAL`.
+
+Answering non-offensive requests should:
+
+* improve friendliness,
+* reduce hostility.
+
+The request triggers should be:
+
+* `PLANET_DEFENSE`
+  * recent hostile attack,
+  * no valid local guard fleet,
+  * local defense below estimated hostile pressure,
+  * important strategic hub.
+* `PLANET_REPAIR`
+  * more than `35%` total HP loss,
+  * cannot repair more than `15%` of missing HP within `5` turns,
+  * and cannot deliver enough repair drones from other own planets.
+* offensive support
+  * blocked `ATTACK` / `BOMBARD` / `SIEGE`,
+  * plus intel that enemy fleet/defenses are weak enough to make allied help worthwhile.
+* `RESOURCE_SUPPORT`
+  * only for extreme shortages,
+  * when the planet cannot afford current queue plus fuel baseline,
+  * or near-zero deuterium / emergency resource state is reached.
+
+Request emission should stay tight:
+
+* max `1` outgoing support request total per turn.
+
+Helper selection should use:
+
+* non-offensive requests:
+  * known capability,
+  * relation strength,
+  * distance.
+* offensive requests:
+  * known capability,
+  * distance,
+  * relation strength.
+
+`ALLIANCE_DEPOT` should:
+
+* improve support and maintenance attractiveness,
+* and raise the chance that support requests are worth sending or accepting.
+
+Explicit non-goals:
+
+* no multi-front global allocator now,
+* no synchronized ally war waves,
+* no ally-to-ally autonomous campaign planner.
+
+Only add a TODO note that a **multi-front global allocator** is a far-future possibility.
+
 ### Indicative fleet allocation
 
 **10–50%**, treated as a soft target.

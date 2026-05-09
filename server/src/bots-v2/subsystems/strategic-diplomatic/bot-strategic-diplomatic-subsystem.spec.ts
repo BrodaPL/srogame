@@ -585,6 +585,107 @@ describe('BotStrategicDiplomaticSubsystem', () => {
       && entry.attackerPlayerId === playerEnemy.playerId
     )).toBe(true);
   });
+
+  it('emits one outgoing repair support request and can choose a stronger peace helper for non-offensive aid', () => {
+    const { galaxy, bot, botPlanet } = createStrategicDiplomaticWorld();
+    const alliedContact = addForeignPlayer(galaxy, 4, 'Ally-4', { x: 2, y: 0 }, 1);
+    const peaceContact = addForeignPlayer(galaxy, 5, 'Peace-5', { x: 1, y: 0 }, 1);
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, alliedContact.playerId, DiplomaticStatus.ALLIED),
+      createDiplomaticRelation(bot.playerId, peaceContact.playerId, DiplomaticStatus.PEACE)
+    );
+    enableAdvancedWarProduction(peaceContact.planets[0]!, peaceContact);
+    markPlanetScanned(bot, alliedContact, alliedContact.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 10 });
+    markPlanetScanned(bot, peaceContact, peaceContact.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 12 });
+    botPlanet.setBuildingLevel(BuildingType.METAL_MINE, 8);
+    botPlanet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 8);
+    botPlanet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 8);
+    botPlanet.setCurrentBuildingStructuralPoints(BuildingType.METAL_MINE, 1);
+    botPlanet.setCurrentBuildingStructuralPoints(BuildingType.CRYSTAL_MINE, 1);
+    botPlanet.setCurrentBuildingStructuralPoints(BuildingType.DEUTERIUM_SYNTHESIZER, 1);
+    botPlanet.rBDSFTQ.ships.removeShipsByType([{ type: ShipType.REPAIR_DRONE, amount: 999 }]);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const supportRequests = result.result.proposals.filter((proposal) =>
+      proposal.requestPayload.actionType === 'SUPPORT_REQUEST'
+    );
+    const repairRequest = supportRequests.find((proposal) =>
+      proposal.requestPayload.supportType === 'PLANET_REPAIR'
+    );
+
+    expect(supportRequests.length).toBe(1);
+    expect(repairRequest).toBeDefined();
+    expect(repairRequest?.requestPayload.targetPlayerId).toBe(peaceContact.playerId);
+  });
+
+  it('emits partial incoming resource-support preference when visible surplus cannot fully cover the request', () => {
+    const { galaxy, bot, botPlanet, botEnemy, botEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, botEnemy.playerId, DiplomaticStatus.ALLIED)
+    );
+    markPlanetScanned(bot, botEnemy, botEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 10 });
+    botPlanet.rBDSFTQ.resources = new ResourcesPack(350, 260, 210);
+    galaxy.supportRequests.push(createSupportRequest(
+      1,
+      botEnemy.playerId,
+      bot.playerId,
+      'RESOURCE_SUPPORT',
+      botEnemyPlanet.basicInfo.name,
+      {
+        x: botEnemyPlanet.basicInfo.solarSystem.coordinates.x,
+        y: botEnemyPlanet.basicInfo.solarSystem.coordinates.y,
+        z: botEnemyPlanet.basicInfo.order
+      },
+      galaxy.currentTurn,
+      galaxy.currentTurn + 5,
+      new ResourcesPack(600, 500, 450)
+    ));
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const preferenceProposal = result.result.proposals.find((proposal) =>
+      proposal.requestPayload.actionType === 'SUPPORT_REQUEST_PREFERENCE'
+      && proposal.requestPayload.supportType === 'RESOURCE_SUPPORT'
+    );
+
+    expect(preferenceProposal).toBeDefined();
+    expect(preferenceProposal?.requestPayload.preference).toBe('PARTIAL');
+    expect(Number((preferenceProposal?.requestPayload.approvedResources as { metal: number }).metal ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('emits outgoing allied offensive support request for a blocked war attack on a still-breakable target', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const alliedContact = addForeignPlayer(galaxy, 4, 'Ally-4', { x: 1, y: 0 }, 1);
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, alliedContact.playerId, DiplomaticStatus.ALLIED),
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    markPlanetScanned(bot, alliedContact, alliedContact.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 10 });
+    enableAdvancedWarProduction(alliedContact.planets[0]!, alliedContact);
+    botPlanet.rBDSFTQ.ships.removeShipsByType([
+      { type: ShipType.CRUISER, amount: 999 },
+      { type: ShipType.FIGHTER, amount: 999 },
+      { type: ShipType.FRIGATE, amount: 999 },
+      { type: ShipType.BATTLE_SHIP, amount: 999 }
+    ]);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    playerEnemyPlanet.rBDSFTQ.defences.addUndamaged(DefenceType.SAM_SITE, 1);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const offensiveRequest = result.result.proposals.find((proposal) =>
+      proposal.requestPayload.actionType === 'SUPPORT_REQUEST'
+      && (
+        proposal.requestPayload.supportType === 'ATTACK_TARGET'
+        || proposal.requestPayload.supportType === 'BOMBARD_TARGET'
+        || proposal.requestPayload.supportType === 'SIEGE_TARGET'
+      )
+    );
+
+    expect(offensiveRequest).toBeDefined();
+    expect(offensiveRequest?.requestPayload.targetPlayerId).toBe(alliedContact.playerId);
+    expect((offensiveRequest?.requestPayload.minimumShips as Array<{ amount: number }>).length).toBeGreaterThan(0);
+  });
 });
 
 function runStrategicDiplomaticSubsystem(

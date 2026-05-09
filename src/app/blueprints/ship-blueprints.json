@@ -18,7 +18,7 @@
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 0,
-      "cost": { "metal": 20, "crystal": 10, "deuterium": 0 },
+      "cost": { "metal": 15, "crystal": 5, "deuterium": 0 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 1 }
       ],

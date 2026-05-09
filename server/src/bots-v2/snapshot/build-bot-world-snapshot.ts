@@ -590,9 +590,11 @@ function resolveInstalledShipValues(
 function resolveBuildingDamageSummary(planet: Planet): {
   damagedBuildingCount: number;
   missingBuildingStructuralPoints: number;
+  totalBuildingStructuralPoints: number;
 } {
   let damagedBuildingCount = 0;
   let missingBuildingStructuralPoints = 0;
+  let totalBuildingStructuralPoints = 0;
 
   for (const [buildingType, level] of planet.rBDSFTQ.buildingsLevels.entries()) {
     if (level <= 0) {
@@ -603,6 +605,7 @@ function resolveBuildingDamageSummary(planet: Planet): {
     if (maxStructuralPoints <= 0) {
       continue;
     }
+    totalBuildingStructuralPoints += maxStructuralPoints;
 
     const currentStructuralPoints = planet.getCurrentBuildingStructuralPoints(buildingType);
     if (currentStructuralPoints >= maxStructuralPoints) {
@@ -615,7 +618,8 @@ function resolveBuildingDamageSummary(planet: Planet): {
 
   return {
     damagedBuildingCount,
-    missingBuildingStructuralPoints
+    missingBuildingStructuralPoints,
+    totalBuildingStructuralPoints
   };
 }
 
@@ -876,13 +880,33 @@ function resolveStrategicDiplomaticFactions(
           request.state === DiplomaticProposalState.PENDING
           && request.fromPlayerId === foreignPlayer.playerId
           && request.toPlayerId === player.playerId
-          && (request.supportType === 'PLANET_REPAIR' || request.supportType === 'PLANET_DEFENSE')
         )
         .map((request) => ({
+          requestId: request.requestId,
           supportType: request.supportType,
           targetCoordinates: { ...request.targetCoordinates },
           createdTurn: request.createdTurn,
-          expiresOnTurn: request.expiresOnTurn
+          expiresOnTurn: request.expiresOnTurn,
+          requestedResources: request.supportType === 'RESOURCE_SUPPORT'
+            ? {
+              metal: request.requestedResources.metal,
+              crystal: request.requestedResources.crystal,
+              deuterium: request.requestedResources.deuterium
+            }
+            : null,
+          missionType: request.supportType === 'ATTACK_TARGET'
+            || request.supportType === 'BOMBARD_TARGET'
+            || request.supportType === 'SIEGE_TARGET'
+            ? request.missionType
+            : null,
+          minimumShips: request.supportType === 'ATTACK_TARGET'
+            || request.supportType === 'BOMBARD_TARGET'
+            || request.supportType === 'SIEGE_TARGET'
+            ? request.minimumShips.map((entry) => ({
+              type: entry.type,
+              amount: entry.amount
+            }))
+            : []
         } satisfies BotStrategicDiplomaticSupportRequestSnapshot))
         .sort((left, right) =>
           left.supportType.localeCompare(right.supportType)
@@ -942,6 +966,8 @@ function resolveStrategicDiplomaticFactions(
             storageCapacity: resolveReportedStorageCapacity(report),
             income: resolveReportedIncome(report, adaptiveTechnologyLevel),
             bunkerLevel: report.buildingsLevels.get(BuildingType.BUNKER_NETWORK) ?? null,
+            allianceDepotLevel: report.buildingsLevels.get(BuildingType.ALLIANCE_DEPOT) ?? null,
+            jumpGateLevel: report.buildingsLevels.get(BuildingType.JUMP_GATE) ?? null,
             recentBattleReportCount: countRecentBattleReportsForCoordinates(
               player,
               {
