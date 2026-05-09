@@ -45,6 +45,8 @@ import {
   calculateMaxShipyardQueueLength
 } from '../../game-commands/command-helpers.js';
 
+const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
+
 export function buildBotWorldSnapshot(
   galaxy: Galaxy,
   player: Player,
@@ -841,8 +843,7 @@ function resolveStrategicDiplomaticFactions(
   player: Player
 ): BotStrategicDiplomaticFactionSnapshot[] {
   const diplomacyResolver = new DiplomacyResolver(galaxy.diplomaticRelations);
-
-  return galaxy.players
+  const factionDrafts = galaxy.players
     .filter((foreignPlayer) =>
       foreignPlayer.playerId !== player.playerId
       && foreignPlayer.type !== PlayerType.NEUTRAL
@@ -889,6 +890,13 @@ function resolveStrategicDiplomaticFactions(
           || left.targetCoordinates.y - right.targetCoordinates.y
           || left.targetCoordinates.z - right.targetCoordinates.z
         );
+      const outgoingCoercion = resolveRecentOutgoingCoercionForFaction(
+        player,
+        foreignPlayer,
+        galaxy.currentTurn
+      );
+      const recentBattleReportCountShort = countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 20);
+      const recentBattleReportCountLong = countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 100);
       const knownPlanets = foreignPlayer.planets
         .map((planet) => {
           const report = planet.lastReportData.get(player.playerId) ?? null;
@@ -968,18 +976,242 @@ function resolveStrategicDiplomaticFactions(
           return best === null ? age : Math.min(best, age);
         }, null),
         recentBattleReportCount: countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 80),
+        recentBattleReportCountShort,
+        recentBattleReportCountLong,
+        recentOutgoingCoercionPressureShort: outgoingCoercion.shortPressure,
+        recentOutgoingCoercionPressureLong: outgoingCoercion.longPressure,
+        recentIncomingCoercionPressureShort: 0,
+        recentIncomingCoercionPressureLong: 0,
+        recentOutgoingDamagePercentShort: outgoingCoercion.shortDamagePercent,
+        recentOutgoingDamagePercentLong: outgoingCoercion.longDamagePercent,
+        recentIncomingDamagePercentShort: 0,
+        recentIncomingDamagePercentLong: 0,
+        lastSuccessfulOutgoingBombardTurn: outgoingCoercion.lastSuccessfulBombardTurn,
+        lastSuccessfulOutgoingSiegeTurn: outgoingCoercion.lastSuccessfulSiegeTurn,
         pendingIncomingRequestedStatuses,
         pendingOutgoingRequestedStatuses,
         pendingIncomingSupportRequests,
         knownPlanets
+      };
+    })
+    .filter((entry): entry is BotStrategicDiplomaticFactionSnapshot & {
+      recentBattleReportCountShort: number;
+      recentBattleReportCountLong: number;
+    } => entry !== null);
+
+  const ownShortDamagePercent = resolveOwnRecentStructuralDamagePercent(player, galaxy.currentTurn, 20);
+  const ownLongDamagePercent = resolveOwnRecentStructuralDamagePercent(player, galaxy.currentTurn, 100);
+  const activeWarDrafts = factionDrafts.filter((entry) => entry.currentStatus === DiplomaticStatus.WAR);
+  const totalShortWarActivity = activeWarDrafts.reduce((sum, entry) =>
+    sum + Math.max(1, entry.recentBattleReportCountShort), 0);
+  const totalLongWarActivity = activeWarDrafts.reduce((sum, entry) =>
+    sum + Math.max(1, entry.recentBattleReportCountLong), 0);
+
+  return factionDrafts
+    .map((entry) => {
+      if (entry.currentStatus !== DiplomaticStatus.WAR || activeWarDrafts.length <= 0) {
+        const { recentBattleReportCountShort: _short, recentBattleReportCountLong: _long, ...rest } = entry;
+        return rest satisfies BotStrategicDiplomaticFactionSnapshot;
+      }
+
+      const shortShareBase = totalShortWarActivity > 0
+        ? Math.max(1, entry.recentBattleReportCountShort) / totalShortWarActivity
+        : 1 / activeWarDrafts.length;
+      const longShareBase = totalLongWarActivity > 0
+        ? Math.max(1, entry.recentBattleReportCountLong) / totalLongWarActivity
+        : 1 / activeWarDrafts.length;
+      const recentIncomingDamagePercentShort = ownShortDamagePercent * shortShareBase;
+      const recentIncomingDamagePercentLong = ownLongDamagePercent * longShareBase;
+      const recentIncomingCoercionPressureShort = Math.max(
+        0,
+        (entry.recentBattleReportCountShort * 4) + (recentIncomingDamagePercentShort * 0.5)
+      );
+      const recentIncomingCoercionPressureLong = Math.max(
+        0,
+        (entry.recentBattleReportCountLong * 3) + (recentIncomingDamagePercentLong * 0.5)
+      );
+      const { recentBattleReportCountShort: _short, recentBattleReportCountLong: _long, ...rest } = entry;
+
+      return {
+        ...rest,
+        recentIncomingCoercionPressureShort,
+        recentIncomingCoercionPressureLong,
+        recentIncomingDamagePercentShort,
+        recentIncomingDamagePercentLong
       } satisfies BotStrategicDiplomaticFactionSnapshot;
     })
-    .filter((entry): entry is BotStrategicDiplomaticFactionSnapshot => entry !== null)
     .sort((left, right) =>
       left.currentStatus.localeCompare(right.currentStatus)
       || right.totalPlanetCount - left.totalPlanetCount
       || left.playerId - right.playerId
     );
+}
+
+function resolveRecentOutgoingCoercionForFaction(
+  player: Player,
+  foreignPlayer: Player,
+  currentTurn: number
+): {
+  shortPressure: number;
+  longPressure: number;
+  shortDamagePercent: number;
+  longDamagePercent: number;
+  lastSuccessfulBombardTurn: number | null;
+  lastSuccessfulSiegeTurn: number | null;
+} {
+  const factionPlanets = new Map(
+    foreignPlayer.planets.map((planet) => {
+      const key = `${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}:${planet.basicInfo.order}`;
+      return [key, planet] as const;
+    })
+  );
+  let shortPressure = 0;
+  let longPressure = 0;
+  let shortDamagePercent = 0;
+  let longDamagePercent = 0;
+  let lastSuccessfulBombardTurn: number | null = null;
+  let lastSuccessfulSiegeTurn: number | null = null;
+
+  for (const report of player.reports) {
+    if (
+      report.reportType !== ReportType.BUILDINGS_REPORT
+      || !report.title.startsWith('Bombardment Report:')
+      || !report.sourceCoordinates
+    ) {
+      continue;
+    }
+
+    const key = `${report.sourceCoordinates.x}:${report.sourceCoordinates.y}:${report.sourceCoordinates.z}`;
+    const targetPlanet = factionPlanets.get(key);
+    if (!targetPlanet) {
+      continue;
+    }
+
+    const age = Math.max(0, currentTurn - report.createdTurn);
+    if (age > 100) {
+      continue;
+    }
+
+    const lines = 'body' in report && typeof report.body === 'string'
+      ? report.body.split('\n')
+      : [];
+    const missionTypeLine = lines.find((line) => line.startsWith('Bombardment mission:')) ?? '';
+    const totalDamageLine = lines.find((line) => line.startsWith('Total structural damage:')) ?? '';
+    const missionType = missionTypeLine.includes(FleetMissionType.SIEGE)
+      ? FleetMissionType.SIEGE
+      : FleetMissionType.BOMBARD;
+    const totalDamage = parseNonNegativeNumberFromLine(totalDamageLine);
+    if (totalDamage <= 0) {
+      continue;
+    }
+
+    const targetReport = targetPlanet.lastReportData.get(player.playerId) ?? null;
+    const estimatedCapacity = targetReport ? estimateReportedStructuralCapacity(targetReport) : 0;
+    const damagePercent = estimatedCapacity > 0
+      ? Math.min(100, (totalDamage / estimatedCapacity) * 100)
+      : Math.min(100, totalDamage / 200);
+    const hostilitySwingMagnitude = (missionType === FleetMissionType.SIEGE ? 3 : 5) + (damagePercent * 0.5);
+    const pressureContribution = hostilitySwingMagnitude + damagePercent;
+
+    if (age <= 20) {
+      shortPressure += pressureContribution;
+      shortDamagePercent += damagePercent;
+    }
+    longPressure += pressureContribution;
+    longDamagePercent += damagePercent;
+
+    if (missionType === FleetMissionType.SIEGE) {
+      if (lastSuccessfulSiegeTurn === null || report.createdTurn > lastSuccessfulSiegeTurn) {
+        lastSuccessfulSiegeTurn = report.createdTurn;
+      }
+    } else if (lastSuccessfulBombardTurn === null || report.createdTurn > lastSuccessfulBombardTurn) {
+      lastSuccessfulBombardTurn = report.createdTurn;
+    }
+  }
+
+  return {
+    shortPressure,
+    longPressure,
+    shortDamagePercent,
+    longDamagePercent,
+    lastSuccessfulBombardTurn,
+    lastSuccessfulSiegeTurn
+  };
+}
+
+function resolveOwnRecentStructuralDamagePercent(
+  player: Player,
+  currentTurn: number,
+  windowTurns: number
+): number {
+  const totalMaxStructuralPoints = player.planets.reduce((sum, planet) => {
+    let planetMax = 0;
+    for (const buildingType of ALL_BUILDING_TYPES) {
+      const level = planet.getBuildingLevel(buildingType);
+      if (level <= 0) {
+        continue;
+      }
+      planetMax += planet.getMaxBuildingStructuralPoints(buildingType);
+    }
+    return sum + planetMax;
+  }, 0);
+  if (totalMaxStructuralPoints <= 0) {
+    return 0;
+  }
+
+  const missingStructuralPoints = player.planets.reduce((sum, planet) =>
+    sum + resolvePlanetMissingStructuralPoints(planet), 0);
+  const recentHostileAttackCount = player.planets.reduce((sum, planet) =>
+    sum + resolveRecentHostileAttackCountLast100Turns(player, planet, currentTurn, windowTurns), 0);
+  if (recentHostileAttackCount <= 0) {
+    return 0;
+  }
+
+  const activityMultiplier = Math.min(1, recentHostileAttackCount / Math.max(1, player.planets.length));
+  return Math.max(0, Math.min(100, ((missingStructuralPoints / totalMaxStructuralPoints) * 100) * activityMultiplier));
+}
+
+function resolvePlanetMissingStructuralPoints(planet: Planet): number {
+  let missing = 0;
+  for (const buildingType of ALL_BUILDING_TYPES) {
+    const level = planet.getBuildingLevel(buildingType);
+    if (level <= 0) {
+      continue;
+    }
+    const maxStructuralPoints = planet.getMaxBuildingStructuralPoints(buildingType);
+    if (maxStructuralPoints <= 0) {
+      continue;
+    }
+    const currentStructuralPoints = planet.getCurrentBuildingStructuralPoints(buildingType);
+    missing += Math.max(0, maxStructuralPoints - currentStructuralPoints);
+  }
+  return missing;
+}
+
+function estimateReportedStructuralCapacity(report: EspionageReportData): number {
+  let total = 0;
+
+  for (const [buildingType, level] of report.buildingsLevels.entries()) {
+    if (level <= 0) {
+      continue;
+    }
+    const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
+    if (!blueprint) {
+      continue;
+    }
+    const cost = blueprint.getCostForLevel(level);
+    total += Math.max(0, Math.floor((cost.metal * 2) + cost.crystal + Math.floor(cost.deuterium * 0.5)));
+  }
+
+  for (const defence of report.defences) {
+    const blueprint = DEFENCE_BLUEPRINTS.get(defence.type);
+    if (!blueprint) {
+      continue;
+    }
+    total += Math.max(0, blueprint.hullPointsCapacity * Math.max(0, defence.amount));
+  }
+
+  return total;
 }
 
 function resolveSystemScanRadiusDistance(
@@ -1174,6 +1406,24 @@ function resolveLatestBattleObservation(
     survivingShipsByType: parseTypedCountSummary<ShipType>(survivingShipsLine, 'Enemy survivors by type:'),
     survivingDefencesByType: parseTypedCountSummary<DefenceType>(survivingDefencesLine, 'Enemy defense survivors by type:')
   };
+}
+
+function parseNonNegativeNumberFromLine(line: string | null | undefined): number {
+  if (!line) {
+    return 0;
+  }
+
+  const match = line.match(/(-?\d+(?:\.\d+)?)/);
+  if (!match) {
+    return 0;
+  }
+
+  const parsed = Number(match[1]);
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return Math.max(0, parsed);
 }
 
 function resolveLatestPlunderObservation(

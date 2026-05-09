@@ -92,6 +92,16 @@ export type BotStrategicDiplomaticFactionSnapshot = {
   bestIntelDepth: number;
   lastRelevantReportAge: number | null;
   recentBattleReportCount: number;
+  recentOutgoingCoercionPressureShort: number;
+  recentOutgoingCoercionPressureLong: number;
+  recentIncomingCoercionPressureShort: number;
+  recentIncomingCoercionPressureLong: number;
+  recentOutgoingDamagePercentShort: number;
+  recentOutgoingDamagePercentLong: number;
+  recentIncomingDamagePercentShort: number;
+  recentIncomingDamagePercentLong: number;
+  lastSuccessfulOutgoingBombardTurn: number | null;
+  lastSuccessfulOutgoingSiegeTurn: number | null;
   pendingIncomingRequestedStatuses: DiplomaticStatus[];
   pendingOutgoingRequestedStatuses: DiplomaticStatus[];
   pendingIncomingSupportRequests: BotStrategicDiplomaticSupportRequestSnapshot[];

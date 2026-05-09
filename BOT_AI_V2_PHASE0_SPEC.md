@@ -2401,6 +2401,127 @@ High-hostility `NEUTRAL` attacks should remain allowed during active `WAR`, but 
 
 So real war fronts stay first priority.
 
+## Strategic Diplomatic phase-7 follow-up
+
+The next `Strategic Diplomatic` slice should be the **war-exit pressure and hostility-rebalancing phase**.
+
+It should cover:
+
+- hostility rebalancing from coercive war actions
+- deescalation proposal readiness
+- campaign-state pacing between continued pressure and war exit
+
+This phase should not primarily add new mission families.
+
+It should instead change how the subsystem interprets:
+
+- successful `BOMBARD`
+- successful `SIEGE`
+- incoming enemy coercion
+- losing-vs-winning war posture
+
+### Strategic Diplomatic phase-7 outgoing coercion rule
+
+Successful outgoing coercion should reduce our hostility toward the target faction.
+
+Successful `BOMBARD` should apply:
+
+- base hostility decrease `-5`
+- plus `0.5` hostility points per `1%` inflicted damage
+
+Successful `SIEGE` should apply per successful orbit turn:
+
+- base hostility decrease `-3`
+- plus `0.5` hostility points per `1%` inflicted damage
+
+This should use mission report outcome plus percentage damage rather than flat destroyed-value only.
+
+### Strategic Diplomatic phase-7 incoming coercion rule
+
+Enemy coercion against us should increase hostility toward that enemy.
+
+Enemy successful `BOMBARD` should apply:
+
+- base hostility increase `+8`
+- plus `0.5` hostility points per `1%` inflicted damage
+
+Enemy successful `SIEGE` should apply per successful orbit turn:
+
+- base hostility increase `+4`
+- plus `0.5` hostility points per `1%` inflicted damage
+
+Incoming enemy coercion should also:
+
+- increase retaliation pressure
+
+### Strategic Diplomatic phase-7 war-evaluation rule
+
+War state should be evaluated in two windows:
+
+- short-term `20` turns
+- long-term `100` turns
+
+Evaluation cadence:
+
+- every `20` turns
+
+Combined war score:
+
+- normalized `-100 .. +100`
+- `60%` long-term weight
+- `40%` short-term weight
+
+Classification:
+
+- `>= 20` winning
+- `<= -20` losing
+- otherwise balanced
+
+### Strategic Diplomatic phase-7 losing-war response
+
+If the combined war score says we are losing, apply:
+
+- hostility decay `-10` per evaluation
+
+There should be no separate hard deescalation-block timer.
+
+Instead:
+
+- recent enemy `BOMBARD` / `SIEGE`
+- should directly worsen the short-term `20`-turn score
+- and raise retaliation pressure
+
+### Strategic Diplomatic phase-7 deescalation rule
+
+Deescalation should stay adjacent-only and prefer:
+
+- `WAR -> NEUTRAL`
+- then `NEUTRAL -> PEACE`
+
+If coercion succeeds and hostility falls enough, the subsystem should:
+
+- allow
+- but not force
+- `NEUTRAL` proposals
+
+### Strategic Diplomatic phase-7 memory rule
+
+This phase should keep a per-faction operational war-pressure ledger with fields such as:
+
+- `lastSuccessfulBombardTurn`
+- `lastSuccessfulSiegeTickTurn`
+- `recentOutgoingCoercionPressure`
+- `recentIncomingCoercionPressure`
+- `lastWarEvaluationTurn`
+- `shortWindowWarScore`
+- `longWindowWarScore`
+- `currentWarExitPressure`
+
+Outgoing coercion pressure should use a hybrid model:
+
+- actual hostility swing
+- plus inflicted damage percentage
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

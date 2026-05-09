@@ -171,6 +171,14 @@ export type BotMemoryV2StrategicMilitary = {
 export type BotMemoryV2StrategicDiplomaticFactionEntry = {
   playerId: number;
   hostilityScore: number;
+  lastSuccessfulBombardTurn: number | null;
+  lastSuccessfulSiegeTickTurn: number | null;
+  recentOutgoingCoercionPressure: number;
+  recentIncomingCoercionPressure: number;
+  lastWarEvaluationTurn: number | null;
+  shortWindowWarScore: number;
+  longWindowWarScore: number;
+  currentWarExitPressure: number;
   lastComputedStanceScore: number;
   lastComputedStrengthEstimate: number;
   lastKnownStatus: DiplomaticStatus | null;
@@ -865,6 +873,30 @@ export class Player {
           playerId: entry.playerId,
           hostilityScore: Number.isFinite(entry.hostilityScore)
             ? Math.max(0, Number(entry.hostilityScore))
+            : 0,
+          lastSuccessfulBombardTurn: Number.isInteger(entry.lastSuccessfulBombardTurn)
+            ? entry.lastSuccessfulBombardTurn
+            : null,
+          lastSuccessfulSiegeTickTurn: Number.isInteger(entry.lastSuccessfulSiegeTickTurn)
+            ? entry.lastSuccessfulSiegeTickTurn
+            : null,
+          recentOutgoingCoercionPressure: Number.isFinite(entry.recentOutgoingCoercionPressure)
+            ? Math.max(0, Number(entry.recentOutgoingCoercionPressure))
+            : 0,
+          recentIncomingCoercionPressure: Number.isFinite(entry.recentIncomingCoercionPressure)
+            ? Math.max(0, Number(entry.recentIncomingCoercionPressure))
+            : 0,
+          lastWarEvaluationTurn: Number.isInteger(entry.lastWarEvaluationTurn)
+            ? entry.lastWarEvaluationTurn
+            : null,
+          shortWindowWarScore: Number.isFinite(entry.shortWindowWarScore)
+            ? Math.max(-100, Math.min(100, Number(entry.shortWindowWarScore)))
+            : 0,
+          longWindowWarScore: Number.isFinite(entry.longWindowWarScore)
+            ? Math.max(-100, Math.min(100, Number(entry.longWindowWarScore)))
+            : 0,
+          currentWarExitPressure: Number.isFinite(entry.currentWarExitPressure)
+            ? Number(entry.currentWarExitPressure)
             : 0,
           lastComputedStanceScore: Number.isFinite(entry.lastComputedStanceScore)
             ? Number(entry.lastComputedStanceScore)

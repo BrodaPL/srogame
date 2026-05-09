@@ -6,6 +6,7 @@ import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplom
 import { PlayerType } from '../../../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
+import { BuildingsReport } from '../../../../../src/app/models/reports/buildings-report.js';
 import { createDiplomaticRelation } from '../../../../../src/app/models/diplomacy/diplomatic-relation.js';
 import { createDiplomaticProposal } from '../../../../../src/app/models/diplomacy/diplomatic-proposal.js';
 import { FleetReport } from '../../../../../src/app/models/reports/fleet-report.js';
@@ -436,6 +437,93 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(bombProductionProposal).toBeDefined();
     expect(bombProductionProposal?.debug.itemKind).toBe('defence');
   });
+
+  it('lets successful bombardment pressure reopen neutral deescalation proposals during war', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    bot.botProfileId = 'MINER';
+    galaxy.currentTurn = 20;
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 0, { forcedReportLevel: 12 });
+    addBombardmentReport(bot, playerEnemyPlanet, 18, FleetMissionType.BOMBARD, 9000);
+
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.factionLedger.push({
+      playerId: playerEnemy.playerId,
+      hostilityScore: 80,
+      lastSuccessfulBombardTurn: null,
+      lastSuccessfulSiegeTickTurn: null,
+      recentOutgoingCoercionPressure: 0,
+      recentIncomingCoercionPressure: 0,
+      lastWarEvaluationTurn: 0,
+      shortWindowWarScore: 0,
+      longWindowWarScore: 0,
+      currentWarExitPressure: 0,
+      lastComputedStanceScore: 0,
+      lastComputedStrengthEstimate: 0,
+      lastKnownStatus: DiplomaticStatus.WAR,
+      lastSeenTurn: 0
+    });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const neutralProposal = result.result.proposals.find((proposal) =>
+      proposal.requestPayload.actionType === 'RELATION_CHANGE'
+      && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
+      && proposal.requestPayload.requestedStatus === DiplomaticStatus.NEUTRAL
+    );
+    const ledgerEntry = result.memory.strategicDiplomatic.factionLedger.find((entry) =>
+      entry.playerId === playerEnemy.playerId
+    );
+
+    expect(neutralProposal).toBeDefined();
+    expect((ledgerEntry?.currentWarExitPressure ?? 0)).toBeGreaterThan(0);
+    expect(ledgerEntry?.lastSuccessfulBombardTurn).toBe(18);
+  });
+
+  it('stores negative war-window scores when war pressure turns against the bot empire', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    bot.botProfileId = 'BALANCED';
+    galaxy.currentTurn = 20;
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    addOwnedPlanet(galaxy, playerEnemy, 'DipEnemy2', { x: 1, y: 1 }, 1);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 0, { forcedReportLevel: 12 });
+    botPlanet.setCurrentBuildingStructuralPoints(
+      BuildingType.METAL_MINE,
+      Math.max(1, botPlanet.getMaxBuildingStructuralPoints(BuildingType.METAL_MINE) - 600)
+    );
+    addBattleReport(bot, botPlanet, 19);
+
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.factionLedger.push({
+      playerId: playerEnemy.playerId,
+      hostilityScore: 50,
+      lastSuccessfulBombardTurn: null,
+      lastSuccessfulSiegeTickTurn: null,
+      recentOutgoingCoercionPressure: 0,
+      recentIncomingCoercionPressure: 0,
+      lastWarEvaluationTurn: 0,
+      shortWindowWarScore: 0,
+      longWindowWarScore: 0,
+      currentWarExitPressure: 0,
+      lastComputedStanceScore: 0,
+      lastComputedStrengthEstimate: 0,
+      lastKnownStatus: DiplomaticStatus.WAR,
+      lastSeenTurn: 0
+    });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const ledgerEntry = result.memory.strategicDiplomatic.factionLedger.find((entry) =>
+      entry.playerId === playerEnemy.playerId
+    );
+
+    expect(ledgerEntry).toBeDefined();
+    expect((ledgerEntry?.shortWindowWarScore ?? 0)).toBeLessThan(0);
+    expect((ledgerEntry?.longWindowWarScore ?? 0)).toBeLessThan(0);
+    expect(ledgerEntry?.lastWarEvaluationTurn).toBe(20);
+  });
 });
 
 function runStrategicDiplomaticSubsystem(
@@ -558,6 +646,48 @@ function addBattleReport(
       'Perspective: Attacker',
       'Enemy survivors by type: none',
       'Enemy defense survivors by type: none'
+    ].join('\n')
+  ));
+}
+
+function addBombardmentReport(
+  bot: Player,
+  targetPlanet: Planet,
+  createdTurn: number,
+  missionType: FleetMissionType.BOMBARD | FleetMissionType.SIEGE,
+  totalStructuralDamage: number
+): void {
+  bot.addReport(new BuildingsReport(
+    {
+      reportId: bot.createReportId(),
+      createdTurn,
+      title: `Bombardment Report: ${missionType} at ${targetPlanet.basicInfo.name}`,
+      sourceCoordinates: {
+        x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+        y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+        z: targetPlanet.basicInfo.order
+      },
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      senderPlayerName: bot.playerName
+    },
+    [
+      `Bombardment mission: ${missionType}`,
+      `Target: ${targetPlanet.basicInfo.name}`,
+      'Shots: 4',
+      'Hits: 3',
+      `Total structural damage: ${totalStructuralDamage}`,
+      'Planetary bombs launched: 0',
+      'Planetary bombs activated: 0',
+      'Planetary bombs intercepted: 0',
+      'Planetary bombs lost: 0',
+      'Priorities: random',
+      'Buildings engaged: 1',
+      'Defences engaged: 0',
+      'Building damage summary:',
+      `${BuildingType.METAL_MINE}: hits 3, damage ${totalStructuralDamage}`,
+      'Defence damage summary:',
+      'No lasting defence damage recorded.'
     ].join('\n')
   ));
 }

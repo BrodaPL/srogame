@@ -43,6 +43,12 @@ type EvaluatedFaction = {
   strengthEstimate: number;
   relativeStrength: number;
   confidence: number;
+  shortWindowWarScore: number;
+  longWindowWarScore: number;
+  combinedWarScore: number;
+  currentWarExitPressure: number;
+  recentOutgoingCoercionPressure: number;
+  recentIncomingCoercionPressure: number;
   bestEscalationUtility: number | null;
   bestEscalationStatus: DiplomaticStatus | null;
   bestDeescalationUtility: number | null;
@@ -217,6 +223,10 @@ const MAX_PROBE_SHIP_NEED_REQUESTS = 2;
 const HOSTILE_NEUTRAL_ATTACK_THRESHOLD = 50;
 const WEAKER_NEUTRAL_ATTACK_RATIO = 1.5;
 const BOMBARDMENT_ATTACK_THRESHOLD = 0.65;
+const SHORT_WAR_EVALUATION_WINDOW = 20;
+const LONG_WAR_EVALUATION_WINDOW = 100;
+const WAR_EVALUATION_INTERVAL = 20;
+const LOSING_WAR_HOSTILITY_DECAY = 10;
 const STRATEGIC_HUB_BOMB_STOCK_RATIO_AT_WAR = 0.9;
 const STRATEGIC_HUB_BOMB_STOCK_RATIO_ALLIED = 0.4;
 const STRATEGIC_HUB_BOMB_STOCK_RATIO_PEACE = 0.15;
@@ -473,6 +483,14 @@ function evaluateFaction(
   const previous = ledger.get(faction.playerId) ?? {
     playerId: faction.playerId,
     hostilityScore: 0,
+    lastSuccessfulBombardTurn: null,
+    lastSuccessfulSiegeTickTurn: null,
+    recentOutgoingCoercionPressure: 0,
+    recentIncomingCoercionPressure: 0,
+    lastWarEvaluationTurn: null,
+    shortWindowWarScore: 0,
+    longWindowWarScore: 0,
+    currentWarExitPressure: 0,
     lastComputedStanceScore: 0,
     lastComputedStrengthEstimate: 0,
     lastKnownStatus: null,
@@ -481,14 +499,16 @@ function evaluateFaction(
   const strengthEstimate = resolveFactionStrengthEstimate(faction);
   const relativeStrength = ownStrengthEstimate - strengthEstimate;
   const confidence = resolveFactionConfidence(faction);
-  const hostilityScore = resolveHostilityScore(faction, previous);
+  const warPressure = resolveWarPressureEvaluation(context, faction, previous, relativeStrength);
+  const hostilityScore = resolveHostilityScore(faction, previous, warPressure);
   const stanceScore = resolveStanceScore(
     context.snapshot.profileId,
     faction,
     relativeStrength,
     hostilityScore,
     confidence,
-    statusCounts
+    statusCounts,
+    warPressure
   );
   const relationUtilities = resolveRelationUtilities(
     context.snapshot.profileId,
@@ -497,12 +517,27 @@ function evaluateFaction(
     hostilityScore,
     relativeStrength,
     confidence,
-    statusCounts
+    statusCounts,
+    warPressure
   );
 
   ledger.set(faction.playerId, {
     playerId: faction.playerId,
     hostilityScore,
+    lastSuccessfulBombardTurn: maxTurn(
+      previous.lastSuccessfulBombardTurn,
+      faction.lastSuccessfulOutgoingBombardTurn
+    ),
+    lastSuccessfulSiegeTickTurn: maxTurn(
+      previous.lastSuccessfulSiegeTickTurn,
+      faction.lastSuccessfulOutgoingSiegeTurn
+    ),
+    recentOutgoingCoercionPressure: warPressure.recentOutgoingCoercionPressure,
+    recentIncomingCoercionPressure: warPressure.recentIncomingCoercionPressure,
+    lastWarEvaluationTurn: warPressure.lastWarEvaluationTurn,
+    shortWindowWarScore: warPressure.shortWindowWarScore,
+    longWindowWarScore: warPressure.longWindowWarScore,
+    currentWarExitPressure: warPressure.currentWarExitPressure,
     lastComputedStanceScore: stanceScore,
     lastComputedStrengthEstimate: strengthEstimate,
     lastKnownStatus: faction.currentStatus,
@@ -516,6 +551,12 @@ function evaluateFaction(
     strengthEstimate,
     relativeStrength,
     confidence,
+    shortWindowWarScore: warPressure.shortWindowWarScore,
+    longWindowWarScore: warPressure.longWindowWarScore,
+    combinedWarScore: warPressure.combinedWarScore,
+    currentWarExitPressure: warPressure.currentWarExitPressure,
+    recentOutgoingCoercionPressure: warPressure.recentOutgoingCoercionPressure,
+    recentIncomingCoercionPressure: warPressure.recentIncomingCoercionPressure,
     bestEscalationUtility: relationUtilities.bestEscalationUtility,
     bestEscalationStatus: relationUtilities.bestEscalationStatus,
     bestDeescalationUtility: relationUtilities.bestDeescalationUtility,
@@ -642,10 +683,13 @@ function estimateEnemyEspionageSuperiority(
 
 function resolveHostilityScore(
   faction: BotStrategicDiplomaticFactionSnapshot,
-  previous: BotMemoryV2StrategicDiplomaticFactionEntry
+  previous: BotMemoryV2StrategicDiplomaticFactionEntry,
+  warPressure: ReturnType<typeof resolveWarPressureEvaluation>
 ): number {
   let score = previous.hostilityScore * 0.6;
   score += faction.recentBattleReportCount * 12;
+  score += faction.recentIncomingCoercionPressureShort * 0.8;
+  score -= faction.recentOutgoingCoercionPressureShort * 0.6;
   if (faction.currentStatus === DiplomaticStatus.WAR) {
     score += 20;
   }
@@ -654,6 +698,13 @@ function resolveHostilityScore(
   }
   if (faction.pendingIncomingRequestedStatuses.includes(DiplomaticStatus.NEUTRAL)) {
     score += 6;
+  }
+  score -= Math.max(0, warPressure.currentWarExitPressure * 0.2);
+  if (
+    faction.currentStatus === DiplomaticStatus.WAR
+    && warPressure.appliedLosingWarDecay
+  ) {
+    score -= LOSING_WAR_HOSTILITY_DECAY;
   }
   return Math.max(0, Math.min(120, score));
 }
@@ -664,7 +715,8 @@ function resolveStanceScore(
   relativeStrength: number,
   hostilityScore: number,
   confidence: number,
-  statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>
+  statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>,
+  warPressure: ReturnType<typeof resolveWarPressureEvaluation>
 ): number {
   const personalityBias = resolvePersonalityEscalationBias(profileId);
   const strengthBias = relativeStrength > 20
@@ -677,6 +729,9 @@ function resolveStanceScore(
           ? -8
           : 0;
   const hostilityBias = Math.min(35, hostilityScore * 0.7);
+  const warExitBias = faction.currentStatus === DiplomaticStatus.WAR
+    ? -Math.min(24, warPressure.currentWarExitPressure * 0.35)
+    : 0;
   const relationBias = faction.currentStatus === DiplomaticStatus.WAR
     ? 10
     : faction.currentStatus === DiplomaticStatus.ALLIED
@@ -685,7 +740,7 @@ function resolveStanceScore(
         ? -7
         : 0;
   const networkPressure = resolveNetworkPressure(profileId, statusCounts, faction.currentStatus);
-  const rawScore = personalityBias + strengthBias + hostilityBias + relationBias + networkPressure;
+  const rawScore = personalityBias + strengthBias + hostilityBias + warExitBias + relationBias + networkPressure;
   const uncertaintyPenalty = (1 - confidence) * 20;
   return rawScore - uncertaintyPenalty;
 }
@@ -738,7 +793,8 @@ function resolveRelationUtilities(
   hostilityScore: number,
   relativeStrength: number,
   confidence: number,
-  statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>
+  statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>,
+  warPressure: ReturnType<typeof resolveWarPressureEvaluation>
 ): {
   bestEscalationUtility: number | null;
   bestEscalationStatus: DiplomaticStatus | null;
@@ -761,7 +817,8 @@ function resolveRelationUtilities(
       hostilityScore,
       relativeStrength,
       confidence,
-      statusCounts
+      statusCounts,
+      warPressure
     );
 
     if (requestedStatus === DiplomaticStatus.WAR) {
@@ -809,7 +866,8 @@ function computeRelationChangeUtility(
   hostilityScore: number,
   relativeStrength: number,
   confidence: number,
-  statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>
+  statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>,
+  warPressure: ReturnType<typeof resolveWarPressureEvaluation>
 ): number {
   if (requestedStatus === DiplomaticStatus.WAR) {
     if (hostilityScore < WAR_HOSTILITY_THRESHOLD) {
@@ -819,8 +877,15 @@ function computeRelationChangeUtility(
   }
 
   if (requestedStatus === DiplomaticStatus.PEACE) {
+    if (currentStatus === DiplomaticStatus.WAR) {
+      return -999;
+    }
     const allianceDeficit = statusCounts.ALLIED <= 0 ? 5 : 0;
-    return (-stanceScore) + (currentStatus === DiplomaticStatus.WAR ? 18 : 8) + allianceDeficit + (confidence * 6);
+    const warExitBonus = currentStatus === DiplomaticStatus.WAR
+      ? Math.max(0, warPressure.currentWarExitPressure * 0.35)
+      : 0;
+    const losingBonus = warPressure.combinedWarScore <= -20 ? 10 : 0;
+    return (-stanceScore) + (currentStatus === DiplomaticStatus.WAR ? 18 : 8) + allianceDeficit + warExitBonus + losingBonus + (confidence * 6);
   }
 
   if (requestedStatus === DiplomaticStatus.ALLIED) {
@@ -830,7 +895,13 @@ function computeRelationChangeUtility(
   }
 
   if (requestedStatus === DiplomaticStatus.NEUTRAL) {
-    return (-Math.abs(stanceScore) * 0.5) + (currentStatus === DiplomaticStatus.WAR ? 14 : 10) + (confidence * 5);
+    const warExitBonus = currentStatus === DiplomaticStatus.WAR
+      ? Math.max(0, warPressure.currentWarExitPressure * 0.5)
+      : 0;
+    const losingBonus = warPressure.combinedWarScore <= -20
+      ? 14
+      : warPressure.combinedWarScore < 0 ? 6 : 0;
+    return (-Math.abs(stanceScore) * 0.5) + (currentStatus === DiplomaticStatus.WAR ? 14 : 10) + warExitBonus + losingBonus + (confidence * 5);
   }
 
   return -999;
@@ -942,7 +1013,17 @@ function createProposalManagementPreferences(
         faction.hostilityScore,
         faction.relativeStrength,
         faction.confidence,
-        resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions)
+        resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions),
+        {
+          recentOutgoingCoercionPressure: faction.recentOutgoingCoercionPressure,
+          recentIncomingCoercionPressure: faction.recentIncomingCoercionPressure,
+          shortWindowWarScore: faction.shortWindowWarScore,
+          longWindowWarScore: faction.longWindowWarScore,
+          combinedWarScore: faction.combinedWarScore,
+          currentWarExitPressure: faction.currentWarExitPressure,
+          lastWarEvaluationTurn: context.snapshot.turn,
+          appliedLosingWarDecay: false
+        }
       );
       proposals.push({
         proposalId: `strategic-diplomatic:incoming:${faction.faction.playerId}:${requestedStatus}:${context.snapshot.turn}`,
@@ -986,7 +1067,17 @@ function createProposalManagementPreferences(
         faction.hostilityScore,
         faction.relativeStrength,
         faction.confidence,
-        resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions)
+        resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions),
+        {
+          recentOutgoingCoercionPressure: faction.recentOutgoingCoercionPressure,
+          recentIncomingCoercionPressure: faction.recentIncomingCoercionPressure,
+          shortWindowWarScore: faction.shortWindowWarScore,
+          longWindowWarScore: faction.longWindowWarScore,
+          combinedWarScore: faction.combinedWarScore,
+          currentWarExitPressure: faction.currentWarExitPressure,
+          lastWarEvaluationTurn: context.snapshot.turn,
+          appliedLosingWarDecay: false
+        }
       );
       if (utility >= 0) {
         continue;
@@ -1072,6 +1163,11 @@ function resolveDiplomaticWarState(
   const warFactions = factions.filter((faction) => faction.faction.currentStatus === DiplomaticStatus.WAR);
   const relativeStrengthScore = warFactions.reduce((sum, faction) => sum + faction.relativeStrength, 0);
   const hostilePressure = warFactions.reduce((sum, faction) => sum + faction.hostilityScore, 0);
+  const incomingCoercionPressure = warFactions.reduce((sum, faction) => sum + faction.recentIncomingCoercionPressure, 0);
+  const outgoingCoercionPressure = warFactions.reduce((sum, faction) => sum + faction.recentOutgoingCoercionPressure, 0);
+  const averageCombinedWarScore = warFactions.length > 0
+    ? warFactions.reduce((sum, faction) => sum + faction.combinedWarScore, 0) / warFactions.length
+    : 0;
   const ownDamage = context.snapshot.planets.reduce((sum, planet) =>
     sum + (planet.infrastructure.damagedBuildingCount * 8) + Math.ceil(planet.infrastructure.missingBuildingStructuralPoints / 100), 0);
   const allyDistress = factions
@@ -1081,18 +1177,92 @@ function resolveDiplomaticWarState(
       + faction.faction.pendingIncomingSupportRequests.length * 18
       + faction.faction.knownPlanets.reduce((planetSum, planet) =>
         planetSum + (planet.recentBattleReportCount * 10), 0), 0);
-  const totalPressure = hostilePressure + ownDamage + allyDistress;
+  const totalPressure = hostilePressure + incomingCoercionPressure + ownDamage + allyDistress - (outgoingCoercionPressure * 0.3);
 
   if (warFactions.length <= 0) {
     return ownDamage > 0 || allyDistress > 24 ? 'BALANCED' : 'WINNING';
   }
-  if (relativeStrengthScore < -25 || totalPressure > 80) {
+  if (averageCombinedWarScore <= -20 || relativeStrengthScore < -25 || totalPressure > 80) {
     return 'LOSING';
   }
-  if (relativeStrengthScore > 25 && totalPressure < 45) {
+  if (averageCombinedWarScore >= 20 || (relativeStrengthScore > 25 && totalPressure < 45)) {
     return 'WINNING';
   }
   return 'BALANCED';
+}
+
+function resolveWarPressureEvaluation(
+  context: BotSubsystemContext,
+  faction: BotStrategicDiplomaticFactionSnapshot,
+  previous: BotMemoryV2StrategicDiplomaticFactionEntry,
+  relativeStrength: number
+): {
+  recentOutgoingCoercionPressure: number;
+  recentIncomingCoercionPressure: number;
+  shortWindowWarScore: number;
+  longWindowWarScore: number;
+  combinedWarScore: number;
+  currentWarExitPressure: number;
+  lastWarEvaluationTurn: number | null;
+  appliedLosingWarDecay: boolean;
+} {
+  const shouldEvaluate = previous.lastWarEvaluationTurn === null
+    || (context.snapshot.turn - previous.lastWarEvaluationTurn) >= WAR_EVALUATION_INTERVAL;
+  const nextShortWindowWarScore = normalizeWarScore(
+    (relativeStrength * 0.8)
+    + (faction.recentOutgoingCoercionPressureShort * 1.2)
+    - (faction.recentIncomingCoercionPressureShort * 1.1)
+    - (faction.recentIncomingDamagePercentShort * 0.5)
+    + (faction.recentOutgoingDamagePercentShort * 0.3)
+  );
+  const nextLongWindowWarScore = normalizeWarScore(
+    (relativeStrength * 0.65)
+    + (faction.recentOutgoingCoercionPressureLong * 0.75)
+    - (faction.recentIncomingCoercionPressureLong * 0.7)
+    - (faction.recentIncomingDamagePercentLong * 0.3)
+    + (faction.recentOutgoingDamagePercentLong * 0.25)
+  );
+  const shortWindowWarScore = shouldEvaluate ? nextShortWindowWarScore : previous.shortWindowWarScore;
+  const longWindowWarScore = shouldEvaluate ? nextLongWindowWarScore : previous.longWindowWarScore;
+  const combinedWarScore = normalizeWarScore((longWindowWarScore * 0.6) + (shortWindowWarScore * 0.4));
+  const currentWarExitPressure = Math.max(
+    0,
+    (faction.recentOutgoingCoercionPressureLong * 0.7)
+      + (faction.recentOutgoingDamagePercentLong * 0.25)
+      - (faction.recentIncomingCoercionPressureShort * 0.4)
+  );
+  const appliedLosingWarDecay = shouldEvaluate
+    && faction.currentStatus === DiplomaticStatus.WAR
+    && combinedWarScore <= -20;
+
+  return {
+    recentOutgoingCoercionPressure: faction.recentOutgoingCoercionPressureShort,
+    recentIncomingCoercionPressure: faction.recentIncomingCoercionPressureShort,
+    shortWindowWarScore,
+    longWindowWarScore,
+    combinedWarScore,
+    currentWarExitPressure,
+    lastWarEvaluationTurn: shouldEvaluate ? context.snapshot.turn : previous.lastWarEvaluationTurn,
+    appliedLosingWarDecay
+  };
+}
+
+function normalizeWarScore(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(-100, Math.min(100, Math.round(value)));
+}
+
+function maxTurn(left: number | null, right: number | null): number | null {
+  if (left === null) {
+    return right;
+  }
+  if (right === null) {
+    return left;
+  }
+  return Math.max(left, right);
 }
 
 function resolveAttackShareForWarState(warState: DiplomaticWarState): number {

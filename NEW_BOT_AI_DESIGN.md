@@ -1726,6 +1726,129 @@ The recent-raid rolling window should depend on solar-system distance:
 * linearly from `5` turns at distance `1`
 * up to `25` turns at maximum galaxy distance
 
+### Phase-7 scope: war-exit pressure and hostility rebalancing
+
+After post-break raids, the next `Strategic Diplomatic` slice should be a **war-exit pressure and hostility-rebalancing phase**.
+
+This phase should focus on:
+
+* hostility rebalancing from coercive war actions
+* diplomatic deescalation readiness
+* campaign-state pacing between continued pressure and war exit
+
+This phase should not introduce new mission families first.
+
+It should instead change how the subsystem interprets:
+
+* successful `BOMBARD`
+* successful `SIEGE`
+* incoming enemy coercion
+* losing-vs-winning war posture
+
+#### Phase-7 outgoing coercion effects
+
+Successful outgoing coercion should reduce our hostility toward the enemy.
+
+Successful `BOMBARD` should apply:
+
+* base hostility decrease `-5`
+* plus `0.5` hostility points per `1%` inflicted damage
+
+Successful `SIEGE` should apply per successful orbit turn:
+
+* base hostility decrease `-3`
+* plus `0.5` hostility points per `1%` inflicted damage
+
+This should use mission report outcome and percentage damage, because raw building HP scales strongly with upgrade level.
+
+#### Phase-7 incoming coercion effects
+
+Enemy coercion against us should increase hostility toward that enemy.
+
+Enemy successful `BOMBARD` should apply:
+
+* base hostility increase `+8`
+* plus `0.5` hostility points per `1%` inflicted damage
+
+Enemy successful `SIEGE` should apply per successful orbit turn:
+
+* base hostility increase `+4`
+* plus `0.5` hostility points per `1%` inflicted damage
+
+Incoming enemy coercion should also:
+
+* increase retaliation pressure
+
+#### Phase-7 war-evaluation windows
+
+This phase should evaluate war state in two windows:
+
+* short-term `20` turns
+* long-term `100` turns
+
+War evaluation should run every:
+
+* `20` turns
+
+The combined war score should be:
+
+* normalized `-100 .. +100`
+* weighted `60%` long-term
+* weighted `40%` short-term
+
+Classification should be:
+
+* `>= 20` winning
+* `<= -20` losing
+* otherwise balanced
+
+#### Phase-7 losing-war response
+
+If the war evaluation says we are losing, the subsystem should reduce hostility to reopen deescalation opportunities.
+
+At each evaluation while losing, apply:
+
+* hostility decay `-10`
+
+There should be no separate hard deescalation-block timer.
+
+Instead:
+
+* recent enemy `BOMBARD` / `SIEGE`
+* should directly worsen the short-term `20`-turn war score
+* and increase retaliation pressure
+
+#### Phase-7 deescalation path
+
+Deescalation should remain adjacent-only and should prefer:
+
+* `WAR -> NEUTRAL`
+* then later `NEUTRAL -> PEACE`
+
+If coercion succeeds and hostility falls enough, the subsystem should:
+
+* allow
+* but not force
+* `NEUTRAL` proposals
+
+#### Phase-7 war-pressure memory
+
+This phase should add a per-faction operational war-pressure ledger with fields such as:
+
+* `lastSuccessfulBombardTurn`
+* `lastSuccessfulSiegeTickTurn`
+* `recentOutgoingCoercionPressure`
+* `recentIncomingCoercionPressure`
+* `lastWarEvaluationTurn`
+* `shortWindowWarScore`
+* `longWindowWarScore`
+* `currentWarExitPressure`
+
+Outgoing coercion pressure should use a hybrid model:
+
+* actual hostility swing
+* plus inflicted damage percentage
+
 #### TODO: allied / peace hostile-activity intel sharing
 
 Later strategic-diplomatic phases should add shared hostile-activity awareness:
