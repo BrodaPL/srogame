@@ -19,7 +19,8 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
     strategicDiplomatic: {
       factionLedger: [],
       primaryWarBreakTarget: null,
-      openedWarTargets: []
+      openedWarTargets: [],
+      sharedHostileEvents: []
     }
   };
 }

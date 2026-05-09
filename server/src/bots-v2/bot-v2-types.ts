@@ -9,6 +9,7 @@ import type { ShipType } from '../../../src/app/models/enums/ship-type.ts';
 import type { TechnologyType } from '../../../src/app/models/enums/technology-type.ts';
 import type { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { PlayerType } from '../../../src/app/models/enums/player-type.ts';
+import type { BotMemoryV2StrategicDiplomaticSharedHostileEventType } from '../../../src/app/models/player.ts';
 
 export type BotProposalKind =
   | 'BUILDING'
@@ -102,10 +103,22 @@ export type BotStrategicDiplomaticFactionSnapshot = {
   recentIncomingDamagePercentLong: number;
   lastSuccessfulOutgoingBombardTurn: number | null;
   lastSuccessfulOutgoingSiegeTurn: number | null;
+  sharedHostileEvents: BotStrategicDiplomaticSharedHostileEventSnapshot[];
   pendingIncomingRequestedStatuses: DiplomaticStatus[];
   pendingOutgoingRequestedStatuses: DiplomaticStatus[];
   pendingIncomingSupportRequests: BotStrategicDiplomaticSupportRequestSnapshot[];
   knownPlanets: BotStrategicDiplomaticKnownPlanetSnapshot[];
+};
+
+export type BotStrategicDiplomaticSharedHostileEventSnapshot = {
+  attackerPlayerId: number;
+  victimPlayerId: number;
+  targetCoordinates: { x: number; y: number; z: number };
+  eventType: BotMemoryV2StrategicDiplomaticSharedHostileEventType;
+  eventTurn: number;
+  sharedFromPlayerId: number;
+  sharedFromStatus: DiplomaticStatus;
+  severity: number;
 };
 
 export type BotStrategicDiplomaticKnownPlanetSnapshot = {

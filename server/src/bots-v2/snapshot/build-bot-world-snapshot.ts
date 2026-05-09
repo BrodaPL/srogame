@@ -29,6 +29,7 @@ import type {
   BotPlanetMaturityStage,
   BotPlanetSnapshot,
   BotStrategicDiplomaticFactionSnapshot,
+  BotStrategicDiplomaticSharedHostileEventSnapshot,
   BotStrategicDiplomaticKnownPlanetSnapshot,
   BotStrategicDiplomaticSupportRequestSnapshot,
   BotStrategicMilitaryTargetSnapshot,
@@ -895,6 +896,12 @@ function resolveStrategicDiplomaticFactions(
         foreignPlayer,
         galaxy.currentTurn
       );
+      const sharedHostileEvents = resolveSharedHostileEventsForFaction(
+        galaxy,
+        player,
+        foreignPlayer,
+        diplomacyResolver
+      );
       const recentBattleReportCountShort = countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 20);
       const recentBattleReportCountLong = countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 100);
       const knownPlanets = foreignPlayer.planets
@@ -988,6 +995,7 @@ function resolveStrategicDiplomaticFactions(
         recentIncomingDamagePercentLong: 0,
         lastSuccessfulOutgoingBombardTurn: outgoingCoercion.lastSuccessfulBombardTurn,
         lastSuccessfulOutgoingSiegeTurn: outgoingCoercion.lastSuccessfulSiegeTurn,
+        sharedHostileEvents,
         pendingIncomingRequestedStatuses,
         pendingOutgoingRequestedStatuses,
         pendingIncomingSupportRequests,
@@ -1139,6 +1147,318 @@ function resolveRecentOutgoingCoercionForFaction(
   };
 }
 
+function resolveSharedHostileEventsForFaction(
+  galaxy: Galaxy,
+  player: Player,
+  foreignPlayer: Player,
+  diplomacyResolver: DiplomacyResolver
+): BotStrategicDiplomaticSharedHostileEventSnapshot[] {
+  const deduped = new Map<string, BotStrategicDiplomaticSharedHostileEventSnapshot>();
+  const foreignStatus = diplomacyResolver.getStatus(player.playerId, foreignPlayer.playerId);
+
+  if (foreignStatus === DiplomaticStatus.ALLIED || foreignStatus === DiplomaticStatus.PEACE) {
+    const sharedFromStatus = foreignStatus;
+    const ownedPlanetCoordinates = new Set(
+      foreignPlayer.planets.map((planet) =>
+        `${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}:${planet.basicInfo.order}`
+      )
+    );
+
+    for (const report of foreignPlayer.reports) {
+      if (Math.max(0, galaxy.currentTurn - report.createdTurn) > 100) {
+        continue;
+      }
+
+      const parsedEvent = parseDirectVictimSharedHostileEventFromReport(
+        report,
+        galaxy,
+        foreignPlayer,
+        ownedPlanetCoordinates
+      );
+      if (!parsedEvent) {
+        continue;
+      }
+
+      const nextEvent: BotStrategicDiplomaticSharedHostileEventSnapshot = {
+        attackerPlayerId: parsedEvent.attackerPlayerId,
+        victimPlayerId: foreignPlayer.playerId,
+        targetCoordinates: parsedEvent.targetCoordinates,
+        eventType: parsedEvent.eventType,
+        eventTurn: report.createdTurn,
+        sharedFromPlayerId: foreignPlayer.playerId,
+        sharedFromStatus,
+        severity: parsedEvent.severity
+      };
+      const dedupeKey = [
+        nextEvent.attackerPlayerId,
+        nextEvent.victimPlayerId,
+        toCoordinatesKey(nextEvent.targetCoordinates),
+        nextEvent.eventType,
+        nextEvent.eventTurn
+      ].join(':');
+      const previous = deduped.get(dedupeKey);
+      if (!previous || resolveSharedStatusWeight(sharedFromStatus) > resolveSharedStatusWeight(previous.sharedFromStatus)) {
+        deduped.set(dedupeKey, nextEvent);
+      }
+    }
+  }
+
+  const directFriendlyContacts = galaxy.players.filter((friendlyPlayer) =>
+    friendlyPlayer.playerId !== player.playerId
+    && friendlyPlayer.playerId !== foreignPlayer.playerId
+    && friendlyPlayer.type !== PlayerType.NEUTRAL
+    && (
+      diplomacyResolver.getStatus(player.playerId, friendlyPlayer.playerId) === DiplomaticStatus.ALLIED
+      || diplomacyResolver.getStatus(player.playerId, friendlyPlayer.playerId) === DiplomaticStatus.PEACE
+    )
+  );
+
+  for (const friendlyPlayer of directFriendlyContacts) {
+    const sharedFromStatus = diplomacyResolver.getStatus(player.playerId, friendlyPlayer.playerId);
+    const ownedPlanetCoordinates = new Set(
+      friendlyPlayer.planets.map((planet) =>
+        `${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}:${planet.basicInfo.order}`
+      )
+    );
+
+    for (const report of friendlyPlayer.reports) {
+      if (Math.max(0, galaxy.currentTurn - report.createdTurn) > 100) {
+        continue;
+      }
+      const parsedEvent = parseSharedHostileEventFromReport(
+        report,
+        friendlyPlayer,
+        foreignPlayer,
+        ownedPlanetCoordinates
+      );
+      if (!parsedEvent) {
+        continue;
+      }
+
+      const nextEvent: BotStrategicDiplomaticSharedHostileEventSnapshot = {
+        attackerPlayerId: foreignPlayer.playerId,
+        victimPlayerId: friendlyPlayer.playerId,
+        targetCoordinates: parsedEvent.targetCoordinates,
+        eventType: parsedEvent.eventType,
+        eventTurn: report.createdTurn,
+        sharedFromPlayerId: friendlyPlayer.playerId,
+        sharedFromStatus,
+        severity: parsedEvent.severity
+      };
+      const dedupeKey = [
+        nextEvent.attackerPlayerId,
+        nextEvent.victimPlayerId,
+        toCoordinatesKey(nextEvent.targetCoordinates),
+        nextEvent.eventType,
+        nextEvent.eventTurn
+      ].join(':');
+      const previous = deduped.get(dedupeKey);
+      if (!previous || resolveSharedStatusWeight(sharedFromStatus) > resolveSharedStatusWeight(previous.sharedFromStatus)) {
+        deduped.set(dedupeKey, nextEvent);
+      }
+    }
+  }
+
+  return [...deduped.values()]
+    .sort((left, right) =>
+      right.eventTurn - left.eventTurn
+      || right.severity - left.severity
+      || left.victimPlayerId - right.victimPlayerId
+    )
+    .slice(0, 120);
+}
+
+function parseSharedHostileEventFromReport(
+  report: Player['reports'][number],
+  victimPlayer: Player,
+  foreignPlayer: Player,
+  ownedPlanetCoordinates: Set<string>
+): {
+  targetCoordinates: { x: number; y: number; z: number };
+  eventType: BotStrategicDiplomaticSharedHostileEventSnapshot['eventType'];
+  severity: number;
+} | null {
+  if (
+    !report.sourceCoordinates
+    || report.senderPlayerName !== foreignPlayer.playerName
+  ) {
+    return null;
+  }
+
+  const coordinatesKey = `${report.sourceCoordinates.x}:${report.sourceCoordinates.y}:${report.sourceCoordinates.z}`;
+  if (!ownedPlanetCoordinates.has(coordinatesKey)) {
+    return null;
+  }
+
+  if (
+    report.reportType === ReportType.FLEET_REPORT
+    && report.title.startsWith('Battle Report:')
+  ) {
+    const body = typeof (report as { body?: unknown }).body === 'string'
+      ? (report as { body: string }).body
+      : '';
+    const severity = resolveBattleSharedHostileSeverity(body);
+    if (severity <= 0) {
+      return null;
+    }
+
+    return {
+      targetCoordinates: { ...report.sourceCoordinates },
+      eventType: 'BATTLE',
+      severity
+    };
+  }
+
+  if (
+    report.reportType === ReportType.BUILDINGS_REPORT
+    && report.title.startsWith('Incoming Bombardment Report:')
+  ) {
+    const body = typeof (report as { body?: unknown }).body === 'string'
+      ? (report as { body: string }).body
+      : '';
+    const missionTypeLine = body.split('\n').find((line) => line.startsWith('Bombardment mission:')) ?? '';
+    const totalDamageLine = body.split('\n').find((line) => line.startsWith('Total structural damage:')) ?? '';
+    const targetPlanet = victimPlayer.planets.find((planet) =>
+      planet.basicInfo.solarSystem.coordinates.x === report.sourceCoordinates?.x
+      && planet.basicInfo.solarSystem.coordinates.y === report.sourceCoordinates?.y
+      && planet.basicInfo.order === report.sourceCoordinates?.z
+    ) ?? null;
+    const totalDamage = parseNonNegativeNumberFromLine(totalDamageLine);
+    if (totalDamage <= 0) {
+      return null;
+    }
+
+    const estimatedCapacity = targetPlanet ? estimatePlanetStructuralCapacity(targetPlanet) : 0;
+    const damagePercent = estimatedCapacity > 0
+      ? Math.min(100, (totalDamage / estimatedCapacity) * 100)
+      : Math.min(100, totalDamage / 200);
+    const base = missionTypeLine.includes(FleetMissionType.SIEGE) ? 3 : 5;
+    return {
+      targetCoordinates: { ...report.sourceCoordinates },
+      eventType: missionTypeLine.includes(FleetMissionType.SIEGE) ? 'SIEGE' : 'BOMBARD',
+      severity: Math.max(0, base + (damagePercent * 0.5))
+    };
+  }
+
+  return null;
+}
+
+function parseDirectVictimSharedHostileEventFromReport(
+  report: Player['reports'][number],
+  galaxy: Galaxy,
+  victimPlayer: Player,
+  ownedPlanetCoordinates: Set<string>
+): {
+  attackerPlayerId: number;
+  targetCoordinates: { x: number; y: number; z: number };
+  eventType: BotStrategicDiplomaticSharedHostileEventSnapshot['eventType'];
+  severity: number;
+} | null {
+  if (!report.sourceCoordinates || !report.senderPlayerName) {
+    return null;
+  }
+
+  const coordinatesKey = `${report.sourceCoordinates.x}:${report.sourceCoordinates.y}:${report.sourceCoordinates.z}`;
+  if (!ownedPlanetCoordinates.has(coordinatesKey)) {
+    return null;
+  }
+
+  const attackerId = galaxy.playerNameMap.get(report.senderPlayerName);
+  const attacker = attackerId === undefined
+    ? null
+    : galaxy.players.find((player) => player.playerId === attackerId) ?? null;
+  if (!attacker) {
+    return null;
+  }
+
+  if (
+    report.reportType === ReportType.FLEET_REPORT
+    && report.title.startsWith('Battle Report:')
+  ) {
+    const body = typeof (report as { body?: unknown }).body === 'string'
+      ? (report as { body: string }).body
+      : '';
+    const severity = resolveBattleSharedHostileSeverity(body);
+    if (severity <= 0) {
+      return null;
+    }
+
+    return {
+      attackerPlayerId: attacker.playerId,
+      targetCoordinates: { ...report.sourceCoordinates },
+      eventType: 'BATTLE',
+      severity
+    };
+  }
+
+  if (
+    report.reportType === ReportType.BUILDINGS_REPORT
+    && report.title.startsWith('Incoming Bombardment Report:')
+  ) {
+    const body = typeof (report as { body?: unknown }).body === 'string'
+      ? (report as { body: string }).body
+      : '';
+    const missionTypeLine = body.split('\n').find((line) => line.startsWith('Bombardment mission:')) ?? '';
+    const totalDamageLine = body.split('\n').find((line) => line.startsWith('Total structural damage:')) ?? '';
+    const targetPlanet = victimPlayer.planets.find((planet) =>
+      planet.basicInfo.solarSystem.coordinates.x === report.sourceCoordinates?.x
+      && planet.basicInfo.solarSystem.coordinates.y === report.sourceCoordinates?.y
+      && planet.basicInfo.order === report.sourceCoordinates?.z
+    ) ?? null;
+    const totalDamage = parseNonNegativeNumberFromLine(totalDamageLine);
+    if (totalDamage <= 0) {
+      return null;
+    }
+
+    const estimatedCapacity = targetPlanet ? estimatePlanetStructuralCapacity(targetPlanet) : 0;
+    const damagePercent = estimatedCapacity > 0
+      ? Math.min(100, (totalDamage / estimatedCapacity) * 100)
+      : Math.min(100, totalDamage / 200);
+    const base = missionTypeLine.includes(FleetMissionType.SIEGE) ? 3 : 5;
+    return {
+      attackerPlayerId: attacker.playerId,
+      targetCoordinates: { ...report.sourceCoordinates },
+      eventType: missionTypeLine.includes(FleetMissionType.SIEGE) ? 'SIEGE' : 'BOMBARD',
+      severity: Math.max(0, base + (damagePercent * 0.5))
+    };
+  }
+
+  return null;
+}
+
+function resolveBattleSharedHostileSeverity(body: string): number {
+  if (!body) {
+    return 0;
+  }
+
+  const ownShipsLine = body.split('\n').find((line) => line.startsWith('Own ships (')) ?? '';
+  const ownDefencesLine = body.split('\n').find((line) => line.startsWith('Own defenses (')) ?? '';
+  const resultLine = body.split('\n').find((line) => line.startsWith('Battle result:')) ?? '';
+  const ownShipsLost = parseBattleLossCount(ownShipsLine);
+  const ownDefencesLost = parseBattleLossCount(ownDefencesLine);
+  const defeatBonus = resultLine.includes('Attacker') ? 8 : resultLine.includes('Defender') ? 0 : 4;
+  return Math.max(0, Math.min(50, (ownShipsLost * 2) + ownDefencesLost + defeatBonus));
+}
+
+function parseBattleLossCount(line: string): number {
+  const match = line.match(/,\s*(\d+)\s+lost\./);
+  if (!match) {
+    return 0;
+  }
+  return Math.max(0, Number.parseInt(match[1] ?? '0', 10));
+}
+
+function resolveSharedStatusWeight(status: DiplomaticStatus): number {
+  switch (status) {
+    case DiplomaticStatus.ALLIED:
+      return 0.4;
+    case DiplomaticStatus.PEACE:
+      return 0.1;
+    default:
+      return 0;
+  }
+}
+
 function resolveOwnRecentStructuralDamagePercent(
   player: Player,
   currentTurn: number,
@@ -1212,6 +1532,34 @@ function estimateReportedStructuralCapacity(report: EspionageReportData): number
   }
 
   return total;
+}
+
+function estimatePlanetStructuralCapacity(planet: Planet): number {
+  let total = 0;
+
+  for (const buildingType of ALL_BUILDING_TYPES) {
+    const level = planet.getBuildingLevel(buildingType);
+    if (level <= 0) {
+      continue;
+    }
+    total += Math.max(0, planet.getMaxBuildingStructuralPoints(buildingType));
+  }
+
+  for (const [defenceType, amount] of ManyDefences.countByType(planet.rBDSFTQ.defences)) {
+    const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+    if (!blueprint) {
+      continue;
+    }
+    total += Math.max(0, blueprint.hullPointsCapacity * Math.max(0, amount));
+  }
+
+  return total;
+}
+
+function toCoordinatesKey(
+  coordinates: { x: number; y: number; z: number }
+): string {
+  return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
 }
 
 function resolveSystemScanRadiusDistance(

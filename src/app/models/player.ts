@@ -204,10 +204,28 @@ export type BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry = {
   lastEstimatedPlunderValue: number;
 };
 
+export type BotMemoryV2StrategicDiplomaticSharedHostileEventType =
+  | 'BATTLE'
+  | 'BOMBARD'
+  | 'SIEGE';
+
+export type BotMemoryV2StrategicDiplomaticSharedHostileEventEntry = {
+  attackerPlayerId: number;
+  victimPlayerId: number;
+  targetCoordinates: BotMemoryCoordinates;
+  eventType: BotMemoryV2StrategicDiplomaticSharedHostileEventType;
+  eventTurn: number;
+  sharedFromPlayerId: number;
+  sharedFromStatus: DiplomaticStatus;
+  severity: number;
+  propagatedOnTurn: number | null;
+};
+
 export type BotMemoryV2StrategicDiplomatic = {
   factionLedger: BotMemoryV2StrategicDiplomaticFactionEntry[];
   primaryWarBreakTarget: BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null;
   openedWarTargets: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[];
+  sharedHostileEvents: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[];
 };
 
 export type BotMemoryV2 = {
@@ -830,6 +848,9 @@ export class Player {
       ),
       openedWarTargets: Player.normalizeBotMemoryV2StrategicDiplomaticOpenedWarTargets(
         strategicDiplomatic?.openedWarTargets
+      ),
+      sharedHostileEvents: Player.normalizeBotMemoryV2StrategicDiplomaticSharedHostileEvents(
+        strategicDiplomatic?.sharedHostileEvents
       )
     };
   }
@@ -959,6 +980,60 @@ export class Player {
       })
       .filter((entry): entry is BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry => entry !== null)
       .slice(-160);
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticSharedHostileEvents(
+    entries: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[] | null | undefined
+  ): BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        if (
+          !entry
+          || !Number.isInteger(entry.attackerPlayerId)
+          || !Number.isInteger(entry.victimPlayerId)
+          || !Number.isInteger(entry.sharedFromPlayerId)
+        ) {
+          return null;
+        }
+
+        const targetCoordinates = Player.normalizeBotMemoryCoordinates(entry.targetCoordinates);
+        if (!targetCoordinates) {
+          return null;
+        }
+
+        const eventType = entry.eventType === 'BATTLE'
+          || entry.eventType === 'BOMBARD'
+          || entry.eventType === 'SIEGE'
+          ? entry.eventType
+          : null;
+        const sharedFromStatus = Player.normalizeDiplomaticStatus(entry.sharedFromStatus);
+        if (
+          !eventType
+          || (sharedFromStatus !== DiplomaticStatus.ALLIED && sharedFromStatus !== DiplomaticStatus.PEACE)
+        ) {
+          return null;
+        }
+
+        return {
+          attackerPlayerId: entry.attackerPlayerId,
+          victimPlayerId: entry.victimPlayerId,
+          targetCoordinates,
+          eventType,
+          eventTurn: Number.isInteger(entry.eventTurn) ? Math.max(0, entry.eventTurn) : 0,
+          sharedFromPlayerId: entry.sharedFromPlayerId,
+          sharedFromStatus,
+          severity: Number.isFinite(entry.severity) ? Math.max(0, Number(entry.severity)) : 0,
+          propagatedOnTurn: Number.isInteger(entry.propagatedOnTurn)
+            ? Math.max(0, entry.propagatedOnTurn)
+            : null
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicDiplomaticSharedHostileEventEntry => entry !== null)
+      .slice(-400);
   }
 
   private static normalizeBotMemoryV2CountByType(

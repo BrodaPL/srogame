@@ -15,12 +15,14 @@ import type {
   BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget,
   BotMemoryV2StrategicDiplomaticFactionEntry,
   BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry,
+  BotMemoryV2StrategicDiplomaticSharedHostileEventEntry,
   BotProfileId
 } from '../../../../../src/app/models/player.ts';
 import type {
   BotPlanetSnapshot,
   BotProposal,
   BotStrategicDiplomaticFactionSnapshot,
+  BotStrategicDiplomaticSharedHostileEventSnapshot,
   BotSubsystem,
   BotSubsystemContext,
   BotSubsystemResult
@@ -35,6 +37,7 @@ import {
 
 type FactionLedgerMap = Map<number, BotMemoryV2StrategicDiplomaticFactionEntry>;
 type OpenedWarTargetLedgerMap = Map<string, BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry>;
+type SharedHostileEventLedgerMap = Map<string, BotMemoryV2StrategicDiplomaticSharedHostileEventEntry>;
 
 type EvaluatedFaction = {
   faction: BotStrategicDiplomaticFactionSnapshot;
@@ -49,6 +52,9 @@ type EvaluatedFaction = {
   currentWarExitPressure: number;
   recentOutgoingCoercionPressure: number;
   recentIncomingCoercionPressure: number;
+  sharedHostilityPressureShort: number;
+  sharedHostilityPressureLong: number;
+  sharedHostileEvents: BotStrategicDiplomaticSharedHostileEventSnapshot[];
   bestEscalationUtility: number | null;
   bestEscalationStatus: DiplomaticStatus | null;
   bestDeescalationUtility: number | null;
@@ -241,6 +247,8 @@ const POST_BREAK_ATTACK_AMBUSH_PAUSE_THRESHOLD = 70;
 const ACTIVE_BREAK_TARGET_CAP = 2;
 const ACTIVE_OPENED_WAR_TARGET_BASE = 1;
 const ACTIVE_WAR_NEUTRAL_ATTACK_SCORE_MULTIPLIER = 0.6;
+const ALLIED_SHARED_HOSTILITY_WEIGHT = 0.4;
+const PEACE_SHARED_HOSTILITY_WEIGHT = 0.1;
 
 export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DIPLOMATIC' as const;
@@ -248,6 +256,9 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
   public generate(context: BotSubsystemContext): BotSubsystemResult {
     const ledger = createFactionLedgerMap(context.memory.strategicDiplomatic.factionLedger);
     const openedWarTargetLedger = createOpenedWarTargetLedgerMap(context.memory.strategicDiplomatic.openedWarTargets);
+    const sharedHostileEventLedger = createSharedHostileEventLedgerMap(
+      context.memory.strategicDiplomatic.sharedHostileEvents
+    );
     const ownStrengthEstimate = resolveOwnStrengthEstimate(context);
     const statusCounts = resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions);
     const proposalCap = resolveDiplomaticProposalCap(context);
@@ -324,6 +335,11 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
       .sort((left, right) => left.playerId - right.playerId);
     context.memory.strategicDiplomatic.openedWarTargets = [...openedWarTargetLedger.values()]
       .sort(compareOpenedWarTargetLedgerEntries);
+    context.memory.strategicDiplomatic.sharedHostileEvents = updateSharedHostileEventLedger(
+      sharedHostileEventLedger,
+      evaluatedFactions,
+      context.snapshot.turn
+    );
 
     const strongestEnemy = evaluatedFactions.reduce<EvaluatedFaction | null>((best, faction) =>
       !best || faction.strengthEstimate > best.strengthEstimate ? faction : best, null);
@@ -382,10 +398,10 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         diplomaticArmamentDeliveryMissionCount: forceProjectionPlanning.armamentDeliveryRequests.length,
         diplomaticBuildingRequestCount: forceProjectionPlanning.buildingRequests.length,
         diplomaticBombProductionRequestCount: forceProjectionPlanning.bombProductionRequests.length,
+        sharedHostileEventCount: context.memory.strategicDiplomatic.sharedHostileEvents.length,
         attackSharePercent: resolveAttackShareForWarState(warState),
         supportSharePercent: 100 - resolveAttackShareForWarState(warState),
         // TODO: Later phases should add tributes / bribes / negotiated payments to influence diplomacy.
-        // TODO: Allied / peace empires should share hostile-activity intel automatically, and human allies should receive copied hostile battle reports.
         // TODO: Clarify whether allied Jump Gate travel should also reduce diplomatic MOVE / ARMAMENT_DELIVERY ETA like own Jump Gate travel.
         futureTributePressure: false
       }
@@ -418,6 +434,68 @@ function createOpenedWarTargetLedgerMap(
     });
   }
   return map;
+}
+
+function createSharedHostileEventLedgerMap(
+  entries: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[]
+): SharedHostileEventLedgerMap {
+  const map: SharedHostileEventLedgerMap = new Map();
+  for (const entry of entries) {
+    map.set(resolveSharedHostileEventLedgerKey(entry), {
+      ...entry,
+      targetCoordinates: { ...entry.targetCoordinates }
+    });
+  }
+  return map;
+}
+
+function updateSharedHostileEventLedger(
+  ledger: SharedHostileEventLedgerMap,
+  factions: EvaluatedFaction[],
+  currentTurn: number
+): BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[] {
+  for (const faction of factions) {
+    for (const event of faction.sharedHostileEvents) {
+      const key = resolveSharedHostileEventLedgerKey(event);
+      const previous = ledger.get(key);
+      ledger.set(key, {
+        attackerPlayerId: event.attackerPlayerId,
+        victimPlayerId: event.victimPlayerId,
+        targetCoordinates: { ...event.targetCoordinates },
+        eventType: event.eventType,
+        eventTurn: event.eventTurn,
+        sharedFromPlayerId: event.sharedFromPlayerId,
+        sharedFromStatus: event.sharedFromStatus,
+        severity: event.severity,
+        propagatedOnTurn: previous?.propagatedOnTurn ?? currentTurn
+      });
+    }
+  }
+
+  return [...ledger.values()]
+    .filter((entry) => entry.eventTurn >= currentTurn - LONG_WAR_EVALUATION_WINDOW)
+    .sort((left, right) =>
+      right.eventTurn - left.eventTurn
+      || right.severity - left.severity
+      || left.attackerPlayerId - right.attackerPlayerId
+    )
+    .slice(0, 400);
+}
+
+function resolveSharedHostileEventLedgerKey(
+  entry: Pick<
+    BotMemoryV2StrategicDiplomaticSharedHostileEventEntry,
+    'attackerPlayerId' | 'victimPlayerId' | 'eventType' | 'eventTurn' | 'sharedFromPlayerId' | 'targetCoordinates'
+  >
+): string {
+  return [
+    entry.attackerPlayerId,
+    entry.victimPlayerId,
+    toCoordinatesKey(entry.targetCoordinates),
+    entry.eventType,
+    entry.eventTurn,
+    entry.sharedFromPlayerId
+  ].join(':');
 }
 
 function resolveOwnStrengthEstimate(context: BotSubsystemContext): number {
@@ -500,7 +578,8 @@ function evaluateFaction(
   const relativeStrength = ownStrengthEstimate - strengthEstimate;
   const confidence = resolveFactionConfidence(faction);
   const warPressure = resolveWarPressureEvaluation(context, faction, previous, relativeStrength);
-  const hostilityScore = resolveHostilityScore(faction, previous, warPressure);
+  const sharedHostility = resolveSharedHostilityPressure(faction, context.snapshot.turn);
+  const hostilityScore = resolveHostilityScore(faction, previous, warPressure, sharedHostility.shortPressure);
   const stanceScore = resolveStanceScore(
     context.snapshot.profileId,
     faction,
@@ -557,6 +636,9 @@ function evaluateFaction(
     currentWarExitPressure: warPressure.currentWarExitPressure,
     recentOutgoingCoercionPressure: warPressure.recentOutgoingCoercionPressure,
     recentIncomingCoercionPressure: warPressure.recentIncomingCoercionPressure,
+    sharedHostilityPressureShort: sharedHostility.shortPressure,
+    sharedHostilityPressureLong: sharedHostility.longPressure,
+    sharedHostileEvents: sharedHostility.events,
     bestEscalationUtility: relationUtilities.bestEscalationUtility,
     bestEscalationStatus: relationUtilities.bestEscalationStatus,
     bestDeescalationUtility: relationUtilities.bestDeescalationUtility,
@@ -681,13 +763,61 @@ function estimateEnemyEspionageSuperiority(
   return requiredProbeBonus >= 9;
 }
 
+function resolveSharedHostilityPressure(
+  faction: BotStrategicDiplomaticFactionSnapshot,
+  currentTurn: number
+): {
+  shortPressure: number;
+  longPressure: number;
+  events: BotStrategicDiplomaticSharedHostileEventSnapshot[];
+} {
+  let shortPressure = 0;
+  let longPressure = 0;
+  if (
+    faction.currentStatus === DiplomaticStatus.ALLIED
+    || faction.currentStatus === DiplomaticStatus.PEACE
+  ) {
+    return {
+      shortPressure: 0,
+      longPressure: 0,
+      events: faction.sharedHostileEvents
+    };
+  }
+  const events = faction.sharedHostileEvents
+    .filter((event) =>
+      event.attackerPlayerId === faction.playerId
+      && event.eventTurn >= currentTurn - LONG_WAR_EVALUATION_WINDOW
+    )
+    .sort((left, right) =>
+      right.eventTurn - left.eventTurn
+      || right.severity - left.severity
+    );
+
+  for (const event of events) {
+    const age = Math.max(0, currentTurn - event.eventTurn);
+    const weightedSeverity = event.severity * resolveSharedHostilityWeight(event.sharedFromStatus);
+    if (age <= SHORT_WAR_EVALUATION_WINDOW) {
+      shortPressure += weightedSeverity;
+    }
+    longPressure += weightedSeverity;
+  }
+
+  return {
+    shortPressure,
+    longPressure,
+    events
+  };
+}
+
 function resolveHostilityScore(
   faction: BotStrategicDiplomaticFactionSnapshot,
   previous: BotMemoryV2StrategicDiplomaticFactionEntry,
-  warPressure: ReturnType<typeof resolveWarPressureEvaluation>
+  warPressure: ReturnType<typeof resolveWarPressureEvaluation>,
+  sharedHostilityPressureShort: number
 ): number {
   let score = previous.hostilityScore * 0.6;
   score += faction.recentBattleReportCount * 12;
+  score += sharedHostilityPressureShort;
   score += faction.recentIncomingCoercionPressureShort * 0.8;
   score -= faction.recentOutgoingCoercionPressureShort * 0.6;
   if (faction.currentStatus === DiplomaticStatus.WAR) {
@@ -707,6 +837,17 @@ function resolveHostilityScore(
     score -= LOSING_WAR_HOSTILITY_DECAY;
   }
   return Math.max(0, Math.min(120, score));
+}
+
+function resolveSharedHostilityWeight(status: DiplomaticStatus): number {
+  switch (status) {
+    case DiplomaticStatus.ALLIED:
+      return ALLIED_SHARED_HOSTILITY_WEIGHT;
+    case DiplomaticStatus.PEACE:
+      return PEACE_SHARED_HOSTILITY_WEIGHT;
+    default:
+      return 0;
+  }
 }
 
 function resolveStanceScore(
@@ -1446,6 +1587,7 @@ function estimateBombardmentTargetPriority(
 ): number {
   return (
     (faction.statusPriorityWeight * 8)
+    + resolveSharedAttackUrgencyModifier(faction)
     + (targetPlanet.averageBuildingLevel * 5)
     + (targetPlanet.totalDefencesAmount * 2)
     - (targetPlanet.lastRelevantReportAge / 5)
@@ -2440,8 +2582,10 @@ function estimatePreBreakTargetValue(
   const shipsValue = targetPlanet.totalShipsAmount * 32;
   const defencesValue = targetPlanet.totalDefencesAmount * 26;
   const developmentValue = targetPlanet.averageBuildingLevel * 42;
+  const sharedPressure = resolveSharedAttackUrgencyModifier(faction);
   const diplomaticPressure = (faction.hostilityScore * 2.2)
     + (faction.faction.recentBattleReportCount * 18)
+    + sharedPressure
     + (faction.statusPriorityWeight * 3.5);
   return Math.max(1, Math.round(shipsValue + defencesValue + developmentValue + diplomaticPressure));
 }
@@ -2790,6 +2934,7 @@ function createAttackPlanForTarget(
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
   hasActiveWar: boolean
 ): AttackMissionRequest | null {
+  const sharedAttackModifier = resolveSharedAttackUrgencyModifier(faction);
   const lowConfidence = faction.confidence < 0.55 || targetPlanet.intelDepth < 8;
   if (lowConfidence) {
     return createScoutAttackPlanForTarget(context, faction, targetPlanet, hasActiveWar);
@@ -2822,6 +2967,7 @@ function createAttackPlanForTarget(
             1,
             500
             + Math.round((requiredStrength * 1.4) - (travelTurns * 9) + (Math.min(24, faction.relativeStrength)))
+            + sharedAttackModifier
           ),
           faction,
           hasActiveWar
@@ -2848,6 +2994,7 @@ function createScoutAttackPlanForTarget(
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
   hasActiveWar: boolean
 ): AttackMissionRequest | null {
+  const sharedAttackModifier = resolveSharedAttackUrgencyModifier(faction);
   for (const shipType of [ShipType.CRUISER, ShipType.BATTLE_SHIP, ShipType.FRIGATE]) {
     const validPlans = context.snapshot.planets
       .map((originPlanet) => {
@@ -2881,7 +3028,7 @@ function createScoutAttackPlanForTarget(
           travelDistance: distance,
           travelTurns: resolveTravelTurns(originPlanet, distance),
           score: applyActiveWarNeutralPenalty(
-            Math.max(1, 360 + Math.round(faction.statusPriorityWeight * 2.5) - Math.round(distance * 0.8)),
+            Math.max(1, 360 + Math.round(faction.statusPriorityWeight * 2.5) - Math.round(distance * 0.8) + sharedAttackModifier),
             faction,
             hasActiveWar
           ),
@@ -2915,6 +3062,37 @@ function applyActiveWarNeutralPenalty(
   }
 
   return Math.max(1, Math.round(score * ACTIVE_WAR_NEUTRAL_ATTACK_SCORE_MULTIPLIER));
+}
+
+function resolveSharedAttackUrgencyModifier(faction: EvaluatedFaction): number {
+  return Math.max(
+    0,
+    Math.round(
+      Math.min(
+        90,
+        (faction.sharedHostilityPressureShort * 1.8)
+        + (faction.sharedHostilityPressureLong * 0.6)
+      )
+    )
+  );
+}
+
+function resolveSharedSupportUrgencyModifier(
+  faction: EvaluatedFaction,
+  targetCoordinates: { x: number; y: number; z: number }
+): number {
+  const targetKey = toCoordinatesKey(targetCoordinates);
+  return Math.max(
+    0,
+    Math.round(
+      Math.min(
+        120,
+        faction.sharedHostileEvents
+          .filter((event) => toCoordinatesKey(event.targetCoordinates) === targetKey)
+          .reduce((sum, event) => sum + (event.severity * resolveSharedHostilityWeight(event.sharedFromStatus)), 0)
+      )
+    )
+  );
 }
 
 function createPostBreakRaidMissionRequests(
@@ -3435,7 +3613,10 @@ function createSupportMissionCandidates(
     }
 
     for (const targetPlanet of faction.faction.knownPlanets) {
-      if (targetPlanet.recentBattleReportCount <= 0) {
+      if (
+        targetPlanet.recentBattleReportCount <= 0
+        && resolveSharedSupportUrgencyModifier(faction, targetPlanet.coordinates) <= 0
+      ) {
         continue;
       }
       const alreadyCovered = requests.some((request) =>
@@ -3463,6 +3644,7 @@ function createRepairSupportPlan(
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
   needReason: SupportMissionRequest['needReason']
 ): SupportMissionRequest | null {
+  const sharedUrgency = resolveSharedSupportUrgencyModifier(faction, targetPlanet.coordinates);
   const candidates = context.snapshot.planets
     .map((originPlanet) => {
       const availableDrones = originPlanet.ships.undamagedCountByType[ShipType.REPAIR_DRONE] ?? 0;
@@ -3492,7 +3674,7 @@ function createRepairSupportPlan(
         selectedStrength: amount,
         travelDistance: distance,
         travelTurns: resolveTravelTurns(originPlanet, distance),
-        score: 380 + (targetPlanet.recentBattleReportCount * 18) + (needReason === 'EXPLICIT_REQUEST' ? 36 : 0),
+        score: 380 + (targetPlanet.recentBattleReportCount * 18) + sharedUrgency + (needReason === 'EXPLICIT_REQUEST' ? 36 : 0),
         needReason
       } satisfies SupportMissionRequest;
     })
@@ -3511,6 +3693,7 @@ function createGuardSupportPlan(
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
   needReason: SupportMissionRequest['needReason']
 ): SupportMissionRequest | null {
+  const sharedUrgency = resolveSharedSupportUrgencyModifier(faction, targetPlanet.coordinates);
   const requiredStrength = Math.max(1, estimateDiplomaticTargetStrength(targetPlanet));
   const validPlans = context.snapshot.planets
     .map((originPlanet) => {
@@ -3532,7 +3715,7 @@ function createGuardSupportPlan(
         selectedStrength: selection.combatStrength,
         travelDistance: distance,
         travelTurns,
-        score: 420 + (targetPlanet.recentBattleReportCount * 22) + (needReason === 'EXPLICIT_REQUEST' ? 28 : 0),
+        score: 420 + (targetPlanet.recentBattleReportCount * 22) + sharedUrgency + (needReason === 'EXPLICIT_REQUEST' ? 28 : 0),
         needReason
       } satisfies SupportMissionRequest;
     })

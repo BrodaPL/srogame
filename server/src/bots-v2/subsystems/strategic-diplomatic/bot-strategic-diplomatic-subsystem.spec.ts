@@ -524,6 +524,67 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect((ledgerEntry?.longWindowWarScore ?? 0)).toBeLessThan(0);
     expect(ledgerEntry?.lastWarEvaluationTurn).toBe(20);
   });
+
+  it('weights allied-shared hostile activity stronger than peace-shared activity', () => {
+    const alliedWorld = createStrategicDiplomaticWorld();
+    const alliedContact = addForeignPlayer(alliedWorld.galaxy, 4, 'Ally-4', { x: 1, y: 1 }, 1);
+    alliedWorld.galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(alliedWorld.bot.playerId, alliedContact.playerId, DiplomaticStatus.ALLIED)
+    );
+    markPlanetScanned(alliedWorld.bot, alliedWorld.playerEnemy, alliedWorld.playerEnemyPlanet, alliedWorld.galaxy.currentTurn, { forcedReportLevel: 12 });
+    addDirectVictimBattleReport(alliedContact, alliedWorld.playerEnemy, alliedContact.planets[0]!, alliedWorld.galaxy.currentTurn, 6, 3);
+
+    const alliedResult = runStrategicDiplomaticSubsystem(alliedWorld.galaxy, alliedWorld.bot);
+    const alliedLedger = alliedResult.memory.strategicDiplomatic.factionLedger.find((entry) =>
+      entry.playerId === alliedWorld.playerEnemy.playerId
+    );
+
+    const peaceWorld = createStrategicDiplomaticWorld();
+    const peaceContact = addForeignPlayer(peaceWorld.galaxy, 4, 'Peace-4', { x: 1, y: 1 }, 1);
+    peaceWorld.galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(peaceWorld.bot.playerId, peaceContact.playerId, DiplomaticStatus.PEACE)
+    );
+    markPlanetScanned(peaceWorld.bot, peaceWorld.playerEnemy, peaceWorld.playerEnemyPlanet, peaceWorld.galaxy.currentTurn, { forcedReportLevel: 12 });
+    addDirectVictimBattleReport(peaceContact, peaceWorld.playerEnemy, peaceContact.planets[0]!, peaceWorld.galaxy.currentTurn, 6, 3);
+
+    const peaceResult = runStrategicDiplomaticSubsystem(peaceWorld.galaxy, peaceWorld.bot);
+    const peaceLedger = peaceResult.memory.strategicDiplomatic.factionLedger.find((entry) =>
+      entry.playerId === peaceWorld.playerEnemy.playerId
+    );
+
+    expect(alliedLedger).toBeDefined();
+    expect(peaceLedger).toBeDefined();
+    expect((alliedLedger?.hostilityScore ?? 0)).toBeGreaterThan(0);
+    expect((alliedLedger?.hostilityScore ?? 0)).toBeGreaterThan(peaceLedger?.hostilityScore ?? 0);
+  });
+
+  it('uses allied-shared hostile activity to trigger support for an attacked allied planet', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const alliedContact = addForeignPlayer(galaxy, 4, 'Ally-4', { x: 1, y: 1 }, 1);
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, alliedContact.playerId, DiplomaticStatus.ALLIED)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    markPlanetScanned(bot, alliedContact, alliedContact.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 10 });
+    addDirectVictimBattleReport(alliedContact, playerEnemy, alliedContact.planets[0]!, galaxy.currentTurn, 5, 2);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const supportProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.DEFEND
+      && proposal.requestPayload.target.x === alliedContact.planets[0]!.basicInfo.solarSystem.coordinates.x
+      && proposal.requestPayload.target.y === alliedContact.planets[0]!.basicInfo.solarSystem.coordinates.y
+      && proposal.requestPayload.target.z === alliedContact.planets[0]!.basicInfo.order
+    );
+
+    expect(supportProposal).toBeDefined();
+    expect(result.memory.strategicDiplomatic.sharedHostileEvents.some((entry) =>
+      entry.sharedFromPlayerId === alliedContact.playerId
+      && entry.attackerPlayerId === playerEnemy.playerId
+    )).toBe(true);
+  });
 });
 
 function runStrategicDiplomaticSubsystem(
@@ -692,6 +753,47 @@ function addBombardmentReport(
   ));
 }
 
+function addDirectVictimBattleReport(
+  victim: Player,
+  attacker: Player,
+  targetPlanet: Planet,
+  createdTurn: number,
+  ownShipsLost: number,
+  ownDefencesLost: number
+): void {
+  victim.addReport(new FleetReport(
+    {
+      reportId: victim.createReportId(),
+      createdTurn,
+      title: `Battle Report: ${targetPlanet.basicInfo.solarSystem.coordinates.x}:${targetPlanet.basicInfo.solarSystem.coordinates.y}:${targetPlanet.basicInfo.order}`,
+      sourceCoordinates: {
+        x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+        y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+        z: targetPlanet.basicInfo.order
+      },
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      senderPlayerName: attacker.playerName
+    },
+    [
+      'Battle result: Attacker',
+      `Perspective: ${victim.playerName}`,
+      `Own ships (${victim.playerName}): 0/0 survived, ${ownShipsLost} lost.`,
+      `Own defenses (${victim.playerName}): 0/0 survived, ${ownDefencesLost} lost.`,
+      'Enemy ships (Enemy): 2/2 survived, 0 lost.',
+      'Enemy defenses (Enemy): 0/0 survived, 0 lost.',
+      'Own ship losses by type: FIGHTER x1',
+      'Own defense losses by type: SAM_SITE x1',
+      'Enemy ship losses by type: none',
+      'Enemy defense losses by type: none',
+      'Own survivors by type: none',
+      'Own defense survivors by type: none',
+      'Enemy survivors by type: CRUISER x2',
+      'Enemy defense survivors by type: none'
+    ].join('\n')
+  ));
+}
+
 function setBasicShipTech(player: Player): void {
   player.setTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY, 2);
   player.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 2);
@@ -732,4 +834,26 @@ function addOwnedPlanet(
   galaxy.stars[coordinates.y] ??= [];
   galaxy.stars[coordinates.y]?.push(system);
   return planet;
+}
+
+function addForeignPlayer(
+  galaxy: Galaxy,
+  playerId: number,
+  playerName: string,
+  coordinates: { x: number; y: number },
+  order: number
+): Player {
+  const system = new SolarSystem(`${playerName}-System`, order + 4, false, false, coordinates, new Set(), new Map());
+  const planet = Planet.createStartingPlanet(`${playerName} I`, 1, system, 1);
+  system.planets[0] = planet;
+  const player = new Player(playerId, playerName, [planet], new Map(), [], PlayerType.PLAYER, createTutorialReadState(true));
+  planet.info.ownerId = player.playerId;
+  configureKnownPlanet(planet);
+  setBasicShipTech(player);
+  galaxy.players.push(player);
+  galaxy.playerNameMap.set(player.playerName, player.playerId);
+  galaxy.humanPlayerMap.set(player.playerId, player);
+  galaxy.stars[coordinates.y] ??= [];
+  galaxy.stars[coordinates.y]?.push(system);
+  return player;
 }

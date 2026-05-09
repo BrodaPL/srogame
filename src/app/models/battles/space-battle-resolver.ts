@@ -1163,7 +1163,8 @@ export class SpaceBattleResolver {
           title,
           sourceCoordinates: reportContext.sourceCoordinates ?? null,
           sourcePlanetName: reportContext.sourcePlanetName ?? null,
-          sourceSystemName: reportContext.sourceSystemName ?? null
+          sourceSystemName: reportContext.sourceSystemName ?? null,
+          senderPlayerName: defenderPlayer.playerName
         },
         this.buildReportBody(result, 'attacker')
       ),
@@ -1174,7 +1175,8 @@ export class SpaceBattleResolver {
           title,
           sourceCoordinates: reportContext.sourceCoordinates ?? null,
           sourcePlanetName: reportContext.sourcePlanetName ?? null,
-          sourceSystemName: reportContext.sourceSystemName ?? null
+          sourceSystemName: reportContext.sourceSystemName ?? null,
+          senderPlayerName: attackerPlayer.playerName
         },
         this.buildReportBody(result, 'defender')
       )

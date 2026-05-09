@@ -880,10 +880,13 @@ function resolveIdleFleetState(
     }
 
     applyPostArrivalBombardmentIfNeeded(
+      galaxy,
       fleet,
       targetPlanet,
       resolvedTurnNumber,
-      playersById.get(fleet.ownerId) ?? null
+      playersById.get(fleet.ownerId) ?? null,
+      targetPlanet.info.ownerId === null ? null : playersById.get(targetPlanet.info.ownerId) ?? null,
+      diplomacyResolver
     );
     return fleet;
   }
@@ -989,7 +992,7 @@ function resolveTargetArrival(
     }
 
     if (battleResolution === 'attacker_won') {
-      applyPostArrivalBombardmentIfNeeded(fleet, targetPlanet, resolvedTurnNumber, owner);
+      applyPostArrivalBombardmentIfNeeded(galaxy, fleet, targetPlanet, resolvedTurnNumber, owner, targetOwner, diplomacyResolver);
       return applyMissionResolution(
         mission.resolveAfterEncounter(
           resolutionContext,
@@ -1002,7 +1005,7 @@ function resolveTargetArrival(
     }
   }
 
-  applyPostArrivalBombardmentIfNeeded(fleet, targetPlanet, resolvedTurnNumber, owner);
+  applyPostArrivalBombardmentIfNeeded(galaxy, fleet, targetPlanet, resolvedTurnNumber, owner, targetOwner, diplomacyResolver);
   return applyMissionResolution(
     mission.resolveWithoutEncounter(resolutionContext),
     galaxy,
@@ -1012,10 +1015,13 @@ function resolveTargetArrival(
 }
 
 function applyPostArrivalBombardmentIfNeeded(
+  galaxy: Galaxy,
   fleet: Fleet,
   targetPlanet: Planet,
   resolvedTurnNumber: number,
-  owner: Player | null = null
+  owner: Player | null = null,
+  targetOwner: Player | null = null,
+  diplomacyResolver: DiplomacyResolver | null = null
 ): void {
   if (
     fleet.missionType !== FleetMissionType.BOMBARD
@@ -1041,6 +1047,28 @@ function applyPostArrivalBombardmentIfNeeded(
   }
 
   addBombardmentReport(owner, fleet, targetPlanet, summary, resolvedTurnNumber);
+  const incomingReport = owner && targetOwner
+    ? createIncomingBombardmentReport(
+      targetOwner.type === PlayerType.PLAYER ? targetOwner.createReportId() : 0,
+      owner,
+      fleet,
+      targetPlanet,
+      summary,
+      resolvedTurnNumber
+    )
+    : null;
+  if (incomingReport && targetOwner?.type === PlayerType.PLAYER) {
+    targetOwner.addReport(incomingReport);
+  }
+  if (incomingReport && galaxy && diplomacyResolver && owner && targetOwner) {
+    shareHostileBuildingsReportWithFriendlyHumans(
+      galaxy,
+      targetOwner,
+      owner,
+      incomingReport,
+      diplomacyResolver
+    );
+  }
   if (fleet.missionType === FleetMissionType.BOMBARD) {
     fleet.createdAtTurn = resolvedTurnNumber;
   }
@@ -1485,10 +1513,13 @@ function resolveEncounterArrival(
         diplomacyResolver
       );
       applyPostArrivalBombardmentIfNeeded(
+        galaxy,
         arrival.fleet,
         arrival.targetPlanet,
         arrival.resolvedTurnNumber,
-        arrival.owner
+        arrival.owner,
+        arrival.targetOwner,
+        diplomacyResolver
       );
       return applyMissionResolution(
         arrival.mission.resolveAfterEncounter(resolutionContext, outcome),
@@ -1518,10 +1549,13 @@ function resolveEncounterArrival(
         diplomacyResolver
       );
       applyPostArrivalBombardmentIfNeeded(
+        galaxy,
         arrival.fleet,
         arrival.targetPlanet,
         arrival.resolvedTurnNumber,
-        arrival.owner
+        arrival.owner,
+        arrival.targetOwner,
+        diplomacyResolver
       );
       return applyMissionResolution(
         arrival.mission.resolveWithoutEncounter(resolutionContext),
@@ -1951,11 +1985,13 @@ function resolveHostilePlanetBattle(
   }
 
   const battleResult = resolvePlanetBattle(
+    galaxy,
     fleet,
     targetPlanet,
     attacker,
     defender,
     resolvedTurnNumber,
+    diplomacyResolver,
     maxRounds
   );
   const attackerSurvivors = ManyShips.totalShipsCount(fleet.ships);
@@ -1980,11 +2016,13 @@ function resolveHostilePlanetBattle(
 }
 
 function resolvePlanetBattle(
+  galaxy: Galaxy,
   fleet: Fleet,
   targetPlanet: Planet,
   attacker: Player,
   defender: Player,
   resolvedTurnNumber: number,
+  diplomacyResolver: DiplomacyResolver,
   maxRounds = SpaceBattleResolver.DEFAULT_MAX_ROUNDS
 ): SpaceBattleResult {
   const attackerShips = ManyShips.toShipInstances(fleet.ships);
@@ -2029,6 +2067,13 @@ function resolvePlanetBattle(
 
   addBattleFleetReport(attacker, battleResult.reports.attacker);
   addBattleFleetReport(defender, battleResult.reports.defender);
+  shareHostileFleetReportWithFriendlyHumans(
+    galaxy,
+    defender,
+    attacker,
+    battleResult.reports.defender,
+    diplomacyResolver
+  );
 
   return battleResult;
 }
@@ -2207,6 +2252,62 @@ function addBombardmentReport(
   player.addReport(report);
 }
 
+function addIncomingBombardmentReport(
+  player: Player | null,
+  attacker: Player | null,
+  fleet: Fleet,
+  targetPlanet: Planet,
+  summary: ReturnType<typeof applyBuildingBombardment>,
+  resolvedTurnNumber: number
+): void {
+  if (!player || player.type !== PlayerType.PLAYER) {
+    return;
+  }
+
+  player.addReport(
+    createIncomingBombardmentReport(
+      player.createReportId(),
+      attacker,
+      fleet,
+      targetPlanet,
+      summary,
+      resolvedTurnNumber
+    )
+  );
+}
+
+function createIncomingBombardmentReport(
+  reportId: number,
+  attacker: Player | null,
+  fleet: Fleet,
+  targetPlanet: Planet,
+  summary: ReturnType<typeof applyBuildingBombardment>,
+  resolvedTurnNumber: number
+): BuildingsReport {
+  return new BuildingsReport(
+    {
+      reportId,
+      createdTurn: resolvedTurnNumber,
+      title: `Incoming Bombardment Report: ${fleet.missionType} at ${targetPlanet.basicInfo.name}`,
+      sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      senderPlayerName: attacker?.playerName ?? null
+    },
+    [
+      `Bombardment mission: ${fleet.missionType}`,
+      `Target: ${targetPlanet.basicInfo.name}`,
+      `Hostile fleet owner: ${attacker?.playerName ?? 'Unknown'}`,
+      `Shots: ${summary.shots}`,
+      `Hits: ${summary.hits}`,
+      `Total structural damage: ${summary.totalDamage}`,
+      `Buildings engaged: ${summary.buildingTargetCount}`,
+      `Defences engaged: ${summary.defenceTargetCount}`,
+      'Your planet sustained hostile bombardment pressure.'
+    ].join('\n')
+  );
+}
+
 function addRepairReturnSummaryReport(
   player: Player | null,
   fleet: Fleet,
@@ -2242,6 +2343,65 @@ function addBattleFleetReport(player: Player, fleetReport: FleetReport): void {
   }
 
   player.addReport(fleetReport);
+}
+
+function shareHostileFleetReportWithFriendlyHumans(
+  galaxy: Galaxy,
+  victim: Player,
+  attacker: Player,
+  fleetReport: FleetReport,
+  diplomacyResolver: DiplomacyResolver
+): void {
+  const recipients = resolveFriendlyHumanRecipientsForSharedHostileReports(
+    galaxy,
+    victim,
+    attacker,
+    diplomacyResolver
+  );
+  for (const recipient of recipients) {
+    const copy = fleetReport.copy();
+    copy.reportId = recipient.createReportId();
+    copy.title = copy.title.replace(/^Battle Report:/, 'Shared Battle Report:');
+    recipient.addReport(copy);
+  }
+}
+
+function shareHostileBuildingsReportWithFriendlyHumans(
+  galaxy: Galaxy,
+  victim: Player,
+  attacker: Player,
+  buildingsReport: BuildingsReport,
+  diplomacyResolver: DiplomacyResolver
+): void {
+  const recipients = resolveFriendlyHumanRecipientsForSharedHostileReports(
+    galaxy,
+    victim,
+    attacker,
+    diplomacyResolver
+  );
+  for (const recipient of recipients) {
+    const copy = buildingsReport.copy();
+    copy.reportId = recipient.createReportId();
+    copy.title = copy.title.replace(/^Incoming Bombardment Report:/, 'Shared Bombardment Report:');
+    recipient.addReport(copy);
+  }
+}
+
+function resolveFriendlyHumanRecipientsForSharedHostileReports(
+  galaxy: Galaxy,
+  victim: Player,
+  attacker: Player,
+  diplomacyResolver: DiplomacyResolver
+): Player[] {
+  return galaxy.players.filter((player) =>
+    player.type === PlayerType.PLAYER
+    && player.playerId !== victim.playerId
+    && player.playerId !== attacker.playerId
+    && (
+      diplomacyResolver.getStatus(victim.playerId, player.playerId) === DiplomaticStatus.ALLIED
+      || diplomacyResolver.getStatus(victim.playerId, player.playerId) === DiplomaticStatus.PEACE
+    )
+  );
 }
 
 function addFleetSuccessReport(

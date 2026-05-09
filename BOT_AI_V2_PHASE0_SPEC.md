@@ -2522,6 +2522,94 @@ Outgoing coercion pressure should use a hybrid model:
 - actual hostility swing
 - plus inflicted damage percentage
 
+## Strategic Diplomatic phase-8 follow-up
+
+The next `Strategic Diplomatic` slice should be the **shared war awareness phase**.
+
+### Strategic Diplomatic phase-8 outputs
+
+This phase should add:
+
+- diplomatic hostile-activity sharing
+- human hostile-report copying
+- bot-side shared hostile-intel summaries
+- hostility updates from shared hostile activity
+- military score modifiers from shared hostile activity
+
+### Strategic Diplomatic phase-8 shared-event scope
+
+This phase should share:
+
+- battle reports
+- bombardment reports
+- siege reports
+
+It should not add hostile attack-intent prediction yet.
+
+### Strategic Diplomatic phase-8 relation scope
+
+Automatic hostile-activity sharing should apply to:
+
+- `ALLIED`
+- `PEACE`
+
+Sharing direction should be:
+
+- two-way always
+
+### Strategic Diplomatic phase-8 human-delivery rule
+
+Human `ALLIED` / `PEACE` contacts should receive:
+
+- copied hostile battle reports
+- copied hostile bombardment / siege reports
+
+### Strategic Diplomatic phase-8 bot-delivery rule
+
+Bots should not receive raw copied inbox reports.
+
+Instead they should receive:
+
+- summarized shared hostile intel only
+
+### Strategic Diplomatic phase-8 memory rule
+
+This phase should add:
+
+- per-faction hostile-event counters
+- plus a per-planet hostile-event ledger
+
+An operational shared hostile-event ledger should include fields such as:
+
+- foreign attacker player id
+- victim player id
+- target coordinates
+- event type: `BATTLE` / `BOMBARD` / `SIEGE`
+- event turn
+- `sharedFromPlayerId`
+- severity estimate
+- propagation marker / propagation turn
+
+### Strategic Diplomatic phase-8 hostility rule
+
+Shared hostile intel should affect diplomatic hostility immediately.
+
+Its weight should depend on relation:
+
+- direct self-hit = `100%`
+- shared from `ALLIED` = `40%`
+- shared from `PEACE` = `10%`
+
+### Strategic Diplomatic phase-8 military-impact rule
+
+Shared hostile intel should also affect military planning,
+but only as score modifiers.
+
+It should not:
+
+- create new mission-legality rules
+- unlock new diplomatic target classes
+
 ## Trace contract
 
 V2 needs dedicated traces from the start so shadow mode is useful.

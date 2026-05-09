@@ -1849,12 +1849,81 @@ Outgoing coercion pressure should use a hybrid model:
 * actual hostility swing
 * plus inflicted damage percentage
 
-#### TODO: allied / peace hostile-activity intel sharing
+#### Next phase: shared war awareness
 
-Later strategic-diplomatic phases should add shared hostile-activity awareness:
+After war-exit pressure, the next `Strategic Diplomatic` slice should add **shared war awareness**.
 
-* `ALLIED` and `PEACE` bots should automatically share attack knowledge
-* human allies / peace contacts should receive copies of hostile battle / attack reports
+This phase should focus on:
+
+* automatic hostile-activity sharing between `ALLIED` and `PEACE` contacts,
+* copied hostile battle / bombardment / siege reports for human `ALLIED` / `PEACE` contacts,
+* bot-side summarized shared hostile intel instead of raw copied reports,
+* immediate hostility impact from shared hostile activity,
+* score modifiers for military planning based on shared hostile activity.
+
+#### Shared hostile-activity scope
+
+The phase should share:
+
+* battle reports,
+* bombardment reports,
+* siege reports.
+
+It should not add attack-intent prediction yet.
+
+#### Shared-awareness relation scope
+
+Hostile-activity sharing should be:
+
+* automatic for `ALLIED`,
+* automatic for `PEACE`,
+* two-way always.
+
+#### Human-vs-bot delivery rule
+
+Human recipients should receive:
+
+* copied hostile battle reports,
+* copied hostile bombardment / siege reports.
+
+Bots should receive:
+
+* summarized shared hostile intel only.
+
+#### Shared hostile-intel shape
+
+Bot-side shared awareness should use:
+
+* per-faction hostile-event counters,
+* plus a per-planet hostile-event ledger.
+
+An operational shared hostile-event ledger should include fields such as:
+
+* foreign attacker player id,
+* victim player id,
+* target coordinates,
+* event type: `BATTLE` / `BOMBARD` / `SIEGE`,
+* event turn,
+* `sharedFromPlayerId`,
+* severity estimate,
+* propagation marker / propagation turn.
+
+#### Shared hostility impact
+
+Shared hostile intel should affect diplomatic hostility immediately.
+
+Its weight should depend on relation:
+
+* direct self-hit = `100%`,
+* shared from `ALLIED` = `40%`,
+* shared from `PEACE` = `10%`.
+
+#### Military-planning impact
+
+Shared hostile intel should also influence military planning in the same phase,
+but only as score modifiers.
+
+It should not unlock new mission-legality rules yet.
 
 ### Indicative fleet allocation
 
