@@ -303,6 +303,11 @@ Rules:
 - `dedupeKey` is mandatory from day one
 - `requestPayload` is command-shaped but not executed yet
 - the common transport type remains `BotProposal` even when a subsystem uses local naming such as `goal` and `request`
+- subsystem contract stays proposal-only:
+  - subsystems propose actions
+  - `Supervisor` chooses what to accept or reject
+  - only `Supervisor` / `Executor` layers should answer requests or execute real commands
+  - this also applies to support-request and maintenance-request handling
 
 ### Subsystem interface
 
