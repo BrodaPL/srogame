@@ -1362,6 +1362,125 @@ First-pass split targets:
 * active hostile pressure
 * recent building damage on our side or hostile side
 
+### Phase-4 scope: force projection and escalation tools
+
+After direct `ATTACK` / allied support planning, the next major `Strategic Diplomatic` slice should add:
+
+* `BOMBARD`
+* `SIEGE`
+* `MOVE`
+* `ARMAMENT_DELIVERY`
+
+This phase should emit:
+
+* immediate mission requests
+* exact-ship-type `SHIP_NEED`
+* direct building requests
+* `PLANETARY_BOMB` production pressure
+
+#### Phase-4 local pressure types
+
+Allow direct local pressure for:
+
+* `BOMB_DEPOT`
+* `ALLIANCE_DEPOT`
+* `JUMP_GATE`
+* `PLANETARY_BOMB` production
+
+#### Phase-4 mission target scope
+
+Mission-family scope should split like this:
+
+* `ATTACK` keeps its current broader scope
+* `BOMBARD` is `WAR` only
+* `SIEGE` is `WAR` only
+
+#### Phase-4 mission meaning
+
+Planning should distinguish:
+
+* `BOMBARD` = shorter sharper structural strike
+* `SIEGE` = persistent orbit pressure aimed at complete target destruction
+
+`SIEGE` must also account for the fact that the orbiting siege fleet can be exposed to enemy relief attacks.
+Also remember:
+
+* hostile orbiting fleets must be fully defeated before siege can really start
+
+#### Phase-4 relocation rules
+
+`MOVE` should be allowed when:
+
+* no single origin can satisfy the desired mission
+* or regrouping on a nearer hub is better than direct launch
+
+Staging-planet choice should use:
+
+* best staging hub by ETA
+* plus `JUMP_GATE` / `ALLIANCE_DEPOT` readiness
+
+Jump Gate travel between own planets can collapse ETA to `1` turn and should influence staging value directly.
+
+TODO:
+
+* clarify and later implement whether allied Jump Gate travel should provide the same ETA reduction between allied planets
+
+#### Phase-4 armament-delivery meaning
+
+In this subsystem, `ARMAMENT_DELIVERY` should carry:
+
+* `PLANETARY_BOMB`
+* small war ships
+* repair / defense reinforcement
+
+Valid targets:
+
+* own planets
+* allied planets
+
+Priority between own and allied targets should be:
+
+* pure need-score competition
+
+#### Phase-4 planetary-bomb pressure model
+
+`PLANETARY_BOMB` pressure should use a hybrid model:
+
+* exact blocked-plan bomb demand
+* plus readiness stock
+
+Readiness stock should be based on:
+
+* active war count
+* fixed stock per strategic hub
+
+Always respect:
+
+* the local `PLANETARY_BOMB` cap from `BOMB_DEPOT`
+
+Stock goals should be interpreted mainly as `%` of local bomb capacity:
+
+* during active war: target near `90%`
+* with allies but no war: target roughly `30%–50%`
+* with peace only: target roughly `10%–20%`
+
+#### Phase-4 family competition
+
+Mission-family competition should remain:
+
+* dynamic
+* war-state-driven
+
+Do not fall back to one rigid static split.
+
+#### Phase-4 explicit non-goals
+
+Still out of scope:
+
+* no cross-turn reservation system yet
+* no multi-target synchronized waves yet
+* no allied / peace hostile-activity auto-sharing execution yet
+
 #### TODO: allied / peace hostile-activity intel sharing
 
 Later strategic-diplomatic phases should add shared hostile-activity awareness:

@@ -215,6 +215,8 @@ export type BotPlanetSnapshot = {
     researchLabLevel: number;
     sensorPhalanxLevel: number;
     jumpGateLevel: number;
+    allianceDepotLevel: number;
+    bombDepotLevel: number;
     interstellarTradePortLevel: number;
     metalStorageLevel: number;
     crystalStorageLevel: number;

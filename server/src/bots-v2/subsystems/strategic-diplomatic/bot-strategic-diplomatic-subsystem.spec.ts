@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
+import { DefenceType } from '../../../../../src/app/models/enums/defence-type.js';
 import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
 import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
 import { PlayerType } from '../../../../../src/app/models/enums/player-type.js';
@@ -221,10 +222,109 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     const shipNeed = result.result.proposals.find((proposal) =>
       proposal.kind === 'SHIPYARD'
       && proposal.requestPayload.shipType !== ShipType.SPY_PROBE
+      && proposal.debug.needKind === 'ATTACK'
     );
 
     expect(shipNeed).toBeDefined();
     expect(shipNeed?.debug.needKind).toBe('ATTACK');
+  });
+
+  it('emits bombardment mission proposals for war targets when bombardment pressure is available', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ORBITAL_BOMBER, 2);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const bombardProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.BOMBARD
+    );
+
+    expect(bombardProposal).toBeDefined();
+    expect(bombardProposal?.debug.missionType).toBe(FleetMissionType.BOMBARD);
+  });
+
+  it('emits relocation move proposals before bombardment ship need when one origin cannot satisfy war pressure alone', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const reservePlanet = addOwnedPlanet(galaxy, bot, 'DipReserve', { x: 1, y: 0 }, 1);
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    enableAdvancedWarProduction(reservePlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ATMOSPHERIC_BOMBER, 1);
+    reservePlanet.rBDSFTQ.ships.addUndamaged(ShipType.ATMOSPHERIC_BOMBER, 1);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 60);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const moveProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.MOVE
+      && proposal.debug.moveRole === 'BOMBARDMENT_STAGING'
+    );
+    const bombardNeed = result.result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.debug.needKind === 'BOMBARD'
+    );
+
+    expect(moveProposal).toBeDefined();
+    expect(bombardNeed).toBeUndefined();
+  });
+
+  it('emits armament-delivery proposals for own strategic hubs with low bomb stock', () => {
+    const { galaxy, bot, botPlanet } = createStrategicDiplomaticWorld();
+    const forwardHub = addOwnedPlanet(galaxy, bot, 'DipForward', { x: 2, y: 0 }, 1);
+    enableAdvancedWarProduction(botPlanet, bot);
+    enableAdvancedWarProduction(forwardHub, bot);
+    botPlanet.setBuildingLevel(BuildingType.BOMB_DEPOT, 4);
+    forwardHub.setBuildingLevel(BuildingType.BOMB_DEPOT, 4);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CARRIER, 1);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CORVETTE, 1);
+    botPlanet.rBDSFTQ.defences.addUndamaged(DefenceType.SMALL_BOMB, 2);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const armamentProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ARMAMENT_DELIVERY
+      && proposal.requestPayload.target.x === forwardHub.basicInfo.solarSystem.coordinates.x
+    );
+
+    expect(armamentProposal).toBeDefined();
+    expect(armamentProposal?.debug.targetKind).toBe('OWN');
+  });
+
+  it('emits diplomatic building and bomb-production pressure under war readiness', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.setBuildingLevel(BuildingType.BOMB_DEPOT, 4);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const buildingProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'BUILDING'
+      && (
+        proposal.requestPayload.buildingType === BuildingType.JUMP_GATE
+        || proposal.requestPayload.buildingType === BuildingType.ALLIANCE_DEPOT
+      )
+    );
+    const bombProductionProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.itemKind === 'defence'
+      && proposal.requestPayload.defenceType !== undefined
+    );
+
+    expect(buildingProposal).toBeDefined();
+    expect(bombProductionProposal).toBeDefined();
+    expect(bombProductionProposal?.debug.itemKind).toBe('defence');
   });
 });
 
@@ -374,4 +474,22 @@ function enableAdvancedWarProduction(planet: Planet, player: Player): void {
   player.setTechLevel(TechnologyType.FUSION_DRIVE, 8);
   player.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 8);
   player.setTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY, 8);
+}
+
+function addOwnedPlanet(
+  galaxy: Galaxy,
+  owner: Player,
+  systemName: string,
+  coordinates: { x: number; y: number },
+  order: number
+): Planet {
+  const system = new SolarSystem(systemName, order + 3, false, false, coordinates, new Set(), new Map());
+  const planet = Planet.createStartingPlanet(`${systemName} I`, 1, system, 1);
+  system.planets[0] = planet;
+  planet.info.ownerId = owner.playerId;
+  configureKnownPlanet(planet);
+  owner.planets.push(planet);
+  galaxy.stars[coordinates.y] ??= [];
+  galaxy.stars[coordinates.y]?.push(system);
+  return planet;
 }

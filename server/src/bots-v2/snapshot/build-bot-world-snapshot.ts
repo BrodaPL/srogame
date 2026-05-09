@@ -247,6 +247,8 @@ function buildPlanetSnapshot(
       researchLabLevel: planet.getBuildingLevel(BuildingType.RESEARCH_LAB),
       sensorPhalanxLevel: planet.getBuildingLevel(BuildingType.SENSOR_PHALANX),
       jumpGateLevel: planet.getBuildingLevel(BuildingType.JUMP_GATE),
+      allianceDepotLevel: planet.getBuildingLevel(BuildingType.ALLIANCE_DEPOT),
+      bombDepotLevel: planet.getBuildingLevel(BuildingType.BOMB_DEPOT),
       interstellarTradePortLevel: planet.getBuildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT),
       metalStorageLevel: planet.getBuildingLevel(BuildingType.METAL_STORAGE),
       crystalStorageLevel: planet.getBuildingLevel(BuildingType.CRYSTAL_STORAGE),
