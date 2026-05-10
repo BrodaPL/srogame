@@ -13,6 +13,7 @@ import { recordBotDecisionTraceV2 } from './bot-v2-trace.js';
 import { buildBotWorldSnapshot } from './snapshot/build-bot-world-snapshot.js';
 import { NoopBotExecutor } from './execution/bot-executor.js';
 import { BotDefensiveSubsystem } from './subsystems/defensive/bot-defensive-subsystem.js';
+import { BotCriticalSubsystem } from './subsystems/critical/bot-critical-subsystem.js';
 import { BotEconomicSubsystem } from './subsystems/economic/bot-economic-subsystem.js';
 import { BotStrategicDevelopmentSubsystem } from './subsystems/strategic-development/bot-strategic-development-subsystem.js';
 import { BotStrategicDiplomaticSubsystem } from './subsystems/strategic-diplomatic/bot-strategic-diplomatic-subsystem.js';
@@ -53,8 +54,19 @@ export class BotBrainV2 {
     player.botProfileId = player.botProfileId ?? defaultBotProfileIdForPlayerId(player.playerId);
     const memory = ensureBotMemoryV2(player);
     const snapshot = buildBotWorldSnapshot(galaxy, player, this.flags);
-    const subsystemResults = this.subsystems.map((subsystem) => subsystem.generate({ snapshot, memory }));
-    const proposals = subsystemResults.flatMap((result) => result.proposals);
+    const subsystemResults = [];
+    const proposals = [];
+
+    for (const subsystem of this.subsystems) {
+      const result = subsystem.generate({
+        snapshot,
+        memory,
+        priorProposals: [...proposals]
+      });
+      subsystemResults.push(result);
+      proposals.push(...result.proposals);
+    }
+
     const supervisorDecision = this.supervisor.decide(snapshot, memory, proposals);
     const executionOutcomes = resolveExecutionOutcomes(this.flags, this.executor.executeAcceptedTasks(
       supervisorDecision.accepted
@@ -150,6 +162,9 @@ function buildEnabledSubsystems(flags: BotV2FeatureFlags): BotSubsystem[] {
   }
   if (flags.enabledSubsystems.weightManager) {
     subsystems.push(new BotWeightManagerSubsystem());
+  }
+  if (flags.enabledSubsystems.critical) {
+    subsystems.push(new BotCriticalSubsystem());
   }
   return subsystems;
 }

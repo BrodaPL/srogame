@@ -25,9 +25,9 @@ This file captures session context for collaborators and future AI agents.
 - Bot AI V2 planning docs now live in `NEW_BOT_AI_DESIGN.md` (high-level architecture) and `BOT_AI_V2_PHASE0_SPEC.md` (implementation-ready Phase 0 scaffolding/spec).
 
 ## Recent Session Notes
-- Weight Manager phase 1 is now implemented in `server/src/bots-v2/subsystems/weight-manager/`.
-- It is still advisory-only: no proposal acceptance, no execution, and no `Critical` weighting. It now computes global strategic weights, per-planet local weights, one mutually-exclusive global mode, and per-planet maturity/focus/danger flags, then persists the latest result into `player.botMemoryV2.weightManager`.
-- Supporting V2 changes landed in `src/app/models/player.ts`, `server/src/bots-v2/bot-v2-types.ts`, and `server/src/bots-v2/snapshot/build-bot-world-snapshot.ts`, which now normalize the new weight-manager memory state and expose the extra recent-attack / known-war-discovery snapshot signals it needs.
+- Critical phase 1 is now implemented in `server/src/bots-v2/subsystems/critical/`.
+- It is still proposal-only: no execution, no request answering, and no emergency fleet missions yet. It now detects `ENERGY_DEADLOCK`, `STORAGE_DEADLOCK`, `INDUSTRY_CHAIN_DEADLOCK`, `LOGISTICS_DEADLOCK`, and `INTEL_DEADLOCK`, persists a blocker ledger in `player.botMemoryV2.critical`, and emits only emergency `BUILDING` / `SHIPYARD` unblock proposals with fixed family priority and anti-spam caps.
+- Supporting V2 changes landed in `src/app/models/player.ts`, `server/src/bots-v2/bot-v2-memory.ts`, `server/src/bots-v2/bot-v2-types.ts`, and `server/src/bots-v2/bot-brain-v2.ts`, which now normalize/persist the new critical memory state and run V2 subsystems sequentially with `priorProposals` visibility so Critical can inspect earlier shadow requests before proposing emergency fixes.
 - TODO: V2 support/maintenance request answers and real execution handoff are intentionally deferred to the future Supervisor subsystem; Strategic Diplomatic remains proposal-only here.
 
 ## Current Behavior

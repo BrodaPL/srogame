@@ -2014,35 +2014,173 @@ Only add a TODO note that a **multi-front global allocator** is a far-future pos
 
 **Purpose:** detect and resolve deadlocks, hard blockers, and self-destructive states.
 
-**Goal amount:** Many goals (up to N goals, where N is the number of planets),
+**Goal amount:** emergency-only unblock goals, not a normal growth planner.
 
-This subsystem has override priority in emergencies, but it still submits proposals to the Supervisory System like the others.
+This subsystem is not a normal growth or war planner.
+It should wake up only when the empire is entering collapse or when normal subsystems cannot recover on their own.
 
-It requests production of spy probes in small amounts (2-10), on developed planets so they always have few spy probes.
+It still stays proposal-only:
+
+* it does not execute commands,
+* it does not auto-accept itself,
+* it does not answer requests directly,
+* it only emits explicit `CRITICAL` proposals for the later `Supervisor`.
 
 ### Responsibilities
 
 * detect:
 
-  * energy starvation,
-  * insufficient storage,
-  * missing prerequisites,
-  * stalled build queues,
-  * lack of transport capacity,
-  * inability to repair,
-  * blocked research/build chains.
-  * lack of building space on planets.
-* **Construction:** energy, storage facilities, research lab, terraformer.
-* **Operations:**
+  * `ENERGY_DEADLOCK`,
+  * `STORAGE_DEADLOCK`,
+  * `INDUSTRY_CHAIN_DEADLOCK`,
+  * `LOGISTICS_DEADLOCK`,
+  * `INTEL_DEADLOCK`.
 
-  * send probes,
-  * send repair missions,
-  * send special transport missions,
-  * unblock critical planetary bottlenecks.
+### Phase-1 blocker families
 
-### Indicative fleet allocation
+Phase 1 should be:
 
-Fixed **minimum reserve around 5%**.
+* emergency detection,
+* unblock proposals,
+* no emergency mission proposals yet.
+
+Blocked families should use explicit family tags:
+
+* `ENERGY_DEADLOCK`
+* `STORAGE_DEADLOCK`
+* `INDUSTRY_CHAIN_DEADLOCK`
+* `LOGISTICS_DEADLOCK`
+* `INTEL_DEADLOCK`
+
+Priority order:
+
+* `ENERGY`
+* `STORAGE`
+* `INDUSTRY_CHAIN`
+* `LOGISTICS`
+* `INTEL`
+
+### What phase 1 may propose
+
+Allowed proposal families:
+
+* `BUILDING`
+* `RESEARCH`
+* `SHIPYARD`
+
+Not in phase 1:
+
+* combat rescue missions,
+* emergency fleet-mission execution,
+* request answering,
+* proposal acceptance or execution logic.
+
+### Detection rules
+
+`ENERGY_DEADLOCK`:
+
+* `energyGap > 0`
+* and the recovery is not already:
+  * in the building queue
+  * or in visible subsystem proposals
+
+`STORAGE_DEADLOCK`:
+
+* per resource type
+* if blocked request cost `* 1.5` exceeds the current relevant storage capacity on that planet
+* a single resource failing is enough
+
+`INDUSTRY_CHAIN_DEADLOCK`:
+
+Core infrastructure set:
+
+* `ROBOTICS_FACTORY`
+* `SHIPYARD`
+* `RESEARCH_LAB`
+* `NANITE_FACTORY`
+
+Detection logic:
+
+* missing required prerequisite chain for blocked recovery
+* or core infrastructure lagging badly compared with the average `ETC` of other industry buildings except storages
+
+This should use `ETC`, not `avg_industry`.
+
+Future TODO:
+
+* later also consider all `3` mine types in deeper industry-chain reasoning
+
+`LOGISTICS_DEADLOCK`:
+
+* no inactive cargo ships available anywhere
+* when a critical logistics transfer is already needed/proposed
+
+Cargo-capacity carriers in scope:
+
+* `TRANSPORTER`
+* `MASS_HAULER`
+* `CARGO_SUPPORT`
+
+This deadlock is about missing cargo capacity, not about one exact ship type.
+
+Critical logistics scope for phase 1:
+
+* emergency resource transfer need
+* emergency repair-drone transfer need
+
+Repair-drone transfer note:
+
+* repair drones should be treated as movable only via carriers / battleships / fleet carriers
+
+`INTEL_DEADLOCK`:
+
+* no `SPY_PROBE` available anywhere
+* while strategic intel targets still need scan coverage
+
+### Emergency repair-drone production
+
+Phase 1 may propose emergency `REPAIR_DRONE` production, but only:
+
+* on safe mature planets,
+* when another planet is heavily damaged,
+* and there are no repair drones available to relocate.
+
+Safe mature planet means:
+
+* `maturePlanet`
+* not `inDangerPlanet`
+* not `constantlyAttackedPlanet`
+
+Heavy damage means:
+
+* more than `35%` structural HP missing
+* and local full repair would take more than `20` turns
+
+### Blocker ledger
+
+Phase 1 should persist a full operational blocker ledger.
+
+Suggested fields:
+
+* blocker key
+* blocker family
+* target planet coordinates or `null`
+* firstSeenTurn
+* lastSeenTurn
+* severity
+* timesEmitted
+* lastProposalTurn
+* resolvedTurn
+* active
+
+Severity should be normalized to `0..100`.
+
+### Output caps
+
+Phase 1 should emit:
+
+* max `2` global Critical proposals
+* plus max `1` per planet
 
 ---
 

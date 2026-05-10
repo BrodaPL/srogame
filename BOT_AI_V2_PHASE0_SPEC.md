@@ -2950,3 +2950,153 @@ But `Weight Manager` itself should not:
 - execute commands
 
 Only the future `Supervisor` / `Executor` layers should do that.
+
+## Critical Phase 1
+
+`Critical` is the next planned V2 subsystem after `Weight Manager`.
+
+It is not a normal growth subsystem.
+It is an emergency-only unblock subsystem.
+
+Phase 1 scope:
+- emergency detection
+- unblock proposals
+- no emergency mission proposals yet
+
+It stays proposal-only:
+- no proposal acceptance
+- no execution
+- no request answering
+
+### Allowed proposal kinds
+
+Phase 1 may emit:
+- `BUILDING`
+- `RESEARCH`
+- `SHIPYARD`
+
+Phase 1 should not emit:
+- combat rescue missions
+- emergency mission execution
+- request-handling decisions
+
+### Blocker families
+
+Phase 1 should use explicit blocker-family tagging:
+- `ENERGY_DEADLOCK`
+- `STORAGE_DEADLOCK`
+- `INDUSTRY_CHAIN_DEADLOCK`
+- `LOGISTICS_DEADLOCK`
+- `INTEL_DEADLOCK`
+
+Fixed priority order:
+- `ENERGY`
+- `STORAGE`
+- `INDUSTRY_CHAIN`
+- `LOGISTICS`
+- `INTEL`
+
+Severity should be normalized to `0..100`.
+
+### ENERGY_DEADLOCK
+
+Trigger when:
+- `energyGap > 0`
+- and the recovery is not already:
+  - in the building queue
+  - or in visible subsystem proposals
+
+### STORAGE_DEADLOCK
+
+Treat storage deadlock per resource type.
+
+Trigger when:
+- blocked request resource cost `* 1.5` exceeds the current relevant storage capacity on that planet
+
+Rules:
+- use the single relevant storage for that resource type
+- any one blocked resource is enough to trigger deadlock
+
+### INDUSTRY_CHAIN_DEADLOCK
+
+Core infrastructure set for phase 1:
+- `ROBOTICS_FACTORY`
+- `SHIPYARD`
+- `RESEARCH_LAB`
+- `NANITE_FACTORY`
+
+Trigger when either:
+- a blocked critical recovery path is missing required prerequisite chain
+- or one of those core infrastructure pieces is lagging badly by `ETC`
+
+Comparison rule:
+- compare lagging core infrastructure against the average `ETC` of other industry buildings except storages
+
+Use `ETC`, not `avg_industry`, for this deadlock family.
+
+TODO, far future:
+- later also consider all `3` mine types in deeper industry-chain reasoning
+
+### LOGISTICS_DEADLOCK
+
+This family is about missing cargo capacity, not one exact ship type.
+
+Cargo-capacity ship families in scope:
+- `TRANSPORTER`
+- `MASS_HAULER`
+- `CARGO_SUPPORT`
+
+Trigger when:
+- no inactive cargo ships are available anywhere
+- while a critical logistics transfer is already needed/proposed
+
+Critical logistics scope in phase 1:
+- emergency resource transfer need
+- emergency repair-drone transfer need
+
+Repair-drone transfer note:
+- repair drones should be treated as movable only via carriers / battleships / fleet carriers
+
+### INTEL_DEADLOCK
+
+Trigger when:
+- no `SPY_PROBE` is available anywhere
+- while strategic intel targets still need scan coverage
+
+### Emergency REPAIR_DRONE production
+
+Phase 1 may propose emergency `REPAIR_DRONE` production, but only:
+- on safe mature planets
+- when another planet is heavily damaged
+- and there are no repair drones available to relocate
+
+Safe mature planet means:
+- `maturePlanet`
+- not `inDangerPlanet`
+- not `constantlyAttackedPlanet`
+
+Heavy damage means:
+- more than `35%` structural HP missing
+- and local full repair would take more than `20` turns
+
+### Blocker ledger
+
+Phase 1 should persist an operational full blocker ledger.
+
+Suggested fields:
+- blocker key
+- blocker family
+- target planet coordinates or `null`
+- firstSeenTurn
+- lastSeenTurn
+- severity
+- timesEmitted
+- lastProposalTurn
+- resolvedTurn
+- active
+
+### Output caps
+
+Phase 1 should emit:
+- max `2` global Critical proposals
+- plus max `1` per planet

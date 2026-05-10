@@ -169,6 +169,30 @@ export type BotMemoryV2StrategicMilitary = {
   farmLedger: BotMemoryV2StrategicMilitaryFarmLedgerEntry[];
 };
 
+export type BotMemoryV2CriticalBlockerFamily =
+  | 'ENERGY_DEADLOCK'
+  | 'STORAGE_DEADLOCK'
+  | 'INDUSTRY_CHAIN_DEADLOCK'
+  | 'LOGISTICS_DEADLOCK'
+  | 'INTEL_DEADLOCK';
+
+export type BotMemoryV2CriticalBlockerEntry = {
+  blockerKey: string;
+  blockerFamily: BotMemoryV2CriticalBlockerFamily;
+  targetCoordinates: BotMemoryCoordinates | null;
+  firstSeenTurn: number;
+  lastSeenTurn: number;
+  severity: number;
+  timesEmitted: number;
+  lastProposalTurn: number | null;
+  resolvedTurn: number | null;
+  active: boolean;
+};
+
+export type BotMemoryV2Critical = {
+  blockerLedger: BotMemoryV2CriticalBlockerEntry[];
+};
+
 export type BotMemoryV2StrategicDiplomaticFactionEntry = {
   playerId: number;
   hostilityScore: number;
@@ -304,6 +328,7 @@ export type BotMemoryV2 = {
   cooldowns: Record<string, number>;
   recentTargets: BotMemoryV2RecentTarget[];
   acceptedLongTermCommitments: BotMemoryV2LongTermCommitment[];
+  critical: BotMemoryV2Critical;
   strategicMilitary: BotMemoryV2StrategicMilitary;
   strategicDiplomatic: BotMemoryV2StrategicDiplomatic;
   weightManager: BotMemoryV2WeightManager;
@@ -540,6 +565,7 @@ export class Player {
       acceptedLongTermCommitments: Player.normalizeBotMemoryV2LongTermCommitments(
         memory.acceptedLongTermCommitments
       ),
+      critical: Player.normalizeBotMemoryV2Critical(memory.critical),
       strategicMilitary: Player.normalizeBotMemoryV2StrategicMilitary(memory.strategicMilitary),
       strategicDiplomatic: Player.normalizeBotMemoryV2StrategicDiplomatic(memory.strategicDiplomatic),
       weightManager: Player.normalizeBotMemoryV2WeightManager(memory.weightManager)
@@ -830,6 +856,66 @@ export class Player {
     return {
       farmLedger: Player.normalizeBotMemoryV2StrategicMilitaryFarmLedger(strategicMilitary?.farmLedger)
     };
+  }
+
+  private static normalizeBotMemoryV2Critical(
+    critical: BotMemoryV2Critical | null | undefined
+  ): BotMemoryV2Critical {
+    return {
+      blockerLedger: Player.normalizeBotMemoryV2CriticalBlockerLedger(critical?.blockerLedger)
+    };
+  }
+
+  private static normalizeBotMemoryV2CriticalBlockerLedger(
+    entries: BotMemoryV2CriticalBlockerEntry[] | null | undefined
+  ): BotMemoryV2CriticalBlockerEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const blockerKey = Player.normalizeBotMemoryV2String(entry?.blockerKey, 160);
+        const blockerFamily = Player.normalizeBotMemoryV2CriticalBlockerFamily(entry?.blockerFamily);
+        if (
+          !blockerKey
+          || !blockerFamily
+          || !Number.isInteger(entry?.firstSeenTurn)
+          || !Number.isInteger(entry?.lastSeenTurn)
+        ) {
+          return null;
+        }
+
+        return {
+          blockerKey,
+          blockerFamily,
+          targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
+          firstSeenTurn: Math.max(0, entry.firstSeenTurn),
+          lastSeenTurn: Math.max(0, entry.lastSeenTurn),
+          severity: Player.normalizeBotMemoryV2WeightValue(entry?.severity),
+          timesEmitted: Player.normalizeBotMemoryV2Count(entry?.timesEmitted),
+          lastProposalTurn: Number.isInteger(entry?.lastProposalTurn) ? Math.max(0, entry.lastProposalTurn) : null,
+          resolvedTurn: Number.isInteger(entry?.resolvedTurn) ? Math.max(0, entry.resolvedTurn) : null,
+          active: entry?.active === true
+        };
+      })
+      .filter((entry): entry is BotMemoryV2CriticalBlockerEntry => entry !== null)
+      .slice(-400);
+  }
+
+  private static normalizeBotMemoryV2CriticalBlockerFamily(
+    family: BotMemoryV2CriticalBlockerFamily | null | undefined
+  ): BotMemoryV2CriticalBlockerFamily | null {
+    switch (family) {
+      case 'ENERGY_DEADLOCK':
+      case 'STORAGE_DEADLOCK':
+      case 'INDUSTRY_CHAIN_DEADLOCK':
+      case 'LOGISTICS_DEADLOCK':
+      case 'INTEL_DEADLOCK':
+        return family;
+      default:
+        return null;
+    }
   }
 
   private static normalizeBotMemoryV2StrategicMilitaryFarmLedger(

@@ -535,6 +535,7 @@ export type BotAcceptedTask = BotProposal & {
 export type BotSubsystemContext = {
   snapshot: BotWorldSnapshot;
   memory: BotMemoryV2;
+  priorProposals?: BotProposal[];
 };
 
 export type BotSubsystemResult = {
