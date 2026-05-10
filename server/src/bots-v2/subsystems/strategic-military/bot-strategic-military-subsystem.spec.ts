@@ -255,7 +255,8 @@ function runStrategicMilitarySubsystem(galaxy: Galaxy, bot: Player, memory: BotM
       critical: false,
       strategicDevelopment: false,
       strategicMilitary: true,
-      strategicDiplomatic: false
+      strategicDiplomatic: false,
+      weightManager: false
     },
     allowSupervisorAcceptance: false,
     allowExecution: false

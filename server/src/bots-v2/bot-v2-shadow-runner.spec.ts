@@ -60,7 +60,8 @@ describe('bot-v2-shadow-runner', () => {
         critical: false,
         strategicDevelopment: false,
         strategicMilitary: false,
-        strategicDiplomatic: false
+        strategicDiplomatic: false,
+        weightManager: false
       },
       allowSupervisorAcceptance: false,
       allowExecution: false

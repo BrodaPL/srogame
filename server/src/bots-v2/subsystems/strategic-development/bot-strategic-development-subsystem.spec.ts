@@ -230,7 +230,8 @@ function runStrategicDevelopmentSubsystem(galaxy: Galaxy, bot: Player) {
       critical: false,
       strategicDevelopment: true,
       strategicMilitary: false,
-      strategicDiplomatic: false
+      strategicDiplomatic: false,
+      weightManager: false
     },
     allowSupervisorAcceptance: false,
     allowExecution: false

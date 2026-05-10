@@ -148,11 +148,12 @@ function runWarfareSubsystem(galaxy: Galaxy, bot: Player) {
       economic: false,
       defensive: false,
       warfare: true,
-      critical: false,
-      strategicDevelopment: false,
-      strategicMilitary: false,
-      strategicDiplomatic: false
-    },
+        critical: false,
+        strategicDevelopment: false,
+        strategicMilitary: false,
+        strategicDiplomatic: false,
+        weightManager: false
+      },
     allowSupervisorAcceptance: false,
     allowExecution: false
   });

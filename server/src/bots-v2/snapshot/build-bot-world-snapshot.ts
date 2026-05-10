@@ -55,6 +55,7 @@ export function buildBotWorldSnapshot(
 ): BotWorldSnapshot {
   const planets = player.planets.map((planet) => buildPlanetSnapshot(planet, player, galaxy.currentTurn));
   const empire = buildEmpireSnapshot(galaxy, player, planets);
+  annotateKnownWarDiscovery(planets, player, galaxy);
 
   return {
     turn: galaxy.currentTurn,
@@ -204,6 +205,12 @@ function buildPlanetSnapshot(
     .reduce((sum, value) => sum + value, 0);
   const buildingDamageSummary = resolveBuildingDamageSummary(planet);
   const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
+  const recentHostileAttackCountLast20Turns = resolveRecentHostileAttackCountLast100Turns(
+    player,
+    planet,
+    currentTurn,
+    20
+  );
   const recentHostileAttackCountLast100Turns = resolveRecentHostileAttackCountLast100Turns(
     player,
     planet,
@@ -302,6 +309,8 @@ function buildPlanetSnapshot(
       bunkerLevel,
       avgIndustryLevel: resolveAverageIndustryLevel(planet),
       planetSize: planet.basicInfo.size,
+      knownByWarFaction: false,
+      recentHostileAttackCountLast20Turns,
       recentHostileAttackCountLast100Turns,
       recentHostileAttackStep: resolveHostileAttackStep(recentHostileAttackCountLast100Turns),
       totalBunkerValue: resolveCompletedBuildingInvestment(BuildingType.BUNKER_NETWORK, bunkerLevel),
@@ -329,6 +338,38 @@ function buildPlanetSnapshot(
       missingRoboticsForGrowth: averageMineLevel >= 2 && planet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY) <= 0
     }
   };
+}
+
+function annotateKnownWarDiscovery(
+  snapshots: BotPlanetSnapshot[],
+  player: Player,
+  galaxy: Galaxy
+): void {
+  const warPlayerIds = new Set<number>();
+  for (const relation of galaxy.diplomaticRelations) {
+    if (relation.status !== DiplomaticStatus.WAR) {
+      continue;
+    }
+    if (relation.playerAId === player.playerId) {
+      warPlayerIds.add(relation.playerBId);
+    } else if (relation.playerBId === player.playerId) {
+      warPlayerIds.add(relation.playerAId);
+    }
+  }
+  if (warPlayerIds.size === 0) {
+    return;
+  }
+
+  for (let index = 0; index < player.planets.length; index += 1) {
+    const livePlanet = player.planets[index];
+    const snapshot = snapshots[index];
+    if (!livePlanet || !snapshot) {
+      continue;
+    }
+
+    snapshot.defense.knownByWarFaction = Array.from(livePlanet.lastReportData.keys())
+      .some((viewerPlayerId) => warPlayerIds.has(viewerPlayerId));
+  }
 }
 
 function resolveAvailableEnergy(planet: Planet, energyTechnologyLevel: number, fusionPowerOutput: number): number {

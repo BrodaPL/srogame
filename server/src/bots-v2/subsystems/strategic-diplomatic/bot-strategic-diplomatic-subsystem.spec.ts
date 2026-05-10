@@ -703,7 +703,8 @@ function runStrategicDiplomaticSubsystem(
       critical: false,
       strategicDevelopment: false,
       strategicMilitary: false,
-      strategicDiplomatic: true
+      strategicDiplomatic: true,
+      weightManager: false
     },
     allowSupervisorAcceptance: false,
     allowExecution: false

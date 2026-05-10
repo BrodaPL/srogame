@@ -217,11 +217,12 @@ function runEconomicSubsystem(galaxy: Galaxy, bot: Player) {
       economic: true,
       defensive: false,
       warfare: false,
-      critical: false,
-      strategicDevelopment: false,
-      strategicMilitary: false,
-      strategicDiplomatic: false
-    },
+        critical: false,
+        strategicDevelopment: false,
+        strategicMilitary: false,
+        strategicDiplomatic: false,
+        weightManager: false
+      },
     allowSupervisorAcceptance: false,
     allowExecution: false
   });

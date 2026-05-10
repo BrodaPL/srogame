@@ -23,7 +23,8 @@ export function getBotV2FeatureFlags(): BotV2FeatureFlags {
       critical: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_CRITICAL', false),
       strategicDevelopment: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_DEVELOPMENT', false),
       strategicMilitary: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_MILITARY', false),
-      strategicDiplomatic: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_DIPLOMATIC', false)
+      strategicDiplomatic: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_DIPLOMATIC', false),
+      weightManager: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_WEIGHT_MANAGER', false)
     },
     allowSupervisorAcceptance: readBooleanEnv('SROGAME_BOT_AI_V2_ALLOW_SUPERVISOR_ACCEPTANCE', false),
     allowExecution: readBooleanEnv('SROGAME_BOT_AI_V2_ALLOW_EXECUTION', false)

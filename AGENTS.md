@@ -25,9 +25,9 @@ This file captures session context for collaborators and future AI agents.
 - Bot AI V2 planning docs now live in `NEW_BOT_AI_DESIGN.md` (high-level architecture) and `BOT_AI_V2_PHASE0_SPEC.md` (implementation-ready Phase 0 scaffolding/spec).
 
 ## Recent Session Notes
-- Strategic Diplomatic phase 9 is now implemented in `server/src/bots-v2/subsystems/strategic-diplomatic/`.
-- It adds shadow-only allied-cooperation execution planning: one best outgoing support request per turn, wider incoming support-request awareness/preferences, depot-aware support scoring, and non-offensive helper selection that can now weigh `ALLIED` / `PEACE` / `NEUTRAL` contacts differently from offensive allied-only asks.
-- Supporting V2 changes landed in `server/src/bots-v2/bot-v2-types.ts` and `server/src/bots-v2/snapshot/build-bot-world-snapshot.ts`, which now expose fuller diplomatic support-request metadata plus known `ALLIANCE_DEPOT` / `JUMP_GATE` levels and total structural HP in diplomatic snapshots.
+- Weight Manager phase 1 is now implemented in `server/src/bots-v2/subsystems/weight-manager/`.
+- It is still advisory-only: no proposal acceptance, no execution, and no `Critical` weighting. It now computes global strategic weights, per-planet local weights, one mutually-exclusive global mode, and per-planet maturity/focus/danger flags, then persists the latest result into `player.botMemoryV2.weightManager`.
+- Supporting V2 changes landed in `src/app/models/player.ts`, `server/src/bots-v2/bot-v2-types.ts`, and `server/src/bots-v2/snapshot/build-bot-world-snapshot.ts`, which now normalize the new weight-manager memory state and expose the extra recent-attack / known-war-discovery snapshot signals it needs.
 - TODO: V2 support/maintenance request answers and real execution handoff are intentionally deferred to the future Supervisor subsystem; Strategic Diplomatic remains proposal-only here.
 
 ## Current Behavior

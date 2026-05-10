@@ -21,6 +21,31 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
       primaryWarBreakTarget: null,
       openedWarTargets: [],
       sharedHostileEvents: []
+    },
+    weightManager: {
+      updatedTurn: null,
+      selectedMode: 'NORMAL',
+      economicRecoveryMode: false,
+      warEmergencyMode: false,
+      expansionMode: false,
+      diplomaticCautionMode: false,
+      normalSituationMode: true,
+      strategicDevelopmentWeight: 0,
+      strategicMilitaryWeight: 0,
+      strategicDiplomaticWeight: 0,
+      aggressionAxis: 0,
+      industryAxis: 0,
+      diplomacyAxis: 0,
+      defencesAxis: 0,
+      cautionAxis: 0,
+      developmentAxis: 0,
+      discoveredBreakNeedFarmCount: 0,
+      discoveredRaidReadyFarmCount: 0,
+      alliedStatusCount: 0,
+      peaceStatusCount: 0,
+      neutralStatusCount: 0,
+      warStatusCount: 0,
+      planets: []
     }
   };
 }

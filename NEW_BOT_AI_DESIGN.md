@@ -1,4 +1,4 @@
-Below is a revised version of your architecture concept, updated to reflect the structural issues we discussed and your clarification that the **Prioritization System is itself another subsystem**, while the **Supervisory System remains the final allocator and scheduler**.
+Below is a revised version of your architecture concept, updated to reflect the structural issues we discussed and your clarification that the **Weight Manager System is itself another subsystem**, while the **Supervisory System remains the final allocator and scheduler**.
 
 ---
 
@@ -23,7 +23,7 @@ Each subsystem focuses on its own domain and generates proposals that are locall
 
 ## Control layers
 
-* **8 Prioritization** — computes dynamic modifiers and context scores
+* **8 Weight Manager** — computes dynamic modifiers, subsystem weights, and context flags
 * **9 Supervisory** — final allocator, scheduler, and commitment manager
 
 
@@ -31,7 +31,7 @@ Each subsystem focuses on its own domain and generates proposals that are locall
 The control flow is:
 
 1. **Specialist subsystems (1–7)** generate goals and task proposals.
-2. **Prioritization Subsystem (8)** analyzes the current context and produces dynamic weight modifiers.
+2. **Weight Manager Subsystem (8)** analyzes the current context and produces dynamic weight modifiers.
 3. **Supervisory System (9)** combines:
 
   * its own light base profile modifiers,
@@ -60,7 +60,7 @@ Its job is to:
 * identify short-term actionable goals,
 * submit candidate tasks.
 
-## 2. The Prioritization Subsystem does not schedule tasks
+## 2. The Weight Manager Subsystem does not schedule tasks
 
 Subsystem 8 does **not** directly allocate resources or approve actions.
 It only evaluates context and produces **weight modifiers, urgency modifiers, and strategic context flags** for the Supervisory System.
@@ -2046,44 +2046,145 @@ Fixed **minimum reserve around 5%**.
 
 ---
 
-## 8) Prioritization Subsystem
+## 8) Weight Manager Subsystem
 
-**Scope:** global context evaluation.
+**Scope:** advisory empire-wide context evaluation plus per-planet weighting metadata.
 
 **Purpose:** analyze the current empire-wide and planetary context and provide **dynamic scoring input** to the Supervisory System.
 
-**Goal amount:** Don't have goals, just eveluate the current situation and adjusting weights.
+**Goal amount:** Don't have goals. Evaluate the current situation and adjust weights.
 
 This subsystem is not a scheduler.
 It does not directly approve or reject tasks.
+It does not execute commands.
+It does not orchestrate multi-turn campaigns.
+`Critical` is intentionally out of scope here and should remain separately handled.
 
 ### Responsibilities
 
 * evaluate:
 
-  * whether a planet is under attack,
-  * whether a planet is still in basic development,
+  * bot personality,
+  * diplomacy status mix,
+  * discovered-farm status mix like `BREAK_NEED` / `RAID_READY`,
   * whether the empire is at war,
   * whether allies require assistance,
-  * whether new farms have appeared,
-  * whether new players were discovered,
-  * whether diplomacy changed,
   * current game stage,
-  * maturity and specialization of each planet.
+  * planet maturity and specialization,
+  * local danger, damage, and repeated attack pressure.
 * produce:
 
-  * subsystem weight modifiers,
-  * urgency multipliers,
-  * strategic context flags,
-  * local vs strategic priority recommendations.
+  * per-subsystem weights,
+  * mutually-exclusive global mode flags,
+  * per-planet mode flags,
+  * rationale/debug metadata.
+
+### Weight contract
+
+Weights should be normalized to `0..100`.
+
+Global strategic outputs:
+
+* `strategicDevelopmentWeight`
+* `strategicMilitaryWeight`
+* `strategicDiplomaticWeight`
+
+Per-planet outputs:
+
+* `economicWeight`
+* `defensiveWeight`
+* `warfareWeight`
+
+### Global mode flags
+
+Mode flags should be mutually exclusive:
+
+* `economicRecoveryMode`
+* `warEmergencyMode`
+* `expansionMode`
+* `diplomaticCautionMode`
+* `normalSituationMode`
+
+`normalSituationMode` should be true only when no other mode is active.
+
+### Aggregate metrics
+
+This subsystem should reuse planet aggregate metrics instead of inventing a separate maturity number first.
+
+Per-planet aggregates:
+
+* `avg_industry`
+* `avg_military`
+* `avg_defence`
+* `avg_development`
+
+Definitions:
+
+* `avg_military` = all combat-capable ships
+* `avg_defence` = planetary defence units + bunker influence
+* `avg_development` = all buildings not counted in industry/military/defence
+
+Empire-wide best aggregates:
+
+* `highest_avg_industry`
+* `highest_avg_military`
+* `highest_avg_defence`
+* `highest_avg_development`
+
+### Planet maturity and focus flags
+
+Phase 1 should use a hard maturity gate:
+
+* if `avg_industry <= 4` => `immaturePlanet`
+* else => `maturePlanet`
+
+Those two flags are mutually exclusive.
+
+`immaturePlanet` should be pushed almost purely toward local economic growth and should not be treated as a capable military-production world yet.
+
+Per-planet focus flags should include:
+
+* `industryFocused`
+* `defenceFocused`
+* `militaryFocused`
+* `developmentFocused`
+
+Those focus flags should be mutually exclusive and chosen by the single biggest gap to the matching `highest_avg_xxx`.
+
+Generic first-pass rule:
+
+* a domain becomes focus-eligible when `planet avg_xxx + 2 < highest_avg_xxx`
+
+`industryFocused` special rule:
+
+* only on `maturePlanet`
+* when `avg_industry + 2 < highest_avg_industry`
+* remove it while any active `WAR` exists
+
+These focus flags are descriptive pressure signals only.
+They should increase matching subsystem weight.
+They should not hard-block all other behavior on that planet.
+
+### Additional planet flags
+
+* `industryHubPlanet` when `maturePlanet` and `avg_industry + 1.5 >= highest_avg_industry`
+* `damagedPlanet` when more than `25%` structural HP is missing
+* `inDangerPlanet` when `avg_defence + 3 < highest_avg_defence` and the planet is already known by a player currently in `WAR`
+* `constantlyAttackedPlanet` when at least `3` hostile attacks happened in the last `20` turns
+* `veryHeavilyAttackedPlanet` when at least `3` hostile attacks happened in the last `20` turns and `damagedPlanet` is currently true
 
 ### Example output
 
-* boost Economic on newly colonized planets,
-* boost Defensive on threatened planets,
-* boost Strategic Diplomatic during active war,
-* suppress Strategic Military on unstable bootstrap planets,
-* boost Critical when deadlock risk rises.
+* boost `economicWeight` on immature or industry-focused planets,
+* boost `defensiveWeight` on `inDangerPlanet` and `constantlyAttackedPlanet`,
+* boost `strategicDiplomaticWeight` during active war,
+* suppress local `warfareWeight` on unstable bootstrap planets,
+* expose debug rationale showing which flags and gaps caused each weight.
+
+### Future TODOs
+
+* Consider a later hybrid model with trait-vector interpolation plus learned/tuned situational modifiers.
+* Add a separate repeated-fleet-loss parameter, mainly for `Strategic Diplomatic`, so the bot can avoid feeding more fleets into the same losing planet for some time.
 
 ---
 
@@ -2343,7 +2444,7 @@ A good default turn order is:
 
 Subsystems 1–7 generate proposals.
 
-## Phase 3: Prioritization analysis
+## Phase 3: Weight Manager analysis
 
 Subsystem 8 computes:
 
@@ -2356,7 +2457,7 @@ Subsystem 8 computes:
 System 9:
 
 * applies base profile weights,
-* applies prioritization modifiers,
+* applies Weight Manager modifiers,
 * checks resources and commitments,
 * selects accepted tasks,
 * reserves resources.

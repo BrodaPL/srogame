@@ -38,6 +38,7 @@ export type BotV2FeatureFlags = {
     strategicDevelopment: boolean;
     strategicMilitary: boolean;
     strategicDiplomatic: boolean;
+    weightManager: boolean;
   };
   allowSupervisorAcceptance: boolean;
   allowExecution: boolean;
@@ -342,6 +343,8 @@ export type BotPlanetSnapshot = {
     bunkerLevel: number;
     avgIndustryLevel: number;
     planetSize: number;
+    knownByWarFaction: boolean;
+    recentHostileAttackCountLast20Turns: number;
     recentHostileAttackCountLast100Turns: number;
     recentHostileAttackStep: number;
     totalBunkerValue: number;

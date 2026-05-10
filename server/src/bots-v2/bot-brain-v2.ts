@@ -18,6 +18,7 @@ import { BotStrategicDevelopmentSubsystem } from './subsystems/strategic-develop
 import { BotStrategicDiplomaticSubsystem } from './subsystems/strategic-diplomatic/bot-strategic-diplomatic-subsystem.js';
 import { BotStrategicMilitarySubsystem } from './subsystems/strategic-military/bot-strategic-military-subsystem.js';
 import { BotWarfareSubsystem } from './subsystems/warfare/bot-warfare-subsystem.js';
+import { BotWeightManagerSubsystem } from './subsystems/weight-manager/bot-weight-manager-subsystem.js';
 import { ShadowBotSupervisor } from './supervisor/bot-supervisor.js';
 
 export class BotBrainV2 {
@@ -146,6 +147,9 @@ function buildEnabledSubsystems(flags: BotV2FeatureFlags): BotSubsystem[] {
   }
   if (flags.enabledSubsystems.strategicDiplomatic) {
     subsystems.push(new BotStrategicDiplomaticSubsystem());
+  }
+  if (flags.enabledSubsystems.weightManager) {
+    subsystems.push(new BotWeightManagerSubsystem());
   }
   return subsystems;
 }

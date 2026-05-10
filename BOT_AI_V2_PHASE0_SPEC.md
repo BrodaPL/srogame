@@ -23,6 +23,7 @@ This document is a working engineering spec, not a final behavior design for all
   - `Strategic Development`
   - `Strategic Military`
   - `Strategic Diplomatic`
+  - `Weight Manager`
   - full `Supervisory`
 - V2 memory persistence scope:
   - persist minimal stable fields only
@@ -2789,17 +2790,163 @@ Phase 0 is complete when all of the following are true:
 - V2 traces are recorded and inspectable
 - no live commands are executed by V2
 
-## Immediate next step after Phase 0
+## Weight Manager Phase 1
 
-After Phase 0 is merged, the next implementation target should be:
+`Weight Manager` is the next planned V2 subsystem after the current `Strategic Diplomatic` scope.
 
-1. scaffold code for `Defensive`
-2. improve the snapshot only where `Defensive` actually needs more information
-3. keep the supervisor mostly stubbed until at least:
-   - `Economic`
-   - `Defensive`
-   - `Warfare`
-   - `Critical`
-   are all producing usable proposals
+It is advisory only:
+- no proposal acceptance
+- no execution
+- no campaign orchestration
+- no `Critical` weighting here
 
-That keeps V2 incremental and prevents the Supervisory layer from becoming another monolith too early.
+It should act as the main policy layer before the future `Supervisor`, using:
+- static personality base tables
+- dynamic situation modifiers
+
+There should not be a separate later "full global policy engine" beyond that model.
+
+### Inputs
+
+`Weight Manager` phase 1 should consume:
+- bot personality
+- world snapshot
+- diplomacy status mix
+- discovered farm status mix like `BREAK_NEED` / `RAID_READY`
+- owned-planet maturity spread
+- per-planet aggregate metrics
+
+### Outputs
+
+Phase 1 should output:
+- global strategic subsystem weights in `0..100`
+- per-planet local subsystem weights in `0..100`
+- one mutually-exclusive global mode flag set
+- per-planet mode/descriptor flags
+- rationale/debug metadata
+
+### Weighted subsystems
+
+Global strategic weights:
+- `strategicDevelopmentWeight`
+- `strategicMilitaryWeight`
+- `strategicDiplomaticWeight`
+
+Per-planet local weights:
+- `economicWeight`
+- `defensiveWeight`
+- `warfareWeight`
+
+`Critical` remains out of scope for `Weight Manager` and should be handled separately later.
+
+### Personality model
+
+Phase 1 should use direct per-profile base tables first.
+
+Expose axis/debug values for:
+- `aggression`
+- `industry`
+- `diplomacy`
+- `defences`
+- `caution`
+- `development`
+
+TODO, far future:
+- consider a hybrid model with trait-vector interpolation plus learned/tuned situational modifiers
+
+### Global mode flags
+
+Global mode flags should be mutually exclusive:
+- `economicRecoveryMode`
+- `warEmergencyMode`
+- `expansionMode`
+- `diplomaticCautionMode`
+- `normalSituationMode`
+
+`normalSituationMode` should be true only when no other mode is active.
+
+### Planet aggregate metrics
+
+Phase 1 should reuse these per-planet aggregates:
+- `avg_industry`
+- `avg_military`
+- `avg_defence`
+- `avg_development`
+
+Definitions:
+- `avg_military` = all combat-capable ships
+- `avg_defence` = planetary defence units + bunker influence
+- `avg_development` = all buildings not counted in industry/military/defence
+
+It should also expose empire-wide best values:
+- `highest_avg_industry`
+- `highest_avg_military`
+- `highest_avg_defence`
+- `highest_avg_development`
+
+### Planet maturity
+
+Use a hard maturity gate:
+- if `avg_industry <= 4` => `immaturePlanet`
+- else => `maturePlanet`
+
+Those two flags are mutually exclusive.
+
+`immaturePlanet` should be focused almost purely on local economic growth and should not be treated as a capable military-production planet.
+
+### Planet focus flags
+
+Phase 1 should include:
+- `industryFocused`
+- `defenceFocused`
+- `militaryFocused`
+- `developmentFocused`
+
+These focus flags should be mutually exclusive.
+They should be chosen by the single biggest gap to the matching `highest_avg_xxx`.
+
+Generic first-pass rule:
+- a focus becomes eligible when `planet avg_xxx + 2 < highest_avg_xxx`
+
+`industryFocused` special rule:
+- only on `maturePlanet`
+- when `avg_industry + 2 < highest_avg_industry`
+- remove it while any active `WAR` exists
+
+These focus flags are pressure signals only.
+They should add weight toward the matching subsystem/role.
+They should not hard-block all other behavior.
+
+### Other planet flags
+
+Phase 1 should also include:
+- `industryHubPlanet`
+- `damagedPlanet`
+- `inDangerPlanet`
+- `constantlyAttackedPlanet`
+- `veryHeavilyAttackedPlanet`
+
+Rules:
+- `industryHubPlanet` when `maturePlanet` and `avg_industry + 1.5 >= highest_avg_industry`
+- `damagedPlanet` when more than `25%` structural HP is missing
+- `inDangerPlanet` when `avg_defence + 3 < highest_avg_defence` and the planet was already discovered by a player currently in `WAR`
+- `constantlyAttackedPlanet` when at least `3` hostile attacks happened in the last `20` turns
+- `veryHeavilyAttackedPlanet` when at least `3` hostile attacks happened in the last `20` turns and `damagedPlanet` is currently true
+
+TODO, far future:
+- track repeated fleet losses on one planet as a separate signal, mainly for `Strategic Diplomatic`, so the bot can avoid feeding more fleets there for some time
+
+### Weight interpretation
+
+`Weight Manager` outputs are advisory inputs for the later `Supervisor`.
+
+The intended later combination is:
+- proposal score * subsystem weight
+
+But `Weight Manager` itself should not:
+- accept proposals
+- reject proposals
+- answer requests
+- execute commands
+
+Only the future `Supervisor` / `Executor` layers should do that.

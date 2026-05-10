@@ -121,7 +121,8 @@ export type BotV2SubsystemId =
   | 'CRITICAL'
   | 'STRATEGIC_DEVELOPMENT'
   | 'STRATEGIC_MILITARY'
-  | 'STRATEGIC_DIPLOMATIC';
+  | 'STRATEGIC_DIPLOMATIC'
+  | 'WEIGHT_MANAGER';
 
 export type BotMemoryV2RecentTarget = {
   key: string;
@@ -228,6 +229,70 @@ export type BotMemoryV2StrategicDiplomatic = {
   sharedHostileEvents: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[];
 };
 
+export type BotMemoryV2WeightManagerMode =
+  | 'NORMAL'
+  | 'ECONOMIC_RECOVERY'
+  | 'WAR_EMERGENCY'
+  | 'EXPANSION'
+  | 'DIPLOMATIC_CAUTION';
+
+export type BotMemoryV2WeightManagerPlanetFocus =
+  | 'INDUSTRY'
+  | 'DEFENCE'
+  | 'MILITARY'
+  | 'DEVELOPMENT';
+
+export type BotMemoryV2WeightManagerPlanetEntry = {
+  coordinates: BotMemoryCoordinates;
+  economicWeight: number;
+  defensiveWeight: number;
+  warfareWeight: number;
+  avgIndustry: number;
+  avgMilitary: number;
+  avgDefence: number;
+  avgDevelopment: number;
+  selectedFocus: BotMemoryV2WeightManagerPlanetFocus | null;
+  immaturePlanet: boolean;
+  maturePlanet: boolean;
+  industryFocused: boolean;
+  defenceFocused: boolean;
+  militaryFocused: boolean;
+  developmentFocused: boolean;
+  industryHubPlanet: boolean;
+  damagedPlanet: boolean;
+  inDangerPlanet: boolean;
+  constantlyAttackedPlanet: boolean;
+  veryHeavilyAttackedPlanet: boolean;
+  knownByWarFaction: boolean;
+  recentHostileAttackCountLast20Turns: number;
+};
+
+export type BotMemoryV2WeightManager = {
+  updatedTurn: number | null;
+  selectedMode: BotMemoryV2WeightManagerMode;
+  economicRecoveryMode: boolean;
+  warEmergencyMode: boolean;
+  expansionMode: boolean;
+  diplomaticCautionMode: boolean;
+  normalSituationMode: boolean;
+  strategicDevelopmentWeight: number;
+  strategicMilitaryWeight: number;
+  strategicDiplomaticWeight: number;
+  aggressionAxis: number;
+  industryAxis: number;
+  diplomacyAxis: number;
+  defencesAxis: number;
+  cautionAxis: number;
+  developmentAxis: number;
+  discoveredBreakNeedFarmCount: number;
+  discoveredRaidReadyFarmCount: number;
+  alliedStatusCount: number;
+  peaceStatusCount: number;
+  neutralStatusCount: number;
+  warStatusCount: number;
+  planets: BotMemoryV2WeightManagerPlanetEntry[];
+};
+
 export type BotMemoryV2 = {
   version: 1;
   currentStance: string | null;
@@ -241,6 +306,7 @@ export type BotMemoryV2 = {
   acceptedLongTermCommitments: BotMemoryV2LongTermCommitment[];
   strategicMilitary: BotMemoryV2StrategicMilitary;
   strategicDiplomatic: BotMemoryV2StrategicDiplomatic;
+  weightManager: BotMemoryV2WeightManager;
 };
 
 export type PlayerExtras = {
@@ -475,7 +541,8 @@ export class Player {
         memory.acceptedLongTermCommitments
       ),
       strategicMilitary: Player.normalizeBotMemoryV2StrategicMilitary(memory.strategicMilitary),
-      strategicDiplomatic: Player.normalizeBotMemoryV2StrategicDiplomatic(memory.strategicDiplomatic)
+      strategicDiplomatic: Player.normalizeBotMemoryV2StrategicDiplomatic(memory.strategicDiplomatic),
+      weightManager: Player.normalizeBotMemoryV2WeightManager(memory.weightManager)
     };
   }
 
@@ -1036,6 +1103,130 @@ export class Player {
       .slice(-400);
   }
 
+  private static normalizeBotMemoryV2WeightManager(
+    weightManager: BotMemoryV2WeightManager | null | undefined
+  ): BotMemoryV2WeightManager {
+    const selectedMode = Player.normalizeBotMemoryV2WeightManagerMode(weightManager?.selectedMode);
+    const planets = Player.normalizeBotMemoryV2WeightManagerPlanets(weightManager?.planets);
+
+    return {
+      updatedTurn: Number.isInteger(weightManager?.updatedTurn) ? Math.max(0, weightManager.updatedTurn) : null,
+      selectedMode,
+      economicRecoveryMode: selectedMode === 'ECONOMIC_RECOVERY',
+      warEmergencyMode: selectedMode === 'WAR_EMERGENCY',
+      expansionMode: selectedMode === 'EXPANSION',
+      diplomaticCautionMode: selectedMode === 'DIPLOMATIC_CAUTION',
+      normalSituationMode: selectedMode === 'NORMAL',
+      strategicDevelopmentWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.strategicDevelopmentWeight),
+      strategicMilitaryWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.strategicMilitaryWeight),
+      strategicDiplomaticWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.strategicDiplomaticWeight),
+      aggressionAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.aggressionAxis),
+      industryAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.industryAxis),
+      diplomacyAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.diplomacyAxis),
+      defencesAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.defencesAxis),
+      cautionAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.cautionAxis),
+      developmentAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.developmentAxis),
+      discoveredBreakNeedFarmCount: Player.normalizeBotMemoryV2Count(weightManager?.discoveredBreakNeedFarmCount),
+      discoveredRaidReadyFarmCount: Player.normalizeBotMemoryV2Count(weightManager?.discoveredRaidReadyFarmCount),
+      alliedStatusCount: Player.normalizeBotMemoryV2Count(weightManager?.alliedStatusCount),
+      peaceStatusCount: Player.normalizeBotMemoryV2Count(weightManager?.peaceStatusCount),
+      neutralStatusCount: Player.normalizeBotMemoryV2Count(weightManager?.neutralStatusCount),
+      warStatusCount: Player.normalizeBotMemoryV2Count(weightManager?.warStatusCount),
+      planets
+    };
+  }
+
+  private static normalizeBotMemoryV2WeightManagerPlanets(
+    planets: BotMemoryV2WeightManagerPlanetEntry[] | null | undefined
+  ): BotMemoryV2WeightManagerPlanetEntry[] {
+    if (!Array.isArray(planets)) {
+      return [];
+    }
+
+    return planets
+      .map((planet) => {
+        const coordinates = Player.normalizeBotMemoryCoordinates(planet?.coordinates);
+        if (!coordinates) {
+          return null;
+        }
+
+        const selectedFocus = Player.normalizeBotMemoryV2WeightManagerPlanetFocus(planet?.selectedFocus);
+
+        return {
+          coordinates,
+          economicWeight: Player.normalizeBotMemoryV2WeightValue(planet?.economicWeight),
+          defensiveWeight: Player.normalizeBotMemoryV2WeightValue(planet?.defensiveWeight),
+          warfareWeight: Player.normalizeBotMemoryV2WeightValue(planet?.warfareWeight),
+          avgIndustry: Player.normalizeBotMemoryV2AverageValue(planet?.avgIndustry),
+          avgMilitary: Player.normalizeBotMemoryV2AverageValue(planet?.avgMilitary),
+          avgDefence: Player.normalizeBotMemoryV2AverageValue(planet?.avgDefence),
+          avgDevelopment: Player.normalizeBotMemoryV2AverageValue(planet?.avgDevelopment),
+          selectedFocus,
+          immaturePlanet: Boolean(planet?.immaturePlanet),
+          maturePlanet: Boolean(planet?.maturePlanet),
+          industryFocused: Boolean(planet?.industryFocused),
+          defenceFocused: Boolean(planet?.defenceFocused),
+          militaryFocused: Boolean(planet?.militaryFocused),
+          developmentFocused: Boolean(planet?.developmentFocused),
+          industryHubPlanet: Boolean(planet?.industryHubPlanet),
+          damagedPlanet: Boolean(planet?.damagedPlanet),
+          inDangerPlanet: Boolean(planet?.inDangerPlanet),
+          constantlyAttackedPlanet: Boolean(planet?.constantlyAttackedPlanet),
+          veryHeavilyAttackedPlanet: Boolean(planet?.veryHeavilyAttackedPlanet),
+          knownByWarFaction: Boolean(planet?.knownByWarFaction),
+          recentHostileAttackCountLast20Turns: Player.normalizeBotMemoryV2Count(
+            planet?.recentHostileAttackCountLast20Turns
+          )
+        };
+      })
+      .filter((planet): planet is BotMemoryV2WeightManagerPlanetEntry => planet !== null)
+      .slice(0, 64);
+  }
+
+  private static normalizeBotMemoryV2WeightManagerMode(
+    mode: BotMemoryV2WeightManagerMode | null | undefined
+  ): BotMemoryV2WeightManagerMode {
+    switch (mode) {
+      case 'ECONOMIC_RECOVERY':
+      case 'WAR_EMERGENCY':
+      case 'EXPANSION':
+      case 'DIPLOMATIC_CAUTION':
+        return mode;
+      default:
+        return 'NORMAL';
+    }
+  }
+
+  private static normalizeBotMemoryV2WeightManagerPlanetFocus(
+    focus: BotMemoryV2WeightManagerPlanetFocus | null | undefined
+  ): BotMemoryV2WeightManagerPlanetFocus | null {
+    switch (focus) {
+      case 'INDUSTRY':
+      case 'DEFENCE':
+      case 'MILITARY':
+      case 'DEVELOPMENT':
+        return focus;
+      default:
+        return null;
+    }
+  }
+
+  private static normalizeBotMemoryV2WeightValue(value: number | null | undefined): number {
+    return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(Number(value)))) : 0;
+  }
+
+  private static normalizeBotMemoryV2AverageValue(value: number | null | undefined): number {
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.round(Number(value) * 100) / 100);
+  }
+
+  private static normalizeBotMemoryV2Count(value: number | null | undefined): number {
+    return Number.isFinite(value) ? Math.max(0, Math.floor(Number(value))) : 0;
+  }
+
   private static normalizeBotMemoryV2CountByType(
     counts: Record<string, number> | null | undefined
   ): Record<string, number> {
@@ -1065,6 +1256,7 @@ export class Player {
       case 'STRATEGIC_DEVELOPMENT':
       case 'STRATEGIC_MILITARY':
       case 'STRATEGIC_DIPLOMATIC':
+      case 'WEIGHT_MANAGER':
         return true;
       default:
         return false;
