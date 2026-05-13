@@ -7,11 +7,18 @@ import type {
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
 import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
 import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
+import { fleetTravelTurnsForDistance } from '../../../../../src/app/models/tech/technology-effects.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
 import {
   BUILDING_BLUEPRINTS,
+  calculateFuelCost,
+  calculateTravelDistance,
   SHIP_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
+import {
+  hasEmergencyInfrastructureDamage,
+  resolveEffectiveInfrastructureDamagePercent
+} from '../../infrastructure-damage.js';
 import type {
   BotPlanetSnapshot,
   BotProposal,
@@ -31,8 +38,9 @@ type ResourceAmounts = {
 type CriticalCandidate = {
   blockerKey: string;
   blockerFamily: BotMemoryV2CriticalBlockerFamily;
+  proposalPlanet: BotPlanetSnapshot;
   targetPlanet: BotPlanetSnapshot;
-  kind: 'BUILDING' | 'RESEARCH' | 'SHIPYARD';
+  kind: 'BUILDING' | 'RESEARCH' | 'SHIPYARD' | 'FLEET_MISSION';
   dedupeKey: string;
   summary: string;
   severity: number;
@@ -52,6 +60,17 @@ type EmergencySignals = {
   empireSpyProbeCount: number;
   empireRepairDroneCount: number;
 };
+
+type CriticalResponseSubtype =
+  | 'REPAIR'
+  | 'TRANSPORT'
+  | 'ARMAMENT_DELIVERY';
+
+type MissionShipSelection = Array<{
+  type: ShipType;
+  undamagedAmount: number;
+  damagedAmount: number;
+}>;
 
 const ENERGY_BUILDINGS = [
   BuildingType.SOLAR_WIND_GEOTHERMAL,
@@ -91,6 +110,27 @@ const CARGO_SHIP_TYPES = [
   ShipType.TRANSPORTER
 ] as const;
 
+const UTILITY_TRANSPORT_SHIP_TYPES = [
+  ShipType.CARGO_SUPPORT,
+  ShipType.MASS_HAULER,
+  ShipType.TRANSPORTER
+] as const;
+
+const UTILITY_ARMAMENT_CARRIER_TYPES = [
+  ShipType.CARGO_SUPPORT,
+  ShipType.CARRIER,
+  ShipType.FLEET_CARRIER
+] as const;
+
+const MAX_CRITICAL_TRANSPORT_LOCAL_RECOVERY_TURNS = 5;
+const MAX_CRITICAL_TRANSPORT_CARGO = 2000;
+const MAX_CRITICAL_REPAIR_TURNS = 8;
+const MAX_CRITICAL_ARMAMENT_DELIVERY_TURNS = 5;
+const MAX_CRITICAL_TRANSPORT_TURNS = 8;
+const MAX_CRITICAL_REPAIR_SOURCE_DRONES = 3;
+const CRITICAL_REPAIR_DAMAGE_THRESHOLD_PERCENT = 35;
+const CRITICAL_REPAIR_LOCAL_RECOVERY_TURNS = 20;
+
 const BLOCKER_FAMILY_PRIORITY: BotMemoryV2CriticalBlockerFamily[] = [
   'ENERGY_DEADLOCK',
   'STORAGE_DEADLOCK',
@@ -109,7 +149,8 @@ export class BotCriticalSubsystem implements BotSubsystem {
       ...collectStorageDeadlockCandidates(context),
       ...collectIndustryChainDeadlockCandidates(context, emergencySignals),
       ...collectLogisticsDeadlockCandidates(context, emergencySignals),
-      ...collectIntelDeadlockCandidates(context, emergencySignals)
+      ...collectIntelDeadlockCandidates(context, emergencySignals),
+      ...collectCriticalPhaseTwoCandidates(context)
     ];
     const selectedCandidates = selectCriticalCandidates(detectedCandidates);
 
@@ -364,6 +405,250 @@ function collectIntelDeadlockCandidates(
       intelTargetCount: context.snapshot.empire.intelCandidates.filter((entry) => entry.needsScan).length
     }
   })];
+}
+
+function collectCriticalPhaseTwoCandidates(context: BotSubsystemContext): CriticalCandidate[] {
+  const candidates: CriticalCandidate[] = [];
+
+  for (const targetPlanet of context.snapshot.planets) {
+    const repairTarget = evaluateCriticalRepairTarget(context, targetPlanet);
+    if (repairTarget) {
+      candidates.push(...collectCriticalRepairResponseCandidates(context, repairTarget));
+    }
+
+    const transportTarget = evaluateCriticalTransportTarget(context, targetPlanet);
+    if (transportTarget) {
+      candidates.push(...collectCriticalTransportResponseCandidates(context, transportTarget));
+    }
+  }
+
+  return dedupeCandidatesByBlockerKey(candidates);
+}
+
+function collectCriticalRepairResponseCandidates(
+  context: BotSubsystemContext,
+  target: {
+    planet: BotPlanetSnapshot;
+    damageRatio: number;
+    localRecoveryTurns: number;
+    severity: number;
+  }
+): CriticalCandidate[] {
+  if (hasVisibleCriticalMissionProposal(context, target.planet, [FleetMissionType.REPAIR, FleetMissionType.ARMAMENT_DELIVERY])) {
+    return [];
+  }
+
+  const localRepairDrones = target.planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0;
+  if (localRepairDrones > 0) {
+    const directRepair = selectCriticalRepairSource(context, target.planet);
+    if (directRepair) {
+      return [createFleetMissionCandidate({
+        blockerFamily: 'LOGISTICS_DEADLOCK',
+        responseSubtype: 'REPAIR',
+        blockerKey: `critical:phase2:repair:${toCoordinatesKey(target.planet.coordinates)}`,
+        originPlanet: directRepair.originPlanet,
+        targetPlanet: target.planet,
+        missionType: FleetMissionType.REPAIR,
+        ships: directRepair.ships,
+        cargo: emptyResources(),
+        severity: target.severity,
+        urgency: 95,
+        risk: 10,
+        confidence: 74,
+        summary: `Critical repair response: send repair aid from ${directRepair.originPlanet.name} to ${target.planet.name}.`,
+        debug: {
+          responseSubtype: 'REPAIR',
+          travelDistance: directRepair.travelDistance,
+          travelTurns: directRepair.travelTurns,
+          sentRepairDrones: directRepair.ships.reduce((sum, ship) => sum + ship.undamagedAmount + ship.damagedAmount, 0),
+          missingStructuralRatio: roundToTwoDecimals(target.damageRatio),
+          localRecoveryTurns: roundToTwoDecimals(target.localRecoveryTurns)
+        }
+      })];
+    }
+  }
+
+  const armamentSource = selectCriticalArmamentDeliverySource(context, target.planet);
+  if (armamentSource) {
+    return [createFleetMissionCandidate({
+      blockerFamily: 'LOGISTICS_DEADLOCK',
+      responseSubtype: 'ARMAMENT_DELIVERY',
+      blockerKey: `critical:phase2:armament-delivery:${toCoordinatesKey(target.planet.coordinates)}`,
+      originPlanet: armamentSource.originPlanet,
+      targetPlanet: target.planet,
+      missionType: FleetMissionType.ARMAMENT_DELIVERY,
+      ships: armamentSource.ships,
+      cargo: armamentSource.cargo,
+      severity: target.severity,
+      urgency: 92,
+      risk: 12,
+      confidence: 70,
+      summary: `Critical repair logistics: deliver repair drones from ${armamentSource.originPlanet.name} to ${target.planet.name}.`,
+      debug: {
+        responseSubtype: 'ARMAMENT_DELIVERY',
+        travelDistance: armamentSource.travelDistance,
+        travelTurns: armamentSource.travelTurns,
+        deliveredRepairDrones: armamentSource.repairDroneAmount,
+        deliveredResources: getTotalResourceAmount(armamentSource.cargo),
+        missingStructuralRatio: roundToTwoDecimals(target.damageRatio),
+        localRecoveryTurns: roundToTwoDecimals(target.localRecoveryTurns)
+      }
+    })];
+  }
+
+  const fallback = selectCriticalRepairFallbackProducer(context, target.planet);
+  if (fallback && !hasVisibleShipProposal(context, fallback.planet, fallback.shipType)) {
+    return [createDemandOnlyShipyardCandidate({
+      blockerFamily: 'LOGISTICS_DEADLOCK',
+      blockerKey: `critical:phase2:repair-fallback:${toCoordinatesKey(fallback.planet.coordinates)}:${fallback.shipType}`,
+      planet: fallback.planet,
+      shipType: fallback.shipType,
+      amount: 1,
+      severity: target.severity,
+      urgency: 86,
+      requestedResources: resolveShipCost(fallback.shipType, 1),
+      reason: fallback.reason,
+      summary: `Critical repair fallback: produce ${fallback.shipType} on ${fallback.planet.name} for ${target.planet.name}.`,
+      debug: {
+        responseSubtype: fallback.shipType === ShipType.REPAIR_DRONE ? 'REPAIR' : 'ARMAMENT_DELIVERY',
+        targetPlanet: target.planet.name,
+        missingStructuralRatio: roundToTwoDecimals(target.damageRatio),
+        localRecoveryTurns: roundToTwoDecimals(target.localRecoveryTurns)
+      }
+    })];
+  }
+
+  return [];
+}
+
+function collectCriticalTransportResponseCandidates(
+  context: BotSubsystemContext,
+  target: {
+    planet: BotPlanetSnapshot;
+    shortage: ResourceAmounts;
+    totalShortage: number;
+    localRecoveryTurns: number;
+    severity: number;
+  }
+): CriticalCandidate[] {
+  if (hasVisibleCriticalMissionProposal(context, target.planet, [FleetMissionType.TRANSPORT])) {
+    return [];
+  }
+
+  const transportSource = selectCriticalTransportSource(context, target.planet, target.shortage);
+  if (transportSource) {
+    return [createFleetMissionCandidate({
+      blockerFamily: 'LOGISTICS_DEADLOCK',
+      responseSubtype: 'TRANSPORT',
+      blockerKey: `critical:phase2:transport:${toCoordinatesKey(target.planet.coordinates)}`,
+      originPlanet: transportSource.originPlanet,
+      targetPlanet: target.planet,
+      missionType: FleetMissionType.TRANSPORT,
+      ships: transportSource.ships,
+      cargo: transportSource.cargo,
+      severity: target.severity,
+      urgency: 82,
+      risk: 8,
+      confidence: 72,
+      summary: `Critical transport response: move resources from ${transportSource.originPlanet.name} to ${target.planet.name}.`,
+      debug: {
+        responseSubtype: 'TRANSPORT',
+        travelDistance: transportSource.travelDistance,
+        travelTurns: transportSource.travelTurns,
+        transportedResources: getTotalResourceAmount(transportSource.cargo),
+        localRecoveryTurns: roundToTwoDecimals(target.localRecoveryTurns)
+      }
+    })];
+  }
+
+  const cargoProducer = selectBestCargoShipProducer(context.snapshot.planets);
+  if (cargoProducer && !hasVisibleShipProposal(context, cargoProducer.planet, cargoProducer.shipType)) {
+    return [createDemandOnlyShipyardCandidate({
+      blockerFamily: 'LOGISTICS_DEADLOCK',
+      blockerKey: `critical:phase2:transport-fallback:${toCoordinatesKey(cargoProducer.planet.coordinates)}:${cargoProducer.shipType}`,
+      planet: cargoProducer.planet,
+      shipType: cargoProducer.shipType,
+      amount: 1,
+      severity: target.severity,
+      urgency: 74,
+      requestedResources: resolveShipCost(cargoProducer.shipType, 1),
+      reason: 'TRANSPORT',
+      summary: `Critical transport fallback: produce ${cargoProducer.shipType} on ${cargoProducer.planet.name} for ${target.planet.name}.`,
+      debug: {
+        responseSubtype: 'TRANSPORT',
+        targetPlanet: target.planet.name,
+        totalShortage: target.totalShortage,
+        localRecoveryTurns: roundToTwoDecimals(target.localRecoveryTurns)
+      }
+    })];
+  }
+
+  return [];
+}
+
+function evaluateCriticalRepairTarget(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot
+): {
+  planet: BotPlanetSnapshot;
+  damageRatio: number;
+  localRecoveryTurns: number;
+  severity: number;
+} | null {
+  if (!isCriticalRepairTargetSafe(context, planet)) {
+    return null;
+  }
+
+  if (!hasEmergencyInfrastructureDamage(planet.infrastructure, CRITICAL_REPAIR_DAMAGE_THRESHOLD_PERCENT)) {
+    return null;
+  }
+
+  const localRecoveryTurns = estimateLocalRepairRecoveryTurns(planet);
+  if (localRecoveryTurns <= CRITICAL_REPAIR_LOCAL_RECOVERY_TURNS) {
+    return null;
+  }
+
+  const damageRatio = resolveEffectiveInfrastructureDamagePercent(planet.infrastructure);
+  return {
+    planet,
+    damageRatio,
+    localRecoveryTurns,
+    severity: clampToHundred(Math.round(68 + Math.min(28, (damageRatio - CRITICAL_REPAIR_DAMAGE_THRESHOLD_PERCENT) * 1.1)))
+  };
+}
+
+function evaluateCriticalTransportTarget(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot
+): {
+  planet: BotPlanetSnapshot;
+  shortage: ResourceAmounts;
+  totalShortage: number;
+  localRecoveryTurns: number;
+  severity: number;
+} | null {
+  if (planet.maturityStage !== 'BOOTSTRAP' && planet.maturityStage !== 'STABILIZING') {
+    return null;
+  }
+
+  const shortage = resolveCriticalTransportShortage(context, planet);
+  const totalShortage = getTotalResourceAmount(shortage);
+  if (totalShortage <= 0 || totalShortage > MAX_CRITICAL_TRANSPORT_CARGO) {
+    return null;
+  }
+
+  const localRecoveryTurns = estimateResourceRecoveryTurns(planet, shortage);
+  if (localRecoveryTurns <= MAX_CRITICAL_TRANSPORT_LOCAL_RECOVERY_TURNS) {
+    return null;
+  }
+
+  return {
+    planet,
+    shortage,
+    totalShortage,
+    localRecoveryTurns,
+    severity: clampToHundred(Math.round(56 + Math.min(24, localRecoveryTurns * 2) + Math.min(16, totalShortage / 150)))
+  };
 }
 
 function resolveEmergencySignals(context: BotSubsystemContext): EmergencySignals {
@@ -633,11 +918,11 @@ function selectHeavilyDamagedRepairTarget(
 ): { planet: BotPlanetSnapshot; damageRatio: number; estimatedRepairTurns: number; severity: number } | null {
   const damaged = planets
     .map((planet) => {
-      const totalStructuralPoints = Math.max(1, planet.infrastructure.totalBuildingStructuralPoints);
-      const damageRatio = (planet.infrastructure.missingBuildingStructuralPoints / totalStructuralPoints) * 100;
+      const damageRatio = resolveEffectiveInfrastructureDamagePercent(planet.infrastructure);
       const estimatedRepairTurns = planet.infrastructure.missingBuildingStructuralPoints
         / Math.max(1, planet.power.industryPower);
-      if (damageRatio <= 35 || estimatedRepairTurns <= 20) {
+      if (!hasEmergencyInfrastructureDamage(planet.infrastructure, CRITICAL_REPAIR_DAMAGE_THRESHOLD_PERCENT)
+        || estimatedRepairTurns <= CRITICAL_REPAIR_LOCAL_RECOVERY_TURNS) {
         return null;
       }
 
@@ -696,6 +981,7 @@ function selectCriticalCandidates(candidates: CriticalCandidate[]): CriticalCand
 
   const sorted = [...candidates].sort((left, right) =>
     compareBlockerFamilyPriority(left.blockerFamily, right.blockerFamily)
+    || compareCriticalResponsePriority(left, right)
     || right.severity - left.severity
     || left.blockerKey.localeCompare(right.blockerKey)
   );
@@ -775,7 +1061,7 @@ function createCriticalProposal(context: BotSubsystemContext, candidate: Critica
     goalKey: candidate.blockerKey,
     dedupeKey: candidate.dedupeKey,
     summary: candidate.summary,
-    planetId: candidate.targetPlanet.planetId,
+    planetId: candidate.proposalPlanet.planetId,
     targetCoordinates: { ...candidate.targetPlanet.coordinates },
     expectedValue: candidate.severity,
     urgency: candidate.urgency,
@@ -810,6 +1096,7 @@ function createBuildingCandidate(input: {
   return {
     blockerKey: input.blockerKey,
     blockerFamily: input.blockerFamily,
+    proposalPlanet: input.planet,
     targetPlanet: input.planet,
     kind: 'BUILDING',
     dedupeKey: `${input.blockerFamily}:${toCoordinatesKey(input.planet.coordinates)}:${input.buildingType}`,
@@ -847,6 +1134,7 @@ function createShipyardCandidate(input: {
   return {
     blockerKey: input.blockerKey,
     blockerFamily: input.blockerFamily,
+    proposalPlanet: input.planet,
     targetPlanet: input.planet,
     kind: 'SHIPYARD',
     dedupeKey: `${input.blockerFamily}:${toCoordinatesKey(input.planet.coordinates)}:${input.shipType}`,
@@ -867,6 +1155,102 @@ function createShipyardCandidate(input: {
     debug: {
       shipType: input.shipType,
       amount: input.amount,
+      ...input.debug
+    }
+  };
+}
+
+function createDemandOnlyShipyardCandidate(input: {
+  blockerFamily: BotMemoryV2CriticalBlockerFamily;
+  blockerKey: string;
+  planet: BotPlanetSnapshot;
+  shipType: ShipType;
+  amount: number;
+  severity: number;
+  urgency: number;
+  requestedResources: ResourceAmounts;
+  summary: string;
+  reason: string;
+  debug: Record<string, string | number | boolean | null>;
+}): CriticalCandidate {
+  const candidate = createShipyardCandidate({
+    blockerFamily: input.blockerFamily,
+    blockerKey: input.blockerKey,
+    planet: input.planet,
+    shipType: input.shipType,
+    amount: input.amount,
+    severity: input.severity,
+    urgency: input.urgency,
+    requestedResources: input.requestedResources,
+    summary: input.summary,
+    debug: {
+      queueType: 'SHIP_NEED',
+      reason: input.reason,
+      ...input.debug
+    }
+  });
+
+  candidate.requestPayload = {
+    demandOnly: true,
+    shipType: input.shipType,
+    amount: input.amount,
+    reason: input.reason
+  };
+
+  return candidate;
+}
+
+function createFleetMissionCandidate(input: {
+  blockerFamily: BotMemoryV2CriticalBlockerFamily;
+  responseSubtype: CriticalResponseSubtype;
+  blockerKey: string;
+  originPlanet: BotPlanetSnapshot;
+  targetPlanet: BotPlanetSnapshot;
+  missionType: FleetMissionType;
+  ships: MissionShipSelection;
+  cargo: ResourceAmounts;
+  severity: number;
+  urgency: number;
+  risk: number;
+  confidence: number;
+  summary: string;
+  debug: Record<string, string | number | boolean | null>;
+}): CriticalCandidate {
+  const repairDroneAmount = input.ships.reduce((sum, ship) =>
+    ship.type === ShipType.REPAIR_DRONE ? sum + ship.undamagedAmount + ship.damagedAmount : sum, 0);
+
+  return {
+    blockerKey: input.blockerKey,
+    blockerFamily: input.blockerFamily,
+    proposalPlanet: input.originPlanet,
+    targetPlanet: input.targetPlanet,
+    kind: 'FLEET_MISSION',
+    dedupeKey: `${input.blockerFamily}:${input.responseSubtype}:${toCoordinatesKey(input.originPlanet.coordinates)}:${toCoordinatesKey(input.targetPlanet.coordinates)}`,
+    summary: input.summary,
+    severity: input.severity,
+    urgency: input.urgency,
+    risk: input.risk,
+    confidence: input.confidence,
+    requestedResources: { ...input.cargo },
+    requestPayload: {
+      responseSubtype: input.responseSubtype,
+      missionType: input.missionType,
+      origin: { ...input.originPlanet.coordinates },
+      target: { ...input.targetPlanet.coordinates },
+      ships: input.ships.map((ship) => ({ ...ship })),
+      carriedBombs: [],
+      cargo: { ...input.cargo },
+      repairDroneAmount,
+      useJumpGate: false,
+      bombardmentPriorities: null
+    },
+    debug: {
+      responseSubtype: input.responseSubtype,
+      originPlanet: input.originPlanet.name,
+      targetPlanet: input.targetPlanet.name,
+      missionType: input.missionType,
+      repairDroneAmount,
+      transportedResources: getTotalResourceAmount(input.cargo),
       ...input.debug
     }
   };
@@ -897,6 +1281,18 @@ function hasVisibleShipProposal(context: BotSubsystemContext, planet: BotPlanetS
   );
 }
 
+function hasVisibleCriticalMissionProposal(
+  context: BotSubsystemContext,
+  targetPlanet: BotPlanetSnapshot,
+  missionTypes: FleetMissionType[]
+): boolean {
+  return (context.priorProposals ?? []).some((proposal) =>
+    proposal.kind === 'FLEET_MISSION'
+    && sameCoordinates(proposal.targetCoordinates, targetPlanet.coordinates)
+    && missionTypes.includes(proposal.requestPayload.missionType as FleetMissionType)
+  );
+}
+
 function hasVisibleSamePlanetProposal(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
@@ -907,6 +1303,380 @@ function hasVisibleSamePlanetProposal(
     && kinds.includes(proposal.kind as 'BUILDING' | 'RESEARCH' | 'SHIPYARD')
   );
 }
+
+function isCriticalRepairTargetSafe(context: BotSubsystemContext, planet: BotPlanetSnapshot): boolean {
+  const weightEntry = resolveWeightManagerPlanetEntry(context, planet.coordinates);
+  const noDangerFlags = weightEntry
+    ? !weightEntry.inDangerPlanet && !weightEntry.constantlyAttackedPlanet
+    : !planet.defense.knownByWarFaction;
+  return noDangerFlags
+    && planet.defense.recentHostileAttackCountLast20Turns <= 0
+    && planet.defense.recentHostileAttackStep <= 0;
+}
+
+function isCriticalRepairSourceSafe(context: BotSubsystemContext, planet: BotPlanetSnapshot): boolean {
+  const damageRatio = resolveEffectiveInfrastructureDamagePercent(planet.infrastructure);
+  const weightEntry = resolveWeightManagerPlanetEntry(context, planet.coordinates);
+  const noDangerFlags = weightEntry
+    ? !weightEntry.inDangerPlanet && !weightEntry.constantlyAttackedPlanet
+    : !planet.defense.knownByWarFaction;
+  return damageRatio < 10
+    && noDangerFlags
+    && planet.defense.recentHostileAttackCountLast20Turns <= 0
+    && planet.defense.recentHostileAttackStep <= 0;
+}
+
+function estimateLocalRepairRecoveryTurns(planet: BotPlanetSnapshot): number {
+  return planet.infrastructure.missingBuildingStructuralPoints / Math.max(1, planet.power.industryPower);
+}
+
+function selectCriticalRepairSource(
+  context: BotSubsystemContext,
+  targetPlanet: BotPlanetSnapshot
+): {
+  originPlanet: BotPlanetSnapshot;
+  ships: MissionShipSelection;
+  travelDistance: number;
+  travelTurns: number;
+} | null {
+  return context.snapshot.planets
+    .filter((originPlanet) => !sameCoordinates(originPlanet.coordinates, targetPlanet.coordinates))
+    .filter((originPlanet) => isCriticalRepairSourceSafe(context, originPlanet))
+    .map((originPlanet) => {
+      const availableDrones = originPlanet.ships.undamagedCountByType[ShipType.REPAIR_DRONE] ?? 0;
+      if (availableDrones <= 0) {
+        return null;
+      }
+
+      const travelDistance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+      const travelTurns = resolveTravelTurns(originPlanet, travelDistance);
+      if (travelTurns > MAX_CRITICAL_REPAIR_TURNS) {
+        return null;
+      }
+
+      const ships: MissionShipSelection = [{
+        type: ShipType.REPAIR_DRONE,
+        undamagedAmount: Math.min(MAX_CRITICAL_REPAIR_SOURCE_DRONES, availableDrones),
+        damagedAmount: 0
+      }];
+      if (!hasEnoughDeuteriumForShips(originPlanet, ships, travelDistance)) {
+        return null;
+      }
+
+      return {
+        originPlanet,
+        ships,
+        travelDistance,
+        travelTurns
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .sort((left, right) =>
+      left.travelTurns - right.travelTurns
+      || left.travelDistance - right.travelDistance
+      || right.originPlanet.defense.avgIndustryLevel - left.originPlanet.defense.avgIndustryLevel
+      || left.originPlanet.name.localeCompare(right.originPlanet.name)
+    )[0] ?? null;
+}
+
+function selectCriticalArmamentDeliverySource(
+  context: BotSubsystemContext,
+  targetPlanet: BotPlanetSnapshot
+): {
+  originPlanet: BotPlanetSnapshot;
+  ships: MissionShipSelection;
+  cargo: ResourceAmounts;
+  repairDroneAmount: number;
+  travelDistance: number;
+  travelTurns: number;
+} | null {
+  return context.snapshot.planets
+    .filter((originPlanet) => !sameCoordinates(originPlanet.coordinates, targetPlanet.coordinates))
+    .filter((originPlanet) => isCriticalRepairSourceSafe(context, originPlanet))
+    .map((originPlanet) => {
+      const availableDrones = originPlanet.ships.undamagedCountByType[ShipType.REPAIR_DRONE] ?? 0;
+      if (availableDrones <= 0) {
+        return null;
+      }
+
+      const repairDroneBlueprint = SHIP_BLUEPRINTS.get(ShipType.REPAIR_DRONE);
+      const repairDroneSize = Math.max(1, repairDroneBlueprint?.size ?? 1);
+      const repairDroneAmount = Math.min(MAX_CRITICAL_REPAIR_SOURCE_DRONES, availableDrones);
+      const carrierSelection = selectUtilityHangarShips(originPlanet, repairDroneSize * repairDroneAmount);
+      if (!carrierSelection) {
+        return null;
+      }
+
+      const travelDistance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+      const travelTurns = resolveTravelTurns(originPlanet, travelDistance);
+      if (travelTurns > MAX_CRITICAL_ARMAMENT_DELIVERY_TURNS) {
+        return null;
+      }
+
+      const cargoCapacity = resolveSelectionCargoCapacity(carrierSelection);
+      const resourceNeed = resolveEmergencyRepairResourceNeed(targetPlanet);
+      const cargo = limitResourcesToCapacity(minResources(resolveSourceSurplus(originPlanet), resourceNeed), cargoCapacity);
+      const ships: MissionShipSelection = [
+        ...carrierSelection.map((ship) => ({ ...ship })),
+        {
+          type: ShipType.REPAIR_DRONE,
+          undamagedAmount: repairDroneAmount,
+          damagedAmount: 0
+        }
+      ];
+      if (!hasEnoughDeuteriumForShips(originPlanet, ships, travelDistance)) {
+        return null;
+      }
+
+      return {
+        originPlanet,
+        ships,
+        cargo,
+        repairDroneAmount,
+        travelDistance,
+        travelTurns
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .sort((left, right) =>
+      left.travelTurns - right.travelTurns
+      || right.repairDroneAmount - left.repairDroneAmount
+      || right.originPlanet.defense.avgIndustryLevel - left.originPlanet.defense.avgIndustryLevel
+      || left.originPlanet.name.localeCompare(right.originPlanet.name)
+    )[0] ?? null;
+}
+
+function selectCriticalTransportSource(
+  context: BotSubsystemContext,
+  targetPlanet: BotPlanetSnapshot,
+  shortage: ResourceAmounts
+): {
+  originPlanet: BotPlanetSnapshot;
+  ships: MissionShipSelection;
+  cargo: ResourceAmounts;
+  travelDistance: number;
+  travelTurns: number;
+} | null {
+  const totalShortage = getTotalResourceAmount(shortage);
+  return context.snapshot.planets
+    .filter((originPlanet) => !sameCoordinates(originPlanet.coordinates, targetPlanet.coordinates))
+    .filter((originPlanet) => isTransportSourcePlanetSafe(context, originPlanet))
+    .map((originPlanet) => {
+      const sourceSurplus = resolveSourceSurplus(originPlanet);
+      const transferable = minResources(shortage, sourceSurplus);
+      if (getTotalResourceAmount(transferable) < totalShortage) {
+        return null;
+      }
+
+      const shipSelection = selectUtilityCargoShips(originPlanet, totalShortage);
+      if (!shipSelection) {
+        return null;
+      }
+
+      const travelDistance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+      const travelTurns = resolveTravelTurns(originPlanet, travelDistance);
+      if (travelTurns > MAX_CRITICAL_TRANSPORT_TURNS) {
+        return null;
+      }
+      if (!hasEnoughDeuteriumForShips(originPlanet, shipSelection, travelDistance)) {
+        return null;
+      }
+
+      return {
+        originPlanet,
+        ships: shipSelection,
+        cargo: transferable,
+        travelDistance,
+        travelTurns
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .sort((left, right) =>
+      left.travelTurns - right.travelTurns
+      || right.originPlanet.defense.avgIndustryLevel - left.originPlanet.defense.avgIndustryLevel
+      || left.originPlanet.name.localeCompare(right.originPlanet.name)
+    )[0] ?? null;
+}
+
+function selectCriticalRepairFallbackProducer(
+  context: BotSubsystemContext,
+  targetPlanet: BotPlanetSnapshot
+): { planet: BotPlanetSnapshot; shipType: ShipType; reason: string } | null {
+  const empireRepairDroneCount = context.snapshot.planets.reduce((sum, planet) =>
+    sum + (planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0), 0);
+
+  if (empireRepairDroneCount <= 0) {
+    const repairProducer = selectSafeRepairDroneProducer(context);
+    return repairProducer
+      ? { planet: repairProducer, shipType: ShipType.REPAIR_DRONE, reason: 'NO_REPAIR_DRONES_AVAILABLE' }
+      : null;
+  }
+
+  if ((targetPlanet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0) <= 0) {
+    for (const shipType of UTILITY_ARMAMENT_CARRIER_TYPES) {
+      const producer = selectBestShipProducer(context.snapshot.planets, shipType);
+      if (producer) {
+        return { planet: producer, shipType, reason: 'NO_UTILITY_ARMAMENT_CARRIER' };
+      }
+    }
+  }
+
+  return null;
+}
+
+function resolveCriticalTransportShortage(context: BotSubsystemContext, planet: BotPlanetSnapshot): ResourceAmounts {
+  let bestShortage = emptyResources();
+  let bestTurnEstimate = 0;
+  for (const proposal of context.priorProposals ?? []) {
+    if (!sameCoordinates(proposal.targetCoordinates, planet.coordinates)) {
+      continue;
+    }
+    if (proposal.kind !== 'BUILDING' && proposal.kind !== 'RESEARCH' && proposal.kind !== 'SHIPYARD') {
+      continue;
+    }
+
+    const shortage = subtractResources(normalizeResources(proposal.requestedResources), planet.localResources);
+    const totalShortage = getTotalResourceAmount(shortage);
+    if (totalShortage <= 0) {
+      continue;
+    }
+
+    const turnEstimate = estimateResourceRecoveryTurns(planet, shortage);
+    if (
+      turnEstimate > bestTurnEstimate
+      || (turnEstimate === bestTurnEstimate && totalShortage > getTotalResourceAmount(bestShortage))
+    ) {
+      bestShortage = shortage;
+      bestTurnEstimate = turnEstimate;
+    }
+  }
+
+  return bestShortage;
+}
+
+function estimateResourceRecoveryTurns(planet: BotPlanetSnapshot, shortage: ResourceAmounts): number {
+  return Math.max(
+    estimateSingleResourceRecoveryTurns(shortage.metal, planet.economy.income.metal),
+    estimateSingleResourceRecoveryTurns(shortage.crystal, planet.economy.income.crystal),
+    estimateSingleResourceRecoveryTurns(shortage.deuterium, planet.economy.income.deuterium)
+  );
+}
+
+function estimateSingleResourceRecoveryTurns(shortage: number, income: number): number {
+  if (shortage <= 0) {
+    return 0;
+  }
+  if (income <= 0) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return Math.ceil(shortage / income);
+}
+
+function resolveEmergencyRepairResourceNeed(targetPlanet: BotPlanetSnapshot): ResourceAmounts {
+  const reserve = {
+    metal: Math.max(0, Math.floor(targetPlanet.economy.income.metal * 2)),
+    crystal: Math.max(0, Math.floor(targetPlanet.economy.income.crystal * 2)),
+    deuterium: Math.max(0, Math.floor(targetPlanet.economy.income.deuterium * 2))
+  };
+  return subtractResources(reserve, targetPlanet.localResources);
+}
+
+function isTransportSourcePlanetSafe(context: BotSubsystemContext, planet: BotPlanetSnapshot): boolean {
+  const weightEntry = resolveWeightManagerPlanetEntry(context, planet.coordinates);
+  const noDangerFlags = weightEntry
+    ? !weightEntry.inDangerPlanet && !weightEntry.constantlyAttackedPlanet
+    : !planet.defense.knownByWarFaction;
+  return noDangerFlags
+    && planet.defense.recentHostileAttackCountLast20Turns <= 1
+    && getTotalResourceAmount(resolveSourceSurplus(planet)) > 0;
+}
+
+function selectUtilityCargoShips(
+  planet: BotPlanetSnapshot,
+  requiredCargo: number
+): MissionShipSelection | null {
+  if (requiredCargo <= 0) {
+    return [];
+  }
+
+  const candidates = UTILITY_TRANSPORT_SHIP_TYPES
+    .map((shipType) => ({
+      shipType,
+      amount: planet.ships.undamagedCountByType[shipType] ?? 0,
+      blueprint: SHIP_BLUEPRINTS.get(shipType) ?? null
+    }))
+    .filter((entry) =>
+      entry.amount > 0
+      && !!entry.blueprint
+      && (entry.blueprint.cargoCapacity ?? 0) > 0
+    )
+    .sort((left, right) =>
+      (right.blueprint?.cargoCapacity ?? 0) - (left.blueprint?.cargoCapacity ?? 0)
+    );
+
+  let remainingCargo = requiredCargo;
+  const selection: MissionShipSelection = [];
+  for (const candidate of candidates) {
+    if (remainingCargo <= 0) {
+      break;
+    }
+
+    const cargoCapacity = candidate.blueprint?.cargoCapacity ?? 0;
+    const amount = Math.min(candidate.amount, Math.max(1, Math.ceil(remainingCargo / Math.max(1, cargoCapacity))));
+    selection.push({
+      type: candidate.shipType,
+      undamagedAmount: amount,
+      damagedAmount: 0
+    });
+    remainingCargo -= cargoCapacity * amount;
+  }
+
+  return remainingCargo <= 0 ? selection : null;
+}
+
+function selectUtilityHangarShips(
+  planet: BotPlanetSnapshot,
+  requiredHangar: number
+): MissionShipSelection | null {
+  if (requiredHangar <= 0) {
+    return [];
+  }
+
+  const candidates = UTILITY_ARMAMENT_CARRIER_TYPES
+    .map((shipType) => ({
+      shipType,
+      amount: planet.ships.undamagedCountByType[shipType] ?? 0,
+      blueprint: SHIP_BLUEPRINTS.get(shipType) ?? null
+    }))
+    .filter((entry) =>
+      entry.amount > 0
+      && !!entry.blueprint
+      && (entry.blueprint.hangarCapacity ?? 0) > 0
+    )
+    .sort((left, right) =>
+      (right.blueprint?.hangarCapacity ?? 0) - (left.blueprint?.hangarCapacity ?? 0)
+    );
+
+  let remainingHangar = requiredHangar;
+  const selection: MissionShipSelection = [];
+  for (const candidate of candidates) {
+    if (remainingHangar <= 0) {
+      break;
+    }
+
+    const hangarCapacity = candidate.blueprint?.hangarCapacity ?? 0;
+    const amount = Math.min(candidate.amount, Math.max(1, Math.ceil(remainingHangar / Math.max(1, hangarCapacity))));
+    selection.push({
+      type: candidate.shipType,
+      undamagedAmount: amount,
+      damagedAmount: 0
+    });
+    remainingHangar -= hangarCapacity * amount;
+  }
+
+  return remainingHangar <= 0 ? selection : null;
+}
+
 
 function resolveBuildingCost(buildingType: BuildingType, nextLevel: number): ResourceAmounts | null {
   const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
@@ -953,6 +1723,43 @@ function resolveAvailableCargoCapacity(planet: BotPlanetSnapshot): number {
       const blueprint = SHIP_BLUEPRINTS.get(shipType);
       return sum + ((blueprint?.cargoCapacity ?? 0) * Math.max(0, Number(amount ?? 0)));
     }, 0);
+}
+
+function resolveSelectionCargoCapacity(ships: MissionShipSelection): number {
+  return ships.reduce((total, ship) =>
+    total + ((SHIP_BLUEPRINTS.get(ship.type)?.cargoCapacity ?? 0) * (ship.undamagedAmount + ship.damagedAmount)), 0);
+}
+
+function hasEnoughDeuteriumForShips(
+  originPlanet: BotPlanetSnapshot,
+  ships: MissionShipSelection,
+  distance: number
+): boolean {
+  if (distance <= 0) {
+    return true;
+  }
+
+  const fuelCost = calculateFuelCost(
+    ships.map((ship) => ({
+      type: ship.type,
+      amount: ship.undamagedAmount + ship.damagedAmount
+    })),
+    distance
+  );
+  return originPlanet.localResources.deuterium >= fuelCost;
+}
+
+function resolveTravelTurns(originPlanet: BotPlanetSnapshot | null, distance: number): number {
+  if (!originPlanet) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return fleetTravelTurnsForDistance(
+    distance,
+    originPlanet.tech.fusionDriveLevel,
+    originPlanet.tech.hyperspaceDriveLevel,
+    0
+  );
 }
 
 function resolveBuildingProductionValue(buildingType: BuildingType, level: number): number {
@@ -1097,6 +1904,15 @@ function compareBlockerFamilyPriority(
   return BLOCKER_FAMILY_PRIORITY.indexOf(left) - BLOCKER_FAMILY_PRIORITY.indexOf(right);
 }
 
+function compareCriticalResponsePriority(left: CriticalCandidate, right: CriticalCandidate): number {
+  const leftSubtype = left.requestPayload.responseSubtype as CriticalResponseSubtype | undefined;
+  const rightSubtype = right.requestPayload.responseSubtype as CriticalResponseSubtype | undefined;
+  const priority = ['REPAIR', 'ARMAMENT_DELIVERY', 'TRANSPORT'] as const;
+  const leftIndex = leftSubtype ? priority.indexOf(leftSubtype) : Number.MAX_SAFE_INTEGER;
+  const rightIndex = rightSubtype ? priority.indexOf(rightSubtype) : Number.MAX_SAFE_INTEGER;
+  return leftIndex - rightIndex;
+}
+
 function sameCoordinates(
   left: { x: number; y: number; z: number } | null | undefined,
   right: { x: number; y: number; z: number } | null | undefined
@@ -1133,6 +1949,65 @@ function multiplyResources(resources: ResourceAmounts, multiplier: number): Reso
     metal: Math.max(0, Math.floor(resources.metal * multiplier)),
     crystal: Math.max(0, Math.floor(resources.crystal * multiplier)),
     deuterium: Math.max(0, Math.floor(resources.deuterium * multiplier))
+  };
+}
+
+function subtractResources(left: ResourceAmounts, right: ResourceAmounts): ResourceAmounts {
+  return {
+    metal: Math.max(0, left.metal - right.metal),
+    crystal: Math.max(0, left.crystal - right.crystal),
+    deuterium: Math.max(0, left.deuterium - right.deuterium)
+  };
+}
+
+function minResources(left: ResourceAmounts, right: ResourceAmounts): ResourceAmounts {
+  return {
+    metal: Math.min(left.metal, right.metal),
+    crystal: Math.min(left.crystal, right.crystal),
+    deuterium: Math.min(left.deuterium, right.deuterium)
+  };
+}
+
+function limitResourcesToCapacity(resources: ResourceAmounts, capacity: number): ResourceAmounts {
+  if (capacity <= 0) {
+    return emptyResources();
+  }
+
+  let remaining = Math.max(0, Math.floor(capacity));
+  const result = emptyResources();
+  for (const resourceKey of ['metal', 'crystal', 'deuterium'] as const) {
+    const amount = Math.min(resources[resourceKey], remaining);
+    result[resourceKey] = amount;
+    remaining -= amount;
+  }
+
+  return result;
+}
+
+function resolveSourceSurplus(planet: BotPlanetSnapshot): ResourceAmounts {
+  const reserveFloor = {
+    metal: Math.max(planet.economy.income.metal * 3, Math.floor(planet.economy.storageCapacity.metal * 0.25)),
+    crystal: Math.max(planet.economy.income.crystal * 3, Math.floor(planet.economy.storageCapacity.crystal * 0.25)),
+    deuterium: Math.max(planet.economy.income.deuterium * 3, Math.floor(planet.economy.storageCapacity.deuterium * 0.25))
+  };
+  const effectiveStored = {
+    metal: planet.localResources.metal * Math.max(0.1, planet.modifiers.metal),
+    crystal: planet.localResources.crystal * Math.max(0.1, planet.modifiers.crystal),
+    deuterium: planet.localResources.deuterium * Math.max(0.1, planet.modifiers.deuterium)
+  };
+  const maxEffective = Math.max(effectiveStored.metal, effectiveStored.crystal, effectiveStored.deuterium);
+  const averageEffective = (effectiveStored.metal + effectiveStored.crystal + effectiveStored.deuterium) / 3;
+
+  return {
+    metal: effectiveStored.metal >= maxEffective && effectiveStored.metal > averageEffective
+      ? Math.max(0, planet.localResources.metal - reserveFloor.metal)
+      : 0,
+    crystal: effectiveStored.crystal >= maxEffective && effectiveStored.crystal > averageEffective
+      ? Math.max(0, planet.localResources.crystal - reserveFloor.crystal)
+      : 0,
+    deuterium: effectiveStored.deuterium >= maxEffective && effectiveStored.deuterium > averageEffective
+      ? Math.max(0, planet.localResources.deuterium - reserveFloor.deuterium)
+      : 0
   };
 }
 

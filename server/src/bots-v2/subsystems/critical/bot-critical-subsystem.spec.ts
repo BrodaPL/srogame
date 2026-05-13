@@ -142,6 +142,106 @@ describe('BotCriticalSubsystem', () => {
 
     expect(intelProposal?.kind).toBe('SHIPYARD');
   });
+
+  it('emits a REPAIR fleet mission when a safe owned helper with repair drones exists', () => {
+    const { galaxy, bot, homePlanet, supportPlanet } = createCriticalWorld();
+    configureRepairEmergencyPlanet(homePlanet);
+    configureStablePlanet(supportPlanet, 6);
+    homePlanet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 1);
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 3);
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
+    applyHeavyStructuralDamage(homePlanet);
+
+    const { result } = runCriticalSubsystem(galaxy, bot);
+    const repairProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.REPAIR
+    );
+
+    expect(repairProposal).toBeDefined();
+    expect(repairProposal?.requestPayload.responseSubtype).toBe('REPAIR');
+  });
+
+  it('emits an ARMAMENT_DELIVERY fleet mission when repair drones must be relocated first', () => {
+    const { galaxy, bot, homePlanet, supportPlanet } = createCriticalWorld();
+    configureRepairEmergencyPlanet(homePlanet);
+    configureStablePlanet(supportPlanet, 6);
+    homePlanet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 3);
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CARRIER, 1);
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
+    applyHeavyStructuralDamage(homePlanet);
+
+    const { result } = runCriticalSubsystem(galaxy, bot);
+    const armamentProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ARMAMENT_DELIVERY
+    );
+
+    expect(armamentProposal).toBeDefined();
+    expect(armamentProposal?.requestPayload.responseSubtype).toBe('ARMAMENT_DELIVERY');
+  });
+
+  it('emits a TRANSPORT fleet mission for an immature planet that is really blocked on immediate resources', () => {
+    const { galaxy, bot, homePlanet, supportPlanet } = createCriticalWorld();
+    configureImmaturePlanet(homePlanet);
+    configureStablePlanet(supportPlanet, 6);
+    supportPlanet.rBDSFTQ.resources.metal = 12000;
+    supportPlanet.rBDSFTQ.resources.crystal = 1000;
+    supportPlanet.rBDSFTQ.resources.deuterium = 1000;
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CARGO_SUPPORT, 4);
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
+    homePlanet.rBDSFTQ.resources.metal = 0;
+    homePlanet.rBDSFTQ.resources.crystal = 0;
+    homePlanet.rBDSFTQ.resources.deuterium = 0;
+
+    const priorProposal = createPriorProposal({
+      subsystemId: 'ECONOMIC',
+      kind: 'BUILDING',
+      target: homePlanet,
+      requestedResources: { metal: 1800, crystal: 0, deuterium: 0 },
+      requestPayload: { x: 0, y: 0, z: 1, buildingType: BuildingType.METAL_MINE }
+    });
+
+    const { result } = runCriticalSubsystem(galaxy, bot, createDefaultBotMemoryV2(), [priorProposal]);
+    const transportProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.TRANSPORT
+    );
+
+    expect(transportProposal).toBeDefined();
+    expect(transportProposal?.requestPayload.responseSubtype).toBe('TRANSPORT');
+  });
+
+  it('does not emit Critical TRANSPORT when local recovery should happen within five turns', () => {
+    const { galaxy, bot, homePlanet, supportPlanet } = createCriticalWorld();
+    configureImmaturePlanet(homePlanet);
+    configureStablePlanet(supportPlanet, 6);
+    supportPlanet.rBDSFTQ.resources.metal = 12000;
+    supportPlanet.rBDSFTQ.resources.crystal = 1000;
+    supportPlanet.rBDSFTQ.resources.deuterium = 1000;
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CARGO_SUPPORT, 4);
+    supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
+    homePlanet.rBDSFTQ.resources.metal = 0;
+    homePlanet.rBDSFTQ.resources.crystal = 0;
+    homePlanet.rBDSFTQ.resources.deuterium = 0;
+
+    const priorProposal = createPriorProposal({
+      subsystemId: 'ECONOMIC',
+      kind: 'BUILDING',
+      target: homePlanet,
+      requestedResources: { metal: 30, crystal: 0, deuterium: 0 },
+      requestPayload: { x: 0, y: 0, z: 1, buildingType: BuildingType.ROBOTICS_FACTORY }
+    });
+
+    const { result } = runCriticalSubsystem(galaxy, bot, createDefaultBotMemoryV2(), [priorProposal]);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.TRANSPORT
+    )).toBe(false);
+  });
 });
 
 function runCriticalSubsystem(
@@ -263,6 +363,53 @@ function configureStablePlanet(planet: Planet, level: number): void {
   planet.setBuildingLevel(BuildingType.METAL_STORAGE, Math.max(1, level - 2));
   planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, Math.max(1, level - 2));
   planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, Math.max(1, level - 2));
+}
+
+function configureImmaturePlanet(planet: Planet): void {
+  planet.setBuildingLevel(BuildingType.METAL_MINE, 2);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 2);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 2);
+  planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 14);
+  planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 0);
+  planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+  planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 0);
+  planet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+  planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 1);
+  planet.setBuildingLevel(BuildingType.METAL_STORAGE, 10);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 10);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 10);
+}
+
+function configureRepairEmergencyPlanet(planet: Planet): void {
+  planet.setBuildingLevel(BuildingType.METAL_MINE, 18);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 18);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 18);
+  planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 12);
+  planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 0);
+  planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 0);
+  planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 8);
+  planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 0);
+  planet.setBuildingLevel(BuildingType.SHIPYARD, 6);
+  planet.setBuildingLevel(BuildingType.RESEARCH_LAB, 6);
+  planet.setBuildingLevel(BuildingType.METAL_STORAGE, 8);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 8);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 8);
+}
+
+function applyHeavyStructuralDamage(planet: Planet): void {
+  for (const buildingType of [
+    BuildingType.METAL_MINE,
+    BuildingType.CRYSTAL_MINE,
+    BuildingType.DEUTERIUM_SYNTHESIZER,
+    BuildingType.ROBOTICS_FACTORY,
+    BuildingType.SHIPYARD,
+    BuildingType.RESEARCH_LAB,
+    BuildingType.METAL_STORAGE,
+    BuildingType.CRYSTAL_STORAGE,
+    BuildingType.DEUTERIUM_TANK
+  ]) {
+    planet.setCurrentBuildingStructuralPoints(buildingType, 0);
+  }
 }
 
 function createPriorProposal(input: {

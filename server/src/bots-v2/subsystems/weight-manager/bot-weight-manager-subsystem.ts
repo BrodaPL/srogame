@@ -15,6 +15,7 @@ import type {
   BotSubsystemResult
 } from '../../bot-v2-types.ts';
 import { SHIP_BLUEPRINTS } from '../../../game-commands/command-helpers.js';
+import { hasEmergencyInfrastructureDamage } from '../../infrastructure-damage.js';
 
 type WeightProfileAxes = {
   aggression: number;
@@ -289,7 +290,7 @@ function buildPlanetFlags(
   const maturePlanet = !immaturePlanet;
   const knownByWarFaction = planet.defense.knownByWarFaction;
   const recentHostileAttackCountLast20Turns = planet.defense.recentHostileAttackCountLast20Turns;
-  const damagedPlanet = resolveStructuralDamagePercent(planet) > 25;
+  const damagedPlanet = resolveStructuralDamagePercent(planet) >= 25;
   const poorDefences = entry.avgDefence + 3 < highestAverages.defence;
   const inDangerPlanet = poorDefences && knownByWarFaction;
   const constantlyAttackedPlanet = recentHostileAttackCountLast20Turns >= 3;
@@ -606,11 +607,11 @@ function createDefaultPlanetFlags(planet: BotPlanetSnapshot): PlanetFlags {
 }
 
 function resolveStructuralDamagePercent(planet: BotPlanetSnapshot): number {
-  if (planet.infrastructure.totalBuildingStructuralPoints <= 0) {
-    return 0;
+  if (hasEmergencyInfrastructureDamage(planet.infrastructure, 25)) {
+    return Math.max(25, planet.infrastructure.totalDamagePercent);
   }
 
-  return (planet.infrastructure.missingBuildingStructuralPoints / planet.infrastructure.totalBuildingStructuralPoints) * 100;
+  return planet.infrastructure.totalDamagePercent;
 }
 
 function clampWeight(value: number): number {

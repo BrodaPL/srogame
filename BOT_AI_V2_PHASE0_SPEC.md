@@ -3100,3 +3100,168 @@ Suggested fields:
 Phase 1 should emit:
 - max `2` global Critical proposals
 - plus max `1` per planet
+
+## Critical Phase 2
+
+Phase 2 extends `Critical` from pure deadlock detection into an emergency mission-response layer.
+
+It is still proposal-only:
+- no proposal acceptance
+- no execution
+- no request answering
+
+Phase 2 should stay narrow.
+It is not a general mission planner, not a general logistics planner, and not an intel subsystem.
+
+### Phase 2 mission scope
+
+Allowed emergency mission types:
+- `REPAIR`
+- `TRANSPORT`
+- `ARMAMENT_DELIVERY`
+
+Not in scope:
+- `SPY`
+- combat rescue missions
+- offensive emergency strikes
+- broad acceleration logistics
+
+`INTEL_DEADLOCK` still remains relevant in phase 2, but only as production pressure for `SPY_PROBE` stock that other subsystems consume.
+`Critical` phase 2 should not emit `SPY` mission proposals.
+
+### Phase 2 allowed proposal kinds
+
+Phase 2 may emit:
+- `FLEET_MISSION`
+- `SHIPYARD`
+
+`SHIPYARD` remains the production fallback form.
+Do not add a new `PRODUCTION_REQUEST` proposal kind for `Critical`.
+
+When a valid owned emergency mission can be formed:
+- emit the mission proposal
+
+When the emergency exists but no valid owned mission can be formed:
+- emit a `SHIPYARD` demand-only fallback
+- use the current `SHIP_NEED` style in payload/debug metadata
+
+### Phase 2 response roles
+
+`REPAIR`:
+- default emergency repair response
+- use when a valid repair helper fleet already exists
+
+`ARMAMENT_DELIVERY`:
+- only for repair recovery when `REPAIR_DRONE`s and optionally resources must be moved first
+- do not use it as a generic transport replacement
+
+`TRANSPORT`:
+- only for small emergency resource rescue on immature planets
+- not for broad empire optimization
+
+### Payload rules
+
+Critical `TRANSPORT` should carry:
+- resources only
+
+Critical `ARMAMENT_DELIVERY` should carry:
+- `REPAIR_DRONE`
+- resources
+
+Critical `ARMAMENT_DELIVERY` should not carry:
+- bombs
+- offensive payloads
+- broad military logistics payloads
+
+### Priority and caps
+
+Priority order in phase 2:
+- `REPAIR`
+- `TRANSPORT`
+
+`SPY` is not considered here.
+
+Phase 2 keeps the same cap shape as phase 1:
+- max `2` global Critical proposals
+- plus max `1` per planet
+
+It is allowed to emit one repair-side mission and one transport-side mission in the same turn, if:
+- they target different planets
+- both pass the cap and validity rules
+
+### Phase 2 blocker-family handling
+
+Keep the existing phase-1 blocker families:
+- `ENERGY_DEADLOCK`
+- `STORAGE_DEADLOCK`
+- `INDUSTRY_CHAIN_DEADLOCK`
+- `LOGISTICS_DEADLOCK`
+- `INTEL_DEADLOCK`
+
+Do not add a new top-level blocker family set in phase 2.
+
+Instead, add mission-response subtype metadata such as:
+- `REPAIR`
+- `TRANSPORT`
+- `ARMAMENT_DELIVERY`
+
+This keeps ledger continuity while making emergency mission traces readable.
+
+### Emergency TRANSPORT trigger
+
+Critical `TRANSPORT` should trigger only when:
+- the target is an immature planet
+- the target is genuinely blocked on immediate recovery cost
+- local recovery is not expected within `<= 5` turns
+
+If the planet can recover locally within `<= 5` turns:
+- do not use `Critical` transport
+
+This emergency transport scope should stay small, roughly:
+- up to about `2000` cargo capacity
+
+Larger acceleration logistics should stay with other subsystems.
+
+### Emergency REPAIR trigger
+
+Critical `REPAIR` response should trigger only when:
+- the target is an owned planet
+- structural damage is more than `35%`
+- local full recovery would take more than `20` turns
+- the target is safe enough to justify committing repair help
+
+### Safe target rule
+
+The target should pass a hybrid safety test:
+- not `inDangerPlanet`
+- not `constantlyAttackedPlanet`
+- and not under meaningful recent hostile pressure
+
+### Valid emergency repair source
+
+A valid owned repair source should be:
+- a planet with a repair-capable fleet
+- source structural damage below `10%`
+- not under recent pressure
+
+### Mission-selection rule
+
+When both repair response paths are possible:
+- prefer `REPAIR` whenever a valid helper already exists
+- use `ARMAMENT_DELIVERY` only when repair recovery depends on moving `REPAIR_DRONE`s or resources first
+
+### ETA caps
+
+Mission-specific ETA caps should be:
+- `REPAIR <= 8`
+- `ARMAMENT_DELIVERY <= 5`
+- `TRANSPORT <= 8`
+
+Do not use one generic ETA cap for all Critical phase-2 missions.
+
+### Utility-only planning rule
+
+For phase 2, `Critical` should use a utility-only planner-side ship selection rule for emergency repair/logistics support.
+
+This is a planner rule for `Critical`.
+It does not require changing the broader shared legality of the mission types themselves.

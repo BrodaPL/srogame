@@ -34,6 +34,10 @@ import {
   calculateTravelDistance,
   SHIP_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
+import {
+  hasEmergencyInfrastructureDamage,
+  resolveEffectiveInfrastructureDamagePercent
+} from '../../infrastructure-damage.js';
 
 type FactionLedgerMap = Map<number, BotMemoryV2StrategicDiplomaticFactionEntry>;
 type OpenedWarTargetLedgerMap = Map<string, BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry>;
@@ -4096,14 +4100,14 @@ function createRepairSupportRequestCandidates(
   const candidates: OutgoingSupportRequestPlan[] = [];
 
   for (const planet of context.snapshot.planets) {
-    const totalStructuralPoints = Math.max(1, planet.infrastructure.totalBuildingStructuralPoints);
-    const missingRatio = planet.infrastructure.missingBuildingStructuralPoints / totalStructuralPoints;
-    if (missingRatio < HEAVY_REPAIR_DAMAGE_RATIO_THRESHOLD) {
+    if (!hasEmergencyInfrastructureDamage(planet.infrastructure, HEAVY_REPAIR_DAMAGE_RATIO_THRESHOLD * 100)) {
       continue;
     }
     if (canPlanetRecoverRepairDamageLocally(planet) || canOtherOwnedPlanetsDeliverRepairSupport(context, planet)) {
       continue;
     }
+
+    const missingRatio = resolveEffectiveInfrastructureDamagePercent(planet.infrastructure) / 100;
 
     const recipient = resolveBestSupportRequestRecipient(
       factions,

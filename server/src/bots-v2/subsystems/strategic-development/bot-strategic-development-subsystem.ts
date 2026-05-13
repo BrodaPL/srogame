@@ -29,6 +29,10 @@ import {
   SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
+import {
+  resolveEffectiveInfrastructureDamagePercent,
+  resolvePrioritizedInfrastructureDamagePoints
+} from '../../infrastructure-damage.js';
 
 type ResourceKey = 'metal' | 'crystal' | 'deuterium';
 
@@ -307,6 +311,7 @@ function resolveTargetSupportNeed(
   const negativeIndustryModifier = planet.modifiers.industry < 1;
   const hasDamagedBuildings = planet.infrastructure.damagedBuildingCount > 0
     && planet.infrastructure.missingBuildingStructuralPoints > 0;
+  const emergencyDamageTrigger = planet.infrastructure.emergencyRepairTriggered;
   const repairPriorityBand = hasDamagedBuildings
     ? 1
     : recentlyColonized
@@ -314,9 +319,11 @@ function resolveTargetSupportNeed(
       : negativeIndustryModifier
         ? 3
         : null;
-  const repairNeedScore = planet.infrastructure.missingBuildingStructuralPoints
+  const prioritizedDamagePoints = resolvePrioritizedInfrastructureDamagePoints(planet.infrastructure);
+  const repairNeedScore = prioritizedDamagePoints
     + (negativeIndustryModifier ? Math.round((1 - planet.modifiers.industry) * 1000) : 0)
-    + (recentlyColonized ? 500 : 0);
+    + (recentlyColonized ? 500 : 0)
+    + (emergencyDamageTrigger ? Math.round(resolveEffectiveInfrastructureDamagePercent(planet.infrastructure) * 10) : 0);
 
   return {
     resourceNeed,

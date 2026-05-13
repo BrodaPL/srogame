@@ -36,6 +36,7 @@ import type {
   BotV2FeatureFlags,
   BotWorldSnapshot
 } from '../bot-v2-types.ts';
+import { resolveInfrastructureDamageSummary } from '../infrastructure-damage.js';
 import type { EspionageReportData } from '../../../../src/app/models/reports/espionage-report-data.ts';
 import {
   BUILDING_BLUEPRINTS,
@@ -203,7 +204,7 @@ function buildPlanetSnapshot(
   const installedShipValueByType = resolveInstalledShipValues(shipCounts);
   const totalInstalledShipValue = Object.values(installedShipValueByType)
     .reduce((sum, value) => sum + value, 0);
-  const buildingDamageSummary = resolveBuildingDamageSummary(planet);
+  const buildingDamageSummary = resolveInfrastructureDamageSummary(planet);
   const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
   const recentHostileAttackCountLast20Turns = resolveRecentHostileAttackCountLast100Turns(
     player,
@@ -626,42 +627,6 @@ function resolveInstalledShipValues(
   }
 
   return values;
-}
-
-function resolveBuildingDamageSummary(planet: Planet): {
-  damagedBuildingCount: number;
-  missingBuildingStructuralPoints: number;
-  totalBuildingStructuralPoints: number;
-} {
-  let damagedBuildingCount = 0;
-  let missingBuildingStructuralPoints = 0;
-  let totalBuildingStructuralPoints = 0;
-
-  for (const [buildingType, level] of planet.rBDSFTQ.buildingsLevels.entries()) {
-    if (level <= 0) {
-      continue;
-    }
-
-    const maxStructuralPoints = planet.getMaxBuildingStructuralPoints(buildingType);
-    if (maxStructuralPoints <= 0) {
-      continue;
-    }
-    totalBuildingStructuralPoints += maxStructuralPoints;
-
-    const currentStructuralPoints = planet.getCurrentBuildingStructuralPoints(buildingType);
-    if (currentStructuralPoints >= maxStructuralPoints) {
-      continue;
-    }
-
-    damagedBuildingCount += 1;
-    missingBuildingStructuralPoints += Math.max(0, maxStructuralPoints - currentStructuralPoints);
-  }
-
-  return {
-    damagedBuildingCount,
-    missingBuildingStructuralPoints,
-    totalBuildingStructuralPoints
-  };
 }
 
 function resolveCompletedBuildingInvestment(buildingType: BuildingType, level: number): number {

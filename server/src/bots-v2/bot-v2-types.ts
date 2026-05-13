@@ -11,6 +11,11 @@ import type { DiplomaticStatus } from '../../../src/app/models/diplomacy/diploma
 import type { PlayerType } from '../../../src/app/models/enums/player-type.ts';
 import type { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.ts';
 import type { BotMemoryV2StrategicDiplomaticSharedHostileEventType } from '../../../src/app/models/player.ts';
+import type {
+  BotInfrastructureBuildingDamageEntry,
+  BotInfrastructureDamageCategory,
+  BotInfrastructureDamageCategorySummary
+} from './infrastructure-damage.ts';
 
 export type BotProposalKind =
   | 'BUILDING'
@@ -363,6 +368,12 @@ export type BotPlanetSnapshot = {
     damagedBuildingCount: number;
     missingBuildingStructuralPoints: number;
     totalBuildingStructuralPoints: number;
+    totalDamagePercent: number;
+    emergencyRepairTriggered: boolean;
+    highestTriggeredCategory: BotInfrastructureDamageCategory | null;
+    maxTriggeredBuildingDamagePercent: number;
+    damageByCategory: Record<BotInfrastructureDamageCategory, BotInfrastructureDamageCategorySummary>;
+    damageByBuildingType: Partial<Record<BuildingType, BotInfrastructureBuildingDamageEntry>>;
   };
   localResources: {
     metal: number;

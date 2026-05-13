@@ -228,6 +228,54 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(repairProposal?.debug.supportReason).toBe('EXPLICIT_REQUEST');
   });
 
+  it('requests foreign repair help when a crucial building breaches threshold even below total damage ratio threshold', () => {
+    const { galaxy, bot, botPlanet, botEnemy } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, botEnemy.playerId, DiplomaticStatus.ALLIED)
+    );
+    botPlanet.setBuildingLevel(BuildingType.METAL_MINE, 12);
+    botPlanet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 12);
+    botPlanet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 12);
+    botPlanet.setBuildingLevel(BuildingType.METAL_STORAGE, 10);
+    botPlanet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 10);
+    botPlanet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 10);
+    botPlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 24);
+    botPlanet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 8);
+    botPlanet.setBuildingLevel(BuildingType.FUSION_REACTOR, 4);
+    botPlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+    botPlanet.setBuildingLevel(BuildingType.SHIPYARD, 0);
+    applyBuildingDamagePercent(botPlanet, BuildingType.SOLAR_WIND_GEOTHERMAL, 70);
+    markPlanetScanned(bot, botEnemy, botEnemy.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 10 });
+
+    const snapshot = buildBotWorldSnapshot(galaxy, bot, {
+      enabled: true,
+      shadowMode: true,
+      enabledSubsystems: {
+        economic: false,
+        defensive: false,
+        warfare: false,
+        critical: false,
+        strategicDevelopment: false,
+        strategicMilitary: false,
+        strategicDiplomatic: true,
+        weightManager: false
+      },
+      allowSupervisorAcceptance: false,
+      allowExecution: false
+    });
+    const botSnapshot = snapshot.planets.find((planet) => planet.name === botPlanet.basicInfo.name);
+    expect(botSnapshot?.infrastructure.totalDamagePercent ?? 100).toBeLessThan(35);
+    expect(botSnapshot?.infrastructure.emergencyRepairTriggered).toBe(true);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const supportRequest = result.result.proposals.find((proposal) =>
+      proposal.requestPayload.actionType === 'SUPPORT_REQUEST'
+      && proposal.requestPayload.supportType === 'PLANET_REPAIR'
+    );
+
+    expect(supportRequest).toBeDefined();
+  });
+
   it('emits exact-ship-type war-break ship need when direct attack and relocation are both unavailable', () => {
     const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     galaxy.diplomaticRelations.push(
@@ -918,6 +966,14 @@ function enableAdvancedWarProduction(planet: Planet, player: Player): void {
   player.setTechLevel(TechnologyType.FUSION_DRIVE, 8);
   player.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 8);
   player.setTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY, 8);
+}
+
+function applyBuildingDamagePercent(planet: Planet, buildingType: BuildingType, remainingPercent: number): void {
+  const maxStructuralPoints = planet.getMaxBuildingStructuralPoints(buildingType);
+  planet.setCurrentBuildingStructuralPoints(
+    buildingType,
+    Math.floor(maxStructuralPoints * Math.max(0, Math.min(100, remainingPercent)) / 100)
+  );
 }
 
 function addOwnedPlanet(

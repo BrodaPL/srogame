@@ -58,6 +58,50 @@ describe('BotWeightManagerSubsystem', () => {
     expect(weakEntry?.defensiveWeight).toBeGreaterThan(weakEntry?.economicWeight ?? 0);
   });
 
+  it('marks a planet as damaged when a crucial building breaches its emergency threshold even below total damage threshold', () => {
+    const { galaxy, bot, matureHubPlanet } = createWeightManagerWorld();
+    configureIndustryPlanet(matureHubPlanet, 12);
+    matureHubPlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 24);
+    matureHubPlanet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 8);
+    matureHubPlanet.setBuildingLevel(BuildingType.FUSION_REACTOR, 4);
+    matureHubPlanet.setBuildingLevel(BuildingType.RESEARCH_LAB, 10);
+    matureHubPlanet.setBuildingLevel(BuildingType.ALLIANCE_DEPOT, 10);
+    matureHubPlanet.setBuildingLevel(BuildingType.BOMB_DEPOT, 10);
+    matureHubPlanet.setBuildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT, 10);
+    matureHubPlanet.setBuildingLevel(BuildingType.BUNKER_NETWORK, 10);
+    applyBuildingDamagePercent(matureHubPlanet, BuildingType.SOLAR_WIND_GEOTHERMAL, 75);
+
+    const snapshot = buildBotWorldSnapshot(galaxy, bot, {
+      enabled: true,
+      shadowMode: true,
+      enabledSubsystems: {
+        economic: false,
+        defensive: false,
+        warfare: false,
+        critical: false,
+        strategicDevelopment: false,
+        strategicMilitary: false,
+        strategicDiplomatic: false,
+        weightManager: true
+      },
+      allowSupervisorAcceptance: false,
+      allowExecution: false
+    });
+    const damagedSnapshot = snapshot.planets.find((planet) =>
+      sameCoordinates(planet.coordinates, matureHubPlanet)
+    );
+
+    expect(damagedSnapshot?.infrastructure.totalDamagePercent ?? 100).toBeLessThan(25);
+    expect(damagedSnapshot?.infrastructure.emergencyRepairTriggered).toBe(true);
+
+    const result = runWeightManagerSubsystem(galaxy, bot);
+    const damagedEntry = result.memory.weightManager.planets.find((planet) =>
+      sameCoordinates(planet.coordinates, matureHubPlanet)
+    );
+
+    expect(damagedEntry?.damagedPlanet).toBe(true);
+  });
+
   it('removes industry focus during active war without forcing a replacement focus', () => {
     const { galaxy, bot, enemy, matureLaggingPlanet, matureHubPlanet } = createWeightManagerWorld();
     configureIndustryPlanet(matureHubPlanet, 9);
@@ -232,4 +276,12 @@ function sameCoordinates(
   return coordinates.x === planet.basicInfo.solarSystem.coordinates.x
     && coordinates.y === planet.basicInfo.solarSystem.coordinates.y
     && coordinates.z === planet.basicInfo.order;
+}
+
+function applyBuildingDamagePercent(planet: Planet, buildingType: BuildingType, remainingPercent: number): void {
+  const maxStructuralPoints = planet.getMaxBuildingStructuralPoints(buildingType);
+  planet.setCurrentBuildingStructuralPoints(
+    buildingType,
+    Math.floor(maxStructuralPoints * Math.max(0, Math.min(100, remainingPercent)) / 100)
+  );
 }
