@@ -438,34 +438,31 @@ function collectCriticalRepairResponseCandidates(
     return [];
   }
 
-  const localRepairDrones = target.planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0;
-  if (localRepairDrones > 0) {
-    const directRepair = selectCriticalRepairSource(context, target.planet);
-    if (directRepair) {
-      return [createFleetMissionCandidate({
-        blockerFamily: 'LOGISTICS_DEADLOCK',
+  const directRepair = selectCriticalRepairSource(context, target.planet);
+  if (directRepair) {
+    return [createFleetMissionCandidate({
+      blockerFamily: 'LOGISTICS_DEADLOCK',
+      responseSubtype: 'REPAIR',
+      blockerKey: `critical:phase2:repair:${toCoordinatesKey(target.planet.coordinates)}`,
+      originPlanet: directRepair.originPlanet,
+      targetPlanet: target.planet,
+      missionType: FleetMissionType.REPAIR,
+      ships: directRepair.ships,
+      cargo: emptyResources(),
+      severity: target.severity,
+      urgency: 95,
+      risk: 10,
+      confidence: 74,
+      summary: `Critical repair response: send repair aid from ${directRepair.originPlanet.name} to ${target.planet.name}.`,
+      debug: {
         responseSubtype: 'REPAIR',
-        blockerKey: `critical:phase2:repair:${toCoordinatesKey(target.planet.coordinates)}`,
-        originPlanet: directRepair.originPlanet,
-        targetPlanet: target.planet,
-        missionType: FleetMissionType.REPAIR,
-        ships: directRepair.ships,
-        cargo: emptyResources(),
-        severity: target.severity,
-        urgency: 95,
-        risk: 10,
-        confidence: 74,
-        summary: `Critical repair response: send repair aid from ${directRepair.originPlanet.name} to ${target.planet.name}.`,
-        debug: {
-          responseSubtype: 'REPAIR',
-          travelDistance: directRepair.travelDistance,
-          travelTurns: directRepair.travelTurns,
-          sentRepairDrones: directRepair.ships.reduce((sum, ship) => sum + ship.undamagedAmount + ship.damagedAmount, 0),
-          missingStructuralRatio: roundToTwoDecimals(target.damageRatio),
-          localRecoveryTurns: roundToTwoDecimals(target.localRecoveryTurns)
-        }
-      })];
-    }
+        travelDistance: directRepair.travelDistance,
+        travelTurns: directRepair.travelTurns,
+        sentRepairDrones: directRepair.ships.reduce((sum, ship) => sum + ship.undamagedAmount + ship.damagedAmount, 0),
+        missingStructuralRatio: roundToTwoDecimals(target.damageRatio),
+        localRecoveryTurns: roundToTwoDecimals(target.localRecoveryTurns)
+      }
+    })];
   }
 
   const armamentSource = selectCriticalArmamentDeliverySource(context, target.planet);
@@ -1415,7 +1412,10 @@ function selectCriticalArmamentDeliverySource(
 
       const cargoCapacity = resolveSelectionCargoCapacity(carrierSelection);
       const resourceNeed = resolveEmergencyRepairResourceNeed(targetPlanet);
-      const cargo = limitResourcesToCapacity(minResources(resolveSourceSurplus(originPlanet), resourceNeed), cargoCapacity);
+      const cargo = limitResourcesToCapacity(
+        minResources(resolveRepairLogisticsSourceSurplus(originPlanet), resourceNeed),
+        cargoCapacity
+      );
       const ships: MissionShipSelection = [
         ...carrierSelection.map((ship) => ({ ...ship })),
         {
@@ -2011,9 +2011,28 @@ function resolveSourceSurplus(planet: BotPlanetSnapshot): ResourceAmounts {
   };
 }
 
+function resolveRepairLogisticsSourceSurplus(planet: BotPlanetSnapshot): ResourceAmounts {
+  const reserveFloor = {
+    metal: Math.max(planet.economy.income.metal * 3, Math.floor(planet.economy.storageCapacity.metal * 0.25)),
+    crystal: Math.max(planet.economy.income.crystal * 3, Math.floor(planet.economy.storageCapacity.crystal * 0.25)),
+    deuterium: Math.max(planet.economy.income.deuterium * 3, Math.floor(planet.economy.storageCapacity.deuterium * 0.25))
+  };
+
+  return {
+    metal: Math.max(0, planet.localResources.metal - reserveFloor.metal),
+    crystal: Math.max(0, planet.localResources.crystal - reserveFloor.crystal),
+    deuterium: Math.max(0, planet.localResources.deuterium - reserveFloor.deuterium)
+  };
+}
+
 function getTotalResourceAmount(resources: ResourceAmounts): number {
   return Math.max(0, resources.metal) + Math.max(0, resources.crystal) + Math.max(0, resources.deuterium);
 }
+
+export const __criticalTestInternals = {
+  resolveSourceSurplus,
+  resolveRepairLogisticsSourceSurplus
+};
 
 function emptyResources(): ResourceAmounts {
   return {

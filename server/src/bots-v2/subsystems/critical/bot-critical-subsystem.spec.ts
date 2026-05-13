@@ -13,7 +13,7 @@ import { Player } from '../../../../../src/app/models/player.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
-import { BotCriticalSubsystem } from './bot-critical-subsystem.js';
+import { __criticalTestInternals, BotCriticalSubsystem } from './bot-critical-subsystem.js';
 
 describe('BotCriticalSubsystem', () => {
   it('emits an emergency energy proposal and records the blocker in the ledger', () => {
@@ -143,12 +143,11 @@ describe('BotCriticalSubsystem', () => {
     expect(intelProposal?.kind).toBe('SHIPYARD');
   });
 
-  it('emits a REPAIR fleet mission when a safe owned helper with repair drones exists', () => {
+  it('emits a REPAIR fleet mission when a safe owned helper with repair drones exists even without local target drones', () => {
     const { galaxy, bot, homePlanet, supportPlanet } = createCriticalWorld();
     configureRepairEmergencyPlanet(homePlanet);
     configureStablePlanet(supportPlanet, 6);
     homePlanet.setBuildingLevel(BuildingType.SHIPYARD, 1);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 1);
     supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 3);
     supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
     applyHeavyStructuralDamage(homePlanet);
@@ -163,7 +162,7 @@ describe('BotCriticalSubsystem', () => {
     expect(repairProposal?.requestPayload.responseSubtype).toBe('REPAIR');
   });
 
-  it('emits an ARMAMENT_DELIVERY fleet mission when repair drones must be relocated first', () => {
+  it('prefers REPAIR over ARMAMENT_DELIVERY when both helper drones and a carrier are available', () => {
     const { galaxy, bot, homePlanet, supportPlanet } = createCriticalWorld();
     configureRepairEmergencyPlanet(homePlanet);
     configureStablePlanet(supportPlanet, 6);
@@ -171,16 +170,55 @@ describe('BotCriticalSubsystem', () => {
     supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 3);
     supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CARRIER, 1);
     supportPlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
+    supportPlanet.rBDSFTQ.resources.metal = 12000;
+    supportPlanet.rBDSFTQ.resources.crystal = 12000;
+    supportPlanet.rBDSFTQ.resources.deuterium = 12000;
     applyHeavyStructuralDamage(homePlanet);
 
     const { result } = runCriticalSubsystem(galaxy, bot);
+    const repairProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.REPAIR
+    );
     const armamentProposal = result.proposals.find((proposal) =>
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.ARMAMENT_DELIVERY
     );
 
-    expect(armamentProposal).toBeDefined();
-    expect(armamentProposal?.requestPayload.responseSubtype).toBe('ARMAMENT_DELIVERY');
+    expect(repairProposal).toBeDefined();
+    expect(armamentProposal).toBeUndefined();
+  });
+
+  it('keeps dominant-only surplus for TRANSPORT but allows balanced surplus for repair logistics', () => {
+    const { galaxy, bot, supportPlanet } = createCriticalWorld();
+    configureStablePlanet(supportPlanet, 6);
+    supportPlanet.rBDSFTQ.resources.metal = 12000;
+    supportPlanet.rBDSFTQ.resources.crystal = 12000;
+    supportPlanet.rBDSFTQ.resources.deuterium = 12000;
+
+    const balancedSnapshot = buildBotWorldSnapshot(galaxy, bot, {
+      enabled: true,
+      shadowMode: true,
+      enabledSubsystems: {
+        economic: false,
+        defensive: false,
+        warfare: false,
+        critical: true,
+        strategicDevelopment: false,
+        strategicMilitary: false,
+        strategicDiplomatic: false,
+        weightManager: false
+      },
+      allowSupervisorAcceptance: false,
+      allowExecution: false
+    }).planets[1]!;
+    const dominantSurplus = __criticalTestInternals.resolveSourceSurplus(balancedSnapshot);
+    const repairSurplus = __criticalTestInternals.resolveRepairLogisticsSourceSurplus(balancedSnapshot);
+
+    expect(dominantSurplus.metal + dominantSurplus.crystal + dominantSurplus.deuterium).toBe(0);
+    expect(repairSurplus.metal).toBeGreaterThan(0);
+    expect(repairSurplus.crystal).toBeGreaterThan(0);
+    expect(repairSurplus.deuterium).toBeGreaterThan(0);
   });
 
   it('emits a TRANSPORT fleet mission for an immature planet that is really blocked on immediate resources', () => {
