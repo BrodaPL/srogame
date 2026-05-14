@@ -1,6 +1,7 @@
 import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
 import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
 import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
+import { normalizeBombardmentPriorities } from '../../../../src/app/models/bombardment/bombardment-priority.js';
 import type {
   ClientCoordinates,
   CreateFleetBombSelectionEntry,
@@ -10,16 +11,14 @@ import type {
 import type { CreateFleetMissionCommand } from '../../game-commands/fleet-commands.ts';
 import type { BotProposal } from '../bot-v2-types.ts';
 
-export const SUPERVISOR_PHASE2_ALLOWED_FLEET_MISSIONS = new Set<FleetMissionType>([
+export const SUPERVISOR_ALLOWED_FLEET_MISSIONS = new Set<FleetMissionType>([
   FleetMissionType.SPY,
   FleetMissionType.TRANSPORT,
   FleetMissionType.ARMAMENT_DELIVERY,
   FleetMissionType.REPAIR,
   FleetMissionType.COLONIZE,
-  FleetMissionType.MOVE
-]);
-
-const SUPERVISOR_PHASE2_DEFERRED_COMBAT_MISSIONS = new Set<FleetMissionType>([
+  FleetMissionType.MOVE,
+  FleetMissionType.DEFEND,
   FleetMissionType.ATTACK,
   FleetMissionType.BOMBARD,
   FleetMissionType.SIEGE
@@ -44,11 +43,8 @@ export function normalizeFleetExecutionProposal(proposal: BotProposal): BotFleet
   if (!isFleetMissionType(missionType)) {
     return { ok: false, reason: 'missing_or_invalid_mission_type' };
   }
-  if (SUPERVISOR_PHASE2_DEFERRED_COMBAT_MISSIONS.has(missionType)) {
-    return { ok: false, reason: 'combat_execution_deferred' };
-  }
-  if (!SUPERVISOR_PHASE2_ALLOWED_FLEET_MISSIONS.has(missionType)) {
-    return { ok: false, reason: 'fleet_mission_not_allowed_in_phase2' };
+  if (!SUPERVISOR_ALLOWED_FLEET_MISSIONS.has(missionType)) {
+    return { ok: false, reason: 'fleet_mission_not_allowed_in_current_supervisor_phase' };
   }
 
   const origin = readCoordinates(proposal.requestPayload.origin);
@@ -82,9 +78,17 @@ export function normalizeFleetExecutionProposal(proposal: BotProposal): BotFleet
       carriedBombs,
       cargo,
       useJumpGate: proposal.requestPayload.useJumpGate === true,
-      bombardmentPriorities: null
+      bombardmentPriorities: normalizeBombardmentPriorities(
+        readRecordOrNull(proposal.requestPayload.bombardmentPriorities)
+      )
     }
   };
+}
+
+function readRecordOrNull(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }
 
 function readCoordinates(value: unknown): ClientCoordinates | null {

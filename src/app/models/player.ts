@@ -147,6 +147,7 @@ export type BotMemoryV2ProposalKind =
 export type BotMemoryV2SupervisorPendingStatus =
   | 'PENDING_RESOURCES'
   | 'PENDING_QUEUE'
+  | 'PENDING_SHIPS_NEXT_TURN'
   | 'EXPIRED'
   | 'CANCELLED';
 
@@ -197,6 +198,17 @@ export type BotMemoryV2SupervisorFleetSlotEntry = {
   createdTurn: number;
   expiresOnTurn: number | null;
   active: boolean;
+};
+
+export type BotMemoryV2SupervisorFuelSpendingEntry = {
+  turn: number;
+  proposalId: string;
+  subsystemId: BotV2SubsystemId;
+  missionType: string;
+  originCoordinates: BotMemoryCoordinates | null;
+  targetCoordinates: BotMemoryCoordinates | null;
+  fleetId: number | null;
+  deuterium: number;
 };
 
 export type BotMemoryV2StrategicMilitaryFarmLedgerEntry = {
@@ -385,6 +397,7 @@ export type BotMemoryV2Supervisor = {
   spendingHistory: BotMemoryV2SupervisorSpendingEntry[];
   proposalHistory: BotMemoryV2SupervisorProposalEntry[];
   fleetSlotHistory: BotMemoryV2SupervisorFleetSlotEntry[];
+  fuelSpendingHistory: BotMemoryV2SupervisorFuelSpendingEntry[];
 };
 
 export type BotMemoryV2 = {
@@ -1351,7 +1364,8 @@ export class Player {
       ),
       spendingHistory: Player.normalizeBotMemoryV2SupervisorSpendingHistory(supervisor?.spendingHistory),
       proposalHistory: Player.normalizeBotMemoryV2SupervisorProposalHistory(supervisor?.proposalHistory),
-      fleetSlotHistory: Player.normalizeBotMemoryV2SupervisorFleetSlotHistory(supervisor?.fleetSlotHistory)
+      fleetSlotHistory: Player.normalizeBotMemoryV2SupervisorFleetSlotHistory(supervisor?.fleetSlotHistory),
+      fuelSpendingHistory: Player.normalizeBotMemoryV2SupervisorFuelSpendingHistory(supervisor?.fuelSpendingHistory)
     };
   }
 
@@ -1508,6 +1522,41 @@ export class Player {
       .slice(-120);
   }
 
+  private static normalizeBotMemoryV2SupervisorFuelSpendingHistory(
+    entries: BotMemoryV2SupervisorFuelSpendingEntry[] | null | undefined
+  ): BotMemoryV2SupervisorFuelSpendingEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        const missionType = Player.normalizeBotMemoryV2String(entry?.missionType, 80);
+        if (
+          !proposalId
+          || !missionType
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Number.isInteger(entry?.turn)
+        ) {
+          return null;
+        }
+
+        return {
+          turn: Math.max(0, entry.turn),
+          proposalId,
+          subsystemId: entry.subsystemId,
+          missionType,
+          originCoordinates: Player.normalizeBotMemoryCoordinates(entry?.originCoordinates),
+          targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
+          fleetId: Number.isInteger(entry?.fleetId) ? Math.max(0, entry.fleetId!) : null,
+          deuterium: Player.normalizeBotMemoryV2Count(entry?.deuterium)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorFuelSpendingEntry => entry !== null)
+      .slice(-200);
+  }
+
   private static normalizeBotMemoryV2Record(
     value: Record<string, unknown> | null | undefined
   ): Record<string, unknown> {
@@ -1562,6 +1611,7 @@ export class Player {
   ): status is BotMemoryV2SupervisorPendingStatus {
     return status === 'PENDING_RESOURCES'
       || status === 'PENDING_QUEUE'
+      || status === 'PENDING_SHIPS_NEXT_TURN'
       || status === 'EXPIRED'
       || status === 'CANCELLED';
   }

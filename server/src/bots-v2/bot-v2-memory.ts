@@ -54,7 +54,8 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
       pendingCommitments: [],
       spendingHistory: [],
       proposalHistory: [],
-      fleetSlotHistory: []
+      fleetSlotHistory: [],
+      fuelSpendingHistory: []
     }
   };
 }

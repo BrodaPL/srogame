@@ -449,6 +449,10 @@ export type BotDecisionTraceDto = {
       crystal: number;
       deuterium: number;
     };
+    fuelSpent?: number;
+    fleetId?: number;
+    missionType?: string;
+    commandErrorCode?: string;
   }>;
 };
 

@@ -209,6 +209,18 @@ function recordExecutedSpending(
         active: true
       });
     }
+    if (proposal.kind === 'FLEET_MISSION' && outcome.fuelSpent !== undefined && outcome.missionType) {
+      memory.supervisor.fuelSpendingHistory.push({
+        turn,
+        proposalId: proposal.proposalId,
+        subsystemId: proposal.subsystemId,
+        missionType: outcome.missionType,
+        originCoordinates: outcome.originCoordinates ? { ...outcome.originCoordinates } : null,
+        targetCoordinates: outcome.targetCoordinates ? { ...outcome.targetCoordinates } : null,
+        fleetId: outcome.fleetId ?? null,
+        deuterium: Math.max(0, Math.floor(outcome.fuelSpent))
+      });
+    }
     memory.supervisor.pendingCommitments = memory.supervisor.pendingCommitments
       .filter((commitment) =>
         commitment.dedupeKey !== proposal.dedupeKey

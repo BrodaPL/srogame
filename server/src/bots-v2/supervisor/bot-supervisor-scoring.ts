@@ -207,6 +207,8 @@ function readPayloadCoordinates(payload: Record<string, unknown>): { x: number; 
 export function pruneSupervisorHistory(memory: BotMemoryV2, turn: number): void {
   memory.supervisor.spendingHistory = memory.supervisor.spendingHistory
     .filter((entry: BotMemoryV2SupervisorSpendingEntry) => turn - entry.turn <= 40);
+  memory.supervisor.fuelSpendingHistory = memory.supervisor.fuelSpendingHistory
+    .filter((entry) => turn - entry.turn <= 40);
   memory.supervisor.proposalHistory = memory.supervisor.proposalHistory
     .filter((entry) => turn - entry.turn <= 40);
   memory.supervisor.pendingCommitments = memory.supervisor.pendingCommitments

@@ -2524,13 +2524,13 @@ This system sees proposals from all subsystems and decides what is actually exec
 
 ### Current implemented slice
 
-The current live Supervisor slice is implemented as a final allocator/executor for queue actions plus the first safe non-combat fleet execution pass. It is not a full campaign executor.
+The current live Supervisor slice is implemented as a final allocator/executor for queue actions plus allowlisted fleet execution. It is not a full campaign executor and does not choose targets or compose fleets.
 
 Runtime mode is explicit:
 
 * `DISABLED` skips V2 bot runtime,
 * `SHADOW` runs V2 planning/traces without execution,
-* `LIVE` lets the Supervisor execute accepted queue proposals and allowlisted non-combat fleet proposals.
+* `LIVE` lets the Supervisor execute accepted queue proposals and allowlisted fleet proposals.
 
 The live execution scope is:
 
@@ -2542,22 +2542,31 @@ The live execution scope is:
 * `ARMAMENT_DELIVERY`,
 * `REPAIR`,
 * `COLONIZE`,
-* `MOVE`.
+* `MOVE`,
+* `DEFEND`,
+* `ATTACK`,
+* `BOMBARD`,
+* `SIEGE`.
 
 The current deferred scope is:
 
-* combat fleet mission execution,
 * maintenance/support/Jump Gate request handling,
 * diplomacy execution,
-* full hard reservation/cancellation engine.
+* full hard reservation/cancellation engine,
+* active-fleet recall management when diplomacy changes,
+* recycle execution until a subsystem emits explicit `RECYCLE` proposals.
 
-Supervisor phase 2 fleet execution rules:
+Supervisor fleet execution rules:
 
 * subsystem proposals must already include exact ships and cargo,
 * Supervisor validates availability and command shape but does not build replacement fleet payloads,
 * missing exact ships reject with `ships_unavailable`,
-* combat missions reject with `combat_execution_deferred`,
+* exact fleet proposals may be stored as `PENDING_SHIPS_NEXT_TURN` only when the exact missing type/count is completing next turn,
+* pending next-turn fleet proposals retry the exact same payload once and expire with `ships_unavailable_after_pending` if still impossible,
+* `BOMBARD` and `SIEGE` get a simple Supervisor metadata precheck for `WAR`, while broader target quality and legality remain subsystem/shared-command responsibility,
 * fleet-slot use is tracked separately from resource spending and aligned through the same target-share model,
+* cargo/resource spending is recorded in normal spending history,
+* deuterium fuel is recorded separately in lightweight `fuelSpendingHistory`,
 * own-planet Jump Gate use is selected by default when legal and auto-approved,
 * foreign/allied Jump Gate request creation remains deferred.
 
@@ -2571,6 +2580,9 @@ Important TODOs:
 
 * add future Jump Gate operating-cost policy,
 * define whether and when Supervisor may create foreign/allied Jump Gate requests,
+* add future active-fleet management to recall our own active `ATTACK` / `BOMBARD` / `SIEGE` fleets when the target relation becomes `PEACE` / `ALLIED`,
+* check whether shared `DEFEND` launch/arrival logic fully supports own + allied/peace guard targets,
+* add/enable `RECYCLE` execution only after an owning subsystem emits explicit recycle proposals,
 * decide the request-handling phase for maintenance/support/Jump Gate approvals,
 * review global research coverage and add a dedicated research subsystem if the existing subsystems do not cover all technologies well enough.
 

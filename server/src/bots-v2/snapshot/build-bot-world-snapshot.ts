@@ -44,7 +44,9 @@ import {
   SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS,
   calculateMaxBuildingQueueLength,
-  calculateMaxShipyardQueueLength
+  calculateMaxShipyardQueueLength,
+  countPlanetaryBombs,
+  isPlanetaryBombDefenceType
 } from '../../game-commands/command-helpers.js';
 
 const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
@@ -305,6 +307,7 @@ function buildPlanetSnapshot(
       queuedShipTypes: planet.rBDSFTQ.shipyardQueue
         .filter((entry) => entry.itemKind === 'ship' && entry.shipType !== null)
         .map((entry) => entry.shipType as ShipType),
+      shipsCompletingNextTurnByType: resolveShipsCompletingNextTurnByType(planet, shipyardPower),
       currentResearchType: planet.rBDSFTQ.currentResearchQueue?.technologyType ?? null
     },
     defense: {
@@ -523,6 +526,15 @@ function resolveShipyardQueueRemainingEtc(planet: Planet, shipyardPower: number)
 
   let remainingPower = 0;
   for (const entry of planet.rBDSFTQ.shipyardQueue) {
+    if (
+      entry.itemKind === 'defence'
+      && entry.defenceType
+      && isPlanetaryBombDefenceType(entry.defenceType)
+      && countPlanetaryBombs(planet.rBDSFTQ.defences) >= planet.getBuildingProductionValue1(BuildingType.BOMB_DEPOT)
+    ) {
+      break;
+    }
+
     const blueprint = entry.itemKind === 'defence'
       ? (entry.defenceType ? DEFENCE_BLUEPRINTS.get(entry.defenceType) : null)
       : (entry.shipType ? SHIP_BLUEPRINTS.get(entry.shipType) : null);
@@ -537,6 +549,41 @@ function resolveShipyardQueueRemainingEtc(planet: Planet, shipyardPower: number)
   }
 
   return remainingPower <= 0 ? 0 : Math.ceil(remainingPower / shipyardPower);
+}
+
+function resolveShipsCompletingNextTurnByType(
+  planet: Planet,
+  shipyardPower: number
+): Partial<Record<ShipType, number>> {
+  const completing: Partial<Record<ShipType, number>> = {};
+  let remainingShipyardPower = Math.max(0, Math.floor(shipyardPower));
+  if (remainingShipyardPower <= 0) {
+    return completing;
+  }
+
+  for (const entry of planet.rBDSFTQ.shipyardQueue) {
+    const blueprint = entry.itemKind === 'defence'
+      ? (entry.defenceType ? DEFENCE_BLUEPRINTS.get(entry.defenceType) : null)
+      : (entry.shipType ? SHIP_BLUEPRINTS.get(entry.shipType) : null);
+    if (!blueprint) {
+      continue;
+    }
+
+    const totalRequiredPower = Math.max(0, Math.floor(
+      blueprint.cost.getTotalResourceAmount() * Math.max(0, Math.floor(entry.amount))
+    ));
+    const remainingRequiredPower = Math.max(0, totalRequiredPower - entry.investedShipyardPower);
+    if (remainingRequiredPower > remainingShipyardPower) {
+      break;
+    }
+
+    remainingShipyardPower -= remainingRequiredPower;
+    if (entry.itemKind === 'ship' && entry.shipType) {
+      completing[entry.shipType] = (completing[entry.shipType] ?? 0) + Math.max(0, Math.floor(entry.amount));
+    }
+  }
+
+  return completing;
 }
 
 function resolveStoragePressure(currentAmount: number, capacity: number): number {

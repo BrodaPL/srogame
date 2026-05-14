@@ -6,6 +6,9 @@ import type {
   BotWorldSnapshot
 } from '../bot-v2-types.ts';
 import type { BotMemoryV2 } from '../../../../src/app/models/player.ts';
+import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
+import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
+import type { ShipType } from '../../../../src/app/models/enums/ship-type.ts';
 import {
   calculateWeightedResourceValue,
   pruneSupervisorHistory,
@@ -19,6 +22,7 @@ const QUEUE_ACTION_KINDS = new Set<BotProposal['kind']>(['BUILDING', 'RESEARCH',
 const FLEET_ACTION_KINDS = new Set<BotProposal['kind']>(['FLEET_MISSION']);
 const COMMITMENT_LIFETIME_TURNS = 5;
 const DUPLICATE_REPLACEMENT_THRESHOLD = 1.25;
+const NEXT_TURN_FLEET_PENDING_LIFETIME_TURNS = 1;
 
 type ScoredProposal = {
   proposal: BotProposal;
@@ -123,13 +127,18 @@ export class BotSupervisorV2 implements BotSupervisor {
           continue;
         }
 
-        const fleetPrecheck = precheckFleetMission(snapshot, entry.proposal);
-        if (fleetPrecheck) {
-          rejected.push({ proposalId: entry.proposal.proposalId, reason: fleetPrecheck });
+        const fleetDecision = evaluateFleetProposal(snapshot, memory, entry, snapshot.turn);
+        if (!fleetDecision.ok) {
+          rejected.push({ proposalId: entry.proposal.proposalId, reason: fleetDecision.reason });
           continue;
         }
 
-        accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
+        if (fleetDecision.accepted) {
+          accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
+        } else {
+          pending.push({ ...entry.proposal, status: 'ACCEPTED' });
+          upsertPendingFleetCommitment(memory, entry, snapshot.turn);
+        }
         acceptedFleetCount += 1;
         fleetSlotsBySubsystem.set(entry.proposal.subsystemId, usedBySubsystem + 1);
         continue;
@@ -205,7 +214,7 @@ export class BotSupervisorV2 implements BotSupervisor {
       if (!normalized.ok) {
         if (
           normalized.reason !== 'combat_execution_deferred'
-          && normalized.reason !== 'fleet_mission_not_allowed_in_phase2'
+          && normalized.reason !== 'fleet_mission_not_allowed_in_current_supervisor_phase'
         ) {
           console.warn(`[BotV2 Supervisor] Invalid fleet proposal ${proposal.proposalId}: ${normalized.reason}`);
         }
@@ -226,7 +235,7 @@ export class BotSupervisorV2 implements BotSupervisor {
     }
     if (proposal.kind === 'MAINTENANCE_REQUEST') {
       // TODO: Extract request command policy before enabling Supervisor request handling.
-      return { proposal, score: 0, adapterReason: 'request_handling_deferred', retryCommitment };
+      return { proposal, score: 0, adapterReason: 'request_handling_phase4_deferred', retryCommitment };
     }
     if (!QUEUE_ACTION_KINDS.has(proposal.kind)) {
       return { proposal, score: 0, adapterReason: 'unsupported_execution_kind', retryCommitment };
@@ -369,24 +378,32 @@ function evaluateQueueProposal(
   };
 }
 
-function precheckFleetMission(snapshot: BotWorldSnapshot, proposal: BotProposal): string | null {
-  const normalized = normalizeFleetExecutionProposal(proposal);
+function evaluateFleetProposal(
+  snapshot: BotWorldSnapshot,
+  memory: BotMemoryV2,
+  entry: ScoredProposal,
+  turn: number
+): {
+  ok: true;
+  accepted: boolean;
+} | {
+  ok: false;
+  reason: string;
+} {
+  const normalized = normalizeFleetExecutionProposal(entry.proposal);
   if (!normalized.ok) {
-    return normalized.reason;
+    return { ok: false, reason: normalized.reason };
   }
 
   const originKey = toCoordinatesKey(normalized.value.origin);
   const origin = snapshot.planets.find((entry) => toCoordinatesKey(entry.coordinates) === originKey);
   if (!origin) {
-    return 'origin_planet_not_owned';
+    return { ok: false, reason: 'origin_planet_not_owned' };
   }
 
-  for (const ship of normalized.value.ships) {
-    const undamaged = origin.ships.undamagedCountByType[ship.type] ?? 0;
-    const damaged = origin.ships.damagedCountByType[ship.type] ?? 0;
-    if (undamaged < ship.undamagedAmount || damaged < ship.damagedAmount) {
-      return 'ships_unavailable';
-    }
+  const relationPrecheck = precheckFleetMissionRelation(entry.proposal);
+  if (relationPrecheck) {
+    return { ok: false, reason: relationPrecheck };
   }
 
   if (
@@ -394,10 +411,76 @@ function precheckFleetMission(snapshot: BotWorldSnapshot, proposal: BotProposal)
     || origin.localResources.crystal < normalized.value.cargo.crystal
     || origin.localResources.deuterium < normalized.value.cargo.deuterium
   ) {
-    return 'cargo_resources_unavailable';
+    return { ok: false, reason: 'cargo_resources_unavailable' };
+  }
+
+  const missingShips = resolveMissingFleetShips(origin, normalized.value.ships);
+  if (missingShips.length === 0) {
+    return { ok: true, accepted: true };
+  }
+
+  if (entry.retryCommitment) {
+    expireMatchingPendingCommitment(memory, entry.proposal.dedupeKey, turn, 'ships_unavailable_after_pending');
+    return { ok: false, reason: 'ships_unavailable_after_pending' };
+  }
+
+  if (areMissingShipsCompletingNextTurn(origin, missingShips)) {
+    return { ok: true, accepted: false };
+  }
+
+  return { ok: false, reason: 'ships_unavailable' };
+}
+
+function precheckFleetMissionRelation(proposal: BotProposal): string | null {
+  const missionType = proposal.requestPayload.missionType;
+  if (missionType !== FleetMissionType.BOMBARD && missionType !== FleetMissionType.SIEGE) {
+    return null;
+  }
+
+  const targetStatus = proposal.requestPayload.targetStatus ?? proposal.debug.targetStatus;
+  if (targetStatus !== undefined && targetStatus !== DiplomaticStatus.WAR) {
+    return 'bombard_siege_requires_war';
   }
 
   return null;
+}
+
+function resolveMissingFleetShips(
+  origin: BotWorldSnapshot['planets'][number],
+  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>
+): Array<{ type: ShipType; missingUndamagedAmount: number; missingDamagedAmount: number }> {
+  const missing: Array<{ type: ShipType; missingUndamagedAmount: number; missingDamagedAmount: number }> = [];
+  for (const ship of ships) {
+    const undamaged = origin.ships.undamagedCountByType[ship.type] ?? 0;
+    const damaged = origin.ships.damagedCountByType[ship.type] ?? 0;
+    const missingUndamagedAmount = Math.max(0, ship.undamagedAmount - undamaged);
+    const missingDamagedAmount = Math.max(0, ship.damagedAmount - damaged);
+    if (missingUndamagedAmount > 0 || missingDamagedAmount > 0) {
+      missing.push({
+        type: ship.type,
+        missingUndamagedAmount,
+        missingDamagedAmount
+      });
+    }
+  }
+
+  return missing;
+}
+
+function areMissingShipsCompletingNextTurn(
+  origin: BotWorldSnapshot['planets'][number],
+  missingShips: Array<{ type: ShipType; missingUndamagedAmount: number; missingDamagedAmount: number }>
+): boolean {
+  for (const missing of missingShips) {
+    if (missing.missingDamagedAmount > 0) {
+      return false;
+    }
+    if ((origin.queues.shipsCompletingNextTurnByType[missing.type] ?? 0) < missing.missingUndamagedAmount) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function resolveMaxFleetExecutions(snapshot: BotWorldSnapshot): number {
@@ -446,9 +529,12 @@ function resolveFleetSlotCaps(
 function buildPendingRetryProposals(memory: BotMemoryV2, turn: number): BotProposal[] {
   return memory.supervisor.pendingCommitments
     .filter((commitment) =>
-      commitment.status === 'PENDING_RESOURCES'
+      (commitment.status === 'PENDING_RESOURCES' || commitment.status === 'PENDING_SHIPS_NEXT_TURN')
       && commitment.expiresOnTurn >= turn
-      && QUEUE_ACTION_KINDS.has(commitment.kind as BotProposal['kind'])
+      && (
+        QUEUE_ACTION_KINDS.has(commitment.kind as BotProposal['kind'])
+        || FLEET_ACTION_KINDS.has(commitment.kind as BotProposal['kind'])
+      )
     )
     .map((commitment): BotProposal => ({
       proposalId: `${commitment.proposalId}:retry:${turn}`,
@@ -520,8 +606,62 @@ function upsertPendingCommitment(memory: BotMemoryV2, entry: ScoredProposal, tur
   }
 }
 
+function upsertPendingFleetCommitment(memory: BotMemoryV2, entry: ScoredProposal, turn: number): void {
+  const existingIndex = memory.supervisor.pendingCommitments.findIndex((commitment) =>
+    isActivePendingCommitment(commitment.status)
+    && commitment.dedupeKey === entry.proposal.dedupeKey
+  );
+  const commitment = {
+    commitmentKey: `${entry.proposal.subsystemId}:${entry.proposal.kind}:${entry.proposal.dedupeKey}`,
+    dedupeKey: entry.proposal.dedupeKey,
+    proposalId: entry.proposal.proposalId,
+    subsystemId: entry.proposal.subsystemId,
+    kind: entry.proposal.kind,
+    targetCoordinates: entry.proposal.targetCoordinates,
+    requestedResources: { ...entry.proposal.requestedResources },
+    weightedResourceValue: calculateWeightedResourceValue(entry.proposal.requestedResources),
+    score: entry.score,
+    status: 'PENDING_SHIPS_NEXT_TURN' as const,
+    createdTurn: existingIndex >= 0
+      ? memory.supervisor.pendingCommitments[existingIndex]!.createdTurn
+      : turn,
+    updatedTurn: turn,
+    expiresOnTurn: turn + NEXT_TURN_FLEET_PENDING_LIFETIME_TURNS,
+    executionPayload: {
+      ...entry.proposal.requestPayload,
+      reservedFleetSlot: true
+    },
+    cancelReason: null
+  };
+
+  if (existingIndex >= 0) {
+    memory.supervisor.pendingCommitments[existingIndex] = commitment;
+  } else {
+    memory.supervisor.pendingCommitments.push(commitment);
+  }
+}
+
+function expireMatchingPendingCommitment(
+  memory: BotMemoryV2,
+  dedupeKey: string,
+  turn: number,
+  reason: string
+): void {
+  for (const commitment of memory.supervisor.pendingCommitments) {
+    if (commitment.dedupeKey !== dedupeKey || !isActivePendingCommitment(commitment.status)) {
+      continue;
+    }
+
+    commitment.status = 'EXPIRED';
+    commitment.updatedTurn = turn;
+    commitment.cancelReason = reason;
+  }
+}
+
 function isActivePendingCommitment(status: BotMemoryV2['supervisor']['pendingCommitments'][number]['status']): boolean {
-  return status === 'PENDING_RESOURCES' || status === 'PENDING_QUEUE';
+  return status === 'PENDING_RESOURCES'
+    || status === 'PENDING_QUEUE'
+    || status === 'PENDING_SHIPS_NEXT_TURN';
 }
 
 function averageLocalWeight(

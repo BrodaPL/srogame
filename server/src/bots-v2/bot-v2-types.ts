@@ -339,6 +339,7 @@ export type BotPlanetSnapshot = {
     queuedBuildingTypes: BuildingType[];
     queuedDefenceTypes: DefenceType[];
     queuedShipTypes: ShipType[];
+    shipsCompletingNextTurnByType: Partial<Record<ShipType, number>>;
     currentResearchType: TechnologyType | null;
   };
   defense: {
@@ -588,8 +589,13 @@ export type BotExecutionOutcome = {
     crystal: number;
     deuterium: number;
   };
+  fuelSpent?: number;
+  fleetId?: number;
   fleetSlotsUsed?: number;
   missionType?: FleetMissionType;
+  originCoordinates?: { x: number; y: number; z: number };
+  targetCoordinates?: { x: number; y: number; z: number };
+  commandErrorCode?: string;
 };
 
 export interface BotExecutor {

@@ -21,20 +21,51 @@ describe('bot fleet execution adapters', () => {
         carriedBombs: [],
         cargo: { metal: 0, crystal: 0, deuterium: 0 },
         useJumpGate: false,
-        bombardmentPriorities: null
+        bombardmentPriorities: {
+          main: null,
+          secondary: null,
+          tertiary: null
+        }
       }
     });
   });
 
-  it('rejects combat missions for phase 2', () => {
+  it('normalizes combat and guard missions for phase 3', () => {
     const result = normalizeFleetExecutionProposal(createFleetProposal({
       missionType: FleetMissionType.ATTACK,
       ships: [{ type: ShipType.FIGHTER, undamagedAmount: 1, damagedAmount: 0 }]
     }));
 
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        missionType: FleetMissionType.ATTACK,
+        ships: [{ type: ShipType.FIGHTER, undamagedAmount: 1, damagedAmount: 0 }]
+      }
+    });
+
+    const guardResult = normalizeFleetExecutionProposal(createFleetProposal({
+      missionType: FleetMissionType.DEFEND,
+      ships: [{ type: ShipType.FIGHTER, undamagedAmount: 1, damagedAmount: 0 }]
+    }));
+
+    expect(guardResult).toMatchObject({
+      ok: true,
+      value: {
+        missionType: FleetMissionType.DEFEND
+      }
+    });
+  });
+
+  it('keeps recycle deferred until a subsystem emits it deliberately', () => {
+    const result = normalizeFleetExecutionProposal(createFleetProposal({
+      missionType: FleetMissionType.RECYCLE,
+      ships: [{ type: ShipType.RECYCLER, undamagedAmount: 1, damagedAmount: 0 }]
+    }));
+
     expect(result).toEqual({
       ok: false,
-      reason: 'combat_execution_deferred'
+      reason: 'fleet_mission_not_allowed_in_current_supervisor_phase'
     });
   });
 

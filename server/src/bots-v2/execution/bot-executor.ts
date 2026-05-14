@@ -123,14 +123,18 @@ export class LiveQueueBotExecutor implements BotExecutor {
         proposalId: proposal.proposalId,
         executed: true,
         success: false,
-        message
+        message,
+        commandErrorCode: result.error.code,
+        missionType: command.missionType,
+        originCoordinates: command.origin,
+        targetCoordinates: command.target
       };
     }
 
     const spent = {
       metal: command.cargo.metal,
       crystal: command.cargo.crystal,
-      deuterium: command.cargo.deuterium + result.value.fleet.fuelCost
+      deuterium: command.cargo.deuterium
     };
 
     return {
@@ -139,8 +143,12 @@ export class LiveQueueBotExecutor implements BotExecutor {
       success: true,
       message: result.value.message,
       spent,
+      fuelSpent: result.value.fleet.fuelCost,
+      fleetId: result.value.fleet.fleetId,
       fleetSlotsUsed: 1,
-      missionType: command.missionType
+      missionType: command.missionType,
+      originCoordinates: command.origin,
+      targetCoordinates: command.target
     };
   }
 

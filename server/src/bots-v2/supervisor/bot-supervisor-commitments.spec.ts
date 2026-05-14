@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
+import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
 import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
 import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
 import { createDefaultBotMemoryV2 } from '../bot-v2-memory.js';
@@ -123,9 +124,9 @@ describe('bot supervisor commitments', () => {
     });
   });
 
-  it('rejects combat fleet missions in phase 2', () => {
+  it('accepts combat fleet missions in phase 3 and rejects non-war bombardment', () => {
     const supervisor = createSupervisor();
-    const decision = supervisor.decide(
+    const attackDecision = supervisor.decide(
       createSnapshot(
         { metal: 100, crystal: 100, deuterium: 100 },
         {
@@ -138,10 +139,51 @@ describe('bot supervisor commitments', () => {
       [createFleetProposal(FleetMissionType.ATTACK, ShipType.FIGHTER)]
     );
 
-    expect(decision.accepted).toHaveLength(0);
-    expect(decision.rejected[0]).toMatchObject({
+    expect(attackDecision.accepted).toHaveLength(1);
+
+    const bombardDecision = supervisor.decide(
+      createSnapshot(
+        { metal: 100, crystal: 100, deuterium: 100 },
+        {
+          activeFleetCount: 0,
+          maxActiveFleetCount: 3,
+          ships: { [ShipType.ATMOSPHERIC_BOMBER]: 1 }
+        }
+      ),
+      createDefaultBotMemoryV2(),
+      [createFleetProposal(FleetMissionType.BOMBARD, ShipType.ATMOSPHERIC_BOMBER, {
+        debug: { targetStatus: DiplomaticStatus.PEACE }
+      })]
+    );
+
+    expect(bombardDecision.accepted).toHaveLength(0);
+    expect(bombardDecision.rejected[0]).toMatchObject({
       proposalId: 'fleet',
-      reason: 'combat_execution_deferred'
+      reason: 'bombard_siege_requires_war'
+    });
+  });
+
+  it('stores exact fleet proposals as pending when missing ships complete next turn', () => {
+    const memory = createDefaultBotMemoryV2();
+    const decision = createSupervisor().decide(
+      createSnapshot(
+        { metal: 100, crystal: 100, deuterium: 100 },
+        {
+          activeFleetCount: 0,
+          maxActiveFleetCount: 3,
+          ships: {},
+          shipsCompletingNextTurnByType: { [ShipType.FIGHTER]: 1 }
+        }
+      ),
+      memory,
+      [createFleetProposal(FleetMissionType.ATTACK, ShipType.FIGHTER)]
+    );
+
+    expect(decision.accepted).toHaveLength(0);
+    expect(decision.pending).toHaveLength(1);
+    expect(memory.supervisor.pendingCommitments[0]).toMatchObject({
+      status: 'PENDING_SHIPS_NEXT_TURN',
+      expiresOnTurn: 2
     });
   });
 
@@ -265,7 +307,11 @@ function createBuildingProposal(overrides: Partial<BotProposal> = {}): BotPropos
   };
 }
 
-function createFleetProposal(missionType: FleetMissionType, shipType: ShipType): BotProposal {
+function createFleetProposal(
+  missionType: FleetMissionType,
+  shipType: ShipType,
+  overrides: Partial<BotProposal> = {}
+): BotProposal {
   return {
     proposalId: 'fleet',
     subsystemId: 'STRATEGIC_DEVELOPMENT',
@@ -293,7 +339,8 @@ function createFleetProposal(missionType: FleetMissionType, shipType: ShipType):
     },
     blockers: [],
     expiresOnTurn: null,
-    debug: {}
+    debug: {},
+    ...overrides
   };
 }
 
@@ -304,6 +351,7 @@ function createSnapshot(
     activeFleetCount?: number;
     maxActiveFleetCount?: number;
     ships?: Partial<Record<ShipType, number>>;
+    shipsCompletingNextTurnByType?: Partial<Record<ShipType, number>>;
   } = {}
 ): BotWorldSnapshot {
   return {
@@ -336,6 +384,7 @@ function createSnapshot(
         queuedBuildingTypes: [],
         queuedDefenceTypes: [],
         queuedShipTypes: [],
+        shipsCompletingNextTurnByType: options.shipsCompletingNextTurnByType ?? {},
         currentResearchType: null
       },
       defense: {} as BotWorldSnapshot['planets'][number]['defense'],

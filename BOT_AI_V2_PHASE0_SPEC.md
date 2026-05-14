@@ -5,7 +5,7 @@ This document turns the high-level architecture in `NEW_BOT_AI_DESIGN.md` into a
 Phase 0 originally described the shadow scaffold. The current implementation has moved beyond that into the first Supervisor runtime slice:
 - V2 owns the end-turn bot runtime for bot-controlled seats
 - V2 supports explicit `DISABLED` / `SHADOW` / `LIVE` modes
-- `LIVE` mode can execute queue actions and allowlisted non-combat fleet missions through the Supervisor/Executor layer
+- `LIVE` mode can execute queue actions and allowlisted fleet missions through the Supervisor/Executor layer
 - the old V1 live turn runner is no longer used by the end-turn flow
 
 This document is a working engineering spec, not a final behavior design for all subsystems.
@@ -41,7 +41,7 @@ This document is a working engineering spec, not a final behavior design for all
 
 - full reservation system
 - full long-term commitment engine
-- combat fleet mission execution
+- active-fleet recall management when diplomatic state changes
 - support / maintenance / Jump Gate request handling
 - diplomacy execution
 - score tuning
@@ -101,7 +101,7 @@ Current flow for each bot turn:
 6. V2 collects proposals.
 7. `Supervisor` scores, accepts, rejects, or stores pending commitments.
 8. `SHADOW` mode records decisions but executes nothing.
-9. `LIVE` mode executes accepted queue actions and allowlisted non-combat fleet missions through shared command helpers.
+9. `LIVE` mode executes accepted queue actions and allowlisted fleet missions through shared command helpers.
 10. V2 records traces and execution outcomes.
 
 ## Feature flags
@@ -351,15 +351,19 @@ Current behavior:
 - `SHADOW` rejects with `shadow_mode_no_execution` and records trace/debug data
 - `LIVE` may accept executable queue proposals and allowlisted fleet proposals
 - executable queue proposal kinds are `BUILDING`, `RESEARCH`, and `SHIPYARD`
-- executable fleet mission types are `SPY`, `TRANSPORT`, `ARMAMENT_DELIVERY`, `REPAIR`, `COLONIZE`, and `MOVE`
-- combat missions are rejected with `combat_execution_deferred`
+- executable fleet mission types are `SPY`, `TRANSPORT`, `ARMAMENT_DELIVERY`, `REPAIR`, `COLONIZE`, `MOVE`, `DEFEND`, `ATTACK`, `BOMBARD`, and `SIEGE`
+- `RECYCLE` stays deferred until a subsystem emits and owns explicit recycle proposals
+- `BOMBARD` and `SIEGE` get a simple Supervisor trace precheck when proposal metadata says the target is not `WAR`
 - request handling and diplomacy execution are deferred and traced
 - `SHIP_NEED` / `demandOnly` proposals are pressure only; they boost matching executable shipyard proposals instead of being converted directly
 - non-critical unaffordable queue proposals can become pending commitments instead of being lost
 - pending queue commitments are retried before new proposals and expired after the current 40-turn horizon
+- exact fleet proposals can become `PENDING_SHIPS_NEXT_TURN` only when the missing exact ship type/count is completing next turn
 - fleet-slot usage is accounted separately from resource spending, using the same target-share policy as a soft alignment input
 - own-planet Jump Gate use is enabled by default when the shared command validation says it is legal and auto-approved
 - foreign/allied Jump Gate request creation remains deferred
+- TODO: add future active-fleet management to recall own active `ATTACK` / `BOMBARD` / `SIEGE` fleets when the target relation becomes peaceful/allied
+- TODO: check whether shared `DEFEND` launch/arrival logic fully supports own + allied/peace guard targets as intended
 
 ### Executor interface
 
@@ -370,8 +374,11 @@ export type BotExecutionOutcome = {
   success: boolean;
   message: string | null;
   spent?: { metal: number; crystal: number; deuterium: number };
+  fuelSpent?: number;
+  fleetId?: number;
   fleetSlotsUsed?: number;
   missionType?: FleetMissionType;
+  commandErrorCode?: string;
 };
 
 export interface BotExecutor {
@@ -385,6 +392,7 @@ Current behavior:
 - `LiveQueueBotExecutor` also normalizes allowlisted fleet mission proposals and calls the shared fleet command helper
 - fleet execution trusts subsystem-provided exact ships and cargo; it does not compose replacement payloads
 - own Jump Gate use is auto-selected when available and legal; foreign Jump Gate request creation is left for a later request-handling phase
+- fleet cargo is recorded as normal spending, while fleet fuel is recorded separately as lightweight fuel spending history
 - command failures are logged and traced instead of falling back to V1
 
 ## Minimal V2 memory
@@ -423,7 +431,7 @@ export type BotMemoryV2 = {
       proposalKind: BotProposalKind;
       createdTurn: number;
       expiresTurn: number;
-      status: 'PENDING' | 'RESERVED' | 'EXECUTED' | 'EXPIRED' | 'CANCELLED';
+      status: 'PENDING_RESOURCES' | 'PENDING_QUEUE' | 'PENDING_SHIPS_NEXT_TURN' | 'EXPIRED' | 'CANCELLED';
     }>;
     spendingHistory: Array<{
       turn: number;
@@ -447,6 +455,16 @@ export type BotMemoryV2 = {
       missionType: string;
       slotsUsed: number;
     }>;
+    fuelSpendingHistory: Array<{
+      turn: number;
+      proposalId: string;
+      subsystemId: BotSubsystemId;
+      missionType: string;
+      originCoordinates: { x: number; y: number; z: number } | null;
+      targetCoordinates: { x: number; y: number; z: number } | null;
+      fleetId: number | null;
+      deuterium: number;
+    }>;
   };
 };
 ```
@@ -468,6 +486,7 @@ Current persistence rules:
   - local resources
   - local building levels
   - local queue saturation
+  - next-turn shipyard ship completions for Supervisor pending-ship checks
   - local energy deficit
   - local storage pressure
   - coarse maturity stage

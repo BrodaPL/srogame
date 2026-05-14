@@ -163,10 +163,16 @@
                           <span class="badge">{{ outcome.success ? 'success' : 'failed' }}</span>
                         </div>
                         <p class="overview-muted">{{ outcome.message ?? 'Command executed.' }}</p>
+                        @if (outcome.commandErrorCode) {
+                          <p class="overview-muted">Code: {{ outcome.commandErrorCode }}</p>
+                        }
                         @if (outcome.spent) {
                           <p class="overview-muted">
                             Spent M{{ outcome.spent.metal }} C{{ outcome.spent.crystal }} D{{ outcome.spent.deuterium }}
                           </p>
+                        }
+                        @if (outcome.fuelSpent !== undefined) {
+                          <p class="overview-muted">Fuel D{{ outcome.fuelSpent }}</p>
                         }
                       </article>
                     }
