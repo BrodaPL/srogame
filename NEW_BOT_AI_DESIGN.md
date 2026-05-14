@@ -2524,34 +2524,53 @@ This system sees proposals from all subsystems and decides what is actually exec
 
 ### Current implemented slice
 
-The first live Supervisor slice is implemented as a queue-action allocator, not a full campaign executor.
+The current live Supervisor slice is implemented as a final allocator/executor for queue actions plus the first safe non-combat fleet execution pass. It is not a full campaign executor.
 
 Runtime mode is explicit:
 
 * `DISABLED` skips V2 bot runtime,
 * `SHADOW` runs V2 planning/traces without execution,
-* `LIVE` lets the Supervisor execute accepted queue proposals.
+* `LIVE` lets the Supervisor execute accepted queue proposals and allowlisted non-combat fleet proposals.
 
 The live execution scope is:
 
 * `BUILDING`,
 * `RESEARCH`,
-* `SHIPYARD`.
+* `SHIPYARD`,
+* `SPY`,
+* `TRANSPORT`,
+* `ARMAMENT_DELIVERY`,
+* `REPAIR`,
+* `COLONIZE`,
+* `MOVE`.
 
 The current deferred scope is:
 
-* fleet mission execution,
+* combat fleet mission execution,
 * maintenance/support/Jump Gate request handling,
 * diplomacy execution,
 * full hard reservation/cancellation engine.
 
+Supervisor phase 2 fleet execution rules:
+
+* subsystem proposals must already include exact ships and cargo,
+* Supervisor validates availability and command shape but does not build replacement fleet payloads,
+* missing exact ships reject with `ships_unavailable`,
+* combat missions reject with `combat_execution_deferred`,
+* fleet-slot use is tracked separately from resource spending and aligned through the same target-share model,
+* own-planet Jump Gate use is selected by default when legal and auto-approved,
+* foreign/allied Jump Gate request creation remains deferred.
+
 `SHIP_NEED` and `demandOnly` shipyard proposals are pressure signals only. They are not executable by themselves; they increase priority for matching concrete shipyard proposals emitted by other subsystems.
+
+Pending queue commitments are retried before new proposals. Expired commitments are marked and kept in short history instead of disappearing immediately, so traces can explain why a previously accepted task was dropped.
 
 The old V1 bot runner is no longer used by the end-turn runtime. If V2 live execution fails, the bot logs/traces the failure and does not fall back to V1.
 
 Important TODOs:
 
-* verify Jump Gate mechanics and default fleet use before fleet execution is wired,
+* add future Jump Gate operating-cost policy,
+* define whether and when Supervisor may create foreign/allied Jump Gate requests,
 * decide the request-handling phase for maintenance/support/Jump Gate approvals,
 * review global research coverage and add a dedicated research subsystem if the existing subsystems do not cover all technologies well enough.
 

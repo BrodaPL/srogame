@@ -147,6 +147,7 @@ export type BotMemoryV2ProposalKind =
 export type BotMemoryV2SupervisorPendingStatus =
   | 'PENDING_RESOURCES'
   | 'PENDING_QUEUE'
+  | 'EXPIRED'
   | 'CANCELLED';
 
 export type BotMemoryV2SupervisorPendingCommitment = {
@@ -1561,6 +1562,7 @@ export class Player {
   ): status is BotMemoryV2SupervisorPendingStatus {
     return status === 'PENDING_RESOURCES'
       || status === 'PENDING_QUEUE'
+      || status === 'EXPIRED'
       || status === 'CANCELLED';
   }
 

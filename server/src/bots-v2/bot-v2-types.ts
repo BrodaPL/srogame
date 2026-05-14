@@ -588,6 +588,8 @@ export type BotExecutionOutcome = {
     crystal: number;
     deuterium: number;
   };
+  fleetSlotsUsed?: number;
+  missionType?: FleetMissionType;
 };
 
 export interface BotExecutor {

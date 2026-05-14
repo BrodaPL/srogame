@@ -5,7 +5,7 @@ This document turns the high-level architecture in `NEW_BOT_AI_DESIGN.md` into a
 Phase 0 originally described the shadow scaffold. The current implementation has moved beyond that into the first Supervisor runtime slice:
 - V2 owns the end-turn bot runtime for bot-controlled seats
 - V2 supports explicit `DISABLED` / `SHADOW` / `LIVE` modes
-- `LIVE` mode can execute queue actions through the Supervisor/Executor layer
+- `LIVE` mode can execute queue actions and allowlisted non-combat fleet missions through the Supervisor/Executor layer
 - the old V1 live turn runner is no longer used by the end-turn flow
 
 This document is a working engineering spec, not a final behavior design for all subsystems.
@@ -41,7 +41,7 @@ This document is a working engineering spec, not a final behavior design for all
 
 - full reservation system
 - full long-term commitment engine
-- fleet mission execution
+- combat fleet mission execution
 - support / maintenance / Jump Gate request handling
 - diplomacy execution
 - score tuning
@@ -76,6 +76,8 @@ server/src/bots-v2/
   execution/
     bot-executor.ts
     bot-execution-types.ts
+    bot-execution-adapters.ts
+    bot-fleet-execution-adapters.ts
   subsystems/
     bot-subsystem-types.ts
     economic/
@@ -99,7 +101,7 @@ Current flow for each bot turn:
 6. V2 collects proposals.
 7. `Supervisor` scores, accepts, rejects, or stores pending commitments.
 8. `SHADOW` mode records decisions but executes nothing.
-9. `LIVE` mode executes accepted queue actions through shared command helpers.
+9. `LIVE` mode executes accepted queue actions and allowlisted non-combat fleet missions through shared command helpers.
 10. V2 records traces and execution outcomes.
 
 ## Feature flags
@@ -322,7 +324,7 @@ export interface BotSubsystem {
 
 ### Supervisor interface
 
-The implemented Supervisor phase-1 slice is intentionally narrow, but it is live in `LIVE` mode.
+The implemented Supervisor is live in `LIVE` mode. It now covers phase-1 queue arbitration plus the first phase-2 safe fleet-execution slice.
 
 ```ts
 export type BotSupervisorDecision = {
@@ -347,11 +349,17 @@ export interface BotSupervisor {
 Current behavior:
 - `DISABLED` rejects all proposals
 - `SHADOW` rejects with `shadow_mode_no_execution` and records trace/debug data
-- `LIVE` may accept executable queue proposals
-- executable proposal kinds are `BUILDING`, `RESEARCH`, and `SHIPYARD`
-- `FLEET_MISSION`, request handling, and diplomacy execution are deferred and traced
+- `LIVE` may accept executable queue proposals and allowlisted fleet proposals
+- executable queue proposal kinds are `BUILDING`, `RESEARCH`, and `SHIPYARD`
+- executable fleet mission types are `SPY`, `TRANSPORT`, `ARMAMENT_DELIVERY`, `REPAIR`, `COLONIZE`, and `MOVE`
+- combat missions are rejected with `combat_execution_deferred`
+- request handling and diplomacy execution are deferred and traced
 - `SHIP_NEED` / `demandOnly` proposals are pressure only; they boost matching executable shipyard proposals instead of being converted directly
 - non-critical unaffordable queue proposals can become pending commitments instead of being lost
+- pending queue commitments are retried before new proposals and expired after the current 40-turn horizon
+- fleet-slot usage is accounted separately from resource spending, using the same target-share policy as a soft alignment input
+- own-planet Jump Gate use is enabled by default when the shared command validation says it is legal and auto-approved
+- foreign/allied Jump Gate request creation remains deferred
 
 ### Executor interface
 
@@ -362,6 +370,8 @@ export type BotExecutionOutcome = {
   success: boolean;
   message: string | null;
   spent?: { metal: number; crystal: number; deuterium: number };
+  fleetSlotsUsed?: number;
+  missionType?: FleetMissionType;
 };
 
 export interface BotExecutor {
@@ -372,6 +382,9 @@ export interface BotExecutor {
 Current behavior:
 - `NoopBotExecutor` is used outside `LIVE`
 - `LiveQueueBotExecutor` calls shared building, research, and shipyard command helpers
+- `LiveQueueBotExecutor` also normalizes allowlisted fleet mission proposals and calls the shared fleet command helper
+- fleet execution trusts subsystem-provided exact ships and cargo; it does not compose replacement payloads
+- own Jump Gate use is auto-selected when available and legal; foreign Jump Gate request creation is left for a later request-handling phase
 - command failures are logged and traced instead of falling back to V1
 
 ## Minimal V2 memory

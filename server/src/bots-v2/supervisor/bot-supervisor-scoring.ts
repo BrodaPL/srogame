@@ -210,5 +210,5 @@ export function pruneSupervisorHistory(memory: BotMemoryV2, turn: number): void 
   memory.supervisor.proposalHistory = memory.supervisor.proposalHistory
     .filter((entry) => turn - entry.turn <= 40);
   memory.supervisor.pendingCommitments = memory.supervisor.pendingCommitments
-    .filter((entry) => entry.expiresOnTurn >= turn && entry.status !== 'CANCELLED');
+    .filter((entry) => turn - entry.updatedTurn <= 40);
 }

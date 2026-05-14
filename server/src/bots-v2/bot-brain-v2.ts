@@ -199,7 +199,20 @@ function recordExecutedSpending(
       resources: { ...outcome.spent },
       weightedResourceValue: outcome.spent.metal + (outcome.spent.crystal * 1.8) + (outcome.spent.deuterium * 2.6)
     });
+    if (proposal.kind === 'FLEET_MISSION' && outcome.fleetSlotsUsed && outcome.missionType) {
+      memory.supervisor.fleetSlotHistory.push({
+        missionKey: `${proposal.subsystemId}:${outcome.missionType}:${proposal.dedupeKey}`,
+        proposalId: proposal.proposalId,
+        subsystemId: proposal.subsystemId,
+        createdTurn: turn,
+        expiresOnTurn: null,
+        active: true
+      });
+    }
     memory.supervisor.pendingCommitments = memory.supervisor.pendingCommitments
-      .filter((commitment) => commitment.dedupeKey !== proposal.dedupeKey);
+      .filter((commitment) =>
+        commitment.dedupeKey !== proposal.dedupeKey
+        || (commitment.status !== 'PENDING_RESOURCES' && commitment.status !== 'PENDING_QUEUE')
+      );
   }
 }
