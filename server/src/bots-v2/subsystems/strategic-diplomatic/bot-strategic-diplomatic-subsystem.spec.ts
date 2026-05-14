@@ -248,8 +248,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     markPlanetScanned(bot, botEnemy, botEnemy.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 10 });
 
     const snapshot = buildBotWorldSnapshot(galaxy, bot, {
-      enabled: true,
-      shadowMode: true,
+      mode: 'SHADOW',
       enabledSubsystems: {
         economic: false,
         defensive: false,
@@ -260,8 +259,6 @@ describe('BotStrategicDiplomaticSubsystem', () => {
         strategicDiplomatic: true,
         weightManager: false
       },
-      allowSupervisorAcceptance: false,
-      allowExecution: false
     });
     const botSnapshot = snapshot.planets.find((planet) => planet.name === botPlanet.basicInfo.name);
     expect(botSnapshot?.infrastructure.totalDamagePercent ?? 100).toBeLessThan(35);
@@ -742,8 +739,7 @@ function runStrategicDiplomaticSubsystem(
   memory = createDefaultBotMemoryV2()
 ): { result: ReturnType<BotStrategicDiplomaticSubsystem['generate']>; memory: ReturnType<typeof createDefaultBotMemoryV2> } {
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
-    enabled: true,
-    shadowMode: true,
+      mode: 'SHADOW',
     enabledSubsystems: {
       economic: false,
       defensive: false,
@@ -754,8 +750,6 @@ function runStrategicDiplomaticSubsystem(
       strategicDiplomatic: true,
       weightManager: false
     },
-    allowSupervisorAcceptance: false,
-    allowExecution: false
   });
 
   return {

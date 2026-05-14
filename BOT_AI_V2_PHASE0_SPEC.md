@@ -2,17 +2,17 @@
 
 This document turns the high-level architecture in `NEW_BOT_AI_DESIGN.md` into an implementation-ready Phase 0 contract.
 
-Phase 0 is intentionally narrow:
-- create the V2 scaffolding
-- keep the current bot runtime as the only live executor
-- run V2 in shadow mode only
-- support the first real subsystem milestone: `Economic`
+Phase 0 originally described the shadow scaffold. The current implementation has moved beyond that into the first Supervisor runtime slice:
+- V2 owns the end-turn bot runtime for bot-controlled seats
+- V2 supports explicit `DISABLED` / `SHADOW` / `LIVE` modes
+- `LIVE` mode can execute queue actions through the Supervisor/Executor layer
+- the old V1 live turn runner is no longer used by the end-turn flow
 
 This document is a working engineering spec, not a final behavior design for all subsystems.
 
 ## Locked rollout decisions
 
-- V2 starts in `shadow mode`
+- V2 supports `SHADOW` for trace-only comparison, but the normal runtime mode is now `LIVE`
 - V2 gets a minimal shared world/state snapshot before any real subsystem logic
 - subsystem rollout order:
   - `Economic`
@@ -24,32 +24,32 @@ This document is a working engineering spec, not a final behavior design for all
   - `Strategic Military`
   - `Strategic Diplomatic`
   - `Weight Manager`
-  - full `Supervisory`
+  - `Supervisor` phase 1 live queue arbitration
 - V2 memory persistence scope:
-  - persist minimal stable fields only
+  - persist stable subsystem state plus Supervisor pending/spending/proposal history
 
 ## Phase 0 goals
 
 - define V2 module boundaries
 - define the first shared type contracts
-- define shadow-mode execution flow
+- define V2 runtime execution flow
 - define the minimum snapshot needed by `Economic`
 - define the minimum durable V2 memory shape
 - define trace output for inspection and later parity work
 
-## Phase 0 non-goals
+## Deferred Supervisor Scope
 
-- replacing the current bot executor
-- full Supervisory arbitration
 - full reservation system
 - full long-term commitment engine
-- complete subsystem set
+- fleet mission execution
+- support / maintenance / Jump Gate request handling
+- diplomacy execution
 - score tuning
-- behavior parity with the current bot
+- behavior parity with the removed V1 bot
 
 ## Proposed location
 
-V2 should live beside the current runtime, not inside the existing monolithic runner.
+V2 lives beside the old monolithic runner instead of being merged into it.
 
 Recommended root:
 
@@ -83,43 +83,34 @@ server/src/bots-v2/
 ```
 
 Notes:
-- the current runtime in `server/src/bots/` remains active
-- V2 must not mutate game state directly
+- V2 is the active bot runtime from the end-turn hook
+- only the Supervisor/Executor layer may mutate game state
 - V2 can reuse shared models and command helpers from the existing server code
 
-## Phase 0 runtime flow
+## Current V2 Runtime Flow
 
-Phase 0 shadow flow for each bot turn:
+Current flow for each bot turn:
 
-1. Current bot runtime executes normally.
-2. V2 shadow runner is invoked after or alongside current bot planning.
+1. `server/src/index.ts` invokes `runBotTurnPhaseV2(...)` before shared turn resolution.
+2. V2 skips execution when mode is `DISABLED`.
 3. V2 builds a `BotWorldSnapshot`.
-4. V2 loads minimal stable `BotMemoryV2`.
+4. V2 loads and normalizes stable `BotMemoryV2`.
 5. V2 runs enabled V2 subsystems.
 6. V2 collects proposals.
-7. V2 runs a stub supervisor that does one of:
-   - no acceptance at all, or
-   - debug-only acceptance for local scoring experiments
-8. V2 records traces.
-9. V2 does not call live commands in Phase 0.
-
-Recommended default for Phase 0:
-- build snapshot
-- run `Economic`
-- collect proposals
-- record traces
-- execute nothing
+7. `Supervisor` scores, accepts, rejects, or stores pending commitments.
+8. `SHADOW` mode records decisions but executes nothing.
+9. `LIVE` mode executes accepted queue actions through shared command helpers.
+10. V2 records traces and execution outcomes.
 
 ## Feature flags
 
-Phase 0 needs explicit V2 gating.
+V2 runtime gating is mode-based.
 
 Recommended flags:
 
 ```ts
 export type BotV2FeatureFlags = {
-  enabled: boolean;
-  shadowMode: boolean;
+  mode: 'DISABLED' | 'SHADOW' | 'LIVE';
   enabledSubsystems: {
     economic: boolean;
     defensive: boolean;
@@ -128,19 +119,17 @@ export type BotV2FeatureFlags = {
     strategicDevelopment: boolean;
     strategicMilitary: boolean;
     strategicDiplomatic: boolean;
+    weightManager: boolean;
   };
-  allowSupervisorAcceptance: boolean;
-  allowExecution: boolean;
 };
 ```
 
-Phase 0 defaults:
-- `enabled = true` only in local/dev when intentionally turned on
-- `shadowMode = true`
-- `enabledSubsystems.economic = true`
-- all other subsystems `false`
-- `allowSupervisorAcceptance = false`
-- `allowExecution = false`
+Current defaults:
+- `mode = 'LIVE'`
+- `SROGAME_BOT_AI_V2_MODE=DISABLED|SHADOW|LIVE` overrides runtime mode
+- legacy `SROGAME_BOT_AI_V2_ENABLED=false` maps to `DISABLED`
+- legacy `SROGAME_BOT_AI_V2_SHADOW_MODE=true` maps to `SHADOW`
+- implemented subsystems default enabled
 
 ## Core V2 contracts
 
@@ -248,6 +237,7 @@ export type BotPlanetSnapshot = {
 };
 
 export type BotWorldFlags = {
+  mode: 'DISABLED' | 'SHADOW' | 'LIVE';
   shadowMode: boolean;
   currentBotStillExecutes: boolean;
 };
@@ -332,15 +322,17 @@ export interface BotSubsystem {
 
 ### Supervisor interface
 
-Phase 0 supervisor is intentionally minimal.
+The implemented Supervisor phase-1 slice is intentionally narrow, but it is live in `LIVE` mode.
 
 ```ts
 export type BotSupervisorDecision = {
   accepted: BotProposal[];
+  pending: BotProposal[];
   rejected: Array<{
     proposalId: string;
     reason: string;
   }>;
+  debug?: Record<string, unknown>;
 };
 
 export interface BotSupervisor {
@@ -352,8 +344,14 @@ export interface BotSupervisor {
 }
 ```
 
-Phase 0 default behavior:
-- reject everything with reason `shadow_mode_no_execution`
+Current behavior:
+- `DISABLED` rejects all proposals
+- `SHADOW` rejects with `shadow_mode_no_execution` and records trace/debug data
+- `LIVE` may accept executable queue proposals
+- executable proposal kinds are `BUILDING`, `RESEARCH`, and `SHIPYARD`
+- `FLEET_MISSION`, request handling, and diplomacy execution are deferred and traced
+- `SHIP_NEED` / `demandOnly` proposals are pressure only; they boost matching executable shipyard proposals instead of being converted directly
+- non-critical unaffordable queue proposals can become pending commitments instead of being lost
 
 ### Executor interface
 
@@ -363,6 +361,7 @@ export type BotExecutionOutcome = {
   executed: boolean;
   success: boolean;
   message: string | null;
+  spent?: { metal: number; crystal: number; deuterium: number };
 };
 
 export interface BotExecutor {
@@ -370,13 +369,14 @@ export interface BotExecutor {
 }
 ```
 
-Phase 0 default behavior:
-- return empty outcomes
-- or emit `executed = false` for all accepted debug tasks
+Current behavior:
+- `NoopBotExecutor` is used outside `LIVE`
+- `LiveQueueBotExecutor` calls shared building, research, and shipyard command helpers
+- command failures are logged and traced instead of falling back to V1
 
 ## Minimal V2 memory
 
-Phase 0 persists only stable, durable fields.
+V2 persists stable subsystem state plus Supervisor state.
 
 Recommended shape:
 
@@ -402,15 +402,48 @@ export type BotMemoryV2 = {
     createdTurn: number;
     expiresOnTurn: number | null;
   }>;
+  supervisor: {
+    pendingCommitments: Array<{
+      proposalId: string;
+      dedupeKey: string;
+      subsystemId: BotSubsystemId;
+      proposalKind: BotProposalKind;
+      createdTurn: number;
+      expiresTurn: number;
+      status: 'PENDING' | 'RESERVED' | 'EXECUTED' | 'EXPIRED' | 'CANCELLED';
+    }>;
+    spendingHistory: Array<{
+      turn: number;
+      subsystemId: BotSubsystemId;
+      proposalKind: BotProposalKind;
+      value: number;
+      resources: { metal: number; crystal: number; deuterium: number };
+    }>;
+    proposalHistory: Array<{
+      turn: number;
+      proposalId: string;
+      subsystemId: BotSubsystemId;
+      proposalKind: BotProposalKind;
+      decision: 'ACCEPTED' | 'PENDING' | 'REJECTED';
+      reason: string | null;
+      score: number;
+    }>;
+    fleetSlotHistory: Array<{
+      turn: number;
+      subsystemId: BotSubsystemId;
+      missionType: string;
+      slotsUsed: number;
+    }>;
+  };
 };
 ```
 
-Phase 0 persistence rules:
+Current persistence rules:
 - persist this inside player bot memory or an adjacent stable bot-memory structure
 - do not persist transient proposal lists
 - do not persist transient scores
 - do not persist snapshot data
-- do not persist supervisor intermediate state
+- do not persist raw per-turn Supervisor score breakdowns
 
 ## Minimal snapshot builder rules
 
@@ -2717,7 +2750,7 @@ Add only a far-future TODO note that a **multi-front global allocator** may be c
 
 ## Trace contract
 
-V2 needs dedicated traces from the start so shadow mode is useful.
+V2 keeps dedicated traces for both shadow inspection and live Supervisor debugging.
 
 Recommended trace shape:
 
@@ -2744,6 +2777,7 @@ export type BotDecisionTraceV2 = {
   proposals: Array<{
     proposalId: string;
     subsystemId: BotSubsystemId;
+    proposalKind: BotProposalKind;
     summary: string;
     expectedValue: number;
     urgency: number;
@@ -2753,34 +2787,37 @@ export type BotDecisionTraceV2 = {
   }>;
   supervisorDecision: {
     acceptedProposalIds: string[];
+    pendingProposalIds: string[];
     rejectedCount: number;
-    mode: 'SHADOW';
+    mode: 'SHADOW' | 'LIVE';
+    debug?: Record<string, unknown>;
   };
   executionOutcomes: BotExecutionOutcome[];
 };
 ```
 
-Phase 0 trace goals:
+Trace goals:
 - inspect snapshot quality
 - inspect proposal volume
 - inspect duplicate proposal patterns
 - inspect whether the emitted primary/secondary requests and their goal metadata are mathematically coherent
+- inspect Supervisor scoring, pending commitments, and execution failures
 
-## Integration with current runtime
+## Integration with Current Runtime
 
-Phase 0 integration rules:
-- current `server/src/bots/bot-turn-runner.ts` remains the live system
-- V2 must be called through a separate shadow runner
-- V2 must not change the existing bot trace format
-- V2 should store its traces separately from current V1 traces
+Current integration rules:
+- `server/src/index.ts` calls `runBotTurnPhaseV2(...)` during end turn
+- V1 `runBotTurnPhase(...)` is no longer part of the live end-turn flow
+- V2 traces are exposed through the admin bot trace endpoint and `/game/bot-debug`
+- if V2 live Supervisor execution fails, the bot skips/logs/traces that proposal instead of falling back to V1
 
-Recommended entry point:
-- current bot executes first
-- then `runBotTurnPhaseV2Shadow(galaxy)` runs only for enabled local/dev scenarios
+Entry points:
+- `runBotTurnPhaseV2(galaxy)` handles `DISABLED`, `SHADOW`, and `LIVE`
+- `runBotTurnPhaseV2Shadow(galaxy)` remains as a compatibility helper for explicit shadow-only tests
 
-## Phase 0 completion criteria
+## Historical Phase 0 Completion Criteria
 
-Phase 0 is complete when all of the following are true:
+The original shadow scaffold was complete when all of the following were true:
 
 - V2 folder structure exists
 - feature flags exist
@@ -2788,7 +2825,7 @@ Phase 0 is complete when all of the following are true:
 - `BotMemoryV2` loads and normalizes safely
 - `Economic` subsystem emits structured proposals
 - V2 traces are recorded and inspectable
-- no live commands are executed by V2
+- no live commands were executed by V2
 
 ## Weight Manager Phase 1
 
@@ -2800,7 +2837,7 @@ It is advisory only:
 - no campaign orchestration
 - no `Critical` weighting here
 
-It should act as the main policy layer before the future `Supervisor`, using:
+It acts as the main policy input layer before `Supervisor`, using:
 - static personality base tables
 - dynamic situation modifiers
 

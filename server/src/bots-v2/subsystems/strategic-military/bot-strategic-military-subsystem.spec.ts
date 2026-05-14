@@ -246,8 +246,7 @@ describe('BotStrategicMilitarySubsystem', () => {
 
 function runStrategicMilitarySubsystem(galaxy: Galaxy, bot: Player, memory: BotMemoryV2 = createDefaultBotMemoryV2()) {
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
-    enabled: true,
-    shadowMode: true,
+      mode: 'SHADOW',
     enabledSubsystems: {
       economic: false,
       defensive: false,
@@ -258,8 +257,6 @@ function runStrategicMilitarySubsystem(galaxy: Galaxy, bot: Player, memory: BotM
       strategicDiplomatic: false,
       weightManager: false
     },
-    allowSupervisorAcceptance: false,
-    allowExecution: false
   });
 
   return new BotStrategicMilitarySubsystem().generate({

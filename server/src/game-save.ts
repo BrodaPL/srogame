@@ -201,7 +201,6 @@ type SavedPlayer = {
   reports: SavedPlayerReport[];
   messages: SavedPlayerMessage[];
   botProfileId: PlayerModel['botProfileId'];
-  botMemory: PlayerModel['botMemory'];
   botMemoryV2: PlayerModel['botMemoryV2'];
 };
 
@@ -759,7 +758,6 @@ function hydrateSavedPlayer(savedPlayer: SavedPlayer): PlayerModel {
     savedPlayer.nextMessageId,
       {
         botProfileId: savedPlayer.botProfileId ?? null,
-        botMemory: Player.normalizeBotMemory(savedPlayer.botMemory ?? null),
         botMemoryV2: Player.normalizeBotMemoryV2(savedPlayer.botMemoryV2 ?? null)
       }
     );
@@ -1043,44 +1041,7 @@ function serializePlayer(
     reports: player.reports.map((report) => serializePlayerReport(report)),
     messages: player.messages.map((message) => serializePlayerMessage(message)),
     botProfileId: player.botProfileId,
-    botMemory: player.botMemory
-      ? {
-        currentGoal: player.botMemory.currentGoal,
-        goalTarget: player.botMemory.goalTarget ? { ...player.botMemory.goalTarget } : null,
-        goalExpiresTurn: player.botMemory.goalExpiresTurn,
-        reservedResources: { ...player.botMemory.reservedResources },
-        lastSpyTargets: player.botMemory.lastSpyTargets.map((entry) => ({ ...entry })),
-        lastAttackTargets: player.botMemory.lastAttackTargets.map((entry) => ({ ...entry })),
-        recentDiplomacyTargets: player.botMemory.recentDiplomacyTargets.map((entry) => ({ ...entry })),
-        goodwillByPlayer: (player.botMemory.goodwillByPlayer ?? []).map((entry) => ({ ...entry })),
-        recentSupportRequests: (player.botMemory.recentSupportRequests ?? []).map((entry) => ({
-          ...entry,
-          targetCoordinates: { ...entry.targetCoordinates }
-        })),
-        processedSupportOutcomeIds: [...(player.botMemory.processedSupportOutcomeIds ?? [])],
-        farmTargets: (player.botMemory.farmTargets ?? []).map((entry) => ({
-          ...entry,
-          targetCoordinates: { ...entry.targetCoordinates }
-        })),
-        lastProcessedFleetReportId: player.botMemory.lastProcessedFleetReportId ?? null
-      }
-      : null,
-    botMemoryV2: player.botMemoryV2
-      ? {
-        version: 1,
-        currentStance: player.botMemoryV2.currentStance,
-        antiOscillation: {
-          lastMajorFocus: player.botMemoryV2.antiOscillation.lastMajorFocus,
-          lastMajorFocusTurn: player.botMemoryV2.antiOscillation.lastMajorFocusTurn,
-          doNotReplaceBeforeTurn: player.botMemoryV2.antiOscillation.doNotReplaceBeforeTurn
-        },
-        cooldowns: { ...player.botMemoryV2.cooldowns },
-        recentTargets: player.botMemoryV2.recentTargets.map((entry) => ({ ...entry })),
-        acceptedLongTermCommitments: player.botMemoryV2.acceptedLongTermCommitments.map((entry) => ({
-          ...entry
-        }))
-      }
-      : null
+    botMemoryV2: Player.normalizeBotMemoryV2(player.botMemoryV2)
   };
 }
 

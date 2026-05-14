@@ -2522,6 +2522,39 @@ They should not hard-block all other behavior on that planet.
 
 This system sees proposals from all subsystems and decides what is actually executed.
 
+### Current implemented slice
+
+The first live Supervisor slice is implemented as a queue-action allocator, not a full campaign executor.
+
+Runtime mode is explicit:
+
+* `DISABLED` skips V2 bot runtime,
+* `SHADOW` runs V2 planning/traces without execution,
+* `LIVE` lets the Supervisor execute accepted queue proposals.
+
+The live execution scope is:
+
+* `BUILDING`,
+* `RESEARCH`,
+* `SHIPYARD`.
+
+The current deferred scope is:
+
+* fleet mission execution,
+* maintenance/support/Jump Gate request handling,
+* diplomacy execution,
+* full hard reservation/cancellation engine.
+
+`SHIP_NEED` and `demandOnly` shipyard proposals are pressure signals only. They are not executable by themselves; they increase priority for matching concrete shipyard proposals emitted by other subsystems.
+
+The old V1 bot runner is no longer used by the end-turn runtime. If V2 live execution fails, the bot logs/traces the failure and does not fall back to V1.
+
+Important TODOs:
+
+* verify Jump Gate mechanics and default fleet use before fleet execution is wired,
+* decide the request-handling phase for maintenance/support/Jump Gate approvals,
+* review global research coverage and add a dedicated research subsystem if the existing subsystems do not cover all technologies well enough.
+
 ### Responsibilities
 
 * apply **light profile-based base weights** depending on bot archetype:
@@ -2546,6 +2579,27 @@ This system sees proposals from all subsystems and decides what is actually exec
 * manage commitment stability,
 * resolve conflicts between subsystems,
 * keep memory of the latest accepted tasks and their owning goals.
+
+### Current Weight Alignment Model
+
+Current weighted subsystems:
+
+* `ECONOMIC`,
+* `DEFENSIVE`,
+* `WARFARE`,
+* `STRATEGIC_DEVELOPMENT`,
+* `STRATEGIC_MILITARY`,
+* `STRATEGIC_DIPLOMATIC`.
+
+`CRITICAL` and `WEIGHT_MANAGER` stay outside normal spending-share equalization. `CRITICAL` proposals are evaluated before ordinary weighted proposals.
+
+Resource value is currently:
+
+```text
+metal * 1 + crystal * 1.8 + deuterium * 2.6
+```
+
+The Supervisor tracks raw resource spending as well as weighted resource value. It uses Weight Manager output for target shares, applies a progressive overfunding penalty, and gives a capped underfunding bonus so long-term spending trends drift back toward the intended allocation instead of enforcing a hard per-turn budget.
 
 ---
 
@@ -2801,7 +2855,7 @@ Then execute:
 * Strategic Development,
 * Strategic Military,
 * Strategic Diplomatic,
-* plus accepted Critical emergency proposals that the future Supervisor marks for immediate execution.
+* plus accepted Critical emergency proposals that the Supervisor marks for immediate execution.
 
 This preserves your original intuition while allowing exceptions.
 

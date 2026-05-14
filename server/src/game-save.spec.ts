@@ -64,7 +64,6 @@ describe('game-save', () => {
     expect(save.galaxy.players[0].reports).toHaveLength(2);
     expect(save.galaxy.players[0].messages[0].title).toBe('Mail');
     expect(save.galaxy.players[0].botProfileId).toBe('BALANCED');
-    expect(save.galaxy.players[0].botMemory?.currentGoal).toBe('KEY_BUILDING_UP');
     expect(save.galaxy.players[0].botMemoryV2?.currentStance).toBe('ECONOMIC_GROWTH');
     expect(save.galaxy.stars[0][0].starSystemNotes[0].text).toBe('Scout route');
     expect(save.galaxy.stars[0][0].planets[0].rBDSFTQ.fleetIds).toEqual([7]);
@@ -137,11 +136,8 @@ describe('game-save', () => {
 
     expect(player.playerName).toBe('Alpha');
     expect(player.botProfileId).toBe('BALANCED');
-    expect(player.botMemory?.currentGoal).toBe('KEY_BUILDING_UP');
-    expect(player.botMemory?.reservedResources).toEqual({ metal: 40, crystal: 20, deuterium: 10 });
-    expect(player.botMemory?.recentDiplomacyTargets).toEqual([{ playerId: 2, requestedStatus: 'PEACE', turn: 5 }]);
-    expect(player.botMemory?.lastProcessedFleetReportId).toBe(12);
-    expect(player.botMemoryV2).toEqual({
+    expect(player.botMemory).toBeNull();
+    expect(player.botMemoryV2).toMatchObject({
       version: 1,
       currentStance: 'ECONOMIC_GROWTH',
       antiOscillation: {
@@ -163,19 +159,6 @@ describe('game-save', () => {
         expiresOnTurn: 9
       }]
     });
-    expect(player.botMemory?.farmTargets).toEqual([
-      {
-        targetCoordinates: { x: 2, y: 1, z: 0 },
-        lastAttackTurn: 6,
-        nextAllowedAttackTurn: 16,
-        lastSentCombatStrength: 42,
-        lastKnownDefenceCount: 0,
-        lastKnownShipCount: 0,
-        lastKnownOpened: true,
-        nextForceMultiplier: 1,
-        lastLossBracket: 'NONE'
-      }
-    ]);
     expect(player.planets[0]).toBe(planet);
     expect(player.fleets[0]).toBe(fleet);
     expect(planet.info.ownerId).toBe(player.playerId);
@@ -471,28 +454,7 @@ function buildTestSave() {
     1,
     {
       botProfileId: 'BALANCED',
-      botMemory: {
-        currentGoal: 'KEY_BUILDING_UP',
-        goalTarget: { x: 0, y: 0, z: 0 },
-        goalExpiresTurn: 8,
-        reservedResources: { metal: 40, crystal: 20, deuterium: 10 },
-        lastSpyTargets: [{ x: 1, y: 0, z: 0 }],
-        lastAttackTargets: [{ x: 2, y: 1, z: 0 }],
-        recentDiplomacyTargets: [{ playerId: 2, requestedStatus: 'PEACE', turn: 5 }],
-        farmTargets: [{
-          targetCoordinates: { x: 2, y: 1, z: 0 },
-          lastAttackTurn: 6,
-          nextAllowedAttackTurn: 16,
-          lastSentCombatStrength: 42,
-          lastKnownDefenceCount: 0,
-          lastKnownShipCount: 0,
-          lastKnownOpened: true,
-          nextForceMultiplier: 1,
-          lastLossBracket: 'NONE'
-        }],
-        lastProcessedFleetReportId: 12
-      },
-      botMemoryV2: {
+      botMemoryV2: Player.normalizeBotMemoryV2({
         version: 1,
         currentStance: 'ECONOMIC_GROWTH',
         antiOscillation: {
@@ -513,7 +475,7 @@ function buildTestSave() {
           createdTurn: 6,
           expiresOnTurn: 9
         }]
-      }
+      } as never)
     }
   );
   player.nextReportId = 9;

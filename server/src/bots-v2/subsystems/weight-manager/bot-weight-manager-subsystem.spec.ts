@@ -72,8 +72,7 @@ describe('BotWeightManagerSubsystem', () => {
     applyBuildingDamagePercent(matureHubPlanet, BuildingType.SOLAR_WIND_GEOTHERMAL, 75);
 
     const snapshot = buildBotWorldSnapshot(galaxy, bot, {
-      enabled: true,
-      shadowMode: true,
+      mode: 'SHADOW',
       enabledSubsystems: {
         economic: false,
         defensive: false,
@@ -84,8 +83,6 @@ describe('BotWeightManagerSubsystem', () => {
         strategicDiplomatic: false,
         weightManager: true
       },
-      allowSupervisorAcceptance: false,
-      allowExecution: false
     });
     const damagedSnapshot = snapshot.planets.find((planet) =>
       sameCoordinates(planet.coordinates, matureHubPlanet)
@@ -141,8 +138,7 @@ function runWeightManagerSubsystem(
   memory: ReturnType<typeof createDefaultBotMemoryV2>;
 } {
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
-    enabled: true,
-    shadowMode: true,
+      mode: 'SHADOW',
     enabledSubsystems: {
       economic: false,
       defensive: false,
@@ -153,8 +149,6 @@ function runWeightManagerSubsystem(
       strategicDiplomatic: false,
       weightManager: true
     },
-    allowSupervisorAcceptance: false,
-    allowExecution: false
   });
 
   return {

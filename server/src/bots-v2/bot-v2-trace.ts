@@ -29,7 +29,9 @@ class BotDebugStoreV2 {
       proposals: entry.proposals.map((proposal) => ({ ...proposal })),
       supervisorDecision: {
         ...entry.supervisorDecision,
-        acceptedProposalIds: [...entry.supervisorDecision.acceptedProposalIds]
+        acceptedProposalIds: [...entry.supervisorDecision.acceptedProposalIds],
+        pendingProposalIds: [...entry.supervisorDecision.pendingProposalIds],
+        debug: entry.supervisorDecision.debug ? { ...entry.supervisorDecision.debug } : undefined
       },
       executionOutcomes: entry.executionOutcomes.map((outcome) => ({ ...outcome }))
     }));

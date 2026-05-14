@@ -137,7 +137,7 @@ import {
   registerFailedPasswordAttempt
 } from './auth-account-security.js';
 import { consumeRateLimit } from './auth-rate-limit.js';
-import { clearBotDecisionTraces, getBotDecisionTraces } from './bots/bot-debug-store.js';
+import { clearBotDecisionTracesV2, getBotDecisionTracesV2 } from './bots-v2/bot-v2-trace.js';
 import {
   clearBotMemory,
   listBotAdminStates,
@@ -150,8 +150,7 @@ import {
 import { BOT_PROFILE_IDS } from './bots/bot-profile.js';
 import { buildRegisterConfigResponse, verifyTurnstileToken } from './turnstile.js';
 import { startBuildingConstruction } from './game-commands/building-commands.js';
-import { runBotTurnPhase } from './bots/bot-turn-runner.js';
-import { runBotTurnPhaseV2Shadow } from './bots-v2/bot-v2-shadow-runner.js';
+import { runBotTurnPhaseV2 } from './bots-v2/bot-v2-shadow-runner.js';
 import {
   approveDiplomaticProposalCommand,
   cancelDiplomaticProposalCommand,
@@ -1228,7 +1227,7 @@ app.post('/api/game/start', (req, res) => {
   currentGameSetup = setup;
   currentGalaxyPresentationByPlayer = nextPresentation;
   resetActiveTurnState();
-  clearBotDecisionTraces();
+  clearBotDecisionTracesV2();
   resetBotAdminRuntimeState();
     registerRunningGame(auth.data, 'SINGLEPLAYER', nextGalaxy, {
       gameId: nextGameId,
@@ -1289,7 +1288,7 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
     currentGameSetup = hydrated.setup;
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
-    clearBotDecisionTraces();
+    clearBotDecisionTracesV2();
     resetBotAdminRuntimeState();
     registerRunningGame(auth.data, 'SINGLEPLAYER', currentGalaxy, {
       gameId: save.gameId ?? undefined,
@@ -1971,7 +1970,7 @@ app.get('/api/admin/bots/traces', (req, res) => {
 
   return res.status(200).json({
     turn: controller.galaxy.currentTurn,
-    traces: getBotDecisionTraces(playerId)
+    traces: getBotDecisionTracesV2(playerId)
   });
 });
 
@@ -5333,7 +5332,7 @@ function loadSingleplayerGameRecord(
   currentGameSetup = hydrated.setup;
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
   resetActiveTurnState();
-  clearBotDecisionTraces();
+  clearBotDecisionTracesV2();
   resetBotAdminRuntimeState();
   registerRunningGame(authData, 'SINGLEPLAYER', currentGalaxy, {
     gameId: save.gameId ?? record.gameId,
@@ -5709,7 +5708,7 @@ function hydrateRunningMultiplayerGameFromLobby(
     currentGameSetup = hydrated.setup;
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
-    clearBotDecisionTraces();
+    clearBotDecisionTracesV2();
     resetBotAdminRuntimeState();
     registerRunningGame(authData, 'MULTIPLAYER', currentGalaxy, {
       gameId,
@@ -5744,7 +5743,7 @@ function hydrateRunningMultiplayerGameFromLobby(
     currentGameSetup = setup;
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
-    clearBotDecisionTraces();
+    clearBotDecisionTracesV2();
     resetBotAdminRuntimeState();
     registerRunningGame(authData, 'MULTIPLAYER', currentGalaxy, {
       gameId,
@@ -6333,8 +6332,7 @@ function handleEndTurnRequest(
 
   try {
     const resolvedTurnNumber = access.galaxy.currentTurn + 1;
-    runBotTurnPhase(access.galaxy);
-    runBotTurnPhaseV2Shadow(access.galaxy);
+    runBotTurnPhaseV2(access.galaxy);
     resolvePhaseOneTurn(access.galaxy, resolvedTurnNumber, {
       botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0
     });

@@ -11,23 +11,33 @@ function readBooleanEnv(name: string, fallback: boolean): boolean {
   return fallback;
 }
 
+function readModeEnv(): BotV2FeatureFlags['mode'] {
+  const value = process.env.SROGAME_BOT_AI_V2_MODE?.trim().toUpperCase() ?? '';
+  if (value === 'DISABLED' || value === 'SHADOW' || value === 'LIVE') {
+    return value;
+  }
+
+  const legacyEnabled = process.env.SROGAME_BOT_AI_V2_ENABLED?.trim().toLowerCase();
+  if (legacyEnabled === '0' || legacyEnabled === 'false' || legacyEnabled === 'no' || legacyEnabled === 'off') {
+    return 'DISABLED';
+  }
+
+  return readBooleanEnv('SROGAME_BOT_AI_V2_SHADOW_MODE', false) ? 'SHADOW' : 'LIVE';
+}
+
 export function getBotV2FeatureFlags(): BotV2FeatureFlags {
-  const enabled = readBooleanEnv('SROGAME_BOT_AI_V2_ENABLED', false);
   return {
-    enabled,
-    shadowMode: readBooleanEnv('SROGAME_BOT_AI_V2_SHADOW_MODE', enabled),
+    mode: readModeEnv(),
     enabledSubsystems: {
       economic: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_ECONOMIC', true),
-      defensive: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_DEFENSIVE', false),
-      warfare: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_WARFARE', false),
-      critical: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_CRITICAL', false),
-      strategicDevelopment: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_DEVELOPMENT', false),
-      strategicMilitary: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_MILITARY', false),
-      strategicDiplomatic: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_DIPLOMATIC', false),
-      weightManager: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_WEIGHT_MANAGER', false)
-    },
-    allowSupervisorAcceptance: readBooleanEnv('SROGAME_BOT_AI_V2_ALLOW_SUPERVISOR_ACCEPTANCE', false),
-    allowExecution: readBooleanEnv('SROGAME_BOT_AI_V2_ALLOW_EXECUTION', false)
+      defensive: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_DEFENSIVE', true),
+      warfare: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_WARFARE', true),
+      critical: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_CRITICAL', true),
+      strategicDevelopment: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_DEVELOPMENT', true),
+      strategicMilitary: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_MILITARY', true),
+      strategicDiplomatic: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_DIPLOMATIC', true),
+      weightManager: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_WEIGHT_MANAGER', true)
+    }
   };
 }
 

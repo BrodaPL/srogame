@@ -10,8 +10,8 @@ import {
   createBotBenchmarkScenario,
   type BotBenchmarkScenarioKey
 } from '../src/app/models/testing/bot-benchmark-scenarios.js';
-import { clearBotDecisionTraces, getBotDecisionTraces } from '../server/src/bots/bot-debug-store.js';
-import { runBotTurnPhase } from '../server/src/bots/bot-turn-runner.js';
+import { clearBotDecisionTracesV2, getBotDecisionTracesV2 } from '../server/src/bots-v2/bot-v2-trace.js';
+import { runBotTurnPhaseV2 } from '../server/src/bots-v2/bot-v2-shadow-runner.js';
 
 type BenchmarkOutcome = {
   signalMet: boolean;
@@ -95,11 +95,11 @@ function runScenario(scenarioKey: BotBenchmarkScenarioKey): BenchmarkScenarioRes
   const scenario = createBotBenchmarkScenario(scenarioKey);
   const startedAt = new Date().toISOString();
   const startedAtPerf = performance.now();
-  clearBotDecisionTraces();
+  clearBotDecisionTracesV2();
 
   try {
-    runBotTurnPhase(scenario.galaxy);
-    const trace = getBotDecisionTraces(scenario.focusBot.playerId)[0] ?? null;
+    runBotTurnPhaseV2(scenario.galaxy);
+    const trace = getBotDecisionTracesV2(scenario.focusBot.playerId)[0] ?? null;
     const outcome = evaluateScenarioOutcome(scenarioKey, scenario.focusBot.playerId, scenario.galaxy);
     const focusBotFleets = scenario.galaxy.activeFleets.filter((fleet) => fleet.ownerId === scenario.focusBot.playerId);
     const outgoingProposals = scenario.galaxy.diplomaticProposals.filter((proposal) => proposal.fromPlayerId === scenario.focusBot.playerId);
@@ -117,9 +117,9 @@ function runScenario(scenarioKey: BotBenchmarkScenarioKey): BenchmarkScenarioRes
         playerName: scenario.focusBot.playerName,
         profileId: scenario.focusBot.botProfileId
       },
-      chosenActionKinds: trace?.chosenActions.map((entry) => entry.kind) ?? [],
-      rejectedActionCount: trace?.rejectedActions.length ?? 0,
-      stopReason: trace?.actionBudget.stopReason ?? null,
+      chosenActionKinds: trace?.supervisorDecision.acceptedProposalIds ?? [],
+      rejectedActionCount: trace?.supervisorDecision.rejectedCount ?? 0,
+      stopReason: trace?.executionOutcomes.find((entry) => !entry.success)?.message ?? null,
       launchedFleetMissionTypes: focusBotFleets.map((fleet) => fleet.missionType),
       outgoingProposalStatuses: outgoingProposals.map((proposal) => proposal.requestedStatus),
       incomingProposalStates: incomingProposals.map((proposal) => proposal.state),

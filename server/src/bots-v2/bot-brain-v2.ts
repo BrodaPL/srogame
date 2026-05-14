@@ -6,12 +6,13 @@ import { ensureBotMemoryV2 } from './bot-v2-memory.js';
 import type {
   BotDecisionTraceV2,
   BotExecutionOutcome,
+  BotProposal,
   BotSubsystem,
   BotV2FeatureFlags
 } from './bot-v2-types.ts';
 import { recordBotDecisionTraceV2 } from './bot-v2-trace.js';
 import { buildBotWorldSnapshot } from './snapshot/build-bot-world-snapshot.js';
-import { NoopBotExecutor } from './execution/bot-executor.js';
+import { LiveQueueBotExecutor, NoopBotExecutor } from './execution/bot-executor.js';
 import { BotDefensiveSubsystem } from './subsystems/defensive/bot-defensive-subsystem.js';
 import { BotCriticalSubsystem } from './subsystems/critical/bot-critical-subsystem.js';
 import { BotEconomicSubsystem } from './subsystems/economic/bot-economic-subsystem.js';
@@ -20,21 +21,19 @@ import { BotStrategicDiplomaticSubsystem } from './subsystems/strategic-diplomat
 import { BotStrategicMilitarySubsystem } from './subsystems/strategic-military/bot-strategic-military-subsystem.js';
 import { BotWarfareSubsystem } from './subsystems/warfare/bot-warfare-subsystem.js';
 import { BotWeightManagerSubsystem } from './subsystems/weight-manager/bot-weight-manager-subsystem.js';
-import { ShadowBotSupervisor } from './supervisor/bot-supervisor.js';
+import { BotSupervisorV2 } from './supervisor/bot-supervisor.js';
 
 export class BotBrainV2 {
   private readonly supervisor;
-  private readonly executor;
   private readonly subsystems;
 
   constructor(private readonly flags: BotV2FeatureFlags) {
-    this.supervisor = new ShadowBotSupervisor(flags);
-    this.executor = new NoopBotExecutor();
+    this.supervisor = new BotSupervisorV2(flags);
     this.subsystems = buildEnabledSubsystems(flags);
   }
 
-  public runShadowTurn(galaxy: Galaxy): void {
-    if (!this.flags.enabled || !this.flags.shadowMode) {
+  public runTurn(galaxy: Galaxy): void {
+    if (this.flags.mode === 'DISABLED') {
       return;
     }
 
@@ -46,11 +45,11 @@ export class BotBrainV2 {
         continue;
       }
 
-      this.runShadowTurnForBot(galaxy, bot);
+      this.runTurnForBot(galaxy, bot);
     }
   }
 
-  private runShadowTurnForBot(galaxy: Galaxy, player: Player): void {
+  private runTurnForBot(galaxy: Galaxy, player: Player): void {
     player.botProfileId = player.botProfileId ?? defaultBotProfileIdForPlayerId(player.playerId);
     const memory = ensureBotMemoryV2(player);
     const snapshot = buildBotWorldSnapshot(galaxy, player, this.flags);
@@ -68,14 +67,16 @@ export class BotBrainV2 {
     }
 
     const supervisorDecision = this.supervisor.decide(snapshot, memory, proposals);
-    const executionOutcomes = resolveExecutionOutcomes(this.flags, this.executor.executeAcceptedTasks(
-      supervisorDecision.accepted
-    ));
+    const executor = this.flags.mode === 'LIVE'
+      ? new LiveQueueBotExecutor(galaxy, player.playerId)
+      : new NoopBotExecutor();
+    const executionOutcomes = executor.executeAcceptedTasks(supervisorDecision.accepted);
+    recordExecutedSpending(memory, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);
     const trace: BotDecisionTraceV2 = {
       playerId: player.playerId,
       playerName: player.playerName,
       turn: galaxy.currentTurn,
-      shadowMode: true,
+      shadowMode: this.flags.mode === 'SHADOW',
       snapshotSummary: {
         planetCount: snapshot.planets.length,
         totalResources: { ...snapshot.empire.totalResources },
@@ -91,6 +92,7 @@ export class BotBrainV2 {
       proposals: proposals.map((proposal) => ({
         proposalId: proposal.proposalId,
         subsystemId: proposal.subsystemId,
+        proposalKind: proposal.kind,
         summary: proposal.summary,
         expectedValue: proposal.expectedValue,
         urgency: proposal.urgency,
@@ -131,8 +133,10 @@ export class BotBrainV2 {
       ),
       supervisorDecision: {
         acceptedProposalIds: supervisorDecision.accepted.map((proposal) => proposal.proposalId),
+        pendingProposalIds: supervisorDecision.pending.map((proposal) => proposal.proposalId),
         rejectedCount: supervisorDecision.rejected.length,
-        mode: 'SHADOW'
+        mode: this.flags.mode === 'LIVE' ? 'LIVE' : 'SHADOW',
+        debug: { ...supervisorDecision.debug }
       },
       executionOutcomes
     };
@@ -169,18 +173,33 @@ function buildEnabledSubsystems(flags: BotV2FeatureFlags): BotSubsystem[] {
   return subsystems;
 }
 
-function resolveExecutionOutcomes(
-  flags: BotV2FeatureFlags,
-  outcomes: BotExecutionOutcome[]
-): BotExecutionOutcome[] {
-  if (flags.allowExecution) {
-    return outcomes;
-  }
+function recordExecutedSpending(
+  memory: ReturnType<typeof ensureBotMemoryV2>,
+  accepted: BotProposal[],
+  outcomes: BotExecutionOutcome[],
+  turn: number
+): void {
+  const proposalById = new Map(accepted.map((proposal) => [proposal.proposalId, proposal]));
+  for (const outcome of outcomes) {
+    if (!outcome.success || !outcome.spent) {
+      continue;
+    }
+    const proposal = proposalById.get(outcome.proposalId);
+    if (!proposal) {
+      continue;
+    }
 
-  return outcomes.map((outcome) => ({
-    ...outcome,
-    executed: false,
-    success: false,
-    message: outcome.message ?? 'Execution disabled in shadow mode.'
-  }));
+    memory.supervisor.spendingHistory.push({
+      turn,
+      proposalId: proposal.proposalId,
+      dedupeKey: proposal.dedupeKey,
+      subsystemId: proposal.subsystemId,
+      kind: proposal.kind,
+      targetCoordinates: proposal.targetCoordinates,
+      resources: { ...outcome.spent },
+      weightedResourceValue: outcome.spent.metal + (outcome.spent.crystal * 1.8) + (outcome.spent.deuterium * 2.6)
+    });
+    memory.supervisor.pendingCommitments = memory.supervisor.pendingCommitments
+      .filter((commitment) => commitment.dedupeKey !== proposal.dedupeKey);
+  }
 }

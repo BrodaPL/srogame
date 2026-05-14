@@ -13,10 +13,10 @@
     </section>
   } @else {
     <section class="overview-card bot-debug-view__header">
-      <div>
-        <p class="eyebrow">Controller Tools</p>
-        <h1>Bot Decision Traces</h1>
-        <p class="overview-muted">Inspect recent chosen actions, failed command attempts, and why each bot stopped planning.</p>
+        <div>
+          <p class="eyebrow">Controller Tools</p>
+        <h1>Bot V2 Decision Traces</h1>
+        <p class="overview-muted">Inspect subsystem proposals, Supervisor decisions, pending commitments, and execution outcomes.</p>
       </div>
       <div class="bot-debug-view__header-actions">
         <div class="overview-stats">
@@ -61,7 +61,7 @@
           <p class="eyebrow">Live Controls</p>
           <h2>{{ selectedBot.playerName }} (#{{ selectedBot.playerId }})</h2>
           <p class="overview-muted">
-            Profile {{ selectedBot.profileId ?? 'n/a' }} | Goal {{ selectedBot.currentGoal ?? 'none' }} |
+            Profile {{ selectedBot.profileId ?? 'n/a' }} | V2 stance {{ selectedBot.currentGoal ?? 'none' }} |
             {{ selectedBot.planetsOwned }} planets | {{ selectedBot.activeFleetCount }} active fleets
           </p>
         </div>
@@ -116,38 +116,34 @@
               <div>
                 <h3>{{ trace.playerName }} (#{{ trace.playerId }})</h3>
                 <p class="overview-muted">
-                  Turn {{ trace.turn }} | Profile {{ trace.profileId ?? 'n/a' }} |
-                  Start goal {{ trace.startingGoal ?? 'none' }} |
-                  End goal {{ trace.endingGoal ?? 'none' }}
+                  Turn {{ trace.turn }} | Mode {{ trace.supervisorDecision.mode }} |
+                  Planets {{ trace.snapshotSummary.planetCount }} |
+                  At war {{ trace.snapshotSummary.atWar ? 'yes' : 'no' }}
                 </p>
               </div>
               <div class="bot-debug-view__trace-budget">
-                <span class="badge">{{ trace.actionBudget.used }} / {{ trace.actionBudget.max }} actions</span>
-                <span class="overview-muted">{{ stopReasonLabel(trace.actionBudget.stopReason) }}</span>
+                <span class="badge">{{ trace.supervisorDecision.acceptedProposalIds.length }} accepted</span>
+                <span class="badge">{{ trace.supervisorDecision.pendingProposalIds.length }} pending</span>
+                <span class="overview-muted">{{ trace.supervisorDecision.rejectedCount }} rejected</span>
               </div>
             </header>
 
             <section class="bot-debug-view__columns">
               <div class="bot-debug-view__column">
-                <h4>Chosen actions</h4>
-                @if (trace.chosenActions.length === 0) {
-                  <p class="overview-muted">No actions applied.</p>
+                <h4>Subsystem proposals</h4>
+                @if (trace.proposals.length === 0) {
+                  <p class="overview-muted">No proposals emitted.</p>
                 } @else {
                   <div class="bot-debug-view__items">
-                    @for (action of trace.chosenActions; track action.kind + action.requestSummary) {
+                    @for (proposal of trace.proposals; track proposal.proposalId) {
                       <article class="bot-debug-view__item">
                         <div class="bot-debug-view__item-head">
-                          <strong>{{ action.kind }}</strong>
-                          <span class="badge">{{ action.expectedUtility.toFixed(2) }}</span>
+                          <strong>{{ proposal.subsystemId }}</strong>
+                          <span class="badge">{{ proposal.expectedValue.toFixed(2) }}</span>
                         </div>
-                        <p>{{ action.reason }}</p>
-                        <p class="overview-muted">{{ action.requestSummary }}</p>
-                        <p class="overview-muted">Goal: {{ action.goalType ?? 'none' }}</p>
-                        @if (action.details['idleFallbackApplied']) {
-                          <p class="overview-muted">
-                            Idle fallback applied. Floor: {{ action.details['idleFallbackFloor'] }}, threshold: {{ action.details['threshold'] }}
-                          </p>
-                        }
+                        <p>{{ proposal.summary }}</p>
+                        <p class="overview-muted">Urgency {{ proposal.urgency }}, confidence {{ proposal.confidence }}, risk {{ proposal.risk }}</p>
+                        <p class="overview-muted">Dedupe: {{ proposal.dedupeKey }}</p>
                       </article>
                     }
                   </div>
@@ -155,30 +151,22 @@
               </div>
 
               <div class="bot-debug-view__column">
-                <h4>Rejected actions</h4>
-                @if (trace.rejectedActions.length === 0) {
-                  <p class="overview-muted">No rejected actions recorded.</p>
+                <h4>Execution outcomes</h4>
+                @if (trace.executionOutcomes.length === 0) {
+                  <p class="overview-muted">No execution outcomes recorded.</p>
                 } @else {
                   <div class="bot-debug-view__items">
-                    @for (action of trace.rejectedActions; track action.kind + action.reason + action.rejectionType) {
-                      <article class="bot-debug-view__item bot-debug-view__item--rejected">
+                    @for (outcome of trace.executionOutcomes; track outcome.proposalId) {
+                      <article class="bot-debug-view__item" [class.bot-debug-view__item--rejected]="!outcome.success">
                         <div class="bot-debug-view__item-head">
-                          <strong>{{ action.kind }}</strong>
-                          <span class="badge">{{ action.rejectionType }}</span>
+                          <strong>{{ outcome.proposalId }}</strong>
+                          <span class="badge">{{ outcome.success ? 'success' : 'failed' }}</span>
                         </div>
-                        <p>{{ action.reason }}</p>
-                        <p class="overview-muted">Utility: {{ action.expectedUtility ?? 'n/a' }}</p>
-                        <p class="overview-muted">{{ action.details['requestSummary'] }}</p>
-                        @if (action.details['idleFallbackReason']) {
+                        <p class="overview-muted">{{ outcome.message ?? 'Command executed.' }}</p>
+                        @if (outcome.spent) {
                           <p class="overview-muted">
-                            Idle fallback: {{ action.details['idleFallbackReason'] }}
-                            @if (action.details['idleFallbackFloor'] !== null && action.details['idleFallbackFloor'] !== undefined) {
-                              (floor {{ action.details['idleFallbackFloor'] }})
-                            }
+                            Spent M{{ outcome.spent.metal }} C{{ outcome.spent.crystal }} D{{ outcome.spent.deuterium }}
                           </p>
-                        }
-                        @if (action.details['message']) {
-                          <p class="overview-muted">Message: {{ action.details['message'] }}</p>
                         }
                       </article>
                     }

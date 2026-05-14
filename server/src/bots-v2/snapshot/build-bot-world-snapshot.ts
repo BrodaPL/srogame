@@ -66,8 +66,9 @@ export function buildBotWorldSnapshot(
     planets,
     empire,
     flags: {
-      shadowMode: flags.shadowMode,
-      currentBotStillExecutes: true
+      shadowMode: flags.mode === 'SHADOW',
+      currentBotStillExecutes: flags.mode !== 'LIVE',
+      mode: flags.mode
     }
   };
 }

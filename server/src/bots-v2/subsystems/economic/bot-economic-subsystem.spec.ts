@@ -211,8 +211,7 @@ describe('BotEconomicSubsystem', () => {
 
 function runEconomicSubsystem(galaxy: Galaxy, bot: Player) {
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
-    enabled: true,
-    shadowMode: true,
+      mode: 'SHADOW',
     enabledSubsystems: {
       economic: true,
       defensive: false,
@@ -223,8 +222,6 @@ function runEconomicSubsystem(galaxy: Galaxy, bot: Player) {
         strategicDiplomatic: false,
         weightManager: false
       },
-    allowSupervisorAcceptance: false,
-    allowExecution: false
   });
 
   return new BotEconomicSubsystem().generate({

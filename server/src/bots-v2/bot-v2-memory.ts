@@ -49,6 +49,12 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
       neutralStatusCount: 0,
       warStatusCount: 0,
       planets: []
+    },
+    supervisor: {
+      pendingCommitments: [],
+      spendingHistory: [],
+      proposalHistory: [],
+      fleetSlotHistory: []
     }
   };
 }

@@ -8,10 +8,23 @@ export function runBotTurnPhaseV2Shadow(
   overrides?: Partial<BotV2FeatureFlags>
 ): void {
   const flags = resolveBotV2FeatureFlags(overrides);
-  if (!flags.enabled || !flags.shadowMode) {
+  if (flags.mode !== 'SHADOW') {
     return;
   }
 
   const brain = new BotBrainV2(flags);
-  brain.runShadowTurn(galaxy);
+  brain.runTurn(galaxy);
+}
+
+export function runBotTurnPhaseV2(
+  galaxy: Galaxy,
+  overrides?: Partial<BotV2FeatureFlags>
+): void {
+  const flags = resolveBotV2FeatureFlags(overrides);
+  if (flags.mode === 'DISABLED') {
+    return;
+  }
+
+  const brain = new BotBrainV2(flags);
+  brain.runTurn(galaxy);
 }

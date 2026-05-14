@@ -6,7 +6,7 @@ import { PlayerReport } from './reports/player-report';
 import { PlayerMessage } from './mail/player-message';
 import type { DefenceType } from './enums/defence-type';
 import type { ShipType } from './enums/ship-type';
-import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
+import { DiplomaticStatus } from './diplomacy/diplomatic-status';
 import { SupportRequestType } from './requests/support-request';
 import {
   TutorialReadState,
@@ -134,6 +134,68 @@ export type BotMemoryV2LongTermCommitment = {
   subsystemId: BotV2SubsystemId;
   createdTurn: number;
   expiresOnTurn: number | null;
+};
+
+export type BotMemoryV2ProposalKind =
+  | 'BUILDING'
+  | 'RESEARCH'
+  | 'SHIPYARD'
+  | 'FLEET_MISSION'
+  | 'MAINTENANCE_REQUEST'
+  | 'NO_OP';
+
+export type BotMemoryV2SupervisorPendingStatus =
+  | 'PENDING_RESOURCES'
+  | 'PENDING_QUEUE'
+  | 'CANCELLED';
+
+export type BotMemoryV2SupervisorPendingCommitment = {
+  commitmentKey: string;
+  dedupeKey: string;
+  proposalId: string;
+  subsystemId: BotV2SubsystemId;
+  kind: BotMemoryV2ProposalKind;
+  targetCoordinates: BotMemoryCoordinates | null;
+  requestedResources: BotMemoryResources;
+  weightedResourceValue: number;
+  score: number;
+  status: BotMemoryV2SupervisorPendingStatus;
+  createdTurn: number;
+  updatedTurn: number;
+  expiresOnTurn: number;
+  executionPayload: Record<string, unknown>;
+  cancelReason: string | null;
+};
+
+export type BotMemoryV2SupervisorSpendingEntry = {
+  turn: number;
+  proposalId: string;
+  dedupeKey: string;
+  subsystemId: BotV2SubsystemId;
+  kind: BotMemoryV2ProposalKind;
+  targetCoordinates: BotMemoryCoordinates | null;
+  resources: BotMemoryResources;
+  weightedResourceValue: number;
+};
+
+export type BotMemoryV2SupervisorProposalEntry = {
+  turn: number;
+  proposalId: string;
+  dedupeKey: string;
+  subsystemId: BotV2SubsystemId;
+  kind: BotMemoryV2ProposalKind;
+  accepted: boolean;
+  pending: boolean;
+  reason: string | null;
+};
+
+export type BotMemoryV2SupervisorFleetSlotEntry = {
+  missionKey: string;
+  proposalId: string;
+  subsystemId: BotV2SubsystemId;
+  createdTurn: number;
+  expiresOnTurn: number | null;
+  active: boolean;
 };
 
 export type BotMemoryV2StrategicMilitaryFarmLedgerEntry = {
@@ -317,6 +379,13 @@ export type BotMemoryV2WeightManager = {
   planets: BotMemoryV2WeightManagerPlanetEntry[];
 };
 
+export type BotMemoryV2Supervisor = {
+  pendingCommitments: BotMemoryV2SupervisorPendingCommitment[];
+  spendingHistory: BotMemoryV2SupervisorSpendingEntry[];
+  proposalHistory: BotMemoryV2SupervisorProposalEntry[];
+  fleetSlotHistory: BotMemoryV2SupervisorFleetSlotEntry[];
+};
+
 export type BotMemoryV2 = {
   version: 1;
   currentStance: string | null;
@@ -332,6 +401,7 @@ export type BotMemoryV2 = {
   strategicMilitary: BotMemoryV2StrategicMilitary;
   strategicDiplomatic: BotMemoryV2StrategicDiplomatic;
   weightManager: BotMemoryV2WeightManager;
+  supervisor: BotMemoryV2Supervisor;
 };
 
 export type PlayerExtras = {
@@ -568,7 +638,8 @@ export class Player {
       critical: Player.normalizeBotMemoryV2Critical(memory.critical),
       strategicMilitary: Player.normalizeBotMemoryV2StrategicMilitary(memory.strategicMilitary),
       strategicDiplomatic: Player.normalizeBotMemoryV2StrategicDiplomatic(memory.strategicDiplomatic),
-      weightManager: Player.normalizeBotMemoryV2WeightManager(memory.weightManager)
+      weightManager: Player.normalizeBotMemoryV2WeightManager(memory.weightManager),
+      supervisor: Player.normalizeBotMemoryV2Supervisor(memory.supervisor)
     };
   }
 
@@ -874,7 +945,7 @@ export class Player {
     }
 
     return entries
-      .map((entry) => {
+      .map((entry): BotMemoryV2CriticalBlockerEntry | null => {
         const blockerKey = Player.normalizeBotMemoryV2String(entry?.blockerKey, 160);
         const blockerFamily = Player.normalizeBotMemoryV2CriticalBlockerFamily(entry?.blockerFamily);
         if (
@@ -894,8 +965,8 @@ export class Player {
           lastSeenTurn: Math.max(0, entry.lastSeenTurn),
           severity: Player.normalizeBotMemoryV2WeightValue(entry?.severity),
           timesEmitted: Player.normalizeBotMemoryV2Count(entry?.timesEmitted),
-          lastProposalTurn: Number.isInteger(entry?.lastProposalTurn) ? Math.max(0, entry.lastProposalTurn) : null,
-          resolvedTurn: Number.isInteger(entry?.resolvedTurn) ? Math.max(0, entry.resolvedTurn) : null,
+          lastProposalTurn: Number.isInteger(entry?.lastProposalTurn) ? Math.max(0, entry.lastProposalTurn!) : null,
+          resolvedTurn: Number.isInteger(entry?.resolvedTurn) ? Math.max(0, entry.resolvedTurn!) : null,
           active: entry?.active === true
         };
       })
@@ -926,7 +997,7 @@ export class Player {
     }
 
     return entries
-      .map((entry) => {
+      .map((entry): BotMemoryV2StrategicMilitaryFarmLedgerEntry | null => {
         const coordinates = Player.normalizeBotMemoryCoordinates(entry?.coordinates);
         if (!coordinates) {
           return null;
@@ -1038,7 +1109,7 @@ export class Player {
     }
 
     return entries
-      .map((entry) => {
+      .map((entry): BotMemoryV2StrategicDiplomaticFactionEntry | null => {
         if (!entry || !Number.isInteger(entry.playerId)) {
           return null;
         }
@@ -1171,7 +1242,7 @@ export class Player {
           return null;
         }
 
-        return {
+        const normalizedEntry: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry = {
           attackerPlayerId: entry.attackerPlayerId,
           victimPlayerId: entry.victimPlayerId,
           targetCoordinates,
@@ -1181,9 +1252,10 @@ export class Player {
           sharedFromStatus,
           severity: Number.isFinite(entry.severity) ? Math.max(0, Number(entry.severity)) : 0,
           propagatedOnTurn: Number.isInteger(entry.propagatedOnTurn)
-            ? Math.max(0, entry.propagatedOnTurn)
+            ? Math.max(0, entry.propagatedOnTurn!)
             : null
         };
+        return normalizedEntry;
       })
       .filter((entry): entry is BotMemoryV2StrategicDiplomaticSharedHostileEventEntry => entry !== null)
       .slice(-400);
@@ -1196,7 +1268,7 @@ export class Player {
     const planets = Player.normalizeBotMemoryV2WeightManagerPlanets(weightManager?.planets);
 
     return {
-      updatedTurn: Number.isInteger(weightManager?.updatedTurn) ? Math.max(0, weightManager.updatedTurn) : null,
+      updatedTurn: Number.isInteger(weightManager?.updatedTurn) ? Math.max(0, weightManager!.updatedTurn!) : null,
       selectedMode,
       economicRecoveryMode: selectedMode === 'ECONOMIC_RECOVERY',
       warEmergencyMode: selectedMode === 'WAR_EMERGENCY',
@@ -1269,6 +1341,182 @@ export class Player {
       .slice(0, 64);
   }
 
+  private static normalizeBotMemoryV2Supervisor(
+    supervisor: BotMemoryV2Supervisor | null | undefined
+  ): BotMemoryV2Supervisor {
+    return {
+      pendingCommitments: Player.normalizeBotMemoryV2SupervisorPendingCommitments(
+        supervisor?.pendingCommitments
+      ),
+      spendingHistory: Player.normalizeBotMemoryV2SupervisorSpendingHistory(supervisor?.spendingHistory),
+      proposalHistory: Player.normalizeBotMemoryV2SupervisorProposalHistory(supervisor?.proposalHistory),
+      fleetSlotHistory: Player.normalizeBotMemoryV2SupervisorFleetSlotHistory(supervisor?.fleetSlotHistory)
+    };
+  }
+
+  private static normalizeBotMemoryV2SupervisorPendingCommitments(
+    entries: BotMemoryV2SupervisorPendingCommitment[] | null | undefined
+  ): BotMemoryV2SupervisorPendingCommitment[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const commitmentKey = Player.normalizeBotMemoryV2String(entry?.commitmentKey, 160);
+        const dedupeKey = Player.normalizeBotMemoryV2String(entry?.dedupeKey, 200);
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        if (
+          !commitmentKey
+          || !dedupeKey
+          || !proposalId
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Player.isBotMemoryV2ProposalKind(entry?.kind)
+          || !Player.isBotMemoryV2SupervisorPendingStatus(entry?.status)
+          || !Number.isInteger(entry?.createdTurn)
+          || !Number.isInteger(entry?.updatedTurn)
+          || !Number.isInteger(entry?.expiresOnTurn)
+        ) {
+          return null;
+        }
+
+        return {
+          commitmentKey,
+          dedupeKey,
+          proposalId,
+          subsystemId: entry.subsystemId,
+          kind: entry.kind,
+          targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
+          requestedResources: Player.normalizeBotMemoryResources(entry?.requestedResources),
+          weightedResourceValue: Player.normalizeBotMemoryV2AverageValue(entry?.weightedResourceValue),
+          score: Player.normalizeBotMemoryV2AverageValue(entry?.score),
+          status: entry.status,
+          createdTurn: Math.max(0, entry.createdTurn),
+          updatedTurn: Math.max(0, entry.updatedTurn),
+          expiresOnTurn: Math.max(0, entry.expiresOnTurn),
+          executionPayload: Player.normalizeBotMemoryV2Record(entry?.executionPayload),
+          cancelReason: Player.normalizeBotMemoryV2String(entry?.cancelReason, 120)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorPendingCommitment => entry !== null)
+      .slice(-80);
+  }
+
+  private static normalizeBotMemoryV2SupervisorSpendingHistory(
+    entries: BotMemoryV2SupervisorSpendingEntry[] | null | undefined
+  ): BotMemoryV2SupervisorSpendingEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        const dedupeKey = Player.normalizeBotMemoryV2String(entry?.dedupeKey, 200);
+        if (
+          !proposalId
+          || !dedupeKey
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Player.isBotMemoryV2ProposalKind(entry?.kind)
+          || !Number.isInteger(entry?.turn)
+        ) {
+          return null;
+        }
+
+        return {
+          turn: Math.max(0, entry.turn),
+          proposalId,
+          dedupeKey,
+          subsystemId: entry.subsystemId,
+          kind: entry.kind,
+          targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
+          resources: Player.normalizeBotMemoryResources(entry?.resources),
+          weightedResourceValue: Player.normalizeBotMemoryV2AverageValue(entry?.weightedResourceValue)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorSpendingEntry => entry !== null)
+      .slice(-200);
+  }
+
+  private static normalizeBotMemoryV2SupervisorProposalHistory(
+    entries: BotMemoryV2SupervisorProposalEntry[] | null | undefined
+  ): BotMemoryV2SupervisorProposalEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        const dedupeKey = Player.normalizeBotMemoryV2String(entry?.dedupeKey, 200);
+        if (
+          !proposalId
+          || !dedupeKey
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Player.isBotMemoryV2ProposalKind(entry?.kind)
+          || !Number.isInteger(entry?.turn)
+        ) {
+          return null;
+        }
+
+        return {
+          turn: Math.max(0, entry.turn),
+          proposalId,
+          dedupeKey,
+          subsystemId: entry.subsystemId,
+          kind: entry.kind,
+          accepted: entry.accepted === true,
+          pending: entry.pending === true,
+          reason: Player.normalizeBotMemoryV2String(entry?.reason, 120)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorProposalEntry => entry !== null)
+      .slice(-200);
+  }
+
+  private static normalizeBotMemoryV2SupervisorFleetSlotHistory(
+    entries: BotMemoryV2SupervisorFleetSlotEntry[] | null | undefined
+  ): BotMemoryV2SupervisorFleetSlotEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const missionKey = Player.normalizeBotMemoryV2String(entry?.missionKey, 200);
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        if (
+          !missionKey
+          || !proposalId
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Number.isInteger(entry?.createdTurn)
+        ) {
+          return null;
+        }
+
+        return {
+          missionKey,
+          proposalId,
+          subsystemId: entry.subsystemId,
+          createdTurn: Math.max(0, entry.createdTurn),
+          expiresOnTurn: Number.isInteger(entry.expiresOnTurn) ? Math.max(0, entry.expiresOnTurn!) : null,
+          active: entry.active === true
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorFleetSlotEntry => entry !== null)
+      .slice(-120);
+  }
+
+  private static normalizeBotMemoryV2Record(
+    value: Record<string, unknown> | null | undefined
+  ): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+
+    return { ...value };
+  }
+
   private static normalizeBotMemoryV2WeightManagerMode(
     mode: BotMemoryV2WeightManagerMode | null | undefined
   ): BotMemoryV2WeightManagerMode {
@@ -1295,6 +1543,25 @@ export class Player {
       default:
         return null;
     }
+  }
+
+  private static isBotMemoryV2ProposalKind(
+    kind: BotMemoryV2ProposalKind | null | undefined
+  ): kind is BotMemoryV2ProposalKind {
+    return kind === 'BUILDING'
+      || kind === 'RESEARCH'
+      || kind === 'SHIPYARD'
+      || kind === 'FLEET_MISSION'
+      || kind === 'MAINTENANCE_REQUEST'
+      || kind === 'NO_OP';
+  }
+
+  private static isBotMemoryV2SupervisorPendingStatus(
+    status: BotMemoryV2SupervisorPendingStatus | null | undefined
+  ): status is BotMemoryV2SupervisorPendingStatus {
+    return status === 'PENDING_RESOURCES'
+      || status === 'PENDING_QUEUE'
+      || status === 'CANCELLED';
   }
 
   private static normalizeBotMemoryV2WeightValue(value: number | null | undefined): number {

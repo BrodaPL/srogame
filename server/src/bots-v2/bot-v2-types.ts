@@ -33,8 +33,7 @@ export type BotProposalStatus =
   | 'BLOCKED';
 
 export type BotV2FeatureFlags = {
-  enabled: boolean;
-  shadowMode: boolean;
+  mode: 'DISABLED' | 'SHADOW' | 'LIVE';
   enabledSubsystems: {
     economic: boolean;
     defensive: boolean;
@@ -45,8 +44,6 @@ export type BotV2FeatureFlags = {
     strategicDiplomatic: boolean;
     weightManager: boolean;
   };
-  allowSupervisorAcceptance: boolean;
-  allowExecution: boolean;
 };
 
 export type BotPlanetMaturityStage =
@@ -391,6 +388,7 @@ export type BotPlanetSnapshot = {
 export type BotWorldFlags = {
   shadowMode: boolean;
   currentBotStillExecutes: boolean;
+  mode: BotV2FeatureFlags['mode'];
 };
 
 export type BotProposal = {
@@ -564,10 +562,12 @@ export interface BotSubsystem {
 
 export type BotSupervisorDecision = {
   accepted: BotProposal[];
+  pending: BotProposal[];
   rejected: Array<{
     proposalId: string;
     reason: string;
   }>;
+  debug: Record<string, string | number | boolean | null>;
 };
 
 export interface BotSupervisor {
@@ -583,6 +583,11 @@ export type BotExecutionOutcome = {
   executed: boolean;
   success: boolean;
   message: string | null;
+  spent?: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  };
 };
 
 export interface BotExecutor {
@@ -613,6 +618,7 @@ export type BotDecisionTraceV2 = {
   proposals: Array<{
     proposalId: string;
     subsystemId: BotV2SubsystemId;
+    proposalKind: BotProposalKind;
     summary: string;
     expectedValue: number;
     urgency: number;
@@ -649,8 +655,10 @@ export type BotDecisionTraceV2 = {
   }>;
   supervisorDecision: {
     acceptedProposalIds: string[];
+    pendingProposalIds: string[];
     rejectedCount: number;
-    mode: 'SHADOW';
+    mode: 'SHADOW' | 'LIVE';
+    debug?: Record<string, string | number | boolean | null>;
   };
   executionOutcomes: BotExecutionOutcome[];
 };

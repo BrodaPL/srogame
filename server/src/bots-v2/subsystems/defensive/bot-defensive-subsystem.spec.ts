@@ -126,8 +126,7 @@ describe('BotDefensiveSubsystem', () => {
 
 function runDefensiveSubsystem(galaxy: Galaxy, bot: Player) {
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
-    enabled: true,
-    shadowMode: true,
+      mode: 'SHADOW',
     enabledSubsystems: {
       economic: false,
       defensive: true,
@@ -138,8 +137,6 @@ function runDefensiveSubsystem(galaxy: Galaxy, bot: Player) {
         strategicDiplomatic: false,
         weightManager: false
       },
-    allowSupervisorAcceptance: false,
-    allowExecution: false
   });
 
   return new BotDefensiveSubsystem().generate({

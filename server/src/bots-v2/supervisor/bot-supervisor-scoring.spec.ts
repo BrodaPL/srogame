@@ -1,0 +1,116 @@
+import { describe, expect, it } from 'vitest';
+import { createDefaultBotMemoryV2 } from '../bot-v2-memory.js';
+import type { BotProposal, BotWorldSnapshot } from '../bot-v2-types.ts';
+import {
+  calculateRawProposalScore,
+  calculateWeightedResourceValue,
+  resolveTargetShares,
+  scoreSupervisorProposal
+} from './bot-supervisor-scoring.js';
+
+describe('bot supervisor scoring', () => {
+  it('uses the selected weighted resource valuation', () => {
+    expect(calculateWeightedResourceValue({
+      metal: 100,
+      crystal: 100,
+      deuterium: 100
+    })).toBe(540);
+  });
+
+  it('keeps the existing raw score formula', () => {
+    expect(calculateRawProposalScore(createProposal({
+      expectedValue: 100,
+      urgency: 20,
+      confidence: 40,
+      risk: 20
+    }))).toBe(115);
+  });
+
+  it('normalizes weights into target shares', () => {
+    const shares = resolveTargetShares({
+      ECONOMIC: 100,
+      DEFENSIVE: 100,
+      WARFARE: 100,
+      STRATEGIC_DEVELOPMENT: 100,
+      STRATEGIC_MILITARY: 100,
+      STRATEGIC_DIPLOMATIC: 100
+    });
+
+    expect(shares.ECONOMIC).toBeCloseTo(1 / 6, 4);
+    expect(shares.DEFENSIVE).toBeCloseTo(1 / 6, 4);
+  });
+
+  it('scores Critical outside normal weight competition', () => {
+    const memory = createDefaultBotMemoryV2();
+    const normal = scoreSupervisorProposal({
+      proposal: createProposal({ subsystemId: 'ECONOMIC' }),
+      snapshot: createSnapshot(),
+      memory,
+      shipNeedPressure: 0,
+      criticalAccepted: false
+    });
+    const critical = scoreSupervisorProposal({
+      proposal: createProposal({ subsystemId: 'CRITICAL' }),
+      snapshot: createSnapshot(),
+      memory,
+      shipNeedPressure: 0,
+      criticalAccepted: false
+    });
+
+    expect(critical).toBeGreaterThan(normal * 10);
+  });
+});
+
+function createProposal(overrides: Partial<BotProposal> = {}): BotProposal {
+  return {
+    proposalId: 'proposal',
+    subsystemId: 'ECONOMIC',
+    kind: 'BUILDING',
+    status: 'PROPOSED',
+    goalKey: 'goal',
+    dedupeKey: 'dedupe',
+    summary: 'summary',
+    planetId: null,
+    targetCoordinates: { x: 0, y: 0, z: 1 },
+    expectedValue: 10,
+    urgency: 10,
+    risk: 0,
+    confidence: 10,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: { x: 0, y: 0, z: 1 },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {},
+    ...overrides
+  };
+}
+
+function createSnapshot(): BotWorldSnapshot {
+  return {
+    turn: 1,
+    playerId: 1,
+    playerName: 'Bot',
+    profileId: 'BALANCED',
+    planets: [],
+    empire: {
+      ownedPlanetCount: 0,
+      computerTechnologyLevel: 0,
+      imperiumFleetCap: 0,
+      activeFleetCount: 0,
+      maxActiveFleetCount: 0,
+      activeColonizeFleetCount: 0,
+      totalResources: { metal: 0, crystal: 0, deuterium: 0 },
+      atWar: false,
+      hasCriticalEnergyProblem: false,
+      hasCriticalStorageProblem: false,
+      intelCandidates: [],
+      strategicMilitaryTargets: [],
+      strategicDiplomaticFactions: []
+    },
+    flags: {
+      shadowMode: false,
+      currentBotStillExecutes: false,
+      mode: 'LIVE'
+    }
+  };
+}

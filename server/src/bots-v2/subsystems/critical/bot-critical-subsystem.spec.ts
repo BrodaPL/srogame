@@ -197,8 +197,7 @@ describe('BotCriticalSubsystem', () => {
     supportPlanet.rBDSFTQ.resources.deuterium = 12000;
 
     const balancedSnapshot = buildBotWorldSnapshot(galaxy, bot, {
-      enabled: true,
-      shadowMode: true,
+      mode: 'SHADOW',
       enabledSubsystems: {
         economic: false,
         defensive: false,
@@ -209,8 +208,6 @@ describe('BotCriticalSubsystem', () => {
         strategicDiplomatic: false,
         weightManager: false
       },
-      allowSupervisorAcceptance: false,
-      allowExecution: false
     }).planets[1]!;
     const dominantSurplus = __criticalTestInternals.resolveSourceSurplus(balancedSnapshot);
     const repairSurplus = __criticalTestInternals.resolveRepairLogisticsSourceSurplus(balancedSnapshot);
@@ -292,8 +289,7 @@ function runCriticalSubsystem(
   memory: ReturnType<typeof createDefaultBotMemoryV2>;
 } {
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
-    enabled: true,
-    shadowMode: true,
+      mode: 'SHADOW',
     enabledSubsystems: {
       economic: false,
       defensive: false,
@@ -304,8 +300,6 @@ function runCriticalSubsystem(
       strategicDiplomatic: false,
       weightManager: false
     },
-    allowSupervisorAcceptance: false,
-    allowExecution: false
   });
 
   return {
