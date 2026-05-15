@@ -1927,13 +1927,13 @@ It should not unlock new mission-legality rules yet.
 
 #### Next phase: allied-cooperation execution
 
-After shared war awareness, the next `Strategic Diplomatic` slice should add **allied-cooperation execution**.
+After shared war awareness, `Strategic Diplomatic` adds **allied-cooperation planning**. Incoming request decisions are now implemented for Jump Gate, Maintenance, and Support requests; outgoing request creation remains the next deferred request slice.
 
 This phase should focus on:
 
 * outgoing support requests,
 * `ALLIANCE_DEPOT` usage,
-* better incoming-request acceptance,
+* richer incoming-request acceptance,
 * and request-driven cooperation instead of global multi-front orchestration.
 
 It should outward:
@@ -2524,7 +2524,7 @@ This system sees proposals from all subsystems and decides what is actually exec
 
 ### Current implemented slice
 
-The current live Supervisor slice is implemented as a final allocator/executor for queue actions plus allowlisted fleet execution. It is not a full campaign executor and does not choose targets or compose fleets.
+The current live Supervisor slice is implemented as a final allocator/executor for queue actions, allowlisted fleet execution, and incoming request-decision execution. It is not a full campaign executor and does not choose targets, compose fleets, or create strategic requests by itself.
 
 Runtime mode is explicit:
 
@@ -2546,15 +2546,22 @@ The live execution scope is:
 * `DEFEND`,
 * `ATTACK`,
 * `BOMBARD`,
-* `SIEGE`.
+* `SIEGE`,
+* incoming `REQUEST_DECISION` proposals for `JUMP_GATE`, `MAINTENANCE`, and `SUPPORT`.
 
 The current deferred scope is:
 
-* maintenance/support/Jump Gate request handling,
+* outgoing request creation,
 * diplomacy execution,
 * full hard reservation/cancellation engine,
 * active-fleet recall management when diplomacy changes,
 * recycle execution until a subsystem emits explicit `RECYCLE` proposals.
+
+Incoming request ownership is split deliberately:
+
+* `Strategic Diplomatic` evaluates incoming Jump Gate, Maintenance, and Support requests and emits explicit `REQUEST_DECISION` proposals.
+* `Supervisor` only arbitrates and executes accepted request decisions through shared command helpers.
+* If no subsystem emits a request decision, Supervisor does not invent one.
 
 Supervisor fleet execution rules:
 
@@ -2579,11 +2586,11 @@ The old V1 bot runner is no longer used by the end-turn runtime. If V2 live exec
 Important TODOs:
 
 * add future Jump Gate operating-cost policy,
-* define whether and when Supervisor may create foreign/allied Jump Gate requests,
+* add outgoing request creation proposals in the owning subsystem, especially Strategic Diplomatic,
+* add future friendliness effects for accepted Jump Gate requests (`+0.5` non-combat fleet, `+1` combat fleet, per fleet),
 * add future active-fleet management to recall our own active `ATTACK` / `BOMBARD` / `SIEGE` fleets when the target relation becomes `PEACE` / `ALLIED`,
 * check whether shared `DEFEND` launch/arrival logic fully supports own + allied/peace guard targets,
 * add/enable `RECYCLE` execution only after an owning subsystem emits explicit recycle proposals,
-* decide the request-handling phase for maintenance/support/Jump Gate approvals,
 * review global research coverage and add a dedicated research subsystem if the existing subsystems do not cover all technologies well enough.
 
 ### Responsibilities

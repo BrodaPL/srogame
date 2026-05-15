@@ -15,6 +15,8 @@ import { Galaxy } from '../../../../../src/app/models/planets/galaxy.js';
 import { Planet } from '../../../../../src/app/models/planets/planet.js';
 import { SolarSystem } from '../../../../../src/app/models/planets/solar-system.js';
 import { Player } from '../../../../../src/app/models/player.js';
+import { createJumpGateRequest } from '../../../../../src/app/models/requests/jump-gate-request.js';
+import { createMaintenanceRequest } from '../../../../../src/app/models/requests/maintenance-request.js';
 import { createSupportRequest } from '../../../../../src/app/models/requests/support-request.js';
 import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
@@ -688,13 +690,98 @@ describe('BotStrategicDiplomaticSubsystem', () => {
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot);
     const preferenceProposal = result.result.proposals.find((proposal) =>
-      proposal.requestPayload.actionType === 'SUPPORT_REQUEST_PREFERENCE'
+      proposal.requestPayload.actionType === 'REQUEST_DECISION'
       && proposal.requestPayload.supportType === 'RESOURCE_SUPPORT'
     );
 
     expect(preferenceProposal).toBeDefined();
-    expect(preferenceProposal?.requestPayload.preference).toBe('PARTIAL');
+    expect(preferenceProposal?.requestPayload.decision).toBe('PARTIAL_APPROVE');
     expect(Number((preferenceProposal?.requestPayload.approvedResources as { metal: number }).metal ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('emits an approval decision for allied Jump Gate requests with valid mission type', () => {
+    const { galaxy, bot, botPlanet, botEnemy, botEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, botEnemy.playerId, DiplomaticStatus.ALLIED)
+    );
+    markPlanetScanned(bot, botEnemy, botEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 10 });
+    galaxy.jumpGateRequests.push(createJumpGateRequest(
+      1,
+      77,
+      botEnemy.playerId,
+      bot.playerId,
+      botEnemyPlanet.basicInfo.name,
+      {
+        x: botEnemyPlanet.basicInfo.solarSystem.coordinates.x,
+        y: botEnemyPlanet.basicInfo.solarSystem.coordinates.y,
+        z: botEnemyPlanet.basicInfo.order
+      },
+      botPlanet.basicInfo.name,
+      {
+        x: botPlanet.basicInfo.solarSystem.coordinates.x,
+        y: botPlanet.basicInfo.solarSystem.coordinates.y,
+        z: botPlanet.basicInfo.order
+      },
+      FleetMissionType.DEFEND,
+      3,
+      galaxy.currentTurn,
+      galaxy.currentTurn + 1
+    ));
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const decisionProposal = result.result.proposals.find((proposal) =>
+      proposal.requestPayload.actionType === 'REQUEST_DECISION'
+      && proposal.requestPayload.requestType === 'JUMP_GATE'
+    );
+
+    expect(decisionProposal).toBeDefined();
+    expect(decisionProposal?.kind).toBe('REQUEST_DECISION');
+    expect(decisionProposal?.requestPayload.decision).toBe('APPROVE');
+  });
+
+  it('emits fuel-only partial maintenance approval for peace requests', () => {
+    const { galaxy, bot, botPlanet, botEnemy, botEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, botEnemy.playerId, DiplomaticStatus.PEACE)
+    );
+    markPlanetScanned(bot, botEnemy, botEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 10 });
+    botPlanet.rBDSFTQ.resources = new ResourcesPack(500, 500, 500);
+    galaxy.maintenanceRequests.push(createMaintenanceRequest(
+      1,
+      78,
+      botEnemy.playerId,
+      bot.playerId,
+      botPlanet.basicInfo.name,
+      {
+        x: botPlanet.basicInfo.solarSystem.coordinates.x,
+        y: botPlanet.basicInfo.solarSystem.coordinates.y,
+        z: botPlanet.basicInfo.order
+      },
+      galaxy.currentTurn,
+      galaxy.currentTurn + 1,
+      {
+        fuel: 300,
+        ships: [{ type: ShipType.TRANSPORTER, amount: 1 }],
+        bombs: [{ type: DefenceType.SMALL_BOMB, amount: 1 }]
+      }
+    ));
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const decisionProposal = result.result.proposals.find((proposal) =>
+      proposal.requestPayload.actionType === 'REQUEST_DECISION'
+      && proposal.requestPayload.requestType === 'MAINTENANCE'
+    );
+    const approval = decisionProposal?.requestPayload.maintenanceApproval as {
+      fuel: number;
+      ships: unknown[];
+      bombs: unknown[];
+    } | null | undefined;
+
+    expect(decisionProposal).toBeDefined();
+    expect(decisionProposal?.requestPayload.decision).toBe('PARTIAL_APPROVE');
+    expect(approval?.fuel).toBeGreaterThan(0);
+    expect(approval?.ships).toEqual([]);
+    expect(approval?.bombs).toEqual([]);
   });
 
   it('emits outgoing allied offensive support request for a blocked war attack on a still-breakable target', () => {

@@ -142,6 +142,7 @@ export type BotMemoryV2ProposalKind =
   | 'SHIPYARD'
   | 'FLEET_MISSION'
   | 'MAINTENANCE_REQUEST'
+  | 'REQUEST_DECISION'
   | 'NO_OP';
 
 export type BotMemoryV2SupervisorPendingStatus =
@@ -1603,6 +1604,7 @@ export class Player {
       || kind === 'SHIPYARD'
       || kind === 'FLEET_MISSION'
       || kind === 'MAINTENANCE_REQUEST'
+      || kind === 'REQUEST_DECISION'
       || kind === 'NO_OP';
   }
 

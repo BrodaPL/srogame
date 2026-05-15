@@ -929,6 +929,48 @@ function resolveStrategicDiplomaticFactions(
           && proposal.toPlayerId === foreignPlayer.playerId
         )
         .map((proposal) => proposal.requestedStatus);
+      const pendingIncomingJumpGateRequests = galaxy.jumpGateRequests
+        .filter((request) =>
+          request.state === DiplomaticProposalState.PENDING
+          && request.fromPlayerId === foreignPlayer.playerId
+          && request.toPlayerId === player.playerId
+        )
+        .map((request) => ({
+          requestId: request.requestId,
+          fleetId: request.fleetId,
+          missionType: request.missionType,
+          originCoordinates: { ...request.originCoordinates },
+          targetCoordinates: { ...request.targetCoordinates },
+          totalShips: request.totalShips,
+          createdTurn: request.createdTurn,
+          expiresOnTurn: request.expiresOnTurn
+        }))
+        .sort((left, right) =>
+          left.createdTurn - right.createdTurn
+          || left.requestId - right.requestId
+        );
+      const pendingIncomingMaintenanceRequests = galaxy.maintenanceRequests
+        .filter((request) =>
+          request.state === DiplomaticProposalState.PENDING
+          && request.fromPlayerId === foreignPlayer.playerId
+          && request.toPlayerId === player.playerId
+        )
+        .map((request) => ({
+          requestId: request.requestId,
+          fleetId: request.fleetId,
+          targetCoordinates: { ...request.targetCoordinates },
+          createdTurn: request.createdTurn,
+          expiresOnTurn: request.expiresOnTurn,
+          requested: {
+            fuel: request.requested.fuel,
+            ships: request.requested.ships.map((entry) => ({ ...entry })),
+            bombs: request.requested.bombs.map((entry) => ({ ...entry }))
+          }
+        }))
+        .sort((left, right) =>
+          left.createdTurn - right.createdTurn
+          || left.requestId - right.requestId
+        );
       const pendingIncomingSupportRequests = galaxy.supportRequests
         .filter((request) =>
           request.state === DiplomaticProposalState.PENDING
@@ -1078,6 +1120,8 @@ function resolveStrategicDiplomaticFactions(
         sharedHostileEvents,
         pendingIncomingRequestedStatuses,
         pendingOutgoingRequestedStatuses,
+        pendingIncomingJumpGateRequests,
+        pendingIncomingMaintenanceRequests,
         pendingIncomingSupportRequests,
         knownPlanets
       };

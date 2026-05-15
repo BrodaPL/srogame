@@ -5,6 +5,18 @@ import { createFleetMission } from '../../game-commands/fleet-commands.js';
 import { startTechnologyResearch } from '../../game-commands/research-commands.js';
 import { startShipyardConstruction } from '../../game-commands/shipyard-commands.js';
 import {
+  approveJumpGateRequestCommand,
+  rejectJumpGateRequestCommand
+} from '../../game-commands/jump-gate-request-commands.js';
+import {
+  approveFleetMaintenanceRequest,
+  rejectFleetMaintenanceRequest
+} from '../../game-commands/maintenance-commands.js';
+import {
+  approveSupportRequestCommand,
+  rejectSupportRequestCommand
+} from '../../game-commands/support-request-commands.js';
+import {
   isJumpGateAutoApprovedStatus,
   isJumpGateMissionAllowed,
   resolvePlanetOrError,
@@ -14,6 +26,7 @@ import {
 import type { BotExecutionOutcome, BotExecutor, BotProposal } from '../bot-v2-types.ts';
 import { normalizeFleetExecutionProposal } from './bot-fleet-execution-adapters.js';
 import { normalizeQueueExecutionProposal } from './bot-execution-adapters.js';
+import { normalizeRequestDecisionProposal } from './bot-request-decision-adapters.js';
 
 export class NoopBotExecutor implements BotExecutor {
   public executeAcceptedTasks(accepted: BotProposal[]): BotExecutionOutcome[] {
@@ -41,6 +54,10 @@ export class LiveQueueBotExecutor implements BotExecutor {
   }
 
   private executeAcceptedTask(proposal: BotProposal): BotExecutionOutcome {
+    if (proposal.kind === 'REQUEST_DECISION') {
+      return this.executeAcceptedRequestDecision(proposal);
+    }
+
     if (proposal.kind === 'FLEET_MISSION') {
       return this.executeAcceptedFleetMission(proposal);
     }
@@ -88,6 +105,75 @@ export class LiveQueueBotExecutor implements BotExecutor {
         crystal: result.value.spent.crystal,
         deuterium: result.value.spent.deuterium
       }
+    };
+  }
+
+  private executeAcceptedRequestDecision(proposal: BotProposal): BotExecutionOutcome {
+    const normalized = normalizeRequestDecisionProposal(proposal);
+    if (!normalized.ok) {
+      return {
+        proposalId: proposal.proposalId,
+        executed: false,
+        success: false,
+        message: normalized.reason
+      };
+    }
+
+    const context = {
+      galaxy: this.galaxy,
+      playerId: this.playerId
+    };
+    const request = normalized.value;
+    if (request.decision === 'PARTIAL_APPROVE' && request.requestType === 'JUMP_GATE') {
+      return {
+        proposalId: proposal.proposalId,
+        executed: false,
+        success: false,
+        message: 'Jump Gate requests do not support partial approval.',
+        requestType: request.requestType,
+        requestId: request.requestId,
+        requestDecision: request.decision,
+        commandErrorCode: 'INVALID_REQUEST_DECISION'
+      };
+    }
+
+    const result = request.requestType === 'JUMP_GATE'
+      ? request.decision === 'REJECT'
+        ? rejectJumpGateRequestCommand(context, request.requestId)
+        : approveJumpGateRequestCommand(context, request.requestId)
+      : request.requestType === 'MAINTENANCE'
+        ? request.decision === 'REJECT'
+          ? rejectFleetMaintenanceRequest(context, request.requestId)
+          : approveFleetMaintenanceRequest(context, request.requestId, request.maintenanceApproval)
+        : request.decision === 'REJECT'
+          ? rejectSupportRequestCommand(context, request.requestId)
+          : approveSupportRequestCommand(context, request.requestId, request.approvedResources);
+
+    if (!result.ok) {
+      const message = result.error.message;
+      console.warn(
+        `[BotV2 Supervisor] Request decision failed for proposal ${proposal.proposalId}: ${result.error.code} ${message}`
+      );
+      return {
+        proposalId: proposal.proposalId,
+        executed: true,
+        success: false,
+        message,
+        requestType: request.requestType,
+        requestId: request.requestId,
+        requestDecision: request.decision,
+        commandErrorCode: result.error.code
+      };
+    }
+
+    return {
+      proposalId: proposal.proposalId,
+      executed: true,
+      success: true,
+      message: null,
+      requestType: request.requestType,
+      requestId: request.requestId,
+      requestDecision: request.decision
     };
   }
 

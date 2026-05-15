@@ -176,6 +176,10 @@ import {
   resolveFleetMaintenanceOptions
 } from './game-commands/maintenance-commands.js';
 import {
+  approveSupportRequestCommand,
+  rejectSupportRequestCommand
+} from './game-commands/support-request-commands.js';
+import {
   collectSensorPhalanxPassiveDetections,
   type SensorPhalanxPassiveDetection
 } from './sensor-phalanx-passive.js';
@@ -2624,24 +2628,15 @@ app.post('/api/game/mail/support-requests/:requestId/approve', (req, res) => {
     return res.status(400).json({ error: 'Invalid support request id.' });
   }
 
-  const request = authPlayer.galaxy.supportRequests.find((entry) => entry.requestId === requestId);
-  if (!request) {
-    return res.status(404).json({ error: 'Support request not found.' });
-  }
-
-  if (request.toPlayerId !== authPlayer.player.playerId) {
-    return res.status(403).json({ error: 'Only the target player can approve this request.' });
-  }
-
-  if (request.state !== DiplomaticProposalState.PENDING) {
-    return res.status(409).json({ error: 'Support request is no longer pending.' });
-  }
-
   const body = req.body as ResolveSupportRequestRequest | undefined;
   const approvedResources = normalizeSupportResources(body?.approvedResources);
-  const result = approveSupportRequest(authPlayer.galaxy, request, approvedResources);
-  if ('error' in result) {
-    return res.status(result.status).json({ error: result.error });
+  const result = approveSupportRequestCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId,
+    approvedResources
+  );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
 
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
@@ -2658,25 +2653,13 @@ app.post('/api/game/mail/support-requests/:requestId/reject', (req, res) => {
     return res.status(400).json({ error: 'Invalid support request id.' });
   }
 
-  const request = authPlayer.galaxy.supportRequests.find((entry) => entry.requestId === requestId);
-  if (!request) {
-    return res.status(404).json({ error: 'Support request not found.' });
-  }
-
-  if (request.toPlayerId !== authPlayer.player.playerId) {
-    return res.status(403).json({ error: 'Only the target player can reject this request.' });
-  }
-
-  if (request.state !== DiplomaticProposalState.PENDING) {
-    return res.status(409).json({ error: 'Support request is no longer pending.' });
-  }
-
-  rejectSupportRequest(
-    authPlayer.galaxy,
-    request,
-    'Support request rejected.',
-    'You rejected the support request.'
+  const result = rejectSupportRequestCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId
   );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
+  }
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 

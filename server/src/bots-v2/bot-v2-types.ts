@@ -23,6 +23,7 @@ export type BotProposalKind =
   | 'SHIPYARD'
   | 'FLEET_MISSION'
   | 'MAINTENANCE_REQUEST'
+  | 'REQUEST_DECISION'
   | 'NO_OP';
 
 export type BotProposalStatus =
@@ -110,6 +111,8 @@ export type BotStrategicDiplomaticFactionSnapshot = {
   sharedHostileEvents: BotStrategicDiplomaticSharedHostileEventSnapshot[];
   pendingIncomingRequestedStatuses: DiplomaticStatus[];
   pendingOutgoingRequestedStatuses: DiplomaticStatus[];
+  pendingIncomingJumpGateRequests: BotStrategicDiplomaticJumpGateRequestSnapshot[];
+  pendingIncomingMaintenanceRequests: BotStrategicDiplomaticMaintenanceRequestSnapshot[];
   pendingIncomingSupportRequests: BotStrategicDiplomaticSupportRequestSnapshot[];
   knownPlanets: BotStrategicDiplomaticKnownPlanetSnapshot[];
 };
@@ -162,6 +165,36 @@ export type BotStrategicDiplomaticKnownPlanetSnapshot = {
     crystal: number;
     deuterium: number;
   } | null;
+};
+
+export type BotStrategicDiplomaticJumpGateRequestSnapshot = {
+  requestId: number;
+  fleetId: number;
+  missionType: FleetMissionType;
+  originCoordinates: { x: number; y: number; z: number };
+  targetCoordinates: { x: number; y: number; z: number };
+  totalShips: number;
+  createdTurn: number;
+  expiresOnTurn: number;
+};
+
+export type BotStrategicDiplomaticMaintenanceRequestSnapshot = {
+  requestId: number;
+  fleetId: number;
+  targetCoordinates: { x: number; y: number; z: number };
+  createdTurn: number;
+  expiresOnTurn: number;
+  requested: {
+    fuel: number;
+    ships: Array<{
+      type: ShipType;
+      amount: number;
+    }>;
+    bombs: Array<{
+      type: DefenceType;
+      amount: number;
+    }>;
+  };
 };
 
 export type BotStrategicDiplomaticSupportRequestSnapshot = {
@@ -595,6 +628,9 @@ export type BotExecutionOutcome = {
   missionType?: FleetMissionType;
   originCoordinates?: { x: number; y: number; z: number };
   targetCoordinates?: { x: number; y: number; z: number };
+  requestType?: 'JUMP_GATE' | 'MAINTENANCE' | 'SUPPORT';
+  requestId?: number;
+  requestDecision?: 'APPROVE' | 'REJECT' | 'PARTIAL_APPROVE';
   commandErrorCode?: string;
 };
 

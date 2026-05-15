@@ -32,6 +32,7 @@ import {
   DEFENCE_BLUEPRINTS,
   calculateFuelCost,
   calculateTravelDistance,
+  isJumpGateMissionAllowed,
   SHIP_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
 import {
@@ -242,10 +243,27 @@ type OutgoingSupportRequestPlan = {
 type IncomingSupportPreferencePlan = {
   faction: EvaluatedFaction;
   request: BotStrategicDiplomaticFactionSnapshot['pendingIncomingSupportRequests'][number];
-  preference: 'APPROVE' | 'REJECT' | 'PARTIAL';
+  preference: 'APPROVE' | 'REJECT' | 'PARTIAL_APPROVE';
   score: number;
   reason: string;
   approvedResources: { metal: number; crystal: number; deuterium: number } | null;
+};
+
+type IncomingRequestDecisionPlan = {
+  faction: EvaluatedFaction;
+  requestType: 'JUMP_GATE' | 'MAINTENANCE' | 'SUPPORT';
+  requestId: number;
+  decision: 'APPROVE' | 'REJECT' | 'PARTIAL_APPROVE';
+  score: number;
+  reason: string;
+  targetCoordinates: { x: number; y: number; z: number } | null;
+  supportType: BotStrategicDiplomaticFactionSnapshot['pendingIncomingSupportRequests'][number]['supportType'] | null;
+  approvedResources: { metal: number; crystal: number; deuterium: number } | null;
+  maintenanceApproval: {
+    fuel: number;
+    ships: Array<{ type: ShipType; amount: number }>;
+    bombs: Array<{ type: DefenceType; amount: number }>;
+  } | null;
 };
 
 const STRATEGIC_DIPLOMATIC_AVAILABILITY = 0.4;
@@ -283,6 +301,7 @@ const LOCAL_REPAIR_EVALUATION_TURNS = 5;
 const EXTREME_RESOURCE_TOTAL_RATIO_THRESHOLD = 0.1;
 const EXTREME_RESOURCE_DEUTERIUM_FLOOR = 120;
 const ALLIANCE_DEPOT_SUPPORT_SCORE_BONUS = 26;
+const MAINTENANCE_STORAGE_RESERVE_RATIO = 0.05;
 
 export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DIPLOMATIC' as const;
@@ -350,14 +369,14 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
       combatPlanning.shipNeeds,
       forceProjectionPlanning.shipNeeds
     );
-    const incomingSupportPreferences = createIncomingSupportPreferencePlans(context, evaluatedFactions);
+    const incomingRequestDecisions = createIncomingRequestDecisionPlans(context, evaluatedFactions);
 
-    const proposals = [
+    const requestDecisionProposals = incomingRequestDecisions.map((request, index) =>
+      createIncomingRequestDecisionProposal(context, request, index)
+    );
+    const normalProposals = [
       ...createRelationChangeProposals(context, evaluatedFactions),
       ...createProposalManagementPreferences(context, evaluatedFactions),
-      ...incomingSupportPreferences.map((request, index) =>
-        createIncomingSupportPreferenceProposal(context, request, index)
-      ),
       ...createRetaliationFlagProposals(context, evaluatedFactions),
       ...outgoingSupportRequests.map((request, index) =>
         createOutgoingSupportRequestProposal(context, request, index)
@@ -375,8 +394,11 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
       ...forceProjectionPlanning.bombProductionRequests.map((request, index) => createDiplomaticBombProductionProposal(context, request, index)),
       ...forceProjectionPlanning.shipNeeds.map((request, index) => createWarShipNeedProposal(context, request, index))
     ]
-      .sort(compareDiplomaticProposals)
-      .slice(0, proposalCap);
+      .sort(compareDiplomaticProposals);
+    const proposals = [
+      ...requestDecisionProposals,
+      ...normalProposals.slice(0, Math.max(0, proposalCap - requestDecisionProposals.length))
+    ];
 
     context.memory.strategicDiplomatic.factionLedger = [...ledger.values()]
       .sort((left, right) => left.playerId - right.playerId);
@@ -446,7 +468,8 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         diplomaticBuildingRequestCount: forceProjectionPlanning.buildingRequests.length,
         diplomaticBombProductionRequestCount: forceProjectionPlanning.bombProductionRequests.length,
         outgoingSupportRequestCount: outgoingSupportRequests.length,
-        incomingSupportPreferenceCount: incomingSupportPreferences.length,
+        incomingRequestDecisionCount: incomingRequestDecisions.length,
+        incomingSupportPreferenceCount: incomingRequestDecisions.filter((request) => request.requestType === 'SUPPORT').length,
         sharedHostileEventCount: context.memory.strategicDiplomatic.sharedHostileEvents.length,
         attackSharePercent: resolveAttackShareForWarState(warState),
         supportSharePercent: 100 - resolveAttackShareForWarState(warState),
@@ -1309,40 +1332,49 @@ function createProposalManagementPreferences(
   return proposals;
 }
 
-function createIncomingSupportPreferenceProposal(
+function createIncomingRequestDecisionProposal(
   context: BotSubsystemContext,
-  request: IncomingSupportPreferencePlan,
+  request: IncomingRequestDecisionPlan,
   index: number
 ): BotProposal {
   return {
-    proposalId: `strategic-diplomatic:incoming-support:${request.request.requestId}:${context.snapshot.turn}`,
+    proposalId: `strategic-diplomatic:request-decision:${request.requestType}:${request.requestId}:${context.snapshot.turn}`,
     subsystemId: 'STRATEGIC_DIPLOMATIC',
-    kind: 'NO_OP',
+    kind: 'REQUEST_DECISION',
     status: 'PROPOSED',
-    goalKey: `strategic-diplomatic:incoming-support:${request.request.requestId}`,
-    dedupeKey: `strategic-diplomatic:incoming-support:${request.request.requestId}`,
-    summary: `Support response #${index + 1}: ${request.preference.toLowerCase()} ${request.request.supportType} request from ${request.faction.faction.playerName}.`,
+    goalKey: `strategic-diplomatic:request-decision:${request.requestType}:${request.requestId}`,
+    dedupeKey: `strategic-diplomatic:request-decision:${request.requestType}:${request.requestId}`,
+    summary: `Request decision #${index + 1}: ${request.decision.toLowerCase()} ${request.requestType} request from ${request.faction.faction.playerName}.`,
     planetId: null,
-    targetCoordinates: { ...request.request.targetCoordinates },
+    targetCoordinates: request.targetCoordinates ? { ...request.targetCoordinates } : null,
     expectedValue: Math.max(1, Math.round(request.score)),
-    urgency: request.preference === 'APPROVE' ? 73 : request.preference === 'PARTIAL' ? 69 : 52,
-    risk: request.request.supportType === 'RESOURCE_SUPPORT' ? 8 : 12,
+    urgency: request.decision === 'APPROVE' ? 78 : request.decision === 'PARTIAL_APPROVE' ? 72 : 58,
+    risk: request.requestType === 'SUPPORT' && request.supportType === 'RESOURCE_SUPPORT' ? 8 : 12,
     confidence: Math.round(request.faction.confidence * 100),
     requestedResources: request.approvedResources ? { ...request.approvedResources } : emptyResources(),
     requestPayload: {
-      actionType: 'SUPPORT_REQUEST_PREFERENCE',
-      requestId: request.request.requestId,
+      actionType: 'REQUEST_DECISION',
+      requestType: request.requestType,
+      requestId: request.requestId,
       targetPlayerId: request.faction.faction.playerId,
-      supportType: request.request.supportType,
-      preference: request.preference,
-      approvedResources: request.approvedResources ? { ...request.approvedResources } : null
+      supportType: request.supportType,
+      decision: request.decision,
+      approvedResources: request.approvedResources ? { ...request.approvedResources } : null,
+      maintenanceApproval: request.maintenanceApproval
+        ? {
+          fuel: request.maintenanceApproval.fuel,
+          ships: request.maintenanceApproval.ships.map((entry) => ({ ...entry })),
+          bombs: request.maintenanceApproval.bombs.map((entry) => ({ ...entry }))
+        }
+        : null
     },
     blockers: [],
     expiresOnTurn: context.snapshot.turn + 1,
     debug: {
-      supportType: request.request.supportType,
+      requestType: request.requestType,
+      supportType: request.supportType,
       targetPlayerId: request.faction.faction.playerId,
-      preference: request.preference,
+      decision: request.decision,
       reason: request.reason
     }
   };
@@ -4309,19 +4341,169 @@ function createOffensiveSupportRequestCandidates(
   return candidates;
 }
 
-function createIncomingSupportPreferencePlans(
+function createIncomingRequestDecisionPlans(
   context: BotSubsystemContext,
   factions: EvaluatedFaction[]
-): IncomingSupportPreferencePlan[] {
+): IncomingRequestDecisionPlan[] {
   return factions
-    .flatMap((faction) => faction.faction.pendingIncomingSupportRequests
-      .map((request) => evaluateIncomingSupportPreference(context, faction, request))
-      .filter((entry): entry is IncomingSupportPreferencePlan => entry !== null))
+    .flatMap((faction) => [
+      ...faction.faction.pendingIncomingJumpGateRequests.map((request) =>
+        evaluateIncomingJumpGateDecision(factions, faction, request)
+      ),
+      ...faction.faction.pendingIncomingMaintenanceRequests.map((request) =>
+        evaluateIncomingMaintenanceDecision(context, faction, request)
+      ),
+      ...faction.faction.pendingIncomingSupportRequests
+        .map((request) => evaluateIncomingSupportPreference(context, faction, request))
+        .filter((entry): entry is IncomingSupportPreferencePlan => entry !== null)
+        .map((preference) => supportPreferenceToRequestDecision(preference))
+    ])
     .sort((left, right) =>
       right.score - left.score
-      || left.request.createdTurn - right.request.createdTurn
-      || left.request.requestId - right.request.requestId
+      || resolveRequestTypeOrder(left.requestType) - resolveRequestTypeOrder(right.requestType)
+      || left.requestId - right.requestId
     );
+}
+
+function evaluateIncomingJumpGateDecision(
+  allFactions: EvaluatedFaction[],
+  faction: EvaluatedFaction,
+  request: BotStrategicDiplomaticFactionSnapshot['pendingIncomingJumpGateRequests'][number]
+): IncomingRequestDecisionPlan {
+  if (!isJumpGateMissionAllowed(request.missionType)) {
+    return createRequestDecisionPlan(
+      faction,
+      'JUMP_GATE',
+      request.requestId,
+      'REJECT',
+      240,
+      'Jump Gate request references a mission type that should not be gate-routable.',
+      request.targetCoordinates
+    );
+  }
+
+  if (faction.faction.currentStatus === DiplomaticStatus.ALLIED) {
+    return createRequestDecisionPlan(
+      faction,
+      'JUMP_GATE',
+      request.requestId,
+      'APPROVE',
+      620 + request.totalShips,
+      'Allied Jump Gate movement is allowed for valid mission types.',
+      request.targetCoordinates
+    );
+  }
+
+  if (
+    faction.faction.currentStatus === DiplomaticStatus.PEACE
+    && request.missionType === FleetMissionType.DEFEND
+    && hasSharedWarPressure(allFactions, faction)
+  ) {
+    return createRequestDecisionPlan(
+      faction,
+      'JUMP_GATE',
+      request.requestId,
+      'APPROVE',
+      520 + request.totalShips,
+      'Peace Jump Gate defense is allowed because there is shared hostile war pressure.',
+      request.targetCoordinates
+    );
+  }
+
+  return createRequestDecisionPlan(
+    faction,
+    'JUMP_GATE',
+    request.requestId,
+    'REJECT',
+    210,
+    'Current diplomatic status does not justify Jump Gate approval.',
+    request.targetCoordinates
+  );
+}
+
+function evaluateIncomingMaintenanceDecision(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  request: BotStrategicDiplomaticFactionSnapshot['pendingIncomingMaintenanceRequests'][number]
+): IncomingRequestDecisionPlan {
+  const targetPlanet = context.snapshot.planets.find((planet) =>
+    planet.coordinates.x === request.targetCoordinates.x
+    && planet.coordinates.y === request.targetCoordinates.y
+    && planet.coordinates.z === request.targetCoordinates.z
+  ) ?? null;
+  if (!targetPlanet) {
+    return createRequestDecisionPlan(
+      faction,
+      'MAINTENANCE',
+      request.requestId,
+      'REJECT',
+      180,
+      'Maintenance target is no longer an owned planet.',
+      request.targetCoordinates
+    );
+  }
+
+  const fuelReserve = Math.floor(targetPlanet.economy.storageCapacity.deuterium * MAINTENANCE_STORAGE_RESERVE_RATIO);
+  const approvedFuel = Math.min(
+    request.requested.fuel,
+    Math.max(0, Math.floor(targetPlanet.localResources.deuterium - fuelReserve))
+  );
+  const canShareMilitaryStores = faction.faction.currentStatus === DiplomaticStatus.ALLIED;
+  const approvedShips = canShareMilitaryStores
+    ? request.requested.ships
+      .map((entry) => ({
+        type: entry.type,
+        amount: Math.min(entry.amount, targetPlanet.ships.undamagedCountByType[entry.type] ?? 0)
+      }))
+      .filter((entry) => entry.amount > 0)
+    : [];
+  const approvedBombs = canShareMilitaryStores
+    ? request.requested.bombs
+      .map((entry) => ({
+        type: entry.type,
+        amount: Math.min(entry.amount, targetPlanet.defense.installedCountByType[entry.type] ?? 0)
+      }))
+      .filter((entry) => entry.amount > 0)
+    : [];
+
+  const maintenanceApproval = {
+    fuel: approvedFuel,
+    ships: approvedShips,
+    bombs: approvedBombs
+  };
+  const approvedTotal = approvedFuel
+    + approvedShips.reduce((sum, entry) => sum + entry.amount, 0)
+    + approvedBombs.reduce((sum, entry) => sum + entry.amount, 0);
+  if (approvedTotal <= 0) {
+    return createRequestDecisionPlan(
+      faction,
+      'MAINTENANCE',
+      request.requestId,
+      'REJECT',
+      190,
+      'Maintenance request would violate reserve limits or has no available payload.',
+      request.targetCoordinates
+    );
+  }
+
+  const requestedTotal = request.requested.fuel
+    + request.requested.ships.reduce((sum, entry) => sum + entry.amount, 0)
+    + request.requested.bombs.reduce((sum, entry) => sum + entry.amount, 0);
+  const full = approvedTotal >= requestedTotal;
+  return {
+    ...createRequestDecisionPlan(
+      faction,
+      'MAINTENANCE',
+      request.requestId,
+      full ? 'APPROVE' : 'PARTIAL_APPROVE',
+      full ? 500 + approvedTotal : 390 + approvedTotal,
+      faction.faction.currentStatus === DiplomaticStatus.PEACE
+        ? 'Peace maintenance is limited to fuel and preserves storage reserve.'
+        : 'Allied maintenance can provide fuel, bombs, and small ships while preserving reserve.',
+      request.targetCoordinates
+    ),
+    maintenanceApproval
+  };
 }
 
 function evaluateIncomingSupportPreference(
@@ -4385,7 +4567,7 @@ function evaluateIncomingSupportPreference(
     return {
       faction,
       request,
-      preference: fullyCovered ? 'APPROVE' : 'PARTIAL',
+      preference: fullyCovered ? 'APPROVE' : 'PARTIAL_APPROVE',
       score: (fullyCovered ? 470 : 360) + Math.round(available.total / 50),
       reason: fullyCovered
         ? 'Visible surplus can satisfy this resource request.'
@@ -4421,6 +4603,63 @@ function evaluateIncomingSupportPreference(
       : 'No visible origin can satisfy the requested offensive support floor.',
     approvedResources: null
   };
+}
+
+function supportPreferenceToRequestDecision(preference: IncomingSupportPreferencePlan): IncomingRequestDecisionPlan {
+  return {
+    faction: preference.faction,
+    requestType: 'SUPPORT',
+    requestId: preference.request.requestId,
+    decision: preference.preference,
+    score: preference.score,
+    reason: preference.reason,
+    targetCoordinates: { ...preference.request.targetCoordinates },
+    supportType: preference.request.supportType,
+    approvedResources: preference.approvedResources ? { ...preference.approvedResources } : null,
+    maintenanceApproval: null
+  };
+}
+
+function createRequestDecisionPlan(
+  faction: EvaluatedFaction,
+  requestType: IncomingRequestDecisionPlan['requestType'],
+  requestId: number,
+  decision: IncomingRequestDecisionPlan['decision'],
+  score: number,
+  reason: string,
+  targetCoordinates: { x: number; y: number; z: number } | null
+): IncomingRequestDecisionPlan {
+  return {
+    faction,
+    requestType,
+    requestId,
+    decision,
+    score,
+    reason,
+    targetCoordinates: targetCoordinates ? { ...targetCoordinates } : null,
+    supportType: null,
+    approvedResources: null,
+    maintenanceApproval: null
+  };
+}
+
+function hasSharedWarPressure(allFactions: EvaluatedFaction[], requester: EvaluatedFaction): boolean {
+  return requester.sharedHostileEvents.length > 0
+    || allFactions.some((faction) =>
+      faction.faction.currentStatus === DiplomaticStatus.WAR
+      && faction.sharedHostileEvents.some((event) => event.sharedFromPlayerId === requester.faction.playerId)
+    );
+}
+
+function resolveRequestTypeOrder(requestType: IncomingRequestDecisionPlan['requestType']): number {
+  switch (requestType) {
+    case 'JUMP_GATE':
+      return 0;
+    case 'MAINTENANCE':
+      return 1;
+    case 'SUPPORT':
+      return 2;
+  }
 }
 
 function canPlanetRecoverRepairDamageLocally(planet: BotPlanetSnapshot): boolean {

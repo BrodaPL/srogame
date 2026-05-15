@@ -17,9 +17,11 @@ import {
 } from './bot-supervisor-scoring.js';
 import { normalizeFleetExecutionProposal } from '../execution/bot-fleet-execution-adapters.js';
 import { normalizeQueueExecutionProposal } from '../execution/bot-execution-adapters.js';
+import { normalizeRequestDecisionProposal } from '../execution/bot-request-decision-adapters.js';
 
 const QUEUE_ACTION_KINDS = new Set<BotProposal['kind']>(['BUILDING', 'RESEARCH', 'SHIPYARD']);
 const FLEET_ACTION_KINDS = new Set<BotProposal['kind']>(['FLEET_MISSION']);
+const REQUEST_ACTION_KINDS = new Set<BotProposal['kind']>(['REQUEST_DECISION']);
 const COMMITMENT_LIFETIME_TURNS = 5;
 const DUPLICATE_REPLACEMENT_THRESHOLD = 1.25;
 const NEXT_TURN_FLEET_PENDING_LIFETIME_TURNS = 1;
@@ -75,6 +77,8 @@ export class BotSupervisorV2 implements BotSupervisor {
         return true;
       })
       .sort((left, right) =>
+        Number(REQUEST_ACTION_KINDS.has(right.proposal.kind)) - Number(REQUEST_ACTION_KINDS.has(left.proposal.kind))
+        ||
         Number(right.retryCommitment) - Number(left.retryCommitment)
         || right.score - left.score
         || left.proposal.proposalId.localeCompare(right.proposal.proposalId)
@@ -109,6 +113,11 @@ export class BotSupervisorV2 implements BotSupervisor {
     const criticalAccepted = scored.some((entry) => entry.proposal.subsystemId === 'CRITICAL');
 
     for (const entry of scored) {
+      if (REQUEST_ACTION_KINDS.has(entry.proposal.kind)) {
+        accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
+        continue;
+      }
+
       if (QUEUE_ACTION_KINDS.has(entry.proposal.kind) && accepted.length + pending.length >= globalQueueCap) {
         rejected.push({ proposalId: entry.proposal.proposalId, reason: 'global_queue_cap_reached' });
         continue;
@@ -236,6 +245,25 @@ export class BotSupervisorV2 implements BotSupervisor {
     if (proposal.kind === 'MAINTENANCE_REQUEST') {
       // TODO: Extract request command policy before enabling Supervisor request handling.
       return { proposal, score: 0, adapterReason: 'request_handling_phase4_deferred', retryCommitment };
+    }
+    if (proposal.kind === 'REQUEST_DECISION') {
+      const normalized = normalizeRequestDecisionProposal(proposal);
+      if (!normalized.ok) {
+        console.warn(`[BotV2 Supervisor] Invalid request decision proposal ${proposal.proposalId}: ${normalized.reason}`);
+        return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
+      }
+      return {
+        proposal,
+        score: scoreSupervisorProposal({
+          proposal,
+          snapshot,
+          memory,
+          shipNeedPressure: 0,
+          criticalAccepted: false
+        }) + 10000,
+        adapterReason: null,
+        retryCommitment
+      };
     }
     if (!QUEUE_ACTION_KINDS.has(proposal.kind)) {
       return { proposal, score: 0, adapterReason: 'unsupported_execution_kind', retryCommitment };

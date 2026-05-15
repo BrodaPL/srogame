@@ -124,6 +124,17 @@ describe('bot supervisor commitments', () => {
     });
   });
 
+  it('prioritizes executable request decisions before normal proposals', () => {
+    const decision = createSupervisor().decide(
+      createSnapshot({ metal: 1000, crystal: 1000, deuterium: 1000 }),
+      createDefaultBotMemoryV2(),
+      [createBuildingProposal({ expectedValue: 999 }), createRequestDecisionProposal()]
+    );
+
+    expect(decision.accepted[0]?.kind).toBe('REQUEST_DECISION');
+    expect(decision.accepted[0]?.proposalId).toBe('request');
+  });
+
   it('accepts combat fleet missions in phase 3 and rejects non-war bombardment', () => {
     const supervisor = createSupervisor();
     const attackDecision = supervisor.decide(
@@ -341,6 +352,36 @@ function createFleetProposal(
     expiresOnTurn: null,
     debug: {},
     ...overrides
+  };
+}
+
+function createRequestDecisionProposal(): BotProposal {
+  return {
+    proposalId: 'request',
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'REQUEST_DECISION',
+    status: 'PROPOSED',
+    goalKey: 'request',
+    dedupeKey: 'request',
+    summary: 'Reject request',
+    planetId: null,
+    targetCoordinates: null,
+    expectedValue: 1,
+    urgency: 1,
+    risk: 0,
+    confidence: 90,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      actionType: 'REQUEST_DECISION',
+      requestType: 'SUPPORT',
+      requestId: 1,
+      decision: 'REJECT',
+      approvedResources: null,
+      maintenanceApproval: null
+    },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {}
   };
 }
 
