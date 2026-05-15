@@ -1,5 +1,6 @@
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { Player } from '../../../src/app/models/player.ts';
+import type { SupportRequestType } from '../../../src/app/models/requests/support-request.ts';
 import { defaultBotProfileIdForPlayerId } from '../../../src/app/models/player.js';
 import { isBotPaused } from '../bots/bot-admin.js';
 import { ensureBotMemoryV2 } from './bot-v2-memory.js';
@@ -181,11 +182,31 @@ function recordExecutedSpending(
 ): void {
   const proposalById = new Map(accepted.map((proposal) => [proposal.proposalId, proposal]));
   for (const outcome of outcomes) {
-    if (!outcome.success || !outcome.spent) {
-      continue;
-    }
     const proposal = proposalById.get(outcome.proposalId);
     if (!proposal) {
+      continue;
+    }
+
+    if (
+      proposal.kind === 'REQUEST_CREATION'
+      && outcome.success
+      && outcome.requestType === 'SUPPORT'
+      && outcome.requestId !== undefined
+      && outcome.targetPlayerId !== undefined
+      && outcome.targetCoordinates
+      && isSupportRequestType(outcome.supportType)
+    ) {
+      memory.strategicDiplomatic.outgoingSupportRequests.push({
+        requestId: outcome.requestId,
+        supportType: outcome.supportType,
+        targetPlayerId: outcome.targetPlayerId,
+        targetCoordinates: { ...outcome.targetCoordinates },
+        createdTurn: turn
+      });
+      memory.strategicDiplomatic.outgoingSupportRequests = memory.strategicDiplomatic.outgoingSupportRequests.slice(-100);
+    }
+
+    if (!outcome.success || !outcome.spent) {
       continue;
     }
 
@@ -227,4 +248,13 @@ function recordExecutedSpending(
         || (commitment.status !== 'PENDING_RESOURCES' && commitment.status !== 'PENDING_QUEUE')
       );
   }
+}
+
+function isSupportRequestType(value: string | undefined): value is SupportRequestType {
+  return value === 'RESOURCE_SUPPORT'
+    || value === 'PLANET_REPAIR'
+    || value === 'PLANET_DEFENSE'
+    || value === 'ATTACK_TARGET'
+    || value === 'BOMBARD_TARGET'
+    || value === 'SIEGE_TARGET';
 }

@@ -143,6 +143,7 @@ export type BotMemoryV2ProposalKind =
   | 'FLEET_MISSION'
   | 'MAINTENANCE_REQUEST'
   | 'REQUEST_DECISION'
+  | 'REQUEST_CREATION'
   | 'NO_OP';
 
 export type BotMemoryV2SupervisorPendingStatus =
@@ -322,11 +323,20 @@ export type BotMemoryV2StrategicDiplomaticSharedHostileEventEntry = {
   propagatedOnTurn: number | null;
 };
 
+export type BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry = {
+  requestId: number;
+  supportType: SupportRequestType;
+  targetPlayerId: number;
+  targetCoordinates: BotMemoryCoordinates;
+  createdTurn: number;
+};
+
 export type BotMemoryV2StrategicDiplomatic = {
   factionLedger: BotMemoryV2StrategicDiplomaticFactionEntry[];
   primaryWarBreakTarget: BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null;
   openedWarTargets: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[];
   sharedHostileEvents: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[];
+  outgoingSupportRequests: BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry[];
 };
 
 export type BotMemoryV2WeightManagerMode =
@@ -1090,8 +1100,38 @@ export class Player {
       ),
       sharedHostileEvents: Player.normalizeBotMemoryV2StrategicDiplomaticSharedHostileEvents(
         strategicDiplomatic?.sharedHostileEvents
+      ),
+      outgoingSupportRequests: Player.normalizeBotMemoryV2StrategicDiplomaticOutgoingSupportRequests(
+        strategicDiplomatic?.outgoingSupportRequests
       )
     };
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticOutgoingSupportRequests(
+    entries: BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry[] | null | undefined
+  ): BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry[] {
+    return (entries ?? [])
+      .map((entry) => {
+        const coordinates = Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates);
+        if (
+          !coordinates
+          || !Number.isFinite(entry?.requestId)
+          || !Number.isFinite(entry?.targetPlayerId)
+          || !Number.isFinite(entry?.createdTurn)
+          || !Player.isSupportRequestType(entry?.supportType)
+        ) {
+          return null;
+        }
+        return {
+          requestId: Math.max(0, Math.floor(entry.requestId)),
+          supportType: entry.supportType,
+          targetPlayerId: Math.max(0, Math.floor(entry.targetPlayerId)),
+          targetCoordinates: coordinates,
+          createdTurn: Math.max(0, Math.floor(entry.createdTurn))
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry => entry !== null)
+      .slice(-100);
   }
 
   private static normalizeBotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget(
@@ -1605,7 +1645,17 @@ export class Player {
       || kind === 'FLEET_MISSION'
       || kind === 'MAINTENANCE_REQUEST'
       || kind === 'REQUEST_DECISION'
+      || kind === 'REQUEST_CREATION'
       || kind === 'NO_OP';
+  }
+
+  private static isSupportRequestType(value: SupportRequestType | null | undefined): value is SupportRequestType {
+    return value === 'RESOURCE_SUPPORT'
+      || value === 'PLANET_REPAIR'
+      || value === 'PLANET_DEFENSE'
+      || value === 'ATTACK_TARGET'
+      || value === 'BOMBARD_TARGET'
+      || value === 'SIEGE_TARGET';
   }
 
   private static isBotMemoryV2SupervisorPendingStatus(

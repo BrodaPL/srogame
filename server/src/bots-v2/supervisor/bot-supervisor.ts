@@ -18,6 +18,7 @@ import {
 import { normalizeFleetExecutionProposal } from '../execution/bot-fleet-execution-adapters.js';
 import { normalizeQueueExecutionProposal } from '../execution/bot-execution-adapters.js';
 import { normalizeRequestDecisionProposal } from '../execution/bot-request-decision-adapters.js';
+import { normalizeRequestCreationProposal } from '../execution/bot-request-creation-adapters.js';
 
 const QUEUE_ACTION_KINDS = new Set<BotProposal['kind']>(['BUILDING', 'RESEARCH', 'SHIPYARD']);
 const FLEET_ACTION_KINDS = new Set<BotProposal['kind']>(['FLEET_MISSION']);
@@ -114,6 +115,11 @@ export class BotSupervisorV2 implements BotSupervisor {
 
     for (const entry of scored) {
       if (REQUEST_ACTION_KINDS.has(entry.proposal.kind)) {
+        accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
+        continue;
+      }
+
+      if (entry.proposal.kind === 'REQUEST_CREATION') {
         accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
         continue;
       }
@@ -261,6 +267,25 @@ export class BotSupervisorV2 implements BotSupervisor {
           shipNeedPressure: 0,
           criticalAccepted: false
         }) + 10000,
+        adapterReason: null,
+        retryCommitment
+      };
+    }
+    if (proposal.kind === 'REQUEST_CREATION') {
+      const normalized = normalizeRequestCreationProposal(proposal);
+      if (!normalized.ok) {
+        console.warn(`[BotV2 Supervisor] Invalid request creation proposal ${proposal.proposalId}: ${normalized.reason}`);
+        return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
+      }
+      return {
+        proposal,
+        score: scoreSupervisorProposal({
+          proposal,
+          snapshot,
+          memory,
+          shipNeedPressure: 0,
+          criticalAccepted: false
+        }),
         adapterReason: null,
         retryCommitment
       };

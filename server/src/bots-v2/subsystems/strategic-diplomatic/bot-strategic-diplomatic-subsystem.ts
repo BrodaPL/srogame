@@ -1388,7 +1388,7 @@ function createOutgoingSupportRequestProposal(
   return {
     proposalId: `strategic-diplomatic:outgoing-support:${request.supportType}:${request.targetFaction.faction.playerId}:${toCoordinatesKey(request.targetCoordinates)}:${context.snapshot.turn}`,
     subsystemId: 'STRATEGIC_DIPLOMATIC',
-    kind: 'NO_OP',
+    kind: 'REQUEST_CREATION',
     status: 'PROPOSED',
     goalKey: `strategic-diplomatic:outgoing-support:${request.supportType}:${toCoordinatesKey(request.targetCoordinates)}`,
     dedupeKey: `strategic-diplomatic:outgoing-support:${request.supportType}:${request.targetFaction.faction.playerId}:${toCoordinatesKey(request.targetCoordinates)}`,
@@ -1404,7 +1404,8 @@ function createOutgoingSupportRequestProposal(
     confidence: Math.round(request.targetFaction.confidence * 100),
     requestedResources: { ...request.requestedResources },
     requestPayload: {
-      actionType: 'SUPPORT_REQUEST',
+      actionType: 'REQUEST_CREATION',
+      requestType: 'SUPPORT',
       targetPlayerId: request.targetFaction.faction.playerId,
       targetStatus: request.recipientStatus,
       supportType: request.supportType,

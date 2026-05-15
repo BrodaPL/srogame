@@ -1927,14 +1927,18 @@ It should not unlock new mission-legality rules yet.
 
 #### Next phase: allied-cooperation execution
 
-After shared war awareness, `Strategic Diplomatic` adds **allied-cooperation planning**. Incoming request decisions are now implemented for Jump Gate, Maintenance, and Support requests; outgoing request creation remains the next deferred request slice.
+After shared war awareness, `Strategic Diplomatic` adds **allied-cooperation planning**. Incoming request decisions are now implemented for Jump Gate, Maintenance, and Support requests; outgoing Support request creation is now executable through `REQUEST_CREATION` proposals. Outgoing Maintenance requests and standalone Jump Gate request creation remain deferred.
 
-This phase should focus on:
+The current executable request-creation slice focuses on:
 
 * outgoing support requests,
-* `ALLIANCE_DEPOT` usage,
-* richer incoming-request acceptance,
 * and request-driven cooperation instead of global multi-front orchestration.
+
+Deferred follow-ups remain:
+
+* `ALLIANCE_DEPOT` usage beyond current request decisions,
+* richer incoming-request acceptance,
+* outgoing Maintenance request creation if a subsystem proves it needs it.
 
 It should outward:
 
@@ -2524,13 +2528,13 @@ This system sees proposals from all subsystems and decides what is actually exec
 
 ### Current implemented slice
 
-The current live Supervisor slice is implemented as a final allocator/executor for queue actions, allowlisted fleet execution, and incoming request-decision execution. It is not a full campaign executor and does not choose targets, compose fleets, or create strategic requests by itself.
+The current live Supervisor slice is implemented as a final allocator/executor for queue actions, allowlisted fleet execution, incoming request-decision execution, and outgoing support-request creation when an owning subsystem emits an executable request proposal. It is not a full campaign executor and does not choose targets, compose fleets, or create strategic requests by itself.
 
 Runtime mode is explicit:
 
 * `DISABLED` skips V2 bot runtime,
 * `SHADOW` runs V2 planning/traces without execution,
-* `LIVE` lets the Supervisor execute accepted queue proposals and allowlisted fleet proposals.
+* `LIVE` lets the Supervisor execute accepted queue proposals, allowlisted fleet proposals, request decisions, and support request creation proposals.
 
 The live execution scope is:
 
@@ -2547,11 +2551,13 @@ The live execution scope is:
 * `ATTACK`,
 * `BOMBARD`,
 * `SIEGE`,
-* incoming `REQUEST_DECISION` proposals for `JUMP_GATE`, `MAINTENANCE`, and `SUPPORT`.
+* incoming `REQUEST_DECISION` proposals for `JUMP_GATE`, `MAINTENANCE`, and `SUPPORT`,
+* outgoing `REQUEST_CREATION` proposals for `SUPPORT`.
 
 The current deferred scope is:
 
-* outgoing request creation,
+* outgoing maintenance request creation,
+* standalone outgoing Jump Gate request creation,
 * diplomacy execution,
 * full hard reservation/cancellation engine,
 * active-fleet recall management when diplomacy changes,
@@ -2560,8 +2566,9 @@ The current deferred scope is:
 Incoming request ownership is split deliberately:
 
 * `Strategic Diplomatic` evaluates incoming Jump Gate, Maintenance, and Support requests and emits explicit `REQUEST_DECISION` proposals.
+* `Strategic Diplomatic` evaluates outgoing support-request needs and emits executable `REQUEST_CREATION` proposals.
 * `Supervisor` only arbitrates and executes accepted request decisions through shared command helpers.
-* If no subsystem emits a request decision, Supervisor does not invent one.
+* If no subsystem emits a request decision or request creation proposal, Supervisor does not invent one.
 
 Supervisor fleet execution rules:
 
@@ -2575,7 +2582,7 @@ Supervisor fleet execution rules:
 * cargo/resource spending is recorded in normal spending history,
 * deuterium fuel is recorded separately in lightweight `fuelSpendingHistory`,
 * own-planet Jump Gate use is selected by default when legal and auto-approved,
-* foreign/allied Jump Gate request creation remains deferred.
+* foreign/allied Jump Gate request creation happens only through accepted `FLEET_MISSION` proposals whose owning subsystem set `useJumpGate: true`; Supervisor does not emit standalone Jump Gate requests.
 
 `SHIP_NEED` and `demandOnly` shipyard proposals are pressure signals only. They are not executable by themselves; they increase priority for matching concrete shipyard proposals emitted by other subsystems.
 
@@ -2586,7 +2593,7 @@ The old V1 bot runner is no longer used by the end-turn runtime. If V2 live exec
 Important TODOs:
 
 * add future Jump Gate operating-cost policy,
-* add outgoing request creation proposals in the owning subsystem, especially Strategic Diplomatic,
+* add outgoing maintenance request creation proposals in the owning subsystem if needed,
 * add future friendliness effects for accepted Jump Gate requests (`+0.5` non-combat fleet, `+1` combat fleet, per fleet),
 * add future active-fleet management to recall our own active `ATTACK` / `BOMBARD` / `SIEGE` fleets when the target relation becomes `PEACE` / `ALLIED`,
 * check whether shared `DEFEND` launch/arrival logic fully supports own + allied/peace guard targets,

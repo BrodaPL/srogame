@@ -24,6 +24,7 @@ export type BotProposalKind =
   | 'FLEET_MISSION'
   | 'MAINTENANCE_REQUEST'
   | 'REQUEST_DECISION'
+  | 'REQUEST_CREATION'
   | 'NO_OP';
 
 export type BotProposalStatus =
@@ -631,6 +632,8 @@ export type BotExecutionOutcome = {
   requestType?: 'JUMP_GATE' | 'MAINTENANCE' | 'SUPPORT';
   requestId?: number;
   requestDecision?: 'APPROVE' | 'REJECT' | 'PARTIAL_APPROVE';
+  supportType?: string;
+  targetPlayerId?: number;
   commandErrorCode?: string;
 };
 

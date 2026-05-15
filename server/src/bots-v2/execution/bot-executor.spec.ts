@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
 import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
 import { PlayerType } from '../../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
 import { DiplomaticProposalState } from '../../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import { createDiplomaticRelation } from '../../../../src/app/models/diplomacy/diplomatic-relation.js';
+import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
+import { FleetState } from '../../../../src/app/models/fleets/fleet.js';
 import { ManyShips } from '../../../../src/app/models/fleets/many-ships.js';
 import { Galaxy } from '../../../../src/app/models/planets/galaxy.js';
 import { Planet } from '../../../../src/app/models/planets/planet.js';
 import { SolarSystem } from '../../../../src/app/models/planets/solar-system.js';
 import { Player } from '../../../../src/app/models/player.js';
+import { EspionageReportGenerator } from '../../../../src/app/generators/espionage-report-generator.js';
 import { createSupportRequest } from '../../../../src/app/models/requests/support-request.js';
 import { ResourcesPack } from '../../../../src/app/models/resources-pack.js';
 import { createTutorialReadState } from '../../../../src/app/tutorial/tutorial-types.js';
@@ -67,6 +72,60 @@ describe('bot executor', () => {
     });
     expect(galaxy.supportRequests[0]?.state).toBe(DiplomaticProposalState.REJECTED);
   });
+
+  it('executes accepted outgoing support request creation proposals', () => {
+    const { galaxy, origin } = createFleetGalaxy();
+    galaxy.diplomaticRelations.push(createDiplomaticRelation(1, 2, DiplomaticStatus.PEACE));
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const [outcome] = executor.executeAcceptedTasks([createSupportRequestCreationProposal(origin)]);
+
+    expect(outcome).toMatchObject({
+      proposalId: 'request-create',
+      executed: true,
+      success: true,
+      requestType: 'SUPPORT',
+      requestId: 1,
+      supportType: 'PLANET_REPAIR',
+      targetPlayerId: 2,
+      targetCoordinates: { x: 0, y: 0, z: 1 }
+    });
+    expect(galaxy.supportRequests).toHaveLength(1);
+    expect(galaxy.supportRequests[0]).toMatchObject({
+      fromPlayerId: 1,
+      toPlayerId: 2,
+      supportType: 'PLANET_REPAIR',
+      state: DiplomaticProposalState.PENDING
+    });
+  });
+
+  it('preserves proposal-owned Jump Gate intent and creates pending foreign Jump Gate requests', () => {
+    const { galaxy, origin, target, bot, ally } = createJumpGateGalaxy();
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const [outcome] = executor.executeAcceptedTasks([createForeignJumpGateTransportProposal()]);
+
+    expect(outcome).toMatchObject({
+      proposalId: 'jump-gate-fleet',
+      executed: true,
+      success: true,
+      missionType: FleetMissionType.TRANSPORT,
+      originCoordinates: { x: 0, y: 0, z: 1 },
+      targetCoordinates: { x: 0, y: 0, z: 2 }
+    });
+    expect(origin.rBDSFTQ.ships.undamagedCountByType().get(ShipType.TRANSPORTER) ?? 0).toBe(0);
+    expect(target.info.ownerId).toBe(ally.playerId);
+    expect(bot.playerId).toBe(1);
+    expect(galaxy.activeFleets[0]?.state).toBe(FleetState.PENDING_JUMP_GATE);
+    expect(galaxy.activeFleets[0]?.usesJumpGate).toBe(true);
+    expect(galaxy.jumpGateRequests).toHaveLength(1);
+    expect(galaxy.jumpGateRequests[0]).toMatchObject({
+      fromPlayerId: 1,
+      toPlayerId: 2,
+      missionType: FleetMissionType.TRANSPORT,
+      state: DiplomaticProposalState.PENDING
+    });
+  });
 });
 
 function createFleetGalaxy(): { galaxy: Galaxy; origin: Planet } {
@@ -113,6 +172,58 @@ function createFleetGalaxy(): { galaxy: Galaxy; origin: Planet } {
   return { galaxy, origin };
 }
 
+function createJumpGateGalaxy(): { galaxy: Galaxy; origin: Planet; target: Planet; bot: Player; ally: Player } {
+  const system = new SolarSystem('GateSys', 3, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const origin = Planet.createStartingPlanet('Origin', 1, system, 1);
+  const target = Planet.createStartingPlanet('AllyTarget', 2, system, 2);
+  system.planets[1] = origin;
+  system.planets[2] = target;
+  origin.rBDSFTQ.resources = new ResourcesPack(5000, 5000, 5000);
+  origin.rBDSFTQ.ships = new ManyShips({ [ShipType.TRANSPORTER]: 1 }, []);
+  origin.setBuildingLevel(BuildingType.JUMP_GATE, 1);
+  target.setBuildingLevel(BuildingType.JUMP_GATE, 1);
+
+  const bot = new Player(
+    1,
+    'Bot-1',
+    [origin],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+  const ally = new Player(
+    2,
+    'Ally-2',
+    [target],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+  const report = new EspionageReportGenerator().createEspionageReport(bot, ally, target, 6, {
+    createdTurn: 1,
+    forcedReportLevel: 12
+  });
+  target.lastReportData.set(bot.playerId, report);
+
+  const galaxy = new Galaxy(
+    'Jump Gate Test',
+    [bot, ally],
+    [[system]],
+    1,
+    [],
+    1,
+    new Map(),
+    new Map([[1, bot], [2, ally]]),
+    new Map(),
+    new Map([[bot.playerName, bot.playerId], [ally.playerName, ally.playerId]]),
+    [createDiplomaticRelation(bot.playerId, ally.playerId, DiplomaticStatus.ALLIED)]
+  );
+
+  return { galaxy, origin, target, bot, ally };
+}
+
 function createRequestDecisionProposal(): BotProposal {
   return {
     proposalId: 'request',
@@ -136,6 +247,79 @@ function createRequestDecisionProposal(): BotProposal {
       decision: 'REJECT',
       approvedResources: null,
       maintenanceApproval: null
+    },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {}
+  };
+}
+
+function createSupportRequestCreationProposal(origin: Planet): BotProposal {
+  return {
+    proposalId: 'request-create',
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'REQUEST_CREATION',
+    status: 'ACCEPTED',
+    goalKey: 'request-create',
+    dedupeKey: 'request-create',
+    summary: 'Request repair support',
+    planetId: null,
+    targetCoordinates: {
+      x: origin.basicInfo.solarSystem.coordinates.x,
+      y: origin.basicInfo.solarSystem.coordinates.y,
+      z: origin.basicInfo.order
+    },
+    expectedValue: 100,
+    urgency: 50,
+    risk: 0,
+    confidence: 90,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      actionType: 'REQUEST_CREATION',
+      requestType: 'SUPPORT',
+      targetPlayerId: 2,
+      supportType: 'PLANET_REPAIR',
+      targetCoordinates: {
+        x: origin.basicInfo.solarSystem.coordinates.x,
+        y: origin.basicInfo.solarSystem.coordinates.y,
+        z: origin.basicInfo.order
+      },
+      requestedResources: null,
+      missionType: null,
+      minimumShips: [],
+      bombardmentPriorities: null
+    },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {}
+  };
+}
+
+function createForeignJumpGateTransportProposal(): BotProposal {
+  return {
+    proposalId: 'jump-gate-fleet',
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'FLEET_MISSION',
+    status: 'ACCEPTED',
+    goalKey: 'jump-gate-fleet',
+    dedupeKey: 'jump-gate-fleet',
+    summary: 'Transport through allied Jump Gate',
+    planetId: null,
+    targetCoordinates: { x: 0, y: 0, z: 2 },
+    expectedValue: 100,
+    urgency: 50,
+    risk: 0,
+    confidence: 90,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      missionType: FleetMissionType.TRANSPORT,
+      origin: { x: 0, y: 0, z: 1 },
+      target: { x: 0, y: 0, z: 2 },
+      ships: [{ type: ShipType.TRANSPORTER, undamagedAmount: 1, damagedAmount: 0 }],
+      carriedBombs: [],
+      cargo: { metal: 1, crystal: 0, deuterium: 0 },
+      useJumpGate: true,
+      bombardmentPriorities: null
     },
     blockers: [],
     expiresOnTurn: null,

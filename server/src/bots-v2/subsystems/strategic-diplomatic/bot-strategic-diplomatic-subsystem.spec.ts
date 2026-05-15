@@ -268,7 +268,9 @@ describe('BotStrategicDiplomaticSubsystem', () => {
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot);
     const supportRequest = result.result.proposals.find((proposal) =>
-      proposal.requestPayload.actionType === 'SUPPORT_REQUEST'
+      proposal.kind === 'REQUEST_CREATION'
+      && proposal.requestPayload.actionType === 'REQUEST_CREATION'
+      && proposal.requestPayload.requestType === 'SUPPORT'
       && proposal.requestPayload.supportType === 'PLANET_REPAIR'
     );
 
@@ -654,7 +656,9 @@ describe('BotStrategicDiplomaticSubsystem', () => {
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot);
     const supportRequests = result.result.proposals.filter((proposal) =>
-      proposal.requestPayload.actionType === 'SUPPORT_REQUEST'
+      proposal.kind === 'REQUEST_CREATION'
+      && proposal.requestPayload.actionType === 'REQUEST_CREATION'
+      && proposal.requestPayload.requestType === 'SUPPORT'
     );
     const repairRequest = supportRequests.find((proposal) =>
       proposal.requestPayload.supportType === 'PLANET_REPAIR'
@@ -806,7 +810,9 @@ describe('BotStrategicDiplomaticSubsystem', () => {
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot);
     const offensiveRequest = result.result.proposals.find((proposal) =>
-      proposal.requestPayload.actionType === 'SUPPORT_REQUEST'
+      proposal.kind === 'REQUEST_CREATION'
+      && proposal.requestPayload.actionType === 'REQUEST_CREATION'
+      && proposal.requestPayload.requestType === 'SUPPORT'
       && (
         proposal.requestPayload.supportType === 'ATTACK_TARGET'
         || proposal.requestPayload.supportType === 'BOMBARD_TARGET'

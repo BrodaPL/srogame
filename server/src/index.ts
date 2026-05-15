@@ -176,6 +176,7 @@ import {
   resolveFleetMaintenanceOptions
 } from './game-commands/maintenance-commands.js';
 import {
+  createSupportRequestCommand as createSupportRequestCommandShared,
   approveSupportRequestCommand,
   rejectSupportRequestCommand
 } from './game-commands/support-request-commands.js';
@@ -455,10 +456,7 @@ const {
 } = maintenanceRequestModule as typeof import('../../src/app/models/requests/maintenance-request.js');
 const {
   clampSupportResourcesToRequested,
-  createSupportRequest,
   normalizeSupportResources,
-  normalizeSupportShipAmounts,
-  supportShipAmountsHaveAnyValue,
   supportResourcesHasAnyValue
 } = supportRequestModule as typeof import('../../src/app/models/requests/support-request.js');
 const { synchronizeTradePortOffers } = tradePortOffersModule as typeof import('../../src/app/models/trade/trade-port-offers.js');
@@ -2245,19 +2243,20 @@ app.post('/api/game/diplomacy/support-requests', (req, res) => {
     return res.status(400).json({ error: 'Invalid support request payload.' });
   }
 
-  const result = createSupportRequestCommand(
-    authPlayer.galaxy,
-    authPlayer.player.playerId,
-    targetPlayerId,
-    supportType,
-    targetCoordinates,
-    requestedResources,
-    missionType,
-    minimumShips ?? [],
-    bombardmentPriorities
+  const result = createSupportRequestCommandShared(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    {
+      targetPlayerId,
+      supportType,
+      targetCoordinates,
+      requestedResources,
+      missionType,
+      minimumShips: minimumShips ?? [],
+      bombardmentPriorities
+    }
   );
-  if ('error' in result) {
-    return res.status(result.status).json({ error: result.error });
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
 
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
@@ -9066,105 +9065,6 @@ function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
   }
 }
 
-function createSupportRequestCommand(
-  galaxy: Galaxy,
-  requesterPlayerId: number,
-  targetPlayerId: number,
-  supportType: SupportRequestTypeDto,
-  targetCoordinates: ClientCoordinates,
-  requestedResources: ResourcesPackType,
-  missionType: FleetMissionTypeType | null,
-  minimumShips: ShipAmountEntry[],
-  bombardmentPriorities: BombardmentPrioritiesType | null
-): { ok: true } | { status: number; error: string } {
-  const normalizedMinimumShips = normalizeSupportShipAmounts(minimumShips);
-  if (requesterPlayerId === targetPlayerId) {
-    return { status: 400, error: 'Support requests cannot target yourself.' };
-  }
-
-  const targetPlayer = resolvePlayerById(galaxy, targetPlayerId);
-  if (!targetPlayer || targetPlayer.type === PLAYER_TYPE_NEUTRAL) {
-    return { status: 404, error: 'Support target not found.' };
-  }
-
-  const status = resolveDiplomaticStatus(galaxy, requesterPlayerId, targetPlayerId);
-  if (!isSupportRequestAllowedForStatus(supportType, status)) {
-    return { status: 403, error: 'Current diplomacy status does not allow this support request.' };
-  }
-
-  const targetPlanet = resolvePlanetAtCoordinates(galaxy, targetCoordinates);
-  if (!targetPlanet) {
-    return { status: 404, error: 'Support target planet not found.' };
-  }
-
-  if (supportType === 'RESOURCE_SUPPORT' || supportType === 'PLANET_REPAIR' || supportType === 'PLANET_DEFENSE') {
-    if (targetPlanet.info.ownerId !== requesterPlayerId) {
-      return { status: 409, error: 'Support requests must target one of your own planets.' };
-    }
-  } else {
-    if (!isKnownHostileSupportTarget(galaxy, requesterPlayerId, targetPlanet, supportType)) {
-      return { status: 409, error: 'Offensive support requests require a known hostile target planet.' };
-    }
-
-    if (!isOffensiveSupportMissionTypeValid(supportType, missionType)) {
-      return { status: 400, error: 'Offensive support request mission type is invalid.' };
-    }
-
-    if (!supportShipAmountsHaveAnyValue(normalizedMinimumShips)) {
-      return { status: 400, error: 'Select at least one minimum ship requirement.' };
-    }
-
-    if (supportType === 'ATTACK_TARGET' && bombardmentPriorities !== null) {
-      return { status: 400, error: 'Bombardment priorities are valid only for bombard and siege support requests.' };
-    }
-
-    const targetOwnerId = targetPlanet.info.ownerId;
-    if (targetOwnerId === null || !isSupportMissionLegalForProvider(galaxy, targetPlayerId, targetOwnerId, supportType)) {
-      return { status: 409, error: 'Requested offensive target is not currently valid for the selected ally.' };
-    }
-  }
-
-  if (supportType === 'RESOURCE_SUPPORT' && !supportResourcesHasAnyValue(requestedResources)) {
-    return { status: 400, error: 'Select at least one requested resource amount.' };
-  }
-
-  const duplicatePending = galaxy.supportRequests.some((request) =>
-    request.state === DiplomaticProposalState.PENDING
-    && request.fromPlayerId === requesterPlayerId
-    && request.toPlayerId === targetPlayerId
-    && request.supportType === supportType
-    && sameCoordinates(request.targetCoordinates, targetCoordinates)
-  );
-  if (duplicatePending) {
-    return { status: 409, error: 'A matching support request is already pending for this planet.' };
-  }
-
-  galaxy.supportRequests.push(createSupportRequest(
-    galaxy.nextSupportRequestId,
-    requesterPlayerId,
-    targetPlayerId,
-    supportType,
-    targetPlanet.basicInfo.name,
-    targetCoordinates,
-    galaxy.currentTurn,
-    galaxy.currentTurn + 2,
-    supportType === 'RESOURCE_SUPPORT' ? requestedResources : null,
-    isOffensiveSupportRequestType(supportType)
-      ? {
-        missionType,
-        minimumShips: normalizedMinimumShips,
-        bombardmentPriorities,
-        targetOwnerPlayerId: targetPlanet.info.ownerId,
-        targetOwnerPlayerName: targetPlanet.info.ownerId !== null
-          ? resolvePlayerById(galaxy, targetPlanet.info.ownerId)?.playerName ?? null
-          : null
-      }
-      : undefined
-  ));
-  galaxy.nextSupportRequestId += 1;
-  return { ok: true };
-}
-
 function approveSupportRequest(
   galaxy: Galaxy,
   request: SupportRequest,
@@ -9496,20 +9396,6 @@ function isOffensiveSupportRequest(
   request: SupportRequest
 ): request is Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }> {
   return isOffensiveSupportRequestType(request.supportType);
-}
-
-function isOffensiveSupportMissionTypeValid(
-  supportType: Extract<SupportRequestTypeDto, 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET'>,
-  missionType: FleetMissionTypeType | null
-): boolean {
-  switch (supportType) {
-    case 'ATTACK_TARGET':
-      return missionType === FleetMissionType.ATTACK;
-    case 'BOMBARD_TARGET':
-      return missionType === FleetMissionType.BOMBARD;
-    case 'SIEGE_TARGET':
-      return missionType === FleetMissionType.SIEGE;
-  }
 }
 
 function isKnownHostileSupportTarget(

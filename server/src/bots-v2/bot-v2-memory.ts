@@ -23,7 +23,8 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
       factionLedger: [],
       primaryWarBreakTarget: null,
       openedWarTargets: [],
-      sharedHostileEvents: []
+      sharedHostileEvents: [],
+      outgoingSupportRequests: []
     },
     weightManager: {
       updatedTurn: null,

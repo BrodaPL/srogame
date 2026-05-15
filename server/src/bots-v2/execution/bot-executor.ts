@@ -13,6 +13,7 @@ import {
   rejectFleetMaintenanceRequest
 } from '../../game-commands/maintenance-commands.js';
 import {
+  createSupportRequestCommand,
   approveSupportRequestCommand,
   rejectSupportRequestCommand
 } from '../../game-commands/support-request-commands.js';
@@ -27,6 +28,7 @@ import type { BotExecutionOutcome, BotExecutor, BotProposal } from '../bot-v2-ty
 import { normalizeFleetExecutionProposal } from './bot-fleet-execution-adapters.js';
 import { normalizeQueueExecutionProposal } from './bot-execution-adapters.js';
 import { normalizeRequestDecisionProposal } from './bot-request-decision-adapters.js';
+import { normalizeRequestCreationProposal } from './bot-request-creation-adapters.js';
 
 export class NoopBotExecutor implements BotExecutor {
   public executeAcceptedTasks(accepted: BotProposal[]): BotExecutionOutcome[] {
@@ -56,6 +58,10 @@ export class LiveQueueBotExecutor implements BotExecutor {
   private executeAcceptedTask(proposal: BotProposal): BotExecutionOutcome {
     if (proposal.kind === 'REQUEST_DECISION') {
       return this.executeAcceptedRequestDecision(proposal);
+    }
+
+    if (proposal.kind === 'REQUEST_CREATION') {
+      return this.executeAcceptedRequestCreation(proposal);
     }
 
     if (proposal.kind === 'FLEET_MISSION') {
@@ -177,6 +183,64 @@ export class LiveQueueBotExecutor implements BotExecutor {
     };
   }
 
+  private executeAcceptedRequestCreation(proposal: BotProposal): BotExecutionOutcome {
+    const normalized = normalizeRequestCreationProposal(proposal);
+    if (!normalized.ok) {
+      return {
+        proposalId: proposal.proposalId,
+        executed: false,
+        success: false,
+        message: normalized.reason
+      };
+    }
+
+    const request = normalized.value;
+    const result = createSupportRequestCommand(
+      {
+        galaxy: this.galaxy,
+        playerId: this.playerId
+      },
+      {
+        targetPlayerId: request.targetPlayerId,
+        supportType: request.supportType,
+        targetCoordinates: request.targetCoordinates,
+        requestedResources: request.requestedResources,
+        missionType: request.missionType,
+        minimumShips: request.minimumShips,
+        bombardmentPriorities: request.bombardmentPriorities
+      }
+    );
+
+    if (!result.ok) {
+      const message = result.error.message;
+      console.warn(
+        `[BotV2 Supervisor] Request creation failed for proposal ${proposal.proposalId}: ${result.error.code} ${message}`
+      );
+      return {
+        proposalId: proposal.proposalId,
+        executed: true,
+        success: false,
+        message,
+        requestType: request.requestType,
+        supportType: request.supportType,
+        targetPlayerId: request.targetPlayerId,
+        commandErrorCode: result.error.code
+      };
+    }
+
+    return {
+      proposalId: proposal.proposalId,
+      executed: true,
+      success: true,
+      message: null,
+      requestType: request.requestType,
+      requestId: result.value.request.requestId,
+      supportType: request.supportType,
+      targetPlayerId: request.targetPlayerId,
+      targetCoordinates: request.targetCoordinates
+    };
+  }
+
   private executeAcceptedFleetMission(proposal: BotProposal): BotExecutionOutcome {
     const normalized = normalizeFleetExecutionProposal(proposal);
     if (!normalized.ok) {
@@ -190,7 +254,7 @@ export class LiveQueueBotExecutor implements BotExecutor {
 
     const command = {
       ...normalized.value,
-      useJumpGate: this.shouldUseOwnJumpGate(normalized.value)
+      useJumpGate: normalized.value.useJumpGate || this.shouldUseOwnJumpGate(normalized.value)
     };
     const result = createFleetMission(
       {
