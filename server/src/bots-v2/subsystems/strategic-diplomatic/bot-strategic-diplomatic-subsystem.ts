@@ -266,6 +266,16 @@ type IncomingRequestDecisionPlan = {
   } | null;
 };
 
+type DiplomacyDecisionPlan = {
+  faction: EvaluatedFaction;
+  proposalId: number;
+  decision: 'ACCEPT' | 'REJECT' | 'CANCEL';
+  requestedStatus: DiplomaticStatus.PEACE | DiplomaticStatus.ALLIED;
+  score: number;
+  reason: string;
+  expiresOnTurn: number;
+};
+
 const STRATEGIC_DIPLOMATIC_AVAILABILITY = 0.4;
 const WAR_HOSTILITY_THRESHOLD = 35;
 const RETALIATION_THRESHOLD = 18;
@@ -376,7 +386,9 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
     );
     const normalProposals = [
       ...createRelationChangeProposals(context, evaluatedFactions),
-      ...createProposalManagementPreferences(context, evaluatedFactions),
+      ...createProposalManagementPreferences(context, evaluatedFactions).map((request, index) =>
+        createDiplomacyDecisionProposal(context, request, index)
+      ),
       ...createRetaliationFlagProposals(context, evaluatedFactions),
       ...outgoingSupportRequests.map((request, index) =>
         createOutgoingSupportRequestProposal(context, request, index)
@@ -1213,11 +1225,16 @@ function createRelationChangeProposals(
 function createProposalManagementPreferences(
   context: BotSubsystemContext,
   factions: EvaluatedFaction[]
-): BotProposal[] {
-  const proposals: BotProposal[] = [];
+): DiplomacyDecisionPlan[] {
+  const proposals: DiplomacyDecisionPlan[] = [];
 
   for (const faction of factions) {
-    for (const requestedStatus of faction.faction.pendingIncomingRequestedStatuses) {
+    for (const pendingProposal of faction.faction.pendingIncomingDiplomacyProposals) {
+      const requestedStatus = normalizeExecutableDiplomaticStatus(pendingProposal.requestedStatus);
+      if (!requestedStatus) {
+        continue;
+      }
+      const validTransition = allowedDiplomaticProposalStatuses(faction.faction.currentStatus).includes(requestedStatus);
       const utility = computeRelationChangeUtility(
         context.snapshot.profileId,
         faction.faction.currentStatus,
@@ -1238,40 +1255,23 @@ function createProposalManagementPreferences(
           appliedLosingWarDecay: false
         }
       );
+      const decision = validTransition && utility >= RELATION_PROPOSAL_MIN_UTILITY ? 'ACCEPT' : 'REJECT';
       proposals.push({
-        proposalId: `strategic-diplomatic:incoming:${faction.faction.playerId}:${requestedStatus}:${context.snapshot.turn}`,
-        subsystemId: 'STRATEGIC_DIPLOMATIC',
-        kind: 'NO_OP',
-        status: 'PROPOSED',
-        goalKey: `strategic-diplomatic:incoming:${faction.faction.playerId}:${requestedStatus}`,
-        dedupeKey: `strategic-diplomatic:incoming:${faction.faction.playerId}:${requestedStatus}`,
-        summary: `Diplomatic response preference: ${utility >= RELATION_PROPOSAL_MIN_UTILITY ? 'approve' : 'reject'} incoming ${requestedStatus} proposal from ${faction.faction.playerName}.`,
-        planetId: null,
-        targetCoordinates: null,
-        expectedValue: Math.max(1, Math.round(Math.abs(utility) * 8)),
-        urgency: 74,
-        risk: 8,
-        confidence: Math.round(faction.confidence * 100),
-        requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
-        requestPayload: {
-          actionType: 'PROPOSAL_PREFERENCE',
-          targetPlayerId: faction.faction.playerId,
-          currentStatus: faction.faction.currentStatus,
-          requestedStatus,
-          preference: utility >= RELATION_PROPOSAL_MIN_UTILITY ? 'APPROVE' : 'REJECT'
-        },
-        blockers: [],
-        expiresOnTurn: context.snapshot.turn + 1,
-        debug: {
-          playerId: faction.faction.playerId,
-          preference: utility >= RELATION_PROPOSAL_MIN_UTILITY ? 'APPROVE' : 'REJECT',
-          requestedStatus,
-          utility: Math.round(utility)
-        }
+        faction,
+        proposalId: pendingProposal.proposalId,
+        decision,
+        requestedStatus,
+        score: Math.max(1, Math.round(Math.abs(utility) * 8)),
+        reason: validTransition ? `utility_${Math.round(utility)}` : 'invalid_treaty_ladder',
+        expiresOnTurn: pendingProposal.expiresOnTurn
       });
     }
 
-    for (const requestedStatus of faction.faction.pendingOutgoingRequestedStatuses) {
+    for (const pendingProposal of faction.faction.pendingOutgoingDiplomacyProposals) {
+      const requestedStatus = normalizeExecutableDiplomaticStatus(pendingProposal.requestedStatus);
+      if (!requestedStatus) {
+        continue;
+      }
       const utility = computeRelationChangeUtility(
         context.snapshot.profileId,
         faction.faction.currentStatus,
@@ -1296,40 +1296,70 @@ function createProposalManagementPreferences(
         continue;
       }
       proposals.push({
-        proposalId: `strategic-diplomatic:outgoing:${faction.faction.playerId}:${requestedStatus}:${context.snapshot.turn}`,
-        subsystemId: 'STRATEGIC_DIPLOMATIC',
-        kind: 'NO_OP',
-        status: 'PROPOSED',
-        goalKey: `strategic-diplomatic:outgoing:${faction.faction.playerId}:${requestedStatus}`,
-        dedupeKey: `strategic-diplomatic:outgoing:${faction.faction.playerId}:${requestedStatus}`,
-        summary: `Diplomatic response preference: cancel outgoing ${requestedStatus} proposal toward ${faction.faction.playerName}.`,
-        planetId: null,
-        targetCoordinates: null,
-        expectedValue: Math.max(1, Math.round(Math.abs(utility) * 8)),
-        urgency: 61,
-        risk: 4,
-        confidence: Math.round(faction.confidence * 100),
-        requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
-        requestPayload: {
-          actionType: 'PROPOSAL_PREFERENCE',
-          targetPlayerId: faction.faction.playerId,
-          currentStatus: faction.faction.currentStatus,
-          requestedStatus,
-          preference: 'CANCEL'
-        },
-        blockers: [],
-        expiresOnTurn: context.snapshot.turn + 1,
-        debug: {
-          playerId: faction.faction.playerId,
-          preference: 'CANCEL',
-          requestedStatus,
-          utility: Math.round(utility)
-        }
+        faction,
+        proposalId: pendingProposal.proposalId,
+        decision: 'CANCEL',
+        requestedStatus,
+        score: Math.max(1, Math.round(Math.abs(utility) * 8)),
+        reason: `negative_utility_${Math.round(utility)}`,
+        expiresOnTurn: pendingProposal.expiresOnTurn
       });
     }
   }
 
   return proposals;
+}
+
+function createDiplomacyDecisionProposal(
+  context: BotSubsystemContext,
+  request: DiplomacyDecisionPlan,
+  index: number
+): BotProposal {
+  const urgency = request.expiresOnTurn <= context.snapshot.turn + 1
+    ? 88
+    : request.decision === 'ACCEPT'
+      ? 72
+      : 64;
+  return {
+    proposalId: `strategic-diplomatic:diplomacy-decision:${request.proposalId}:${context.snapshot.turn}`,
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'DIPLOMACY_DECISION',
+    status: 'PROPOSED',
+    goalKey: `strategic-diplomatic:diplomacy-decision:${request.proposalId}`,
+    dedupeKey: `strategic-diplomatic:diplomacy-decision:${request.proposalId}`,
+    summary: `Diplomacy decision #${index + 1}: ${request.decision.toLowerCase()} ${request.requestedStatus} proposal with ${request.faction.faction.playerName}.`,
+    planetId: null,
+    targetCoordinates: null,
+    expectedValue: request.score,
+    urgency,
+    risk: request.decision === 'ACCEPT' ? 12 : 4,
+    confidence: Math.round(request.faction.confidence * 100),
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      actionType: 'DIPLOMACY_DECISION',
+      proposalId: request.proposalId,
+      decision: request.decision,
+      targetPlayerId: request.faction.faction.playerId,
+      currentStatus: request.faction.faction.currentStatus,
+      requestedStatus: request.requestedStatus,
+      reason: request.reason
+    },
+    blockers: [],
+    expiresOnTurn: request.expiresOnTurn,
+    debug: {
+      playerId: request.faction.faction.playerId,
+      decision: request.decision,
+      requestedStatus: request.requestedStatus,
+      reason: request.reason,
+      proposalExpiresOnTurn: request.expiresOnTurn
+    }
+  };
+}
+
+function normalizeExecutableDiplomaticStatus(
+  status: DiplomaticStatus
+): DiplomacyDecisionPlan['requestedStatus'] | null {
+  return status === DiplomaticStatus.PEACE || status === DiplomaticStatus.ALLIED ? status : null;
 }
 
 function createIncomingRequestDecisionProposal(

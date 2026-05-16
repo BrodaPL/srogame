@@ -80,7 +80,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     )).toBe(true);
   });
 
-  it('emits proposal-management preference for incoming peace proposal', () => {
+  it('emits executable diplomacy approval for incoming peace proposal', () => {
     const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     bot.botProfileId = 'MINER';
     markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
@@ -89,13 +89,34 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     );
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot);
-    const preferenceProposal = result.result.proposals.find((proposal) =>
-      proposal.requestPayload.actionType === 'PROPOSAL_PREFERENCE'
+    const decisionProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_DECISION'
       && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
     );
 
-    expect(preferenceProposal).toBeDefined();
-    expect(preferenceProposal?.requestPayload.preference).toBe('APPROVE');
+    expect(decisionProposal).toBeDefined();
+    expect(decisionProposal?.requestPayload.decision).toBe('ACCEPT');
+    expect(decisionProposal?.requestPayload.proposalId).toBe(1);
+  });
+
+  it('rejects incoming allied proposal when current relation is still neutral', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
+    galaxy.diplomaticProposals.push(
+      createDiplomaticProposal(1, playerEnemy.playerId, bot.playerId, DiplomaticStatus.ALLIED, galaxy.currentTurn, galaxy.currentTurn + 1)
+    );
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const decisionProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
+    );
+
+    expect(decisionProposal).toBeDefined();
+    expect(decisionProposal?.requestPayload.decision).toBe('REJECT');
+    expect(decisionProposal?.requestPayload.requestedStatus).toBe(DiplomaticStatus.ALLIED);
   });
 
   it('prioritizes war espionage over allied coverage when intel is insufficient', () => {

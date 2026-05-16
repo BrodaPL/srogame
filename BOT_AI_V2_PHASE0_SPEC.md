@@ -5,7 +5,7 @@ This document turns the high-level architecture in `NEW_BOT_AI_DESIGN.md` into a
 Phase 0 originally described the shadow scaffold. The current implementation has moved beyond that into the first Supervisor runtime slice:
 - V2 owns the end-turn bot runtime for bot-controlled seats
 - V2 supports explicit `DISABLED` / `SHADOW` / `LIVE` modes
-- `LIVE` mode can execute queue actions, allowlisted fleet missions, subsystem-proposed incoming request decisions, and Strategic Diplomatic outgoing support-request creation through the Supervisor/Executor layer
+- `LIVE` mode can execute queue actions, allowlisted fleet missions, subsystem-proposed incoming request decisions, Strategic Diplomatic outgoing support-request creation, and subsystem-proposed diplomacy decisions through the Supervisor/Executor layer
 - the old V1 live turn runner is no longer used by the end-turn flow
 
 This document is a working engineering spec, not a final behavior design for all subsystems.
@@ -41,10 +41,8 @@ This document is a working engineering spec, not a final behavior design for all
 
 - full reservation system
 - full long-term commitment engine
-- active-fleet recall management when diplomatic state changes
 - outgoing maintenance request creation
 - standalone outgoing Jump Gate request creation; foreign/allied Jump Gate requests are created only as a side effect of accepted fleet proposals with `useJumpGate: true`
-- diplomacy execution
 - score tuning
 - behavior parity with the removed V1 bot
 
@@ -352,15 +350,18 @@ export interface BotSupervisor {
 Current behavior:
 - `DISABLED` rejects all proposals
 - `SHADOW` rejects with `shadow_mode_no_execution` and records trace/debug data
-- `LIVE` may accept executable queue proposals, allowlisted fleet proposals, incoming request decisions, and outgoing support request creation proposals
+- `LIVE` may accept executable queue proposals, allowlisted fleet proposals, incoming request decisions, outgoing support request creation proposals, and diplomacy decision proposals
 - executable queue proposal kinds are `BUILDING`, `RESEARCH`, and `SHIPYARD`
 - executable fleet mission types are `SPY`, `TRANSPORT`, `ARMAMENT_DELIVERY`, `REPAIR`, `COLONIZE`, `MOVE`, `DEFEND`, `ATTACK`, `BOMBARD`, and `SIEGE`
 - executable incoming request decisions use `REQUEST_DECISION`; Strategic Diplomatic evaluates the request and Supervisor only executes the accepted decision
 - supported incoming request families are `JUMP_GATE`, `MAINTENANCE`, and `SUPPORT`
 - executable outgoing support request creation uses `REQUEST_CREATION` with `requestType: 'SUPPORT'`; Strategic Diplomatic owns the intent and Supervisor only arbitrates/executes it
+- executable diplomacy decisions use `DIPLOMACY_DECISION`; Strategic Diplomatic owns pending `PEACE` / `ALLIED` proposal policy, including rejecting invalid treaty-ladder proposals and cancelling own outgoing proposals when utility turns negative
 - `RECYCLE` stays deferred until a subsystem emits and owns explicit recycle proposals
 - `BOMBARD` and `SIEGE` get a simple Supervisor trace precheck when proposal metadata says the target is not `WAR`
-- outgoing maintenance request creation, standalone outgoing Jump Gate request creation, and diplomacy execution are deferred and traced
+- outgoing maintenance request creation and standalone outgoing Jump Gate request creation are deferred and traced
+- accepted diplomacy decisions execute before lifecycle recall, then normal accepted actions execute after recall
+- Supervisor lifecycle recall returns own `ATTACK`, `BOMBARD`, `SIEGE`, and `SPY` fleets in `MOVING_TO_TARGET`, `PENDING_JUMP_GATE`, or `ORBITING` when the target owner relation is now `NEUTRAL`, `PEACE`, or `ALLIED`
 - `SHIP_NEED` / `demandOnly` proposals are pressure only; they boost matching executable shipyard proposals instead of being converted directly
 - non-critical unaffordable queue proposals can become pending commitments instead of being lost
 - pending queue commitments are retried before new proposals and expired after the current 40-turn horizon
@@ -369,7 +370,6 @@ Current behavior:
 - own-planet Jump Gate use is enabled by default when the shared command validation says it is legal and auto-approved
 - foreign/allied Jump Gate request creation is not a standalone Supervisor proposal; it can happen through an accepted `FLEET_MISSION` whose owning subsystem set `useJumpGate: true`
 - incoming foreign/allied Jump Gate approval is request-driven: Strategic Diplomatic emits `REQUEST_DECISION`, then Supervisor executes the shared Jump Gate request command
-- TODO: add future active-fleet management to recall own active `ATTACK` / `BOMBARD` / `SIEGE` fleets when the target relation becomes peaceful/allied
 - TODO: check whether shared `DEFEND` launch/arrival logic fully supports own + allied/peace guard targets as intended
 
 ### Executor interface

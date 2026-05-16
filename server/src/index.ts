@@ -161,6 +161,7 @@ import {
   rejectDiplomaticProposalCommand
 } from './game-commands/diplomacy-commands.js';
 import { createFleetMission } from './game-commands/fleet-commands.js';
+import { returnActiveFleetCommand } from './game-commands/fleet-lifecycle-commands.js';
 import { createStarSystemSpyMissions } from './game-commands/star-system-spy-commands.js';
 import {
   approveJumpGateRequestCommand,
@@ -3948,41 +3949,16 @@ app.post('/api/game/active-fleets/:fleetId/return', (req, res) => {
     return res.status(400).json({ error: 'Invalid fleet id.' });
   }
 
-  const fleet = currentGalaxy.activeFleets.find((entry) => entry.fleetId === fleetId && entry.ownerId === playerId);
-  if (!fleet) {
-    return res.status(404).json({ error: 'Fleet not found.' });
+  const result = returnActiveFleetCommand(
+    {
+      galaxy: currentGalaxy,
+      playerId
+    },
+    { fleetId }
+  );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
-
-  if (fleet.state === FleetState.PENDING_JUMP_GATE) {
-    const pendingRequest = findPendingJumpGateRequestForFleet(currentGalaxy, playerId, fleetId);
-    if (pendingRequest) {
-      pendingRequest.state = DiplomaticProposalState.CANCELLED;
-    }
-    restorePendingJumpGateFleetToOrigin(currentGalaxy, fleet, true);
-    return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
-  }
-
-  if (fleet.state === FleetState.RETURNING || fleet.state === FleetState.MISSION_FAILURE_RETURNING) {
-    return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
-  }
-
-  if (fleet.state !== FleetState.MOVING_TO_TARGET && fleet.state !== FleetState.ORBITING) {
-    return res.status(400).json({ error: 'Fleet cannot return from its current state.' });
-  }
-
-  if (fleet.state === FleetState.MOVING_TO_TARGET) {
-    const elapsedTravelTurns = Math.max(
-      0,
-      Math.min(fleet.travelTurns, currentGalaxy.currentTurn - fleet.createdAtTurn)
-    );
-    fleet.returnTurns = Math.max(1, elapsedTravelTurns);
-  }
-
-  fleet.state = FleetState.RETURNING;
-  fleet.orbitActivity = FleetOrbitActivity.IDLE;
-  fleet.suspendedMissionType = null;
-  fleet.returnReason = FleetReturnReason.MANUAL_RECALL;
-  fleet.createdAtTurn = currentGalaxy.currentTurn;
 
   synchronizeJumpGateRequests(currentGalaxy);
   synchronizeMaintenanceRequests(currentGalaxy);

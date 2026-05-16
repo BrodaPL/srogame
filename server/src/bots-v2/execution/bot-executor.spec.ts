@@ -5,8 +5,10 @@ import { PlayerType } from '../../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
 import { DiplomaticProposalState } from '../../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
 import { createDiplomaticRelation } from '../../../../src/app/models/diplomacy/diplomatic-relation.js';
+import { createDiplomaticProposal } from '../../../../src/app/models/diplomacy/diplomatic-proposal.js';
 import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
-import { FleetState } from '../../../../src/app/models/fleets/fleet.js';
+import { Fleet, FleetState } from '../../../../src/app/models/fleets/fleet.js';
+import { Destination } from '../../../../src/app/models/fleets/destination.js';
 import { ManyShips } from '../../../../src/app/models/fleets/many-ships.js';
 import { Galaxy } from '../../../../src/app/models/planets/galaxy.js';
 import { Planet } from '../../../../src/app/models/planets/planet.js';
@@ -97,6 +99,59 @@ describe('bot executor', () => {
       supportType: 'PLANET_REPAIR',
       state: DiplomaticProposalState.PENDING
     });
+  });
+
+  it('executes accepted diplomacy decisions before recalling invalid offensive fleets', () => {
+    const { galaxy, origin, target } = createRecallGalaxy();
+    galaxy.diplomaticProposals.push(createDiplomaticProposal(
+      1,
+      2,
+      1,
+      DiplomaticStatus.PEACE,
+      galaxy.currentTurn,
+      galaxy.currentTurn + 1
+    ));
+    galaxy.activeFleets.push(createAttackFleet(origin, target));
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const outcomes = executor.executeAcceptedTasks([createDiplomacyDecisionProposal()]);
+
+    expect(outcomes[0]).toMatchObject({
+      proposalId: 'diplomacy',
+      executed: true,
+      success: true,
+      diplomacyProposalId: 1,
+      diplomacyDecision: 'ACCEPT',
+      targetPlayerId: 2,
+      requestedStatus: DiplomaticStatus.PEACE
+    });
+    expect(outcomes[1]).toMatchObject({
+      lifecycleAction: 'FLEET_RECALL',
+      fleetId: 1,
+      missionType: FleetMissionType.ATTACK,
+      targetPlayerId: 2,
+      currentStatus: DiplomaticStatus.PEACE,
+      success: true
+    });
+    expect(galaxy.activeFleets[0]?.state).toBe(FleetState.RETURNING);
+  });
+
+  it('recalls outbound spy fleets when target relation is neutral', () => {
+    const { galaxy, origin, target } = createRecallGalaxy();
+    galaxy.activeFleets.push(createAttackFleet(origin, target, FleetMissionType.SPY));
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const outcomes = executor.executeAcceptedTasks([]);
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({
+      lifecycleAction: 'FLEET_RECALL',
+      fleetId: 1,
+      missionType: FleetMissionType.SPY,
+      currentStatus: DiplomaticStatus.NEUTRAL,
+      success: true
+    });
+    expect(galaxy.activeFleets[0]?.state).toBe(FleetState.RETURNING);
   });
 
   it('preserves proposal-owned Jump Gate intent and creates pending foreign Jump Gate requests', () => {
@@ -224,6 +279,76 @@ function createJumpGateGalaxy(): { galaxy: Galaxy; origin: Planet; target: Plane
   return { galaxy, origin, target, bot, ally };
 }
 
+function createRecallGalaxy(): { galaxy: Galaxy; origin: Planet; target: Planet; bot: Player; targetPlayer: Player } {
+  const system = new SolarSystem('RecallSys', 3, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const origin = Planet.createStartingPlanet('Origin', 1, system, 1);
+  const target = Planet.createStartingPlanet('Target', 2, system, 2);
+  system.planets[1] = origin;
+  system.planets[2] = target;
+  origin.rBDSFTQ.resources = new ResourcesPack(5000, 5000, 5000);
+  origin.rBDSFTQ.ships = new ManyShips({ [ShipType.FIGHTER]: 1, [ShipType.SPY_PROBE]: 1 }, []);
+
+  const bot = new Player(
+    1,
+    'Bot-1',
+    [origin],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+  const targetPlayer = new Player(
+    2,
+    'Target-2',
+    [target],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+
+  const galaxy = new Galaxy(
+    'Recall Test',
+    [bot, targetPlayer],
+    [[system]],
+    3,
+    [],
+    2,
+    new Map(),
+    new Map([[1, bot], [2, targetPlayer]]),
+    new Map(),
+    new Map([[bot.playerName, bot.playerId], [targetPlayer.playerName, targetPlayer.playerId]])
+  );
+
+  return { galaxy, origin, target, bot, targetPlayer };
+}
+
+function createAttackFleet(
+  origin: Planet,
+  target: Planet,
+  missionType: FleetMissionType = FleetMissionType.ATTACK
+): Fleet {
+  const shipType = missionType === FleetMissionType.SPY ? ShipType.SPY_PROBE : ShipType.FIGHTER;
+  return new Fleet(
+    1,
+    1,
+    missionType,
+    new Destination(origin.basicInfo.solarSystem.coordinates.x, origin.basicInfo.solarSystem.coordinates.y, origin.basicInfo.order),
+    new Destination(target.basicInfo.solarSystem.coordinates.x, target.basicInfo.solarSystem.coordinates.y, target.basicInfo.order),
+    origin.basicInfo.name,
+    target.basicInfo.name,
+    new ManyShips({ [shipType]: 1 }, []),
+    new ResourcesPack(0, 0, 0),
+    0,
+    0,
+    0,
+    4,
+    4,
+    FleetState.MOVING_TO_TARGET,
+    1
+  );
+}
+
 function createRequestDecisionProposal(): BotProposal {
   return {
     proposalId: 'request',
@@ -288,6 +413,35 @@ function createSupportRequestCreationProposal(origin: Planet): BotProposal {
       missionType: null,
       minimumShips: [],
       bombardmentPriorities: null
+    },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {}
+  };
+}
+
+function createDiplomacyDecisionProposal(): BotProposal {
+  return {
+    proposalId: 'diplomacy',
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'DIPLOMACY_DECISION',
+    status: 'ACCEPTED',
+    goalKey: 'diplomacy',
+    dedupeKey: 'diplomacy',
+    summary: 'Accept peace proposal',
+    planetId: null,
+    targetCoordinates: null,
+    expectedValue: 100,
+    urgency: 90,
+    risk: 0,
+    confidence: 90,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      actionType: 'DIPLOMACY_DECISION',
+      proposalId: 1,
+      decision: 'ACCEPT',
+      targetPlayerId: 2,
+      requestedStatus: DiplomaticStatus.PEACE
     },
     blockers: [],
     expiresOnTurn: null,

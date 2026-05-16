@@ -922,6 +922,24 @@ function resolveStrategicDiplomaticFactions(
           && proposal.toPlayerId === player.playerId
         )
         .map((proposal) => proposal.requestedStatus);
+      const pendingIncomingDiplomacyProposals = galaxy.diplomaticProposals
+        .filter((proposal) =>
+          proposal.state === DiplomaticProposalState.PENDING
+          && proposal.fromPlayerId === foreignPlayer.playerId
+          && proposal.toPlayerId === player.playerId
+        )
+        .map((proposal) => ({
+          proposalId: proposal.proposalId,
+          fromPlayerId: proposal.fromPlayerId,
+          toPlayerId: proposal.toPlayerId,
+          requestedStatus: proposal.requestedStatus,
+          createdTurn: proposal.createdTurn,
+          expiresOnTurn: proposal.expiresOnTurn
+        }))
+        .sort((left, right) =>
+          left.expiresOnTurn - right.expiresOnTurn
+          || left.proposalId - right.proposalId
+        );
       const pendingOutgoingRequestedStatuses = galaxy.diplomaticProposals
         .filter((proposal) =>
           proposal.state === DiplomaticProposalState.PENDING
@@ -929,6 +947,24 @@ function resolveStrategicDiplomaticFactions(
           && proposal.toPlayerId === foreignPlayer.playerId
         )
         .map((proposal) => proposal.requestedStatus);
+      const pendingOutgoingDiplomacyProposals = galaxy.diplomaticProposals
+        .filter((proposal) =>
+          proposal.state === DiplomaticProposalState.PENDING
+          && proposal.fromPlayerId === player.playerId
+          && proposal.toPlayerId === foreignPlayer.playerId
+        )
+        .map((proposal) => ({
+          proposalId: proposal.proposalId,
+          fromPlayerId: proposal.fromPlayerId,
+          toPlayerId: proposal.toPlayerId,
+          requestedStatus: proposal.requestedStatus,
+          createdTurn: proposal.createdTurn,
+          expiresOnTurn: proposal.expiresOnTurn
+        }))
+        .sort((left, right) =>
+          left.expiresOnTurn - right.expiresOnTurn
+          || left.proposalId - right.proposalId
+        );
       const pendingIncomingJumpGateRequests = galaxy.jumpGateRequests
         .filter((request) =>
           request.state === DiplomaticProposalState.PENDING
@@ -1120,6 +1156,8 @@ function resolveStrategicDiplomaticFactions(
         sharedHostileEvents,
         pendingIncomingRequestedStatuses,
         pendingOutgoingRequestedStatuses,
+        pendingIncomingDiplomacyProposals,
+        pendingOutgoingDiplomacyProposals,
         pendingIncomingJumpGateRequests,
         pendingIncomingMaintenanceRequests,
         pendingIncomingSupportRequests,

@@ -25,6 +25,7 @@ export type BotProposalKind =
   | 'MAINTENANCE_REQUEST'
   | 'REQUEST_DECISION'
   | 'REQUEST_CREATION'
+  | 'DIPLOMACY_DECISION'
   | 'NO_OP';
 
 export type BotProposalStatus =
@@ -112,10 +113,21 @@ export type BotStrategicDiplomaticFactionSnapshot = {
   sharedHostileEvents: BotStrategicDiplomaticSharedHostileEventSnapshot[];
   pendingIncomingRequestedStatuses: DiplomaticStatus[];
   pendingOutgoingRequestedStatuses: DiplomaticStatus[];
+  pendingIncomingDiplomacyProposals: BotStrategicDiplomaticProposalSnapshot[];
+  pendingOutgoingDiplomacyProposals: BotStrategicDiplomaticProposalSnapshot[];
   pendingIncomingJumpGateRequests: BotStrategicDiplomaticJumpGateRequestSnapshot[];
   pendingIncomingMaintenanceRequests: BotStrategicDiplomaticMaintenanceRequestSnapshot[];
   pendingIncomingSupportRequests: BotStrategicDiplomaticSupportRequestSnapshot[];
   knownPlanets: BotStrategicDiplomaticKnownPlanetSnapshot[];
+};
+
+export type BotStrategicDiplomaticProposalSnapshot = {
+  proposalId: number;
+  fromPlayerId: number;
+  toPlayerId: number;
+  requestedStatus: DiplomaticStatus;
+  createdTurn: number;
+  expiresOnTurn: number;
 };
 
 export type BotStrategicDiplomaticSharedHostileEventSnapshot = {
@@ -632,8 +644,13 @@ export type BotExecutionOutcome = {
   requestType?: 'JUMP_GATE' | 'MAINTENANCE' | 'SUPPORT';
   requestId?: number;
   requestDecision?: 'APPROVE' | 'REJECT' | 'PARTIAL_APPROVE';
+  diplomacyProposalId?: number;
+  diplomacyDecision?: 'ACCEPT' | 'REJECT' | 'CANCEL';
+  requestedStatus?: DiplomaticStatus;
   supportType?: string;
   targetPlayerId?: number;
+  lifecycleAction?: 'FLEET_RECALL';
+  currentStatus?: DiplomaticStatus;
   commandErrorCode?: string;
 };
 

@@ -144,6 +144,7 @@ export type BotMemoryV2ProposalKind =
   | 'MAINTENANCE_REQUEST'
   | 'REQUEST_DECISION'
   | 'REQUEST_CREATION'
+  | 'DIPLOMACY_DECISION'
   | 'NO_OP';
 
 export type BotMemoryV2SupervisorPendingStatus =
@@ -1646,6 +1647,7 @@ export class Player {
       || kind === 'MAINTENANCE_REQUEST'
       || kind === 'REQUEST_DECISION'
       || kind === 'REQUEST_CREATION'
+      || kind === 'DIPLOMACY_DECISION'
       || kind === 'NO_OP';
   }
 

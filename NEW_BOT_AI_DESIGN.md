@@ -1927,7 +1927,7 @@ It should not unlock new mission-legality rules yet.
 
 #### Next phase: allied-cooperation execution
 
-After shared war awareness, `Strategic Diplomatic` adds **allied-cooperation planning**. Incoming request decisions are now implemented for Jump Gate, Maintenance, and Support requests; outgoing Support request creation is now executable through `REQUEST_CREATION` proposals. Outgoing Maintenance requests and standalone Jump Gate request creation remain deferred.
+After shared war awareness, `Strategic Diplomatic` adds **allied-cooperation planning**. Incoming request decisions are now implemented for Jump Gate, Maintenance, and Support requests; outgoing Support request creation is now executable through `REQUEST_CREATION` proposals. Pending `PEACE` / `ALLIED` treaty proposals are executable through `DIPLOMACY_DECISION` proposals owned by Strategic Diplomatic policy. Outgoing Maintenance requests and standalone Jump Gate request creation remain deferred.
 
 The current executable request-creation slice focuses on:
 
@@ -2552,23 +2552,31 @@ The live execution scope is:
 * `BOMBARD`,
 * `SIEGE`,
 * incoming `REQUEST_DECISION` proposals for `JUMP_GATE`, `MAINTENANCE`, and `SUPPORT`,
-* outgoing `REQUEST_CREATION` proposals for `SUPPORT`.
+* outgoing `REQUEST_CREATION` proposals for `SUPPORT`,
+* `DIPLOMACY_DECISION` proposals for pending `PEACE` / `ALLIED` diplomacy.
 
 The current deferred scope is:
 
 * outgoing maintenance request creation,
 * standalone outgoing Jump Gate request creation,
-* diplomacy execution,
 * full hard reservation/cancellation engine,
-* active-fleet recall management when diplomacy changes,
 * recycle execution until a subsystem emits explicit `RECYCLE` proposals.
 
 Incoming request ownership is split deliberately:
 
 * `Strategic Diplomatic` evaluates incoming Jump Gate, Maintenance, and Support requests and emits explicit `REQUEST_DECISION` proposals.
 * `Strategic Diplomatic` evaluates outgoing support-request needs and emits executable `REQUEST_CREATION` proposals.
+* `Strategic Diplomatic` evaluates pending incoming/outgoing `PEACE` / `ALLIED` treaty proposals and emits executable `DIPLOMACY_DECISION` proposals.
 * `Supervisor` only arbitrates and executes accepted request decisions through shared command helpers.
-* If no subsystem emits a request decision or request creation proposal, Supervisor does not invent one.
+* If no subsystem emits a request decision, request creation, or diplomacy decision proposal, Supervisor does not invent one.
+
+Supervisor diplomacy and lifecycle order:
+
+* accepted `DIPLOMACY_DECISION` proposals execute first,
+* then Supervisor performs the lifecycle recall pass,
+* then normal accepted queue, fleet, and request actions execute.
+
+The lifecycle recall pass uses the shared fleet-return command and recalls own `ATTACK`, `BOMBARD`, `SIEGE`, and `SPY` fleets in `MOVING_TO_TARGET`, `PENDING_JUMP_GATE`, or `ORBITING` when the target owner is now `NEUTRAL`, `PEACE`, or `ALLIED`. This prevents continued escalation after accepted peace/alliance or after relations otherwise stop being valid for offensive action.
 
 Supervisor fleet execution rules:
 
@@ -2595,7 +2603,6 @@ Important TODOs:
 * add future Jump Gate operating-cost policy,
 * add outgoing maintenance request creation proposals in the owning subsystem if needed,
 * add future friendliness effects for accepted Jump Gate requests (`+0.5` non-combat fleet, `+1` combat fleet, per fleet),
-* add future active-fleet management to recall our own active `ATTACK` / `BOMBARD` / `SIEGE` fleets when the target relation becomes `PEACE` / `ALLIED`,
 * check whether shared `DEFEND` launch/arrival logic fully supports own + allied/peace guard targets,
 * add/enable `RECYCLE` execution only after an owning subsystem emits explicit recycle proposals,
 * review global research coverage and add a dedicated research subsystem if the existing subsystems do not cover all technologies well enough.
