@@ -42,6 +42,7 @@ export type BotV2FeatureFlags = {
     economic: boolean;
     defensive: boolean;
     warfare: boolean;
+    research?: boolean;
     critical: boolean;
     strategicDevelopment: boolean;
     strategicMilitary: boolean;
@@ -318,6 +319,7 @@ export type BotPlanetSnapshot = {
     hyperspaceTechnologyLevel: number;
     espionageTechnologyLevel: number;
     astrophysicsTechnologyLevel: number;
+    gravitonTechnologyLevel: number;
   };
   economy: {
     metalMineLevel: number;
@@ -383,6 +385,7 @@ export type BotPlanetSnapshot = {
     buildingQueueLength: number;
     shipyardQueueLength: number;
     hasActiveResearch: boolean;
+    isResearchHelper: boolean;
     queuedBuildingTypes: BuildingType[];
     queuedDefenceTypes: DefenceType[];
     queuedShipTypes: ShipType[];

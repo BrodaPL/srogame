@@ -118,6 +118,7 @@ export type BotV2SubsystemId =
   | 'ECONOMIC'
   | 'DEFENSIVE'
   | 'WARFARE'
+  | 'RESEARCH'
   | 'CRITICAL'
   | 'STRATEGIC_DEVELOPMENT'
   | 'STRATEGIC_MILITARY'
@@ -272,6 +273,11 @@ export type BotMemoryV2Critical = {
   blockerLedger: BotMemoryV2CriticalBlockerEntry[];
 };
 
+export type BotMemoryV2Research = {
+  affordabilityWindowTurns: number;
+  lastWindowIncreaseTurn: number | null;
+};
+
 export type BotMemoryV2StrategicDiplomaticFactionEntry = {
   playerId: number;
   hostilityScore: number;
@@ -390,6 +396,7 @@ export type BotMemoryV2WeightManager = {
   expansionMode: boolean;
   diplomaticCautionMode: boolean;
   normalSituationMode: boolean;
+  researchWeight: number;
   strategicDevelopmentWeight: number;
   strategicMilitaryWeight: number;
   strategicDiplomaticWeight: number;
@@ -428,6 +435,7 @@ export type BotMemoryV2 = {
   recentTargets: BotMemoryV2RecentTarget[];
   acceptedLongTermCommitments: BotMemoryV2LongTermCommitment[];
   critical: BotMemoryV2Critical;
+  research: BotMemoryV2Research;
   strategicMilitary: BotMemoryV2StrategicMilitary;
   strategicDiplomatic: BotMemoryV2StrategicDiplomatic;
   weightManager: BotMemoryV2WeightManager;
@@ -666,6 +674,7 @@ export class Player {
         memory.acceptedLongTermCommitments
       ),
       critical: Player.normalizeBotMemoryV2Critical(memory.critical),
+      research: Player.normalizeBotMemoryV2Research(memory.research),
       strategicMilitary: Player.normalizeBotMemoryV2StrategicMilitary(memory.strategicMilitary),
       strategicDiplomatic: Player.normalizeBotMemoryV2StrategicDiplomatic(memory.strategicDiplomatic),
       weightManager: Player.normalizeBotMemoryV2WeightManager(memory.weightManager),
@@ -964,6 +973,21 @@ export class Player {
   ): BotMemoryV2Critical {
     return {
       blockerLedger: Player.normalizeBotMemoryV2CriticalBlockerLedger(critical?.blockerLedger)
+    };
+  }
+
+  private static normalizeBotMemoryV2Research(
+    research: BotMemoryV2Research | null | undefined
+  ): BotMemoryV2Research {
+    const affordabilityWindowTurns = Number.isInteger(research?.affordabilityWindowTurns)
+      ? Math.max(5, research!.affordabilityWindowTurns!)
+      : 5;
+
+    return {
+      affordabilityWindowTurns,
+      lastWindowIncreaseTurn: Number.isInteger(research?.lastWindowIncreaseTurn)
+        ? Math.max(0, research!.lastWindowIncreaseTurn!)
+        : null
     };
   }
 
@@ -1344,6 +1368,7 @@ export class Player {
       expansionMode: selectedMode === 'EXPANSION',
       diplomaticCautionMode: selectedMode === 'DIPLOMATIC_CAUTION',
       normalSituationMode: selectedMode === 'NORMAL',
+      researchWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.researchWeight),
       strategicDevelopmentWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.strategicDevelopmentWeight),
       strategicMilitaryWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.strategicMilitaryWeight),
       strategicDiplomaticWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.strategicDiplomaticWeight),
@@ -1725,6 +1750,7 @@ export class Player {
       case 'ECONOMIC':
       case 'DEFENSIVE':
       case 'WARFARE':
+      case 'RESEARCH':
       case 'CRITICAL':
       case 'STRATEGIC_DEVELOPMENT':
       case 'STRATEGIC_MILITARY':

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
 import { createDefaultBotMemoryV2 } from '../bot-v2-memory.js';
 import type { BotProposal, BotWorldSnapshot } from '../bot-v2-types.ts';
 import {
@@ -31,13 +32,14 @@ describe('bot supervisor scoring', () => {
       ECONOMIC: 100,
       DEFENSIVE: 100,
       WARFARE: 100,
+      RESEARCH: 100,
       STRATEGIC_DEVELOPMENT: 100,
       STRATEGIC_MILITARY: 100,
       STRATEGIC_DIPLOMATIC: 100
     });
 
-    expect(shares.ECONOMIC).toBeCloseTo(1 / 6, 4);
-    expect(shares.DEFENSIVE).toBeCloseTo(1 / 6, 4);
+    expect(shares.ECONOMIC).toBeCloseTo(1 / 7, 4);
+    expect(shares.DEFENSIVE).toBeCloseTo(1 / 7, 4);
   });
 
   it('scores Critical outside normal weight competition', () => {
@@ -58,6 +60,25 @@ describe('bot supervisor scoring', () => {
     });
 
     expect(critical).toBeGreaterThan(normal * 10);
+  });
+
+  it('can score Research as a normal weighted subsystem', () => {
+    const memory = createDefaultBotMemoryV2();
+    memory.weightManager.researchWeight = 80;
+
+    const research = scoreSupervisorProposal({
+      proposal: createProposal({
+        subsystemId: 'RESEARCH',
+        kind: 'RESEARCH',
+        requestPayload: { x: 0, y: 0, z: 1, technologyType: TechnologyType.ENERGY_TECHNOLOGY }
+      }),
+      snapshot: createSnapshot(),
+      memory,
+      shipNeedPressure: 0,
+      criticalAccepted: false
+    });
+
+    expect(research).toBeGreaterThan(0);
   });
 });
 

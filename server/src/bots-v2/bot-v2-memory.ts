@@ -16,6 +16,10 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
     critical: {
       blockerLedger: []
     },
+    research: {
+      affordabilityWindowTurns: 5,
+      lastWindowIncreaseTurn: null
+    },
     strategicMilitary: {
       farmLedger: []
     },
@@ -34,6 +38,7 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
       expansionMode: false,
       diplomaticCautionMode: false,
       normalSituationMode: true,
+      researchWeight: 0,
       strategicDevelopmentWeight: 0,
       strategicMilitaryWeight: 0,
       strategicDiplomaticWeight: 0,

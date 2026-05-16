@@ -32,6 +32,7 @@ export function getBotV2FeatureFlags(): BotV2FeatureFlags {
       economic: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_ECONOMIC', true),
       defensive: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_DEFENSIVE', true),
       warfare: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_WARFARE', true),
+      research: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_RESEARCH', true),
       critical: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_CRITICAL', true),
       strategicDevelopment: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_DEVELOPMENT', true),
       strategicMilitary: readBooleanEnv('SROGAME_BOT_AI_V2_SUBSYSTEM_STRATEGIC_MILITARY', true),

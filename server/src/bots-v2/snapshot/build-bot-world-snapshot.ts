@@ -134,6 +134,7 @@ function buildPlanetSnapshot(
   const hyperspaceTechnologyLevel = player.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY);
   const espionageTechnologyLevel = player.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY);
   const astrophysicsTechnologyLevel = player.getTechLevel(TechnologyType.ASTROPHYSICS_TECHNOLOGY);
+  const gravitonTechnologyLevel = player.getTechLevel(TechnologyType.GRAVITON_TECHNOLOGY);
   const effectiveParameters = planet.getEffectivePlanetaryParameters();
   const fusionOperation = planet.resolveFusionReactorOperation(adaptiveTechnologyLevel, energyTechnologyLevel);
   const availableEnergy = resolveAvailableEnergy(planet, energyTechnologyLevel, fusionOperation.powerOutput);
@@ -246,7 +247,8 @@ function buildPlanetSnapshot(
       hyperspaceDriveLevel,
       hyperspaceTechnologyLevel,
       espionageTechnologyLevel,
-      astrophysicsTechnologyLevel
+      astrophysicsTechnologyLevel,
+      gravitonTechnologyLevel
     },
     economy: {
       metalMineLevel: planet.getBuildingLevel(BuildingType.METAL_MINE),
@@ -300,6 +302,7 @@ function buildPlanetSnapshot(
       buildingQueueLength: planet.rBDSFTQ.buildingQueue.length,
       shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length,
       hasActiveResearch: planet.rBDSFTQ.currentResearchQueue !== null,
+      isResearchHelper: planet.rBDSFTQ.researchHelperFor !== null,
       queuedBuildingTypes: planet.rBDSFTQ.buildingQueue.map((entry) => entry.buildingType),
       queuedDefenceTypes: planet.rBDSFTQ.shipyardQueue
         .filter((entry) => entry.itemKind === 'defence' && entry.defenceType !== null)

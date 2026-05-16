@@ -34,6 +34,7 @@ type WeightProfile = {
     warfare: number;
   };
   strategicWeights: {
+    research: number;
     strategicDevelopment: number;
     strategicMilitary: number;
     strategicDiplomatic: number;
@@ -91,32 +92,32 @@ const PROFILE_TABLES: Record<BotProfileId, WeightProfile> = {
   BALANCED: {
     axes: { aggression: 50, industry: 50, diplomacy: 45, defences: 50, caution: 45, development: 50 },
     localWeights: { economic: 50, defensive: 50, warfare: 50 },
-    strategicWeights: { strategicDevelopment: 50, strategicMilitary: 50, strategicDiplomatic: 50 }
+    strategicWeights: { research: 50, strategicDevelopment: 50, strategicMilitary: 50, strategicDiplomatic: 50 }
   },
   AGGRESSOR: {
     axes: { aggression: 85, industry: 40, diplomacy: 35, defences: 40, caution: 20, development: 45 },
     localWeights: { economic: 40, defensive: 40, warfare: 78 },
-    strategicWeights: { strategicDevelopment: 45, strategicMilitary: 82, strategicDiplomatic: 70 }
+    strategicWeights: { research: 38, strategicDevelopment: 45, strategicMilitary: 82, strategicDiplomatic: 70 }
   },
   TURTLE: {
     axes: { aggression: 20, industry: 45, diplomacy: 35, defences: 85, caution: 70, development: 50 },
     localWeights: { economic: 45, defensive: 82, warfare: 28 },
-    strategicWeights: { strategicDevelopment: 50, strategicMilitary: 35, strategicDiplomatic: 40 }
+    strategicWeights: { research: 52, strategicDevelopment: 50, strategicMilitary: 35, strategicDiplomatic: 40 }
   },
   MINER: {
     axes: { aggression: 20, industry: 85, diplomacy: 50, defences: 40, caution: 55, development: 70 },
     localWeights: { economic: 82, defensive: 35, warfare: 20 },
-    strategicWeights: { strategicDevelopment: 72, strategicMilitary: 25, strategicDiplomatic: 40 }
+    strategicWeights: { research: 78, strategicDevelopment: 72, strategicMilitary: 25, strategicDiplomatic: 40 }
   },
   AVOIDER: {
     axes: { aggression: 10, industry: 45, diplomacy: 72, defences: 50, caution: 85, development: 45 },
     localWeights: { economic: 45, defensive: 55, warfare: 15 },
-    strategicWeights: { strategicDevelopment: 45, strategicMilitary: 20, strategicDiplomatic: 72 }
+    strategicWeights: { research: 46, strategicDevelopment: 45, strategicMilitary: 20, strategicDiplomatic: 72 }
   },
   BUNKERER: {
     axes: { aggression: 25, industry: 40, diplomacy: 30, defences: 90, caution: 65, development: 45 },
     localWeights: { economic: 40, defensive: 88, warfare: 25 },
-    strategicWeights: { strategicDevelopment: 40, strategicMilitary: 25, strategicDiplomatic: 35 }
+    strategicWeights: { research: 42, strategicDevelopment: 40, strategicMilitary: 25, strategicDiplomatic: 35 }
   }
 };
 
@@ -159,6 +160,7 @@ export class BotWeightManagerSubsystem implements BotSubsystem {
       expansionMode: selectedMode === 'EXPANSION',
       diplomaticCautionMode: selectedMode === 'DIPLOMATIC_CAUTION',
       normalSituationMode: selectedMode === 'NORMAL',
+      researchWeight: globalWeights.researchWeight,
       strategicDevelopmentWeight: globalWeights.strategicDevelopmentWeight,
       strategicMilitaryWeight: globalWeights.strategicMilitaryWeight,
       strategicDiplomaticWeight: globalWeights.strategicDiplomaticWeight,
@@ -182,6 +184,7 @@ export class BotWeightManagerSubsystem implements BotSubsystem {
       proposals: [],
       debug: {
         selectedMode,
+        researchWeight: globalWeights.researchWeight,
         strategicDevelopmentWeight: globalWeights.strategicDevelopmentWeight,
         strategicMilitaryWeight: globalWeights.strategicMilitaryWeight,
         strategicDiplomaticWeight: globalWeights.strategicDiplomaticWeight,
@@ -441,6 +444,7 @@ function buildGlobalWeights(
   farmCounts: { breakNeed: number; raidReady: number },
   planetFlags: PlanetFlags[]
 ): {
+  researchWeight: number;
   strategicDevelopmentWeight: number;
   strategicMilitaryWeight: number;
   strategicDiplomaticWeight: number;
@@ -448,6 +452,13 @@ function buildGlobalWeights(
   const immatureCount = planetFlags.filter((planet) => planet.immaturePlanet).length;
   const inDangerCount = planetFlags.filter((planet) => planet.inDangerPlanet).length;
 
+  const researchWeight = clampWeight(
+    profile.strategicWeights.research
+    + (modeScores.ECONOMIC_RECOVERY * 0.25)
+    + (modeScores.EXPANSION * 0.1)
+    + (immatureCount * 2)
+    - (selectedMode === 'WAR_EMERGENCY' ? 10 : 0)
+  );
   const strategicDevelopmentWeight = clampWeight(
     profile.strategicWeights.strategicDevelopment
     + (modeScores.ECONOMIC_RECOVERY * 0.35)
@@ -474,6 +485,7 @@ function buildGlobalWeights(
   );
 
   return {
+    researchWeight,
     strategicDevelopmentWeight,
     strategicMilitaryWeight,
     strategicDiplomaticWeight

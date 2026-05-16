@@ -3,6 +3,7 @@ import { BuildingType } from '../../../../src/app/models/enums/building-type.js'
 import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
 import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
 import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
+import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
 import { createDefaultBotMemoryV2 } from '../bot-v2-memory.js';
 import type { BotProposal, BotWorldSnapshot } from '../bot-v2-types.ts';
 import { BotSupervisorV2 } from './bot-supervisor.js';
@@ -276,6 +277,21 @@ describe('bot supervisor commitments', () => {
     expect(decision.accepted).toHaveLength(1);
     expect(decision.rejected.find((entry) => entry.proposalId === 'new')).toBeUndefined();
   });
+
+  it('prefers exact same-technology overlap when competing research proposals are otherwise tied', () => {
+    const decision = createSupervisor().decide(
+      createSnapshot({ metal: 1000, crystal: 1000, deuterium: 1000 }),
+      createDefaultBotMemoryV2(),
+      [
+        createResearchProposal('research-main', 'RESEARCH', TechnologyType.ENERGY_TECHNOLOGY),
+        createResearchProposal('research-overlap', 'ECONOMIC', TechnologyType.ENERGY_TECHNOLOGY),
+        createResearchProposal('research-other', 'STRATEGIC_DEVELOPMENT', TechnologyType.MATERIAL_TECHNOLOGY)
+      ]
+    );
+
+    expect(decision.accepted).toHaveLength(1);
+    expect(decision.accepted[0]?.requestPayload.technologyType).toBe(TechnologyType.ENERGY_TECHNOLOGY);
+  });
 });
 
 function createSupervisor(): BotSupervisorV2 {
@@ -385,6 +401,33 @@ function createRequestDecisionProposal(): BotProposal {
   };
 }
 
+function createResearchProposal(
+  proposalId: string,
+  subsystemId: BotProposal['subsystemId'],
+  technologyType: TechnologyType
+): BotProposal {
+  return {
+    proposalId,
+    subsystemId,
+    kind: 'RESEARCH',
+    status: 'PROPOSED',
+    goalKey: `research:${technologyType}`,
+    dedupeKey: `research:${technologyType}:${proposalId}`,
+    summary: `Research ${technologyType}`,
+    planetId: null,
+    targetCoordinates: { x: 0, y: 0, z: 1 },
+    expectedValue: 25,
+    urgency: 20,
+    risk: 0,
+    confidence: 80,
+    requestedResources: { metal: 100, crystal: 100, deuterium: 0 },
+    requestPayload: { x: 0, y: 0, z: 1, technologyType, helperPlanets: [] },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {}
+  };
+}
+
 function createSnapshot(
   resources: { metal: number; crystal: number; deuterium: number },
   options: {
@@ -422,6 +465,7 @@ function createSnapshot(
         buildingQueueLength: 0,
         shipyardQueueLength: 0,
         hasActiveResearch: false,
+        isResearchHelper: false,
         queuedBuildingTypes: [],
         queuedDefenceTypes: [],
         queuedShipTypes: [],

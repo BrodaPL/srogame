@@ -44,6 +44,12 @@ The control flow is:
 
 So the architecture has **one final decision-maker only**: the **Supervisory System**.
 
+Current implementation note:
+- A dedicated `Research` subsystem now exists in the live V2 runtime.
+- It runs before `Strategic Development`.
+- Phase-1 scope is intentionally simple: at most one new global `RESEARCH` proposal per turn, optional helper labs at launch time, no building upgrades, no production proposals, and no helper reassignment yet.
+- `Supervisor` still keeps the global cap of one newly accepted `RESEARCH` proposal per turn, but now weights `RESEARCH` as a first-class subsystem and boosts exact same-technology overlap across subsystem proposals.
+
 ---
 
 # Core design principles
@@ -2616,7 +2622,8 @@ Important TODOs:
 * add future friendliness effects for accepted Jump Gate requests (`+0.5` non-combat fleet, `+1` combat fleet, per fleet),
 * check whether shared `DEFEND` launch/arrival logic fully supports own + allied/peace guard targets,
 * add/enable `RECYCLE` execution only after an owning subsystem emits explicit recycle proposals,
-* review global research coverage and add a dedicated research subsystem if the existing subsystems do not cover all technologies well enough.
+* future optimize helper-lab reassignment for already running researches,
+* future revisit research category pressure only if simple global coverage proves too flat.
 
 ### Responsibilities
 

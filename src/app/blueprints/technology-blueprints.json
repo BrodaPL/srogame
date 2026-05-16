@@ -116,7 +116,7 @@
       "imagePath": "images/technologies/normal/GRAVITON_TECHNOLOGY.jpg",
       "description": "Gives 5% ship bonus evasion bonus. Increases jump range by 1. Increses Jump Gate and Interstellar Trade Port capacity by 25%. Increase Sensor Phlanx base range by 0.5",
       "basicCost": { "metal": 0, "crystal": 5000, "deuterium": 50000 },
-      "energyRequired": [110],
+      "energyRequired": [0],
       "researchTime": [0.1],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 2 }

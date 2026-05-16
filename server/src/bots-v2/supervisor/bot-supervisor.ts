@@ -58,6 +58,7 @@ export class BotSupervisorV2 implements BotSupervisor {
       return this.rejectAll([], 'no_proposals');
     }
     const shipNeedPressure = buildShipNeedPressure(proposals);
+    const researchOverlapBonus = buildResearchOverlapBonus(proposals);
     const rejected: BotSupervisorDecision['rejected'] = [];
     const scored = allProposals
       .map((proposal) => this.scoreProposal(
@@ -65,6 +66,7 @@ export class BotSupervisorV2 implements BotSupervisor {
         snapshot,
         memory,
         shipNeedPressure,
+        researchOverlapBonus,
         retryProposals.some((retry) => retry.proposalId === proposal.proposalId)
       ))
       .filter((entry): entry is ScoredProposal => {
@@ -223,6 +225,7 @@ export class BotSupervisorV2 implements BotSupervisor {
     snapshot: BotWorldSnapshot,
     memory: BotMemoryV2,
     shipNeedPressure: Map<string, number>,
+    researchOverlapBonus: Map<string, number>,
     retryCommitment = false
   ): ScoredProposal | null {
     if (proposal.status === 'BLOCKED' || proposal.blockers.length > 0) {
@@ -245,15 +248,16 @@ export class BotSupervisorV2 implements BotSupervisor {
         }
         return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
       }
+      const score = scoreSupervisorProposal({
+        proposal,
+        snapshot,
+        memory,
+        shipNeedPressure: 0,
+        criticalAccepted: false
+      });
       return {
         proposal,
-        score: scoreSupervisorProposal({
-          proposal,
-          snapshot,
-          memory,
-          shipNeedPressure: 0,
-          criticalAccepted: false
-        }),
+        score,
         adapterReason: null,
         retryCommitment
       };
@@ -268,15 +272,16 @@ export class BotSupervisorV2 implements BotSupervisor {
         console.warn(`[BotV2 Supervisor] Invalid request decision proposal ${proposal.proposalId}: ${normalized.reason}`);
         return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
       }
+      const score = scoreSupervisorProposal({
+        proposal,
+        snapshot,
+        memory,
+        shipNeedPressure: 0,
+        criticalAccepted: false
+      });
       return {
         proposal,
-        score: scoreSupervisorProposal({
-          proposal,
-          snapshot,
-          memory,
-          shipNeedPressure: 0,
-          criticalAccepted: false
-        }) + 10000,
+        score: score + 10000,
         adapterReason: null,
         retryCommitment
       };
@@ -287,15 +292,16 @@ export class BotSupervisorV2 implements BotSupervisor {
         console.warn(`[BotV2 Supervisor] Invalid request creation proposal ${proposal.proposalId}: ${normalized.reason}`);
         return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
       }
+      const score = scoreSupervisorProposal({
+        proposal,
+        snapshot,
+        memory,
+        shipNeedPressure: 0,
+        criticalAccepted: false
+      });
       return {
         proposal,
-        score: scoreSupervisorProposal({
-          proposal,
-          snapshot,
-          memory,
-          shipNeedPressure: 0,
-          criticalAccepted: false
-        }),
+        score,
         adapterReason: null,
         retryCommitment
       };
@@ -309,15 +315,16 @@ export class BotSupervisorV2 implements BotSupervisor {
       const expiringBoost = proposal.expiresOnTurn !== null && proposal.expiresOnTurn <= snapshot.turn + 1
         ? 10000
         : 0;
+      const score = scoreSupervisorProposal({
+        proposal,
+        snapshot,
+        memory,
+        shipNeedPressure: 0,
+        criticalAccepted: false
+      });
       return {
         proposal,
-        score: scoreSupervisorProposal({
-          proposal,
-          snapshot,
-          memory,
-          shipNeedPressure: 0,
-          criticalAccepted: false
-        }) + expiringBoost,
+        score: score + expiringBoost,
         adapterReason: null,
         retryCommitment
       };
@@ -328,15 +335,16 @@ export class BotSupervisorV2 implements BotSupervisor {
         console.warn(`[BotV2 Supervisor] Invalid diplomacy proposal ${proposal.proposalId}: ${normalized.reason}`);
         return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
       }
+      const score = scoreSupervisorProposal({
+        proposal,
+        snapshot,
+        memory,
+        shipNeedPressure: 0,
+        criticalAccepted: false
+      });
       return {
         proposal,
-        score: scoreSupervisorProposal({
-          proposal,
-          snapshot,
-          memory,
-          shipNeedPressure: 0,
-          criticalAccepted: false
-        }),
+        score,
         adapterReason: null,
         retryCommitment
       };
@@ -355,15 +363,22 @@ export class BotSupervisorV2 implements BotSupervisor {
       ? shipNeedPressure.get(resolveShipyardNeedKey(proposal) ?? '') ?? 0
       : 0;
 
+    let score = scoreSupervisorProposal({
+      proposal,
+      snapshot,
+      memory,
+      shipNeedPressure: pressure,
+      criticalAccepted: false
+    });
+    if (proposal.kind === 'RESEARCH') {
+      const technologyType = readResearchTechnologyType(proposal);
+      const overlapBonus = technologyType ? (researchOverlapBonus.get(technologyType) ?? 0) : 0;
+      score *= 1 + overlapBonus;
+    }
+
     return {
       proposal,
-      score: scoreSupervisorProposal({
-        proposal,
-        snapshot,
-        memory,
-        shipNeedPressure: pressure,
-        criticalAccepted: false
-      }),
+      score,
       adapterReason: null,
       retryCommitment
     };
@@ -401,7 +416,9 @@ function precheckQueue(
   }
 
   if (kind === 'RESEARCH') {
-    return planet.queues.hasActiveResearch ? 'queue_became_unavailable' : null;
+    return planet.queues.hasActiveResearch || planet.queues.isResearchHelper
+      ? 'queue_became_unavailable'
+      : null;
   }
 
   return planet.queues.buildingQueueLength >= planet.power.maxBuildingQueueLength
@@ -616,6 +633,7 @@ function resolveFleetSlotCaps(
     ECONOMIC: averageLocalWeight(memory, 'economicWeight'),
     DEFENSIVE: averageLocalWeight(memory, 'defensiveWeight'),
     WARFARE: averageLocalWeight(memory, 'warfareWeight'),
+    RESEARCH: memory.weightManager.researchWeight || 50,
     STRATEGIC_DEVELOPMENT: memory.weightManager.strategicDevelopmentWeight || 50,
     STRATEGIC_MILITARY: memory.weightManager.strategicMilitaryWeight || 50,
     STRATEGIC_DIPLOMATIC: memory.weightManager.strategicDiplomaticWeight || 50
@@ -821,6 +839,42 @@ function buildShipNeedPressure(proposals: BotProposal[]): Map<string, number> {
     pressure.set(key, (pressure.get(key) ?? 0) + amount + urgency);
   }
   return pressure;
+}
+
+function buildResearchOverlapBonus(proposals: BotProposal[]): Map<string, number> {
+  const subsystemSets = new Map<string, Set<string>>();
+  for (const proposal of proposals) {
+    if (proposal.kind !== 'RESEARCH') {
+      continue;
+    }
+
+    const technologyType = readResearchTechnologyType(proposal);
+    if (!technologyType) {
+      continue;
+    }
+
+    if (!subsystemSets.has(technologyType)) {
+      subsystemSets.set(technologyType, new Set());
+    }
+    subsystemSets.get(technologyType)!.add(proposal.subsystemId);
+  }
+
+  const bonusByTechnology = new Map<string, number>();
+  for (const [technologyType, subsystemIds] of subsystemSets.entries()) {
+    const overlapCount = subsystemIds.size - 1;
+    if (overlapCount <= 0) {
+      continue;
+    }
+    bonusByTechnology.set(technologyType, Math.min(0.6, overlapCount * 0.2));
+  }
+
+  return bonusByTechnology;
+}
+
+function readResearchTechnologyType(proposal: BotProposal): string | null {
+  return typeof proposal.requestPayload.technologyType === 'string'
+    ? proposal.requestPayload.technologyType
+    : null;
 }
 
 function resolveShipyardNeedKey(proposal: BotProposal): string | null {

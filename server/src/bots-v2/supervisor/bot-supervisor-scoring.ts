@@ -13,6 +13,7 @@ const NORMAL_WEIGHTED_SUBSYSTEMS: BotV2SubsystemId[] = [
   'ECONOMIC',
   'DEFENSIVE',
   'WARFARE',
+  'RESEARCH',
   'STRATEGIC_DEVELOPMENT',
   'STRATEGIC_MILITARY',
   'STRATEGIC_DIPLOMATIC'
@@ -101,6 +102,8 @@ export function resolveStrategicProposalWeight(
   memory: BotMemoryV2
 ): number {
   switch (subsystemId) {
+    case 'RESEARCH':
+      return memory.weightManager.researchWeight || 50;
     case 'STRATEGIC_DEVELOPMENT':
       return memory.weightManager.strategicDevelopmentWeight || 50;
     case 'STRATEGIC_MILITARY':
@@ -160,6 +163,7 @@ function resolveMemoryWeights(memory: BotMemoryV2): Partial<Record<BotV2Subsyste
     ECONOMIC: averageLocalWeight(memory, 'economicWeight'),
     DEFENSIVE: averageLocalWeight(memory, 'defensiveWeight'),
     WARFARE: averageLocalWeight(memory, 'warfareWeight'),
+    RESEARCH: memory.weightManager.researchWeight || 50,
     STRATEGIC_DEVELOPMENT: memory.weightManager.strategicDevelopmentWeight || 50,
     STRATEGIC_MILITARY: memory.weightManager.strategicMilitaryWeight || 50,
     STRATEGIC_DIPLOMATIC: memory.weightManager.strategicDiplomaticWeight || 50

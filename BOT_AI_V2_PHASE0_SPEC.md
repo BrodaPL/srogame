@@ -18,12 +18,12 @@ This document is a working engineering spec, not a final behavior design for all
   - `Economic`
   - `Defensive`
   - `Warfare`
-  - `Critical`
-  - richer `World/State analysis`
+  - `Research`
   - `Strategic Development`
   - `Strategic Military`
   - `Strategic Diplomatic`
   - `Weight Manager`
+  - `Critical`
   - `Supervisor` phase 1 live queue arbitration
 - V2 memory persistence scope:
   - persist stable subsystem state plus Supervisor pending/spending/proposal history
@@ -116,6 +116,7 @@ export type BotV2FeatureFlags = {
     economic: boolean;
     defensive: boolean;
     warfare: boolean;
+    research: boolean;
     critical: boolean;
     strategicDevelopment: boolean;
     strategicMilitary: boolean;
@@ -124,6 +125,13 @@ export type BotV2FeatureFlags = {
   };
 };
 ```
+
+Current research note:
+- `Research` is now a dedicated simple global subsystem.
+- It emits at most one new `RESEARCH` proposal per turn.
+- It chooses the best `(technology, main lab)` pair by affordability ETA, ETC, resource fit, and research power.
+- It can attach helper labs when starting the research, preferring weaker or currently unaffordable idle labs first up to the IRN helper cap.
+- It persists a per-player affordability window in `player.botMemoryV2.research`, starting at `5` turns and widening by `+1` at most once per turn when nothing is affordable yet.
 
 Current defaults:
 - `mode = 'LIVE'`
