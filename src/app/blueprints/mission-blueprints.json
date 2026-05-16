@@ -170,7 +170,7 @@
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
       "targetRules": {
-        "allowedDiplomaticStatuses": ["SELF", "ALLIED", "PEACE", "PASSIVE", "WAR"],
+        "allowedDiplomaticStatuses": ["SELF", "ALLIED", "PEACE", "NEUTRAL", "PASSIVE", "WAR"],
         "allowUnowned": true
       },
       "shipRules": {

@@ -75,6 +75,7 @@ export type BotEmpireSnapshot = {
   activeFleetCount: number;
   maxActiveFleetCount: number;
   activeColonizeFleetCount: number;
+  activeRecycleFleetCount?: number;
   totalResources: {
     metal: number;
     crystal: number;
@@ -180,6 +181,11 @@ export type BotStrategicDiplomaticKnownPlanetSnapshot = {
     crystal: number;
     deuterium: number;
   } | null;
+  spaceDebris?: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  };
 };
 
 export type BotStrategicDiplomaticJumpGateRequestSnapshot = {
@@ -296,6 +302,11 @@ export type BotStrategicMilitaryTargetSnapshot = {
     deuterium: number;
   } | null;
   combatObservationTurn: number | null;
+  spaceDebris?: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  };
 };
 
 export type BotPlanetSnapshot = {
@@ -428,6 +439,11 @@ export type BotPlanetSnapshot = {
     crystal: number;
     deuterium: number;
   };
+  spaceDebris?: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+  };
   blockers: {
     energyStarved: boolean;
     storageBlocked: boolean;
@@ -480,7 +496,8 @@ export type BotDefensiveBranch =
 export type BotWarfareBranch =
   | 'CAPACITY'
   | 'UNLOCK'
-  | 'PRODUCTION';
+  | 'PRODUCTION'
+  | 'RECOVERY';
 
 export type BotStrategicDevelopmentBranch =
   | 'LOCAL_DEVELOPMENT';
@@ -490,13 +507,15 @@ export type BotGoalFamily =
   | 'UNLOCK'
   | 'BUILDING'
   | 'PRODUCTION'
-  | 'CAPACITY';
+  | 'CAPACITY'
+  | 'RECOVERY';
 
 export type BotGoalTargetKind =
   | 'BUILDING'
   | 'RESEARCH'
   | 'DEFENCE'
-  | 'SHIP';
+  | 'SHIP'
+  | 'MISSION';
 
 type BotGoalBase = {
   goalKey: string;
@@ -542,7 +561,7 @@ export type BotDefensiveGoal = BotGoalBase & {
 
 export type BotWarfareGoal = BotGoalBase & {
   subsystemId: 'WARFARE';
-  goalFamily: 'CAPACITY' | 'UNLOCK' | 'PRODUCTION';
+  goalFamily: 'CAPACITY' | 'UNLOCK' | 'PRODUCTION' | 'RECOVERY';
   branch: BotWarfareBranch;
 };
 

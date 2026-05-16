@@ -1,5 +1,7 @@
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { Player } from '../../../src/app/models/player.ts';
+import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.js';
 import type { SupportRequestType } from '../../../src/app/models/requests/support-request.ts';
 import { defaultBotProfileIdForPlayerId } from '../../../src/app/models/player.js';
 import { isBotPaused } from '../bots/bot-admin.js';
@@ -74,6 +76,7 @@ export class BotBrainV2 {
       : new NoopBotExecutor();
     const executionOutcomes = executor.executeAcceptedTasks(supervisorDecision.accepted);
     recordExecutedSpending(memory, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);
+    applyRecycleHostilitySideEffects(galaxy, player, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);
     const trace: BotDecisionTraceV2 = {
       playerId: player.playerId,
       playerName: player.playerName,
@@ -261,4 +264,82 @@ function isSupportRequestType(value: string | undefined): value is SupportReques
     || value === 'ATTACK_TARGET'
     || value === 'BOMBARD_TARGET'
     || value === 'SIEGE_TARGET';
+}
+
+function applyRecycleHostilitySideEffects(
+  galaxy: Galaxy,
+  attacker: Player,
+  accepted: BotProposal[],
+  outcomes: BotExecutionOutcome[],
+  turn: number
+): void {
+  const acceptedById = new Map(accepted.map((proposal) => [proposal.proposalId, proposal]));
+  for (const outcome of outcomes) {
+    if (!outcome.success || outcome.missionType !== FleetMissionType.RECYCLE) {
+      continue;
+    }
+
+    const proposal = acceptedById.get(outcome.proposalId);
+    if (!proposal || proposal.kind !== 'FLEET_MISSION') {
+      continue;
+    }
+
+    const targetOwnerId = Number(proposal.debug.hostilityTargetPlayerId);
+    if (!Number.isInteger(targetOwnerId) || targetOwnerId === attacker.playerId || !outcome.targetCoordinates) {
+      continue;
+    }
+
+    const targetOwner = galaxy.players.find((player) => player.playerId === targetOwnerId);
+    if (!targetOwner || targetOwner.type !== 'BOT') {
+      continue;
+    }
+
+    const targetMemory = ensureBotMemoryV2(targetOwner);
+    const currentStatus = isDiplomaticStatus(proposal.debug.targetStatus)
+      ? proposal.debug.targetStatus
+      : DiplomaticStatus.NEUTRAL;
+    const existingLedger = targetMemory.strategicDiplomatic.factionLedger.find((entry) => entry.playerId === attacker.playerId);
+    if (existingLedger) {
+      existingLedger.hostilityScore = Math.min(120, Math.max(0, existingLedger.hostilityScore + 1));
+      existingLedger.lastKnownStatus = currentStatus;
+      existingLedger.lastSeenTurn = turn;
+    } else {
+      targetMemory.strategicDiplomatic.factionLedger.push({
+        playerId: attacker.playerId,
+        hostilityScore: 1,
+        lastSuccessfulBombardTurn: null,
+        lastSuccessfulSiegeTickTurn: null,
+        recentOutgoingCoercionPressure: 0,
+        recentIncomingCoercionPressure: 0,
+        lastWarEvaluationTurn: null,
+        shortWindowWarScore: 0,
+        longWindowWarScore: 0,
+        currentWarExitPressure: 0,
+        lastComputedStanceScore: 0,
+        lastComputedStrengthEstimate: 0,
+        lastKnownStatus: currentStatus,
+        lastSeenTurn: turn,
+        nonAggressionUntilTurn: null,
+        nonAggressionStartedTurn: null,
+        nonAggressionReason: null
+      });
+    }
+
+    targetMemory.strategicDiplomatic.sharedHostileEvents.push({
+      attackerPlayerId: attacker.playerId,
+      victimPlayerId: targetOwner.playerId,
+      targetCoordinates: { ...outcome.targetCoordinates },
+      eventType: 'RECYCLE',
+      eventTurn: turn,
+      sharedFromPlayerId: targetOwner.playerId,
+      sharedFromStatus: currentStatus,
+      severity: Math.max(1, Math.floor(Number(proposal.debug.hostilitySeverity) || 1)),
+      propagatedOnTurn: turn
+    });
+    targetMemory.strategicDiplomatic.sharedHostileEvents = targetMemory.strategicDiplomatic.sharedHostileEvents.slice(-400);
+  }
+}
+
+function isDiplomaticStatus(value: unknown): value is DiplomaticStatus {
+  return typeof value === 'string' && Object.values(DiplomaticStatus).includes(value as DiplomaticStatus);
 }

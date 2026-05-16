@@ -104,6 +104,7 @@ function buildEmpireSnapshot(
     activeFleetCount: activeFleets.length,
     maxActiveFleetCount: maxActiveFleets(computerTechnologyLevel),
     activeColonizeFleetCount: activeFleets.filter((fleet) => fleet.missionType === FleetMissionType.COLONIZE).length,
+    activeRecycleFleetCount: activeFleets.filter((fleet) => fleet.missionType === FleetMissionType.RECYCLE).length,
     totalResources,
     atWar,
     hasCriticalEnergyProblem: planets.some((planet) => planet.blockers.energyStarved),
@@ -338,6 +339,11 @@ function buildPlanetSnapshot(
       metal: Math.max(0, Math.floor(planet.rBDSFTQ.resources.metal)),
       crystal: Math.max(0, Math.floor(planet.rBDSFTQ.resources.crystal)),
       deuterium: Math.max(0, Math.floor(planet.rBDSFTQ.resources.deuterium))
+    },
+    spaceDebris: {
+      metal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.metal)),
+      crystal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.crystal)),
+      deuterium: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.deuterium))
     },
     blockers: {
       energyStarved: energyGap > 0,
@@ -891,7 +897,12 @@ function resolveStrategicMilitaryTargets(
           lastAttackTurn: latestBattleObservation?.turn ?? null,
           lastPlunderTurn: latestPlunderObservation?.turn ?? null,
           latestPlunderedResources: latestPlunderObservation?.stolenResources ?? null,
-          combatObservationTurn: latestBattleObservation?.turn ?? reportTurn
+          combatObservationTurn: latestBattleObservation?.turn ?? reportTurn,
+          spaceDebris: {
+            metal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.metal)),
+            crystal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.crystal)),
+            deuterium: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.deuterium))
+          }
         });
       }
     }
@@ -905,12 +916,17 @@ function resolveStrategicDiplomaticFactions(
   player: Player
 ): BotStrategicDiplomaticFactionSnapshot[] {
   const diplomacyResolver = new DiplomacyResolver(galaxy.diplomaticRelations);
+  type DiplomaticFactionDraft = BotStrategicDiplomaticFactionSnapshot & {
+    recentBattleReportCountShort: number;
+    recentBattleReportCountLong: number;
+  };
+
   const factionDrafts = galaxy.players
     .filter((foreignPlayer) =>
       foreignPlayer.playerId !== player.playerId
       && foreignPlayer.type !== PlayerType.NEUTRAL
     )
-    .map((foreignPlayer) => {
+    .map((foreignPlayer): DiplomaticFactionDraft | null => {
       const knownReports = foreignPlayer.planets
         .map((planet) => planet.lastReportData.get(player.playerId) ?? null)
         .filter((report): report is EspionageReportData => report !== null);
@@ -1064,7 +1080,7 @@ function resolveStrategicDiplomaticFactions(
       const recentBattleReportCountShort = countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 20);
       const recentBattleReportCountLong = countRecentBattleReportsForFaction(player, foreignPlayer, galaxy.currentTurn, 100);
       const knownPlanets = foreignPlayer.planets
-        .map((planet) => {
+        .map((planet): BotStrategicDiplomaticKnownPlanetSnapshot | null => {
           const report = planet.lastReportData.get(player.playerId) ?? null;
           if (!report) {
             return null;
@@ -1115,7 +1131,12 @@ function resolveStrategicDiplomaticFactions(
             ),
             lastCombatObservationTurn: latestBattleObservation?.turn ?? null,
             lastPlunderTurn: latestPlunderObservation?.turn ?? null,
-            latestPlunderedResources: latestPlunderObservation?.stolenResources ?? null
+            latestPlunderedResources: latestPlunderObservation?.stolenResources ?? null,
+            spaceDebris: {
+              metal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.metal)),
+              crystal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.crystal)),
+              deuterium: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.deuterium))
+            }
           } satisfies BotStrategicDiplomaticKnownPlanetSnapshot;
         })
         .filter((entry): entry is BotStrategicDiplomaticKnownPlanetSnapshot => entry !== null)
@@ -1167,10 +1188,7 @@ function resolveStrategicDiplomaticFactions(
         knownPlanets
       };
     })
-    .filter((entry): entry is BotStrategicDiplomaticFactionSnapshot & {
-      recentBattleReportCountShort: number;
-      recentBattleReportCountLong: number;
-    } => entry !== null);
+    .filter((entry): entry is DiplomaticFactionDraft => entry !== null);
 
   const ownShortDamagePercent = resolveOwnRecentStructuralDamagePercent(player, galaxy.currentTurn, 20);
   const ownLongDamagePercent = resolveOwnRecentStructuralDamagePercent(player, galaxy.currentTurn, 100);

@@ -1,7 +1,13 @@
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
+import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
+import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
 import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
-import { industryPowerMultiplier, researchPowerMultiplier } from '../../../../../src/app/models/tech/technology-effects.js';
+import {
+  fleetTravelTurnsForDistance,
+  industryPowerMultiplier,
+  researchPowerMultiplier
+} from '../../../../../src/app/models/tech/technology-effects.js';
 import {
   calculateRepairDroneProductionBasePower,
   routeRepairDroneProduction
@@ -20,6 +26,7 @@ import type {
 } from '../../bot-v2-types.ts';
 import {
   BUILDING_BLUEPRINTS,
+  calculateFuelCost,
   SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
@@ -75,6 +82,38 @@ type PlanetWarfareEvaluationResult = {
   planetResult: BotWarfarePlanetResult;
 };
 
+type RecycleTarget = {
+  scope: 'OWN' | 'SAFE_FOREIGN' | 'NEUTRAL_FOREIGN';
+  targetCoordinates: { x: number; y: number; z: number };
+  targetName: string;
+  targetOwnerId: number | null;
+  targetStatus: DiplomaticStatus | null;
+  debris: ResourceAmounts;
+  debrisValue: number;
+  thresholdValue: number;
+  intelAge: number | null;
+  knownShipsCount: number;
+  knownDefencesCount: number;
+};
+
+type RecycleCandidate = RecycleTarget & {
+  originPlanet: BotPlanetSnapshot;
+  desiredRecyclerCount: number;
+  escortShipType: ShipType | null;
+  escortShipCount: number;
+  travelDistance: number;
+  travelTurns: number;
+  fuelCost: number;
+  idleTurnsEstimate: number;
+  score: number;
+};
+
+type RecoveryPlan = {
+  proposals: BotProposal[];
+  goals: BotWarfareGoal[];
+  debug: Record<string, string | number | boolean | null>;
+};
+
 const CARGO_SHIP_TYPES = [
   ShipType.TRANSPORTER,
   ShipType.MASS_HAULER,
@@ -127,6 +166,7 @@ const BONUS_FACTOR_CEILING = 3;
 const NANITE_WEIGHTED_ETC_PENALTY = 1.2;
 const MAX_VISIBLE_GOALS = 5;
 const STRUCTURAL_VISIBILITY_THRESHOLD = 1.5;
+const FOREIGN_RECYCLE_INTEL_MAX_AGE = 20;
 
 export class BotWarfareSubsystem implements BotSubsystem {
   public readonly subsystemId = 'WARFARE' as const;
@@ -148,6 +188,10 @@ export class BotWarfareSubsystem implements BotSubsystem {
       planetResults.push(planetResult.planetResult);
     }
 
+    const recoveryPlan = buildRecoveryPlan(context);
+    proposals.push(...recoveryPlan.proposals);
+    goals.push(...recoveryPlan.goals);
+
     return {
       subsystemId: this.subsystemId,
       proposals,
@@ -158,7 +202,10 @@ export class BotWarfareSubsystem implements BotSubsystem {
         excludedShipTypeCount: EXCLUDED_WARFARE_SHIP_TYPES.length,
         goalCount: goals.length,
         planetCount: context.snapshot.planets.length,
-        planetResultCount: planetResults.length
+        planetResultCount: planetResults.length,
+        recycleProposalCount: recoveryPlan.proposals.length,
+        recoveryGoalCount: recoveryPlan.goals.length,
+        ...recoveryPlan.debug
       }
     };
   }
@@ -207,6 +254,619 @@ function buildPlanetWarfareResult(
       blockedGoalCount
     }
   };
+}
+
+function buildRecoveryPlan(context: BotSubsystemContext): RecoveryPlan {
+  const recycleFleetCap = resolveRecycleFleetCap(context);
+  const activeRecycleFleetCount = context.snapshot.empire.activeRecycleFleetCount ?? 0;
+  if (activeRecycleFleetCount >= recycleFleetCap) {
+    return {
+      proposals: [],
+      goals: [],
+      debug: {
+        recoveryNoActionReason: 'ACTIVE_RECYCLE_FLEET_PRESENT',
+        recycleFleetCap,
+        activeRecycleFleetCount
+      }
+    };
+  }
+
+  const targets = collectRecycleTargets(context);
+  if (targets.length <= 0) {
+    return {
+      proposals: [],
+      goals: [],
+      debug: {
+        recoveryNoActionReason: 'NO_RECYCLE_TARGETS',
+        recycleFleetCap,
+        activeRecycleFleetCount
+      }
+    };
+  }
+
+  const totalRecyclerCount = context.snapshot.planets.reduce((sum, planet) =>
+    sum + (planet.ships.undamagedCountByType[ShipType.RECYCLER] ?? 0), 0);
+  const candidates = targets
+    .map((target) => evaluateBestRecycleCandidateForTarget(context, target))
+    .filter((candidate): candidate is RecycleCandidate => candidate !== null)
+    .sort((left, right) =>
+      right.score - left.score
+      || left.travelTurns - right.travelTurns
+      || left.targetCoordinates.x - right.targetCoordinates.x
+      || left.targetCoordinates.y - right.targetCoordinates.y
+      || left.targetCoordinates.z - right.targetCoordinates.z
+    );
+  const bestCandidate = candidates[0] ?? null;
+  const bestTarget = targets
+    .sort((left, right) =>
+      right.debrisValue - left.debrisValue
+      || right.thresholdValue - left.thresholdValue
+      || left.targetCoordinates.x - right.targetCoordinates.x
+      || left.targetCoordinates.y - right.targetCoordinates.y
+      || left.targetCoordinates.z - right.targetCoordinates.z
+    )[0] ?? null;
+
+  if (bestCandidate) {
+    return {
+      proposals: [createRecycleFleetProposal(context, bestCandidate)],
+      goals: [createRecycleRecoveryGoal(context, bestCandidate)],
+      debug: {
+        recoveryNoActionReason: null,
+        recycleFleetCap,
+        activeRecycleFleetCount,
+        recycleTargetCount: targets.length,
+        recycleCandidateCount: candidates.length,
+        recycleBestTargetScope: bestCandidate.scope,
+        recycleBestTargetDebrisValue: Math.round(bestCandidate.debrisValue),
+        recycleBestTargetTravelTurns: bestCandidate.travelTurns
+      }
+    };
+  }
+
+  if (bestTarget && totalRecyclerCount <= 0) {
+    return {
+      proposals: [createRecycleShipNeedProposal(context, bestTarget)],
+      goals: [createRecyclerNeedGoal(context, bestTarget, 1)],
+      debug: {
+        recoveryNoActionReason: 'NO_RECYCLERS_AVAILABLE',
+        recycleFleetCap,
+        activeRecycleFleetCount,
+        recycleTargetCount: targets.length,
+        recycleCandidateCount: 0
+      }
+    };
+  }
+
+  if (bestTarget && totalRecyclerCount > 0) {
+    const shipyardPlanet = resolveBestRecyclerProductionPlanet(context.snapshot.planets);
+    if (shipyardPlanet) {
+      const desiredRecyclerCount = resolveDesiredRecyclerCount(bestTarget);
+      const availableOnBestPlanet = shipyardPlanet.ships.undamagedCountByType[ShipType.RECYCLER] ?? 0;
+      const shortage = Math.max(0, desiredRecyclerCount - availableOnBestPlanet);
+      if (shortage > 0) {
+        return {
+          proposals: [createRecycleShipyardProposal(context, shipyardPlanet, bestTarget, shortage)],
+          goals: [createRecyclerNeedGoal(context, bestTarget, shortage)],
+          debug: {
+            recoveryNoActionReason: 'RECYCLER_SHORTAGE',
+            recycleFleetCap,
+            activeRecycleFleetCount,
+            recycleTargetCount: targets.length,
+            recycleCandidateCount: 0,
+            recycleShortageAmount: shortage
+          }
+        };
+      }
+    }
+  }
+
+  return {
+    proposals: [],
+    goals: [],
+    debug: {
+      recoveryNoActionReason: 'NO_ACTIONABLE_RECYCLE_OR_FALLBACK',
+      recycleFleetCap,
+      activeRecycleFleetCount,
+      recycleTargetCount: targets.length,
+      recycleCandidateCount: 0
+    }
+  };
+}
+
+function collectRecycleTargets(context: BotSubsystemContext): RecycleTarget[] {
+  const ownTargets = context.snapshot.planets
+    .map((planet): RecycleTarget | null => {
+      const debris = normalizeResources(planet.spaceDebris ?? { metal: 0, crystal: 0, deuterium: 0 });
+      const debrisValue = calculateWeightedValue(debris);
+      const thresholdValue = calculateWeightedValue(normalizeResources(planet.economy.income));
+      if (debrisValue < thresholdValue || getTotalResourceAmount(debris) <= 0) {
+        return null;
+      }
+
+      return {
+        scope: 'OWN' as const,
+        targetCoordinates: { ...planet.coordinates },
+        targetName: planet.name,
+        targetOwnerId: context.snapshot.playerId,
+        targetStatus: null,
+        debris,
+        debrisValue,
+        thresholdValue,
+        intelAge: 0,
+        knownShipsCount: 0,
+        knownDefencesCount: 0
+      };
+    })
+    .filter((entry): entry is RecycleTarget => entry !== null);
+  const averageDevelopedIncomeValue = resolveAverageDevelopedIncomeValue(context.snapshot.planets);
+  const safeForeignTargets = context.snapshot.empire.strategicMilitaryTargets
+    .map((target): RecycleTarget | null => {
+      const debris = normalizeResources(target.spaceDebris ?? { metal: 0, crystal: 0, deuterium: 0 });
+      const debrisValue = calculateWeightedValue(debris);
+      const thresholdValue = averageDevelopedIncomeValue * 4;
+      if (
+        !target.isNeutral
+        || target.reportAge === null
+        || target.reportAge > FOREIGN_RECYCLE_INTEL_MAX_AGE
+        || (target.currentDefencesCount ?? 0) > 0
+        || (target.currentShipsCount ?? 0) > 0
+        || debrisValue < thresholdValue
+        || getTotalResourceAmount(debris) <= 0
+      ) {
+        return null;
+      }
+
+      return {
+        scope: 'SAFE_FOREIGN' as const,
+        targetCoordinates: { ...target.coordinates },
+        targetName: formatCoordinatesLabel(target.coordinates),
+        targetOwnerId: null,
+        targetStatus: null,
+        debris,
+        debrisValue,
+        thresholdValue,
+        intelAge: target.reportAge,
+        knownShipsCount: target.currentShipsCount ?? 0,
+        knownDefencesCount: target.currentDefencesCount ?? 0
+      };
+    })
+    .filter((entry): entry is RecycleTarget => entry !== null);
+  const neutralForeignTargets = context.snapshot.empire.strategicDiplomaticFactions
+    .filter((faction) => faction.currentStatus === DiplomaticStatus.NEUTRAL)
+    .flatMap((faction) => faction.knownPlanets
+      .map((planet): RecycleTarget | null => {
+        const debris = normalizeResources(planet.spaceDebris ?? { metal: 0, crystal: 0, deuterium: 0 });
+        const debrisValue = calculateWeightedValue(debris);
+        const thresholdValue = averageDevelopedIncomeValue * 8;
+        if (
+          planet.lastRelevantReportAge > FOREIGN_RECYCLE_INTEL_MAX_AGE
+          || debrisValue < thresholdValue
+          || getTotalResourceAmount(debris) <= 0
+        ) {
+          return null;
+        }
+
+        return {
+          scope: 'NEUTRAL_FOREIGN' as const,
+          targetCoordinates: { ...planet.coordinates },
+          targetName: formatCoordinatesLabel(planet.coordinates),
+          targetOwnerId: faction.playerId,
+          targetStatus: faction.currentStatus,
+          debris,
+          debrisValue,
+          thresholdValue,
+          intelAge: planet.lastRelevantReportAge,
+          knownShipsCount: planet.totalShipsAmount,
+          knownDefencesCount: planet.totalDefencesAmount
+        };
+      })
+      .filter((entry): entry is RecycleTarget => entry !== null));
+
+  return [...ownTargets, ...safeForeignTargets, ...neutralForeignTargets];
+}
+
+function evaluateBestRecycleCandidateForTarget(
+  context: BotSubsystemContext,
+  target: RecycleTarget
+): RecycleCandidate | null {
+  const desiredRecyclerCount = resolveDesiredRecyclerCount(target);
+  const candidates = context.snapshot.planets
+    .map((originPlanet) => buildRecycleCandidate(context, target, originPlanet, desiredRecyclerCount))
+    .filter((candidate): candidate is RecycleCandidate => candidate !== null)
+    .sort((left, right) =>
+      right.score - left.score
+      || left.travelTurns - right.travelTurns
+      || left.originPlanet.coordinates.x - right.originPlanet.coordinates.x
+      || left.originPlanet.coordinates.y - right.originPlanet.coordinates.y
+      || left.originPlanet.coordinates.z - right.originPlanet.coordinates.z
+    );
+
+  return candidates[0] ?? null;
+}
+
+function buildRecycleCandidate(
+  context: BotSubsystemContext,
+  target: RecycleTarget,
+  originPlanet: BotPlanetSnapshot,
+  desiredRecyclerCount: number
+): RecycleCandidate | null {
+  const availableRecyclers = originPlanet.ships.undamagedCountByType[ShipType.RECYCLER] ?? 0;
+  if (availableRecyclers < desiredRecyclerCount) {
+    return null;
+  }
+
+  const escortShipCount = target.scope === 'NEUTRAL_FOREIGN'
+    ? Math.max(1, Math.ceil(desiredRecyclerCount / 10))
+    : 0;
+  const escortShipType = escortShipCount > 0
+    ? resolveCheapestAvailableCombatShipType(originPlanet, escortShipCount)
+    : null;
+  if (escortShipCount > 0 && !escortShipType) {
+    return null;
+  }
+
+  const travelDistance = calculateTravelDistance(originPlanet.coordinates, target.targetCoordinates);
+  const travelTurns = resolveTravelTurns(originPlanet, travelDistance);
+  const fuelCost = calculateFuelCost([
+    { type: ShipType.RECYCLER, amount: desiredRecyclerCount },
+    ...(escortShipType ? [{ type: escortShipType, amount: escortShipCount }] : [])
+  ], travelDistance);
+  if (originPlanet.localResources.deuterium < fuelCost) {
+    return null;
+  }
+
+  const recyclerStrength = resolveRecyclerStrength();
+  const recyclerCargoCapacity = resolveRecyclerCargoCapacity();
+  const idleTurnsEstimate = Math.max(1, Math.ceil(
+    getTotalResourceAmount(target.debris)
+    / Math.max(1, desiredRecyclerCount * Math.min(recyclerStrength, recyclerCargoCapacity))
+  ));
+  const escortCostValue = escortShipType
+    ? calculateWeightedValue(normalizeResources(SHIP_BLUEPRINTS.get(escortShipType)?.cost ?? {
+      metal: 0,
+      crystal: 0,
+      deuterium: 0
+    })) * escortShipCount
+    : 0;
+  const fuelValue = fuelCost * 2.6;
+  const score = target.debrisValue
+    + ((target.debrisValue / Math.max(1, target.thresholdValue)) * 400)
+    - (travelTurns * 120)
+    - (idleTurnsEstimate * 40)
+    - (fuelValue * 0.5)
+    - (escortCostValue * 0.25);
+
+  return {
+    ...target,
+    originPlanet,
+    desiredRecyclerCount,
+    escortShipType,
+    escortShipCount,
+    travelDistance,
+    travelTurns,
+    fuelCost,
+    idleTurnsEstimate,
+    score
+  };
+}
+
+function createRecycleFleetProposal(context: BotSubsystemContext, candidate: RecycleCandidate): BotProposal {
+  const ships = [{
+    type: ShipType.RECYCLER,
+    undamagedAmount: candidate.desiredRecyclerCount,
+    damagedAmount: 0
+  }, ...(candidate.escortShipType
+    ? [{
+      type: candidate.escortShipType,
+      undamagedAmount: candidate.escortShipCount,
+      damagedAmount: 0
+    }]
+    : [])];
+  const urgency = candidate.scope === 'OWN'
+    ? 56
+    : candidate.scope === 'SAFE_FOREIGN'
+      ? 48
+      : 42;
+  const risk = candidate.scope === 'OWN'
+    ? 4
+    : candidate.scope === 'SAFE_FOREIGN'
+      ? 12
+      : 24;
+  const confidence = candidate.scope === 'OWN'
+    ? 92
+    : candidate.scope === 'SAFE_FOREIGN'
+      ? 80
+      : 68;
+
+  return {
+    proposalId: `warfare:recycle:${candidate.originPlanet.coordinates.x}:${candidate.originPlanet.coordinates.y}:${candidate.originPlanet.coordinates.z}:${candidate.targetCoordinates.x}:${candidate.targetCoordinates.y}:${candidate.targetCoordinates.z}:${context.snapshot.turn}`,
+    subsystemId: 'WARFARE',
+    kind: 'FLEET_MISSION',
+    status: 'PROPOSED',
+    goalKey: `warfare:recovery:recycle:${candidate.targetCoordinates.x}:${candidate.targetCoordinates.y}:${candidate.targetCoordinates.z}`,
+    dedupeKey: `warfare:recycle:${candidate.originPlanet.coordinates.x}:${candidate.originPlanet.coordinates.y}:${candidate.originPlanet.coordinates.z}:${candidate.targetCoordinates.x}:${candidate.targetCoordinates.y}:${candidate.targetCoordinates.z}`,
+    summary: candidate.scope === 'OWN'
+      ? `Primary request: recycle own debris over ${candidate.targetName} from ${candidate.originPlanet.name}.`
+      : candidate.scope === 'SAFE_FOREIGN'
+        ? `Primary request: recycle safe debris over ${candidate.targetName} from ${candidate.originPlanet.name}.`
+        : `Primary request: recycle neutral debris over ${candidate.targetName} with escort from ${candidate.originPlanet.name}.`,
+    planetId: candidate.originPlanet.planetId,
+    targetCoordinates: { ...candidate.targetCoordinates },
+    expectedValue: Math.max(1, Math.round(candidate.score / 10)),
+    urgency,
+    risk,
+    confidence,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      missionType: FleetMissionType.RECYCLE,
+      origin: { ...candidate.originPlanet.coordinates },
+      target: { ...candidate.targetCoordinates },
+      ships,
+      carriedBombs: [],
+      cargo: { metal: 0, crystal: 0, deuterium: 0 },
+      useJumpGate: false,
+      bombardmentPriorities: null,
+      targetStatus: candidate.targetStatus
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 1,
+    debug: {
+      goalFamily: 'RECOVERY',
+      branch: 'RECOVERY',
+      recycleScope: candidate.scope,
+      targetOwnerId: candidate.targetOwnerId,
+      targetStatus: candidate.targetStatus,
+      debrisValue: Math.round(candidate.debrisValue),
+      debrisThresholdValue: Math.round(candidate.thresholdValue),
+      desiredRecyclerCount: candidate.desiredRecyclerCount,
+      escortShipType: candidate.escortShipType,
+      escortShipCount: candidate.escortShipCount,
+      travelDistance: candidate.travelDistance,
+      travelTurns: candidate.travelTurns,
+      idleTurnsEstimate: candidate.idleTurnsEstimate,
+      hostilityTargetPlayerId: candidate.scope === 'NEUTRAL_FOREIGN' ? candidate.targetOwnerId : null,
+      hostilitySeverity: candidate.scope === 'NEUTRAL_FOREIGN' ? 1 : null
+    }
+  };
+}
+
+function createRecycleShipNeedProposal(context: BotSubsystemContext, target: RecycleTarget): BotProposal {
+  return {
+    proposalId: `warfare:recovery:ship-need:recycler:${target.targetCoordinates.x}:${target.targetCoordinates.y}:${target.targetCoordinates.z}:${context.snapshot.turn}`,
+    subsystemId: 'WARFARE',
+    kind: 'SHIPYARD',
+    status: 'PROPOSED',
+    goalKey: `warfare:recovery:need:recycler:${target.targetCoordinates.x}:${target.targetCoordinates.y}:${target.targetCoordinates.z}`,
+    dedupeKey: 'warfare:ship-need:recycler',
+    summary: `Primary request: emergency recycler demand for recovery over ${target.targetName}.`,
+    planetId: null,
+    targetCoordinates: { ...target.targetCoordinates },
+    expectedValue: Math.max(1, Math.round(target.debrisValue / 20)),
+    urgency: 50,
+    risk: 8,
+    confidence: 84,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      x: 0,
+      y: 0,
+      z: 0,
+      itemKind: 'ship',
+      shipType: ShipType.RECYCLER,
+      amount: 1,
+      demandOnly: true
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 1,
+    debug: {
+      goalFamily: 'RECOVERY',
+      branch: 'RECOVERY',
+      queueType: 'SHIP_NEED',
+      recycleScope: target.scope,
+      debrisValue: Math.round(target.debrisValue),
+      debrisThresholdValue: Math.round(target.thresholdValue)
+    }
+  };
+}
+
+function createRecycleShipyardProposal(
+  context: BotSubsystemContext,
+  shipyardPlanet: BotPlanetSnapshot,
+  target: RecycleTarget,
+  amount: number
+): BotProposal {
+  const blueprintCost = normalizeResources(SHIP_BLUEPRINTS.get(ShipType.RECYCLER)?.cost ?? {
+    metal: 0,
+    crystal: 0,
+    deuterium: 0
+  });
+  const totalCost = multiplyResources(blueprintCost, amount);
+
+  return {
+    proposalId: `warfare:recovery:shipyard:recycler:${shipyardPlanet.coordinates.x}:${shipyardPlanet.coordinates.y}:${shipyardPlanet.coordinates.z}:${amount}:${context.snapshot.turn}`,
+    subsystemId: 'WARFARE',
+    kind: 'SHIPYARD',
+    status: 'PROPOSED',
+    goalKey: `warfare:recovery:produce:recycler:${shipyardPlanet.coordinates.x}:${shipyardPlanet.coordinates.y}:${shipyardPlanet.coordinates.z}`,
+    dedupeKey: `warfare:shipyard:${shipyardPlanet.coordinates.x}:${shipyardPlanet.coordinates.y}:${shipyardPlanet.coordinates.z}:${ShipType.RECYCLER}`,
+    summary: `Primary request: produce ${amount} ${ShipType.RECYCLER} for recovery over ${target.targetName} on ${shipyardPlanet.name}.`,
+    planetId: shipyardPlanet.planetId,
+    targetCoordinates: { ...shipyardPlanet.coordinates },
+    expectedValue: Math.max(1, Math.round(target.debrisValue / 25)),
+    urgency: 44,
+    risk: 10,
+    confidence: 78,
+    requestedResources: { ...totalCost },
+    requestPayload: {
+      x: shipyardPlanet.coordinates.x,
+      y: shipyardPlanet.coordinates.y,
+      z: shipyardPlanet.coordinates.z,
+      itemKind: 'ship',
+      shipType: ShipType.RECYCLER,
+      amount
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 1,
+    debug: {
+      goalFamily: 'RECOVERY',
+      branch: 'RECOVERY',
+      recycleScope: target.scope,
+      recycleShortageAmount: amount,
+      debrisValue: Math.round(target.debrisValue),
+      debrisThresholdValue: Math.round(target.thresholdValue)
+    }
+  };
+}
+
+function createRecycleRecoveryGoal(context: BotSubsystemContext, candidate: RecycleCandidate): BotWarfareGoal {
+  return {
+    goalKey: `warfare:recovery:recycle:${candidate.targetCoordinates.x}:${candidate.targetCoordinates.y}:${candidate.targetCoordinates.z}`,
+    subsystemId: 'WARFARE',
+    goalFamily: 'RECOVERY',
+    branch: 'RECOVERY',
+    planetId: candidate.originPlanet.planetId,
+    targetCoordinates: { ...candidate.targetCoordinates },
+    finalTargetKind: 'MISSION',
+    finalBuildingType: null,
+    finalTechnologyType: null,
+    finalDefenceType: null,
+    finalShipType: ShipType.RECYCLER,
+    finalLevel: null,
+    finalAmount: candidate.desiredRecyclerCount,
+    weightedEtc: candidate.travelTurns + candidate.idleTurnsEstimate,
+    totalEtc: candidate.travelTurns + candidate.idleTurnsEstimate,
+    buildingSideEtc: 0,
+    researchSideEtc: 0,
+    bonusFactor: 1,
+    blockers: [],
+    debug: {
+      recoveryScope: candidate.scope,
+      debrisValue: Math.round(candidate.debrisValue),
+      targetOwnerId: candidate.targetOwnerId
+    }
+  };
+}
+
+function createRecyclerNeedGoal(
+  context: BotSubsystemContext,
+  target: RecycleTarget,
+  amount: number
+): BotWarfareGoal {
+  return {
+    goalKey: `warfare:recovery:recycler-need:${target.targetCoordinates.x}:${target.targetCoordinates.y}:${target.targetCoordinates.z}`,
+    subsystemId: 'WARFARE',
+    goalFamily: 'RECOVERY',
+    branch: 'RECOVERY',
+    planetId: null,
+    targetCoordinates: { ...target.targetCoordinates },
+    finalTargetKind: 'SHIP',
+    finalBuildingType: null,
+    finalTechnologyType: null,
+    finalDefenceType: null,
+    finalShipType: ShipType.RECYCLER,
+    finalLevel: null,
+    finalAmount: amount,
+    weightedEtc: Number.MAX_SAFE_INTEGER,
+    totalEtc: Number.MAX_SAFE_INTEGER,
+    buildingSideEtc: 0,
+    researchSideEtc: 0,
+    bonusFactor: 1,
+    blockers: [],
+    debug: {
+      recoveryScope: target.scope,
+      debrisValue: Math.round(target.debrisValue),
+      targetOwnerId: target.targetOwnerId
+    }
+  };
+}
+
+function resolveRecycleFleetCap(context: BotSubsystemContext): number {
+  return Math.max(1, Math.floor(Math.max(1, context.snapshot.empire.maxActiveFleetCount) / 10));
+}
+
+function resolveAverageDevelopedIncomeValue(planets: BotPlanetSnapshot[]): number {
+  const developedPlanets = planets.filter((planet) =>
+    planet.maturityStage === 'DEVELOPED'
+    || planet.maturityStage === 'MILITARY_CAPABLE'
+    || planet.maturityStage === 'STRATEGIC_HUB'
+  );
+  const source = developedPlanets.length > 0 ? developedPlanets : planets;
+  if (source.length <= 0) {
+    return 1;
+  }
+
+  const total = source.reduce((sum, planet) =>
+    sum + calculateWeightedValue(normalizeResources(planet.economy.income)), 0);
+  return Math.max(1, total / source.length);
+}
+
+function resolveDesiredRecyclerCount(target: RecycleTarget): number {
+  return Math.max(1, Math.ceil(getTotalResourceAmount(target.debris) / Math.max(1, resolveRecyclerCargoCapacity())));
+}
+
+function resolveBestRecyclerProductionPlanet(planets: BotPlanetSnapshot[]): BotPlanetSnapshot | null {
+  return [...planets]
+    .sort((left, right) =>
+      right.power.shipyardPower - left.power.shipyardPower
+      || right.economy.shipyardLevel - left.economy.shipyardLevel
+      || right.localResources.metal - left.localResources.metal
+    )[0] ?? null;
+}
+
+function resolveCheapestAvailableCombatShipType(originPlanet: BotPlanetSnapshot, requiredAmount: number): ShipType | null {
+  return [...COMBAT_SHIP_TYPES]
+    .filter((shipType) =>
+      (originPlanet.ships.undamagedCountByType[shipType] ?? 0) >= requiredAmount
+      && (SHIP_BLUEPRINTS.get(shipType)?.canJump ?? false)
+    )
+    .sort((left, right) =>
+      calculateWeightedValue(normalizeResources(SHIP_BLUEPRINTS.get(left)?.cost ?? {
+        metal: 0,
+        crystal: 0,
+        deuterium: 0
+      }))
+      - calculateWeightedValue(normalizeResources(SHIP_BLUEPRINTS.get(right)?.cost ?? {
+        metal: 0,
+        crystal: 0,
+        deuterium: 0
+      }))
+    )[0] ?? null;
+}
+
+function calculateWeightedValue(resources: ResourceAmounts): number {
+  return resources.metal + (resources.crystal * 1.8) + (resources.deuterium * 2.6);
+}
+
+function formatCoordinatesLabel(coordinates: { x: number; y: number; z: number }): string {
+  return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+}
+
+function calculateTravelDistance(
+  origin: { x: number; y: number; z: number },
+  target: { x: number; y: number; z: number }
+): number {
+  return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
+}
+
+function resolveRecyclerCargoCapacity(): number {
+  return Math.max(1, SHIP_BLUEPRINTS.get(ShipType.RECYCLER)?.cargoCapacity ?? 0);
+}
+
+function resolveRecyclerStrength(): number {
+  const recycler = SHIP_BLUEPRINTS.get(ShipType.RECYCLER);
+  if (!recycler) {
+    return 1;
+  }
+
+  return Math.max(1, recycler.weapons.reduce((sum, weapon) => sum + Math.max(0, weapon.dmg * weapon.shots), 0));
+}
+
+function resolveTravelTurns(originPlanet: BotPlanetSnapshot, distance: number): number {
+  return fleetTravelTurnsForDistance(
+    distance,
+    originPlanet.tech.fusionDriveLevel,
+    originPlanet.tech.hyperspaceDriveLevel,
+    0
+  );
 }
 
 function evaluateCapacityGoal(

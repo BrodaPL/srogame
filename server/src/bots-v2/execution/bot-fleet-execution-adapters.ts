@@ -16,6 +16,7 @@ export const SUPERVISOR_ALLOWED_FLEET_MISSIONS = new Set<FleetMissionType>([
   FleetMissionType.TRANSPORT,
   FleetMissionType.ARMAMENT_DELIVERY,
   FleetMissionType.REPAIR,
+  FleetMissionType.RECYCLE,
   FleetMissionType.COLONIZE,
   FleetMissionType.MOVE,
   FleetMissionType.DEFEND,

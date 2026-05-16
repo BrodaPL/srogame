@@ -320,7 +320,8 @@ export type BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry = {
 export type BotMemoryV2StrategicDiplomaticSharedHostileEventType =
   | 'BATTLE'
   | 'BOMBARD'
-  | 'SIEGE';
+  | 'SIEGE'
+  | 'RECYCLE';
 
 export type BotMemoryV2StrategicDiplomaticSharedHostileEventEntry = {
   attackerPlayerId: number;

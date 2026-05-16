@@ -57,15 +57,18 @@ describe('bot fleet execution adapters', () => {
     });
   });
 
-  it('keeps recycle deferred until a subsystem emits it deliberately', () => {
+  it('normalizes recycle missions once a subsystem emits them deliberately', () => {
     const result = normalizeFleetExecutionProposal(createFleetProposal({
       missionType: FleetMissionType.RECYCLE,
       ships: [{ type: ShipType.RECYCLER, undamagedAmount: 1, damagedAmount: 0 }]
     }));
 
-    expect(result).toEqual({
-      ok: false,
-      reason: 'fleet_mission_not_allowed_in_current_supervisor_phase'
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        missionType: FleetMissionType.RECYCLE,
+        ships: [{ type: ShipType.RECYCLER, undamagedAmount: 1, damagedAmount: 0 }]
+      }
     });
   });
 

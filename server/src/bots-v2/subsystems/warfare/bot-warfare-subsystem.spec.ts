@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingQueueEntry } from '../../../../../src/app/models/buildings/building-queue-entry.js';
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
+import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
+import { createDiplomaticRelation } from '../../../../../src/app/models/diplomacy/diplomatic-relation.js';
+import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
 import { PlayerType } from '../../../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
+import { EspionageReportGenerator } from '../../../../../src/app/generators/espionage-report-generator.js';
 import { ManyShips } from '../../../../../src/app/models/fleets/many-ships.js';
 import { ShipyardQueueEntry } from '../../../../../src/app/models/fleets/shipyard-queue-entry.js';
 import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
@@ -13,6 +17,7 @@ import { Galaxy } from '../../../../../src/app/models/planets/galaxy.js';
 import { Planet } from '../../../../../src/app/models/planets/planet.js';
 import { SolarSystem } from '../../../../../src/app/models/planets/solar-system.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
+import { BotProposal } from '../../bot-v2-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
 import { BotWarfareSubsystem } from './bot-warfare-subsystem.js';
@@ -138,6 +143,64 @@ describe('BotWarfareSubsystem', () => {
     expect(result.planetResults?.[0]?.emittedRequestCount).toBe(0);
     expect(result.planetResults?.[0]?.noActionReason).not.toBeNull();
   });
+
+  it('emits a recycle mission for valuable debris on an owned planet', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.rBDSFTQ.ships.addUndamaged(ShipType.RECYCLER, 2);
+    planet.rBDSFTQ.spaceDebris = new ResourcesPack(900, 400, 200);
+
+    const result = runWarfareSubsystem(galaxy, bot);
+    const recycleProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.RECYCLE
+    );
+    const recyclePayload = recycleProposal ? getFleetMissionPayload(recycleProposal) : null;
+
+    expect(recycleProposal).toBeDefined();
+    expect(recycleProposal?.debug.branch).toBe('RECOVERY');
+    expect(recyclePayload?.origin).toEqual({ x: 0, y: 0, z: 1 });
+    expect(recyclePayload?.target).toEqual({ x: 0, y: 0, z: 1 });
+  });
+
+  it('emits escorted recycle missions for neutral foreign debris with fresh intel', () => {
+    const { galaxy, bot, homePlanet, foreignPlayer, foreignPlanet } = createRecoveryWorld();
+    configureBaseWarfarePlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.RECYCLER, 10);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    foreignPlanet.rBDSFTQ.spaceDebris = new ResourcesPack(6000, 4000, 2000);
+    markPlanetScanned(bot, foreignPlayer, foreignPlanet, galaxy.currentTurn);
+
+    const result = runWarfareSubsystem(galaxy, bot);
+    const recycleProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.RECYCLE
+      && proposal.targetCoordinates?.z === foreignPlanet.basicInfo.order
+    );
+    const recyclePayload = recycleProposal ? getFleetMissionPayload(recycleProposal) : null;
+
+    expect(recycleProposal).toBeDefined();
+    expect(recycleProposal?.debug.recycleScope).toBe('NEUTRAL_FOREIGN');
+    expect(recyclePayload?.ships.some((entry) => entry.type === ShipType.RECYCLER)).toBe(true);
+    expect(recyclePayload?.ships.some((entry) => entry.type === ShipType.CRUISER)).toBe(true);
+  });
+
+  it('emits recycler ship-need pressure when debris is valuable and no recyclers exist', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.rBDSFTQ.spaceDebris = new ResourcesPack(900, 400, 200);
+
+    const result = runWarfareSubsystem(galaxy, bot);
+    const shipNeedProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.demandOnly === true
+      && proposal.requestPayload.shipType === ShipType.RECYCLER
+    );
+
+    expect(shipNeedProposal).toBeDefined();
+    expect(shipNeedProposal?.debug.queueType).toBe('SHIP_NEED');
+    expect(shipNeedProposal?.debug.goalFamily).toBe('RECOVERY');
+  });
 });
 
 function runWarfareSubsystem(galaxy: Galaxy, bot: Player) {
@@ -159,6 +222,18 @@ function runWarfareSubsystem(galaxy: Galaxy, bot: Player) {
     snapshot,
     memory: createDefaultBotMemoryV2()
   });
+}
+
+function getFleetMissionPayload(proposal: BotProposal): {
+  origin: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+  ships: Array<{ type: ShipType; amount: number }>;
+} {
+  return proposal.requestPayload as {
+    origin: { x: number; y: number; z: number };
+    target: { x: number; y: number; z: number };
+    ships: Array<{ type: ShipType; amount: number }>;
+  };
 }
 
 function createBotWorld() {
@@ -189,6 +264,50 @@ function createBotWorld() {
   );
 
   return { galaxy, bot, planet };
+}
+
+function createRecoveryWorld() {
+  const system = new SolarSystem('RecoverySys', 2, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const homePlanet = Planet.createStartingPlanet('RecoverySys I', 1, system, 1);
+  const foreignPlanet = Planet.createStartingPlanet('RecoverySys II', 2, system, 1);
+  system.planets[0] = homePlanet;
+  system.planets[1] = foreignPlanet;
+
+  const bot = new Player(
+    1,
+    'Bot-1',
+    [homePlanet],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+  const foreignPlayer = new Player(
+    2,
+    'Foreign-2',
+    [foreignPlanet],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+  foreignPlanet.info.ownerId = foreignPlayer.playerId;
+
+  const galaxy = new Galaxy(
+    'Recovery Test',
+    [bot, foreignPlayer],
+    [[system]],
+    12,
+    [],
+    1,
+    new Map(),
+    new Map([[bot.playerId, bot], [foreignPlayer.playerId, foreignPlayer]]),
+    new Map(),
+    new Map([[bot.playerName, bot.playerId], [foreignPlayer.playerName, foreignPlayer.playerId]]),
+    [createDiplomaticRelation(bot.playerId, foreignPlayer.playerId, DiplomaticStatus.NEUTRAL)]
+  );
+
+  return { galaxy, bot, homePlanet, foreignPlayer, foreignPlanet };
 }
 
 function configureBaseWarfarePlanet(planet: Planet): void {
@@ -232,4 +351,17 @@ function addInstalledShips(
   }
 
   planet.rBDSFTQ.ships = ships;
+}
+
+function markPlanetScanned(
+  bot: Player,
+  owner: Player,
+  planet: Planet,
+  createdTurn: number
+): void {
+  const report = new EspionageReportGenerator().createEspionageReport(bot, owner, planet, 5, {
+    createdTurn,
+    forcedReportLevel: 12
+  });
+  planet.lastReportData.set(bot.playerId, report);
 }
