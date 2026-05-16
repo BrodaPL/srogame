@@ -20,11 +20,12 @@ import { normalizeQueueExecutionProposal } from '../execution/bot-execution-adap
 import { normalizeRequestDecisionProposal } from '../execution/bot-request-decision-adapters.js';
 import { normalizeRequestCreationProposal } from '../execution/bot-request-creation-adapters.js';
 import { normalizeDiplomacyDecisionProposal } from '../execution/bot-diplomacy-decision-adapters.js';
+import { normalizeDiplomacyProposal } from '../execution/bot-diplomacy-proposal-adapters.js';
 
 const QUEUE_ACTION_KINDS = new Set<BotProposal['kind']>(['BUILDING', 'RESEARCH', 'SHIPYARD']);
 const FLEET_ACTION_KINDS = new Set<BotProposal['kind']>(['FLEET_MISSION']);
 const REQUEST_ACTION_KINDS = new Set<BotProposal['kind']>(['REQUEST_DECISION']);
-const DIPLOMACY_ACTION_KINDS = new Set<BotProposal['kind']>(['DIPLOMACY_DECISION']);
+const DIPLOMACY_ACTION_KINDS = new Set<BotProposal['kind']>(['DIPLOMACY_DECISION', 'DIPLOMACY_PROPOSAL']);
 const COMMITMENT_LIFETIME_TURNS = 5;
 const DUPLICATE_REPLACEMENT_THRESHOLD = 1.25;
 const NEXT_TURN_FLEET_PENDING_LIFETIME_TURNS = 1;
@@ -317,6 +318,25 @@ export class BotSupervisorV2 implements BotSupervisor {
           shipNeedPressure: 0,
           criticalAccepted: false
         }) + expiringBoost,
+        adapterReason: null,
+        retryCommitment
+      };
+    }
+    if (proposal.kind === 'DIPLOMACY_PROPOSAL') {
+      const normalized = normalizeDiplomacyProposal(proposal);
+      if (!normalized.ok) {
+        console.warn(`[BotV2 Supervisor] Invalid diplomacy proposal ${proposal.proposalId}: ${normalized.reason}`);
+        return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
+      }
+      return {
+        proposal,
+        score: scoreSupervisorProposal({
+          proposal,
+          snapshot,
+          memory,
+          shipNeedPressure: 0,
+          criticalAccepted: false
+        }),
         adapterReason: null,
         retryCommitment
       };

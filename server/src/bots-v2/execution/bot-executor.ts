@@ -7,6 +7,7 @@ import type { CreateFleetMissionCommand } from '../../game-commands/fleet-comman
 import { startBuildingConstruction } from '../../game-commands/building-commands.js';
 import {
   approveDiplomaticProposalCommand,
+  createDiplomaticProposalCommand,
   cancelDiplomaticProposalCommand,
   rejectDiplomaticProposalCommand
 } from '../../game-commands/diplomacy-commands.js';
@@ -40,6 +41,7 @@ import { normalizeQueueExecutionProposal } from './bot-execution-adapters.js';
 import { normalizeRequestDecisionProposal } from './bot-request-decision-adapters.js';
 import { normalizeRequestCreationProposal } from './bot-request-creation-adapters.js';
 import { normalizeDiplomacyDecisionProposal } from './bot-diplomacy-decision-adapters.js';
+import { normalizeDiplomacyProposal } from './bot-diplomacy-proposal-adapters.js';
 
 const RECALLABLE_OFFENSIVE_MISSIONS = new Set<FleetMissionType>([
   FleetMissionType.ATTACK,
@@ -93,6 +95,10 @@ export class LiveQueueBotExecutor implements BotExecutor {
   private executeAcceptedTask(proposal: BotProposal): BotExecutionOutcome {
     if (proposal.kind === 'DIPLOMACY_DECISION') {
       return this.executeAcceptedDiplomacyDecision(proposal);
+    }
+
+    if (proposal.kind === 'DIPLOMACY_PROPOSAL') {
+      return this.executeAcceptedDiplomacyProposal(proposal);
     }
 
     if (proposal.kind === 'REQUEST_DECISION') {
@@ -202,6 +208,54 @@ export class LiveQueueBotExecutor implements BotExecutor {
       diplomacyDecision: decision.decision,
       targetPlayerId: decision.targetPlayerId,
       requestedStatus: decision.requestedStatus
+    };
+  }
+
+  private executeAcceptedDiplomacyProposal(proposal: BotProposal): BotExecutionOutcome {
+    const normalized = normalizeDiplomacyProposal(proposal);
+    if (!normalized.ok) {
+      return {
+        proposalId: proposal.proposalId,
+        executed: false,
+        success: false,
+        message: normalized.reason
+      };
+    }
+
+    const context = {
+      galaxy: this.galaxy,
+      playerId: this.playerId
+    };
+    const request = normalized.value;
+    const result = createDiplomaticProposalCommand(context, {
+      targetPlayerId: request.targetPlayerId,
+      requestedStatus: request.requestedStatus
+    });
+
+    if (!result.ok) {
+      const message = result.error.message;
+      console.warn(
+        `[BotV2 Supervisor] Diplomacy proposal failed for proposal ${proposal.proposalId}: ${result.error.code} ${message}`
+      );
+      return {
+        proposalId: proposal.proposalId,
+        executed: true,
+        success: false,
+        message,
+        targetPlayerId: request.targetPlayerId,
+        requestedStatus: request.requestedStatus,
+        commandErrorCode: result.error.code
+      };
+    }
+
+    return {
+      proposalId: proposal.proposalId,
+      executed: true,
+      success: true,
+      message: null,
+      diplomacyProposalId: result.value.proposal.proposalId,
+      targetPlayerId: request.targetPlayerId,
+      requestedStatus: request.requestedStatus
     };
   }
 

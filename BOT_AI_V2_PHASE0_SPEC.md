@@ -156,6 +156,8 @@ export type BotProposalKind =
   | 'MAINTENANCE_REQUEST'
   | 'REQUEST_DECISION'
   | 'REQUEST_CREATION'
+  | 'DIPLOMACY_DECISION'
+  | 'DIPLOMACY_PROPOSAL'
   | 'NO_OP';
 
 export type BotProposalStatus =
@@ -350,13 +352,14 @@ export interface BotSupervisor {
 Current behavior:
 - `DISABLED` rejects all proposals
 - `SHADOW` rejects with `shadow_mode_no_execution` and records trace/debug data
-- `LIVE` may accept executable queue proposals, allowlisted fleet proposals, incoming request decisions, outgoing support request creation proposals, and diplomacy decision proposals
+- `LIVE` may accept executable queue proposals, allowlisted fleet proposals, incoming request decisions, outgoing support request creation proposals, diplomacy decision proposals, and outgoing diplomacy proposal creation
 - executable queue proposal kinds are `BUILDING`, `RESEARCH`, and `SHIPYARD`
 - executable fleet mission types are `SPY`, `TRANSPORT`, `ARMAMENT_DELIVERY`, `REPAIR`, `COLONIZE`, `MOVE`, `DEFEND`, `ATTACK`, `BOMBARD`, and `SIEGE`
 - executable incoming request decisions use `REQUEST_DECISION`; Strategic Diplomatic evaluates the request and Supervisor only executes the accepted decision
 - supported incoming request families are `JUMP_GATE`, `MAINTENANCE`, and `SUPPORT`
 - executable outgoing support request creation uses `REQUEST_CREATION` with `requestType: 'SUPPORT'`; Strategic Diplomatic owns the intent and Supervisor only arbitrates/executes it
-- executable diplomacy decisions use `DIPLOMACY_DECISION`; Strategic Diplomatic owns pending `PEACE` / `ALLIED` proposal policy, including rejecting invalid treaty-ladder proposals and cancelling own outgoing proposals when utility turns negative
+- executable diplomacy decisions use `DIPLOMACY_DECISION`; Strategic Diplomatic owns pending `PEACE` / `ALLIED` / `NEUTRAL` / `WAR` proposal policy, including rejecting invalid treaty-ladder proposals and cancelling own outgoing proposals when utility turns negative
+- executable outgoing treaty creation uses `DIPLOMACY_PROPOSAL`; Strategic Diplomatic owns treaty policy and emits at most one best outgoing treaty proposal per turn, while Supervisor only arbitrates/executes it
 - `RECYCLE` stays deferred until a subsystem emits and owns explicit recycle proposals
 - `BOMBARD` and `SIEGE` get a simple Supervisor trace precheck when proposal metadata says the target is not `WAR`
 - outgoing maintenance request creation and standalone outgoing Jump Gate request creation are deferred and traced
@@ -1711,7 +1714,7 @@ Phase-1 should **not** yet emit:
 
 Allowed proposal families:
 
-- relation-change proposals
+- executable relation-change proposals via `DIPLOMACY_PROPOSAL`
 - proposal-management preferences
 - retaliation flags
 
@@ -1814,6 +1817,16 @@ Use accumulated hostility:
 - hostile actions add escalation pressure
 - repeated hostility adds more pressure
 - only sufficient accumulated hostility should make `WAR` a top diplomatic action
+
+Treaty-policy extension:
+
+- bots may also propose `WAR` against a clearly weaker faction even without repeated hostility
+- the "clearly weaker" threshold is personality-dependent: aggressive profiles need a smaller advantage, avoider/turtle-style profiles need a larger one
+- weaker bots should bias more strongly toward `ALLIED` proposals
+- if a war target has been heavily beaten, Strategic Diplomatic applies temporary non-aggression treatment for roughly `40-100` turns, modified by personality (`AGGRESSOR -20`, `BALANCED -10`, `AVOIDER +20`)
+- temporary non-aggression suppresses renewed `WAR` proposals and favors `WAR -> NEUTRAL` deescalation
+- incoming pending treaty proposals suppress outgoing treaty creation for the same pair; older outgoing pending proposals suppress only that pair
+- TODO: far-future coalition policy where weaker bots seek alliances specifically to contain a much stronger player
 
 ### Strategic Diplomatic upward summary contract
 

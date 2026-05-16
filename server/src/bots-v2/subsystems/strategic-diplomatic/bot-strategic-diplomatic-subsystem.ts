@@ -70,6 +70,9 @@ type EvaluatedFaction = {
   desiredIntelDepth: number;
   intelInsufficient: boolean;
   enemyEspionageSuperiority: boolean;
+  nonAggressionUntilTurn: number | null;
+  nonAggressionActive: boolean;
+  nonAggressionReason: string | null;
 };
 
 type SpyMissionRequest = {
@@ -270,7 +273,7 @@ type DiplomacyDecisionPlan = {
   faction: EvaluatedFaction;
   proposalId: number;
   decision: 'ACCEPT' | 'REJECT' | 'CANCEL';
-  requestedStatus: DiplomaticStatus.PEACE | DiplomaticStatus.ALLIED;
+  requestedStatus: DiplomaticStatus.PEACE | DiplomaticStatus.ALLIED | DiplomaticStatus.NEUTRAL | DiplomaticStatus.WAR;
   score: number;
   reason: string;
   expiresOnTurn: number;
@@ -305,6 +308,10 @@ const ACTIVE_WAR_NEUTRAL_ATTACK_SCORE_MULTIPLIER = 0.6;
 const ALLIED_SHARED_HOSTILITY_WEIGHT = 0.4;
 const PEACE_SHARED_HOSTILITY_WEIGHT = 0.1;
 const OUTGOING_SUPPORT_REQUEST_CAP = 1;
+const NON_AGGRESSION_MIN_TURNS = 40;
+const NON_AGGRESSION_MAX_TURNS = 100;
+const NON_AGGRESSION_DEFEATED_TARGET_RELATIVE_STRENGTH = 15;
+const NON_AGGRESSION_DEFEATED_TARGET_DAMAGE_PERCENT = 20;
 const HEAVY_REPAIR_DAMAGE_RATIO_THRESHOLD = 0.35;
 const LOCAL_REPAIR_RECOVERY_RATIO_THRESHOLD = 0.15;
 const LOCAL_REPAIR_EVALUATION_TURNS = 5;
@@ -656,14 +663,31 @@ function evaluateFaction(
     lastComputedStanceScore: 0,
     lastComputedStrengthEstimate: 0,
     lastKnownStatus: null,
-    lastSeenTurn: null
+    lastSeenTurn: null,
+    nonAggressionUntilTurn: null,
+    nonAggressionStartedTurn: null,
+    nonAggressionReason: null
   };
   const strengthEstimate = resolveFactionStrengthEstimate(faction);
   const relativeStrength = ownStrengthEstimate - strengthEstimate;
   const confidence = resolveFactionConfidence(faction);
   const warPressure = resolveWarPressureEvaluation(context, faction, previous, relativeStrength);
   const sharedHostility = resolveSharedHostilityPressure(faction, context.snapshot.turn);
-  const hostilityScore = resolveHostilityScore(faction, previous, warPressure, sharedHostility.shortPressure);
+  const nonAggression = resolveNonAggressionTreatment(
+    context,
+    faction,
+    previous,
+    relativeStrength,
+    strengthEstimate,
+    warPressure
+  );
+  const hostilityScore = resolveHostilityScore(
+    faction,
+    previous,
+    warPressure,
+    sharedHostility.shortPressure,
+    nonAggression.active
+  );
   const stanceScore = resolveStanceScore(
     context.snapshot.profileId,
     faction,
@@ -671,7 +695,8 @@ function evaluateFaction(
     hostilityScore,
     confidence,
     statusCounts,
-    warPressure
+    warPressure,
+    nonAggression.active
   );
   const relationUtilities = resolveRelationUtilities(
     context.snapshot.profileId,
@@ -681,7 +706,8 @@ function evaluateFaction(
     relativeStrength,
     confidence,
     statusCounts,
-    warPressure
+    warPressure,
+    nonAggression.active
   );
 
   ledger.set(faction.playerId, {
@@ -704,7 +730,10 @@ function evaluateFaction(
     lastComputedStanceScore: stanceScore,
     lastComputedStrengthEstimate: strengthEstimate,
     lastKnownStatus: faction.currentStatus,
-    lastSeenTurn: context.snapshot.turn
+    lastSeenTurn: context.snapshot.turn,
+    nonAggressionUntilTurn: nonAggression.untilTurn,
+    nonAggressionStartedTurn: nonAggression.startedTurn,
+    nonAggressionReason: nonAggression.reason
   });
 
   return {
@@ -734,7 +763,10 @@ function evaluateFaction(
     statusPriorityWeight: resolveStatusPriorityWeight(faction.currentStatus),
     desiredIntelDepth: resolveDesiredIntelDepth(faction.currentStatus),
     intelInsufficient: isFactionIntelInsufficient(faction),
-    enemyEspionageSuperiority: estimateEnemyEspionageSuperiority(context, faction)
+    enemyEspionageSuperiority: estimateEnemyEspionageSuperiority(context, faction),
+    nonAggressionUntilTurn: nonAggression.untilTurn,
+    nonAggressionActive: nonAggression.active,
+    nonAggressionReason: nonAggression.reason
   };
 }
 
@@ -897,7 +929,8 @@ function resolveHostilityScore(
   faction: BotStrategicDiplomaticFactionSnapshot,
   previous: BotMemoryV2StrategicDiplomaticFactionEntry,
   warPressure: ReturnType<typeof resolveWarPressureEvaluation>,
-  sharedHostilityPressureShort: number
+  sharedHostilityPressureShort: number,
+  nonAggressionActive: boolean
 ): number {
   let score = previous.hostilityScore * 0.6;
   score += faction.recentBattleReportCount * 12;
@@ -920,7 +953,88 @@ function resolveHostilityScore(
   ) {
     score -= LOSING_WAR_HOSTILITY_DECAY;
   }
+  if (nonAggressionActive) {
+    score -= 45;
+  }
   return Math.max(0, Math.min(120, score));
+}
+
+function resolveNonAggressionTreatment(
+  context: BotSubsystemContext,
+  faction: BotStrategicDiplomaticFactionSnapshot,
+  previous: BotMemoryV2StrategicDiplomaticFactionEntry,
+  relativeStrength: number,
+  strengthEstimate: number,
+  warPressure: ReturnType<typeof resolveWarPressureEvaluation>
+): {
+  untilTurn: number | null;
+  startedTurn: number | null;
+  reason: string | null;
+  active: boolean;
+} {
+  const existingUntilTurn = previous.nonAggressionUntilTurn !== null
+    && previous.nonAggressionUntilTurn > context.snapshot.turn
+    ? previous.nonAggressionUntilTurn
+    : null;
+  if (existingUntilTurn !== null) {
+    return {
+      untilTurn: existingUntilTurn,
+      startedTurn: previous.nonAggressionStartedTurn,
+      reason: previous.nonAggressionReason ?? 'DEFEATED_WAR_TARGET',
+      active: true
+    };
+  }
+
+  const targetStrengthReduced = previous.lastComputedStrengthEstimate > 0
+    && strengthEstimate <= previous.lastComputedStrengthEstimate * 0.75;
+  const defeatedWarTarget = faction.currentStatus === DiplomaticStatus.WAR
+    && relativeStrength >= NON_AGGRESSION_DEFEATED_TARGET_RELATIVE_STRENGTH
+    && (
+      warPressure.currentWarExitPressure >= 25
+      || warPressure.combinedWarScore >= 25
+      || targetStrengthReduced
+      || faction.recentOutgoingDamagePercentLong >= NON_AGGRESSION_DEFEATED_TARGET_DAMAGE_PERCENT
+    );
+  if (!defeatedWarTarget) {
+    return {
+      untilTurn: null,
+      startedTurn: null,
+      reason: null,
+      active: false
+    };
+  }
+
+  const duration = resolveNonAggressionDuration(
+    context.snapshot.profileId,
+    context.snapshot.playerId,
+    faction.playerId
+  );
+  return {
+    untilTurn: context.snapshot.turn + duration,
+    startedTurn: context.snapshot.turn,
+    reason: 'DEFEATED_WAR_TARGET',
+    active: true
+  };
+}
+
+function resolveNonAggressionDuration(
+  profileId: BotProfileId | null,
+  playerId: number,
+  targetPlayerId: number
+): number {
+  const baseDuration = resolveDeterministicIntInRange(
+    `non-aggression:${profileId ?? 'UNKNOWN'}:${playerId}:${targetPlayerId}`,
+    NON_AGGRESSION_MIN_TURNS,
+    NON_AGGRESSION_MAX_TURNS
+  );
+  const modifier = profileId === 'AGGRESSOR'
+    ? -20
+    : profileId === 'BALANCED'
+      ? -10
+      : profileId === 'AVOIDER'
+        ? 20
+        : 0;
+  return Math.max(20, Math.min(120, baseDuration + modifier));
 }
 
 function resolveSharedHostilityWeight(status: DiplomaticStatus): number {
@@ -941,7 +1055,8 @@ function resolveStanceScore(
   hostilityScore: number,
   confidence: number,
   statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>,
-  warPressure: ReturnType<typeof resolveWarPressureEvaluation>
+  warPressure: ReturnType<typeof resolveWarPressureEvaluation>,
+  nonAggressionActive: boolean
 ): number {
   const personalityBias = resolvePersonalityEscalationBias(profileId);
   const strengthBias = relativeStrength > 20
@@ -965,7 +1080,8 @@ function resolveStanceScore(
         ? -7
         : 0;
   const networkPressure = resolveNetworkPressure(profileId, statusCounts, faction.currentStatus);
-  const rawScore = personalityBias + strengthBias + hostilityBias + warExitBias + relationBias + networkPressure;
+  const nonAggressionBias = nonAggressionActive ? -50 : 0;
+  const rawScore = personalityBias + strengthBias + hostilityBias + warExitBias + relationBias + networkPressure + nonAggressionBias;
   const uncertaintyPenalty = (1 - confidence) * 20;
   return rawScore - uncertaintyPenalty;
 }
@@ -985,6 +1101,25 @@ function resolvePersonalityEscalationBias(profileId: BotProfileId | null): numbe
     case 'BALANCED':
     default:
       return 0;
+  }
+}
+
+function resolveWayWeakerWarThreshold(profileId: BotProfileId | null): number {
+  switch (profileId) {
+    case 'AGGRESSOR':
+      return 18;
+    case 'BALANCED':
+      return 28;
+    case 'MINER':
+      return 42;
+    case 'BUNKERER':
+      return 45;
+    case 'TURTLE':
+      return 50;
+    case 'AVOIDER':
+      return 55;
+    default:
+      return 32;
   }
 }
 
@@ -1019,7 +1154,8 @@ function resolveRelationUtilities(
   relativeStrength: number,
   confidence: number,
   statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>,
-  warPressure: ReturnType<typeof resolveWarPressureEvaluation>
+  warPressure: ReturnType<typeof resolveWarPressureEvaluation>,
+  nonAggressionActive: boolean
 ): {
   bestEscalationUtility: number | null;
   bestEscalationStatus: DiplomaticStatus | null;
@@ -1043,7 +1179,8 @@ function resolveRelationUtilities(
       relativeStrength,
       confidence,
       statusCounts,
-      warPressure
+      warPressure,
+      nonAggressionActive
     );
 
     if (requestedStatus === DiplomaticStatus.WAR) {
@@ -1092,17 +1229,32 @@ function computeRelationChangeUtility(
   relativeStrength: number,
   confidence: number,
   statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>,
-  warPressure: ReturnType<typeof resolveWarPressureEvaluation>
+  warPressure: ReturnType<typeof resolveWarPressureEvaluation>,
+  nonAggressionActive = false
 ): number {
   if (requestedStatus === DiplomaticStatus.WAR) {
-    if (hostilityScore < WAR_HOSTILITY_THRESHOLD) {
+    if (nonAggressionActive) {
       return -999;
     }
-    return stanceScore + Math.max(0, hostilityScore - 20) + Math.max(0, relativeStrength * 0.5) + (confidence * 10);
+    const weakerTargetThreshold = resolveWayWeakerWarThreshold(profileId);
+    if (hostilityScore < WAR_HOSTILITY_THRESHOLD && relativeStrength < weakerTargetThreshold) {
+      return -999;
+    }
+    const weakerTargetBonus = relativeStrength >= weakerTargetThreshold
+      ? Math.max(0, (relativeStrength - weakerTargetThreshold) * 1.2) + 24
+      : 0;
+    return stanceScore
+      + Math.max(0, hostilityScore - 20)
+      + Math.max(0, relativeStrength * 0.5)
+      + weakerTargetBonus
+      + (confidence * 10);
   }
 
   if (requestedStatus === DiplomaticStatus.PEACE) {
-    if (currentStatus === DiplomaticStatus.WAR) {
+    if (
+      currentStatus === DiplomaticStatus.WAR
+      && warPressure.combinedWarScore > -20
+    ) {
       return -999;
     }
     const allianceDeficit = statusCounts.ALLIED <= 0 ? 5 : 0;
@@ -1116,7 +1268,11 @@ function computeRelationChangeUtility(
   if (requestedStatus === DiplomaticStatus.ALLIED) {
     const allyNeed = statusCounts.ALLIED <= 0 ? 12 : 4;
     const minerBias = profileId === 'MINER' ? 8 : profileId === 'AVOIDER' ? 4 : 0;
-    return (-stanceScore) + allyNeed + minerBias + (relativeStrength > -15 ? 4 : -6) + (confidence * 8);
+    // TODO: Far-future coalition policy: weak bots should coordinate alliances against a much stronger player.
+    const weakerAllianceBonus = relativeStrength < -35
+      ? 18
+      : relativeStrength < -15 ? 10 : 0;
+    return (-stanceScore) + allyNeed + minerBias + weakerAllianceBonus + (relativeStrength > -15 ? 4 : 0) + (confidence * 8);
   }
 
   if (requestedStatus === DiplomaticStatus.NEUTRAL) {
@@ -1136,22 +1292,27 @@ function createRelationChangeProposals(
   context: BotSubsystemContext,
   factions: EvaluatedFaction[]
 ): BotProposal[] {
-  const proposals: BotProposal[] = [];
+  const candidates: Array<{
+    faction: EvaluatedFaction;
+    requestedStatus: DiplomaticStatus;
+    utility: number;
+  }> = [];
 
   for (const faction of factions) {
-    const incomingOrOutgoingRequested = new Set([
-      ...faction.faction.pendingIncomingRequestedStatuses,
-      ...faction.faction.pendingOutgoingRequestedStatuses
-    ]);
+    if (
+      faction.faction.pendingIncomingDiplomacyProposals.length > 0
+      || faction.faction.pendingOutgoingDiplomacyProposals.length > 0
+    ) {
+      continue;
+    }
 
-    const candidates: Array<{ requestedStatus: DiplomaticStatus; utility: number }> = [];
+    const factionCandidates: Array<{ requestedStatus: DiplomaticStatus; utility: number }> = [];
     if (
       faction.bestEscalationStatus !== null
       && faction.bestEscalationUtility !== null
       && faction.bestEscalationUtility >= RELATION_PROPOSAL_MIN_UTILITY
-      && !incomingOrOutgoingRequested.has(faction.bestEscalationStatus)
     ) {
-      candidates.push({
+      factionCandidates.push({
         requestedStatus: faction.bestEscalationStatus,
         utility: faction.bestEscalationUtility
       });
@@ -1160,9 +1321,8 @@ function createRelationChangeProposals(
       faction.bestDeescalationStatus !== null
       && faction.bestDeescalationUtility !== null
       && faction.bestDeescalationUtility >= RELATION_PROPOSAL_MIN_UTILITY
-      && !incomingOrOutgoingRequested.has(faction.bestDeescalationStatus)
     ) {
-      candidates.push({
+      factionCandidates.push({
         requestedStatus: faction.bestDeescalationStatus,
         utility: faction.bestDeescalationUtility
       });
@@ -1171,23 +1331,40 @@ function createRelationChangeProposals(
       faction.faction.currentStatus === DiplomaticStatus.PEACE
       && faction.allianceUtility !== null
       && faction.allianceUtility >= RELATION_PROPOSAL_MIN_UTILITY
-      && !incomingOrOutgoingRequested.has(DiplomaticStatus.ALLIED)
     ) {
-      candidates.push({
+      factionCandidates.push({
         requestedStatus: DiplomaticStatus.ALLIED,
         utility: faction.allianceUtility
       });
     }
 
-    const best = candidates.sort((left, right) => right.utility - left.utility)[0] ?? null;
+    const best = factionCandidates.sort((left, right) => right.utility - left.utility)[0] ?? null;
     if (!best) {
       continue;
     }
 
-    proposals.push({
+    candidates.push({
+      faction,
+      requestedStatus: best.requestedStatus,
+      utility: best.utility
+    });
+  }
+
+  const best = candidates
+    .sort((left, right) =>
+      right.utility - left.utility
+      || left.faction.faction.playerId - right.faction.faction.playerId
+    )[0] ?? null;
+  if (!best) {
+    return [];
+  }
+
+  const { faction } = best;
+  return [
+    {
       proposalId: `strategic-diplomatic:relation:${faction.faction.playerId}:${best.requestedStatus}:${context.snapshot.turn}`,
       subsystemId: 'STRATEGIC_DIPLOMATIC',
-      kind: 'NO_OP',
+      kind: 'DIPLOMACY_PROPOSAL',
       status: 'PROPOSED',
       goalKey: `strategic-diplomatic:relation:${faction.faction.playerId}`,
       dedupeKey: `strategic-diplomatic:relation:${faction.faction.playerId}:${best.requestedStatus}`,
@@ -1200,10 +1377,12 @@ function createRelationChangeProposals(
       confidence: Math.round(faction.confidence * 100),
       requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
       requestPayload: {
-        actionType: 'RELATION_CHANGE',
+        actionType: 'DIPLOMACY_PROPOSAL',
         targetPlayerId: faction.faction.playerId,
         currentStatus: faction.faction.currentStatus,
-        requestedStatus: best.requestedStatus
+        requestedStatus: best.requestedStatus,
+        utility: Math.round(best.utility),
+        reason: resolveRelationProposalReason(context.snapshot.profileId, best.requestedStatus, faction)
       },
       blockers: [],
       expiresOnTurn: context.snapshot.turn + 1,
@@ -1214,12 +1393,12 @@ function createRelationChangeProposals(
         utility: Math.round(best.utility),
         hostilityScore: Math.round(faction.hostilityScore),
         stanceScore: Math.round(faction.stanceScore),
-        relativeStrength: Math.round(faction.relativeStrength)
+        relativeStrength: Math.round(faction.relativeStrength),
+        nonAggressionUntilTurn: faction.nonAggressionUntilTurn,
+        nonAggressionReason: faction.nonAggressionReason
       }
-    });
-  }
-
-  return proposals;
+    }
+  ];
 }
 
 function createProposalManagementPreferences(
@@ -1227,6 +1406,7 @@ function createProposalManagementPreferences(
   factions: EvaluatedFaction[]
 ): DiplomacyDecisionPlan[] {
   const proposals: DiplomacyDecisionPlan[] = [];
+  const statusCounts = resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions);
 
   for (const faction of factions) {
     for (const pendingProposal of faction.faction.pendingIncomingDiplomacyProposals) {
@@ -1243,7 +1423,7 @@ function createProposalManagementPreferences(
         faction.hostilityScore,
         faction.relativeStrength,
         faction.confidence,
-        resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions),
+        statusCounts,
         {
           recentOutgoingCoercionPressure: faction.recentOutgoingCoercionPressure,
           recentIncomingCoercionPressure: faction.recentIncomingCoercionPressure,
@@ -1253,7 +1433,8 @@ function createProposalManagementPreferences(
           currentWarExitPressure: faction.currentWarExitPressure,
           lastWarEvaluationTurn: context.snapshot.turn,
           appliedLosingWarDecay: false
-        }
+        },
+        faction.nonAggressionActive
       );
       const decision = validTransition && utility >= RELATION_PROPOSAL_MIN_UTILITY ? 'ACCEPT' : 'REJECT';
       proposals.push({
@@ -1280,7 +1461,7 @@ function createProposalManagementPreferences(
         faction.hostilityScore,
         faction.relativeStrength,
         faction.confidence,
-        resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions),
+        statusCounts,
         {
           recentOutgoingCoercionPressure: faction.recentOutgoingCoercionPressure,
           recentIncomingCoercionPressure: faction.recentIncomingCoercionPressure,
@@ -1290,7 +1471,8 @@ function createProposalManagementPreferences(
           currentWarExitPressure: faction.currentWarExitPressure,
           lastWarEvaluationTurn: context.snapshot.turn,
           appliedLosingWarDecay: false
-        }
+        },
+        faction.nonAggressionActive
       );
       if (utility >= 0) {
         continue;
@@ -1359,7 +1541,34 @@ function createDiplomacyDecisionProposal(
 function normalizeExecutableDiplomaticStatus(
   status: DiplomaticStatus
 ): DiplomacyDecisionPlan['requestedStatus'] | null {
-  return status === DiplomaticStatus.PEACE || status === DiplomaticStatus.ALLIED ? status : null;
+  return status === DiplomaticStatus.PEACE
+    || status === DiplomaticStatus.ALLIED
+    || status === DiplomaticStatus.NEUTRAL
+    || status === DiplomaticStatus.WAR
+    ? status
+    : null;
+}
+
+function resolveRelationProposalReason(
+  profileId: BotProfileId | null,
+  requestedStatus: DiplomaticStatus,
+  faction: EvaluatedFaction
+): string {
+  if (requestedStatus === DiplomaticStatus.WAR) {
+    return faction.relativeStrength >= resolveWayWeakerWarThreshold(profileId)
+      ? 'way_weaker_target'
+      : 'hostility_escalation';
+  }
+  if (
+    requestedStatus === DiplomaticStatus.NEUTRAL
+    && faction.nonAggressionActive
+  ) {
+    return 'post_victory_non_aggression';
+  }
+  if (requestedStatus === DiplomaticStatus.ALLIED) {
+    return faction.relativeStrength < -15 ? 'weaker_empire_alliance_seek' : 'alliance_utility';
+  }
+  return 'relation_utility';
 }
 
 function createIncomingRequestDecisionProposal(

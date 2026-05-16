@@ -145,6 +145,7 @@ export type BotMemoryV2ProposalKind =
   | 'REQUEST_DECISION'
   | 'REQUEST_CREATION'
   | 'DIPLOMACY_DECISION'
+  | 'DIPLOMACY_PROPOSAL'
   | 'NO_OP';
 
 export type BotMemoryV2SupervisorPendingStatus =
@@ -286,6 +287,9 @@ export type BotMemoryV2StrategicDiplomaticFactionEntry = {
   lastComputedStrengthEstimate: number;
   lastKnownStatus: DiplomaticStatus | null;
   lastSeenTurn: number | null;
+  nonAggressionUntilTurn: number | null;
+  nonAggressionStartedTurn: number | null;
+  nonAggressionReason: string | null;
 };
 
 export type BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget = {
@@ -1206,7 +1210,16 @@ export class Player {
             ? Math.max(0, Number(entry.lastComputedStrengthEstimate))
             : 0,
           lastKnownStatus: Player.normalizeDiplomaticStatus(entry.lastKnownStatus),
-          lastSeenTurn: Number.isInteger(entry.lastSeenTurn) ? entry.lastSeenTurn : null
+          lastSeenTurn: Number.isInteger(entry.lastSeenTurn) ? entry.lastSeenTurn : null,
+          nonAggressionUntilTurn: Number.isInteger(entry.nonAggressionUntilTurn)
+            ? entry.nonAggressionUntilTurn
+            : null,
+          nonAggressionStartedTurn: Number.isInteger(entry.nonAggressionStartedTurn)
+            ? entry.nonAggressionStartedTurn
+            : null,
+          nonAggressionReason: typeof entry.nonAggressionReason === 'string'
+            ? entry.nonAggressionReason
+            : null
         };
       })
       .filter((entry): entry is BotMemoryV2StrategicDiplomaticFactionEntry => entry !== null)
@@ -1648,6 +1661,7 @@ export class Player {
       || kind === 'REQUEST_DECISION'
       || kind === 'REQUEST_CREATION'
       || kind === 'DIPLOMACY_DECISION'
+      || kind === 'DIPLOMACY_PROPOSAL'
       || kind === 'NO_OP';
   }
 

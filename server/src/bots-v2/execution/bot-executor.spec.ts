@@ -101,6 +101,30 @@ describe('bot executor', () => {
     });
   });
 
+  it('executes accepted outgoing diplomacy proposals', () => {
+    const { galaxy } = createFleetGalaxy();
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const [outcome] = executor.executeAcceptedTasks([createDiplomacyProposalAction()]);
+
+    expect(outcome).toMatchObject({
+      proposalId: 'diplomacy-create',
+      executed: true,
+      success: true,
+      diplomacyProposalId: 1,
+      targetPlayerId: 2,
+      requestedStatus: DiplomaticStatus.PEACE
+    });
+    expect(galaxy.diplomaticProposals).toHaveLength(1);
+    expect(galaxy.diplomaticProposals[0]).toMatchObject({
+      proposalId: 1,
+      fromPlayerId: 1,
+      toPlayerId: 2,
+      requestedStatus: DiplomaticStatus.PEACE,
+      state: DiplomaticProposalState.PENDING
+    });
+  });
+
   it('executes accepted diplomacy decisions before recalling invalid offensive fleets', () => {
     const { galaxy, origin, target } = createRecallGalaxy();
     galaxy.diplomaticProposals.push(createDiplomaticProposal(
@@ -440,6 +464,33 @@ function createDiplomacyDecisionProposal(): BotProposal {
       actionType: 'DIPLOMACY_DECISION',
       proposalId: 1,
       decision: 'ACCEPT',
+      targetPlayerId: 2,
+      requestedStatus: DiplomaticStatus.PEACE
+    },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {}
+  };
+}
+
+function createDiplomacyProposalAction(): BotProposal {
+  return {
+    proposalId: 'diplomacy-create',
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'DIPLOMACY_PROPOSAL',
+    status: 'ACCEPTED',
+    goalKey: 'diplomacy-create',
+    dedupeKey: 'diplomacy-create',
+    summary: 'Create peace proposal',
+    planetId: null,
+    targetCoordinates: null,
+    expectedValue: 100,
+    urgency: 70,
+    risk: 0,
+    confidence: 90,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      actionType: 'DIPLOMACY_PROPOSAL',
       targetPlayerId: 2,
       requestedStatus: DiplomaticStatus.PEACE
     },

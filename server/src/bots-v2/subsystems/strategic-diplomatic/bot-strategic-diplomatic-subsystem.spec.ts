@@ -48,7 +48,8 @@ describe('BotStrategicDiplomaticSubsystem', () => {
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot);
     const peaceProposal = result.result.proposals.find((proposal) =>
-      proposal.requestPayload.actionType === 'RELATION_CHANGE'
+      proposal.kind === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_PROPOSAL'
       && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
     );
 
@@ -64,7 +65,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
 
     const firstResult = runStrategicDiplomaticSubsystem(galaxy, bot);
     expect(firstResult.result.proposals.some((proposal) =>
-      proposal.requestPayload.actionType === 'RELATION_CHANGE'
+      proposal.kind === 'DIPLOMACY_PROPOSAL'
       && proposal.requestPayload.requestedStatus === DiplomaticStatus.WAR
     )).toBe(false);
 
@@ -74,10 +75,61 @@ describe('BotStrategicDiplomaticSubsystem', () => {
 
     const secondResult = runStrategicDiplomaticSubsystem(galaxy, bot, firstResult.memory);
     expect(secondResult.result.proposals.some((proposal) =>
-      proposal.requestPayload.actionType === 'RELATION_CHANGE'
+      proposal.kind === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_PROPOSAL'
       && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
       && proposal.requestPayload.requestedStatus === DiplomaticStatus.WAR
     )).toBe(true);
+  });
+
+  it('can propose war against a way weaker neutral faction', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    bot.botProfileId = 'BALANCED';
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 20);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const warProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
+      && proposal.requestPayload.requestedStatus === DiplomaticStatus.WAR
+    );
+
+    expect(warProposal).toBeDefined();
+  });
+
+  it('emits only the best outgoing diplomacy proposal per turn', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const secondEnemy = addForeignPlayer(galaxy, 4, 'Human-4', { x: 1, y: 1 }, 1);
+    bot.botProfileId = 'BALANCED';
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 20);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
+    markPlanetScanned(bot, secondEnemy, secondEnemy.planets[0]!, galaxy.currentTurn);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+
+    expect(result.result.proposals.filter((proposal) => proposal.kind === 'DIPLOMACY_PROPOSAL')).toHaveLength(1);
+  });
+
+  it('cancels an outgoing war proposal when its utility turns negative', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    bot.botProfileId = 'AVOIDER';
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
+    galaxy.diplomaticProposals.push(
+      createDiplomaticProposal(1, bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR, galaxy.currentTurn, galaxy.currentTurn + 1)
+    );
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const cancelProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.decision === 'CANCEL'
+      && proposal.requestPayload.requestedStatus === DiplomaticStatus.WAR
+    );
+
+    expect(cancelProposal).toBeDefined();
   });
 
   it('emits executable diplomacy approval for incoming peace proposal', () => {
@@ -533,12 +585,16 @@ describe('BotStrategicDiplomaticSubsystem', () => {
       lastComputedStanceScore: 0,
       lastComputedStrengthEstimate: 0,
       lastKnownStatus: DiplomaticStatus.WAR,
-      lastSeenTurn: 0
+      lastSeenTurn: 0,
+      nonAggressionUntilTurn: null,
+      nonAggressionStartedTurn: null,
+      nonAggressionReason: null
     });
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
     const neutralProposal = result.result.proposals.find((proposal) =>
-      proposal.requestPayload.actionType === 'RELATION_CHANGE'
+      proposal.kind === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_PROPOSAL'
       && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
       && proposal.requestPayload.requestedStatus === DiplomaticStatus.NEUTRAL
     );
@@ -581,7 +637,10 @@ describe('BotStrategicDiplomaticSubsystem', () => {
       lastComputedStanceScore: 0,
       lastComputedStrengthEstimate: 0,
       lastKnownStatus: DiplomaticStatus.WAR,
-      lastSeenTurn: 0
+      lastSeenTurn: 0,
+      nonAggressionUntilTurn: null,
+      nonAggressionStartedTurn: null,
+      nonAggressionReason: null
     });
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);

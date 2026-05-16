@@ -2,9 +2,7 @@ import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomati
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { BotProposal } from '../bot-v2-types.ts';
 
-export type BotDiplomacyDecisionExecution = {
-  proposalId: number;
-  decision: 'ACCEPT' | 'REJECT' | 'CANCEL';
+export type BotDiplomacyProposalExecution = {
   targetPlayerId: number;
   requestedStatus: Extract<
     DiplomaticStatusType,
@@ -12,23 +10,13 @@ export type BotDiplomacyDecisionExecution = {
   >;
 };
 
-export type BotDiplomacyDecisionAdapterResult =
-  | { ok: true; value: BotDiplomacyDecisionExecution }
+export type BotDiplomacyProposalAdapterResult =
+  | { ok: true; value: BotDiplomacyProposalExecution }
   | { ok: false; reason: string };
 
-export function normalizeDiplomacyDecisionProposal(proposal: BotProposal): BotDiplomacyDecisionAdapterResult {
-  if (proposal.kind !== 'DIPLOMACY_DECISION') {
-    return { ok: false, reason: 'not_diplomacy_decision' };
-  }
-
-  const proposalId = normalizePositiveInteger(proposal.requestPayload.proposalId);
-  if (proposalId === null) {
-    return { ok: false, reason: 'invalid_diplomacy_proposal_id' };
-  }
-
-  const decision = normalizeDecision(proposal.requestPayload.decision);
-  if (!decision) {
-    return { ok: false, reason: 'invalid_diplomacy_decision' };
+export function normalizeDiplomacyProposal(proposal: BotProposal): BotDiplomacyProposalAdapterResult {
+  if (proposal.kind !== 'DIPLOMACY_PROPOSAL') {
+    return { ok: false, reason: 'not_diplomacy_proposal' };
   }
 
   const targetPlayerId = normalizePositiveInteger(proposal.requestPayload.targetPlayerId);
@@ -44,19 +32,13 @@ export function normalizeDiplomacyDecisionProposal(proposal: BotProposal): BotDi
   return {
     ok: true,
     value: {
-      proposalId,
-      decision,
       targetPlayerId,
       requestedStatus
     }
   };
 }
 
-function normalizeDecision(value: unknown): BotDiplomacyDecisionExecution['decision'] | null {
-  return value === 'ACCEPT' || value === 'REJECT' || value === 'CANCEL' ? value : null;
-}
-
-function normalizeRequestedStatus(value: unknown): BotDiplomacyDecisionExecution['requestedStatus'] | null {
+function normalizeRequestedStatus(value: unknown): BotDiplomacyProposalExecution['requestedStatus'] | null {
   return value === DiplomaticStatus.PEACE
     || value === DiplomaticStatus.ALLIED
     || value === DiplomaticStatus.NEUTRAL

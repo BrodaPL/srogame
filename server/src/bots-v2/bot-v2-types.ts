@@ -26,6 +26,7 @@ export type BotProposalKind =
   | 'REQUEST_DECISION'
   | 'REQUEST_CREATION'
   | 'DIPLOMACY_DECISION'
+  | 'DIPLOMACY_PROPOSAL'
   | 'NO_OP';
 
 export type BotProposalStatus =

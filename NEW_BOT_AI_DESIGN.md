@@ -1927,7 +1927,16 @@ It should not unlock new mission-legality rules yet.
 
 #### Next phase: allied-cooperation execution
 
-After shared war awareness, `Strategic Diplomatic` adds **allied-cooperation planning**. Incoming request decisions are now implemented for Jump Gate, Maintenance, and Support requests; outgoing Support request creation is now executable through `REQUEST_CREATION` proposals. Pending `PEACE` / `ALLIED` treaty proposals are executable through `DIPLOMACY_DECISION` proposals owned by Strategic Diplomatic policy. Outgoing Maintenance requests and standalone Jump Gate request creation remain deferred.
+After shared war awareness, `Strategic Diplomatic` adds **allied-cooperation planning**. Incoming request decisions are now implemented for Jump Gate, Maintenance, and Support requests; outgoing Support request creation is now executable through `REQUEST_CREATION` proposals. Pending treaty proposals across the full `PEACE` / `ALLIED` / `NEUTRAL` / `WAR` ladder are executable through `DIPLOMACY_DECISION` proposals owned by Strategic Diplomatic policy. Outgoing treaty creation is executable through `DIPLOMACY_PROPOSAL` proposals, with Strategic Diplomatic emitting at most one best outgoing treaty proposal per turn. Outgoing Maintenance requests and standalone Jump Gate request creation remain deferred.
+
+Current treaty policy rules:
+
+* bots may propose `WAR` against clearly weaker factions, with the advantage threshold adjusted by bot personality,
+* weaker bots bias harder toward alliance-seeking,
+* winning a damaging war can place the beaten target under temporary non-aggression treatment for roughly `40-100` turns, modified by personality,
+* temporary non-aggression suppresses renewed `WAR` proposals and favors `WAR -> NEUTRAL` deescalation,
+* pending incoming or outgoing treaty proposals suppress only the same pair,
+* TODO: later coalition policy should let weaker bots seek alliances to contain a much stronger player.
 
 The current executable request-creation slice focuses on:
 
@@ -2534,7 +2543,7 @@ Runtime mode is explicit:
 
 * `DISABLED` skips V2 bot runtime,
 * `SHADOW` runs V2 planning/traces without execution,
-* `LIVE` lets the Supervisor execute accepted queue proposals, allowlisted fleet proposals, request decisions, and support request creation proposals.
+* `LIVE` lets the Supervisor execute accepted queue proposals, allowlisted fleet proposals, request decisions, support request creation proposals, and diplomacy proposals.
 
 The live execution scope is:
 
@@ -2553,7 +2562,8 @@ The live execution scope is:
 * `SIEGE`,
 * incoming `REQUEST_DECISION` proposals for `JUMP_GATE`, `MAINTENANCE`, and `SUPPORT`,
 * outgoing `REQUEST_CREATION` proposals for `SUPPORT`,
-* `DIPLOMACY_DECISION` proposals for pending `PEACE` / `ALLIED` diplomacy.
+* `DIPLOMACY_DECISION` proposals for pending treaty decisions,
+* `DIPLOMACY_PROPOSAL` proposals for outgoing treaty creation.
 
 The current deferred scope is:
 
@@ -2566,9 +2576,10 @@ Incoming request ownership is split deliberately:
 
 * `Strategic Diplomatic` evaluates incoming Jump Gate, Maintenance, and Support requests and emits explicit `REQUEST_DECISION` proposals.
 * `Strategic Diplomatic` evaluates outgoing support-request needs and emits executable `REQUEST_CREATION` proposals.
-* `Strategic Diplomatic` evaluates pending incoming/outgoing `PEACE` / `ALLIED` treaty proposals and emits executable `DIPLOMACY_DECISION` proposals.
+* `Strategic Diplomatic` evaluates pending incoming/outgoing treaty proposals and emits executable `DIPLOMACY_DECISION` proposals.
+* `Strategic Diplomatic` evaluates outgoing treaty opportunities and emits executable `DIPLOMACY_PROPOSAL` proposals.
 * `Supervisor` only arbitrates and executes accepted request decisions through shared command helpers.
-* If no subsystem emits a request decision, request creation, or diplomacy decision proposal, Supervisor does not invent one.
+* If no subsystem emits a request decision, request creation, diplomacy decision, or diplomacy creation proposal, Supervisor does not invent one.
 
 Supervisor diplomacy and lifecycle order:
 
