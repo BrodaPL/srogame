@@ -1,7 +1,11 @@
 import type { Galaxy } from '../../../../src/app/models/planets/galaxy.ts';
+import type { Planet } from '../../../../src/app/models/planets/planet.ts';
+import type { Player } from '../../../../src/app/models/player.ts';
+import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
 import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
 import { DiplomacyResolver } from '../../../../src/app/models/diplomacy/diplomacy-resolver.js';
 import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
+import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
 import { FleetState } from '../../../../src/app/models/fleets/fleet.js';
 import type { CreateFleetMissionCommand } from '../../game-commands/fleet-commands.ts';
 import { startBuildingConstruction } from '../../game-commands/building-commands.js';
@@ -13,7 +17,7 @@ import {
 } from '../../game-commands/diplomacy-commands.js';
 import { createFleetMission } from '../../game-commands/fleet-commands.js';
 import { returnActiveFleetCommand } from '../../game-commands/fleet-lifecycle-commands.js';
-import { startTechnologyResearch } from '../../game-commands/research-commands.js';
+import { startTechnologyResearch, updateResearchHelpers } from '../../game-commands/research-commands.js';
 import { startShipyardConstruction } from '../../game-commands/shipyard-commands.js';
 import {
   approveJumpGateRequestCommand,
@@ -29,9 +33,12 @@ import {
   rejectSupportRequestCommand
 } from '../../game-commands/support-request-commands.js';
 import {
+  calculateMaxLabsPerTechnology,
   isJumpGateAutoApprovedStatus,
   isJumpGateMissionAllowed,
   resolvePlanetOrError,
+  sameCoordinates,
+  TECHNOLOGY_BLUEPRINTS,
   toShipAmountEntriesFromSelections,
   validateJumpGateLaunchAccess
 } from '../../game-commands/command-helpers.js';
@@ -89,6 +96,7 @@ export class LiveQueueBotExecutor implements BotExecutor {
       }
       outcomes.push(this.executeAcceptedTask(proposal));
     }
+    outcomes.push(...this.assignIdleResearchHelpers());
     return outcomes;
   }
 
@@ -548,4 +556,164 @@ export class LiveQueueBotExecutor implements BotExecutor {
 
     return outcomes;
   }
+
+  private assignIdleResearchHelpers(): BotExecutionOutcome[] {
+    const player = this.galaxy.players.find((entry) => entry.playerId === this.playerId) ?? null;
+    if (!player) {
+      return [];
+    }
+
+    const outcomes: BotExecutionOutcome[] = [];
+    const runningResearchPlanets = [...player.planets]
+      .filter((planet) => planet.rBDSFTQ.currentResearchQueue !== null)
+      .sort((left, right) =>
+        left.rBDSFTQ.currentResearchQueue!.helperLabs.length - right.rBDSFTQ.currentResearchQueue!.helperLabs.length
+        || left.basicInfo.solarSystem.coordinates.x - right.basicInfo.solarSystem.coordinates.x
+        || left.basicInfo.solarSystem.coordinates.y - right.basicInfo.solarSystem.coordinates.y
+        || left.basicInfo.order - right.basicInfo.order
+      );
+
+    for (const mainPlanet of runningResearchPlanets) {
+      const currentResearchQueue = mainPlanet.rBDSFTQ.currentResearchQueue;
+      if (!currentResearchQueue) {
+        continue;
+      }
+
+      const maxHelpers = Math.max(0, calculateMaxLabsPerTechnology(player) - 1);
+      if (currentResearchQueue.helperLabs.length >= maxHelpers) {
+        continue;
+      }
+
+      const researchBlueprint = TECHNOLOGY_BLUEPRINTS.get(currentResearchQueue.technologyType);
+      if (!researchBlueprint) {
+        continue;
+      }
+
+      const availableIdleHelpers = this.resolveAvailableIdleResearchHelpers(
+        player,
+        mainPlanet,
+        researchBlueprint.getCostForLevel(currentResearchQueue.nextLevel)
+      );
+      if (availableIdleHelpers.length <= 0) {
+        continue;
+      }
+
+      const additionalHelpers = availableIdleHelpers.slice(
+        0,
+        Math.max(0, maxHelpers - currentResearchQueue.helperLabs.length)
+      );
+      if (additionalHelpers.length <= 0) {
+        continue;
+      }
+
+      const targetCoordinates = {
+        x: mainPlanet.basicInfo.solarSystem.coordinates.x,
+        y: mainPlanet.basicInfo.solarSystem.coordinates.y,
+        z: mainPlanet.basicInfo.order
+      };
+      const result = updateResearchHelpers(
+        {
+          galaxy: this.galaxy,
+          playerId: this.playerId
+        },
+        {
+          ...targetCoordinates,
+          helperPlanets: [
+            ...currentResearchQueue.helperLabs,
+            ...additionalHelpers.map((planet) => ({
+              x: planet.basicInfo.solarSystem.coordinates.x,
+              y: planet.basicInfo.solarSystem.coordinates.y,
+              z: planet.basicInfo.order
+            }))
+          ]
+        }
+      );
+
+      if (!result.ok) {
+        const message = result.error.message;
+        console.warn(
+          `[BotV2 Supervisor] Research helper update failed for ${mainPlanet.basicInfo.name}: ${result.error.code} ${message}`
+        );
+        outcomes.push({
+          proposalId: `maintenance:research-helpers:${targetCoordinates.x}:${targetCoordinates.y}:${targetCoordinates.z}:${this.galaxy.currentTurn}`,
+          executed: true,
+          success: false,
+          message,
+          commandErrorCode: result.error.code,
+          targetCoordinates
+        });
+        continue;
+      }
+
+      outcomes.push({
+        proposalId: `maintenance:research-helpers:${targetCoordinates.x}:${targetCoordinates.y}:${targetCoordinates.z}:${this.galaxy.currentTurn}`,
+        executed: true,
+        success: true,
+        message: `Assigned ${additionalHelpers.length} free helper labs to active research.`,
+        targetCoordinates
+      });
+    }
+
+    return outcomes;
+  }
+
+  private resolveAvailableIdleResearchHelpers(
+    player: Player,
+    mainPlanet: Planet,
+    researchCost: { metal: number; crystal: number; deuterium: number }
+  ): Planet[] {
+    const mainCoordinates = {
+      x: mainPlanet.basicInfo.solarSystem.coordinates.x,
+      y: mainPlanet.basicInfo.solarSystem.coordinates.y,
+      z: mainPlanet.basicInfo.order
+    };
+
+    return [...player.planets]
+      .filter((planet) =>
+        !sameCoordinates(
+          {
+            x: planet.basicInfo.solarSystem.coordinates.x,
+            y: planet.basicInfo.solarSystem.coordinates.y,
+            z: planet.basicInfo.order
+          },
+          mainCoordinates
+        )
+        && planet.getBuildingLevel(BuildingType.RESEARCH_LAB) > 0
+        && planet.rBDSFTQ.currentResearchQueue === null
+        && planet.rBDSFTQ.researchHelperFor === null
+      )
+      .sort((left, right) =>
+        Number(resolveResearchAffordabilityEta(right, player, researchCost) > 5)
+        - Number(resolveResearchAffordabilityEta(left, player, researchCost) > 5)
+        || left.getBuildingProductionValue1(BuildingType.RESEARCH_LAB)
+        - right.getBuildingProductionValue1(BuildingType.RESEARCH_LAB)
+        || left.basicInfo.solarSystem.coordinates.x - right.basicInfo.solarSystem.coordinates.x
+        || left.basicInfo.solarSystem.coordinates.y - right.basicInfo.solarSystem.coordinates.y
+        || left.basicInfo.order - right.basicInfo.order
+      );
+  }
+}
+
+function resolveResearchAffordabilityEta(
+  planet: Planet,
+  player: Player,
+  cost: { metal: number; crystal: number; deuterium: number }
+): number {
+  const adaptiveTechnologyLevel = player.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+  return Math.max(
+    resolveResourceAffordabilityEta(planet.rBDSFTQ.resources.metal, planet.getMetalGain(adaptiveTechnologyLevel), cost.metal),
+    resolveResourceAffordabilityEta(planet.rBDSFTQ.resources.crystal, planet.getCrystalGain(adaptiveTechnologyLevel), cost.crystal),
+    resolveResourceAffordabilityEta(planet.rBDSFTQ.resources.deuterium, planet.getDeuteriumGain(adaptiveTechnologyLevel), cost.deuterium)
+  );
+}
+
+function resolveResourceAffordabilityEta(current: number, income: number, required: number): number {
+  if (current >= required) {
+    return 0;
+  }
+  if (income <= 0) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return Math.max(1, Math.ceil((required - current) / income));
 }
