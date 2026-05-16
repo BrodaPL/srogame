@@ -59,6 +59,7 @@ export class BotSupervisorV2 implements BotSupervisor {
     }
     const shipNeedPressure = buildShipNeedPressure(proposals);
     const researchOverlapBonus = buildResearchOverlapBonus(proposals);
+    const shipyardOverlapBonus = buildShipyardOverlapBonus(proposals);
     const rejected: BotSupervisorDecision['rejected'] = [];
     const scored = allProposals
       .map((proposal) => this.scoreProposal(
@@ -67,6 +68,7 @@ export class BotSupervisorV2 implements BotSupervisor {
         memory,
         shipNeedPressure,
         researchOverlapBonus,
+        shipyardOverlapBonus,
         retryProposals.some((retry) => retry.proposalId === proposal.proposalId)
       ))
       .filter((entry): entry is ScoredProposal => {
@@ -226,6 +228,7 @@ export class BotSupervisorV2 implements BotSupervisor {
     memory: BotMemoryV2,
     shipNeedPressure: Map<string, number>,
     researchOverlapBonus: Map<string, number>,
+    shipyardOverlapBonus: Map<string, number>,
     retryCommitment = false
   ): ScoredProposal | null {
     if (proposal.status === 'BLOCKED' || proposal.blockers.length > 0) {
@@ -373,6 +376,11 @@ export class BotSupervisorV2 implements BotSupervisor {
     if (proposal.kind === 'RESEARCH') {
       const technologyType = readResearchTechnologyType(proposal);
       const overlapBonus = technologyType ? (researchOverlapBonus.get(technologyType) ?? 0) : 0;
+      score *= 1 + overlapBonus;
+    }
+    if (proposal.kind === 'SHIPYARD' && proposal.requestPayload.demandOnly !== true) {
+      const shipyardKey = resolveShipyardNeedKey(proposal);
+      const overlapBonus = shipyardKey ? (shipyardOverlapBonus.get(shipyardKey) ?? 0) : 0;
       score *= 1 + overlapBonus;
     }
 
@@ -869,6 +877,36 @@ function buildResearchOverlapBonus(proposals: BotProposal[]): Map<string, number
   }
 
   return bonusByTechnology;
+}
+
+function buildShipyardOverlapBonus(proposals: BotProposal[]): Map<string, number> {
+  const subsystemSets = new Map<string, Set<string>>();
+  for (const proposal of proposals) {
+    if (proposal.kind !== 'SHIPYARD' || proposal.requestPayload.demandOnly === true) {
+      continue;
+    }
+
+    const shipyardKey = resolveShipyardNeedKey(proposal);
+    if (!shipyardKey) {
+      continue;
+    }
+
+    if (!subsystemSets.has(shipyardKey)) {
+      subsystemSets.set(shipyardKey, new Set());
+    }
+    subsystemSets.get(shipyardKey)!.add(proposal.subsystemId);
+  }
+
+  const bonusByShipyardKey = new Map<string, number>();
+  for (const [shipyardKey, subsystemIds] of subsystemSets.entries()) {
+    const overlapCount = subsystemIds.size - 1;
+    if (overlapCount <= 0) {
+      continue;
+    }
+    bonusByShipyardKey.set(shipyardKey, Math.min(0.6, overlapCount * 0.2));
+  }
+
+  return bonusByShipyardKey;
 }
 
 function readResearchTechnologyType(proposal: BotProposal): string | null {

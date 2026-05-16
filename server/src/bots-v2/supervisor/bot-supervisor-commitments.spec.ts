@@ -292,6 +292,21 @@ describe('bot supervisor commitments', () => {
     expect(decision.accepted).toHaveLength(1);
     expect(decision.accepted[0]?.requestPayload.technologyType).toBe(TechnologyType.ENERGY_TECHNOLOGY);
   });
+
+  it('prefers exact same-item shipyard overlap when competing production proposals are otherwise tied', () => {
+    const decision = createSupervisor().decide(
+      createSnapshot({ metal: 1000, crystal: 1000, deuterium: 1000 }),
+      createDefaultBotMemoryV2(),
+      [
+        createShipyardProposal('zzz-shipyard-overlap-main', 'STRATEGIC_MILITARY', ShipType.FIGHTER),
+        createShipyardProposal('yyy-shipyard-overlap-support', 'WARFARE', ShipType.FIGHTER),
+        createShipyardProposal('aaa-shipyard-other', 'STRATEGIC_DEVELOPMENT', ShipType.CRUISER)
+      ]
+    );
+
+    expect(decision.accepted).toHaveLength(1);
+    expect(decision.accepted[0]?.requestPayload.shipType).toBe(ShipType.FIGHTER);
+  });
 });
 
 function createSupervisor(): BotSupervisorV2 {
@@ -422,6 +437,33 @@ function createResearchProposal(
     confidence: 80,
     requestedResources: { metal: 100, crystal: 100, deuterium: 0 },
     requestPayload: { x: 0, y: 0, z: 1, technologyType, helperPlanets: [] },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {}
+  };
+}
+
+function createShipyardProposal(
+  proposalId: string,
+  subsystemId: BotProposal['subsystemId'],
+  shipType: ShipType
+): BotProposal {
+  return {
+    proposalId,
+    subsystemId,
+    kind: 'SHIPYARD',
+    status: 'PROPOSED',
+    goalKey: `shipyard:${shipType}`,
+    dedupeKey: `shipyard:${shipType}:${proposalId}`,
+    summary: `Build ${shipType}`,
+    planetId: null,
+    targetCoordinates: { x: 0, y: 0, z: 1 },
+    expectedValue: 25,
+    urgency: 20,
+    risk: 0,
+    confidence: 80,
+    requestedResources: { metal: 100, crystal: 100, deuterium: 0 },
+    requestPayload: { x: 0, y: 0, z: 1, itemKind: 'ship', shipType, amount: 1 },
     blockers: [],
     expiresOnTurn: null,
     debug: {}
