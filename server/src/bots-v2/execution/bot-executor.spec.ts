@@ -38,8 +38,8 @@ describe('bot executor', () => {
       spent: { metal: 0, crystal: 0, deuterium: 0 },
       fleetSlotsUsed: 1,
       missionType: FleetMissionType.MOVE,
-      originCoordinates: { x: 0, y: 0, z: 1 },
-      targetCoordinates: { x: 0, y: 0, z: 2 }
+      originCoordinates: { x: 0, y: 0, z: 0 },
+      targetCoordinates: { x: 0, y: 0, z: 1 }
     });
     expect(outcome?.fleetId).toBe(1);
     expect(outcome?.fuelSpent).toBeGreaterThan(0);
@@ -93,7 +93,7 @@ describe('bot executor', () => {
       requestId: 1,
       supportType: 'PLANET_REPAIR',
       targetPlayerId: 2,
-      targetCoordinates: { x: 0, y: 0, z: 1 }
+      targetCoordinates: { x: 0, y: 0, z: 0 }
     });
     expect(galaxy.supportRequests).toHaveLength(1);
     expect(galaxy.supportRequests[0]).toMatchObject({
@@ -192,8 +192,8 @@ describe('bot executor', () => {
       executed: true,
       success: true,
       missionType: FleetMissionType.TRANSPORT,
-      originCoordinates: { x: 0, y: 0, z: 1 },
-      targetCoordinates: { x: 0, y: 0, z: 2 }
+      originCoordinates: { x: 0, y: 0, z: 0 },
+      targetCoordinates: { x: 0, y: 0, z: 1 }
     });
     expect(origin.rBDSFTQ.ships.undamagedCountByType().get(ShipType.TRANSPORTER) ?? 0).toBe(0);
     expect(target.info.ownerId).toBe(ally.playerId);
@@ -222,7 +222,7 @@ describe('bot executor', () => {
       success: true
     });
     expect(outcomes[1]).toMatchObject({
-      proposalId: `maintenance:research-helpers:0:0:${mainPlanet.basicInfo.order}:${galaxy.currentTurn}`,
+      proposalId: `maintenance:research-helpers:0:0:${mainPlanet.basicInfo.order - 1}:${galaxy.currentTurn}`,
       executed: true,
       success: true
     });
@@ -261,8 +261,8 @@ function createFleetGalaxy(): { galaxy: Galaxy; origin: Planet } {
   const system = new SolarSystem('BotSys', 3, false, false, { x: 0, y: 0 }, new Set(), new Map());
   const origin = Planet.createStartingPlanet('Origin', 1, system, 1);
   const target = Planet.createStartingPlanet('Target', 2, system, 1);
-  system.planets[1] = origin;
-  system.planets[2] = target;
+  system.planets[0] = origin;
+  system.planets[1] = target;
   origin.rBDSFTQ.resources = new ResourcesPack(5000, 5000, 5000);
   origin.rBDSFTQ.ships = new ManyShips({ [ShipType.TRANSPORTER]: 1 }, []);
 
@@ -305,8 +305,8 @@ function createJumpGateGalaxy(): { galaxy: Galaxy; origin: Planet; target: Plane
   const system = new SolarSystem('GateSys', 3, false, false, { x: 0, y: 0 }, new Set(), new Map());
   const origin = Planet.createStartingPlanet('Origin', 1, system, 1);
   const target = Planet.createStartingPlanet('AllyTarget', 2, system, 2);
-  system.planets[1] = origin;
-  system.planets[2] = target;
+  system.planets[0] = origin;
+  system.planets[1] = target;
   origin.rBDSFTQ.resources = new ResourcesPack(5000, 5000, 5000);
   origin.rBDSFTQ.ships = new ManyShips({ [ShipType.TRANSPORTER]: 1 }, []);
   origin.setBuildingLevel(BuildingType.JUMP_GATE, 1);
@@ -357,8 +357,8 @@ function createRecallGalaxy(): { galaxy: Galaxy; origin: Planet; target: Planet;
   const system = new SolarSystem('RecallSys', 3, false, false, { x: 0, y: 0 }, new Set(), new Map());
   const origin = Planet.createStartingPlanet('Origin', 1, system, 1);
   const target = Planet.createStartingPlanet('Target', 2, system, 2);
-  system.planets[1] = origin;
-  system.planets[2] = target;
+  system.planets[0] = origin;
+  system.planets[1] = target;
   origin.rBDSFTQ.resources = new ResourcesPack(5000, 5000, 5000);
   origin.rBDSFTQ.ships = new ManyShips({ [ShipType.FIGHTER]: 1, [ShipType.SPY_PROBE]: 1 }, []);
 
@@ -407,8 +407,8 @@ function createAttackFleet(
     1,
     1,
     missionType,
-    new Destination(origin.basicInfo.solarSystem.coordinates.x, origin.basicInfo.solarSystem.coordinates.y, origin.basicInfo.order),
-    new Destination(target.basicInfo.solarSystem.coordinates.x, target.basicInfo.solarSystem.coordinates.y, target.basicInfo.order),
+    new Destination(origin.basicInfo.solarSystem.coordinates.x, origin.basicInfo.solarSystem.coordinates.y, origin.basicInfo.order - 1),
+    new Destination(target.basicInfo.solarSystem.coordinates.x, target.basicInfo.solarSystem.coordinates.y, target.basicInfo.order - 1),
     origin.basicInfo.name,
     target.basicInfo.name,
     new ManyShips({ [shipType]: 1 }, []),
@@ -625,13 +625,13 @@ function createResearchHelperGalaxy(): {
   const mainPlanet = Planet.createStartingPlanet('MainResearch', 1, systemA, 1);
   const helperA = Planet.createStartingPlanet('HelperA', 2, systemA, 1);
   const helperB = Planet.createStartingPlanet('HelperB', 3, systemA, 1);
-  systemA.planets[1] = mainPlanet;
-  systemA.planets[2] = helperA;
-  systemA.planets[3] = helperB;
+  systemA.planets[0] = mainPlanet;
+  systemA.planets[1] = helperA;
+  systemA.planets[2] = helperB;
 
   const systemB = new SolarSystem('Research-B', 1, false, false, { x: 1, y: 0 }, new Set(), new Map());
   const otherMainPlanet = Planet.createStartingPlanet('OtherMain', 1, systemB, 1);
-  systemB.planets[1] = otherMainPlanet;
+  systemB.planets[0] = otherMainPlanet;
 
   for (const planet of [mainPlanet, helperA, helperB, otherMainPlanet]) {
     planet.info.ownerId = 1;
@@ -701,6 +701,6 @@ function planetCoordinates(planet: Planet) {
   return {
     x: planet.basicInfo.solarSystem.coordinates.x,
     y: planet.basicInfo.solarSystem.coordinates.y,
-    z: planet.basicInfo.order
+    z: planet.basicInfo.order - 1
   };
 }

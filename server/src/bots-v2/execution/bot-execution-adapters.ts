@@ -7,6 +7,7 @@ import type { StartBuildingConstructionCommand } from '../../game-commands/build
 import type { StartTechnologyResearchCommand } from '../../game-commands/research-commands.ts';
 import type { StartShipyardConstructionCommand } from '../../game-commands/shipyard-commands.ts';
 import type { BotProposal } from '../bot-v2-types.ts';
+import { readV2ProposalCoordinates } from './bot-coordinate-adapters.js';
 
 export type BotQueueExecutionKind = 'BUILDING' | 'RESEARCH' | 'SHIPYARD';
 
@@ -159,16 +160,9 @@ function readCoordinates(value: unknown): ClientCoordinates | null {
 
   const record = value as Record<string, unknown>;
   const source = record.targetCoordinates && typeof record.targetCoordinates === 'object'
-    ? record.targetCoordinates as Record<string, unknown>
+    ? record.targetCoordinates
     : record;
-  const x = Number(source.x);
-  const y = Number(source.y);
-  const z = Number(source.z);
-  if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(z)) {
-    return null;
-  }
-
-  return { x, y, z };
+  return readV2ProposalCoordinates(source);
 }
 
 function isBuildingType(value: unknown): value is BuildingType {

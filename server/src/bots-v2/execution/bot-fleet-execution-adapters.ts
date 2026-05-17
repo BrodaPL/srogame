@@ -10,6 +10,7 @@ import type {
 } from '../../../../src/app/models/game-api-types.ts';
 import type { CreateFleetMissionCommand } from '../../game-commands/fleet-commands.ts';
 import type { BotProposal } from '../bot-v2-types.ts';
+import { readV2ProposalCoordinates } from './bot-coordinate-adapters.js';
 
 export const SUPERVISOR_ALLOWED_FLEET_MISSIONS = new Set<FleetMissionType>([
   FleetMissionType.SPY,
@@ -93,17 +94,7 @@ function readRecordOrNull(value: unknown): Record<string, unknown> | null {
 }
 
 function readCoordinates(value: unknown): ClientCoordinates | null {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-  const record = value as Record<string, unknown>;
-  const x = Number(record.x);
-  const y = Number(record.y);
-  const z = Number(record.z);
-  if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(z)) {
-    return null;
-  }
-  return { x, y, z };
+  return readV2ProposalCoordinates(value);
 }
 
 function readShips(value: unknown): CreateFleetShipSelectionEntry[] | null {

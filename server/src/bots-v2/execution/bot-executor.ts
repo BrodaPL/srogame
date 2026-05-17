@@ -150,7 +150,8 @@ export class LiveQueueBotExecutor implements BotExecutor {
         proposalId: proposal.proposalId,
         executed: true,
         success: false,
-        message
+        message,
+        commandErrorCode: result.error.code
       };
     }
 
@@ -609,7 +610,7 @@ export class LiveQueueBotExecutor implements BotExecutor {
       const targetCoordinates = {
         x: mainPlanet.basicInfo.solarSystem.coordinates.x,
         y: mainPlanet.basicInfo.solarSystem.coordinates.y,
-        z: mainPlanet.basicInfo.order
+        z: Math.max(0, mainPlanet.basicInfo.order - 1)
       };
       const result = updateResearchHelpers(
         {
@@ -623,17 +624,17 @@ export class LiveQueueBotExecutor implements BotExecutor {
             ...additionalHelpers.map((planet) => ({
               x: planet.basicInfo.solarSystem.coordinates.x,
               y: planet.basicInfo.solarSystem.coordinates.y,
-              z: planet.basicInfo.order
+              z: Math.max(0, planet.basicInfo.order - 1)
             }))
           ]
         }
       );
 
       if (!result.ok) {
-        const message = result.error.message;
-        console.warn(
-          `[BotV2 Supervisor] Research helper update failed for ${mainPlanet.basicInfo.name}: ${result.error.code} ${message}`
-        );
+      const message = result.error.message;
+      console.warn(
+        `[BotV2 Supervisor] Research helper update failed for ${mainPlanet.basicInfo.name}: ${result.error.code} ${message}`
+      );
         outcomes.push({
           proposalId: `maintenance:research-helpers:${targetCoordinates.x}:${targetCoordinates.y}:${targetCoordinates.z}:${this.galaxy.currentTurn}`,
           executed: true,
@@ -665,7 +666,7 @@ export class LiveQueueBotExecutor implements BotExecutor {
     const mainCoordinates = {
       x: mainPlanet.basicInfo.solarSystem.coordinates.x,
       y: mainPlanet.basicInfo.solarSystem.coordinates.y,
-      z: mainPlanet.basicInfo.order
+      z: Math.max(0, mainPlanet.basicInfo.order - 1)
     };
 
     return [...player.planets]
@@ -674,7 +675,7 @@ export class LiveQueueBotExecutor implements BotExecutor {
           {
             x: planet.basicInfo.solarSystem.coordinates.x,
             y: planet.basicInfo.solarSystem.coordinates.y,
-            z: planet.basicInfo.order
+            z: Math.max(0, planet.basicInfo.order - 1)
           },
           mainCoordinates
         )

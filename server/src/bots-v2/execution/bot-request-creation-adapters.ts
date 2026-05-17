@@ -3,6 +3,7 @@ import type { FleetMissionType } from '../../../../src/app/models/enums/fleet-mi
 import type { ShipType } from '../../../../src/app/models/enums/ship-type.ts';
 import type { SupportRequestType } from '../../../../src/app/models/requests/support-request.ts';
 import type { BotProposal } from '../bot-v2-types.ts';
+import { readV2ProposalCoordinates } from './bot-coordinate-adapters.js';
 
 export type BotRequestCreationExecution = {
   requestType: 'SUPPORT';
@@ -75,14 +76,7 @@ function normalizeSupportType(value: unknown): SupportRequestType | null {
 }
 
 function normalizeCoordinates(value: unknown): { x: number; y: number; z: number } | null {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-  const record = value as Record<string, unknown>;
-  const x = normalizeInteger(record.x);
-  const y = normalizeInteger(record.y);
-  const z = normalizeInteger(record.z);
-  return x === null || y === null || z === null ? null : { x, y, z };
+  return readV2ProposalCoordinates(value);
 }
 
 function normalizeResources(value: unknown): { metal: number; crystal: number; deuterium: number } {

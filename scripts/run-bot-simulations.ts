@@ -761,7 +761,7 @@ function summarizePlayer(
     profileId: player.botProfileId,
     planetsOwned: player.planets.length,
     activeFleetCount,
-    currentGoal: player.botMemory?.currentGoal ?? null,
+    currentGoal: player.botMemoryV2?.currentStance ?? null,
     totalResources,
     proposalCounts,
     chosenActionCounts

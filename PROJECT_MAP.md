@@ -75,7 +75,7 @@ Server bootstrap:
 - `server/src/turnstile.ts`
 - `server/src/game-commands/`
 - `server/src/bots-v2/`
-- `server/src/bots/` for shared profile/admin helpers and legacy V1 files during cleanup
+- `server/src/bots/` for shared profile/admin helpers and legacy V1 files that are no longer in the active turn runtime
 
 Smoke runner:
 - `scripts/run-smoke-tests.js`
@@ -729,6 +729,14 @@ Advisory bot simulation runner:
 - `warHotspot` additionally occupies the remaining map, seeds mutual full-strength espionage intel, and sets contender pairs to explicit `WAR` so advisory runs can surface attack behavior instead of only growth/logistics
 - output now includes per-run `profileSummary` plus top-level `overallProfileSummary` aggregates for profile-level tuning
 - supports `--profiles=AGGRESSOR,TURTLE` and `--compare=AGGRESSOR,TURTLE` for targeted comparison runs
+
+Strict V2 bot simulation runner:
+- `scripts/run-bot-v2-simulation.ts`
+- package entries: `npm.cmd run bot:sim`, `npm.cmd run bot:sim:initial`, `npm.cmd run bot:sim:advanced`
+- writes `tmp/bot-v2-sim/<timestamp>-*/summary.json`, `traces.jsonl`, `turn-summary.jsonl`, and `anomalies.json`
+- supports fresh-game and `--load-save-id=<saveId>` execution modes
+- runs `runBotTurnPhaseV2(..., { mode: 'LIVE' })` plus `resolvePhaseOneTurn(...)`
+- performs first-pass invariant checks and groups unexpected bot command failures for stabilization work
 
 Advisory simulation baseline compare:
 - `scripts/run-bot-sim-baselines.ts`
