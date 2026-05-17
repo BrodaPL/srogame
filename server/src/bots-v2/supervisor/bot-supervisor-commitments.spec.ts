@@ -40,6 +40,17 @@ describe('bot supervisor commitments', () => {
     });
   });
 
+  it('accepts affordable queue proposals on owned planets', () => {
+    const decision = createSupervisor().decide(
+      createSnapshot({ metal: 1000, crystal: 1000, deuterium: 1000 }),
+      createDefaultBotMemoryV2(),
+      [createBuildingProposal()]
+    );
+
+    expect(decision.accepted).toHaveLength(1);
+    expect(decision.accepted[0]?.kind).toBe('BUILDING');
+  });
+
   it('rejects duplicate pending proposals unless clearly better', () => {
     const memory = createDefaultBotMemoryV2();
     memory.supervisor.pendingCommitments.push({
@@ -280,7 +291,10 @@ describe('bot supervisor commitments', () => {
 
   it('prefers exact same-technology overlap when competing research proposals are otherwise tied', () => {
     const decision = createSupervisor().decide(
-      createSnapshot({ metal: 1000, crystal: 1000, deuterium: 1000 }),
+      createSnapshot(
+        { metal: 1000, crystal: 1000, deuterium: 1000 },
+        { researchLabLevel: 1 }
+      ),
       createDefaultBotMemoryV2(),
       [
         createResearchProposal('research-main', 'RESEARCH', TechnologyType.ENERGY_TECHNOLOGY),
@@ -295,12 +309,15 @@ describe('bot supervisor commitments', () => {
 
   it('prefers exact same-item shipyard overlap when competing production proposals are otherwise tied', () => {
     const decision = createSupervisor().decide(
-      createSnapshot({ metal: 1000, crystal: 1000, deuterium: 1000 }),
+      createSnapshot(
+        { metal: 1000, crystal: 1000, deuterium: 1000 },
+        { shipyardLevel: 10, defaultTechLevel: 10 }
+      ),
       createDefaultBotMemoryV2(),
       [
         createShipyardProposal('zzz-shipyard-overlap-main', 'STRATEGIC_MILITARY', ShipType.FIGHTER),
         createShipyardProposal('yyy-shipyard-overlap-support', 'WARFARE', ShipType.FIGHTER),
-        createShipyardProposal('aaa-shipyard-other', 'STRATEGIC_DEVELOPMENT', ShipType.CRUISER)
+        createShipyardProposal('aaa-shipyard-other', 'STRATEGIC_DEVELOPMENT', ShipType.SPY_PROBE)
       ]
     );
 
@@ -478,8 +495,12 @@ function createSnapshot(
     maxActiveFleetCount?: number;
     ships?: Partial<Record<ShipType, number>>;
     shipsCompletingNextTurnByType?: Partial<Record<ShipType, number>>;
+    shipyardLevel?: number;
+    researchLabLevel?: number;
+    defaultTechLevel?: number;
   } = {}
 ): BotWorldSnapshot {
+  const defaultTechLevel = options.defaultTechLevel ?? 0;
   return {
     turn: options.turn ?? 1,
     playerId: 1,
@@ -490,8 +511,51 @@ function createSnapshot(
       name: 'Home',
       coordinates: { x: 0, y: 0, z: 1 },
       maturityStage: 'BOOTSTRAP',
-      tech: {} as BotWorldSnapshot['planets'][number]['tech'],
-      economy: {} as BotWorldSnapshot['planets'][number]['economy'],
+      tech: {
+        energyTechnologyLevel: defaultTechLevel,
+        materialTechnologyLevel: defaultTechLevel,
+        adaptiveTechnologyLevel: defaultTechLevel,
+        computerTechnologyLevel: defaultTechLevel,
+        intergalacticResearchNetworkLevel: defaultTechLevel,
+        shieldingTechnologyLevel: defaultTechLevel,
+        armourTechnologyLevel: defaultTechLevel,
+        railgunsWeaponsLevel: defaultTechLevel,
+        beamsWeaponsLevel: defaultTechLevel,
+        missilesWeaponsLevel: defaultTechLevel,
+        fusionDriveLevel: defaultTechLevel,
+        hyperspaceDriveLevel: defaultTechLevel,
+        hyperspaceTechnologyLevel: defaultTechLevel,
+        espionageTechnologyLevel: defaultTechLevel,
+        astrophysicsTechnologyLevel: defaultTechLevel,
+        gravitonTechnologyLevel: defaultTechLevel
+      },
+      economy: {
+        metalMineLevel: 0,
+        crystalMineLevel: 0,
+        deuteriumSynthesizerLevel: 0,
+        solarLevel: 0,
+        nuclearLevel: 0,
+        fusionLevel: 0,
+        roboticsLevel: 0,
+        naniteLevel: 0,
+        shipyardLevel: options.shipyardLevel ?? 0,
+        researchLabLevel: options.researchLabLevel ?? 0,
+        sensorPhalanxLevel: 0,
+        jumpGateLevel: 0,
+        allianceDepotLevel: 0,
+        bombDepotLevel: 0,
+        interstellarTradePortLevel: 0,
+        metalStorageLevel: 0,
+        crystalStorageLevel: 0,
+        deuteriumTankLevel: 0,
+        averageMineLevel: 0,
+        availableEnergy: 0,
+        usedEnergy: 0,
+        energyGap: 0,
+        storagePressure: { metal: 0, crystal: 0, deuterium: 0 },
+        storageCapacity: { metal: 0, crystal: 0, deuterium: 0 },
+        income: { metal: 0, crystal: 0, deuterium: 0 }
+      },
       modifiers: {} as BotWorldSnapshot['planets'][number]['modifiers'],
       power: {
         industryPower: 1,
@@ -514,7 +578,19 @@ function createSnapshot(
         shipsCompletingNextTurnByType: options.shipsCompletingNextTurnByType ?? {},
         currentResearchType: null
       },
-      defense: {} as BotWorldSnapshot['planets'][number]['defense'],
+      defense: {
+        bunkerLevel: 0,
+        avgIndustryLevel: 0,
+        planetSize: 100,
+        knownByWarFaction: false,
+        recentHostileAttackCountLast20Turns: 0,
+        recentHostileAttackCountLast100Turns: 0,
+        recentHostileAttackStep: 0,
+        totalBunkerValue: 0,
+        totalInstalledDefenseValue: 0,
+        installedCountByType: {},
+        installedValueByType: {}
+      },
       ships: {
         undamagedCountByType: options.ships ?? {},
         damagedCountByType: {},

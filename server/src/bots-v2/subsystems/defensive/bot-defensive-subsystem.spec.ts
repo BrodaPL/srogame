@@ -70,6 +70,31 @@ describe('BotDefensiveSubsystem', () => {
     )).toBe(true);
   });
 
+  it('does not emit SAM production just because one is installed when missile tech is still missing', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseDefensivePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 5);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+    planet.rBDSFTQ.defences.addUndamaged(DefenceType.SAM_SITE, 1);
+
+    const result = runDefensiveSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && (proposal.requestPayload as { defenceType?: DefenceType }).defenceType === DefenceType.SAM_SITE
+    )).toBe(false);
+    expect(result.goals?.some((goal) =>
+      goal.goalFamily === 'UNLOCK'
+      && goal.finalDefenceType === DefenceType.SAM_SITE
+    )).toBe(true);
+  });
+
   it('falls back to production-only when bunker is on target and current unlocks are exhausted', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseDefensivePlanet(planet);

@@ -6,9 +6,12 @@ import type {
   BotWorldSnapshot
 } from '../bot-v2-types.ts';
 import type { BotMemoryV2 } from '../../../../src/app/models/player.ts';
+import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
 import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
+import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
 import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
 import type { ShipType } from '../../../../src/app/models/enums/ship-type.ts';
+import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
 import {
   calculateWeightedResourceValue,
   pruneSupervisorHistory,
@@ -21,6 +24,12 @@ import { normalizeRequestDecisionProposal } from '../execution/bot-request-decis
 import { normalizeRequestCreationProposal } from '../execution/bot-request-creation-adapters.js';
 import { normalizeDiplomacyDecisionProposal } from '../execution/bot-diplomacy-decision-adapters.js';
 import { normalizeDiplomacyProposal } from '../execution/bot-diplomacy-proposal-adapters.js';
+import {
+  BUILDING_BLUEPRINTS,
+  DEFENCE_BLUEPRINTS,
+  SHIP_BLUEPRINTS,
+  TECHNOLOGY_BLUEPRINTS
+} from '../../game-commands/command-helpers.js';
 
 const QUEUE_ACTION_KINDS = new Set<BotProposal['kind']>(['BUILDING', 'RESEARCH', 'SHIPYARD']);
 const FLEET_ACTION_KINDS = new Set<BotProposal['kind']>(['FLEET_MISSION']);
@@ -114,6 +123,8 @@ export class BotSupervisorV2 implements BotSupervisor {
     const pending: BotProposal[] = [];
     const usedPlanetBuildSlots = new Set<string>();
     const usedPlanetShipyardSlots = new Set<string>();
+    const reservedFleetShipsByOrigin = new Map<string, Map<ShipType, { undamaged: number; damaged: number }>>();
+    const reservedFleetCargoByOrigin = new Map<string, { metal: number; crystal: number; deuterium: number }>();
     let researchAccepted = false;
     const globalQueueCap = Math.max(1, snapshot.planets.length * 2);
     const maxFleetExecutions = resolveMaxFleetExecutions(snapshot);
@@ -156,7 +167,14 @@ export class BotSupervisorV2 implements BotSupervisor {
           continue;
         }
 
-        const fleetDecision = evaluateFleetProposal(snapshot, memory, entry, snapshot.turn);
+        const fleetDecision = evaluateFleetProposal(
+          snapshot,
+          memory,
+          entry,
+          snapshot.turn,
+          reservedFleetShipsByOrigin,
+          reservedFleetCargoByOrigin
+        );
         if (!fleetDecision.ok) {
           rejected.push({ proposalId: entry.proposal.proposalId, reason: fleetDecision.reason });
           continue;
@@ -164,6 +182,7 @@ export class BotSupervisorV2 implements BotSupervisor {
 
         if (fleetDecision.accepted) {
           accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
+          reserveFleetResources(entry.proposal, reservedFleetShipsByOrigin, reservedFleetCargoByOrigin);
         } else {
           pending.push({ ...entry.proposal, status: 'ACCEPTED' });
           upsertPendingFleetCommitment(memory, entry, snapshot.turn);
@@ -466,7 +485,11 @@ function evaluateQueueProposal(
     return { ok: false, reason: normalized.reason };
   }
 
-  const planetKey = `${normalized.value.command.x}:${normalized.value.command.y}:${normalized.value.command.z}`;
+  const planetCoordinates = readQueueProposalCoordinates(entry.proposal);
+  if (!planetCoordinates) {
+    return { ok: false, reason: 'invalid_queue_target_coordinates' };
+  }
+  const planetKey = toCoordinatesKey(planetCoordinates);
   const duplicate = memory.supervisor.pendingCommitments.find((commitment) =>
     isActivePendingCommitment(commitment.status)
     && commitment.dedupeKey === entry.proposal.dedupeKey
@@ -497,6 +520,11 @@ function evaluateQueueProposal(
     return { ok: false, reason: queuePrecheck };
   }
 
+  const requirementPrecheck = precheckQueueRequirements(snapshot, entry.proposal, planetKey);
+  if (requirementPrecheck) {
+    return { ok: false, reason: requirementPrecheck };
+  }
+
   const affordable = isLocallyAffordable(snapshot, planetKey, entry.proposal);
 
   return {
@@ -511,7 +539,9 @@ function evaluateFleetProposal(
   snapshot: BotWorldSnapshot,
   memory: BotMemoryV2,
   entry: ScoredProposal,
-  turn: number
+  turn: number,
+  reservedFleetShipsByOrigin: Map<string, Map<ShipType, { undamaged: number; damaged: number }>>,
+  reservedFleetCargoByOrigin: Map<string, { metal: number; crystal: number; deuterium: number }>
 ): {
   ok: true;
   accepted: boolean;
@@ -524,7 +554,11 @@ function evaluateFleetProposal(
     return { ok: false, reason: normalized.reason };
   }
 
-  const originKey = toCoordinatesKey(normalized.value.origin);
+  const originCoordinates = readFleetOriginCoordinates(entry.proposal);
+  if (!originCoordinates) {
+    return { ok: false, reason: 'invalid_origin_coordinates' };
+  }
+  const originKey = toCoordinatesKey(originCoordinates);
   const origin = snapshot.planets.find((entry) => toCoordinatesKey(entry.coordinates) === originKey);
   if (!origin) {
     return { ok: false, reason: 'origin_planet_not_owned' };
@@ -535,15 +569,17 @@ function evaluateFleetProposal(
     return { ok: false, reason: relationPrecheck };
   }
 
+  const reservedCargo = reservedFleetCargoByOrigin.get(originKey) ?? { metal: 0, crystal: 0, deuterium: 0 };
   if (
-    origin.localResources.metal < normalized.value.cargo.metal
-    || origin.localResources.crystal < normalized.value.cargo.crystal
-    || origin.localResources.deuterium < normalized.value.cargo.deuterium
+    origin.localResources.metal < (normalized.value.cargo.metal + reservedCargo.metal)
+    || origin.localResources.crystal < (normalized.value.cargo.crystal + reservedCargo.crystal)
+    || origin.localResources.deuterium < (normalized.value.cargo.deuterium + reservedCargo.deuterium)
   ) {
     return { ok: false, reason: 'cargo_resources_unavailable' };
   }
 
-  const missingShips = resolveMissingFleetShips(origin, normalized.value.ships);
+  const reservedShips = reservedFleetShipsByOrigin.get(originKey) ?? new Map<ShipType, { undamaged: number; damaged: number }>();
+  const missingShips = resolveMissingFleetShips(origin, normalized.value.ships, reservedShips);
   if (missingShips.length === 0) {
     return { ok: true, accepted: true };
   }
@@ -576,12 +612,14 @@ function precheckFleetMissionRelation(proposal: BotProposal): string | null {
 
 function resolveMissingFleetShips(
   origin: BotWorldSnapshot['planets'][number],
-  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>
+  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>,
+  reservedShips: Map<ShipType, { undamaged: number; damaged: number }>
 ): Array<{ type: ShipType; missingUndamagedAmount: number; missingDamagedAmount: number }> {
   const missing: Array<{ type: ShipType; missingUndamagedAmount: number; missingDamagedAmount: number }> = [];
   for (const ship of ships) {
-    const undamaged = origin.ships.undamagedCountByType[ship.type] ?? 0;
-    const damaged = origin.ships.damagedCountByType[ship.type] ?? 0;
+    const reserved = reservedShips.get(ship.type) ?? { undamaged: 0, damaged: 0 };
+    const undamaged = Math.max(0, (origin.ships.undamagedCountByType[ship.type] ?? 0) - reserved.undamaged);
+    const damaged = Math.max(0, (origin.ships.damagedCountByType[ship.type] ?? 0) - reserved.damaged);
     const missingUndamagedAmount = Math.max(0, ship.undamagedAmount - undamaged);
     const missingDamagedAmount = Math.max(0, ship.damagedAmount - damaged);
     if (missingUndamagedAmount > 0 || missingDamagedAmount > 0) {
@@ -927,4 +965,301 @@ function resolveShipyardNeedKey(proposal: BotProposal): string | null {
 
 function toCoordinatesKey(coordinates: { x: number; y: number; z: number }): string {
   return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+}
+
+function precheckQueueRequirements(
+  snapshot: BotWorldSnapshot,
+  proposal: BotProposal,
+  planetKey: string
+): string | null {
+  const planet = snapshot.planets.find((entry) => toCoordinatesKey(entry.coordinates) === planetKey);
+  if (!planet) {
+    return 'target_planet_not_owned';
+  }
+
+  if (proposal.kind === 'BUILDING') {
+    const buildingType = typeof proposal.requestPayload.buildingType === 'string'
+      ? proposal.requestPayload.buildingType as BuildingType
+      : null;
+    const blueprint = buildingType ? BUILDING_BLUEPRINTS.get(buildingType) : null;
+    if (!buildingType || !blueprint) {
+      return 'invalid_building_type';
+    }
+
+    const nextLevel = getSnapshotBuildingLevel(planet, buildingType) + 1;
+    if (!hasSnapshotBuildingRequirements(planet, blueprint.buildingRequirements, nextLevel)) {
+      return 'building_requirements_not_met';
+    }
+    if (!hasSnapshotTechnologyRequirements(planet, blueprint.techRequirements, nextLevel)) {
+      return 'technology_requirements_not_met';
+    }
+    return null;
+  }
+
+  if (proposal.kind === 'RESEARCH') {
+    const technologyType = typeof proposal.requestPayload.technologyType === 'string'
+      ? proposal.requestPayload.technologyType as TechnologyType
+      : null;
+    const blueprint = technologyType ? TECHNOLOGY_BLUEPRINTS.get(technologyType) : null;
+    if (!technologyType || !blueprint) {
+      return 'invalid_technology_type';
+    }
+
+    const nextLevel = getSnapshotTechnologyLevel(planet, technologyType) + 1;
+    if (!hasSnapshotBuildingRequirements(planet, blueprint.buildingRequirements, nextLevel)) {
+      return 'building_requirements_not_met';
+    }
+    if (!hasSnapshotTechnologyRequirements(planet, blueprint.techRequirements, nextLevel)) {
+      return 'technology_requirements_not_met';
+    }
+    return null;
+  }
+
+  if (proposal.kind === 'SHIPYARD') {
+    const itemKind = proposal.requestPayload.itemKind;
+    if (itemKind === 'ship') {
+      const shipType = typeof proposal.requestPayload.shipType === 'string'
+        ? proposal.requestPayload.shipType as ShipType
+        : null;
+      const blueprint = shipType ? SHIP_BLUEPRINTS.get(shipType) : null;
+      if (!shipType || !blueprint) {
+        return 'invalid_ship_type';
+      }
+
+      if (!hasSnapshotStaticRequirements(planet, blueprint.buildingRequirements, 'building')) {
+        return 'building_requirements_not_met';
+      }
+      if (!hasSnapshotStaticRequirements(planet, blueprint.techRequirements, 'technology')) {
+        return 'technology_requirements_not_met';
+      }
+      return null;
+    }
+
+    if (itemKind === 'defence') {
+      const defenceType = typeof proposal.requestPayload.defenceType === 'string'
+        ? proposal.requestPayload.defenceType as DefenceType
+        : null;
+      const blueprint = defenceType ? DEFENCE_BLUEPRINTS.get(defenceType) : null;
+      if (!defenceType || !blueprint) {
+        return 'invalid_defence_type';
+      }
+
+      if (!hasSnapshotStaticRequirements(planet, blueprint.buildingRequirements, 'building')) {
+        return 'building_requirements_not_met';
+      }
+      if (!hasSnapshotStaticRequirements(planet, blueprint.techRequirements, 'technology')) {
+        return 'technology_requirements_not_met';
+      }
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function readQueueProposalCoordinates(proposal: BotProposal): { x: number; y: number; z: number } | null {
+  if (proposal.targetCoordinates) {
+    return proposal.targetCoordinates;
+  }
+
+  if (!proposal.requestPayload || typeof proposal.requestPayload !== 'object') {
+    return null;
+  }
+
+  const payload = proposal.requestPayload as Record<string, unknown>;
+  return readOneBasedCoordinates(payload);
+}
+
+function readFleetOriginCoordinates(proposal: BotProposal): { x: number; y: number; z: number } | null {
+  if (!proposal.requestPayload || typeof proposal.requestPayload !== 'object') {
+    return null;
+  }
+
+  const payload = proposal.requestPayload as Record<string, unknown>;
+  return readOneBasedCoordinates(payload.origin);
+}
+
+function readOneBasedCoordinates(value: unknown): { x: number; y: number; z: number } | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const x = Number(record.x);
+  const y = Number(record.y);
+  const z = Number(record.z);
+  if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(z)) {
+    return null;
+  }
+
+  return { x, y, z };
+}
+
+function hasSnapshotBuildingRequirements(
+  planet: BotWorldSnapshot['planets'][number],
+  requirements: Array<{ building: BuildingType; level: number }>,
+  scaledLevel: number
+): boolean {
+  for (const requirement of requirements) {
+    const requiredLevel = Math.ceil(scaledLevel * requirement.level);
+    if (getSnapshotBuildingLevel(planet, requirement.building) < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSnapshotTechnologyRequirements(
+  planet: BotWorldSnapshot['planets'][number],
+  requirements: Array<{ tech: TechnologyType; level: number }>,
+  scaledLevel: number
+): boolean {
+  for (const requirement of requirements) {
+    const requiredLevel = Math.ceil(scaledLevel * requirement.level);
+    if (getSnapshotTechnologyLevel(planet, requirement.tech) < requiredLevel) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSnapshotStaticRequirements(
+  planet: BotWorldSnapshot['planets'][number],
+  requirements: Array<{ building: BuildingType; level: number }> | Array<{ tech: TechnologyType; level: number }>,
+  kind: 'building' | 'technology'
+): boolean {
+  if (kind === 'building') {
+    return (requirements as Array<{ building: BuildingType; level: number }>).every((requirement) =>
+      getSnapshotBuildingLevel(planet, requirement.building) >= Math.ceil(requirement.level)
+    );
+  }
+
+  return (requirements as Array<{ tech: TechnologyType; level: number }>).every((requirement) =>
+    getSnapshotTechnologyLevel(planet, requirement.tech) >= Math.ceil(requirement.level)
+  );
+}
+
+function getSnapshotBuildingLevel(
+  planet: BotWorldSnapshot['planets'][number],
+  buildingType: BuildingType
+): number {
+  switch (buildingType) {
+    case BuildingType.METAL_MINE:
+      return planet.economy.metalMineLevel;
+    case BuildingType.CRYSTAL_MINE:
+      return planet.economy.crystalMineLevel;
+    case BuildingType.DEUTERIUM_SYNTHESIZER:
+      return planet.economy.deuteriumSynthesizerLevel;
+    case BuildingType.SOLAR_WIND_GEOTHERMAL:
+      return planet.economy.solarLevel;
+    case BuildingType.NUCLEAR_PLANT:
+      return planet.economy.nuclearLevel;
+    case BuildingType.FUSION_REACTOR:
+      return planet.economy.fusionLevel;
+    case BuildingType.METAL_STORAGE:
+      return planet.economy.metalStorageLevel;
+    case BuildingType.CRYSTAL_STORAGE:
+      return planet.economy.crystalStorageLevel;
+    case BuildingType.DEUTERIUM_TANK:
+      return planet.economy.deuteriumTankLevel;
+    case BuildingType.ROBOTICS_FACTORY:
+      return planet.economy.roboticsLevel;
+    case BuildingType.NANITE_FACTORY:
+      return planet.economy.naniteLevel;
+    case BuildingType.SHIPYARD:
+      return planet.economy.shipyardLevel;
+    case BuildingType.RESEARCH_LAB:
+      return planet.economy.researchLabLevel;
+    case BuildingType.SENSOR_PHALANX:
+      return planet.economy.sensorPhalanxLevel;
+    case BuildingType.JUMP_GATE:
+      return planet.economy.jumpGateLevel;
+    case BuildingType.ALLIANCE_DEPOT:
+      return planet.economy.allianceDepotLevel;
+    case BuildingType.BOMB_DEPOT:
+      return planet.economy.bombDepotLevel;
+    case BuildingType.BUNKER_NETWORK:
+      return planet.defense.bunkerLevel;
+    case BuildingType.INTERSTELLAR_TRADE_PORT:
+      return planet.economy.interstellarTradePortLevel;
+    default:
+      return 0;
+  }
+}
+
+function getSnapshotTechnologyLevel(
+  planet: BotWorldSnapshot['planets'][number],
+  technologyType: TechnologyType
+): number {
+  switch (technologyType) {
+    case TechnologyType.ENERGY_TECHNOLOGY:
+      return planet.tech.energyTechnologyLevel;
+    case TechnologyType.MATERIAL_TECHNOLOGY:
+      return planet.tech.materialTechnologyLevel;
+    case TechnologyType.ADAPTIVE_TECHNOLOGY:
+      return planet.tech.adaptiveTechnologyLevel;
+    case TechnologyType.COMPUTER_TECHNOLOGY:
+      return planet.tech.computerTechnologyLevel;
+    case TechnologyType.INTERGALACTIC_RESEARCH_NETWORK:
+      return planet.tech.intergalacticResearchNetworkLevel;
+    case TechnologyType.SHIELDING_TECHNOLOGY:
+      return planet.tech.shieldingTechnologyLevel;
+    case TechnologyType.ARMOUR_TECHNOLOGY:
+      return planet.tech.armourTechnologyLevel;
+    case TechnologyType.RAILGUNS_WEAPONS:
+      return planet.tech.railgunsWeaponsLevel;
+    case TechnologyType.BEAMS_WEAPONS:
+      return planet.tech.beamsWeaponsLevel;
+    case TechnologyType.MISSILES_WEAPONS:
+      return planet.tech.missilesWeaponsLevel;
+    case TechnologyType.FUSION_DRIVE:
+      return planet.tech.fusionDriveLevel;
+    case TechnologyType.HYPERSPACE_DRIVE:
+      return planet.tech.hyperspaceDriveLevel;
+    case TechnologyType.HYPERSPACE_TECHNOLOGY:
+      return planet.tech.hyperspaceTechnologyLevel;
+    case TechnologyType.ESPIONAGE_TECHNOLOGY:
+      return planet.tech.espionageTechnologyLevel;
+    case TechnologyType.ASTROPHYSICS_TECHNOLOGY:
+      return planet.tech.astrophysicsTechnologyLevel;
+    case TechnologyType.GRAVITON_TECHNOLOGY:
+      return planet.tech.gravitonTechnologyLevel;
+    default:
+      return 0;
+  }
+}
+
+function reserveFleetResources(
+  proposal: BotProposal,
+  shipsByOrigin: Map<string, Map<ShipType, { undamaged: number; damaged: number }>>,
+  cargoByOrigin: Map<string, { metal: number; crystal: number; deuterium: number }>
+): void {
+  const originCoordinates = readFleetOriginCoordinates(proposal);
+  if (!originCoordinates) {
+    return;
+  }
+
+  const originKey = toCoordinatesKey(originCoordinates);
+  if (!shipsByOrigin.has(originKey)) {
+    shipsByOrigin.set(originKey, new Map());
+  }
+  const shipReservations = shipsByOrigin.get(originKey)!;
+  const fleetShips = Array.isArray(proposal.requestPayload.ships)
+    ? proposal.requestPayload.ships as Array<{ type: ShipType; undamagedAmount?: number; damagedAmount?: number }>
+    : [];
+  for (const ship of fleetShips) {
+    const existing = shipReservations.get(ship.type) ?? { undamaged: 0, damaged: 0 };
+    existing.undamaged += Math.max(0, Math.floor(ship.undamagedAmount ?? 0));
+    existing.damaged += Math.max(0, Math.floor(ship.damagedAmount ?? 0));
+    shipReservations.set(ship.type, existing);
+  }
+
+  const existingCargo = cargoByOrigin.get(originKey) ?? { metal: 0, crystal: 0, deuterium: 0 };
+  const cargo = proposal.requestPayload.cargo as Partial<{ metal: number; crystal: number; deuterium: number }> | undefined;
+  existingCargo.metal += Math.max(0, Math.floor(cargo?.metal ?? 0));
+  existingCargo.crystal += Math.max(0, Math.floor(cargo?.crystal ?? 0));
+  existingCargo.deuterium += Math.max(0, Math.floor(cargo?.deuterium ?? 0));
+  cargoByOrigin.set(originKey, existingCargo);
 }

@@ -108,6 +108,35 @@ describe('BotWarfareSubsystem', () => {
     expect(cargoProposals).toHaveLength(1);
   });
 
+  it('does not emit transporter production only because one transporter is installed when build prerequisites are missing', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 5);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 5);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 6);
+    addInstalledShips(planet, {
+      [ShipType.TRANSPORTER]: 1
+    });
+    bot.setTechLevel(TechnologyType.BEAMS_WEAPONS, 1);
+    bot.setTechLevel(TechnologyType.SHIELDING_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 1);
+
+    const result = runWarfareSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && (proposal.requestPayload as { shipType?: ShipType }).shipType === ShipType.TRANSPORTER
+    )).toBe(false);
+    expect(result.goals?.some((goal) =>
+      goal.goalFamily === 'UNLOCK'
+      && goal.finalShipType === ShipType.TRANSPORTER
+    )).toBe(true);
+  });
+
   it('emits a first-class no-action planet result when local queues block all requests', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseWarfarePlanet(planet);

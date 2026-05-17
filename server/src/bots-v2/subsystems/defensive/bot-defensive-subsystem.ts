@@ -409,7 +409,7 @@ function evaluateProductionGoal(
   planet: BotPlanetSnapshot,
   defenceType: DefenceType
 ): DefensiveGoalEvaluation | null {
-  if (!isDefenseUnlocked(planet, defenceType)) {
+  if (!canProduceDefenseNow(planet, defenceType)) {
     return null;
   }
 
@@ -516,7 +516,7 @@ function resolveUnlockCandidates(
 ): Array<{ defenceType: DefenceType; threshold: number }> {
   return UNLOCK_THRESHOLDS.filter((entry) =>
     planet.defense.avgIndustryLevel >= entry.threshold
-    && !isDefenseUnlocked(planet, entry.defenceType)
+    && !canProduceDefenseNow(planet, entry.defenceType)
   );
 }
 
@@ -531,6 +531,19 @@ function isDefenseUnlocked(planet: BotPlanetSnapshot, defenceType: DefenceType):
     return false;
   }
 
+  const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+  if (!blueprint) {
+    return false;
+  }
+
+  return blueprint.buildingRequirements.every((requirement) =>
+    getBuildingLevel(planet, requirement.building) >= Math.ceil(requirement.level)
+  ) && blueprint.techRequirements.every((requirement) =>
+    getTechnologyLevel(planet, requirement.tech) >= Math.ceil(requirement.level)
+  );
+}
+
+function canProduceDefenseNow(planet: BotPlanetSnapshot, defenceType: DefenceType): boolean {
   const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
   if (!blueprint) {
     return false;

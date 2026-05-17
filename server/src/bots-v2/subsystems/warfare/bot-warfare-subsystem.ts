@@ -221,7 +221,7 @@ function buildPlanetWarfareResult(
   ].filter((goal): goal is WarfareGoalEvaluation => goal !== null)
     .sort(compareGoals);
   const unlockGoals = INCLUDED_WARFARE_SHIP_TYPES
-    .filter((shipType) => isShipUnlockBandOpen(planet, shipType) && !isShipUnlocked(planet, shipType))
+    .filter((shipType) => isShipUnlockBandOpen(planet, shipType) && !canProduceShipNow(planet, shipType))
     .map((shipType) => evaluateUnlockGoal(context, planet, shipType))
     .filter((goal): goal is WarfareGoalEvaluation => goal !== null)
     .sort(compareGoals);
@@ -1104,7 +1104,7 @@ function evaluateProductionGoal(
   planet: BotPlanetSnapshot,
   shipType: ShipType
 ): WarfareGoalEvaluation | null {
-  if (!isShipUnlocked(planet, shipType)) {
+  if (!canProduceShipNow(planet, shipType)) {
     return null;
   }
 
@@ -1309,6 +1309,19 @@ function isShipUnlocked(planet: BotPlanetSnapshot, shipType: ShipType): boolean 
     return false;
   }
 
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return false;
+  }
+
+  return blueprint.buildingRequirements.every((requirement) =>
+    getBuildingLevel(planet, requirement.building) >= Math.ceil(requirement.level)
+  ) && blueprint.techRequirements.every((requirement) =>
+    getTechnologyLevel(planet, requirement.tech) >= Math.ceil(requirement.level)
+  );
+}
+
+function canProduceShipNow(planet: BotPlanetSnapshot, shipType: ShipType): boolean {
   const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return false;
