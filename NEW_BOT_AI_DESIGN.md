@@ -1625,6 +1625,11 @@ It should not re-expand `MOVE`, `BOMBARD`, or `SIEGE` here.
 Current implementation note:
 
 * phase 6 now also consumes the live per-faction `warAdvantageLevel` as extra raid-scoring context
+* post-break raid continuation now hard-stops as soon as the relation is no longer `WAR`
+* stale opened targets are no longer blind-raided; they instead feed high-priority `SPY` refresh pressure
+* only one opened-target raid per enemy is kept each turn
+* direct `BREAK` pressure is still preferred unless the best raid is at least `25%` better
+* raid pause thresholds and active opened-raid caps now scale with `warAdvantageLevel`
 * it still does not define a broader doctrine table or campaign-state machine yet
 
 #### Phase-6 opened-target gate
@@ -1699,6 +1704,14 @@ The subsystem should:
 
 * pause raids on that target
 
+Current implementation detail:
+
+* pause threshold is now dynamic by `warAdvantageLevel`:
+  * `-2 -> 55`
+  * `-1 -> 60`
+  * `0 -> 70`
+  * `+1/+2 -> 80`
+
 If no valid post-break raid targets remain, it should fall back to:
 
 * `SPY` on current `WAR` targets
@@ -1718,6 +1731,10 @@ This phase should keep separate caps for:
 Opened-war raid targets may be active up to:
 
 * `floor(sqrt(ownedPlanetsCount)) + 1`
+
+Current implementation detail:
+
+* when average active-war `warAdvantageLevel <= -1`, the opened-target raid cap is reduced to `1`
 
 But concentrated `BREAK` attempts should still preferably stay at:
 
