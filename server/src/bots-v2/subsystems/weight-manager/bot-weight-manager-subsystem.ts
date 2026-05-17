@@ -566,6 +566,7 @@ function buildWeightManagerPlanetEntry(
   }
 
   if (flags.immaturePlanet) {
+    economicWeight += Math.max(0, warfareWeight);
     economicWeight = Math.max(economicWeight, 80);
     warfareWeight = 0;
     if (!flags.inDangerPlanet) {
