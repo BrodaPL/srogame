@@ -1071,6 +1071,11 @@ function resolveStrategicDiplomaticFactions(
         foreignPlayer,
         galaxy.currentTurn
       );
+      const recentWarValueSignals = resolveRecentWarValueSignalsForFaction(
+        player,
+        foreignPlayer,
+        galaxy.currentTurn
+      );
       const sharedHostileEvents = resolveSharedHostileEventsForFaction(
         galaxy,
         player,
@@ -1171,6 +1176,10 @@ function resolveStrategicDiplomaticFactions(
         recentOutgoingCoercionPressureLong: outgoingCoercion.longPressure,
         recentIncomingCoercionPressureShort: 0,
         recentIncomingCoercionPressureLong: 0,
+        recentOutgoingShipLossValueShort: recentWarValueSignals.outgoingShipLossValueShort,
+        recentIncomingShipLossValueShort: recentWarValueSignals.incomingShipLossValueShort,
+        recentOutgoingPlunderValueShort: recentWarValueSignals.outgoingPlunderValueShort,
+        recentIncomingPlunderValueShort: recentWarValueSignals.incomingPlunderValueShort,
         recentOutgoingDamagePercentShort: outgoingCoercion.shortDamagePercent,
         recentOutgoingDamagePercentLong: outgoingCoercion.longDamagePercent,
         recentIncomingDamagePercentShort: 0,
@@ -1327,6 +1336,97 @@ function resolveRecentOutgoingCoercionForFaction(
     longDamagePercent,
     lastSuccessfulBombardTurn,
     lastSuccessfulSiegeTurn
+  };
+}
+
+function resolveRecentWarValueSignalsForFaction(
+  player: Player,
+  foreignPlayer: Player,
+  currentTurn: number
+): {
+  outgoingShipLossValueShort: number;
+  incomingShipLossValueShort: number;
+  outgoingPlunderValueShort: number;
+  incomingPlunderValueShort: number;
+} {
+  const ownPlanetCoordinates = new Set(
+    player.planets.map((planet) =>
+      `${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}:${planet.basicInfo.order}`
+    )
+  );
+  const foreignPlanetCoordinates = new Set(
+    foreignPlayer.planets.map((planet) =>
+      `${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}:${planet.basicInfo.order}`
+    )
+  );
+  let outgoingShipLossValueShort = 0;
+  let incomingShipLossValueShort = 0;
+  let outgoingPlunderValueShort = 0;
+  let incomingPlunderValueShort = 0;
+
+  for (const report of player.reports) {
+    const age = Math.max(0, currentTurn - report.createdTurn);
+    if (age > 20 || !report.sourceCoordinates) {
+      continue;
+    }
+
+    const coordinatesKey = `${report.sourceCoordinates.x}:${report.sourceCoordinates.y}:${report.sourceCoordinates.z}`;
+    const isForeignCoordinates = foreignPlanetCoordinates.has(coordinatesKey);
+    const isOwnCoordinates = ownPlanetCoordinates.has(coordinatesKey);
+    if (!isForeignCoordinates && !isOwnCoordinates) {
+      continue;
+    }
+
+    const reportWithBody = report as unknown as { body?: unknown };
+    const body = typeof reportWithBody.body === 'string'
+      ? reportWithBody.body
+      : '';
+    if (!body) {
+      continue;
+    }
+    const lines = body.split('\n');
+
+    if (
+      report.reportType === ReportType.FLEET_REPORT
+      && report.title.startsWith('Battle Report:')
+      && (isForeignCoordinates || report.senderPlayerName === foreignPlayer.playerName)
+    ) {
+      outgoingShipLossValueShort += resolveTypedShipValueFromLine(
+        lines.find((line) => line.startsWith('Enemy ship losses by type:')) ?? null,
+        'Enemy ship losses by type:'
+      );
+      incomingShipLossValueShort += resolveTypedShipValueFromLine(
+        lines.find((line) => line.startsWith('Own ship losses by type:')) ?? null,
+        'Own ship losses by type:'
+      );
+      outgoingPlunderValueShort += resolveResourceValueFromLine(
+        lines.find((line) => line.startsWith('Resources stolen: ')) ?? null,
+        'Resources stolen: '
+      );
+      incomingPlunderValueShort += resolveResourceValueFromLine(
+        lines.find((line) => line.startsWith('Resources lost: ')) ?? null,
+        'Resources lost: '
+      );
+      continue;
+    }
+
+    if (
+      report.reportType === ReportType.FLEET_REPORT
+      && report.title.startsWith('Plunder Report:')
+      && isForeignCoordinates
+    ) {
+      outgoingPlunderValueShort += resolveResourceValueFromLine(
+        lines.find((line) => line.startsWith('Resources stolen: ')) ?? null,
+        'Resources stolen: '
+      );
+    }
+  }
+
+  return {
+    outgoingShipLossValueShort,
+    incomingShipLossValueShort,
+    outgoingPlunderValueShort,
+    incomingPlunderValueShort
   };
 }
 
@@ -2072,6 +2172,64 @@ function parseTypedCountSummary<T extends string>(
   return counts;
 }
 
+function resolveTypedShipValueFromLine(
+  line: string | null,
+  prefix: string
+): number {
+  const counts = parseTypedCountSummary<ShipType>(line, prefix);
+  let total = 0;
+
+  for (const [shipType, amount] of Object.entries(counts) as Array<[ShipType, number]>) {
+    const blueprint = SHIP_BLUEPRINTS.get(shipType);
+    if (!blueprint || !Number.isFinite(amount) || amount <= 0) {
+      continue;
+    }
+
+    total += resolveWeightedResourceValue({
+      metal: blueprint.cost.metal * amount,
+      crystal: blueprint.cost.crystal * amount,
+      deuterium: blueprint.cost.deuterium * amount
+    });
+  }
+
+  return Math.max(0, Math.floor(total));
+}
+
+function resolveResourceValueFromLine(
+  line: string | null,
+  prefix: string
+): number {
+  if (!line || !line.startsWith(prefix)) {
+    return 0;
+  }
+
+  const match = line.match(/Metal (\d+), Crystal (\d+), Deuterium (\d+)\./);
+  if (!match) {
+    return 0;
+  }
+
+  return resolveWeightedResourceValue({
+    metal: Math.max(0, Number.parseInt(match[1] ?? '0', 10)),
+    crystal: Math.max(0, Number.parseInt(match[2] ?? '0', 10)),
+    deuterium: Math.max(0, Number.parseInt(match[3] ?? '0', 10))
+  });
+}
+
+function resolveWeightedResourceValue(resources: {
+  metal: number;
+  crystal: number;
+  deuterium: number;
+}): number {
+  return Math.max(
+    0,
+    Math.floor(
+      resources.metal
+      + (resources.crystal * 1.8)
+      + (resources.deuterium * 2.6)
+    )
+  );
+}
+
 function resolveKnownShipCountsForStrategicMilitary(
   report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
   latestBattleObservation: ReturnType<typeof resolveLatestBattleObservation>
@@ -2097,7 +2255,8 @@ function resolveKnownDefenceCountsForStrategicMilitary(
 }
 
 function sumCountsByType<T extends string>(counts: Partial<Record<T, number>>): number {
-  return Object.values(counts).reduce((sum, value) => sum + Math.max(0, value ?? 0), 0);
+  return (Object.values(counts) as Array<number | undefined>)
+    .reduce<number>((sum, value) => sum + Math.max(0, value ?? 0), 0);
 }
 
 function resolveReportedStorageCapacity(

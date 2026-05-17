@@ -307,6 +307,7 @@ function applyRecycleHostilitySideEffects(
       targetMemory.strategicDiplomatic.factionLedger.push({
         playerId: attacker.playerId,
         hostilityScore: 1,
+        warAdvantageLevel: 0,
         lastSuccessfulBombardTurn: null,
         lastSuccessfulSiegeTickTurn: null,
         recentOutgoingCoercionPressure: 0,

@@ -1400,6 +1400,10 @@ Mission-family scope should split like this:
 * `ATTACK` keeps its current broader scope
 * `BOMBARD` is `WAR` only
 * `SIEGE` is `WAR` only
+* explicit hostility gates now apply:
+  * `BOMBARD` requires hostility `>= 35`
+  * `SIEGE` requires hostility `>= 60`
+* when a target is siege-eligible but siege hostility is still too low, the subsystem should fall back to `BOMBARD`
 
 #### Phase-4 mission meaning
 
@@ -1618,6 +1622,11 @@ This phase should execute:
 
 It should not re-expand `MOVE`, `BOMBARD`, or `SIEGE` here.
 
+Current implementation note:
+
+* phase 6 now also consumes the live per-faction `warAdvantageLevel` as extra raid-scoring context
+* it still does not define a broader doctrine table or campaign-state machine yet
+
 #### Phase-6 opened-target gate
 
 This phase may attack a target only after the subsystem is sure the target planet is opened.
@@ -1755,6 +1764,13 @@ It should instead change how the subsystem interprets:
 
 Successful outgoing coercion should reduce our hostility toward the enemy.
 
+Current live extension:
+
+* successful outgoing plunder also reduces hostility when the plunder is meaningful
+* enemy ship losses reduce hostility immediately
+* meaningful outgoing structural damage reduces hostility
+* successful `BOMBARD` / `SIEGE` damage reduces hostility on both sides
+
 Successful `BOMBARD` should apply:
 
 * base hostility decrease `-5`
@@ -1770,6 +1786,11 @@ This should use mission report outcome and percentage damage, because raw buildi
 #### Phase-7 incoming coercion effects
 
 Enemy coercion against us should increase hostility toward that enemy.
+
+Current live extension:
+
+* incoming plunder increases hostility when we are not losing
+* incoming plunder decreases hostility when we are already losing
 
 Enemy successful `BOMBARD` should apply:
 
@@ -1796,6 +1817,16 @@ War evaluation should run every:
 
 * `20` turns
 
+Current live extension:
+
+* the same cadence now persists `warAdvantageLevel` on `-2 .. +2`
+* score-band mapping is:
+  * `<= -60 -> -2`
+  * `-59 .. -20 -> -1`
+  * `-19 .. +19 -> 0`
+  * `+20 .. +59 -> +1`
+  * `>= +60 -> +2`
+
 The combined war score should be:
 
 * normalized `-100 .. +100`
@@ -1815,6 +1846,12 @@ If the war evaluation says we are losing, the subsystem should reduce hostility 
 At each evaluation while losing, apply:
 
 * hostility decay `-10`
+
+Current live extension:
+
+* hostility decay now also keys off `warAdvantageLevel`
+* decay applies at `-1`
+* stronger decay applies at `-2`
 
 There should be no separate hard deescalation-block timer.
 
@@ -1848,6 +1885,7 @@ This phase should add a per-faction operational war-pressure ledger with fields 
 * `lastWarEvaluationTurn`
 * `shortWindowWarScore`
 * `longWindowWarScore`
+* `warAdvantageLevel`
 * `currentWarExitPressure`
 
 Outgoing coercion pressure should use a hybrid model:
@@ -2603,6 +2641,7 @@ Supervisor fleet execution rules:
 * exact fleet proposals may be stored as `PENDING_SHIPS_NEXT_TURN` only when the exact missing type/count is completing next turn,
 * pending next-turn fleet proposals retry the exact same payload once and expire with `ships_unavailable_after_pending` if still impossible,
 * `BOMBARD` and `SIEGE` get a simple Supervisor metadata precheck for `WAR`, while broader target quality and legality remain subsystem/shared-command responsibility,
+* Strategic Diplomatic now also persists a per-faction `warAdvantageLevel` (`-2 .. +2`) from the 20-turn war-evaluation cadence; ship-loss value is dominant, structural damage is medium-high, and plunder is light,
 * fleet-slot use is tracked separately from resource spending and aligned through the same target-share model,
 * cargo/resource spending is recorded in normal spending history,
 * deuterium fuel is recorded separately in lightweight `fuelSpendingHistory`,

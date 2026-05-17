@@ -107,6 +107,10 @@ export type BotStrategicDiplomaticFactionSnapshot = {
   recentOutgoingCoercionPressureLong: number;
   recentIncomingCoercionPressureShort: number;
   recentIncomingCoercionPressureLong: number;
+  recentOutgoingShipLossValueShort: number;
+  recentIncomingShipLossValueShort: number;
+  recentOutgoingPlunderValueShort: number;
+  recentIncomingPlunderValueShort: number;
   recentOutgoingDamagePercentShort: number;
   recentOutgoingDamagePercentLong: number;
   recentIncomingDamagePercentShort: number;

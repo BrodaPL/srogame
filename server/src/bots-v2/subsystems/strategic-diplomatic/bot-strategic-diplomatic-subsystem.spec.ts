@@ -471,8 +471,10 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ORBITAL_BOMBER, 2);
     playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
     markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.factionLedger.push(createFactionLedgerSeed(playerEnemy.playerId, 40));
 
-    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
     const bombardProposal = result.result.proposals.find((proposal) =>
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.BOMBARD
@@ -480,6 +482,50 @@ describe('BotStrategicDiplomaticSubsystem', () => {
 
     expect(bombardProposal).toBeDefined();
     expect(bombardProposal?.debug.missionType).toBe(FleetMissionType.BOMBARD);
+  });
+
+  it('does not emit bombardment below the hostility threshold even during war', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ORBITAL_BOMBER, 2);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const bombardProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.BOMBARD
+    );
+
+    expect(bombardProposal).toBeUndefined();
+  });
+
+  it('falls back to bombard instead of siege until siege hostility threshold is reached', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ORBITAL_BOMBER, 2);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.factionLedger.push(createFactionLedgerSeed(playerEnemy.playerId, 40));
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const bombardProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.BOMBARD
+    );
+    const siegeProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SIEGE
+    );
+
+    expect(bombardProposal).toBeDefined();
+    expect(siegeProposal).toBeUndefined();
   });
 
   it('emits relocation move proposals before bombardment ship need when one origin cannot satisfy war pressure alone', () => {
@@ -494,8 +540,10 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     reservePlanet.rBDSFTQ.ships.addUndamaged(ShipType.ATMOSPHERIC_BOMBER, 1);
     playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 60);
     markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.factionLedger.push(createFactionLedgerSeed(playerEnemy.playerId, 40));
 
-    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
     const moveProposal = result.result.proposals.find((proposal) =>
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.MOVE
@@ -574,6 +622,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     memory.strategicDiplomatic.factionLedger.push({
       playerId: playerEnemy.playerId,
       hostilityScore: 80,
+      warAdvantageLevel: 0,
       lastSuccessfulBombardTurn: null,
       lastSuccessfulSiegeTickTurn: null,
       recentOutgoingCoercionPressure: 0,
@@ -626,6 +675,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     memory.strategicDiplomatic.factionLedger.push({
       playerId: playerEnemy.playerId,
       hostilityScore: 50,
+      warAdvantageLevel: 0,
       lastSuccessfulBombardTurn: null,
       lastSuccessfulSiegeTickTurn: null,
       recentOutgoingCoercionPressure: 0,
@@ -652,6 +702,47 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect((ledgerEntry?.shortWindowWarScore ?? 0)).toBeLessThan(0);
     expect((ledgerEntry?.longWindowWarScore ?? 0)).toBeLessThan(0);
     expect(ledgerEntry?.lastWarEvaluationTurn).toBe(20);
+  });
+
+  it('stores positive war advantage when recent enemy ship losses clearly outweigh our own', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.currentTurn = 20;
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 0, { forcedReportLevel: 12 });
+    addBattleReportWithLosses(bot, playerEnemyPlanet, galaxy.currentTurn, 'none', 'Battle Ship x10');
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const ledgerEntry = result.memory.strategicDiplomatic.factionLedger.find((entry) =>
+      entry.playerId === playerEnemy.playerId
+    );
+
+    expect((ledgerEntry?.warAdvantageLevel ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('reduces hostility after meaningful successful plunder against a war target', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.currentTurn = 20;
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 0, { forcedReportLevel: 12 });
+
+    const baselineMemory = createDefaultBotMemoryV2();
+    baselineMemory.strategicDiplomatic.factionLedger.push(createFactionLedgerSeed(playerEnemy.playerId, 60));
+
+    const baselineResult = runStrategicDiplomaticSubsystem(galaxy, bot, structuredClone(baselineMemory));
+    addPlunderReport(bot, playerEnemyPlanet, galaxy.currentTurn, new ResourcesPack(700, 700, 700));
+    const plunderResult = runStrategicDiplomaticSubsystem(galaxy, bot, baselineMemory);
+    const baselineLedger = baselineResult.memory.strategicDiplomatic.factionLedger.find((entry) =>
+      entry.playerId === playerEnemy.playerId
+    );
+    const plunderLedger = plunderResult.memory.strategicDiplomatic.factionLedger.find((entry) =>
+      entry.playerId === playerEnemy.playerId
+    );
+
+    expect((plunderLedger?.hostilityScore ?? 999)).toBeLessThan(baselineLedger?.hostilityScore ?? 0);
   });
 
   it('weights allied-shared hostile activity stronger than peace-shared activity', () => {
@@ -924,7 +1015,6 @@ function runStrategicDiplomaticSubsystem(
       weightManager: false
     },
   });
-
   return {
     result: new BotStrategicDiplomaticSubsystem().generate({
       snapshot,
@@ -1028,6 +1118,39 @@ function addBattleReport(
   ));
 }
 
+function addBattleReportWithLosses(
+  bot: Player,
+  planet: Planet,
+  createdTurn: number,
+  ownShipLosses: string,
+  enemyShipLosses: string
+): void {
+  bot.addReport(new FleetReport(
+    {
+      reportId: bot.createReportId(),
+      createdTurn,
+      title: `Battle Report: ${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}:${planet.basicInfo.order}`,
+      sourceCoordinates: {
+        x: planet.basicInfo.solarSystem.coordinates.x,
+        y: planet.basicInfo.solarSystem.coordinates.y,
+        z: planet.basicInfo.order
+      },
+      sourcePlanetName: planet.basicInfo.name,
+      sourceSystemName: planet.basicInfo.solarSystem.name
+    },
+    [
+      'Battle result: ATTACKER',
+      'Perspective: Attacker',
+      `Own ship losses by type: ${ownShipLosses}`,
+      'Own defense losses by type: none',
+      `Enemy ship losses by type: ${enemyShipLosses}`,
+      'Enemy defense losses by type: none',
+      'Enemy survivors by type: none',
+      'Enemy defense survivors by type: none'
+    ].join('\n')
+  ));
+}
+
 function addBombardmentReport(
   bot: Player,
   targetPlanet: Planet,
@@ -1066,6 +1189,32 @@ function addBombardmentReport(
       `${BuildingType.METAL_MINE}: hits 3, damage ${totalStructuralDamage}`,
       'Defence damage summary:',
       'No lasting defence damage recorded.'
+    ].join('\n')
+  ));
+}
+
+function addPlunderReport(
+  bot: Player,
+  targetPlanet: Planet,
+  createdTurn: number,
+  stolenResources: ResourcesPack
+): void {
+  bot.addReport(new FleetReport(
+    {
+      reportId: bot.createReportId(),
+      createdTurn,
+      title: `Plunder Report: ${targetPlanet.basicInfo.name}`,
+      sourceCoordinates: {
+        x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+        y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+        z: targetPlanet.basicInfo.order
+      },
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name
+    },
+    [
+      `Attack mission reached ${targetPlanet.basicInfo.name}.`,
+      `Resources stolen: Metal ${stolenResources.metal}, Crystal ${stolenResources.crystal}, Deuterium ${stolenResources.deuterium}.`
     ].join('\n')
   ));
 }
@@ -1109,6 +1258,29 @@ function addDirectVictimBattleReport(
       'Enemy defense survivors by type: none'
     ].join('\n')
   ));
+}
+
+function createFactionLedgerSeed(playerId: number, hostilityScore: number) {
+  return {
+    playerId,
+    hostilityScore,
+    warAdvantageLevel: 0 as const,
+    lastSuccessfulBombardTurn: null,
+    lastSuccessfulSiegeTickTurn: null,
+    recentOutgoingCoercionPressure: 0,
+    recentIncomingCoercionPressure: 0,
+    lastWarEvaluationTurn: 0,
+    shortWindowWarScore: 0,
+    longWindowWarScore: 0,
+    currentWarExitPressure: 0,
+    lastComputedStanceScore: 0,
+    lastComputedStrengthEstimate: 0,
+    lastKnownStatus: DiplomaticStatus.WAR,
+    lastSeenTurn: 0,
+    nonAggressionUntilTurn: null,
+    nonAggressionStartedTurn: null,
+    nonAggressionReason: null
+  };
 }
 
 function setBasicShipTech(player: Player): void {

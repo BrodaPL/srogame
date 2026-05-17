@@ -47,6 +47,7 @@ type SharedHostileEventLedgerMap = Map<string, BotMemoryV2StrategicDiplomaticSha
 type EvaluatedFaction = {
   faction: BotStrategicDiplomaticFactionSnapshot;
   hostilityScore: number;
+  warAdvantageLevel: -2 | -1 | 0 | 1 | 2;
   stanceScore: number;
   strengthEstimate: number;
   relativeStrength: number;
@@ -287,10 +288,16 @@ const MAX_PROBE_SHIP_NEED_REQUESTS = 2;
 const HOSTILE_NEUTRAL_ATTACK_THRESHOLD = 50;
 const WEAKER_NEUTRAL_ATTACK_RATIO = 1.5;
 const BOMBARDMENT_ATTACK_THRESHOLD = 0.65;
+const BOMBARD_HOSTILITY_THRESHOLD = 35;
+const SIEGE_HOSTILITY_THRESHOLD = 60;
 const SHORT_WAR_EVALUATION_WINDOW = 20;
 const LONG_WAR_EVALUATION_WINDOW = 100;
 const WAR_EVALUATION_INTERVAL = 20;
 const LOSING_WAR_HOSTILITY_DECAY = 10;
+const CATASTROPHIC_WAR_HOSTILITY_DECAY = 18;
+const WAR_ADVANTAGE_NEGATIVE_THRESHOLD = -20;
+const WAR_ADVANTAGE_POSITIVE_THRESHOLD = 20;
+const MEANINGFUL_STRUCTURAL_DAMAGE_PERCENT = 5;
 const STRATEGIC_HUB_BOMB_STOCK_RATIO_AT_WAR = 0.9;
 const STRATEGIC_HUB_BOMB_STOCK_RATIO_ALLIED = 0.4;
 const STRATEGIC_HUB_BOMB_STOCK_RATIO_PEACE = 0.15;
@@ -330,10 +337,18 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
       context.memory.strategicDiplomatic.sharedHostileEvents
     );
     const ownStrengthEstimate = resolveOwnStrengthEstimate(context);
+    const averageDevelopedIncomeValue = resolveAverageDevelopedPlanetIncomeValue(context);
     const statusCounts = resolveStatusCounts(context.snapshot.empire.strategicDiplomaticFactions);
     const proposalCap = resolveDiplomaticProposalCap(context);
     const evaluatedFactions = context.snapshot.empire.strategicDiplomaticFactions
-      .map((faction) => evaluateFaction(context, faction, ledger, ownStrengthEstimate, statusCounts))
+      .map((faction) => evaluateFaction(
+        context,
+        faction,
+        ledger,
+        ownStrengthEstimate,
+        averageDevelopedIncomeValue,
+        statusCounts
+      ))
       .sort((left, right) =>
         Math.max(
           right.bestEscalationUtility ?? -Infinity,
@@ -647,11 +662,13 @@ function evaluateFaction(
   faction: BotStrategicDiplomaticFactionSnapshot,
   ledger: FactionLedgerMap,
   ownStrengthEstimate: number,
+  averageDevelopedIncomeValue: number,
   statusCounts: Record<'WAR' | 'ALLIED' | 'PEACE' | 'NEUTRAL', number>
 ): EvaluatedFaction {
   const previous = ledger.get(faction.playerId) ?? {
     playerId: faction.playerId,
     hostilityScore: 0,
+    warAdvantageLevel: 0,
     lastSuccessfulBombardTurn: null,
     lastSuccessfulSiegeTickTurn: null,
     recentOutgoingCoercionPressure: 0,
@@ -682,11 +699,13 @@ function evaluateFaction(
     warPressure
   );
   const hostilityScore = resolveHostilityScore(
+    context,
     faction,
     previous,
     warPressure,
     sharedHostility.shortPressure,
-    nonAggression.active
+    nonAggression.active,
+    averageDevelopedIncomeValue
   );
   const stanceScore = resolveStanceScore(
     context.snapshot.profileId,
@@ -713,6 +732,7 @@ function evaluateFaction(
   ledger.set(faction.playerId, {
     playerId: faction.playerId,
     hostilityScore,
+    warAdvantageLevel: warPressure.warAdvantageLevel,
     lastSuccessfulBombardTurn: maxTurn(
       previous.lastSuccessfulBombardTurn,
       faction.lastSuccessfulOutgoingBombardTurn
@@ -739,6 +759,7 @@ function evaluateFaction(
   return {
     faction,
     hostilityScore,
+    warAdvantageLevel: warPressure.warAdvantageLevel,
     stanceScore,
     strengthEstimate,
     relativeStrength,
@@ -779,6 +800,25 @@ function resolveFactionStrengthEstimate(faction: BotStrategicDiplomaticFactionSn
     + (faction.averageKnownDefencesAmount * 0.8)
     + (faction.bestIntelDepth * 4)
   );
+}
+
+function resolveAverageDevelopedPlanetIncomeValue(context: BotSubsystemContext): number {
+  const developedPlanets = context.snapshot.planets.filter((planet) =>
+    planet.maturityStage === 'DEVELOPED'
+    || planet.maturityStage === 'MILITARY_CAPABLE'
+    || planet.maturityStage === 'STRATEGIC_HUB'
+  );
+  const source = developedPlanets.length > 0 ? developedPlanets : context.snapshot.planets;
+  if (source.length <= 0) {
+    return 0;
+  }
+
+  const total = source.reduce((sum, planet) =>
+    sum
+    + planet.economy.income.metal
+    + (planet.economy.income.crystal * 1.8)
+    + (planet.economy.income.deuterium * 2.6), 0);
+  return Math.max(0, total / source.length);
 }
 
 function resolveFactionConfidence(faction: BotStrategicDiplomaticFactionSnapshot): number {
@@ -926,11 +966,13 @@ function resolveSharedHostilityPressure(
 }
 
 function resolveHostilityScore(
+  context: BotSubsystemContext,
   faction: BotStrategicDiplomaticFactionSnapshot,
   previous: BotMemoryV2StrategicDiplomaticFactionEntry,
   warPressure: ReturnType<typeof resolveWarPressureEvaluation>,
   sharedHostilityPressureShort: number,
-  nonAggressionActive: boolean
+  nonAggressionActive: boolean,
+  averageDevelopedIncomeValue: number
 ): number {
   let score = previous.hostilityScore * 0.6;
   score += faction.recentBattleReportCount * 12;
@@ -946,12 +988,30 @@ function resolveHostilityScore(
   if (faction.pendingIncomingRequestedStatuses.includes(DiplomaticStatus.NEUTRAL)) {
     score += 6;
   }
+  score -= resolveOutgoingShipLossHostilityRelief(faction.recentOutgoingShipLossValueShort);
+  score += resolveIncomingPlunderHostilityDelta(
+    faction.recentIncomingPlunderValueShort,
+    averageDevelopedIncomeValue,
+    warPressure.warAdvantageLevel
+  );
+  score -= resolveOutgoingPlunderHostilityRelief(
+    faction.recentOutgoingPlunderValueShort,
+    averageDevelopedIncomeValue
+  );
+  if (faction.recentOutgoingDamagePercentShort >= MEANINGFUL_STRUCTURAL_DAMAGE_PERCENT) {
+    score -= 6 + Math.min(12, faction.recentOutgoingDamagePercentShort * 0.35);
+  }
+  if (faction.recentIncomingDamagePercentShort >= MEANINGFUL_STRUCTURAL_DAMAGE_PERCENT) {
+    score -= 4 + Math.min(10, faction.recentIncomingDamagePercentShort * 0.25);
+  }
   score -= Math.max(0, warPressure.currentWarExitPressure * 0.2);
   if (
     faction.currentStatus === DiplomaticStatus.WAR
     && warPressure.appliedLosingWarDecay
   ) {
-    score -= LOSING_WAR_HOSTILITY_DECAY;
+    score -= warPressure.warAdvantageLevel <= -2
+      ? CATASTROPHIC_WAR_HOSTILITY_DECAY
+      : LOSING_WAR_HOSTILITY_DECAY;
   }
   if (nonAggressionActive) {
     score -= 45;
@@ -1430,6 +1490,7 @@ function createProposalManagementPreferences(
           shortWindowWarScore: faction.shortWindowWarScore,
           longWindowWarScore: faction.longWindowWarScore,
           combinedWarScore: faction.combinedWarScore,
+          warAdvantageLevel: faction.warAdvantageLevel,
           currentWarExitPressure: faction.currentWarExitPressure,
           lastWarEvaluationTurn: context.snapshot.turn,
           appliedLosingWarDecay: false
@@ -1468,6 +1529,7 @@ function createProposalManagementPreferences(
           shortWindowWarScore: faction.shortWindowWarScore,
           longWindowWarScore: faction.longWindowWarScore,
           combinedWarScore: faction.combinedWarScore,
+          warAdvantageLevel: faction.warAdvantageLevel,
           currentWarExitPressure: faction.currentWarExitPressure,
           lastWarEvaluationTurn: context.snapshot.turn,
           appliedLosingWarDecay: false
@@ -1716,6 +1778,9 @@ function resolveDiplomaticWarState(
   const averageCombinedWarScore = warFactions.length > 0
     ? warFactions.reduce((sum, faction) => sum + faction.combinedWarScore, 0) / warFactions.length
     : 0;
+  const averageWarAdvantageLevel = warFactions.length > 0
+    ? warFactions.reduce((sum, faction) => sum + faction.warAdvantageLevel, 0) / warFactions.length
+    : 0;
   const ownDamage = context.snapshot.planets.reduce((sum, planet) =>
     sum + (planet.infrastructure.damagedBuildingCount * 8) + Math.ceil(planet.infrastructure.missingBuildingStructuralPoints / 100), 0);
   const allyDistress = factions
@@ -1730,10 +1795,10 @@ function resolveDiplomaticWarState(
   if (warFactions.length <= 0) {
     return ownDamage > 0 || allyDistress > 24 ? 'BALANCED' : 'WINNING';
   }
-  if (averageCombinedWarScore <= -20 || relativeStrengthScore < -25 || totalPressure > 80) {
+  if (averageWarAdvantageLevel <= -1 || averageCombinedWarScore <= -20 || relativeStrengthScore < -25 || totalPressure > 80) {
     return 'LOSING';
   }
-  if (averageCombinedWarScore >= 20 || (relativeStrengthScore > 25 && totalPressure < 45)) {
+  if (averageWarAdvantageLevel >= 1 || averageCombinedWarScore >= 20 || (relativeStrengthScore > 25 && totalPressure < 45)) {
     return 'WINNING';
   }
   return 'BALANCED';
@@ -1750,6 +1815,7 @@ function resolveWarPressureEvaluation(
   shortWindowWarScore: number;
   longWindowWarScore: number;
   combinedWarScore: number;
+  warAdvantageLevel: -2 | -1 | 0 | 1 | 2;
   currentWarExitPressure: number;
   lastWarEvaluationTurn: number | null;
   appliedLosingWarDecay: boolean;
@@ -1770,9 +1836,15 @@ function resolveWarPressureEvaluation(
     - (faction.recentIncomingDamagePercentLong * 0.3)
     + (faction.recentOutgoingDamagePercentLong * 0.25)
   );
+  const nextWarAdvantageScore = normalizeWarScore(
+    resolveWarAdvantageScore(faction, nextShortWindowWarScore, relativeStrength)
+  );
   const shortWindowWarScore = shouldEvaluate ? nextShortWindowWarScore : previous.shortWindowWarScore;
   const longWindowWarScore = shouldEvaluate ? nextLongWindowWarScore : previous.longWindowWarScore;
   const combinedWarScore = normalizeWarScore((longWindowWarScore * 0.6) + (shortWindowWarScore * 0.4));
+  const warAdvantageLevel = shouldEvaluate
+    ? mapWarAdvantageLevel(nextWarAdvantageScore)
+    : previous.warAdvantageLevel;
   const currentWarExitPressure = Math.max(
     0,
     (faction.recentOutgoingCoercionPressureLong * 0.7)
@@ -1781,7 +1853,7 @@ function resolveWarPressureEvaluation(
   );
   const appliedLosingWarDecay = shouldEvaluate
     && faction.currentStatus === DiplomaticStatus.WAR
-    && combinedWarScore <= -20;
+    && warAdvantageLevel <= -1;
 
   return {
     recentOutgoingCoercionPressure: faction.recentOutgoingCoercionPressureShort,
@@ -1789,10 +1861,120 @@ function resolveWarPressureEvaluation(
     shortWindowWarScore,
     longWindowWarScore,
     combinedWarScore,
+    warAdvantageLevel,
     currentWarExitPressure,
     lastWarEvaluationTurn: shouldEvaluate ? context.snapshot.turn : previous.lastWarEvaluationTurn,
     appliedLosingWarDecay
   };
+}
+
+function resolveWarAdvantageScore(
+  faction: BotStrategicDiplomaticFactionSnapshot,
+  shortWindowWarScore: number,
+  relativeStrength: number
+): number {
+  const outgoingShipLossValue = Math.max(0, faction.recentOutgoingShipLossValueShort);
+  const incomingShipLossValue = Math.max(0, faction.recentIncomingShipLossValueShort);
+  const shipLossRatio = (outgoingShipLossValue + 1) / (incomingShipLossValue + 1);
+  const shipLossDelta = outgoingShipLossValue - incomingShipLossValue;
+  const shipRatioScore = resolveShipLossRatioScore(shipLossRatio);
+  const shipDeltaScore = Math.max(-30, Math.min(30, Math.round(shipLossDelta / 1500)));
+  const structuralDamageScore = Math.max(
+    -30,
+    Math.min(
+      30,
+      Math.round(
+        (faction.recentOutgoingDamagePercentShort * 1.7)
+        - (faction.recentIncomingDamagePercentShort * 1.7)
+      )
+    )
+  );
+  const plunderScore = Math.max(
+    -12,
+    Math.min(
+      12,
+      Math.round(
+        (faction.recentOutgoingPlunderValueShort - faction.recentIncomingPlunderValueShort)
+        / 4000
+      )
+    )
+  );
+  const legacyScore = Math.round((shortWindowWarScore * 0.35) + (relativeStrength * 0.1));
+
+  return shipRatioScore + shipDeltaScore + structuralDamageScore + plunderScore + legacyScore;
+}
+
+function resolveShipLossRatioScore(ratio: number): number {
+  if (!Number.isFinite(ratio)) {
+    return 0;
+  }
+  if (ratio >= 4) {
+    return 42;
+  }
+  if (ratio >= 2) {
+    return 30;
+  }
+  if (ratio >= 1.2) {
+    return 16;
+  }
+  if (ratio <= 0.25) {
+    return -42;
+  }
+  if (ratio <= 0.5) {
+    return -30;
+  }
+  if (ratio <= 0.83) {
+    return -16;
+  }
+  return 0;
+}
+
+function mapWarAdvantageLevel(score: number): -2 | -1 | 0 | 1 | 2 {
+  if (score <= -60) {
+    return -2;
+  }
+  if (score <= WAR_ADVANTAGE_NEGATIVE_THRESHOLD) {
+    return -1;
+  }
+  if (score >= 60) {
+    return 2;
+  }
+  if (score >= WAR_ADVANTAGE_POSITIVE_THRESHOLD) {
+    return 1;
+  }
+  return 0;
+}
+
+function resolveOutgoingShipLossHostilityRelief(shipLossValue: number): number {
+  if (shipLossValue <= 0) {
+    return 0;
+  }
+
+  return Math.min(18, Math.round(shipLossValue / 2500));
+}
+
+function resolveOutgoingPlunderHostilityRelief(
+  plunderValue: number,
+  averageDevelopedIncomeValue: number
+): number {
+  if (averageDevelopedIncomeValue <= 0 || plunderValue < (averageDevelopedIncomeValue * 2)) {
+    return 0;
+  }
+
+  return Math.min(14, Math.round(plunderValue / Math.max(1, averageDevelopedIncomeValue * 1.5)));
+}
+
+function resolveIncomingPlunderHostilityDelta(
+  plunderValue: number,
+  averageDevelopedIncomeValue: number,
+  warAdvantageLevel: -2 | -1 | 0 | 1 | 2
+): number {
+  if (averageDevelopedIncomeValue <= 0 || plunderValue < (averageDevelopedIncomeValue * 2)) {
+    return 0;
+  }
+
+  const magnitude = Math.min(14, Math.round(plunderValue / Math.max(1, averageDevelopedIncomeValue * 1.5)));
+  return warAdvantageLevel < 0 ? -magnitude : magnitude;
 }
 
 function normalizeWarScore(value: number): number {
@@ -1943,6 +2125,9 @@ function createForceProjectionRequests(
       if (bombardmentRequests.length + relocationRequests.length >= availableFleetSlots) {
         break;
       }
+      if (!isBombardmentEscalationUnlocked(faction, targetPlanet)) {
+        continue;
+      }
 
       const bombardmentPlan = createBombardmentPlanForTarget(context, faction, targetPlanet);
       if (bombardmentPlan) {
@@ -2006,7 +2191,10 @@ function createBombardmentPlanForTarget(
   faction: EvaluatedFaction,
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
 ): BombardmentMissionRequest | null {
-  const missionType = resolvePreferredBombardmentMissionType(targetPlanet);
+  const missionType = resolveAllowedBombardmentMissionType(faction, targetPlanet);
+  if (missionType === null) {
+    return null;
+  }
   const requiredStrength = resolveBombardmentRequiredStrength(targetPlanet, missionType);
   const plans = context.snapshot.planets
     .map((originPlanet) => createBombardmentPlanFromOrigin(context, originPlanet, faction, targetPlanet, missionType, requiredStrength))
@@ -2063,12 +2251,21 @@ function createBombardmentPlanFromOrigin(
   };
 }
 
-function resolvePreferredBombardmentMissionType(
+function resolveAllowedBombardmentMissionType(
+  faction: EvaluatedFaction,
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
-): FleetMissionType.BOMBARD | FleetMissionType.SIEGE {
-  return targetPlanet.totalShipsAmount <= 0 && targetPlanet.totalDefencesAmount <= 0
-    ? FleetMissionType.SIEGE
-    : FleetMissionType.BOMBARD;
+): FleetMissionType.BOMBARD | FleetMissionType.SIEGE | null {
+  if (faction.hostilityScore < BOMBARD_HOSTILITY_THRESHOLD) {
+    return null;
+  }
+  if (
+    targetPlanet.totalShipsAmount <= 0
+    && targetPlanet.totalDefencesAmount <= 0
+    && faction.hostilityScore >= SIEGE_HOSTILITY_THRESHOLD
+  ) {
+    return FleetMissionType.SIEGE;
+  }
+  return FleetMissionType.BOMBARD;
 }
 
 function resolveBombardmentRequiredStrength(
@@ -2099,7 +2296,11 @@ function createBombardmentRelocationPlan(
   faction: EvaluatedFaction,
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
 ): { requests: RelocationMissionRequest[] } | null {
-  const requiredStrength = resolveBombardmentRequiredStrength(targetPlanet, resolvePreferredBombardmentMissionType(targetPlanet));
+  const missionType = resolveAllowedBombardmentMissionType(faction, targetPlanet);
+  if (missionType === null) {
+    return null;
+  }
+  const requiredStrength = resolveBombardmentRequiredStrength(targetPlanet, missionType);
   const stagingPlanet = resolveBestDiplomaticStagingPlanet(context, targetPlanet.coordinates);
   if (!stagingPlanet) {
     return null;
@@ -2166,6 +2367,13 @@ function createBombardmentRelocationPlan(
     : null;
 }
 
+function isBombardmentEscalationUnlocked(
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): boolean {
+  return resolveAllowedBombardmentMissionType(faction, targetPlanet) !== null;
+}
+
 function createBombardmentShipNeed(
   context: BotSubsystemContext,
   faction: EvaluatedFaction,
@@ -2177,7 +2385,10 @@ function createBombardmentShipNeed(
     return null;
   }
 
-  const missionType = resolvePreferredBombardmentMissionType(targetPlanet);
+  const missionType = resolveAllowedBombardmentMissionType(faction, targetPlanet);
+  if (missionType === null) {
+    return null;
+  }
   const requiredStrength = resolveBombardmentRequiredStrength(targetPlanet, missionType);
   const availableStrength = estimateBestAvailableBombardmentStrength(context, targetPlanet.coordinates);
   const bombardmentType = resolveBestProducibleBombardmentShipType(context);
@@ -3693,6 +3904,7 @@ function createOpenedWarRaidPlanFromOrigin(
       1,
       470
       + estimatedPlunder
+      + (faction.warAdvantageLevel * 18)
       - (travelTurns * 10)
       - Math.round(ledgerEntry.currentAmbushRiskScore * 1.5)
       - Math.round(distance * 2)

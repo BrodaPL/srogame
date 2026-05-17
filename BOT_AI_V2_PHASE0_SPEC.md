@@ -370,6 +370,7 @@ Current behavior:
 - executable outgoing treaty creation uses `DIPLOMACY_PROPOSAL`; Strategic Diplomatic owns treaty policy and emits at most one best outgoing treaty proposal per turn, while Supervisor only arbitrates/executes it
 - `RECYCLE` stays deferred until a subsystem emits and owns explicit recycle proposals
 - `BOMBARD` and `SIEGE` get a simple Supervisor trace precheck when proposal metadata says the target is not `WAR`
+- Strategic Diplomatic now also persists a per-faction `warAdvantageLevel` (`-2 .. +2`) from the 20-turn war-evaluation cadence; ship-loss value is dominant, structural damage is medium-high, and plunder is light
 - outgoing maintenance request creation and standalone outgoing Jump Gate request creation are deferred and traced
 - accepted diplomacy decisions execute before lifecycle recall, then normal accepted actions execute after recall
 - Supervisor lifecycle recall returns own `ATTACK`, `BOMBARD`, `SIEGE`, and `SPY` fleets in `MOVING_TO_TARGET`, `PENDING_JUMP_GATE`, or `ORBITING` when the target owner relation is now `NEUTRAL`, `PEACE`, or `ALLIED`
@@ -2146,6 +2147,10 @@ Important mission-scope split:
 - `ATTACK` keeps its current broader offensive scope
 - `BOMBARD` is `WAR` only
 - `SIEGE` is `WAR` only
+- explicit hostility gates now apply:
+  - `BOMBARD` requires hostility `>= 35`
+  - `SIEGE` requires hostility `>= 60`
+- when a target is siege-eligible but siege hostility is still too low, the subsystem should fall back to `BOMBARD`
 
 ### Strategic Diplomatic phase-4 local pressure scope
 
@@ -2390,6 +2395,11 @@ Mission scope for this phase:
 
 It should not re-expand `MOVE`, `BOMBARD`, or `SIEGE` in this slice.
 
+Current implementation note:
+
+- phase 6 now also consumes the live per-faction `warAdvantageLevel` as extra raid-scoring context
+- it still does not introduce a broader doctrine table or campaign-state machine yet
+
 ### Strategic Diplomatic phase-6 opened-target gate
 
 A target may become a post-break raid target only after the subsystem is sure `BREAK` succeeded for that planet.
@@ -2530,6 +2540,13 @@ It should instead change how the subsystem interprets:
 
 Successful outgoing coercion should reduce our hostility toward the target faction.
 
+Current live extension:
+
+- successful outgoing plunder also reduces hostility when the plunder is meaningful
+- enemy ship losses reduce hostility immediately
+- meaningful outgoing structural damage reduces hostility
+- successful `BOMBARD` / `SIEGE` damage reduces hostility on both sides
+
 Successful `BOMBARD` should apply:
 
 - base hostility decrease `-5`
@@ -2545,6 +2562,11 @@ This should use mission report outcome plus percentage damage rather than flat d
 ### Strategic Diplomatic phase-7 incoming coercion rule
 
 Enemy coercion against us should increase hostility toward that enemy.
+
+Current live extension:
+
+- incoming plunder increases hostility when we are not losing
+- incoming plunder decreases hostility when we are already losing
 
 Enemy successful `BOMBARD` should apply:
 
@@ -2571,6 +2593,16 @@ Evaluation cadence:
 
 - every `20` turns
 
+Current live extension:
+
+- the same cadence now persists `warAdvantageLevel` on `-2 .. +2`
+- score-band mapping is:
+  - `<= -60 -> -2`
+  - `-59 .. -20 -> -1`
+  - `-19 .. +19 -> 0`
+  - `+20 .. +59 -> +1`
+  - `>= +60 -> +2`
+
 Combined war score:
 
 - normalized `-100 .. +100`
@@ -2588,6 +2620,12 @@ Classification:
 If the combined war score says we are losing, apply:
 
 - hostility decay `-10` per evaluation
+
+Current live extension:
+
+- hostility decay now also keys off `warAdvantageLevel`
+- decay applies at `-1`
+- stronger decay applies at `-2`
 
 There should be no separate hard deescalation-block timer.
 
@@ -2621,6 +2659,7 @@ This phase should keep a per-faction operational war-pressure ledger with fields
 - `lastWarEvaluationTurn`
 - `shortWindowWarScore`
 - `longWindowWarScore`
+- `warAdvantageLevel`
 - `currentWarExitPressure`
 
 Outgoing coercion pressure should use a hybrid model:

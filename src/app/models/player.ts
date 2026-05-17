@@ -281,6 +281,7 @@ export type BotMemoryV2Research = {
 export type BotMemoryV2StrategicDiplomaticFactionEntry = {
   playerId: number;
   hostilityScore: number;
+  warAdvantageLevel: -2 | -1 | 0 | 1 | 2;
   lastSuccessfulBombardTurn: number | null;
   lastSuccessfulSiegeTickTurn: number | null;
   recentOutgoingCoercionPressure: number;
@@ -1203,6 +1204,13 @@ export class Player {
           playerId: entry.playerId,
           hostilityScore: Number.isFinite(entry.hostilityScore)
             ? Math.max(0, Number(entry.hostilityScore))
+            : 0,
+          warAdvantageLevel: entry.warAdvantageLevel === -2
+            || entry.warAdvantageLevel === -1
+            || entry.warAdvantageLevel === 0
+            || entry.warAdvantageLevel === 1
+            || entry.warAdvantageLevel === 2
+            ? entry.warAdvantageLevel
             : 0,
           lastSuccessfulBombardTurn: Number.isInteger(entry.lastSuccessfulBombardTurn)
             ? entry.lastSuccessfulBombardTurn
