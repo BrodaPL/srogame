@@ -152,6 +152,14 @@ const INCLUDED_WARFARE_SHIP_TYPES = [
   ...COMBAT_SHIP_TYPES,
   ...CARGO_SHIP_TYPES
 ] as const;
+
+const SMALL_SUPPORT_SHIP_TYPES = [
+  ShipType.FIGHTER,
+  ShipType.ASSAULT_FIGHTER,
+  ShipType.ATMOSPHERIC_FIGHTER,
+  ShipType.CORVETTE,
+  ShipType.ATMOSPHERIC_BOMBER
+] as const;
 // TODO: Add dedicated production-goal handling for MOTHER_SHIP if its order sizing
 // or unlock/selection rules need to differ from the generic ship-production flow.
 
@@ -1140,7 +1148,8 @@ function evaluateProductionGoal(
   }
 
   const bonusFactor = resolveProductionBonusFactor(planet, shipType);
-  const weightedEtc = totalEtc / bonusFactor;
+  const smallShipPenaltyMultiplier = resolveSmallShipPenaltyMultiplier(context, planet, shipType);
+  const weightedEtc = (totalEtc / bonusFactor) * smallShipPenaltyMultiplier;
 
   return {
     goalKey: `warfare:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:produce:${shipType}:${immediateRequest.amount}`,
@@ -1170,6 +1179,10 @@ function evaluateProductionGoal(
       isCargoShip: isCargoShipType(shipType),
       orderAmount: immediateRequest.amount,
       queueRemainingEtc: planet.power.shipyardQueueRemainingEtc,
+      smallShipPenaltyMultiplier: roundToTwoDecimals(smallShipPenaltyMultiplier),
+      smallShipTargetCapacity: resolveLocalSmallShipTargetCapacity(context, planet),
+      localSmallShipRequiredCapacity: resolveLocalSmallShipRequiredCapacity(planet),
+      localCarrierHangarCapacity: resolveLocalCarrierHangarCapacity(planet),
       totalEtc: roundToTwoDecimals(totalEtc),
       weightedEtc: roundToTwoDecimals(weightedEtc)
     }
@@ -1748,6 +1761,73 @@ function resolveProductionBonusFactor(
   let bonusFactor = 1;
   bonusFactor *= 1 + resolveDistributionBonusRatio(planet, shipType);
   return Math.min(BONUS_FACTOR_CEILING, Math.max(1, bonusFactor));
+}
+
+function resolveSmallShipPenaltyMultiplier(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot,
+  shipType: ShipType
+): number {
+  if (!isSmallSupportShipType(shipType)) {
+    return 1;
+  }
+
+  const localSmallShipRequiredCapacity = resolveLocalSmallShipRequiredCapacity(planet);
+  const localCarrierHangarCapacity = resolveLocalCarrierHangarCapacity(planet);
+  if (localCarrierHangarCapacity > localSmallShipRequiredCapacity) {
+    return 1;
+  }
+
+  const targetCapacity = resolveLocalSmallShipTargetCapacity(context, planet);
+  if (localSmallShipRequiredCapacity <= targetCapacity) {
+    return 1;
+  }
+
+  const normalizedTarget = Math.max(1, targetCapacity);
+  const overageRatio = localSmallShipRequiredCapacity / normalizedTarget;
+  return 1 + Math.min(5, overageRatio * 2.5);
+}
+
+function resolveLocalSmallShipTargetCapacity(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot
+): number {
+  const ownedPlanetCount = Math.max(1, context.snapshot.empire.ownedPlanetCount);
+  return Math.floor(resolveLocalCarrierHangarCapacity(planet) / (ownedPlanetCount + 1));
+}
+
+function resolveLocalSmallShipRequiredCapacity(planet: BotPlanetSnapshot): number {
+  let total = 0;
+
+  for (const shipType of SMALL_SUPPORT_SHIP_TYPES) {
+    const blueprint = SHIP_BLUEPRINTS.get(shipType);
+    if (!blueprint) {
+      continue;
+    }
+
+    total += blueprint.size * (planet.ships.installedCountByType[shipType] ?? 0);
+  }
+
+  return total;
+}
+
+function isSmallSupportShipType(shipType: ShipType): boolean {
+  return (SMALL_SUPPORT_SHIP_TYPES as readonly ShipType[]).includes(shipType);
+}
+
+function resolveLocalCarrierHangarCapacity(planet: BotPlanetSnapshot): number {
+  let total = 0;
+
+  for (const shipType of INCLUDED_WARFARE_SHIP_TYPES) {
+    const blueprint = SHIP_BLUEPRINTS.get(shipType);
+    if (!blueprint || blueprint.hangarCapacity <= 0) {
+      continue;
+    }
+
+    total += blueprint.hangarCapacity * (planet.ships.installedCountByType[shipType] ?? 0);
+  }
+
+  return total;
 }
 
 function resolveDistributionBonusRatio(

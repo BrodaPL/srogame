@@ -173,6 +173,7 @@ function createSpyMissionRequests(
   context: BotSubsystemContext,
   targets: BotStrategicMilitaryTargetSnapshot[]
 ): MissionRequest[] {
+  const claimedTargets = collectClaimedSpyTargets(context.priorProposals ?? []);
   const unscannedTargets = targets.filter((target) => target.neverScanned);
   const scanPool = unscannedTargets.length > 0
     ? unscannedTargets
@@ -184,35 +185,59 @@ function createSpyMissionRequests(
     );
   const phase = unscannedTargets.length > 0 ? 'INTEL' as const : 'INTEL' as const;
 
-  return scanPool
-    .map((target) => {
-      const request = selectSpyOrigin(context, target);
-      if (!request) {
-        return null;
-      }
+  const requests: MissionRequest[] = [];
 
-      const priorityBase = target.neverScanned ? 260 : 80;
-      return {
-        kind: 'MISSION',
-        phase,
-        missionType: FleetMissionType.SPY,
-        target,
-        destinationCoordinates: { ...target.coordinates },
-        originPlanet: request.originPlanet,
-        ships: [{
-          type: ShipType.SPY_PROBE,
-          undamagedAmount: 1,
-          damagedAmount: 0
-        }],
-        expectedLoot: 0,
-        travelDistance: request.travelDistance,
-        travelTurns: request.travelTurns,
-        score: priorityBase - request.travelTurns,
-        stagingPlanet: null,
-        moveRole: null
-      } satisfies MissionRequest;
-    })
-    .filter((request): request is MissionRequest => request !== null);
+  for (const target of scanPool) {
+    if (claimedTargets.has(toCoordinatesKey(target.coordinates))) {
+      continue;
+    }
+
+    const request = selectSpyOrigin(context, target);
+    if (!request) {
+      continue;
+    }
+
+    const priorityBase = target.neverScanned ? 260 : 80;
+    requests.push({
+      kind: 'MISSION',
+      phase,
+      missionType: FleetMissionType.SPY,
+      target,
+      destinationCoordinates: { ...target.coordinates },
+      originPlanet: request.originPlanet,
+      ships: [{
+        type: ShipType.SPY_PROBE,
+        undamagedAmount: 1,
+        damagedAmount: 0
+      }],
+      expectedLoot: 0,
+      travelDistance: request.travelDistance,
+      travelTurns: request.travelTurns,
+      score: priorityBase - request.travelTurns,
+      stagingPlanet: null,
+      moveRole: null
+    });
+  }
+
+  return requests;
+}
+
+function collectClaimedSpyTargets(priorProposals: BotProposal[]): Set<string> {
+  const claimedTargets = new Set<string>();
+
+  for (const proposal of priorProposals) {
+    if (
+      proposal.kind !== 'FLEET_MISSION'
+      || proposal.requestPayload.missionType !== FleetMissionType.SPY
+      || !proposal.targetCoordinates
+    ) {
+      continue;
+    }
+
+    claimedTargets.add(toCoordinatesKey(proposal.targetCoordinates));
+  }
+
+  return claimedTargets;
 }
 
 function createBreakMissionRequest(

@@ -463,9 +463,13 @@ function createIntelScanRequests(
   context: BotSubsystemContext
 ): FleetMissionImmediateRequest[] {
   const requests: FleetMissionImmediateRequest[] = [];
+  const claimedSpyTargets = collectClaimedSpyTargets(context.priorProposals ?? []);
 
   for (const candidate of context.snapshot.empire.intelCandidates) {
     if (!candidate.needsScan) {
+      continue;
+    }
+    if (claimedSpyTargets.has(toCoordinatesKey(candidate.coordinates))) {
       continue;
     }
 
@@ -544,6 +548,24 @@ function createColonizationRequests(
   return [source.request];
 }
 
+function collectClaimedSpyTargets(priorProposals: BotProposal[]): Set<string> {
+  const claimedTargets = new Set<string>();
+
+  for (const proposal of priorProposals) {
+    if (
+      proposal.kind !== 'FLEET_MISSION'
+      || proposal.requestPayload.missionType !== FleetMissionType.SPY
+      || !proposal.targetCoordinates
+    ) {
+      continue;
+    }
+
+    claimedTargets.add(toCoordinatesKey(proposal.targetCoordinates));
+  }
+
+  return claimedTargets;
+}
+
 function canEmpireColonizeMorePlanets(context: BotSubsystemContext): boolean {
   return context.snapshot.empire.ownedPlanetCount < maxOwnedPlanets(resolveAdaptiveTechnologyLevel(context));
 }
@@ -557,6 +579,44 @@ function resolveAdaptiveTechnologyLevel(context: BotSubsystemContext): number {
     0,
     ...context.snapshot.planets.map((planet) => planet.tech.adaptiveTechnologyLevel)
   );
+}
+
+function resolveAdaptiveColonizationPressure(context: BotSubsystemContext): {
+  active: boolean;
+  blockedCandidateCount: number;
+  requiredAdaptiveLevel: number | null;
+} {
+  if (!canEmpireColonizeMorePlanets(context)) {
+    return {
+      active: false,
+      blockedCandidateCount: 0,
+      requiredAdaptiveLevel: null
+    };
+  }
+
+  const adaptiveLevel = resolveAdaptiveTechnologyLevel(context);
+  const blockedCandidates = context.snapshot.empire.intelCandidates.filter((candidate) =>
+    !candidate.needsScan
+    && candidate.colonizationDifficulty !== null
+    && candidate.colonizationDifficulty > adaptiveLevel
+    && candidate.colonizationDifficulty <= adaptiveLevel + 1
+  );
+
+  const requiredAdaptiveLevel = blockedCandidates.reduce<number | null>((lowest, candidate) => {
+    if (candidate.colonizationDifficulty === null) {
+      return lowest;
+    }
+    if (lowest === null) {
+      return candidate.colonizationDifficulty;
+    }
+    return Math.min(lowest, candidate.colonizationDifficulty);
+  }, null);
+
+  return {
+    active: blockedCandidates.length > 0,
+    blockedCandidateCount: blockedCandidates.length,
+    requiredAdaptiveLevel
+  };
 }
 
 function selectColonizerSource(
@@ -623,6 +683,10 @@ function createColonizeMissionRequest(
     },
     cargoAmount
   };
+}
+
+function toCoordinatesKey(coordinates: { x: number; y: number; z: number }): string {
+  return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
 }
 
 function resolveColonizerBootstrapCargo(
@@ -1505,6 +1569,7 @@ function createProposalFromGoal(
     : request.kind === 'RESEARCH'
       ? `${requestLabel}: research ${request.technologyType} on ${planet.name}.`
       : `${requestLabel}: produce ${request.amount} ${request.shipType} on ${planet.name}.`;
+  const adaptiveColonizationPressure = resolveAdaptiveColonizationPressure(context);
 
   return {
     proposalId: `${goal.goalKey}:${queueType}:${selectedIndex}:${context.snapshot.turn}`,
@@ -1547,6 +1612,9 @@ function createProposalFromGoal(
     expiresOnTurn: context.snapshot.turn + 1,
     debug: {
       ...goal.debug,
+      adaptiveColonizationPressureActive: adaptiveColonizationPressure.active,
+      adaptiveColonizationBlockedCandidateCount: adaptiveColonizationPressure.blockedCandidateCount,
+      adaptiveColonizationRequiredLevel: adaptiveColonizationPressure.requiredAdaptiveLevel,
       finalTargetKind: goal.finalTargetKind,
       finalBuildingType: goal.finalBuildingType,
       finalTechnologyType: goal.finalTechnologyType,
@@ -1575,6 +1643,7 @@ function createFleetMissionProposal(
   index: number
 ): BotProposal {
   const totalRequestedResources = getTotalResourceAmount(request.cargo);
+  const adaptiveColonizationPressure = resolveAdaptiveColonizationPressure(context);
   const summary = request.missionType === FleetMissionType.SPY
     ? `Mission request #${index + 1}: spy ${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z} from ${request.originPlanet.name}.`
     : `Mission request #${index + 1}: ${request.missionType} from ${request.originPlanet.name} to ${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}.`;
@@ -1615,6 +1684,9 @@ function createFleetMissionProposal(
     blockers: [],
     expiresOnTurn: context.snapshot.turn + 1,
     debug: {
+      adaptiveColonizationPressureActive: adaptiveColonizationPressure.active,
+      adaptiveColonizationBlockedCandidateCount: adaptiveColonizationPressure.blockedCandidateCount,
+      adaptiveColonizationRequiredLevel: adaptiveColonizationPressure.requiredAdaptiveLevel,
       missionSection: 'GLOBAL',
       missionType: request.missionType,
       originPlanet: request.originPlanet.name,

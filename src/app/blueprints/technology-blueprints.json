@@ -57,7 +57,7 @@
       "type": "COMPUTER_TECHNOLOGY",
       "imagePath": "images/technologies/normal/COMPUTER_TECHNOLOGY.jpg",
       "description": "Every level give +2 to maximum fleet amount, also gives +5% to research power.",
-      "basicCost": { "metal": 0, "crystal": 40, "deuterium": 0 },
+      "basicCost": { "metal": 0, "crystal": 20, "deuterium": 0 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
@@ -83,7 +83,7 @@
       "type": "ADAPTIVE_TECHNOLOGY",
       "imagePath": "images/technologies/normal/ADAPTIVE_TECHNOLOGY.jpg",
       "description": "Make possible to colonise more types of planets. Increases all resources income, research and industry by +1%.",
-      "basicCost": { "metal": 60, "crystal": 40, "deuterium": 20 },
+      "basicCost": { "metal": 50, "crystal": 30, "deuterium": 10 },
       "energyRequired": [0],
       "researchTime": [2.5],
       "buildingRequirements": [

@@ -15,6 +15,7 @@ import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
 import { FleetReport } from '../../../../../src/app/models/reports/fleet-report.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
+import type { BotProposal } from '../../bot-v2-types.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
 import { BotStrategicMilitarySubsystem } from './bot-strategic-military-subsystem.js';
 
@@ -30,6 +31,45 @@ describe('BotStrategicMilitarySubsystem', () => {
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.SPY
     )).toBe(true);
+  });
+
+  it('does not duplicate a spy target already claimed by an earlier subsystem', () => {
+    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 2);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot, createDefaultBotMemoryV2(), [{
+      proposalId: 'prior:spy',
+      subsystemId: 'STRATEGIC_DEVELOPMENT',
+      kind: 'FLEET_MISSION',
+      status: 'PROPOSED',
+      goalKey: 'prior:spy',
+      dedupeKey: 'prior:spy',
+      summary: 'Prior spy.',
+      planetId: null,
+      targetCoordinates: {
+        x: neutralPlanet.basicInfo.solarSystem.coordinates.x,
+        y: neutralPlanet.basicInfo.solarSystem.coordinates.y,
+        z: neutralPlanet.basicInfo.order
+      },
+      expectedValue: 1,
+      urgency: 1,
+      risk: 1,
+      confidence: 1,
+      requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      requestPayload: {
+        missionType: FleetMissionType.SPY
+      },
+      blockers: [],
+      expiresOnTurn: galaxy.currentTurn + 1,
+      debug: {}
+    }]);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SPY
+      && proposal.targetCoordinates?.z === neutralPlanet.basicInfo.order
+    )).toBe(false);
   });
 
   it('emits a break attack for scanned neutral planets with remaining defenders', () => {
@@ -244,7 +284,12 @@ describe('BotStrategicMilitarySubsystem', () => {
   });
 });
 
-function runStrategicMilitarySubsystem(galaxy: Galaxy, bot: Player, memory: BotMemoryV2 = createDefaultBotMemoryV2()) {
+function runStrategicMilitarySubsystem(
+  galaxy: Galaxy,
+  bot: Player,
+  memory: BotMemoryV2 = createDefaultBotMemoryV2(),
+  priorProposals: BotProposal[] = []
+) {
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
       mode: 'SHADOW',
     enabledSubsystems: {
@@ -261,7 +306,8 @@ function runStrategicMilitarySubsystem(galaxy: Galaxy, bot: Player, memory: BotM
 
   return new BotStrategicMilitarySubsystem().generate({
     snapshot,
-    memory
+    memory,
+    priorProposals
   });
 }
 

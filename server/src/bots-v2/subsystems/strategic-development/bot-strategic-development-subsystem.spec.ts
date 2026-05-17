@@ -16,6 +16,7 @@ import { Planet } from '../../../../../src/app/models/planets/planet.js';
 import { SolarSystem } from '../../../../../src/app/models/planets/solar-system.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
+import type { BotProposal } from '../../bot-v2-types.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
 import { BotStrategicDevelopmentSubsystem } from './bot-strategic-development-subsystem.js';
 
@@ -150,6 +151,63 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     )).toBe(true);
   });
 
+  it('does not duplicate a colonization-intel spy target already claimed by an earlier subsystem', () => {
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 2);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot, [{
+      proposalId: 'prior:spy',
+      subsystemId: 'STRATEGIC_MILITARY',
+      kind: 'FLEET_MISSION',
+      status: 'PROPOSED',
+      goalKey: 'prior:spy',
+      dedupeKey: 'prior:spy',
+      summary: 'Prior spy.',
+      planetId: null,
+      targetCoordinates: {
+        x: unownedPlanet.basicInfo.solarSystem.coordinates.x,
+        y: unownedPlanet.basicInfo.solarSystem.coordinates.y,
+        z: unownedPlanet.basicInfo.order
+      },
+      expectedValue: 1,
+      urgency: 1,
+      risk: 1,
+      confidence: 1,
+      requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      requestPayload: {
+        missionType: FleetMissionType.SPY
+      },
+      blockers: [],
+      expiresOnTurn: galaxy.currentTurn + 1,
+      debug: {}
+    }]);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SPY
+      && proposal.targetCoordinates?.z === unownedPlanet.basicInfo.order
+    )).toBe(false);
+  });
+
+  it('annotates adaptive colonization pressure when a scanned target is blocked by exactly one adaptive level', () => {
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 2);
+    unownedPlanet.basicInfo.colonizationDifficulty = 3;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.debug.adaptiveColonizationPressureActive === true
+      && proposal.debug.adaptiveColonizationBlockedCandidateCount === 1
+      && proposal.debug.adaptiveColonizationRequiredLevel === 3
+    )).toBe(true);
+  });
+
   it('emits one colonize mission with bootstrap cargo for a fresh valid scanned target', () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
     const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
@@ -219,7 +277,11 @@ describe('BotStrategicDevelopmentSubsystem', () => {
   });
 });
 
-function runStrategicDevelopmentSubsystem(galaxy: Galaxy, bot: Player) {
+function runStrategicDevelopmentSubsystem(
+  galaxy: Galaxy,
+  bot: Player,
+  priorProposals: BotProposal[] = []
+) {
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
       mode: 'SHADOW',
     enabledSubsystems: {
@@ -236,7 +298,8 @@ function runStrategicDevelopmentSubsystem(galaxy: Galaxy, bot: Player) {
 
   return new BotStrategicDevelopmentSubsystem().generate({
     snapshot,
-    memory: createDefaultBotMemoryV2()
+    memory: createDefaultBotMemoryV2(),
+    priorProposals
   });
 }
 

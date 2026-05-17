@@ -49,7 +49,7 @@ export function scoreSupervisorProposal(input: {
   }
 
   const weight = resolveProposalWeight(input.proposal, input.snapshot, input.memory);
-  const weightMultiplier = weight <= 0 ? 0.5 : Math.max(0.25, weight / 50);
+  const weightMultiplier = weight <= 0 ? 0 : Math.max(0.25, weight / 50);
   const alignmentMultiplier = input.criticalAccepted
     ? 1
     : resolveResourceAlignmentMultiplier(input.proposal.subsystemId, input.snapshot.turn, input.memory);

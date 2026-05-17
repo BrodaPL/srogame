@@ -10,6 +10,7 @@ import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
 import { ResearchHelperFor } from '../../../../../src/app/models/tech/research-helper-for.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
+import type { BotProposal } from '../../bot-v2-types.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
 import { TECHNOLOGY_BLUEPRINTS } from '../../../game-commands/command-helpers.js';
 import { BotResearchSubsystem } from './bot-research-subsystem.js';
@@ -112,18 +113,68 @@ describe('BotResearchSubsystem', () => {
     expect(result.proposals[0]?.requestPayload.z).toBe(fallbackMainPlanet.basicInfo.order);
     expect(result.proposals[0]?.requestPayload.helperPlanets).toEqual([]);
   });
+
+  it('biases toward Adaptive Technology when colonization pressure is reported by Strategic Development', () => {
+    const { galaxy, bot, planets } = createResearchWorld(1);
+    const [planet] = planets;
+    configureResearchPlanet(planet, {
+      researchLabLevel: 5,
+      resources: new ResourcesPack(20000, 20000, 20000)
+    });
+    bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.SHIELDING_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.ASTROPHYSICS_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 1);
+
+    const result = runResearchSubsystem(galaxy, bot, createDefaultBotMemoryV2(), [{
+      proposalId: 'strategic-development:pressure',
+      subsystemId: 'STRATEGIC_DEVELOPMENT',
+      kind: 'BUILDING',
+      status: 'PROPOSED',
+      goalKey: 'strategic-development:pressure',
+      dedupeKey: 'strategic-development:pressure',
+      summary: 'Pressure marker.',
+      planetId: null,
+      targetCoordinates: {
+        x: planet.basicInfo.solarSystem.coordinates.x,
+        y: planet.basicInfo.solarSystem.coordinates.y,
+        z: planet.basicInfo.order
+      },
+      expectedValue: 1,
+      urgency: 1,
+      risk: 1,
+      confidence: 1,
+      requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      requestPayload: {
+        x: planet.basicInfo.solarSystem.coordinates.x,
+        y: planet.basicInfo.solarSystem.coordinates.y,
+        z: planet.basicInfo.order,
+        buildingType: BuildingType.METAL_MINE
+      },
+      blockers: [],
+      expiresOnTurn: galaxy.currentTurn + 1,
+      debug: {
+        adaptiveColonizationPressureActive: true,
+        adaptiveColonizationBlockedCandidateCount: 1
+      }
+    }]);
+
+    expect(result.proposals[0]?.requestPayload.technologyType).toBe(TechnologyType.ADAPTIVE_TECHNOLOGY);
+    expect(result.proposals[0]?.debug.adaptiveColonizationBias).toBeGreaterThan(0);
+  });
 });
 
 function runResearchSubsystem(
   galaxy: Galaxy,
   bot: Player,
-  memory = createDefaultBotMemoryV2()
+  memory = createDefaultBotMemoryV2(),
+  priorProposals: BotProposal[] = []
 ) {
   const subsystem = new BotResearchSubsystem();
   return subsystem.generate({
     snapshot: buildSnapshot(galaxy, bot),
     memory,
-    priorProposals: []
+    priorProposals
   });
 }
 

@@ -27,9 +27,11 @@ type ResearchCandidate = {
   estimatedResearchEtc: number;
   weightedCost: number;
   resourceMatchScore: number;
+  adaptiveColonizationBias: number;
 };
 
 const MIN_AFFORDABILITY_WINDOW_TURNS = 5;
+const ADAPTIVE_COLONIZATION_PRIORITY_BONUS = 1;
 
 export class BotResearchSubsystem implements BotSubsystem {
   public readonly subsystemId = 'RESEARCH' as const;
@@ -57,7 +59,8 @@ export class BotResearchSubsystem implements BotSubsystem {
       availableMainLabs,
       activeResearchTypes,
       affordabilityWindowTurns,
-      maxLabsPerTechnology
+      maxLabsPerTechnology,
+      adaptiveColonizationPressure: resolveAdaptiveColonizationPressure(context.priorProposals ?? [])
     });
 
     if (
@@ -74,7 +77,8 @@ export class BotResearchSubsystem implements BotSubsystem {
         availableMainLabs,
         activeResearchTypes,
         affordabilityWindowTurns,
-        maxLabsPerTechnology
+        maxLabsPerTechnology,
+        adaptiveColonizationPressure: resolveAdaptiveColonizationPressure(context.priorProposals ?? [])
       });
     }
 
@@ -101,6 +105,8 @@ export class BotResearchSubsystem implements BotSubsystem {
         blockedByBuildingRequirementsCount: evaluation.blockedByBuildingRequirementsCount,
         blockedByTechRequirementsCount: evaluation.blockedByTechRequirementsCount,
         candidatePairCount: evaluation.candidatePairCount,
+        adaptiveColonizationPressureActive: evaluation.adaptiveColonizationPressure.active,
+        adaptiveColonizationBlockedCandidateCount: evaluation.adaptiveColonizationPressure.blockedCandidateCount,
         selectedTechnologyType: evaluation.bestCandidate?.technology.type ?? null,
         selectedMainPlanet: evaluation.bestCandidate
           ? toCoordinatesKey(evaluation.bestCandidate.mainPlanet.coordinates)
@@ -117,12 +123,20 @@ function evaluateBestResearchCandidate(input: {
   activeResearchTypes: Set<TechnologyType>;
   affordabilityWindowTurns: number;
   maxLabsPerTechnology: number;
+  adaptiveColonizationPressure: {
+    active: boolean;
+    blockedCandidateCount: number;
+  };
 }): {
   bestCandidate: ResearchCandidate | null;
   availableTechnologyCount: number;
   blockedByBuildingRequirementsCount: number;
   blockedByTechRequirementsCount: number;
   candidatePairCount: number;
+  adaptiveColonizationPressure: {
+    active: boolean;
+    blockedCandidateCount: number;
+  };
 } {
   let bestCandidate: ResearchCandidate | null = null;
   let availableTechnologyCount = 0;
@@ -180,7 +194,11 @@ function evaluateBestResearchCandidate(input: {
         affordabilityEta,
         estimatedResearchEtc: Math.max(1, Math.ceil(getTotalResourceAmount(cost) / totalResearchPower)),
         weightedCost: calculateWeightedResourceValue(cost),
-        resourceMatchScore: resolveResourceMatchScore(mainPlanet, cost)
+        resourceMatchScore: resolveResourceMatchScore(mainPlanet, cost),
+        adaptiveColonizationBias: resolveAdaptiveColonizationBiasForTechnology(
+          technology.type,
+          input.adaptiveColonizationPressure
+        )
       };
       candidatePairCount += 1;
 
@@ -195,7 +213,8 @@ function evaluateBestResearchCandidate(input: {
     availableTechnologyCount,
     blockedByBuildingRequirementsCount,
     blockedByTechRequirementsCount,
-    candidatePairCount
+    candidatePairCount,
+    adaptiveColonizationPressure: input.adaptiveColonizationPressure
   };
 }
 
@@ -241,10 +260,51 @@ function createResearchProposal(
       estimatedResearchEtc: candidate.estimatedResearchEtc,
       weightedCost: roundToTwoDecimals(candidate.weightedCost),
       resourceMatchScore: roundToTwoDecimals(candidate.resourceMatchScore),
+      adaptiveColonizationBias: candidate.adaptiveColonizationBias,
       helperCount: helperPlanets.length,
       helperPlanets: helperPlanets.map(toCoordinatesKey).join(',') || 'none'
     }
   };
+}
+
+function resolveAdaptiveColonizationPressure(priorProposals: BotProposal[]): {
+  active: boolean;
+  blockedCandidateCount: number;
+} {
+  let blockedCandidateCount = 0;
+
+  for (const proposal of priorProposals) {
+    if (proposal.subsystemId !== 'STRATEGIC_DEVELOPMENT') {
+      continue;
+    }
+    if (proposal.debug.adaptiveColonizationPressureActive !== true) {
+      continue;
+    }
+
+    blockedCandidateCount = Math.max(
+      blockedCandidateCount,
+      Number(proposal.debug.adaptiveColonizationBlockedCandidateCount ?? 0)
+    );
+  }
+
+  return {
+    active: blockedCandidateCount > 0,
+    blockedCandidateCount
+  };
+}
+
+function resolveAdaptiveColonizationBiasForTechnology(
+  technologyType: TechnologyType,
+  pressure: {
+    active: boolean;
+    blockedCandidateCount: number;
+  }
+): number {
+  if (!pressure.active || technologyType !== 'Adaptive Technology') {
+    return 0;
+  }
+
+  return ADAPTIVE_COLONIZATION_PRIORITY_BONUS;
 }
 
 function inputTechnologies(): Technology[] {
@@ -386,6 +446,7 @@ function normalizeShareVector(resources: ResourceAmounts): {
 
 function compareCandidates(left: ResearchCandidate, right: ResearchCandidate): number {
   return left.affordabilityEta - right.affordabilityEta
+    || right.adaptiveColonizationBias - left.adaptiveColonizationBias
     || left.estimatedResearchEtc - right.estimatedResearchEtc
     || left.weightedCost - right.weightedCost
     || right.resourceMatchScore - left.resourceMatchScore

@@ -388,7 +388,7 @@
         { "tech": "ENERGY_TECHNOLOGY", "level": 2 },
         { "tech": "COMPUTER_TECHNOLOGY", "level": 2 },
         { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 1 },
-        { "tech": "ADAPTIVE_TECHNOLOGY", "level": 1 }
+        { "tech": "ADAPTIVE_TECHNOLOGY", "level": 2 }
       ]
     },
     {

@@ -30,7 +30,7 @@ describe('BotWeightManagerSubsystem', () => {
 
     expect(immatureEntry?.immaturePlanet).toBe(true);
     expect(immatureEntry?.economicWeight).toBeGreaterThanOrEqual(80);
-    expect(immatureEntry?.warfareWeight).toBeLessThanOrEqual(15);
+    expect(immatureEntry?.warfareWeight).toBe(0);
     expect(matureHubEntry?.maturePlanet).toBe(true);
     expect(matureHubEntry?.industryHubPlanet).toBe(true);
   });

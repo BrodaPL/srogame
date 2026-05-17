@@ -230,6 +230,67 @@ describe('BotWarfareSubsystem', () => {
     expect(shipNeedProposal?.debug.queueType).toBe('SHIP_NEED');
     expect(shipNeedProposal?.debug.goalFamily).toBe('RECOVERY');
   });
+
+  it('penalizes additional small-ship production when local small-ship capacity already exceeds the target', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 6);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 5);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 7);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 5);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 6);
+    planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 2);
+    setBaselineShipTech(bot, 5);
+    addInstalledShips(planet, {
+      [ShipType.FIGHTER]: 20,
+      [ShipType.ASSAULT_FIGHTER]: 20,
+      [ShipType.CORVETTE]: 10,
+      [ShipType.CRUISER]: 1
+    });
+
+    const result = runWarfareSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && (proposal.requestPayload as { shipType?: ShipType }).shipType === ShipType.BATTLE_SHIP
+    )).toBe(true);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && ((proposal.debug.smallShipPenaltyMultiplier as number | undefined) ?? 1) > 1
+    )).toBe(true);
+  });
+
+  it('keeps small-ship production eligible when local hangar capacity still exceeds current small-ship capacity', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 6);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 5);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 7);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 5);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 6);
+    planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 2);
+    setBaselineShipTech(bot, 5);
+    addInstalledShips(planet, {
+      [ShipType.CARRIER]: 2,
+      [ShipType.FLEET_CARRIER]: 1,
+      [ShipType.FIGHTER]: 2
+    });
+
+    const result = runWarfareSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && (proposal.requestPayload as { shipType?: ShipType }).shipType === ShipType.FIGHTER
+    )).toBe(true);
+  });
 });
 
 function runWarfareSubsystem(galaxy: Galaxy, bot: Player) {

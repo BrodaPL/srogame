@@ -141,6 +141,11 @@ export class BotSupervisorV2 implements BotSupervisor {
     const criticalAccepted = scored.some((entry) => entry.proposal.subsystemId === 'CRITICAL');
 
     for (const entry of scored) {
+      if (entry.score <= 0) {
+        rejected.push({ proposalId: entry.proposal.proposalId, reason: 'nonpositive_score' });
+        continue;
+      }
+
       if (REQUEST_ACTION_KINDS.has(entry.proposal.kind)) {
         accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
         continue;
@@ -392,7 +397,9 @@ export class BotSupervisorV2 implements BotSupervisor {
 
     const normalized = normalizeQueueExecutionProposal(proposal);
     if (!normalized.ok) {
-      console.warn(`[BotV2 Supervisor] Invalid queue proposal ${proposal.proposalId}: ${normalized.reason}`);
+      if (normalized.reason !== 'ship_need_pressure_only') {
+        console.warn(`[BotV2 Supervisor] Invalid queue proposal ${proposal.proposalId}: ${normalized.reason}`);
+      }
       return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
     }
 

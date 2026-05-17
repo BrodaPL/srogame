@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
 import { createDefaultBotMemoryV2 } from '../bot-v2-memory.js';
 import type { BotProposal, BotWorldSnapshot } from '../bot-v2-types.ts';
@@ -80,6 +81,50 @@ describe('bot supervisor scoring', () => {
 
     expect(research).toBeGreaterThan(0);
   });
+
+  it('treats zero local subsystem weight as zero score', () => {
+    const memory = createDefaultBotMemoryV2();
+    memory.weightManager.planets = [{
+      coordinates: { x: 0, y: 0, z: 1 },
+      economicWeight: 80,
+      defensiveWeight: 20,
+      warfareWeight: 0,
+      avgIndustry: 2,
+      avgMilitary: 0,
+      avgDefence: 0,
+      avgDevelopment: 0,
+      selectedFocus: null,
+      immaturePlanet: true,
+      maturePlanet: false,
+      industryFocused: true,
+      defenceFocused: false,
+      militaryFocused: false,
+      developmentFocused: false,
+      industryHubPlanet: false,
+      damagedPlanet: false,
+      inDangerPlanet: false,
+      constantlyAttackedPlanet: false,
+      veryHeavilyAttackedPlanet: false,
+      knownByWarFaction: false,
+      recentHostileAttackCountLast20Turns: 0
+    }];
+
+    const warfare = scoreSupervisorProposal({
+      proposal: createProposal({
+        subsystemId: 'WARFARE',
+        kind: 'SHIPYARD',
+        requestPayload: { x: 0, y: 0, z: 1, itemKind: 'ship', shipType: ShipType.FIGHTER, amount: 1 }
+      }),
+      snapshot: createSnapshot([{
+        coordinates: { x: 0, y: 0, z: 1 }
+      }]),
+      memory,
+      shipNeedPressure: 0,
+      criticalAccepted: false
+    });
+
+    expect(warfare).toBe(0);
+  });
 });
 
 function createProposal(overrides: Partial<BotProposal> = {}): BotProposal {
@@ -106,13 +151,16 @@ function createProposal(overrides: Partial<BotProposal> = {}): BotProposal {
   };
 }
 
-function createSnapshot(): BotWorldSnapshot {
+function createSnapshot(planets: Array<Partial<BotWorldSnapshot['planets'][number]>> = []): BotWorldSnapshot {
   return {
     turn: 1,
     playerId: 1,
     playerName: 'Bot',
     profileId: 'BALANCED',
-    planets: [],
+    planets: planets.map((planet) => ({
+      coordinates: { x: 0, y: 0, z: 1 },
+      ...planet
+    })) as BotWorldSnapshot['planets'],
     empire: {
       ownedPlanetCount: 0,
       computerTechnologyLevel: 0,
