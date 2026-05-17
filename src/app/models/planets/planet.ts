@@ -161,7 +161,7 @@ export class Planet {
     // Pick modifier ranges based on planet type, then roll actual values within those ranges.
     const modifierRanges = Planet.modifierRangesFor(type);
     const colonizationRange = Planet.colonizationDifficultyRangeFor(type);
-    const size = Planet.randomInt(90, 200);
+    const size = Planet.randomInt(100, 220);
 
     return new Planet(
       new PlanetBasicInfo(

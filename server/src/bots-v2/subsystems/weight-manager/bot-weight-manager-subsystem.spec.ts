@@ -29,7 +29,7 @@ describe('BotWeightManagerSubsystem', () => {
     );
 
     expect(immatureEntry?.immaturePlanet).toBe(true);
-    expect(immatureEntry?.economicWeight).toBeGreaterThanOrEqual(80);
+    expect(immatureEntry?.economicWeight).toBeGreaterThan(80);
     expect(immatureEntry?.warfareWeight).toBe(0);
     expect(matureHubEntry?.maturePlanet).toBe(true);
     expect(matureHubEntry?.industryHubPlanet).toBe(true);
@@ -101,10 +101,10 @@ describe('BotWeightManagerSubsystem', () => {
 
   it('removes industry focus during active war without forcing a replacement focus', () => {
     const { galaxy, bot, enemy, matureLaggingPlanet, matureHubPlanet } = createWeightManagerWorld();
-    configureIndustryPlanet(matureHubPlanet, 9);
+    configureIndustryPlanet(matureHubPlanet, 12);
     matureHubPlanet.setBuildingLevel(BuildingType.RESEARCH_LAB, 3);
     matureHubPlanet.setBuildingLevel(BuildingType.SENSOR_PHALANX, 3);
-    configureIndustryPlanet(matureLaggingPlanet, 5);
+    configureIndustryPlanet(matureLaggingPlanet, 7);
     matureLaggingPlanet.setBuildingLevel(BuildingType.RESEARCH_LAB, 3);
     matureLaggingPlanet.setBuildingLevel(BuildingType.SENSOR_PHALANX, 3);
 

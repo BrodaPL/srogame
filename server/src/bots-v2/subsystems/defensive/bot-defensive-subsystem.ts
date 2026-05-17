@@ -409,6 +409,9 @@ function evaluateProductionGoal(
   planet: BotPlanetSnapshot,
   defenceType: DefenceType
 ): DefensiveGoalEvaluation | null {
+  if (isImmaturePlanet(planet)) {
+    return null;
+  }
   if (!canProduceDefenseNow(planet, defenceType)) {
     return null;
   }
@@ -443,7 +446,8 @@ function evaluateProductionGoal(
   }
 
   const bonusFactor = resolveProductionBonusFactor(planet, defenceType);
-  const weightedEtc = totalEtc / bonusFactor;
+  const softCapPenaltyMultiplier = resolveDefenceSoftCapPenaltyMultiplier(context, planet, defenceType);
+  const weightedEtc = (totalEtc / bonusFactor) * softCapPenaltyMultiplier;
 
   return {
     goalKey: `defensive:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:produce:${defenceType}:${immediateRequest.amount}`,
@@ -472,6 +476,7 @@ function evaluateProductionGoal(
       goalFamily: 'PRODUCTION',
       orderAmount: immediateRequest.amount,
       queueRemainingEtc: planet.power.shipyardQueueRemainingEtc,
+      softCapPenaltyMultiplier: roundToTwoDecimals(softCapPenaltyMultiplier),
       totalEtc: roundToTwoDecimals(totalEtc),
       weightedEtc: roundToTwoDecimals(weightedEtc)
     }
@@ -995,6 +1000,71 @@ function resolveDistributionBonusRatio(
   const candidateValue = planet.defense.installedValueByType[defenceType] ?? 0;
   const missingRatio = Math.max(0, (maxInstalledValue - candidateValue) / maxInstalledValue);
   return missingRatio * 0.35;
+}
+
+function resolveDefenceSoftCapPenaltyMultiplier(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot,
+  defenceType: DefenceType
+): number {
+  if (isImmaturePlanet(planet)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  if (planet.defense.knownByWarFaction || planet.defense.recentHostileAttackCountLast20Turns > 0) {
+    return 1;
+  }
+
+  const multiplier = context.snapshot.profileId === 'BUNKERER' ? 20 : 12;
+  const capResources = {
+    metal: Math.max(1, planet.economy.income.metal * multiplier),
+    crystal: Math.max(1, planet.economy.income.crystal * multiplier),
+    deuterium: Math.max(1, planet.economy.income.deuterium * multiplier)
+  };
+  const layerValue = resolveDefenceLayerResources(planet, defenceType);
+  const overageRatio = Math.max(
+    layerValue.metal / capResources.metal,
+    layerValue.crystal / capResources.crystal,
+    layerValue.deuterium / capResources.deuterium
+  );
+  if (overageRatio <= 1) {
+    return 1;
+  }
+
+  return 1 + Math.min(6, (overageRatio - 1) * 2.5);
+}
+
+function resolveDefenceLayerResources(
+  planet: BotPlanetSnapshot,
+  defenceType: DefenceType
+): ResourceAmounts {
+  const layerTypes = isMissileLayerDefenceType(defenceType)
+    ? [DefenceType.SAM_SITE, DefenceType.ORBITAL_MISSILE_LAUNCHER, DefenceType.HEAVY_ORBITAL_MISSILE_LAUNCHER]
+    : [DefenceType.LIGHT_BEAM_CANNON, DefenceType.BEAM_CANNON, DefenceType.HEAVY_BEAM_CANNON, DefenceType.RAIL_GUN_CANNON];
+  const total: ResourceAmounts = { metal: 0, crystal: 0, deuterium: 0 };
+
+  for (const type of layerTypes) {
+    const blueprint = DEFENCE_BLUEPRINTS.get(type);
+    if (!blueprint) {
+      continue;
+    }
+    const amount = planet.defense.installedCountByType[type] ?? 0;
+    total.metal += blueprint.cost.metal * amount;
+    total.crystal += blueprint.cost.crystal * amount;
+    total.deuterium += blueprint.cost.deuterium * amount;
+  }
+
+  return total;
+}
+
+function isMissileLayerDefenceType(defenceType: DefenceType): boolean {
+  return defenceType === DefenceType.SAM_SITE
+    || defenceType === DefenceType.ORBITAL_MISSILE_LAUNCHER
+    || defenceType === DefenceType.HEAVY_ORBITAL_MISSILE_LAUNCHER;
+}
+
+function isImmaturePlanet(planet: BotPlanetSnapshot): boolean {
+  return planet.maturityStage === 'BOOTSTRAP' || planet.maturityStage === 'STABILIZING';
 }
 
 function createPlanetProposals(

@@ -90,33 +90,33 @@ const COMBAT_SHIP_TYPES = Array.from(SHIP_BLUEPRINTS.shipsMap.keys())
 
 const PROFILE_TABLES: Record<BotProfileId, WeightProfile> = {
   BALANCED: {
-    axes: { aggression: 50, industry: 50, diplomacy: 45, defences: 50, caution: 45, development: 50 },
-    localWeights: { economic: 50, defensive: 50, warfare: 50 },
+    axes: { aggression: 50, industry: 50, diplomacy: 45, defences: 35, caution: 45, development: 50 },
+    localWeights: { economic: 50, defensive: 35, warfare: 50 },
     strategicWeights: { research: 50, strategicDevelopment: 50, strategicMilitary: 50, strategicDiplomatic: 50 }
   },
   AGGRESSOR: {
-    axes: { aggression: 85, industry: 40, diplomacy: 35, defences: 40, caution: 20, development: 45 },
-    localWeights: { economic: 40, defensive: 40, warfare: 78 },
+    axes: { aggression: 85, industry: 40, diplomacy: 35, defences: 25, caution: 20, development: 45 },
+    localWeights: { economic: 40, defensive: 25, warfare: 78 },
     strategicWeights: { research: 38, strategicDevelopment: 45, strategicMilitary: 82, strategicDiplomatic: 70 }
   },
   TURTLE: {
-    axes: { aggression: 20, industry: 45, diplomacy: 35, defences: 85, caution: 70, development: 50 },
-    localWeights: { economic: 45, defensive: 82, warfare: 28 },
+    axes: { aggression: 20, industry: 45, diplomacy: 35, defences: 60, caution: 70, development: 50 },
+    localWeights: { economic: 45, defensive: 55, warfare: 28 },
     strategicWeights: { research: 52, strategicDevelopment: 50, strategicMilitary: 35, strategicDiplomatic: 40 }
   },
   MINER: {
-    axes: { aggression: 20, industry: 85, diplomacy: 50, defences: 40, caution: 55, development: 70 },
-    localWeights: { economic: 82, defensive: 35, warfare: 20 },
+    axes: { aggression: 20, industry: 85, diplomacy: 50, defences: 20, caution: 55, development: 70 },
+    localWeights: { economic: 82, defensive: 20, warfare: 20 },
     strategicWeights: { research: 78, strategicDevelopment: 72, strategicMilitary: 25, strategicDiplomatic: 40 }
   },
   AVOIDER: {
-    axes: { aggression: 10, industry: 45, diplomacy: 72, defences: 50, caution: 85, development: 45 },
-    localWeights: { economic: 45, defensive: 55, warfare: 15 },
+    axes: { aggression: 10, industry: 45, diplomacy: 72, defences: 30, caution: 85, development: 45 },
+    localWeights: { economic: 45, defensive: 30, warfare: 15 },
     strategicWeights: { research: 46, strategicDevelopment: 45, strategicMilitary: 20, strategicDiplomatic: 72 }
   },
   BUNKERER: {
-    axes: { aggression: 25, industry: 40, diplomacy: 30, defences: 90, caution: 65, development: 45 },
-    localWeights: { economic: 40, defensive: 88, warfare: 25 },
+    axes: { aggression: 25, industry: 40, diplomacy: 30, defences: 70, caution: 65, development: 45 },
+    localWeights: { economic: 40, defensive: 60, warfare: 25 },
     strategicWeights: { research: 42, strategicDevelopment: 40, strategicMilitary: 25, strategicDiplomatic: 35 }
   }
 };
@@ -289,8 +289,9 @@ function buildPlanetFlags(
   atWar: boolean
 ): PlanetFlags {
   const { planet } = entry;
-  const immaturePlanet = entry.avgIndustry <= 4;
-  const maturePlanet = !immaturePlanet;
+  const localStage = resolveLocalDevelopmentStage(entry.avgIndustry);
+  const immaturePlanet = localStage === 'IMMATURE';
+  const maturePlanet = localStage !== 'IMMATURE';
   const knownByWarFaction = planet.defense.knownByWarFaction;
   const recentHostileAttackCountLast20Turns = planet.defense.recentHostileAttackCountLast20Turns;
   const damagedPlanet = resolveStructuralDamagePercent(planet) >= 25;
@@ -298,9 +299,9 @@ function buildPlanetFlags(
   const inDangerPlanet = poorDefences && knownByWarFaction;
   const constantlyAttackedPlanet = recentHostileAttackCountLast20Turns >= 3;
   const veryHeavilyAttackedPlanet = constantlyAttackedPlanet && damagedPlanet;
-  const industryHubPlanet = maturePlanet && entry.avgIndustry + 1.5 >= highestAverages.industry;
+  const industryHubPlanet = localStage === 'DEVELOPED' && entry.avgIndustry + 1.5 >= highestAverages.industry;
 
-  const selectedFocus = resolveSelectedFocus(entry, highestAverages, maturePlanet, atWar);
+  const selectedFocus = resolveSelectedFocus(entry, highestAverages, localStage, atWar);
 
   return {
     selectedFocus,
@@ -328,10 +329,10 @@ function resolveSelectedFocus(
     defence: number;
     development: number;
   },
-  maturePlanet: boolean,
+  localStage: 'IMMATURE' | 'MATURING' | 'DEVELOPED',
   atWar: boolean
 ): BotMemoryV2WeightManagerPlanetFocus | null {
-  if (!maturePlanet) {
+  if (localStage !== 'DEVELOPED') {
     return null;
   }
 
@@ -498,6 +499,7 @@ function buildWeightManagerPlanetEntry(
   profile: WeightProfile,
   selectedMode: BotMemoryV2WeightManagerMode
 ): BotMemoryV2WeightManagerPlanetEntry {
+  const localStage = resolveLocalDevelopmentStage(entry.avgIndustry);
   let economicWeight = profile.localWeights.economic;
   let defensiveWeight = profile.localWeights.defensive;
   let warfareWeight = profile.localWeights.warfare;
@@ -506,6 +508,11 @@ function buildWeightManagerPlanetEntry(
     economicWeight += 34;
     defensiveWeight -= 8;
     warfareWeight -= 35;
+  }
+  if (localStage === 'MATURING') {
+    economicWeight += 12;
+    warfareWeight = Math.max(warfareWeight, Math.round(profile.localWeights.warfare * 0.5));
+    defensiveWeight -= 4;
   }
   if (flags.industryFocused) {
     economicWeight += 18;
@@ -570,7 +577,13 @@ function buildWeightManagerPlanetEntry(
     economicWeight = Math.max(economicWeight, 80);
     warfareWeight = 0;
     if (!flags.inDangerPlanet) {
-      defensiveWeight = Math.min(defensiveWeight, 45);
+      defensiveWeight = Math.min(defensiveWeight, 35);
+    }
+  }
+  if (localStage === 'MATURING') {
+    economicWeight = Math.max(economicWeight, 60);
+    if (!flags.inDangerPlanet) {
+      defensiveWeight = Math.min(defensiveWeight, 40);
     }
   }
 
@@ -617,6 +630,16 @@ function createDefaultPlanetFlags(planet: BotPlanetSnapshot): PlanetFlags {
     knownByWarFaction: planet.defense.knownByWarFaction,
     recentHostileAttackCountLast20Turns: planet.defense.recentHostileAttackCountLast20Turns
   };
+}
+
+function resolveLocalDevelopmentStage(avgIndustry: number): 'IMMATURE' | 'MATURING' | 'DEVELOPED' {
+  if (avgIndustry <= 4) {
+    return 'IMMATURE';
+  }
+  if (avgIndustry <= 6) {
+    return 'MATURING';
+  }
+  return 'DEVELOPED';
 }
 
 function resolveStructuralDamagePercent(planet: BotPlanetSnapshot): number {

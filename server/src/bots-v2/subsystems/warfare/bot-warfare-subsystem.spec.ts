@@ -45,6 +45,17 @@ describe('BotWarfareSubsystem', () => {
     ]).toContain(result.proposals[0]?.debug?.finalShipType as ShipType);
   });
 
+  it('does not emit actual ship production on immature planets', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 5);
+    setBaselineShipTech(bot, 5);
+
+    const result = runWarfareSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) => proposal.kind === 'SHIPYARD')).toBe(false);
+  });
+
   it('emits a shipyard capacity request when shipyard is below avg-industry target', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseWarfarePlanet(planet);
@@ -135,6 +146,34 @@ describe('BotWarfareSubsystem', () => {
       goal.goalFamily === 'UNLOCK'
       && goal.finalShipType === ShipType.TRANSPORTER
     )).toBe(true);
+  });
+
+  it('suppresses transporter production when local transporter count already exceeds the soft cap', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 7);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 7);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 7);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 6);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 6);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 6);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 6);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 6);
+    planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 2);
+    setBaselineShipTech(bot, 5);
+    addInstalledShips(planet, {
+      [ShipType.TRANSPORTER]: 40,
+      [ShipType.CRUISER]: 4,
+      [ShipType.BATTLE_SHIP]: 2
+    });
+
+    const result = runWarfareSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && (proposal.requestPayload as { shipType?: ShipType }).shipType === ShipType.TRANSPORTER
+    )).toBe(false);
   });
 
   it('emits a first-class no-action planet result when local queues block all requests', () => {

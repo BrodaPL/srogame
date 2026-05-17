@@ -43,16 +43,27 @@ describe('BotDefensiveSubsystem', () => {
     ]).toContain(result.proposals[0]?.debug?.finalDefenceType as DefenceType);
   });
 
+  it('does not emit actual defence production on immature planets', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseDefensivePlanet(planet);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 2);
+    bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 2);
+
+    const result = runDefensiveSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) => proposal.kind === 'SHIPYARD')).toBe(false);
+  });
+
   it('emits one bunker request and one production request when defenses are already buildable', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseDefensivePlanet(planet);
-    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
-    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
-    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
-    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
-    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
-    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
-    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 5);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 7);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 7);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 7);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 6);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 6);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 6);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
     planet.setBuildingLevel(BuildingType.SHIPYARD, 1);
     bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 1);
 
@@ -98,15 +109,15 @@ describe('BotDefensiveSubsystem', () => {
   it('falls back to production-only when bunker is on target and current unlocks are exhausted', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseDefensivePlanet(planet);
-    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
-    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
-    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
-    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
-    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
-    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
-    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 4);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 7);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 7);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 7);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 6);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 6);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 6);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 7);
     planet.setBuildingLevel(BuildingType.SHIPYARD, 2);
-    planet.setBuildingLevel(BuildingType.BUNKER_NETWORK, 3);
+    planet.setBuildingLevel(BuildingType.BUNKER_NETWORK, 5);
     bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 2);
     bot.setTechLevel(TechnologyType.BEAMS_WEAPONS, 2);
     bot.setTechLevel(TechnologyType.SHIELDING_TECHNOLOGY, 2);
@@ -118,6 +129,32 @@ describe('BotDefensiveSubsystem', () => {
     expect(result.planetResults?.[0]?.branch).toBe('PRODUCTION_ONLY');
     expect(result.proposals).toHaveLength(2);
     expect(result.proposals.every((proposal) => proposal.kind === 'SHIPYARD')).toBe(true);
+  });
+
+  it('suppresses additional missile-layer production once the soft cap is already exceeded on a peaceful planet', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseDefensivePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 5);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 5);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 6);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
+    bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 2);
+    bot.setTechLevel(TechnologyType.BEAMS_WEAPONS, 2);
+    bot.setTechLevel(TechnologyType.SHIELDING_TECHNOLOGY, 2);
+    bot.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 1);
+    planet.rBDSFTQ.defences.addUndamaged(DefenceType.SAM_SITE, 200);
+
+    const result = runDefensiveSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && (proposal.requestPayload as { defenceType?: DefenceType }).defenceType === DefenceType.SAM_SITE
+    )).toBe(false);
   });
 
   it('can unlock orbital missile launchers through a shipyard upgrade request', () => {

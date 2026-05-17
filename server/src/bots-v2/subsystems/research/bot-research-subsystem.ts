@@ -10,7 +10,6 @@ import type {
 import {
   TECHNOLOGY_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
-import { calculateWeightedResourceValue } from '../../supervisor/bot-supervisor-scoring.js';
 
 type ResourceAmounts = {
   metal: number;
@@ -25,8 +24,6 @@ type ResearchCandidate = {
   helperPlanets: BotPlanetSnapshot[];
   affordabilityEta: number;
   estimatedResearchEtc: number;
-  weightedCost: number;
-  resourceMatchScore: number;
   adaptiveColonizationBias: number;
 };
 
@@ -193,8 +190,6 @@ function evaluateBestResearchCandidate(input: {
         helperPlanets,
         affordabilityEta,
         estimatedResearchEtc: Math.max(1, Math.ceil(getTotalResourceAmount(cost) / totalResearchPower)),
-        weightedCost: calculateWeightedResourceValue(cost),
-        resourceMatchScore: resolveResourceMatchScore(mainPlanet, cost),
         adaptiveColonizationBias: resolveAdaptiveColonizationBiasForTechnology(
           technology.type,
           input.adaptiveColonizationPressure
@@ -258,8 +253,6 @@ function createResearchProposal(
       nextLevel: candidate.nextLevel,
       affordabilityEta: candidate.affordabilityEta,
       estimatedResearchEtc: candidate.estimatedResearchEtc,
-      weightedCost: roundToTwoDecimals(candidate.weightedCost),
-      resourceMatchScore: roundToTwoDecimals(candidate.resourceMatchScore),
       adaptiveColonizationBias: candidate.adaptiveColonizationBias,
       helperCount: helperPlanets.length,
       helperPlanets: helperPlanets.map(toCoordinatesKey).join(',') || 'none'
@@ -409,47 +402,10 @@ function resolveResourceAffordabilityEta(current: number, income: number, requir
   return Math.max(1, Math.ceil((required - current) / income));
 }
 
-function resolveResourceMatchScore(
-  planet: BotPlanetSnapshot,
-  cost: ResourceAmounts
-): number {
-  const totalCost = getTotalResourceAmount(cost);
-  if (totalCost <= 0) {
-    return 0;
-  }
-
-  const localShare = normalizeShareVector({
-    metal: planet.localResources.metal + (planet.economy.income.metal * 5),
-    crystal: planet.localResources.crystal + (planet.economy.income.crystal * 5),
-    deuterium: planet.localResources.deuterium + (planet.economy.income.deuterium * 5)
-  });
-  const costShare = normalizeShareVector(cost);
-  const spread = Math.abs(localShare.metal - costShare.metal)
-    + Math.abs(localShare.crystal - costShare.crystal)
-    + Math.abs(localShare.deuterium - costShare.deuterium);
-
-  return Math.max(0, 1 - (spread / 2));
-}
-
-function normalizeShareVector(resources: ResourceAmounts): {
-  metal: number;
-  crystal: number;
-  deuterium: number;
-} {
-  const total = Math.max(1, getTotalResourceAmount(resources));
-  return {
-    metal: resources.metal / total,
-    crystal: resources.crystal / total,
-    deuterium: resources.deuterium / total
-  };
-}
-
 function compareCandidates(left: ResearchCandidate, right: ResearchCandidate): number {
-  return left.affordabilityEta - right.affordabilityEta
-    || right.adaptiveColonizationBias - left.adaptiveColonizationBias
+  return right.adaptiveColonizationBias - left.adaptiveColonizationBias
     || left.estimatedResearchEtc - right.estimatedResearchEtc
-    || left.weightedCost - right.weightedCost
-    || right.resourceMatchScore - left.resourceMatchScore
+    || left.affordabilityEta - right.affordabilityEta
     || right.mainPlanet.power.researchPower - left.mainPlanet.power.researchPower
     || right.helperPlanets.length - left.helperPlanets.length
     || left.technology.type.localeCompare(right.technology.type)
@@ -572,6 +528,5 @@ function roundToTwoDecimals(value: number): number {
 
 export const __researchTestInternals = {
   estimateAffordabilityEta,
-  selectHelperPlanets,
-  resolveResourceMatchScore
+  selectHelperPlanets
 };

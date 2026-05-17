@@ -156,7 +156,7 @@ export class EncyclopediaMechanicsComponent {
         'Terraformer permanently increases planet size once a level finishes, using the blueprint production1 value of the highest completed terraformer level reached.'
       ],
       formulas: [
-        'randomPlanetBaseSize = randomInt(90, 200)',
+        'randomPlanetBaseSize = randomInt(100, 220)',
         'startingPlanetBaseSize = 160',
         'currentPlanetSize = baseSize + permanentTerraformerSizeBonus'
       ]

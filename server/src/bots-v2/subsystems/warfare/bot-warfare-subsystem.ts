@@ -1112,6 +1112,9 @@ function evaluateProductionGoal(
   planet: BotPlanetSnapshot,
   shipType: ShipType
 ): WarfareGoalEvaluation | null {
+  if (isImmaturePlanet(planet)) {
+    return null;
+  }
   if (!canProduceShipNow(planet, shipType)) {
     return null;
   }
@@ -1149,7 +1152,12 @@ function evaluateProductionGoal(
 
   const bonusFactor = resolveProductionBonusFactor(planet, shipType);
   const smallShipPenaltyMultiplier = resolveSmallShipPenaltyMultiplier(context, planet, shipType);
-  const weightedEtc = (totalEtc / bonusFactor) * smallShipPenaltyMultiplier;
+  const transporterPenaltyMultiplier = resolveTransporterPenaltyMultiplier(context, planet, shipType);
+  const repairDronePenaltyMultiplier = resolveRepairDronePenaltyMultiplier(planet, shipType);
+  const weightedEtc = (totalEtc / bonusFactor)
+    * smallShipPenaltyMultiplier
+    * transporterPenaltyMultiplier
+    * repairDronePenaltyMultiplier;
 
   return {
     goalKey: `warfare:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:produce:${shipType}:${immediateRequest.amount}`,
@@ -1180,9 +1188,13 @@ function evaluateProductionGoal(
       orderAmount: immediateRequest.amount,
       queueRemainingEtc: planet.power.shipyardQueueRemainingEtc,
       smallShipPenaltyMultiplier: roundToTwoDecimals(smallShipPenaltyMultiplier),
+      transporterPenaltyMultiplier: roundToTwoDecimals(transporterPenaltyMultiplier),
+      repairDronePenaltyMultiplier: roundToTwoDecimals(repairDronePenaltyMultiplier),
       smallShipTargetCapacity: resolveLocalSmallShipTargetCapacity(context, planet),
       localSmallShipRequiredCapacity: resolveLocalSmallShipRequiredCapacity(planet),
       localCarrierHangarCapacity: resolveLocalCarrierHangarCapacity(planet),
+      transporterCap: resolveTransporterCap(context, planet),
+      repairDroneCap: resolveRepairDroneCap(planet),
       totalEtc: roundToTwoDecimals(totalEtc),
       weightedEtc: roundToTwoDecimals(weightedEtc)
     }
@@ -1783,6 +1795,10 @@ function resolveSmallShipPenaltyMultiplier(
     return 1;
   }
 
+  if (isMaturingPlanet(planet)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
   const normalizedTarget = Math.max(1, targetCapacity);
   const overageRatio = localSmallShipRequiredCapacity / normalizedTarget;
   return 1 + Math.min(5, overageRatio * 2.5);
@@ -1792,6 +1808,10 @@ function resolveLocalSmallShipTargetCapacity(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot
 ): number {
+  if (isImmaturePlanet(planet)) {
+    return 0;
+  }
+
   const ownedPlanetCount = Math.max(1, context.snapshot.empire.ownedPlanetCount);
   return Math.floor(resolveLocalCarrierHangarCapacity(planet) / (ownedPlanetCount + 1));
 }
@@ -1828,6 +1848,71 @@ function resolveLocalCarrierHangarCapacity(planet: BotPlanetSnapshot): number {
   }
 
   return total;
+}
+
+function resolveTransporterPenaltyMultiplier(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot,
+  shipType: ShipType
+): number {
+  if (shipType !== ShipType.TRANSPORTER) {
+    return 1;
+  }
+
+  const cap = resolveTransporterCap(context, planet);
+  const installed = planet.ships.installedCountByType[ShipType.TRANSPORTER] ?? 0;
+  if (installed <= cap) {
+    return 1;
+  }
+
+  const overageRatio = installed / Math.max(1, cap);
+  return 1 + Math.min(6, overageRatio * 2.5);
+}
+
+function resolveRepairDronePenaltyMultiplier(
+  planet: BotPlanetSnapshot,
+  shipType: ShipType
+): number {
+  if (shipType !== ShipType.REPAIR_DRONE) {
+    return 1;
+  }
+
+  const cap = resolveRepairDroneCap(planet);
+  const installed = planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0;
+  if (installed <= cap) {
+    return 1;
+  }
+
+  const overageRatio = installed / Math.max(1, cap);
+  return 1 + Math.min(6, overageRatio * 2.5);
+}
+
+function resolveTransporterCap(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot
+): number {
+  const blueprint = SHIP_BLUEPRINTS.get(ShipType.TRANSPORTER);
+  const cargoCapacity = Math.max(1, blueprint?.cargoCapacity ?? 1);
+  const tenTurnIncomeCargo = (
+    (planet.economy.income.metal + planet.economy.income.crystal + planet.economy.income.deuterium)
+    * 10
+  );
+  return Math.max(
+    1,
+    Math.ceil(tenTurnIncomeCargo / cargoCapacity) + (Math.max(1, context.snapshot.empire.ownedPlanetCount) * 5)
+  );
+}
+
+function resolveRepairDroneCap(planet: BotPlanetSnapshot): number {
+  return Math.max(1, Math.floor(planet.power.industryPower / 2));
+}
+
+function isImmaturePlanet(planet: BotPlanetSnapshot): boolean {
+  return planet.maturityStage === 'BOOTSTRAP' || planet.maturityStage === 'STABILIZING';
+}
+
+function isMaturingPlanet(planet: BotPlanetSnapshot): boolean {
+  return planet.maturityStage === 'DEVELOPED';
 }
 
 function resolveDistributionBonusRatio(
