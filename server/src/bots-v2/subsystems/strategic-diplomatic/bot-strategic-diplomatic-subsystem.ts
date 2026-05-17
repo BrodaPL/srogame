@@ -309,6 +309,7 @@ const PRIMARY_WAR_BREAK_NEAR_EQUAL_IMPROVEMENT_RATIO = 0.1;
 const POST_BREAK_ATTACK_CONFIRMATION_REPORT_MAX_AGE = 10;
 const POST_BREAK_ATTACK_AMBUSH_RISK_DECAY_PER_TURN = 10;
 const POST_BREAK_ATTACK_AMBUSH_PAUSE_THRESHOLD = 70;
+const POST_BREAK_ATTACK_BREAK_SCORE_PREFERENCE_RATIO = 1.25;
 const ACTIVE_BREAK_TARGET_CAP = 2;
 const ACTIVE_OPENED_WAR_TARGET_BASE = 1;
 const ACTIVE_WAR_NEUTRAL_ATTACK_SCORE_MULTIPLIER = 0.6;
@@ -507,6 +508,12 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         sharedHostileEventCount: context.memory.strategicDiplomatic.sharedHostileEvents.length,
         attackSharePercent: resolveAttackShareForWarState(warState),
         supportSharePercent: 100 - resolveAttackShareForWarState(warState),
+        diplomaticBestBreakAttackScore: combatPlanning.debug.bestBreakScore,
+        diplomaticBestRaidAttackScore: combatPlanning.debug.bestRaidScore,
+        diplomaticBreakPreferredOverRaid: combatPlanning.debug.breakPreferred,
+        diplomaticPostBreakRaidCap: combatPlanning.debug.postBreakRaidCap,
+        diplomaticRaidPauseThreshold: combatPlanning.debug.raidPauseThreshold,
+        averageWarAdvantageLevel: combatPlanning.debug.averageWarAdvantageLevel,
         // TODO: Later phases should add tributes / bribes / negotiated payments to influence diplomacy.
         // TODO: Clarify whether allied Jump Gate travel should also reduce diplomatic MOVE / ARMAMENT_DELIVERY ETA like own Jump Gate travel.
         futureTributePressure: false
@@ -2018,13 +2025,29 @@ function createCombatMissionRequests(
   attackRequests: AttackMissionRequest[];
   supportRequests: SupportMissionRequest[];
   shipNeeds: WarShipNeedRequest[];
+  debug: {
+    bestBreakScore: number | null;
+    bestRaidScore: number | null;
+    breakPreferred: boolean | null;
+    postBreakRaidCap: number;
+    raidPauseThreshold: number | null;
+    averageWarAdvantageLevel: -2 | -1 | 0 | 1 | 2 | null;
+  };
 } {
   if (availableFleetSlots <= 0) {
     return {
       relocationRequests: [],
       attackRequests: [],
       supportRequests: [],
-      shipNeeds: []
+      shipNeeds: [],
+      debug: {
+        bestBreakScore: null,
+        bestRaidScore: null,
+        breakPreferred: null,
+        postBreakRaidCap: 0,
+        raidPauseThreshold: null,
+        averageWarAdvantageLevel: null
+      }
     };
   }
 
@@ -2063,17 +2086,61 @@ function createCombatMissionRequests(
     Math.max(0, ACTIVE_BREAK_TARGET_CAP - existingBreakAttackCount),
     Math.max(0, attackBudget)
   );
-  attackRequests.push(...attackCandidates.slice(0, breakAttackCap));
-  attackBudget = Math.max(0, attackBudget - breakAttackCap);
-
   const postBreakRaidCandidates = createPostBreakRaidMissionRequests(
     context,
     factions,
     openedWarTargetLedger,
     hasActiveWar
   ).sort((left, right) => right.score - left.score || left.travelTurns - right.travelTurns);
-  const postBreakRaidCap = Math.min(resolveActiveOpenedWarTargetCap(context), Math.max(0, attackBudget));
-  attackRequests.push(...postBreakRaidCandidates.slice(0, postBreakRaidCap));
+  const averageWarAdvantageLevel = resolveAverageWarAdvantageLevel(factions);
+  const postBreakRaidCap = Math.min(
+    resolveActiveOpenedWarTargetCap(context, factions, averageWarAdvantageLevel),
+    Math.max(0, attackBudget)
+  );
+  const bestBreakScore = attackCandidates[0]?.score ?? null;
+  const bestRaidScore = postBreakRaidCandidates[0]?.score ?? null;
+  const breakPreferred = resolveBreakPreferredAgainstRaid(bestBreakScore, bestRaidScore);
+  const selectedRaidTargetPlayerIds = new Set<number>();
+  let breakIndex = 0;
+  let raidIndex = 0;
+  let selectedBreakCount = 0;
+  let selectedRaidCount = 0;
+
+  while (attackBudget > 0) {
+    const nextBreak = selectedBreakCount < breakAttackCap
+      ? attackCandidates[breakIndex] ?? null
+      : null;
+    let nextRaid = selectedRaidCount < postBreakRaidCap
+      ? postBreakRaidCandidates[raidIndex] ?? null
+      : null;
+    while (nextRaid && selectedRaidTargetPlayerIds.has(nextRaid.faction.faction.playerId)) {
+      raidIndex += 1;
+      nextRaid = selectedRaidCount < postBreakRaidCap
+        ? postBreakRaidCandidates[raidIndex] ?? null
+        : null;
+    }
+    if (!nextBreak && !nextRaid) {
+      break;
+    }
+
+    if (shouldSelectRaidCandidate(nextBreak, nextRaid)) {
+      attackRequests.push(nextRaid!);
+      selectedRaidTargetPlayerIds.add(nextRaid!.faction.faction.playerId);
+      selectedRaidCount += 1;
+      raidIndex += 1;
+      attackBudget -= 1;
+      continue;
+    }
+    if (!nextBreak) {
+      break;
+    }
+
+    attackRequests.push(nextBreak);
+    selectedBreakCount += 1;
+    breakIndex += 1;
+    attackBudget -= 1;
+  }
+
   const supportCandidates = createSupportMissionCandidates(context, factions)
     .sort((left, right) => right.score - left.score || left.travelTurns - right.travelTurns);
   const supportRequests = supportCandidates.slice(0, Math.max(0, supportCap));
@@ -2086,7 +2153,17 @@ function createCombatMissionRequests(
     relocationRequests,
     attackRequests,
     supportRequests,
-    shipNeeds: selectTopWarShipNeedsPerPlanet(blockedNeeds)
+    shipNeeds: selectTopWarShipNeedsPerPlanet(blockedNeeds),
+    debug: {
+      bestBreakScore,
+      bestRaidScore,
+      breakPreferred,
+      postBreakRaidCap,
+      raidPauseThreshold: averageWarAdvantageLevel === null
+        ? null
+        : resolveOpenedWarRaidPauseThreshold(averageWarAdvantageLevel),
+      averageWarAdvantageLevel
+    }
   };
 }
 
@@ -3723,12 +3800,14 @@ function createPostBreakRaidMissionRequests(
   const activeKeys = new Set<string>();
 
   for (const faction of factions) {
-    if (!isFactionEligibleForDiplomaticAttack(faction)) {
-      continue;
-    }
-
+    const isWarFaction = faction.faction.currentStatus === DiplomaticStatus.WAR;
+    let bestFactionRequest: AttackMissionRequest | null = null;
     for (const targetPlanet of faction.faction.knownPlanets) {
       const targetKey = toCoordinatesKey(targetPlanet.coordinates);
+      if (!isWarFaction) {
+        openedWarTargetLedger.delete(targetKey);
+        continue;
+      }
       if (!isConfirmedOpenedWarTarget(targetPlanet)) {
         openedWarTargetLedger.delete(targetKey);
         continue;
@@ -3747,7 +3826,17 @@ function createPostBreakRaidMissionRequests(
       }
       ledgerEntry.preferredRaidOriginCoordinates = { ...request.originPlanet.coordinates };
       ledgerEntry.lastEstimatedPlunderValue = request.estimatedPlunder;
-      requests.push(request);
+      if (
+        !bestFactionRequest
+        || request.score > bestFactionRequest.score
+        || (request.score === bestFactionRequest.score && request.travelTurns < bestFactionRequest.travelTurns)
+      ) {
+        bestFactionRequest = request;
+      }
+    }
+
+    if (bestFactionRequest) {
+      requests.push(bestFactionRequest);
     }
   }
 
@@ -3770,6 +3859,21 @@ function isConfirmedOpenedWarTarget(
     && targetPlanet.totalShipsAmount <= 0
     && targetPlanet.totalDefencesAmount <= 0;
   return battleConfirmed || freshSpyConfirmed;
+}
+
+function isKnownOpenedWarTargetForRefresh(
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): boolean {
+  return targetPlanet.intelDepth > 0 && (
+    (
+      sumTypedCounts(targetPlanet.knownShipCountsByType) <= 0
+      && sumTypedCounts(targetPlanet.knownDefenceCountsByType) <= 0
+    )
+    || (
+      targetPlanet.totalShipsAmount <= 0
+      && targetPlanet.totalDefencesAmount <= 0
+    )
+  );
 }
 
 function updateOpenedWarTargetLedgerEntry(
@@ -3815,11 +3919,12 @@ function updateOpenedWarTargetLedgerEntry(
     targetPlanet,
     entry
   );
-  if (entry.currentAmbushRiskScore >= POST_BREAK_ATTACK_AMBUSH_PAUSE_THRESHOLD) {
+  const pauseThreshold = resolveOpenedWarRaidPauseThreshold(faction.warAdvantageLevel);
+  if (entry.currentAmbushRiskScore >= pauseThreshold) {
     const quietTurnRecovery = Math.max(
       1,
       Math.ceil(
-        (entry.currentAmbushRiskScore - POST_BREAK_ATTACK_AMBUSH_PAUSE_THRESHOLD + 1)
+        (entry.currentAmbushRiskScore - pauseThreshold + 1)
         / Math.max(1, POST_BREAK_ATTACK_AMBUSH_RISK_DECAY_PER_TURN)
       )
     );
@@ -3839,7 +3944,13 @@ function createOpenedWarRaidPlanForTarget(
   ledgerEntry: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry,
   hasActiveWar: boolean
 ): AttackMissionRequest | null {
+  if (faction.faction.currentStatus !== DiplomaticStatus.WAR) {
+    return null;
+  }
   if (ledgerEntry.pausedUntilTurn !== null && context.snapshot.turn < ledgerEntry.pausedUntilTurn) {
+    return null;
+  }
+  if (isOpenedWarTargetRaidStale(context, targetPlanet)) {
     return null;
   }
 
@@ -3860,6 +3971,14 @@ function createOpenedWarRaidPlanForTarget(
     );
 
   return validPlans[0] ?? null;
+}
+
+function isOpenedWarTargetRaidStale(
+  context: BotSubsystemContext,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
+): boolean {
+  const lastObservationTurn = resolveOpenedWarTargetLastObservationTurn(targetPlanet, context.snapshot.turn);
+  return Math.max(0, context.snapshot.turn - lastObservationTurn) > POST_BREAK_ATTACK_CONFIRMATION_REPORT_MAX_AGE;
 }
 
 function createOpenedWarRaidPlanFromOrigin(
@@ -4160,11 +4279,91 @@ function resolveNearbyHostileCoverage(
   }, 0);
 }
 
-function resolveActiveOpenedWarTargetCap(context: BotSubsystemContext): number {
-  return Math.max(
+function resolveOpenedWarRaidPauseThreshold(
+  warAdvantageLevel: -2 | -1 | 0 | 1 | 2
+): number {
+  switch (warAdvantageLevel) {
+    case -2:
+      return 55;
+    case -1:
+      return 60;
+    case 1:
+    case 2:
+      return 80;
+    case 0:
+    default:
+      return POST_BREAK_ATTACK_AMBUSH_PAUSE_THRESHOLD;
+  }
+}
+
+function resolveAverageWarAdvantageLevel(
+  factions: EvaluatedFaction[]
+): -2 | -1 | 0 | 1 | 2 | null {
+  const warFactions = factions.filter((faction) => faction.faction.currentStatus === DiplomaticStatus.WAR);
+  if (warFactions.length <= 0) {
+    return null;
+  }
+  const average = warFactions.reduce((sum, faction) => sum + faction.warAdvantageLevel, 0) / warFactions.length;
+  if (average <= -1.5) {
+    return -2;
+  }
+  if (average < -0.5) {
+    return -1;
+  }
+  if (average >= 1.5) {
+    return 2;
+  }
+  if (average >= 0.5) {
+    return 1;
+  }
+  return 0;
+}
+
+function resolveBreakPreferredAgainstRaid(
+  bestBreakScore: number | null,
+  bestRaidScore: number | null
+): boolean | null {
+  if (bestBreakScore === null && bestRaidScore === null) {
+    return null;
+  }
+  if (bestBreakScore === null) {
+    return false;
+  }
+  if (bestRaidScore === null) {
+    return true;
+  }
+  return bestRaidScore < (bestBreakScore * POST_BREAK_ATTACK_BREAK_SCORE_PREFERENCE_RATIO);
+}
+
+function shouldSelectRaidCandidate(
+  breakCandidate: AttackMissionRequest | null,
+  raidCandidate: AttackMissionRequest | null
+): boolean {
+  if (!raidCandidate) {
+    return false;
+  }
+  if (!breakCandidate) {
+    return true;
+  }
+  return raidCandidate.score >= (breakCandidate.score * POST_BREAK_ATTACK_BREAK_SCORE_PREFERENCE_RATIO);
+}
+
+function resolveActiveOpenedWarTargetCap(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[],
+  averageWarAdvantageLevel: -2 | -1 | 0 | 1 | 2 | null = resolveAverageWarAdvantageLevel(factions)
+): number {
+  if (averageWarAdvantageLevel === null) {
+    return 0;
+  }
+  const baseCap = Math.max(
     ACTIVE_OPENED_WAR_TARGET_BASE,
     Math.floor(Math.sqrt(Math.max(1, context.snapshot.empire.ownedPlanetCount))) + 1
   );
+  if (averageWarAdvantageLevel <= -1) {
+    return Math.min(1, baseCap);
+  }
+  return baseCap;
 }
 
 function compareOpenedWarTargetLedgerEntries(
@@ -5452,7 +5651,7 @@ function createSpyMissionRequests(
   globalProbeDeficit: number;
 } {
   const candidates = factions
-    .filter((faction) => faction.intelInsufficient)
+    .filter((faction) => faction.intelInsufficient || hasStaleOpenedWarTargetForSpy(context, faction))
     .map((faction) => createSpyMissionRequestForFaction(context, faction))
     .filter((entry): entry is SpyMissionRequest | BlockedSpyNeed => entry !== null)
     .sort(compareSpyCandidates);
@@ -5486,11 +5685,22 @@ function createSpyMissionRequests(
   };
 }
 
+function hasStaleOpenedWarTargetForSpy(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction
+): boolean {
+  return faction.faction.currentStatus === DiplomaticStatus.WAR
+    && faction.faction.knownPlanets.some((planet) =>
+      isKnownOpenedWarTargetForRefresh(planet) && isOpenedWarTargetRaidStale(context, planet)
+    );
+}
+
 function createSpyMissionRequestForFaction(
   context: BotSubsystemContext,
   faction: EvaluatedFaction
 ): SpyMissionRequest | BlockedSpyNeed | null {
-  const bestTarget = faction.faction.knownPlanets
+  const bestTarget = resolvePriorityWarSpyTarget(context, faction)
+    ?? faction.faction.knownPlanets
     .map((planet) => {
       const desiredReportLevel = resolveDesiredReportLevel(faction.faction.currentStatus);
       const estimatedDifficulty = resolveEstimatedProbeDifficulty(context, faction, planet, desiredReportLevel);
@@ -5549,6 +5759,46 @@ function createSpyMissionRequestForFaction(
       probeAmount: bestTarget.probeAmount,
       score: bestTarget.score
     };
+}
+
+function resolvePriorityWarSpyTarget(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction
+): {
+  planet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number];
+  desiredReportLevel: number;
+  estimatedDifficulty: number;
+  probeAmount: number;
+  score: number;
+} | null {
+  if (faction.faction.currentStatus !== DiplomaticStatus.WAR) {
+    return null;
+  }
+
+  return faction.faction.knownPlanets
+    .filter((planet) => isKnownOpenedWarTargetForRefresh(planet) && isOpenedWarTargetRaidStale(context, planet))
+    .map((planet) => {
+      const desiredReportLevel = resolveDesiredReportLevel(faction.faction.currentStatus);
+      const estimatedDifficulty = resolveEstimatedProbeDifficulty(context, faction, planet, desiredReportLevel);
+      const probeAmount = Math.min(
+        resolveAffordableProbeCap(context),
+        resolveProbeAmountForDifficulty(estimatedDifficulty, faction.faction.currentStatus)
+      );
+      return {
+        planet,
+        desiredReportLevel,
+        estimatedDifficulty,
+        probeAmount: Math.max(1, probeAmount),
+        score: Math.round(440 + (planet.lastRelevantReportAge * 4) + (faction.statusPriorityWeight * 1.5))
+      };
+    })
+    .sort((left, right) =>
+      right.score - left.score
+      || right.planet.lastRelevantReportAge - left.planet.lastRelevantReportAge
+      || left.planet.coordinates.x - right.planet.coordinates.x
+      || left.planet.coordinates.y - right.planet.coordinates.y
+      || left.planet.coordinates.z - right.planet.coordinates.z
+    )[0] ?? null;
 }
 
 function createProbeShipNeedRequests(

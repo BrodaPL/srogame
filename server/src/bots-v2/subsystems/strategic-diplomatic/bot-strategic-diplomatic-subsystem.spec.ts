@@ -430,6 +430,52 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(Number(raidProposal?.debug.cargoCapacity)).toBeGreaterThan(0);
   });
 
+  it('stops post-break raid pressure immediately once war status ends', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    playerEnemyPlanet.rBDSFTQ.resources = new ResourcesPack(12000, 9000, 6000);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.openedWarTargets.push(createOpenedWarTargetSeed(playerEnemyPlanet, playerEnemy.playerId));
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const raidProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.attackKind === 'RAID'
+    );
+
+    expect(raidProposal).toBeUndefined();
+    expect(result.memory.strategicDiplomatic.openedWarTargets).toHaveLength(0);
+  });
+
+  it('emits at most one post-break raid target per enemy per turn', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const secondEnemyPlanet = addPlanetToPlayer(galaxy, playerEnemy, 'Human-2 II', { x: 1, y: 0 }, 1);
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 4);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 6);
+    playerEnemyPlanet.rBDSFTQ.resources = new ResourcesPack(12000, 9000, 6000);
+    secondEnemyPlanet.rBDSFTQ.resources = new ResourcesPack(18000, 12000, 8000);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    markPlanetScanned(bot, playerEnemy, secondEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const raidProposals = result.result.proposals.filter((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.attackKind === 'RAID'
+      && proposal.debug.targetPlayerId === playerEnemy.playerId
+    );
+
+    expect(raidProposals).toHaveLength(1);
+  });
+
   it('pauses repeated post-break raids when ambush risk grows too high', () => {
     const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     galaxy.diplomaticRelations.push(
@@ -460,6 +506,100 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(openedTarget).not.toBeNull();
     expect((openedTarget?.currentAmbushRiskScore ?? 0)).toBeGreaterThanOrEqual(70);
     expect((openedTarget?.pausedUntilTurn ?? 0)).toBeGreaterThan(galaxy.currentTurn);
+  });
+
+  it('refreshes stale opened war targets with spy instead of blind raids', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 40);
+    playerEnemyPlanet.rBDSFTQ.resources = new ResourcesPack(12000, 9000, 6000);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 0, { forcedReportLevel: 12 });
+    galaxy.currentTurn = 12;
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const raidProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.attackKind === 'RAID'
+    );
+    const spyProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SPY
+      && proposal.requestPayload.target.x === playerEnemyPlanet.basicInfo.solarSystem.coordinates.x
+      && proposal.requestPayload.target.y === playerEnemyPlanet.basicInfo.solarSystem.coordinates.y
+      && proposal.requestPayload.target.z === playerEnemyPlanet.basicInfo.order
+    );
+
+    expect(raidProposal).toBeUndefined();
+    expect(spyProposal).toBeDefined();
+  });
+
+  it('pauses post-break raids earlier when the current war advantage is strongly negative', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    playerEnemyPlanet.rBDSFTQ.resources = new ResourcesPack(12000, 9000, 6000);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    const memory = createDefaultBotMemoryV2();
+    const factionLedger = createFactionLedgerSeed(playerEnemy.playerId, 60, -2);
+    factionLedger.lastWarEvaluationTurn = galaxy.currentTurn;
+    memory.strategicDiplomatic.factionLedger.push(factionLedger);
+    memory.strategicDiplomatic.openedWarTargets.push({
+      ...createOpenedWarTargetSeed(playerEnemyPlanet, playerEnemy.playerId),
+      currentAmbushRiskScore: 60
+    });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const raidProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.attackKind === 'RAID'
+    );
+    const openedTarget = result.memory.strategicDiplomatic.openedWarTargets[0] ?? null;
+
+    expect(raidProposal).toBeUndefined();
+    expect(openedTarget?.currentAmbushRiskScore).toBeGreaterThanOrEqual(60);
+    expect((openedTarget?.pausedUntilTurn ?? 0)).toBeGreaterThan(galaxy.currentTurn);
+  });
+
+  it('keeps post-break raids active at the same ambush risk when the war advantage is strongly positive', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 4);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 3);
+    playerEnemyPlanet.rBDSFTQ.resources = new ResourcesPack(12000, 9000, 6000);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    const memory = createDefaultBotMemoryV2();
+    const factionLedger = createFactionLedgerSeed(playerEnemy.playerId, 60, 2);
+    factionLedger.lastWarEvaluationTurn = galaxy.currentTurn;
+    memory.strategicDiplomatic.factionLedger.push(factionLedger);
+    memory.strategicDiplomatic.openedWarTargets.push({
+      ...createOpenedWarTargetSeed(playerEnemyPlanet, playerEnemy.playerId),
+      currentAmbushRiskScore: 60
+    });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const raidProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.attackKind === 'RAID'
+    );
+    const openedTarget = result.memory.strategicDiplomatic.openedWarTargets[0] ?? null;
+
+    expect(raidProposal).toBeDefined();
+    expect(openedTarget?.pausedUntilTurn ?? null).toBeNull();
   });
 
   it('emits bombardment mission proposals for war targets when bombardment pressure is available', () => {
@@ -1260,11 +1400,15 @@ function addDirectVictimBattleReport(
   ));
 }
 
-function createFactionLedgerSeed(playerId: number, hostilityScore: number) {
+function createFactionLedgerSeed(
+  playerId: number,
+  hostilityScore: number,
+  warAdvantageLevel: -2 | -1 | 0 | 1 | 2 = 0
+) {
   return {
     playerId,
     hostilityScore,
-    warAdvantageLevel: 0 as const,
+    warAdvantageLevel,
     lastSuccessfulBombardTurn: null,
     lastSuccessfulSiegeTickTurn: null,
     recentOutgoingCoercionPressure: 0,
@@ -1280,6 +1424,24 @@ function createFactionLedgerSeed(playerId: number, hostilityScore: number) {
     nonAggressionUntilTurn: null,
     nonAggressionStartedTurn: null,
     nonAggressionReason: null
+  };
+}
+
+function createOpenedWarTargetSeed(planet: Planet, targetPlayerId: number) {
+  return {
+    targetPlayerId,
+    coordinates: {
+      x: planet.basicInfo.solarSystem.coordinates.x,
+      y: planet.basicInfo.solarSystem.coordinates.y,
+      z: planet.basicInfo.order
+    },
+    lastPostBreakAttackTurn: null,
+    recentRaidCount: 0,
+    recentRaidTurns: [],
+    currentAmbushRiskScore: 0,
+    pausedUntilTurn: null,
+    preferredRaidOriginCoordinates: null,
+    lastEstimatedPlunderValue: 0
   };
 }
 
@@ -1353,4 +1515,22 @@ function addForeignPlayer(
   galaxy.stars[coordinates.y] ??= [];
   galaxy.stars[coordinates.y]?.push(system);
   return player;
+}
+
+function addPlanetToPlayer(
+  galaxy: Galaxy,
+  player: Player,
+  planetName: string,
+  coordinates: { x: number; y: number },
+  order: number
+): Planet {
+  const system = new SolarSystem(`${planetName}-System`, order + 10, false, false, coordinates, new Set(), new Map());
+  const planet = Planet.createStartingPlanet(planetName, 1, system, 1);
+  system.planets[0] = planet;
+  planet.info.ownerId = player.playerId;
+  configureKnownPlanet(planet);
+  player.planets.push(planet);
+  galaxy.stars[coordinates.y] ??= [];
+  galaxy.stars[coordinates.y]?.push(system);
+  return planet;
 }
