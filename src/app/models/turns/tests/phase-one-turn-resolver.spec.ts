@@ -1871,4 +1871,195 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].getCurrentBuildingPowerConsumption(BuildingType.CRYSTAL_MINE)).toBe(0);
     expect(system.planets[1].getMaxBuildingPowerConsumption(BuildingType.CRYSTAL_MINE)).toBeGreaterThan(0);
   });
+
+  it('sends a direct system-mail espionage alert only to the spied player', () => {
+    const spyFleet = new Fleet(
+      300,
+      1,
+      FleetMissionType.SPY,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.SPY_PROBE, amount: 3 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [spyFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[2].basicInfo.name = 'Gamma Ally';
+        solarSystem.planets[2].info.ownerId = 3;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER),
+        new Player(3, 'Gamma', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.ALLIED }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[1].messages.some((message) =>
+      message.title === 'Espionage alert: Alpha spied Beta Frontier'
+      && message.senderPlayerName === 'System'
+    )).toBe(true);
+    expect(players[2].messages.some((message) =>
+      message.title.includes('Espionage alert:')
+    )).toBe(false);
+  });
+
+  it('sends shared attack system-mail alerts to the victim plus allied and peace contacts', () => {
+    const attackFleet = new Fleet(
+      301,
+      1,
+      FleetMissionType.ATTACK,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips(
+        { type: ShipType.CRUISER, amount: 1 },
+        { type: ShipType.TRANSPORTER, amount: 1 }
+      ),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players, system } = createGalaxyWithPlayers(
+      [attackFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.resources = new ResourcesPack(800, 600, 400);
+        solarSystem.planets[2].basicInfo.name = 'Gamma Ally';
+        solarSystem.planets[2].info.ownerId = 3;
+        solarSystem.planets[3].basicInfo.name = 'Delta Peace';
+        solarSystem.planets[3].info.ownerId = 4;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER),
+        new Player(3, 'Gamma', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER),
+        new Player(4, 'Delta', [solarSystem.planets[3]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.ALLIED },
+      { playerAId: 2, playerBId: 4, status: DiplomaticStatus.PEACE }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[1].messages.some((message) =>
+      message.title === 'Hostile attack alert: Alpha attacked Beta Frontier'
+      && message.senderPlayerName === 'System'
+    )).toBe(true);
+    expect(players[2].messages.some((message) =>
+      message.title === 'Shared attack alert: Alpha attacked Beta at Beta Frontier'
+      && message.senderPlayerName === 'System'
+    )).toBe(true);
+    expect(players[3].messages.some((message) =>
+      message.title === 'Shared attack alert: Alpha attacked Beta at Beta Frontier'
+      && message.senderPlayerName === 'System'
+    )).toBe(true);
+  });
+
+  it('aggregates same-turn bombardment system-mail alerts for the same attacker, target, and mission type', () => {
+    const firstBombardFleet = new Fleet(
+      302,
+      1,
+      FleetMissionType.BOMBARD,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.ORBITAL_BOMBER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+    const secondBombardFleet = new Fleet(
+      303,
+      1,
+      FleetMissionType.BOMBARD,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.ORBITAL_BOMBER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [firstBombardFleet, secondBombardFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].setBuildingLevel(BuildingType.METAL_MINE, 6);
+        solarSystem.planets[2].basicInfo.name = 'Gamma Ally';
+        solarSystem.planets[2].info.ownerId = 3;
+      },
+      (solarSystem) => {
+        const alpha = new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER);
+        const beta = new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER);
+        const gamma = new Player(3, 'Gamma', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER);
+        alpha.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 4);
+        beta.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 4);
+        return [alpha, beta, gamma];
+      }
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.ALLIED }
+    ];
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[1].messages.filter((message) =>
+      message.title === 'Hostile bombard alert: Alpha targeted Beta Frontier'
+    )).toHaveLength(1);
+    expect(players[2].messages.filter((message) =>
+      message.title === 'Shared bombard alert: Alpha targeted Beta'
+    )).toHaveLength(1);
+  });
 });

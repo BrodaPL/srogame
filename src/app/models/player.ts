@@ -319,6 +319,7 @@ export type BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry = {
 };
 
 export type BotMemoryV2StrategicDiplomaticSharedHostileEventType =
+  | 'ATTACK'
   | 'BATTLE'
   | 'BOMBARD'
   | 'SIEGE'
@@ -1331,7 +1332,8 @@ export class Player {
           return null;
         }
 
-        const eventType = entry.eventType === 'BATTLE'
+        const eventType = entry.eventType === 'ATTACK'
+          || entry.eventType === 'BATTLE'
           || entry.eventType === 'BOMBARD'
           || entry.eventType === 'SIEGE'
           ? entry.eventType

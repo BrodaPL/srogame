@@ -1910,27 +1910,30 @@ Outgoing coercion pressure should use a hybrid model:
 * actual hostility swing
 * plus inflicted damage percentage
 
-#### Next phase: shared war awareness
+#### Shared war awareness
 
-After war-exit pressure, the next `Strategic Diplomatic` slice should add **shared war awareness**.
+After war-exit pressure, the shared-war-awareness slice is now live in a narrower report-backed form.
 
-This phase should focus on:
+The current phase now focuses on:
 
 * automatic hostile-activity sharing between `ALLIED` and `PEACE` contacts,
 * copied hostile battle / bombardment / siege reports for human `ALLIED` / `PEACE` contacts,
+* aggregated same-turn system-mail alerts for hostile `ATTACK` / `BOMBARD` / `SIEGE`,
+* victim-only `Espionage alert` system mail that does not propagate outward,
 * bot-side summarized shared hostile intel instead of raw copied reports,
 * immediate hostility impact from shared hostile activity,
 * score modifiers for military planning based on shared hostile activity.
 
 #### Shared hostile-activity scope
 
-The phase should share:
+The current phase shares:
 
+* direct-victim `ATTACK` evidence from `Incoming Attack Report`,
 * battle reports,
 * bombardment reports,
 * siege reports.
 
-It should not add attack-intent prediction yet.
+It still does not add attack-intent prediction yet.
 
 #### Shared-awareness relation scope
 
@@ -1945,7 +1948,14 @@ Hostile-activity sharing should be:
 Human recipients should receive:
 
 * copied hostile battle reports,
-* copied hostile bombardment / siege reports.
+* copied hostile bombardment / siege reports,
+* aggregated same-turn system-mail alerts for hostile `ATTACK` / `BOMBARD` / `SIEGE`.
+
+The direct victim should also receive:
+
+* a direct `Espionage alert` system mail when spied.
+
+`SPY` does not propagate into coalition awareness or shared hostility.
 
 Bots should receive:
 
@@ -1956,14 +1966,15 @@ Bots should receive:
 Bot-side shared awareness should use:
 
 * per-faction hostile-event counters,
-* plus a per-planet hostile-event ledger.
+* plus a per-planet hostile-event ledger,
+* with a `40`-turn shared hostile-event horizon.
 
 An operational shared hostile-event ledger should include fields such as:
 
 * foreign attacker player id,
 * victim player id,
 * target coordinates,
-* event type: `BATTLE` / `BOMBARD` / `SIEGE`,
+* event type: `ATTACK` / `BATTLE` / `BOMBARD` / `SIEGE`,
 * event turn,
 * `sharedFromPlayerId`,
 * severity estimate,

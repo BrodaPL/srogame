@@ -50,6 +50,7 @@ import {
 } from '../../game-commands/command-helpers.js';
 
 const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
+const SHARED_HOSTILE_EVENT_REPORT_WINDOW = 40;
 
 export function buildBotWorldSnapshot(
   galaxy: Galaxy,
@@ -1448,7 +1449,7 @@ function resolveSharedHostileEventsForFaction(
     );
 
     for (const report of foreignPlayer.reports) {
-      if (Math.max(0, galaxy.currentTurn - report.createdTurn) > 100) {
+      if (Math.max(0, galaxy.currentTurn - report.createdTurn) > SHARED_HOSTILE_EVENT_REPORT_WINDOW) {
         continue;
       }
 
@@ -1505,7 +1506,7 @@ function resolveSharedHostileEventsForFaction(
     );
 
     for (const report of friendlyPlayer.reports) {
-      if (Math.max(0, galaxy.currentTurn - report.createdTurn) > 100) {
+      if (Math.max(0, galaxy.currentTurn - report.createdTurn) > SHARED_HOSTILE_EVENT_REPORT_WINDOW) {
         continue;
       }
       const parsedEvent = parseSharedHostileEventFromReport(
@@ -1593,6 +1594,24 @@ function parseSharedHostileEventFromReport(
   }
 
   if (
+    report.reportType === ReportType.FLEET_REPORT
+    && report.title.startsWith('Incoming Attack Report:')
+  ) {
+    const body = typeof (report as { body?: unknown }).body === 'string'
+      ? (report as { body: string }).body
+      : '';
+    const lostValue = resolveResourceValueFromLine(
+      body.split('\n').find((line) => line.startsWith('Resources lost: ')) ?? null,
+      'Resources lost: '
+    );
+    return {
+      targetCoordinates: { ...report.sourceCoordinates },
+      eventType: 'ATTACK',
+      severity: Math.max(2, 4 + Math.min(12, lostValue / 1200))
+    };
+  }
+
+  if (
     report.reportType === ReportType.BUILDINGS_REPORT
     && report.title.startsWith('Incoming Bombardment Report:')
   ) {
@@ -1671,6 +1690,25 @@ function parseDirectVictimSharedHostileEventFromReport(
       targetCoordinates: { ...report.sourceCoordinates },
       eventType: 'BATTLE',
       severity
+    };
+  }
+
+  if (
+    report.reportType === ReportType.FLEET_REPORT
+    && report.title.startsWith('Incoming Attack Report:')
+  ) {
+    const body = typeof (report as { body?: unknown }).body === 'string'
+      ? (report as { body: string }).body
+      : '';
+    const lostValue = resolveResourceValueFromLine(
+      body.split('\n').find((line) => line.startsWith('Resources lost: ')) ?? null,
+      'Resources lost: '
+    );
+    return {
+      attackerPlayerId: attacker.playerId,
+      targetCoordinates: { ...report.sourceCoordinates },
+      eventType: 'ATTACK',
+      severity: Math.max(2, 4 + Math.min(12, lostValue / 1200))
     };
   }
 

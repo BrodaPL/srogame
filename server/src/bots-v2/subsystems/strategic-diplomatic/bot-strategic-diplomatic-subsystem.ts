@@ -327,6 +327,7 @@ const EXTREME_RESOURCE_TOTAL_RATIO_THRESHOLD = 0.1;
 const EXTREME_RESOURCE_DEUTERIUM_FLOOR = 120;
 const ALLIANCE_DEPOT_SUPPORT_SCORE_BONUS = 26;
 const MAINTENANCE_STORAGE_RESERVE_RATIO = 0.05;
+const SHARED_HOSTILE_EVENT_WINDOW = 40;
 
 export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DIPLOMATIC' as const;
@@ -586,7 +587,7 @@ function updateSharedHostileEventLedger(
   }
 
   return [...ledger.values()]
-    .filter((entry) => entry.eventTurn >= currentTurn - LONG_WAR_EVALUATION_WINDOW)
+    .filter((entry) => entry.eventTurn >= currentTurn - SHARED_HOSTILE_EVENT_WINDOW)
     .sort((left, right) =>
       right.eventTurn - left.eventTurn
       || right.severity - left.severity
@@ -949,7 +950,7 @@ function resolveSharedHostilityPressure(
   const events = faction.sharedHostileEvents
     .filter((event) =>
       event.attackerPlayerId === faction.playerId
-      && event.eventTurn >= currentTurn - LONG_WAR_EVALUATION_WINDOW
+      && event.eventTurn >= currentTurn - SHARED_HOSTILE_EVENT_WINDOW
     )
     .sort((left, right) =>
       right.eventTurn - left.eventTurn

@@ -48,6 +48,7 @@ import { FleetMissionRegistry } from '../missions/fleet-mission-registry';
 import { Galaxy } from '../planets/galaxy';
 import { Planet } from '../planets/planet';
 import { Player } from '../player';
+import { PlayerMessage } from '../mail/player-message';
 import { BuildingsReport } from '../reports/buildings-report';
 import { FleetReport } from '../reports/fleet-report';
 import {
@@ -1068,6 +1069,16 @@ function applyPostArrivalBombardmentIfNeeded(
       incomingReport,
       diplomacyResolver
     );
+    shareIncomingBombardmentSystemMail(
+      galaxy,
+      targetOwner,
+      owner,
+      fleet,
+      targetPlanet,
+      summary,
+      resolvedTurnNumber,
+      diplomacyResolver
+    );
   }
   if (fleet.missionType === FleetMissionType.BOMBARD) {
     fleet.createdAtTurn = resolvedTurnNumber;
@@ -1504,6 +1515,7 @@ function resolveEncounterArrival(
   switch (outcome.resolution) {
     case 'victory':
       applyAttackPlunderIfNeeded(
+        galaxy,
         arrival.fleet,
         arrival.targetPlanet,
         arrival.owner,
@@ -1540,6 +1552,7 @@ function resolveEncounterArrival(
     case 'notInvolved':
     default:
       applyAttackPlunderIfNeeded(
+        galaxy,
         arrival.fleet,
         arrival.targetPlanet,
         arrival.owner,
@@ -1567,6 +1580,7 @@ function resolveEncounterArrival(
 }
 
 function applyAttackPlunderIfNeeded(
+  galaxy: Galaxy,
   fleet: Fleet,
   targetPlanet: Planet,
   owner: Player | null,
@@ -1596,6 +1610,25 @@ function applyAttackPlunderIfNeeded(
   appendAttackPlunderToBattleReports(battleReports, targetPlanet, summary);
   if (!battleReports) {
     addAttackPlunderSummaryReport(owner, targetOwner, targetPlanet, summary, resolvedTurnNumber);
+    if (owner && targetOwner && targetOwner.type !== PlayerType.NEUTRAL) {
+      const incomingReport = createIncomingAttackReport(
+        targetOwner.createReportId(),
+        owner,
+        targetPlanet,
+        summary,
+        resolvedTurnNumber
+      );
+      targetOwner.addReport(incomingReport);
+      shareIncomingAttackReportSystemMail(
+        galaxy,
+        targetOwner,
+        owner,
+        targetPlanet,
+        summary,
+        resolvedTurnNumber,
+        diplomacyResolver
+      );
+    }
   }
 
   return summary;
@@ -1815,6 +1848,38 @@ function addAttackPlunderSummaryReport(
   player.addReport(report);
 }
 
+function createIncomingAttackReport(
+  reportId: number,
+  attacker: Player,
+  targetPlanet: Planet,
+  summary: AttackPlunderSummary,
+  resolvedTurnNumber: number
+): FleetReport {
+  const lostTotal = summary.stolenResources.getTotalResourceAmount();
+  const lostLine = lostTotal > 0
+    ? `Resources lost: Metal ${summary.stolenResources.metal}, Crystal ${summary.stolenResources.crystal}, Deuterium ${summary.stolenResources.deuterium}.`
+    : 'Resources lost: none.';
+  return new FleetReport(
+    {
+      reportId,
+      createdTurn: resolvedTurnNumber,
+      title: `Incoming Attack Report: ${targetPlanet.basicInfo.name}`,
+      sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      senderPlayerName: attacker.playerName
+    },
+    [
+      `Hostile fleet owner: ${attacker.playerName}`,
+      `Target: ${targetPlanet.basicInfo.name}`,
+      lostLine,
+      lostTotal > 0
+        ? 'Your planet was attacked and resources were stolen.'
+        : 'Your planet was attacked but no resources were stolen.'
+    ].join('\n')
+  );
+}
+
 function resolveReturnArrival(
   fleet: Fleet,
   planetById: Map<string, Planet>,
@@ -1949,6 +2014,19 @@ function applyMissionResolution(
     );
   }
 
+  if (
+    context.fleet.missionType === FleetMissionType.SPY
+    || context.fleet.missionType === FleetMissionType.STAR_SYSTEM_SPY
+  ) {
+    addDirectSpyAlertMessage(
+      context.targetOwner,
+      context.owner,
+      context.targetPlanet,
+      ManyShips.countByType(context.fleet.ships).get(ShipType.SPY_PROBE) ?? 0,
+      context.resolvedTurnNumber
+    );
+  }
+
   return resolution.fleetOutcome === 'remove' ? null : context.fleet;
 }
 
@@ -2072,6 +2150,14 @@ function resolvePlanetBattle(
     defender,
     attacker,
     battleResult.reports.defender,
+    diplomacyResolver
+  );
+  shareBattleAttackSystemMail(
+    galaxy,
+    defender,
+    attacker,
+    targetPlanet,
+    resolvedTurnNumber,
     diplomacyResolver
   );
 
@@ -2366,6 +2452,68 @@ function shareHostileFleetReportWithFriendlyHumans(
   }
 }
 
+function shareIncomingAttackReportSystemMail(
+  galaxy: Galaxy,
+  victim: Player,
+  attacker: Player,
+  targetPlanet: Planet,
+  summary: AttackPlunderSummary,
+  resolvedTurnNumber: number,
+  diplomacyResolver: DiplomacyResolver
+): void {
+  const body = summary.stolenResources.getTotalResourceAmount() > 0
+    ? `${attacker.playerName} attacked ${targetPlanet.basicInfo.name} and stole ${formatResourcesInline(summary.stolenResources)}.`
+    : `${attacker.playerName} attacked ${targetPlanet.basicInfo.name}, but no resources were stolen.`;
+  addAggregatedSystemMessage(
+    victim,
+    resolvedTurnNumber,
+    `Hostile attack alert: ${attacker.playerName} attacked ${targetPlanet.basicInfo.name}`,
+    body
+  );
+  for (const recipient of resolveFriendlyHumanRecipientsForSharedHostileReports(
+    galaxy,
+    victim,
+    attacker,
+    diplomacyResolver
+  )) {
+    addAggregatedSystemMessage(
+      recipient,
+      resolvedTurnNumber,
+      `Shared attack alert: ${attacker.playerName} attacked ${victim.playerName} at ${targetPlanet.basicInfo.name}`,
+      `${attacker.playerName} attacked ${victim.playerName}'s planet ${targetPlanet.basicInfo.name}.`
+    );
+  }
+}
+
+function shareBattleAttackSystemMail(
+  galaxy: Galaxy,
+  victim: Player,
+  attacker: Player,
+  targetPlanet: Planet,
+  resolvedTurnNumber: number,
+  diplomacyResolver: DiplomacyResolver
+): void {
+  addAggregatedSystemMessage(
+    victim,
+    resolvedTurnNumber,
+    `Hostile attack alert: ${attacker.playerName} attacked ${targetPlanet.basicInfo.name}`,
+    `${attacker.playerName} attacked ${targetPlanet.basicInfo.name} with a hostile fleet.`
+  );
+  for (const recipient of resolveFriendlyHumanRecipientsForSharedHostileReports(
+    galaxy,
+    victim,
+    attacker,
+    diplomacyResolver
+  )) {
+    addAggregatedSystemMessage(
+      recipient,
+      resolvedTurnNumber,
+      `Shared attack alert: ${attacker.playerName} attacked ${victim.playerName} at ${targetPlanet.basicInfo.name}`,
+      `${attacker.playerName} attacked ${victim.playerName}'s planet ${targetPlanet.basicInfo.name}.`
+    );
+  }
+}
+
 function shareHostileBuildingsReportWithFriendlyHumans(
   galaxy: Galaxy,
   victim: Player,
@@ -2387,6 +2535,37 @@ function shareHostileBuildingsReportWithFriendlyHumans(
   }
 }
 
+function shareIncomingBombardmentSystemMail(
+  galaxy: Galaxy,
+  victim: Player,
+  attacker: Player,
+  fleet: Fleet,
+  targetPlanet: Planet,
+  summary: ReturnType<typeof applyBuildingBombardment>,
+  resolvedTurnNumber: number,
+  diplomacyResolver: DiplomacyResolver
+): void {
+  addAggregatedSystemMessage(
+    victim,
+    resolvedTurnNumber,
+    `Hostile ${fleet.missionType.toLowerCase()} alert: ${attacker.playerName} targeted ${targetPlanet.basicInfo.name}`,
+    `${attacker.playerName} used ${fleet.missionType} on ${targetPlanet.basicInfo.name}, causing ${summary.totalDamage} structural damage.`
+  );
+  for (const recipient of resolveFriendlyHumanRecipientsForSharedHostileReports(
+    galaxy,
+    victim,
+    attacker,
+    diplomacyResolver
+  )) {
+    addAggregatedSystemMessage(
+      recipient,
+      resolvedTurnNumber,
+      `Shared ${fleet.missionType.toLowerCase()} alert: ${attacker.playerName} targeted ${victim.playerName}`,
+      `${attacker.playerName} used ${fleet.missionType} on ${victim.playerName}'s planet ${targetPlanet.basicInfo.name}.`
+    );
+  }
+}
+
 function resolveFriendlyHumanRecipientsForSharedHostileReports(
   galaxy: Galaxy,
   victim: Player,
@@ -2402,6 +2581,67 @@ function resolveFriendlyHumanRecipientsForSharedHostileReports(
       || diplomacyResolver.getStatus(victim.playerId, player.playerId) === DiplomaticStatus.PEACE
     )
   );
+}
+
+function addDirectSpyAlertMessage(
+  targetOwner: Player | null,
+  attacker: Player | null,
+  targetPlanet: Planet | null,
+  probeAmount: number,
+  resolvedTurnNumber: number
+): void {
+  if (!targetOwner || targetOwner.type === PlayerType.NEUTRAL || !attacker || !targetPlanet) {
+    return;
+  }
+
+  addAggregatedSystemMessage(
+    targetOwner,
+    resolvedTurnNumber,
+    `Espionage alert: ${attacker.playerName} spied ${targetPlanet.basicInfo.name}`,
+    `${attacker.playerName} sent ${probeAmount} spy probe${probeAmount === 1 ? '' : 's'} to ${targetPlanet.basicInfo.name}.`
+  );
+}
+
+function addAggregatedSystemMessage(
+  recipient: Player,
+  createdTurn: number,
+  title: string,
+  body: string
+): void {
+  if (recipient.type === PlayerType.NEUTRAL) {
+    return;
+  }
+
+  const existing = recipient.messages.find((message) =>
+    message.createdTurn === createdTurn
+    && message.title === title
+    && message.senderPlayerId === null
+    && message.senderPlayerName === 'System'
+  );
+  if (existing) {
+    if (!existing.body.includes(body)) {
+      existing.body = `${existing.body}\n\n${body}`;
+    }
+    return;
+  }
+
+  recipient.addMessage(new PlayerMessage({
+    messageId: recipient.createMessageId(),
+    createdTurn,
+    title,
+    body,
+    senderPlayerId: null,
+    senderPlayerName: 'System'
+  }));
+}
+
+function formatResourcesInline(resources: ResourcesPack): string {
+  const entries = [
+    resources.metal > 0 ? `${resources.metal} metal` : null,
+    resources.crystal > 0 ? `${resources.crystal} crystal` : null,
+    resources.deuterium > 0 ? `${resources.deuterium} deuterium` : null
+  ].filter((entry): entry is string => entry !== null);
+  return entries.length > 0 ? entries.join(', ') : 'no resources';
 }
 
 function addFleetSuccessReport(

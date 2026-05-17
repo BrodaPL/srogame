@@ -2684,29 +2684,31 @@ Outgoing coercion pressure should use a hybrid model:
 - actual hostility swing
 - plus inflicted damage percentage
 
-## Strategic Diplomatic phase-8 follow-up
+## Strategic Diplomatic phase-8 status
 
-The next `Strategic Diplomatic` slice should be the **shared war awareness phase**.
+`Strategic Diplomatic` shared war awareness is now live in a report-backed form.
 
 ### Strategic Diplomatic phase-8 outputs
 
-This phase should add:
+This phase now adds:
 
 - diplomatic hostile-activity sharing
-- human hostile-report copying
+- human hostile-report copying plus system-mail alerts
 - bot-side shared hostile-intel summaries
 - hostility updates from shared hostile activity
 - military score modifiers from shared hostile activity
+- direct victim-only spy alerts that stay outside coalition awareness
 
 ### Strategic Diplomatic phase-8 shared-event scope
 
-This phase should share:
+This phase now shares:
 
+- direct victim `ATTACK` evidence from `Incoming Attack Report`
 - battle reports
 - bombardment reports
 - siege reports
 
-It should not add hostile attack-intent prediction yet.
+It still does not add hostile attack-intent prediction.
 
 ### Strategic Diplomatic phase-8 relation scope
 
@@ -2725,6 +2727,14 @@ Human `ALLIED` / `PEACE` contacts should receive:
 
 - copied hostile battle reports
 - copied hostile bombardment / siege reports
+- aggregated same-turn system-mail alerts for hostile `ATTACK` / `BOMBARD` / `SIEGE`
+
+The direct victim should also receive:
+
+- the same hostile system-mail alert for `ATTACK` / `BOMBARD` / `SIEGE`
+- a direct `Espionage alert` system mail when spied
+
+`SPY` must not propagate to `ALLIED` / `PEACE` contacts.
 
 ### Strategic Diplomatic phase-8 bot-delivery rule
 
@@ -2736,17 +2746,18 @@ Instead they should receive:
 
 ### Strategic Diplomatic phase-8 memory rule
 
-This phase should add:
+This phase now uses:
 
 - per-faction hostile-event counters
 - plus a per-planet hostile-event ledger
+- a `40`-turn shared hostile-event horizon
 
 An operational shared hostile-event ledger should include fields such as:
 
 - foreign attacker player id
 - victim player id
 - target coordinates
-- event type: `BATTLE` / `BOMBARD` / `SIEGE`
+- event type: `ATTACK` / `BATTLE` / `BOMBARD` / `SIEGE`
 - event turn
 - `sharedFromPlayerId`
 - severity estimate

@@ -918,6 +918,24 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect((alliedLedger?.hostilityScore ?? 0)).toBeGreaterThan(peaceLedger?.hostilityScore ?? 0);
   });
 
+  it('ignores shared hostile activity older than 40 turns', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const alliedContact = addForeignPlayer(galaxy, 4, 'Ally-4', { x: 1, y: 1 }, 1);
+    galaxy.currentTurn = 50;
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, alliedContact.playerId, DiplomaticStatus.ALLIED)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    addDirectVictimBattleReport(alliedContact, playerEnemy, alliedContact.planets[0]!, 9, 6, 3);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const ledger = result.memory.strategicDiplomatic.factionLedger.find((entry) =>
+      entry.playerId === playerEnemy.playerId
+    );
+
+    expect((ledger?.hostilityScore ?? 0)).toBe(0);
+  });
+
   it('uses allied-shared hostile activity to trigger support for an attacked allied planet', () => {
     const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     const alliedContact = addForeignPlayer(galaxy, 4, 'Ally-4', { x: 1, y: 1 }, 1);
