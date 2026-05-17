@@ -10,6 +10,7 @@ import { BuildingType } from '../../../../src/app/models/enums/building-type.js'
 import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
 import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
 import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
+import { FleetMissionRegistry } from '../../../../src/app/models/missions/fleet-mission-registry.js';
 import type { ShipType } from '../../../../src/app/models/enums/ship-type.ts';
 import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
 import {
@@ -24,8 +25,11 @@ import { normalizeRequestDecisionProposal } from '../execution/bot-request-decis
 import { normalizeRequestCreationProposal } from '../execution/bot-request-creation-adapters.js';
 import { normalizeDiplomacyDecisionProposal } from '../execution/bot-diplomacy-decision-adapters.js';
 import { normalizeDiplomacyProposal } from '../execution/bot-diplomacy-proposal-adapters.js';
+import type { CreateFleetMissionCommand } from '../../game-commands/fleet-commands.ts';
 import {
   BUILDING_BLUEPRINTS,
+  calculateFuelCost,
+  calculateTravelDistance,
   DEFENCE_BLUEPRINTS,
   SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS
@@ -38,6 +42,7 @@ const DIPLOMACY_ACTION_KINDS = new Set<BotProposal['kind']>(['DIPLOMACY_DECISION
 const COMMITMENT_LIFETIME_TURNS = 5;
 const DUPLICATE_REPLACEMENT_THRESHOLD = 1.25;
 const NEXT_TURN_FLEET_PENDING_LIFETIME_TURNS = 1;
+const FLEET_MISSION_REGISTRY = FleetMissionRegistry.createDefault();
 
 type ScoredProposal = {
   proposal: BotProposal;
@@ -125,6 +130,8 @@ export class BotSupervisorV2 implements BotSupervisor {
     const usedPlanetShipyardSlots = new Set<string>();
     const reservedFleetShipsByOrigin = new Map<string, Map<ShipType, { undamaged: number; damaged: number }>>();
     const reservedFleetCargoByOrigin = new Map<string, { metal: number; crystal: number; deuterium: number }>();
+    const reservedFleetFuelByOrigin = new Map<string, number>();
+    const reservedQueueResourcesByPlanet = new Map<string, { metal: number; crystal: number; deuterium: number }>();
     let researchAccepted = false;
     const globalQueueCap = Math.max(1, snapshot.planets.length * 2);
     const maxFleetExecutions = resolveMaxFleetExecutions(snapshot);
@@ -173,7 +180,8 @@ export class BotSupervisorV2 implements BotSupervisor {
           entry,
           snapshot.turn,
           reservedFleetShipsByOrigin,
-          reservedFleetCargoByOrigin
+          reservedFleetCargoByOrigin,
+          reservedFleetFuelByOrigin
         );
         if (!fleetDecision.ok) {
           rejected.push({ proposalId: entry.proposal.proposalId, reason: fleetDecision.reason });
@@ -182,7 +190,12 @@ export class BotSupervisorV2 implements BotSupervisor {
 
         if (fleetDecision.accepted) {
           accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
-          reserveFleetResources(entry.proposal, reservedFleetShipsByOrigin, reservedFleetCargoByOrigin);
+          reserveFleetResources(
+            entry.proposal,
+            reservedFleetShipsByOrigin,
+            reservedFleetCargoByOrigin,
+            reservedFleetFuelByOrigin
+          );
         } else {
           pending.push({ ...entry.proposal, status: 'ACCEPTED' });
           upsertPendingFleetCommitment(memory, entry, snapshot.turn);
@@ -198,7 +211,8 @@ export class BotSupervisorV2 implements BotSupervisor {
         entry,
         usedPlanetBuildSlots,
         usedPlanetShipyardSlots,
-        researchAccepted
+        researchAccepted,
+        reservedQueueResourcesByPlanet
       );
       if (!queueDecision.ok) {
         rejected.push({ proposalId: entry.proposal.proposalId, reason: queueDecision.reason });
@@ -207,6 +221,7 @@ export class BotSupervisorV2 implements BotSupervisor {
 
       if (queueDecision.accepted) {
         accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
+        reserveQueueResources(entry.proposal, queueDecision.planetKey, reservedQueueResourcesByPlanet);
       } else {
         pending.push({ ...entry.proposal, status: 'ACCEPTED' });
         upsertPendingCommitment(memory, entry, snapshot.turn);
@@ -453,15 +468,21 @@ function precheckQueue(
     : null;
 }
 
-function isLocallyAffordable(snapshot: BotWorldSnapshot, planetKey: string, proposal: BotProposal): boolean {
+function isLocallyAffordable(
+  snapshot: BotWorldSnapshot,
+  planetKey: string,
+  proposal: BotProposal,
+  reservedQueueResourcesByPlanet: Map<string, { metal: number; crystal: number; deuterium: number }>
+): boolean {
   const planet = snapshot.planets.find((entry) => toCoordinatesKey(entry.coordinates) === planetKey);
   if (!planet) {
     return false;
   }
 
-  return planet.localResources.metal >= proposal.requestedResources.metal
-    && planet.localResources.crystal >= proposal.requestedResources.crystal
-    && planet.localResources.deuterium >= proposal.requestedResources.deuterium;
+  const reserved = reservedQueueResourcesByPlanet.get(planetKey) ?? { metal: 0, crystal: 0, deuterium: 0 };
+  return planet.localResources.metal >= proposal.requestedResources.metal + reserved.metal
+    && planet.localResources.crystal >= proposal.requestedResources.crystal + reserved.crystal
+    && planet.localResources.deuterium >= proposal.requestedResources.deuterium + reserved.deuterium;
 }
 
 function evaluateQueueProposal(
@@ -470,7 +491,8 @@ function evaluateQueueProposal(
   entry: ScoredProposal,
   usedPlanetBuildSlots: Set<string>,
   usedPlanetShipyardSlots: Set<string>,
-  researchAccepted: boolean
+  researchAccepted: boolean,
+  reservedQueueResourcesByPlanet: Map<string, { metal: number; crystal: number; deuterium: number }>
 ): {
   ok: true;
   accepted: boolean;
@@ -525,7 +547,7 @@ function evaluateQueueProposal(
     return { ok: false, reason: requirementPrecheck };
   }
 
-  const affordable = isLocallyAffordable(snapshot, planetKey, entry.proposal);
+  const affordable = isLocallyAffordable(snapshot, planetKey, entry.proposal, reservedQueueResourcesByPlanet);
 
   return {
     ok: true,
@@ -535,13 +557,27 @@ function evaluateQueueProposal(
   };
 }
 
+function reserveQueueResources(
+  proposal: BotProposal,
+  planetKey: string,
+  reservedQueueResourcesByPlanet: Map<string, { metal: number; crystal: number; deuterium: number }>
+): void {
+  const reserved = reservedQueueResourcesByPlanet.get(planetKey) ?? { metal: 0, crystal: 0, deuterium: 0 };
+  reservedQueueResourcesByPlanet.set(planetKey, {
+    metal: reserved.metal + proposal.requestedResources.metal,
+    crystal: reserved.crystal + proposal.requestedResources.crystal,
+    deuterium: reserved.deuterium + proposal.requestedResources.deuterium
+  });
+}
+
 function evaluateFleetProposal(
   snapshot: BotWorldSnapshot,
   memory: BotMemoryV2,
   entry: ScoredProposal,
   turn: number,
   reservedFleetShipsByOrigin: Map<string, Map<ShipType, { undamaged: number; damaged: number }>>,
-  reservedFleetCargoByOrigin: Map<string, { metal: number; crystal: number; deuterium: number }>
+  reservedFleetCargoByOrigin: Map<string, { metal: number; crystal: number; deuterium: number }>,
+  reservedFleetFuelByOrigin: Map<string, number>
 ): {
   ok: true;
   accepted: boolean;
@@ -570,12 +606,19 @@ function evaluateFleetProposal(
   }
 
   const reservedCargo = reservedFleetCargoByOrigin.get(originKey) ?? { metal: 0, crystal: 0, deuterium: 0 };
+  const reservedFuel = reservedFleetFuelByOrigin.get(originKey) ?? 0;
+  const fuelCost = resolveFleetFuelCost(normalized.value);
   if (
     origin.localResources.metal < (normalized.value.cargo.metal + reservedCargo.metal)
     || origin.localResources.crystal < (normalized.value.cargo.crystal + reservedCargo.crystal)
-    || origin.localResources.deuterium < (normalized.value.cargo.deuterium + reservedCargo.deuterium)
+    || origin.localResources.deuterium < (normalized.value.cargo.deuterium + reservedCargo.deuterium + fuelCost + reservedFuel)
   ) {
-    return { ok: false, reason: 'cargo_resources_unavailable' };
+    return {
+      ok: false,
+      reason: origin.localResources.deuterium < (normalized.value.cargo.deuterium + reservedCargo.deuterium + fuelCost + reservedFuel)
+        ? 'fuel_resources_unavailable'
+        : 'cargo_resources_unavailable'
+    };
   }
 
   const reservedShips = reservedFleetShipsByOrigin.get(originKey) ?? new Map<ShipType, { undamaged: number; damaged: number }>();
@@ -1234,7 +1277,8 @@ function getSnapshotTechnologyLevel(
 function reserveFleetResources(
   proposal: BotProposal,
   shipsByOrigin: Map<string, Map<ShipType, { undamaged: number; damaged: number }>>,
-  cargoByOrigin: Map<string, { metal: number; crystal: number; deuterium: number }>
+  cargoByOrigin: Map<string, { metal: number; crystal: number; deuterium: number }>,
+  fuelByOrigin: Map<string, number>
 ): void {
   const originCoordinates = readFleetOriginCoordinates(proposal);
   if (!originCoordinates) {
@@ -1262,4 +1306,23 @@ function reserveFleetResources(
   existingCargo.crystal += Math.max(0, Math.floor(cargo?.crystal ?? 0));
   existingCargo.deuterium += Math.max(0, Math.floor(cargo?.deuterium ?? 0));
   cargoByOrigin.set(originKey, existingCargo);
+
+  const normalized = normalizeFleetExecutionProposal(proposal);
+  if (normalized.ok) {
+    fuelByOrigin.set(originKey, (fuelByOrigin.get(originKey) ?? 0) + resolveFleetFuelCost(normalized.value));
+  }
+}
+
+function resolveFleetFuelCost(command: CreateFleetMissionCommand): number {
+  const mission = FLEET_MISSION_REGISTRY.get(command.missionType);
+  const minimumFuelReserves = mission?.minimumFuelReserves ?? 1;
+  const distance = calculateTravelDistance(command.origin, command.target);
+  return calculateFuelCost(
+    command.ships.map((ship) => ({
+      type: ship.type,
+      amount: ship.undamagedAmount + ship.damagedAmount
+    })),
+    distance,
+    minimumFuelReserves
+  );
 }

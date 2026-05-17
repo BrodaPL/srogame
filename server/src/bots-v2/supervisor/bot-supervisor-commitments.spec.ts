@@ -51,6 +51,28 @@ describe('bot supervisor commitments', () => {
     expect(decision.accepted[0]?.kind).toBe('BUILDING');
   });
 
+  it('does not oversubscribe same-turn local queue resources on one planet', () => {
+    const memory = createDefaultBotMemoryV2();
+    const decision = createSupervisor().decide(
+      createSnapshot(
+        { metal: 150, crystal: 100, deuterium: 0 },
+        { shipyardLevel: 10, defaultTechLevel: 10 }
+      ),
+      memory,
+      [
+        createBuildingProposal({ expectedValue: 30 }),
+        createShipyardProposal('shipyard-second', 'DEFENSIVE', ShipType.SPY_PROBE)
+      ]
+    );
+
+    expect(decision.accepted).toHaveLength(1);
+    expect(decision.pending).toHaveLength(1);
+    expect(new Set([decision.accepted[0]?.kind, decision.pending[0]?.kind])).toEqual(new Set(['BUILDING', 'SHIPYARD']));
+    expect(memory.supervisor.pendingCommitments.find((entry) => entry.proposalId === decision.pending[0]?.proposalId)).toMatchObject({
+      status: 'PENDING_RESOURCES'
+    });
+  });
+
   it('rejects duplicate pending proposals unless clearly better', () => {
     const memory = createDefaultBotMemoryV2();
     memory.supervisor.pendingCommitments.push({
@@ -133,6 +155,38 @@ describe('bot supervisor commitments', () => {
     expect(rejectedDecision.rejected[0]).toMatchObject({
       proposalId: 'fleet',
       reason: 'ships_unavailable'
+    });
+  });
+
+  it('rejects fleet missions that lack enough deuterium for cargo and fuel', () => {
+    const decision = createSupervisor().decide(
+      createSnapshot(
+        { metal: 0, crystal: 0, deuterium: 1 },
+        {
+          activeFleetCount: 0,
+          maxActiveFleetCount: 3,
+          ships: { [ShipType.COLONIZER]: 1 }
+        }
+      ),
+      createDefaultBotMemoryV2(),
+      [createFleetProposal(FleetMissionType.COLONIZE, ShipType.COLONIZER, {
+        requestPayload: {
+          missionType: FleetMissionType.COLONIZE,
+          origin: { x: 0, y: 0, z: 1 },
+          target: { x: 1, y: 0, z: 1 },
+          ships: [{ type: ShipType.COLONIZER, undamagedAmount: 1, damagedAmount: 0 }],
+          carriedBombs: [],
+          cargo: { metal: 0, crystal: 0, deuterium: 1 },
+          useJumpGate: false,
+          bombardmentPriorities: null
+        }
+      })]
+    );
+
+    expect(decision.accepted).toHaveLength(0);
+    expect(decision.rejected[0]).toMatchObject({
+      proposalId: 'fleet',
+      reason: 'fuel_resources_unavailable'
     });
   });
 
