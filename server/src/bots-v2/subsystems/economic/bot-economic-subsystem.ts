@@ -1,7 +1,7 @@
-import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
-import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
-import { resolveFusionReactorOperation } from '../../../../../src/app/models/planets/fusion-reactor-operation.js';
-import { industryPowerMultiplier, researchPowerMultiplier } from '../../../../../src/app/models/tech/technology-effects.js';
+import * as buildingTypeModule from '../../../../../src/app/models/enums/building-type.js';
+import * as technologyTypeModule from '../../../../../src/app/models/enums/technology-type.js';
+import * as fusionReactorOperationModule from '../../../../../src/app/models/planets/fusion-reactor-operation.js';
+import * as technologyEffectsModule from '../../../../../src/app/models/tech/technology-effects.js';
 import type { Technology } from '../../../../../src/app/models/tech/technology.ts';
 import type {
   BotEconomicBranch,
@@ -18,6 +18,12 @@ import {
   BUILDING_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
+import { resolveModule } from '../../../esm-module.js';
+
+const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../../src/app/models/enums/building-type.js');
+const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../../src/app/models/enums/technology-type.js');
+const { resolveFusionReactorOperation } = resolveModule(fusionReactorOperationModule) as typeof import('../../../../../src/app/models/planets/fusion-reactor-operation.js');
+const { industryPowerMultiplier, researchPowerMultiplier } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
 type ResourceKey = 'metal' | 'crystal' | 'deuterium';
 

@@ -5,7 +5,7 @@ import type {
   BotMemoryV2WeightManagerPlanetFocus,
   BotProfileId
 } from '../../../../../src/app/models/player.ts';
-import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as diplomaticStatusModule from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
 import type {
   BotPlanetSnapshot,
   BotStrategicDiplomaticFactionSnapshot,
@@ -16,6 +16,9 @@ import type {
 } from '../../bot-v2-types.ts';
 import { SHIP_BLUEPRINTS } from '../../../game-commands/command-helpers.js';
 import { hasEmergencyInfrastructureDamage } from '../../infrastructure-damage.js';
+import { resolveModule } from '../../../esm-module.js';
+
+const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../../src/app/models/diplomacy/diplomatic-status.js');
 
 type WeightProfileAxes = {
   aggression: number;

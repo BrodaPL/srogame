@@ -1,6 +1,9 @@
-import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as diplomaticStatusModule from '../../../../src/app/models/diplomacy/diplomatic-status.js';
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { BotProposal } from '../bot-v2-types.ts';
+import { resolveModule } from '../../esm-module.js';
+
+const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../src/app/models/diplomacy/diplomatic-status.js');
 
 export type BotDiplomacyDecisionExecution = {
   proposalId: number;

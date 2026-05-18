@@ -6,13 +6,13 @@ import type {
   BotWorldSnapshot
 } from '../bot-v2-types.ts';
 import type { BotMemoryV2 } from '../../../../src/app/models/player.ts';
-import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
-import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
-import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
-import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
-import { FleetMissionRegistry } from '../../../../src/app/models/missions/fleet-mission-registry.js';
+import * as buildingTypeModule from '../../../../src/app/models/enums/building-type.js';
+import * as diplomaticStatusModule from '../../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as defenceTypeModule from '../../../../src/app/models/enums/defence-type.js';
+import * as fleetMissionTypeModule from '../../../../src/app/models/enums/fleet-mission-type.js';
+import * as fleetMissionRegistryModule from '../../../../src/app/models/missions/fleet-mission-registry.js';
 import type { ShipType } from '../../../../src/app/models/enums/ship-type.ts';
-import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
+import * as technologyTypeModule from '../../../../src/app/models/enums/technology-type.js';
 import {
   calculateWeightedResourceValue,
   pruneSupervisorHistory,
@@ -34,6 +34,14 @@ import {
   SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS
 } from '../../game-commands/command-helpers.js';
+import { resolveModule } from '../../esm-module.js';
+
+const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../src/app/models/enums/building-type.js');
+const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../src/app/models/diplomacy/diplomatic-status.js');
+const { DefenceType } = resolveModule(defenceTypeModule) as typeof import('../../../../src/app/models/enums/defence-type.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../src/app/models/enums/fleet-mission-type.js');
+const { FleetMissionRegistry } = resolveModule(fleetMissionRegistryModule) as typeof import('../../../../src/app/models/missions/fleet-mission-registry.js');
+const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../src/app/models/enums/technology-type.js');
 
 const QUEUE_ACTION_KINDS = new Set<BotProposal['kind']>(['BUILDING', 'RESEARCH', 'SHIPYARD']);
 const FLEET_ACTION_KINDS = new Set<BotProposal['kind']>(['FLEET_MISSION']);

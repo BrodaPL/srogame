@@ -1,16 +1,16 @@
-import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
-import { DefenceType } from '../../../../../src/app/models/enums/defence-type.js';
-import { allowedDiplomaticProposalStatuses } from '../../../../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
-import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
-import { calculateProbeEspionageLevelBonus } from '../../../../../src/app/generators/espionage-report-generator.js';
-import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
-import { ShipPurpose } from '../../../../../src/app/models/enums/ship-purpose.js';
-import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
-import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
-import { WeaponType } from '../../../../../src/app/models/enums/weapon-type.js';
-import { isPlanetaryBombDefenceType } from '../../../../../src/app/models/defences/planetary-bomb.js';
-import { isArmamentDeliveryShipType } from '../../../../../src/app/models/missions/armament-delivery.js';
-import { fleetTravelTurnsForDistance } from '../../../../../src/app/models/tech/technology-effects.js';
+import * as buildingTypeModule from '../../../../../src/app/models/enums/building-type.js';
+import * as defenceTypeModule from '../../../../../src/app/models/enums/defence-type.js';
+import * as diplomaticProposalRulesModule from '../../../../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
+import * as diplomaticStatusModule from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as espionageReportGeneratorModule from '../../../../../src/app/generators/espionage-report-generator.js';
+import * as fleetMissionTypeModule from '../../../../../src/app/models/enums/fleet-mission-type.js';
+import * as shipPurposeModule from '../../../../../src/app/models/enums/ship-purpose.js';
+import * as shipTypeModule from '../../../../../src/app/models/enums/ship-type.js';
+import * as technologyTypeModule from '../../../../../src/app/models/enums/technology-type.js';
+import * as weaponTypeModule from '../../../../../src/app/models/enums/weapon-type.js';
+import * as planetaryBombModule from '../../../../../src/app/models/defences/planetary-bomb.js';
+import * as armamentDeliveryModule from '../../../../../src/app/models/missions/armament-delivery.js';
+import * as technologyEffectsModule from '../../../../../src/app/models/tech/technology-effects.js';
 import type {
   BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget,
   BotMemoryV2StrategicDiplomaticFactionEntry,
@@ -39,6 +39,21 @@ import {
   hasEmergencyInfrastructureDamage,
   resolveEffectiveInfrastructureDamagePercent
 } from '../../infrastructure-damage.js';
+import { resolveModule } from '../../../esm-module.js';
+
+const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../../src/app/models/enums/building-type.js');
+const { DefenceType } = resolveModule(defenceTypeModule) as typeof import('../../../../../src/app/models/enums/defence-type.js');
+const { allowedDiplomaticProposalStatuses } = resolveModule(diplomaticProposalRulesModule) as typeof import('../../../../../src/app/models/diplomacy/diplomatic-proposal-rules.js');
+const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../../src/app/models/diplomacy/diplomatic-status.js');
+const { calculateProbeEspionageLevelBonus } = resolveModule(espionageReportGeneratorModule) as typeof import('../../../../../src/app/generators/espionage-report-generator.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../../src/app/models/enums/fleet-mission-type.js');
+const { ShipPurpose } = resolveModule(shipPurposeModule) as typeof import('../../../../../src/app/models/enums/ship-purpose.js');
+const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../../src/app/models/enums/ship-type.js');
+const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../../src/app/models/enums/technology-type.js');
+const { WeaponType } = resolveModule(weaponTypeModule) as typeof import('../../../../../src/app/models/enums/weapon-type.js');
+const { isPlanetaryBombDefenceType } = resolveModule(planetaryBombModule) as typeof import('../../../../../src/app/models/defences/planetary-bomb.js');
+const { isArmamentDeliveryShipType } = resolveModule(armamentDeliveryModule) as typeof import('../../../../../src/app/models/missions/armament-delivery.js');
+const { fleetTravelTurnsForDistance } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
 type FactionLedgerMap = Map<number, BotMemoryV2StrategicDiplomaticFactionEntry>;
 type OpenedWarTargetLedgerMap = Map<string, BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry>;

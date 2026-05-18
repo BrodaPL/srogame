@@ -1,9 +1,9 @@
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { Player } from '../../../src/app/models/player.ts';
-import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
-import { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.js';
+import * as diplomaticStatusModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as fleetMissionTypeModule from '../../../src/app/models/enums/fleet-mission-type.js';
 import type { SupportRequestType } from '../../../src/app/models/requests/support-request.ts';
-import { defaultBotProfileIdForPlayerId } from '../../../src/app/models/player.js';
+import * as playerModule from '../../../src/app/models/player.js';
 import { isBotPaused } from '../bots/bot-admin.js';
 import { ensureBotMemoryV2 } from './bot-v2-memory.js';
 import type {
@@ -26,6 +26,11 @@ import { BotStrategicMilitarySubsystem } from './subsystems/strategic-military/b
 import { BotWarfareSubsystem } from './subsystems/warfare/bot-warfare-subsystem.js';
 import { BotWeightManagerSubsystem } from './subsystems/weight-manager/bot-weight-manager-subsystem.js';
 import { BotSupervisorV2 } from './supervisor/bot-supervisor.js';
+import { resolveModule } from '../esm-module.js';
+
+const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-status.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../src/app/models/enums/fleet-mission-type.js');
+const { defaultBotProfileIdForPlayerId } = resolveModule(playerModule) as typeof import('../../../src/app/models/player.js');
 
 export class BotBrainV2 {
   private readonly supervisor;

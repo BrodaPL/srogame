@@ -2458,38 +2458,38 @@ function applyMissionResolution(
     };
 
     if (outcomeType === 'TRANSPORT' || outcomeType === 'ARMAMENT_DELIVERY') {
-      payload.targetPlanetName = context.targetPlanet?.basicInfo.name ?? null;
-      deltas.deliveredResources = {
+      payload['targetPlanetName'] = context.targetPlanet?.basicInfo.name ?? null;
+      deltas['deliveredResources'] = {
         metal: beforeCargo.metal - context.fleet.cargo.metal,
         crystal: beforeCargo.crystal - context.fleet.cargo.crystal,
         deuterium: beforeCargo.deuterium - context.fleet.cargo.deuterium
       };
       if (outcomeType === 'ARMAMENT_DELIVERY') {
-        deltas.remainingBombs = snapshotBombCounts(context.fleet);
+        deltas['remainingBombs'] = snapshotBombCounts(context.fleet);
       }
     }
 
     if (outcomeType === 'COLONIZE' && context.targetPlanet) {
-      payload.targetPlanetName = context.targetPlanet.basicInfo.name;
-      deltas.colonizedOwnerId = context.targetPlanet.info.ownerId;
-      deltas.planetSize = context.targetPlanet.basicInfo.size;
+      payload['targetPlanetName'] = context.targetPlanet.basicInfo.name;
+      deltas['colonizedOwnerId'] = context.targetPlanet.info.ownerId;
+      deltas['planetSize'] = context.targetPlanet.basicInfo.size;
     }
 
     if (outcomeType === 'RECYCLE') {
-      payload.targetPlanetName = context.targetPlanet?.basicInfo.name ?? null;
-      deltas.collectedResources = {
+      payload['targetPlanetName'] = context.targetPlanet?.basicInfo.name ?? null;
+      deltas['collectedResources'] = {
         metal: context.fleet.cargo.metal - beforeCargo.metal,
         crystal: context.fleet.cargo.crystal - beforeCargo.crystal,
         deuterium: context.fleet.cargo.deuterium - beforeCargo.deuterium
       };
       if (beforeDebris && context.targetPlanet) {
-        deltas.debrisBefore = beforeDebris;
-        deltas.debrisAfter = snapshotResourcesPack(context.targetPlanet.rBDSFTQ.spaceDebris);
+        deltas['debrisBefore'] = beforeDebris;
+        deltas['debrisAfter'] = snapshotResourcesPack(context.targetPlanet.rBDSFTQ.spaceDebris);
       }
     }
 
     if (outcomeType === 'ATTACK' && attackPlunderSummary) {
-      deltas.stolenResources = snapshotResourcesPack(attackPlunderSummary.stolenResources);
+      deltas['stolenResources'] = snapshotResourcesPack(attackPlunderSummary.stolenResources);
     }
 
     emitFleetOutcome(difficultyConfig, {

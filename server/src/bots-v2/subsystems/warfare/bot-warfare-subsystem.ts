@@ -1,17 +1,10 @@
-import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
-import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
-import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
-import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
-import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
-import {
-  fleetTravelTurnsForDistance,
-  industryPowerMultiplier,
-  researchPowerMultiplier
-} from '../../../../../src/app/models/tech/technology-effects.js';
-import {
-  calculateRepairDroneProductionBasePower,
-  routeRepairDroneProduction
-} from '../../../../../src/app/models/turns/repair-drone-production.js';
+import * as buildingTypeModule from '../../../../../src/app/models/enums/building-type.js';
+import * as diplomaticStatusModule from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as fleetMissionTypeModule from '../../../../../src/app/models/enums/fleet-mission-type.js';
+import * as shipTypeModule from '../../../../../src/app/models/enums/ship-type.js';
+import * as technologyTypeModule from '../../../../../src/app/models/enums/technology-type.js';
+import * as technologyEffectsModule from '../../../../../src/app/models/tech/technology-effects.js';
+import * as repairDroneProductionModule from '../../../../../src/app/models/turns/repair-drone-production.js';
 import type { Technology } from '../../../../../src/app/models/tech/technology.ts';
 import type {
   BotPlanetSnapshot,
@@ -30,6 +23,22 @@ import {
   SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
+import { resolveModule } from '../../../esm-module.js';
+
+const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../../src/app/models/enums/building-type.js');
+const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../../src/app/models/diplomacy/diplomatic-status.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../../src/app/models/enums/fleet-mission-type.js');
+const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../../src/app/models/enums/ship-type.js');
+const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../../src/app/models/enums/technology-type.js');
+const {
+  fleetTravelTurnsForDistance,
+  industryPowerMultiplier,
+  researchPowerMultiplier
+} = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
+const {
+  calculateRepairDroneProductionBasePower,
+  routeRepairDroneProduction
+} = resolveModule(repairDroneProductionModule) as typeof import('../../../../../src/app/models/turns/repair-drone-production.js');
 
 type ResourceKey = 'metal' | 'crystal' | 'deuterium';
 

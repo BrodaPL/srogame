@@ -4,11 +4,11 @@ import type {
   BotMemoryV2CriticalBlockerFamily,
   BotMemoryV2WeightManagerPlanetEntry
 } from '../../../../../src/app/models/player.ts';
-import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
-import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
-import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
-import { fleetTravelTurnsForDistance } from '../../../../../src/app/models/tech/technology-effects.js';
-import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
+import * as buildingTypeModule from '../../../../../src/app/models/enums/building-type.js';
+import * as fleetMissionTypeModule from '../../../../../src/app/models/enums/fleet-mission-type.js';
+import * as shipTypeModule from '../../../../../src/app/models/enums/ship-type.js';
+import * as technologyEffectsModule from '../../../../../src/app/models/tech/technology-effects.js';
+import * as technologyTypeModule from '../../../../../src/app/models/enums/technology-type.js';
 import {
   BUILDING_BLUEPRINTS,
   calculateFuelCost,
@@ -26,6 +26,13 @@ import type {
   BotSubsystemContext,
   BotSubsystemResult
 } from '../../bot-v2-types.ts';
+import { resolveModule } from '../../../esm-module.js';
+
+const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../../src/app/models/enums/building-type.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../../src/app/models/enums/fleet-mission-type.js');
+const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../../src/app/models/enums/ship-type.js');
+const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../../src/app/models/enums/technology-type.js');
+const { fleetTravelTurnsForDistance } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
 type ResourceKey = 'metal' | 'crystal' | 'deuterium';
 

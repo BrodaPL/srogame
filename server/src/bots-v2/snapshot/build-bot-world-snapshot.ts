@@ -1,25 +1,18 @@
-import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
-import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
-import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
-import { PlanetType } from '../../../../src/app/models/enums/planet-type.js';
-import { PlayerType } from '../../../../src/app/models/enums/player-type.js';
-import { ReportType } from '../../../../src/app/models/enums/report-type.js';
-import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
-import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
-import { DiplomaticProposalState } from '../../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
-import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
-import { DiplomacyResolver } from '../../../../src/app/models/diplomacy/diplomacy-resolver.js';
-import { ManyDefences } from '../../../../src/app/models/defences/many-defences.js';
-import { ManyShips } from '../../../../src/app/models/fleets/many-ships.js';
-import {
-  industryPowerMultiplier,
-  maxActiveFleets,
-  researchPowerMultiplier
-} from '../../../../src/app/models/tech/technology-effects.js';
-import {
-  calculateRepairDroneProductionBasePower,
-  routeRepairDroneProduction
-} from '../../../../src/app/models/turns/repair-drone-production.js';
+import * as buildingTypeModule from '../../../../src/app/models/enums/building-type.js';
+import * as defenceTypeModule from '../../../../src/app/models/enums/defence-type.js';
+import * as fleetMissionTypeModule from '../../../../src/app/models/enums/fleet-mission-type.js';
+import * as planetTypeModule from '../../../../src/app/models/enums/planet-type.js';
+import * as playerTypeModule from '../../../../src/app/models/enums/player-type.js';
+import * as reportTypeModule from '../../../../src/app/models/enums/report-type.js';
+import * as shipTypeModule from '../../../../src/app/models/enums/ship-type.js';
+import * as technologyTypeModule from '../../../../src/app/models/enums/technology-type.js';
+import * as diplomaticProposalStateModule from '../../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import * as diplomaticStatusModule from '../../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as diplomacyResolverModule from '../../../../src/app/models/diplomacy/diplomacy-resolver.js';
+import * as manyDefencesModule from '../../../../src/app/models/defences/many-defences.js';
+import * as manyShipsModule from '../../../../src/app/models/fleets/many-ships.js';
+import * as technologyEffectsModule from '../../../../src/app/models/tech/technology-effects.js';
+import * as repairDroneProductionModule from '../../../../src/app/models/turns/repair-drone-production.js';
 import type { Galaxy } from '../../../../src/app/models/planets/galaxy.ts';
 import type { Planet } from '../../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../../src/app/models/player.ts';
@@ -48,6 +41,30 @@ import {
   countPlanetaryBombs,
   isPlanetaryBombDefenceType
 } from '../../game-commands/command-helpers.js';
+import { resolveModule } from '../../esm-module.js';
+
+const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../src/app/models/enums/building-type.js');
+const { DefenceType } = resolveModule(defenceTypeModule) as typeof import('../../../../src/app/models/enums/defence-type.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../src/app/models/enums/fleet-mission-type.js');
+const { PlanetType } = resolveModule(planetTypeModule) as typeof import('../../../../src/app/models/enums/planet-type.js');
+const { PlayerType } = resolveModule(playerTypeModule) as typeof import('../../../../src/app/models/enums/player-type.js');
+const { ReportType } = resolveModule(reportTypeModule) as typeof import('../../../../src/app/models/enums/report-type.js');
+const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../src/app/models/enums/ship-type.js');
+const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../src/app/models/enums/technology-type.js');
+const { DiplomaticProposalState } = resolveModule(diplomaticProposalStateModule) as typeof import('../../../../src/app/models/diplomacy/diplomatic-proposal-state.js');
+const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../src/app/models/diplomacy/diplomatic-status.js');
+const { DiplomacyResolver } = resolveModule(diplomacyResolverModule) as typeof import('../../../../src/app/models/diplomacy/diplomacy-resolver.js');
+const { ManyDefences } = resolveModule(manyDefencesModule) as typeof import('../../../../src/app/models/defences/many-defences.js');
+const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../../../src/app/models/fleets/many-ships.js');
+const {
+  industryPowerMultiplier,
+  maxActiveFleets,
+  researchPowerMultiplier
+} = resolveModule(technologyEffectsModule) as typeof import('../../../../src/app/models/tech/technology-effects.js');
+const {
+  calculateRepairDroneProductionBasePower,
+  routeRepairDroneProduction
+} = resolveModule(repairDroneProductionModule) as typeof import('../../../../src/app/models/turns/repair-drone-production.js');
 
 const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
 const SHARED_HOSTILE_EVENT_REPORT_WINDOW = 40;

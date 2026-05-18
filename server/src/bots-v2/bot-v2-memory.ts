@@ -1,5 +1,11 @@
 import type { BotMemoryV2, Player } from '../../../src/app/models/player.ts';
-import { Player as PlayerModel } from '../../../src/app/models/player.js';
+import * as playerModule from '../../../src/app/models/player.js';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { Player: PlayerModel } = resolveModule(playerModule) as typeof import('../../../src/app/models/player.js');
 
 export function createDefaultBotMemoryV2(): BotMemoryV2 {
   return {

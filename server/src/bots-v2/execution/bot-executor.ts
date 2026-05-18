@@ -1,12 +1,12 @@
 import type { Galaxy } from '../../../../src/app/models/planets/galaxy.ts';
 import type { Planet } from '../../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../../src/app/models/player.ts';
-import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
-import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
-import { DiplomacyResolver } from '../../../../src/app/models/diplomacy/diplomacy-resolver.js';
-import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
-import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
-import { FleetState } from '../../../../src/app/models/fleets/fleet.js';
+import * as buildingTypeModule from '../../../../src/app/models/enums/building-type.js';
+import * as diplomaticStatusModule from '../../../../src/app/models/diplomacy/diplomatic-status.js';
+import * as diplomacyResolverModule from '../../../../src/app/models/diplomacy/diplomacy-resolver.js';
+import * as fleetMissionTypeModule from '../../../../src/app/models/enums/fleet-mission-type.js';
+import * as technologyTypeModule from '../../../../src/app/models/enums/technology-type.js';
+import * as fleetModule from '../../../../src/app/models/fleets/fleet.js';
 import type { CreateFleetMissionCommand } from '../../game-commands/fleet-commands.ts';
 import { startBuildingConstruction } from '../../game-commands/building-commands.js';
 import {
@@ -49,6 +49,14 @@ import { normalizeRequestDecisionProposal } from './bot-request-decision-adapter
 import { normalizeRequestCreationProposal } from './bot-request-creation-adapters.js';
 import { normalizeDiplomacyDecisionProposal } from './bot-diplomacy-decision-adapters.js';
 import { normalizeDiplomacyProposal } from './bot-diplomacy-proposal-adapters.js';
+import { resolveModule } from '../../esm-module.js';
+
+const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../src/app/models/enums/building-type.js');
+const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../src/app/models/diplomacy/diplomatic-status.js');
+const { DiplomacyResolver } = resolveModule(diplomacyResolverModule) as typeof import('../../../../src/app/models/diplomacy/diplomacy-resolver.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../src/app/models/enums/fleet-mission-type.js');
+const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../src/app/models/enums/technology-type.js');
+const { FleetState } = resolveModule(fleetModule) as typeof import('../../../../src/app/models/fleets/fleet.js');
 
 const RECALLABLE_OFFENSIVE_MISSIONS = new Set<FleetMissionType>([
   FleetMissionType.ATTACK,

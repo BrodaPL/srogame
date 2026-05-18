@@ -1,11 +1,11 @@
-import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
-import { DefenceType } from '../../../../../src/app/models/enums/defence-type.js';
-import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
-import { ShipPurpose } from '../../../../../src/app/models/enums/ship-purpose.js';
-import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
-import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
-import { WeaponType } from '../../../../../src/app/models/enums/weapon-type.js';
-import { fleetTravelTurnsForDistance } from '../../../../../src/app/models/tech/technology-effects.js';
+import * as buildingTypeModule from '../../../../../src/app/models/enums/building-type.js';
+import * as defenceTypeModule from '../../../../../src/app/models/enums/defence-type.js';
+import * as fleetMissionTypeModule from '../../../../../src/app/models/enums/fleet-mission-type.js';
+import * as shipPurposeModule from '../../../../../src/app/models/enums/ship-purpose.js';
+import * as shipTypeModule from '../../../../../src/app/models/enums/ship-type.js';
+import * as technologyTypeModule from '../../../../../src/app/models/enums/technology-type.js';
+import * as weaponTypeModule from '../../../../../src/app/models/enums/weapon-type.js';
+import * as technologyEffectsModule from '../../../../../src/app/models/tech/technology-effects.js';
 import type { BotMemoryV2StrategicMilitaryFarmLedgerEntry } from '../../../../../src/app/models/player.ts';
 import type {
   BotPlanetSnapshot,
@@ -21,6 +21,16 @@ import {
   DEFENCE_BLUEPRINTS,
   SHIP_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
+import { resolveModule } from '../../../esm-module.js';
+
+const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../../src/app/models/enums/building-type.js');
+const { DefenceType } = resolveModule(defenceTypeModule) as typeof import('../../../../../src/app/models/enums/defence-type.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../../src/app/models/enums/fleet-mission-type.js');
+const { ShipPurpose } = resolveModule(shipPurposeModule) as typeof import('../../../../../src/app/models/enums/ship-purpose.js');
+const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../../src/app/models/enums/ship-type.js');
+const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../../src/app/models/enums/technology-type.js');
+const { WeaponType } = resolveModule(weaponTypeModule) as typeof import('../../../../../src/app/models/enums/weapon-type.js');
+const { fleetTravelTurnsForDistance } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
 type ResourceKey = 'metal' | 'crystal' | 'deuterium';
 type ResourceAmounts = Record<ResourceKey, number>;

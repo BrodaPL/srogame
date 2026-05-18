@@ -1,5 +1,11 @@
-import { BuildingType } from '../../../src/app/models/enums/building-type.js';
+import * as buildingTypeEnumModule from '../../../src/app/models/enums/building-type.js';
 import type { Planet } from '../../../src/app/models/planets/planet.ts';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { BuildingType } = resolveModule(buildingTypeEnumModule) as typeof import('../../../src/app/models/enums/building-type.js');
 
 export type BotInfrastructureDamageCategory = 'CRUCIAL' | 'IMPORTANT' | 'BASIC';
 

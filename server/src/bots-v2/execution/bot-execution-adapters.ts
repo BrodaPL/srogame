@@ -1,13 +1,19 @@
-import { BuildingType } from '../../../../src/app/models/enums/building-type.js';
-import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
-import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
-import { TechnologyType } from '../../../../src/app/models/enums/technology-type.js';
+import * as buildingTypeModule from '../../../../src/app/models/enums/building-type.js';
+import * as defenceTypeModule from '../../../../src/app/models/enums/defence-type.js';
+import * as shipTypeModule from '../../../../src/app/models/enums/ship-type.js';
+import * as technologyTypeModule from '../../../../src/app/models/enums/technology-type.js';
 import type { ClientCoordinates } from '../../../../src/app/models/game-api-types.ts';
 import type { StartBuildingConstructionCommand } from '../../game-commands/building-commands.ts';
 import type { StartTechnologyResearchCommand } from '../../game-commands/research-commands.ts';
 import type { StartShipyardConstructionCommand } from '../../game-commands/shipyard-commands.ts';
 import type { BotProposal } from '../bot-v2-types.ts';
 import { readV2ProposalCoordinates } from './bot-coordinate-adapters.js';
+import { resolveModule } from '../../esm-module.js';
+
+const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../src/app/models/enums/building-type.js');
+const { DefenceType } = resolveModule(defenceTypeModule) as typeof import('../../../../src/app/models/enums/defence-type.js');
+const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../src/app/models/enums/ship-type.js');
+const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../src/app/models/enums/technology-type.js');
 
 export type BotQueueExecutionKind = 'BUILDING' | 'RESEARCH' | 'SHIPYARD';
 

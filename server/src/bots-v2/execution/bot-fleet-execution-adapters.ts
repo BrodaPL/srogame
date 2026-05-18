@@ -1,7 +1,7 @@
-import { DefenceType } from '../../../../src/app/models/enums/defence-type.js';
-import { FleetMissionType } from '../../../../src/app/models/enums/fleet-mission-type.js';
-import { ShipType } from '../../../../src/app/models/enums/ship-type.js';
-import { normalizeBombardmentPriorities } from '../../../../src/app/models/bombardment/bombardment-priority.js';
+import * as defenceTypeModule from '../../../../src/app/models/enums/defence-type.js';
+import * as fleetMissionTypeModule from '../../../../src/app/models/enums/fleet-mission-type.js';
+import * as shipTypeModule from '../../../../src/app/models/enums/ship-type.js';
+import * as bombardmentPriorityModule from '../../../../src/app/models/bombardment/bombardment-priority.js';
 import type {
   ClientCoordinates,
   CreateFleetBombSelectionEntry,
@@ -11,6 +11,12 @@ import type {
 import type { CreateFleetMissionCommand } from '../../game-commands/fleet-commands.ts';
 import type { BotProposal } from '../bot-v2-types.ts';
 import { readV2ProposalCoordinates } from './bot-coordinate-adapters.js';
+import { resolveModule } from '../../esm-module.js';
+
+const { DefenceType } = resolveModule(defenceTypeModule) as typeof import('../../../../src/app/models/enums/defence-type.js');
+const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../src/app/models/enums/fleet-mission-type.js');
+const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../src/app/models/enums/ship-type.js');
+const { normalizeBombardmentPriorities } = resolveModule(bombardmentPriorityModule) as typeof import('../../../../src/app/models/bombardment/bombardment-priority.js');
 
 export const SUPERVISOR_ALLOWED_FLEET_MISSIONS = new Set<FleetMissionType>([
   FleetMissionType.SPY,
