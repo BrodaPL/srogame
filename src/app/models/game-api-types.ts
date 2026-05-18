@@ -43,6 +43,7 @@ export type GalaxySetup = {
   neutralBotsAmount: number;
   neutralBotsDifficulty: number;
   autoSaveTurns: number;
+  enablePlayerActionLogging?: boolean;
   startingHomeworldPreset: StartingHomeworldPreset;
   createRandomPlanets?: boolean;
   createStartingShips?: boolean;
@@ -103,6 +104,7 @@ export function normalizeGalaxySetup(
       botsAmount
     ),
     autoSaveTurns: normalizeAutoSaveTurns(setup.autoSaveTurns),
+    enablePlayerActionLogging: setup.enablePlayerActionLogging === true,
     startingHomeworldPreset: normalizeStartingHomeworldPreset(setup.startingHomeworldPreset)
   };
 }

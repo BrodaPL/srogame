@@ -187,6 +187,10 @@ import {
 } from './sensor-phalanx-passive.js';
 import { startShipyardConstruction } from './game-commands/shipyard-commands.js';
 import { startTechnologyResearch, updateResearchHelpers } from './game-commands/research-commands.js';
+import {
+  appendPlayerActionLogEntry,
+  ensurePlayerActionLogFile
+} from './player-action-log.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
 import fleetReportModule from '../../src/app/models/reports/fleet-report.js';
 import sensorPhalanxReportModule from '../../src/app/models/reports/sensor-phalanx-report.js';
@@ -634,6 +638,30 @@ function moveMountedRuntimeAwayFromGame(gameId: string): void {
   if (fallbackRuntimeId) {
     switchCurrentRuntime(fallbackRuntimeId);
   }
+}
+
+function ensureCurrentPlayerActionLog(playerName: string): void {
+  if (!currentRuntimeGameId || !currentGameSetup) {
+    return;
+  }
+
+  ensurePlayerActionLogFile(currentRuntimeGameId, currentGameSetup, playerName);
+}
+
+function appendCurrentPlayerActionLog(
+  playerName: string,
+  entry: Parameters<typeof appendPlayerActionLogEntry>[3]
+): void {
+  if (!currentRuntimeGameId || !currentGameSetup) {
+    return;
+  }
+
+  appendPlayerActionLogEntry(
+    currentRuntimeGameId,
+    currentGameSetup,
+    playerName,
+    entry
+  );
 }
 
 app.get('/api/auth/register-config', (_req, res) => {
@@ -1245,8 +1273,9 @@ app.post('/api/game/start', (req, res) => {
       accountId: auth.session.accountId,
       playerName: auth.session.playerName,
       role: 'OWNER'
-    }]
+      }]
   });
+  ensureCurrentPlayerActionLog(auth.session.playerName);
 
   const response: StartGameResponse = {
     player: toPlayerSession(auth.session, nextGalaxy),
@@ -1308,6 +1337,7 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
         role: 'OWNER'
       }]
     });
+    ensureCurrentPlayerActionLog(auth.session.playerName);
 
     const response: LoadGameResponse = {
       player: toPlayerSession(auth.session, currentGalaxy),
@@ -3166,6 +3196,26 @@ app.post('/api/game/building-queue', (req, res) => {
     return sendGameCommandError(res, result.error);
   }
 
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'BUILDING_QUEUE_ADD',
+    summary: `${auth.session.playerName} queued ${buildingType} level ${result.value.planet.getBuildingLevel(buildingType) + 1} on ${x}:${y}:${z}; spent M${result.value.spent.metal} C${result.value.spent.crystal} D${result.value.spent.deuterium}; buildingQueueLength=${result.value.queueLength}`,
+    coordinates: { x, y, z },
+    payload: {
+      buildingType,
+      targetLevel: result.value.planet.getBuildingLevel(buildingType) + 1
+    },
+    deltas: {
+      spent: {
+        metal: result.value.spent.metal,
+        crystal: result.value.spent.crystal,
+        deuterium: result.value.spent.deuterium
+      },
+      buildingQueueLength: result.value.queueLength
+    }
+  });
+
   const clientPlanet = currentGalaxy.createClientPlanet(result.value.planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
   return res.status(200).json(response);
@@ -3222,6 +3272,21 @@ app.post('/api/game/building-queue/reorder', (req, res) => {
   if (fromIndex !== toIndex) {
     moveQueueEntry(planet.rBDSFTQ.buildingQueue, fromIndex, toIndex);
   }
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'BUILDING_QUEUE_REORDER',
+    summary: `${auth.session.playerName} reordered building queue on ${x}:${y}:${z}; ${fromIndex} -> ${toIndex}; buildingQueueLength=${planet.rBDSFTQ.buildingQueue.length}`,
+    coordinates: { x, y, z },
+    payload: {
+      fromIndex,
+      toIndex
+    },
+    deltas: {
+      buildingQueueLength: planet.rBDSFTQ.buildingQueue.length
+    }
+  });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -3281,8 +3346,31 @@ app.post('/api/game/building-queue/cancel', (req, res) => {
   }
 
   const refund = calculateBuildingCancellationRefund(building, queueEntry);
+  const canceledBuildingType = queueEntry.buildingType;
+  const canceledTargetLevel = queueEntry.targetLevel;
   planet.rBDSFTQ.resources.addResourcePack(refund);
   planet.rBDSFTQ.buildingQueue.splice(index, 1);
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'BUILDING_QUEUE_CANCEL',
+    summary: `${auth.session.playerName} canceled ${canceledBuildingType} level ${canceledTargetLevel} on ${x}:${y}:${z}; refund M${refund.metal} C${refund.crystal} D${refund.deuterium}; buildingQueueLength=${planet.rBDSFTQ.buildingQueue.length}`,
+    coordinates: { x, y, z },
+    payload: {
+      index,
+      buildingType: canceledBuildingType,
+      targetLevel: canceledTargetLevel
+    },
+    deltas: {
+      refund: {
+        metal: refund.metal,
+        crystal: refund.crystal,
+        deuterium: refund.deuterium
+      },
+      buildingQueueLength: planet.rBDSFTQ.buildingQueue.length
+    }
+  });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -3341,6 +3429,29 @@ app.post('/api/game/shipyard-queue', (req, res) => {
     return sendGameCommandError(res, result.error);
   }
 
+  const queuedShipyardType = itemKind === 'ship' ? shipType : defenceType;
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'SHIPYARD_QUEUE_ADD',
+    summary: `${auth.session.playerName} queued ${amount} ${queuedShipyardType} (${itemKind}) on ${x}:${y}:${z}; spent M${result.value.spent.metal} C${result.value.spent.crystal} D${result.value.spent.deuterium}; shipyardQueueLength=${result.value.queueLength}`,
+    coordinates: { x, y, z },
+    payload: {
+      itemKind,
+      shipType,
+      defenceType,
+      amount
+    },
+    deltas: {
+      spent: {
+        metal: result.value.spent.metal,
+        crystal: result.value.spent.crystal,
+        deuterium: result.value.spent.deuterium
+      },
+      shipyardQueueLength: result.value.queueLength
+    }
+  });
+
   const clientPlanet = currentGalaxy.createClientPlanet(result.value.planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
   return res.status(200).json(response);
@@ -3397,6 +3508,21 @@ app.post('/api/game/shipyard-queue/reorder', (req, res) => {
   if (fromIndex !== toIndex) {
     moveQueueEntry(planet.rBDSFTQ.shipyardQueue, fromIndex, toIndex);
   }
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'SHIPYARD_QUEUE_REORDER',
+    summary: `${auth.session.playerName} reordered shipyard queue on ${x}:${y}:${z}; ${fromIndex} -> ${toIndex}; shipyardQueueLength=${planet.rBDSFTQ.shipyardQueue.length}`,
+    coordinates: { x, y, z },
+    payload: {
+      fromIndex,
+      toIndex
+    },
+    deltas: {
+      shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length
+    }
+  });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -3458,11 +3584,39 @@ app.post('/api/game/shipyard-queue/cancel', (req, res) => {
   }
 
   const cancellation = calculateShipyardCancellation(blueprint, queueEntry);
+  const canceledItemKind = queueEntry.itemKind;
+  const canceledShipType = queueEntry.shipType ?? null;
+  const canceledDefenceType = queueEntry.defenceType ?? null;
+  const canceledAmount = queueEntry.amount;
   if (cancellation.deliveredAmount > 0) {
     addProducedShipyardUnitsToPlanet(planet, blueprint, queueEntry.itemKind, cancellation.deliveredAmount);
   }
   planet.rBDSFTQ.resources.addResourcePack(cancellation.refund);
   planet.rBDSFTQ.shipyardQueue.splice(index, 1);
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'SHIPYARD_QUEUE_CANCEL',
+    summary: `${auth.session.playerName} canceled ${canceledAmount} ${canceledShipType ?? canceledDefenceType} (${canceledItemKind}) on ${x}:${y}:${z}; refund M${cancellation.refund.metal} C${cancellation.refund.crystal} D${cancellation.refund.deuterium}; delivered=${cancellation.deliveredAmount}; shipyardQueueLength=${planet.rBDSFTQ.shipyardQueue.length}`,
+    coordinates: { x, y, z },
+    payload: {
+      index,
+      itemKind: canceledItemKind,
+      shipType: canceledShipType,
+      defenceType: canceledDefenceType,
+      amount: canceledAmount
+    },
+    deltas: {
+      refund: {
+        metal: cancellation.refund.metal,
+        crystal: cancellation.refund.crystal,
+        deuterium: cancellation.refund.deuterium
+      },
+      deliveredAmount: cancellation.deliveredAmount,
+      shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length
+    }
+  });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -3510,6 +3664,27 @@ app.post('/api/game/technology-queue', (req, res) => {
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
   }
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'RESEARCH_START',
+    summary: `${auth.session.playerName} started ${technologyType} on ${x}:${y}:${z}; helpers=${result.value.helperPlanets.length}; spent M${result.value.spent.metal} C${result.value.spent.crystal} D${result.value.spent.deuterium}`,
+    coordinates: { x, y, z },
+    payload: {
+      technologyType,
+      helperPlanets: helperCoordinates
+    },
+    deltas: {
+      helperCount: result.value.helperPlanets.length,
+      spent: {
+        metal: result.value.spent.metal,
+        crystal: result.value.spent.crystal,
+        deuterium: result.value.spent.deuterium
+      },
+      queueActive: result.value.mainPlanet.rBDSFTQ.currentResearchQueue !== null
+    }
+  });
 
   const presentation = getPresentationData(currentGalaxy, playerId);
   const response = presentation.ownedPlanets.map((entry) => toClientPlanetDtoFromClientPlanet(entry));
@@ -4056,6 +4231,32 @@ app.post('/api/game/active-fleets', (req, res) => {
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
   }
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'FLEET_MISSION_CREATE',
+    summary: `${auth.session.playerName} launched ${missionType} from ${origin.x}:${origin.y}:${origin.z} to ${target.x}:${target.y}:${target.z}; fleetId=${result.value.fleet.fleetId}; eta=${result.value.fleet.travelTurns}; fuel=${result.value.fleet.fuelCost}; cargo=M${cargo.metal} C${cargo.crystal} D${cargo.deuterium}`,
+    coordinates: origin,
+    targetCoordinates: target,
+    payload: {
+      missionType,
+      ships,
+      carriedBombs,
+      cargo,
+      useJumpGate,
+      bombardmentPriorities
+    },
+    deltas: {
+      fleetId: result.value.fleet.fleetId,
+      mode: result.value.mode,
+      travelTurns: result.value.fleet.travelTurns,
+      fuelCost: result.value.fleet.fuelCost,
+      totalCargoCapacity: result.value.fleet.totalCargoCapacity,
+      usedCargoCapacity: result.value.fleet.usedCargoCapacity,
+      state: result.value.fleet.state
+    }
+  });
 
   const presentation = getPresentationData(currentGalaxy, playerId);
   const response: CreateFleetMissionResponse = {
@@ -5307,6 +5508,7 @@ function loadSingleplayerGameRecord(
       role: 'OWNER'
     }]
   });
+  ensureCurrentPlayerActionLog(session.playerName);
 
   return { ok: true };
 }
@@ -10704,6 +10906,7 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Number.isInteger(setup.autoSaveTurns) &&
     setup.autoSaveTurns >= 0 &&
     setup.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&
+    (setup.enablePlayerActionLogging === undefined || typeof setup.enablePlayerActionLogging === 'boolean') &&
     (setup.startingHomeworldPreset === 'Low'
       || setup.startingHomeworldPreset === 'Medium'
       || setup.startingHomeworldPreset === 'High') &&

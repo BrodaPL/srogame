@@ -272,6 +272,22 @@
       </div>
 
       <div class="field">
+        <label>Player action logging</label>
+        <div class="test-options">
+          <label class="checkbox-field" for="enablePlayerActionLogging">
+            <input
+              id="enablePlayerActionLogging"
+              name="enablePlayerActionLogging"
+              type="checkbox"
+              [(ngModel)]="form.enablePlayerActionLogging"
+            />
+            <span>Log successful local player actions to disk</span>
+          </label>
+        </div>
+        <small>Writes building, shipyard, research, and fleet actions to <code>server/data/player-action-logs/</code>.</small>
+      </div>
+
+      <div class="field">
         <label>Starting homeworld preset</label>
         <div class="test-options">
           @for (preset of startingHomeworldPresetValues; track preset) {
