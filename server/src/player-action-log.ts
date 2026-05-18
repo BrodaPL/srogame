@@ -10,7 +10,18 @@ export type PlayerActionLogKind =
   | 'SHIPYARD_QUEUE_REORDER'
   | 'SHIPYARD_QUEUE_CANCEL'
   | 'RESEARCH_START'
-  | 'FLEET_MISSION_CREATE';
+  | 'FLEET_MISSION_CREATE'
+  | 'FLEET_OUTCOME_ATTACK'
+  | 'FLEET_OUTCOME_BOMBARD'
+  | 'FLEET_OUTCOME_SIEGE'
+  | 'FLEET_OUTCOME_TRANSPORT'
+  | 'FLEET_OUTCOME_ARMAMENT_DELIVERY'
+  | 'FLEET_OUTCOME_COLONIZE'
+  | 'FLEET_OUTCOME_RECYCLE'
+  | 'FLEET_OUTCOME_REPAIR'
+  | 'FLEET_OUTCOME_RETURN'
+  | 'FLEET_OUTCOME_FAILURE'
+  | 'FLEET_OUTCOME_DESTROYED';
 
 export type PlayerActionLogCoordinates = {
   x: number;
@@ -34,6 +45,8 @@ export type PlayerActionLogEntry = {
 };
 
 export const PLAYER_ACTION_LOGS_DIRECTORY_PATH = path.join(process.cwd(), 'server', 'data', 'player-action-logs');
+
+export type TrackedPlayerActionFleetIds = Set<number>;
 
 export function isPlayerActionLoggingEnabled(setup: GalaxySetup | null | undefined): boolean {
   return setup?.enablePlayerActionLogging === true;
@@ -110,4 +123,24 @@ export function appendPlayerActionLogEntry(
     ''
   ];
   fs.appendFileSync(filePath, lines.join('\n'), 'utf8');
+}
+
+export function createTrackedPlayerActionFleetIds(
+  fleetIds: Iterable<number> | null | undefined = []
+): TrackedPlayerActionFleetIds {
+  const tracked = new Set<number>();
+  for (const fleetId of fleetIds ?? []) {
+    if (Number.isInteger(fleetId) && fleetId > 0) {
+      tracked.add(fleetId);
+    }
+  }
+  return tracked;
+}
+
+export function serializeTrackedPlayerActionFleetIds(
+  trackedFleetIds: TrackedPlayerActionFleetIds | null | undefined
+): number[] {
+  return [...(trackedFleetIds ?? new Set<number>())]
+    .filter((fleetId) => Number.isInteger(fleetId) && fleetId > 0)
+    .sort((left, right) => left - right);
 }

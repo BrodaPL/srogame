@@ -7,6 +7,7 @@ export type GameRuntimeState = {
   galaxy: Galaxy;
   setup: GalaxySetup;
   presentationByPlayer: Map<number, GalaxyPresentationData>;
+  trackedPlayerActionFleetIds: Set<number>;
   loadedAt: string;
   lastTouchedAt: string;
   isDirty: boolean;
@@ -67,6 +68,7 @@ export function updateGameRuntime(
     ...patch,
     gameId: runtime.gameId,
     loadedAt: runtime.loadedAt,
+    trackedPlayerActionFleetIds: patch.trackedPlayerActionFleetIds ?? runtime.trackedPlayerActionFleetIds,
     currentTurnReadyPlayerIds: patch.currentTurnReadyPlayerIds ?? runtime.currentTurnReadyPlayerIds,
     offlineBotControlledPlayerIds: patch.offlineBotControlledPlayerIds ?? runtime.offlineBotControlledPlayerIds,
     emptyPresenceUnloadAt: patch.emptyPresenceUnloadAt ?? runtime.emptyPresenceUnloadAt,

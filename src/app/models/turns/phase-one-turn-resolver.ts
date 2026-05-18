@@ -108,8 +108,44 @@ type AttackPlunderSummary = {
   totalCargoCapacity: number;
 };
 
+type AttackBattleOutcomeDetails = {
+  winner: SpaceBattleResult['winner'];
+  roundsFought: number;
+  ourShipsLost: Record<string, number>;
+  enemyShipsLost: Record<string, number>;
+  enemyDefencesLost: Record<string, number>;
+};
+
+export type PlayerFleetOutcomeLogEvent = {
+  fleetId: number;
+  ownerId: number;
+  missionType: FleetMissionType;
+  origin: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+  createdAtTurn: number;
+  resolvedTurn: number;
+  outcomeType:
+    | 'ATTACK'
+    | 'BOMBARD'
+    | 'SIEGE'
+    | 'TRANSPORT'
+    | 'ARMAMENT_DELIVERY'
+    | 'COLONIZE'
+    | 'RECYCLE'
+    | 'REPAIR'
+    | 'RETURN'
+    | 'FAILURE'
+    | 'DESTROYED';
+  launchSummary: string;
+  resultSummary: string;
+  payload?: Record<string, unknown>;
+  deltas?: Record<string, unknown>;
+  terminal?: boolean;
+};
+
 export type TurnDifficultyConfig = {
   botDifficultyPercent?: number;
+  fleetOutcomeLogger?: (event: PlayerFleetOutcomeLogEvent) => void;
 };
 
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
@@ -120,6 +156,109 @@ const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
 const SPACE_BATTLE_RESOLVER = new SpaceBattleResolver();
 const MISSION_EFFECT_EXECUTOR = new MissionEffectExecutor();
 const FLEET_MISSION_REGISTRY = FleetMissionRegistry.createDefault();
+
+function snapshotFleetShipCounts(fleet: Fleet): Record<string, number> {
+  return Object.fromEntries(ManyShips.countByType(fleet.ships).entries());
+}
+
+function snapshotBombCounts(fleet: Fleet): Record<string, number> {
+  return Object.fromEntries(ManyDefences.countByType(fleet.carriedBombs).entries());
+}
+
+function snapshotResourcesPack(pack: ResourcesPack): ResourceSnapshot {
+  return {
+    metal: pack.metal,
+    crystal: pack.crystal,
+    deuterium: pack.deuterium
+  };
+}
+
+function createFleetLaunchSummary(fleet: Fleet): string {
+  return `${fleet.missionType} ${fleet.origin.x}:${fleet.origin.y}:${fleet.origin.z} -> ${fleet.target.x}:${fleet.target.y}:${fleet.target.z} (fleet ${fleet.fleetId})`;
+}
+
+function summarizeMissionReports(
+  reports: Array<{ kind: 'success' | 'failure' | 'draw'; body: string }>
+): string | null {
+  const report = reports[0];
+  if (!report) {
+    return null;
+  }
+
+  const trimmed = report.body.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.split('\n')[0] ?? null;
+}
+
+function summarizeBattleOutcome(result: SpaceBattleResult): AttackBattleOutcomeDetails {
+  return {
+    winner: result.winner,
+    roundsFought: result.roundsFought,
+    ourShipsLost: summarizeBattleShipTypeCounts(result.attacker.destroyedShips),
+    enemyShipsLost: summarizeBattleShipTypeCounts(result.defender.destroyedShips),
+    enemyDefencesLost: summarizeBattleDefenceTypeCounts(result.defender.destroyedDefences)
+  };
+}
+
+function summarizeBattleShipTypeCounts(ships: ShipInstance[]): Record<string, number> {
+  const counts = new Map<string, number>();
+  for (const ship of ships) {
+    counts.set(ship.type.type, (counts.get(ship.type.type) ?? 0) + 1);
+  }
+  return Object.fromEntries(counts.entries());
+}
+
+function summarizeBattleDefenceTypeCounts(defences: DefenceInstance[]): Record<string, number> {
+  const counts = new Map<string, number>();
+  for (const defence of defences) {
+    counts.set(defence.type.type, (counts.get(defence.type.type) ?? 0) + 1);
+  }
+  return Object.fromEntries(counts.entries());
+}
+
+function createAttackOutcomeSummary(
+  targetPlanet: Planet,
+  battle: AttackBattleOutcomeDetails | null,
+  plunder: AttackPlunderSummary | null
+): string {
+  const fragments = [`Attack resolved at ${targetPlanet.basicInfo.name}.`];
+  if (battle) {
+    fragments.push(`Battle winner: ${battle.winner}.`);
+  }
+  if (plunder && plunder.stolenResources.getTotalResourceAmount() > 0) {
+    fragments.push(`Stolen ${formatResourcesInline(plunder.stolenResources)}.`);
+  } else if (plunder) {
+    fragments.push('No resources were stolen.');
+  }
+  return fragments.join(' ');
+}
+
+function resolveMissionOutcomeType(
+  missionType: FleetMissionType
+): PlayerFleetOutcomeLogEvent['outcomeType'] | null {
+  switch (missionType) {
+    case FleetMissionType.TRANSPORT:
+      return 'TRANSPORT';
+    case FleetMissionType.ARMAMENT_DELIVERY:
+      return 'ARMAMENT_DELIVERY';
+    case FleetMissionType.COLONIZE:
+      return 'COLONIZE';
+    case FleetMissionType.RECYCLE:
+      return 'RECYCLE';
+    default:
+      return null;
+  }
+}
+
+function emitFleetOutcome(
+  difficultyConfig: TurnDifficultyConfig,
+  event: PlayerFleetOutcomeLogEvent
+): void {
+  difficultyConfig.fleetOutcomeLogger?.(event);
+}
 
 export function resolvePhaseOneTurn(
   galaxy: Galaxy,
@@ -203,14 +342,23 @@ export function resolvePhaseOneTurn(
   const diplomacyResolver = new DiplomacyResolver(galaxy.diplomaticRelations);
   const encounterResolver = new EncounterResolver(diplomacyResolver);
 
-  resolveShipRepairs(galaxy, playersById, planetById, snapshotsByPlanetId, diplomacyResolver, resolvedTurnNumber);
+  resolveShipRepairs(
+    galaxy,
+    playersById,
+    planetById,
+    snapshotsByPlanetId,
+    diplomacyResolver,
+    resolvedTurnNumber,
+    difficultyConfig
+  );
   resolveActiveFleets(
     galaxy,
     playersById,
     planetById,
     resolvedTurnNumber,
     diplomacyResolver,
-    encounterResolver
+    encounterResolver,
+    difficultyConfig
   );
 }
 
@@ -649,7 +797,8 @@ function resolveActiveFleets(
   planetById: Map<string, Planet>,
   resolvedTurnNumber: number,
   diplomacyResolver: DiplomacyResolver,
-  encounterResolver: EncounterResolver
+  encounterResolver: EncounterResolver,
+  difficultyConfig: TurnDifficultyConfig
 ): void {
   const espionageReportGenerator = new EspionageReportGenerator();
   const activeFleets: Fleet[] = [];
@@ -703,7 +852,8 @@ function resolveActiveFleets(
       planetById,
       espionageReportGenerator,
       resolvedTurnNumber,
-      diplomacyResolver
+      diplomacyResolver,
+      difficultyConfig
     );
     if (nextFleetState) {
       activeFleets.push(nextFleetState);
@@ -748,7 +898,8 @@ function resolveActiveFleets(
           galaxy,
           resolvedArrival,
           espionageReportGenerator,
-          diplomacyResolver
+          diplomacyResolver,
+          difficultyConfig
         );
         if (nextFleetState) {
           activeFleets.push(nextFleetState);
@@ -765,7 +916,8 @@ function resolveActiveFleets(
       planetById,
       espionageReportGenerator,
       resolvedTurnNumber,
-      diplomacyResolver
+      diplomacyResolver,
+      difficultyConfig
     );
     if (nextFleetState) {
       activeFleets.push(nextFleetState);
@@ -798,7 +950,8 @@ function resolveFleetState(
   planetById: Map<string, Planet>,
   espionageReportGenerator: EspionageReportGenerator,
   resolvedTurnNumber: number,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
+  difficultyConfig: TurnDifficultyConfig
 ): Fleet | null {
   switch (fleet.state) {
     case FleetState.MOVING_TO_TARGET:
@@ -809,7 +962,8 @@ function resolveFleetState(
         planetById,
         espionageReportGenerator,
         resolvedTurnNumber,
-        diplomacyResolver
+        diplomacyResolver,
+        difficultyConfig
       );
     case FleetState.RETURNING:
     case FleetState.MISSION_FAILURE_RETURNING:
@@ -817,6 +971,7 @@ function resolveFleetState(
         fleet,
         planetById,
         resolvedTurnNumber,
+        difficultyConfig
       );
     case FleetState.ORBITING:
       return resolveIdleFleetState(
@@ -826,7 +981,8 @@ function resolveFleetState(
         planetById,
         espionageReportGenerator,
         resolvedTurnNumber,
-        diplomacyResolver
+        diplomacyResolver,
+        difficultyConfig
       );
     default:
       return fleet;
@@ -840,7 +996,8 @@ function resolveIdleFleetState(
   planetById: Map<string, Planet>,
   espionageReportGenerator: EspionageReportGenerator,
   resolvedTurnNumber: number,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
+  difficultyConfig: TurnDifficultyConfig
 ): Fleet | null {
   if (fleet.state !== FleetState.ORBITING) {
     return fleet;
@@ -887,7 +1044,8 @@ function resolveIdleFleetState(
       resolvedTurnNumber,
       playersById.get(fleet.ownerId) ?? null,
       targetPlanet.info.ownerId === null ? null : playersById.get(targetPlanet.info.ownerId) ?? null,
-      diplomacyResolver
+      diplomacyResolver,
+      difficultyConfig
     );
     return fleet;
   }
@@ -895,6 +1053,21 @@ function resolveIdleFleetState(
   if (fleet.missionType === FleetMissionType.REPAIR && targetPlanet.info.ownerId !== null) {
     const diplomaticStatus = diplomacyResolver.getStatus(fleet.ownerId, targetPlanet.info.ownerId);
     if (diplomaticStatus === DiplomaticStatus.WAR) {
+      emitFleetOutcome(difficultyConfig, {
+        fleetId: fleet.fleetId,
+        ownerId: fleet.ownerId,
+        missionType: fleet.missionType,
+        origin: { x: fleet.origin.x, y: fleet.origin.y, z: fleet.origin.z },
+        target: { x: fleet.target.x, y: fleet.target.y, z: fleet.target.z },
+        createdAtTurn: fleet.createdAtTurn,
+        resolvedTurn: resolvedTurnNumber,
+        outcomeType: 'FAILURE',
+        launchSummary: createFleetLaunchSummary(fleet),
+        resultSummary: `Repair mission failed over ${targetPlanet.basicInfo.name} because the target became hostile.`,
+        payload: {
+          failureReason: 'TARGET_BECAME_HOSTILE'
+        }
+      });
       return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
     }
   }
@@ -933,7 +1106,8 @@ function resolveIdleFleetState(
       targetPlanet,
       resolvedTurnNumber
     },
-    espionageReportGenerator
+    espionageReportGenerator,
+    difficultyConfig
   );
 }
 
@@ -944,7 +1118,8 @@ function resolveTargetArrival(
   planetById: Map<string, Planet>,
   espionageReportGenerator: EspionageReportGenerator,
   resolvedTurnNumber: number,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
+  difficultyConfig: TurnDifficultyConfig
 ): Fleet | null {
   const mission = FLEET_MISSION_REGISTRY.get(fleet.missionType);
   if (!mission) {
@@ -955,6 +1130,21 @@ function resolveTargetArrival(
   const originPlanet = planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z)) ?? null;
   const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
   if (!owner || !targetPlanet) {
+    emitFleetOutcome(difficultyConfig, {
+      fleetId: fleet.fleetId,
+      ownerId: fleet.ownerId,
+      missionType: fleet.missionType,
+      origin: { x: fleet.origin.x, y: fleet.origin.y, z: fleet.origin.z },
+      target: { x: fleet.target.x, y: fleet.target.y, z: fleet.target.z },
+      createdAtTurn: fleet.createdAtTurn,
+      resolvedTurn: resolvedTurnNumber,
+      outcomeType: 'FAILURE',
+      launchSummary: createFleetLaunchSummary(fleet),
+      resultSummary: 'Mission failed because the origin owner or target planet no longer existed.',
+      payload: {
+        failureReason: !owner ? 'OWNER_MISSING' : 'TARGET_MISSING'
+      }
+    });
     return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
   }
 
@@ -973,6 +1163,7 @@ function resolveTargetArrival(
 
   if (mission.participatesInEncounter()) {
     const battleResolution = resolveHostilePlanetBattle(
+      galaxy,
       fleet,
       targetPlanet,
       playersById,
@@ -981,19 +1172,86 @@ function resolveTargetArrival(
       diplomacyResolver
     );
     if (battleResolution === 'attacker_destroyed') {
+      emitFleetOutcome(difficultyConfig, {
+        fleetId: fleet.fleetId,
+        ownerId: fleet.ownerId,
+        missionType: fleet.missionType,
+        origin: { x: fleet.origin.x, y: fleet.origin.y, z: fleet.origin.z },
+        target: { x: fleet.target.x, y: fleet.target.y, z: fleet.target.z },
+        createdAtTurn: fleet.createdAtTurn,
+        resolvedTurn: resolvedTurnNumber,
+        outcomeType: 'DESTROYED',
+        launchSummary: createFleetLaunchSummary(fleet),
+        resultSummary: `${fleet.missionType} fleet was destroyed at ${targetPlanet.basicInfo.name}.`,
+        payload: {
+          targetPlanetName: targetPlanet.basicInfo.name
+        },
+        deltas: {
+          survivingShips: snapshotFleetShipCounts(fleet),
+          remainingCargo: snapshotResourcesPack(fleet.cargo)
+        },
+        terminal: true
+      });
       return null;
     }
     if (battleResolution === 'attacker_retreating') {
+      if (fleet.missionType === FleetMissionType.ATTACK) {
+        emitFleetOutcome(difficultyConfig, {
+          fleetId: fleet.fleetId,
+          ownerId: fleet.ownerId,
+          missionType: fleet.missionType,
+          origin: { x: fleet.origin.x, y: fleet.origin.y, z: fleet.origin.z },
+          target: { x: fleet.target.x, y: fleet.target.y, z: fleet.target.z },
+          createdAtTurn: fleet.createdAtTurn,
+          resolvedTurn: resolvedTurnNumber,
+          outcomeType: 'ATTACK',
+          launchSummary: createFleetLaunchSummary(fleet),
+          resultSummary: createAttackOutcomeSummary(
+            targetPlanet,
+            null,
+            null
+          ),
+          payload: {
+            targetPlanetName: targetPlanet.basicInfo.name,
+            battleOutcome: 'retreat'
+          },
+          deltas: {
+            survivingShips: snapshotFleetShipCounts(fleet),
+            cargo: snapshotResourcesPack(fleet.cargo)
+          }
+        });
+      }
       return applyMissionResolution(
         mission.onBattleRetreat(resolutionContext),
         galaxy,
         resolutionContext,
-        espionageReportGenerator
+        espionageReportGenerator,
+        difficultyConfig
       );
     }
 
     if (battleResolution === 'attacker_won') {
-      applyPostArrivalBombardmentIfNeeded(galaxy, fleet, targetPlanet, resolvedTurnNumber, owner, targetOwner, diplomacyResolver);
+      const plunderSummary = applyAttackPlunderIfNeeded(
+        galaxy,
+        fleet,
+        targetPlanet,
+        owner,
+        targetOwner,
+        resolvedTurnNumber,
+        null,
+        diplomacyResolver,
+        difficultyConfig
+      );
+      applyPostArrivalBombardmentIfNeeded(
+        galaxy,
+        fleet,
+        targetPlanet,
+        resolvedTurnNumber,
+        owner,
+        targetOwner,
+        diplomacyResolver,
+        difficultyConfig
+      );
       return applyMissionResolution(
         mission.resolveAfterEncounter(
           resolutionContext,
@@ -1001,17 +1259,41 @@ function resolveTargetArrival(
         ),
         galaxy,
         resolutionContext,
-        espionageReportGenerator
+        espionageReportGenerator,
+        difficultyConfig,
+        plunderSummary
       );
     }
   }
 
-  applyPostArrivalBombardmentIfNeeded(galaxy, fleet, targetPlanet, resolvedTurnNumber, owner, targetOwner, diplomacyResolver);
+  const plunderSummary = applyAttackPlunderIfNeeded(
+    galaxy,
+    fleet,
+    targetPlanet,
+    owner,
+    targetOwner,
+    resolvedTurnNumber,
+    null,
+    diplomacyResolver,
+    difficultyConfig
+  );
+  applyPostArrivalBombardmentIfNeeded(
+    galaxy,
+    fleet,
+    targetPlanet,
+    resolvedTurnNumber,
+    owner,
+    targetOwner,
+    diplomacyResolver,
+    difficultyConfig
+  );
   return applyMissionResolution(
     mission.resolveWithoutEncounter(resolutionContext),
     galaxy,
     resolutionContext,
-    espionageReportGenerator
+    espionageReportGenerator,
+    difficultyConfig,
+    plunderSummary
   );
 }
 
@@ -1022,7 +1304,8 @@ function applyPostArrivalBombardmentIfNeeded(
   resolvedTurnNumber: number,
   owner: Player | null = null,
   targetOwner: Player | null = null,
-  diplomacyResolver: DiplomacyResolver | null = null
+  diplomacyResolver: DiplomacyResolver | null = null,
+  difficultyConfig: TurnDifficultyConfig = {}
 ): void {
   if (
     fleet.missionType !== FleetMissionType.BOMBARD
@@ -1083,6 +1366,35 @@ function applyPostArrivalBombardmentIfNeeded(
   if (fleet.missionType === FleetMissionType.BOMBARD) {
     fleet.createdAtTurn = resolvedTurnNumber;
   }
+
+  emitFleetOutcome(difficultyConfig, {
+    fleetId: fleet.fleetId,
+    ownerId: fleet.ownerId,
+    missionType: fleet.missionType,
+    origin: { x: fleet.origin.x, y: fleet.origin.y, z: fleet.origin.z },
+    target: { x: fleet.target.x, y: fleet.target.y, z: fleet.target.z },
+    createdAtTurn: fleet.createdAtTurn,
+    resolvedTurn: resolvedTurnNumber,
+    outcomeType: fleet.missionType === FleetMissionType.SIEGE ? 'SIEGE' : 'BOMBARD',
+    launchSummary: createFleetLaunchSummary(fleet),
+    resultSummary: `${fleet.missionType} tick resolved at ${targetPlanet.basicInfo.name}.`,
+    payload: {
+      targetPlanetName: targetPlanet.basicInfo.name,
+      shots: summary.shots,
+      hits: summary.hits,
+      buildingTargets: summary.buildingTargetCount,
+      defenceTargets: summary.defenceTargetCount,
+      bombsLaunched: summary.bombsLaunched,
+      bombsActivated: summary.bombsActivated,
+      bombsIntercepted: summary.bombsIntercepted,
+      bombsLost: summary.bombsLost
+    },
+    deltas: {
+      totalStructuralDamage: summary.totalDamage,
+      survivingShips: snapshotFleetShipCounts(fleet),
+      remainingBombs: snapshotBombCounts(fleet)
+    }
+  });
 }
 
 function resolveShipRepairs(
@@ -1091,7 +1403,8 @@ function resolveShipRepairs(
   planetById: Map<string, Planet>,
   snapshotsByPlanetId: Map<string, PlanetTurnSnapshot>,
   diplomacyResolver: DiplomacyResolver,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
+  difficultyConfig: TurnDifficultyConfig
 ): void {
   for (const [coordinatesId, planet] of planetById.entries()) {
     const snapshot = snapshotsByPlanetId.get(coordinatesId);
@@ -1161,6 +1474,24 @@ function resolveShipRepairs(
         fleet.orbitActivity = FleetOrbitActivity.IDLE;
         fleet.createdAtTurn = resolvedTurnNumber;
         addRepairReturnSummaryReport(playersById.get(fleet.ownerId) ?? null, fleet, planet, resolvedTurnNumber);
+        emitFleetOutcome(difficultyConfig, {
+          fleetId: fleet.fleetId,
+          ownerId: fleet.ownerId,
+          missionType: fleet.missionType,
+          origin: { x: fleet.origin.x, y: fleet.origin.y, z: fleet.origin.z },
+          target: { x: fleet.target.x, y: fleet.target.y, z: fleet.target.z },
+          createdAtTurn: fleet.createdAtTurn,
+          resolvedTurn: resolvedTurnNumber,
+          outcomeType: 'REPAIR',
+          launchSummary: createFleetLaunchSummary(fleet),
+          resultSummary: `Repair mission completed at ${planet.basicInfo.name}.`,
+          payload: {
+            targetPlanetName: planet.basicInfo.name
+          },
+          deltas: {
+            survivingShips: snapshotFleetShipCounts(fleet)
+          }
+        });
       }
     }
   }
@@ -1496,7 +1827,8 @@ function resolveEncounterArrival(
   galaxy: Galaxy,
   resolvedArrival: PlanetOrbitEncounterResolvedArrival,
   espionageReportGenerator: EspionageReportGenerator,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
+  difficultyConfig: TurnDifficultyConfig
 ): Fleet | null {
   const {
     arrival,
@@ -1522,7 +1854,8 @@ function resolveEncounterArrival(
         arrival.targetOwner,
         arrival.resolvedTurnNumber,
         outcome.battleReports ?? null,
-        diplomacyResolver
+        diplomacyResolver,
+        difficultyConfig
       );
       applyPostArrivalBombardmentIfNeeded(
         galaxy,
@@ -1531,13 +1864,15 @@ function resolveEncounterArrival(
         arrival.resolvedTurnNumber,
         arrival.owner,
         arrival.targetOwner,
-        diplomacyResolver
+        diplomacyResolver,
+        difficultyConfig
       );
       return applyMissionResolution(
         arrival.mission.resolveAfterEncounter(resolutionContext, outcome),
         galaxy,
         resolutionContext,
-        espionageReportGenerator
+        espionageReportGenerator,
+        difficultyConfig
       );
     case 'retreat':
     case 'stalemate':
@@ -1545,9 +1880,31 @@ function resolveEncounterArrival(
         arrival.mission.onBattleRetreat(resolutionContext),
         galaxy,
         resolutionContext,
-        espionageReportGenerator
+        espionageReportGenerator,
+        difficultyConfig
       );
     case 'defeat':
+      emitFleetOutcome(difficultyConfig, {
+        fleetId: arrival.fleet.fleetId,
+        ownerId: arrival.fleet.ownerId,
+        missionType: arrival.fleet.missionType,
+        origin: { x: arrival.fleet.origin.x, y: arrival.fleet.origin.y, z: arrival.fleet.origin.z },
+        target: { x: arrival.fleet.target.x, y: arrival.fleet.target.y, z: arrival.fleet.target.z },
+        createdAtTurn: arrival.fleet.createdAtTurn,
+        resolvedTurn: arrival.resolvedTurnNumber,
+        outcomeType: 'DESTROYED',
+        launchSummary: createFleetLaunchSummary(arrival.fleet),
+        resultSummary: `${arrival.fleet.missionType} fleet was destroyed at ${arrival.targetPlanet.basicInfo.name}.`,
+        payload: {
+          targetPlanetName: arrival.targetPlanet.basicInfo.name,
+          encounterResolution: outcome.resolution
+        },
+        deltas: {
+          survivingShips: snapshotFleetShipCounts(arrival.fleet),
+          remainingCargo: snapshotResourcesPack(arrival.fleet.cargo)
+        },
+        terminal: true
+      });
       return null;
     case 'notInvolved':
     default:
@@ -1559,7 +1916,8 @@ function resolveEncounterArrival(
         arrival.targetOwner,
         arrival.resolvedTurnNumber,
         outcome.battleReports ?? null,
-        diplomacyResolver
+        diplomacyResolver,
+        difficultyConfig
       );
       applyPostArrivalBombardmentIfNeeded(
         galaxy,
@@ -1568,13 +1926,15 @@ function resolveEncounterArrival(
         arrival.resolvedTurnNumber,
         arrival.owner,
         arrival.targetOwner,
-        diplomacyResolver
+        diplomacyResolver,
+        difficultyConfig
       );
       return applyMissionResolution(
         arrival.mission.resolveWithoutEncounter(resolutionContext),
         galaxy,
         resolutionContext,
-        espionageReportGenerator
+        espionageReportGenerator,
+        difficultyConfig
       );
   }
 }
@@ -1587,7 +1947,8 @@ function applyAttackPlunderIfNeeded(
   targetOwner: Player | null,
   resolvedTurnNumber: number,
   battleReports: SpaceBattleReports | null,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
+  difficultyConfig: TurnDifficultyConfig
 ): AttackPlunderSummary | null {
   if (fleet.missionType !== FleetMissionType.ATTACK) {
     return null;
@@ -1630,6 +1991,31 @@ function applyAttackPlunderIfNeeded(
       );
     }
   }
+
+  emitFleetOutcome(difficultyConfig, {
+    fleetId: fleet.fleetId,
+    ownerId: fleet.ownerId,
+    missionType: fleet.missionType,
+    origin: { x: fleet.origin.x, y: fleet.origin.y, z: fleet.origin.z },
+    target: { x: fleet.target.x, y: fleet.target.y, z: fleet.target.z },
+    createdAtTurn: fleet.createdAtTurn,
+    resolvedTurn: resolvedTurnNumber,
+    outcomeType: 'ATTACK',
+    launchSummary: createFleetLaunchSummary(fleet),
+    resultSummary: createAttackOutcomeSummary(targetPlanet, null, summary),
+    payload: {
+      targetPlanetName: targetPlanet.basicInfo.name,
+      plunderPercent: summary.plunderPercent,
+      bunkerReductionPercent: summary.bunkerReductionPercent
+    },
+    deltas: {
+      availableLoot: snapshotResourcesPack(summary.availableLoot),
+      stolenResources: snapshotResourcesPack(summary.stolenResources),
+      currentCargoCapacity: summary.currentCargoCapacity,
+      totalCargoCapacity: summary.totalCargoCapacity,
+      survivingShips: snapshotFleetShipCounts(fleet)
+    }
+  });
 
   return summary;
 }
@@ -1883,7 +2269,8 @@ function createIncomingAttackReport(
 function resolveReturnArrival(
   fleet: Fleet,
   planetById: Map<string, Planet>,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
+  difficultyConfig: TurnDifficultyConfig
 ): Fleet | null {
   const originPlanet = planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z));
   if (!originPlanet || originPlanet.info.ownerId !== fleet.ownerId) {
@@ -1898,6 +2285,9 @@ function resolveReturnArrival(
     return fleet;
   }
 
+  const returningCargo = snapshotResourcesPack(fleet.cargo);
+  const survivingShips = snapshotFleetShipCounts(fleet);
+  const returningBombs = snapshotBombCounts(fleet);
   addFleetShipsToPlanet(originPlanet, fleet.ships);
   addFleetBombsToPlanet(originPlanet, fleet.carriedBombs);
   originPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
@@ -1905,6 +2295,28 @@ function resolveReturnArrival(
     fleet.cargo.crystal,
     fleet.cargo.deuterium
   ));
+  emitFleetOutcome(difficultyConfig, {
+    fleetId: fleet.fleetId,
+    ownerId: fleet.ownerId,
+    missionType: fleet.missionType,
+    origin: { x: fleet.origin.x, y: fleet.origin.y, z: fleet.origin.z },
+    target: { x: fleet.target.x, y: fleet.target.y, z: fleet.target.z },
+    createdAtTurn: fleet.createdAtTurn,
+    resolvedTurn: resolvedTurnNumber,
+    outcomeType: 'RETURN',
+    launchSummary: createFleetLaunchSummary(fleet),
+    resultSummary: `Fleet returned to ${originPlanet.basicInfo.name}.`,
+    payload: {
+      originPlanetName: originPlanet.basicInfo.name,
+      returnReason: fleet.returnReason
+    },
+    deltas: {
+      cargoReturned: returningCargo,
+      survivingShips,
+      returningBombs
+    },
+    terminal: true
+  });
   return null;
 }
 
@@ -1992,8 +2404,14 @@ function applyMissionResolution(
     targetPlanet: Planet | null;
     resolvedTurnNumber: number;
   },
-  espionageReportGenerator: EspionageReportGenerator
+  espionageReportGenerator: EspionageReportGenerator,
+  difficultyConfig: TurnDifficultyConfig,
+  attackPlunderSummary: AttackPlunderSummary | null = null
 ): Fleet | null {
+  const beforeCargo = snapshotResourcesPack(context.fleet.cargo);
+  const beforeDebris = context.targetPlanet
+    ? snapshotResourcesPack(context.targetPlanet.rBDSFTQ.spaceDebris)
+    : null;
   MISSION_EFFECT_EXECUTOR.execute({
     galaxy,
     fleet: context.fleet,
@@ -2027,10 +2445,98 @@ function applyMissionResolution(
     );
   }
 
+  const outcomeType = resolveMissionOutcomeType(context.fleet.missionType);
+  if (outcomeType) {
+    const resultSummary = summarizeMissionReports(resolution.reports)
+      ?? `${context.fleet.missionType} resolved at ${context.targetPlanet?.basicInfo.name ?? 'target'}.`;
+    const payload: Record<string, unknown> = {
+      reports: resolution.reports,
+      nextState: resolution.nextState ?? null
+    };
+    const deltas: Record<string, unknown> = {
+      survivingShips: snapshotFleetShipCounts(context.fleet)
+    };
+
+    if (outcomeType === 'TRANSPORT' || outcomeType === 'ARMAMENT_DELIVERY') {
+      payload.targetPlanetName = context.targetPlanet?.basicInfo.name ?? null;
+      deltas.deliveredResources = {
+        metal: beforeCargo.metal - context.fleet.cargo.metal,
+        crystal: beforeCargo.crystal - context.fleet.cargo.crystal,
+        deuterium: beforeCargo.deuterium - context.fleet.cargo.deuterium
+      };
+      if (outcomeType === 'ARMAMENT_DELIVERY') {
+        deltas.remainingBombs = snapshotBombCounts(context.fleet);
+      }
+    }
+
+    if (outcomeType === 'COLONIZE' && context.targetPlanet) {
+      payload.targetPlanetName = context.targetPlanet.basicInfo.name;
+      deltas.colonizedOwnerId = context.targetPlanet.info.ownerId;
+      deltas.planetSize = context.targetPlanet.basicInfo.size;
+    }
+
+    if (outcomeType === 'RECYCLE') {
+      payload.targetPlanetName = context.targetPlanet?.basicInfo.name ?? null;
+      deltas.collectedResources = {
+        metal: context.fleet.cargo.metal - beforeCargo.metal,
+        crystal: context.fleet.cargo.crystal - beforeCargo.crystal,
+        deuterium: context.fleet.cargo.deuterium - beforeCargo.deuterium
+      };
+      if (beforeDebris && context.targetPlanet) {
+        deltas.debrisBefore = beforeDebris;
+        deltas.debrisAfter = snapshotResourcesPack(context.targetPlanet.rBDSFTQ.spaceDebris);
+      }
+    }
+
+    if (outcomeType === 'ATTACK' && attackPlunderSummary) {
+      deltas.stolenResources = snapshotResourcesPack(attackPlunderSummary.stolenResources);
+    }
+
+    emitFleetOutcome(difficultyConfig, {
+      fleetId: context.fleet.fleetId,
+      ownerId: context.fleet.ownerId,
+      missionType: context.fleet.missionType,
+      origin: { x: context.fleet.origin.x, y: context.fleet.origin.y, z: context.fleet.origin.z },
+      target: { x: context.fleet.target.x, y: context.fleet.target.y, z: context.fleet.target.z },
+      createdAtTurn: context.fleet.createdAtTurn,
+      resolvedTurn: context.resolvedTurnNumber,
+      outcomeType,
+      launchSummary: createFleetLaunchSummary(context.fleet),
+      resultSummary,
+      payload,
+      deltas,
+      terminal: resolution.fleetOutcome === 'remove' && outcomeType !== 'RECYCLE'
+    });
+  }
+
+  const failureReport = resolution.reports.find((report) => report.kind === 'failure');
+  if (failureReport) {
+    emitFleetOutcome(difficultyConfig, {
+      fleetId: context.fleet.fleetId,
+      ownerId: context.fleet.ownerId,
+      missionType: context.fleet.missionType,
+      origin: { x: context.fleet.origin.x, y: context.fleet.origin.y, z: context.fleet.origin.z },
+      target: { x: context.fleet.target.x, y: context.fleet.target.y, z: context.fleet.target.z },
+      createdAtTurn: context.fleet.createdAtTurn,
+      resolvedTurn: context.resolvedTurnNumber,
+      outcomeType: 'FAILURE',
+      launchSummary: createFleetLaunchSummary(context.fleet),
+      resultSummary: summarizeMissionReports([failureReport]) ?? 'Mission failed.',
+      payload: {
+        reports: [failureReport]
+      },
+      deltas: {
+        survivingShips: snapshotFleetShipCounts(context.fleet)
+      },
+      terminal: resolution.fleetOutcome === 'remove'
+    });
+  }
+
   return resolution.fleetOutcome === 'remove' ? null : context.fleet;
 }
 
 function resolveHostilePlanetBattle(
+  galaxy: Galaxy,
   fleet: Fleet,
   targetPlanet: Planet,
   playersById: Map<number, Player>,

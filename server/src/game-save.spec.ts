@@ -58,6 +58,7 @@ describe('game-save', () => {
     expect(save.gameId).toBe('game-save-test');
     expect(save.ownerAccountId).toBe(42);
     expect(save.savedAt).toBe('2026-04-01T12:00:00.000Z');
+    expect(save.trackedPlayerActionFleetIds).toEqual([7, 12]);
     expect(save.setup.autoSaveTurns).toBe(5);
     expect(save.galaxy.players[0].planetCoordinates).toEqual([{ x: 0, y: 0, z: 0 }]);
     expect(save.galaxy.players[0].fleetIds).toEqual([7]);
@@ -125,6 +126,7 @@ describe('game-save', () => {
     expect(hydrated.gameId).toBe('game-save-test');
     expect(hydrated.ownerAccountId).toBe(42);
     expect(hydrated.ownerPlayerName).toBe('Alpha');
+    expect(hydrated.trackedPlayerActionFleetIds).toEqual([7, 12]);
     expect(hydrated.setup.autoSaveTurns).toBe(5);
     expect(hydrated.galaxy.name).toBe('Save Test');
     expect(hydrated.galaxy.currentTurn).toBe(6);
@@ -579,5 +581,5 @@ function buildTestSave() {
     skipTutorial: true,
     startingHomeworldPreset: StartingHomeworldPreset.MEDIUM,
     startingResources: { metal: 6, crystal: 3, deuterium: 1 }
-  }, '2026-04-01T12:00:00.000Z', null, 'game-save-test');
+  }, '2026-04-01T12:00:00.000Z', null, 'game-save-test', [7, 12]);
 }

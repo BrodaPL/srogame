@@ -189,6 +189,7 @@ import { startShipyardConstruction } from './game-commands/shipyard-commands.js'
 import { startTechnologyResearch, updateResearchHelpers } from './game-commands/research-commands.js';
 import {
   appendPlayerActionLogEntry,
+  createTrackedPlayerActionFleetIds,
   ensurePlayerActionLogFile
 } from './player-action-log.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
@@ -197,6 +198,7 @@ import sensorPhalanxReportModule from '../../src/app/models/reports/sensor-phala
 import resourcesPackModule from '../../src/app/models/resources-pack.js';
 import type { GameCommandError } from './game-commands/command-result.ts';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
+import type { PlayerFleetOutcomeLogEvent } from '../../src/app/models/turns/phase-one-turn-resolver.ts';
 import type {
   BotAdminActionResponse,
   BotAdminStatesResponse,
@@ -608,6 +610,7 @@ let currentRuntimeGameId: string | null = null;
 let currentGameOwnerId: number | null = null;
 let currentGameOwnerPlayerName: string | null = null;
 let currentGameSetup: GalaxySetup | null = null;
+let currentTrackedPlayerActionFleetIds = new Set<number>();
 let currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
 let isTurnProcessing = false;
 let currentTurnReadyPlayerIds = new Set<number>();
@@ -624,6 +627,7 @@ function clearMountedRuntimeState(): void {
   currentGameOwnerId = null;
   currentGameOwnerPlayerName = null;
   currentGameSetup = null;
+  currentTrackedPlayerActionFleetIds = new Set<number>();
   currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
   resetActiveTurnState();
 }
@@ -662,6 +666,47 @@ function appendCurrentPlayerActionLog(
     playerName,
     entry
   );
+}
+
+function trackCurrentPlayerActionFleet(fleetId: number): void {
+  if (!Number.isInteger(fleetId) || fleetId <= 0) {
+    return;
+  }
+
+  currentTrackedPlayerActionFleetIds.add(fleetId);
+}
+
+function untrackCurrentPlayerActionFleet(fleetId: number): void {
+  currentTrackedPlayerActionFleetIds.delete(fleetId);
+}
+
+function resolvePlayerFleetOutcomeLogKind(
+  outcomeType: PlayerFleetOutcomeLogEvent['outcomeType']
+): import('./player-action-log.js').PlayerActionLogKind {
+  switch (outcomeType) {
+    case 'ATTACK':
+      return 'FLEET_OUTCOME_ATTACK';
+    case 'BOMBARD':
+      return 'FLEET_OUTCOME_BOMBARD';
+    case 'SIEGE':
+      return 'FLEET_OUTCOME_SIEGE';
+    case 'TRANSPORT':
+      return 'FLEET_OUTCOME_TRANSPORT';
+    case 'ARMAMENT_DELIVERY':
+      return 'FLEET_OUTCOME_ARMAMENT_DELIVERY';
+    case 'COLONIZE':
+      return 'FLEET_OUTCOME_COLONIZE';
+    case 'RECYCLE':
+      return 'FLEET_OUTCOME_RECYCLE';
+    case 'REPAIR':
+      return 'FLEET_OUTCOME_REPAIR';
+    case 'RETURN':
+      return 'FLEET_OUTCOME_RETURN';
+    case 'FAILURE':
+      return 'FLEET_OUTCOME_FAILURE';
+    case 'DESTROYED':
+      return 'FLEET_OUTCOME_DESTROYED';
+  }
 }
 
 app.get('/api/auth/register-config', (_req, res) => {
@@ -1233,6 +1278,7 @@ app.post('/api/game/start', (req, res) => {
   generateSelfReportsForHumanPlayers(nextGalaxy, nextGalaxy.currentTurn);
   const nextPresentation = buildPresentationDataByPlayer(nextGalaxy);
   const nextGameId = createGameId();
+  currentTrackedPlayerActionFleetIds = new Set<number>();
   let initialSaveSummary: ReturnType<typeof buildGameSaveSummary> | null = null;
 
   try {
@@ -1244,7 +1290,8 @@ app.post('/api/game/start', (req, res) => {
       {
         rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
         maxSaveFiles: MAX_GAME_SAVE_FILES,
-        gameId: nextGameId
+        gameId: nextGameId,
+        trackedPlayerActionFleetIds: []
       }
     );
   } catch (error) {
@@ -1318,6 +1365,7 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
     currentGameOwnerId = auth.session.accountId;
     currentGameOwnerPlayerName = auth.session.playerName;
     currentGameSetup = hydrated.setup;
+    currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(hydrated.trackedPlayerActionFleetIds);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
     clearBotDecisionTracesV2();
@@ -4257,6 +4305,9 @@ app.post('/api/game/active-fleets', (req, res) => {
       state: result.value.fleet.state
     }
   });
+  if (missionType !== FleetMissionType.SPY && missionType !== FleetMissionType.STAR_SYSTEM_SPY) {
+    trackCurrentPlayerActionFleet(result.value.fleet.fleetId);
+  }
 
   const presentation = getPresentationData(currentGalaxy, playerId);
   const response: CreateFleetMissionResponse = {
@@ -4793,7 +4844,8 @@ function saveCurrentGameSnapshot(): void {
     {
       rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
       maxSaveFiles: MAX_GAME_SAVE_FILES,
-      gameId: currentRuntimeGameId
+      gameId: currentRuntimeGameId,
+      trackedPlayerActionFleetIds: [...currentTrackedPlayerActionFleetIds]
     }
   );
 
@@ -4818,7 +4870,8 @@ function saveRuntimeSnapshot(
     {
       rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
       maxSaveFiles: MAX_GAME_SAVE_FILES,
-      gameId
+      gameId,
+      trackedPlayerActionFleetIds: [...runtime.trackedPlayerActionFleetIds]
     }
   );
 
@@ -5255,6 +5308,7 @@ function persistCurrentRuntimeStoreState(): void {
       galaxy: currentGalaxy,
       setup: currentGameSetup,
       presentationByPlayer: currentGalaxyPresentationByPlayer,
+      trackedPlayerActionFleetIds: new Set(currentTrackedPlayerActionFleetIds),
       loadedAt: now,
       lastTouchedAt: now,
       isDirty: false,
@@ -5270,6 +5324,7 @@ function persistCurrentRuntimeStoreState(): void {
     galaxy: currentGalaxy,
     setup: currentGameSetup,
     presentationByPlayer: currentGalaxyPresentationByPlayer,
+    trackedPlayerActionFleetIds: new Set(currentTrackedPlayerActionFleetIds),
     currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
     offlineBotControlledPlayerIds: new Set(existingRuntime.offlineBotControlledPlayerIds),
     emptyPresenceUnloadAt: existingRuntime.emptyPresenceUnloadAt,
@@ -5291,6 +5346,7 @@ function switchCurrentRuntime(gameId: string): boolean {
   currentRuntimeGameId = runtime.gameId;
   currentGalaxy = runtime.galaxy;
   currentGameSetup = runtime.setup;
+  currentTrackedPlayerActionFleetIds = new Set(runtime.trackedPlayerActionFleetIds);
   currentGalaxyPresentationByPlayer = runtime.presentationByPlayer;
   currentTurnReadyPlayerIds = new Set(runtime.currentTurnReadyPlayerIds);
   isTurnProcessing = runtime.isTurnProcessing;
@@ -5489,6 +5545,7 @@ function loadSingleplayerGameRecord(
   currentGameOwnerId = session.accountId;
   currentGameOwnerPlayerName = session.playerName;
   currentGameSetup = hydrated.setup;
+  currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(hydrated.trackedPlayerActionFleetIds);
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
   resetActiveTurnState();
   clearBotDecisionTracesV2();
@@ -5866,6 +5923,7 @@ function hydrateRunningMultiplayerGameFromLobby(
     currentGameOwnerId = session.accountId;
     currentGameOwnerPlayerName = session.playerName;
     currentGameSetup = hydrated.setup;
+    currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(hydrated.trackedPlayerActionFleetIds);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
     clearBotDecisionTracesV2();
@@ -5901,6 +5959,7 @@ function hydrateRunningMultiplayerGameFromLobby(
     currentGameOwnerId = session.accountId;
     currentGameOwnerPlayerName = session.playerName;
     currentGameSetup = setup;
+    currentTrackedPlayerActionFleetIds = new Set<number>();
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
     clearBotDecisionTracesV2();
@@ -6494,7 +6553,36 @@ function handleEndTurnRequest(
     const resolvedTurnNumber = access.galaxy.currentTurn + 1;
     runBotTurnPhaseV2(access.galaxy);
     resolvePhaseOneTurn(access.galaxy, resolvedTurnNumber, {
-      botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0
+      botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0,
+      fleetOutcomeLogger: (event) => {
+        if (!currentGameOwnerPlayerName || !currentTrackedPlayerActionFleetIds.has(event.fleetId)) {
+          return;
+        }
+
+        appendCurrentPlayerActionLog(currentGameOwnerPlayerName, {
+          turn: event.resolvedTurn,
+          playerId: event.ownerId,
+          kind: resolvePlayerFleetOutcomeLogKind(event.outcomeType),
+          summary: `${currentGameOwnerPlayerName} ${event.resultSummary}`,
+          coordinates: event.origin,
+          targetCoordinates: event.target,
+          payload: {
+            fleetId: event.fleetId,
+            missionType: event.missionType,
+            createdAtTurn: event.createdAtTurn,
+            resolvedTurn: event.resolvedTurn,
+            outcomeType: event.outcomeType,
+            launchSummary: event.launchSummary,
+            resultSummary: event.resultSummary,
+            ...(event.payload ?? {})
+          },
+          deltas: event.deltas
+        });
+
+        if (event.terminal) {
+          untrackCurrentPlayerActionFleet(event.fleetId);
+        }
+      }
     });
     access.galaxy.currentTurn = resolvedTurnNumber;
     processSensorPhalanxTurnStart(access.galaxy, access.galaxy.currentTurn);

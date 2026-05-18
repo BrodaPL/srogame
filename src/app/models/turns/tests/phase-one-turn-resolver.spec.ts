@@ -20,7 +20,7 @@ import { SolarSystem } from '../../planets/solar-system';
 import { Player } from '../../player';
 import { ResourcesPack } from '../../resources-pack';
 import { TechnologyQueueEntry } from '../../tech/technology-queue-entry';
-import { resolvePhaseOneTurn } from '../phase-one-turn-resolver';
+import { resolvePhaseOneTurn, type PlayerFleetOutcomeLogEvent } from '../phase-one-turn-resolver';
 
 const blueprints = ShipBlueprintsFactory.fromDefaultJson();
 const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson().buildingsMap;
@@ -202,6 +202,98 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(galaxy.activeFleets[0].pendingJumpGateRequestId).toBe(7);
     expect(galaxy.activeFleets[0].originPlanetName).toBe('Alpha Prime');
     expect(system.planets[0].rBDSFTQ.resources.metal).toBe(0);
+  });
+
+  it('emits a colonize outcome callback for a successful colonization', () => {
+    const colonizeFleet = new Fleet(
+      91,
+      1,
+      FleetMissionType.COLONIZE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'New World',
+      manyShips({ type: ShipType.COLONIZER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const events: PlayerFleetOutcomeLogEvent[] = [];
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [colonizeFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'New World';
+        solarSystem.planets[1].info.ownerId = null;
+      },
+      (solarSystem) => {
+        const player = new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER);
+        player.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 1);
+        return [player];
+      }
+    );
+
+    resolvePhaseOneTurn(galaxy, 2, {
+      fleetOutcomeLogger: (event) => events.push(event)
+    });
+
+    expect(system.planets[1].info.ownerId).toBe(1);
+    expect(events.some((event) =>
+      event.fleetId === 91
+      && event.outcomeType === 'COLONIZE'
+      && event.payload?.targetPlanetName === 'New World'
+    )).toBe(true);
+  });
+
+  it('emits a return outcome callback when a fleet unloads at origin', () => {
+    const returningFleet = new Fleet(
+      92,
+      1,
+      FleetMissionType.TRANSPORT,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Outer Hold',
+      manyShips({ type: ShipType.TRANSPORTER, amount: 2 }),
+      new ResourcesPack(50, 20, 10),
+      0,
+      1200,
+      80,
+      1,
+      1,
+      FleetState.RETURNING,
+      1
+    );
+
+    const events: PlayerFleetOutcomeLogEvent[] = [];
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [returningFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Outer Hold';
+        solarSystem.planets[1].info.ownerId = null;
+      },
+      (solarSystem) => [new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER)]
+    );
+
+    resolvePhaseOneTurn(galaxy, 2, {
+      fleetOutcomeLogger: (event) => events.push(event)
+    });
+
+    expect(galaxy.activeFleets).toHaveLength(0);
+    expect(system.planets[0].rBDSFTQ.resources.metal).toBe(50);
+    expect(events.some((event) =>
+      event.fleetId === 92
+      && event.outcomeType === 'RETURN'
+    )).toBe(true);
   });
 
   it('destroys a hostile transport that loses its arrival battle before cargo delivery', () => {

@@ -350,6 +350,7 @@ export type SavedGameFile = {
   savedAt: string;
   ownerAccountId: number;
   ownerPlayerName: string | null;
+  trackedPlayerActionFleetIds?: number[];
   setup: GalaxySetup;
   galaxy: SavedGalaxy;
 };
@@ -358,6 +359,7 @@ export type HydratedGameSave = {
   gameId: string | null;
   ownerAccountId: number;
   ownerPlayerName: string | null;
+  trackedPlayerActionFleetIds: number[];
   setup: GalaxySetup;
   galaxy: GalaxyModel;
 };
@@ -372,6 +374,7 @@ export type RotatingAutoSaveOptions = {
   maxSaveFiles?: number;
   savedAt?: string;
   gameId?: string | null;
+  trackedPlayerActionFleetIds?: number[];
 };
 
 export function createGameSave(
@@ -380,7 +383,8 @@ export function createGameSave(
   setup: GalaxySetup,
   savedAt = new Date().toISOString(),
   autoSaveSlot: number | null = null,
-  gameId: string | null = null
+  gameId: string | null = null,
+  trackedPlayerActionFleetIds: number[] = []
 ): SavedGameFile {
   const planetCoordinatesByReference = buildPlanetCoordinateMap(galaxy);
 
@@ -392,6 +396,9 @@ export function createGameSave(
     savedAt,
     ownerAccountId,
     ownerPlayerName: resolveGalaxySaveOwnerPlayerName(galaxy),
+    trackedPlayerActionFleetIds: trackedPlayerActionFleetIds
+      .filter((fleetId) => Number.isInteger(fleetId) && fleetId > 0)
+      .sort((left, right) => left - right),
     setup,
     galaxy: {
       name: galaxy.name,
@@ -530,7 +537,8 @@ export function writeRotatingAutoSave(
     setup,
     options.savedAt ?? new Date().toISOString(),
     nextSlot,
-    gameId
+    gameId,
+    options.trackedPlayerActionFleetIds ?? []
   );
   const saveId = buildGameSaveFileName(save);
   saveGameFile(path.join(saveDirectoryPath, saveId), save);
@@ -570,6 +578,9 @@ export function readGameSave(saveFilePath: string): SavedGameFile | null {
       ? parsed.ownerAccountId
       : 0,
     ownerPlayerName,
+    trackedPlayerActionFleetIds: Array.isArray(parsed.trackedPlayerActionFleetIds)
+      ? parsed.trackedPlayerActionFleetIds.filter((fleetId): fleetId is number => Number.isInteger(fleetId) && fleetId > 0)
+      : [],
     setup
   };
 }
@@ -726,6 +737,7 @@ export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
     gameId: save.gameId,
     ownerAccountId: save.ownerAccountId,
     ownerPlayerName: save.ownerPlayerName ?? resolveSavedOwnerPlayerName(save),
+    trackedPlayerActionFleetIds: save.trackedPlayerActionFleetIds ?? [],
     setup: normalizeGalaxySetup(save.setup),
     galaxy
   };
