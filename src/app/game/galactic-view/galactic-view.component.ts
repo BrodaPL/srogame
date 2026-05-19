@@ -7,6 +7,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -71,6 +72,7 @@ type GalacticRouteVm = {
 type SelectCellOptions = {
   onSettled?: () => void;
   preserveSpyNotice?: boolean;
+  focusPlanetZ?: number | null;
 };
 
 type ReloadGalaxyPresentationOptions = {
@@ -120,6 +122,7 @@ export class GalacticViewComponent implements OnInit {
   protected selectedSystemLoading = false;
   protected selectedSystemError: string | null = null;
   protected selectedSystemPlanets: ClientPlanetDto[] = [];
+  protected selectedPlanetZ: number | null = null;
   protected selectedSystemOwnFleets: GalaxyOwnFleetMovementDto[] = [];
   protected ownFleetRoutes: GalacticRouteVm[] = [];
   protected noteActionError: string | null = null;
@@ -139,8 +142,10 @@ export class GalacticViewComponent implements OnInit {
   private starSystemCache = new Map<string, ClientStarSystemDto>();
   private ownFleetPresenceBySystemKey = new Set<string>();
   private selectedSystemRequestKey: string | null = null;
+  private pendingRouteFocus: { x: number; y: number; z: number | null } | null = null;
 
   constructor(
+    private readonly route: ActivatedRoute,
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly gameState: GameStateService,
@@ -150,6 +155,16 @@ export class GalacticViewComponent implements OnInit {
 
   public ngOnInit(): void {
     this.galaxyName = this.resolveGalaxyName();
+    this.route.queryParamMap.subscribe((params) => {
+      this.pendingRouteFocus = this.parseRouteFocus({
+        x: params.get('x'),
+        y: params.get('y'),
+        z: params.get('z')
+      });
+      if (this.gridHeight > 0 && this.gridWidth > 0) {
+        this.applyRouteFocusIfPossible();
+      }
+    });
     this.loadGalaxyPresentation({ autoSelectHomeSystem: true });
   }
 
@@ -198,8 +213,13 @@ export class GalacticViewComponent implements OnInit {
     return this.homeSystemCoordinates?.x === cell.x && this.homeSystemCoordinates?.y === cell.y;
   }
 
+  protected isHighlightedPlanet(planet: ClientPlanetDto): boolean {
+    return this.selectedPlanetZ !== null && planet.coordinates.z === this.selectedPlanetZ;
+  }
+
   private selectCell(cell: GalacticCellVm, options: SelectCellOptions = {}): void {
     this.selectedCell = cell;
+    this.selectedPlanetZ = options.focusPlanetZ ?? null;
     this.selectedSystem = null;
     this.selectedSystemPlanets = [];
     this.selectedSystemError = null;
@@ -625,11 +645,15 @@ export class GalacticViewComponent implements OnInit {
                   }
                 }
               });
+            } else if (this.applyRouteFocusIfPossible()) {
+              // Route focus handled.
             }
           } else if (options.autoSelectHomeSystem) {
-            this.autoSelectHomeSystem(() => {
-              this.tutorialService.autoOpenTutorial('galacticView');
-            });
+            if (!this.applyRouteFocusIfPossible()) {
+              this.autoSelectHomeSystem(() => {
+                this.tutorialService.autoOpenTutorial('galacticView');
+              });
+            }
           }
 
           this.cdr.markForCheck();
@@ -694,6 +718,49 @@ export class GalacticViewComponent implements OnInit {
     }
 
     this.selectCell(homeCell, { onSettled });
+  }
+
+  private applyRouteFocusIfPossible(): boolean {
+    if (!this.pendingRouteFocus) {
+      return false;
+    }
+
+    const targetCell = this.grid[this.pendingRouteFocus.y]?.[this.pendingRouteFocus.x] ?? null;
+    if (!targetCell) {
+      return false;
+    }
+
+    this.selectCell(targetCell, {
+      focusPlanetZ: this.pendingRouteFocus.z
+    });
+    return true;
+  }
+
+  private parseRouteFocus(query: { x: string | null; y: string | null; z: string | null }): { x: number; y: number; z: number | null } | null {
+    const x = this.parseQueryCoordinate(query.x);
+    const y = this.parseQueryCoordinate(query.y);
+    if (x === null || y === null) {
+      return null;
+    }
+
+    return {
+      x,
+      y,
+      z: this.parseQueryCoordinate(query.z)
+    };
+  }
+
+  private parseQueryCoordinate(value: string | null): number | null {
+    if (value === null || value.trim().length <= 0) {
+      return null;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      return null;
+    }
+
+    return parsed;
   }
 
   private resolveHomeSystemCoordinates(

@@ -94,7 +94,18 @@
                   </div>
                   <div class="reports-view__item-meta">
                     <span>Turn {{ report.createdTurn }}</span>
-                    <span>{{ coordinatesLabel(report) }}</span>
+                    <span>
+                      @if (canOpenInGalaxy(report)) {
+                        <button
+                          class="reports-view__coordinate-link"
+                          type="button"
+                          (click)="openInGalaxy(report, $event)">
+                          {{ coordinatesLabel(report) }}
+                        </button>
+                      } @else {
+                        <span>{{ coordinatesLabel(report) }}</span>
+                      }
+                    </span>
                     <span>{{ report.isRead ? 'Read' : 'Unread' }}</span>
                   </div>
                 </div>
@@ -146,7 +157,18 @@
             </div>
             <div class="overview-stat">
               <span class="overview-stat__label">Coordinates</span>
-              <span class="overview-stat__value">{{ coordinatesLabel(report) }}</span>
+              <span class="overview-stat__value">
+                @if (canOpenInGalaxy(report)) {
+                  <button
+                    class="reports-view__coordinate-link"
+                    type="button"
+                    (click)="openInGalaxy(report)">
+                    {{ coordinatesLabel(report) }}
+                  </button>
+                } @else {
+                  <span>{{ coordinatesLabel(report) }}</span>
+                }
+              </span>
             </div>
             <div class="overview-stat">
               <span class="overview-stat__label">Sender</span>

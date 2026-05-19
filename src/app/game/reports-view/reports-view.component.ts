@@ -1,4 +1,5 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
@@ -48,7 +49,8 @@ export class ReportsViewComponent implements OnInit {
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
     private readonly tutorialService: TutorialService,
-    private readonly authState: AuthStateService
+    private readonly authState: AuthStateService,
+    private readonly router: Router
   ) {}
 
   public ngOnInit(): void {
@@ -163,6 +165,30 @@ export class ReportsViewComponent implements OnInit {
 
   protected canPreviewLocation(report: PlayerReport | null): boolean {
     return !!report?.sourceCoordinates && report.sourceCoordinates.z >= 0;
+  }
+
+  protected canOpenInGalaxy(report: PlayerReport | null): boolean {
+    return !!report?.sourceCoordinates
+      && report.sourceCoordinates.x >= 0
+      && report.sourceCoordinates.y >= 0;
+  }
+
+  protected openInGalaxy(report: PlayerReport | null, event?: Event): void {
+    event?.stopPropagation();
+    if (!report || !this.canOpenInGalaxy(report) || !report.sourceCoordinates) {
+      return;
+    }
+
+    void this.router.navigate(
+      ['/game/galactic'],
+      {
+        queryParams: {
+          x: report.sourceCoordinates.x,
+          y: report.sourceCoordinates.y,
+          z: report.sourceCoordinates.z
+        }
+      }
+    );
   }
 
   protected previewLocation(report: PlayerReport | null): void {

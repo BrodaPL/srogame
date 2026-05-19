@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { catchError, finalize, forkJoin, of } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
@@ -25,6 +25,12 @@ import { calculateRecycleCapabilityForManyShips } from '../../models/recycling/r
 import { maxActiveFleets } from '../../models/tech/technology-effects';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
+
+type CoordinateSegmentVm = {
+  coordinates: { x: number; y: number; z: number };
+  ownerName: string | null;
+  relation: string;
+};
 
 @Component({
   selector: 'app-operations-view',
@@ -61,7 +67,8 @@ export class OperationsViewComponent implements OnInit {
     private readonly gameState: GameStateService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly tutorialService: TutorialService
+    private readonly tutorialService: TutorialService,
+    private readonly router: Router
   ) {}
 
   public ngOnInit(): void {
@@ -129,6 +136,22 @@ export class OperationsViewComponent implements OnInit {
     return this.coordinatesRelation(coordinates);
   }
 
+  protected currentLocationSegments(fleet: Fleet): CoordinateSegmentVm[] {
+    if (fleet.state === FleetState.PENDING_JUMP_GATE) {
+      return [this.toCoordinateSegment(fleet.origin)];
+    }
+
+    if (this.isRecalledInTransit(fleet)) {
+      return [
+        this.toCoordinateSegment(fleet.origin),
+        this.toCoordinateSegment(fleet.target)
+      ];
+    }
+
+    const coordinates = this.usesOriginCoordinates(fleet.state) ? fleet.origin : fleet.target;
+    return [this.toCoordinateSegment(coordinates)];
+  }
+
   protected destinationPlanetName(fleet: Fleet): string {
     switch (fleet.state) {
       case FleetState.PENDING_JUMP_GATE:
@@ -169,6 +192,33 @@ export class OperationsViewComponent implements OnInit {
       default:
         return this.coordinatesRelation(fleet.target);
     }
+  }
+
+  protected destinationSegments(fleet: Fleet): CoordinateSegmentVm[] {
+    switch (fleet.state) {
+      case FleetState.PENDING_JUMP_GATE:
+        return [this.toCoordinateSegment(fleet.target)];
+      case FleetState.RETURNING:
+      case FleetState.MISSION_FAILURE_RETURNING:
+        return [this.toCoordinateSegment(fleet.origin)];
+      case FleetState.ORBITING:
+        return this.currentLocationSegments(fleet);
+      default:
+        return [this.toCoordinateSegment(fleet.target)];
+    }
+  }
+
+  protected openCoordinatesInGalaxy(coordinates: { x: number; y: number; z: number }): void {
+    void this.router.navigate(
+      ['/game/galactic'],
+      {
+        queryParams: {
+          x: coordinates.x,
+          y: coordinates.y,
+          z: coordinates.z
+        }
+      }
+    );
   }
 
   protected missionLabel(fleet: Fleet): string {
@@ -720,6 +770,15 @@ export class OperationsViewComponent implements OnInit {
       default:
         return 'none';
     }
+  }
+
+  private toCoordinateSegment(coordinates: { x: number; y: number; z: number }): CoordinateSegmentVm {
+    const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
+    return {
+      coordinates,
+      ownerName: ownerInfo?.ownerName ?? null,
+      relation: this.coordinatesRelation(coordinates)
+    };
   }
 
   private coordinatesKey(coordinates: { x: number; y: number; z: number }): string {
