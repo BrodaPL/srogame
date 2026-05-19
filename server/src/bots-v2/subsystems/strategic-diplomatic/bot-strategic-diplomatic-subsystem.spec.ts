@@ -41,6 +41,22 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     )).toBe(false);
   });
 
+  it('does not emit outgoing diplomacy proposals against undiscovered factions', () => {
+    const { galaxy, bot, botPlanet, playerEnemy } = createStrategicDiplomaticWorld();
+    bot.botProfileId = 'BALANCED';
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 20);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const diplomacyProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
+    );
+
+    expect(diplomacyProposal).toBeUndefined();
+  });
+
   it('prefers peace-oriented diplomatic changes for miner profile', () => {
     const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     bot.botProfileId = 'MINER';

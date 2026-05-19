@@ -1383,7 +1383,9 @@ function createRelationChangeProposals(
 
   for (const faction of factions) {
     if (
-      faction.faction.pendingIncomingDiplomacyProposals.length > 0
+      faction.faction.knownPlanetCount <= 0
+      || faction.faction.knownPlanets.length <= 0
+      || faction.faction.pendingIncomingDiplomacyProposals.length > 0
       || faction.faction.pendingOutgoingDiplomacyProposals.length > 0
     ) {
       continue;
