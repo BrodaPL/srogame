@@ -176,7 +176,84 @@ describe('bot supervisor commitments', () => {
           target: { x: 1, y: 0, z: 1 },
           ships: [{ type: ShipType.COLONIZER, undamagedAmount: 1, damagedAmount: 0 }],
           carriedBombs: [],
-          cargo: { metal: 0, crystal: 0, deuterium: 1 },
+          cargo: { metal: 200, crystal: 120, deuterium: 80 },
+          useJumpGate: false,
+          bombardmentPriorities: null
+        }
+      })]
+    );
+
+    expect(decision.accepted).toHaveLength(0);
+    expect(decision.pending).toHaveLength(1);
+    expect(decision.pending[0]?.proposalId).toBe('fleet');
+  });
+
+  it('reserves colonize deuterium ahead of lower-priority queue spending', () => {
+    const memory = createDefaultBotMemoryV2();
+    memory.supervisor.pendingCommitments.push({
+      commitmentKey: 'colonize',
+      dedupeKey: 'fleet:Colonize',
+      proposalId: 'fleet',
+      subsystemId: 'STRATEGIC_DEVELOPMENT',
+      kind: 'FLEET_MISSION',
+      targetCoordinates: { x: 1, y: 0, z: 1 },
+      requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      weightedResourceValue: 0,
+      score: 500,
+      status: 'PENDING_RESOURCES',
+      createdTurn: 1,
+      updatedTurn: 1,
+      expiresOnTurn: 6,
+      executionPayload: {
+        missionType: FleetMissionType.COLONIZE,
+        origin: { x: 0, y: 0, z: 1 },
+        target: { x: 1, y: 0, z: 1 },
+        ships: [{ type: ShipType.COLONIZER, undamagedAmount: 1, damagedAmount: 0 }],
+        carriedBombs: [],
+        cargo: { metal: 200, crystal: 120, deuterium: 80 },
+        useJumpGate: false,
+        bombardmentPriorities: null
+      },
+      cancelReason: null
+    });
+
+    const decision = createSupervisor().decide(
+      createSnapshot(
+        { metal: 400, crystal: 400, deuterium: 200 },
+        {
+          ships: { [ShipType.COLONIZER]: 1 }
+        }
+      ),
+      memory,
+      [createBuildingProposal({
+        proposalId: 'deuterium-build',
+        requestedResources: { metal: 10, crystal: 10, deuterium: 150 }
+      })]
+    );
+
+    expect(decision.accepted.some((proposal) => proposal.proposalId === 'deuterium-build')).toBe(false);
+    expect(decision.pending.some((proposal) => proposal.proposalId === 'deuterium-build')).toBe(true);
+  });
+
+  it('rejects non-colonize fleets that lack enough deuterium for cargo and fuel', () => {
+    const decision = createSupervisor().decide(
+      createSnapshot(
+        { metal: 0, crystal: 0, deuterium: 1 },
+        {
+          activeFleetCount: 0,
+          maxActiveFleetCount: 3,
+          ships: { [ShipType.TRANSPORTER]: 1 }
+        }
+      ),
+      createDefaultBotMemoryV2(),
+      [createFleetProposal(FleetMissionType.TRANSPORT, ShipType.TRANSPORTER, {
+        requestPayload: {
+          missionType: FleetMissionType.TRANSPORT,
+          origin: { x: 0, y: 0, z: 1 },
+          target: { x: 1, y: 0, z: 1 },
+          ships: [{ type: ShipType.TRANSPORTER, undamagedAmount: 1, damagedAmount: 0 }],
+          carriedBombs: [],
+          cargo: { metal: 0, crystal: 0, deuterium: 10 },
           useJumpGate: false,
           bombardmentPriorities: null
         }

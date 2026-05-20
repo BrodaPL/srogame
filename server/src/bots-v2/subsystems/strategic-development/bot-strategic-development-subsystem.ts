@@ -138,6 +138,9 @@ const MAX_BUILDING_GOALS_PER_PLANET = 2;
 const MAX_PRODUCTION_GOALS_PER_PLANET = 2;
 const LOW_INDUSTRY_REPAIR_DRONE_THRESHOLD = 2.5;
 const STRATEGIC_DEVELOPMENT_AVAILABILITY = 0.4;
+const NANITE_BONUS_FACTOR = 1.22;
+const ROBOTICS_PENALTY_FACTOR = 1.12;
+const COLONIZER_IDLE_CAP = 1;
 
 export class BotStrategicDevelopmentSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DEVELOPMENT' as const;
@@ -582,6 +585,12 @@ function hasPendingColonizationPlan(context: BotSubsystemContext): boolean {
   return context.snapshot.empire.activeColonizeFleetCount > 0;
 }
 
+function resolveIdleColonizerCount(context: BotSubsystemContext): number {
+  const totalColonizers = context.snapshot.planets.reduce((sum, planet) =>
+    sum + Math.max(0, planet.ships.installedCountByType[ShipType.COLONIZER] ?? 0), 0);
+  return Math.max(0, totalColonizers - context.snapshot.empire.activeColonizeFleetCount);
+}
+
 function resolveAdaptiveTechnologyLevel(context: BotSubsystemContext): number {
   return Math.max(
     0,
@@ -709,17 +718,20 @@ function resolveColonizerBootstrapCargo(
   // 3. richer colonizer-source selection
   // 4. longer-run trace tuning on real saves
   const colonizerCargoCapacity = SHIP_BLUEPRINTS.get(ShipType.COLONIZER)?.cargoCapacity ?? 0;
-  const bootstrapCargoCapacity = Math.min(400, Math.max(0, colonizerCargoCapacity));
-  if (bootstrapCargoCapacity <= 0) {
+  const targetCargo = {
+    metal: 200,
+    crystal: 120,
+    deuterium: 80
+  };
+  if (colonizerCargoCapacity <= 0) {
     return emptyResources();
   }
 
-  const perResourceAmount = Math.floor(bootstrapCargoCapacity / 3);
   return {
-    metal: Math.min(perResourceAmount, originPlanet.localResources.metal),
-    crystal: Math.min(perResourceAmount, originPlanet.localResources.crystal),
+    metal: Math.min(targetCargo.metal, originPlanet.localResources.metal),
+    crystal: Math.min(targetCargo.crystal, originPlanet.localResources.crystal),
     deuterium: Math.min(
-      perResourceAmount,
+      targetCargo.deuterium,
       Math.max(0, originPlanet.localResources.deuterium - fuelCost)
     )
   };
@@ -788,7 +800,12 @@ function evaluateBuildingGoal(
   }
 
   const bonusFactor = resolveBuildingBonusFactor(planet, buildingType);
-  const weightedEtc = totalEtc / bonusFactor;
+  const roboticsPenaltyMultiplier = immediateRequest.kind === 'BUILDING'
+    && immediateRequest.buildingType === BuildingType.ROBOTICS_FACTORY
+    && shouldPenalizeFurtherRobotics(planet)
+    ? ROBOTICS_PENALTY_FACTOR
+    : 1;
+  const weightedEtc = (totalEtc / bonusFactor) * roboticsPenaltyMultiplier;
 
   return {
     goalKey: `strategic-development:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:building:${buildingType}:${desiredLevel}`,
@@ -816,6 +833,7 @@ function evaluateBuildingGoal(
       bonusFactor: roundToTwoDecimals(bonusFactor),
       buildingType,
       goalFamily: 'BUILDING',
+      roboticsPenaltyMultiplier: roundToTwoDecimals(roboticsPenaltyMultiplier),
       totalEtc: roundToTwoDecimals(totalEtc),
       weightedEtc: roundToTwoDecimals(weightedEtc)
     }
@@ -1406,6 +1424,10 @@ function resolveBuildingBonusFactor(
 ): number {
   let bonusFactor = 1;
 
+  if (buildingType === BuildingType.NANITE_FACTORY) {
+    bonusFactor *= NANITE_BONUS_FACTOR;
+  }
+
   if (buildingType === BuildingType.INTERSTELLAR_TRADE_PORT) {
     const maxModifier = Math.max(planet.modifiers.metal, planet.modifiers.crystal, planet.modifiers.deuterium);
     const minModifier = Math.min(planet.modifiers.metal, planet.modifiers.crystal, planet.modifiers.deuterium);
@@ -1421,6 +1443,13 @@ function resolveBuildingBonusFactor(
   }
 
   return Math.min(BONUS_FACTOR_CEILING, Math.max(1, bonusFactor));
+}
+
+function shouldPenalizeFurtherRobotics(planet: BotPlanetSnapshot): boolean {
+  const roboticsLevel = planet.economy.roboticsLevel;
+  const shipyardLevel = planet.economy.shipyardLevel;
+  const naniteLevel = planet.economy.naniteLevel;
+  return naniteLevel > 0 || (roboticsLevel >= 4 && shipyardLevel >= 3);
 }
 
 function resolveProductionBonusFactor(
@@ -1467,6 +1496,7 @@ function isProductionShipEligible(
 
   if (shipType === ShipType.COLONIZER) {
     return planet.defense.avgIndustryLevel >= threshold
+      && resolveIdleColonizerCount(context) < COLONIZER_IDLE_CAP
       && canColonizeMorePlanets(context, planet);
   }
 

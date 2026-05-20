@@ -226,8 +226,29 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     expect(colonizeProposal).toBeDefined();
     expect(colonizeProposal?.requestPayload.origin).toEqual({ x: 0, y: 0, z: 1 });
     expect(colonizeProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 3 });
-    expect(colonizeProposal?.requestPayload.cargo).toEqual({ metal: 133, crystal: 133, deuterium: 133 });
+    expect(colonizeProposal?.requestPayload.cargo).toEqual({ metal: 200, crystal: 120, deuterium: 80 });
     randomSpy.mockRestore();
+  });
+
+  it('does not consider more colonizer production while one idle colonizer already exists', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseStrategicDevelopmentPlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 5);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 2);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
+    setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
+    planet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.goals?.some((goal) => goal.finalShipType === ShipType.COLONIZER)).toBe(false);
   });
 
   it('does not emit a colonize mission while an active colonize fleet already exists', () => {

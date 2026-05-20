@@ -90,6 +90,10 @@ const MAX_PLUNDER_ESCORTS = 2;
 const DEFAULT_ESCORT_SHIP_NEED = 1;
 const MAX_SHIP_NEED_PROPOSALS = 6;
 const BREAK_MISSION_SHARE = 0.6;
+const POST_EARLY_NEUTRAL_WARFARE_AVG_INDUSTRY_THRESHOLD = 4;
+const POST_EARLY_BREAK_SCORE_BONUS = 120;
+const POST_EARLY_PLUNDER_SCORE_MULTIPLIER = 1.35;
+const POST_EARLY_SHIP_NEED_SCORE_BONUS = 110;
 
 export class BotStrategicMilitarySubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_MILITARY' as const;
@@ -303,7 +307,12 @@ function createBreakMissionRequest(
       expectedLoot: 0,
       travelDistance: distance,
       travelTurns,
-      score: Math.max(1, 600 + Math.round((targetStrength * 2) - (travelTurns * 8) - Math.max(0, selection.combatStrength - requiredStrength))),
+      score: Math.max(
+        1,
+        600
+        + Math.round((targetStrength * 2) - (travelTurns * 8) - Math.max(0, selection.combatStrength - requiredStrength))
+        + resolvePostEarlyNeutralAttackScoreBonus(originPlanet)
+      ),
       stagingPlanet: null,
       moveRole: null
     });
@@ -405,7 +414,10 @@ function createPlunderMissionRequest(
       expectedLoot: estimatedLoot,
       travelDistance: distance,
       travelTurns,
-      score: Math.max(1, Math.round(estimatedLoot - (travelTurns * 6))),
+      score: Math.max(
+        1,
+        Math.round((estimatedLoot - (travelTurns * 6)) * resolvePostEarlyPlunderScoreMultiplier(originPlanet))
+      ),
       stagingPlanet: null,
       moveRole: null
     });
@@ -836,7 +848,7 @@ function createBreakShipNeed(
       shortageKind: 'BOMBARDMENT',
       targetCoordinates: { ...target.coordinates },
       preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
-      score: 500 + requiredStrength,
+      score: 500 + requiredStrength + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
       reason: 'Need a bombardment-capable ship to break neutral defenses.'
     };
   }
@@ -853,7 +865,7 @@ function createBreakShipNeed(
     shortageKind: 'COMBAT',
     targetCoordinates: { ...target.coordinates },
     preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
-    score: 420 + requiredStrength,
+    score: 420 + requiredStrength + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
     reason: 'Need more combat ships to clear neutral defenders.'
   };
 }
@@ -883,7 +895,7 @@ function createPlunderShipNeed(
       shortageKind: 'COMBAT',
       targetCoordinates: { ...target.coordinates },
       preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
-      score: 260 + maxFullLoot,
+      score: 260 + maxFullLoot + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
       reason: 'Need an escort ship for repeatable neutral-farm plunder.'
     };
   }
@@ -904,7 +916,7 @@ function createPlunderShipNeed(
     shortageKind: 'CARGO',
     targetCoordinates: { ...target.coordinates },
     preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
-    score: 240 + maxFullLoot,
+    score: 240 + maxFullLoot + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
     reason: 'Need more cargo capacity to plunder opened neutral farms efficiently.'
   };
 }
@@ -1217,6 +1229,22 @@ function resolveMissionRequestCap(context: BotSubsystemContext): number {
     Math.floor(context.snapshot.empire.imperiumFleetCap * STRATEGIC_MILITARY_AVAILABILITY)
       + context.snapshot.empire.ownedPlanetCount
   );
+}
+
+function isPostEarlyNeutralWarfarePlanet(planet: BotPlanetSnapshot | null): boolean {
+  return (planet?.defense.avgIndustryLevel ?? 0) > POST_EARLY_NEUTRAL_WARFARE_AVG_INDUSTRY_THRESHOLD;
+}
+
+function resolvePostEarlyNeutralAttackScoreBonus(planet: BotPlanetSnapshot): number {
+  return isPostEarlyNeutralWarfarePlanet(planet) ? POST_EARLY_BREAK_SCORE_BONUS : 0;
+}
+
+function resolvePostEarlyPlunderScoreMultiplier(planet: BotPlanetSnapshot): number {
+  return isPostEarlyNeutralWarfarePlanet(planet) ? POST_EARLY_PLUNDER_SCORE_MULTIPLIER : 1;
+}
+
+function resolvePostEarlyNeutralShipNeedScoreBonus(planet: BotPlanetSnapshot | null): number {
+  return isPostEarlyNeutralWarfarePlanet(planet) ? POST_EARLY_SHIP_NEED_SCORE_BONUS : 0;
 }
 
 function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: TechnologyType): number {

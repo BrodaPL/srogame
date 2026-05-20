@@ -6,6 +6,9 @@ import {
   type BotProfileId,
   type Player
 } from '../src/app/models/player.js';
+import { DiplomaticProposalState } from '../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import { GameType } from '../src/app/models/enums/game-type.js';
+import { ReportType } from '../src/app/models/enums/report-type.js';
 import {
   createEmptyBotProfileCounts,
   normalizeGalaxySetup,
@@ -30,7 +33,8 @@ import {
   type HydratedGameSave
 } from '../server/src/game-save.js';
 
-type SimulationScenarioKey = 'initial' | 'advanced';
+type SimulationScenarioKey = 'initial' | 'advanced' | 'benchmark20x20';
+type SimulationLogMode = 'full' | 'compact' | 'summary';
 
 type SimulationScenario = {
   key: SimulationScenarioKey;
@@ -39,11 +43,13 @@ type SimulationScenario = {
   height: number;
   turns: number;
   seed: number;
+  defaultLogMode: SimulationLogMode;
   setup: GalaxySetup;
 };
 
 type SimulationCliOptions = {
   scenario: SimulationScenarioKey;
+  logModeOverride: SimulationLogMode | null;
   turnsOverride: number | null;
   seedOverride: number | null;
   saveId: string | null;
@@ -102,6 +108,7 @@ type SimulationAnomalyReport = {
 type SimulationSummary = {
   scenario: SimulationScenarioKey;
   description: string;
+  logMode: SimulationLogMode;
   seed: number;
   startedAt: string;
   finishedAt: string;
@@ -128,10 +135,64 @@ type SimulationSummary = {
   }>;
   artifactPaths: {
     summaryJson: string;
-    tracesJsonl: string;
-    turnSummaryJsonl: string;
+    tracesJsonl: string | null;
+    turnSummaryJsonl: string | null;
     anomaliesJson: string;
+    finalStateSummaryJson: string;
+    battleSummaryJson: string;
   };
+};
+
+type FinalStateSummary = {
+  scenario: SimulationScenarioKey;
+  seed: number;
+  finalTurn: number;
+  galaxyName: string;
+  activeFleetCount: number;
+  players: Array<{
+    playerId: number;
+    playerName: string;
+    profileId: BotProfileId | null;
+    planetsOwned: number;
+    activeFleetCount: number;
+    techLevels: Record<string, number>;
+    totalShips: Record<string, number>;
+    totalDefences: Record<string, number>;
+    planets: Array<{
+      name: string;
+      coordinates: { x: number; y: number; z: number };
+      size: number;
+      resources: { metal: number; crystal: number; deuterium: number };
+      buildings: Record<string, number>;
+      ships: Record<string, number>;
+      defences: Record<string, number>;
+    }>;
+  }>;
+};
+
+type BattleSummary = {
+  scenario: SimulationScenarioKey;
+  seed: number;
+  finalTurn: number;
+  totalUniqueEvents: number;
+  countsByCategory: Record<string, number>;
+  events: Array<{
+    eventKey: string;
+    category: 'BATTLE' | 'BOMBARDMENT' | 'PLUNDER';
+    reportType: string;
+    createdTurn: number;
+    title: string;
+    senderPlayerName: string | null;
+    sourcePlanetName: string | null;
+    sourceSystemName: string | null;
+    sourceCoordinates: { x: number; y: number; z: number } | null;
+    observers: Array<{
+      playerId: number;
+      playerName: string;
+      profileId: BotProfileId | null;
+    }>;
+    body: string;
+  }>;
 };
 
 type SimulationContext = {
@@ -158,6 +219,7 @@ const SCENARIOS: Record<SimulationScenarioKey, SimulationScenario> = {
     height: 10,
     turns: 20,
     seed: 2026051701,
+    defaultLogMode: 'full',
     setup: createScenarioSetup(10, 10)
   },
   advanced: {
@@ -167,7 +229,18 @@ const SCENARIOS: Record<SimulationScenarioKey, SimulationScenario> = {
     height: 12,
     turns: 100,
     seed: 2026051702,
+    defaultLogMode: 'full',
     setup: createScenarioSetup(12, 12)
+  },
+  benchmark20x20: {
+    key: 'benchmark20x20',
+    description: '170-turn bot-only benchmark on a 20x20 galaxy with 5% neutral bots, star modifier -1..3, 5% voids, medium homeworlds, and low starting resources.',
+    width: 20,
+    height: 20,
+    turns: 170,
+    seed: 2026052001,
+    defaultLogMode: 'compact',
+    setup: createBenchmark20x20Setup()
   }
 };
 
@@ -178,7 +251,7 @@ function createScenarioSetup(width: number, height: number): GalaxySetup {
   }
 
   return normalizeGalaxySetup({
-    gameType: 'Sandbox',
+    gameType: GameType.SANDBOX,
     galaxyName: `Bot V2 Sim ${width}x${height}`,
     galaxyWidth: width,
     galaxyHeight: height,
@@ -204,9 +277,43 @@ function createScenarioSetup(width: number, height: number): GalaxySetup {
   });
 }
 
+function createBenchmark20x20Setup(): GalaxySetup {
+  const botProfileCounts = createEmptyBotProfileCounts();
+  for (const profileId of BOT_PROFILE_IDS) {
+    botProfileCounts[profileId] = 1;
+  }
+
+  return normalizeGalaxySetup({
+    gameType: GameType.SANDBOX,
+    galaxyName: 'Bot V2 Benchmark 20x20',
+    galaxyWidth: 20,
+    galaxyHeight: 20,
+    galaxyCenterSize: 10,
+    voidChance: 5,
+    starsAmountModifier: [-1, 3],
+    playerAmount: 1,
+    botsAmount: BOT_PROFILE_IDS.length - 1,
+    botDifficulty: 25,
+    botProfileCounts,
+    neutralBotsAmount: 5,
+    neutralBotsDifficulty: 0,
+    autoSaveTurns: 0,
+    startingHomeworldPreset: StartingHomeworldPreset.MEDIUM,
+    createRandomPlanets: false,
+    createStartingShips: false,
+    skipTutorial: true,
+    startingResources: {
+      metal: 200,
+      crystal: 150,
+      deuterium: 100
+    }
+  });
+}
+
 async function main(): Promise<void> {
   const options = parseCliOptions(process.argv.slice(2));
   const scenario = SCENARIOS[options.scenario];
+  const logMode = options.logModeOverride ?? scenario.defaultLogMode;
   const turnLimit = options.turnsOverride ?? scenario.turns;
   const seed = options.seedOverride ?? scenario.seed;
   const outputDir = options.outputDir
@@ -228,8 +335,15 @@ async function main(): Promise<void> {
     repeatedPendingProposalIds: [],
     repeatedDedupeKeys: []
   };
-  const rawTraces: BotDecisionTraceV2[] = [];
-  const compactTurnTraces: CompactTurnTrace[] = [];
+  const artifactPaths = {
+    summaryJson: path.join(outputDir, 'summary.json'),
+    tracesJsonl: logMode === 'full' ? path.join(outputDir, 'traces.jsonl') : null,
+    turnSummaryJsonl: logMode !== 'summary' ? path.join(outputDir, 'turn-summary.jsonl') : null,
+    anomaliesJson: path.join(outputDir, 'anomalies.json'),
+    finalStateSummaryJson: path.join(outputDir, 'final-state-summary.json'),
+    battleSummaryJson: path.join(outputDir, 'battle-summary.json')
+  };
+  initializeJsonlArtifacts(artifactPaths.tracesJsonl, artifactPaths.turnSummaryJsonl);
   const acceptedActionCounts = new Map<number, number>();
   const pendingProposalCounts = new Map<string, number>();
   const dedupeKeyCounts = new Map<string, number>();
@@ -252,7 +366,6 @@ async function main(): Promise<void> {
         recordMissingTraceTurn(anomalies, context.contenders, activeTurn, tracesForTurn);
 
         for (const trace of tracesForTurn) {
-          rawTraces.push(trace);
           acceptedActions += trace.supervisorDecision.acceptedProposalIds.length;
           pendingActions += trace.supervisorDecision.pendingProposalIds.length;
           rejectedActions += trace.supervisorDecision.rejectedCount;
@@ -300,7 +413,7 @@ async function main(): Promise<void> {
             }
           }
 
-          compactTurnTraces.push({
+          const compactTurnTrace: CompactTurnTrace = {
             turn: trace.turn,
             playerId: trace.playerId,
             playerName: trace.playerName,
@@ -316,7 +429,9 @@ async function main(): Promise<void> {
               failureCount: trace.executionOutcomes.filter((entry) => !entry.success).length,
               commandErrorCodes: executionErrorCodes
             }
-          });
+          };
+
+          appendTurnArtifacts(logMode, artifactPaths, trace, compactTurnTrace);
         }
 
         const resolvedTurnNumber = context.galaxy.currentTurn + 1;
@@ -366,20 +481,22 @@ async function main(): Promise<void> {
     successfulExecutions,
     acceptedActionCounts
   );
-
-  const artifactPaths = {
-    summaryJson: path.join(outputDir, 'summary.json'),
-    tracesJsonl: path.join(outputDir, 'traces.jsonl'),
-    turnSummaryJsonl: path.join(outputDir, 'turn-summary.jsonl'),
-    anomaliesJson: path.join(outputDir, 'anomalies.json')
-  };
-  writeJsonl(artifactPaths.tracesJsonl, rawTraces);
-  writeJsonl(artifactPaths.turnSummaryJsonl, compactTurnTraces);
   fs.writeFileSync(artifactPaths.anomaliesJson, `${JSON.stringify(anomalies, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(
+    artifactPaths.finalStateSummaryJson,
+    `${JSON.stringify(buildFinalStateSummary(scenario.key, seed, context), null, 2)}\n`,
+    'utf8'
+  );
+  fs.writeFileSync(
+    artifactPaths.battleSummaryJson,
+    `${JSON.stringify(buildBattleSummary(scenario.key, seed, context.contenders, context.galaxy.currentTurn), null, 2)}\n`,
+    'utf8'
+  );
 
   const summary: SimulationSummary = {
     scenario: scenario.key,
     description: scenario.description,
+    logMode,
     seed,
     startedAt,
     finishedAt: new Date().toISOString(),
@@ -549,21 +666,48 @@ function expirePendingDiplomaticProposalsForSimulation(
   resolvedTurnNumber: number
 ): void {
   for (const proposal of galaxy.diplomaticProposals) {
-    if (proposal.state !== 'PENDING' || proposal.expiresOnTurn > resolvedTurnNumber) {
+    if (proposal.state !== DiplomaticProposalState.PENDING || proposal.expiresOnTurn > resolvedTurnNumber) {
       continue;
     }
-    proposal.state = 'EXPIRED';
+    proposal.state = DiplomaticProposalState.EXPIRED;
   }
 }
 
-function writeJsonl(filePath: string, entries: unknown[]): void {
-  const lines = entries.map((entry) => JSON.stringify(entry));
-  fs.writeFileSync(filePath, `${lines.join('\n')}\n`, 'utf8');
+function initializeJsonlArtifacts(...filePaths: Array<string | null>): void {
+  for (const filePath of filePaths) {
+    if (!filePath) {
+      continue;
+    }
+    fs.writeFileSync(filePath, '', 'utf8');
+  }
+}
+
+function appendJsonlEntry(filePath: string | null, entry: unknown): void {
+  if (!filePath) {
+    return;
+  }
+  fs.appendFileSync(filePath, `${JSON.stringify(entry)}\n`, 'utf8');
+}
+
+function appendTurnArtifacts(
+  logMode: SimulationLogMode,
+  artifactPaths: SimulationSummary['artifactPaths'],
+  trace: BotDecisionTraceV2,
+  compactTurnTrace: CompactTurnTrace
+): void {
+  if (logMode === 'full') {
+    appendJsonlEntry(artifactPaths.tracesJsonl, trace);
+  }
+
+  if (logMode !== 'summary') {
+    appendJsonlEntry(artifactPaths.turnSummaryJsonl, compactTurnTrace);
+  }
 }
 
 function printConsoleSummary(summary: SimulationSummary, anomalies: SimulationAnomalyReport): void {
   console.log(`Scenario: ${summary.scenario}`);
   console.log(`Description: ${summary.description}`);
+  console.log(`Log mode: ${summary.logMode}`);
   console.log(`Seed: ${summary.seed}`);
   console.log(`Turns: ${summary.turnsCompleted}/${summary.turnsRequested}`);
   console.log(`Bots: ${summary.botCount}`);
@@ -573,13 +717,16 @@ function printConsoleSummary(summary: SimulationSummary, anomalies: SimulationAn
   console.log(`Hard failures: ${anomalies.hardFailures.length}`);
   console.log(`Activity failures: ${anomalies.activityFailures.length}`);
   console.log(`Summary: ${summary.artifactPaths.summaryJson}`);
-  console.log(`Traces: ${summary.artifactPaths.tracesJsonl}`);
-  console.log(`Turn summaries: ${summary.artifactPaths.turnSummaryJsonl}`);
+  console.log(`Traces: ${summary.artifactPaths.tracesJsonl ?? '(disabled)'}`);
+  console.log(`Turn summaries: ${summary.artifactPaths.turnSummaryJsonl ?? '(disabled)'}`);
   console.log(`Anomalies: ${summary.artifactPaths.anomaliesJson}`);
+  console.log(`Final state: ${summary.artifactPaths.finalStateSummaryJson}`);
+  console.log(`Battle summary: ${summary.artifactPaths.battleSummaryJson}`);
 }
 
 function parseCliOptions(args: string[]): SimulationCliOptions {
   let scenario: SimulationScenarioKey = 'initial';
+  let logModeOverride: SimulationLogMode | null = null;
   let turnsOverride: number | null = null;
   let seedOverride: number | null = null;
   let saveId: string | null = null;
@@ -589,10 +736,18 @@ function parseCliOptions(args: string[]): SimulationCliOptions {
   for (const arg of args) {
     if (arg.startsWith('--scenario=')) {
       const rawScenario = arg.slice('--scenario='.length).trim() as SimulationScenarioKey;
-      if (rawScenario !== 'initial' && rawScenario !== 'advanced') {
-        throw new Error(`Unknown scenario '${rawScenario}'. Use --scenario=initial or --scenario=advanced.`);
+      if (rawScenario !== 'initial' && rawScenario !== 'advanced' && rawScenario !== 'benchmark20x20') {
+        throw new Error(`Unknown scenario '${rawScenario}'. Use --scenario=initial, --scenario=advanced, or --scenario=benchmark20x20.`);
       }
       scenario = rawScenario;
+      continue;
+    }
+    if (arg.startsWith('--log-mode=')) {
+      const rawLogMode = arg.slice('--log-mode='.length).trim() as SimulationLogMode;
+      if (rawLogMode !== 'full' && rawLogMode !== 'compact' && rawLogMode !== 'summary') {
+        throw new Error(`Unknown log mode '${rawLogMode}'. Use --log-mode=full, --log-mode=compact, or --log-mode=summary.`);
+      }
+      logModeOverride = rawLogMode;
       continue;
     }
     if (arg.startsWith('--turns=')) {
@@ -621,6 +776,7 @@ function parseCliOptions(args: string[]): SimulationCliOptions {
 
   return {
     scenario,
+    logModeOverride,
     turnsOverride,
     seedOverride,
     saveId,
@@ -646,6 +802,183 @@ function timestampSlug(): string {
   const minutes = `${now.getMinutes()}`.padStart(2, '0');
   const seconds = `${now.getSeconds()}`.padStart(2, '0');
   return `${year}${month}${day}-${hours}${minutes}${seconds}`;
+}
+
+function buildFinalStateSummary(
+  scenario: SimulationScenarioKey,
+  seed: number,
+  context: SimulationContext
+): FinalStateSummary {
+  return {
+    scenario,
+    seed,
+    finalTurn: context.galaxy.currentTurn,
+    galaxyName: context.galaxy.name,
+    activeFleetCount: context.galaxy.activeFleets.length,
+    players: context.contenders.map((player) => ({
+      playerId: player.playerId,
+      playerName: player.playerName,
+      profileId: player.botProfileId,
+      planetsOwned: player.planets.length,
+      activeFleetCount: context.galaxy.activeFleets.filter((fleet) => fleet.ownerId === player.playerId).length,
+      techLevels: extractPositiveRecord(player.tech),
+      totalShips: sumPlanetShipCounts(player),
+      totalDefences: sumPlanetDefenceCounts(player),
+      planets: [...player.planets]
+        .sort((left, right) =>
+          left.basicInfo.solarSystem.coordinates.y - right.basicInfo.solarSystem.coordinates.y
+          || left.basicInfo.solarSystem.coordinates.x - right.basicInfo.solarSystem.coordinates.x
+          || left.basicInfo.order - right.basicInfo.order
+        )
+        .map((planet) => ({
+          name: planet.basicInfo.name,
+          coordinates: {
+            x: planet.basicInfo.solarSystem.coordinates.x,
+            y: planet.basicInfo.solarSystem.coordinates.y,
+            z: planet.basicInfo.order
+          },
+          size: planet.basicInfo.size,
+          resources: {
+            metal: planet.rBDSFTQ.resources.metal,
+            crystal: planet.rBDSFTQ.resources.crystal,
+            deuterium: planet.rBDSFTQ.resources.deuterium
+          },
+          buildings: extractPositiveRecord(planet.rBDSFTQ.buildingsLevels),
+          ships: extractPositiveRecord(planet.rBDSFTQ.ships.countByType()),
+          defences: extractPositiveRecord(planet.rBDSFTQ.defences.countByType())
+        }))
+    }))
+  };
+}
+
+function buildBattleSummary(
+  scenario: SimulationScenarioKey,
+  seed: number,
+  contenders: Player[],
+  finalTurn: number
+): BattleSummary {
+  const uniqueEvents = new Map<string, BattleSummary['events'][number]>();
+
+  for (const player of contenders) {
+    for (const report of player.reports) {
+      if (
+        report.reportType !== ReportType.FLEET_REPORT
+        && report.reportType !== ReportType.BUILDINGS_REPORT
+      ) {
+        continue;
+      }
+      const category = classifyCombatReport(report.title);
+      if (!category || !('body' in report) || typeof report.body !== 'string') {
+        continue;
+      }
+
+      const eventKey = [
+        category,
+        report.reportType,
+        report.createdTurn,
+        report.title,
+        report.senderPlayerName ?? '',
+        report.coordinatesLabel() ?? '',
+        report.body
+      ].join('|');
+      const existing = uniqueEvents.get(eventKey);
+      if (existing) {
+        if (!existing.observers.some((observer) => observer.playerId === player.playerId)) {
+          existing.observers.push({
+            playerId: player.playerId,
+            playerName: player.playerName,
+            profileId: player.botProfileId
+          });
+        }
+        continue;
+      }
+
+      uniqueEvents.set(eventKey, {
+        eventKey,
+        category,
+        reportType: report.reportType,
+        createdTurn: report.createdTurn,
+        title: report.title,
+        senderPlayerName: report.senderPlayerName,
+        sourcePlanetName: report.sourcePlanetName,
+        sourceSystemName: report.sourceSystemName,
+        sourceCoordinates: report.sourceCoordinates ? { ...report.sourceCoordinates } : null,
+        observers: [{
+          playerId: player.playerId,
+          playerName: player.playerName,
+          profileId: player.botProfileId
+        }],
+        body: report.body
+      });
+    }
+  }
+
+  const events = [...uniqueEvents.values()].sort((left, right) =>
+    left.createdTurn - right.createdTurn
+    || left.title.localeCompare(right.title)
+    || left.eventKey.localeCompare(right.eventKey)
+  );
+  const countsByCategory: Record<string, number> = {
+    BATTLE: 0,
+    BOMBARDMENT: 0,
+    PLUNDER: 0
+  };
+  for (const event of events) {
+    countsByCategory[event.category] = (countsByCategory[event.category] ?? 0) + 1;
+  }
+
+  return {
+    scenario,
+    seed,
+    finalTurn,
+    totalUniqueEvents: events.length,
+    countsByCategory,
+    events
+  };
+}
+
+function classifyCombatReport(title: string): BattleSummary['events'][number]['category'] | null {
+  if (title.startsWith('Battle Report:')) {
+    return 'BATTLE';
+  }
+  if (title.startsWith('Bombardment Report:')) {
+    return 'BOMBARDMENT';
+  }
+  if (title.startsWith('Plunder Report:')) {
+    return 'PLUNDER';
+  }
+  return null;
+}
+
+function extractPositiveRecord(entries: Map<string | number, number>): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [key, value] of entries.entries()) {
+    if (!Number.isFinite(value) || value <= 0) {
+      continue;
+    }
+    result[String(key)] = value;
+  }
+  return result;
+}
+
+function sumPlanetShipCounts(player: Player): Record<string, number> {
+  const totals = new Map<string, number>();
+  for (const planet of player.planets) {
+    for (const [shipType, amount] of planet.rBDSFTQ.ships.countByType().entries()) {
+      totals.set(String(shipType), (totals.get(String(shipType)) ?? 0) + amount);
+    }
+  }
+  return extractPositiveRecord(totals);
+}
+
+function sumPlanetDefenceCounts(player: Player): Record<string, number> {
+  const totals = new Map<string, number>();
+  for (const planet of player.planets) {
+    for (const [defenceType, amount] of planet.rBDSFTQ.defences.countByType().entries()) {
+      totals.set(String(defenceType), (totals.get(String(defenceType)) ?? 0) + amount);
+    }
+  }
+  return extractPositiveRecord(totals);
 }
 
 function withSeededRandom<T>(seed: number, callback: () => T): T {
