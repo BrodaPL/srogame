@@ -138,6 +138,61 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     expect(missionProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 2 });
   });
 
+  it('does not emit strategic-development logistics missions for a one-planet empire', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureDevelopedSupportSource(planet);
+    setSupportShipTech(bot);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && (
+        proposal.requestPayload.missionType === FleetMissionType.TRANSPORT
+        || proposal.requestPayload.missionType === FleetMissionType.ARMAMENT_DELIVERY
+      )
+    )).toBe(false);
+  });
+
+  it('does not emit an armament-delivery mission without a valid hangar carrier', () => {
+    const { galaxy, bot, sourcePlanet, targetPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    configureLowIndustrySupportTarget(targetPlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 2);
+    targetPlanet.setCurrentBuildingStructuralPoints(BuildingType.METAL_MINE, 1);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ARMAMENT_DELIVERY
+    )).toBe(false);
+  });
+
+  it('does not emit logistics support when an active logistics fleet already fills the cap', () => {
+    const { galaxy, bot, sourcePlanet, targetPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    configureLowIndustrySupportTarget(targetPlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 2);
+    targetPlanet.setCurrentBuildingStructuralPoints(BuildingType.METAL_MINE, 1);
+    galaxy.activeFleets.push(createActiveTransportFleet(bot.playerId, sourcePlanet, targetPlanet));
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && (
+        proposal.requestPayload.missionType === FleetMissionType.TRANSPORT
+        || proposal.requestPayload.missionType === FleetMissionType.ARMAMENT_DELIVERY
+      )
+    )).toBe(false);
+  });
+
   it('emits spy missions for eligible unscanned colonization targets', () => {
     const { galaxy, bot, sourcePlanet } = createSupportWorld();
     configureDevelopedSupportSource(sourcePlanet);
@@ -564,6 +619,39 @@ function createActiveColonizeFleet(ownerId: number, originPlanet: Planet): Fleet
     2,
     2,
     FleetState.MOVING_TO_TARGET,
+    1,
+    ManyDefences.empty(),
+    FleetOrbitActivity.IDLE,
+    null,
+    FleetReturnReason.NORMAL
+  );
+}
+
+function createActiveTransportFleet(ownerId: number, originPlanet: Planet, targetPlanet: Planet): Fleet {
+  return new Fleet(
+    100,
+    ownerId,
+    FleetMissionType.TRANSPORT,
+    new Destination(
+      originPlanet.basicInfo.solarSystem.coordinates.x,
+      originPlanet.basicInfo.solarSystem.coordinates.y,
+      originPlanet.basicInfo.order
+    ),
+    new Destination(
+      targetPlanet.basicInfo.solarSystem.coordinates.x,
+      targetPlanet.basicInfo.solarSystem.coordinates.y,
+      targetPlanet.basicInfo.order
+    ),
+    originPlanet.basicInfo.name,
+    targetPlanet.basicInfo.name,
+    ManyShips.empty(),
+    new ResourcesPack(0, 0, 0),
+    1,
+    0,
+    0,
+    2,
+    2,
+    FleetState.RETURNING,
     1,
     ManyDefences.empty(),
     FleetOrbitActivity.IDLE,

@@ -73,6 +73,7 @@ export type BotEmpireSnapshot = {
   computerTechnologyLevel: number;
   imperiumFleetCap: number;
   activeFleetCount: number;
+  activeStrategicDevelopmentLogisticsFleetCount?: number;
   maxActiveFleetCount: number;
   activeColonizeFleetCount: number;
   activeRecycleFleetCount?: number;

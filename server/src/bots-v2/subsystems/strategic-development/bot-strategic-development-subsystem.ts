@@ -253,6 +253,7 @@ function createGlobalMissionProposals(
 
   const requests: FleetMissionImmediateRequest[] = [];
   const requestCap = resolveMissionRequestCap(context);
+  const remainingLogisticsCapacity = resolveRemainingLogisticsCapacity(context);
 
   for (const localResult of localResults) {
     const targetPlanet = resolvePlanetByCoordinates(context, localResult.planetResult.targetCoordinates);
@@ -261,14 +262,14 @@ function createGlobalMissionProposals(
     }
 
     const targetNeed = resolveTargetSupportNeed(targetPlanet, localResult);
-    if (targetNeed.repairPriorityBand !== null) {
+    if (remainingLogisticsCapacity > 0 && targetNeed.repairPriorityBand !== null) {
       const repairRequest = buildRepairSupportRequest(context, targetPlanet, targetNeed, localResults);
       if (repairRequest) {
         requests.push(repairRequest);
       }
     }
 
-    if (getTotalResourceAmount(targetNeed.resourceNeed) > 0) {
+    if (remainingLogisticsCapacity > 0 && getTotalResourceAmount(targetNeed.resourceNeed) > 0) {
       const resourceRequest = buildTargetResourceSupportRequest(context, targetPlanet, targetNeed, localResults);
       if (resourceRequest) {
         requests.push(resourceRequest);
@@ -282,17 +283,36 @@ function createGlobalMissionProposals(
       continue;
     }
 
-    const exportRequests = buildSourceDrivenResourceSupportRequests(context, sourcePlanet, localResults);
+    const exportRequests = remainingLogisticsCapacity > 0
+      ? buildSourceDrivenResourceSupportRequests(context, sourcePlanet, localResults)
+      : [];
     requests.push(...exportRequests);
   }
 
   requests.push(...createColonizationRequests(context));
   requests.push(...createIntelScanRequests(context));
 
-  return mergeFleetMissionRequests(requests)
-    .sort(compareMissionRequests)
-    .slice(0, requestCap)
-    .map((request, index) => createFleetMissionProposal(context, request, index));
+  const mergedRequests = mergeFleetMissionRequests(requests)
+    .sort(compareMissionRequests);
+  const selectedRequests: FleetMissionImmediateRequest[] = [];
+  let usedLogisticsCapacity = 0;
+
+  for (const request of mergedRequests) {
+    if (selectedRequests.length >= requestCap) {
+      break;
+    }
+
+    if (isStrategicDevelopmentLogisticsMission(request)) {
+      if (usedLogisticsCapacity >= remainingLogisticsCapacity) {
+        continue;
+      }
+      usedLogisticsCapacity += 1;
+    }
+
+    selectedRequests.push(request);
+  }
+
+  return selectedRequests.map((request, index) => createFleetMissionProposal(context, request, index));
 }
 
 function resolveMissionRequestCap(context: BotSubsystemContext): number {
@@ -334,11 +354,9 @@ function resolveTargetSupportNeed(
   const emergencyDamageTrigger = planet.infrastructure.emergencyRepairTriggered;
   const repairPriorityBand = hasDamagedBuildings
     ? 1
-    : recentlyColonized
-      ? 2
-      : negativeIndustryModifier
-        ? 3
-        : null;
+    : negativeIndustryModifier
+      ? 3
+      : null;
   const prioritizedDamagePoints = resolvePrioritizedInfrastructureDamagePoints(planet.infrastructure);
   const repairNeedScore = prioritizedDamagePoints
     + (negativeIndustryModifier ? Math.round((1 - planet.modifiers.industry) * 1000) : 0)
@@ -392,9 +410,7 @@ function buildRepairSupportRequest(
         priorityBand,
         summaryLabel: priorityBand === 1
           ? 'building repair support'
-          : priorityBand === 2
-            ? 'recent colony support'
-            : 'industry recovery support'
+          : 'industry recovery support'
       };
     }
   }
@@ -408,6 +424,10 @@ function buildTargetResourceSupportRequest(
   targetNeed: { resourceNeed: ResourceAmounts },
   localResults: PlanetStrategicDevelopmentEvaluationResult[]
 ): FleetMissionImmediateRequest | null {
+  if (!shouldAllowTargetResourceSupport(targetPlanet, targetNeed, localResults, context)) {
+    return null;
+  }
+
   let bestRequest: FleetMissionImmediateRequest | null = null;
 
   for (const localResult of localResults) {
@@ -442,7 +462,7 @@ function buildSourceDrivenResourceSupportRequests(
   sourcePlanet: BotPlanetSnapshot,
   localResults: PlanetStrategicDevelopmentEvaluationResult[]
 ): FleetMissionImmediateRequest[] {
-  if (!isLogisticsSourcePlanet(sourcePlanet)) {
+  if (!isRareBroadSurplusSourcePlanet(context, sourcePlanet, localResults)) {
     return [];
   }
 
@@ -1956,28 +1976,18 @@ function resolveResourceShortage(
   planet: BotPlanetSnapshot,
   immediateDemand: ResourceAmounts
 ): ResourceAmounts {
-  const effectiveStored = {
-    metal: planet.localResources.metal * Math.max(0.1, planet.modifiers.metal),
-    crystal: planet.localResources.crystal * Math.max(0.1, planet.modifiers.crystal),
-    deuterium: planet.localResources.deuterium * Math.max(0.1, planet.modifiers.deuterium)
-  };
-  const averageEffective = (effectiveStored.metal + effectiveStored.crystal + effectiveStored.deuterium) / 3;
-
   return {
     metal: Math.max(
       0,
-      Math.floor(Math.max(0, immediateDemand.metal - planet.localResources.metal)
-        + Math.max(0, ((averageEffective - effectiveStored.metal) / Math.max(0.1, planet.modifiers.metal)) * 0.25))
+      Math.floor(Math.max(0, immediateDemand.metal - planet.localResources.metal))
     ),
     crystal: Math.max(
       0,
-      Math.floor(Math.max(0, immediateDemand.crystal - planet.localResources.crystal)
-        + Math.max(0, ((averageEffective - effectiveStored.crystal) / Math.max(0.1, planet.modifiers.crystal)) * 0.25))
+      Math.floor(Math.max(0, immediateDemand.crystal - planet.localResources.crystal))
     ),
     deuterium: Math.max(
       0,
-      Math.floor(Math.max(0, immediateDemand.deuterium - planet.localResources.deuterium)
-        + Math.max(0, ((averageEffective - effectiveStored.deuterium) / Math.max(0.1, planet.modifiers.deuterium)) * 0.25))
+      Math.floor(Math.max(0, immediateDemand.deuterium - planet.localResources.deuterium))
     )
   };
 }
@@ -2007,6 +2017,102 @@ function resolveSourceSurplus(planet: BotPlanetSnapshot): ResourceAmounts {
       ? Math.max(0, planet.localResources.deuterium - reserveFloor.deuterium)
       : 0
   };
+}
+
+function resolveRemainingLogisticsCapacity(context: BotSubsystemContext): number {
+  const hardCap = Math.max(0, context.snapshot.empire.ownedPlanetCount - 1);
+  if (hardCap <= 0) {
+    return 0;
+  }
+
+  const activeCount = context.snapshot.empire.activeStrategicDevelopmentLogisticsFleetCount ?? 0;
+  const pendingCount = context.memory.supervisor.pendingCommitments.filter((commitment) =>
+    commitment.kind === 'FLEET_MISSION'
+    && commitment.status !== 'EXPIRED'
+    && commitment.status !== 'CANCELLED'
+    && isStrategicDevelopmentLogisticsMissionType(readMissionTypeFromPayload(commitment.executionPayload))
+  ).length;
+
+  return Math.max(0, hardCap - activeCount - pendingCount);
+}
+
+function isStrategicDevelopmentLogisticsMission(request: FleetMissionImmediateRequest): boolean {
+  return isStrategicDevelopmentLogisticsMissionType(request.missionType);
+}
+
+function isStrategicDevelopmentLogisticsMissionType(missionType: FleetMissionType | null): boolean {
+  return missionType === FleetMissionType.TRANSPORT || missionType === FleetMissionType.ARMAMENT_DELIVERY;
+}
+
+function readMissionTypeFromPayload(payload: Record<string, unknown>): FleetMissionType | null {
+  return typeof payload.missionType === 'string' ? payload.missionType as FleetMissionType : null;
+}
+
+function shouldAllowTargetResourceSupport(
+  targetPlanet: BotPlanetSnapshot,
+  targetNeed: { resourceNeed: ResourceAmounts },
+  localResults: PlanetStrategicDevelopmentEvaluationResult[],
+  context: BotSubsystemContext
+): boolean {
+  if (context.snapshot.empire.ownedPlanetCount <= 1) {
+    return false;
+  }
+  if (getTotalResourceAmount(targetNeed.resourceNeed) <= 0) {
+    return false;
+  }
+
+  const localResult = localResults.find((entry) =>
+    sameCoordinates(entry.planetResult.targetCoordinates, targetPlanet.coordinates)
+  );
+  if (!localResult) {
+    return false;
+  }
+
+  const recentlyColonized = targetPlanet.defense.avgIndustryLevel < 2;
+  if (!recentlyColonized) {
+    return true;
+  }
+
+  const hasEmptyQueues = targetPlanet.queues.buildingQueueLength <= 0
+    && targetPlanet.queues.shipyardQueueLength <= 0;
+  const hasActionableDemand = localResult.selectedBuildingGoals.length > 0 || localResult.selectedProductionGoals.length > 0;
+  return hasEmptyQueues && hasActionableDemand;
+}
+
+function isRareBroadSurplusSourcePlanet(
+  context: BotSubsystemContext,
+  sourcePlanet: BotPlanetSnapshot,
+  localResults: PlanetStrategicDevelopmentEvaluationResult[]
+): boolean {
+  if (context.snapshot.empire.ownedPlanetCount <= 1) {
+    return false;
+  }
+  if (!isLogisticsSourcePlanet(sourcePlanet)) {
+    return false;
+  }
+
+  const storageExceeded = sourcePlanet.localResources.metal >= sourcePlanet.economy.storageCapacity.metal
+    || sourcePlanet.localResources.crystal >= sourcePlanet.economy.storageCapacity.crystal
+    || sourcePlanet.localResources.deuterium >= sourcePlanet.economy.storageCapacity.deuterium;
+  if (!storageExceeded) {
+    return false;
+  }
+
+  const queuesFull = sourcePlanet.queues.buildingQueueLength >= sourcePlanet.power.maxBuildingQueueLength
+    && sourcePlanet.queues.shipyardQueueLength >= sourcePlanet.power.maxShipyardQueueLength
+    && sourcePlanet.queues.hasActiveResearch;
+  if (!queuesFull) {
+    return false;
+  }
+
+  const localResult = localResults.find((entry) =>
+    sameCoordinates(entry.planetResult.targetCoordinates, sourcePlanet.coordinates)
+  );
+  if (!localResult) {
+    return false;
+  }
+
+  return localResult.selectedBuildingGoals.length <= 0 && localResult.selectedProductionGoals.length <= 0;
 }
 
 function selectCargoShips(
@@ -2065,7 +2171,11 @@ function selectHangarShips(
       amount: amount ?? 0,
       blueprint: SHIP_BLUEPRINTS.get(type as ShipType) ?? null
     }))
-    .filter((entry) => entry.amount > 0 && (entry.blueprint?.hangarCapacity ?? 0) > 0)
+    .filter((entry) =>
+      entry.amount > 0
+      && entry.type !== ShipType.COLONIZER
+      && (entry.blueprint?.hangarCapacity ?? 0) > 2
+    )
     .sort((left, right) =>
       (right.blueprint?.hangarCapacity ?? 0) - (left.blueprint?.hangarCapacity ?? 0)
       || (right.blueprint?.cargoCapacity ?? 0) - (left.blueprint?.cargoCapacity ?? 0)

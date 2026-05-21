@@ -120,6 +120,10 @@ function buildEmpireSnapshot(
     computerTechnologyLevel,
     imperiumFleetCap: 4 + Math.max(0, computerTechnologyLevel),
     activeFleetCount: activeFleets.length,
+    activeStrategicDevelopmentLogisticsFleetCount: activeFleets.filter((fleet) =>
+      fleet.missionType === FleetMissionType.TRANSPORT
+      || fleet.missionType === FleetMissionType.ARMAMENT_DELIVERY
+    ).length,
     maxActiveFleetCount: maxActiveFleets(computerTechnologyLevel),
     activeColonizeFleetCount: activeFleets.filter((fleet) => fleet.missionType === FleetMissionType.COLONIZE).length,
     activeRecycleFleetCount: activeFleets.filter((fleet) => fleet.missionType === FleetMissionType.RECYCLE).length,
