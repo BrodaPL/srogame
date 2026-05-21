@@ -91,13 +91,40 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(attackProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 2 });
   });
 
+  it('emits a one-ship probing attack when spy intel is insufficient for neutral defense estimation', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 2);
+    markPlanetScannedWithLowIntel(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const probeProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'INTEL'
+    );
+
+    expect(probeProposal).toBeDefined();
+    expect(probeProposal?.requestPayload.ships).toEqual([{
+      type: ShipType.CRUISER,
+      undamagedAmount: 1,
+      damagedAmount: 0
+    }]);
+  });
+
   it('emits a plunder attack for opened neutral farms with enough loot at arrival', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
     neutralPlanet.rBDSFTQ.resources = new ResourcesPack(300, 300, 300);
     markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+    galaxy.currentTurn = 2;
+    addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
+      survivingShipsLine: 'Enemy survivors by type: none',
+      survivingDefencesLine: 'Enemy defense survivors by type: none'
+    });
 
     const result = runStrategicMilitarySubsystem(galaxy, bot);
     const attackProposal = result.proposals.find((proposal) =>
@@ -108,7 +135,7 @@ describe('BotStrategicMilitarySubsystem', () => {
 
     expect(attackProposal).toBeDefined();
     expect(attackProposal?.requestPayload.ships.some((ship: { type: ShipType }) => ship.type === ShipType.TRANSPORTER)).toBe(true);
-    expect(attackProposal?.requestPayload.ships.some((ship: { type: ShipType }) => ship.type === ShipType.FIGHTER)).toBe(true);
+    expect(attackProposal?.requestPayload.ships.some((ship: { type: ShipType }) => ship.type === ShipType.CRUISER)).toBe(true);
   });
 
   it('emits a ship-need request when current fleets cannot clear a scanned neutral target', () => {
@@ -126,17 +153,22 @@ describe('BotStrategicMilitarySubsystem', () => {
 
     expect(shipNeedProposal).toBeDefined();
     expect(shipNeedProposal?.debug.queueType).toBe('SHIP_NEED');
-    expect(shipNeedProposal?.requestPayload.shipType).toBe(ShipType.FIGHTER);
+    expect(shipNeedProposal?.requestPayload.shipType).toBe(ShipType.CRUISER);
     expect(shipNeedProposal?.requestPayload.amount).toBeGreaterThan(0);
   });
 
   it('uses report-derived farm resources instead of live hidden planet resources', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
     neutralPlanet.rBDSFTQ.resources = new ResourcesPack(300, 300, 300);
     markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+    galaxy.currentTurn = 2;
+    addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
+      survivingShipsLine: 'Enemy survivors by type: none',
+      survivingDefencesLine: 'Enemy defense survivors by type: none'
+    });
     neutralPlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 0);
 
     const result = runStrategicMilitarySubsystem(galaxy, bot);
@@ -150,8 +182,8 @@ describe('BotStrategicMilitarySubsystem', () => {
   it('uses battle reports to open a neutral farm for plunder without reading live defenders', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
     neutralPlanet.rBDSFTQ.resources = new ResourcesPack(300, 300, 300);
     neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 2);
     markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
@@ -175,8 +207,8 @@ describe('BotStrategicMilitarySubsystem', () => {
     const memory = createDefaultBotMemoryV2();
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
     neutralPlanet.rBDSFTQ.resources = new ResourcesPack(300, 300, 300);
     markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
     galaxy.currentTurn = 2;
@@ -199,7 +231,7 @@ describe('BotStrategicMilitarySubsystem', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
     homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
     neutralPlanet.rBDSFTQ.resources = new ResourcesPack(900, 900, 900);
     neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
     markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
@@ -389,12 +421,12 @@ function addOwnedSupportPlanet(
 }
 
 function configureOriginPlanet(planet: Planet): void {
-  planet.setBuildingLevel(BuildingType.METAL_MINE, 3);
-  planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 3);
-  planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 3);
-  planet.setBuildingLevel(BuildingType.METAL_STORAGE, 3);
-  planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 3);
-  planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 3);
+  planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+  planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+  planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+  planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
   planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 5);
   planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 2);
   planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
@@ -411,6 +443,19 @@ function markPlanetScanned(
   const report = new EspionageReportGenerator().createEspionageReport(bot, owner, planet, 4, {
     createdTurn,
     reportLevelBonus: 10
+  });
+  planet.lastReportData.set(bot.playerId, report);
+}
+
+function markPlanetScannedWithLowIntel(
+  bot: Player,
+  owner: Player,
+  planet: Planet,
+  createdTurn: number
+): void {
+  const report = new EspionageReportGenerator().createEspionageReport(bot, owner, planet, 1, {
+    createdTurn,
+    forcedReportLevel: 4
   });
   planet.lastReportData.set(bot.playerId, report);
 }
@@ -473,6 +518,10 @@ function setBasicShipTech(bot: Player): void {
   bot.setTechLevel(TechnologyType.FUSION_DRIVE, 2);
   bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 2);
   bot.setTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY, 2);
+  bot.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 2);
+  bot.setTechLevel(TechnologyType.SHIELDING_TECHNOLOGY, 2);
   bot.setTechLevel(TechnologyType.BEAMS_WEAPONS, 2);
+  bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 1);
+  bot.setTechLevel(TechnologyType.RAILGUNS_WEAPONS, 1);
   bot.setTechLevel(TechnologyType.COMPUTER_TECHNOLOGY, 2);
 }

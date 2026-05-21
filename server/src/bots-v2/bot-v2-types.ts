@@ -263,12 +263,17 @@ export type BotIntelCandidateSnapshot = {
 
 export type BotStrategicMilitaryTargetSnapshot = {
   coordinates: { x: number; y: number; z: number };
+  inOwnedSystem: boolean;
+  inHomeSystem: boolean;
   neverScanned: boolean;
   hasEspionageReport: boolean;
+  spyCombatIntelEnough: boolean;
   reportAge: number | null;
   reportTurn: number | null;
   needsScan: boolean;
   isNeutral: boolean;
+  hasForeignGuard: boolean;
+  hasOwnActiveFarmMission: boolean;
   mineLevels: {
     metalMineLevel: number;
     crystalMineLevel: number;

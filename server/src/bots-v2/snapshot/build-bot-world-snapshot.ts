@@ -837,6 +837,11 @@ function resolveStrategicMilitaryTargets(
   player: Player
 ): BotStrategicMilitaryTargetSnapshot[] {
   const targets: BotStrategicMilitaryTargetSnapshot[] = [];
+  const ownedSystems = new Set(player.planets.map((planet) =>
+    `${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}`));
+  const homeSystemKey = player.planets[0]
+    ? `${player.planets[0].basicInfo.solarSystem.coordinates.x}:${player.planets[0].basicInfo.solarSystem.coordinates.y}`
+    : null;
 
   for (const row of galaxy.stars) {
     for (const system of row) {
@@ -852,10 +857,17 @@ function resolveStrategicMilitaryTargets(
         const reportAge = report === null
           ? null
           : Math.max(0, galaxy.currentTurn - report.createdTurn);
+        const systemKey = `${system.coordinates.x}:${system.coordinates.y}`;
         const owner = planet.info.ownerId === null
           ? null
           : galaxy.players.find((entry) => entry.playerId === planet.info.ownerId) ?? null;
         const reportTurn = report?.createdTurn ?? null;
+        const spyCombatIntelEnough = report !== null && (
+          report.totalDefencesAmount > 0
+          || report.totalShipsAmount > 0
+          || report.defences.length > 0
+          || report.ships.size > 0
+        );
         const mineLevels = report === null
           ? null
           : {
@@ -881,6 +893,23 @@ function resolveStrategicMilitaryTargets(
           : resolveReportedBunkerReductionPercent(report);
         const latestBattleObservation = resolveLatestBattleObservation(player, planet);
         const latestPlunderObservation = resolveLatestPlunderObservation(player, planet);
+        const targetCoordinatesMatch = (coordinates: { x: number; y: number; z: number } | null | undefined) =>
+          coordinates?.x === system.coordinates.x
+          && coordinates?.y === system.coordinates.y
+          && coordinates?.z === planet.basicInfo.order;
+        const hasForeignGuard = galaxy.activeFleets.some((fleet) =>
+          fleet.ownerId !== player.playerId
+          && targetCoordinatesMatch(fleet.target?.coordinates)
+          && fleet.state === 'ORBITING'
+        );
+        const hasOwnActiveFarmMission = galaxy.activeFleets.some((fleet) =>
+          fleet.ownerId === player.playerId
+          && targetCoordinatesMatch(fleet.target?.coordinates)
+          && (
+            fleet.missionType === FleetMissionType.SPY
+            || fleet.missionType === FleetMissionType.ATTACK
+          )
+        );
         const knownShipCountsByType = report === null
           ? {}
           : resolveKnownShipCountsForStrategicMilitary(report, latestBattleObservation);
@@ -894,12 +923,17 @@ function resolveStrategicMilitaryTargets(
             y: system.coordinates.y,
             z: planet.basicInfo.order
           },
+          inOwnedSystem: ownedSystems.has(systemKey),
+          inHomeSystem: homeSystemKey === systemKey,
           neverScanned: report === null,
           hasEspionageReport: report !== null,
+          spyCombatIntelEnough,
           reportAge,
           reportTurn,
           needsScan: report === null,
           isNeutral: owner?.type === PlayerType.NEUTRAL,
+          hasForeignGuard,
+          hasOwnActiveFarmMission,
           mineLevels,
           currentShipsCount: report === null ? null : sumCountsByType(knownShipCountsByType),
           currentDefencesCount: report === null ? null : sumCountsByType(knownDefenceCountsByType),

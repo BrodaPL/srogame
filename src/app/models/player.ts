@@ -237,11 +237,13 @@ export type BotMemoryV2StrategicMilitaryFarmLedgerEntry = {
   };
   knownShipCountsByType: Partial<Record<ShipType, number>>;
   knownDefenceCountsByType: Partial<Record<DefenceType, number>>;
+  farmIntelEnough: boolean;
   initialDefenseBroken: boolean;
   lastObservedResources: BotMemoryResources;
   lastResourceObservationTurn: number | null;
   lastCombatObservationTurn: number | null;
   estimatedNextGoodAttackTurn: number | null;
+  preferredPlunderTransporterCount: number;
   preferredOriginCoordinates: BotMemoryCoordinates | null;
 };
 
@@ -1099,6 +1101,7 @@ export class Player {
           },
           knownShipCountsByType: Player.normalizeBotMemoryV2CountByType(entry?.knownShipCountsByType),
           knownDefenceCountsByType: Player.normalizeBotMemoryV2CountByType(entry?.knownDefenceCountsByType),
+          farmIntelEnough: entry?.farmIntelEnough === true,
           initialDefenseBroken: entry?.initialDefenseBroken === true,
           lastObservedResources: Player.normalizeBotMemoryResources(entry?.lastObservedResources),
           lastResourceObservationTurn: Number.isInteger(entry?.lastResourceObservationTurn)
@@ -1110,6 +1113,9 @@ export class Player {
           estimatedNextGoodAttackTurn: Number.isInteger(entry?.estimatedNextGoodAttackTurn)
             ? entry.estimatedNextGoodAttackTurn
             : null,
+          preferredPlunderTransporterCount: Number.isInteger(entry?.preferredPlunderTransporterCount)
+            ? Math.max(1, Math.floor(entry.preferredPlunderTransporterCount))
+            : 6,
           preferredOriginCoordinates: Player.normalizeBotMemoryCoordinates(entry?.preferredOriginCoordinates)
         };
       })
