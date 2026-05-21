@@ -14,6 +14,7 @@ import { Player } from '../../../../../src/app/models/player.js';
 import { Galaxy } from '../../../../../src/app/models/planets/galaxy.js';
 import { Planet } from '../../../../../src/app/models/planets/planet.js';
 import { SolarSystem } from '../../../../../src/app/models/planets/solar-system.js';
+import { TechnologyQueueEntry } from '../../../../../src/app/models/tech/technology-queue-entry.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
 import type { BotProposal } from '../../bot-v2-types.js';
@@ -295,6 +296,92 @@ describe('BotStrategicDevelopmentSubsystem', () => {
 
     expect(colonizeProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 4 });
     randomSpy.mockRestore();
+  });
+
+  it('forces the best valid colonization target after turn 100', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    galaxy.currentTurn = 101;
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 80000);
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    unownedPlanet.info.planetaryParameters.industryModifier = 1.05;
+    unownedPlanet.basicInfo.baseSize = 150;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const betterTarget = Planet.createRandomEmpty('BotSys IV', 4, sourcePlanet.basicInfo.solarSystem, null);
+    betterTarget.basicInfo.baseSize = 180;
+    betterTarget.basicInfo.colonizationDifficulty = 1;
+    betterTarget.info.planetaryParameters.industryModifier = 1.25;
+    sourcePlanet.basicInfo.solarSystem.planets[3] = betterTarget;
+    markPlanetScanned(bot, betterTarget, galaxy.currentTurn);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+    const colonizeProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
+    );
+
+    expect(colonizeProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 4 });
+    randomSpy.mockRestore();
+  });
+
+  it('waits on forced colonization when Adaptive Technology is already proposed this turn', () => {
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    galaxy.currentTurn = 101;
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot, [{
+      subsystemId: 'RESEARCH',
+      kind: 'RESEARCH',
+      goalKey: 'research:Adaptive Technology',
+      dedupeKey: 'research:Adaptive Technology',
+      summary: 'Research Adaptive Technology.',
+      requestPayload: {
+        x: 0,
+        y: 0,
+        z: 1,
+        technologyType: TechnologyType.ADAPTIVE_TECHNOLOGY,
+        helperPlanets: []
+      },
+      targetCoordinates: { x: 0, y: 0, z: 1 },
+      expectedValue: 1,
+      debug: {}
+    }]);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
+    )).toBe(false);
+  });
+
+  it('waits on forced colonization when Adaptive Technology is already in active research', () => {
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    galaxy.currentTurn = 101;
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+    sourcePlanet.rBDSFTQ.currentResearchQueue = new TechnologyQueueEntry(
+      TechnologyType.ADAPTIVE_TECHNOLOGY,
+      2,
+      0,
+      []
+    );
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
+    )).toBe(false);
   });
 });
 

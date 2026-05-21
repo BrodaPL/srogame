@@ -141,6 +141,7 @@ const STRATEGIC_DEVELOPMENT_AVAILABILITY = 0.4;
 const NANITE_BONUS_FACTOR = 1.22;
 const ROBOTICS_PENALTY_FACTOR = 1.12;
 const COLONIZER_IDLE_CAP = 1;
+const FORCED_COLONIZATION_TURN_THRESHOLD = 100;
 
 export class BotStrategicDevelopmentSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DEVELOPMENT' as const;
@@ -242,6 +243,14 @@ function createGlobalMissionProposals(
   context: BotSubsystemContext,
   localResults: PlanetStrategicDevelopmentEvaluationResult[]
 ): BotProposal[] {
+  const forcedColonization = resolveForcedColonizationPriority(context);
+  if (forcedColonization.active) {
+    return createColonizationRequests(context, forcedColonization)
+      .sort(compareMissionRequests)
+      .slice(0, 1)
+      .map((request, index) => createFleetMissionProposal(context, request, index));
+  }
+
   const requests: FleetMissionImmediateRequest[] = [];
   const requestCap = resolveMissionRequestCap(context);
 
@@ -516,12 +525,16 @@ function createIntelScanRequests(
 }
 
 function createColonizationRequests(
-  context: BotSubsystemContext
+  context: BotSubsystemContext,
+  forcedPriority: ForcedColonizationPriority = resolveForcedColonizationPriority(context)
 ): FleetMissionImmediateRequest[] {
   if (!canEmpireColonizeMorePlanets(context)) {
     return [];
   }
   if (hasPendingColonizationPlan(context)) {
+    return [];
+  }
+  if (forcedPriority.waitForAdaptive) {
     return [];
   }
 
@@ -543,10 +556,12 @@ function createColonizationRequests(
   }
 
   const topCandidatePool = eligibleCandidates.slice(0, Math.min(2, eligibleCandidates.length));
-  const chosenCandidate = topCandidatePool[Math.min(
-    topCandidatePool.length - 1,
-    Math.floor(Math.random() * topCandidatePool.length)
-  )] ?? null;
+  const chosenCandidate = forcedPriority.active
+    ? eligibleCandidates[0] ?? null
+    : topCandidatePool[Math.min(
+      topCandidatePool.length - 1,
+      Math.floor(Math.random() * topCandidatePool.length)
+    )] ?? null;
   if (!chosenCandidate) {
     return [];
   }
@@ -585,6 +600,11 @@ function hasPendingColonizationPlan(context: BotSubsystemContext): boolean {
   return context.snapshot.empire.activeColonizeFleetCount > 0;
 }
 
+type ForcedColonizationPriority = {
+  active: boolean;
+  waitForAdaptive: boolean;
+};
+
 function resolveIdleColonizerCount(context: BotSubsystemContext): number {
   const totalColonizers = context.snapshot.planets.reduce((sum, planet) =>
     sum + Math.max(0, planet.ships.installedCountByType[ShipType.COLONIZER] ?? 0), 0);
@@ -595,6 +615,40 @@ function resolveAdaptiveTechnologyLevel(context: BotSubsystemContext): number {
   return Math.max(
     0,
     ...context.snapshot.planets.map((planet) => planet.tech.adaptiveTechnologyLevel)
+  );
+}
+
+function resolveForcedColonizationPriority(context: BotSubsystemContext): ForcedColonizationPriority {
+  const eligibleCandidates = context.snapshot.empire.intelCandidates.filter((candidate) =>
+    !candidate.needsScan
+    && candidate.colonizationDifficulty !== null
+    && candidate.colonizationDifficulty <= resolveAdaptiveTechnologyLevel(context)
+  );
+  if (
+    context.snapshot.turn <= FORCED_COLONIZATION_TURN_THRESHOLD
+    || !canEmpireColonizeMorePlanets(context)
+    || eligibleCandidates.length <= 0
+  ) {
+    return {
+      active: false,
+      waitForAdaptive: false
+    };
+  }
+
+  return {
+    active: true,
+    waitForAdaptive: isAdaptiveResearchAlreadyAdvancing(context)
+  };
+}
+
+function isAdaptiveResearchAlreadyAdvancing(context: BotSubsystemContext): boolean {
+  if (context.snapshot.planets.some((planet) => planet.queues.currentResearchType === TechnologyType.ADAPTIVE_TECHNOLOGY)) {
+    return true;
+  }
+
+  return (context.priorProposals ?? []).some((proposal) =>
+    proposal.kind === 'RESEARCH'
+    && proposal.requestPayload.technologyType === TechnologyType.ADAPTIVE_TECHNOLOGY
   );
 }
 
