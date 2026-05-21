@@ -20,6 +20,7 @@ import { createMaintenanceRequest } from '../../../../../src/app/models/requests
 import { createSupportRequest } from '../../../../../src/app/models/requests/support-request.js';
 import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
+import { BuildingQueueEntry } from '../../../../../src/app/models/buildings/building-queue-entry.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
 import { BotStrategicDiplomaticSubsystem } from './bot-strategic-diplomatic-subsystem.js';
@@ -1012,6 +1013,26 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(supportRequests.length).toBe(1);
     expect(repairRequest).toBeDefined();
     expect(repairRequest?.requestPayload.targetPlayerId).toBe(peaceContact.playerId);
+  });
+
+  it('does not emit outgoing resource-support requests to peace contacts', () => {
+    const { galaxy, bot, botPlanet } = createStrategicDiplomaticWorld();
+    const peaceContact = addForeignPlayer(galaxy, 4, 'Peace-4', { x: 1, y: 0 }, 1);
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, peaceContact.playerId, DiplomaticStatus.PEACE)
+    );
+    markPlanetScanned(bot, peaceContact, peaceContact.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 10 });
+    botPlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 0);
+    botPlanet.rBDSFTQ.currentBuildingQueue = new BuildingQueueEntry(BuildingType.METAL_MINE, 5, 0);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+
+    expect(result.result.proposals.some((proposal) =>
+      proposal.kind === 'REQUEST_CREATION'
+      && proposal.requestPayload.actionType === 'REQUEST_CREATION'
+      && proposal.requestPayload.requestType === 'SUPPORT'
+      && proposal.requestPayload.supportType === 'RESOURCE_SUPPORT'
+    )).toBe(false);
   });
 
   it('emits partial incoming resource-support preference when visible surplus cannot fully cover the request', () => {

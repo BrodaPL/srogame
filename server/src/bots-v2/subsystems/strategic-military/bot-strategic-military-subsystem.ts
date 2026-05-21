@@ -1361,35 +1361,48 @@ function selectMissionRequestsForCap(
     return [];
   }
 
-  const intelRequests = requests
-    .filter((request) => request.phase === 'INTEL')
+  const probeRequests = requests
+    .filter((request) => request.phase === 'INTEL' && request.missionType === FleetMissionType.ATTACK)
     .sort(compareMissionRequests);
-  if (intelRequests.length >= missionCap) {
-    return intelRequests.slice(0, missionCap);
-  }
-
-  const selected = [...intelRequests];
-  let remainingCap = missionCap - selected.length;
   const breakRequests = requests
     .filter((request) => request.phase === 'BREAK')
     .sort(compareMissionRequests);
   const plunderRequests = requests
     .filter((request) => request.phase === 'PLUNDER')
     .sort(compareMissionRequests);
+  const spyRequests = requests
+    .filter((request) => request.phase === 'INTEL' && request.missionType === FleetMissionType.SPY)
+    .sort(compareMissionRequests);
+
+  const selected: MissionRequest[] = [];
+  let remainingCap = missionCap;
+
+  const plunderCap = Math.min(plunderRequests.length, remainingCap);
+  selected.push(...plunderRequests.slice(0, plunderCap));
+  remainingCap = missionCap - selected.length;
 
   const breakCap = Math.min(breakRequests.length, Math.ceil(remainingCap * BREAK_MISSION_SHARE));
-  const plunderCap = Math.min(plunderRequests.length, Math.max(0, remainingCap - breakCap));
   selected.push(...breakRequests.slice(0, breakCap));
-  selected.push(...plunderRequests.slice(0, plunderCap));
-
   remainingCap = missionCap - selected.length;
+
+  const probeCap = Math.min(probeRequests.length, remainingCap);
+  selected.push(...probeRequests.slice(0, probeCap));
+  remainingCap = missionCap - selected.length;
+
+  const spyCap = Math.min(spyRequests.length, remainingCap);
+  selected.push(...spyRequests.slice(0, spyCap));
+  remainingCap = missionCap - selected.length;
+
   if (remainingCap <= 0) {
     return selected;
   }
 
-  const remainingBreak = breakRequests.slice(breakCap);
-  const remainingPlunder = plunderRequests.slice(plunderCap);
-  const overflow = [...remainingBreak, ...remainingPlunder].sort(compareMissionRequests);
+  const overflow = [
+    ...plunderRequests.slice(plunderCap),
+    ...breakRequests.slice(breakCap),
+    ...probeRequests.slice(probeCap),
+    ...spyRequests.slice(spyCap)
+  ].sort(compareMissionRequests);
   selected.push(...overflow.slice(0, remainingCap));
   return selected;
 }

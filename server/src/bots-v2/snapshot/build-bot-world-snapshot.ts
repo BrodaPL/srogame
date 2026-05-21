@@ -789,7 +789,7 @@ function resolveIntelCandidates(
           continue;
         }
 
-        if (planet.basicInfo.size < 140) {
+        if (planet.basicInfo.size < 110) {
           continue;
         }
 

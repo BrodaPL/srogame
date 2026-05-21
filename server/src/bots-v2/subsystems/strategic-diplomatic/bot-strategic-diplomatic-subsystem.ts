@@ -429,9 +429,10 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         createDiplomacyDecisionProposal(context, request, index)
       ),
       ...createRetaliationFlagProposals(context, evaluatedFactions),
-      ...outgoingSupportRequests.map((request, index) =>
-        createOutgoingSupportRequestProposal(context, request, index)
-      ),
+      ...outgoingSupportRequests.flatMap((request, index) => {
+        const proposal = createOutgoingSupportRequestProposal(context, request, index);
+        return proposal ? [proposal] : [];
+      }),
       ...spyPlanning.requests.map((request, index) => createSpyMissionProposal(context, request, index)),
       ...diplomaticProbeNeedRequests.map((request, index) => createProbeShipNeedProposal(context, request, index)),
       ...combatPlanning.relocationRequests.map((request, index) => createRelocationMissionProposal(context, request, index)),
@@ -1710,7 +1711,11 @@ function createOutgoingSupportRequestProposal(
   context: BotSubsystemContext,
   request: OutgoingSupportRequestPlan,
   index: number
-): BotProposal {
+): BotProposal | null {
+  if (!isOutgoingSupportRequestPlanLegal(request)) {
+    return null;
+  }
+
   return {
     proposalId: `strategic-diplomatic:outgoing-support:${request.supportType}:${request.targetFaction.faction.playerId}:${toCoordinatesKey(request.targetCoordinates)}:${context.snapshot.turn}`,
     subsystemId: 'STRATEGIC_DIPLOMATIC',
@@ -5398,7 +5403,7 @@ function resolveBestSupportRequestRecipient(
   mode: 'OFFENSIVE' | 'NON_OFFENSIVE'
 ): { faction: EvaluatedFaction; capabilityScore: number; distance: number } | null {
   const candidates = factions
-    .filter((faction) => isFactionEligibleForSupportRequestRecipient(faction.faction.currentStatus, supportType))
+    .filter((faction) => isFactionEligibleForSupportRequestRecipient(faction, supportType))
     .map((faction) => {
       const capabilityScore = estimateKnownSupportCapability(faction, supportType);
       const distance = resolveKnownFactionDistanceToTarget(faction, targetCoordinates);
@@ -5428,15 +5433,31 @@ function resolveBestSupportRequestRecipient(
 }
 
 function isFactionEligibleForSupportRequestRecipient(
-  status: DiplomaticStatus,
+  faction: EvaluatedFaction,
   supportType: OutgoingSupportRequestPlan['supportType']
 ): boolean {
+  if (faction.faction.knownPlanetCount <= 0 || faction.faction.knownPlanets.length <= 0) {
+    return false;
+  }
+
+  const status = faction.faction.currentStatus;
   if (supportType === 'ATTACK_TARGET' || supportType === 'BOMBARD_TARGET' || supportType === 'SIEGE_TARGET') {
     return status === DiplomaticStatus.ALLIED;
   }
-  return status === DiplomaticStatus.ALLIED
-    || status === DiplomaticStatus.PEACE
-    || status === DiplomaticStatus.NEUTRAL;
+  if (supportType === 'RESOURCE_SUPPORT') {
+    return status === DiplomaticStatus.ALLIED;
+  }
+  return status === DiplomaticStatus.ALLIED || status === DiplomaticStatus.PEACE;
+}
+
+function isOutgoingSupportRequestPlanLegal(
+  request: OutgoingSupportRequestPlan
+): boolean {
+  if (request.targetFaction.faction.knownPlanetCount <= 0 || request.targetFaction.faction.knownPlanets.length <= 0) {
+    return false;
+  }
+
+  return isFactionEligibleForSupportRequestRecipient(request.targetFaction, request.supportType);
 }
 
 function resolveSupportRelationRank(status: DiplomaticStatus): number {

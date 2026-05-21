@@ -654,7 +654,7 @@ function resolveForcedColonizationPriority(context: BotSubsystemContext): Forced
   if (
     context.snapshot.turn <= FORCED_COLONIZATION_TURN_THRESHOLD
     || !canEmpireColonizeMorePlanets(context)
-    || eligibleCandidates.length <= 0
+    || eligibleCandidates.length < 3
   ) {
     return {
       active: false,
@@ -775,7 +775,7 @@ function createColonizeMissionRequest(
       }],
       cargo,
       repairDroneAmount: 0,
-      priorityBand: 3,
+      priorityBand: 2,
       sourceDistance: distance,
       summaryLabel: cargoAmount > 0 ? 'colony establishment with bootstrap cargo' : 'colony establishment'
     },

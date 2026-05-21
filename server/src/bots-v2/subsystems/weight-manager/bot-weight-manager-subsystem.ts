@@ -14,11 +14,13 @@ import type {
   BotSubsystemContext,
   BotSubsystemResult
 } from '../../bot-v2-types.ts';
+import * as technologyEffectsModule from '../../../../../src/app/models/tech/technology-effects.js';
 import { SHIP_BLUEPRINTS } from '../../../game-commands/command-helpers.js';
 import { hasEmergencyInfrastructureDamage } from '../../infrastructure-damage.js';
 import { resolveModule } from '../../../esm-module.js';
 
 const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../../src/app/models/diplomacy/diplomatic-status.js');
+const { maxOwnedPlanets } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
 type WeightProfileAxes = {
   aggression: number;
@@ -379,6 +381,7 @@ function buildGlobalModeScores(
   const veryHeavilyAttackedCount = planetFlags.filter((planet) => planet.veryHeavilyAttackedPlanet).length;
   const energyOrStorageProblems = Number(context.snapshot.empire.hasCriticalEnergyProblem)
     + Number(context.snapshot.empire.hasCriticalStorageProblem);
+  const colonizationPressure = resolveColonizationOpportunityPressure(context);
 
   return {
     ECONOMIC_RECOVERY: Math.min(
@@ -404,6 +407,7 @@ function buildGlobalModeScores(
       Math.min(40, context.snapshot.empire.intelCandidates.length * 4)
       + Math.min(30, (farmCounts.breakNeed * 3) + (farmCounts.raidReady * 4))
       + (context.snapshot.empire.ownedPlanetCount <= 2 ? 15 : 0)
+      + colonizationPressure
       + (axes.development * 0.12)
       + (axes.industry * 0.08)
       - (context.snapshot.empire.atWar ? 12 : 0)
@@ -455,6 +459,7 @@ function buildGlobalWeights(
 } {
   const immatureCount = planetFlags.filter((planet) => planet.immaturePlanet).length;
   const inDangerCount = planetFlags.filter((planet) => planet.inDangerPlanet).length;
+  const colonizationPressure = resolveColonizationOpportunityPressure(context);
 
   const researchWeight = clampWeight(
     profile.strategicWeights.research
@@ -468,6 +473,7 @@ function buildGlobalWeights(
     - 8
     + (modeScores.ECONOMIC_RECOVERY * 0.25)
     + (modeScores.EXPANSION * 0.12)
+    + (colonizationPressure * 0.8)
     + (immatureCount * 2)
     - (selectedMode === 'WAR_EMERGENCY' ? 10 : 0)
   );
@@ -477,6 +483,7 @@ function buildGlobalWeights(
     + (modeScores.EXPANSION * 0.25)
     + (farmCounts.breakNeed * 3)
     + (farmCounts.raidReady * 4)
+    + Math.min(18, farmCounts.breakNeed * 6)
     + (context.snapshot.empire.atWar ? 8 : 0)
     - (selectedMode === 'DIPLOMATIC_CAUTION' ? 12 : 0)
   );
@@ -495,6 +502,27 @@ function buildGlobalWeights(
     strategicMilitaryWeight,
     strategicDiplomaticWeight
   };
+}
+
+function resolveColonizationOpportunityPressure(context: BotSubsystemContext): number {
+  const adaptiveTechnologyLevel = Math.max(0, ...context.snapshot.planets.map((planet) => planet.tech.adaptiveTechnologyLevel));
+  const maxPlanets = maxOwnedPlanets(adaptiveTechnologyLevel);
+  if (context.snapshot.empire.ownedPlanetCount >= maxPlanets) {
+    return 0;
+  }
+
+  const viableCandidates = context.snapshot.empire.intelCandidates.filter((candidate) =>
+    !candidate.needsScan
+    && candidate.colonizationDifficulty !== null
+    && candidate.colonizationDifficulty <= adaptiveTechnologyLevel
+  ).length;
+
+  if (viableCandidates < 3) {
+    return 0;
+  }
+
+  const basePressure = context.snapshot.empire.ownedPlanetCount <= 1 ? 20 : 10;
+  return Math.min(24, basePressure + ((viableCandidates - 3) * 2));
 }
 
 function buildWeightManagerPlanetEntry(

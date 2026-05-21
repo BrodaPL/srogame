@@ -411,6 +411,13 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     sourcePlanet.basicInfo.solarSystem.planets[3] = betterTarget;
     markPlanetScanned(bot, betterTarget, galaxy.currentTurn);
 
+    const thirdTarget = Planet.createRandomEmpty('BotSys V', 5, sourcePlanet.basicInfo.solarSystem, null);
+    thirdTarget.basicInfo.baseSize = 145;
+    thirdTarget.basicInfo.colonizationDifficulty = 1;
+    thirdTarget.info.planetaryParameters.industryModifier = 1.02;
+    sourcePlanet.basicInfo.solarSystem.planets[4] = thirdTarget;
+    markPlanetScanned(bot, thirdTarget, galaxy.currentTurn);
+
     const result = runStrategicDevelopmentSubsystem(galaxy, bot);
     const colonizeProposal = result.proposals.find((proposal) =>
       proposal.kind === 'FLEET_MISSION'
@@ -429,6 +436,18 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
     unownedPlanet.basicInfo.colonizationDifficulty = 1;
     markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const secondTarget = Planet.createRandomEmpty('BotSys IV', 4, sourcePlanet.basicInfo.solarSystem, null);
+    secondTarget.basicInfo.baseSize = 165;
+    secondTarget.basicInfo.colonizationDifficulty = 1;
+    sourcePlanet.basicInfo.solarSystem.planets[3] = secondTarget;
+    markPlanetScanned(bot, secondTarget, galaxy.currentTurn);
+
+    const thirdTarget = Planet.createRandomEmpty('BotSys V', 5, sourcePlanet.basicInfo.solarSystem, null);
+    thirdTarget.basicInfo.baseSize = 155;
+    thirdTarget.basicInfo.colonizationDifficulty = 1;
+    sourcePlanet.basicInfo.solarSystem.planets[4] = thirdTarget;
+    markPlanetScanned(bot, thirdTarget, galaxy.currentTurn);
 
     const result = runStrategicDevelopmentSubsystem(galaxy, bot, [{
       subsystemId: 'RESEARCH',
@@ -462,6 +481,19 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
     unownedPlanet.basicInfo.colonizationDifficulty = 1;
     markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const secondTarget = Planet.createRandomEmpty('BotSys IV', 4, sourcePlanet.basicInfo.solarSystem, null);
+    secondTarget.basicInfo.baseSize = 165;
+    secondTarget.basicInfo.colonizationDifficulty = 1;
+    sourcePlanet.basicInfo.solarSystem.planets[3] = secondTarget;
+    markPlanetScanned(bot, secondTarget, galaxy.currentTurn);
+
+    const thirdTarget = Planet.createRandomEmpty('BotSys V', 5, sourcePlanet.basicInfo.solarSystem, null);
+    thirdTarget.basicInfo.baseSize = 155;
+    thirdTarget.basicInfo.colonizationDifficulty = 1;
+    sourcePlanet.basicInfo.solarSystem.planets[4] = thirdTarget;
+    markPlanetScanned(bot, thirdTarget, galaxy.currentTurn);
+
     sourcePlanet.rBDSFTQ.currentResearchQueue = new TechnologyQueueEntry(
       TechnologyType.ADAPTIVE_TECHNOLOGY,
       2,
@@ -475,6 +507,24 @@ describe('BotStrategicDevelopmentSubsystem', () => {
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
     )).toBe(false);
+  });
+
+  it('accepts colonization targets down to size 110', () => {
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 80000);
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    unownedPlanet.basicInfo.baseSize = 115;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
+    )).toBe(true);
   });
 });
 
