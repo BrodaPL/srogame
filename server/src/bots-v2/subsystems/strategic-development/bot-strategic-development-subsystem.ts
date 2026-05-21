@@ -123,6 +123,12 @@ const TARGET_PRODUCTION_SHIP_TYPES = [
   ShipType.REPAIR_DRONE
 ] as const;
 
+const SUPPORT_CARGO_SHIP_TYPES = [
+  ShipType.TRANSPORTER,
+  ShipType.MASS_HAULER,
+  ShipType.CARGO_SUPPORT
+] as const;
+
 const ALLOWED_STRATEGIC_DEVELOPMENT_BUILDING_SCOPE = new Set<BuildingType>([
   BuildingType.INTERSTELLAR_TRADE_PORT,
   BuildingType.JUMP_GATE,
@@ -142,6 +148,7 @@ const NANITE_BONUS_FACTOR = 1.22;
 const ROBOTICS_PENALTY_FACTOR = 1.12;
 const COLONIZER_IDLE_CAP = 1;
 const FORCED_COLONIZATION_TURN_THRESHOLD = 100;
+const SUPPORT_TRANSFER_BASE_TURNS = 2;
 
 export class BotStrategicDevelopmentSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DEVELOPMENT' as const;
@@ -1450,6 +1457,9 @@ function resolveProductionRequest(
   }
 
   const amount = resolveProductionOrderAmount(planet, shipType);
+  if (amount <= 0) {
+    return null;
+  }
   return {
     kind: 'SHIPYARD',
     shipType,
@@ -1472,6 +1482,17 @@ function resolveProductionOrderAmount(
     return 1;
   }
 
+  if (shipType === ShipType.REPAIR_DRONE) {
+    const installed = planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0;
+    return Math.max(0, resolveStrategicDevelopmentRepairDroneCap(planet) - installed);
+  }
+
+  if (isStrategicDevelopmentSupportCargoShipType(shipType)) {
+    const remainingCapacity = resolveStrategicDevelopmentSupportCargoRemainingCapacity(planet);
+    const cargoCapacity = Math.max(1, blueprint.cargoCapacity ?? 1);
+    return Math.max(0, Math.ceil(remainingCapacity / cargoCapacity));
+  }
+
   const localIncomeTotal = planet.economy.income.metal + planet.economy.income.crystal + planet.economy.income.deuterium;
   const targetBudget = Math.max(
     1,
@@ -1490,6 +1511,35 @@ function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, shipType: Sh
 
   const maxExtraFactor = Math.max(0, planet.defense.avgIndustryLevel);
   return 1 + (((hash % 1000) / 1000) * maxExtraFactor);
+}
+
+function isStrategicDevelopmentSupportCargoShipType(shipType: ShipType): boolean {
+  return (SUPPORT_CARGO_SHIP_TYPES as readonly ShipType[]).includes(shipType);
+}
+
+function resolveStrategicDevelopmentSupportCargoTurnBudget(planet: BotPlanetSnapshot): number {
+  return SUPPORT_TRANSFER_BASE_TURNS + Math.max(0, Math.floor(planet.defense.avgIndustryLevel - 4));
+}
+
+function resolveStrategicDevelopmentSupportCargoTargetCapacity(planet: BotPlanetSnapshot): number {
+  const localIncomeTotal = planet.economy.income.metal + planet.economy.income.crystal + planet.economy.income.deuterium;
+  return Math.max(0, Math.floor(localIncomeTotal * resolveStrategicDevelopmentSupportCargoTurnBudget(planet)));
+}
+
+function resolveStrategicDevelopmentInstalledSupportCargoCapacity(planet: BotPlanetSnapshot): number {
+  return SUPPORT_CARGO_SHIP_TYPES.reduce((total, shipType) =>
+    total + ((SHIP_BLUEPRINTS.get(shipType)?.cargoCapacity ?? 0) * (planet.ships.installedCountByType[shipType] ?? 0)), 0);
+}
+
+function resolveStrategicDevelopmentSupportCargoRemainingCapacity(planet: BotPlanetSnapshot): number {
+  return Math.max(
+    0,
+    resolveStrategicDevelopmentSupportCargoTargetCapacity(planet) - resolveStrategicDevelopmentInstalledSupportCargoCapacity(planet)
+  );
+}
+
+function resolveStrategicDevelopmentRepairDroneCap(planet: BotPlanetSnapshot): number {
+  return Math.max(0, Math.floor(planet.power.industryPower / 2));
 }
 
 function resolveBuildingBonusFactor(
@@ -1575,7 +1625,14 @@ function isProductionShipEligible(
   }
 
   if (shipType === ShipType.REPAIR_DRONE) {
-    return isRepairDroneSupportPlanet(planet);
+    return context.snapshot.empire.ownedPlanetCount > 1
+      && isRepairDroneSupportPlanet(planet)
+      && (planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0) < resolveStrategicDevelopmentRepairDroneCap(planet);
+  }
+
+  if (isStrategicDevelopmentSupportCargoShipType(shipType)) {
+    return context.snapshot.empire.ownedPlanetCount > 1
+      && resolveStrategicDevelopmentSupportCargoRemainingCapacity(planet) > 0;
   }
 
   return true;

@@ -465,9 +465,10 @@ function buildGlobalWeights(
   );
   const strategicDevelopmentWeight = clampWeight(
     profile.strategicWeights.strategicDevelopment
-    + (modeScores.ECONOMIC_RECOVERY * 0.35)
-    + (modeScores.EXPANSION * 0.2)
-    + (immatureCount * 4)
+    - 8
+    + (modeScores.ECONOMIC_RECOVERY * 0.25)
+    + (modeScores.EXPANSION * 0.12)
+    + (immatureCount * 2)
     - (selectedMode === 'WAR_EMERGENCY' ? 10 : 0)
   );
   const strategicMilitaryWeight = clampWeight(
@@ -508,12 +509,12 @@ function buildWeightManagerPlanetEntry(
   let warfareWeight = profile.localWeights.warfare;
 
   if (flags.immaturePlanet) {
-    economicWeight += 34;
+    economicWeight += 40;
     defensiveWeight -= 8;
     warfareWeight -= 35;
   }
   if (localStage === 'MATURING') {
-    economicWeight += 12;
+    economicWeight += 16;
     warfareWeight = Math.max(warfareWeight, Math.round(profile.localWeights.warfare * 0.5));
     defensiveWeight -= 4;
   }
@@ -565,7 +566,7 @@ function buildWeightManagerPlanetEntry(
       break;
     case 'EXPANSION':
       warfareWeight += 8;
-      economicWeight += 6;
+      economicWeight += 10;
       break;
     case 'DIPLOMATIC_CAUTION':
       warfareWeight -= 8;

@@ -93,7 +93,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     expect(result.goals?.some((goal) => goal.finalShipType === ShipType.COLONIZER)).toBe(false);
   });
 
-  it('allows repair-drone production on low-industry planets once unlocked', () => {
+  it('does not allow repair-drone production on a one-planet empire even when unlocked', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseStrategicDevelopmentPlanet(planet);
     planet.setBuildingLevel(BuildingType.METAL_MINE, 2);
@@ -114,7 +114,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     expect(result.goals?.some((goal) =>
       goal.goalFamily === 'PRODUCTION'
       && goal.finalShipType === ShipType.REPAIR_DRONE
-    )).toBe(true);
+    )).toBe(false);
   });
 
   it('emits an armament-delivery mission for repair support from a developed planet', () => {
@@ -154,6 +154,24 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     )).toBe(false);
   });
 
+  it('does not produce support cargo or repair hulls for a one-planet empire', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureDevelopedSupportSource(planet);
+    setSupportShipTech(bot);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.goals?.some((goal) =>
+      goal.goalFamily === 'PRODUCTION'
+      && (
+        goal.finalShipType === ShipType.TRANSPORTER
+        || goal.finalShipType === ShipType.MASS_HAULER
+        || goal.finalShipType === ShipType.CARGO_SUPPORT
+        || goal.finalShipType === ShipType.REPAIR_DRONE
+      )
+    )).toBe(false);
+  });
+
   it('does not emit an armament-delivery mission without a valid hangar carrier', () => {
     const { galaxy, bot, sourcePlanet, targetPlanet } = createSupportWorld();
     configureDevelopedSupportSource(sourcePlanet);
@@ -168,6 +186,26 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     expect(result.proposals.some((proposal) =>
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.ARMAMENT_DELIVERY
+    )).toBe(false);
+  });
+
+  it('does not produce more support cargo hulls once local transfer capacity is already sufficient', () => {
+    const { galaxy, bot, sourcePlanet, targetPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    configureLowIndustrySupportTarget(targetPlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 20);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.REPAIR_DRONE, 6);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.goals?.some((goal) =>
+      goal.goalFamily === 'PRODUCTION'
+      && (
+        goal.finalShipType === ShipType.TRANSPORTER
+        || goal.finalShipType === ShipType.MASS_HAULER
+        || goal.finalShipType === ShipType.CARGO_SUPPORT
+      )
     )).toBe(false);
   });
 
