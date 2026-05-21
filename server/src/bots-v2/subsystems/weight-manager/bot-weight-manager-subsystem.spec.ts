@@ -127,6 +127,17 @@ describe('BotWeightManagerSubsystem', () => {
     expect(wartimeEntry?.industryFocused).toBe(false);
     expect(wartimeEntry?.selectedFocus).toBeNull();
   });
+
+  it('compresses non-balanced profile personality weights toward balanced values', () => {
+    const { galaxy, bot } = createWeightManagerWorld();
+    bot.botProfileId = 'AVOIDER';
+
+    const result = runWeightManagerSubsystem(galaxy, bot);
+
+    expect(result.memory.weightManager.aggressionAxis).toBe(18);
+    expect(result.memory.weightManager.cautionAxis).toBe(77);
+    expect(result.memory.weightManager.strategicMilitaryWeight).toBeGreaterThanOrEqual(26);
+  });
 });
 
 function runWeightManagerSubsystem(

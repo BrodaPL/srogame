@@ -113,6 +113,61 @@ describe('BotStrategicMilitarySubsystem', () => {
     }]);
   });
 
+  it('does not fall back to repeated spy when farm memory already shows a prior spy and a cruiser probe is available', () => {
+    const memory = createDefaultBotMemoryV2();
+    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    memory.strategicMilitary.farmLedger.push({
+      coordinates: {
+        x: neutralPlanet.basicInfo.solarSystem.coordinates.x,
+        y: neutralPlanet.basicInfo.solarSystem.coordinates.y,
+        z: neutralPlanet.basicInfo.order
+      },
+      lastSpyTurn: galaxy.currentTurn - 1,
+      lastAttackTurn: null,
+      lastSuccessfulPlunderTurn: null,
+      knownMineLevels: {
+        metalMineLevel: 0,
+        crystalMineLevel: 0,
+        deuteriumSynthesizerLevel: 0
+      },
+      knownStorageCapacity: { metal: 0, crystal: 0, deuterium: 0 },
+      knownIncome: { metal: 0, crystal: 0, deuterium: 0 },
+      knownBunkerReductionPercent: 0,
+      knownPlanetaryModifiers: {
+        industryModifier: 1,
+        metalModifier: 1,
+        crystalModifier: 1,
+        deuteriumModifier: 1
+      },
+      knownShipCountsByType: {},
+      knownDefenceCountsByType: {},
+      farmIntelEnough: false,
+      initialDefenseBroken: false,
+      lastObservedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      lastResourceObservationTurn: null,
+      lastCombatObservationTurn: null,
+      estimatedNextGoodAttackTurn: null,
+      preferredPlunderTransporterCount: 6,
+      preferredOriginCoordinates: null
+    });
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot, memory);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SPY
+      && proposal.targetCoordinates?.z === neutralPlanet.basicInfo.order
+    )).toBe(false);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'INTEL'
+      && proposal.targetCoordinates?.z === neutralPlanet.basicInfo.order
+    )).toBe(true);
+  });
+
   it('emits a plunder attack for opened neutral farms with enough loot at arrival', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);

@@ -46,6 +46,8 @@ type WeightProfile = {
   };
 };
 
+const PERSONALITY_VARIANCE_RETENTION = 0.8;
+
 type GlobalModeScores = {
   ECONOMIC_RECOVERY: number;
   WAR_EMERGENCY: number;
@@ -93,7 +95,7 @@ const COMBAT_SHIP_TYPES = Array.from(SHIP_BLUEPRINTS.shipsMap.keys())
     return blueprint?.weapons.some((weapon) => weapon.damage > 0) ?? false;
   });
 
-const PROFILE_TABLES: Record<BotProfileId, WeightProfile> = {
+const RAW_PROFILE_TABLES: Record<BotProfileId, WeightProfile> = {
   BALANCED: {
     axes: { aggression: 50, industry: 50, diplomacy: 45, defences: 35, caution: 45, development: 50 },
     localWeights: { economic: 50, defensive: 35, warfare: 50 },
@@ -125,6 +127,8 @@ const PROFILE_TABLES: Record<BotProfileId, WeightProfile> = {
     strategicWeights: { research: 42, strategicDevelopment: 40, strategicMilitary: 25, strategicDiplomatic: 35 }
   }
 };
+
+const PROFILE_TABLES: Record<BotProfileId, WeightProfile> = compressProfileTables(RAW_PROFILE_TABLES);
 
 export class BotWeightManagerSubsystem implements BotSubsystem {
   public readonly subsystemId = 'WEIGHT_MANAGER' as const;
@@ -267,7 +271,12 @@ function countFarmStatuses(targets: BotStrategicMilitaryTargetSnapshot[]): {
   let raidReady = 0;
 
   for (const target of targets) {
-    if (!target.hasEspionageReport) {
+    if (!target.isNeutral || !target.inOwnedSystem) {
+      continue;
+    }
+
+    const hasCombatIntel = target.spyCombatIntelEnough || target.lastAttackTurn !== null;
+    if (!hasCombatIntel) {
       continue;
     }
 
@@ -281,6 +290,45 @@ function countFarmStatuses(targets: BotStrategicMilitaryTargetSnapshot[]): {
   }
 
   return { breakNeed, raidReady };
+}
+
+function compressProfileTables(
+  tables: Record<BotProfileId, WeightProfile>
+): Record<BotProfileId, WeightProfile> {
+  const balanced = tables.BALANCED;
+  return Object.fromEntries(
+    Object.entries(tables).map(([profileId, profile]) => {
+      if (profileId === 'BALANCED') {
+        return [profileId, profile];
+      }
+
+      return [profileId, {
+        axes: {
+          aggression: compressTowardBalanced(profile.axes.aggression, balanced.axes.aggression),
+          industry: compressTowardBalanced(profile.axes.industry, balanced.axes.industry),
+          diplomacy: compressTowardBalanced(profile.axes.diplomacy, balanced.axes.diplomacy),
+          defences: compressTowardBalanced(profile.axes.defences, balanced.axes.defences),
+          caution: compressTowardBalanced(profile.axes.caution, balanced.axes.caution),
+          development: compressTowardBalanced(profile.axes.development, balanced.axes.development)
+        },
+        localWeights: {
+          economic: compressTowardBalanced(profile.localWeights.economic, balanced.localWeights.economic),
+          defensive: compressTowardBalanced(profile.localWeights.defensive, balanced.localWeights.defensive),
+          warfare: compressTowardBalanced(profile.localWeights.warfare, balanced.localWeights.warfare)
+        },
+        strategicWeights: {
+          research: compressTowardBalanced(profile.strategicWeights.research, balanced.strategicWeights.research),
+          strategicDevelopment: compressTowardBalanced(profile.strategicWeights.strategicDevelopment, balanced.strategicWeights.strategicDevelopment),
+          strategicMilitary: compressTowardBalanced(profile.strategicWeights.strategicMilitary, balanced.strategicWeights.strategicMilitary),
+          strategicDiplomatic: compressTowardBalanced(profile.strategicWeights.strategicDiplomatic, balanced.strategicWeights.strategicDiplomatic)
+        }
+      }];
+    })
+  ) as Record<BotProfileId, WeightProfile>;
+}
+
+function compressTowardBalanced(value: number, balancedValue: number): number {
+  return Math.round(balancedValue + ((value - balancedValue) * PERSONALITY_VARIANCE_RETENTION));
 }
 
 function buildPlanetFlags(

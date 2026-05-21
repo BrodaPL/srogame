@@ -117,7 +117,7 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
       }
 
       if (!farmEntry.farmIntelEnough) {
-        if (!target.hasEspionageReport) {
+        if (!target.hasEspionageReport && farmEntry.lastSpyTurn === null) {
           const spyRequest = createTargetedSpyMissionRequest(
             context,
             target,
