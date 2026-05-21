@@ -59,9 +59,9 @@ describe('BotWarfareSubsystem', () => {
   it('emits a shipyard capacity request when shipyard is below avg-industry target', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseWarfarePlanet(planet);
-    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
-    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
-    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 5);
     planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
     planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
     planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
@@ -78,6 +78,78 @@ describe('BotWarfareSubsystem', () => {
     expect(result.proposals.some((proposal) =>
       proposal.kind === 'BUILDING'
       && (proposal.requestPayload as { buildingType?: BuildingType }).buildingType === BuildingType.SHIPYARD
+    )).toBe(true);
+  });
+
+  it('prefers cruiser unlock pressure once avgIndustry rises above 3.8 and cruiser is not unlocked yet', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 5);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 5);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 2);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
+    bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 2);
+    bot.setTechLevel(TechnologyType.FUSION_DRIVE, 2);
+    bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 1);
+    bot.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.SHIELDING_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.BEAMS_WEAPONS, 1);
+    bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 1);
+    bot.setTechLevel(TechnologyType.RAILGUNS_WEAPONS, 1);
+
+    const result = runWarfareSubsystem(galaxy, bot);
+    const cruiserUnlockGoal = result.goals?.find((goal) =>
+      goal.goalFamily === 'UNLOCK'
+      && goal.finalShipType === ShipType.CRUISER
+    );
+
+    expect(cruiserUnlockGoal).toBeDefined();
+    expect(cruiserUnlockGoal?.debug.bonusFactor).toBeGreaterThan(1);
+  });
+
+  it('shifts follow-through pressure toward battle ships once a cruiser break fleet already exists', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 6);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 5);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 7);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 5);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 4);
+    planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+    setBaselineShipTech(bot, 5);
+    bot.setTechLevel(TechnologyType.FUSION_DRIVE, 3);
+    bot.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 2);
+    bot.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 3);
+    bot.setTechLevel(TechnologyType.BEAMS_WEAPONS, 2);
+    bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 2);
+    addInstalledShips(planet, {
+      [ShipType.CRUISER]: 8
+    });
+
+    const result = runWarfareSubsystem(galaxy, bot);
+    const battleShipGoal = result.goals?.find((goal) =>
+      goal.goalFamily === 'PRODUCTION'
+      && goal.finalShipType === ShipType.BATTLE_SHIP
+    );
+
+    expect(battleShipGoal).toBeDefined();
+    expect(battleShipGoal?.debug.bonusFactor).toBeGreaterThan(1);
+    expect(result.goals?.find((goal) =>
+      goal.goalFamily === 'PRODUCTION'
+      && goal.finalShipType === ShipType.FIGHTER
+    )?.debug.postCruiserSmallShipPenaltyMultiplier).toBeGreaterThan(1);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && (proposal.requestPayload as { shipType?: ShipType }).shipType === ShipType.BATTLE_SHIP
     )).toBe(true);
   });
 

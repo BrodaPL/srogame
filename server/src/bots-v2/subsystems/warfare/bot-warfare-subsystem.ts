@@ -184,6 +184,9 @@ const NANITE_WEIGHTED_ETC_PENALTY = 1.2;
 const MAX_VISIBLE_GOALS = 5;
 const STRUCTURAL_VISIBILITY_THRESHOLD = 1.5;
 const FOREIGN_RECYCLE_INTEL_MAX_AGE = 20;
+const CRUISER_FOCUS_AVG_INDUSTRY_THRESHOLD = 3.8;
+const CRUISER_BREAK_FLEET_TARGET = 8;
+const MIN_HOME_GUARD_JUMP_SHIPS = 2;
 
 export class BotWarfareSubsystem implements BotSubsystem {
   public readonly subsystemId = 'WARFARE' as const;
@@ -1081,7 +1084,7 @@ function evaluateUnlockGoal(
     });
   }
 
-  const bonusFactor = 1;
+  const bonusFactor = resolveUnlockBonusFactor(planet, shipType);
   const weightedEtc = totalEtc / bonusFactor;
 
   return {
@@ -1108,6 +1111,7 @@ function evaluateUnlockGoal(
     immediateRequest,
     debug: {
       avgIndustryLevel: roundToTwoDecimals(planet.defense.avgIndustryLevel),
+      bonusFactor: roundToTwoDecimals(bonusFactor),
       goalFamily: 'UNLOCK',
       shipyardRequirement: resolveShipyardUnlockThreshold(shipType),
       totalEtc: roundToTwoDecimals(totalEtc),
@@ -1161,10 +1165,12 @@ function evaluateProductionGoal(
 
   const bonusFactor = resolveProductionBonusFactor(planet, shipType);
   const smallShipPenaltyMultiplier = resolveSmallShipPenaltyMultiplier(context, planet, shipType);
+  const postCruiserSmallShipPenaltyMultiplier = resolvePostCruiserSmallShipPenaltyMultiplier(planet, shipType);
   const transporterPenaltyMultiplier = resolveTransporterPenaltyMultiplier(context, planet, shipType);
   const repairDronePenaltyMultiplier = resolveRepairDronePenaltyMultiplier(planet, shipType);
   const weightedEtc = (totalEtc / bonusFactor)
     * smallShipPenaltyMultiplier
+    * postCruiserSmallShipPenaltyMultiplier
     * transporterPenaltyMultiplier
     * repairDronePenaltyMultiplier;
 
@@ -1197,6 +1203,7 @@ function evaluateProductionGoal(
       orderAmount: immediateRequest.amount,
       queueRemainingEtc: planet.power.shipyardQueueRemainingEtc,
       smallShipPenaltyMultiplier: roundToTwoDecimals(smallShipPenaltyMultiplier),
+      postCruiserSmallShipPenaltyMultiplier: roundToTwoDecimals(postCruiserSmallShipPenaltyMultiplier),
       transporterPenaltyMultiplier: roundToTwoDecimals(transporterPenaltyMultiplier),
       repairDronePenaltyMultiplier: roundToTwoDecimals(repairDronePenaltyMultiplier),
       smallShipTargetCapacity: resolveLocalSmallShipTargetCapacity(context, planet),
@@ -1781,7 +1788,50 @@ function resolveProductionBonusFactor(
 ): number {
   let bonusFactor = 1;
   bonusFactor *= 1 + resolveDistributionBonusRatio(planet, shipType);
+  bonusFactor *= resolveFollowThroughBonusFactor(planet, shipType);
   return Math.min(BONUS_FACTOR_CEILING, Math.max(1, bonusFactor));
+}
+
+function resolveUnlockBonusFactor(
+  planet: BotPlanetSnapshot,
+  shipType: ShipType
+): number {
+  return Math.min(BONUS_FACTOR_CEILING, Math.max(1, resolveFollowThroughBonusFactor(planet, shipType)));
+}
+
+function resolveFollowThroughBonusFactor(
+  planet: BotPlanetSnapshot,
+  shipType: ShipType
+): number {
+  if (planet.defense.avgIndustryLevel <= CRUISER_FOCUS_AVG_INDUSTRY_THRESHOLD) {
+    return 1;
+  }
+
+  const cruiserUnlocked = isShipUnlocked(planet, ShipType.CRUISER);
+  const jumpCombatCount = resolveInstalledJumpCombatCount(planet);
+  const followThroughType = resolveFollowThroughShipType(planet);
+
+  if (!cruiserUnlocked) {
+    return shipType === ShipType.CRUISER ? 1.85 : 1;
+  }
+
+  if (jumpCombatCount < CRUISER_BREAK_FLEET_TARGET) {
+    return shipType === ShipType.CRUISER ? 1.6 : 1;
+  }
+
+  if (jumpCombatCount < (CRUISER_BREAK_FLEET_TARGET + MIN_HOME_GUARD_JUMP_SHIPS)) {
+    return isJumpCapableCombatShipType(shipType) ? 1.15 : 1;
+  }
+
+  if (followThroughType !== null && shipType === followThroughType) {
+    return 1.6;
+  }
+
+  if (shipType === ShipType.CRUISER) {
+    return 1.05;
+  }
+
+  return 1;
 }
 
 function resolveSmallShipPenaltyMultiplier(
@@ -1844,6 +1894,55 @@ function isSmallSupportShipType(shipType: ShipType): boolean {
   return (SMALL_SUPPORT_SHIP_TYPES as readonly ShipType[]).includes(shipType);
 }
 
+function isJumpCapableCombatShipType(shipType: ShipType): boolean {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  return Boolean(
+    blueprint
+    && blueprint.canJump
+    && blueprint.weapons.length > 0
+    && !isCargoShipType(shipType)
+    && shipType !== ShipType.SPY_PROBE
+    && shipType !== ShipType.REPAIR_DRONE
+    && shipType !== ShipType.COLONIZER
+    && shipType !== ShipType.RECYCLER
+  );
+}
+
+function resolveInstalledJumpCombatCount(planet: BotPlanetSnapshot): number {
+  return INCLUDED_WARFARE_SHIP_TYPES.reduce((sum, shipType) =>
+    sum + (isJumpCapableCombatShipType(shipType) ? (planet.ships.installedCountByType[shipType] ?? 0) : 0), 0);
+}
+
+function resolveFollowThroughShipType(planet: BotPlanetSnapshot): ShipType | null {
+  const candidates = [ShipType.BATTLE_SHIP, ShipType.FRIGATE]
+    .filter((shipType) => isShipUnlockBandOpen(planet, shipType));
+  if (candidates.length <= 0) {
+    return null;
+  }
+
+  return [...candidates]
+    .sort((left, right) =>
+      resolveShipUnlockReadinessScore(planet, left) - resolveShipUnlockReadinessScore(planet, right)
+      || left.localeCompare(right)
+    )[0] ?? null;
+}
+
+function resolveShipUnlockReadinessScore(planet: BotPlanetSnapshot, shipType: ShipType): number {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  let gap = 0;
+  for (const requirement of blueprint.buildingRequirements) {
+    gap += Math.max(0, Math.ceil(requirement.level) - getBuildingLevel(planet, requirement.building));
+  }
+  for (const requirement of blueprint.techRequirements) {
+    gap += Math.max(0, Math.ceil(requirement.level) - getTechnologyLevel(planet, requirement.tech));
+  }
+  return gap;
+}
+
 function resolveLocalCarrierHangarCapacity(planet: BotPlanetSnapshot): number {
   let total = 0;
 
@@ -1876,6 +1975,19 @@ function resolveTransporterPenaltyMultiplier(
 
   const overageRatio = installed / Math.max(1, cap);
   return 1 + Math.min(6, overageRatio * 2.5);
+}
+
+function resolvePostCruiserSmallShipPenaltyMultiplier(
+  planet: BotPlanetSnapshot,
+  shipType: ShipType
+): number {
+  if (!isSmallSupportShipType(shipType)) {
+    return 1;
+  }
+
+  return resolveInstalledJumpCombatCount(planet) >= CRUISER_BREAK_FLEET_TARGET
+    ? 2.4
+    : 1;
 }
 
 function resolveRepairDronePenaltyMultiplier(
