@@ -218,6 +218,7 @@ export type BotMemoryV2SupervisorFuelSpendingEntry = {
 
 export type BotMemoryV2StrategicMilitaryFarmLedgerEntry = {
   coordinates: BotMemoryCoordinates;
+  intelPhase: 'UNSCANNED' | 'SPY_SENT' | 'PROBE_REQUIRED' | 'COMBAT_INTEL_READY';
   lastSpyTurn: number | null;
   lastAttackTurn: number | null;
   lastSuccessfulPlunderTurn: number | null;
@@ -1064,6 +1065,16 @@ export class Player {
 
         return {
           coordinates,
+          intelPhase: entry?.intelPhase === 'SPY_SENT'
+            || entry?.intelPhase === 'PROBE_REQUIRED'
+            || entry?.intelPhase === 'COMBAT_INTEL_READY'
+            || entry?.intelPhase === 'UNSCANNED'
+            ? entry.intelPhase
+            : entry?.farmIntelEnough === true
+              ? 'COMBAT_INTEL_READY'
+              : Number.isInteger(entry?.lastSpyTurn)
+                ? 'SPY_SENT'
+                : 'UNSCANNED',
           lastSpyTurn: Number.isInteger(entry?.lastSpyTurn) ? entry.lastSpyTurn : null,
           lastAttackTurn: Number.isInteger(entry?.lastAttackTurn) ? entry.lastAttackTurn : null,
           lastSuccessfulPlunderTurn: Number.isInteger(entry?.lastSuccessfulPlunderTurn)

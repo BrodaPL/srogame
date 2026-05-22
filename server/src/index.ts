@@ -7809,6 +7809,8 @@ function toEspionagePlayerReportDto(report: EspionageReportData): EspionagePlaye
   return {
     ...toPlayerReportBaseDto(report),
     diff: report.diff,
+    hasTotalDefencesIntel: report.hasTotalDefencesIntel,
+    hasTotalShipsIntel: report.hasTotalShipsIntel,
     size: report.size,
     planetaryParameters: toPlanetaryParametersDto(report.planetaryParameters),
     averageBuildingLevel: report.averageBuildingLevel,

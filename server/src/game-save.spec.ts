@@ -390,6 +390,8 @@ function buildTestSave() {
       senderPlayerName: 'Scout'
     },
     4,
+    true,
+    true,
     172,
     new PlanetaryParameters(1, 1, 1, 1, 1, 1, 1, 1, 1),
     3,

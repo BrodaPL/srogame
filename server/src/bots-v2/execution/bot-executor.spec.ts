@@ -181,6 +181,17 @@ describe('bot executor', () => {
     expect(galaxy.activeFleets[0]?.state).toBe(FleetState.RETURNING);
   });
 
+  it('does not recall outbound attack fleets against environmental neutral planets', () => {
+    const { galaxy, origin, target } = createNeutralRecallGalaxy();
+    galaxy.activeFleets.push(createAttackFleet(origin, target));
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const outcomes = executor.executeAcceptedTasks([]);
+
+    expect(outcomes).toHaveLength(0);
+    expect(galaxy.activeFleets[0]?.state).toBe(FleetState.MOVING_TO_TARGET);
+  });
+
   it('preserves proposal-owned Jump Gate intent and creates pending foreign Jump Gate requests', () => {
     const { galaxy, origin, target, bot, ally } = createJumpGateGalaxy();
     const executor = new LiveQueueBotExecutor(galaxy, 1);
@@ -391,6 +402,50 @@ function createRecallGalaxy(): { galaxy: Galaxy; origin: Planet; target: Planet;
     new Map(),
     new Map([[1, bot], [2, targetPlayer]]),
     new Map(),
+    new Map([[bot.playerName, bot.playerId], [targetPlayer.playerName, targetPlayer.playerId]])
+  );
+
+  return { galaxy, origin, target, bot, targetPlayer };
+}
+
+function createNeutralRecallGalaxy(): { galaxy: Galaxy; origin: Planet; target: Planet; bot: Player; targetPlayer: Player } {
+  const system = new SolarSystem('NeutralRecallSys', 3, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const origin = Planet.createStartingPlanet('Origin', 1, system, 1);
+  const target = Planet.createStartingPlanet('NeutralTarget', 2, system, 2);
+  system.planets[0] = origin;
+  system.planets[1] = target;
+  origin.rBDSFTQ.resources = new ResourcesPack(5000, 5000, 5000);
+  origin.rBDSFTQ.ships = new ManyShips({ [ShipType.FIGHTER]: 1 }, []);
+
+  const bot = new Player(
+    1,
+    'Bot-1',
+    [origin],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+  const targetPlayer = new Player(
+    2,
+    'Neutral-2',
+    [target],
+    new Map(),
+    [],
+    PlayerType.NEUTRAL,
+    createTutorialReadState(true)
+  );
+
+  const galaxy = new Galaxy(
+    'Neutral Recall Test',
+    [bot, targetPlayer],
+    [[system]],
+    3,
+    [],
+    2,
+    new Map(),
+    new Map([[1, bot]]),
+    new Map([[2, targetPlayer]]),
     new Map([[bot.playerName, bot.playerId], [targetPlayer.playerName, targetPlayer.playerId]])
   );
 

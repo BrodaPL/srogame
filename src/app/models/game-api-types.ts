@@ -961,6 +961,8 @@ export type TextPlayerReportDto = PlayerReportDtoBase & {
 export type EspionagePlayerReportDto = PlayerReportDtoBase & {
   reportType: ReportType;
   diff: number;
+  hasTotalDefencesIntel: boolean;
+  hasTotalShipsIntel: boolean;
   size: number;
   planetaryParameters: PlanetaryParametersDto;
   averageBuildingLevel: number;

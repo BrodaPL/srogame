@@ -166,6 +166,55 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(defender.reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
   });
 
+  it('creates battle and fleet outcome reports for bots', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const moveFleet = new Fleet(
+      41,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(40, 20, 10),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [moveFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[2].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.fromShipInstances([shipInstance(ShipType.SPY_PROBE)]);
+        solarSystem.planets[3].info.ownerId = 2;
+      },
+      (solarSystem) => ([
+        new Player(1, 'AlphaBot', [solarSystem.planets[0], solarSystem.planets[2]], new Map(), [], PlayerType.BOT),
+        new Player(2, 'BetaBot', [solarSystem.planets[1], solarSystem.planets[3]], new Map(), [], PlayerType.BOT)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[0].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
+    expect(players[0].reports.some((report) => report.title.startsWith('Fleet Failed: Move'))).toBe(true);
+    expect(players[1].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
+  });
+
   it('keeps pending jump gate fleets waiting at origin through end turn resolution', () => {
     const waitingFleet = new Fleet(
       90,
@@ -1458,6 +1507,52 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].rBDSFTQ.resources.crystal).toBe(100);
     expect(system.planets[1].rBDSFTQ.resources.deuterium).toBe(100);
     expect(attacker.reports.some((report) =>
+      report.title.startsWith('Plunder Report: Beta Storehouse')
+      && report.show().includes('Fleet cargo after looting: 600/600')
+    )).toBe(true);
+  });
+
+  it('creates plunder reports for bot attackers on no-battle Attack missions', () => {
+    const transporterCargoCapacity = blueprints.get(ShipType.TRANSPORTER)!.cargoCapacity;
+    const attackFleet = new Fleet(
+      297,
+      1,
+      FleetMissionType.ATTACK,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Storehouse',
+      manyShips({ type: ShipType.TRANSPORTER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      transporterCargoCapacity,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [attackFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Storehouse';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.resources = new ResourcesPack(300, 300, 300);
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+      },
+      (system) => {
+        const attacker = new Player(1, 'AlphaBot', [system.planets[0]], new Map(), [], PlayerType.BOT);
+        const defender = new Player(2, 'BetaBot', [system.planets[1]], new Map(), [], PlayerType.BOT);
+        return [attacker, defender];
+      }
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[0].reports.some((report) =>
       report.title.startsWith('Plunder Report: Beta Storehouse')
       && report.show().includes('Fleet cargo after looting: 600/600')
     )).toBe(true);

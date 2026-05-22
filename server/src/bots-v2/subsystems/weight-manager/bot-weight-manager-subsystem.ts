@@ -565,12 +565,13 @@ function resolveColonizationOpportunityPressure(context: BotSubsystemContext): n
     && candidate.colonizationDifficulty <= adaptiveTechnologyLevel
   ).length;
 
-  if (viableCandidates < 3) {
+  const requiredCandidates = context.snapshot.empire.ownedPlanetCount <= 1 ? 2 : 3;
+  if (viableCandidates < requiredCandidates) {
     return 0;
   }
 
   const basePressure = context.snapshot.empire.ownedPlanetCount <= 1 ? 20 : 10;
-  return Math.min(24, basePressure + ((viableCandidates - 3) * 2));
+  return Math.min(24, basePressure + ((viableCandidates - requiredCandidates) * 2));
 }
 
 function buildWeightManagerPlanetEntry(

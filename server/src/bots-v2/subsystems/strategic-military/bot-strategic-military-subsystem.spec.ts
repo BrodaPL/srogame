@@ -124,6 +124,7 @@ describe('BotStrategicMilitarySubsystem', () => {
         y: neutralPlanet.basicInfo.solarSystem.coordinates.y,
         z: neutralPlanet.basicInfo.order
       },
+      intelPhase: 'SPY_SENT',
       lastSpyTurn: galaxy.currentTurn - 1,
       lastAttackTurn: null,
       lastSuccessfulPlunderTurn: null,
@@ -168,6 +169,23 @@ describe('BotStrategicMilitarySubsystem', () => {
     )).toBe(true);
   });
 
+  it('seeds break intel from a spy report that reveals neutral defenders', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 8);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CORVETTE, 2);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'BREAK'
+      && proposal.targetCoordinates?.z === neutralPlanet.basicInfo.order
+    )).toBe(true);
+  });
+
   it('emits a plunder attack for opened neutral farms with enough loot at arrival', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
@@ -191,6 +209,24 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(attackProposal).toBeDefined();
     expect(attackProposal?.requestPayload.ships.some((ship: { type: ShipType }) => ship.type === ShipType.TRANSPORTER)).toBe(true);
     expect(attackProposal?.requestPayload.ships.some((ship: { type: ShipType }) => ship.type === ShipType.CRUISER)).toBe(true);
+  });
+
+  it('treats scanned neutral planets with confirmed zero defenders as raid-ready intel', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    neutralPlanet.rBDSFTQ.resources = new ResourcesPack(300, 300, 300);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const plunderProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'PLUNDER'
+    );
+
+    expect(plunderProposal).toBeDefined();
   });
 
   it('emits a ship-need request when current fleets cannot clear a scanned neutral target', () => {

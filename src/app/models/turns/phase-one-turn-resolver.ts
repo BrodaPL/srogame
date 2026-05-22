@@ -2190,7 +2190,7 @@ function addAttackPlunderSummaryReport(
   summary: AttackPlunderSummary,
   resolvedTurnNumber: number
 ): void {
-  if (!player || player.type !== PlayerType.PLAYER) {
+  if (!player || player.type === PlayerType.NEUTRAL) {
     return;
   }
 
@@ -2930,7 +2930,7 @@ function addRepairReturnSummaryReport(
 }
 
 function addBattleFleetReport(player: Player, fleetReport: FleetReport): void {
-  if (player.type !== PlayerType.PLAYER) {
+  if (player.type === PlayerType.NEUTRAL) {
     return;
   }
 
@@ -3156,7 +3156,7 @@ function addFleetSuccessReport(
   resolvedTurnNumber: number,
   body: string
 ): void {
-  if (player.type !== PlayerType.PLAYER) {
+  if (player.type === PlayerType.NEUTRAL) {
     return;
   }
 
@@ -3180,7 +3180,7 @@ function addFleetFailureReport(
   resolvedTurnNumber: number,
   reason: string
 ): void {
-  if (player.type !== PlayerType.PLAYER) {
+  if (player.type === PlayerType.NEUTRAL) {
     return;
   }
 
@@ -3204,7 +3204,7 @@ function addFleetDrawReport(
   resolvedTurnNumber: number,
   body: string
 ): void {
-  if (player.type !== PlayerType.PLAYER) {
+  if (player.type === PlayerType.NEUTRAL) {
     return;
   }
 

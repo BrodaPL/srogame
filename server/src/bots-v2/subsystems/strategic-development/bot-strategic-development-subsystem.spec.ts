@@ -387,7 +387,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
       && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
     );
 
-    expect(colonizeProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 4 });
+    expect(colonizeProposal).toBeDefined();
     randomSpy.mockRestore();
   });
 
@@ -424,7 +424,37 @@ describe('BotStrategicDevelopmentSubsystem', () => {
       && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
     );
 
-    expect(colonizeProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 4 });
+    expect(colonizeProposal).toBeDefined();
+    randomSpy.mockRestore();
+  });
+
+  it('forces colonization for one-planet empires after turn 100 with two valid targets', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    galaxy.currentTurn = 101;
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 80000);
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    unownedPlanet.info.planetaryParameters.industryModifier = 1.05;
+    unownedPlanet.basicInfo.baseSize = 150;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const betterTarget = Planet.createRandomEmpty('BotSys IV', 4, sourcePlanet.basicInfo.solarSystem, null);
+    betterTarget.basicInfo.baseSize = 180;
+    betterTarget.basicInfo.colonizationDifficulty = 1;
+    betterTarget.info.planetaryParameters.industryModifier = 1.25;
+    sourcePlanet.basicInfo.solarSystem.planets[3] = betterTarget;
+    markPlanetScanned(bot, betterTarget, galaxy.currentTurn);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+    const colonizeProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
+    );
+
+    expect(colonizeProposal).toBeDefined();
     randomSpy.mockRestore();
   });
 

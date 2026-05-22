@@ -5,6 +5,7 @@ import * as buildingTypeModule from '../../../../src/app/models/enums/building-t
 import * as diplomaticStatusModule from '../../../../src/app/models/diplomacy/diplomatic-status.js';
 import * as diplomacyResolverModule from '../../../../src/app/models/diplomacy/diplomacy-resolver.js';
 import * as fleetMissionTypeModule from '../../../../src/app/models/enums/fleet-mission-type.js';
+import * as playerTypeModule from '../../../../src/app/models/enums/player-type.js';
 import * as technologyTypeModule from '../../../../src/app/models/enums/technology-type.js';
 import * as fleetModule from '../../../../src/app/models/fleets/fleet.js';
 import type { CreateFleetMissionCommand } from '../../game-commands/fleet-commands.ts';
@@ -55,6 +56,7 @@ const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../
 const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../src/app/models/diplomacy/diplomatic-status.js');
 const { DiplomacyResolver } = resolveModule(diplomacyResolverModule) as typeof import('../../../../src/app/models/diplomacy/diplomacy-resolver.js');
 const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../src/app/models/enums/fleet-mission-type.js');
+const { PlayerType } = resolveModule(playerTypeModule) as typeof import('../../../../src/app/models/enums/player-type.js');
 const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../src/app/models/enums/technology-type.js');
 const { FleetState } = resolveModule(fleetModule) as typeof import('../../../../src/app/models/fleets/fleet.js');
 
@@ -512,6 +514,10 @@ export class LiveQueueBotExecutor implements BotExecutor {
       }
 
       const targetPlayerId = targetResult.value.info.ownerId;
+      const targetPlayer = this.galaxy.players.find((entry) => entry.playerId === targetPlayerId) ?? null;
+      if (targetPlayer?.type === PlayerType.NEUTRAL) {
+        continue;
+      }
       const currentStatus = diplomacyResolver.getStatus(this.playerId, targetPlayerId);
       if (!RELATIONS_REQUIRING_OFFENSIVE_RECALL.has(currentStatus)) {
         continue;

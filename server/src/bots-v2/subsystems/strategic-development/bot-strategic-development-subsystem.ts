@@ -646,15 +646,16 @@ function resolveAdaptiveTechnologyLevel(context: BotSubsystemContext): number {
 }
 
 function resolveForcedColonizationPriority(context: BotSubsystemContext): ForcedColonizationPriority {
+  const adaptiveTechnologyLevel = resolveAdaptiveTechnologyLevel(context);
   const eligibleCandidates = context.snapshot.empire.intelCandidates.filter((candidate) =>
     !candidate.needsScan
     && candidate.colonizationDifficulty !== null
-    && candidate.colonizationDifficulty <= resolveAdaptiveTechnologyLevel(context)
+    && candidate.colonizationDifficulty <= adaptiveTechnologyLevel
   );
   if (
     context.snapshot.turn <= FORCED_COLONIZATION_TURN_THRESHOLD
     || !canEmpireColonizeMorePlanets(context)
-    || eligibleCandidates.length < 3
+    || eligibleCandidates.length < resolveForcedColonizationTargetThreshold(context.snapshot.empire.ownedPlanetCount)
   ) {
     return {
       active: false,
@@ -666,6 +667,10 @@ function resolveForcedColonizationPriority(context: BotSubsystemContext): Forced
     active: true,
     waitForAdaptive: isAdaptiveResearchAlreadyAdvancing(context)
   };
+}
+
+function resolveForcedColonizationTargetThreshold(ownedPlanetCount: number): number {
+  return ownedPlanetCount <= 1 ? 2 : 3;
 }
 
 function isAdaptiveResearchAlreadyAdvancing(context: BotSubsystemContext): boolean {

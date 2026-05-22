@@ -138,6 +138,44 @@ describe('BotWeightManagerSubsystem', () => {
     expect(result.memory.weightManager.cautionAxis).toBe(77);
     expect(result.memory.weightManager.strategicMilitaryWeight).toBeGreaterThanOrEqual(26);
   });
+
+  it('adds colonization pressure for one-planet empires when two valid scanned targets exist', () => {
+    const system = new SolarSystem('ColonizeA', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+    const homePlanet = Planet.createStartingPlanet('ColonizeA I', 1, system, 1);
+    const targetOne = Planet.createRandomEmpty('ColonizeA II', 2, system, null);
+    const targetTwo = Planet.createRandomEmpty('ColonizeA III', 3, system, null);
+    system.planets[0] = homePlanet;
+    system.planets[1] = targetOne;
+    system.planets[2] = targetTwo;
+
+    const bot = new Player(1, 'ColonizeBot', [homePlanet], new Map(), [], PlayerType.BOT, createTutorialReadState(true));
+    homePlanet.info.ownerId = bot.playerId;
+    configureIndustryPlanet(homePlanet, 5);
+    bot.setTechLevel('Adaptive Technology', 2);
+
+    const reportOne = new EspionageReportGenerator().createEspionageReport(bot, null, targetOne, 1, { createdTurn: 100 });
+    const reportTwo = new EspionageReportGenerator().createEspionageReport(bot, null, targetTwo, 1, { createdTurn: 100 });
+    targetOne.lastReportData.set(bot.playerId, reportOne);
+    targetTwo.lastReportData.set(bot.playerId, reportTwo);
+    targetOne.basicInfo.colonizationDifficulty = 1;
+    targetTwo.basicInfo.colonizationDifficulty = 2;
+
+    const galaxy = new Galaxy(
+      'ColonizeWeights',
+      [bot],
+      [[system]],
+      101,
+      [],
+      1,
+      new Map(),
+      new Map([[bot.playerId, bot]]),
+      new Map(),
+      new Map([[bot.playerName, bot.playerId]])
+    );
+    const { memory } = runWeightManagerSubsystem(galaxy, bot);
+
+    expect(memory.weightManager.strategicDevelopmentWeight).toBeGreaterThan(50);
+  });
 });
 
 function runWeightManagerSubsystem(

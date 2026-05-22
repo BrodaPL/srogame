@@ -218,6 +218,72 @@ Current role:
 - verify `/game/operations`, `/game/mail`, `/game/diplomacy`, and `/game/bot-debug`
 - useful for route / DTO / integration failures
 
+## Current High-Priority TODO
+
+These are the current V2 blockers from the latest fixed-seed `benchmark20x20` 170-turn runs.
+
+### 1. Neutral home-system farming is still blocked
+
+Observed state:
+- recent benchmark reruns still end with `BATTLE: 0`, `PLUNDER: 0`, `BOMBARDMENT: 0`
+- Strategic Military can now leave the endless `SPY` loop and emit probe `ATTACK` intent
+- bots now also receive fleet/battle outcome reports, not just human players
+
+Important benchmark detail:
+- `battle-summary.json` is built from contender reports only
+- so `0` battle/plunder events means the runner still did not observe usable `Battle Report:` or `Plunder Report:` entries on the bot players
+
+What still needs to be verified and fixed:
+- whether accepted neutral probe `ATTACK` missions actually reach combat resolution
+- whether those probe outcomes become `Battle Report:` entries on the attacking/defending bot consistently
+- whether the V2 snapshot path then converts those reports into:
+  - `lastAttackTurn`
+  - `combatObservationTurn`
+  - `knownShipCountsByType`
+  - `knownDefenceCountsByType`
+- whether Strategic Military then advances from probe intel into real `BREAK`
+- whether `BREAK` can then advance into repeated `PLUNDER`
+
+Practical debugging target:
+- inspect one fixed-seed run end-to-end for a single home-system neutral farm:
+  1. accepted `INTEL:Attack`
+  2. actual fleet arrival/combat result
+  3. generated bot reports
+  4. snapshot target fields on the following turn
+  5. next Strategic Military decision
+
+### 2. Personality compression changed outcomes, but did not solve the farm blocker
+
+Recent change:
+- non-`BALANCED` profile variance was reduced another `20%` toward `BALANCED`
+
+Observed effect:
+- this materially changes macro results even under the same fixed seed
+- example across the recent reruns:
+  - `AGGRESSOR` recovered from `1` planet to `3`
+  - `MINER` regressed from `3` planets to `1`
+  - `BUNKERER` regressed from `3` planets to `1`
+
+Interpretation:
+- the benchmark is still deterministic for a fixed seed
+- but behavior changes can still move arbitration enough to produce very different final empires
+- so blanket profile-weight compression is not a substitute for fixing subsystem conversion bugs
+
+Follow-up after farming is unblocked:
+- revisit Weight Manager and profile compression using the human `170`-turn gameplay log
+- rebalance with evidence instead of more broad reductions first
+
+### 3. Strategic Development may still need a more solid colony-conversion policy
+
+Reason:
+- one-planet recovery improved for some profiles after threshold fixes
+- but colony conversion remains unstable across personalities after later weight changes
+
+What to review later:
+- when one-planet empires should override routine shipyard competition
+- whether colonizer production / colonize launch needs stronger anti-starvation priority bands
+- whether one-planet recovery should depend less on broad profile pressure and more on explicit recovery rules
+
 Current limitation:
 - the default 10-turn live smoke can still be too passive to judge gameplay quality
 

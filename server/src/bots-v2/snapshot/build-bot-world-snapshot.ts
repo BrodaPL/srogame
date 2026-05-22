@@ -863,10 +863,8 @@ function resolveStrategicMilitaryTargets(
           : galaxy.players.find((entry) => entry.playerId === planet.info.ownerId) ?? null;
         const reportTurn = report?.createdTurn ?? null;
         const spyCombatIntelEnough = report !== null && (
-          report.totalDefencesAmount > 0
-          || report.totalShipsAmount > 0
-          || report.defences.length > 0
-          || report.ships.size > 0
+          (report.hasTotalDefencesIntel || report.defences.length > 0)
+          && (report.hasTotalShipsIntel || report.ships.size > 0)
         );
         const mineLevels = report === null
           ? null

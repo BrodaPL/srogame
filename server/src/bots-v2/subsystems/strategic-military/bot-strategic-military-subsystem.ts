@@ -116,8 +116,13 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
         continue;
       }
 
+      if (target.spyCombatIntelEnough || target.lastAttackTurn !== null) {
+        farmEntry.farmIntelEnough = true;
+        farmEntry.intelPhase = 'COMBAT_INTEL_READY';
+      }
+
       if (!farmEntry.farmIntelEnough) {
-        if (!target.hasEspionageReport && farmEntry.lastSpyTurn === null) {
+        if (farmEntry.intelPhase === 'UNSCANNED') {
           const spyRequest = createTargetedSpyMissionRequest(
             context,
             target,
@@ -125,13 +130,17 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
           );
           if (spyRequest) {
             missionRequests.push(spyRequest);
+            farmEntry.intelPhase = 'SPY_SENT';
+            farmEntry.lastSpyTurn = context.snapshot.turn;
           }
           continue;
         }
 
-        if (target.spyCombatIntelEnough || target.lastAttackTurn !== null) {
-          farmEntry.farmIntelEnough = true;
-        } else {
+        if (farmEntry.intelPhase === 'SPY_SENT') {
+          farmEntry.intelPhase = 'PROBE_REQUIRED';
+        }
+
+        if (farmEntry.intelPhase === 'PROBE_REQUIRED') {
           const probePlan = createProbeMissionRequest(context, target);
           if (probePlan.request) {
             missionRequests.push(probePlan.request);
@@ -1619,6 +1628,7 @@ function createFarmLedgerMap(
       knownPlanetaryModifiers: { ...entry.knownPlanetaryModifiers },
       knownShipCountsByType: { ...entry.knownShipCountsByType },
       knownDefenceCountsByType: { ...entry.knownDefenceCountsByType },
+      intelPhase: entry.intelPhase,
       farmIntelEnough: entry.farmIntelEnough,
       lastObservedResources: { ...entry.lastObservedResources },
       preferredOriginCoordinates: entry.preferredOriginCoordinates
@@ -1686,6 +1696,16 @@ function updateFarmLedgerEntryFromTarget(
   }
 
   if (
+    target.spyCombatIntelEnough
+    && target.reportTurn !== null
+    && (entry.lastCombatObservationTurn === null || target.reportTurn > entry.lastCombatObservationTurn)
+  ) {
+    entry.knownShipCountsByType = { ...target.knownShipCountsByType };
+    entry.knownDefenceCountsByType = { ...target.knownDefenceCountsByType };
+    entry.lastCombatObservationTurn = target.reportTurn;
+  }
+
+  if (
     target.lastAttackTurn !== null
     && (entry.lastAttackTurn === null || target.lastAttackTurn > entry.lastAttackTurn)
   ) {
@@ -1704,6 +1724,12 @@ function updateFarmLedgerEntryFromTarget(
     entry.preferredPlunderTransporterCount = resolvePlunderTransporterAdjustment(entry, stolenResources);
   }
 
+  if (target.lastAttackTurn !== null || target.spyCombatIntelEnough) {
+    entry.intelPhase = 'COMBAT_INTEL_READY';
+  } else if (target.reportTurn !== null && entry.intelPhase !== 'COMBAT_INTEL_READY') {
+    entry.intelPhase = 'PROBE_REQUIRED';
+  }
+
   entry.farmIntelEnough = entry.farmIntelEnough || target.spyCombatIntelEnough || target.lastAttackTurn !== null;
   entry.initialDefenseBroken = sumRecordCounts(entry.knownShipCountsByType) <= 0
     && sumRecordCounts(entry.knownDefenceCountsByType) <= 0;
@@ -1717,6 +1743,7 @@ function createEmptyFarmLedgerEntry(
 ): BotMemoryV2StrategicMilitaryFarmLedgerEntry {
   return {
     coordinates: { ...coordinates },
+    intelPhase: 'UNSCANNED',
     lastSpyTurn: null,
     lastAttackTurn: null,
     lastSuccessfulPlunderTurn: null,

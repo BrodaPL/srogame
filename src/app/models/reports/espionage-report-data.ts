@@ -17,6 +17,8 @@ export class EspionageReportData extends PlayerReport {
   constructor(
     data: PlayerReportBaseData,
     public diff: number,
+    public hasTotalDefencesIntel: boolean,
+    public hasTotalShipsIntel: boolean,
     public size: number,
     public planetaryParameters: PlanetaryParameters,
     public averageBuildingLevel: number,
@@ -76,6 +78,8 @@ export class EspionageReportData extends PlayerReport {
         senderPlayerName: this.senderPlayerName
       },
       this.diff,
+      this.hasTotalDefencesIntel,
+      this.hasTotalShipsIntel,
       this.size,
       this.planetaryParameters.copy(),
       this.averageBuildingLevel,

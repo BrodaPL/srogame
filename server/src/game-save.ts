@@ -158,6 +158,8 @@ type SavedTextPlayerReport = SavedPlayerReportBase & {
 
 type SavedEspionagePlayerReport = SavedPlayerReportBase & {
   diff?: number;
+  hasTotalDefencesIntel?: boolean;
+  hasTotalShipsIntel?: boolean;
   size?: number;
   planetaryParameters: SavedPlanetaryParameters;
   averageBuildingLevel: number;
@@ -957,6 +959,8 @@ function hydrateSavedPlayerReport(savedReport: SavedPlayerReport): PlayerReport 
       return new EspionageReportDataModel(
         baseData,
         savedReport.diff ?? 0,
+        savedReport.hasTotalDefencesIntel ?? false,
+        savedReport.hasTotalShipsIntel ?? false,
         savedReport.size ?? 0,
         hydrateSavedPlanetaryParameters(savedReport.planetaryParameters),
         savedReport.averageBuildingLevel,
@@ -1277,6 +1281,8 @@ function serializeEspionageReport(report: EspionageReportData): SavedEspionagePl
   return {
     ...serializePlayerReportBase(report),
     diff: report.diff,
+    hasTotalDefencesIntel: report.hasTotalDefencesIntel,
+    hasTotalShipsIntel: report.hasTotalShipsIntel,
     size: report.size,
     planetaryParameters: serializePlanetaryParameters(report.planetaryParameters),
     averageBuildingLevel: report.averageBuildingLevel,
