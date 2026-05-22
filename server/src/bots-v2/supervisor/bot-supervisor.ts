@@ -787,7 +787,11 @@ function resolveFleetSlotCaps(
   for (const subsystemId of subsystemIds) {
     const share = shares[subsystemId] ?? (1 / subsystemIds.length);
     const redistributedShare = share / activeShareTotal;
-    result.set(subsystemId, Math.max(1, Math.round(maxFleetExecutions * redistributedShare)));
+    let cap = Math.max(1, Math.round(maxFleetExecutions * redistributedShare));
+    if (subsystemId === 'WARFARE') {
+      cap = Math.min(2, cap);
+    }
+    result.set(subsystemId, cap);
   }
 
   return result;

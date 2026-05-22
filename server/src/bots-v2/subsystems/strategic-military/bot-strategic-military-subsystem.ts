@@ -81,6 +81,14 @@ type PlunderSelection = {
 
 type FarmLedgerMap = Map<string, BotMemoryV2StrategicMilitaryFarmLedgerEntry>;
 
+type FarmMissionReservation = {
+  actionableFarmCount: number;
+  activeFarmIntelMissionCount: number;
+  activeFarmOperationMissionCount: number;
+  reservedOperationSlots: number;
+  availableIntelSlots: number;
+};
+
 const STRATEGIC_MILITARY_AVAILABILITY = 0.4;
 const BREAK_FORCE_MULTIPLIER = 1.5;
 const MIN_PLUNDER_ESCORTS = 1;
@@ -97,6 +105,9 @@ const NEUTRAL_FARM_PRODUCTION_AVG_INDUSTRY_THRESHOLD = 3.3;
 const DEFAULT_FARM_TRANSPORTER_COUNT = 6;
 const MIN_FARM_TRANSPORTER_COUNT = 1;
 const MAX_FARM_TRANSPORTER_COUNT = 12;
+const MIN_DEFENDED_BREAK_WARSHIPS = 2;
+const RESERVED_FARM_INTEL_SLOTS = 1;
+const BASE_RESERVED_FARM_OPERATION_SLOTS = 2;
 
 export class BotStrategicMilitarySubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_MILITARY' as const;
@@ -189,7 +200,8 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
     context.memory.strategicMilitary.farmLedger = [...farmLedger.values()]
       .sort(compareFarmLedgerEntries);
 
-    const selectedMissionRequests = selectMissionRequestsForCap(missionRequests, missionCap);
+    const farmReservation = resolveFarmMissionReservation(context, neutralFarmTargets, farmLedger, missionCap);
+    const selectedMissionRequests = selectMissionRequestsForCap(missionRequests, missionCap, farmReservation);
     const proposals = [
       ...selectedMissionRequests
         .map((request, index) => createMissionProposal(context, request, index)),
@@ -209,6 +221,9 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
         missionRequestCap: missionCap,
         missionRequestCount: missionRequests.length,
         selectedMissionRequestCount: selectedMissionRequests.length,
+        actionableFarmCount: farmReservation.actionableFarmCount,
+        reservedFarmOperationSlots: farmReservation.reservedOperationSlots,
+        availableFarmIntelSlots: farmReservation.availableIntelSlots,
         shipNeedCount: shipNeeds.length,
         availabilityTarget: STRATEGIC_MILITARY_AVAILABILITY,
         // TODO: Critical should maintain a minimum stock of 5 Spy Probes on every planet.
@@ -428,6 +443,7 @@ function createBreakMissionRequest(
 } {
   const targetStrength = estimateTargetCombatStrength(farmEntry);
   const requiredStrength = Math.max(1, Math.ceil(targetStrength * BREAK_FORCE_MULTIPLIER));
+  const hasKnownDefenders = (target.currentShipsCount ?? 0) > 0 || (target.currentDefencesCount ?? 0) > 0;
   const validPlans: MissionRequest[] = [];
   let bestAvailableStrength = 0;
   let closestOrigin: BotPlanetSnapshot | null = null;
@@ -436,7 +452,7 @@ function createBreakMissionRequest(
   for (const originPlanet of context.snapshot.planets) {
     const distance = calculateTravelDistance(originPlanet.coordinates, target.coordinates);
     const travelTurns = resolveTravelTurns(originPlanet, distance);
-    const selection = buildBreakSelection(originPlanet, requiredStrength, (target.currentDefencesCount ?? 0) > 0);
+    const selection = buildBreakSelection(originPlanet, requiredStrength, (target.currentDefencesCount ?? 0) > 0, hasKnownDefenders);
     if (selection.combatStrength > bestAvailableStrength) {
       bestAvailableStrength = selection.combatStrength;
       closestOrigin = originPlanet;
@@ -494,7 +510,8 @@ function createBreakMissionRequest(
     context,
     target,
     requiredStrength,
-    (target.currentDefencesCount ?? 0) > 0
+    (target.currentDefencesCount ?? 0) > 0,
+    hasKnownDefenders
   );
   if (relocationPlan) {
     return {
@@ -638,7 +655,8 @@ function selectSpyOrigin(
 function buildBreakSelection(
   originPlanet: BotPlanetSnapshot,
   requiredStrength: number,
-  requireBombardmentBreaker: boolean
+  requireBombardmentBreaker: boolean,
+  requireMultiWarshipBreak: boolean
 ): BreakSelection {
   const combatCandidates = resolveOriginCombatCandidates(originPlanet);
   const selection: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> = [];
@@ -679,6 +697,17 @@ function buildBreakSelection(
     totalStrength += candidate.power * amountToSend;
   }
 
+  const selectedWarshipCount = selection.reduce(
+    (sum, ship) => sum + ship.undamagedAmount + ship.damagedAmount,
+    0
+  );
+  const hasSingleHeavyBreakShip = selection.length === 1
+    && selectedWarshipCount === 1
+    && isHeavyNeutralBreakWarshipType(selection[0]?.type ?? null);
+  if (requireMultiWarshipBreak && selectedWarshipCount < MIN_DEFENDED_BREAK_WARSHIPS && !hasSingleHeavyBreakShip) {
+    return { ships: [], combatStrength: totalStrength };
+  }
+
   return totalStrength >= requiredStrength
     ? { ships: selection, combatStrength: totalStrength }
     : { ships: [], combatStrength: totalStrength };
@@ -688,7 +717,8 @@ function createBreakRelocationPlan(
   context: BotSubsystemContext,
   target: BotStrategicMilitaryTargetSnapshot,
   requiredStrength: number,
-  requireBombardmentBreaker: boolean
+  requireBombardmentBreaker: boolean,
+  requireMultiWarshipBreak: boolean
 ): RelocationBreakPlan | null {
   const stagePlans = context.snapshot.planets
     .map((stagingPlanet) => buildBreakRelocationPlanForStage(
@@ -696,7 +726,8 @@ function createBreakRelocationPlan(
       target,
       stagingPlanet,
       requiredStrength,
-      requireBombardmentBreaker
+      requireBombardmentBreaker,
+      requireMultiWarshipBreak
     ))
     .filter((plan): plan is RelocationBreakPlan => plan !== null)
     .sort((left, right) =>
@@ -715,7 +746,8 @@ function buildBreakRelocationPlanForStage(
   target: BotStrategicMilitaryTargetSnapshot,
   stagingPlanet: BotPlanetSnapshot,
   requiredStrength: number,
-  requireBombardmentBreaker: boolean
+  requireBombardmentBreaker: boolean,
+  requireMultiWarshipBreak: boolean
 ): RelocationBreakPlan | null {
   const originCandidates = context.snapshot.planets
     .map((originPlanet) => {
@@ -813,6 +845,18 @@ function buildBreakRelocationPlanForStage(
   }
 
   if (combinedStrength < requiredStrength) {
+    return null;
+  }
+
+  const selectedWarshipCount = [...selections.values()]
+    .flat()
+    .reduce((sum, ship) => sum + ship.undamagedAmount + ship.damagedAmount, 0);
+  const hasSingleHeavyBreakShip = [...selections.values()]
+    .flat()
+    .length === 1
+    && selectedWarshipCount === 1
+    && isHeavyNeutralBreakWarshipType([...selections.values()].flat()[0]?.type ?? null);
+  if (requireMultiWarshipBreak && selectedWarshipCount < MIN_DEFENDED_BREAK_WARSHIPS && !hasSingleHeavyBreakShip) {
     return null;
   }
 
@@ -925,9 +969,7 @@ function resolveOriginCombatCandidates(originPlanet: BotPlanetSnapshot): Array<{
       && entry.blueprint !== null
       && entry.blueprint.canJump
       && entry.blueprint.weapons.length > 0
-      && entry.type !== ShipType.SPY_PROBE
-      && entry.type !== ShipType.REPAIR_DRONE
-      && entry.type !== ShipType.COLONIZER
+      && isNeutralFarmWarshipType(entry.type)
     )
     .map((entry) => ({
       type: entry.type,
@@ -941,6 +983,31 @@ function resolveOriginCombatCandidates(originPlanet: BotPlanetSnapshot): Array<{
       || right.power - left.power
       || left.type.localeCompare(right.type)
     );
+}
+
+function isNeutralFarmWarshipType(shipType: ShipType): boolean {
+  return shipType !== ShipType.SPY_PROBE
+    && shipType !== ShipType.REPAIR_DRONE
+    && shipType !== ShipType.COLONIZER
+    && shipType !== ShipType.TRANSPORTER
+    && shipType !== ShipType.CARGO_SUPPORT
+    && shipType !== ShipType.MASS_HAULER
+    && shipType !== ShipType.RECYCLER;
+}
+
+function isHeavyNeutralBreakWarshipType(shipType: ShipType | null): boolean {
+  return shipType === ShipType.FRIGATE
+    || shipType === ShipType.BATTLE_SHIP
+    || shipType === ShipType.BATTLE_CRUISER
+    || shipType === ShipType.DESTROYER
+    || shipType === ShipType.DREADNOUGHT
+    || shipType === ShipType.ORBITAL_BOMBER
+    || shipType === ShipType.CARRIER
+    || shipType === ShipType.TITAN
+    || shipType === ShipType.ARMAGEDDON_BOMBER
+    || shipType === ShipType.BEHEMOTH
+    || shipType === ShipType.FLEET_CARRIER
+    || shipType === ShipType.MOTHER_SHIP;
 }
 
 function createBreakShipNeed(
@@ -1082,16 +1149,30 @@ function isShipTypeEligibleForRole(
   if (role === 'COMBAT') {
     return blueprint.canJump
       && blueprint.weapons.length > 0
-      && shipType !== ShipType.SPY_PROBE
-      && shipType !== ShipType.REPAIR_DRONE
-      && shipType !== ShipType.COLONIZER;
+      && isNeutralFarmWarshipType(shipType);
   }
   return shipType === ShipType.TRANSPORTER;
 }
 
 function resolveBestAvailableProbeShipType(originPlanet: BotPlanetSnapshot): ShipType | null {
-  const candidates = resolveOriginCombatCandidates(originPlanet).filter((candidate) => candidate.amount > 0);
-  return candidates[0]?.type ?? null;
+  const availableTypes = new Set(
+    resolveOriginCombatCandidates(originPlanet)
+      .filter((candidate) => candidate.amount > 0)
+      .map((candidate) => candidate.type)
+  );
+  const preferredProbeTypes: ShipType[] = [
+    ShipType.CRUISER,
+    ShipType.FRIGATE,
+    ShipType.BATTLE_SHIP
+  ];
+  for (const shipType of preferredProbeTypes) {
+    if (availableTypes.has(shipType)) {
+      return shipType;
+    }
+  }
+
+  return resolveOriginCombatCandidates(originPlanet)
+    .find((candidate) => candidate.amount > 0)?.type ?? null;
 }
 
 function resolvePreferredFarmOrigin(
@@ -1364,7 +1445,8 @@ function compareMissionRequests(left: MissionRequest, right: MissionRequest): nu
 
 function selectMissionRequestsForCap(
   requests: MissionRequest[],
-  missionCap: number
+  missionCap: number,
+  reservation: FarmMissionReservation
 ): MissionRequest[] {
   if (missionCap <= 0) {
     return [];
@@ -1385,35 +1467,97 @@ function selectMissionRequestsForCap(
 
   const selected: MissionRequest[] = [];
   let remainingCap = missionCap;
+  const reservedOperationBudget = Math.min(
+    remainingCap,
+    Math.max(0, reservation.reservedOperationSlots - reservation.activeFarmOperationMissionCount)
+  );
+  const reservedIntelBudget = Math.min(
+    remainingCap,
+    reservation.availableIntelSlots
+  );
+  let selectedSpyCount = 0;
 
-  const plunderCap = Math.min(plunderRequests.length, remainingCap);
-  selected.push(...plunderRequests.slice(0, plunderCap));
-  remainingCap = missionCap - selected.length;
+  const takeRequests = (pool: MissionRequest[], amount: number): number => {
+    if (amount <= 0 || remainingCap <= 0) {
+      return 0;
+    }
 
-  const breakCap = Math.min(breakRequests.length, Math.ceil(remainingCap * BREAK_MISSION_SHARE));
-  selected.push(...breakRequests.slice(0, breakCap));
-  remainingCap = missionCap - selected.length;
+    const count = Math.min(pool.length, amount, remainingCap);
+    selected.push(...pool.slice(0, count));
+    remainingCap -= count;
+    return count;
+  };
 
-  const probeCap = Math.min(probeRequests.length, remainingCap);
-  selected.push(...probeRequests.slice(0, probeCap));
-  remainingCap = missionCap - selected.length;
+  let remainingReservedOperationBudget = reservedOperationBudget;
+  remainingReservedOperationBudget -= takeRequests(plunderRequests, remainingReservedOperationBudget);
+  remainingReservedOperationBudget -= takeRequests(breakRequests, remainingReservedOperationBudget);
+  remainingReservedOperationBudget -= takeRequests(probeRequests, remainingReservedOperationBudget);
 
-  const spyCap = Math.min(spyRequests.length, remainingCap);
-  selected.push(...spyRequests.slice(0, spyCap));
-  remainingCap = missionCap - selected.length;
+  selectedSpyCount += takeRequests(spyRequests, reservedIntelBudget);
 
   if (remainingCap <= 0) {
     return selected;
   }
 
   const overflow = [
-    ...plunderRequests.slice(plunderCap),
-    ...breakRequests.slice(breakCap),
-    ...probeRequests.slice(probeCap),
-    ...spyRequests.slice(spyCap)
+    ...plunderRequests.filter((request) => !selected.includes(request)),
+    ...breakRequests.filter((request) => !selected.includes(request)),
+    ...probeRequests.filter((request) => !selected.includes(request)),
+    ...spyRequests.filter((request) => !selected.includes(request))
   ].sort(compareMissionRequests);
-  selected.push(...overflow.slice(0, remainingCap));
+
+  for (const request of overflow) {
+    if (remainingCap <= 0) {
+      break;
+    }
+    if (request.phase === 'INTEL' && request.missionType === FleetMissionType.SPY) {
+      if (selectedSpyCount >= reservation.availableIntelSlots) {
+        continue;
+      }
+      selectedSpyCount += 1;
+    }
+    selected.push(request);
+    remainingCap -= 1;
+  }
+
   return selected;
+}
+
+function resolveFarmMissionReservation(
+  context: BotSubsystemContext,
+  targets: BotStrategicMilitaryTargetSnapshot[],
+  farmLedger: FarmLedgerMap,
+  missionCap: number
+): FarmMissionReservation {
+  const actionableFarmCount = countActionableFarms(targets, farmLedger);
+  const activeFarmIntelMissionCount = countActiveFarmIntelMissions(targets, farmLedger);
+  const activeFarmOperationMissionCount = countActiveFarmOperationMissions(targets, farmLedger);
+  const availableFleetSlots = Math.max(
+    0,
+    context.snapshot.empire.maxActiveFleetCount - context.snapshot.empire.activeFleetCount
+  );
+
+  let reservedOperationSlots = 0;
+  if (actionableFarmCount > 0) {
+    reservedOperationSlots = BASE_RESERVED_FARM_OPERATION_SLOTS + Math.floor(actionableFarmCount / 2);
+    if (availableFleetSlots > 0) {
+      reservedOperationSlots = Math.min(
+        reservedOperationSlots,
+        Math.max(0, availableFleetSlots - 1)
+      );
+    }
+    reservedOperationSlots = Math.min(missionCap, reservedOperationSlots);
+  }
+
+  const availableIntelSlots = Math.max(0, RESERVED_FARM_INTEL_SLOTS - activeFarmIntelMissionCount);
+
+  return {
+    actionableFarmCount,
+    activeFarmIntelMissionCount,
+    activeFarmOperationMissionCount,
+    reservedOperationSlots,
+    availableIntelSlots
+  };
 }
 
 function resolveMissionRequestCap(context: BotSubsystemContext): number {
@@ -1638,6 +1782,67 @@ function createFarmLedgerMap(
     });
   }
   return map;
+}
+
+function countActionableFarms(
+  targets: BotStrategicMilitaryTargetSnapshot[],
+  farmLedger: FarmLedgerMap
+): number {
+  const actionable = new Set<string>();
+  for (const target of targets) {
+    if (!target.isNeutral || !target.inOwnedSystem || target.hasForeignGuard) {
+      continue;
+    }
+    const entry = resolveFarmLedgerEntry(farmLedger, target.coordinates);
+    if (!entry) {
+      continue;
+    }
+    if (
+      entry.intelPhase === 'PROBE_REQUIRED'
+      || (entry.farmIntelEnough && !entry.initialDefenseBroken)
+      || entry.initialDefenseBroken
+    ) {
+      actionable.add(toCoordinatesKey(target.coordinates));
+    }
+  }
+  return actionable.size;
+}
+
+function countActiveFarmIntelMissions(
+  targets: BotStrategicMilitaryTargetSnapshot[],
+  farmLedger: FarmLedgerMap
+): number {
+  const active = new Set<string>();
+  for (const target of targets) {
+    if (!target.hasOwnActiveFarmMission) {
+      continue;
+    }
+    const entry = resolveFarmLedgerEntry(farmLedger, target.coordinates);
+    if (entry && !entry.farmIntelEnough && entry.intelPhase === 'SPY_SENT') {
+      active.add(toCoordinatesKey(target.coordinates));
+    }
+  }
+  return active.size;
+}
+
+function countActiveFarmOperationMissions(
+  targets: BotStrategicMilitaryTargetSnapshot[],
+  farmLedger: FarmLedgerMap
+): number {
+  const active = new Set<string>();
+  for (const target of targets) {
+    if (!target.hasOwnActiveFarmMission) {
+      continue;
+    }
+    const entry = resolveFarmLedgerEntry(farmLedger, target.coordinates);
+    if (!entry) {
+      continue;
+    }
+    if (entry.farmIntelEnough || entry.intelPhase === 'PROBE_REQUIRED') {
+      active.add(toCoordinatesKey(target.coordinates));
+    }
+  }
+  return active.size;
 }
 
 function resolveFarmLedgerEntry(

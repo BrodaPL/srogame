@@ -3165,7 +3165,7 @@ function addFleetSuccessReport(
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
       title: `Fleet Arrived: ${fleet.missionType} to ${fleet.targetPlanetName}`,
-      sourceCoordinates: { ...fleet.target },
+      sourceCoordinates: toFleetTargetReportCoordinates(fleet),
       sourcePlanetName: fleet.targetPlanetName,
       senderPlayerName: player.playerName
     },
@@ -3189,7 +3189,7 @@ function addFleetFailureReport(
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
       title: `Fleet Failed: ${fleet.missionType} to ${fleet.targetPlanetName}`,
-      sourceCoordinates: { ...fleet.target },
+      sourceCoordinates: toFleetTargetReportCoordinates(fleet),
       sourcePlanetName: fleet.targetPlanetName,
       senderPlayerName: player.playerName
     },
@@ -3213,7 +3213,7 @@ function addFleetDrawReport(
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
       title: `Fleet Draw: ${fleet.missionType} at ${fleet.targetPlanetName}`,
-      sourceCoordinates: { ...fleet.target },
+      sourceCoordinates: toFleetTargetReportCoordinates(fleet),
       sourcePlanetName: fleet.targetPlanetName,
       senderPlayerName: player.playerName
     },
@@ -3281,7 +3281,15 @@ function toPlanetReportCoordinates(planet: Planet): { x: number; y: number; z: n
   return {
     x: planet.basicInfo.solarSystem.coordinates.x,
     y: planet.basicInfo.solarSystem.coordinates.y,
-    z: Math.max(0, planet.basicInfo.order - 1)
+    z: planet.basicInfo.order
+  };
+}
+
+function toFleetTargetReportCoordinates(fleet: Fleet): { x: number; y: number; z: number } {
+  return {
+    x: fleet.target.x,
+    y: fleet.target.y,
+    z: fleet.target.z + 1
   };
 }
 

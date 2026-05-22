@@ -393,7 +393,7 @@ export class EncounterResolver {
         sourceCoordinates: {
           x: targetPlanet.basicInfo.solarSystem.coordinates.x,
           y: targetPlanet.basicInfo.solarSystem.coordinates.y,
-          z: Math.max(0, targetPlanet.basicInfo.order - 1)
+          z: targetPlanet.basicInfo.order
         },
         sourcePlanetName: targetPlanet.basicInfo.name,
         sourceSystemName: targetPlanet.basicInfo.solarSystem.name

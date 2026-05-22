@@ -5,6 +5,9 @@ import { PlayerType } from '../../../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
 import { EspionageReportGenerator } from '../../../../../src/app/generators/espionage-report-generator.js';
+import { ManyDefences } from '../../../../../src/app/models/defences/many-defences.js';
+import { Destination } from '../../../../../src/app/models/fleets/destination.js';
+import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../../../../src/app/models/fleets/fleet.js';
 import { ManyShips } from '../../../../../src/app/models/fleets/many-ships.js';
 import { Galaxy } from '../../../../../src/app/models/planets/galaxy.js';
 import { Planet } from '../../../../../src/app/models/planets/planet.js';
@@ -72,6 +75,24 @@ describe('BotStrategicMilitarySubsystem', () => {
     )).toBe(false);
   });
 
+  it('caps farm-intel output to one spy mission at a time across neutral farms', () => {
+    const { galaxy, bot, humanEnemy, neutralOwner, homePlanet, neutralPlanet, foreignPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 4);
+    humanEnemy.planets = [];
+    foreignPlanet.info.ownerId = neutralOwner.playerId;
+    neutralOwner.planets.push(foreignPlanet);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const spyProposals = result.proposals.filter((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SPY
+    );
+
+    expect(spyProposals).toHaveLength(1);
+    expect(spyProposals[0]?.targetCoordinates?.z).toBe(neutralPlanet.basicInfo.order);
+  });
+
   it('emits a break attack for scanned neutral planets with remaining defenders', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
@@ -111,6 +132,27 @@ describe('BotStrategicMilitarySubsystem', () => {
       undamagedAmount: 1,
       damagedAmount: 0
     }]);
+  });
+
+  it('does not use a single transporter as a neutral-farm probe ship', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 2);
+    markPlanetScannedWithLowIntel(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'INTEL'
+    )).toBe(false);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.demandOnly === true
+      && proposal.requestPayload.shipType === ShipType.CRUISER
+    )).toBe(true);
   });
 
   it('does not fall back to repeated spy when farm memory already shows a prior spy and a cruiser probe is available', () => {
@@ -167,6 +209,23 @@ describe('BotStrategicMilitarySubsystem', () => {
       && proposal.debug.missionPhase === 'INTEL'
       && proposal.targetCoordinates?.z === neutralPlanet.basicInfo.order
     )).toBe(true);
+  });
+
+  it('does not queue another farm attack when a matching zero-based active attack fleet is already outbound', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 8);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CORVETTE, 2);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+    galaxy.activeFleets.push(createActiveNeutralFarmAttackFleet(bot.playerId, homePlanet, neutralPlanet));
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.targetCoordinates?.z === neutralPlanet.basicInfo.order
+    )).toBe(false);
   });
 
   it('seeds break intel from a spy report that reveals neutral defenders', () => {
@@ -322,7 +381,7 @@ describe('BotStrategicMilitarySubsystem', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
     homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
     neutralPlanet.rBDSFTQ.resources = new ResourcesPack(900, 900, 900);
     neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
     markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
@@ -337,6 +396,26 @@ describe('BotStrategicMilitarySubsystem', () => {
       proposal.kind === 'FLEET_MISSION'
       && proposal.debug.missionPhase === 'BREAK'
       && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+    )).toBe(true);
+  });
+
+  it('does not send a lone defended BREAK ship when more real warships are needed', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 1);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.debug.missionPhase === 'BREAK'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+    )).toBe(false);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.demandOnly === true
     )).toBe(true);
   });
 
@@ -509,6 +588,39 @@ function addOwnedSupportPlanet(
   bot.planets.push(supportPlanet);
   galaxy.stars.push([system]);
   return supportPlanet;
+}
+
+function createActiveNeutralFarmAttackFleet(ownerId: number, originPlanet: Planet, targetPlanet: Planet): Fleet {
+  return new Fleet(
+    101,
+    ownerId,
+    FleetMissionType.ATTACK,
+    new Destination(
+      originPlanet.basicInfo.solarSystem.coordinates.x,
+      originPlanet.basicInfo.solarSystem.coordinates.y,
+      originPlanet.basicInfo.order - 1
+    ),
+    new Destination(
+      targetPlanet.basicInfo.solarSystem.coordinates.x,
+      targetPlanet.basicInfo.solarSystem.coordinates.y,
+      targetPlanet.basicInfo.order - 1
+    ),
+    originPlanet.basicInfo.name,
+    targetPlanet.basicInfo.name,
+    ManyShips.empty(),
+    new ResourcesPack(0, 0, 0),
+    1,
+    0,
+    0,
+    2,
+    2,
+    FleetState.MOVING_TO_TARGET,
+    1,
+    ManyDefences.empty(),
+    FleetOrbitActivity.IDLE,
+    null,
+    FleetReturnReason.NORMAL
+  );
 }
 
 function configureOriginPlanet(planet: Planet): void {

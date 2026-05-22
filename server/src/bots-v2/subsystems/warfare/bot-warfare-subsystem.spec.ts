@@ -342,6 +342,55 @@ describe('BotWarfareSubsystem', () => {
     expect(shipNeedProposal?.debug.goalFamily).toBe('RECOVERY');
   });
 
+  it('does not emit new recycle missions when two recycle slots are already occupied', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.rBDSFTQ.ships.addUndamaged(ShipType.RECYCLER, 2);
+    planet.rBDSFTQ.spaceDebris = new ResourcesPack(900, 400, 200);
+    const memory = createDefaultBotMemoryV2();
+    memory.supervisor.pendingCommitments.push({
+      commitmentKey: 'warfare:recycle:1',
+      dedupeKey: 'warfare:recycle:1',
+      proposalId: 'warfare:recycle:1',
+      subsystemId: 'WARFARE',
+      kind: 'FLEET_MISSION',
+      targetCoordinates: { x: 0, y: 0, z: 1 },
+      requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      weightedResourceValue: 0,
+      score: 1,
+      status: 'PENDING_SHIPS_NEXT_TURN',
+      createdTurn: galaxy.currentTurn,
+      updatedTurn: galaxy.currentTurn,
+      expiresOnTurn: galaxy.currentTurn + 1,
+      executionPayload: { missionType: FleetMissionType.RECYCLE },
+      cancelReason: null
+    });
+    memory.supervisor.pendingCommitments.push({
+      commitmentKey: 'warfare:recycle:2',
+      dedupeKey: 'warfare:recycle:2',
+      proposalId: 'warfare:recycle:2',
+      subsystemId: 'WARFARE',
+      kind: 'FLEET_MISSION',
+      targetCoordinates: { x: 0, y: 0, z: 1 },
+      requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      weightedResourceValue: 0,
+      score: 1,
+      status: 'PENDING_SHIPS_NEXT_TURN',
+      createdTurn: galaxy.currentTurn,
+      updatedTurn: galaxy.currentTurn,
+      expiresOnTurn: galaxy.currentTurn + 1,
+      executionPayload: { missionType: FleetMissionType.RECYCLE },
+      cancelReason: null
+    });
+
+    const result = runWarfareSubsystem(galaxy, bot, memory);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.RECYCLE
+    )).toBe(false);
+  });
+
   it('penalizes additional small-ship production when local small-ship capacity already exceeds the target', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseWarfarePlanet(planet);
@@ -404,7 +453,11 @@ describe('BotWarfareSubsystem', () => {
   });
 });
 
-function runWarfareSubsystem(galaxy: Galaxy, bot: Player) {
+function runWarfareSubsystem(
+  galaxy: Galaxy,
+  bot: Player,
+  memory = createDefaultBotMemoryV2()
+) {
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
       mode: 'SHADOW',
     enabledSubsystems: {
@@ -421,7 +474,7 @@ function runWarfareSubsystem(galaxy: Galaxy, bot: Player) {
 
   return new BotWarfareSubsystem().generate({
     snapshot,
-    memory: createDefaultBotMemoryV2()
+    memory
   });
 }
 

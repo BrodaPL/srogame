@@ -187,6 +187,7 @@ const FOREIGN_RECYCLE_INTEL_MAX_AGE = 20;
 const CRUISER_FOCUS_AVG_INDUSTRY_THRESHOLD = 3.8;
 const CRUISER_BREAK_FLEET_TARGET = 8;
 const MIN_HOME_GUARD_JUMP_SHIPS = 2;
+const MAX_WARFARE_RECYCLE_FLEET_SLOTS = 2;
 
 export class BotWarfareSubsystem implements BotSubsystem {
   public readonly subsystemId = 'WARFARE' as const;
@@ -279,14 +280,18 @@ function buildPlanetWarfareResult(
 function buildRecoveryPlan(context: BotSubsystemContext): RecoveryPlan {
   const recycleFleetCap = resolveRecycleFleetCap(context);
   const activeRecycleFleetCount = context.snapshot.empire.activeRecycleFleetCount ?? 0;
-  if (activeRecycleFleetCount >= recycleFleetCap) {
+  const pendingRecycleFleetCount = countPendingRecycleFleetSlots(context);
+  const occupiedRecycleFleetSlots = activeRecycleFleetCount + pendingRecycleFleetCount;
+  if (occupiedRecycleFleetSlots >= recycleFleetCap) {
     return {
       proposals: [],
       goals: [],
       debug: {
         recoveryNoActionReason: 'ACTIVE_RECYCLE_FLEET_PRESENT',
         recycleFleetCap,
-        activeRecycleFleetCount
+        activeRecycleFleetCount,
+        pendingRecycleFleetCount,
+        occupiedRecycleFleetSlots
       }
     };
   }
@@ -299,7 +304,9 @@ function buildRecoveryPlan(context: BotSubsystemContext): RecoveryPlan {
       debug: {
         recoveryNoActionReason: 'NO_RECYCLE_TARGETS',
         recycleFleetCap,
-        activeRecycleFleetCount
+        activeRecycleFleetCount,
+        pendingRecycleFleetCount,
+        occupiedRecycleFleetSlots
       }
     };
   }
@@ -334,6 +341,8 @@ function buildRecoveryPlan(context: BotSubsystemContext): RecoveryPlan {
         recoveryNoActionReason: null,
         recycleFleetCap,
         activeRecycleFleetCount,
+        pendingRecycleFleetCount,
+        occupiedRecycleFleetSlots,
         recycleTargetCount: targets.length,
         recycleCandidateCount: candidates.length,
         recycleBestTargetScope: bestCandidate.scope,
@@ -351,6 +360,8 @@ function buildRecoveryPlan(context: BotSubsystemContext): RecoveryPlan {
         recoveryNoActionReason: 'NO_RECYCLERS_AVAILABLE',
         recycleFleetCap,
         activeRecycleFleetCount,
+        pendingRecycleFleetCount,
+        occupiedRecycleFleetSlots,
         recycleTargetCount: targets.length,
         recycleCandidateCount: 0
       }
@@ -371,6 +382,8 @@ function buildRecoveryPlan(context: BotSubsystemContext): RecoveryPlan {
             recoveryNoActionReason: 'RECYCLER_SHORTAGE',
             recycleFleetCap,
             activeRecycleFleetCount,
+            pendingRecycleFleetCount,
+            occupiedRecycleFleetSlots,
             recycleTargetCount: targets.length,
             recycleCandidateCount: 0,
             recycleShortageAmount: shortage
@@ -387,6 +400,8 @@ function buildRecoveryPlan(context: BotSubsystemContext): RecoveryPlan {
       recoveryNoActionReason: 'NO_ACTIONABLE_RECYCLE_OR_FALLBACK',
       recycleFleetCap,
       activeRecycleFleetCount,
+      pendingRecycleFleetCount,
+      occupiedRecycleFleetSlots,
       recycleTargetCount: targets.length,
       recycleCandidateCount: 0
     }
@@ -800,7 +815,15 @@ function createRecyclerNeedGoal(
 }
 
 function resolveRecycleFleetCap(context: BotSubsystemContext): number {
-  return Math.max(1, Math.floor(Math.max(1, context.snapshot.empire.maxActiveFleetCount) / 10));
+  return MAX_WARFARE_RECYCLE_FLEET_SLOTS;
+}
+
+function countPendingRecycleFleetSlots(context: BotSubsystemContext): number {
+  return context.memory.supervisor.pendingCommitments.filter((commitment) =>
+    (commitment.status === 'PENDING_RESOURCES' || commitment.status === 'PENDING_SHIPS_NEXT_TURN')
+    && commitment.kind === 'FLEET_MISSION'
+    && commitment.executionPayload?.missionType === FleetMissionType.RECYCLE
+  ).length;
 }
 
 function resolveAverageDevelopedIncomeValue(planets: BotPlanetSnapshot[]): number {

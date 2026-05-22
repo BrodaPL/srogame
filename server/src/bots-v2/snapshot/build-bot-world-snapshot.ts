@@ -894,15 +894,15 @@ function resolveStrategicMilitaryTargets(
         const targetCoordinatesMatch = (coordinates: { x: number; y: number; z: number } | null | undefined) =>
           coordinates?.x === system.coordinates.x
           && coordinates?.y === system.coordinates.y
-          && coordinates?.z === planet.basicInfo.order;
+          && (coordinates?.z + 1) === planet.basicInfo.order;
         const hasForeignGuard = galaxy.activeFleets.some((fleet) =>
           fleet.ownerId !== player.playerId
-          && targetCoordinatesMatch(fleet.target?.coordinates)
+          && targetCoordinatesMatch(fleet.target)
           && fleet.state === 'ORBITING'
         );
         const hasOwnActiveFarmMission = galaxy.activeFleets.some((fleet) =>
           fleet.ownerId === player.playerId
-          && targetCoordinatesMatch(fleet.target?.coordinates)
+          && targetCoordinatesMatch(fleet.target)
           && (
             fleet.missionType === FleetMissionType.SPY
             || fleet.missionType === FleetMissionType.ATTACK

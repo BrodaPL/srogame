@@ -188,7 +188,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
       1
     );
 
-    const { galaxy, players } = createGalaxyWithPlayers(
+    const { galaxy, players, system } = createGalaxyWithPlayers(
       [moveFleet],
       (solarSystem) => {
         solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
@@ -213,6 +213,12 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(players[0].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
     expect(players[0].reports.some((report) => report.title.startsWith('Fleet Failed: Move'))).toBe(true);
     expect(players[1].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
+    const alphaBattleReport = players[0].reports.find((report) => report.title.startsWith('Battle Report:')) ?? null;
+    expect(alphaBattleReport?.sourceCoordinates).toEqual({
+      x: 1,
+      y: 1,
+      z: system.planets[1].basicInfo.order
+    });
   });
 
   it('keeps pending jump gate fleets waiting at origin through end turn resolution', () => {
