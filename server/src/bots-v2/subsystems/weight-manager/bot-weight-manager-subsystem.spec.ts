@@ -9,6 +9,7 @@ import { Galaxy } from '../../../../../src/app/models/planets/galaxy.js';
 import { Planet } from '../../../../../src/app/models/planets/planet.js';
 import { SolarSystem } from '../../../../../src/app/models/planets/solar-system.js';
 import { Player } from '../../../../../src/app/models/player.js';
+import { FleetReport } from '../../../../../src/app/models/reports/fleet-report.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
@@ -175,6 +176,102 @@ describe('BotWeightManagerSubsystem', () => {
     const { memory } = runWeightManagerSubsystem(galaxy, bot);
 
     expect(memory.weightManager.strategicDevelopmentWeight).toBeGreaterThan(50);
+  });
+
+  it('adds strategic military pressure for actionable farms tracked in farm memory before break/raid-ready intel exists', () => {
+    const { galaxy, bot } = createWeightManagerWorld();
+    bot.botProfileId = 'MINER';
+    const targetSystem = galaxy.stars[0][0];
+    const targetPlanet = Planet.createRandomEmpty('Actionable Farm', 3, targetSystem, null);
+    targetSystem.planets[2] = targetPlanet;
+    const neutralOwner = new Player(99, 'N-Test', [targetPlanet], new Map(), [], PlayerType.NEUTRAL, createTutorialReadState(true));
+    targetPlanet.info.ownerId = neutralOwner.playerId;
+    galaxy.players.push(neutralOwner);
+    galaxy.neutralPlayerMap.set(neutralOwner.playerId, neutralOwner);
+    galaxy.playerNameMap.set(neutralOwner.playerName, neutralOwner.playerId);
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicMilitary.farmLedger.push({
+      coordinates: {
+        x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+        y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+        z: targetPlanet.basicInfo.order
+      },
+      intelPhase: 'PROBE_REQUIRED',
+      lastSpyTurn: 100,
+      lastAttackTurn: null,
+      lastSuccessfulPlunderTurn: null,
+      knownMineLevels: {
+        metalMineLevel: 0,
+        crystalMineLevel: 0,
+        deuteriumSynthesizerLevel: 0
+      },
+      knownStorageCapacity: { metal: 0, crystal: 0, deuterium: 0 },
+      knownIncome: { metal: 0, crystal: 0, deuterium: 0 },
+      knownBunkerReductionPercent: 0,
+      knownPlanetaryModifiers: {
+        industryModifier: 1,
+        metalModifier: 1,
+        crystalModifier: 1,
+        deuteriumModifier: 1
+      },
+      knownShipCountsByType: {},
+      knownDefenceCountsByType: {},
+      farmIntelEnough: false,
+      initialDefenseBroken: false,
+      lastObservedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      lastResourceObservationTurn: null,
+      lastCombatObservationTurn: null,
+      estimatedNextGoodAttackTurn: null,
+      preferredPlunderTransporterCount: 6,
+      preferredOriginCoordinates: null
+    });
+
+    const { memory: resultMemory } = runWeightManagerSubsystem(galaxy, bot, memory);
+
+    expect(resultMemory.weightManager.strategicMilitaryWeight).toBeGreaterThanOrEqual(32);
+  });
+
+  it('prefers newer battle defender counts over later weak spy reports when classifying farm readiness', () => {
+    const { galaxy, bot } = createWeightManagerWorld();
+    const targetSystem = galaxy.stars[0][0];
+    const targetPlanet = Planet.createRandomEmpty('Neutral Farm', 3, targetSystem, null);
+    targetSystem.planets[2] = targetPlanet;
+    const neutralOwner = new Player(100, 'N-Report', [targetPlanet], new Map(), [], PlayerType.NEUTRAL, createTutorialReadState(true));
+    targetPlanet.info.ownerId = neutralOwner.playerId;
+    galaxy.players.push(neutralOwner);
+    galaxy.neutralPlayerMap.set(neutralOwner.playerId, neutralOwner);
+    galaxy.playerNameMap.set(neutralOwner.playerName, neutralOwner.playerId);
+
+    const weakSpyReport = new EspionageReportGenerator().createEspionageReport(bot, null, targetPlanet, 1, {
+      createdTurn: 110,
+      forcedReportLevel: 4
+    });
+    targetPlanet.lastReportData.set(bot.playerId, weakSpyReport);
+
+    bot.addReport(new FleetReport(
+      {
+        reportId: bot.createReportId(),
+        createdTurn: 109,
+        title: `Battle Report: ${targetPlanet.basicInfo.solarSystem.coordinates.x}:${targetPlanet.basicInfo.solarSystem.coordinates.y}:${targetPlanet.basicInfo.order}`,
+        sourceCoordinates: {
+          x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+          y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+          z: targetPlanet.basicInfo.order
+        },
+        sourcePlanetName: targetPlanet.basicInfo.name,
+        sourceSystemName: targetPlanet.basicInfo.solarSystem.name
+      },
+      [
+        'Battle result: Defender',
+        'Enemy survivors by type: Cruiser x4, Corvette x3',
+        'Enemy defense survivors by type: none'
+      ].join('\n')
+    ));
+
+    const { result } = runWeightManagerSubsystem(galaxy, bot);
+
+    expect(result.debug?.breakNeedFarmCount).toBeGreaterThanOrEqual(1);
+    expect(result.debug?.raidReadyFarmCount).toBe(0);
   });
 });
 

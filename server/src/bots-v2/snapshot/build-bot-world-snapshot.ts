@@ -2325,7 +2325,11 @@ function resolveKnownShipCountsForStrategicMilitary(
   report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
   latestBattleObservation: ReturnType<typeof resolveLatestBattleObservation>
 ): Partial<Record<ShipType, number>> {
-  if (latestBattleObservation && latestBattleObservation.turn > report.createdTurn) {
+  const reportHasCombatIntel = (
+    (report.hasTotalDefencesIntel || report.defences.length > 0)
+    && (report.hasTotalShipsIntel || report.ships.size > 0)
+  );
+  if (latestBattleObservation && (!reportHasCombatIntel || latestBattleObservation.turn > report.createdTurn)) {
     return latestBattleObservation.survivingShipsByType;
   }
 
@@ -2336,7 +2340,11 @@ function resolveKnownDefenceCountsForStrategicMilitary(
   report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
   latestBattleObservation: ReturnType<typeof resolveLatestBattleObservation>
 ): Partial<Record<DefenceType, number>> {
-  if (latestBattleObservation && latestBattleObservation.turn > report.createdTurn) {
+  const reportHasCombatIntel = (
+    (report.hasTotalDefencesIntel || report.defences.length > 0)
+    && (report.hasTotalShipsIntel || report.ships.size > 0)
+  );
+  if (latestBattleObservation && (!reportHasCombatIntel || latestBattleObservation.turn > report.createdTurn)) {
     return latestBattleObservation.survivingDefencesByType;
   }
 

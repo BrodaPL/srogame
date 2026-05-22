@@ -353,6 +353,48 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(attackProposal).toBeDefined();
   });
 
+  it('requests a spy on an opened farm when combat intel exists but no resource model is known yet', () => {
+    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
+    addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
+      survivingShipsLine: 'Enemy survivors by type: none',
+      survivingDefencesLine: 'Enemy defense survivors by type: none'
+    });
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const spyProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SPY
+      && proposal.targetCoordinates?.x === neutralPlanet.basicInfo.solarSystem.coordinates.x
+      && proposal.targetCoordinates?.y === neutralPlanet.basicInfo.solarSystem.coordinates.y
+      && proposal.targetCoordinates?.z === neutralPlanet.basicInfo.order
+    );
+
+    expect(spyProposal).toBeDefined();
+  });
+
+  it('produces a spy probe for an opened farm when combat intel exists but no probe can launch', () => {
+    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.setBuildingLevel(BuildingType.RESEARCH_LAB, 1);
+    bot.setTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY, 1);
+    addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
+      survivingShipsLine: 'Enemy survivors by type: none',
+      survivingDefencesLine: 'Enemy defense survivors by type: none'
+    });
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const shipyardProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.itemKind === 'ship'
+      && proposal.requestPayload.shipType === ShipType.SPY_PROBE
+      && proposal.requestPayload.amount === 1
+    );
+
+    expect(shipyardProposal).toBeDefined();
+  });
+
   it('uses plunder reports to suppress immediate re-plunder after a farm was drained', () => {
     const memory = createDefaultBotMemoryV2();
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();

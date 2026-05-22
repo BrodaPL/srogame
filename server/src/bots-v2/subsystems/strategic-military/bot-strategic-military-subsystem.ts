@@ -113,9 +113,10 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_MILITARY' as const;
 
   public generate(context: BotSubsystemContext): BotSubsystemResult {
-    const missionRequests: MissionRequest[] = [];
-    const shipNeeds: ShipNeedRequest[] = [];
-    const missionCap = resolveMissionRequestCap(context);
+  const missionRequests: MissionRequest[] = [];
+  const shipNeeds: ShipNeedRequest[] = [];
+  const directShipyardProposals: BotProposal[] = [];
+  const missionCap = resolveMissionRequestCap(context);
     const targets = context.snapshot.empire.strategicMilitaryTargets;
     const farmLedger = createFarmLedgerMap(context.memory.strategicMilitary.farmLedger);
     const neutralFarmTargets = resolveNeutralFarmTargets(context, targets, farmLedger);
@@ -184,6 +185,24 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
         continue;
       }
 
+      if (!hasFarmResourceModel(farmEntry)) {
+        const spyRequest = createTargetedSpyMissionRequest(
+          context,
+          target,
+          collectClaimedSpyTargets(context.priorProposals ?? [])
+        );
+        if (spyRequest) {
+          missionRequests.push(spyRequest);
+          farmEntry.lastSpyTurn = context.snapshot.turn;
+        } else {
+          const probeBuildProposal = createFarmResourceSpyProbeProductionProposal(context, target, directShipyardProposals.length);
+          if (probeBuildProposal) {
+            directShipyardProposals.push(probeBuildProposal);
+          }
+        }
+        continue;
+      }
+
       const plunderPlan = createPlunderMissionRequest(context, target, farmEntry);
       if (plunderPlan.request) {
         missionRequests.push(plunderPlan.request);
@@ -208,7 +227,8 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
       ...selectTopShipNeedsPerPlanet(shipNeeds)
         .sort((left, right) => right.score - left.score || left.shipType.localeCompare(right.shipType))
         .slice(0, MAX_SHIP_NEED_PROPOSALS)
-        .map((request, index) => createShipNeedProposal(context, request, index))
+        .map((request, index) => createShipNeedProposal(context, request, index)),
+      ...directShipyardProposals
     ];
 
     return {
@@ -1433,6 +1453,51 @@ function createShipNeedProposal(
   };
 }
 
+function createFarmResourceSpyProbeProductionProposal(
+  context: BotSubsystemContext,
+  target: BotStrategicMilitaryTargetSnapshot,
+  index: number
+): BotProposal | null {
+  const producer = selectBestShipProducer(context.snapshot.planets, ShipType.SPY_PROBE);
+  if (!producer || hasVisibleShipProposal(context, producer, ShipType.SPY_PROBE)) {
+    return null;
+  }
+
+  const blueprintCost = normalizeResources(SHIP_BLUEPRINTS.get(ShipType.SPY_PROBE)?.cost ?? emptyResources());
+  return {
+    proposalId: `strategic-military:shipyard:spy-probe:${producer.coordinates.x}:${producer.coordinates.y}:${producer.coordinates.z}:${target.coordinates.x}:${target.coordinates.y}:${target.coordinates.z}:${context.snapshot.turn}`,
+    subsystemId: 'STRATEGIC_MILITARY',
+    kind: 'SHIPYARD',
+    status: 'PROPOSED',
+    goalKey: `strategic-military:farm-resource-intel:${target.coordinates.x}:${target.coordinates.y}:${target.coordinates.z}`,
+    dedupeKey: `strategic-military:shipyard:${producer.coordinates.x}:${producer.coordinates.y}:${producer.coordinates.z}:${ShipType.SPY_PROBE}`,
+    summary: `Shipyard request #${index + 1}: produce ${ShipType.SPY_PROBE} on ${producer.name} to scout opened farm ${target.coordinates.x}:${target.coordinates.y}:${target.coordinates.z}.`,
+    planetId: producer.planetId,
+    targetCoordinates: { ...producer.coordinates },
+    expectedValue: 90,
+    urgency: 72,
+    risk: 6,
+    confidence: 78,
+    requestedResources: { ...blueprintCost },
+    requestPayload: {
+      x: producer.coordinates.x,
+      y: producer.coordinates.y,
+      z: producer.coordinates.z,
+      itemKind: 'ship',
+      shipType: ShipType.SPY_PROBE,
+      amount: 1
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 1,
+    debug: {
+      queueType: 'FARM_RESOURCE_INTEL',
+      shipType: ShipType.SPY_PROBE,
+      amount: 1,
+      targetFarm: `${target.coordinates.x}:${target.coordinates.y}:${target.coordinates.z}`
+    }
+  };
+}
+
 function compareMissionRequests(left: MissionRequest, right: MissionRequest): number {
   return right.score - left.score
     || right.expectedLoot - left.expectedLoot
@@ -1566,6 +1631,50 @@ function resolveMissionRequestCap(context: BotSubsystemContext): number {
     Math.floor(context.snapshot.empire.imperiumFleetCap * STRATEGIC_MILITARY_AVAILABILITY)
       + context.snapshot.empire.ownedPlanetCount
   );
+}
+
+function selectBestShipProducer(planets: BotPlanetSnapshot[], shipType: ShipType): BotPlanetSnapshot | null {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return null;
+  }
+
+  return [...planets]
+    .filter((planet) =>
+      snapshotHasShipBuildingRequirements(planet, blueprint)
+      && snapshotHasShipTechnologyRequirements(planet, blueprint)
+    )
+    .sort((left, right) =>
+      right.power.shipyardPower - left.power.shipyardPower
+      || right.defense.avgIndustryLevel - left.defense.avgIndustryLevel
+      || left.name.localeCompare(right.name)
+    )[0] ?? null;
+}
+
+function hasVisibleShipProposal(context: BotSubsystemContext, planet: BotPlanetSnapshot, shipType: ShipType): boolean {
+  return (context.priorProposals ?? []).some((proposal) =>
+    proposal.kind === 'SHIPYARD'
+    && sameCoordinates(proposal.targetCoordinates, planet.coordinates)
+    && proposal.requestPayload.itemKind === 'ship'
+    && proposal.requestPayload.shipType === shipType
+  );
+}
+
+function sameCoordinates(
+  left: { x: number; y: number; z: number } | null | undefined,
+  right: { x: number; y: number; z: number } | null | undefined
+): boolean {
+  return left?.x === right?.x
+    && left?.y === right?.y
+    && left?.z === right?.z;
+}
+
+function normalizeResources(resources: Partial<ResourceAmounts>): ResourceAmounts {
+  return {
+    metal: Math.max(0, resources.metal ?? 0),
+    crystal: Math.max(0, resources.crystal ?? 0),
+    deuterium: Math.max(0, resources.deuterium ?? 0)
+  };
 }
 
 function isPostEarlyNeutralWarfarePlanet(planet: BotPlanetSnapshot | null): boolean {

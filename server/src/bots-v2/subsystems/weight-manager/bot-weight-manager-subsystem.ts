@@ -138,7 +138,10 @@ export class BotWeightManagerSubsystem implements BotSubsystem {
     const profile = PROFILE_TABLES[profileId] ?? PROFILE_TABLES.BALANCED;
     const strategicFactions = context.snapshot.empire.strategicDiplomaticFactions;
     const statusCounts = countFactionStatuses(strategicFactions);
-    const farmCounts = countFarmStatuses(context.snapshot.empire.strategicMilitaryTargets);
+    const farmCounts = countFarmStatuses(
+      context.snapshot.empire.strategicMilitaryTargets,
+      context.memory.strategicMilitary.farmLedger
+    );
     const planetAggregates = context.snapshot.planets.map((planet) => buildPlanetAggregate(planet));
     const highestAverages = {
       industry: Math.max(0, ...planetAggregates.map((entry) => entry.avgIndustry)),
@@ -201,6 +204,7 @@ export class BotWeightManagerSubsystem implements BotSubsystem {
         warEmergencyScore: roundToTwoDecimals(modeScores.WAR_EMERGENCY),
         expansionScore: roundToTwoDecimals(modeScores.EXPANSION),
         diplomaticCautionScore: roundToTwoDecimals(modeScores.DIPLOMATIC_CAUTION),
+        actionableFarmCount: farmCounts.actionable,
         breakNeedFarmCount: farmCounts.breakNeed,
         raidReadyFarmCount: farmCounts.raidReady,
         alliedStatusCount: statusCounts.ALLIED,
@@ -263,16 +267,41 @@ function countFactionStatuses(
   return counts;
 }
 
-function countFarmStatuses(targets: BotStrategicMilitaryTargetSnapshot[]): {
+function countFarmStatuses(
+  targets: BotStrategicMilitaryTargetSnapshot[],
+  farmLedger: BotMemoryV2['strategicMilitary']['farmLedger']
+): {
+  actionable: number;
   breakNeed: number;
   raidReady: number;
 } {
+  let actionable = 0;
   let breakNeed = 0;
   let raidReady = 0;
+
+  const actionableKeys = new Set<string>();
 
   for (const target of targets) {
     if (!target.isNeutral || !target.inOwnedSystem) {
       continue;
+    }
+
+    const key = `${target.coordinates.x}:${target.coordinates.y}:${target.coordinates.z}`;
+    const memoryEntry = farmLedger.find((entry) =>
+      entry.coordinates.x === target.coordinates.x
+      && entry.coordinates.y === target.coordinates.y
+      && entry.coordinates.z === target.coordinates.z
+    ) ?? null;
+    if (
+      !target.hasForeignGuard
+      && memoryEntry
+      && (
+        memoryEntry.intelPhase === 'PROBE_REQUIRED'
+        || (memoryEntry.farmIntelEnough && !memoryEntry.initialDefenseBroken)
+        || memoryEntry.initialDefenseBroken
+      )
+    ) {
+      actionableKeys.add(key);
     }
 
     const hasCombatIntel = target.spyCombatIntelEnough || target.lastAttackTurn !== null;
@@ -289,7 +318,8 @@ function countFarmStatuses(targets: BotStrategicMilitaryTargetSnapshot[]): {
     }
   }
 
-  return { breakNeed, raidReady };
+  actionable = actionableKeys.size;
+  return { actionable, breakNeed, raidReady };
 }
 
 function compressProfileTables(
@@ -419,7 +449,7 @@ function buildGlobalModeScores(
   context: BotSubsystemContext,
   axes: WeightProfileAxes,
   statusCounts: Record<DiplomaticStatus, number>,
-  farmCounts: { breakNeed: number; raidReady: number },
+  farmCounts: { actionable: number; breakNeed: number; raidReady: number },
   planetFlags: PlanetFlags[]
 ): GlobalModeScores {
   const immatureCount = planetFlags.filter((planet) => planet.immaturePlanet).length;
@@ -453,6 +483,7 @@ function buildGlobalModeScores(
     EXPANSION: Math.min(
       100,
       Math.min(40, context.snapshot.empire.intelCandidates.length * 4)
+      + Math.min(18, farmCounts.actionable * 2)
       + Math.min(30, (farmCounts.breakNeed * 3) + (farmCounts.raidReady * 4))
       + (context.snapshot.empire.ownedPlanetCount <= 2 ? 15 : 0)
       + colonizationPressure
@@ -497,7 +528,7 @@ function buildGlobalWeights(
   selectedMode: BotMemoryV2WeightManagerMode,
   context: BotSubsystemContext,
   statusCounts: Record<DiplomaticStatus, number>,
-  farmCounts: { breakNeed: number; raidReady: number },
+  farmCounts: { actionable: number; breakNeed: number; raidReady: number },
   planetFlags: PlanetFlags[]
 ): {
   researchWeight: number;
@@ -529,6 +560,7 @@ function buildGlobalWeights(
     profile.strategicWeights.strategicMilitary
     + (modeScores.WAR_EMERGENCY * 0.2)
     + (modeScores.EXPANSION * 0.25)
+    + (farmCounts.actionable * 4)
     + (farmCounts.breakNeed * 3)
     + (farmCounts.raidReady * 4)
     + Math.min(18, farmCounts.breakNeed * 6)
