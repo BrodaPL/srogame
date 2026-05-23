@@ -15,6 +15,11 @@ const { DefenceType } = resolveModule(defenceTypeModule) as typeof import('../..
 const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../src/app/models/enums/ship-type.js');
 const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../src/app/models/enums/technology-type.js');
 
+type BuildingTypeT = buildingTypeModule.BuildingType;
+type DefenceTypeT = defenceTypeModule.DefenceType;
+type ShipTypeT = shipTypeModule.ShipType;
+type TechnologyTypeT = technologyTypeModule.TechnologyType;
+
 export type BotQueueExecutionKind = 'BUILDING' | 'RESEARCH' | 'SHIPYARD';
 
 export type BotQueueExecutionCommand =
@@ -171,18 +176,18 @@ function readCoordinates(value: unknown): ClientCoordinates | null {
   return readV2ProposalCoordinates(source);
 }
 
-function isBuildingType(value: unknown): value is BuildingType {
-  return typeof value === 'string' && Object.values(BuildingType).includes(value as BuildingType);
+function isBuildingType(value: unknown): value is BuildingTypeT {
+  return typeof value === 'string' && Object.values(BuildingType).includes(value as BuildingTypeT);
 }
 
-function isTechnologyType(value: unknown): value is TechnologyType {
-  return typeof value === 'string' && Object.values(TechnologyType).includes(value as TechnologyType);
+function isTechnologyType(value: unknown): value is TechnologyTypeT {
+  return typeof value === 'string' && Object.values(TechnologyType).includes(value as TechnologyTypeT);
 }
 
-function isShipType(value: unknown): value is ShipType {
-  return typeof value === 'string' && Object.values(ShipType).includes(value as ShipType);
+function isShipType(value: unknown): value is ShipTypeT {
+  return typeof value === 'string' && Object.values(ShipType).includes(value as ShipTypeT);
 }
 
-function isDefenceType(value: unknown): value is DefenceType {
-  return typeof value === 'string' && Object.values(DefenceType).includes(value as DefenceType);
+function isDefenceType(value: unknown): value is DefenceTypeT {
+  return typeof value === 'string' && Object.values(DefenceType).includes(value as DefenceTypeT);
 }

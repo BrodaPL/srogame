@@ -6,6 +6,7 @@ function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
 }
 
 const { BuildingType } = resolveModule(buildingTypeEnumModule) as typeof import('../../../src/app/models/enums/building-type.js');
+type BuildingTypeT = buildingTypeEnumModule.BuildingType;
 
 export type BotInfrastructureDamageCategory = 'CRUCIAL' | 'IMPORTANT' | 'BASIC';
 
@@ -28,7 +29,7 @@ export type BotInfrastructureDamageCategorySummary = {
   thresholdPercent: number;
   emergencyTriggered: boolean;
   maxBuildingDamagePercent: number;
-  triggeredBuildingTypes: BuildingType[];
+  triggeredBuildingTypes: BuildingTypeT[];
 };
 
 export type BotInfrastructureDamageSummary = {
@@ -40,7 +41,7 @@ export type BotInfrastructureDamageSummary = {
   highestTriggeredCategory: BotInfrastructureDamageCategory | null;
   maxTriggeredBuildingDamagePercent: number;
   damageByCategory: Record<BotInfrastructureDamageCategory, BotInfrastructureDamageCategorySummary>;
-  damageByBuildingType: Partial<Record<BuildingType, BotInfrastructureBuildingDamageEntry>>;
+  damageByBuildingType: Partial<Record<BuildingTypeT, BotInfrastructureBuildingDamageEntry>>;
 };
 
 type InfrastructureThresholdMap = Record<BotInfrastructureDamageCategory, number>;
@@ -51,13 +52,13 @@ const BUILDING_DAMAGE_CATEGORY_THRESHOLDS: InfrastructureThresholdMap = {
   BASIC: 80
 };
 
-const CRUCIAL_BUILDINGS = new Set<BuildingType>([
+const CRUCIAL_BUILDINGS = new Set<BuildingTypeT>([
   BuildingType.SOLAR_WIND_GEOTHERMAL,
   BuildingType.NUCLEAR_PLANT,
   BuildingType.FUSION_REACTOR
 ]);
 
-const IMPORTANT_BUILDINGS = new Set<BuildingType>([
+const IMPORTANT_BUILDINGS = new Set<BuildingTypeT>([
   BuildingType.METAL_MINE,
   BuildingType.CRYSTAL_MINE,
   BuildingType.DEUTERIUM_SYNTHESIZER,
@@ -66,7 +67,7 @@ const IMPORTANT_BUILDINGS = new Set<BuildingType>([
   BuildingType.SHIPYARD
 ]);
 
-export function resolveInfrastructureDamageCategory(buildingType: BuildingType): BotInfrastructureDamageCategory {
+export function resolveInfrastructureDamageCategory(buildingType: BuildingTypeT): BotInfrastructureDamageCategory {
   if (CRUCIAL_BUILDINGS.has(buildingType)) {
     return 'CRUCIAL';
   }
@@ -86,7 +87,7 @@ export function resolveInfrastructureDamageSummary(planet: Planet): BotInfrastru
     IMPORTANT: createCategorySummary('IMPORTANT'),
     BASIC: createCategorySummary('BASIC')
   };
-  const damageByBuildingType: Partial<Record<BuildingType, BotInfrastructureBuildingDamageEntry>> = {};
+  const damageByBuildingType: Partial<Record<BuildingTypeT, BotInfrastructureBuildingDamageEntry>> = {};
 
   let damagedBuildingCount = 0;
   let missingBuildingStructuralPoints = 0;

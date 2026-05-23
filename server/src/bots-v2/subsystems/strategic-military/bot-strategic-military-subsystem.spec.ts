@@ -270,8 +270,9 @@ describe('BotStrategicMilitarySubsystem', () => {
     );
 
     expect(attackProposal).toBeDefined();
-    expect(attackProposal?.requestPayload.ships.some((ship: { type: ShipType }) => ship.type === ShipType.TRANSPORTER)).toBe(true);
-    expect(attackProposal?.requestPayload.ships.some((ship: { type: ShipType }) => ship.type === ShipType.CRUISER)).toBe(true);
+    const attackShipTypes = readProposalShipTypes(attackProposal);
+    expect(attackShipTypes).toContain(ShipType.TRANSPORTER);
+    expect(attackShipTypes).toContain(ShipType.CRUISER);
   });
 
   it('treats scanned neutral planets with confirmed zero defenders as raid-ready intel', () => {
@@ -366,7 +367,19 @@ describe('BotStrategicMilitarySubsystem', () => {
       survivingDefencesLine: 'Enemy defense survivors by type: none'
     });
 
-    const snapshot = buildBotWorldSnapshot(galaxy, bot, { mode: 'LIVE' });
+    const snapshot = buildBotWorldSnapshot(galaxy, bot, {
+      mode: 'LIVE',
+      enabledSubsystems: {
+        economic: false,
+        defensive: false,
+        warfare: false,
+        critical: false,
+        strategicDevelopment: false,
+        strategicMilitary: true,
+        strategicDiplomatic: false,
+        weightManager: false
+      }
+    });
     const target = snapshot.empire.strategicMilitaryTargets.find((entry) =>
       entry.coordinates.x === neutralPlanet.basicInfo.solarSystem.coordinates.x
       && entry.coordinates.y === neutralPlanet.basicInfo.solarSystem.coordinates.y
@@ -450,7 +463,8 @@ describe('BotStrategicMilitarySubsystem', () => {
     );
 
     expect(plunderProposal).toBeDefined();
-    expect(plunderProposal?.requestPayload.ships.some((ship: { type: ShipType }) => ship.type === ShipType.CARGO_SUPPORT)).toBe(true);
+    const plunderShipTypes = readProposalShipTypes(plunderProposal);
+    expect(plunderShipTypes).toContain(ShipType.CARGO_SUPPORT);
   });
 
   it('holds a failed defended farm in cooldown and asks for more force instead of retrying immediately', () => {
@@ -614,6 +628,22 @@ function runStrategicMilitarySubsystem(
     memory,
     priorProposals
   });
+}
+
+function readProposalShipTypes(proposal: BotProposal | undefined): ShipType[] {
+  const ships = proposal?.requestPayload?.ships;
+  if (!Array.isArray(ships)) {
+    return [];
+  }
+
+  return ships
+    .filter((entry): entry is { type: ShipType } =>
+      !!entry
+      && typeof entry === 'object'
+      && 'type' in entry
+      && Object.values(ShipType).includes((entry as { type: unknown }).type as ShipType)
+    )
+    .map((entry) => entry.type);
 }
 
 function createStrategicMilitaryWorld() {

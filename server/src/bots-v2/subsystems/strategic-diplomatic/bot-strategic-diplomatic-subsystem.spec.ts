@@ -20,10 +20,11 @@ import { createMaintenanceRequest } from '../../../../../src/app/models/requests
 import { createSupportRequest } from '../../../../../src/app/models/requests/support-request.js';
 import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
-import { BuildingQueueEntry } from '../../../../../src/app/models/buildings/building-queue-entry.js';
-import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
-import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
-import { BotStrategicDiplomaticSubsystem } from './bot-strategic-diplomatic-subsystem.js';
+  import { BuildingQueueEntry } from '../../../../../src/app/models/buildings/building-queue-entry.js';
+  import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
+  import type { BotProposal } from '../../bot-v2-types.js';
+  import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
+  import { BotStrategicDiplomaticSubsystem } from './bot-strategic-diplomatic-subsystem.js';
 
 describe('BotStrategicDiplomaticSubsystem', () => {
   it('tracks only discovered non-neutral factions', () => {
@@ -253,9 +254,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     const attackProposal = result.result.proposals.find((proposal) =>
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.ATTACK
-      && proposal.requestPayload.target.x === playerEnemyPlanet.basicInfo.solarSystem.coordinates.x
-      && proposal.requestPayload.target.y === playerEnemyPlanet.basicInfo.solarSystem.coordinates.y
-      && proposal.requestPayload.target.z === playerEnemyPlanet.basicInfo.order
+      && proposalTargetsPlanet(proposal, playerEnemyPlanet)
     );
 
     expect(attackProposal).toBeDefined();
@@ -547,9 +546,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     const spyProposal = result.result.proposals.find((proposal) =>
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.SPY
-      && proposal.requestPayload.target.x === playerEnemyPlanet.basicInfo.solarSystem.coordinates.x
-      && proposal.requestPayload.target.y === playerEnemyPlanet.basicInfo.solarSystem.coordinates.y
-      && proposal.requestPayload.target.z === playerEnemyPlanet.basicInfo.order
+      && proposalTargetsPlanet(proposal, playerEnemyPlanet)
     );
 
     expect(raidProposal).toBeUndefined();
@@ -730,7 +727,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     const armamentProposal = result.result.proposals.find((proposal) =>
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.ARMAMENT_DELIVERY
-      && proposal.requestPayload.target.x === forwardHub.basicInfo.solarSystem.coordinates.x
+      && proposalTargetsPlanet(proposal, forwardHub)
     );
 
     expect(armamentProposal).toBeDefined();
@@ -969,9 +966,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     const supportProposal = result.result.proposals.find((proposal) =>
       proposal.kind === 'FLEET_MISSION'
       && proposal.requestPayload.missionType === FleetMissionType.DEFEND
-      && proposal.requestPayload.target.x === alliedContact.planets[0]!.basicInfo.solarSystem.coordinates.x
-      && proposal.requestPayload.target.y === alliedContact.planets[0]!.basicInfo.solarSystem.coordinates.y
-      && proposal.requestPayload.target.z === alliedContact.planets[0]!.basicInfo.order
+      && proposalTargetsPlanet(proposal, alliedContact.planets[0]!)
     );
 
     expect(supportProposal).toBeDefined();
@@ -1023,7 +1018,7 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     );
     markPlanetScanned(bot, peaceContact, peaceContact.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 10 });
     botPlanet.rBDSFTQ.resources = new ResourcesPack(0, 0, 0);
-    botPlanet.rBDSFTQ.currentBuildingQueue = new BuildingQueueEntry(BuildingType.METAL_MINE, 5, 0);
+    botPlanet.rBDSFTQ.buildingQueue = [new BuildingQueueEntry(BuildingType.METAL_MINE, 5, 0)];
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot);
 
@@ -1498,6 +1493,28 @@ function createOpenedWarTargetSeed(planet: Planet, targetPlayerId: number) {
     preferredRaidOriginCoordinates: null,
     lastEstimatedPlunderValue: 0
   };
+}
+
+function proposalTargetsPlanet(proposal: BotProposal, planet: Planet): boolean {
+  const targetCoordinates = proposal.targetCoordinates ?? readCoordinatesFromUnknown(proposal.requestPayload.target);
+  return !!targetCoordinates
+    && targetCoordinates.x === planet.basicInfo.solarSystem.coordinates.x
+    && targetCoordinates.y === planet.basicInfo.solarSystem.coordinates.y
+    && targetCoordinates.z === planet.basicInfo.order;
+}
+
+function readCoordinatesFromUnknown(value: unknown): { x: number; y: number; z: number } | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const x = Number(record.x);
+  const y = Number(record.y);
+  const z = Number(record.z);
+  if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(z)) {
+    return null;
+  }
+  return { x, y, z };
 }
 
 function setBasicShipTech(player: Player): void {

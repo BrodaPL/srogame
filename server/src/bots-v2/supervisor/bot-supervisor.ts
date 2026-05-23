@@ -43,6 +43,10 @@ const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof imp
 const { FleetMissionRegistry } = resolveModule(fleetMissionRegistryModule) as typeof import('../../../../src/app/models/missions/fleet-mission-registry.js');
 const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../src/app/models/enums/technology-type.js');
 
+type BuildingTypeT = buildingTypeModule.BuildingType;
+type DefenceTypeT = defenceTypeModule.DefenceType;
+type TechnologyTypeT = technologyTypeModule.TechnologyType;
+
 const QUEUE_ACTION_KINDS = new Set<BotProposal['kind']>(['BUILDING', 'RESEARCH', 'SHIPYARD']);
 const FLEET_ACTION_KINDS = new Set<BotProposal['kind']>(['FLEET_MISSION']);
 const REQUEST_ACTION_KINDS = new Set<BotProposal['kind']>(['REQUEST_DECISION']);
@@ -1092,7 +1096,7 @@ function precheckQueueRequirements(
 
   if (proposal.kind === 'BUILDING') {
     const buildingType = typeof proposal.requestPayload.buildingType === 'string'
-      ? proposal.requestPayload.buildingType as BuildingType
+      ? proposal.requestPayload.buildingType as BuildingTypeT
       : null;
     const blueprint = buildingType ? BUILDING_BLUEPRINTS.get(buildingType) : null;
     if (!buildingType || !blueprint) {
@@ -1111,7 +1115,7 @@ function precheckQueueRequirements(
 
   if (proposal.kind === 'RESEARCH') {
     const technologyType = typeof proposal.requestPayload.technologyType === 'string'
-      ? proposal.requestPayload.technologyType as TechnologyType
+      ? proposal.requestPayload.technologyType as TechnologyTypeT
       : null;
     const blueprint = technologyType ? TECHNOLOGY_BLUEPRINTS.get(technologyType) : null;
     if (!technologyType || !blueprint) {
@@ -1150,7 +1154,7 @@ function precheckQueueRequirements(
 
     if (itemKind === 'defence') {
       const defenceType = typeof proposal.requestPayload.defenceType === 'string'
-        ? proposal.requestPayload.defenceType as DefenceType
+        ? proposal.requestPayload.defenceType as DefenceTypeT
         : null;
       const blueprint = defenceType ? DEFENCE_BLUEPRINTS.get(defenceType) : null;
       if (!defenceType || !blueprint) {
@@ -1210,7 +1214,7 @@ function readOneBasedCoordinates(value: unknown): { x: number; y: number; z: num
 
 function hasSnapshotBuildingRequirements(
   planet: BotWorldSnapshot['planets'][number],
-  requirements: Array<{ building: BuildingType; level: number }>,
+  requirements: Array<{ building: BuildingTypeT; level: number }>,
   scaledLevel: number
 ): boolean {
   for (const requirement of requirements) {
@@ -1225,7 +1229,7 @@ function hasSnapshotBuildingRequirements(
 
 function hasSnapshotTechnologyRequirements(
   planet: BotWorldSnapshot['planets'][number],
-  requirements: Array<{ tech: TechnologyType; level: number }>,
+  requirements: Array<{ tech: TechnologyTypeT; level: number }>,
   scaledLevel: number
 ): boolean {
   for (const requirement of requirements) {
@@ -1240,23 +1244,23 @@ function hasSnapshotTechnologyRequirements(
 
 function hasSnapshotStaticRequirements(
   planet: BotWorldSnapshot['planets'][number],
-  requirements: Array<{ building: BuildingType; level: number }> | Array<{ tech: TechnologyType; level: number }>,
+  requirements: Array<{ building: BuildingTypeT; level: number }> | Array<{ tech: TechnologyTypeT; level: number }>,
   kind: 'building' | 'technology'
 ): boolean {
   if (kind === 'building') {
-    return (requirements as Array<{ building: BuildingType; level: number }>).every((requirement) =>
+    return (requirements as Array<{ building: BuildingTypeT; level: number }>).every((requirement) =>
       getSnapshotBuildingLevel(planet, requirement.building) >= Math.ceil(requirement.level)
     );
   }
 
-  return (requirements as Array<{ tech: TechnologyType; level: number }>).every((requirement) =>
+  return (requirements as Array<{ tech: TechnologyTypeT; level: number }>).every((requirement) =>
     getSnapshotTechnologyLevel(planet, requirement.tech) >= Math.ceil(requirement.level)
   );
 }
 
 function getSnapshotBuildingLevel(
   planet: BotWorldSnapshot['planets'][number],
-  buildingType: BuildingType
+  buildingType: BuildingTypeT
 ): number {
   switch (buildingType) {
     case BuildingType.METAL_MINE:
@@ -1304,7 +1308,7 @@ function getSnapshotBuildingLevel(
 
 function getSnapshotTechnologyLevel(
   planet: BotWorldSnapshot['planets'][number],
-  technologyType: TechnologyType
+  technologyType: TechnologyTypeT
 ): number {
   switch (technologyType) {
     case TechnologyType.ENERGY_TECHNOLOGY:

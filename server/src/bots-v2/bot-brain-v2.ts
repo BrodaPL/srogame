@@ -32,6 +32,8 @@ const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof imp
 const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../src/app/models/enums/fleet-mission-type.js');
 const { defaultBotProfileIdForPlayerId } = resolveModule(playerModule) as typeof import('../../../src/app/models/player.js');
 
+type DiplomaticStatusT = diplomaticStatusModule.DiplomaticStatus;
+
 export class BotBrainV2 {
   private readonly supervisor;
   private readonly subsystems;
@@ -300,8 +302,9 @@ function applyRecycleHostilitySideEffects(
     }
 
     const targetMemory = ensureBotMemoryV2(targetOwner);
-    const currentStatus = isDiplomaticStatus(proposal.debug.targetStatus)
-      ? proposal.debug.targetStatus
+    const targetStatusValue = proposal.debug.targetStatus;
+    const currentStatus: DiplomaticStatusT = isDiplomaticStatus(targetStatusValue)
+      ? targetStatusValue
       : DiplomaticStatus.NEUTRAL;
     const existingLedger = targetMemory.strategicDiplomatic.factionLedger.find((entry) => entry.playerId === attacker.playerId);
     if (existingLedger) {
@@ -346,6 +349,6 @@ function applyRecycleHostilitySideEffects(
   }
 }
 
-function isDiplomaticStatus(value: unknown): value is DiplomaticStatus {
-  return typeof value === 'string' && Object.values(DiplomaticStatus).includes(value as DiplomaticStatus);
+function isDiplomaticStatus(value: unknown): value is DiplomaticStatusT {
+  return typeof value === 'string' && Object.values(DiplomaticStatus).includes(value as DiplomaticStatusT);
 }

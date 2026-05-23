@@ -709,8 +709,10 @@ describe.sequential('auth api', () => {
 
     const stateResponse = await request('GET', '/api/game/state', undefined, '10.0.0.71', token);
     expect(stateResponse.status).toBe(200);
-    expect(stateResponse.json?.player?.currentGameId).toBe(gameId);
-    expect(stateResponse.json?.galaxy?.name).toBe('Resume Singleplayer Sector');
+    const statePlayer = stateResponse.json?.player as Record<string, unknown> | undefined;
+    const stateGalaxy = stateResponse.json?.galaxy as Record<string, unknown> | undefined;
+    expect(statePlayer?.currentGameId).toBe(gameId);
+    expect(stateGalaxy?.name).toBe('Resume Singleplayer Sector');
   });
 
   it('classifies stale draft lobbies into other multiplayer games', async () => {

@@ -60,14 +60,17 @@ const { PlayerType } = resolveModule(playerTypeModule) as typeof import('../../.
 const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../src/app/models/enums/technology-type.js');
 const { FleetState } = resolveModule(fleetModule) as typeof import('../../../../src/app/models/fleets/fleet.js');
 
-const RECALLABLE_OFFENSIVE_MISSIONS = new Set<FleetMissionType>([
+type DiplomaticStatusT = diplomaticStatusModule.DiplomaticStatus;
+type FleetMissionTypeT = fleetMissionTypeModule.MissionType;
+
+const RECALLABLE_OFFENSIVE_MISSIONS = new Set<FleetMissionTypeT>([
   FleetMissionType.ATTACK,
   FleetMissionType.BOMBARD,
   FleetMissionType.SIEGE,
   FleetMissionType.SPY
 ]);
 
-const RELATIONS_REQUIRING_OFFENSIVE_RECALL = new Set<DiplomaticStatus>([
+const RELATIONS_REQUIRING_OFFENSIVE_RECALL = new Set<DiplomaticStatusT>([
   DiplomaticStatus.NEUTRAL,
   DiplomaticStatus.PEACE,
   DiplomaticStatus.ALLIED

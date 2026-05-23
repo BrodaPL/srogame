@@ -3395,7 +3395,7 @@ app.post('/api/game/building-queue/cancel', (req, res) => {
 
   const refund = calculateBuildingCancellationRefund(building, queueEntry);
   const canceledBuildingType = queueEntry.buildingType;
-  const canceledTargetLevel = queueEntry.targetLevel;
+  const canceledTargetLevel = queueEntry.nextLevel;
   planet.rBDSFTQ.resources.addResourcePack(refund);
   planet.rBDSFTQ.buildingQueue.splice(index, 1);
 

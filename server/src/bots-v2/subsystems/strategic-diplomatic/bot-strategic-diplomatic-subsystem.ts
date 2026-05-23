@@ -55,6 +55,13 @@ const { isPlanetaryBombDefenceType } = resolveModule(planetaryBombModule) as typ
 const { isArmamentDeliveryShipType } = resolveModule(armamentDeliveryModule) as typeof import('../../../../../src/app/models/missions/armament-delivery.js');
 const { fleetTravelTurnsForDistance } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
+type BuildingType = buildingTypeModule.BuildingType;
+type DefenceType = defenceTypeModule.DefenceType;
+type DiplomaticStatus = diplomaticStatusModule.DiplomaticStatus;
+type FleetMissionType = fleetMissionTypeModule.MissionType;
+type ShipType = shipTypeModule.ShipType;
+type TechnologyType = technologyTypeModule.TechnologyType;
+
 type FactionLedgerMap = Map<number, BotMemoryV2StrategicDiplomaticFactionEntry>;
 type OpenedWarTargetLedgerMap = Map<string, BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry>;
 type SharedHostileEventLedgerMap = Map<string, BotMemoryV2StrategicDiplomaticSharedHostileEventEntry>;
@@ -153,7 +160,7 @@ type AttackMissionRequest = {
 
 type SupportMissionRequest = {
   kind: 'SUPPORT';
-  supportMissionType: FleetMissionType.DEFEND | FleetMissionType.REPAIR;
+  supportMissionType: typeof FleetMissionType.DEFEND | typeof FleetMissionType.REPAIR;
   faction: EvaluatedFaction;
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number];
   originPlanet: BotPlanetSnapshot;
@@ -177,7 +184,7 @@ type WarShipNeedRequest = {
 };
 
 type BombardmentMissionRequest = {
-  missionType: FleetMissionType.BOMBARD | FleetMissionType.SIEGE;
+  missionType: typeof FleetMissionType.BOMBARD | typeof FleetMissionType.SIEGE;
   faction: EvaluatedFaction;
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number];
   originPlanet: BotPlanetSnapshot;
@@ -192,7 +199,7 @@ type BombardmentMissionRequest = {
 };
 
 type RelocationMissionRequest = {
-  missionType: FleetMissionType.MOVE;
+  missionType: typeof FleetMissionType.MOVE;
   phase: 'BOMBARDMENT_RELOCATION' | 'PRE_BREAK_CONCENTRATION';
   faction: EvaluatedFaction;
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number];
@@ -216,7 +223,7 @@ type PreBreakTargetSelection = {
 };
 
 type ArmamentDeliveryMissionRequest = {
-  missionType: FleetMissionType.ARMAMENT_DELIVERY;
+  missionType: typeof FleetMissionType.ARMAMENT_DELIVERY;
   targetKind: 'OWN' | 'ALLIED';
   originPlanet: BotPlanetSnapshot;
   targetCoordinates: { x: number; y: number; z: number };
@@ -289,7 +296,7 @@ type DiplomacyDecisionPlan = {
   faction: EvaluatedFaction;
   proposalId: number;
   decision: 'ACCEPT' | 'REJECT' | 'CANCEL';
-  requestedStatus: DiplomaticStatus.PEACE | DiplomaticStatus.ALLIED | DiplomaticStatus.NEUTRAL | DiplomaticStatus.WAR;
+  requestedStatus: typeof DiplomaticStatus.PEACE | typeof DiplomaticStatus.ALLIED | typeof DiplomaticStatus.NEUTRAL | typeof DiplomaticStatus.WAR;
   score: number;
   reason: string;
   expiresOnTurn: number;
@@ -2313,7 +2320,7 @@ function createBombardmentPlanFromOrigin(
   originPlanet: BotPlanetSnapshot,
   faction: EvaluatedFaction,
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
-  missionType: FleetMissionType.BOMBARD | FleetMissionType.SIEGE,
+  missionType: typeof FleetMissionType.BOMBARD | typeof FleetMissionType.SIEGE,
   requiredStrength: number
 ): BombardmentMissionRequest | null {
   const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
@@ -2354,7 +2361,7 @@ function createBombardmentPlanFromOrigin(
 function resolveAllowedBombardmentMissionType(
   faction: EvaluatedFaction,
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number]
-): FleetMissionType.BOMBARD | FleetMissionType.SIEGE | null {
+): typeof FleetMissionType.BOMBARD | typeof FleetMissionType.SIEGE | null {
   if (faction.hostilityScore < BOMBARD_HOSTILITY_THRESHOLD) {
     return null;
   }
@@ -2370,7 +2377,7 @@ function resolveAllowedBombardmentMissionType(
 
 function resolveBombardmentRequiredStrength(
   targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
-  missionType: FleetMissionType.BOMBARD | FleetMissionType.SIEGE
+  missionType: typeof FleetMissionType.BOMBARD | typeof FleetMissionType.SIEGE
 ): number {
   const baseline = Math.max(
     1,
@@ -3352,7 +3359,7 @@ function createConcentratedDirectAttackPlan(
   selection: PreBreakTargetSelection
 ): AttackMissionRequest | null {
   const validPlans = context.snapshot.planets
-    .map((originPlanet) => {
+    .map((originPlanet): AttackMissionRequest | null => {
       const distance = calculateTravelDistance(originPlanet.coordinates, selection.targetPlanet.coordinates);
       const travelTurns = resolveTravelTurns(originPlanet, distance);
       const combatSelection = selectCombatShipsForStrength(originPlanet, selection.requiredStrength, distance);
@@ -3436,7 +3443,7 @@ function createPreBreakRelocationCandidates(
 ): RelocationMissionRequest[] {
   return context.snapshot.planets
     .filter((originPlanet) => toCoordinatesKey(originPlanet.coordinates) !== toCoordinatesKey(stagingPlanet.coordinates))
-    .map((originPlanet) => {
+    .map((originPlanet): RelocationMissionRequest | null => {
       const moveDistance = calculateTravelDistance(originPlanet.coordinates, stagingPlanet.coordinates);
       const moveSelection = selectCombatShipsForStrength(originPlanet, Number.MAX_SAFE_INTEGER, moveDistance);
       if (moveSelection.ships.length <= 0 || moveSelection.combatStrength <= 0) {
@@ -3491,7 +3498,7 @@ function createAnyPreBreakRelocationPlan(
   for (const stagingPlanet of stagingCandidates) {
     const candidate = context.snapshot.planets
       .filter((originPlanet) => toCoordinatesKey(originPlanet.coordinates) !== toCoordinatesKey(stagingPlanet.coordinates))
-      .map((originPlanet) => {
+      .map((originPlanet): RelocationMissionRequest | null => {
         const moveDistance = calculateTravelDistance(originPlanet.coordinates, stagingPlanet.coordinates);
         const moveSelection = selectCombatShipsForStrength(originPlanet, Number.MAX_SAFE_INTEGER, moveDistance);
         if (moveSelection.ships.length <= 0 || moveSelection.combatStrength <= 0) {
@@ -3662,7 +3669,7 @@ function createAttackPlanForTarget(
   const requiredStrengthMultiplier = resolveDiplomaticAttackMultiplier(faction, targetPlanet);
   const requiredStrength = Math.max(1, Math.ceil(targetStrength * requiredStrengthMultiplier));
   const validPlans = context.snapshot.planets
-    .map((originPlanet) => {
+    .map((originPlanet): AttackMissionRequest | null => {
       const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
       const travelTurns = resolveTravelTurns(originPlanet, distance);
       const selection = selectCombatShipsForStrength(originPlanet, requiredStrength, distance);
@@ -3671,6 +3678,7 @@ function createAttackPlanForTarget(
       }
 
       return {
+        kind: 'ATTACK',
         faction,
         phase: 'DIRECT',
         targetPlanet,
@@ -3715,7 +3723,7 @@ function createScoutAttackPlanForTarget(
   const sharedAttackModifier = resolveSharedAttackUrgencyModifier(faction);
   for (const shipType of [ShipType.CRUISER, ShipType.BATTLE_SHIP, ShipType.FRIGATE]) {
     const validPlans = context.snapshot.planets
-      .map((originPlanet) => {
+      .map((originPlanet): AttackMissionRequest | null => {
         const available = originPlanet.ships.undamagedCountByType[shipType] ?? 0;
         if (available <= 0) {
           return null;
@@ -4399,7 +4407,11 @@ function compareOpenedWarTargetLedgerEntries(
 }
 
 function sumTypedCounts<T extends string>(counts: Partial<Record<T, number>>): number {
-  return Object.values(counts).reduce((sum, amount) => sum + Math.max(0, amount ?? 0), 0);
+  let total = 0;
+  for (const amount of Object.values(counts) as Array<number | undefined>) {
+    total += Math.max(0, amount ?? 0);
+  }
+  return total;
 }
 
 function resolveBunkerReductionPercentForLevel(level: number | null): number {
@@ -4493,7 +4505,7 @@ function createRepairSupportPlan(
 ): SupportMissionRequest | null {
   const sharedUrgency = resolveSharedSupportUrgencyModifier(faction, targetPlanet.coordinates);
   const candidates = context.snapshot.planets
-    .map((originPlanet) => {
+    .map((originPlanet): SupportMissionRequest | null => {
       const availableDrones = originPlanet.ships.undamagedCountByType[ShipType.REPAIR_DRONE] ?? 0;
       if (availableDrones <= 0) {
         return null;
@@ -4543,7 +4555,7 @@ function createGuardSupportPlan(
   const sharedUrgency = resolveSharedSupportUrgencyModifier(faction, targetPlanet.coordinates);
   const requiredStrength = Math.max(1, estimateDiplomaticTargetStrength(targetPlanet));
   const validPlans = context.snapshot.planets
-    .map((originPlanet) => {
+    .map((originPlanet): SupportMissionRequest | null => {
       const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
       const travelTurns = resolveTravelTurns(originPlanet, distance);
       const selection = selectCombatShipsForStrength(originPlanet, requiredStrength, distance);
@@ -5886,7 +5898,6 @@ function createSpyMissionProposal(
   request: SpyMissionRequest,
   index: number
 ): BotProposal {
-  const isPostBreakRaid = request.phase === 'POST_BREAK_RAID';
   return {
     proposalId: `strategic-diplomatic:spy:${request.faction.faction.playerId}:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.targetCoordinates.x}:${request.targetCoordinates.y}:${request.targetCoordinates.z}:${context.snapshot.turn}`,
     subsystemId: 'STRATEGIC_DIPLOMATIC',

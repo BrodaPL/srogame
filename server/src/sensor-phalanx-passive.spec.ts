@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DiplomaticStatus } from '../../src/app/models/diplomacy/diplomatic-status.js';
 import { DiplomacyResolver } from '../../src/app/models/diplomacy/diplomacy-resolver.js';
+import { Destination } from '../../src/app/models/fleets/destination.js';
 import { Fleet, FleetState } from '../../src/app/models/fleets/fleet.js';
 import { ManyShips } from '../../src/app/models/fleets/many-ships.js';
 import { FleetMissionType } from '../../src/app/models/enums/fleet-mission-type.js';
@@ -14,6 +15,10 @@ import { collectSensorPhalanxPassiveDetections } from './sensor-phalanx-passive.
 
 function point(x: number, y: number, z: number) {
   return { x, y, z };
+}
+
+function destination(x: number, y: number, z: number): Destination {
+  return new Destination(x, y, z);
 }
 
 function manyShips(...entries: Array<{ type: ShipType; amount: number }>): ManyShips {
@@ -45,8 +50,8 @@ describe('sensor-phalanx passive detection', () => {
       10,
       1,
       FleetMissionType.MOVE,
-      point(0, 0, 2),
-      point(0, 0, 1),
+      destination(0, 0, 2),
+      destination(0, 0, 1),
       'Spare World',
       'Guarded World',
       manyShips({ type: ShipType.SPY_PROBE, amount: 1 }),
@@ -63,8 +68,8 @@ describe('sensor-phalanx passive detection', () => {
       11,
       2,
       FleetMissionType.MOVE,
-      point(0, 0, 2),
-      point(0, 0, 1),
+      destination(0, 0, 2),
+      destination(0, 0, 1),
       'Ally Origin',
       'Guarded World',
       manyShips({ type: ShipType.TRANSPORTER, amount: 2 }),
@@ -81,8 +86,8 @@ describe('sensor-phalanx passive detection', () => {
       12,
       3,
       FleetMissionType.ATTACK,
-      point(0, 0, 2),
-      point(0, 0, 1),
+      destination(0, 0, 2),
+      destination(0, 0, 1),
       'Enemy Origin',
       'Guarded World',
       manyShips({ type: ShipType.FIGHTER, amount: 3 }),

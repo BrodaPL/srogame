@@ -25,13 +25,16 @@ const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import(
 const { resolveFusionReactorOperation } = resolveModule(fusionReactorOperationModule) as typeof import('../../../../../src/app/models/planets/fusion-reactor-operation.js');
 const { industryPowerMultiplier, researchPowerMultiplier } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
+type BuildingTypeT = buildingTypeModule.BuildingType;
+type TechnologyTypeT = technologyTypeModule.TechnologyType;
+
 type ResourceKey = 'metal' | 'crystal' | 'deuterium';
 
 type ResourceAmounts = Record<ResourceKey, number>;
 
 type SimulatedState = {
-  buildingLevels: Map<BuildingType, number>;
-  techLevels: Map<TechnologyType, number>;
+  buildingLevels: Map<BuildingTypeT, number>;
+  techLevels: Map<TechnologyTypeT, number>;
 };
 
 type SimulatedThroughput = {
@@ -44,7 +47,7 @@ type SimulatedThroughput = {
 
 type BuildingStep = {
   kind: 'BUILDING';
-  buildingType: BuildingType;
+  buildingType: BuildingTypeT;
   nextLevel: number;
   cost: ResourceAmounts;
   blockers: string[];
@@ -52,7 +55,7 @@ type BuildingStep = {
 
 type ResearchStep = {
   kind: 'RESEARCH';
-  technologyType: TechnologyType;
+  technologyType: TechnologyTypeT;
   nextLevel: number;
   cost: ResourceAmounts;
   blockers: string[];
@@ -89,7 +92,7 @@ const STORAGE_BUILDING_TYPES = [
   BuildingType.DEUTERIUM_TANK
 ] as const;
 
-const ALLOWED_ECONOMIC_BUILDING_SCOPE = new Set<BuildingType>([
+const ALLOWED_ECONOMIC_BUILDING_SCOPE = new Set<BuildingTypeT>([
   ...ECONOMY_BUILDING_TYPES,
   ...ENERGY_BUILDING_TYPES,
   ...STORAGE_BUILDING_TYPES
@@ -189,7 +192,7 @@ function resolveActiveBranch(planet: BotPlanetSnapshot): BotEconomicBranch {
 function resolveCandidateBuildingTypes(
   planet: BotPlanetSnapshot,
   branch: BotEconomicBranch
-): BuildingType[] {
+): BuildingTypeT[] {
   if (branch === 'ENERGY') {
     return [...ENERGY_BUILDING_TYPES];
   }
@@ -206,7 +209,7 @@ function evaluateGoalForBuilding(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
   branch: BotEconomicBranch,
-  finalBuildingType: BuildingType
+  finalBuildingType: BuildingTypeT
 ): EconomicGoalEvaluation | null {
   const finalBuildingLevel = getBuildingLevel(planet, finalBuildingType) + 1;
   const buildingBlueprint = BUILDING_BLUEPRINTS.get(finalBuildingType);
@@ -215,7 +218,7 @@ function evaluateGoalForBuilding(
   }
 
   const dependencyState = createSimulationState(planet);
-  const requiredTechLevels = new Map<TechnologyType, number>();
+  const requiredTechLevels = new Map<TechnologyTypeT, number>();
   const buildingSteps: BuildingStep[] = [];
   const blockers: string[] = [];
   collectBuildingGoalDependencies(
@@ -291,10 +294,10 @@ function evaluateGoalForBuilding(
 }
 
 function collectBuildingGoalDependencies(
-  buildingType: BuildingType,
+  buildingType: BuildingTypeT,
   targetLevel: number,
   state: SimulatedState,
-  requiredTechLevels: Map<TechnologyType, number>,
+  requiredTechLevels: Map<TechnologyTypeT, number>,
   buildingSteps: BuildingStep[],
   blockers: string[],
   visiting: Set<string>
@@ -375,7 +378,7 @@ function collectBuildingGoalDependencies(
 
 function resolveResearchSteps(
   planet: BotPlanetSnapshot,
-  requiredTechLevels: Map<TechnologyType, number>
+  requiredTechLevels: Map<TechnologyTypeT, number>
 ): ResearchStep[] {
   const steps: ResearchStep[] = [];
   const state = createSimulationState(planet);
@@ -395,7 +398,7 @@ function resolveResearchSteps(
 }
 
 function collectResearchDependencies(
-  technologyType: TechnologyType,
+  technologyType: TechnologyTypeT,
   targetLevel: number,
   state: SimulatedState,
   steps: ResearchStep[],
@@ -570,7 +573,7 @@ function resolveActionableResearchRequest(
 function resolveBonusFactor(
   planet: BotPlanetSnapshot,
   branch: BotEconomicBranch,
-  finalBuildingType: BuildingType
+  finalBuildingType: BuildingTypeT
 ): number {
   let bonusFactor = 1;
 
@@ -593,7 +596,7 @@ function resolveBonusFactor(
   return Math.min(BONUS_FACTOR_CEILING, Math.max(1, bonusFactor));
 }
 
-function resolvePlanetaryBonusFactor(planet: BotPlanetSnapshot, buildingType: BuildingType): number {
+function resolvePlanetaryBonusFactor(planet: BotPlanetSnapshot, buildingType: BuildingTypeT): number {
   const positiveModifier = (() => {
     switch (buildingType) {
       case BuildingType.METAL_MINE:
@@ -618,7 +621,7 @@ function resolvePlanetaryBonusFactor(planet: BotPlanetSnapshot, buildingType: Bu
   return 1 + ((positiveModifier - 1) / 4);
 }
 
-function resolveMostDeficientStorageType(planet: BotPlanetSnapshot): BuildingType | null {
+function resolveMostDeficientStorageType(planet: BotPlanetSnapshot): BuildingTypeT | null {
   const targets = resolveStorageTargets(planet);
   const deficiencies = [
     {
@@ -640,7 +643,7 @@ function resolveMostDeficientStorageType(planet: BotPlanetSnapshot): BuildingTyp
   return deficiencies[0]?.buildingType ?? null;
 }
 
-function resolveStorageDeficiencyForType(planet: BotPlanetSnapshot, buildingType: BuildingType): number {
+function resolveStorageDeficiencyForType(planet: BotPlanetSnapshot, buildingType: BuildingTypeT): number {
   const targets = resolveStorageTargets(planet);
   if (buildingType === BuildingType.METAL_STORAGE) {
     return Math.max(0, (targets.metal - planet.economy.storageCapacity.metal) / Math.max(1, targets.metal));
@@ -835,7 +838,7 @@ function resolvePlanetNoActionReason(
 function createBlockedGoal(
   planet: BotPlanetSnapshot,
   branch: BotEconomicBranch,
-  finalBuildingType: BuildingType,
+  finalBuildingType: BuildingTypeT,
   finalBuildingLevel: number,
   blockers: string[]
 ): EconomicGoalEvaluation {
@@ -896,7 +899,7 @@ function stripImmediateRequest(goal: EconomicGoalEvaluation): BotEconomicGoal {
 
 function createSimulationState(planet: BotPlanetSnapshot): SimulatedState {
   return {
-    buildingLevels: new Map<BuildingType, number>([
+    buildingLevels: new Map<BuildingTypeT, number>([
       [BuildingType.METAL_MINE, planet.economy.metalMineLevel],
       [BuildingType.CRYSTAL_MINE, planet.economy.crystalMineLevel],
       [BuildingType.DEUTERIUM_SYNTHESIZER, planet.economy.deuteriumSynthesizerLevel],
@@ -911,7 +914,7 @@ function createSimulationState(planet: BotPlanetSnapshot): SimulatedState {
       [BuildingType.SHIPYARD, planet.economy.shipyardLevel],
       [BuildingType.RESEARCH_LAB, planet.economy.researchLabLevel]
     ]),
-    techLevels: new Map<TechnologyType, number>([
+    techLevels: new Map<TechnologyTypeT, number>([
       [TechnologyType.ENERGY_TECHNOLOGY, planet.tech.energyTechnologyLevel],
       [TechnologyType.MATERIAL_TECHNOLOGY, planet.tech.materialTechnologyLevel],
       [TechnologyType.ADAPTIVE_TECHNOLOGY, planet.tech.adaptiveTechnologyLevel],
@@ -1016,7 +1019,7 @@ function resolveSimulatedUsedEnergy(state: SimulatedState): number {
   return Math.max(0, Math.floor(usedEnergy));
 }
 
-function getMaxPowerConsumption(buildingType: BuildingType, level: number): number {
+function getMaxPowerConsumption(buildingType: BuildingTypeT, level: number): number {
   const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
   if (!blueprint || level <= 0) {
     return 0;
@@ -1026,7 +1029,7 @@ function getMaxPowerConsumption(buildingType: BuildingType, level: number): numb
 }
 
 function getRawBuildingProductionValue(
-  buildingType: BuildingType,
+  buildingType: BuildingTypeT,
   state: SimulatedState
 ): number {
   return getRawBuildingStageProductionValue(
@@ -1037,7 +1040,7 @@ function getRawBuildingProductionValue(
 }
 
 function getRawBuildingStageProductionValue(
-  buildingType: BuildingType,
+  buildingType: BuildingTypeT,
   level: number,
   key: 'production1' | 'production2'
 ): number {
@@ -1063,7 +1066,7 @@ function resolveEnergyEfficiency(availableEnergy: number, usedEnergy: number): n
   return Math.max(0, Math.min(1, availableEnergy / usedEnergy));
 }
 
-function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingType): number {
+function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingTypeT): number {
   switch (buildingType) {
     case BuildingType.METAL_MINE:
       return planet.economy.metalMineLevel;

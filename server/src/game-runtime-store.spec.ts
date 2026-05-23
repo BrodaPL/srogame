@@ -31,6 +31,7 @@ describe('game-runtime-store', () => {
         loadedAt: '2026-04-09T10:00:00.000Z',
         lastTouchedAt: '2026-04-09T10:00:00.000Z',
         isDirty: false,
+        trackedPlayerActionFleetIds: new Set<number>(),
         currentTurnReadyPlayerIds: new Set([1]),
         isTurnProcessing: false,
         offlineBotControlledPlayerIds: new Set<number>(),

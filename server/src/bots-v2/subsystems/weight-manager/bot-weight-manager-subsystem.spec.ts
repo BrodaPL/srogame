@@ -3,6 +3,7 @@ import { BuildingType } from '../../../../../src/app/models/enums/building-type.
 import { DefenceType } from '../../../../../src/app/models/enums/defence-type.js';
 import { PlayerType } from '../../../../../src/app/models/enums/player-type.js';
 import { DiplomaticStatus } from '../../../../../src/app/models/diplomacy/diplomatic-status.js';
+import { TechnologyType } from '../../../../../src/app/models/enums/technology-type.js';
 import { createDiplomaticRelation } from '../../../../../src/app/models/diplomacy/diplomatic-relation.js';
 import { EspionageReportGenerator } from '../../../../../src/app/generators/espionage-report-generator.js';
 import { Galaxy } from '../../../../../src/app/models/planets/galaxy.js';
@@ -152,7 +153,7 @@ describe('BotWeightManagerSubsystem', () => {
     const bot = new Player(1, 'ColonizeBot', [homePlanet], new Map(), [], PlayerType.BOT, createTutorialReadState(true));
     homePlanet.info.ownerId = bot.playerId;
     configureIndustryPlanet(homePlanet, 5);
-    bot.setTechLevel('Adaptive Technology', 2);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 2);
 
     const reportOne = new EspionageReportGenerator().createEspionageReport(bot, null, targetOne, 1, { createdTurn: 100 });
     const reportTwo = new EspionageReportGenerator().createEspionageReport(bot, null, targetTwo, 1, { createdTurn: 100 });
@@ -218,6 +219,10 @@ describe('BotWeightManagerSubsystem', () => {
       knownDefenceCountsByType: {},
       farmIntelEnough: false,
       initialDefenseBroken: false,
+      lastProcessedAttackTurn: null,
+      lastBreakAttemptCombatStrength: null,
+      nextBreakAllowedTurn: null,
+      lastBreakFailureLossBracket: null,
       lastObservedResources: { metal: 0, crystal: 0, deuterium: 0 },
       lastResourceObservationTurn: null,
       lastCombatObservationTurn: null,

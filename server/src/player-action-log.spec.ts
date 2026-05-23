@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { GameType } from '../../src/app/models/enums/game-type.js';
 import { normalizeGalaxySetup } from '../../src/app/models/game-api-types.js';
 import {
   appendPlayerActionLogEntry,
@@ -22,7 +23,7 @@ describe('player-action-log', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'srogame-player-log-'));
     tempDirs.push(dir);
     const setup = normalizeGalaxySetup({
-      gameType: 'Sandbox',
+      gameType: GameType.SANDBOX,
       galaxyName: 'Player Logging Test',
       galaxyWidth: 25,
       galaxyHeight: 20,
@@ -50,7 +51,7 @@ describe('player-action-log', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'srogame-player-log-'));
     tempDirs.push(dir);
     const setup = normalizeGalaxySetup({
-      gameType: 'Sandbox',
+      gameType: GameType.SANDBOX,
       galaxyName: 'Action Playback',
       galaxyWidth: 25,
       galaxyHeight: 20,

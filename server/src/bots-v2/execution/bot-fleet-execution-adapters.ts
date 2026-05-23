@@ -18,7 +18,11 @@ const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof imp
 const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../src/app/models/enums/ship-type.js');
 const { normalizeBombardmentPriorities } = resolveModule(bombardmentPriorityModule) as typeof import('../../../../src/app/models/bombardment/bombardment-priority.js');
 
-export const SUPERVISOR_ALLOWED_FLEET_MISSIONS = new Set<FleetMissionType>([
+type DefenceTypeT = defenceTypeModule.DefenceType;
+type FleetMissionTypeT = fleetMissionTypeModule.MissionType;
+type ShipTypeT = shipTypeModule.ShipType;
+
+export const SUPERVISOR_ALLOWED_FLEET_MISSIONS = new Set<FleetMissionTypeT>([
   FleetMissionType.SPY,
   FleetMissionType.TRANSPORT,
   FleetMissionType.ARMAMENT_DELIVERY,
@@ -196,14 +200,14 @@ function readResources(value: unknown): ResourcesPackDto | null {
   };
 }
 
-function isFleetMissionType(value: unknown): value is FleetMissionType {
-  return typeof value === 'string' && Object.values(FleetMissionType).includes(value as FleetMissionType);
+function isFleetMissionType(value: unknown): value is FleetMissionTypeT {
+  return typeof value === 'string' && Object.values(FleetMissionType).includes(value as FleetMissionTypeT);
 }
 
-function isShipType(value: unknown): value is ShipType {
-  return typeof value === 'string' && Object.values(ShipType).includes(value as ShipType);
+function isShipType(value: unknown): value is ShipTypeT {
+  return typeof value === 'string' && Object.values(ShipType).includes(value as ShipTypeT);
 }
 
-function isDefenceType(value: unknown): value is DefenceType {
-  return typeof value === 'string' && Object.values(DefenceType).includes(value as DefenceType);
+function isDefenceType(value: unknown): value is DefenceTypeT {
+  return typeof value === 'string' && Object.values(DefenceType).includes(value as DefenceTypeT);
 }

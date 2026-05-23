@@ -22,6 +22,8 @@ import { resolveModule } from '../../../esm-module.js';
 const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../../src/app/models/diplomacy/diplomatic-status.js');
 const { maxOwnedPlanets } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
+type DiplomaticStatusT = diplomaticStatusModule.DiplomaticStatus;
+
 type WeightProfileAxes = {
   aggression: number;
   industry: number;
@@ -92,7 +94,7 @@ const DEVELOPMENT_BUILDING_LEVEL_KEYS = [
 const COMBAT_SHIP_TYPES = Array.from(SHIP_BLUEPRINTS.shipsMap.keys())
   .filter((shipType) => {
     const blueprint = SHIP_BLUEPRINTS.get(shipType);
-    return blueprint?.weapons.some((weapon) => weapon.damage > 0) ?? false;
+    return blueprint?.weapons.some((weapon) => weapon.dmg > 0) ?? false;
   });
 
 const RAW_PROFILE_TABLES: Record<BotProfileId, WeightProfile> = {
@@ -250,8 +252,8 @@ function buildPlanetAggregate(planet: BotPlanetSnapshot): PlanetAggregate {
 
 function countFactionStatuses(
   factions: BotStrategicDiplomaticFactionSnapshot[]
-): Record<DiplomaticStatus, number> {
-  const counts: Record<DiplomaticStatus, number> = {
+): Record<DiplomaticStatusT, number> {
+  const counts: Record<DiplomaticStatusT, number> = {
     [DiplomaticStatus.SELF]: 0,
     [DiplomaticStatus.ALLIED]: 0,
     [DiplomaticStatus.PEACE]: 0,
@@ -448,7 +450,7 @@ function resolveSelectedFocus(
 function buildGlobalModeScores(
   context: BotSubsystemContext,
   axes: WeightProfileAxes,
-  statusCounts: Record<DiplomaticStatus, number>,
+  statusCounts: Record<DiplomaticStatusT, number>,
   farmCounts: { actionable: number; breakNeed: number; raidReady: number },
   planetFlags: PlanetFlags[]
 ): GlobalModeScores {
@@ -527,7 +529,7 @@ function buildGlobalWeights(
   modeScores: GlobalModeScores,
   selectedMode: BotMemoryV2WeightManagerMode,
   context: BotSubsystemContext,
-  statusCounts: Record<DiplomaticStatus, number>,
+  statusCounts: Record<DiplomaticStatusT, number>,
   farmCounts: { actionable: number; breakNeed: number; raidReady: number },
   planetFlags: PlanetFlags[]
 ): {

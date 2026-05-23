@@ -17,7 +17,7 @@ import { SolarSystem } from '../../../../../src/app/models/planets/solar-system.
 import { TechnologyQueueEntry } from '../../../../../src/app/models/tech/technology-queue-entry.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
-import type { BotProposal } from '../../bot-v2-types.js';
+import type { BotProposal, BotStrategicDevelopmentPlanetResult } from '../../bot-v2-types.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
 import { BotStrategicDevelopmentSubsystem } from './bot-strategic-development-subsystem.js';
 
@@ -41,13 +41,16 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     setSupportShipTech(bot);
 
     const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+    const planetResult = result.planetResults?.find(
+      (entry): entry is BotStrategicDevelopmentPlanetResult => entry.subsystemId === 'STRATEGIC_DEVELOPMENT'
+    );
 
     expect(result.proposals.some((proposal) => proposal.debug.queueType === 'BUILDING')).toBe(true);
     expect(result.proposals.some((proposal) => proposal.debug.queueType === 'PRODUCTION')).toBe(true);
-    expect(result.planetResults?.[0]?.emittedBuildingRequestCount).toBeGreaterThan(0);
-    expect(result.planetResults?.[0]?.emittedProductionRequestCount).toBeGreaterThan(0);
-    expect(result.planetResults?.[0]?.buildingGoalKeys.length).toBeGreaterThan(0);
-    expect(result.planetResults?.[0]?.productionGoalKeys.length).toBeGreaterThan(0);
+    expect(planetResult?.emittedBuildingRequestCount).toBeGreaterThan(0);
+    expect(planetResult?.emittedProductionRequestCount).toBeGreaterThan(0);
+    expect(planetResult?.buildingGoalKeys.length).toBeGreaterThan(0);
+    expect(planetResult?.productionGoalKeys.length).toBeGreaterThan(0);
   });
 
   it('can emit a research request for a sensor phalanx building goal', () => {
@@ -480,11 +483,14 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     markPlanetScanned(bot, thirdTarget, galaxy.currentTurn);
 
     const result = runStrategicDevelopmentSubsystem(galaxy, bot, [{
+      proposalId: 'prior:research:adaptive',
       subsystemId: 'RESEARCH',
       kind: 'RESEARCH',
+      status: 'PROPOSED',
       goalKey: 'research:Adaptive Technology',
       dedupeKey: 'research:Adaptive Technology',
       summary: 'Research Adaptive Technology.',
+      planetId: null,
       requestPayload: {
         x: 0,
         y: 0,
@@ -494,6 +500,12 @@ describe('BotStrategicDevelopmentSubsystem', () => {
       },
       targetCoordinates: { x: 0, y: 0, z: 1 },
       expectedValue: 1,
+      urgency: 1,
+      risk: 1,
+      confidence: 1,
+      requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+      blockers: [],
+      expiresOnTurn: galaxy.currentTurn + 1,
       debug: {}
     }]);
 

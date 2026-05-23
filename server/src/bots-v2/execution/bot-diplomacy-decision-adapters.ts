@@ -5,14 +5,20 @@ import { resolveModule } from '../../esm-module.js';
 
 const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../src/app/models/diplomacy/diplomatic-status.js');
 
+const REQUESTED_DIPLOMACY_STATUSES = [
+  DiplomaticStatus.PEACE,
+  DiplomaticStatus.ALLIED,
+  DiplomaticStatus.NEUTRAL,
+  DiplomaticStatus.WAR
+] as const satisfies readonly DiplomaticStatusType[];
+
+type RequestedDiplomaticStatus = typeof REQUESTED_DIPLOMACY_STATUSES[number];
+
 export type BotDiplomacyDecisionExecution = {
   proposalId: number;
   decision: 'ACCEPT' | 'REJECT' | 'CANCEL';
   targetPlayerId: number;
-  requestedStatus: Extract<
-    DiplomaticStatusType,
-    DiplomaticStatus.PEACE | DiplomaticStatus.ALLIED | DiplomaticStatus.NEUTRAL | DiplomaticStatus.WAR
-  >;
+  requestedStatus: RequestedDiplomaticStatus;
 };
 
 export type BotDiplomacyDecisionAdapterResult =
@@ -60,11 +66,8 @@ function normalizeDecision(value: unknown): BotDiplomacyDecisionExecution['decis
 }
 
 function normalizeRequestedStatus(value: unknown): BotDiplomacyDecisionExecution['requestedStatus'] | null {
-  return value === DiplomaticStatus.PEACE
-    || value === DiplomaticStatus.ALLIED
-    || value === DiplomaticStatus.NEUTRAL
-    || value === DiplomaticStatus.WAR
-    ? value
+  return REQUESTED_DIPLOMACY_STATUSES.includes(value as RequestedDiplomaticStatus)
+    ? (value as RequestedDiplomaticStatus)
     : null;
 }
 

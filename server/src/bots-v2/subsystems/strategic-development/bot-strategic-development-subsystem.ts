@@ -42,13 +42,18 @@ const {
   routeRepairDroneProduction
 } = resolveModule(repairDroneProductionModule) as typeof import('../../../../../src/app/models/turns/repair-drone-production.js');
 
+type BuildingTypeT = buildingTypeModule.BuildingType;
+type FleetMissionTypeT = fleetMissionTypeModule.MissionType;
+type ShipTypeT = shipTypeModule.ShipType;
+type TechnologyTypeT = technologyTypeModule.TechnologyType;
+
 type ResourceKey = 'metal' | 'crystal' | 'deuterium';
 
 type ResourceAmounts = Record<ResourceKey, number>;
 
 type SimulatedState = {
-  buildingLevels: Map<BuildingType, number>;
-  techLevels: Map<TechnologyType, number>;
+  buildingLevels: Map<BuildingTypeT, number>;
+  techLevels: Map<TechnologyTypeT, number>;
 };
 
 type SimulatedThroughput = {
@@ -60,7 +65,7 @@ type SimulatedThroughput = {
 
 type BuildingStep = {
   kind: 'BUILDING';
-  buildingType: BuildingType;
+  buildingType: BuildingTypeT;
   nextLevel: number;
   cost: ResourceAmounts;
   blockers: string[];
@@ -68,7 +73,7 @@ type BuildingStep = {
 
 type ResearchStep = {
   kind: 'RESEARCH';
-  technologyType: TechnologyType;
+  technologyType: TechnologyTypeT;
   nextLevel: number;
   cost: ResourceAmounts;
   blockers: string[];
@@ -76,7 +81,7 @@ type ResearchStep = {
 
 type ProductionStep = {
   kind: 'SHIPYARD';
-  shipType: ShipType;
+  shipType: ShipTypeT;
   amount: number;
   cost: ResourceAmounts;
   blockers: string[];
@@ -89,10 +94,10 @@ type StrategicDevelopmentGoalEvaluation = BotStrategicDevelopmentGoal & {
 
 type FleetMissionImmediateRequest = {
   kind: 'FLEET_MISSION';
-  missionType: FleetMissionType;
+  missionType: FleetMissionTypeT;
   originPlanet: BotPlanetSnapshot;
   targetCoordinates: { x: number; y: number; z: number };
-  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
+  ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>;
   cargo: ResourceAmounts;
   repairDroneAmount: number;
   priorityBand: number;
@@ -129,7 +134,7 @@ const SUPPORT_CARGO_SHIP_TYPES = [
   ShipType.CARGO_SUPPORT
 ] as const;
 
-const ALLOWED_STRATEGIC_DEVELOPMENT_BUILDING_SCOPE = new Set<BuildingType>([
+const ALLOWED_STRATEGIC_DEVELOPMENT_BUILDING_SCOPE = new Set<BuildingTypeT>([
   BuildingType.INTERSTELLAR_TRADE_PORT,
   BuildingType.JUMP_GATE,
   BuildingType.RESEARCH_LAB,
@@ -831,7 +836,7 @@ function evaluateBuildingGoal(
   const currentLevel = getBuildingLevel(planet, buildingType);
   const desiredLevel = currentLevel + 1;
   const dependencyState = createSimulationState(planet);
-  const requiredTechLevels = new Map<TechnologyType, number>();
+  const requiredTechLevels = new Map<TechnologyTypeT, number>();
   const buildingSteps: BuildingStep[] = [];
   const blockers: string[] = [];
 
@@ -1007,7 +1012,7 @@ function evaluateProductionGoal(
 function evaluateUnlockLikeProductionGoal(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
-  shipType: ShipType
+  shipType: ShipTypeT
 ): StrategicDevelopmentGoalEvaluation | null {
   const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
@@ -1015,7 +1020,7 @@ function evaluateUnlockLikeProductionGoal(
   }
 
   const dependencyState = createSimulationState(planet);
-  const requiredTechLevels = new Map<TechnologyType, number>();
+  const requiredTechLevels = new Map<TechnologyTypeT, number>();
   const buildingSteps: BuildingStep[] = [];
   const blockers: string[] = [];
 
@@ -1126,10 +1131,10 @@ function evaluateUnlockLikeProductionGoal(
 }
 
 function collectBuildingGoalDependencies(
-  buildingType: BuildingType,
+  buildingType: BuildingTypeT,
   targetLevel: number,
   state: SimulatedState,
-  requiredTechLevels: Map<TechnologyType, number>,
+  requiredTechLevels: Map<TechnologyTypeT, number>,
   buildingSteps: BuildingStep[],
   blockers: string[],
   visiting: Set<string>
@@ -1207,7 +1212,7 @@ function collectBuildingGoalDependencies(
 
 function resolveResearchSteps(
   planet: BotPlanetSnapshot,
-  requiredTechLevels: Map<TechnologyType, number>,
+  requiredTechLevels: Map<TechnologyTypeT, number>,
   buildingSteps: BuildingStep[]
 ): ResearchStep[] {
   const steps: ResearchStep[] = [];
@@ -1233,7 +1238,7 @@ function resolveResearchSteps(
 }
 
 function collectResearchDependencies(
-  technologyType: TechnologyType,
+  technologyType: TechnologyTypeT,
   targetLevel: number,
   state: SimulatedState,
   buildingSteps: BuildingStep[],
@@ -1450,7 +1455,7 @@ function resolveActionableResearchRequest(
 
 function resolveProductionRequest(
   planet: BotPlanetSnapshot,
-  shipType: ShipType
+  shipType: ShipTypeT
 ): ProductionStep | null {
   if (planet.queues.shipyardQueueLength >= planet.power.maxShipyardQueueLength) {
     return null;
@@ -1476,7 +1481,7 @@ function resolveProductionRequest(
 
 function resolveProductionOrderAmount(
   planet: BotPlanetSnapshot,
-  shipType: ShipType
+  shipType: ShipTypeT
 ): number {
   if (shipType === ShipType.COLONIZER) {
     return 1;
@@ -1507,7 +1512,7 @@ function resolveProductionOrderAmount(
   return Math.max(1, Math.floor(targetBudget / totalCost));
 }
 
-function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, shipType: ShipType): number {
+function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, shipType: ShipTypeT): number {
   const seed = `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${planet.name}:${shipType}`;
   let hash = 0;
   for (const character of seed) {
@@ -1518,8 +1523,8 @@ function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, shipType: Sh
   return 1 + (((hash % 1000) / 1000) * maxExtraFactor);
 }
 
-function isStrategicDevelopmentSupportCargoShipType(shipType: ShipType): boolean {
-  return (SUPPORT_CARGO_SHIP_TYPES as readonly ShipType[]).includes(shipType);
+function isStrategicDevelopmentSupportCargoShipType(shipType: ShipTypeT): boolean {
+  return (SUPPORT_CARGO_SHIP_TYPES as readonly ShipTypeT[]).includes(shipType);
 }
 
 function resolveStrategicDevelopmentSupportCargoTurnBudget(planet: BotPlanetSnapshot): number {
@@ -1549,7 +1554,7 @@ function resolveStrategicDevelopmentRepairDroneCap(planet: BotPlanetSnapshot): n
 
 function resolveBuildingBonusFactor(
   planet: BotPlanetSnapshot,
-  buildingType: BuildingType
+  buildingType: BuildingTypeT
 ): number {
   let bonusFactor = 1;
 
@@ -1583,7 +1588,7 @@ function shouldPenalizeFurtherRobotics(planet: BotPlanetSnapshot): boolean {
 
 function resolveProductionBonusFactor(
   planet: BotPlanetSnapshot,
-  shipType: ShipType
+  shipType: ShipTypeT
 ): number {
   let bonusFactor = 1;
   bonusFactor *= 1 + resolveProductionDistributionBonusRatio(planet, shipType);
@@ -1595,7 +1600,7 @@ function resolveProductionBonusFactor(
 
 function resolveProductionDistributionBonusRatio(
   planet: BotPlanetSnapshot,
-  shipType: ShipType
+  shipType: ShipTypeT
 ): number {
   const unlockedTypes = TARGET_PRODUCTION_SHIP_TYPES.filter((type) => isShipUnlocked(planet, type));
   if (unlockedTypes.length <= 1) {
@@ -1616,7 +1621,7 @@ function resolveProductionDistributionBonusRatio(
 function isProductionShipEligible(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
-  shipType: ShipType
+  shipType: ShipTypeT
 ): boolean {
   const threshold = resolveShipyardRequirement(shipType);
   if (planet.defense.avgIndustryLevel < threshold) {
@@ -1653,7 +1658,7 @@ function isRepairDroneSupportPlanet(planet: BotPlanetSnapshot): boolean {
     || planet.maturityStage === 'STABILIZING';
 }
 
-function isShipUnlocked(planet: BotPlanetSnapshot, shipType: ShipType): boolean {
+function isShipUnlocked(planet: BotPlanetSnapshot, shipType: ShipTypeT): boolean {
   const installedCount = planet.ships.installedCountByType[shipType] ?? 0;
   if (installedCount > 0 || planet.queues.queuedShipTypes.includes(shipType)) {
     return true;
@@ -1671,7 +1676,7 @@ function isShipUnlocked(planet: BotPlanetSnapshot, shipType: ShipType): boolean 
   );
 }
 
-function resolveShipyardRequirement(shipType: ShipType): number {
+function resolveShipyardRequirement(shipType: ShipTypeT): number {
   const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return Number.MAX_SAFE_INTEGER;
@@ -2025,7 +2030,7 @@ function hasAnyCargoOrHangarFleet(planet: BotPlanetSnapshot): boolean {
       if ((amount ?? 0) <= 0) {
         return false;
       }
-      const blueprint = SHIP_BLUEPRINTS.get(shipType as ShipType);
+      const blueprint = SHIP_BLUEPRINTS.get(shipType as ShipTypeT);
       return (blueprint?.cargoCapacity ?? 0) > 0 || (blueprint?.hangarCapacity ?? 0) > 0;
     });
 }
@@ -2102,12 +2107,12 @@ function isStrategicDevelopmentLogisticsMission(request: FleetMissionImmediateRe
   return isStrategicDevelopmentLogisticsMissionType(request.missionType);
 }
 
-function isStrategicDevelopmentLogisticsMissionType(missionType: FleetMissionType | null): boolean {
+function isStrategicDevelopmentLogisticsMissionType(missionType: FleetMissionTypeT | null): boolean {
   return missionType === FleetMissionType.TRANSPORT || missionType === FleetMissionType.ARMAMENT_DELIVERY;
 }
 
-function readMissionTypeFromPayload(payload: Record<string, unknown>): FleetMissionType | null {
-  return typeof payload.missionType === 'string' ? payload.missionType as FleetMissionType : null;
+function readMissionTypeFromPayload(payload: Record<string, unknown>): FleetMissionTypeT | null {
+  return typeof payload.missionType === 'string' ? payload.missionType as FleetMissionTypeT : null;
 }
 
 function shouldAllowTargetResourceSupport(
@@ -2180,17 +2185,17 @@ function isRareBroadSurplusSourcePlanet(
 function selectCargoShips(
   planet: BotPlanetSnapshot,
   requiredCargo: number,
-  excludedTypes: Set<ShipType> = new Set()
-): Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> | null {
+  excludedTypes: Set<ShipTypeT> = new Set()
+): Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> | null {
   if (requiredCargo <= 0) {
     return [];
   }
 
   const candidates = Object.entries(planet.ships.undamagedCountByType)
     .map(([type, amount]) => ({
-      type: type as ShipType,
+      type: type as ShipTypeT,
       amount: amount ?? 0,
-      blueprint: SHIP_BLUEPRINTS.get(type as ShipType) ?? null
+      blueprint: SHIP_BLUEPRINTS.get(type as ShipTypeT) ?? null
     }))
     .filter((entry) =>
       entry.amount > 0
@@ -2202,7 +2207,7 @@ function selectCargoShips(
     );
 
   let remainingCargo = requiredCargo;
-  const selection: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> = [];
+  const selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> = [];
   for (const candidate of candidates) {
     if (remainingCargo <= 0) {
       break;
@@ -2225,13 +2230,13 @@ function selectHangarShips(
   planet: BotPlanetSnapshot,
   payloadSize: number,
   payloadAmount: number
-): Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> | null {
+): Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> | null {
   const requiredHangar = payloadSize * Math.max(1, payloadAmount);
   const candidates = Object.entries(planet.ships.undamagedCountByType)
     .map(([type, amount]) => ({
-      type: type as ShipType,
+      type: type as ShipTypeT,
       amount: amount ?? 0,
-      blueprint: SHIP_BLUEPRINTS.get(type as ShipType) ?? null
+      blueprint: SHIP_BLUEPRINTS.get(type as ShipTypeT) ?? null
     }))
     .filter((entry) =>
       entry.amount > 0
@@ -2244,7 +2249,7 @@ function selectHangarShips(
     );
 
   let remainingHangar = requiredHangar;
-  const selection: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> = [];
+  const selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> = [];
   for (const candidate of candidates) {
     if (remainingHangar <= 0) {
       break;
@@ -2264,14 +2269,14 @@ function selectHangarShips(
 }
 
 function resolveSelectionCargoCapacity(
-  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>
+  ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>
 ): number {
   return ships.reduce((total, ship) =>
     total + ((SHIP_BLUEPRINTS.get(ship.type)?.cargoCapacity ?? 0) * ship.undamagedAmount), 0);
 }
 
 function resolveSelectionHangarCapacity(
-  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>
+  ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>
 ): number {
   return ships.reduce((total, ship) =>
     total + ((SHIP_BLUEPRINTS.get(ship.type)?.hangarCapacity ?? 0) * ship.undamagedAmount), 0);
@@ -2329,9 +2334,9 @@ function createBlockedGoal(
   blockers: string[],
   finalTarget: {
     finalTargetKind: 'BUILDING' | 'SHIP';
-    finalBuildingType: BuildingType | null;
-    finalTechnologyType: TechnologyType | null;
-    finalShipType: ShipType | null;
+    finalBuildingType: BuildingTypeT | null;
+    finalTechnologyType: TechnologyTypeT | null;
+    finalShipType: ShipTypeT | null;
     finalLevel: number | null;
     finalAmount: number | null;
   }
@@ -2420,7 +2425,7 @@ function resolveGoalTargetLabel(
 
 function createSimulationState(planet: BotPlanetSnapshot): SimulatedState {
   return {
-    buildingLevels: new Map<BuildingType, number>([
+    buildingLevels: new Map<BuildingTypeT, number>([
       [BuildingType.METAL_MINE, planet.economy.metalMineLevel],
       [BuildingType.CRYSTAL_MINE, planet.economy.crystalMineLevel],
       [BuildingType.DEUTERIUM_SYNTHESIZER, planet.economy.deuteriumSynthesizerLevel],
@@ -2438,7 +2443,7 @@ function createSimulationState(planet: BotPlanetSnapshot): SimulatedState {
       [BuildingType.SENSOR_PHALANX, getBuildingLevel(planet, BuildingType.SENSOR_PHALANX)],
       [BuildingType.JUMP_GATE, getBuildingLevel(planet, BuildingType.JUMP_GATE)]
     ]),
-    techLevels: new Map<TechnologyType, number>([
+    techLevels: new Map<TechnologyTypeT, number>([
       [TechnologyType.ENERGY_TECHNOLOGY, planet.tech.energyTechnologyLevel],
       [TechnologyType.MATERIAL_TECHNOLOGY, planet.tech.materialTechnologyLevel],
       [TechnologyType.ADAPTIVE_TECHNOLOGY, planet.tech.adaptiveTechnologyLevel],
@@ -2530,8 +2535,8 @@ function resolveEnergyEfficiency(planet: BotPlanetSnapshot): number {
 }
 
 function resolveBuildingProductionValue1(
-  buildingType: BuildingType,
-  buildingLevels: Map<BuildingType, number>
+  buildingType: BuildingTypeT,
+  buildingLevels: Map<BuildingTypeT, number>
 ): number {
   const level = buildingLevels.get(buildingType) ?? 0;
   if (level <= 0) {
@@ -2544,8 +2549,8 @@ function resolveBuildingProductionValue1(
 }
 
 function resolveBuildingProductionValue1Exact(
-  buildingType: BuildingType,
-  buildingLevels: Map<BuildingType, number>
+  buildingType: BuildingTypeT,
+  buildingLevels: Map<BuildingTypeT, number>
 ): number {
   const level = buildingLevels.get(buildingType) ?? 0;
   if (level <= 0) {
@@ -2557,7 +2562,7 @@ function resolveBuildingProductionValue1Exact(
   return Number.isFinite(value) ? value : 0;
 }
 
-function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingType): number {
+function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingTypeT): number {
   switch (buildingType) {
     case BuildingType.METAL_MINE:
       return planet.economy.metalMineLevel;
@@ -2596,7 +2601,7 @@ function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingType)
   }
 }
 
-function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: TechnologyType): number {
+function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: TechnologyTypeT): number {
   switch (technologyType) {
     case TechnologyType.ENERGY_TECHNOLOGY:
       return planet.tech.energyTechnologyLevel;

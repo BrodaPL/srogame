@@ -30,17 +30,23 @@ const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import(
 const { WeaponType } = resolveModule(weaponTypeModule) as typeof import('../../../../../src/app/models/enums/weapon-type.js');
 const { fleetTravelTurnsForDistance } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
+type BuildingTypeT = buildingTypeModule.BuildingType;
+type DefenceTypeT = defenceTypeModule.DefenceType;
+type FleetMissionTypeT = fleetMissionTypeModule.MissionType;
+type ShipTypeT = shipTypeModule.ShipType;
+type TechnologyTypeT = technologyTypeModule.TechnologyType;
+
 type ResourceKey = 'metal' | 'crystal' | 'deuterium';
 type ResourceAmounts = Record<ResourceKey, number>;
 
 type MissionRequest = {
   kind: 'MISSION';
   phase: 'INTEL' | 'BREAK' | 'PLUNDER';
-  missionType: FleetMissionType;
+  missionType: FleetMissionTypeT;
   target: BotStrategicMilitaryTargetSnapshot;
   destinationCoordinates: { x: number; y: number; z: number };
   originPlanet: BotPlanetSnapshot;
-  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
+  ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>;
   expectedLoot: number;
   travelDistance: number;
   travelTurns: number;
@@ -51,7 +57,7 @@ type MissionRequest = {
 
 type ShipNeedRequest = {
   kind: 'SHIP_NEED';
-  shipType: ShipType;
+  shipType: ShipTypeT;
   amount: number;
   shortageKind: 'BOMBARDMENT' | 'COMBAT' | 'CARGO';
   targetCoordinates: { x: number; y: number; z: number };
@@ -61,7 +67,7 @@ type ShipNeedRequest = {
 };
 
 type BreakSelection = {
-  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
+  ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>;
   combatStrength: number;
 };
 
@@ -74,7 +80,7 @@ type RelocationBreakPlan = {
 };
 
 type PlunderSelection = {
-  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
+  ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>;
   cargoCapacity: number;
   combatEscortCount: number;
 };
@@ -348,7 +354,7 @@ function createProbeMissionRequest(
   shipNeed: ShipNeedRequest | null;
 } {
   const validPlans = context.snapshot.planets
-    .map((originPlanet) => {
+    .map((originPlanet): MissionRequest | null => {
       const probeShipType = resolveBestAvailableProbeShipType(originPlanet);
       if (!probeShipType) {
         return null;
@@ -696,7 +702,7 @@ function buildBreakSelection(
   requireMultiWarshipBreak: boolean
 ): BreakSelection {
   const combatCandidates = resolveOriginCombatCandidates(originPlanet);
-  const selection: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> = [];
+  const selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> = [];
   let totalStrength = 0;
 
   if (requireBombardmentBreaker) {
@@ -810,7 +816,7 @@ function buildBreakRelocationPlanForStage(
     return null;
   }
 
-  const selections = new Map<string, Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>>();
+  const selections = new Map<string, Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>>();
   let combinedStrength = 0;
   let hasBombardmentPresence = originCandidates.some((origin) =>
     origin.combatCandidates.some((candidate) => candidate.hasBombardmentWeapons)
@@ -963,7 +969,7 @@ function buildPlunderSelection(
     return { ships: [], cargoCapacity: 0, combatEscortCount: 0 };
   }
 
-  const selection: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> = [];
+  const selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> = [];
   selection.push({
     type: escortShipType,
     undamagedAmount: 1,
@@ -984,7 +990,7 @@ function buildPlunderCargoSelection(
   originPlanet: BotPlanetSnapshot,
   desiredCargoCapacity: number
 ): {
-  ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
+  ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>;
   cargoCapacity: number;
 } {
   const cargoCandidates = [
@@ -1006,7 +1012,7 @@ function buildPlunderCargoSelection(
     return { ships: [], cargoCapacity: 0 };
   }
 
-  const ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }> = [];
+  const ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> = [];
   let cargoCapacity = 0;
   let remainingCargoNeed = Math.max(1, desiredCargoCapacity);
 
@@ -1035,16 +1041,16 @@ function buildPlunderCargoSelection(
 }
 
 function resolveOriginCombatCandidates(originPlanet: BotPlanetSnapshot): Array<{
-  type: ShipType;
+  type: ShipTypeT;
   amount: number;
   power: number;
   hasBombardmentWeapons: boolean;
 }> {
   return Object.entries(originPlanet.ships.undamagedCountByType)
     .map(([type, amount]) => ({
-      type: type as ShipType,
+      type: type as ShipTypeT,
       amount: amount ?? 0,
-      blueprint: SHIP_BLUEPRINTS.get(type as ShipType) ?? null
+      blueprint: SHIP_BLUEPRINTS.get(type as ShipTypeT) ?? null
     }))
     .filter((entry) =>
       entry.amount > 0
@@ -1067,7 +1073,7 @@ function resolveOriginCombatCandidates(originPlanet: BotPlanetSnapshot): Array<{
     );
 }
 
-function isNeutralFarmWarshipType(shipType: ShipType): boolean {
+function isNeutralFarmWarshipType(shipType: ShipTypeT): boolean {
   return shipType !== ShipType.SPY_PROBE
     && shipType !== ShipType.REPAIR_DRONE
     && shipType !== ShipType.COLONIZER
@@ -1077,7 +1083,7 @@ function isNeutralFarmWarshipType(shipType: ShipType): boolean {
     && shipType !== ShipType.RECYCLER;
 }
 
-function isHeavyNeutralBreakWarshipType(shipType: ShipType | null): boolean {
+function isHeavyNeutralBreakWarshipType(shipType: ShipTypeT | null): boolean {
   return shipType === ShipType.FRIGATE
     || shipType === ShipType.BATTLE_SHIP
     || shipType === ShipType.BATTLE_CRUISER
@@ -1189,8 +1195,8 @@ function createPlunderShipNeed(
 function resolveBestProducibleShipType(
   context: BotSubsystemContext,
   role: 'BOMBARDMENT' | 'COMBAT' | 'CARGO'
-): ShipType | null {
-  const candidates = new Map<ShipType, number>();
+): ShipTypeT | null {
+  const candidates = new Map<ShipTypeT, number>();
 
   for (const planet of context.snapshot.planets) {
     for (const [shipType, blueprint] of SHIP_BLUEPRINTS.shipsMap.entries()) {
@@ -1217,7 +1223,7 @@ function resolveBestProducibleShipType(
 }
 
 function isShipTypeEligibleForRole(
-  shipType: ShipType,
+  shipType: ShipTypeT,
   role: 'BOMBARDMENT' | 'COMBAT' | 'CARGO'
 ): boolean {
   const blueprint = SHIP_BLUEPRINTS.get(shipType);
@@ -1236,13 +1242,13 @@ function isShipTypeEligibleForRole(
   return shipType === ShipType.TRANSPORTER;
 }
 
-function resolveBestAvailableProbeShipType(originPlanet: BotPlanetSnapshot): ShipType | null {
+function resolveBestAvailableProbeShipType(originPlanet: BotPlanetSnapshot): ShipTypeT | null {
   const availableTypes = new Set(
     resolveOriginCombatCandidates(originPlanet)
       .filter((candidate) => candidate.amount > 0)
       .map((candidate) => candidate.type)
   );
-  const preferredProbeTypes: ShipType[] = [
+  const preferredProbeTypes: ShipTypeT[] = [
     ShipType.CRUISER,
     ShipType.FRIGATE,
     ShipType.BATTLE_SHIP
@@ -1371,10 +1377,10 @@ function estimateTargetCombatStrength(farmEntry: BotMemoryV2StrategicMilitaryFar
   let total = 0;
 
   for (const [shipType, amount] of Object.entries(farmEntry.knownShipCountsByType)) {
-    total += estimateShipCombatPower(shipType as ShipType) * (amount ?? 0);
+    total += estimateShipCombatPower(shipType as ShipTypeT) * (amount ?? 0);
   }
   for (const [defenceType, amount] of Object.entries(farmEntry.knownDefenceCountsByType)) {
-    total += estimateDefenceCombatPower(defenceType as DefenceType) * (amount ?? 0);
+    total += estimateDefenceCombatPower(defenceType as DefenceTypeT) * (amount ?? 0);
   }
 
   if (total <= 0) {
@@ -1385,7 +1391,7 @@ function estimateTargetCombatStrength(farmEntry: BotMemoryV2StrategicMilitaryFar
   return total;
 }
 
-function estimateShipCombatPower(shipType: ShipType): number {
+function estimateShipCombatPower(shipType: ShipTypeT): number {
   const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return 0;
@@ -1395,7 +1401,7 @@ function estimateShipCombatPower(shipType: ShipType): number {
   return weaponPower + (blueprint.hullPointsCapacity / 15) + (blueprint.shieldCapacity / 10);
 }
 
-function estimateDefenceCombatPower(defenceType: DefenceType): number {
+function estimateDefenceCombatPower(defenceType: DefenceTypeT): number {
   const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
   if (!blueprint) {
     return 0;
@@ -1405,7 +1411,7 @@ function estimateDefenceCombatPower(defenceType: DefenceType): number {
   return weaponPower + (blueprint.hullPointsCapacity / 15) + (blueprint.shieldCapacity / 10);
 }
 
-function shipTypeHasBombardmentWeapons(shipType: ShipType): boolean {
+function shipTypeHasBombardmentWeapons(shipType: ShipTypeT): boolean {
   const blueprint = SHIP_BLUEPRINTS.get(shipType);
   return Boolean(blueprint?.weapons.some((weapon) => weapon.type === WeaponType.BOMBARDMENT_WEAPONS));
 }
@@ -1749,7 +1755,7 @@ function resolvePostEarlyNeutralShipNeedScoreBonus(planet: BotPlanetSnapshot | n
   return isPostEarlyNeutralWarfarePlanet(planet) ? POST_EARLY_SHIP_NEED_SCORE_BONUS : 0;
 }
 
-function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: TechnologyType): number {
+function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: TechnologyTypeT): number {
   switch (technologyType) {
     case TechnologyType.ENERGY_TECHNOLOGY:
       return planet.tech.energyTechnologyLevel;
@@ -1808,7 +1814,7 @@ function snapshotHasShipTechnologyRequirements(planet: BotPlanetSnapshot, bluepr
   return true;
 }
 
-function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingType): number {
+function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingTypeT): number {
   switch (buildingType) {
     case BuildingType.METAL_MINE:
       return planet.economy.metalMineLevel;
@@ -1857,9 +1863,9 @@ function resolveTravelTurns(originPlanet: BotPlanetSnapshot, distance: number): 
 }
 
 function tryAddShipsToSelection(
-  selections: Map<string, Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>>,
+  selections: Map<string, Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>>,
   originPlanet: BotPlanetSnapshot,
-  shipType: ShipType,
+  shipType: ShipTypeT,
   maxWanted: number,
   distance: number
 ): number {
@@ -1898,7 +1904,7 @@ function tryAddShipsToSelection(
 
 function hasEnoughDeuteriumForSelection(
   originPlanet: BotPlanetSnapshot,
-  selection: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>,
+  selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>,
   distance: number
 ): boolean {
   if (distance <= 0) {
@@ -2266,7 +2272,11 @@ function subtractResources(
 }
 
 function sumRecordCounts<T extends string>(counts: Partial<Record<T, number>>): number {
-  return Object.values(counts).reduce((sum, value) => sum + Math.max(0, value ?? 0), 0);
+  let total = 0;
+  for (const value of Object.values(counts) as Array<number | undefined>) {
+    total += Math.max(0, value ?? 0);
+  }
+  return total;
 }
 
 function toCoordinatesKey(
