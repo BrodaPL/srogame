@@ -188,6 +188,10 @@ describe('BotStrategicMilitarySubsystem', () => {
       knownDefenceCountsByType: {},
       farmIntelEnough: false,
       initialDefenseBroken: false,
+      lastProcessedAttackTurn: null,
+      lastBreakAttemptCombatStrength: null,
+      nextBreakAllowedTurn: null,
+      lastBreakFailureLossBracket: null,
       lastObservedResources: { metal: 0, crystal: 0, deuterium: 0 },
       lastResourceObservationTurn: null,
       lastCombatObservationTurn: null,
@@ -353,49 +357,30 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(attackProposal).toBeDefined();
   });
 
-  it('requests a spy on an opened farm when combat intel exists but no resource model is known yet', () => {
+  it('plunders an opened farm even when no separate resource model is known yet', () => {
     const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
-    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
     addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
       survivingShipsLine: 'Enemy survivors by type: none',
       survivingDefencesLine: 'Enemy defense survivors by type: none'
     });
 
     const result = runStrategicMilitarySubsystem(galaxy, bot);
-    const spyProposal = result.proposals.find((proposal) =>
+    const plunderProposal = result.proposals.find((proposal) =>
       proposal.kind === 'FLEET_MISSION'
-      && proposal.requestPayload.missionType === FleetMissionType.SPY
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'PLUNDER'
       && proposal.targetCoordinates?.x === neutralPlanet.basicInfo.solarSystem.coordinates.x
       && proposal.targetCoordinates?.y === neutralPlanet.basicInfo.solarSystem.coordinates.y
       && proposal.targetCoordinates?.z === neutralPlanet.basicInfo.order
     );
 
-    expect(spyProposal).toBeDefined();
+    expect(plunderProposal).toBeDefined();
   });
 
-  it('produces a spy probe for an opened farm when combat intel exists but no probe can launch', () => {
-    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
-    configureOriginPlanet(homePlanet);
-    homePlanet.setBuildingLevel(BuildingType.RESEARCH_LAB, 1);
-    bot.setTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY, 1);
-    addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
-      survivingShipsLine: 'Enemy survivors by type: none',
-      survivingDefencesLine: 'Enemy defense survivors by type: none'
-    });
-
-    const result = runStrategicMilitarySubsystem(galaxy, bot);
-    const shipyardProposal = result.proposals.find((proposal) =>
-      proposal.kind === 'SHIPYARD'
-      && proposal.requestPayload.itemKind === 'ship'
-      && proposal.requestPayload.shipType === ShipType.SPY_PROBE
-      && proposal.requestPayload.amount === 1
-    );
-
-    expect(shipyardProposal).toBeDefined();
-  });
-
-  it('uses plunder reports to suppress immediate re-plunder after a farm was drained', () => {
+  it('keeps opened farms on the repeat-attack path after a successful farm hit', () => {
     const memory = createDefaultBotMemoryV2();
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
@@ -416,7 +401,54 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(result.proposals.some((proposal) =>
       proposal.kind === 'FLEET_MISSION'
       && proposal.debug.missionPhase === 'PLUNDER'
+    )).toBe(true);
+  });
+
+  it('uses any available cargo hull for opened-farm repeat attacks', () => {
+    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CARGO_SUPPORT, 1);
+    addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
+      survivingShipsLine: 'Enemy survivors by type: none',
+      survivingDefencesLine: 'Enemy defense survivors by type: none'
+    });
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const plunderProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.debug.missionPhase === 'PLUNDER'
+    );
+
+    expect(plunderProposal).toBeDefined();
+    expect(plunderProposal?.requestPayload.ships.some((ship: { type: ShipType }) => ship.type === ShipType.CARGO_SUPPORT)).toBe(true);
+  });
+
+  it('holds a failed defended farm in cooldown and asks for more force instead of retrying immediately', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 2);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn - 1);
+    addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
+      survivingShipsLine: 'Enemy survivors by type: Battle Ship x2',
+      survivingDefencesLine: 'Enemy defense survivors by type: none',
+      ownShipsLine: 'Own ships (attacker): 0/2 survived, 2 lost.',
+      ownShipLossesLine: 'Own ship losses by type: Cruiser x2',
+      ownSurvivorsLine: 'Own survivors by type: none'
+    });
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.debug.missionPhase === 'BREAK'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
     )).toBe(false);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.demandOnly === true
+    )).toBe(true);
   });
 
   it('keeps BREAK as a hard gate before PLUNDER is considered', () => {
@@ -712,6 +744,9 @@ function addBattleReport(
   lines: {
     survivingShipsLine: string;
     survivingDefencesLine: string;
+    ownShipsLine?: string;
+    ownShipLossesLine?: string;
+    ownSurvivorsLine?: string;
   }
 ): void {
   bot.addReport(new FleetReport(
@@ -729,6 +764,9 @@ function addBattleReport(
     },
     [
       'Battle result: ATTACKER',
+      lines.ownShipsLine ?? 'Own ships (attacker): 1/1 survived, 0 lost.',
+      lines.ownShipLossesLine ?? 'Own ship losses by type: none',
+      lines.ownSurvivorsLine ?? 'Own survivors by type: Cruiser x1',
       lines.survivingShipsLine,
       lines.survivingDefencesLine
     ].join('\n')

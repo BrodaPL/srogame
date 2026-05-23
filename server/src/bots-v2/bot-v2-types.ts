@@ -305,6 +305,9 @@ export type BotStrategicMilitaryTargetSnapshot = {
   crystalModifier: number | null;
   deuteriumModifier: number | null;
   lastAttackTurn: number | null;
+  lastAttackOwnCombatStrength: number | null;
+  lastAttackOwnLossRatio: number | null;
+  lastAttackFleetDestroyed: boolean;
   lastPlunderTurn: number | null;
   latestPlunderedResources: {
     metal: number;

@@ -949,6 +949,9 @@ function resolveStrategicMilitaryTargets(
           crystalModifier: report?.planetaryParameters.crystalModifier ?? null,
           deuteriumModifier: report?.planetaryParameters.deuteriumModifier ?? null,
           lastAttackTurn: latestBattleObservation?.turn ?? null,
+          lastAttackOwnCombatStrength: latestBattleObservation?.ownInitialCombatStrength ?? null,
+          lastAttackOwnLossRatio: latestBattleObservation?.ownLossRatio ?? null,
+          lastAttackFleetDestroyed: latestBattleObservation?.ownFleetDestroyed ?? false,
           lastPlunderTurn: latestPlunderObservation?.turn ?? null,
           latestPlunderedResources: latestPlunderObservation?.stolenResources ?? null,
           combatObservationTurn: latestBattleObservation?.turn ?? reportTurn,
@@ -2110,23 +2113,43 @@ function resolveLatestBattleObservation(
   turn: number;
   survivingShipsByType: Partial<Record<ShipType, number>>;
   survivingDefencesByType: Partial<Record<DefenceType, number>>;
+  ownInitialCombatStrength: number;
+  ownLossRatio: number;
+  ownFleetDestroyed: boolean;
 } | null {
   const latestReport = resolveLatestFleetReport(player, planet, 'Battle Report:');
   if (!latestReport?.body) {
     return null;
   }
 
-  const survivingShipsLine = latestReport.body.split('\n')
+  const lines = latestReport.body.split('\n');
+  const survivingShipsLine = lines
     .find((line) => line.startsWith('Enemy survivors by type:'))
     ?? null;
-  const survivingDefencesLine = latestReport.body.split('\n')
+  const survivingDefencesLine = lines
     .find((line) => line.startsWith('Enemy defense survivors by type:'))
     ?? null;
+  const ownSurvivorsLine = lines
+    .find((line) => line.startsWith('Own survivors by type:'))
+    ?? null;
+  const ownLossesLine = lines
+    .find((line) => line.startsWith('Own ship losses by type:'))
+    ?? null;
+  const ownSurvivorsByType = parseTypedCountSummary<ShipType>(ownSurvivorsLine, 'Own survivors by type:');
+  const ownLossesByType = parseTypedCountSummary<ShipType>(ownLossesLine, 'Own ship losses by type:');
+  const ownInitialCombatStrength = resolveTypedShipValueFromCounts(ownSurvivorsByType) + resolveTypedShipValueFromCounts(ownLossesByType);
+  const ownSurvivingCombatStrength = resolveTypedShipValueFromCounts(ownSurvivorsByType);
+  const ownLossRatio = ownInitialCombatStrength <= 0
+    ? 0
+    : Math.max(0, Math.min(1, (ownInitialCombatStrength - ownSurvivingCombatStrength) / ownInitialCombatStrength));
 
   return {
     turn: latestReport.createdTurn,
     survivingShipsByType: parseTypedCountSummary<ShipType>(survivingShipsLine, 'Enemy survivors by type:'),
-    survivingDefencesByType: parseTypedCountSummary<DefenceType>(survivingDefencesLine, 'Enemy defense survivors by type:')
+    survivingDefencesByType: parseTypedCountSummary<DefenceType>(survivingDefencesLine, 'Enemy defense survivors by type:'),
+    ownInitialCombatStrength,
+    ownLossRatio,
+    ownFleetDestroyed: ownInitialCombatStrength > 0 && ownSurvivingCombatStrength <= 0
   };
 }
 
@@ -2268,6 +2291,12 @@ function resolveTypedShipValueFromLine(
   prefix: string
 ): number {
   const counts = parseTypedCountSummary<ShipType>(line, prefix);
+  return resolveTypedShipValueFromCounts(counts);
+}
+
+function resolveTypedShipValueFromCounts(
+  counts: Partial<Record<ShipType, number>>
+): number {
   let total = 0;
 
   for (const [shipType, amount] of Object.entries(counts) as Array<[ShipType, number]>) {

@@ -221,7 +221,11 @@ export type BotMemoryV2StrategicMilitaryFarmLedgerEntry = {
   intelPhase: 'UNSCANNED' | 'SPY_SENT' | 'PROBE_REQUIRED' | 'COMBAT_INTEL_READY';
   lastSpyTurn: number | null;
   lastAttackTurn: number | null;
+  lastProcessedAttackTurn: number | null;
   lastSuccessfulPlunderTurn: number | null;
+  lastBreakAttemptCombatStrength: number | null;
+  nextBreakAllowedTurn: number | null;
+  lastBreakFailureLossBracket: BotFarmLossBracket | null;
   knownMineLevels: {
     metalMineLevel: number;
     crystalMineLevel: number;
@@ -1114,6 +1118,22 @@ export class Player {
           knownDefenceCountsByType: Player.normalizeBotMemoryV2CountByType(entry?.knownDefenceCountsByType),
           farmIntelEnough: entry?.farmIntelEnough === true,
           initialDefenseBroken: entry?.initialDefenseBroken === true,
+          lastProcessedAttackTurn: Number.isInteger(entry?.lastProcessedAttackTurn)
+            ? entry.lastProcessedAttackTurn
+            : null,
+          lastBreakAttemptCombatStrength: Number.isFinite(entry?.lastBreakAttemptCombatStrength)
+            ? Math.max(0, Math.floor(Number(entry.lastBreakAttemptCombatStrength)))
+            : null,
+          nextBreakAllowedTurn: Number.isInteger(entry?.nextBreakAllowedTurn)
+            ? entry.nextBreakAllowedTurn
+            : null,
+          lastBreakFailureLossBracket: entry?.lastBreakFailureLossBracket === 'LIGHT'
+            || entry?.lastBreakFailureLossBracket === 'MEDIUM'
+            || entry?.lastBreakFailureLossBracket === 'HEAVY'
+            || entry?.lastBreakFailureLossBracket === 'DEFEAT'
+            || entry?.lastBreakFailureLossBracket === 'NONE'
+            ? entry.lastBreakFailureLossBracket
+            : null,
           lastObservedResources: Player.normalizeBotMemoryResources(entry?.lastObservedResources),
           lastResourceObservationTurn: Number.isInteger(entry?.lastResourceObservationTurn)
             ? entry.lastResourceObservationTurn
