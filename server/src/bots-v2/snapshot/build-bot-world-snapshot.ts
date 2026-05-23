@@ -66,6 +66,12 @@ const {
   routeRepairDroneProduction
 } = resolveModule(repairDroneProductionModule) as typeof import('../../../../src/app/models/turns/repair-drone-production.js');
 
+type BuildingTypeId = (typeof BuildingType)[keyof typeof BuildingType];
+type DefenceTypeId = (typeof DefenceType)[keyof typeof DefenceType];
+type ShipTypeId = (typeof ShipType)[keyof typeof ShipType];
+type DiplomaticStatusId = (typeof DiplomaticStatus)[keyof typeof DiplomaticStatus];
+type DiplomacyResolverInstance = InstanceType<typeof DiplomacyResolver>;
+
 const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
 const SHARED_HOSTILE_EVENT_REPORT_WINDOW = 40;
 
@@ -98,7 +104,7 @@ function buildEmpireSnapshot(
   player: Player,
   planets: BotPlanetSnapshot[]
 ): BotEmpireSnapshot {
-  const totalResources = planets.reduce((sum, planet) => ({
+  const totalResources = planets.reduce<{ metal: number; crystal: number; deuterium: number }>((sum, planet) => ({
     metal: sum.metal + planet.localResources.metal,
     crystal: sum.crystal + planet.localResources.crystal,
     deuterium: sum.deuterium + planet.localResources.deuterium
@@ -218,19 +224,19 @@ function buildPlanetSnapshot(
     deuterium: Math.max(0, Math.floor(fusionOperation.netDeuteriumIncome))
   };
   const defenseCounts = ManyDefences.countByType(planet.rBDSFTQ.defences);
-  const installedCountByType = Object.fromEntries(defenseCounts.entries()) as Partial<Record<DefenceType, number>>;
+  const installedCountByType = Object.fromEntries(defenseCounts.entries()) as Partial<Record<DefenceTypeId, number>>;
   const installedValueByType = resolveInstalledDefenseValues(defenseCounts);
   const totalInstalledDefenseValue = Object.values(installedValueByType)
-    .reduce((sum, value) => sum + value, 0);
+    .reduce<number>((sum, value) => sum + (value ?? 0), 0);
   const shipCounts = ManyShips.countByType(planet.rBDSFTQ.ships);
   const undamagedShipCounts = ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
   const damagedShipCounts = ManyShips.damagedCountByType(planet.rBDSFTQ.ships);
-  const installedShipCountByType = Object.fromEntries(shipCounts.entries()) as Partial<Record<ShipType, number>>;
-  const undamagedShipCountByType = Object.fromEntries(undamagedShipCounts.entries()) as Partial<Record<ShipType, number>>;
-  const damagedShipCountByType = Object.fromEntries(damagedShipCounts.entries()) as Partial<Record<ShipType, number>>;
+  const installedShipCountByType = Object.fromEntries(shipCounts.entries()) as Partial<Record<ShipTypeId, number>>;
+  const undamagedShipCountByType = Object.fromEntries(undamagedShipCounts.entries()) as Partial<Record<ShipTypeId, number>>;
+  const damagedShipCountByType = Object.fromEntries(damagedShipCounts.entries()) as Partial<Record<ShipTypeId, number>>;
   const installedShipValueByType = resolveInstalledShipValues(shipCounts);
   const totalInstalledShipValue = Object.values(installedShipValueByType)
-    .reduce((sum, value) => sum + value, 0);
+    .reduce<number>((sum, value) => sum + (value ?? 0), 0);
   const buildingDamageSummary = resolveInfrastructureDamageSummary(planet);
   const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
   const recentHostileAttackCountLast20Turns = resolveRecentHostileAttackCountLast100Turns(
@@ -329,10 +335,10 @@ function buildPlanetSnapshot(
       queuedBuildingTypes: planet.rBDSFTQ.buildingQueue.map((entry) => entry.buildingType),
       queuedDefenceTypes: planet.rBDSFTQ.shipyardQueue
         .filter((entry) => entry.itemKind === 'defence' && entry.defenceType !== null)
-        .map((entry) => entry.defenceType as DefenceType),
+        .map((entry) => entry.defenceType as DefenceTypeId),
       queuedShipTypes: planet.rBDSFTQ.shipyardQueue
         .filter((entry) => entry.itemKind === 'ship' && entry.shipType !== null)
-        .map((entry) => entry.shipType as ShipType),
+        .map((entry) => entry.shipType as ShipTypeId),
       shipsCompletingNextTurnByType: resolveShipsCompletingNextTurnByType(planet, shipyardPower),
       currentResearchType: planet.rBDSFTQ.currentResearchQueue?.technologyType ?? null
     },
@@ -585,8 +591,8 @@ function resolveShipyardQueueRemainingEtc(planet: Planet, shipyardPower: number)
 function resolveShipsCompletingNextTurnByType(
   planet: Planet,
   shipyardPower: number
-): Partial<Record<ShipType, number>> {
-  const completing: Partial<Record<ShipType, number>> = {};
+): Partial<Record<ShipTypeId, number>> {
+  const completing: Partial<Record<ShipTypeId, number>> = {};
   let remainingShipyardPower = Math.max(0, Math.floor(shipyardPower));
   if (remainingShipyardPower <= 0) {
     return completing;
@@ -640,7 +646,7 @@ function resolveMaturityStage(averageMineLevel: number): BotPlanetMaturityStage 
 }
 
 function resolveAverageIndustryLevel(planet: Planet): number {
-  const includedBuildings: Array<{ buildingType: BuildingType; weight: number }> = [
+  const includedBuildings: Array<{ buildingType: BuildingTypeId; weight: number }> = [
     { buildingType: BuildingType.METAL_MINE, weight: 1 },
     { buildingType: BuildingType.CRYSTAL_MINE, weight: 1 },
     { buildingType: BuildingType.DEUTERIUM_SYNTHESIZER, weight: 1 },
@@ -675,9 +681,9 @@ function resolveAverageIndustryLevel(planet: Planet): number {
 }
 
 function resolveInstalledDefenseValues(
-  counts: Map<DefenceType, number>
-): Partial<Record<DefenceType, number>> {
-  const values: Partial<Record<DefenceType, number>> = {};
+  counts: Map<DefenceTypeId, number>
+): Partial<Record<DefenceTypeId, number>> {
+  const values: Partial<Record<DefenceTypeId, number>> = {};
 
   for (const [defenceType, amount] of counts.entries()) {
     const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
@@ -692,9 +698,9 @@ function resolveInstalledDefenseValues(
 }
 
 function resolveInstalledShipValues(
-  counts: Map<ShipType, number>
-): Partial<Record<ShipType, number>> {
-  const values: Partial<Record<ShipType, number>> = {};
+  counts: Map<ShipTypeId, number>
+): Partial<Record<ShipTypeId, number>> {
+  const values: Partial<Record<ShipTypeId, number>> = {};
 
   for (const [shipType, amount] of counts.entries()) {
     const blueprint = SHIP_BLUEPRINTS.get(shipType);
@@ -708,7 +714,7 @@ function resolveInstalledShipValues(
   return values;
 }
 
-function resolveCompletedBuildingInvestment(buildingType: BuildingType, level: number): number {
+function resolveCompletedBuildingInvestment(buildingType: BuildingTypeId, level: number): number {
   const blueprint = BUILDING_BLUEPRINTS.get(buildingType);
   if (!blueprint || level <= 0) {
     return 0;
@@ -909,10 +915,10 @@ function resolveStrategicMilitaryTargets(
           )
         );
         const knownShipCountsByType = report === null
-          ? {}
+          ? (latestBattleObservation?.survivingShipsByType ?? {})
           : resolveKnownShipCountsForStrategicMilitary(report, latestBattleObservation);
         const knownDefenceCountsByType = report === null
-          ? {}
+          ? (latestBattleObservation?.survivingDefencesByType ?? {})
           : resolveKnownDefenceCountsForStrategicMilitary(report, latestBattleObservation);
 
         targets.push({
@@ -933,8 +939,12 @@ function resolveStrategicMilitaryTargets(
           hasForeignGuard,
           hasOwnActiveFarmMission,
           mineLevels,
-          currentShipsCount: report === null ? null : sumCountsByType(knownShipCountsByType),
-          currentDefencesCount: report === null ? null : sumCountsByType(knownDefenceCountsByType),
+          currentShipsCount: (report === null && latestBattleObservation === null)
+            ? null
+            : sumCountsByType(knownShipCountsByType),
+          currentDefencesCount: (report === null && latestBattleObservation === null)
+            ? null
+            : sumCountsByType(knownDefenceCountsByType),
           knownShipCountsByType,
           knownDefenceCountsByType,
           currentResources,
@@ -1221,7 +1231,7 @@ function resolveStrategicDiplomaticFactions(
         averageKnownTechLevel: averageNumber(knownReports.map((report) => report.averageTechLevel)),
         averageKnownShipsAmount: averageNumber(knownReports.map((report) => report.totalShipsAmount)),
         averageKnownDefencesAmount: averageNumber(knownReports.map((report) => report.totalDefencesAmount)),
-        bestIntelDepth: knownReports.reduce((best, report) => Math.max(best, resolveEspionageIntelDepth(report)), 0),
+        bestIntelDepth: knownReports.reduce<number>((best, report) => Math.max(best, resolveEspionageIntelDepth(report)), 0),
         lastRelevantReportAge: knownReports.reduce<number | null>((best, report) => {
           const age = Math.max(0, galaxy.currentTurn - report.createdTurn);
           return best === null ? age : Math.min(best, age);
@@ -1259,9 +1269,9 @@ function resolveStrategicDiplomaticFactions(
   const ownShortDamagePercent = resolveOwnRecentStructuralDamagePercent(player, galaxy.currentTurn, 20);
   const ownLongDamagePercent = resolveOwnRecentStructuralDamagePercent(player, galaxy.currentTurn, 100);
   const activeWarDrafts = factionDrafts.filter((entry) => entry.currentStatus === DiplomaticStatus.WAR);
-  const totalShortWarActivity = activeWarDrafts.reduce((sum, entry) =>
+  const totalShortWarActivity = activeWarDrafts.reduce<number>((sum, entry) =>
     sum + Math.max(1, entry.recentBattleReportCountShort), 0);
-  const totalLongWarActivity = activeWarDrafts.reduce((sum, entry) =>
+  const totalLongWarActivity = activeWarDrafts.reduce<number>((sum, entry) =>
     sum + Math.max(1, entry.recentBattleReportCountLong), 0);
 
   return factionDrafts
@@ -1491,7 +1501,7 @@ function resolveSharedHostileEventsForFaction(
   galaxy: Galaxy,
   player: Player,
   foreignPlayer: Player,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolverInstance
 ): BotStrategicDiplomaticSharedHostileEventSnapshot[] {
   const deduped = new Map<string, BotStrategicDiplomaticSharedHostileEventSnapshot>();
   const foreignStatus = diplomacyResolver.getStatus(player.playerId, foreignPlayer.playerId);
@@ -1634,9 +1644,7 @@ function parseSharedHostileEventFromReport(
     report.reportType === ReportType.FLEET_REPORT
     && report.title.startsWith('Battle Report:')
   ) {
-    const body = typeof (report as { body?: unknown }).body === 'string'
-      ? (report as { body: string }).body
-      : '';
+    const body = getReportBody(report) ?? '';
     const severity = resolveBattleSharedHostileSeverity(body);
     if (severity <= 0) {
       return null;
@@ -1653,9 +1661,7 @@ function parseSharedHostileEventFromReport(
     report.reportType === ReportType.FLEET_REPORT
     && report.title.startsWith('Incoming Attack Report:')
   ) {
-    const body = typeof (report as { body?: unknown }).body === 'string'
-      ? (report as { body: string }).body
-      : '';
+    const body = getReportBody(report) ?? '';
     const lostValue = resolveResourceValueFromLine(
       body.split('\n').find((line) => line.startsWith('Resources lost: ')) ?? null,
       'Resources lost: '
@@ -1671,9 +1677,7 @@ function parseSharedHostileEventFromReport(
     report.reportType === ReportType.BUILDINGS_REPORT
     && report.title.startsWith('Incoming Bombardment Report:')
   ) {
-    const body = typeof (report as { body?: unknown }).body === 'string'
-      ? (report as { body: string }).body
-      : '';
+    const body = getReportBody(report) ?? '';
     const missionTypeLine = body.split('\n').find((line) => line.startsWith('Bombardment mission:')) ?? '';
     const totalDamageLine = body.split('\n').find((line) => line.startsWith('Total structural damage:')) ?? '';
     const targetPlanet = victimPlayer.planets.find((planet) =>
@@ -1733,9 +1737,7 @@ function parseDirectVictimSharedHostileEventFromReport(
     report.reportType === ReportType.FLEET_REPORT
     && report.title.startsWith('Battle Report:')
   ) {
-    const body = typeof (report as { body?: unknown }).body === 'string'
-      ? (report as { body: string }).body
-      : '';
+    const body = getReportBody(report) ?? '';
     const severity = resolveBattleSharedHostileSeverity(body);
     if (severity <= 0) {
       return null;
@@ -1753,9 +1755,7 @@ function parseDirectVictimSharedHostileEventFromReport(
     report.reportType === ReportType.FLEET_REPORT
     && report.title.startsWith('Incoming Attack Report:')
   ) {
-    const body = typeof (report as { body?: unknown }).body === 'string'
-      ? (report as { body: string }).body
-      : '';
+    const body = getReportBody(report) ?? '';
     const lostValue = resolveResourceValueFromLine(
       body.split('\n').find((line) => line.startsWith('Resources lost: ')) ?? null,
       'Resources lost: '
@@ -1772,9 +1772,7 @@ function parseDirectVictimSharedHostileEventFromReport(
     report.reportType === ReportType.BUILDINGS_REPORT
     && report.title.startsWith('Incoming Bombardment Report:')
   ) {
-    const body = typeof (report as { body?: unknown }).body === 'string'
-      ? (report as { body: string }).body
-      : '';
+    const body = getReportBody(report) ?? '';
     const missionTypeLine = body.split('\n').find((line) => line.startsWith('Bombardment mission:')) ?? '';
     const totalDamageLine = body.split('\n').find((line) => line.startsWith('Total structural damage:')) ?? '';
     const targetPlanet = victimPlayer.planets.find((planet) =>
@@ -1825,7 +1823,7 @@ function parseBattleLossCount(line: string): number {
   return Math.max(0, Number.parseInt(match[1] ?? '0', 10));
 }
 
-function resolveSharedStatusWeight(status: DiplomaticStatus): number {
+function resolveSharedStatusWeight(status: DiplomaticStatusId): number {
   switch (status) {
     case DiplomaticStatus.ALLIED:
       return 0.4;
@@ -1841,7 +1839,7 @@ function resolveOwnRecentStructuralDamagePercent(
   currentTurn: number,
   windowTurns: number
 ): number {
-  const totalMaxStructuralPoints = player.planets.reduce((sum, planet) => {
+  const totalMaxStructuralPoints = player.planets.reduce<number>((sum, planet) => {
     let planetMax = 0;
     for (const buildingType of ALL_BUILDING_TYPES) {
       const level = planet.getBuildingLevel(buildingType);
@@ -1856,9 +1854,9 @@ function resolveOwnRecentStructuralDamagePercent(
     return 0;
   }
 
-  const missingStructuralPoints = player.planets.reduce((sum, planet) =>
+  const missingStructuralPoints = player.planets.reduce<number>((sum, planet) =>
     sum + resolvePlanetMissingStructuralPoints(planet), 0);
-  const recentHostileAttackCount = player.planets.reduce((sum, planet) =>
+  const recentHostileAttackCount = player.planets.reduce<number>((sum, planet) =>
     sum + resolveRecentHostileAttackCountLast100Turns(player, planet, currentTurn, windowTurns), 0);
   if (recentHostileAttackCount <= 0) {
     return 0;
@@ -2069,7 +2067,7 @@ function averageNumber(values: number[]): number {
     return 0;
   }
 
-  const sum = values.reduce((accumulator, value) =>
+  const sum = values.reduce<number>((accumulator, value) =>
     accumulator + (Number.isFinite(value) ? value : 0), 0
   );
   return sum / values.length;
@@ -2111,8 +2109,8 @@ function resolveLatestBattleObservation(
   planet: Planet
 ): {
   turn: number;
-  survivingShipsByType: Partial<Record<ShipType, number>>;
-  survivingDefencesByType: Partial<Record<DefenceType, number>>;
+  survivingShipsByType: Partial<Record<ShipTypeId, number>>;
+  survivingDefencesByType: Partial<Record<DefenceTypeId, number>>;
   ownInitialCombatStrength: number;
   ownLossRatio: number;
   ownFleetDestroyed: boolean;
@@ -2135,8 +2133,8 @@ function resolveLatestBattleObservation(
   const ownLossesLine = lines
     .find((line) => line.startsWith('Own ship losses by type:'))
     ?? null;
-  const ownSurvivorsByType = parseTypedCountSummary<ShipType>(ownSurvivorsLine, 'Own survivors by type:');
-  const ownLossesByType = parseTypedCountSummary<ShipType>(ownLossesLine, 'Own ship losses by type:');
+  const ownSurvivorsByType = parseTypedCountSummary<ShipTypeId>(ownSurvivorsLine, 'Own survivors by type:');
+  const ownLossesByType = parseTypedCountSummary<ShipTypeId>(ownLossesLine, 'Own ship losses by type:');
   const ownInitialCombatStrength = resolveTypedShipValueFromCounts(ownSurvivorsByType) + resolveTypedShipValueFromCounts(ownLossesByType);
   const ownSurvivingCombatStrength = resolveTypedShipValueFromCounts(ownSurvivorsByType);
   const ownLossRatio = ownInitialCombatStrength <= 0
@@ -2145,8 +2143,8 @@ function resolveLatestBattleObservation(
 
   return {
     turn: latestReport.createdTurn,
-    survivingShipsByType: parseTypedCountSummary<ShipType>(survivingShipsLine, 'Enemy survivors by type:'),
-    survivingDefencesByType: parseTypedCountSummary<DefenceType>(survivingDefencesLine, 'Enemy defense survivors by type:'),
+    survivingShipsByType: parseTypedCountSummary<ShipTypeId>(survivingShipsLine, 'Enemy survivors by type:'),
+    survivingDefencesByType: parseTypedCountSummary<DefenceTypeId>(survivingDefencesLine, 'Enemy defense survivors by type:'),
     ownInitialCombatStrength,
     ownLossRatio,
     ownFleetDestroyed: ownInitialCombatStrength > 0 && ownSurvivingCombatStrength <= 0
@@ -2163,7 +2161,7 @@ function parseNonNegativeNumberFromLine(line: string | null | undefined): number
     return 0;
   }
 
-  const parsed = Number(match[1]);
+  const parsed = Number(match[1] ?? '');
   if (!Number.isFinite(parsed)) {
     return 0;
   }
@@ -2219,6 +2217,13 @@ function resolveLatestPlunderObservation(
   };
 }
 
+function getReportBody(report: Player['reports'][number]): string | null {
+  const reportWithBody = report as unknown as { body?: unknown };
+  return typeof reportWithBody.body === 'string'
+    ? reportWithBody.body
+    : null;
+}
+
 function resolveLatestFleetReport(
   player: Player,
   planet: Planet,
@@ -2238,7 +2243,7 @@ function resolveLatestFleetReport(
       || report.sourceCoordinates?.x !== coordinates.x
       || report.sourceCoordinates?.y !== coordinates.y
       || report.sourceCoordinates?.z !== coordinates.z
-      || typeof (report as { body?: unknown }).body !== 'string'
+      || getReportBody(report) === null
     ) {
       continue;
     }
@@ -2246,7 +2251,7 @@ function resolveLatestFleetReport(
     if (latestReport === null || report.createdTurn > latestReport.createdTurn) {
       latestReport = {
         createdTurn: report.createdTurn,
-        body: (report as { body: string }).body
+        body: getReportBody(report) ?? ''
       };
     }
   }
@@ -2290,16 +2295,16 @@ function resolveTypedShipValueFromLine(
   line: string | null,
   prefix: string
 ): number {
-  const counts = parseTypedCountSummary<ShipType>(line, prefix);
+  const counts = parseTypedCountSummary<ShipTypeId>(line, prefix);
   return resolveTypedShipValueFromCounts(counts);
 }
 
 function resolveTypedShipValueFromCounts(
-  counts: Partial<Record<ShipType, number>>
+  counts: Partial<Record<ShipTypeId, number>>
 ): number {
   let total = 0;
 
-  for (const [shipType, amount] of Object.entries(counts) as Array<[ShipType, number]>) {
+  for (const [shipType, amount] of Object.entries(counts) as Array<[ShipTypeId, number]>) {
     const blueprint = SHIP_BLUEPRINTS.get(shipType);
     if (!blueprint || !Number.isFinite(amount) || amount <= 0) {
       continue;
@@ -2353,7 +2358,7 @@ function resolveWeightedResourceValue(resources: {
 function resolveKnownShipCountsForStrategicMilitary(
   report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
   latestBattleObservation: ReturnType<typeof resolveLatestBattleObservation>
-): Partial<Record<ShipType, number>> {
+): Partial<Record<ShipTypeId, number>> {
   const reportHasCombatIntel = (
     (report.hasTotalDefencesIntel || report.defences.length > 0)
     && (report.hasTotalShipsIntel || report.ships.size > 0)
@@ -2362,13 +2367,13 @@ function resolveKnownShipCountsForStrategicMilitary(
     return latestBattleObservation.survivingShipsByType;
   }
 
-  return Object.fromEntries(report.ships.entries()) as Partial<Record<ShipType, number>>;
+  return Object.fromEntries(report.ships.entries()) as Partial<Record<ShipTypeId, number>>;
 }
 
 function resolveKnownDefenceCountsForStrategicMilitary(
   report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
   latestBattleObservation: ReturnType<typeof resolveLatestBattleObservation>
-): Partial<Record<DefenceType, number>> {
+): Partial<Record<DefenceTypeId, number>> {
   const reportHasCombatIntel = (
     (report.hasTotalDefencesIntel || report.defences.length > 0)
     && (report.hasTotalShipsIntel || report.ships.size > 0)
@@ -2378,8 +2383,8 @@ function resolveKnownDefenceCountsForStrategicMilitary(
   }
 
   return Object.fromEntries(
-    report.defences.map((entry) => [entry.type, entry.amount] satisfies [DefenceType, number])
-  ) as Partial<Record<DefenceType, number>>;
+    report.defences.map((entry) => [entry.type, entry.amount] satisfies [DefenceTypeId, number])
+  ) as Partial<Record<DefenceTypeId, number>>;
 }
 
 function sumCountsByType<T extends string>(counts: Partial<Record<T, number>>): number {
@@ -2446,7 +2451,7 @@ function resolveReportedIncome(
 
 function resolveReportedBuildingProductionValue1(
   report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never>,
-  buildingType: BuildingType
+  buildingType: BuildingTypeId
 ): number {
   const level = report.buildingsLevels.get(buildingType) ?? 0;
   if (level <= 0) {

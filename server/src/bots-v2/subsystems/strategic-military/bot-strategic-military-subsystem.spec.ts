@@ -357,6 +357,35 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(attackProposal).toBeDefined();
   });
 
+  it('keeps a farm in break phase when only battle intel exists and defenders survived', () => {
+    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 2);
+    addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
+      survivingShipsLine: 'Enemy survivors by type: Corvette x2',
+      survivingDefencesLine: 'Enemy defense survivors by type: none'
+    });
+
+    const snapshot = buildBotWorldSnapshot(galaxy, bot, { mode: 'LIVE' });
+    const target = snapshot.empire.strategicMilitaryTargets.find((entry) =>
+      entry.coordinates.x === neutralPlanet.basicInfo.solarSystem.coordinates.x
+      && entry.coordinates.y === neutralPlanet.basicInfo.solarSystem.coordinates.y
+      && entry.coordinates.z === neutralPlanet.basicInfo.order
+    );
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+
+    expect(target?.lastAttackTurn).toBe(galaxy.currentTurn);
+    expect(target?.currentShipsCount).toBe(2);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'PLUNDER'
+      && proposal.targetCoordinates?.x === neutralPlanet.basicInfo.solarSystem.coordinates.x
+      && proposal.targetCoordinates?.y === neutralPlanet.basicInfo.solarSystem.coordinates.y
+      && proposal.targetCoordinates?.z === neutralPlanet.basicInfo.order
+    )).toBe(false);
+  });
+
   it('plunders an opened farm even when no separate resource model is known yet', () => {
     const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
