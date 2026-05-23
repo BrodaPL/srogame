@@ -467,6 +467,29 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(plunderShipTypes).toContain(ShipType.CARGO_SUPPORT);
   });
 
+  it('pushes cargo ship demand for opened farms when no cargo hull can repeat attack', () => {
+    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    addBattleReport(bot, neutralPlanet, galaxy.currentTurn - 1, {
+      survivingShipsLine: 'Enemy survivors by type: none',
+      survivingDefencesLine: 'Enemy defense survivors by type: none'
+    });
+    addPlunderReport(bot, neutralPlanet, galaxy.currentTurn - 1, new ResourcesPack(300, 300, 300));
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const cargoNeed = result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.demandOnly === true
+      && proposal.requestPayload.shortageKind === 'CARGO'
+    );
+
+    expect(cargoNeed).toBeDefined();
+    expect(cargoNeed?.requestPayload.shipType).toBe(ShipType.TRANSPORTER);
+    expect(cargoNeed?.urgency).toBeGreaterThanOrEqual(78);
+    expect(cargoNeed?.expectedValue).toBeGreaterThan(900);
+  });
+
   it('holds a failed defended farm in cooldown and asks for more force instead of retrying immediately', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);

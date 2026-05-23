@@ -109,8 +109,13 @@ const ALLOWED_DEFENSIVE_BUILDING_SCOPE = new Set<BuildingTypeT>([
 ]);
 
 const BONUS_FACTOR_CEILING = 3;
-const LOW_TIER_DEFENCE_TARGET_SHARE = 0.35;
-const MID_TIER_DEFENCE_TARGET_SHARE = 0.4;
+const LOW_TIER_DEFENCE_TARGET_SHARE = 0.25;
+const MID_TIER_DEFENCE_TARGET_SHARE = 0.35;
+const PEACEFUL_BUNKER_AFFORDABILITY_TURNS = 0;
+const PRESSURED_BUNKER_AFFORDABILITY_TURNS = 6;
+const LOW_TIER_DEFENCE_ORDER_CAP = 4;
+const MID_TIER_DEFENCE_ORDER_CAP = 3;
+const HIGH_TIER_DEFENCE_ORDER_CAP = 2;
 
 const UNLOCK_THRESHOLDS: Array<{ defenceType: DefenceTypeT; threshold: number }> = [
   { defenceType: DefenceType.SAM_SITE, threshold: 2 },
@@ -207,6 +212,9 @@ function evaluateBunkerGoal(
   if (desiredLevel <= currentLevel) {
     return null;
   }
+  if (!hasRealDefensivePressure(planet)) {
+    return null;
+  }
 
   const buildingSteps: BuildingStep[] = [];
   const blockers: string[] = [];
@@ -253,6 +261,19 @@ function evaluateBunkerGoal(
   const immediateRequest = selectImmediateStructuralRequest(planet, buildingSteps, buildingSideEtc, researchSteps, researchSideEtc);
   if (!immediateRequest || !Number.isFinite(totalEtc) || totalEtc <= 0) {
     return createBlockedGoal(planet, 'BUILDING', currentLevel + 1, ['NO_ACTIONABLE_REQUEST'], {
+      finalTargetKind: 'BUILDING',
+      finalBuildingType: BuildingType.BUNKER_NETWORK,
+      finalTechnologyType: null,
+      finalDefenceType: null,
+      finalLevel: desiredLevel,
+      finalAmount: null
+    });
+  }
+
+  const affordabilityTurns = estimateAffordabilityTurns(planet, immediateRequest.cost);
+  const maxAffordabilityTurns = resolveBunkerAffordabilityTurnLimit(planet);
+  if (affordabilityTurns > maxAffordabilityTurns) {
+    return createBlockedGoal(planet, 'BUILDING', currentLevel + 1, ['BUNKER_AFFORDABILITY_TOO_SLOW'], {
       finalTargetKind: 'BUILDING',
       finalBuildingType: BuildingType.BUNKER_NETWORK,
       finalTechnologyType: null,
@@ -954,7 +975,21 @@ function resolveProductionOrderAmount(
   const totalCost = Math.max(1, Math.floor(blueprint.cost.getTotalResourceAmount()));
   const targetBudget = Math.max(totalCost, Math.floor(localIncomeTotal * orderFactor));
 
-  return Math.max(1, Math.floor(targetBudget / totalCost));
+  return Math.max(1, Math.min(
+    resolveDefenceProductionOrderCap(defenceType),
+    Math.floor(targetBudget / totalCost)
+  ));
+}
+
+function resolveDefenceProductionOrderCap(defenceType: DefenceTypeT): number {
+  switch (resolveDefenceTier(defenceType)) {
+    case 'LOW':
+      return LOW_TIER_DEFENCE_ORDER_CAP;
+    case 'MID':
+      return MID_TIER_DEFENCE_ORDER_CAP;
+    case 'HIGH':
+      return HIGH_TIER_DEFENCE_ORDER_CAP;
+  }
 }
 
 function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, defenceType: DefenceTypeT): number {
@@ -970,11 +1005,14 @@ function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, defenceType:
 function resolveBunkerBonusFactor(planet: BotPlanetSnapshot, desiredLevel: number): number {
   let bonusFactor = 1;
   bonusFactor *= 1 + (planet.defense.recentHostileAttackStep * 0.5);
-  bonusFactor *= 1 + (Math.max(0, desiredLevel - planet.defense.bunkerLevel) * 0.1);
-  bonusFactor *= 1 + resolveEquilibriumBonusRatio(
+  bonusFactor *= 1 + (Math.max(0, desiredLevel - planet.defense.bunkerLevel) * 0.05);
+  bonusFactor *= 1 + (resolveEquilibriumBonusRatio(
     planet.defense.totalInstalledDefenseValue,
     planet.defense.totalBunkerValue
-  );
+  ) * 0.5);
+  if (!hasRealDefensivePressure(planet)) {
+    bonusFactor *= 0.55;
+  }
   return Math.min(BONUS_FACTOR_CEILING, Math.max(1, bonusFactor));
 }
 
@@ -1066,14 +1104,52 @@ function resolveDefenceTierRatioPenaltyMultiplier(
   const midShare = tierValues.mid / totalValue;
 
   if (candidateTier === 'LOW' && lowShare > LOW_TIER_DEFENCE_TARGET_SHARE) {
-    return 1 + Math.min(5, (lowShare - LOW_TIER_DEFENCE_TARGET_SHARE) * 10);
+    return 1 + Math.min(7, (lowShare - LOW_TIER_DEFENCE_TARGET_SHARE) * 14);
   }
 
   if (candidateTier === 'MID' && midShare > MID_TIER_DEFENCE_TARGET_SHARE) {
-    return 1 + Math.min(3, (midShare - MID_TIER_DEFENCE_TARGET_SHARE) * 7);
+    return 1 + Math.min(5, (midShare - MID_TIER_DEFENCE_TARGET_SHARE) * 10);
   }
 
   return 1;
+}
+
+function resolveBunkerAffordabilityTurnLimit(planet: BotPlanetSnapshot): number {
+  if (hasRealDefensivePressure(planet)) {
+    return PRESSURED_BUNKER_AFFORDABILITY_TURNS;
+  }
+  return PEACEFUL_BUNKER_AFFORDABILITY_TURNS;
+}
+
+function hasRealDefensivePressure(planet: BotPlanetSnapshot): boolean {
+  return planet.defense.knownByWarFaction
+    || planet.defense.recentHostileAttackCountLast20Turns > 0;
+}
+
+function estimateAffordabilityTurns(
+  planet: BotPlanetSnapshot,
+  cost: ResourceAmounts
+): number {
+  return Math.max(
+    estimateSingleResourceAffordabilityTurns(planet.localResources.metal, planet.economy.income.metal, cost.metal),
+    estimateSingleResourceAffordabilityTurns(planet.localResources.crystal, planet.economy.income.crystal, cost.crystal),
+    estimateSingleResourceAffordabilityTurns(planet.localResources.deuterium, planet.economy.income.deuterium, cost.deuterium)
+  );
+}
+
+function estimateSingleResourceAffordabilityTurns(
+  available: number,
+  income: number,
+  cost: number
+): number {
+  const missing = Math.max(0, cost - available);
+  if (missing <= 0) {
+    return 0;
+  }
+  if (income <= 0) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return Math.ceil(missing / income);
 }
 
 function resolveDefenceTierValues(planet: BotPlanetSnapshot): { low: number; mid: number; high: number } {

@@ -106,9 +106,12 @@ const DEFAULT_ESCORT_SHIP_NEED = 1;
 const MAX_SHIP_NEED_PROPOSALS = 6;
 const BREAK_MISSION_SHARE = 0.6;
 const POST_EARLY_NEUTRAL_WARFARE_AVG_INDUSTRY_THRESHOLD = 4;
-const POST_EARLY_BREAK_SCORE_BONUS = 120;
-const POST_EARLY_PLUNDER_SCORE_MULTIPLIER = 1.35;
-const POST_EARLY_SHIP_NEED_SCORE_BONUS = 110;
+const POST_EARLY_BREAK_SCORE_BONUS = 180;
+const POST_EARLY_PLUNDER_SCORE_MULTIPLIER = 1.6;
+const POST_EARLY_SHIP_NEED_SCORE_BONUS = 180;
+const OPENED_FARM_REPEAT_BASE_SCORE_BONUS = 160;
+const OPENED_FARM_RECENT_PLUNDER_MAX_BONUS = 120;
+const OPENED_FARM_EXTRA_CARGO_SCORE_BONUS = 18;
 const NEUTRAL_FARM_UNLOCK_AVG_INDUSTRY_THRESHOLD = 3;
 const NEUTRAL_FARM_PRODUCTION_AVG_INDUSTRY_THRESHOLD = 3.3;
 const DEFAULT_FARM_TRANSPORTER_COUNT = 6;
@@ -966,7 +969,7 @@ function buildPlunderSelection(
   const desiredCargoCapacity = desiredTransporters * (SHIP_BLUEPRINTS.get(ShipType.TRANSPORTER)?.cargoCapacity ?? 0);
   const cargoSelection = buildPlunderCargoSelection(originPlanet, desiredCargoCapacity);
   if (cargoSelection.ships.length <= 0 || cargoSelection.cargoCapacity <= 0) {
-    return { ships: [], cargoCapacity: 0, combatEscortCount: 0 };
+    return { ships: [], cargoCapacity: 0, combatEscortCount: 1 };
   }
 
   const selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> = [];
@@ -1139,7 +1142,7 @@ function createBreakShipNeed(
 
   const combatPower = Math.max(1, estimateShipCombatPower(combatNeed.shipType));
   combatNeed.amount = Math.max(1, Math.ceil(Math.max(0, requiredStrength - bestAvailableStrength) / combatPower));
-  combatNeed.score = 420 + requiredStrength + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin);
+  combatNeed.score = 620 + requiredStrength + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin);
   return combatNeed;
 }
 
@@ -1167,7 +1170,7 @@ function createPlunderShipNeed(
       return null;
     }
     combatNeed.amount = DEFAULT_ESCORT_SHIP_NEED;
-    combatNeed.score = 260 + maxFullLoot + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin);
+    combatNeed.score = 420 + maxFullLoot + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin);
     return combatNeed;
   }
 
@@ -1187,7 +1190,8 @@ function createPlunderShipNeed(
     shortageKind: 'CARGO',
     targetCoordinates: { ...target.coordinates },
     preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
-    score: 240 + maxFullLoot + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
+    score: 520 + maxFullLoot + resolveOpenedFarmReuseScoreBonus(farmEntry, context.snapshot.turn)
+      + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
     reason: 'Need more cargo capacity to plunder opened neutral farms efficiently.'
   };
 }
@@ -1344,9 +1348,10 @@ function resolveOpenedFarmReuseScoreBonus(
     return 0;
   }
 
-  const recencyBonus = Math.max(0, 80 - ((currentTurn - farmEntry.lastSuccessfulPlunderTurn) * 4));
-  const cargoBonus = Math.max(0, farmEntry.preferredPlunderTransporterCount - DEFAULT_FARM_TRANSPORTER_COUNT) * 10;
-  return recencyBonus + cargoBonus;
+  const recencyBonus = Math.max(0, OPENED_FARM_RECENT_PLUNDER_MAX_BONUS - ((currentTurn - farmEntry.lastSuccessfulPlunderTurn) * 4));
+  const cargoBonus = Math.max(0, farmEntry.preferredPlunderTransporterCount - MIN_FARM_TRANSPORTER_COUNT)
+    * OPENED_FARM_EXTRA_CARGO_SCORE_BONUS;
+  return OPENED_FARM_REPEAT_BASE_SCORE_BONUS + recencyBonus + cargoBonus;
 }
 
 function resolveBreakRetryMultiplier(lossBracket: NonNullable<BotMemoryV2StrategicMilitaryFarmLedgerEntry['lastBreakFailureLossBracket']>): number {
@@ -1510,7 +1515,7 @@ function createMissionProposal(
     planetId: request.originPlanet.planetId,
     targetCoordinates: { ...request.destinationCoordinates },
     expectedValue: Math.max(1, Math.round(request.expectedLoot + request.score)),
-    urgency: request.phase === 'INTEL' ? 52 : request.missionType === FleetMissionType.MOVE ? 79 : request.phase === 'BREAK' ? 81 : 88,
+    urgency: request.phase === 'INTEL' ? 52 : request.missionType === FleetMissionType.MOVE ? 79 : request.phase === 'BREAK' ? 86 : 91,
     risk: request.phase === 'INTEL' ? 6 : request.missionType === FleetMissionType.MOVE ? 12 : request.phase === 'BREAK' ? 24 : 15,
     confidence: request.phase === 'INTEL' ? 78 : request.missionType === FleetMissionType.MOVE ? 71 : request.phase === 'BREAK' ? 67 : 73,
     requestedResources: emptyResources(),
@@ -1561,7 +1566,7 @@ function createShipNeedProposal(
     planetId: null,
     targetCoordinates: { ...request.targetCoordinates },
     expectedValue: Math.max(1, Math.round(request.score)),
-    urgency: request.shortageKind === 'CARGO' ? 66 : 74,
+    urgency: request.shortageKind === 'CARGO' ? 78 : 84,
     risk: 9,
     confidence: 64,
     requestedResources: emptyResources(),

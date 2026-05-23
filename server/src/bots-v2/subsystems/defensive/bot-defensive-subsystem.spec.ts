@@ -13,6 +13,7 @@ import { createTutorialReadState } from '../../../../../src/app/tutorial/tutoria
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
 import { BotDefensiveSubsystem } from './bot-defensive-subsystem.js';
+import { FleetReport } from '../../../../../src/app/models/reports/fleet-report.js';
 
 describe('BotDefensiveSubsystem', () => {
   it('emits a structural-only unlock research request when SAM is gated by missile tech', () => {
@@ -66,6 +67,7 @@ describe('BotDefensiveSubsystem', () => {
     planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
     planet.setBuildingLevel(BuildingType.SHIPYARD, 1);
     bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 1);
+    addHostileBattleReport(bot, planet, galaxy.currentTurn);
 
     const result = runDefensiveSubsystem(galaxy, bot);
 
@@ -79,6 +81,35 @@ describe('BotDefensiveSubsystem', () => {
       proposal.kind === 'SHIPYARD'
       && (proposal.requestPayload as { defenceType?: DefenceType }).defenceType === DefenceType.SAM_SITE
     )).toBe(true);
+  });
+
+  it('suppresses peaceful bunker upgrades without storage or attack pressure', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseDefensivePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 1);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 1);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 1);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 8);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 8);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 8);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+    planet.setBuildingLevel(BuildingType.NUCLEAR_PLANT, 8);
+    planet.setBuildingLevel(BuildingType.FUSION_REACTOR, 8);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 8);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
+    planet.setBuildingLevel(BuildingType.BUNKER_NETWORK, 2);
+    planet.rBDSFTQ.resources = new ResourcesPack(0, 0, 0);
+    bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 1);
+
+    const result = runDefensiveSubsystem(galaxy, bot);
+
+    expect(result.goals?.some((goal) =>
+      goal.finalBuildingType === BuildingType.BUNKER_NETWORK
+    )).toBe(false);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'BUILDING'
+      && (proposal.requestPayload as { buildingType?: BuildingType }).buildingType === BuildingType.BUNKER_NETWORK
+    )).toBe(false);
   });
 
   it('does not emit SAM production just because one is installed when missile tech is still missing', () => {
@@ -155,6 +186,30 @@ describe('BotDefensiveSubsystem', () => {
       proposal.kind === 'SHIPYARD'
       && (proposal.requestPayload as { defenceType?: DefenceType }).defenceType === DefenceType.SAM_SITE
     )).toBe(false);
+  });
+
+  it('keeps individual defence production batches small even with high local income', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseDefensivePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 8);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 8);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 8);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 8);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 8);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 8);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 9);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
+    bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 2);
+    bot.setTechLevel(TechnologyType.BEAMS_WEAPONS, 2);
+    bot.setTechLevel(TechnologyType.SHIELDING_TECHNOLOGY, 2);
+
+    const result = runDefensiveSubsystem(galaxy, bot);
+    const productionAmounts = result.proposals
+      .filter((proposal) => proposal.kind === 'SHIPYARD')
+      .map((proposal) => (proposal.requestPayload as { amount?: number }).amount ?? 0);
+
+    expect(productionAmounts.length).toBeGreaterThan(0);
+    expect(Math.max(...productionAmounts)).toBeLessThanOrEqual(4);
   });
 
   it('can unlock orbital missile launchers through a shipyard upgrade request', () => {
@@ -252,4 +307,22 @@ function configureBaseDefensivePlanet(planet: Planet): void {
   planet.rBDSFTQ.buildingQueue = [];
   planet.rBDSFTQ.shipyardQueue = [];
   planet.rBDSFTQ.currentResearchQueue = null;
+}
+
+function addHostileBattleReport(bot: Player, planet: Planet, createdTurn: number): void {
+  bot.addReport(new FleetReport(
+    {
+      reportId: bot.createReportId(),
+      createdTurn,
+      title: `Battle Report: ${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}:${planet.basicInfo.order}`,
+      sourceCoordinates: {
+        x: planet.basicInfo.solarSystem.coordinates.x,
+        y: planet.basicInfo.solarSystem.coordinates.y,
+        z: planet.basicInfo.order
+      },
+      sourcePlanetName: planet.basicInfo.name,
+      sourceSystemName: planet.basicInfo.solarSystem.name
+    },
+    'Battle result: Defender'
+  ));
 }
