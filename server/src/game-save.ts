@@ -102,7 +102,7 @@ const { ShipyardQueueEntry } = resolveModule(shipyardQueueEntryModule) as typeof
 const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as typeof import('../../src/app/models/tech/technology-queue-entry.js');
 const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../src/app/models/tech/research-helper-for.js');
 
-export const GAME_SAVE_VERSION = 3;
+export const GAME_SAVE_VERSION = 4;
 export const AUTO_SAVE_ROTATION_LIMIT = 5;
 export const MAX_GAME_SAVE_FILES = 100;
 
@@ -158,6 +158,8 @@ type SavedTextPlayerReport = SavedPlayerReportBase & {
 
 type SavedEspionagePlayerReport = SavedPlayerReportBase & {
   diff?: number;
+  hasTotalDefencesIntel?: boolean;
+  hasTotalShipsIntel?: boolean;
   size?: number;
   planetaryParameters: SavedPlanetaryParameters;
   averageBuildingLevel: number;
@@ -202,7 +204,7 @@ type SavedPlayer = {
   reports: SavedPlayerReport[];
   messages: SavedPlayerMessage[];
   botProfileId: PlayerModel['botProfileId'];
-  botMemory: PlayerModel['botMemory'];
+  botMemoryV2: PlayerModel['botMemoryV2'];
 };
 
 type SavedStarSystemNote = {
@@ -351,6 +353,7 @@ export type SavedGameFile = {
   savedAt: string;
   ownerAccountId: number;
   ownerPlayerName: string | null;
+  trackedPlayerActionFleetIds?: number[];
   setup: GalaxySetup;
   galaxy: SavedGalaxy;
 };
@@ -359,6 +362,7 @@ export type HydratedGameSave = {
   gameId: string | null;
   ownerAccountId: number;
   ownerPlayerName: string | null;
+  trackedPlayerActionFleetIds: number[];
   setup: GalaxySetup;
   galaxy: GalaxyModel;
 };
@@ -373,6 +377,7 @@ export type RotatingAutoSaveOptions = {
   maxSaveFiles?: number;
   savedAt?: string;
   gameId?: string | null;
+  trackedPlayerActionFleetIds?: number[];
 };
 
 export function createGameSave(
@@ -381,7 +386,8 @@ export function createGameSave(
   setup: GalaxySetup,
   savedAt = new Date().toISOString(),
   autoSaveSlot: number | null = null,
-  gameId: string | null = null
+  gameId: string | null = null,
+  trackedPlayerActionFleetIds: number[] = []
 ): SavedGameFile {
   const planetCoordinatesByReference = buildPlanetCoordinateMap(galaxy);
 
@@ -393,6 +399,9 @@ export function createGameSave(
     savedAt,
     ownerAccountId,
     ownerPlayerName: resolveGalaxySaveOwnerPlayerName(galaxy),
+    trackedPlayerActionFleetIds: trackedPlayerActionFleetIds
+      .filter((fleetId) => Number.isInteger(fleetId) && fleetId > 0)
+      .sort((left, right) => left - right),
     setup,
     galaxy: {
       name: galaxy.name,
@@ -531,7 +540,8 @@ export function writeRotatingAutoSave(
     setup,
     options.savedAt ?? new Date().toISOString(),
     nextSlot,
-    gameId
+    gameId,
+    options.trackedPlayerActionFleetIds ?? []
   );
   const saveId = buildGameSaveFileName(save);
   saveGameFile(path.join(saveDirectoryPath, saveId), save);
@@ -571,6 +581,9 @@ export function readGameSave(saveFilePath: string): SavedGameFile | null {
       ? parsed.ownerAccountId
       : 0,
     ownerPlayerName,
+    trackedPlayerActionFleetIds: Array.isArray(parsed.trackedPlayerActionFleetIds)
+      ? parsed.trackedPlayerActionFleetIds.filter((fleetId): fleetId is number => Number.isInteger(fleetId) && fleetId > 0)
+      : [],
     setup
   };
 }
@@ -727,6 +740,7 @@ export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
     gameId: save.gameId,
     ownerAccountId: save.ownerAccountId,
     ownerPlayerName: save.ownerPlayerName ?? resolveSavedOwnerPlayerName(save),
+    trackedPlayerActionFleetIds: save.trackedPlayerActionFleetIds ?? [],
     setup: normalizeGalaxySetup(save.setup),
     galaxy
   };
@@ -757,11 +771,11 @@ function hydrateSavedPlayer(savedPlayer: SavedPlayer): PlayerModel {
     savedPlayer.nextReportId,
     savedPlayer.messages.map((message) => hydrateSavedPlayerMessage(message)),
     savedPlayer.nextMessageId,
-    {
-      botProfileId: savedPlayer.botProfileId ?? null,
-      botMemory: Player.normalizeBotMemory(savedPlayer.botMemory ?? null)
-    }
-  );
+      {
+        botProfileId: savedPlayer.botProfileId ?? null,
+        botMemoryV2: Player.normalizeBotMemoryV2(savedPlayer.botMemoryV2 ?? null)
+      }
+    );
 
   player.nextReportId = savedPlayer.nextReportId;
   player.nextMessageId = savedPlayer.nextMessageId;
@@ -946,6 +960,8 @@ function hydrateSavedPlayerReport(savedReport: SavedPlayerReport): PlayerReport 
       return new EspionageReportDataModel(
         baseData,
         savedReport.diff ?? 0,
+        savedReport.hasTotalDefencesIntel ?? false,
+        savedReport.hasTotalShipsIntel ?? false,
         savedReport.size ?? 0,
         hydrateSavedPlanetaryParameters(savedReport.planetaryParameters),
         savedReport.averageBuildingLevel,
@@ -1043,28 +1059,7 @@ function serializePlayer(
     reports: player.reports.map((report) => serializePlayerReport(report)),
     messages: player.messages.map((message) => serializePlayerMessage(message)),
     botProfileId: player.botProfileId,
-    botMemory: player.botMemory
-      ? {
-        currentGoal: player.botMemory.currentGoal,
-        goalTarget: player.botMemory.goalTarget ? { ...player.botMemory.goalTarget } : null,
-        goalExpiresTurn: player.botMemory.goalExpiresTurn,
-        reservedResources: { ...player.botMemory.reservedResources },
-        lastSpyTargets: player.botMemory.lastSpyTargets.map((entry) => ({ ...entry })),
-        lastAttackTargets: player.botMemory.lastAttackTargets.map((entry) => ({ ...entry })),
-        recentDiplomacyTargets: player.botMemory.recentDiplomacyTargets.map((entry) => ({ ...entry })),
-        goodwillByPlayer: (player.botMemory.goodwillByPlayer ?? []).map((entry) => ({ ...entry })),
-        recentSupportRequests: (player.botMemory.recentSupportRequests ?? []).map((entry) => ({
-          ...entry,
-          targetCoordinates: { ...entry.targetCoordinates }
-        })),
-        processedSupportOutcomeIds: [...(player.botMemory.processedSupportOutcomeIds ?? [])],
-        farmTargets: (player.botMemory.farmTargets ?? []).map((entry) => ({
-          ...entry,
-          targetCoordinates: { ...entry.targetCoordinates }
-        })),
-        lastProcessedFleetReportId: player.botMemory.lastProcessedFleetReportId ?? null
-      }
-      : null
+    botMemoryV2: Player.normalizeBotMemoryV2(player.botMemoryV2)
   };
 }
 
@@ -1288,6 +1283,8 @@ function serializeEspionageReport(report: EspionageReportData): SavedEspionagePl
   return {
     ...serializePlayerReportBase(report),
     diff: report.diff,
+    hasTotalDefencesIntel: report.hasTotalDefencesIntel,
+    hasTotalShipsIntel: report.hasTotalShipsIntel,
     size: report.size,
     planetaryParameters: serializePlanetaryParameters(report.planetaryParameters),
     averageBuildingLevel: report.averageBuildingLevel,

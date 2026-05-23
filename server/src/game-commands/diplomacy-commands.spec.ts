@@ -19,9 +19,22 @@ function createDiplomacyTestGalaxy() {
   return new Galaxy('Diplomacy Galaxy', [alpha, beta], [[system]], 12, [], 1);
 }
 
+function markPlayerVisibleInDiplomacy(galaxy: Galaxy, viewerPlayerId: number, targetPlayerId: number): void {
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (planet.info.ownerId === targetPlayerId) {
+          planet.lastReportData.set(viewerPlayerId, {} as never);
+        }
+      }
+    }
+  }
+}
+
 describe('diplomacy commands', () => {
   it('allows NEUTRAL to PEACE proposals', () => {
     const galaxy = createDiplomacyTestGalaxy();
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
 
     const result = createDiplomaticProposalCommand(
       { galaxy, playerId: 1 },
@@ -35,6 +48,7 @@ describe('diplomacy commands', () => {
 
   it('allows NEUTRAL to WAR proposals', () => {
     const galaxy = createDiplomacyTestGalaxy();
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
 
     const result = createDiplomaticProposalCommand(
       { galaxy, playerId: 1 },
@@ -46,7 +60,7 @@ describe('diplomacy commands', () => {
     expect(galaxy.diplomaticProposals[0].requestedStatus).toBe(DiplomaticStatus.WAR);
   });
 
-  it('allows proposals without prior espionage visibility', () => {
+  it('rejects proposals without prior diplomacy visibility', () => {
     const galaxy = createDiplomacyTestGalaxy();
 
     const result = createDiplomaticProposalCommand(
@@ -54,12 +68,16 @@ describe('diplomacy commands', () => {
       { targetPlayerId: 2, requestedStatus: DiplomaticStatus.PEACE }
     );
 
-    expect(result.ok).toBe(true);
-    expect(galaxy.diplomaticProposals).toHaveLength(1);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.status).toBe(403);
+    }
+    expect(galaxy.diplomaticProposals).toHaveLength(0);
   });
 
   it('creates human proposals with the normal one-turn expiry window', () => {
     const galaxy = createDiplomacyTestGalaxy();
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
 
     const result = createDiplomaticProposalCommand(
       { galaxy, playerId: 1 },
@@ -73,6 +91,7 @@ describe('diplomacy commands', () => {
 
   it('rejects direct NEUTRAL to ALLIED proposals', () => {
     const galaxy = createDiplomacyTestGalaxy();
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
 
     const result = createDiplomaticProposalCommand(
       { galaxy, playerId: 1 },
@@ -88,6 +107,8 @@ describe('diplomacy commands', () => {
 
   it('allows PEACE to ALLIED after peace is accepted', () => {
     const galaxy = createDiplomacyTestGalaxy();
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
+    markPlayerVisibleInDiplomacy(galaxy, 2, 1);
 
     const peaceProposalResult = createDiplomaticProposalCommand(
       { galaxy, playerId: 1 },
@@ -113,6 +134,7 @@ describe('diplomacy commands', () => {
 
   it('allows WAR to NEUTRAL proposals', () => {
     const galaxy = createDiplomacyTestGalaxy();
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
     galaxy.diplomaticRelations = [{
       playerAId: 1,
       playerBId: 2,
@@ -130,6 +152,7 @@ describe('diplomacy commands', () => {
 
   it('allows PEACE to NEUTRAL proposals', () => {
     const galaxy = createDiplomacyTestGalaxy();
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
     galaxy.diplomaticRelations = [{
       playerAId: 1,
       playerBId: 2,
@@ -147,6 +170,7 @@ describe('diplomacy commands', () => {
 
   it('allows ALLIED to PEACE but still rejects direct ALLIED to NEUTRAL proposals', () => {
     const galaxy = createDiplomacyTestGalaxy();
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
     galaxy.diplomaticRelations = [{
       playerAId: 1,
       playerBId: 2,
@@ -182,6 +206,8 @@ describe('diplomacy commands', () => {
     const bot = new Player(2, 'Bot', [system.planets[1]], new Map(), [], PlayerType.BOT);
     const neutral = new Player(3, 'Neutral', [system.planets[2]], new Map(), [], PlayerType.NEUTRAL);
     const galaxy = new Galaxy('Diplomacy Galaxy', [alpha, bot, neutral], [[system]], 12, [], 1);
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
+    markPlayerVisibleInDiplomacy(galaxy, 1, 3);
 
     const botResult = createDiplomaticProposalCommand(
       { galaxy, playerId: 1 },

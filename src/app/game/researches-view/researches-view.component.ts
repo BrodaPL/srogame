@@ -18,6 +18,7 @@ import type {
   ClientCoordinates,
   ClientPlanetDto,
   StartTechnologyResearchRequest,
+  UpdateResearchHelpersRequest,
   TechnologyQueueEntryDto
 } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier } from '../../models/planets/energy-deficit';
@@ -65,11 +66,15 @@ type ResearchRequirementRowVm = {
 
 type ResearchQueueRowVm = {
   position: number;
+  mainPlanetId: string;
+  mainPlanetCoordinates: ClientCoordinates;
   planetLabel: string;
+  mainLabLabel: string;
   technologyType: TechnologyType;
   fromLevel: number;
   toLevel: number;
   helperLabsCount: number;
+  helperSlotCount: number;
   status: 'Researching';
   investedResearchPower: number;
   baseTotalResearchTime: number;
@@ -86,10 +91,12 @@ export class ResearchesViewComponent implements OnInit {
   protected isLoading = false;
   protected loadError: string | null = null;
   protected startResearchError: string | null = null;
+  protected updateResearchHelpersError: string | null = null;
   protected allOwnedPlanetsWithResearchLab: ClientPlanetDto[] = [];
   protected freeResearchLabs: ResearchLabVm[] = [];
   protected maxLabsPerTechnology = 1;
   protected labSlotIndexes: number[] = [0];
+  protected helperSlotIndexes: number[] = [];
   protected readonly technologies: Technology[];
   protected selectedTechnologyDetails: PlanetObjectDetailDialogData | null = null;
 
@@ -98,7 +105,9 @@ export class ResearchesViewComponent implements OnInit {
   private readonly allOwnedPlanetsById = new Map<string, ClientPlanetDto>();
   private readonly allResearchLabsById = new Map<string, ResearchLabVm>();
   private readonly selectedLabsByTechnology = new Map<TechnologyType, Array<string | null>>();
+  private readonly queuedHelperSelectionsByPlanetId = new Map<string, Array<string | null>>();
   private readonly researchStartInFlightByType = new Set<TechnologyType>();
+  private readonly researchHelperUpdateInFlightByPlanetId = new Set<string>();
   private techLevelsByType = new Map<TechnologyType, number>();
 
   constructor(
@@ -266,7 +275,7 @@ export class ResearchesViewComponent implements OnInit {
   }
 
   protected isLabDropdownDisabled(technologyType: TechnologyType, slotIndex: number): boolean {
-    if (slotIndex === 0 && this.isTechnologyQueued(technologyType)) {
+    if (this.isTechnologyQueued(technologyType)) {
       return true;
     }
 
@@ -428,6 +437,131 @@ export class ResearchesViewComponent implements OnInit {
       });
   }
 
+  protected queuedHelperSelectedLabId(mainPlanetId: string, slotIndex: number): string | null {
+    return this.queuedHelperSelectionArray(mainPlanetId)[slotIndex] ?? null;
+  }
+
+  protected queuedHelperOptionsForSlot(queuedResearch: ResearchQueueRowVm, slotIndex: number): ResearchLabVm[] {
+    const selectedId = this.queuedHelperSelectedLabId(queuedResearch.mainPlanetId, slotIndex);
+    const selectedLab = selectedId ? (this.allResearchLabsById.get(selectedId) ?? null) : null;
+    if (this.isQueuedHelperDropdownDisabled(queuedResearch.mainPlanetId, slotIndex)) {
+      return selectedLab ? [selectedLab] : [];
+    }
+
+    const assignedElsewhere = this.assignedQueuedHelperIdsExcluding(queuedResearch.mainPlanetId, slotIndex);
+    const options = Array.from(this.allResearchLabsById.values())
+      .filter((lab) =>
+        !assignedElsewhere.has(lab.id)
+        && this.canLabBeAssignedAsHelperForResearch(
+          lab,
+          queuedResearch.mainPlanetId,
+          queuedResearch.technologyType
+        )
+      )
+      .sort((left, right) => left.label.localeCompare(right.label));
+    if (!selectedLab) {
+      return options;
+    }
+
+    const alreadyIncluded = options.some((entry) => entry.id === selectedLab.id);
+    if (alreadyIncluded) {
+      return options;
+    }
+
+    return [selectedLab, ...options];
+  }
+
+  protected isQueuedHelperDropdownDisabled(mainPlanetId: string, slotIndex: number): boolean {
+    if (this.helperSlotIndexes.length === 0) {
+      return true;
+    }
+
+    if (slotIndex === 0) {
+      return false;
+    }
+
+    return this.queuedHelperSelectedLabId(mainPlanetId, slotIndex - 1) === null;
+  }
+
+  protected onQueuedHelperSelectionChange(
+    mainPlanetId: string,
+    slotIndex: number,
+    rawValue: unknown
+  ): void {
+    const normalized = typeof rawValue === 'string' && rawValue.trim().length > 0
+      ? rawValue.trim()
+      : null;
+    const selected = this.queuedHelperSelectionArray(mainPlanetId);
+
+    selected[slotIndex] = normalized;
+    for (let index = slotIndex + 1; index < selected.length; index += 1) {
+      selected[index] = null;
+    }
+
+    this.sanitizeQueuedHelperSelections();
+  }
+
+  protected canApplyQueuedHelperChanges(queuedResearch: ResearchQueueRowVm): boolean {
+    if (this.researchHelperUpdateInFlightByPlanetId.has(queuedResearch.mainPlanetId)) {
+      return false;
+    }
+
+    return this.isQueuedHelperSelectionDirty(queuedResearch);
+  }
+
+  protected applyQueuedHelperButtonLabel(queuedResearch: ResearchQueueRowVm): string {
+    if (this.researchHelperUpdateInFlightByPlanetId.has(queuedResearch.mainPlanetId)) {
+      return 'Applying...';
+    }
+
+    return 'Apply helpers';
+  }
+
+  protected onApplyQueuedHelperChanges(queuedResearch: ResearchQueueRowVm): void {
+    if (!this.canApplyQueuedHelperChanges(queuedResearch)) {
+      return;
+    }
+
+    const session = this.playerSession.load();
+    if (!session) {
+      return;
+    }
+
+    const request: UpdateResearchHelpersRequest = {
+      x: queuedResearch.mainPlanetCoordinates.x,
+      y: queuedResearch.mainPlanetCoordinates.y,
+      z: queuedResearch.mainPlanetCoordinates.z,
+      helperPlanets: this.selectedQueuedHelperCoordinates(queuedResearch.mainPlanetId)
+    };
+
+    this.researchHelperUpdateInFlightByPlanetId.add(queuedResearch.mainPlanetId);
+    this.updateResearchHelpersError = null;
+    this.cdr.markForCheck();
+
+    this.gameApi.updateResearchHelpers(request, session.token)
+      .pipe(
+        timeout(10000),
+        finalize(() => {
+          this.researchHelperUpdateInFlightByPlanetId.delete(queuedResearch.mainPlanetId);
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe({
+        next: (ownedPlanets) => {
+          this.applyOwnedPlanets(ownedPlanets);
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.updateResearchHelpersError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            'Unable to update research helpers.'
+          );
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
   protected hasResearchQueueEntries(): boolean {
     return this.researchQueueRows().length > 0;
   }
@@ -454,11 +588,19 @@ export class ResearchesViewComponent implements OnInit {
 
       rows.push({
         position,
+        mainPlanetId: this.planetId(planet),
+        mainPlanetCoordinates: {
+          x: planet.coordinates.x,
+          y: planet.coordinates.y,
+          z: planet.coordinates.z
+        },
         planetLabel: `${planet.basicInfo.name} [${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}]`,
+        mainLabLabel: this.researchLabCardLabel(planet),
         technologyType,
         fromLevel: Math.max(0, toLevel - 1),
         toLevel,
         helperLabsCount: helperLabs.length,
+        helperSlotCount: this.helperSlotIndexes.length,
         status: 'Researching',
         investedResearchPower,
         baseTotalResearchTime,
@@ -524,7 +666,12 @@ export class ResearchesViewComponent implements OnInit {
 
     this.maxLabsPerTechnology = this.calculateMaxLabsPerTechnology();
     this.labSlotIndexes = Array.from({ length: this.maxLabsPerTechnology }, (_, index) => index);
+    this.helperSlotIndexes = Array.from(
+      { length: Math.max(0, this.maxLabsPerTechnology - 1) },
+      (_, index) => index
+    );
     this.rebuildLabSelections();
+    this.rebuildQueuedHelperSelections();
   }
 
   private toResearchLabVm(planet: ClientPlanetDto): ResearchLabVm {
@@ -540,6 +687,15 @@ export class ResearchesViewComponent implements OnInit {
       label: `${planet.basicInfo.name} L${labLevel} (${researchPower})`,
       isBusy: planet.objects.currentResearchQueue !== null || planet.objects.researchHelperFor !== null
     };
+  }
+
+  private researchLabCardLabel(planet: ClientPlanetDto): string {
+    const lab = this.allResearchLabsById.get(this.planetId(planet));
+    if (!lab) {
+      return `${planet.basicInfo.name} [${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}]`;
+    }
+
+    return `${planet.basicInfo.name} L${lab.labLevel} (${lab.researchPower})`;
   }
 
   private researchPower(planet: ClientPlanetDto, researchLabLevel: number): number {
@@ -591,6 +747,30 @@ export class ResearchesViewComponent implements OnInit {
     this.sanitizeLabSelections();
   }
 
+  private rebuildQueuedHelperSelections(): void {
+    const next = new Map<string, Array<string | null>>();
+    for (const planet of this.allOwnedPlanets) {
+      const queue = planet.objects.currentResearchQueue;
+      if (!queue) {
+        continue;
+      }
+
+      const helperIds = this.queuedHelperLabIds(queue);
+      const selection = Array.from(
+        { length: this.helperSlotIndexes.length },
+        (_, index) => helperIds[index] ?? null
+      );
+      next.set(this.planetId(planet), selection);
+    }
+
+    this.queuedHelperSelectionsByPlanetId.clear();
+    for (const [planetId, selection] of next.entries()) {
+      this.queuedHelperSelectionsByPlanetId.set(planetId, selection);
+    }
+
+    this.sanitizeQueuedHelperSelections();
+  }
+
   private sanitizeLabSelections(): void {
     const freeLabIds = new Set(this.freeResearchLabs.map((lab) => lab.id));
     const globallyAssigned = new Set<string>();
@@ -629,6 +809,40 @@ export class ResearchesViewComponent implements OnInit {
         const isQueuedHelper = slotIndex > 0 && queuedHelperIds.has(selectedLabId);
         const isSelectable = freeLabIds.has(selectedLabId) || isLockedMain || isQueuedHelper;
         if (!isSelectable || globallyAssigned.has(selectedLabId)) {
+          selection[slotIndex] = null;
+          continue;
+        }
+
+        globallyAssigned.add(selectedLabId);
+      }
+    }
+  }
+
+  private sanitizeQueuedHelperSelections(): void {
+    const globallyAssigned = new Set<string>();
+    for (const planet of this.allOwnedPlanets) {
+      const queue = planet.objects.currentResearchQueue;
+      if (!queue) {
+        continue;
+      }
+
+      const mainPlanetId = this.planetId(planet);
+      const selection = this.queuedHelperSelectionArray(mainPlanetId);
+      const technologyType = this.queueEntryTechnologyType(queue);
+      for (let slotIndex = 0; slotIndex < selection.length; slotIndex += 1) {
+        const previousSelected = slotIndex === 0 || selection[slotIndex - 1] !== null;
+        const selectedLabId = selection[slotIndex];
+        if (!previousSelected || !selectedLabId) {
+          selection[slotIndex] = null;
+          continue;
+        }
+
+        const selectedLab = this.allResearchLabsById.get(selectedLabId) ?? null;
+        if (
+          !selectedLab
+          || globallyAssigned.has(selectedLabId)
+          || !this.canLabBeAssignedAsHelperForResearch(selectedLab, mainPlanetId, technologyType)
+        ) {
           selection[slotIndex] = null;
           continue;
         }
@@ -679,6 +893,65 @@ export class ResearchesViewComponent implements OnInit {
     return assigned;
   }
 
+  private canLabBeAssignedAsHelperForResearch(
+    lab: ResearchLabVm,
+    mainPlanetId: string,
+    technologyType: TechnologyType
+  ): boolean {
+    if (lab.id === mainPlanetId) {
+      return false;
+    }
+
+    if (lab.planet.objects.currentResearchQueue) {
+      return false;
+    }
+
+    const helperReference = lab.planet.objects.researchHelperFor;
+    if (!helperReference) {
+      return true;
+    }
+
+    return helperReference.technologyType === technologyType
+      && this.coordinatesId(helperReference.mainResearchCoordinates) === mainPlanetId;
+  }
+
+  private isQueuedHelperSelectionDirty(queuedResearch: ResearchQueueRowVm): boolean {
+    const currentHelperIds = this.queuedHelperLabIdsForPlanetId(queuedResearch.mainPlanetId);
+    const selectedHelperIds = this.queuedHelperSelectionArray(queuedResearch.mainPlanetId)
+      .filter((entry): entry is string => Boolean(entry));
+    if (currentHelperIds.length !== selectedHelperIds.length) {
+      return true;
+    }
+
+    for (let index = 0; index < currentHelperIds.length; index += 1) {
+      if (currentHelperIds[index] !== selectedHelperIds[index]) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private assignedQueuedHelperIdsExcluding(mainPlanetId: string, slotIndex: number): Set<string> {
+    const assigned = new Set<string>();
+    for (const [planetId, selection] of this.queuedHelperSelectionsByPlanetId.entries()) {
+      for (let index = 0; index < selection.length; index += 1) {
+        const selectedLabId = selection[index];
+        if (!selectedLabId) {
+          continue;
+        }
+
+        if (planetId === mainPlanetId && index === slotIndex) {
+          continue;
+        }
+
+        assigned.add(selectedLabId);
+      }
+    }
+
+    return assigned;
+  }
+
   private firstAssignedLab(technologyType: TechnologyType): ResearchLabVm | null {
     const firstLabId = this.selectedLabId(technologyType, 0);
     if (!firstLabId) {
@@ -712,10 +985,20 @@ export class ResearchesViewComponent implements OnInit {
   private queuedHelperLabIds(queue: TechnologyQueueEntryDto): string[] {
     const ids: string[] = [];
     for (const helperCoordinates of this.queueEntryHelperLabs(queue)) {
-      ids.push(`${helperCoordinates.x}:${helperCoordinates.y}:${helperCoordinates.z}`);
+      ids.push(this.coordinatesId(helperCoordinates));
     }
 
     return ids;
+  }
+
+  private queuedHelperLabIdsForPlanetId(mainPlanetId: string): string[] {
+    const mainPlanet = this.allOwnedPlanetsById.get(mainPlanetId);
+    const queue = mainPlanet?.objects.currentResearchQueue ?? null;
+    if (!queue) {
+      return [];
+    }
+
+    return this.queuedHelperLabIds(queue);
   }
 
   private selectedHelperCoordinates(technologyType: TechnologyType): ClientCoordinates[] {
@@ -724,6 +1007,31 @@ export class ResearchesViewComponent implements OnInit {
     const ids = new Set<string>();
     for (let slotIndex = 1; slotIndex < selection.length; slotIndex += 1) {
       const helperLabId = selection[slotIndex];
+      if (!helperLabId || ids.has(helperLabId)) {
+        continue;
+      }
+
+      const helperLab = this.allResearchLabsById.get(helperLabId);
+      if (!helperLab) {
+        continue;
+      }
+
+      ids.add(helperLabId);
+      helperCoordinates.push({
+        x: helperLab.planet.coordinates.x,
+        y: helperLab.planet.coordinates.y,
+        z: helperLab.planet.coordinates.z
+      });
+    }
+
+    return helperCoordinates;
+  }
+
+  private selectedQueuedHelperCoordinates(mainPlanetId: string): ClientCoordinates[] {
+    const selection = this.queuedHelperSelectionArray(mainPlanetId);
+    const helperCoordinates: ClientCoordinates[] = [];
+    const ids = new Set<string>();
+    for (const helperLabId of selection) {
       if (!helperLabId || ids.has(helperLabId)) {
         continue;
       }
@@ -856,6 +1164,17 @@ export class ResearchesViewComponent implements OnInit {
 
     const initialized = Array.from({ length: this.maxLabsPerTechnology }, () => null);
     this.selectedLabsByTechnology.set(technologyType, initialized);
+    return initialized;
+  }
+
+  private queuedHelperSelectionArray(mainPlanetId: string): Array<string | null> {
+    const existing = this.queuedHelperSelectionsByPlanetId.get(mainPlanetId);
+    if (existing) {
+      return existing;
+    }
+
+    const initialized = Array.from({ length: this.helperSlotIndexes.length }, () => null);
+    this.queuedHelperSelectionsByPlanetId.set(mainPlanetId, initialized);
     return initialized;
   }
 
@@ -1147,7 +1466,11 @@ export class ResearchesViewComponent implements OnInit {
   }
 
   private planetId(planet: ClientPlanetDto): string {
-    return `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`;
+    return this.coordinatesId(planet.coordinates);
+  }
+
+  private coordinatesId(coordinates: ClientCoordinates): string {
+    return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
   }
 
   private openTutorialAfterRender(): void {

@@ -4,6 +4,9 @@ import { Fleet } from './fleets/fleet';
 import { PlayerType } from './enums/player-type';
 import { PlayerReport } from './reports/player-report';
 import { PlayerMessage } from './mail/player-message';
+import type { DefenceType } from './enums/defence-type';
+import type { ShipType } from './enums/ship-type';
+import { DiplomaticStatus } from './diplomacy/diplomatic-status';
 import { SupportRequestType } from './requests/support-request';
 import {
   TutorialReadState,
@@ -111,9 +114,348 @@ export type BotMemory = {
   lastProcessedFleetReportId?: number | null;
 };
 
+export type BotV2SubsystemId =
+  | 'ECONOMIC'
+  | 'DEFENSIVE'
+  | 'WARFARE'
+  | 'RESEARCH'
+  | 'CRITICAL'
+  | 'STRATEGIC_DEVELOPMENT'
+  | 'STRATEGIC_MILITARY'
+  | 'STRATEGIC_DIPLOMATIC'
+  | 'WEIGHT_MANAGER';
+
+export type BotMemoryV2RecentTarget = {
+  key: string;
+  turn: number;
+};
+
+export type BotMemoryV2LongTermCommitment = {
+  commitmentKey: string;
+  subsystemId: BotV2SubsystemId;
+  createdTurn: number;
+  expiresOnTurn: number | null;
+};
+
+export type BotMemoryV2ProposalKind =
+  | 'BUILDING'
+  | 'RESEARCH'
+  | 'SHIPYARD'
+  | 'FLEET_MISSION'
+  | 'MAINTENANCE_REQUEST'
+  | 'REQUEST_DECISION'
+  | 'REQUEST_CREATION'
+  | 'DIPLOMACY_DECISION'
+  | 'DIPLOMACY_PROPOSAL'
+  | 'NO_OP';
+
+export type BotMemoryV2SupervisorPendingStatus =
+  | 'PENDING_RESOURCES'
+  | 'PENDING_QUEUE'
+  | 'PENDING_SHIPS_NEXT_TURN'
+  | 'EXPIRED'
+  | 'CANCELLED';
+
+export type BotMemoryV2SupervisorPendingCommitment = {
+  commitmentKey: string;
+  dedupeKey: string;
+  proposalId: string;
+  subsystemId: BotV2SubsystemId;
+  kind: BotMemoryV2ProposalKind;
+  targetCoordinates: BotMemoryCoordinates | null;
+  requestedResources: BotMemoryResources;
+  weightedResourceValue: number;
+  score: number;
+  status: BotMemoryV2SupervisorPendingStatus;
+  createdTurn: number;
+  updatedTurn: number;
+  expiresOnTurn: number;
+  executionPayload: Record<string, unknown>;
+  cancelReason: string | null;
+};
+
+export type BotMemoryV2SupervisorSpendingEntry = {
+  turn: number;
+  proposalId: string;
+  dedupeKey: string;
+  subsystemId: BotV2SubsystemId;
+  kind: BotMemoryV2ProposalKind;
+  targetCoordinates: BotMemoryCoordinates | null;
+  resources: BotMemoryResources;
+  weightedResourceValue: number;
+};
+
+export type BotMemoryV2SupervisorProposalEntry = {
+  turn: number;
+  proposalId: string;
+  dedupeKey: string;
+  subsystemId: BotV2SubsystemId;
+  kind: BotMemoryV2ProposalKind;
+  accepted: boolean;
+  pending: boolean;
+  reason: string | null;
+};
+
+export type BotMemoryV2SupervisorFleetSlotEntry = {
+  missionKey: string;
+  proposalId: string;
+  subsystemId: BotV2SubsystemId;
+  createdTurn: number;
+  expiresOnTurn: number | null;
+  active: boolean;
+};
+
+export type BotMemoryV2SupervisorFuelSpendingEntry = {
+  turn: number;
+  proposalId: string;
+  subsystemId: BotV2SubsystemId;
+  missionType: string;
+  originCoordinates: BotMemoryCoordinates | null;
+  targetCoordinates: BotMemoryCoordinates | null;
+  fleetId: number | null;
+  deuterium: number;
+};
+
+export type BotMemoryV2StrategicMilitaryFarmLedgerEntry = {
+  coordinates: BotMemoryCoordinates;
+  intelPhase: 'UNSCANNED' | 'SPY_SENT' | 'PROBE_REQUIRED' | 'COMBAT_INTEL_READY';
+  lastSpyTurn: number | null;
+  lastAttackTurn: number | null;
+  lastProcessedAttackTurn: number | null;
+  lastSuccessfulPlunderTurn: number | null;
+  lastBreakAttemptCombatStrength: number | null;
+  nextBreakAllowedTurn: number | null;
+  lastBreakFailureLossBracket: BotFarmLossBracket | null;
+  knownMineLevels: {
+    metalMineLevel: number;
+    crystalMineLevel: number;
+    deuteriumSynthesizerLevel: number;
+  };
+  knownStorageCapacity: BotMemoryResources;
+  knownIncome: BotMemoryResources;
+  knownBunkerReductionPercent: number;
+  knownPlanetaryModifiers: {
+    industryModifier: number;
+    metalModifier: number;
+    crystalModifier: number;
+    deuteriumModifier: number;
+  };
+  knownShipCountsByType: Partial<Record<ShipType, number>>;
+  knownDefenceCountsByType: Partial<Record<DefenceType, number>>;
+  farmIntelEnough: boolean;
+  initialDefenseBroken: boolean;
+  lastObservedResources: BotMemoryResources;
+  lastResourceObservationTurn: number | null;
+  lastCombatObservationTurn: number | null;
+  estimatedNextGoodAttackTurn: number | null;
+  preferredPlunderTransporterCount: number;
+  preferredOriginCoordinates: BotMemoryCoordinates | null;
+};
+
+export type BotMemoryV2StrategicMilitary = {
+  farmLedger: BotMemoryV2StrategicMilitaryFarmLedgerEntry[];
+};
+
+export type BotMemoryV2CriticalBlockerFamily =
+  | 'ENERGY_DEADLOCK'
+  | 'STORAGE_DEADLOCK'
+  | 'INDUSTRY_CHAIN_DEADLOCK'
+  | 'LOGISTICS_DEADLOCK'
+  | 'INTEL_DEADLOCK';
+
+export type BotMemoryV2CriticalBlockerEntry = {
+  blockerKey: string;
+  blockerFamily: BotMemoryV2CriticalBlockerFamily;
+  targetCoordinates: BotMemoryCoordinates | null;
+  firstSeenTurn: number;
+  lastSeenTurn: number;
+  severity: number;
+  timesEmitted: number;
+  lastProposalTurn: number | null;
+  resolvedTurn: number | null;
+  active: boolean;
+};
+
+export type BotMemoryV2Critical = {
+  blockerLedger: BotMemoryV2CriticalBlockerEntry[];
+};
+
+export type BotMemoryV2Research = {
+  affordabilityWindowTurns: number;
+  lastWindowIncreaseTurn: number | null;
+};
+
+export type BotMemoryV2StrategicDiplomaticFactionEntry = {
+  playerId: number;
+  hostilityScore: number;
+  warAdvantageLevel: -2 | -1 | 0 | 1 | 2;
+  lastSuccessfulBombardTurn: number | null;
+  lastSuccessfulSiegeTickTurn: number | null;
+  recentOutgoingCoercionPressure: number;
+  recentIncomingCoercionPressure: number;
+  lastWarEvaluationTurn: number | null;
+  shortWindowWarScore: number;
+  longWindowWarScore: number;
+  currentWarExitPressure: number;
+  lastComputedStanceScore: number;
+  lastComputedStrengthEstimate: number;
+  lastKnownStatus: DiplomaticStatus | null;
+  lastSeenTurn: number | null;
+  nonAggressionUntilTurn: number | null;
+  nonAggressionStartedTurn: number | null;
+  nonAggressionReason: string | null;
+};
+
+export type BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget = {
+  targetPlayerId: number;
+  coordinates: BotMemoryCoordinates;
+  holdUntilTurn: number;
+  valueLossMultiplier: number;
+};
+
+export type BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry = {
+  targetPlayerId: number;
+  coordinates: BotMemoryCoordinates;
+  lastPostBreakAttackTurn: number | null;
+  recentRaidCount: number;
+  recentRaidTurns: number[];
+  currentAmbushRiskScore: number;
+  pausedUntilTurn: number | null;
+  preferredRaidOriginCoordinates: BotMemoryCoordinates | null;
+  lastEstimatedPlunderValue: number;
+};
+
+export type BotMemoryV2StrategicDiplomaticSharedHostileEventType =
+  | 'ATTACK'
+  | 'BATTLE'
+  | 'BOMBARD'
+  | 'SIEGE'
+  | 'RECYCLE';
+
+export type BotMemoryV2StrategicDiplomaticSharedHostileEventEntry = {
+  attackerPlayerId: number;
+  victimPlayerId: number;
+  targetCoordinates: BotMemoryCoordinates;
+  eventType: BotMemoryV2StrategicDiplomaticSharedHostileEventType;
+  eventTurn: number;
+  sharedFromPlayerId: number;
+  sharedFromStatus: DiplomaticStatus;
+  severity: number;
+  propagatedOnTurn: number | null;
+};
+
+export type BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry = {
+  requestId: number;
+  supportType: SupportRequestType;
+  targetPlayerId: number;
+  targetCoordinates: BotMemoryCoordinates;
+  createdTurn: number;
+};
+
+export type BotMemoryV2StrategicDiplomatic = {
+  factionLedger: BotMemoryV2StrategicDiplomaticFactionEntry[];
+  primaryWarBreakTarget: BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null;
+  openedWarTargets: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[];
+  sharedHostileEvents: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[];
+  outgoingSupportRequests: BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry[];
+};
+
+export type BotMemoryV2WeightManagerMode =
+  | 'NORMAL'
+  | 'ECONOMIC_RECOVERY'
+  | 'WAR_EMERGENCY'
+  | 'EXPANSION'
+  | 'DIPLOMATIC_CAUTION';
+
+export type BotMemoryV2WeightManagerPlanetFocus =
+  | 'INDUSTRY'
+  | 'DEFENCE'
+  | 'MILITARY'
+  | 'DEVELOPMENT';
+
+export type BotMemoryV2WeightManagerPlanetEntry = {
+  coordinates: BotMemoryCoordinates;
+  economicWeight: number;
+  defensiveWeight: number;
+  warfareWeight: number;
+  avgIndustry: number;
+  avgMilitary: number;
+  avgDefence: number;
+  avgDevelopment: number;
+  selectedFocus: BotMemoryV2WeightManagerPlanetFocus | null;
+  immaturePlanet: boolean;
+  maturePlanet: boolean;
+  industryFocused: boolean;
+  defenceFocused: boolean;
+  militaryFocused: boolean;
+  developmentFocused: boolean;
+  industryHubPlanet: boolean;
+  damagedPlanet: boolean;
+  inDangerPlanet: boolean;
+  constantlyAttackedPlanet: boolean;
+  veryHeavilyAttackedPlanet: boolean;
+  knownByWarFaction: boolean;
+  recentHostileAttackCountLast20Turns: number;
+};
+
+export type BotMemoryV2WeightManager = {
+  updatedTurn: number | null;
+  selectedMode: BotMemoryV2WeightManagerMode;
+  economicRecoveryMode: boolean;
+  warEmergencyMode: boolean;
+  expansionMode: boolean;
+  diplomaticCautionMode: boolean;
+  normalSituationMode: boolean;
+  researchWeight: number;
+  strategicDevelopmentWeight: number;
+  strategicMilitaryWeight: number;
+  strategicDiplomaticWeight: number;
+  aggressionAxis: number;
+  industryAxis: number;
+  diplomacyAxis: number;
+  defencesAxis: number;
+  cautionAxis: number;
+  developmentAxis: number;
+  discoveredBreakNeedFarmCount: number;
+  discoveredRaidReadyFarmCount: number;
+  alliedStatusCount: number;
+  peaceStatusCount: number;
+  neutralStatusCount: number;
+  warStatusCount: number;
+  planets: BotMemoryV2WeightManagerPlanetEntry[];
+};
+
+export type BotMemoryV2Supervisor = {
+  pendingCommitments: BotMemoryV2SupervisorPendingCommitment[];
+  spendingHistory: BotMemoryV2SupervisorSpendingEntry[];
+  proposalHistory: BotMemoryV2SupervisorProposalEntry[];
+  fleetSlotHistory: BotMemoryV2SupervisorFleetSlotEntry[];
+  fuelSpendingHistory: BotMemoryV2SupervisorFuelSpendingEntry[];
+};
+
+export type BotMemoryV2 = {
+  version: 1;
+  currentStance: string | null;
+  antiOscillation: {
+    lastMajorFocus: string | null;
+    lastMajorFocusTurn: number | null;
+    doNotReplaceBeforeTurn: number | null;
+  };
+  cooldowns: Record<string, number>;
+  recentTargets: BotMemoryV2RecentTarget[];
+  acceptedLongTermCommitments: BotMemoryV2LongTermCommitment[];
+  critical: BotMemoryV2Critical;
+  research: BotMemoryV2Research;
+  strategicMilitary: BotMemoryV2StrategicMilitary;
+  strategicDiplomatic: BotMemoryV2StrategicDiplomatic;
+  weightManager: BotMemoryV2WeightManager;
+  supervisor: BotMemoryV2Supervisor;
+};
+
 export type PlayerExtras = {
   botProfileId?: BotProfileId | null;
   botMemory?: BotMemory | null;
+  botMemoryV2?: BotMemoryV2 | null;
 };
 
 export function defaultBotProfileIdForPlayerId(playerId: number): BotProfileId {
@@ -124,6 +466,7 @@ export function defaultBotProfileIdForPlayerId(playerId: number): BotProfileId {
 export class Player {
   public botProfileId: BotProfileId | null;
   public botMemory: BotMemory | null;
+  public botMemoryV2: BotMemoryV2 | null;
 
   constructor(
     public playerId: number,
@@ -141,6 +484,7 @@ export class Player {
   ) {
     this.botProfileId = extras.botProfileId ?? null;
     this.botMemory = Player.normalizeBotMemory(extras.botMemory);
+    this.botMemoryV2 = Player.normalizeBotMemoryV2(extras.botMemoryV2);
   }
 
   public getTechLevel(type: TechnologyType): number {
@@ -314,6 +658,37 @@ export class Player {
       lastProcessedFleetReportId: Number.isInteger(memory.lastProcessedFleetReportId)
         ? memory.lastProcessedFleetReportId
         : null
+    };
+  }
+
+  public static normalizeBotMemoryV2(memory: BotMemoryV2 | null | undefined): BotMemoryV2 | null {
+    if (!memory) {
+      return null;
+    }
+
+    return {
+      version: 1,
+      currentStance: Player.normalizeBotMemoryV2String(memory.currentStance, 80),
+      antiOscillation: {
+        lastMajorFocus: Player.normalizeBotMemoryV2String(memory.antiOscillation?.lastMajorFocus, 80),
+        lastMajorFocusTurn: Number.isInteger(memory.antiOscillation?.lastMajorFocusTurn)
+          ? memory.antiOscillation.lastMajorFocusTurn
+          : null,
+        doNotReplaceBeforeTurn: Number.isInteger(memory.antiOscillation?.doNotReplaceBeforeTurn)
+          ? memory.antiOscillation.doNotReplaceBeforeTurn
+          : null
+      },
+      cooldowns: Player.normalizeBotMemoryV2Cooldowns(memory.cooldowns),
+      recentTargets: Player.normalizeBotMemoryV2RecentTargets(memory.recentTargets),
+      acceptedLongTermCommitments: Player.normalizeBotMemoryV2LongTermCommitments(
+        memory.acceptedLongTermCommitments
+      ),
+      critical: Player.normalizeBotMemoryV2Critical(memory.critical),
+      research: Player.normalizeBotMemoryV2Research(memory.research),
+      strategicMilitary: Player.normalizeBotMemoryV2StrategicMilitary(memory.strategicMilitary),
+      strategicDiplomatic: Player.normalizeBotMemoryV2StrategicDiplomatic(memory.strategicDiplomatic),
+      weightManager: Player.normalizeBotMemoryV2WeightManager(memory.weightManager),
+      supervisor: Player.normalizeBotMemoryV2Supervisor(memory.supervisor)
     };
   }
 
@@ -502,6 +877,950 @@ export class Player {
       case 'HEAVY':
       case 'DEFEAT':
         return bracket;
+      default:
+        return null;
+    }
+  }
+
+  private static normalizeBotMemoryV2String(
+    value: string | null | undefined,
+    maxLength: number
+  ): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+
+    return trimmed.slice(0, maxLength);
+  }
+
+  private static normalizeBotMemoryV2Cooldowns(
+    cooldowns: Record<string, number> | null | undefined
+  ): Record<string, number> {
+    const normalized: Record<string, number> = {};
+    if (!cooldowns || typeof cooldowns !== 'object') {
+      return normalized;
+    }
+
+    for (const [key, value] of Object.entries(cooldowns)) {
+      const trimmedKey = key.trim();
+      if (trimmedKey.length === 0 || !Number.isInteger(value)) {
+        continue;
+      }
+
+      normalized[trimmedKey.slice(0, 80)] = Math.max(0, value);
+    }
+
+    return normalized;
+  }
+
+  private static normalizeBotMemoryV2RecentTargets(
+    recentTargets: BotMemoryV2RecentTarget[] | null | undefined
+  ): BotMemoryV2RecentTarget[] {
+    if (!Array.isArray(recentTargets)) {
+      return [];
+    }
+
+    return recentTargets
+      .map((entry) => {
+        const key = Player.normalizeBotMemoryV2String(entry?.key, 120);
+        if (!key || !Number.isInteger(entry?.turn)) {
+          return null;
+        }
+
+        return {
+          key,
+          turn: entry.turn
+        };
+      })
+      .filter((entry): entry is BotMemoryV2RecentTarget => entry !== null)
+      .slice(-40);
+  }
+
+  private static normalizeBotMemoryV2LongTermCommitments(
+    commitments: BotMemoryV2LongTermCommitment[] | null | undefined
+  ): BotMemoryV2LongTermCommitment[] {
+    if (!Array.isArray(commitments)) {
+      return [];
+    }
+
+    return commitments
+      .map((entry) => {
+        const commitmentKey = Player.normalizeBotMemoryV2String(entry?.commitmentKey, 120);
+        if (
+          !commitmentKey
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Number.isInteger(entry?.createdTurn)
+        ) {
+          return null;
+        }
+
+        return {
+          commitmentKey,
+          subsystemId: entry.subsystemId,
+          createdTurn: entry.createdTurn,
+          expiresOnTurn: Number.isInteger(entry.expiresOnTurn) ? entry.expiresOnTurn : null
+        };
+      })
+      .filter((entry): entry is BotMemoryV2LongTermCommitment => entry !== null)
+      .slice(-40);
+  }
+
+  private static normalizeBotMemoryV2StrategicMilitary(
+    strategicMilitary: BotMemoryV2StrategicMilitary | null | undefined
+  ): BotMemoryV2StrategicMilitary {
+    return {
+      farmLedger: Player.normalizeBotMemoryV2StrategicMilitaryFarmLedger(strategicMilitary?.farmLedger)
+    };
+  }
+
+  private static normalizeBotMemoryV2Critical(
+    critical: BotMemoryV2Critical | null | undefined
+  ): BotMemoryV2Critical {
+    return {
+      blockerLedger: Player.normalizeBotMemoryV2CriticalBlockerLedger(critical?.blockerLedger)
+    };
+  }
+
+  private static normalizeBotMemoryV2Research(
+    research: BotMemoryV2Research | null | undefined
+  ): BotMemoryV2Research {
+    const affordabilityWindowTurns = Number.isInteger(research?.affordabilityWindowTurns)
+      ? Math.max(5, research!.affordabilityWindowTurns!)
+      : 5;
+
+    return {
+      affordabilityWindowTurns,
+      lastWindowIncreaseTurn: Number.isInteger(research?.lastWindowIncreaseTurn)
+        ? Math.max(0, research!.lastWindowIncreaseTurn!)
+        : null
+    };
+  }
+
+  private static normalizeBotMemoryV2CriticalBlockerLedger(
+    entries: BotMemoryV2CriticalBlockerEntry[] | null | undefined
+  ): BotMemoryV2CriticalBlockerEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry): BotMemoryV2CriticalBlockerEntry | null => {
+        const blockerKey = Player.normalizeBotMemoryV2String(entry?.blockerKey, 160);
+        const blockerFamily = Player.normalizeBotMemoryV2CriticalBlockerFamily(entry?.blockerFamily);
+        if (
+          !blockerKey
+          || !blockerFamily
+          || !Number.isInteger(entry?.firstSeenTurn)
+          || !Number.isInteger(entry?.lastSeenTurn)
+        ) {
+          return null;
+        }
+
+        return {
+          blockerKey,
+          blockerFamily,
+          targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
+          firstSeenTurn: Math.max(0, entry.firstSeenTurn),
+          lastSeenTurn: Math.max(0, entry.lastSeenTurn),
+          severity: Player.normalizeBotMemoryV2WeightValue(entry?.severity),
+          timesEmitted: Player.normalizeBotMemoryV2Count(entry?.timesEmitted),
+          lastProposalTurn: Number.isInteger(entry?.lastProposalTurn) ? Math.max(0, entry.lastProposalTurn!) : null,
+          resolvedTurn: Number.isInteger(entry?.resolvedTurn) ? Math.max(0, entry.resolvedTurn!) : null,
+          active: entry?.active === true
+        };
+      })
+      .filter((entry): entry is BotMemoryV2CriticalBlockerEntry => entry !== null)
+      .slice(-400);
+  }
+
+  private static normalizeBotMemoryV2CriticalBlockerFamily(
+    family: BotMemoryV2CriticalBlockerFamily | null | undefined
+  ): BotMemoryV2CriticalBlockerFamily | null {
+    switch (family) {
+      case 'ENERGY_DEADLOCK':
+      case 'STORAGE_DEADLOCK':
+      case 'INDUSTRY_CHAIN_DEADLOCK':
+      case 'LOGISTICS_DEADLOCK':
+      case 'INTEL_DEADLOCK':
+        return family;
+      default:
+        return null;
+    }
+  }
+
+  private static normalizeBotMemoryV2StrategicMilitaryFarmLedger(
+    entries: BotMemoryV2StrategicMilitaryFarmLedgerEntry[] | null | undefined
+  ): BotMemoryV2StrategicMilitaryFarmLedgerEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry): BotMemoryV2StrategicMilitaryFarmLedgerEntry | null => {
+        const coordinates = Player.normalizeBotMemoryCoordinates(entry?.coordinates);
+        if (!coordinates) {
+          return null;
+        }
+
+        return {
+          coordinates,
+          intelPhase: entry?.intelPhase === 'SPY_SENT'
+            || entry?.intelPhase === 'PROBE_REQUIRED'
+            || entry?.intelPhase === 'COMBAT_INTEL_READY'
+            || entry?.intelPhase === 'UNSCANNED'
+            ? entry.intelPhase
+            : entry?.farmIntelEnough === true
+              ? 'COMBAT_INTEL_READY'
+              : Number.isInteger(entry?.lastSpyTurn)
+                ? 'SPY_SENT'
+                : 'UNSCANNED',
+          lastSpyTurn: Number.isInteger(entry?.lastSpyTurn) ? entry.lastSpyTurn : null,
+          lastAttackTurn: Number.isInteger(entry?.lastAttackTurn) ? entry.lastAttackTurn : null,
+          lastSuccessfulPlunderTurn: Number.isInteger(entry?.lastSuccessfulPlunderTurn)
+            ? entry.lastSuccessfulPlunderTurn
+            : null,
+          knownMineLevels: {
+            metalMineLevel: Number.isInteger(entry?.knownMineLevels?.metalMineLevel)
+              ? Math.max(0, entry.knownMineLevels.metalMineLevel)
+              : 0,
+            crystalMineLevel: Number.isInteger(entry?.knownMineLevels?.crystalMineLevel)
+              ? Math.max(0, entry.knownMineLevels.crystalMineLevel)
+              : 0,
+            deuteriumSynthesizerLevel: Number.isInteger(entry?.knownMineLevels?.deuteriumSynthesizerLevel)
+              ? Math.max(0, entry.knownMineLevels.deuteriumSynthesizerLevel)
+              : 0
+          },
+          knownStorageCapacity: Player.normalizeBotMemoryResources(entry?.knownStorageCapacity),
+          knownIncome: Player.normalizeBotMemoryResources(entry?.knownIncome),
+          knownBunkerReductionPercent: Number.isFinite(entry?.knownBunkerReductionPercent)
+            ? Math.max(0, Math.floor(entry.knownBunkerReductionPercent))
+            : 0,
+          knownPlanetaryModifiers: {
+            industryModifier: Number.isFinite(entry?.knownPlanetaryModifiers?.industryModifier)
+              ? Math.max(0, Number(entry.knownPlanetaryModifiers.industryModifier))
+              : 1,
+            metalModifier: Number.isFinite(entry?.knownPlanetaryModifiers?.metalModifier)
+              ? Math.max(0, Number(entry.knownPlanetaryModifiers.metalModifier))
+              : 1,
+            crystalModifier: Number.isFinite(entry?.knownPlanetaryModifiers?.crystalModifier)
+              ? Math.max(0, Number(entry.knownPlanetaryModifiers.crystalModifier))
+              : 1,
+            deuteriumModifier: Number.isFinite(entry?.knownPlanetaryModifiers?.deuteriumModifier)
+              ? Math.max(0, Number(entry.knownPlanetaryModifiers.deuteriumModifier))
+              : 1
+          },
+          knownShipCountsByType: Player.normalizeBotMemoryV2CountByType(entry?.knownShipCountsByType),
+          knownDefenceCountsByType: Player.normalizeBotMemoryV2CountByType(entry?.knownDefenceCountsByType),
+          farmIntelEnough: entry?.farmIntelEnough === true,
+          initialDefenseBroken: entry?.initialDefenseBroken === true,
+          lastProcessedAttackTurn: Number.isInteger(entry?.lastProcessedAttackTurn)
+            ? entry.lastProcessedAttackTurn
+            : null,
+          lastBreakAttemptCombatStrength: Number.isFinite(entry?.lastBreakAttemptCombatStrength)
+            ? Math.max(0, Math.floor(Number(entry.lastBreakAttemptCombatStrength)))
+            : null,
+          nextBreakAllowedTurn: Number.isInteger(entry?.nextBreakAllowedTurn)
+            ? entry.nextBreakAllowedTurn
+            : null,
+          lastBreakFailureLossBracket: entry?.lastBreakFailureLossBracket === 'LIGHT'
+            || entry?.lastBreakFailureLossBracket === 'MEDIUM'
+            || entry?.lastBreakFailureLossBracket === 'HEAVY'
+            || entry?.lastBreakFailureLossBracket === 'DEFEAT'
+            || entry?.lastBreakFailureLossBracket === 'NONE'
+            ? entry.lastBreakFailureLossBracket
+            : null,
+          lastObservedResources: Player.normalizeBotMemoryResources(entry?.lastObservedResources),
+          lastResourceObservationTurn: Number.isInteger(entry?.lastResourceObservationTurn)
+            ? entry.lastResourceObservationTurn
+            : null,
+          lastCombatObservationTurn: Number.isInteger(entry?.lastCombatObservationTurn)
+            ? entry.lastCombatObservationTurn
+            : null,
+          estimatedNextGoodAttackTurn: Number.isInteger(entry?.estimatedNextGoodAttackTurn)
+            ? entry.estimatedNextGoodAttackTurn
+            : null,
+          preferredPlunderTransporterCount: Number.isInteger(entry?.preferredPlunderTransporterCount)
+            ? Math.max(1, Math.floor(entry.preferredPlunderTransporterCount))
+            : 6,
+          preferredOriginCoordinates: Player.normalizeBotMemoryCoordinates(entry?.preferredOriginCoordinates)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicMilitaryFarmLedgerEntry => entry !== null)
+      .slice(-400);
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomatic(
+    strategicDiplomatic: BotMemoryV2StrategicDiplomatic | null | undefined
+  ): BotMemoryV2StrategicDiplomatic {
+    return {
+      factionLedger: Player.normalizeBotMemoryV2StrategicDiplomaticFactionLedger(
+        strategicDiplomatic?.factionLedger
+      ),
+      primaryWarBreakTarget: Player.normalizeBotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget(
+        strategicDiplomatic?.primaryWarBreakTarget
+      ),
+      openedWarTargets: Player.normalizeBotMemoryV2StrategicDiplomaticOpenedWarTargets(
+        strategicDiplomatic?.openedWarTargets
+      ),
+      sharedHostileEvents: Player.normalizeBotMemoryV2StrategicDiplomaticSharedHostileEvents(
+        strategicDiplomatic?.sharedHostileEvents
+      ),
+      outgoingSupportRequests: Player.normalizeBotMemoryV2StrategicDiplomaticOutgoingSupportRequests(
+        strategicDiplomatic?.outgoingSupportRequests
+      )
+    };
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticOutgoingSupportRequests(
+    entries: BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry[] | null | undefined
+  ): BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry[] {
+    return (entries ?? [])
+      .map((entry) => {
+        const coordinates = Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates);
+        if (
+          !coordinates
+          || !Number.isFinite(entry?.requestId)
+          || !Number.isFinite(entry?.targetPlayerId)
+          || !Number.isFinite(entry?.createdTurn)
+          || !Player.isSupportRequestType(entry?.supportType)
+        ) {
+          return null;
+        }
+        return {
+          requestId: Math.max(0, Math.floor(entry.requestId)),
+          supportType: entry.supportType,
+          targetPlayerId: Math.max(0, Math.floor(entry.targetPlayerId)),
+          targetCoordinates: coordinates,
+          createdTurn: Math.max(0, Math.floor(entry.createdTurn))
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry => entry !== null)
+      .slice(-100);
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget(
+    target: BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null | undefined
+  ): BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null {
+    if (!target || !Number.isInteger(target.targetPlayerId)) {
+      return null;
+    }
+
+    const coordinates = Player.normalizeBotMemoryCoordinates(target.coordinates);
+    if (!coordinates) {
+      return null;
+    }
+
+    return {
+      targetPlayerId: target.targetPlayerId,
+      coordinates,
+      holdUntilTurn: Number.isInteger(target.holdUntilTurn) ? target.holdUntilTurn : 0,
+      valueLossMultiplier: Number.isFinite(target.valueLossMultiplier)
+        ? Math.max(1, Number(target.valueLossMultiplier))
+        : 1.25
+    };
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticFactionLedger(
+    entries: BotMemoryV2StrategicDiplomaticFactionEntry[] | null | undefined
+  ): BotMemoryV2StrategicDiplomaticFactionEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry): BotMemoryV2StrategicDiplomaticFactionEntry | null => {
+        if (!entry || !Number.isInteger(entry.playerId)) {
+          return null;
+        }
+
+        return {
+          playerId: entry.playerId,
+          hostilityScore: Number.isFinite(entry.hostilityScore)
+            ? Math.max(0, Number(entry.hostilityScore))
+            : 0,
+          warAdvantageLevel: entry.warAdvantageLevel === -2
+            || entry.warAdvantageLevel === -1
+            || entry.warAdvantageLevel === 0
+            || entry.warAdvantageLevel === 1
+            || entry.warAdvantageLevel === 2
+            ? entry.warAdvantageLevel
+            : 0,
+          lastSuccessfulBombardTurn: Number.isInteger(entry.lastSuccessfulBombardTurn)
+            ? entry.lastSuccessfulBombardTurn
+            : null,
+          lastSuccessfulSiegeTickTurn: Number.isInteger(entry.lastSuccessfulSiegeTickTurn)
+            ? entry.lastSuccessfulSiegeTickTurn
+            : null,
+          recentOutgoingCoercionPressure: Number.isFinite(entry.recentOutgoingCoercionPressure)
+            ? Math.max(0, Number(entry.recentOutgoingCoercionPressure))
+            : 0,
+          recentIncomingCoercionPressure: Number.isFinite(entry.recentIncomingCoercionPressure)
+            ? Math.max(0, Number(entry.recentIncomingCoercionPressure))
+            : 0,
+          lastWarEvaluationTurn: Number.isInteger(entry.lastWarEvaluationTurn)
+            ? entry.lastWarEvaluationTurn
+            : null,
+          shortWindowWarScore: Number.isFinite(entry.shortWindowWarScore)
+            ? Math.max(-100, Math.min(100, Number(entry.shortWindowWarScore)))
+            : 0,
+          longWindowWarScore: Number.isFinite(entry.longWindowWarScore)
+            ? Math.max(-100, Math.min(100, Number(entry.longWindowWarScore)))
+            : 0,
+          currentWarExitPressure: Number.isFinite(entry.currentWarExitPressure)
+            ? Number(entry.currentWarExitPressure)
+            : 0,
+          lastComputedStanceScore: Number.isFinite(entry.lastComputedStanceScore)
+            ? Number(entry.lastComputedStanceScore)
+            : 0,
+          lastComputedStrengthEstimate: Number.isFinite(entry.lastComputedStrengthEstimate)
+            ? Math.max(0, Number(entry.lastComputedStrengthEstimate))
+            : 0,
+          lastKnownStatus: Player.normalizeDiplomaticStatus(entry.lastKnownStatus),
+          lastSeenTurn: Number.isInteger(entry.lastSeenTurn) ? entry.lastSeenTurn : null,
+          nonAggressionUntilTurn: Number.isInteger(entry.nonAggressionUntilTurn)
+            ? entry.nonAggressionUntilTurn
+            : null,
+          nonAggressionStartedTurn: Number.isInteger(entry.nonAggressionStartedTurn)
+            ? entry.nonAggressionStartedTurn
+            : null,
+          nonAggressionReason: typeof entry.nonAggressionReason === 'string'
+            ? entry.nonAggressionReason
+            : null
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicDiplomaticFactionEntry => entry !== null)
+      .slice(-120);
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticOpenedWarTargets(
+    entries: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[] | null | undefined
+  ): BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        if (!entry || !Number.isInteger(entry.targetPlayerId)) {
+          return null;
+        }
+
+        const coordinates = Player.normalizeBotMemoryCoordinates(entry.coordinates);
+        if (!coordinates) {
+          return null;
+        }
+
+        return {
+          targetPlayerId: entry.targetPlayerId,
+          coordinates,
+          lastPostBreakAttackTurn: Number.isInteger(entry.lastPostBreakAttackTurn)
+            ? entry.lastPostBreakAttackTurn
+            : null,
+          recentRaidCount: Number.isInteger(entry.recentRaidCount)
+            ? Math.max(0, entry.recentRaidCount)
+            : 0,
+          recentRaidTurns: Array.isArray(entry.recentRaidTurns)
+            ? entry.recentRaidTurns
+              .filter((turn): turn is number => Number.isInteger(turn))
+              .map((turn) => Math.max(0, turn))
+              .slice(-40)
+            : [],
+          currentAmbushRiskScore: Number.isFinite(entry.currentAmbushRiskScore)
+            ? Math.max(0, Number(entry.currentAmbushRiskScore))
+            : 0,
+          pausedUntilTurn: Number.isInteger(entry.pausedUntilTurn)
+            ? entry.pausedUntilTurn
+            : null,
+          preferredRaidOriginCoordinates: Player.normalizeBotMemoryCoordinates(entry.preferredRaidOriginCoordinates),
+          lastEstimatedPlunderValue: Number.isFinite(entry.lastEstimatedPlunderValue)
+            ? Math.max(0, Math.floor(entry.lastEstimatedPlunderValue))
+            : 0
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry => entry !== null)
+      .slice(-160);
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticSharedHostileEvents(
+    entries: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[] | null | undefined
+  ): BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        if (
+          !entry
+          || !Number.isInteger(entry.attackerPlayerId)
+          || !Number.isInteger(entry.victimPlayerId)
+          || !Number.isInteger(entry.sharedFromPlayerId)
+        ) {
+          return null;
+        }
+
+        const targetCoordinates = Player.normalizeBotMemoryCoordinates(entry.targetCoordinates);
+        if (!targetCoordinates) {
+          return null;
+        }
+
+        const eventType = entry.eventType === 'ATTACK'
+          || entry.eventType === 'BATTLE'
+          || entry.eventType === 'BOMBARD'
+          || entry.eventType === 'SIEGE'
+          ? entry.eventType
+          : null;
+        const sharedFromStatus = Player.normalizeDiplomaticStatus(entry.sharedFromStatus);
+        if (
+          !eventType
+          || (sharedFromStatus !== DiplomaticStatus.ALLIED && sharedFromStatus !== DiplomaticStatus.PEACE)
+        ) {
+          return null;
+        }
+
+        const normalizedEntry: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry = {
+          attackerPlayerId: entry.attackerPlayerId,
+          victimPlayerId: entry.victimPlayerId,
+          targetCoordinates,
+          eventType,
+          eventTurn: Number.isInteger(entry.eventTurn) ? Math.max(0, entry.eventTurn) : 0,
+          sharedFromPlayerId: entry.sharedFromPlayerId,
+          sharedFromStatus,
+          severity: Number.isFinite(entry.severity) ? Math.max(0, Number(entry.severity)) : 0,
+          propagatedOnTurn: Number.isInteger(entry.propagatedOnTurn)
+            ? Math.max(0, entry.propagatedOnTurn!)
+            : null
+        };
+        return normalizedEntry;
+      })
+      .filter((entry): entry is BotMemoryV2StrategicDiplomaticSharedHostileEventEntry => entry !== null)
+      .slice(-400);
+  }
+
+  private static normalizeBotMemoryV2WeightManager(
+    weightManager: BotMemoryV2WeightManager | null | undefined
+  ): BotMemoryV2WeightManager {
+    const selectedMode = Player.normalizeBotMemoryV2WeightManagerMode(weightManager?.selectedMode);
+    const planets = Player.normalizeBotMemoryV2WeightManagerPlanets(weightManager?.planets);
+
+    return {
+      updatedTurn: Number.isInteger(weightManager?.updatedTurn) ? Math.max(0, weightManager!.updatedTurn!) : null,
+      selectedMode,
+      economicRecoveryMode: selectedMode === 'ECONOMIC_RECOVERY',
+      warEmergencyMode: selectedMode === 'WAR_EMERGENCY',
+      expansionMode: selectedMode === 'EXPANSION',
+      diplomaticCautionMode: selectedMode === 'DIPLOMATIC_CAUTION',
+      normalSituationMode: selectedMode === 'NORMAL',
+      researchWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.researchWeight),
+      strategicDevelopmentWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.strategicDevelopmentWeight),
+      strategicMilitaryWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.strategicMilitaryWeight),
+      strategicDiplomaticWeight: Player.normalizeBotMemoryV2WeightValue(weightManager?.strategicDiplomaticWeight),
+      aggressionAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.aggressionAxis),
+      industryAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.industryAxis),
+      diplomacyAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.diplomacyAxis),
+      defencesAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.defencesAxis),
+      cautionAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.cautionAxis),
+      developmentAxis: Player.normalizeBotMemoryV2WeightValue(weightManager?.developmentAxis),
+      discoveredBreakNeedFarmCount: Player.normalizeBotMemoryV2Count(weightManager?.discoveredBreakNeedFarmCount),
+      discoveredRaidReadyFarmCount: Player.normalizeBotMemoryV2Count(weightManager?.discoveredRaidReadyFarmCount),
+      alliedStatusCount: Player.normalizeBotMemoryV2Count(weightManager?.alliedStatusCount),
+      peaceStatusCount: Player.normalizeBotMemoryV2Count(weightManager?.peaceStatusCount),
+      neutralStatusCount: Player.normalizeBotMemoryV2Count(weightManager?.neutralStatusCount),
+      warStatusCount: Player.normalizeBotMemoryV2Count(weightManager?.warStatusCount),
+      planets
+    };
+  }
+
+  private static normalizeBotMemoryV2WeightManagerPlanets(
+    planets: BotMemoryV2WeightManagerPlanetEntry[] | null | undefined
+  ): BotMemoryV2WeightManagerPlanetEntry[] {
+    if (!Array.isArray(planets)) {
+      return [];
+    }
+
+    return planets
+      .map((planet) => {
+        const coordinates = Player.normalizeBotMemoryCoordinates(planet?.coordinates);
+        if (!coordinates) {
+          return null;
+        }
+
+        const selectedFocus = Player.normalizeBotMemoryV2WeightManagerPlanetFocus(planet?.selectedFocus);
+
+        return {
+          coordinates,
+          economicWeight: Player.normalizeBotMemoryV2WeightValue(planet?.economicWeight),
+          defensiveWeight: Player.normalizeBotMemoryV2WeightValue(planet?.defensiveWeight),
+          warfareWeight: Player.normalizeBotMemoryV2WeightValue(planet?.warfareWeight),
+          avgIndustry: Player.normalizeBotMemoryV2AverageValue(planet?.avgIndustry),
+          avgMilitary: Player.normalizeBotMemoryV2AverageValue(planet?.avgMilitary),
+          avgDefence: Player.normalizeBotMemoryV2AverageValue(planet?.avgDefence),
+          avgDevelopment: Player.normalizeBotMemoryV2AverageValue(planet?.avgDevelopment),
+          selectedFocus,
+          immaturePlanet: Boolean(planet?.immaturePlanet),
+          maturePlanet: Boolean(planet?.maturePlanet),
+          industryFocused: Boolean(planet?.industryFocused),
+          defenceFocused: Boolean(planet?.defenceFocused),
+          militaryFocused: Boolean(planet?.militaryFocused),
+          developmentFocused: Boolean(planet?.developmentFocused),
+          industryHubPlanet: Boolean(planet?.industryHubPlanet),
+          damagedPlanet: Boolean(planet?.damagedPlanet),
+          inDangerPlanet: Boolean(planet?.inDangerPlanet),
+          constantlyAttackedPlanet: Boolean(planet?.constantlyAttackedPlanet),
+          veryHeavilyAttackedPlanet: Boolean(planet?.veryHeavilyAttackedPlanet),
+          knownByWarFaction: Boolean(planet?.knownByWarFaction),
+          recentHostileAttackCountLast20Turns: Player.normalizeBotMemoryV2Count(
+            planet?.recentHostileAttackCountLast20Turns
+          )
+        };
+      })
+      .filter((planet): planet is BotMemoryV2WeightManagerPlanetEntry => planet !== null)
+      .slice(0, 64);
+  }
+
+  private static normalizeBotMemoryV2Supervisor(
+    supervisor: BotMemoryV2Supervisor | null | undefined
+  ): BotMemoryV2Supervisor {
+    return {
+      pendingCommitments: Player.normalizeBotMemoryV2SupervisorPendingCommitments(
+        supervisor?.pendingCommitments
+      ),
+      spendingHistory: Player.normalizeBotMemoryV2SupervisorSpendingHistory(supervisor?.spendingHistory),
+      proposalHistory: Player.normalizeBotMemoryV2SupervisorProposalHistory(supervisor?.proposalHistory),
+      fleetSlotHistory: Player.normalizeBotMemoryV2SupervisorFleetSlotHistory(supervisor?.fleetSlotHistory),
+      fuelSpendingHistory: Player.normalizeBotMemoryV2SupervisorFuelSpendingHistory(supervisor?.fuelSpendingHistory)
+    };
+  }
+
+  private static normalizeBotMemoryV2SupervisorPendingCommitments(
+    entries: BotMemoryV2SupervisorPendingCommitment[] | null | undefined
+  ): BotMemoryV2SupervisorPendingCommitment[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const commitmentKey = Player.normalizeBotMemoryV2String(entry?.commitmentKey, 160);
+        const dedupeKey = Player.normalizeBotMemoryV2String(entry?.dedupeKey, 200);
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        if (
+          !commitmentKey
+          || !dedupeKey
+          || !proposalId
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Player.isBotMemoryV2ProposalKind(entry?.kind)
+          || !Player.isBotMemoryV2SupervisorPendingStatus(entry?.status)
+          || !Number.isInteger(entry?.createdTurn)
+          || !Number.isInteger(entry?.updatedTurn)
+          || !Number.isInteger(entry?.expiresOnTurn)
+        ) {
+          return null;
+        }
+
+        return {
+          commitmentKey,
+          dedupeKey,
+          proposalId,
+          subsystemId: entry.subsystemId,
+          kind: entry.kind,
+          targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
+          requestedResources: Player.normalizeBotMemoryResources(entry?.requestedResources),
+          weightedResourceValue: Player.normalizeBotMemoryV2AverageValue(entry?.weightedResourceValue),
+          score: Player.normalizeBotMemoryV2AverageValue(entry?.score),
+          status: entry.status,
+          createdTurn: Math.max(0, entry.createdTurn),
+          updatedTurn: Math.max(0, entry.updatedTurn),
+          expiresOnTurn: Math.max(0, entry.expiresOnTurn),
+          executionPayload: Player.normalizeBotMemoryV2Record(entry?.executionPayload),
+          cancelReason: Player.normalizeBotMemoryV2String(entry?.cancelReason, 120)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorPendingCommitment => entry !== null)
+      .slice(-80);
+  }
+
+  private static normalizeBotMemoryV2SupervisorSpendingHistory(
+    entries: BotMemoryV2SupervisorSpendingEntry[] | null | undefined
+  ): BotMemoryV2SupervisorSpendingEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        const dedupeKey = Player.normalizeBotMemoryV2String(entry?.dedupeKey, 200);
+        if (
+          !proposalId
+          || !dedupeKey
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Player.isBotMemoryV2ProposalKind(entry?.kind)
+          || !Number.isInteger(entry?.turn)
+        ) {
+          return null;
+        }
+
+        return {
+          turn: Math.max(0, entry.turn),
+          proposalId,
+          dedupeKey,
+          subsystemId: entry.subsystemId,
+          kind: entry.kind,
+          targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
+          resources: Player.normalizeBotMemoryResources(entry?.resources),
+          weightedResourceValue: Player.normalizeBotMemoryV2AverageValue(entry?.weightedResourceValue)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorSpendingEntry => entry !== null)
+      .slice(-200);
+  }
+
+  private static normalizeBotMemoryV2SupervisorProposalHistory(
+    entries: BotMemoryV2SupervisorProposalEntry[] | null | undefined
+  ): BotMemoryV2SupervisorProposalEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        const dedupeKey = Player.normalizeBotMemoryV2String(entry?.dedupeKey, 200);
+        if (
+          !proposalId
+          || !dedupeKey
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Player.isBotMemoryV2ProposalKind(entry?.kind)
+          || !Number.isInteger(entry?.turn)
+        ) {
+          return null;
+        }
+
+        return {
+          turn: Math.max(0, entry.turn),
+          proposalId,
+          dedupeKey,
+          subsystemId: entry.subsystemId,
+          kind: entry.kind,
+          accepted: entry.accepted === true,
+          pending: entry.pending === true,
+          reason: Player.normalizeBotMemoryV2String(entry?.reason, 120)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorProposalEntry => entry !== null)
+      .slice(-200);
+  }
+
+  private static normalizeBotMemoryV2SupervisorFleetSlotHistory(
+    entries: BotMemoryV2SupervisorFleetSlotEntry[] | null | undefined
+  ): BotMemoryV2SupervisorFleetSlotEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const missionKey = Player.normalizeBotMemoryV2String(entry?.missionKey, 200);
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        if (
+          !missionKey
+          || !proposalId
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Number.isInteger(entry?.createdTurn)
+        ) {
+          return null;
+        }
+
+        return {
+          missionKey,
+          proposalId,
+          subsystemId: entry.subsystemId,
+          createdTurn: Math.max(0, entry.createdTurn),
+          expiresOnTurn: Number.isInteger(entry.expiresOnTurn) ? Math.max(0, entry.expiresOnTurn!) : null,
+          active: entry.active === true
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorFleetSlotEntry => entry !== null)
+      .slice(-120);
+  }
+
+  private static normalizeBotMemoryV2SupervisorFuelSpendingHistory(
+    entries: BotMemoryV2SupervisorFuelSpendingEntry[] | null | undefined
+  ): BotMemoryV2SupervisorFuelSpendingEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        const missionType = Player.normalizeBotMemoryV2String(entry?.missionType, 80);
+        if (
+          !proposalId
+          || !missionType
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Number.isInteger(entry?.turn)
+        ) {
+          return null;
+        }
+
+        return {
+          turn: Math.max(0, entry.turn),
+          proposalId,
+          subsystemId: entry.subsystemId,
+          missionType,
+          originCoordinates: Player.normalizeBotMemoryCoordinates(entry?.originCoordinates),
+          targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
+          fleetId: Number.isInteger(entry?.fleetId) ? Math.max(0, entry.fleetId!) : null,
+          deuterium: Player.normalizeBotMemoryV2Count(entry?.deuterium)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorFuelSpendingEntry => entry !== null)
+      .slice(-200);
+  }
+
+  private static normalizeBotMemoryV2Record(
+    value: Record<string, unknown> | null | undefined
+  ): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+
+    return { ...value };
+  }
+
+  private static normalizeBotMemoryV2WeightManagerMode(
+    mode: BotMemoryV2WeightManagerMode | null | undefined
+  ): BotMemoryV2WeightManagerMode {
+    switch (mode) {
+      case 'ECONOMIC_RECOVERY':
+      case 'WAR_EMERGENCY':
+      case 'EXPANSION':
+      case 'DIPLOMATIC_CAUTION':
+        return mode;
+      default:
+        return 'NORMAL';
+    }
+  }
+
+  private static normalizeBotMemoryV2WeightManagerPlanetFocus(
+    focus: BotMemoryV2WeightManagerPlanetFocus | null | undefined
+  ): BotMemoryV2WeightManagerPlanetFocus | null {
+    switch (focus) {
+      case 'INDUSTRY':
+      case 'DEFENCE':
+      case 'MILITARY':
+      case 'DEVELOPMENT':
+        return focus;
+      default:
+        return null;
+    }
+  }
+
+  private static isBotMemoryV2ProposalKind(
+    kind: BotMemoryV2ProposalKind | null | undefined
+  ): kind is BotMemoryV2ProposalKind {
+    return kind === 'BUILDING'
+      || kind === 'RESEARCH'
+      || kind === 'SHIPYARD'
+      || kind === 'FLEET_MISSION'
+      || kind === 'MAINTENANCE_REQUEST'
+      || kind === 'REQUEST_DECISION'
+      || kind === 'REQUEST_CREATION'
+      || kind === 'DIPLOMACY_DECISION'
+      || kind === 'DIPLOMACY_PROPOSAL'
+      || kind === 'NO_OP';
+  }
+
+  private static isSupportRequestType(value: SupportRequestType | null | undefined): value is SupportRequestType {
+    return value === 'RESOURCE_SUPPORT'
+      || value === 'PLANET_REPAIR'
+      || value === 'PLANET_DEFENSE'
+      || value === 'ATTACK_TARGET'
+      || value === 'BOMBARD_TARGET'
+      || value === 'SIEGE_TARGET';
+  }
+
+  private static isBotMemoryV2SupervisorPendingStatus(
+    status: BotMemoryV2SupervisorPendingStatus | null | undefined
+  ): status is BotMemoryV2SupervisorPendingStatus {
+    return status === 'PENDING_RESOURCES'
+      || status === 'PENDING_QUEUE'
+      || status === 'PENDING_SHIPS_NEXT_TURN'
+      || status === 'EXPIRED'
+      || status === 'CANCELLED';
+  }
+
+  private static normalizeBotMemoryV2WeightValue(value: number | null | undefined): number {
+    return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(Number(value)))) : 0;
+  }
+
+  private static normalizeBotMemoryV2AverageValue(value: number | null | undefined): number {
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.round(Number(value) * 100) / 100);
+  }
+
+  private static normalizeBotMemoryV2Count(value: number | null | undefined): number {
+    return Number.isFinite(value) ? Math.max(0, Math.floor(Number(value))) : 0;
+  }
+
+  private static normalizeBotMemoryV2CountByType(
+    counts: Record<string, number> | null | undefined
+  ): Record<string, number> {
+    const normalized: Record<string, number> = {};
+    if (!counts || typeof counts !== 'object') {
+      return normalized;
+    }
+
+    for (const [key, value] of Object.entries(counts)) {
+      const trimmedKey = key.trim();
+      if (trimmedKey.length === 0 || !Number.isFinite(value)) {
+        continue;
+      }
+
+      normalized[trimmedKey.slice(0, 80)] = Math.max(0, Math.floor(value));
+    }
+
+    return normalized;
+  }
+
+  private static isBotV2SubsystemId(value: unknown): value is BotV2SubsystemId {
+    switch (value) {
+      case 'ECONOMIC':
+      case 'DEFENSIVE':
+      case 'WARFARE':
+      case 'RESEARCH':
+      case 'CRITICAL':
+      case 'STRATEGIC_DEVELOPMENT':
+      case 'STRATEGIC_MILITARY':
+      case 'STRATEGIC_DIPLOMATIC':
+      case 'WEIGHT_MANAGER':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private static normalizeDiplomaticStatus(
+    status: DiplomaticStatus | null | undefined
+  ): DiplomaticStatus | null {
+    switch (status) {
+      case 'SELF':
+      case 'ALLIED':
+      case 'PEACE':
+      case 'NEUTRAL':
+      case 'PASSIVE':
+      case 'WAR':
+        return status;
       default:
         return null;
     }

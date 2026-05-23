@@ -1,6 +1,7 @@
 import { MissionBlueprintsFactory } from '../../factories/mission-blueprints.factory';
 import { FleetMissionType } from '../enums/fleet-mission-type';
 import type { FleetMissionBlueprints } from './fleet-mission-blueprint';
+import { ArmamentDeliveryFleetMission } from './types/armament-delivery-fleet-mission';
 import { FleetMission } from './fleet-mission';
 import { AttackFleetMission } from './types/attack-fleet-mission';
 import { BombardFleetMission } from './types/bombard-fleet-mission';
@@ -51,6 +52,7 @@ export class FleetMissionRegistry {
     const attack = this.blueprints.get(FleetMissionType.ATTACK);
     const move = this.blueprints.get(FleetMissionType.MOVE);
     const transport = this.blueprints.get(FleetMissionType.TRANSPORT);
+    const armamentDelivery = this.blueprints.get(FleetMissionType.ARMAMENT_DELIVERY);
     const spy = this.blueprints.get(FleetMissionType.SPY);
     const bombard = this.blueprints.get(FleetMissionType.BOMBARD);
     const siege = this.blueprints.get(FleetMissionType.SIEGE);
@@ -70,6 +72,10 @@ export class FleetMissionRegistry {
 
     if (transport) {
       this.missionByType.set(transport.type, new TransportFleetMission(transport));
+    }
+
+    if (armamentDelivery) {
+      this.missionByType.set(armamentDelivery.type, new ArmamentDeliveryFleetMission(armamentDelivery));
     }
 
     if (spy) {

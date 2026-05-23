@@ -74,7 +74,8 @@ Server bootstrap:
 - `server/src/auth-rate-limit.ts`
 - `server/src/turnstile.ts`
 - `server/src/game-commands/`
-- `server/src/bots/`
+- `server/src/bots-v2/`
+- `server/src/bots/` for shared profile/admin helpers and legacy V1 files that are no longer in the active turn runtime
 
 Smoke runner:
 - `scripts/run-smoke-tests.js`
@@ -132,6 +133,9 @@ Game child routes:
 - `/game/defence` -> `src/app/game/defence-view/`
 - `/game/operations` -> `src/app/game/operations-view/`
 - `/game/mission-planner` -> `src/app/game/mission-planner-view/`
+
+Researches route note:
+- `src/app/game/researches-view/` owns both technology start flow and active helper-lab reassignment for queued research; the technology cards remain the start surface, while the queued-technologies table now owns live helper assignment with a fixed main lab
 
 Shared game UI components:
 - `src/app/game/ui/`
@@ -303,8 +307,8 @@ Lifecycle persistence note:
 - `/api/game/end-turn` now also runs the server-side bot planning phase before shared turn resolution; for active games with more than one human player it first records per-player readiness and resolves only after every human has clicked End Turn for that turn
 - `/api/game/turn-status` and `/api/games/:gameId/turn-status` now also carry optional `progressionBlockedReasonKey` + `progressionBlockedReasonParams` metadata for localization-ready active-play blockers
 - `/api/game/end-turn`, `/api/games/:gameId/end-turn`, and `/api/multiplayer/games/:gameId/auto-skip-turn` now also return keyed error metadata for the common active-play blockers and validation failures used by the top menu / game shell
-- `/api/game/building-queue`, `/api/game/shipyard-queue`, `/api/game/technology-queue`, and `/api/game/fleet` now also return keyed metadata for the mapped common `GameCommandError` cases, while still falling back to raw English for dynamic or not-yet-mapped command messages
-- `/api/admin/bots*` exposes local-admin/controller-only bot inspection and live runtime controls for profile, pause/resume, and memory clearing
+- `/api/game/building-queue`, `/api/game/shipyard-queue`, `/api/game/technology-queue`, `/api/game/technology-queue/helpers`, and `/api/game/fleet` now also return keyed metadata for the mapped common `GameCommandError` cases, while still falling back to raw English for dynamic or not-yet-mapped command messages
+- `/api/admin/bots*` exposes local-admin/controller-only V2 bot inspection and live runtime controls for profile, pause/resume, V2 trace viewing, and V2 memory clearing
 
 Galaxy and planet reads:
 - `/api/game/client-galaxy`
@@ -336,12 +340,13 @@ Queues and production:
 - `/api/game/shipyard-queue/reorder`
 - `/api/game/shipyard-queue/cancel`
 - `/api/game/technology-queue`
+- `/api/game/technology-queue/helpers`
 
 Queue command ownership note:
-- `server/src/index.ts` owns auth/session checks, request parsing, and HTTP DTO responses for queue-start endpoints
+- `server/src/index.ts` owns auth/session checks, request parsing, and HTTP DTO responses for queue-start/update endpoints
 - `server/src/game-commands/building-commands.ts` owns building-queue validation + mutation
 - `server/src/game-commands/shipyard-commands.ts` owns shipyard-queue validation + mutation
-- `server/src/game-commands/research-commands.ts` owns technology-queue validation + mutation
+- `server/src/game-commands/research-commands.ts` owns technology-queue validation + mutation, including active helper-lab replacement for ongoing research
 - `server/src/game-commands/command-helpers.ts` owns shared player/planet resolution plus queue/research requirement helpers
 - `server/src/game-commands/command-result.ts` defines the shared internal command result/error shape used by those modules
 
@@ -363,21 +368,49 @@ Fleet command ownership note:
 Diplomacy command ownership note:
 - `server/src/index.ts` owns auth/session checks, request parsing, and diplomacy view/mail DTO projection
 - `server/src/game-commands/diplomacy-commands.ts` owns treaty-proposal create/accept/reject/cancel validation + mutation, diplomacy-contact visibility checks, human/bot proposal eligibility, and shared one-outgoing-per-turn / pending-pair enforcement
-- `src/app/models/diplomacy/diplomatic-proposal-rules.ts` owns the shared treaty ladder used by both server and Angular UI (`NEUTRAL` / `WAR` -> `PEACE`, `PEACE` -> `ALLIED`)
+- `src/app/models/diplomacy/diplomatic-proposal-rules.ts` owns the shared treaty ladder used by both server and Angular UI (`NEUTRAL -> PEACE/WAR`, `WAR -> PEACE/NEUTRAL`, `PEACE -> ALLIED/NEUTRAL`, `ALLIED -> PEACE`)
 - `src/app/models/requests/support-request.ts` owns the shared phase-1 diplomacy support-request model and resource-payload normalization used by the server, save layer, and Angular UI
-- diplomacy support-request creation, Mail projection, expiry/synchronization, and support execution currently live in `server/src/index.ts` rather than `server/src/game-commands/`
+- diplomacy support-request creation/approval/rejection command logic lives in `server/src/game-commands/support-request-commands.ts`; Mail projection, support expiry/synchronization, and accepted support execution still live in `server/src/index.ts`
 - phase-2 offensive support requests (`ATTACK_TARGET`, `BOMBARD_TARGET`, `SIEGE_TARGET`) currently auto-launch via the shared `createFleetMission(...)` command path after acceptance, so mission legality still resolves through the normal fleet-command layer
 
 Bot runtime ownership note:
 - `server/src/index.ts` owns the end-turn hook and runs bot planning immediately before `resolvePhaseOneTurn(...)`
-- `server/src/bots/bot-turn-runner.ts` owns current server-side bot turn planning and action application
-- `server/src/bots/bot-profile.ts` owns fixed bot personality weights, military thresholds, and per-turn soft caps
-- `server/src/bots/bot-diplomacy-awareness.ts` owns lightweight per-contact diplomacy context building for bot planning
-- `server/src/bots/bot-diplomacy-planner.ts` owns outgoing bot `PEACE` / `ALLIED` proposal candidate generation plus proposal cooldown heuristics
-- `server/src/bots/bot-diplomacy-resolver.ts` owns bot treaty-response heuristics for incoming `PEACE` / `ALLIED` proposals
-- `server/src/bots/bot-admin.ts` owns controller-only runtime bot controls and paused-bot state
-- `server/src/bots/bot-debug.ts` and `server/src/bots/bot-debug-store.ts` own the in-memory bot decision trace model and ring buffer used for controller-side AI inspection
-- bot actions currently reuse the shared command layer in `server/src/game-commands/` for buildings, research, shipyard, spy, colonize, attack, transport, maintenance, recycle, repair, bombard, siege, guard, and move launches; self-owned move/transport/guard routes can now opt into Jump Gate travel when access is valid and the distance benefit is meaningful, orbiting self-owned fleets can request auto-approved Alliance Depot maintenance support, bots now resolve incoming allied/peace maintenance + Jump Gate requests plus incoming `PEACE` / `ALLIED` diplomacy proposals before normal action planning, can initiate one conservative outgoing `PEACE` / `ALLIED` proposal per turn using cooldown memory, owned planets can trigger conservative recycle/repair support launches, high-infrastructure hostile worlds can trigger bombard/siege plans instead of default raids, and current diplomacy status now feeds back into bot attack/spy/border-defense scoring
+- `server/src/bots-v2/` now owns the active Bot AI V2 runtime: feature flags, persisted V2 memory contract, snapshot builder, V2 trace store, Supervisor, executor, and the `Economic` + `Defensive` + `Warfare` + `Research` + `Strategic Development` + `Strategic Military` + `Strategic Diplomatic` + `Weight Manager` + `Critical` subsystems
+- `server/src/bots-v2/bot-v2-feature-flags.ts` owns the mode gate: `DISABLED`, `SHADOW`, or `LIVE`. `LIVE` is the normal V2 runtime mode, while `SHADOW` still runs trace-only planning.
+- `server/src/bots-v2/bot-v2-shadow-runner.ts` owns the V2 end-turn runner. `runBotTurnPhaseV2(...)` handles all V2 modes, and `runBotTurnPhaseV2Shadow(...)` remains only as an explicit shadow helper for tests.
+- `server/src/bots-v2/bot-brain-v2.ts` now runs enabled V2 subsystems sequentially instead of in one blind batch, passing accumulated `priorProposals` into later subsystem contexts so advisory/policy layers like `Critical` can inspect earlier shadow requests before proposing emergency overrides. The current order includes `Research` before `Strategic Development`, and successful neutral-foreign `RECYCLE` execution now also records a Strategic Diplomatic hostile-event side effect against the target bot owner there.
+- `server/src/bots-v2/supervisor/bot-supervisor.ts` owns live Supervisor arbitration: Critical-first scoring, Weight Manager spending-share alignment, pressure-only `SHIP_NEED` boosts, exact same-technology `RESEARCH` overlap boosts across subsystem proposals, queue caps, soft fleet-slot caps, pending-commitment retry/expiry, allowlisted fleet acceptance including combat/guard launch proposals, one-turn pending for exact ships completing next turn, priority handling for executable incoming `REQUEST_DECISION` proposals, normal arbitration for executable outgoing `REQUEST_CREATION` support proposals, and priority handling for executable diplomacy actions (`DIPLOMACY_DECISION` / `DIPLOMACY_PROPOSAL`).
+- `server/src/bots-v2/supervisor/bot-supervisor-scoring.ts` owns Supervisor resource-value scoring, using `metal * 1 + crystal * 1.8 + deuterium * 2.6`, local Weight Manager planet weights, global strategic weights including `RESEARCH`, progressive overfunding penalties, and capped underfunding bonuses.
+- `server/src/bots-v2/execution/bot-executor.ts` owns live execution for accepted `BUILDING`, `RESEARCH`, `SHIPYARD`, allowlisted `FLEET_MISSION`, incoming `REQUEST_DECISION`, outgoing support `REQUEST_CREATION`, `DIPLOMACY_DECISION`, and `DIPLOMACY_PROPOSAL` proposals. It executes diplomacy decisions first, runs the lifecycle recall pass second, then executes normal accepted actions. It calls shared command helpers, auto-selects own Jump Gate use when legal/auto-approved, preserves subsystem-owned `useJumpGate: true` so shared fleet validation can create foreign/allied pending Jump Gate requests, executes accepted Jump Gate/Maintenance/Support request decisions, Support request creation, full-ladder diplomacy decisions, and outgoing treaty creation through shared command helpers, recalls own invalid offensive `ATTACK` / `BOMBARD` / `SIEGE` / `SPY` fleets when target relations become `NEUTRAL` / `PEACE` / `ALLIED`, runs the Research phase-2 free-helper maintenance pass after accepted actions via `updateResearchHelpers(...)`, splits cargo spending from fuel spending, and logs/traces command failures instead of falling back to V1.
+- `server/src/bots-v2/execution/bot-execution-adapters.ts` owns normalization of executable queue proposals and intentionally rejects `demandOnly` shipyard / `SHIP_NEED` pressure as non-executable.
+- `server/src/bots-v2/execution/bot-fleet-execution-adapters.ts` owns normalization of executable fleet proposals. It allows `SPY`, `TRANSPORT`, `ARMAMENT_DELIVERY`, `REPAIR`, `COLONIZE`, `MOVE`, `DEFEND`, `ATTACK`, `BOMBARD`, `SIEGE`, and `RECYCLE`. Fleet adapters require exact subsystem-provided ships/cargo instead of composing missions inside Supervisor.
+- `server/src/bots-v2/execution/bot-request-creation-adapters.ts` owns normalization of executable outgoing request-creation proposals. The current scope is Support requests only; outgoing Maintenance and standalone Jump Gate request creation are deferred.
+- `server/src/bots-v2/execution/bot-request-decision-adapters.ts` owns normalization of executable incoming request decisions (`JUMP_GATE`, `MAINTENANCE`, `SUPPORT`; `APPROVE`, `REJECT`, `PARTIAL_APPROVE`).
+- `server/src/bots-v2/execution/bot-diplomacy-decision-adapters.ts` owns normalization of executable diplomacy decisions (`PEACE` / `ALLIED` / `NEUTRAL` / `WAR`; `ACCEPT`, `REJECT`, `CANCEL`).
+- `server/src/bots-v2/execution/bot-diplomacy-proposal-adapters.ts` owns normalization of executable outgoing treaty proposals (`DIPLOMACY_PROPOSAL` with target player and requested treaty status).
+- `server/src/game-commands/fleet-lifecycle-commands.ts` owns the shared active-fleet return helper used by both the player API and V2 Supervisor lifecycle recall.
+- `server/src/bots-v2/snapshot/build-bot-world-snapshot.ts` now owns the enriched V2 local read model: local incomes/capacities, industry/research/shipyard power, queue ETC estimates, next-turn queued ship completions for Supervisor pending-ship checks, bunker/defense value summaries, installed-ship value summaries plus undamaged/damaged ship splits, building-damage summaries, owned-planet debris exposure, `avg_industry`, queued-defense/queued-ship state, `isResearchHelper` queue occupancy, recent hostile-attack proxy counts including the 20-turn local pressure window plus `knownByWarFaction`, empire-level Strategic Development intel candidates with scan freshness + reported colonization difficulty, Strategic Military target snapshots with neutral-vs-not-neutral classification plus report-derived stored-resource/storage/income/bunker/defender observations and debris exposure, Strategic Diplomatic faction snapshots for discovered non-neutral players/bots with relation state + intel depth + battle-history + pending incoming/outgoing diplomacy proposal ids plus known-planet debris exposure, pending incoming Jump Gate/Maintenance/Support request snapshots, per-known-planet recent battle pressure, active-fleet / active-colonize-fleet counts, active-recycle-fleet count, strategic-development building levels, and the tech/modifier fields required by the Economic, Defensive, Warfare, Research, Strategic Development, Strategic Military, Strategic Diplomatic, and Weight Manager planners, including `anomaliesAndNoise` and `hyperspaceParameters`; it now also normalizes the report-backed 40-turn shared hostile-awareness feed that Strategic Diplomatic consumes from direct `Incoming Attack Report`, `Battle Report`, and `Incoming Bombardment Report` evidence
+- `server/src/bots-v2/infrastructure-damage.ts` now centralizes V2 building-damage classification and emergency-threshold logic. It defines the shared `CRUCIAL` / `IMPORTANT` / `BASIC` categories, their emergency thresholds (`25 / 40 / 80`), per-building damage entries, per-category summaries, the hybrid total-plus-category emergency trigger, and the prioritized damage-point helper used by repair-aware planners.
+- `server/src/bots-v2/subsystems/economic/bot-economic-subsystem.ts` now owns the branch-first local Economic planner: per-planet energy/storage/economy branch selection, dependency-chain expansion, narrow ETC-first goal ranking with stepwise throughput re-simulation, prerequisite research support, deduped shared-request emission, and first-class per-planet goal/no-action results
+- `server/src/bots-v2/subsystems/defensive/bot-defensive-subsystem.ts` now owns the local Defensive planner: per-planet unlock/bunker/production candidate generation, strict prerequisite building/research expansion for unlock paths, narrow ETC-first structural and production ranking with positive-only bonuses, and explicit selection between structural-only, mixed structural+production, and production-only output modes
+- `server/src/bots-v2/subsystems/warfare/bot-warfare-subsystem.ts` now owns the local Warfare planner: per-planet `CAPACITY` / `UNLOCK` / `PRODUCTION` candidate generation for military+cargo ship production, explicit included ship lists, avg-industry-driven shipyard/nanite targets, category-shaped 5-goal/5-request output, reserved cargo visibility, first-class per-planet no-action results, and the current `RECOVERY` slice for owned/safe/neutral recycle planning with recycler `SHIP_NEED` / direct `SHIPYARD` fallback when a chosen recycle job cannot yet launch
+- `server/src/bots-v2/subsystems/research/bot-research-subsystem.ts` now owns the current global Research planner: at most one new `RESEARCH` proposal per turn, best `(technology, main lab)` pair selection by affordability ETA + ETC + resource fit + research power, helper-lab attachment at launch time with preference for weaker/currently unaffordable idle labs, and persistent per-player affordability-window state in `player.botMemoryV2.research`. Helper reassignment for already running research is intentionally not proposal-driven; the first phase-2 slice runs later in the executor as a free idle-lab maintenance pass.
+- `server/src/bots-v2/subsystems/strategic-development/bot-strategic-development-subsystem.ts` now owns the current layered Strategic Development planner: the local building/production planner for `INTERSTELLAR_TRADE_PORT` / `JUMP_GATE` / `RESEARCH_LAB` / `SENSOR_PHALANX` plus support-ship readiness stock, the global logistics/intel planner for `TRANSPORT`, `ARMAMENT_DELIVERY`, and `SPY`, and the current colonization-execution slice that can emit one executable `COLONIZE` mission request with bootstrap cargo from any ready colonizer source toward the best fresh scanned target
+- `server/src/bots-v2/subsystems/strategic-military/bot-strategic-military-subsystem.ts` now owns the current global neutral-farm planner: galaxy-wide `SPY` discovery/refresh requests, direct `BREAK` attack proposals against scanned neutral defenders, relocation `MOVE` proposals that gather military ships from multiple owned origins onto the best staging planet when no single origin can satisfy `BREAK`, repeatable `PLUNDER` attack proposals against opened farms using cargo plus 1-2 military ships, exact-ship-type `SHIP_NEED` demand proposals when current local fleets still cannot execute the next farm step after relocation, and the persistent memory-backed farm ledger / regrowth scheduling layer that converts espionage, battle, and plunder reports into remembered neutral-farm state
+- `server/src/bots-v2/subsystems/strategic-diplomatic/bot-strategic-diplomatic-subsystem.ts` now owns the current phased Strategic Diplomatic planner: phase-1 discovered-faction evaluation, per-faction hostility/stance/strength/confidence scoring, adjacent-only relation-change proposals, incoming/outgoing diplomatic-proposal preference suggestions, retaliation flags, and memory-backed per-faction diplomatic ledgers, the phase-2 real-player espionage slice that emits weighted `SPY` mission proposals and up to two per-planet `SPY_PROBE` `SHIP_NEED` requests from global diplomatic probe pressure, and the current phase-3 diplomatic combat slice that emits executable `ATTACK`, allied `REPAIR`, and allied `DEFEND` mission proposals plus exact-ship-type non-probe `SHIP_NEED` fallbacks for blocked war/support plans
+- `server/src/bots-v2/subsystems/strategic-diplomatic/bot-strategic-diplomatic-subsystem.ts` now also owns the phase-4 diplomatic force-projection slice: `BOMBARD` / `SIEGE` planning for `WAR` targets, bombardment-staging `MOVE` regrouping when no single origin can satisfy war pressure, own/allied `ARMAMENT_DELIVERY` support proposals, and direct `BOMB_DEPOT` / `ALLIANCE_DEPOT` / `JUMP_GATE` building pressure plus hybrid `PLANETARY_BOMB` production pressure
+- `server/src/bots-v2/subsystems/strategic-diplomatic/bot-strategic-diplomatic-subsystem.ts` now also owns the phase-5 pre-break concentration slice: one persisted global primary `WAR` break target in `BotMemoryV2`, deterministic randomized hold/worth thresholds, relocation-first `MOVE + ATTACK` war-break planning, and exact-ship-type war-break `SHIP_NEED` only after concentration options are exhausted
+- `server/src/bots-v2/subsystems/strategic-diplomatic/bot-strategic-diplomatic-subsystem.ts` now also owns the live phase-8 shared-war-awareness slice: report-backed `ATTACK` / `BOMBARD` / `SIEGE` event sharing across `ALLIED` and `PEACE` contacts, 40-turn shared-hostile-event retention, existing `ALLIED > PEACE` hostility weighting, and the resulting hostility/support/escalation score pressure without propagating `SPY` events into coalition awareness
+- `server/src/bots-v2/subsystems/strategic-diplomatic/bot-strategic-diplomatic-subsystem.ts` now also owns V2 request and diplomacy evaluation: it emits executable `REQUEST_DECISION` proposals for pending Jump Gate, Maintenance, and Support requests, executable `REQUEST_CREATION` proposals for outgoing Support requests, executable `DIPLOMACY_DECISION` proposals for pending full-ladder treaty decisions, and executable `DIPLOMACY_PROPOSAL` proposals for one best outgoing treaty opportunity per turn. Allied Jump Gate requests with valid mission types are approved, Peace Jump Gate defense can be approved under shared hostile pressure, Maintenance approvals preserve a 5% deuterium-storage reserve and limit Peace to fuel only, Support decisions reuse the existing diplomatic support preference logic, outgoing Support creation is capped to one request per turn, invalid treaty-ladder proposals such as neutral-to-allied are rejected, and own outgoing treaty proposals can be cancelled when utility turns negative. Treaty policy can propose `WAR` against clearly weaker factions, boosts alliance seeking when weaker, and persists temporary post-victory non-aggression treatment in the per-faction ledger.
+- `server/src/bots-v2/subsystems/weight-manager/bot-weight-manager-subsystem.ts` now owns the advisory Weight Manager phase-1 policy layer: direct per-profile base tables, mutually-exclusive global mode selection, global strategic weights, per-planet local weights, reused aggregate-metric comparisons (`avg_industry`, computed `avg_military` / `avg_defence` / `avg_development` vs `highest_*`), and maturity/focus/danger flags intended for later Supervisor consumption
+- `server/src/bots-v2/subsystems/critical/bot-critical-subsystem.ts` now owns the current emergency-only Critical planner: phase-1 shadow detection of energy/storage/industry-chain/logistics/intel deadlocks, fixed family priority, blocker-ledger persistence, earlier-proposal awareness, and capped emergency `BUILDING` / `SHIPYARD` unblock proposals including safe-planet `REPAIR_DRONE` production when damage recovery is otherwise stuck; plus the current phase-2 owned-planet emergency mission layer that can emit proposal-only self-recovery `REPAIR`, `ARMAMENT_DELIVERY`, and immature-planet `TRANSPORT` requests with response-subtype metadata and `SHIPYARD` demand-only fallback when the required utility hulls are missing. Its repair escalation now uses the shared categorized infrastructure-damage model instead of only aggregate structural loss.
+- `server/src/bots-v2/bot-v2-types.ts` now owns the shared V2 goal/result contracts for multiple subsystems, including ship-target metadata, Warfare planet results, the separate building-vs-production Strategic Development planet-result shape, the optional `priorProposals` context channel for later-running subsystems, and the extra snapshot fields needed by Weight Manager
+- `server/src/bots/bot-profile.ts` still owns shared fixed bot personality/profile definitions used by setup/admin flows
+- `server/src/bots/bot-diplomacy-awareness.ts`, `server/src/bots/bot-diplomacy-planner.ts`, and `server/src/bots/bot-diplomacy-resolver.ts` are legacy V1 planning helpers and are not part of the current V2 end-turn runtime
+- `server/src/bots/bot-admin.ts` owns controller-only runtime bot controls and paused-bot state, but bot memory clearing now targets `botMemoryV2`
+- `server/src/bots-v2/bot-v2-trace.ts` owns the in-memory V2 trace ring buffer used by `/api/admin/bots/traces` and `/game/bot-debug`
+- bot actions currently reuse the shared command layer in `server/src/game-commands/` for buildings, research, shipyard, spy, colonize, attack, transport, maintenance, recycle, repair, bombard, siege, guard, move launches, incoming request decisions, outgoing Support request creation, diplomacy decisions/proposals, and active-fleet returns; self-owned move/transport/guard routes can now opt into Jump Gate travel when access is valid and the distance benefit is meaningful, accepted V2 fleet proposals with `useJumpGate: true` can create pending foreign/allied Jump Gate requests through the shared fleet command, orbiting self-owned fleets can request auto-approved Alliance Depot maintenance support, V2 bots now resolve incoming Jump Gate/Maintenance/Support requests only when Strategic Diplomatic emits executable `REQUEST_DECISION` proposals, V2 bots resolve pending treaty proposals only when Strategic Diplomatic emits executable `DIPLOMACY_DECISION` proposals, V2 bots create outgoing treaty proposals only when Strategic Diplomatic emits executable `DIPLOMACY_PROPOSAL` proposals, Warfare can now launch conservative owned/safe/neutral recycle missions directly, owned planets can trigger conservative repair support launches, high-infrastructure hostile worlds can trigger bombard/siege plans instead of default raids, and current diplomacy status now feeds back into bot attack/spy/border-defense scoring and Supervisor recall behavior
+- `src/app/models/turns/phase-one-turn-resolver.ts` now also owns the human-facing alert layer for shared hostile awareness: it still forwards copied hostile battle/bombardment reports to human `ALLIED` / `PEACE` contacts, and now also adds aggregated same-turn system-mail alerts for hostile `ATTACK` / `BOMBARD` / `SIEGE` events plus direct victim-only `Espionage alert` mail that does not enter shared coalition awareness
 
 Reports and tutorials:
 - `/api/game/reports`
@@ -652,7 +685,7 @@ Server responsibilities:
 - API validation and DTO translation
 - invoking shared domain rules
 - snapshot and report serialization
-- orchestrating server-side bot planning during end turn through `server/src/bots/`
+- orchestrating server-side bot planning during end turn through `server/src/bots-v2/`
 
 Important constraint:
 - the server is large and central, but many rules should still stay in shared domain modules under `src/app/models`
@@ -691,11 +724,19 @@ Local Chrome MCP route smoke runner:
 Advisory bot simulation runner:
 - `scripts/run-bot-simulations.ts`
 - writes `tmp/bot-simulation-results.json`
-- runs standalone 20/50/100-turn all-bot simulations using `GalaxyCreator`, `runBotTurnPhase(...)`, and `resolvePhaseOneTurn(...)`
+- runs standalone 20/50/100-turn all-bot simulations using `GalaxyCreator`, the bot runtime, and `resolvePhaseOneTurn(...)`
 - includes `baselineMixed`, `frontierPressure`, and `warHotspot` presets
 - `warHotspot` additionally occupies the remaining map, seeds mutual full-strength espionage intel, and sets contender pairs to explicit `WAR` so advisory runs can surface attack behavior instead of only growth/logistics
 - output now includes per-run `profileSummary` plus top-level `overallProfileSummary` aggregates for profile-level tuning
 - supports `--profiles=AGGRESSOR,TURTLE` and `--compare=AGGRESSOR,TURTLE` for targeted comparison runs
+
+Strict V2 bot simulation runner:
+- `scripts/run-bot-v2-simulation.ts`
+- package entries: `npm.cmd run bot:sim`, `npm.cmd run bot:sim:initial`, `npm.cmd run bot:sim:advanced`
+- writes `tmp/bot-v2-sim/<timestamp>-*/summary.json`, `traces.jsonl`, `turn-summary.jsonl`, and `anomalies.json`
+- supports fresh-game and `--load-save-id=<saveId>` execution modes
+- runs `runBotTurnPhaseV2(..., { mode: 'LIVE' })` plus `resolvePhaseOneTurn(...)`
+- performs first-pass invariant checks and groups unexpected bot command failures for stabilization work
 
 Advisory simulation baseline compare:
 - `scripts/run-bot-sim-baselines.ts`
@@ -844,13 +885,12 @@ Change setup/start-game flow:
 - `server/src/multiplayer-lobby.ts` if saved-human seat conversion or bot defaults change
 
 Change bot AI:
-- `server/src/bots/bot-turn-runner.ts`
-- `server/src/bots/bot-profile.ts`
-- `server/src/bots/bot-diplomacy-awareness.ts`
-- `server/src/bots/bot-diplomacy-planner.ts`
-- `server/src/bots/bot-diplomacy-resolver.ts`
-- `server/src/bots/bot-debug.ts`
-- `server/src/bots/bot-debug-store.ts`
+- `server/src/bots-v2/` for active bot planning/runtime changes
+- `server/src/bots-v2/supervisor/` for proposal arbitration, spending alignment, fleet-slot alignment, pending commitments, executable diplomacy decisions, and lifecycle recall decisions
+- `server/src/bots-v2/execution/` for live queue/fleet command adapters and executors
+- `server/src/bots-v2/subsystems/` for subsystem proposal generation
+- `server/src/bots/bot-profile.ts` for shared bot personality/profile definitions
+- `server/src/bots/bot-admin.ts` for controller-only profile/pause/memory controls
 - `server/src/game-commands/` when bot actions need new shared validation/mutation paths
 - `server/src/index.ts` for end-turn orchestration
 - `src/app/models/player.ts` and `server/src/game-save.ts` for bot profile/memory persistence

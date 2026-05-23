@@ -8,6 +8,7 @@ import { TechnologyType } from '../../models/enums/technology-type';
 
 describe('OperationsViewComponent', () => {
   it('shows active fleet count against the maximum fleet cap', () => {
+    const router = createRouter();
     const component = new OperationsViewComponent(
       {} as never,
       {} as never,
@@ -19,7 +20,8 @@ describe('OperationsViewComponent', () => {
       } as never,
       {
         autoOpenTutorial: vi.fn()
-      } as never
+      } as never,
+      router as never
     );
 
     (component as { ownedPlanets: ClientPlanetDto[] }).ownedPlanets = [
@@ -28,6 +30,41 @@ describe('OperationsViewComponent', () => {
     (component as { activeFleets: Array<unknown> }).activeFleets = [{}, {}, {}];
 
     expect((component as { activeFleetCountLabel(): string }).activeFleetCountLabel()).toBe('3/6');
+  });
+
+  it('navigates to Galaxy View with clicked coordinates', () => {
+    const router = createRouter();
+    const component = new OperationsViewComponent(
+      {} as never,
+      {} as never,
+      {
+        load: vi.fn().mockReturnValue(createPlayerSession())
+      } as never,
+      {
+        markForCheck: vi.fn()
+      } as never,
+      {
+        autoOpenTutorial: vi.fn()
+      } as never,
+      router as never
+    );
+
+    (component as { openCoordinatesInGalaxy(coords: ClientCoordinates): void }).openCoordinatesInGalaxy({
+      x: 4,
+      y: 5,
+      z: 6
+    });
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/game/galactic'],
+      {
+        queryParams: {
+          x: 4,
+          y: 5,
+          z: 6
+        }
+      }
+    );
   });
 });
 
@@ -41,7 +78,14 @@ function createPlayerSession(): PlayerSession {
     tutorialRead: {},
     unreadReportCount: 0,
     unreadMailCount: 0,
-    pendingRequestCount: 0
+    pendingRequestCount: 0,
+    currentGameId: null
+  };
+}
+
+function createRouter() {
+  return {
+    navigate: vi.fn().mockResolvedValue(true)
   };
 }
 

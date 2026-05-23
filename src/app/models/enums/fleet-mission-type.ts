@@ -9,6 +9,7 @@ export enum MissionType {
   BLOCK = 'Block',
   INTERCEPT = 'Intercept',
   TRANSPORT = 'Transport',
+  ARMAMENT_DELIVERY = 'Armament Delivery',
   COLONIZE = 'Colonize',
   SPY = 'Spy',
   STAR_SYSTEM_SPY = 'Star System Spy',

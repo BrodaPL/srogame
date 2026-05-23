@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EspionageReportGenerator } from '../espionage-report-generator';
+import { calculateProbeEspionageLevelBonus, EspionageReportGenerator } from '../espionage-report-generator';
 import { Player } from '../../models/player';
 import { PlayerType } from '../../models/enums/player-type';
 import { TechnologyType } from '../../models/enums/technology-type';
@@ -57,6 +57,29 @@ describe('EspionageReportGenerator', () => {
     ),
     new Map()
   );
+
+  it('uses the triangular probe threshold table for report level bonus', () => {
+    expect(calculateProbeEspionageLevelBonus(0)).toBe(0);
+    expect(calculateProbeEspionageLevelBonus(1)).toBe(0);
+    expect(calculateProbeEspionageLevelBonus(2)).toBe(0);
+    expect(calculateProbeEspionageLevelBonus(3)).toBe(1);
+    expect(calculateProbeEspionageLevelBonus(5)).toBe(1);
+    expect(calculateProbeEspionageLevelBonus(6)).toBe(2);
+    expect(calculateProbeEspionageLevelBonus(10)).toBe(3);
+    expect(calculateProbeEspionageLevelBonus(15)).toBe(4);
+    expect(calculateProbeEspionageLevelBonus(21)).toBe(5);
+    expect(calculateProbeEspionageLevelBonus(28)).toBe(6);
+    expect(calculateProbeEspionageLevelBonus(36)).toBe(7);
+    expect(calculateProbeEspionageLevelBonus(45)).toBe(8);
+    expect(calculateProbeEspionageLevelBonus(55)).toBe(9);
+    expect(calculateProbeEspionageLevelBonus(66)).toBe(10);
+    expect(calculateProbeEspionageLevelBonus(78)).toBe(11);
+    expect(calculateProbeEspionageLevelBonus(91)).toBe(12);
+    expect(calculateProbeEspionageLevelBonus(105)).toBe(13);
+    expect(calculateProbeEspionageLevelBonus(120)).toBe(14);
+    expect(calculateProbeEspionageLevelBonus(999)).toBe(14);
+    expect(calculateProbeEspionageLevelBonus(10.9)).toBe(3);
+  });
 
   it('includes detailed data for high report levels', () => {
     const generator = new EspionageReportGenerator();
@@ -209,7 +232,7 @@ describe('EspionageReportGenerator', () => {
 
     const baseReport = generator.createEspionageReport(attacker, defender, planet, 1);
     const boostedReport = generator.createEspionageReport(attacker, defender, planet, 1, {
-      reportLevelBonus: 10
+      reportLevelBonus: 11
     });
 
     expect(baseReport.totalDefencesAmount).toBe(0);

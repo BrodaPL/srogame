@@ -20,7 +20,7 @@ import { SolarSystem } from '../../planets/solar-system';
 import { Player } from '../../player';
 import { ResourcesPack } from '../../resources-pack';
 import { TechnologyQueueEntry } from '../../tech/technology-queue-entry';
-import { resolvePhaseOneTurn } from '../phase-one-turn-resolver';
+import { resolvePhaseOneTurn, type PlayerFleetOutcomeLogEvent } from '../phase-one-turn-resolver';
 
 const blueprints = ShipBlueprintsFactory.fromDefaultJson();
 const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson().buildingsMap;
@@ -166,6 +166,61 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(defender.reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
   });
 
+  it('creates battle and fleet outcome reports for bots', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const moveFleet = new Fleet(
+      41,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.TITAN, amount: 1 }),
+      new ResourcesPack(40, 20, 10),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players, system } = createGalaxyWithPlayers(
+      [moveFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[2].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.fromShipInstances([shipInstance(ShipType.SPY_PROBE)]);
+        solarSystem.planets[3].info.ownerId = 2;
+      },
+      (solarSystem) => ([
+        new Player(1, 'AlphaBot', [solarSystem.planets[0], solarSystem.planets[2]], new Map(), [], PlayerType.BOT),
+        new Player(2, 'BetaBot', [solarSystem.planets[1], solarSystem.planets[3]], new Map(), [], PlayerType.BOT)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[0].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
+    expect(players[0].reports.some((report) => report.title.startsWith('Fleet Failed: Move'))).toBe(true);
+    expect(players[1].reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
+    const alphaBattleReport = players[0].reports.find((report) => report.title.startsWith('Battle Report:')) ?? null;
+    expect(alphaBattleReport?.sourceCoordinates).toEqual({
+      x: 1,
+      y: 1,
+      z: system.planets[1].basicInfo.order
+    });
+  });
+
   it('keeps pending jump gate fleets waiting at origin through end turn resolution', () => {
     const waitingFleet = new Fleet(
       90,
@@ -202,6 +257,98 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(galaxy.activeFleets[0].pendingJumpGateRequestId).toBe(7);
     expect(galaxy.activeFleets[0].originPlanetName).toBe('Alpha Prime');
     expect(system.planets[0].rBDSFTQ.resources.metal).toBe(0);
+  });
+
+  it('emits a colonize outcome callback for a successful colonization', () => {
+    const colonizeFleet = new Fleet(
+      91,
+      1,
+      FleetMissionType.COLONIZE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'New World',
+      manyShips({ type: ShipType.COLONIZER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const events: PlayerFleetOutcomeLogEvent[] = [];
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [colonizeFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'New World';
+        solarSystem.planets[1].info.ownerId = null;
+      },
+      (solarSystem) => {
+        const player = new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER);
+        player.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 1);
+        return [player];
+      }
+    );
+
+    resolvePhaseOneTurn(galaxy, 2, {
+      fleetOutcomeLogger: (event) => events.push(event)
+    });
+
+    expect(system.planets[1].info.ownerId).toBe(1);
+    expect(events.some((event) =>
+      event.fleetId === 91
+      && event.outcomeType === 'COLONIZE'
+      && event.payload?.targetPlanetName === 'New World'
+    )).toBe(true);
+  });
+
+  it('emits a return outcome callback when a fleet unloads at origin', () => {
+    const returningFleet = new Fleet(
+      92,
+      1,
+      FleetMissionType.TRANSPORT,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Outer Hold',
+      manyShips({ type: ShipType.TRANSPORTER, amount: 2 }),
+      new ResourcesPack(50, 20, 10),
+      0,
+      1200,
+      80,
+      1,
+      1,
+      FleetState.RETURNING,
+      1
+    );
+
+    const events: PlayerFleetOutcomeLogEvent[] = [];
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [returningFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Outer Hold';
+        solarSystem.planets[1].info.ownerId = null;
+      },
+      (solarSystem) => [new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER)]
+    );
+
+    resolvePhaseOneTurn(galaxy, 2, {
+      fleetOutcomeLogger: (event) => events.push(event)
+    });
+
+    expect(galaxy.activeFleets).toHaveLength(0);
+    expect(system.planets[0].rBDSFTQ.resources.metal).toBe(50);
+    expect(events.some((event) =>
+      event.fleetId === 92
+      && event.outcomeType === 'RETURN'
+    )).toBe(true);
   });
 
   it('destroys a hostile transport that loses its arrival battle before cargo delivery', () => {
@@ -895,7 +1042,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
   });
 
   it('uses terraformer-adjusted industry and science modifiers during turn-resolution queue progress', () => {
-    const { galaxy, system } = createGalaxyWithPlayers(
+    const { galaxy, players, system } = createGalaxyWithPlayers(
       [],
       (solarSystem) => {
         const homePlanet = solarSystem.planets[0];
@@ -924,8 +1071,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     resolvePhaseOneTurn(galaxy);
 
-    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(23);
-    expect(system.planets[0].rBDSFTQ.currentResearchQueue?.investedResearchPower).toBe(32);
+    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(34);
+    expect(system.planets[0].rBDSFTQ.currentResearchQueue).toBeNull();
+    expect(players[0]?.getTechLevel(TechnologyType.ENERGY_TECHNOLOGY)).toBe(1);
   });
 
   it('applies fractional nanite multipliers to industry and shipyard power', () => {
@@ -988,6 +1136,86 @@ describe('resolvePhaseOneTurn battle integration', () => {
 
     expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(60);
     expect(system.planets[1].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(61);
+  });
+
+  it('routes repair-drone production to shipyard only when no building queue is active', () => {
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        const controlPlanet = solarSystem.planets[0];
+        controlPlanet.info.ownerId = 1;
+        controlPlanet.info.planetaryParameters.industryModifier = 1;
+        controlPlanet.info.planetaryParameters.energyModifierRES = 1;
+        controlPlanet.info.planetaryParameters.energyModifierNuclear = 1;
+        controlPlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+        controlPlanet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+        controlPlanet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+        controlPlanet.rBDSFTQ.shipyardQueue.push(ShipyardQueueEntry.ship(ShipType.ATMOSPHERIC_BOMBER, 1, 0));
+
+        const dronePlanet = solarSystem.planets[1];
+        dronePlanet.info.ownerId = 2;
+        dronePlanet.info.planetaryParameters.industryModifier = 1;
+        dronePlanet.info.planetaryParameters.energyModifierRES = 1;
+        dronePlanet.info.planetaryParameters.energyModifierNuclear = 1;
+        dronePlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+        dronePlanet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+        dronePlanet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+        dronePlanet.rBDSFTQ.ships = manyShips({ type: ShipType.REPAIR_DRONE, amount: 1 });
+        dronePlanet.rBDSFTQ.shipyardQueue.push(ShipyardQueueEntry.ship(ShipType.ATMOSPHERIC_BOMBER, 1, 0));
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(system.planets[0].rBDSFTQ.shipyardQueue[0]?.investedShipyardPower).toBe(52);
+    expect(system.planets[1].rBDSFTQ.shipyardQueue[0]?.investedShipyardPower).toBe(53);
+  });
+
+  it('keeps repair-drone production on industry when building and shipyard queues are both active', () => {
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        const controlPlanet = solarSystem.planets[0];
+        controlPlanet.info.ownerId = 1;
+        controlPlanet.info.planetaryParameters.industryModifier = 1;
+        controlPlanet.info.planetaryParameters.energyModifierRES = 1;
+        controlPlanet.info.planetaryParameters.energyModifierNuclear = 1;
+        controlPlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+        controlPlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+        controlPlanet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+        controlPlanet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+        controlPlanet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(BuildingType.FUSION_REACTOR, 1, 0));
+        controlPlanet.rBDSFTQ.shipyardQueue.push(ShipyardQueueEntry.ship(ShipType.ATMOSPHERIC_BOMBER, 1, 0));
+
+        const dronePlanet = solarSystem.planets[1];
+        dronePlanet.info.ownerId = 2;
+        dronePlanet.info.planetaryParameters.industryModifier = 1;
+        dronePlanet.info.planetaryParameters.energyModifierRES = 1;
+        dronePlanet.info.planetaryParameters.energyModifierNuclear = 1;
+        dronePlanet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+        dronePlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 1);
+        dronePlanet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+        dronePlanet.setBuildingLevel(BuildingType.SHIPYARD, 1);
+        dronePlanet.rBDSFTQ.ships = manyShips({ type: ShipType.REPAIR_DRONE, amount: 1 });
+        dronePlanet.rBDSFTQ.buildingQueue.push(new BuildingQueueEntry(BuildingType.FUSION_REACTOR, 1, 0));
+        dronePlanet.rBDSFTQ.shipyardQueue.push(ShipyardQueueEntry.ship(ShipType.ATMOSPHERIC_BOMBER, 1, 0));
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(system.planets[0].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(60);
+    expect(system.planets[1].rBDSFTQ.buildingQueue[0]?.investedIndustryPower).toBe(61);
+    expect(system.planets[0].rBDSFTQ.shipyardQueue[0]?.investedShipyardPower).toBe(52);
+    expect(system.planets[1].rBDSFTQ.shipyardQueue[0]?.investedShipyardPower).toBe(52);
   });
 
   it('uses fusion reactor upkeep against turn income only and never spends stored deuterium', () => {
@@ -1089,6 +1317,60 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(ManyShips.hasDamagedShips(system.planets[0].rBDSFTQ.ships)).toBe(false);
     expect(ManyShips.hasDamagedShips(galaxy.activeFleets[0].ships)).toBe(false);
     expect(ManyShips.undamagedCountByType(galaxy.activeFleets[0].ships).get(ShipType.CRUISER) ?? 0).toBe(1);
+  });
+
+  it('does not auto-repair fresh battle damage in the same turn after fleet resolution', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const attackFleet = new Fleet(
+      202,
+      1,
+      FleetMissionType.MOVE,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Dock',
+      manyShips({ type: ShipType.FIGHTER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [attackFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Dock';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].info.planetaryParameters.industryModifier = 1;
+        solarSystem.planets[1].info.planetaryParameters.energyModifierRES = 1;
+        solarSystem.planets[1].info.planetaryParameters.energyModifierNuclear = 1;
+        solarSystem.planets[1].setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 3);
+        solarSystem.planets[1].setBuildingLevel(BuildingType.SHIPYARD, 1);
+        solarSystem.planets[1].rBDSFTQ.ships = manyShips({ type: ShipType.TRANSPORTER, amount: 1 });
+        solarSystem.planets[2].info.ownerId = 1;
+        solarSystem.planets[3].info.ownerId = 2;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0], solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1], solarSystem.planets[3]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(ManyShips.undamagedCountByType(system.planets[1].rBDSFTQ.ships).get(ShipType.TRANSPORTER) ?? 0).toBe(0);
+    expect(ManyShips.damagedCountByType(system.planets[1].rBDSFTQ.ships).get(ShipType.TRANSPORTER) ?? 0).toBe(1);
+    expect(ManyShips.totalMissingHull(system.planets[1].rBDSFTQ.ships)).toBe(3);
   });
 
   it('repairs allied idle fleets in orbit with the host planet shipyard power', () => {
@@ -1231,6 +1513,52 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].rBDSFTQ.resources.crystal).toBe(100);
     expect(system.planets[1].rBDSFTQ.resources.deuterium).toBe(100);
     expect(attacker.reports.some((report) =>
+      report.title.startsWith('Plunder Report: Beta Storehouse')
+      && report.show().includes('Fleet cargo after looting: 600/600')
+    )).toBe(true);
+  });
+
+  it('creates plunder reports for bot attackers on no-battle Attack missions', () => {
+    const transporterCargoCapacity = blueprints.get(ShipType.TRANSPORTER)!.cargoCapacity;
+    const attackFleet = new Fleet(
+      297,
+      1,
+      FleetMissionType.ATTACK,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Storehouse',
+      manyShips({ type: ShipType.TRANSPORTER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      transporterCargoCapacity,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [attackFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Storehouse';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.resources = new ResourcesPack(300, 300, 300);
+        solarSystem.planets[1].rBDSFTQ.ships = ManyShips.empty();
+      },
+      (system) => {
+        const attacker = new Player(1, 'AlphaBot', [system.planets[0]], new Map(), [], PlayerType.BOT);
+        const defender = new Player(2, 'BetaBot', [system.planets[1]], new Map(), [], PlayerType.BOT);
+        return [attacker, defender];
+      }
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[0].reports.some((report) =>
       report.title.startsWith('Plunder Report: Beta Storehouse')
       && report.show().includes('Fleet cargo after looting: 600/600')
     )).toBe(true);
@@ -1735,5 +2063,196 @@ describe('resolvePhaseOneTurn battle integration', () => {
     expect(system.planets[1].getBuildingLevel(BuildingType.CRYSTAL_MINE)).toBe(2);
     expect(system.planets[1].getCurrentBuildingPowerConsumption(BuildingType.CRYSTAL_MINE)).toBe(0);
     expect(system.planets[1].getMaxBuildingPowerConsumption(BuildingType.CRYSTAL_MINE)).toBeGreaterThan(0);
+  });
+
+  it('sends a direct system-mail espionage alert only to the spied player', () => {
+    const spyFleet = new Fleet(
+      300,
+      1,
+      FleetMissionType.SPY,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.SPY_PROBE, amount: 3 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [spyFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[2].basicInfo.name = 'Gamma Ally';
+        solarSystem.planets[2].info.ownerId = 3;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER),
+        new Player(3, 'Gamma', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.ALLIED }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[1].messages.some((message) =>
+      message.title === 'Espionage alert: Alpha spied Beta Frontier'
+      && message.senderPlayerName === 'System'
+    )).toBe(true);
+    expect(players[2].messages.some((message) =>
+      message.title.includes('Espionage alert:')
+    )).toBe(false);
+  });
+
+  it('sends shared attack system-mail alerts to the victim plus allied and peace contacts', () => {
+    const attackFleet = new Fleet(
+      301,
+      1,
+      FleetMissionType.ATTACK,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips(
+        { type: ShipType.CRUISER, amount: 1 },
+        { type: ShipType.TRANSPORTER, amount: 1 }
+      ),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players, system } = createGalaxyWithPlayers(
+      [attackFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].rBDSFTQ.resources = new ResourcesPack(800, 600, 400);
+        solarSystem.planets[2].basicInfo.name = 'Gamma Ally';
+        solarSystem.planets[2].info.ownerId = 3;
+        solarSystem.planets[3].basicInfo.name = 'Delta Peace';
+        solarSystem.planets[3].info.ownerId = 4;
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER),
+        new Player(3, 'Gamma', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER),
+        new Player(4, 'Delta', [solarSystem.planets[3]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.ALLIED },
+      { playerAId: 2, playerBId: 4, status: DiplomaticStatus.PEACE }
+    ];
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[1].messages.some((message) =>
+      message.title === 'Hostile attack alert: Alpha attacked Beta Frontier'
+      && message.senderPlayerName === 'System'
+    )).toBe(true);
+    expect(players[2].messages.some((message) =>
+      message.title === 'Shared attack alert: Alpha attacked Beta at Beta Frontier'
+      && message.senderPlayerName === 'System'
+    )).toBe(true);
+    expect(players[3].messages.some((message) =>
+      message.title === 'Shared attack alert: Alpha attacked Beta at Beta Frontier'
+      && message.senderPlayerName === 'System'
+    )).toBe(true);
+  });
+
+  it('aggregates same-turn bombardment system-mail alerts for the same attacker, target, and mission type', () => {
+    const firstBombardFleet = new Fleet(
+      302,
+      1,
+      FleetMissionType.BOMBARD,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.ORBITAL_BOMBER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+    const secondBombardFleet = new Fleet(
+      303,
+      1,
+      FleetMissionType.BOMBARD,
+      point(1, 1, 0),
+      point(1, 1, 1),
+      'Alpha Prime',
+      'Beta Frontier',
+      manyShips({ type: ShipType.ORBITAL_BOMBER, amount: 1 }),
+      new ResourcesPack(0, 0, 0),
+      0,
+      0,
+      0,
+      1,
+      1,
+      FleetState.MOVING_TO_TARGET,
+      1
+    );
+
+    const { galaxy, players } = createGalaxyWithPlayers(
+      [firstBombardFleet, secondBombardFleet],
+      (solarSystem) => {
+        solarSystem.planets[0].basicInfo.name = 'Alpha Prime';
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[1].basicInfo.name = 'Beta Frontier';
+        solarSystem.planets[1].info.ownerId = 2;
+        solarSystem.planets[1].setBuildingLevel(BuildingType.METAL_MINE, 6);
+        solarSystem.planets[2].basicInfo.name = 'Gamma Ally';
+        solarSystem.planets[2].info.ownerId = 3;
+      },
+      (solarSystem) => {
+        const alpha = new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER);
+        const beta = new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER);
+        const gamma = new Player(3, 'Gamma', [solarSystem.planets[2]], new Map(), [], PlayerType.PLAYER);
+        alpha.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 4);
+        beta.setTechLevel(TechnologyType.ARMOUR_TECHNOLOGY, 4);
+        return [alpha, beta, gamma];
+      }
+    );
+    galaxy.diplomaticRelations = [
+      { playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR },
+      { playerAId: 2, playerBId: 3, status: DiplomaticStatus.ALLIED }
+    ];
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(players[1].messages.filter((message) =>
+      message.title === 'Hostile bombard alert: Alpha targeted Beta Frontier'
+    )).toHaveLength(1);
+    expect(players[2].messages.filter((message) =>
+      message.title === 'Shared bombard alert: Alpha targeted Beta'
+    )).toHaveLength(1);
   });
 });

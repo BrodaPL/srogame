@@ -98,19 +98,6 @@ export class BotDebugViewComponent implements OnInit {
     this.runBotAction((playerId, token) => this.gameApi.clearBotMemory(playerId, token), 'Unable to clear bot memory.');
   }
 
-  protected stopReasonLabel(stopReason: BotDecisionTraceDto['actionBudget']['stopReason']): string {
-    switch (stopReason) {
-      case 'action_cap':
-        return 'Action cap reached';
-      case 'below_threshold':
-        return 'Stopped below utility threshold';
-      case 'no_candidates':
-        return 'No valid candidates remained';
-      default:
-        return 'Still active';
-    }
-  }
-
   private loadTraces(): void {
     if (!this.canInspectBots()) {
       this.loadError = 'Bot traces are only available to local admin/controller sessions.';

@@ -54,17 +54,18 @@ describe('game-save', () => {
   it('serializes the live galaxy state into a save DTO without circular references', () => {
     const save = buildTestSave();
 
-    expect(save.version).toBe(3);
+    expect(save.version).toBe(4);
     expect(save.gameId).toBe('game-save-test');
     expect(save.ownerAccountId).toBe(42);
     expect(save.savedAt).toBe('2026-04-01T12:00:00.000Z');
+    expect(save.trackedPlayerActionFleetIds).toEqual([7, 12]);
     expect(save.setup.autoSaveTurns).toBe(5);
     expect(save.galaxy.players[0].planetCoordinates).toEqual([{ x: 0, y: 0, z: 0 }]);
     expect(save.galaxy.players[0].fleetIds).toEqual([7]);
     expect(save.galaxy.players[0].reports).toHaveLength(2);
     expect(save.galaxy.players[0].messages[0].title).toBe('Mail');
     expect(save.galaxy.players[0].botProfileId).toBe('BALANCED');
-    expect(save.galaxy.players[0].botMemory?.currentGoal).toBe('KEY_BUILDING_UP');
+    expect(save.galaxy.players[0].botMemoryV2?.currentStance).toBe('ECONOMIC_GROWTH');
     expect(save.galaxy.stars[0][0].starSystemNotes[0].text).toBe('Scout route');
     expect(save.galaxy.stars[0][0].planets[0].rBDSFTQ.fleetIds).toEqual([7]);
     expect(save.galaxy.stars[0][0].planets[0].lastReportData[0].report.reportType).toBe('Espionage Report');
@@ -125,6 +126,7 @@ describe('game-save', () => {
     expect(hydrated.gameId).toBe('game-save-test');
     expect(hydrated.ownerAccountId).toBe(42);
     expect(hydrated.ownerPlayerName).toBe('Alpha');
+    expect(hydrated.trackedPlayerActionFleetIds).toEqual([7, 12]);
     expect(hydrated.setup.autoSaveTurns).toBe(5);
     expect(hydrated.galaxy.name).toBe('Save Test');
     expect(hydrated.galaxy.currentTurn).toBe(6);
@@ -136,23 +138,29 @@ describe('game-save', () => {
 
     expect(player.playerName).toBe('Alpha');
     expect(player.botProfileId).toBe('BALANCED');
-    expect(player.botMemory?.currentGoal).toBe('KEY_BUILDING_UP');
-    expect(player.botMemory?.reservedResources).toEqual({ metal: 40, crystal: 20, deuterium: 10 });
-    expect(player.botMemory?.recentDiplomacyTargets).toEqual([{ playerId: 2, requestedStatus: 'PEACE', turn: 5 }]);
-    expect(player.botMemory?.lastProcessedFleetReportId).toBe(12);
-    expect(player.botMemory?.farmTargets).toEqual([
-      {
-        targetCoordinates: { x: 2, y: 1, z: 0 },
-        lastAttackTurn: 6,
-        nextAllowedAttackTurn: 16,
-        lastSentCombatStrength: 42,
-        lastKnownDefenceCount: 0,
-        lastKnownShipCount: 0,
-        lastKnownOpened: true,
-        nextForceMultiplier: 1,
-        lastLossBracket: 'NONE'
-      }
-    ]);
+    expect(player.botMemory).toBeNull();
+    expect(player.botMemoryV2).toMatchObject({
+      version: 1,
+      currentStance: 'ECONOMIC_GROWTH',
+      antiOscillation: {
+        lastMajorFocus: 'ECONOMIC',
+        lastMajorFocusTurn: 5,
+        doNotReplaceBeforeTurn: 7
+      },
+      cooldowns: {
+        economic_rebalance: 8
+      },
+      recentTargets: [{
+        key: 'planet:0:0:0',
+        turn: 6
+      }],
+      acceptedLongTermCommitments: [{
+        commitmentKey: 'economic:0:0:0:metal',
+        subsystemId: 'ECONOMIC',
+        createdTurn: 6,
+        expiresOnTurn: 9
+      }]
+    });
     expect(player.planets[0]).toBe(planet);
     expect(player.fleets[0]).toBe(fleet);
     expect(planet.info.ownerId).toBe(player.playerId);
@@ -387,6 +395,8 @@ function buildTestSave() {
       senderPlayerName: 'Scout'
     },
     4,
+    true,
+    true,
     172,
     new PlanetaryParameters(1, 1, 1, 1, 1, 1, 1, 1, 1),
     3,
@@ -454,27 +464,28 @@ function buildTestSave() {
     1,
     {
       botProfileId: 'BALANCED',
-      botMemory: {
-        currentGoal: 'KEY_BUILDING_UP',
-        goalTarget: { x: 0, y: 0, z: 0 },
-        goalExpiresTurn: 8,
-        reservedResources: { metal: 40, crystal: 20, deuterium: 10 },
-        lastSpyTargets: [{ x: 1, y: 0, z: 0 }],
-        lastAttackTargets: [{ x: 2, y: 1, z: 0 }],
-        recentDiplomacyTargets: [{ playerId: 2, requestedStatus: 'PEACE', turn: 5 }],
-        farmTargets: [{
-          targetCoordinates: { x: 2, y: 1, z: 0 },
-          lastAttackTurn: 6,
-          nextAllowedAttackTurn: 16,
-          lastSentCombatStrength: 42,
-          lastKnownDefenceCount: 0,
-          lastKnownShipCount: 0,
-          lastKnownOpened: true,
-          nextForceMultiplier: 1,
-          lastLossBracket: 'NONE'
+      botMemoryV2: Player.normalizeBotMemoryV2({
+        version: 1,
+        currentStance: 'ECONOMIC_GROWTH',
+        antiOscillation: {
+          lastMajorFocus: 'ECONOMIC',
+          lastMajorFocusTurn: 5,
+          doNotReplaceBeforeTurn: 7
+        },
+        cooldowns: {
+          economic_rebalance: 8
+        },
+        recentTargets: [{
+          key: 'planet:0:0:0',
+          turn: 6
         }],
-        lastProcessedFleetReportId: 12
-      }
+        acceptedLongTermCommitments: [{
+          commitmentKey: 'economic:0:0:0:metal',
+          subsystemId: 'ECONOMIC',
+          createdTurn: 6,
+          expiresOnTurn: 9
+        }]
+      } as never)
     }
   );
   player.nextReportId = 9;
@@ -578,5 +589,5 @@ function buildTestSave() {
     skipTutorial: true,
     startingHomeworldPreset: StartingHomeworldPreset.MEDIUM,
     startingResources: { metal: 6, crystal: 3, deuterium: 1 }
-  }, '2026-04-01T12:00:00.000Z', null, 'game-save-test');
+  }, '2026-04-01T12:00:00.000Z', null, 'game-save-test', [7, 12]);
 }

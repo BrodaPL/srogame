@@ -230,7 +230,11 @@
         @if (selectedSystemPlanets.length > 0) {
           <div class="star-system-preview__planets" data-tutorial-id="galactic-planet-mini-cards">
             @for (planet of selectedSystemPlanets; track planet.coordinates.z) {
-              <app-mini-planet-preview [planet]="planet" />
+              <div
+                class="star-system-preview__planet-slot"
+                [class.star-system-preview__planet-slot--highlighted]="isHighlightedPlanet(planet)">
+                <app-mini-planet-preview [planet]="planet" />
+              </div>
             }
           </div>
         } @else {

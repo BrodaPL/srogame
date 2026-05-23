@@ -41,6 +41,7 @@ type GalaxySetupForm = {
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
   autoSaveTurns: string;
+  enablePlayerActionLogging: boolean;
   startingHomeworldPreset: StartingHomeworldPreset;
   botProfileCounts: Record<string, string>;
   createRandomPlanets: boolean;
@@ -183,6 +184,7 @@ export class GalaxySetupComponent {
       neutralBotsAmount: Number(this.form.neutralBotsAmount),
       neutralBotsDifficulty: Number(this.form.neutralBotsDifficulty),
       autoSaveTurns: Number(this.form.autoSaveTurns),
+      enablePlayerActionLogging: this.form.enablePlayerActionLogging,
       startingHomeworldPreset: this.form.startingHomeworldPreset,
       createRandomPlanets: this.form.createRandomPlanets,
       createStartingShips: this.form.createStartingShips,
@@ -230,6 +232,7 @@ export class GalaxySetupComponent {
       neutralBotsAmount: String(DEFAULT_NEUTRAL_PLANET_PERCENT),
       neutralBotsDifficulty: '0',
       autoSaveTurns: '5',
+      enablePlayerActionLogging: false,
       startingHomeworldPreset: DEFAULT_STARTING_HOMEWORLD_PRESET,
       botProfileCounts: this.formStringsFromBotProfileCounts(botProfileCounts),
       createRandomPlanets: false,
@@ -257,6 +260,7 @@ export class GalaxySetupComponent {
       neutralBotsAmount: String(config.neutralBotsAmount),
       neutralBotsDifficulty: String(config.neutralBotsDifficulty),
       autoSaveTurns: String(config.autoSaveTurns),
+      enablePlayerActionLogging: config.enablePlayerActionLogging === true,
       startingHomeworldPreset: config.startingHomeworldPreset,
       botProfileCounts: this.formStringsFromBotProfileCounts(
         config.botProfileCounts ?? createDefaultBotProfileCounts(config.botsAmount)
@@ -339,6 +343,7 @@ export class GalaxySetupComponent {
       Number.isInteger(config.autoSaveTurns) &&
       config.autoSaveTurns >= 0 &&
       config.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&
+      (config.enablePlayerActionLogging === undefined || typeof config.enablePlayerActionLogging === 'boolean') &&
       (config.startingHomeworldPreset === StartingHomeworldPreset.LOW
         || config.startingHomeworldPreset === StartingHomeworldPreset.MEDIUM
         || config.startingHomeworldPreset === StartingHomeworldPreset.HIGH) &&

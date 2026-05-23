@@ -1,4 +1,4 @@
-import type { BotGoalType, BotProfileId, Player } from '../../../src/app/models/player.ts';
+import type { BotProfileId, Player } from '../../../src/app/models/player.ts';
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import { BOT_PROFILE_IDS } from './bot-profile.js';
 
@@ -8,7 +8,7 @@ export type BotAdminState = {
   playerId: number;
   playerName: string;
   profileId: BotProfileId | null;
-  currentGoal: BotGoalType | null;
+  currentGoal: string | null;
   planetsOwned: number;
   activeFleetCount: number;
   paused: boolean;
@@ -25,7 +25,7 @@ export function toBotAdminState(galaxy: Galaxy, player: Player): BotAdminState {
     playerId: player.playerId,
     playerName: player.playerName,
     profileId: player.botProfileId,
-    currentGoal: player.botMemory?.currentGoal ?? null,
+    currentGoal: player.botMemoryV2?.currentStance ?? null,
     planetsOwned: player.planets.length,
     activeFleetCount: galaxy.activeFleets.filter((fleet) => fleet.ownerId === player.playerId).length,
     paused: pausedBotPlayerIds.has(player.playerId)
@@ -41,7 +41,7 @@ export function setBotProfile(player: Player, profileId: BotProfileId): void {
 }
 
 export function clearBotMemory(player: Player): void {
-  player.botMemory = null;
+  player.botMemoryV2 = null;
 }
 
 export function pauseBot(playerId: number): void {

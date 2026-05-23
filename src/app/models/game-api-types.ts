@@ -43,6 +43,7 @@ export type GalaxySetup = {
   neutralBotsAmount: number;
   neutralBotsDifficulty: number;
   autoSaveTurns: number;
+  enablePlayerActionLogging?: boolean;
   startingHomeworldPreset: StartingHomeworldPreset;
   createRandomPlanets?: boolean;
   createStartingShips?: boolean;
@@ -103,6 +104,7 @@ export function normalizeGalaxySetup(
       botsAmount
     ),
     autoSaveTurns: normalizeAutoSaveTurns(setup.autoSaveTurns),
+    enablePlayerActionLogging: setup.enablePlayerActionLogging === true,
     startingHomeworldPreset: normalizeStartingHomeworldPreset(setup.startingHomeworldPreset)
   };
 }
@@ -405,16 +407,55 @@ export type BotDecisionTraceDto = {
   playerId: number;
   playerName: string;
   turn: number;
-  profileId: BotProfileId | null;
-  startingGoal: BotGoalType | null;
-  endingGoal: BotGoalType | null;
-  actionBudget: {
-    max: number;
-    used: number;
-    stopReason: BotTraceStopReason | null;
+  shadowMode: boolean;
+  snapshotSummary: {
+    planetCount: number;
+    totalResources: {
+      metal: number;
+      crystal: number;
+      deuterium: number;
+    };
+    atWar: boolean;
   };
-  chosenActions: BotChosenActionTraceDto[];
-  rejectedActions: BotRejectedActionTraceDto[];
+  subsystemResults: Array<{
+    subsystemId: string;
+    proposalCount: number;
+    goalCount?: number;
+    planetResultCount?: number;
+    debug: Record<string, string | number | boolean | null>;
+  }>;
+  proposals: Array<{
+    proposalId: string;
+    subsystemId: string;
+    summary: string;
+    expectedValue: number;
+    urgency: number;
+    risk: number;
+    confidence: number;
+    dedupeKey: string;
+  }>;
+  supervisorDecision: {
+    acceptedProposalIds: string[];
+    pendingProposalIds: string[];
+    rejectedCount: number;
+    mode: 'SHADOW' | 'LIVE';
+    debug?: Record<string, string | number | boolean | null>;
+  };
+  executionOutcomes: Array<{
+    proposalId: string;
+    executed: boolean;
+    success: boolean;
+    message: string | null;
+    spent?: {
+      metal: number;
+      crystal: number;
+      deuterium: number;
+    };
+    fuelSpent?: number;
+    fleetId?: number;
+    missionType?: string;
+    commandErrorCode?: string;
+  }>;
 };
 
 export type BotDecisionTracesResponse = {
@@ -426,7 +467,7 @@ export type BotAdminStateDto = {
   playerId: number;
   playerName: string;
   profileId: BotProfileId | null;
-  currentGoal: BotGoalType | null;
+  currentGoal: string | null;
   planetsOwned: number;
   activeFleetCount: number;
   paused: boolean;
@@ -921,6 +962,8 @@ export type TextPlayerReportDto = PlayerReportDtoBase & {
 export type EspionagePlayerReportDto = PlayerReportDtoBase & {
   reportType: ReportType;
   diff: number;
+  hasTotalDefencesIntel: boolean;
+  hasTotalShipsIntel: boolean;
   size: number;
   planetaryParameters: PlanetaryParametersDto;
   averageBuildingLevel: number;
@@ -1176,6 +1219,13 @@ export type StartTechnologyResearchRequest = {
   y: number;
   z: number;
   technologyType: TechnologyType;
+  helperPlanets: ClientCoordinates[];
+};
+
+export type UpdateResearchHelpersRequest = {
+  x: number;
+  y: number;
+  z: number;
   helperPlanets: ClientCoordinates[];
 };
 

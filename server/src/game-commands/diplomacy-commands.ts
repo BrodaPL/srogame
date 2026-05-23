@@ -236,6 +236,10 @@ function validateDiplomaticProposalCreation(
     return commandError(403, 'FORBIDDEN', 'Neutral factions do not participate in treaty proposals.');
   }
 
+  if (!isPlayerVisibleInDiplomacy(galaxy, sourcePlayer.playerId, targetPlayer.playerId)) {
+    return commandError(403, 'FORBIDDEN', 'Diplomacy target is not yet visible.');
+  }
+
   if (!isDiplomaticProposalRequestedStatus(requestedStatus)) {
     return commandError(400, 'INVALID_INPUT', 'Requested diplomacy status is not proposeable.');
   }

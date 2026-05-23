@@ -169,6 +169,21 @@
   line-height: 1.1;
 }
 
+.reports-view__coordinate-link {
+  border: 0;
+  background: transparent;
+  color: #8cc1ff;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12rem;
+  cursor: pointer;
+}
+
+.reports-view__coordinate-link:hover {
+  color: #bfdcff;
+}
+
 .reports-view__detail-scroll {
   min-height: 0;
   overflow-y: auto;

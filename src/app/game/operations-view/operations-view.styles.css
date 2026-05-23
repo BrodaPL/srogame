@@ -67,20 +67,54 @@
   word-break: break-word;
 }
 
-.operations-view__coordinate-line[data-relation='own'] {
+.operations-view__coordinate-segment[data-relation='own'] {
   color: #63c874;
 }
 
-.operations-view__coordinate-line[data-relation='war'] {
+.operations-view__coordinate-segment[data-relation='war'] {
   color: #e45b5b;
 }
 
-.operations-view__coordinate-line[data-relation='allied'] {
+.operations-view__coordinate-segment[data-relation='allied'] {
   color: #5f92e8;
 }
 
-.operations-view__coordinate-line[data-relation='peace'] {
+.operations-view__coordinate-segment[data-relation='peace'] {
   color: #d8bf46;
+}
+
+.operations-view__coordinate-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.32rem;
+  align-items: center;
+}
+
+.operations-view__coordinate-segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  align-items: center;
+}
+
+.operations-view__coordinate-link {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12rem;
+  cursor: pointer;
+}
+
+.operations-view__coordinate-link:hover {
+  color: #fff;
+}
+
+.operations-view__coordinate-owner,
+.operations-view__coordinate-arrow {
+  color: inherit;
 }
 
 .operations-view__card--attack {

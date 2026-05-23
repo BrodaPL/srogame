@@ -35,6 +35,10 @@ import { resolveFusionReactorOperation, type FusionReactorOperation } from '../.
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
+import {
+  calculateRepairDroneProductionBasePower,
+  routeRepairDroneProduction
+} from '../../models/turns/repair-drone-production';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import {
@@ -848,7 +852,7 @@ export class ProductionViewComponent implements OnInit {
 
   protected shipyardQueueRows(): ShipyardQueueRowVm[] {
     const queueEntries = this.selectedPlanet()?.objects.shipyardQueue ?? [];
-    const shipyardPower = this.currentShipyardPower();
+    const shipyardPower = this.currentTotalShipyardPower();
     let cumulativeRemaining = 0;
     const rows: ShipyardQueueRowVm[] = [];
 
@@ -1128,7 +1132,9 @@ export class ProductionViewComponent implements OnInit {
       industryPower: this.currentIndustryPower(),
       droneIndustryPower: this.currentDroneIndustryPower(),
       totalIndustryPower: this.currentTotalIndustryPower(),
-      shipyardPower: this.currentShipyardPower(),
+      shipyardPower: this.currentBaseShipyardPower(),
+      droneShipyardPower: this.currentDroneShipyardPower(),
+      totalShipyardPower: this.currentTotalShipyardPower(),
       researchPower: this.currentResearchPower(),
       industryPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
         || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
@@ -1200,19 +1206,19 @@ export class ProductionViewComponent implements OnInit {
   }
 
   private currentDroneIndustryPower(): number {
-    const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
-    const industryModifier = this.selectedPlanet()?.info.planetaryParameters.industryModifier ?? 1;
-    const repairDroneCount = ManyShips.countByType(this.selectedPlanet()?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
-    const droneIndustryPower = repairDroneCount
-      * industryModifier
-      * industryPowerMultiplier(adaptiveTechnologyLevel);
-    return !Number.isFinite(droneIndustryPower) || droneIndustryPower <= 0
-      ? 0
-      : Math.floor(droneIndustryPower * this.currentEnergyEfficiency());
+    return this.currentDroneProductionRouting().droneIndustryPower;
+  }
+
+  private currentDroneShipyardPower(): number {
+    return this.currentDroneProductionRouting().droneShipyardPower;
   }
 
   private currentTotalIndustryPower(): number {
     return this.currentIndustryPower() + this.currentDroneIndustryPower();
+  }
+
+  private currentTotalShipyardPower(): number {
+    return this.currentBaseShipyardPower() + this.currentDroneShipyardPower();
   }
 
   private currentFusionReactorSelectedStage(): number {
@@ -1279,7 +1285,7 @@ export class ProductionViewComponent implements OnInit {
     });
   }
 
-  private currentShipyardPower(): number {
+  private currentBaseShipyardPower(): number {
     const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const industryModifier = this.selectedPlanet()?.info.planetaryParameters.industryModifier ?? 1;
     const shipyardLevel = this.buildingLevel(BuildingType.SHIPYARD);
@@ -1291,6 +1297,25 @@ export class ProductionViewComponent implements OnInit {
       * industryModifier
       * industryPowerMultiplier(adaptiveTechnologyLevel);
     return !Number.isFinite(shipyardPower) || shipyardPower <= 0 ? 0 : Math.floor(shipyardPower * this.currentEnergyEfficiency());
+  }
+
+  private currentDroneProductionRouting(): ReturnType<typeof routeRepairDroneProduction> {
+    const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const industryModifier = this.selectedPlanet()?.info.planetaryParameters.industryModifier ?? 1;
+    const repairDroneCount = ManyShips.countByType(this.selectedPlanet()?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
+
+    return routeRepairDroneProduction(
+      calculateRepairDroneProductionBasePower({
+        repairDroneCount,
+        industryModifier,
+        adaptiveIndustryMultiplier: industryPowerMultiplier(adaptiveTechnologyLevel),
+        energyEfficiency: this.currentEnergyEfficiency()
+      }),
+      {
+        hasBuildingQueueWork: (this.selectedPlanet()?.objects.buildingQueue?.length ?? 0) > 0,
+        hasShipyardQueueWork: (this.selectedPlanet()?.objects.shipyardQueue?.length ?? 0) > 0
+      }
+    );
   }
 
   private currentResearchPower(): number {

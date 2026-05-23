@@ -11,7 +11,9 @@
     "mcp:smoke": "node scripts/run-mcp-smoke-tests.js",
     "bot:bench": "npx tsx scripts/run-bot-benchmarks.ts",
     "bot:smoke": "node scripts/run-bot-smoke-tests.js",
-    "bot:sim": "npx tsx scripts/run-bot-simulations.ts",
+    "bot:sim": "npx tsx scripts/run-bot-v2-simulation.ts",
+    "bot:sim:initial": "npx tsx scripts/run-bot-v2-simulation.ts --scenario=initial",
+    "bot:sim:advanced": "npx tsx scripts/run-bot-v2-simulation.ts --scenario=advanced",
     "bot:sim:baseline": "npx tsx scripts/run-bot-sim-baselines.ts",
     "ships:descr": "node scripts/generate-ships-descr.ts",
     "defences:descr": "node scripts/generate-defences-descr.ts"

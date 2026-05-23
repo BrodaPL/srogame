@@ -51,6 +51,8 @@ describe('PlayerReport domain', () => {
         sourceSystemName: 'System'
       },
       3,
+      true,
+      true,
       160,
       new PlanetaryParameters(1, 1, 1, 1, 1, 1, 1, 1, 1),
       2,

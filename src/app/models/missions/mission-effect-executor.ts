@@ -1,6 +1,7 @@
 import { EspionageReportGenerator } from '../../generators/espionage-report-generator';
 import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
 import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
+import { ManyDefences } from '../defences/many-defences';
 import { BuildingType } from '../enums/building-type';
 import { FleetMissionType } from '../enums/fleet-mission-type';
 import { PlayerType } from '../enums/player-type';
@@ -13,6 +14,7 @@ import type { Planet } from '../planets/planet';
 import type { Player } from '../player';
 import type { Fleet } from '../fleets/fleet';
 import type { MissionEffect, MissionResolutionResult } from './mission-effect';
+import { armamentDeliveryShipAmountRequestsFromManyShips } from './armament-delivery';
 
 export type MissionEffectExecutionContext = {
   galaxy: Galaxy;
@@ -82,6 +84,28 @@ export class MissionEffectExecutor {
           context.fleet.cargo.deuterium
         ));
         break;
+      case 'transferFleetBombsToPlanet': {
+        const targetPlanet = this.resolvePlanet(effect.planetRef, context);
+        if (!targetPlanet) {
+          break;
+        }
+
+        targetPlanet.rBDSFTQ.defences.addManyDefences(context.fleet.carriedBombs);
+        context.fleet.carriedBombs = ManyDefences.empty();
+        break;
+      }
+      case 'transferArmamentDeliveryShipsToPlanet': {
+        const targetPlanet = this.resolvePlanet(effect.planetRef, context);
+        if (!targetPlanet) {
+          break;
+        }
+
+        const extractedShips = context.fleet.ships.extractAnyShipsByType(
+          armamentDeliveryShipAmountRequestsFromManyShips(context.fleet.ships)
+        );
+        targetPlanet.rBDSFTQ.ships.addManyShips(extractedShips);
+        break;
+      }
       case 'clearFleetCargo':
         context.fleet.cargo = new ResourcesPack(0, 0, 0);
         context.fleet.usedCargoCapacity = 0;

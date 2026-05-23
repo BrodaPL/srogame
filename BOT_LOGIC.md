@@ -37,6 +37,24 @@ The current server-side bot runtime covers:
 The main runtime lives in:
 - `server/src/bots/bot-turn-runner.ts`
 
+Bot AI V2 note:
+- `server/src/bots-v2/` is still shadow-only and does not execute live commands
+- its current implemented subsystems are `Economic`, `Defensive`, `Warfare`, `Strategic Development`, `Strategic Military`, `Strategic Diplomatic`, `Weight Manager`, and `Critical`
+- the current Economic shadow planner is local-per-planet, branch-first (`ENERGY` / `STORAGE` / `ECONOMY`), expands building + strict prerequisite-research chains, uses narrow throughput-only `ETC` with stepwise throughput re-simulation, deduplicates shared immediate requests, and emits per-planet goal/no-action metadata for later supervisory work
+- the current Defensive shadow planner is also local-per-planet, mixes `UNLOCK` / `BUILDING` / `PRODUCTION` goals, uses `avg_industry`, bunker-vs-defense value balance, local shipyard throughput, and explicit selection modes (`STRUCTURAL_ONLY`, `STRUCTURE_AND_PRODUCTION`, `PRODUCTION_ONLY`), and emits the same primary/secondary goal-request contract as Economic
+- the current Warfare shadow planner is also local-per-planet, mixes `CAPACITY` / `UNLOCK` / `PRODUCTION` goals, uses `avg_industry` for unlock and shipyard/nanite targets, ranks by `weightedEtc = totalEtc / bonusFactor`, emits up to five visible requests per planet with category-aware structural/cargo shaping, and currently scopes ship production to combat ships plus `TRANSPORTER` / `MASS_HAULER` / `CARGO_SUPPORT`
+- the current Strategic Development shadow planner now has a split local/global shape: it still emits separate per-planet building-side and production-side requests for `INTERSTELLAR_TRADE_PORT` / `JUMP_GATE` / `RESEARCH_LAB` / `SENSOR_PHALANX` plus `COLONIZER` / transport / `REPAIR_DRONE` readiness stock, and it now also emits separate global `FLEET_MISSION` proposals for `TRANSPORT`, `ARMAMENT_DELIVERY`, colonization-intel `SPY`, and one executable `COLONIZE` request when a fresh scanned target, free colony slot, and ready colonizer source all exist
+- the current Strategic Military shadow planner is global and mission-focused: it scans the whole galaxy for neutral-vs-not-neutral classification, keeps persistent neutral-farm ledgers in `BotMemoryV2`, uses only report/battle/plunder-derived farm facts plus remembered regrowth estimates instead of hidden live neutral state, hard-gates `PLUNDER` behind completed `BREAK`, can now emit relocation `MOVE` proposals that gather military ships from multiple owned origins onto the best staging planet for blocked `BREAK` targets, and emits exact-ship-type `SHIP_NEED` demand proposals only when regrouping still cannot satisfy the current farm plan
+- Strategic Diplomatic phase-5 update: on top of the existing relation, spy, attack/support, and force-projection layers, it now persists one primary pre-break `WAR` target in `BotMemoryV2`, holds that target for a deterministic randomized `3..10` turn window unless invalidated, evaluates target-worth margin with a deterministic randomized `1.25..1.5` multiplier, tries concentration-first `MOVE + ATTACK` planning before new production pressure, and emits exact-ship-type war-break `SHIP_NEED` only after direct attack and regrouping options are both exhausted
+- Strategic Diplomatic phase-6 update: after the pre-break layer, it now keeps opened-war target ledgers in `BotMemoryV2`, requires battle or fresh-spy confirmation that a target planet has zero ships and zero defenses before post-break pressure begins, emits cargo-supported raid `ATTACK` proposals with risk-banded military cover, and pauses repeated raids when ambush-risk from enemy strength, raid frequency, and nearby hostile coverage grows too high
+- Strategic Diplomatic phase-7 update: it now keeps a per-faction war-pressure ledger in `BotMemoryV2`, parses outgoing `Bombardment Report` results into coercion pressure, estimates incoming coercion from recent own structural damage during war, reevaluates short-term (`20`) and long-term (`100`) war scores every `20` turns, lowers hostility when coercive pressure succeeds or when a war is being lost, and can reopen `WAR -> NEUTRAL` deescalation proposals without forcing them
+- Strategic Diplomatic phase-8 update: it now keeps a shared-hostile-event ledger in `BotMemoryV2`, mines direct allied/peace battle and incoming bombardment/siege reports into relation-weighted shared hostility (`ALLIED 40%`, `PEACE 10%`), raises enemy hostility immediately from that shared pressure, and reuses those shared events as diplomatic attack/support score modifiers without changing legality rules
+- Strategic Diplomatic phase-9 update: it now emits one best shadow outgoing support request per turn (`PLANET_REPAIR`, `PLANET_DEFENSE`, extreme `RESOURCE_SUPPORT`, or blocked offensive help), widens incoming support-request awareness to all support families, emits structured incoming support-request approve/reject/partial preferences, and uses known `ALLIANCE_DEPOT` / `JUMP_GATE` levels plus total structural-damage ratios to make repair/defense/depot cooperation requests more informed
+- Weight Manager phase-1 update: it now persists advisory `player.botMemoryV2.weightManager` output with global `strategicDevelopment` / `strategicMilitary` / `strategicDiplomatic` weights, per-planet `economic` / `defensive` / `warfare` weights, one mutually-exclusive empire mode, and maturity/focus/danger flags derived from reused `avg_industry`, computed `avg_military` / `avg_defence` / `avg_development`, discovered-farm pressure, diplomacy mix, known-war discovery, and recent hostile attack counts
+- Critical phase-1 update: it now persists `player.botMemoryV2.critical.blockerLedger`, detects `ENERGY_DEADLOCK`, `STORAGE_DEADLOCK`, `INDUSTRY_CHAIN_DEADLOCK`, `LOGISTICS_DEADLOCK`, and `INTEL_DEADLOCK`, inspects earlier subsystem proposals through sequential `priorProposals` context, and emits only capped emergency `BUILDING` / `SHIPYARD` unblock proposals for local energy fixes, storage overflow relief, core industry-chain recovery, cargo-capacity shortages, spy-probe shortages, and safe-planet emergency `REPAIR_DRONE` production
+- TODO: actual V2 answering/execution of support and maintenance requests is deferred to the future Supervisor subsystem; Strategic Diplomatic currently only emits the request and preference proposals
+- the current Strategic Diplomatic shadow planner now has a split phase-1/phase-2/phase-3 shape: it still tracks only discovered non-neutral players/bots, keeps memory-backed per-faction strength/stance/hostility/confidence ledgers, emits diplomatic relation-change proposals plus incoming/outgoing proposal-management preferences and retaliation flags, and emits real-player `SPY` mission proposals plus up to two per-planet `SPY_PROBE` `SHIP_NEED` requests when diplomatic intel is too old, too shallow, or too sparse across a faction’s known planets; on top of that it now also emits executable diplomatic `ATTACK`, allied `REPAIR`, and allied `DEFEND` mission proposals plus exact-ship-type war `SHIP_NEED` fallbacks, using `WAR` / hostile-`NEUTRAL` / clearly-weaker-`NEUTRAL` offensive targeting, one-medium-ship battle-scout attacks when military confidence is low, allied explicit-support + recent-attack support triggers, and a dynamic `ATTACK`/`SUPPORT` split driven by global war state and ally distress
+
 Supporting bot modules:
 - `server/src/bots/bot-profile.ts`
 - `server/src/bots/bot-diplomacy-awareness.ts`
@@ -199,6 +217,72 @@ Current role:
 - make sure a live local-admin bot game still starts and runs
 - verify `/game/operations`, `/game/mail`, `/game/diplomacy`, and `/game/bot-debug`
 - useful for route / DTO / integration failures
+
+## Current High-Priority TODO
+
+These are the current V2 blockers from the latest fixed-seed `benchmark20x20` 170-turn runs.
+
+### 1. Neutral home-system farming is still blocked
+
+Observed state:
+- recent benchmark reruns still end with `BATTLE: 0`, `PLUNDER: 0`, `BOMBARDMENT: 0`
+- Strategic Military can now leave the endless `SPY` loop and emit probe `ATTACK` intent
+- bots now also receive fleet/battle outcome reports, not just human players
+
+Important benchmark detail:
+- `battle-summary.json` is built from contender reports only
+- so `0` battle/plunder events means the runner still did not observe usable `Battle Report:` or `Plunder Report:` entries on the bot players
+
+What still needs to be verified and fixed:
+- whether accepted neutral probe `ATTACK` missions actually reach combat resolution
+- whether those probe outcomes become `Battle Report:` entries on the attacking/defending bot consistently
+- whether the V2 snapshot path then converts those reports into:
+  - `lastAttackTurn`
+  - `combatObservationTurn`
+  - `knownShipCountsByType`
+  - `knownDefenceCountsByType`
+- whether Strategic Military then advances from probe intel into real `BREAK`
+- whether `BREAK` can then advance into repeated `PLUNDER`
+
+Practical debugging target:
+- inspect one fixed-seed run end-to-end for a single home-system neutral farm:
+  1. accepted `INTEL:Attack`
+  2. actual fleet arrival/combat result
+  3. generated bot reports
+  4. snapshot target fields on the following turn
+  5. next Strategic Military decision
+
+### 2. Personality compression changed outcomes, but did not solve the farm blocker
+
+Recent change:
+- non-`BALANCED` profile variance was reduced another `20%` toward `BALANCED`
+
+Observed effect:
+- this materially changes macro results even under the same fixed seed
+- example across the recent reruns:
+  - `AGGRESSOR` recovered from `1` planet to `3`
+  - `MINER` regressed from `3` planets to `1`
+  - `BUNKERER` regressed from `3` planets to `1`
+
+Interpretation:
+- the benchmark is still deterministic for a fixed seed
+- but behavior changes can still move arbitration enough to produce very different final empires
+- so blanket profile-weight compression is not a substitute for fixing subsystem conversion bugs
+
+Follow-up after farming is unblocked:
+- revisit Weight Manager and profile compression using the human `170`-turn gameplay log
+- rebalance with evidence instead of more broad reductions first
+
+### 3. Strategic Development may still need a more solid colony-conversion policy
+
+Reason:
+- one-planet recovery improved for some profiles after threshold fixes
+- but colony conversion remains unstable across personalities after later weight changes
+
+What to review later:
+- when one-planet empires should override routine shipyard competition
+- whether colonizer production / colonize launch needs stronger anti-starvation priority bands
+- whether one-planet recovery should depend less on broad profile pressure and more on explicit recovery rules
 
 Current limitation:
 - the default 10-turn live smoke can still be too passive to judge gameplay quality

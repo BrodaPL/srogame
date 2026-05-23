@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Defence } from '../../defences/defence';
 import { DefenceInstance } from '../../defences/defence-instance';
+import { ManyDefences } from '../../defences/many-defences';
 import { DefenceType } from '../../enums/defence-type';
 import { HullClass } from '../../enums/hull-class';
 import { PlayerType } from '../../enums/player-type';
 import { ShipType } from '../../enums/ship-type';
 import { TechnologyType } from '../../enums/technology-type';
 import { WeaponType } from '../../enums/weapon-type';
+import { ManyShips } from '../../fleets/many-ships';
 import { Ship } from '../../fleets/ship';
 import { ShipInstance } from '../../fleets/ship-instance';
 import { Weapon } from '../../fleets/weapon';
@@ -14,6 +16,8 @@ import { Player } from '../../player';
 import { FleetReport } from '../../reports/fleet-report';
 import { ResourcesPack } from '../../resources-pack';
 import {
+  createPersistentManyDefencesFromBattleSurvivors,
+  createPersistentManyShipsFromBattleSurvivors,
   SpaceBattleResolver,
   type BattleRandomSource,
   type BattleFleetSummary,
@@ -392,6 +396,47 @@ describe('SpaceBattleResolver', () => {
     expect(result.defender.ships[0].shield).toBe(22);
   });
 
+  it('preserves proportional hull damage when battle survivors are stored back with armour technology', () => {
+    const defender = createPlayer(2, 'Defender', {
+      [TechnologyType.ARMOUR_TECHNOLOGY]: 2
+    });
+    const targetShip = createShip(
+      ShipType.CRUISER,
+      [],
+      { hullPointsCapacity: 100 }
+    );
+
+    const persistedShips = createPersistentManyShipsFromBattleSurvivors(
+      [createShipInstance(targetShip, 110, 0)],
+      defender
+    );
+
+    expect(ManyShips.undamagedCountByType(persistedShips).get(ShipType.CRUISER) ?? 0).toBe(0);
+    expect(ManyShips.damagedCountByType(persistedShips).get(ShipType.CRUISER) ?? 0).toBe(1);
+    expect(persistedShips.damagedShips[0]?.hull).toBeCloseTo(91.6666667, 5);
+  });
+
+  it('preserves proportional defence hull damage when battle survivors are stored back with armour technology', () => {
+    const defender = createPlayer(2, 'Defender', {
+      [TechnologyType.ARMOUR_TECHNOLOGY]: 2
+    });
+    const targetDefence = createDefence(
+      DefenceType.RAIL_GUN_CANNON,
+      HullClass.BIG_DEFENCE,
+      [],
+      { hullPointsCapacity: 100 }
+    );
+
+    const persistedDefences = createPersistentManyDefencesFromBattleSurvivors(
+      [createDefenceInstance(targetDefence, 110, 0)],
+      defender
+    );
+
+    expect(ManyDefences.undamagedCountByType(persistedDefences).get(DefenceType.RAIL_GUN_CANNON) ?? 0).toBe(0);
+    expect(ManyDefences.damagedCountByType(persistedDefences).get(DefenceType.RAIL_GUN_CANNON) ?? 0).toBe(1);
+    expect(persistedDefences.damagedDefences[0]?.hull).toBeCloseTo(91.6666667, 5);
+  });
+
   it('applies material technology to armor mitigation after shield spillover', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
@@ -743,6 +788,25 @@ describe('SpaceBattleResolver', () => {
     expect(result.attacker.survivingShipCount).toBe(2);
     expect(result.defender.survivingShipCount).toBe(2);
     expect(result.roundSummaries.every((round) => round.destroyedShips.length === 0)).toBe(true);
+  });
+
+  it('returns draw when the round cap ends with both sides still alive', () => {
+    const resolver = new SpaceBattleResolver();
+    const attacker = createPlayer(1, 'Attacker');
+    const defender = createPlayer(2, 'Defender');
+    const passiveShip = createShip(ShipType.FIGHTER, []);
+
+    const result = resolver.resolve({
+      attacker: { player: attacker, ships: createFleet(passiveShip, 2) },
+      defender: { player: defender, ships: createFleet(passiveShip, 1) },
+      reportContext: { createdTurn: 21 },
+      maxRounds: 1
+    });
+
+    expect(result.roundsFought).toBe(1);
+    expect(result.attacker.survivingShipCount).toBe(2);
+    expect(result.defender.survivingShipCount).toBe(1);
+    expect(result.winner).toBe('Draw');
   });
 
   it('resolves a multi-ship battle with losses across multiple rounds', () => {

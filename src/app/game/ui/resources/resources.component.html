@@ -134,7 +134,11 @@
         class="resource__power-line"
         [class.resource__power-line--limited]="powers?.shipyardPowerLimited"
       >
-        Shipyard: {{ formatPower(powers?.shipyardPower) }}
+        @if (powers?.droneShipyardPower !== null && powers?.droneShipyardPower !== undefined && powers?.totalShipyardPower !== null && powers?.totalShipyardPower !== undefined) {
+          Shipyard: {{ formatPower(powers?.shipyardPower) }} + {{ formatPower(powers?.droneShipyardPower) }} = {{ formatPower(powers?.totalShipyardPower) }}
+        } @else {
+          Shipyard: {{ formatPower(powers?.shipyardPower) }}
+        }
       </span>
       <span
         class="resource__power-line"

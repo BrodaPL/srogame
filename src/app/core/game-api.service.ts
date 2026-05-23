@@ -33,6 +33,7 @@ import {
   ReorderShipyardQueueRequest,
   CancelShipyardQueueEntryRequest,
   StartTechnologyResearchRequest,
+  UpdateResearchHelpersRequest,
   CreateFleetMissionRequest,
   CreateFleetMissionResponse,
   CreateStarSystemSpyRequest,
@@ -509,6 +510,14 @@ export class GameApiService {
   public startTechnologyResearch(request: StartTechnologyResearchRequest, token: string) {
     return this.http.post<ClientPlanetDto[]>(
       `${API_BASE_URL}/game/technology-queue`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public updateResearchHelpers(request: UpdateResearchHelpersRequest, token: string) {
+    return this.http.post<ClientPlanetDto[]>(
+      `${API_BASE_URL}/game/technology-queue/helpers`,
       request,
       { headers: this.authHeaders(token) }
     );

@@ -57,7 +57,7 @@
       "type": "COMPUTER_TECHNOLOGY",
       "imagePath": "images/technologies/normal/COMPUTER_TECHNOLOGY.jpg",
       "description": "Every level give +2 to maximum fleet amount, also gives +5% to research power.",
-      "basicCost": { "metal": 0, "crystal": 40, "deuterium": 0 },
+      "basicCost": { "metal": 0, "crystal": 20, "deuterium": 0 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
@@ -83,17 +83,17 @@
       "type": "ADAPTIVE_TECHNOLOGY",
       "imagePath": "images/technologies/normal/ADAPTIVE_TECHNOLOGY.jpg",
       "description": "Make possible to colonise more types of planets. Increases all resources income, research and industry by +1%.",
-      "basicCost": { "metal": 60, "crystal": 40, "deuterium": 20 },
+      "basicCost": { "metal": 50, "crystal": 30, "deuterium": 10 },
       "energyRequired": [0],
       "researchTime": [2.5],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 0.5 }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 1 },
-        { "tech": "SHIELDING_TECHNOLOGY", "level": 1 },
-        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 1 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 1 }
+        { "tech": "MATERIAL_TECHNOLOGY", "level": 0.75 },
+        { "tech": "SHIELDING_TECHNOLOGY", "level": 0.75 },
+        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 0.75 },
+        { "tech": "ENERGY_TECHNOLOGY", "level": 0.75 }
       ]
     },
     {
@@ -115,8 +115,8 @@
       "type": "GRAVITON_TECHNOLOGY",
       "imagePath": "images/technologies/normal/GRAVITON_TECHNOLOGY.jpg",
       "description": "Gives 5% ship bonus evasion bonus. Increases jump range by 1. Increses Jump Gate and Interstellar Trade Port capacity by 25%. Increase Sensor Phlanx base range by 0.5",
-      "basicCost": { "metal": 0, "crystal": 5000, "deuterium": 50000 },
-      "energyRequired": [110],
+      "basicCost": { "metal": 0, "crystal": 4000, "deuterium": 40000 },
+      "energyRequired": [0],
       "researchTime": [0.1],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 2 }
@@ -216,17 +216,17 @@
       "type": "HYPERSPACE_DRIVE",
       "imagePath": "images/technologies/normal/HYPERSPACE_DRIVE.jpg",
       "description": "Increases jump range by 1.",
-      "basicCost": { "metal": 20, "crystal": 120, "deuterium": 120 },
+      "basicCost": { "metal": 20, "crystal": 60, "deuterium": 100 },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
         { "building": "RESEARCH_LAB", "level": 1.0}
       ],
       "techRequirements": [
-        { "tech": "HYPERSPACE_TECHNOLOGY", "level": 1.25 },
+        { "tech": "HYPERSPACE_TECHNOLOGY", "level": 1.0 },
         { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 0.75 },
         { "tech": "COMPUTER_TECHNOLOGY", "level": 0.75 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 1.0 }
+        { "tech": "ENERGY_TECHNOLOGY", "level": 0.75 }
       ]
     }
   ]

@@ -17,8 +17,8 @@ import { ManyShips } from '../src/app/models/fleets/many-ships.js';
 import { GalaxyCreator } from '../src/app/models/planets/galaxy-creator.js';
 import { ResourcesPack } from '../src/app/models/resources-pack.js';
 import { BOT_PROFILE_IDS, type BotProfileId, type Player } from '../src/app/models/player.js';
-import { clearBotDecisionTraces, getBotDecisionTraces } from '../server/src/bots/bot-debug-store.js';
-import { runBotTurnPhase } from '../server/src/bots/bot-turn-runner.js';
+import { clearBotDecisionTracesV2, getBotDecisionTracesV2 } from '../server/src/bots-v2/bot-v2-trace.js';
+import { runBotTurnPhaseV2 } from '../server/src/bots-v2/bot-v2-shadow-runner.js';
 import { resolvePhaseOneTurn } from '../src/app/models/turns/phase-one-turn-resolver.js';
 
 export type SimulationPresetKey = 'baselineMixed' | 'frontierPressure' | 'warHotspot';
@@ -345,7 +345,7 @@ function runSimulation(preset: SimulationPreset, targetTurns: number): Simulatio
   const startedAtPerf = performance.now();
 
   try {
-    clearBotDecisionTraces();
+    clearBotDecisionTracesV2();
     const { galaxy, contenders } = createSimulationGalaxy(preset);
     const actionCounts: Record<string, number> = {};
     const actionCountsByPlayer = new Map<number, Record<string, number>>();
@@ -359,24 +359,28 @@ function runSimulation(preset: SimulationPreset, targetTurns: number): Simulatio
     let firstTurnWithCombatAction: number | null = null;
 
     for (let turnIndex = 0; turnIndex < targetTurns; turnIndex += 1) {
-      runBotTurnPhase(galaxy);
-      const tracesForTurn = getBotDecisionTraces().filter((trace) => trace.turn === galaxy.currentTurn);
+      runBotTurnPhaseV2(galaxy);
+      const tracesForTurn = getBotDecisionTracesV2().filter((trace) => trace.turn === galaxy.currentTurn);
       let diplomacyActions = 0;
       let combatActions = 0;
       let colonizeActions = 0;
 
       for (const trace of tracesForTurn) {
         const playerActionCounts = actionCountsByPlayer.get(trace.playerId) ?? {};
-        for (const action of trace.chosenActions) {
-          actionCounts[action.kind] = (actionCounts[action.kind] ?? 0) + 1;
-          playerActionCounts[action.kind] = (playerActionCounts[action.kind] ?? 0) + 1;
-          if (isDiplomacyAction(action.kind)) {
+        const acceptedProposals = trace.proposals.filter((proposal) =>
+          trace.supervisorDecision.acceptedProposalIds.includes(proposal.proposalId)
+        );
+        for (const proposal of acceptedProposals) {
+          const actionKind = proposal.proposalKind;
+          actionCounts[actionKind] = (actionCounts[actionKind] ?? 0) + 1;
+          playerActionCounts[actionKind] = (playerActionCounts[actionKind] ?? 0) + 1;
+          if (isDiplomacyAction(actionKind)) {
             diplomacyActions += 1;
           }
-          if (isCombatAction(action.kind)) {
+          if (isCombatAction(actionKind)) {
             combatActions += 1;
           }
-          if (action.kind === 'colonize') {
+          if (actionKind === 'COLONIZE') {
             colonizeActions += 1;
           }
         }
@@ -522,6 +526,7 @@ function createSimulationGalaxy(preset: SimulationPreset): {
     player.type = PlayerType.BOT;
     player.botProfileId = preset.profileOrder[index % preset.profileOrder.length] ?? 'BALANCED';
     player.botMemory = null;
+    player.botMemoryV2 = null;
     galaxy.botPlayerMap.set(player.playerId, player);
     seedPlayerPlanets(
       player,
@@ -756,7 +761,7 @@ function summarizePlayer(
     profileId: player.botProfileId,
     planetsOwned: player.planets.length,
     activeFleetCount,
-    currentGoal: player.botMemory?.currentGoal ?? null,
+    currentGoal: player.botMemoryV2?.currentStance ?? null,
     totalResources,
     proposalCounts,
     chosenActionCounts
@@ -818,11 +823,11 @@ function countActionSubset(
 }
 
 function isDiplomacyAction(kind: string): boolean {
-  return kind.startsWith('propose-') || kind.startsWith('approve-') || kind.startsWith('reject-');
+  return kind === 'DIPLOMACY' || kind === 'SUPPORT_REQUEST' || kind === 'MAINTENANCE_REQUEST';
 }
 
 function isCombatAction(kind: string): boolean {
-  return kind === 'attack' || kind === 'bombard' || kind === 'siege';
+  return kind === 'FLEET_MISSION';
 }
 
 function summarizeCounts(counts: Record<string, number>): string {

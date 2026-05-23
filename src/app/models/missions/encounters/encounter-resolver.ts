@@ -1,4 +1,6 @@
 import {
+  createPersistentManyDefencesFromBattleSurvivors,
+  createPersistentManyShipsFromBattleSurvivors,
   SpaceBattleResolver,
   type SpaceBattleReports,
   type SpaceBattleResult
@@ -59,15 +61,16 @@ const MISSION_PRIORITY: Record<FleetMissionType, number> = {
   [FleetMissionType.SIEGE]: 4,
   [FleetMissionType.MOVE]: 5,
   [FleetMissionType.TRANSPORT]: 6,
-  [FleetMissionType.SPY]: 7,
-  [FleetMissionType.COLONIZE]: 8,
-  [FleetMissionType.INVADE]: 9,
-  [FleetMissionType.BLOCK]: 10,
-  [FleetMissionType.INTERCEPT]: 11,
-  [FleetMissionType.STAR_SYSTEM_SPY]: 12,
-  [FleetMissionType.RECYCLE]: 13,
-  [FleetMissionType.REPAIR]: 14,
-  [FleetMissionType.HOLD]: 15
+  [FleetMissionType.ARMAMENT_DELIVERY]: 7,
+  [FleetMissionType.SPY]: 8,
+  [FleetMissionType.COLONIZE]: 9,
+  [FleetMissionType.INVADE]: 10,
+  [FleetMissionType.BLOCK]: 11,
+  [FleetMissionType.INTERCEPT]: 12,
+  [FleetMissionType.STAR_SYSTEM_SPY]: 13,
+  [FleetMissionType.RECYCLE]: 14,
+  [FleetMissionType.REPAIR]: 15,
+  [FleetMissionType.HOLD]: 16
 };
 
 export class EncounterResolver {
@@ -390,7 +393,7 @@ export class EncounterResolver {
         sourceCoordinates: {
           x: targetPlanet.basicInfo.solarSystem.coordinates.x,
           y: targetPlanet.basicInfo.solarSystem.coordinates.y,
-          z: Math.max(0, targetPlanet.basicInfo.order - 1)
+          z: targetPlanet.basicInfo.order
         },
         sourcePlanetName: targetPlanet.basicInfo.name,
         sourceSystemName: targetPlanet.basicInfo.solarSystem.name
@@ -398,10 +401,19 @@ export class EncounterResolver {
       maxRounds: arrivals[0].mission.getBattleRounds()
     });
 
-    const coalitionSurvivors = ManyShips.fromShipInstances(battleResult.attacker.survivingShips);
+    const coalitionSurvivors = createPersistentManyShipsFromBattleSurvivors(
+      battleResult.attacker.survivingShips,
+      attacker
+    );
     const overflowShips = coalitionSurvivors.trimNonJumpShipsToTravelHangarCapacity();
-    const defenderSurvivorPool = ManyShips.fromShipInstances(battleResult.defender.survivingShips);
-    const defenderDefenceSurvivorPool = ManyDefences.fromDefenceInstances(battleResult.defender.survivingDefences);
+    const defenderSurvivorPool = createPersistentManyShipsFromBattleSurvivors(
+      battleResult.defender.survivingShips,
+      defender
+    );
+    const defenderDefenceSurvivorPool = createPersistentManyDefencesFromBattleSurvivors(
+      battleResult.defender.survivingDefences,
+      defender
+    );
 
     for (const defenderEntry of defenderInitialForces) {
       const requested = this.toShipAmountRequests(defenderEntry.ships);

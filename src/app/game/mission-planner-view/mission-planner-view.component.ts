@@ -108,6 +108,7 @@ const PHASE_ONE_MISSION_TYPES: FleetMissionType[] = [
   FleetMissionType.MOVE,
   FleetMissionType.DEFEND,
   FleetMissionType.TRANSPORT,
+  FleetMissionType.ARMAMENT_DELIVERY,
   FleetMissionType.SPY,
   FleetMissionType.BOMBARD,
   FleetMissionType.SIEGE,

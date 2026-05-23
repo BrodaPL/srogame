@@ -64,6 +64,8 @@ function fromEspionageReportDto(report: EspionagePlayerReportDto): EspionageRepo
   return new EspionageReportData(
     toBaseData(report),
     report.diff,
+    report.hasTotalDefencesIntel,
+    report.hasTotalShipsIntel,
     report.size,
     new PlanetaryParameters(
       report.planetaryParameters.metalModifier,

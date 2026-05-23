@@ -137,7 +137,7 @@ import {
   registerFailedPasswordAttempt
 } from './auth-account-security.js';
 import { consumeRateLimit } from './auth-rate-limit.js';
-import { clearBotDecisionTraces, getBotDecisionTraces } from './bots/bot-debug-store.js';
+import { clearBotDecisionTracesV2, getBotDecisionTracesV2 } from './bots-v2/bot-v2-trace.js';
 import {
   clearBotMemory,
   listBotAdminStates,
@@ -150,7 +150,7 @@ import {
 import { BOT_PROFILE_IDS } from './bots/bot-profile.js';
 import { buildRegisterConfigResponse, verifyTurnstileToken } from './turnstile.js';
 import { startBuildingConstruction } from './game-commands/building-commands.js';
-import { runBotTurnPhase } from './bots/bot-turn-runner.js';
+import { runBotTurnPhaseV2 } from './bots-v2/bot-v2-shadow-runner.js';
 import {
   approveDiplomaticProposalCommand,
   cancelDiplomaticProposalCommand,
@@ -161,6 +161,7 @@ import {
   rejectDiplomaticProposalCommand
 } from './game-commands/diplomacy-commands.js';
 import { createFleetMission } from './game-commands/fleet-commands.js';
+import { returnActiveFleetCommand } from './game-commands/fleet-lifecycle-commands.js';
 import { createStarSystemSpyMissions } from './game-commands/star-system-spy-commands.js';
 import {
   approveJumpGateRequestCommand,
@@ -176,17 +177,28 @@ import {
   resolveFleetMaintenanceOptions
 } from './game-commands/maintenance-commands.js';
 import {
+  createSupportRequestCommand as createSupportRequestCommandShared,
+  approveSupportRequestCommand,
+  rejectSupportRequestCommand
+} from './game-commands/support-request-commands.js';
+import {
   collectSensorPhalanxPassiveDetections,
   type SensorPhalanxPassiveDetection
 } from './sensor-phalanx-passive.js';
 import { startShipyardConstruction } from './game-commands/shipyard-commands.js';
-import { startTechnologyResearch } from './game-commands/research-commands.js';
+import { startTechnologyResearch, updateResearchHelpers } from './game-commands/research-commands.js';
+import {
+  appendPlayerActionLogEntry,
+  createTrackedPlayerActionFleetIds,
+  ensurePlayerActionLogFile
+} from './player-action-log.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
 import fleetReportModule from '../../src/app/models/reports/fleet-report.js';
 import sensorPhalanxReportModule from '../../src/app/models/reports/sensor-phalanx-report.js';
 import resourcesPackModule from '../../src/app/models/resources-pack.js';
 import type { GameCommandError } from './game-commands/command-result.ts';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
+import type { PlayerFleetOutcomeLogEvent } from '../../src/app/models/turns/phase-one-turn-resolver.ts';
 import type {
   BotAdminActionResponse,
   BotAdminStatesResponse,
@@ -250,6 +262,7 @@ import type {
   ReorderShipyardQueueRequest,
   CancelShipyardQueueEntryRequest,
   StartTechnologyResearchRequest,
+  UpdateResearchHelpersRequest,
   CreateFleetMissionRequest,
   CreateFleetBombSelectionEntry,
   CreateFleetMissionResponse,
@@ -450,10 +463,7 @@ const {
 } = maintenanceRequestModule as typeof import('../../src/app/models/requests/maintenance-request.js');
 const {
   clampSupportResourcesToRequested,
-  createSupportRequest,
   normalizeSupportResources,
-  normalizeSupportShipAmounts,
-  supportShipAmountsHaveAnyValue,
   supportResourcesHasAnyValue
 } = supportRequestModule as typeof import('../../src/app/models/requests/support-request.js');
 const { synchronizeTradePortOffers } = tradePortOffersModule as typeof import('../../src/app/models/trade/trade-port-offers.js');
@@ -586,6 +596,7 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
   FleetMissionType.MOVE as FleetMissionTypeType,
   FleetMissionType.DEFEND as FleetMissionTypeType,
   FleetMissionType.TRANSPORT as FleetMissionTypeType,
+  FleetMissionType.ARMAMENT_DELIVERY as FleetMissionTypeType,
   FleetMissionType.SPY as FleetMissionTypeType,
   FleetMissionType.BOMBARD as FleetMissionTypeType,
   FleetMissionType.SIEGE as FleetMissionTypeType,
@@ -599,6 +610,7 @@ let currentRuntimeGameId: string | null = null;
 let currentGameOwnerId: number | null = null;
 let currentGameOwnerPlayerName: string | null = null;
 let currentGameSetup: GalaxySetup | null = null;
+let currentTrackedPlayerActionFleetIds = new Set<number>();
 let currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
 let isTurnProcessing = false;
 let currentTurnReadyPlayerIds = new Set<number>();
@@ -615,6 +627,7 @@ function clearMountedRuntimeState(): void {
   currentGameOwnerId = null;
   currentGameOwnerPlayerName = null;
   currentGameSetup = null;
+  currentTrackedPlayerActionFleetIds = new Set<number>();
   currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataType>();
   resetActiveTurnState();
 }
@@ -628,6 +641,71 @@ function moveMountedRuntimeAwayFromGame(gameId: string): void {
   const fallbackRuntimeId = listLoadedGameIds().find((loadedGameId) => loadedGameId !== gameId) ?? null;
   if (fallbackRuntimeId) {
     switchCurrentRuntime(fallbackRuntimeId);
+  }
+}
+
+function ensureCurrentPlayerActionLog(playerName: string): void {
+  if (!currentRuntimeGameId || !currentGameSetup) {
+    return;
+  }
+
+  ensurePlayerActionLogFile(currentRuntimeGameId, currentGameSetup, playerName);
+}
+
+function appendCurrentPlayerActionLog(
+  playerName: string,
+  entry: Parameters<typeof appendPlayerActionLogEntry>[3]
+): void {
+  if (!currentRuntimeGameId || !currentGameSetup) {
+    return;
+  }
+
+  appendPlayerActionLogEntry(
+    currentRuntimeGameId,
+    currentGameSetup,
+    playerName,
+    entry
+  );
+}
+
+function trackCurrentPlayerActionFleet(fleetId: number): void {
+  if (!Number.isInteger(fleetId) || fleetId <= 0) {
+    return;
+  }
+
+  currentTrackedPlayerActionFleetIds.add(fleetId);
+}
+
+function untrackCurrentPlayerActionFleet(fleetId: number): void {
+  currentTrackedPlayerActionFleetIds.delete(fleetId);
+}
+
+function resolvePlayerFleetOutcomeLogKind(
+  outcomeType: PlayerFleetOutcomeLogEvent['outcomeType']
+): import('./player-action-log.js').PlayerActionLogKind {
+  switch (outcomeType) {
+    case 'ATTACK':
+      return 'FLEET_OUTCOME_ATTACK';
+    case 'BOMBARD':
+      return 'FLEET_OUTCOME_BOMBARD';
+    case 'SIEGE':
+      return 'FLEET_OUTCOME_SIEGE';
+    case 'TRANSPORT':
+      return 'FLEET_OUTCOME_TRANSPORT';
+    case 'ARMAMENT_DELIVERY':
+      return 'FLEET_OUTCOME_ARMAMENT_DELIVERY';
+    case 'COLONIZE':
+      return 'FLEET_OUTCOME_COLONIZE';
+    case 'RECYCLE':
+      return 'FLEET_OUTCOME_RECYCLE';
+    case 'REPAIR':
+      return 'FLEET_OUTCOME_REPAIR';
+    case 'RETURN':
+      return 'FLEET_OUTCOME_RETURN';
+    case 'FAILURE':
+      return 'FLEET_OUTCOME_FAILURE';
+    case 'DESTROYED':
+      return 'FLEET_OUTCOME_DESTROYED';
   }
 }
 
@@ -1200,6 +1278,7 @@ app.post('/api/game/start', (req, res) => {
   generateSelfReportsForHumanPlayers(nextGalaxy, nextGalaxy.currentTurn);
   const nextPresentation = buildPresentationDataByPlayer(nextGalaxy);
   const nextGameId = createGameId();
+  currentTrackedPlayerActionFleetIds = new Set<number>();
   let initialSaveSummary: ReturnType<typeof buildGameSaveSummary> | null = null;
 
   try {
@@ -1211,7 +1290,8 @@ app.post('/api/game/start', (req, res) => {
       {
         rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
         maxSaveFiles: MAX_GAME_SAVE_FILES,
-        gameId: nextGameId
+        gameId: nextGameId,
+        trackedPlayerActionFleetIds: []
       }
     );
   } catch (error) {
@@ -1225,7 +1305,7 @@ app.post('/api/game/start', (req, res) => {
   currentGameSetup = setup;
   currentGalaxyPresentationByPlayer = nextPresentation;
   resetActiveTurnState();
-  clearBotDecisionTraces();
+  clearBotDecisionTracesV2();
   resetBotAdminRuntimeState();
     registerRunningGame(auth.data, 'SINGLEPLAYER', nextGalaxy, {
       gameId: nextGameId,
@@ -1240,8 +1320,9 @@ app.post('/api/game/start', (req, res) => {
       accountId: auth.session.accountId,
       playerName: auth.session.playerName,
       role: 'OWNER'
-    }]
+      }]
   });
+  ensureCurrentPlayerActionLog(auth.session.playerName);
 
   const response: StartGameResponse = {
     player: toPlayerSession(auth.session, nextGalaxy),
@@ -1284,9 +1365,10 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
     currentGameOwnerId = auth.session.accountId;
     currentGameOwnerPlayerName = auth.session.playerName;
     currentGameSetup = hydrated.setup;
+    currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(hydrated.trackedPlayerActionFleetIds);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
-    clearBotDecisionTraces();
+    clearBotDecisionTracesV2();
     resetBotAdminRuntimeState();
     registerRunningGame(auth.data, 'SINGLEPLAYER', currentGalaxy, {
       gameId: save.gameId ?? undefined,
@@ -1303,6 +1385,7 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
         role: 'OWNER'
       }]
     });
+    ensureCurrentPlayerActionLog(auth.session.playerName);
 
     const response: LoadGameResponse = {
       player: toPlayerSession(auth.session, currentGalaxy),
@@ -1968,7 +2051,7 @@ app.get('/api/admin/bots/traces', (req, res) => {
 
   return res.status(200).json({
     turn: controller.galaxy.currentTurn,
-    traces: getBotDecisionTraces(playerId)
+    traces: getBotDecisionTracesV2(playerId)
   });
 });
 
@@ -2239,19 +2322,20 @@ app.post('/api/game/diplomacy/support-requests', (req, res) => {
     return res.status(400).json({ error: 'Invalid support request payload.' });
   }
 
-  const result = createSupportRequestCommand(
-    authPlayer.galaxy,
-    authPlayer.player.playerId,
-    targetPlayerId,
-    supportType,
-    targetCoordinates,
-    requestedResources,
-    missionType,
-    minimumShips ?? [],
-    bombardmentPriorities
+  const result = createSupportRequestCommandShared(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    {
+      targetPlayerId,
+      supportType,
+      targetCoordinates,
+      requestedResources,
+      missionType,
+      minimumShips: minimumShips ?? [],
+      bombardmentPriorities
+    }
   );
-  if ('error' in result) {
-    return res.status(result.status).json({ error: result.error });
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
 
   return res.status(200).json(buildDiplomacyViewResponse(authPlayer.galaxy, authPlayer.player));
@@ -2622,24 +2706,15 @@ app.post('/api/game/mail/support-requests/:requestId/approve', (req, res) => {
     return res.status(400).json({ error: 'Invalid support request id.' });
   }
 
-  const request = authPlayer.galaxy.supportRequests.find((entry) => entry.requestId === requestId);
-  if (!request) {
-    return res.status(404).json({ error: 'Support request not found.' });
-  }
-
-  if (request.toPlayerId !== authPlayer.player.playerId) {
-    return res.status(403).json({ error: 'Only the target player can approve this request.' });
-  }
-
-  if (request.state !== DiplomaticProposalState.PENDING) {
-    return res.status(409).json({ error: 'Support request is no longer pending.' });
-  }
-
   const body = req.body as ResolveSupportRequestRequest | undefined;
   const approvedResources = normalizeSupportResources(body?.approvedResources);
-  const result = approveSupportRequest(authPlayer.galaxy, request, approvedResources);
-  if ('error' in result) {
-    return res.status(result.status).json({ error: result.error });
+  const result = approveSupportRequestCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId,
+    approvedResources
+  );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
 
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
@@ -2656,25 +2731,13 @@ app.post('/api/game/mail/support-requests/:requestId/reject', (req, res) => {
     return res.status(400).json({ error: 'Invalid support request id.' });
   }
 
-  const request = authPlayer.galaxy.supportRequests.find((entry) => entry.requestId === requestId);
-  if (!request) {
-    return res.status(404).json({ error: 'Support request not found.' });
-  }
-
-  if (request.toPlayerId !== authPlayer.player.playerId) {
-    return res.status(403).json({ error: 'Only the target player can reject this request.' });
-  }
-
-  if (request.state !== DiplomaticProposalState.PENDING) {
-    return res.status(409).json({ error: 'Support request is no longer pending.' });
-  }
-
-  rejectSupportRequest(
-    authPlayer.galaxy,
-    request,
-    'Support request rejected.',
-    'You rejected the support request.'
+  const result = rejectSupportRequestCommand(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    requestId
   );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
+  }
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
 
@@ -3181,6 +3244,26 @@ app.post('/api/game/building-queue', (req, res) => {
     return sendGameCommandError(res, result.error);
   }
 
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'BUILDING_QUEUE_ADD',
+    summary: `${auth.session.playerName} queued ${buildingType} level ${result.value.planet.getBuildingLevel(buildingType) + 1} on ${x}:${y}:${z}; spent M${result.value.spent.metal} C${result.value.spent.crystal} D${result.value.spent.deuterium}; buildingQueueLength=${result.value.queueLength}`,
+    coordinates: { x, y, z },
+    payload: {
+      buildingType,
+      targetLevel: result.value.planet.getBuildingLevel(buildingType) + 1
+    },
+    deltas: {
+      spent: {
+        metal: result.value.spent.metal,
+        crystal: result.value.spent.crystal,
+        deuterium: result.value.spent.deuterium
+      },
+      buildingQueueLength: result.value.queueLength
+    }
+  });
+
   const clientPlanet = currentGalaxy.createClientPlanet(result.value.planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
   return res.status(200).json(response);
@@ -3237,6 +3320,21 @@ app.post('/api/game/building-queue/reorder', (req, res) => {
   if (fromIndex !== toIndex) {
     moveQueueEntry(planet.rBDSFTQ.buildingQueue, fromIndex, toIndex);
   }
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'BUILDING_QUEUE_REORDER',
+    summary: `${auth.session.playerName} reordered building queue on ${x}:${y}:${z}; ${fromIndex} -> ${toIndex}; buildingQueueLength=${planet.rBDSFTQ.buildingQueue.length}`,
+    coordinates: { x, y, z },
+    payload: {
+      fromIndex,
+      toIndex
+    },
+    deltas: {
+      buildingQueueLength: planet.rBDSFTQ.buildingQueue.length
+    }
+  });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -3296,8 +3394,31 @@ app.post('/api/game/building-queue/cancel', (req, res) => {
   }
 
   const refund = calculateBuildingCancellationRefund(building, queueEntry);
+  const canceledBuildingType = queueEntry.buildingType;
+  const canceledTargetLevel = queueEntry.nextLevel;
   planet.rBDSFTQ.resources.addResourcePack(refund);
   planet.rBDSFTQ.buildingQueue.splice(index, 1);
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'BUILDING_QUEUE_CANCEL',
+    summary: `${auth.session.playerName} canceled ${canceledBuildingType} level ${canceledTargetLevel} on ${x}:${y}:${z}; refund M${refund.metal} C${refund.crystal} D${refund.deuterium}; buildingQueueLength=${planet.rBDSFTQ.buildingQueue.length}`,
+    coordinates: { x, y, z },
+    payload: {
+      index,
+      buildingType: canceledBuildingType,
+      targetLevel: canceledTargetLevel
+    },
+    deltas: {
+      refund: {
+        metal: refund.metal,
+        crystal: refund.crystal,
+        deuterium: refund.deuterium
+      },
+      buildingQueueLength: planet.rBDSFTQ.buildingQueue.length
+    }
+  });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -3356,6 +3477,29 @@ app.post('/api/game/shipyard-queue', (req, res) => {
     return sendGameCommandError(res, result.error);
   }
 
+  const queuedShipyardType = itemKind === 'ship' ? shipType : defenceType;
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'SHIPYARD_QUEUE_ADD',
+    summary: `${auth.session.playerName} queued ${amount} ${queuedShipyardType} (${itemKind}) on ${x}:${y}:${z}; spent M${result.value.spent.metal} C${result.value.spent.crystal} D${result.value.spent.deuterium}; shipyardQueueLength=${result.value.queueLength}`,
+    coordinates: { x, y, z },
+    payload: {
+      itemKind,
+      shipType,
+      defenceType,
+      amount
+    },
+    deltas: {
+      spent: {
+        metal: result.value.spent.metal,
+        crystal: result.value.spent.crystal,
+        deuterium: result.value.spent.deuterium
+      },
+      shipyardQueueLength: result.value.queueLength
+    }
+  });
+
   const clientPlanet = currentGalaxy.createClientPlanet(result.value.planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
   return res.status(200).json(response);
@@ -3412,6 +3556,21 @@ app.post('/api/game/shipyard-queue/reorder', (req, res) => {
   if (fromIndex !== toIndex) {
     moveQueueEntry(planet.rBDSFTQ.shipyardQueue, fromIndex, toIndex);
   }
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'SHIPYARD_QUEUE_REORDER',
+    summary: `${auth.session.playerName} reordered shipyard queue on ${x}:${y}:${z}; ${fromIndex} -> ${toIndex}; shipyardQueueLength=${planet.rBDSFTQ.shipyardQueue.length}`,
+    coordinates: { x, y, z },
+    payload: {
+      fromIndex,
+      toIndex
+    },
+    deltas: {
+      shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length
+    }
+  });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -3473,11 +3632,39 @@ app.post('/api/game/shipyard-queue/cancel', (req, res) => {
   }
 
   const cancellation = calculateShipyardCancellation(blueprint, queueEntry);
+  const canceledItemKind = queueEntry.itemKind;
+  const canceledShipType = queueEntry.shipType ?? null;
+  const canceledDefenceType = queueEntry.defenceType ?? null;
+  const canceledAmount = queueEntry.amount;
   if (cancellation.deliveredAmount > 0) {
     addProducedShipyardUnitsToPlanet(planet, blueprint, queueEntry.itemKind, cancellation.deliveredAmount);
   }
   planet.rBDSFTQ.resources.addResourcePack(cancellation.refund);
   planet.rBDSFTQ.shipyardQueue.splice(index, 1);
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'SHIPYARD_QUEUE_CANCEL',
+    summary: `${auth.session.playerName} canceled ${canceledAmount} ${canceledShipType ?? canceledDefenceType} (${canceledItemKind}) on ${x}:${y}:${z}; refund M${cancellation.refund.metal} C${cancellation.refund.crystal} D${cancellation.refund.deuterium}; delivered=${cancellation.deliveredAmount}; shipyardQueueLength=${planet.rBDSFTQ.shipyardQueue.length}`,
+    coordinates: { x, y, z },
+    payload: {
+      index,
+      itemKind: canceledItemKind,
+      shipType: canceledShipType,
+      defenceType: canceledDefenceType,
+      amount: canceledAmount
+    },
+    deltas: {
+      refund: {
+        metal: cancellation.refund.metal,
+        crystal: cancellation.refund.crystal,
+        deuterium: cancellation.refund.deuterium
+      },
+      deliveredAmount: cancellation.deliveredAmount,
+      shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length
+    }
+  });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, { x, y, z });
@@ -3521,6 +3708,73 @@ app.post('/api/game/technology-queue', (req, res) => {
   const result = startTechnologyResearch(
     { galaxy: currentGalaxy, playerId },
     { x, y, z, technologyType, helperPlanets: helperCoordinates }
+  );
+  if (!result.ok) {
+    return sendGameCommandError(res, result.error);
+  }
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'RESEARCH_START',
+    summary: `${auth.session.playerName} started ${technologyType} on ${x}:${y}:${z}; helpers=${result.value.helperPlanets.length}; spent M${result.value.spent.metal} C${result.value.spent.crystal} D${result.value.spent.deuterium}`,
+    coordinates: { x, y, z },
+    payload: {
+      technologyType,
+      helperPlanets: helperCoordinates
+    },
+    deltas: {
+      helperCount: result.value.helperPlanets.length,
+      spent: {
+        metal: result.value.spent.metal,
+        crystal: result.value.spent.crystal,
+        deuterium: result.value.spent.deuterium
+      },
+      queueActive: result.value.mainPlanet.rBDSFTQ.currentResearchQueue !== null
+    }
+  });
+
+  const presentation = getPresentationData(currentGalaxy, playerId);
+  const response = presentation.ownedPlanets.map((entry) => toClientPlanetDtoFromClientPlanet(entry));
+  return res.status(200).json(response);
+});
+
+app.post('/api/game/technology-queue/helpers', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (!canSessionAccessCurrentGame(currentGalaxy, auth.session)) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as UpdateResearchHelpersRequest | undefined;
+  const x = parseBodyNonNegativeInt(body?.x);
+  const y = parseBodyNonNegativeInt(body?.y);
+  const z = parseBodyNonNegativeInt(body?.z);
+  const helperCoordinates = parseResearchHelperCoordinates(body?.helperPlanets);
+  if (x === null || y === null || z === null || helperCoordinates === null) {
+    return res.status(400).json({ error: 'Invalid research helper payload.' });
+  }
+
+  const result = updateResearchHelpers(
+    { galaxy: currentGalaxy, playerId },
+    { x, y, z, helperPlanets: helperCoordinates }
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -3918,41 +4172,16 @@ app.post('/api/game/active-fleets/:fleetId/return', (req, res) => {
     return res.status(400).json({ error: 'Invalid fleet id.' });
   }
 
-  const fleet = currentGalaxy.activeFleets.find((entry) => entry.fleetId === fleetId && entry.ownerId === playerId);
-  if (!fleet) {
-    return res.status(404).json({ error: 'Fleet not found.' });
+  const result = returnActiveFleetCommand(
+    {
+      galaxy: currentGalaxy,
+      playerId
+    },
+    { fleetId }
+  );
+  if (!result.ok) {
+    return res.status(result.error.status).json({ error: result.error.message });
   }
-
-  if (fleet.state === FleetState.PENDING_JUMP_GATE) {
-    const pendingRequest = findPendingJumpGateRequestForFleet(currentGalaxy, playerId, fleetId);
-    if (pendingRequest) {
-      pendingRequest.state = DiplomaticProposalState.CANCELLED;
-    }
-    restorePendingJumpGateFleetToOrigin(currentGalaxy, fleet, true);
-    return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
-  }
-
-  if (fleet.state === FleetState.RETURNING || fleet.state === FleetState.MISSION_FAILURE_RETURNING) {
-    return res.status(200).json(buildOwnedActiveFleetsResponse(currentGalaxy, playerId));
-  }
-
-  if (fleet.state !== FleetState.MOVING_TO_TARGET && fleet.state !== FleetState.ORBITING) {
-    return res.status(400).json({ error: 'Fleet cannot return from its current state.' });
-  }
-
-  if (fleet.state === FleetState.MOVING_TO_TARGET) {
-    const elapsedTravelTurns = Math.max(
-      0,
-      Math.min(fleet.travelTurns, currentGalaxy.currentTurn - fleet.createdAtTurn)
-    );
-    fleet.returnTurns = Math.max(1, elapsedTravelTurns);
-  }
-
-  fleet.state = FleetState.RETURNING;
-  fleet.orbitActivity = FleetOrbitActivity.IDLE;
-  fleet.suspendedMissionType = null;
-  fleet.returnReason = FleetReturnReason.MANUAL_RECALL;
-  fleet.createdAtTurn = currentGalaxy.currentTurn;
 
   synchronizeJumpGateRequests(currentGalaxy);
   synchronizeMaintenanceRequests(currentGalaxy);
@@ -4049,6 +4278,35 @@ app.post('/api/game/active-fleets', (req, res) => {
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
+  }
+
+  appendCurrentPlayerActionLog(auth.session.playerName, {
+    turn: currentGalaxy.currentTurn,
+    playerId,
+    kind: 'FLEET_MISSION_CREATE',
+    summary: `${auth.session.playerName} launched ${missionType} from ${origin.x}:${origin.y}:${origin.z} to ${target.x}:${target.y}:${target.z}; fleetId=${result.value.fleet.fleetId}; eta=${result.value.fleet.travelTurns}; fuel=${result.value.fleet.fuelCost}; cargo=M${cargo.metal} C${cargo.crystal} D${cargo.deuterium}`,
+    coordinates: origin,
+    targetCoordinates: target,
+    payload: {
+      missionType,
+      ships,
+      carriedBombs,
+      cargo,
+      useJumpGate,
+      bombardmentPriorities
+    },
+    deltas: {
+      fleetId: result.value.fleet.fleetId,
+      mode: result.value.mode,
+      travelTurns: result.value.fleet.travelTurns,
+      fuelCost: result.value.fleet.fuelCost,
+      totalCargoCapacity: result.value.fleet.totalCargoCapacity,
+      usedCargoCapacity: result.value.fleet.usedCargoCapacity,
+      state: result.value.fleet.state
+    }
+  });
+  if (missionType !== FleetMissionType.SPY && missionType !== FleetMissionType.STAR_SYSTEM_SPY) {
+    trackCurrentPlayerActionFleet(result.value.fleet.fleetId);
   }
 
   const presentation = getPresentationData(currentGalaxy, playerId);
@@ -4586,7 +4844,8 @@ function saveCurrentGameSnapshot(): void {
     {
       rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
       maxSaveFiles: MAX_GAME_SAVE_FILES,
-      gameId: currentRuntimeGameId
+      gameId: currentRuntimeGameId,
+      trackedPlayerActionFleetIds: [...currentTrackedPlayerActionFleetIds]
     }
   );
 
@@ -4611,7 +4870,8 @@ function saveRuntimeSnapshot(
     {
       rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
       maxSaveFiles: MAX_GAME_SAVE_FILES,
-      gameId
+      gameId,
+      trackedPlayerActionFleetIds: [...runtime.trackedPlayerActionFleetIds]
     }
   );
 
@@ -5048,6 +5308,7 @@ function persistCurrentRuntimeStoreState(): void {
       galaxy: currentGalaxy,
       setup: currentGameSetup,
       presentationByPlayer: currentGalaxyPresentationByPlayer,
+      trackedPlayerActionFleetIds: new Set(currentTrackedPlayerActionFleetIds),
       loadedAt: now,
       lastTouchedAt: now,
       isDirty: false,
@@ -5063,6 +5324,7 @@ function persistCurrentRuntimeStoreState(): void {
     galaxy: currentGalaxy,
     setup: currentGameSetup,
     presentationByPlayer: currentGalaxyPresentationByPlayer,
+    trackedPlayerActionFleetIds: new Set(currentTrackedPlayerActionFleetIds),
     currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
     offlineBotControlledPlayerIds: new Set(existingRuntime.offlineBotControlledPlayerIds),
     emptyPresenceUnloadAt: existingRuntime.emptyPresenceUnloadAt,
@@ -5084,6 +5346,7 @@ function switchCurrentRuntime(gameId: string): boolean {
   currentRuntimeGameId = runtime.gameId;
   currentGalaxy = runtime.galaxy;
   currentGameSetup = runtime.setup;
+  currentTrackedPlayerActionFleetIds = new Set(runtime.trackedPlayerActionFleetIds);
   currentGalaxyPresentationByPlayer = runtime.presentationByPlayer;
   currentTurnReadyPlayerIds = new Set(runtime.currentTurnReadyPlayerIds);
   isTurnProcessing = runtime.isTurnProcessing;
@@ -5282,9 +5545,10 @@ function loadSingleplayerGameRecord(
   currentGameOwnerId = session.accountId;
   currentGameOwnerPlayerName = session.playerName;
   currentGameSetup = hydrated.setup;
+  currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(hydrated.trackedPlayerActionFleetIds);
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
   resetActiveTurnState();
-  clearBotDecisionTraces();
+  clearBotDecisionTracesV2();
   resetBotAdminRuntimeState();
   registerRunningGame(authData, 'SINGLEPLAYER', currentGalaxy, {
     gameId: save.gameId ?? record.gameId,
@@ -5301,6 +5565,7 @@ function loadSingleplayerGameRecord(
       role: 'OWNER'
     }]
   });
+  ensureCurrentPlayerActionLog(session.playerName);
 
   return { ok: true };
 }
@@ -5658,9 +5923,10 @@ function hydrateRunningMultiplayerGameFromLobby(
     currentGameOwnerId = session.accountId;
     currentGameOwnerPlayerName = session.playerName;
     currentGameSetup = hydrated.setup;
+    currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(hydrated.trackedPlayerActionFleetIds);
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
-    clearBotDecisionTraces();
+    clearBotDecisionTracesV2();
     resetBotAdminRuntimeState();
     registerRunningGame(authData, 'MULTIPLAYER', currentGalaxy, {
       gameId,
@@ -5693,9 +5959,10 @@ function hydrateRunningMultiplayerGameFromLobby(
     currentGameOwnerId = session.accountId;
     currentGameOwnerPlayerName = session.playerName;
     currentGameSetup = setup;
+    currentTrackedPlayerActionFleetIds = new Set<number>();
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
-    clearBotDecisionTraces();
+    clearBotDecisionTracesV2();
     resetBotAdminRuntimeState();
     registerRunningGame(authData, 'MULTIPLAYER', currentGalaxy, {
       gameId,
@@ -6284,9 +6551,38 @@ function handleEndTurnRequest(
 
   try {
     const resolvedTurnNumber = access.galaxy.currentTurn + 1;
-    runBotTurnPhase(access.galaxy);
+    runBotTurnPhaseV2(access.galaxy);
     resolvePhaseOneTurn(access.galaxy, resolvedTurnNumber, {
-      botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0
+      botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0,
+      fleetOutcomeLogger: (event) => {
+        if (!currentGameOwnerPlayerName || !currentTrackedPlayerActionFleetIds.has(event.fleetId)) {
+          return;
+        }
+
+        appendCurrentPlayerActionLog(currentGameOwnerPlayerName, {
+          turn: event.resolvedTurn,
+          playerId: event.ownerId,
+          kind: resolvePlayerFleetOutcomeLogKind(event.outcomeType),
+          summary: `${currentGameOwnerPlayerName} ${event.resultSummary}`,
+          coordinates: event.origin,
+          targetCoordinates: event.target,
+          payload: {
+            fleetId: event.fleetId,
+            missionType: event.missionType,
+            createdAtTurn: event.createdAtTurn,
+            resolvedTurn: event.resolvedTurn,
+            outcomeType: event.outcomeType,
+            launchSummary: event.launchSummary,
+            resultSummary: event.resultSummary,
+            ...(event.payload ?? {})
+          },
+          deltas: event.deltas
+        });
+
+        if (event.terminal) {
+          untrackCurrentPlayerActionFleet(event.fleetId);
+        }
+      }
     });
     access.galaxy.currentTurn = resolvedTurnNumber;
     processSensorPhalanxTurnStart(access.galaxy, access.galaxy.currentTurn);
@@ -7514,6 +7810,8 @@ function toEspionagePlayerReportDto(report: EspionageReportData): EspionagePlaye
   return {
     ...toPlayerReportBaseDto(report),
     diff: report.diff,
+    hasTotalDefencesIntel: report.hasTotalDefencesIntel,
+    hasTotalShipsIntel: report.hasTotalShipsIntel,
     size: report.size,
     planetaryParameters: toPlanetaryParametersDto(report.planetaryParameters),
     averageBuildingLevel: report.averageBuildingLevel,
@@ -9037,105 +9335,6 @@ function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
   }
 }
 
-function createSupportRequestCommand(
-  galaxy: Galaxy,
-  requesterPlayerId: number,
-  targetPlayerId: number,
-  supportType: SupportRequestTypeDto,
-  targetCoordinates: ClientCoordinates,
-  requestedResources: ResourcesPackType,
-  missionType: FleetMissionTypeType | null,
-  minimumShips: ShipAmountEntry[],
-  bombardmentPriorities: BombardmentPrioritiesType | null
-): { ok: true } | { status: number; error: string } {
-  const normalizedMinimumShips = normalizeSupportShipAmounts(minimumShips);
-  if (requesterPlayerId === targetPlayerId) {
-    return { status: 400, error: 'Support requests cannot target yourself.' };
-  }
-
-  const targetPlayer = resolvePlayerById(galaxy, targetPlayerId);
-  if (!targetPlayer || targetPlayer.type === PLAYER_TYPE_NEUTRAL) {
-    return { status: 404, error: 'Support target not found.' };
-  }
-
-  const status = resolveDiplomaticStatus(galaxy, requesterPlayerId, targetPlayerId);
-  if (!isSupportRequestAllowedForStatus(supportType, status)) {
-    return { status: 403, error: 'Current diplomacy status does not allow this support request.' };
-  }
-
-  const targetPlanet = resolvePlanetAtCoordinates(galaxy, targetCoordinates);
-  if (!targetPlanet) {
-    return { status: 404, error: 'Support target planet not found.' };
-  }
-
-  if (supportType === 'RESOURCE_SUPPORT' || supportType === 'PLANET_REPAIR' || supportType === 'PLANET_DEFENSE') {
-    if (targetPlanet.info.ownerId !== requesterPlayerId) {
-      return { status: 409, error: 'Support requests must target one of your own planets.' };
-    }
-  } else {
-    if (!isKnownHostileSupportTarget(galaxy, requesterPlayerId, targetPlanet, supportType)) {
-      return { status: 409, error: 'Offensive support requests require a known hostile target planet.' };
-    }
-
-    if (!isOffensiveSupportMissionTypeValid(supportType, missionType)) {
-      return { status: 400, error: 'Offensive support request mission type is invalid.' };
-    }
-
-    if (!supportShipAmountsHaveAnyValue(normalizedMinimumShips)) {
-      return { status: 400, error: 'Select at least one minimum ship requirement.' };
-    }
-
-    if (supportType === 'ATTACK_TARGET' && bombardmentPriorities !== null) {
-      return { status: 400, error: 'Bombardment priorities are valid only for bombard and siege support requests.' };
-    }
-
-    const targetOwnerId = targetPlanet.info.ownerId;
-    if (targetOwnerId === null || !isSupportMissionLegalForProvider(galaxy, targetPlayerId, targetOwnerId, supportType)) {
-      return { status: 409, error: 'Requested offensive target is not currently valid for the selected ally.' };
-    }
-  }
-
-  if (supportType === 'RESOURCE_SUPPORT' && !supportResourcesHasAnyValue(requestedResources)) {
-    return { status: 400, error: 'Select at least one requested resource amount.' };
-  }
-
-  const duplicatePending = galaxy.supportRequests.some((request) =>
-    request.state === DiplomaticProposalState.PENDING
-    && request.fromPlayerId === requesterPlayerId
-    && request.toPlayerId === targetPlayerId
-    && request.supportType === supportType
-    && sameCoordinates(request.targetCoordinates, targetCoordinates)
-  );
-  if (duplicatePending) {
-    return { status: 409, error: 'A matching support request is already pending for this planet.' };
-  }
-
-  galaxy.supportRequests.push(createSupportRequest(
-    galaxy.nextSupportRequestId,
-    requesterPlayerId,
-    targetPlayerId,
-    supportType,
-    targetPlanet.basicInfo.name,
-    targetCoordinates,
-    galaxy.currentTurn,
-    galaxy.currentTurn + 2,
-    supportType === 'RESOURCE_SUPPORT' ? requestedResources : null,
-    isOffensiveSupportRequestType(supportType)
-      ? {
-        missionType,
-        minimumShips: normalizedMinimumShips,
-        bombardmentPriorities,
-        targetOwnerPlayerId: targetPlanet.info.ownerId,
-        targetOwnerPlayerName: targetPlanet.info.ownerId !== null
-          ? resolvePlayerById(galaxy, targetPlanet.info.ownerId)?.playerName ?? null
-          : null
-      }
-      : undefined
-  ));
-  galaxy.nextSupportRequestId += 1;
-  return { ok: true };
-}
-
 function approveSupportRequest(
   galaxy: Galaxy,
   request: SupportRequest,
@@ -9467,20 +9666,6 @@ function isOffensiveSupportRequest(
   request: SupportRequest
 ): request is Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }> {
   return isOffensiveSupportRequestType(request.supportType);
-}
-
-function isOffensiveSupportMissionTypeValid(
-  supportType: Extract<SupportRequestTypeDto, 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET'>,
-  missionType: FleetMissionTypeType | null
-): boolean {
-  switch (supportType) {
-    case 'ATTACK_TARGET':
-      return missionType === FleetMissionType.ATTACK;
-    case 'BOMBARD_TARGET':
-      return missionType === FleetMissionType.BOMBARD;
-    case 'SIEGE_TARGET':
-      return missionType === FleetMissionType.SIEGE;
-  }
 }
 
 function isKnownHostileSupportTarget(
@@ -10813,6 +10998,7 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Number.isInteger(setup.autoSaveTurns) &&
     setup.autoSaveTurns >= 0 &&
     setup.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&
+    (setup.enablePlayerActionLogging === undefined || typeof setup.enablePlayerActionLogging === 'boolean') &&
     (setup.startingHomeworldPreset === 'Low'
       || setup.startingHomeworldPreset === 'Medium'
       || setup.startingHomeworldPreset === 'High') &&

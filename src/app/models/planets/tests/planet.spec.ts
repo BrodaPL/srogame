@@ -345,5 +345,14 @@ describe('Planet', () => {
       expect(parameters.hyperspaceParameters).toBeLessThanOrEqual(1.5);
     }
   });
+
+  it('uses the updated random planet base-size range', () => {
+    const system = createSystem();
+    for (let index = 0; index < 60; index += 1) {
+      const planet = Planet.createRandomEmpty(`Sized-${index}`, 1, system, null);
+      expect(planet.basicInfo.baseSize).toBeGreaterThanOrEqual(100);
+      expect(planet.basicInfo.baseSize).toBeLessThanOrEqual(220);
+    }
+  });
 });
 

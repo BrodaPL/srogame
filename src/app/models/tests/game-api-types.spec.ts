@@ -41,6 +41,7 @@ describe('game-api-types bot profile counts', () => {
       BUNKERER: 0
     });
     expect(setup.startingHomeworldPreset).toBe(DEFAULT_STARTING_HOMEWORLD_PRESET);
+    expect(setup.enablePlayerActionLogging).toBe(false);
   });
 
   it('normalizes invalid values to zero and preserves exact totals', () => {
@@ -106,5 +107,35 @@ describe('game-api-types bot profile counts', () => {
 
     expect(missingPreset.startingHomeworldPreset).toBe(StartingHomeworldPreset.MEDIUM);
     expect(invalidPreset.startingHomeworldPreset).toBe(StartingHomeworldPreset.MEDIUM);
+  });
+
+  it('normalizes player action logging flag to a strict boolean', () => {
+    const disabled = normalizeGalaxySetup({
+      gameType: 'PvE',
+      galaxyName: 'Logging Disabled',
+      galaxyWidth: 25,
+      galaxyHeight: 20,
+      galaxyCenterSize: 10,
+      voidChance: 5,
+      starsAmountModifier: [-1, 4],
+      playerAmount: 1,
+      botsAmount: 0,
+      botDifficulty: 0,
+      neutralBotsAmount: 1,
+      neutralBotsDifficulty: 0,
+      enablePlayerActionLogging: false,
+      startingResources: {
+        metal: 6,
+        crystal: 3,
+        deuterium: 1
+      }
+    });
+    const enabled = normalizeGalaxySetup({
+      ...disabled,
+      enablePlayerActionLogging: true
+    });
+
+    expect(disabled.enablePlayerActionLogging).toBe(false);
+    expect(enabled.enablePlayerActionLogging).toBe(true);
   });
 });
