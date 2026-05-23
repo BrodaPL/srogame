@@ -1,4 +1,5 @@
 import * as buildingTypeModule from '../../../../../src/app/models/enums/building-type.js';
+import * as shipTypeModule from '../../../../../src/app/models/enums/ship-type.js';
 import * as technologyTypeModule from '../../../../../src/app/models/enums/technology-type.js';
 import * as fusionReactorOperationModule from '../../../../../src/app/models/planets/fusion-reactor-operation.js';
 import * as technologyEffectsModule from '../../../../../src/app/models/tech/technology-effects.js';
@@ -16,16 +17,19 @@ import type {
 } from '../../bot-v2-types.ts';
 import {
   BUILDING_BLUEPRINTS,
+  SHIP_BLUEPRINTS,
   TECHNOLOGY_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
 import { resolveModule } from '../../../esm-module.js';
 
 const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../../src/app/models/enums/building-type.js');
+const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../../src/app/models/enums/ship-type.js');
 const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../../src/app/models/enums/technology-type.js');
 const { resolveFusionReactorOperation } = resolveModule(fusionReactorOperationModule) as typeof import('../../../../../src/app/models/planets/fusion-reactor-operation.js');
 const { industryPowerMultiplier, researchPowerMultiplier } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
 type BuildingTypeT = buildingTypeModule.BuildingType;
+type ShipTypeT = shipTypeModule.ShipType;
 type TechnologyTypeT = technologyTypeModule.TechnologyType;
 
 type ResourceKey = 'metal' | 'crystal' | 'deuterium';
@@ -61,8 +65,16 @@ type ResearchStep = {
   blockers: string[];
 };
 
+type ProductionStep = {
+  kind: 'SHIPYARD';
+  shipType: ShipTypeT;
+  amount: number;
+  cost: ResourceAmounts;
+  blockers: string[];
+};
+
 type EconomicGoalEvaluation = BotEconomicGoal & {
-  immediateRequest: BuildingStep | ResearchStep | null;
+  immediateRequest: BuildingStep | ResearchStep | ProductionStep | null;
   selectedRequestKind: BotProposalKind;
 };
 
@@ -102,6 +114,7 @@ const BRANCH_ENERGY_TARGET_BUFFER = 5;
 const INDUSTRY_BONUS_FACTOR = 1.1;
 const BONUS_FACTOR_CEILING = 2;
 const STORAGE_TARGET_MULTIPLIER = 1.5;
+const REPAIR_DRONE_BASE_INDUSTRY_RATIO = 0.05;
 
 export class BotEconomicSubsystem implements BotSubsystem {
   public readonly subsystemId = 'ECONOMIC' as const;
@@ -151,12 +164,16 @@ function buildPlanetEconomicResult(
     .sort((left, right) =>
       left.weightedEtc - right.weightedEtc
       || left.totalEtc - right.totalEtc
-      || left.finalBuildingType.localeCompare(right.finalBuildingType)
+      || resolveEconomicGoalTargetLabel(left).localeCompare(resolveEconomicGoalTargetLabel(right))
     );
   const selectedGoals = rankedGoals
     .filter((goal) => goal.immediateRequest !== null && goal.blockers.length === 0)
     .slice(0, 2);
-  const proposals = createPlanetProposals(context, planet, selectedGoals);
+  const repairDroneGoal = evaluateRepairDroneEconomyGoal(planet);
+  const proposals = createPlanetProposals(context, planet, [
+    ...selectedGoals,
+    ...(repairDroneGoal ? [repairDroneGoal] : [])
+  ]);
   const blockedGoalCount = rankedGoals.filter((goal) => goal.blockers.length > 0).length;
 
   return {
@@ -291,6 +308,100 @@ function evaluateGoalForBuilding(
       weightedEtc: roundToTwoDecimals(weightedEtc)
     }
   };
+}
+
+function evaluateRepairDroneEconomyGoal(
+  planet: BotPlanetSnapshot
+): EconomicGoalEvaluation | null {
+  if (planet.queues.shipyardQueueLength >= planet.power.maxShipyardQueueLength) {
+    return null;
+  }
+  if (!canProduceShipNow(planet, ShipType.REPAIR_DRONE)) {
+    return null;
+  }
+
+  const installed = planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0;
+  const target = resolveEconomicRepairDroneTarget(planet);
+  const gap = Math.max(0, target - installed);
+  if (gap <= 0) {
+    return null;
+  }
+
+  const blueprint = SHIP_BLUEPRINTS.get(ShipType.REPAIR_DRONE);
+  if (!blueprint || planet.power.shipyardPower <= 0) {
+    return null;
+  }
+
+  const unitCost = normalizeResources(blueprint.cost);
+  const unitCostTotal = Math.max(1, getTotalResourceAmount(unitCost));
+  const localIncomeTotal = planet.economy.income.metal + planet.economy.income.crystal + planet.economy.income.deuterium;
+  const amount = Math.min(
+    gap,
+    Math.max(1, Math.floor(localIncomeTotal / unitCostTotal), Math.ceil(gap / 3))
+  );
+  const cost = multiplyResources(unitCost, amount);
+  const totalEtc = normalizeFiniteEtc(planet.power.shipyardQueueRemainingEtc)
+    + Math.ceil(getTotalResourceAmount(cost) / planet.power.shipyardPower);
+  const weightedEtc = totalEtc / resolveRepairDroneEconomyBonusFactor(planet, installed, target);
+
+  return {
+    goalKey: `economic:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:ship:${ShipType.REPAIR_DRONE}:${target}`,
+    subsystemId: 'ECONOMIC',
+    goalFamily: 'ECONOMIC',
+    branch: 'ECONOMY',
+    planetId: planet.planetId,
+    targetCoordinates: { ...planet.coordinates },
+    finalTargetKind: 'SHIP',
+    finalBuildingType: null,
+    finalTechnologyType: null,
+    finalDefenceType: null,
+    finalShipType: ShipType.REPAIR_DRONE,
+    finalLevel: null,
+    finalAmount: amount,
+    weightedEtc,
+    totalEtc,
+    buildingSideEtc: totalEtc,
+    researchSideEtc: 0,
+    bonusFactor: resolveRepairDroneEconomyBonusFactor(planet, installed, target),
+    blockers: [],
+    selectedRequestKind: 'SHIPYARD',
+    immediateRequest: {
+      kind: 'SHIPYARD',
+      shipType: ShipType.REPAIR_DRONE,
+      amount,
+      cost,
+      blockers: []
+    },
+    debug: {
+      branch: 'ECONOMY',
+      finalShipType: ShipType.REPAIR_DRONE,
+      goalFamily: 'ECONOMIC',
+      repairDroneInstalled: installed,
+      repairDroneTarget: target,
+      totalEtc: roundToTwoDecimals(totalEtc),
+      weightedEtc: roundToTwoDecimals(weightedEtc)
+    }
+  };
+}
+
+function resolveEconomicRepairDroneTarget(planet: BotPlanetSnapshot): number {
+  const industryModifierPenalty = Math.max(0, 1 - planet.modifiers.industry);
+  const targetRatio = REPAIR_DRONE_BASE_INDUSTRY_RATIO + industryModifierPenalty;
+  return Math.max(0, Math.ceil(planet.power.industryPower * targetRatio));
+}
+
+function resolveRepairDroneEconomyBonusFactor(
+  planet: BotPlanetSnapshot,
+  installed: number,
+  target: number
+): number {
+  if (target <= 0) {
+    return 1;
+  }
+
+  const missingRatio = Math.max(0, (target - installed) / target);
+  const industryPenalty = Math.max(0, 1 - planet.modifiers.industry);
+  return Math.min(BONUS_FACTOR_CEILING, 1 + (missingRatio * 0.5) + industryPenalty);
 }
 
 function collectBuildingGoalDependencies(
@@ -724,11 +835,15 @@ function createPlanetProposals(
 
 function resolveRequestKey(
   planet: BotPlanetSnapshot,
-  request: BuildingStep | ResearchStep
+  request: BuildingStep | ResearchStep | ProductionStep
 ): string {
-  return request.kind === 'BUILDING'
-    ? `building:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.buildingType}:${request.nextLevel}`
-    : `research:${request.technologyType}:${request.nextLevel}`;
+  if (request.kind === 'BUILDING') {
+    return `building:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.buildingType}:${request.nextLevel}`;
+  }
+  if (request.kind === 'RESEARCH') {
+    return `research:${request.technologyType}:${request.nextLevel}`;
+  }
+  return `shipyard:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.shipType}:${request.amount}`;
 }
 
 function createProposalFromGoal(
@@ -745,9 +860,12 @@ function createProposalFromGoal(
   const requestKey = selectedIndex === 0 ? 'primary_request' : 'secondary_request';
   const requestLabel = selectedIndex === 0 ? 'Primary request' : 'Secondary request';
   const goalLabel = selectedIndex === 0 ? 'Primary goal' : 'Secondary goal';
+  const goalTargetLabel = resolveEconomicGoalTargetLabel(goal);
   const summary = request.kind === 'BUILDING'
-    ? `${requestLabel}: queue ${request.buildingType} for ${goalLabel} ${goal.finalBuildingType} on ${planet.name}.`
-    : `${requestLabel}: research ${request.technologyType} for ${goalLabel} ${goal.finalBuildingType} on ${planet.name}.`;
+    ? `${requestLabel}: queue ${request.buildingType} for ${goalLabel} ${goalTargetLabel} on ${planet.name}.`
+    : request.kind === 'RESEARCH'
+      ? `${requestLabel}: research ${request.technologyType} for ${goalLabel} ${goalTargetLabel} on ${planet.name}.`
+      : `${requestLabel}: produce ${request.amount} ${request.shipType} for ${goalLabel} production support on ${planet.name}.`;
 
   const expectedValue = Math.max(1, Math.round((1000 / Math.max(1, goal.weightedEtc)) * 100));
   const urgency = goal.branch === 'ENERGY'
@@ -764,7 +882,9 @@ function createProposalFromGoal(
     goalKey: goal.goalKey,
     dedupeKey: request.kind === 'BUILDING'
       ? `economic:building:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.buildingType}`
-      : `economic:research:${request.technologyType}`,
+      : request.kind === 'RESEARCH'
+        ? `economic:research:${request.technologyType}`
+        : `economic:shipyard:${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}:${request.shipType}`,
     summary,
     planetId: planet.planetId,
     targetCoordinates: { ...planet.coordinates },
@@ -780,29 +900,48 @@ function createProposalFromGoal(
         z: planet.coordinates.z,
         buildingType: request.buildingType
       }
-      : {
-        x: planet.coordinates.x,
-        y: planet.coordinates.y,
-        z: planet.coordinates.z,
-        technologyType: request.technologyType
-      },
+      : request.kind === 'RESEARCH'
+        ? {
+          x: planet.coordinates.x,
+          y: planet.coordinates.y,
+          z: planet.coordinates.z,
+          technologyType: request.technologyType
+        }
+        : {
+          x: planet.coordinates.x,
+          y: planet.coordinates.y,
+          z: planet.coordinates.z,
+          itemKind: 'ship',
+          shipType: request.shipType,
+          amount: request.amount
+        },
     blockers: [],
     expiresOnTurn: context.snapshot.turn + 1,
     debug: {
       ...goal.debug,
       bonusFactor: roundToTwoDecimals(goal.bonusFactor),
       finalGoalBuildingType: goal.finalBuildingType,
+      finalGoalShipType: goal.finalShipType,
       finalGoalBuildingLevel: goal.finalLevel,
       goalRole: goalLabel,
       immediateRequestKind: request.kind,
       immediateRequestLabel: requestLabel,
-      immediateRequestTarget: request.kind === 'BUILDING' ? request.buildingType : request.technologyType,
+      immediateRequestTarget: request.kind === 'BUILDING'
+        ? request.buildingType
+        : request.kind === 'RESEARCH'
+          ? request.technologyType
+          : request.shipType,
+      immediateRequestAmount: request.kind === 'SHIPYARD' ? request.amount : null,
       primaryGoalKey: goal.goalKey,
       secondaryGoalKey: null,
       selectedIndex: selectedIndex + 1,
       sharedImmediateRequest: false
     }
   };
+}
+
+function resolveEconomicGoalTargetLabel(goal: EconomicGoalEvaluation): string {
+  return goal.finalBuildingType ?? goal.finalShipType ?? goal.finalTechnologyType ?? 'economic support';
 }
 
 function resolvePlanetNoActionReason(
@@ -1099,11 +1238,71 @@ function getBuildingLevel(planet: BotPlanetSnapshot, buildingType: BuildingTypeT
   }
 }
 
+function canProduceShipNow(planet: BotPlanetSnapshot, shipType: ShipTypeT): boolean {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return false;
+  }
+
+  return blueprint.buildingRequirements.every((requirement) =>
+    getBuildingLevel(planet, requirement.building) >= Math.ceil(requirement.level)
+  ) && blueprint.techRequirements.every((requirement) =>
+    getTechnologyLevel(planet, requirement.tech) >= Math.ceil(requirement.level)
+  );
+}
+
+function getTechnologyLevel(planet: BotPlanetSnapshot, technologyType: TechnologyTypeT): number {
+  switch (technologyType) {
+    case TechnologyType.ENERGY_TECHNOLOGY:
+      return planet.tech.energyTechnologyLevel;
+    case TechnologyType.MATERIAL_TECHNOLOGY:
+      return planet.tech.materialTechnologyLevel;
+    case TechnologyType.ADAPTIVE_TECHNOLOGY:
+      return planet.tech.adaptiveTechnologyLevel;
+    case TechnologyType.COMPUTER_TECHNOLOGY:
+      return planet.tech.computerTechnologyLevel;
+    case TechnologyType.INTERGALACTIC_RESEARCH_NETWORK:
+      return planet.tech.intergalacticResearchNetworkLevel;
+    case TechnologyType.SHIELDING_TECHNOLOGY:
+      return planet.tech.shieldingTechnologyLevel;
+    case TechnologyType.ARMOUR_TECHNOLOGY:
+      return planet.tech.armourTechnologyLevel;
+    case TechnologyType.RAILGUNS_WEAPONS:
+      return planet.tech.railgunsWeaponsLevel;
+    case TechnologyType.BEAMS_WEAPONS:
+      return planet.tech.beamsWeaponsLevel;
+    case TechnologyType.MISSILES_WEAPONS:
+      return planet.tech.missilesWeaponsLevel;
+    case TechnologyType.FUSION_DRIVE:
+      return planet.tech.fusionDriveLevel;
+    case TechnologyType.HYPERSPACE_DRIVE:
+      return planet.tech.hyperspaceDriveLevel;
+    case TechnologyType.HYPERSPACE_TECHNOLOGY:
+      return planet.tech.hyperspaceTechnologyLevel;
+    case TechnologyType.ESPIONAGE_TECHNOLOGY:
+      return planet.tech.espionageTechnologyLevel;
+    case TechnologyType.ASTROPHYSICS_TECHNOLOGY:
+      return planet.tech.astrophysicsTechnologyLevel;
+    case TechnologyType.GRAVITON_TECHNOLOGY:
+      return planet.tech.gravitonTechnologyLevel;
+    default:
+      return 0;
+  }
+}
+
 function normalizeResources(resources: { metal: number; crystal: number; deuterium: number }): ResourceAmounts {
   return {
     metal: Math.max(0, Math.floor(resources.metal)),
     crystal: Math.max(0, Math.floor(resources.crystal)),
     deuterium: Math.max(0, Math.floor(resources.deuterium))
+  };
+}
+
+function multiplyResources(resources: ResourceAmounts, amount: number): ResourceAmounts {
+  return {
+    metal: resources.metal * amount,
+    crystal: resources.crystal * amount,
+    deuterium: resources.deuterium * amount
   };
 }
 

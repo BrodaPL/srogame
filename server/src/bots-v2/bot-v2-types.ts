@@ -557,13 +557,13 @@ export type BotEconomicGoal = BotGoalBase & {
   subsystemId: 'ECONOMIC';
   goalFamily: 'ECONOMIC';
   branch: BotEconomicBranch;
-  finalTargetKind: 'BUILDING';
-  finalBuildingType: BuildingType;
+  finalTargetKind: 'BUILDING' | 'SHIP';
+  finalBuildingType: BuildingType | null;
   finalTechnologyType: null;
   finalDefenceType: null;
-  finalShipType: null;
-  finalLevel: number;
-  finalAmount: null;
+  finalShipType: ShipType | null;
+  finalLevel: number | null;
+  finalAmount: number | null;
 };
 
 export type BotDefensiveGoal = BotGoalBase & {

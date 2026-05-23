@@ -109,6 +109,8 @@ const ALLOWED_DEFENSIVE_BUILDING_SCOPE = new Set<BuildingTypeT>([
 ]);
 
 const BONUS_FACTOR_CEILING = 3;
+const LOW_TIER_DEFENCE_TARGET_SHARE = 0.35;
+const MID_TIER_DEFENCE_TARGET_SHARE = 0.4;
 
 const UNLOCK_THRESHOLDS: Array<{ defenceType: DefenceTypeT; threshold: number }> = [
   { defenceType: DefenceType.SAM_SITE, threshold: 2 },
@@ -1028,7 +1030,7 @@ function resolveDefenceSoftCapPenaltyMultiplier(
     return 1;
   }
 
-  const multiplier = context.snapshot.profileId === 'BUNKERER' ? 20 : 12;
+  const multiplier = 10;
   const capResources = {
     metal: Math.max(1, planet.economy.income.metal * multiplier),
     crystal: Math.max(1, planet.economy.income.crystal * multiplier),
@@ -1040,11 +1042,81 @@ function resolveDefenceSoftCapPenaltyMultiplier(
     layerValue.crystal / capResources.crystal,
     layerValue.deuterium / capResources.deuterium
   );
+  const ratioPenalty = resolveDefenceTierRatioPenaltyMultiplier(planet, defenceType);
   if (overageRatio <= 1) {
+    return ratioPenalty;
+  }
+
+  return (1 + Math.min(6, (overageRatio - 1) * 2.5))
+    * ratioPenalty;
+}
+
+function resolveDefenceTierRatioPenaltyMultiplier(
+  planet: BotPlanetSnapshot,
+  defenceType: DefenceTypeT
+): number {
+  const tierValues = resolveDefenceTierValues(planet);
+  const totalValue = tierValues.low + tierValues.mid + tierValues.high;
+  if (totalValue <= 0) {
     return 1;
   }
 
-  return 1 + Math.min(6, (overageRatio - 1) * 2.5);
+  const candidateTier = resolveDefenceTier(defenceType);
+  const lowShare = tierValues.low / totalValue;
+  const midShare = tierValues.mid / totalValue;
+
+  if (candidateTier === 'LOW' && lowShare > LOW_TIER_DEFENCE_TARGET_SHARE) {
+    return 1 + Math.min(5, (lowShare - LOW_TIER_DEFENCE_TARGET_SHARE) * 10);
+  }
+
+  if (candidateTier === 'MID' && midShare > MID_TIER_DEFENCE_TARGET_SHARE) {
+    return 1 + Math.min(3, (midShare - MID_TIER_DEFENCE_TARGET_SHARE) * 7);
+  }
+
+  return 1;
+}
+
+function resolveDefenceTierValues(planet: BotPlanetSnapshot): { low: number; mid: number; high: number } {
+  const values = { low: 0, mid: 0, high: 0 };
+  for (const defenceType of NON_BOMB_DEFENCE_TYPES) {
+    const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
+    if (!blueprint) {
+      continue;
+    }
+
+    const amount = planet.defense.installedCountByType[defenceType] ?? 0;
+    const value = blueprint.cost.getTotalResourceAmount() * amount;
+    switch (resolveDefenceTier(defenceType)) {
+      case 'LOW':
+        values.low += value;
+        break;
+      case 'MID':
+        values.mid += value;
+        break;
+      case 'HIGH':
+        values.high += value;
+        break;
+    }
+  }
+  return values;
+}
+
+function resolveDefenceTier(defenceType: DefenceTypeT): 'LOW' | 'MID' | 'HIGH' {
+  if (
+    defenceType === DefenceType.SAM_SITE
+    || defenceType === DefenceType.LIGHT_BEAM_CANNON
+  ) {
+    return 'LOW';
+  }
+
+  if (
+    defenceType === DefenceType.ORBITAL_MISSILE_LAUNCHER
+    || defenceType === DefenceType.BEAM_CANNON
+  ) {
+    return 'MID';
+  }
+
+  return 'HIGH';
 }
 
 function resolveDefenceLayerResources(

@@ -154,6 +154,7 @@ const ROBOTICS_PENALTY_FACTOR = 1.12;
 const COLONIZER_IDLE_CAP = 1;
 const FORCED_COLONIZATION_TURN_THRESHOLD = 100;
 const SUPPORT_TRANSFER_BASE_TURNS = 2;
+const REPAIR_DRONE_BASE_INDUSTRY_RATIO = 0.05;
 
 export class BotStrategicDevelopmentSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DEVELOPMENT' as const;
@@ -1494,7 +1495,7 @@ function resolveProductionOrderAmount(
 
   if (shipType === ShipType.REPAIR_DRONE) {
     const installed = planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0;
-    return Math.max(0, resolveStrategicDevelopmentRepairDroneCap(planet) - installed);
+    return resolveRepairDroneOrderAmount(planet, installed);
   }
 
   if (isStrategicDevelopmentSupportCargoShipType(shipType)) {
@@ -1549,7 +1550,26 @@ function resolveStrategicDevelopmentSupportCargoRemainingCapacity(planet: BotPla
 }
 
 function resolveStrategicDevelopmentRepairDroneCap(planet: BotPlanetSnapshot): number {
-  return Math.max(0, Math.floor(planet.power.industryPower / 2));
+  const industryModifierPenalty = Math.max(0, 1 - planet.modifiers.industry);
+  const targetRatio = REPAIR_DRONE_BASE_INDUSTRY_RATIO + industryModifierPenalty;
+  return Math.max(0, Math.ceil(planet.power.industryPower * targetRatio));
+}
+
+function resolveRepairDroneOrderAmount(
+  planet: BotPlanetSnapshot,
+  installed: number
+): number {
+  const gap = Math.max(0, resolveStrategicDevelopmentRepairDroneCap(planet) - installed);
+  if (gap <= 0) {
+    return 0;
+  }
+
+  const blueprint = SHIP_BLUEPRINTS.get(ShipType.REPAIR_DRONE);
+  const unitCost = Math.max(1, Math.floor(blueprint?.cost.getTotalResourceAmount() ?? 1));
+  const localIncomeTotal = planet.economy.income.metal + planet.economy.income.crystal + planet.economy.income.deuterium;
+  const incomeSizedBatch = Math.max(1, Math.floor(localIncomeTotal / unitCost));
+  const targetSizedBatch = Math.max(1, Math.ceil(gap / 3));
+  return Math.min(gap, Math.max(incomeSizedBatch, targetSizedBatch));
 }
 
 function resolveBuildingBonusFactor(
@@ -1635,9 +1655,7 @@ function isProductionShipEligible(
   }
 
   if (shipType === ShipType.REPAIR_DRONE) {
-    return context.snapshot.empire.ownedPlanetCount > 1
-      && isRepairDroneSupportPlanet(planet)
-      && (planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0) < resolveStrategicDevelopmentRepairDroneCap(planet);
+    return (planet.ships.installedCountByType[ShipType.REPAIR_DRONE] ?? 0) < resolveStrategicDevelopmentRepairDroneCap(planet);
   }
 
   if (isStrategicDevelopmentSupportCargoShipType(shipType)) {

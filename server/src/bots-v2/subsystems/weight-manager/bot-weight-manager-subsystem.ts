@@ -49,6 +49,7 @@ type WeightProfile = {
 };
 
 const PERSONALITY_VARIANCE_RETENTION = 0.8;
+const DEFENSIVE_WEIGHT_RETENTION = 0.68;
 
 type GlobalModeScores = {
   ECONOMIC_RECOVERY: number;
@@ -634,7 +635,7 @@ function buildWeightManagerPlanetEntry(
     warfareWeight -= 8;
   }
   if (flags.defenceFocused) {
-    defensiveWeight += 16;
+    defensiveWeight += 8;
   }
   if (flags.militaryFocused) {
     warfareWeight += 16;
@@ -646,23 +647,23 @@ function buildWeightManagerPlanetEntry(
     economicWeight += 8;
   }
   if (flags.damagedPlanet) {
-    defensiveWeight += 10;
+    defensiveWeight += 6;
     economicWeight -= 4;
     warfareWeight -= 4;
   }
   if (flags.inDangerPlanet) {
-    defensiveWeight += 34;
-    warfareWeight += 10;
-    economicWeight -= 12;
+    defensiveWeight += 20;
+    warfareWeight += 16;
+    economicWeight -= 8;
   }
   if (flags.constantlyAttackedPlanet) {
-    defensiveWeight += 18;
-    warfareWeight += 8;
-    economicWeight -= 6;
+    defensiveWeight += 10;
+    warfareWeight += 12;
+    economicWeight -= 4;
   }
   if (flags.veryHeavilyAttackedPlanet) {
-    defensiveWeight += 16;
-    warfareWeight += 6;
+    defensiveWeight += 8;
+    warfareWeight += 10;
   }
 
   switch (selectedMode) {
@@ -671,8 +672,8 @@ function buildWeightManagerPlanetEntry(
       warfareWeight -= 10;
       break;
     case 'WAR_EMERGENCY':
-      defensiveWeight += 10;
-      warfareWeight += 12;
+      defensiveWeight += 4;
+      warfareWeight += 18;
       economicWeight -= flags.maturePlanet ? 10 : 4;
       break;
     case 'EXPANSION':
@@ -681,7 +682,7 @@ function buildWeightManagerPlanetEntry(
       break;
     case 'DIPLOMATIC_CAUTION':
       warfareWeight -= 8;
-      defensiveWeight += 4;
+      defensiveWeight += 2;
       break;
     default:
       break;
@@ -701,6 +702,18 @@ function buildWeightManagerPlanetEntry(
       defensiveWeight = Math.min(defensiveWeight, 40);
     }
   }
+
+  const defensiveReduction = Math.max(0, Math.round(defensiveWeight * (1 - DEFENSIVE_WEIGHT_RETENTION)));
+  defensiveWeight -= defensiveReduction;
+  const warfareShare = flags.immaturePlanet && !flags.inDangerPlanet
+    ? 0
+    : flags.militaryFocused || flags.inDangerPlanet || flags.constantlyAttackedPlanet || selectedMode === 'WAR_EMERGENCY'
+    ? 0.7
+    : flags.industryFocused || selectedMode === 'ECONOMIC_RECOVERY'
+      ? 0.35
+      : 0.5;
+  warfareWeight += Math.round(defensiveReduction * warfareShare);
+  economicWeight += defensiveReduction - Math.round(defensiveReduction * warfareShare);
 
   return {
     coordinates: { ...entry.planet.coordinates },

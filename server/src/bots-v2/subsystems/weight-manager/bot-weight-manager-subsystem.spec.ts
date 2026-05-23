@@ -57,7 +57,8 @@ describe('BotWeightManagerSubsystem', () => {
     expect(result.memory.weightManager.selectedMode).toBe('WAR_EMERGENCY');
     expect(weakEntry?.knownByWarFaction).toBe(true);
     expect(weakEntry?.inDangerPlanet).toBe(true);
-    expect(weakEntry?.defensiveWeight).toBeGreaterThan(weakEntry?.economicWeight ?? 0);
+    expect(weakEntry?.defensiveWeight).toBeGreaterThan(30);
+    expect(weakEntry?.warfareWeight).toBeGreaterThan(weakEntry?.defensiveWeight ?? 0);
   });
 
   it('marks a planet as damaged when a crucial building breaches its emergency threshold even below total damage threshold', () => {
@@ -256,7 +257,7 @@ describe('BotWeightManagerSubsystem', () => {
     bot.addReport(new FleetReport(
       {
         reportId: bot.createReportId(),
-        createdTurn: 109,
+        createdTurn: 111,
         title: `Battle Report: ${targetPlanet.basicInfo.solarSystem.coordinates.x}:${targetPlanet.basicInfo.solarSystem.coordinates.y}:${targetPlanet.basicInfo.order}`,
         sourceCoordinates: {
           x: targetPlanet.basicInfo.solarSystem.coordinates.x,

@@ -96,7 +96,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     expect(result.goals?.some((goal) => goal.finalShipType === ShipType.COLONIZER)).toBe(false);
   });
 
-  it('does not allow repair-drone production on a one-planet empire even when unlocked', () => {
+  it('allows baseline repair-drone production on a one-planet empire when unlocked', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseStrategicDevelopmentPlanet(planet);
     planet.setBuildingLevel(BuildingType.METAL_MINE, 2);
@@ -117,7 +117,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     expect(result.goals?.some((goal) =>
       goal.goalFamily === 'PRODUCTION'
       && goal.finalShipType === ShipType.REPAIR_DRONE
-    )).toBe(false);
+    )).toBe(true);
   });
 
   it('emits an armament-delivery mission for repair support from a developed planet', () => {
@@ -157,7 +157,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     )).toBe(false);
   });
 
-  it('does not produce support cargo or repair hulls for a one-planet empire', () => {
+  it('does not produce support cargo hulls for a one-planet empire', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureDevelopedSupportSource(planet);
     setSupportShipTech(bot);
@@ -170,7 +170,6 @@ describe('BotStrategicDevelopmentSubsystem', () => {
         goal.finalShipType === ShipType.TRANSPORTER
         || goal.finalShipType === ShipType.MASS_HAULER
         || goal.finalShipType === ShipType.CARGO_SUPPORT
-        || goal.finalShipType === ShipType.REPAIR_DRONE
       )
     )).toBe(false);
   });
