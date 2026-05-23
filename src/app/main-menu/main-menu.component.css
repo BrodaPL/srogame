@@ -53,3 +53,15 @@
   box-shadow: none;
   transform: none;
 }
+
+.main-menu-version {
+  position: fixed;
+  left: 1rem;
+  bottom: 0.75rem;
+  margin: 0;
+  color: rgba(214, 221, 232, 0.72);
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  z-index: 4;
+}
