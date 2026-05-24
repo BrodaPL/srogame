@@ -15,21 +15,64 @@ import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.j
 import { BotEconomicSubsystem } from './bot-economic-subsystem.js';
 
 describe('BotEconomicSubsystem', () => {
-  it('prefers a crystal-mine request on a crystal-rich planet in the economy branch', () => {
+  it('prioritizes penalized metal mines before Interstellar Trade Port is available', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseEconomyPlanet(planet);
-    planet.setBuildingLevel(BuildingType.METAL_MINE, 2);
-    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 1);
-    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 2);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+    planet.info.planetaryParameters.metalModifier = 0.7;
+
+    const result = runEconomicSubsystem(galaxy, bot);
+    const goals = result.goals ?? [];
+    const metalGoal = goals.find((goal) => goal.finalBuildingType === BuildingType.METAL_MINE);
+    const crystalGoal = goals.find((goal) => goal.finalBuildingType === BuildingType.CRYSTAL_MINE);
+
+    expect(metalGoal?.bonusFactor).toBeCloseTo(1.375, 3);
+    expect(metalGoal?.weightedEtc).toBeLessThan(crystalGoal?.weightedEtc ?? Number.MAX_SAFE_INTEGER);
+    expect(result.proposals[0]?.debug?.branch).toBe('ECONOMY');
+    expect(result.proposals[0]?.debug?.goalRole).toBe('Primary goal');
+  });
+
+  it('prioritizes penalized crystal mines before Interstellar Trade Port is available', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseEconomyPlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+    planet.info.planetaryParameters.crystalModifier = 0.7;
+
+    const result = runEconomicSubsystem(galaxy, bot);
+    const crystalGoal = (result.goals ?? []).find((goal) => goal.finalBuildingType === BuildingType.CRYSTAL_MINE);
+
+    expect(crystalGoal?.bonusFactor).toBeCloseTo(1.33, 3);
+  });
+
+  it('does not add mine priority from rich resource modifiers', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseEconomyPlanet(planet);
     planet.info.planetaryParameters.crystalModifier = 1.6;
 
     const result = runEconomicSubsystem(galaxy, bot);
+    const crystalGoal = (result.goals ?? []).find((goal) => goal.finalBuildingType === BuildingType.CRYSTAL_MINE);
 
-    expect(result.proposals[0]?.requestPayload).toMatchObject({
-      buildingType: BuildingType.CRYSTAL_MINE
-    });
-    expect(result.proposals[0]?.debug?.branch).toBe('ECONOMY');
-    expect(result.proposals[0]?.debug?.goalRole).toBe('Primary goal');
+    expect(crystalGoal?.bonusFactor).toBe(1);
+  });
+
+  it('stops compensating mine penalties once Interstellar Trade Port is available', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseEconomyPlanet(planet);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 20);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 20);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 20);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 20);
+    planet.info.planetaryParameters.metalModifier = 0.7;
+    planet.setBuildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT, 1);
+
+    const result = runEconomicSubsystem(galaxy, bot);
+    const metalGoal = (result.goals ?? []).find((goal) => goal.finalBuildingType === BuildingType.METAL_MINE);
+
+    expect(metalGoal?.bonusFactor).toBe(1);
   });
 
   it('switches to the energy branch when energy is below target', () => {

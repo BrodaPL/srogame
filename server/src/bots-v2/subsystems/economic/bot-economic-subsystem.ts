@@ -115,6 +115,8 @@ const INDUSTRY_BONUS_FACTOR = 1.1;
 const BONUS_FACTOR_CEILING = 2;
 const STORAGE_TARGET_MULTIPLIER = 1.5;
 const REPAIR_DRONE_BASE_INDUSTRY_RATIO = 0.05;
+const METAL_PENALTY_MINE_PRIORITY_MULTIPLIER = 1.25;
+const CRYSTAL_PENALTY_MINE_PRIORITY_MULTIPLIER = 1.1;
 
 export class BotEconomicSubsystem implements BotSubsystem {
   public readonly subsystemId = 'ECONOMIC' as const;
@@ -708,28 +710,18 @@ function resolveBonusFactor(
 }
 
 function resolvePlanetaryBonusFactor(planet: BotPlanetSnapshot, buildingType: BuildingTypeT): number {
-  const positiveModifier = (() => {
-    switch (buildingType) {
-      case BuildingType.METAL_MINE:
-        return planet.modifiers.metal;
-      case BuildingType.CRYSTAL_MINE:
-        return planet.modifiers.crystal;
-      case BuildingType.DEUTERIUM_SYNTHESIZER:
-        return planet.modifiers.deuterium;
-      case BuildingType.SOLAR_WIND_GEOTHERMAL:
-        return planet.modifiers.solarEnergy;
-      case BuildingType.NUCLEAR_PLANT:
-        return planet.modifiers.nuclearEnergy;
-      default:
-        return 1;
-    }
-  })();
-
-  if (positiveModifier <= 1) {
+  if (planet.economy.interstellarTradePortLevel > 0) {
     return 1;
   }
 
-  return 1 + ((positiveModifier - 1) / 4);
+  switch (buildingType) {
+    case BuildingType.METAL_MINE:
+      return 1 + (Math.max(0, 1 - planet.modifiers.metal) * METAL_PENALTY_MINE_PRIORITY_MULTIPLIER);
+    case BuildingType.CRYSTAL_MINE:
+      return 1 + (Math.max(0, 1 - planet.modifiers.crystal) * CRYSTAL_PENALTY_MINE_PRIORITY_MULTIPLIER);
+    default:
+      return 1;
+  }
 }
 
 function resolveMostDeficientStorageType(planet: BotPlanetSnapshot): BuildingTypeT | null {
