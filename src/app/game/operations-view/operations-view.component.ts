@@ -32,6 +32,8 @@ type CoordinateSegmentVm = {
   relation: string;
 };
 
+type MissionTypeFilterValue = FleetMissionType | 'ALL';
+
 @Component({
   selector: 'app-operations-view',
   imports: [TopMenuComponent, RouterLink, FormsModule],
@@ -48,6 +50,7 @@ export class OperationsViewComponent implements OnInit {
   protected actionError: string | null = null;
   protected actionSuccess: string | null = null;
   protected activeFleets: Fleet[] = [];
+  protected selectedMissionTypeFilter: MissionTypeFilterValue = 'ALL';
   protected ownedPlanets: ClientPlanetDto[] = [];
   protected activeActionFleetId: number | null = null;
   protected maintenanceDialogFleetId: number | null = null;
@@ -80,11 +83,44 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected primaryFleet(): Fleet | null {
-    return this.activeFleets[0] ?? null;
+    return this.filteredActiveFleets()[0] ?? null;
   }
 
   protected activeFleetCountLabel(): string {
     return `${this.activeFleets.length}/${this.maxActiveFleetCount()}`;
+  }
+
+  protected missionTypeFilterOptions(): Array<{ value: MissionTypeFilterValue; label: string }> {
+    const missionTypes = [...new Set(this.activeFleets.map((fleet) => fleet.missionType))]
+      .sort((left, right) => this.missionFilterLabel(left).localeCompare(this.missionFilterLabel(right)));
+
+    return [
+      { value: 'ALL', label: 'All missions' },
+      ...missionTypes.map((missionType) => ({
+        value: missionType,
+        label: this.missionFilterLabel(missionType)
+      }))
+    ];
+  }
+
+  protected filteredActiveFleets(): Fleet[] {
+    if (this.selectedMissionTypeFilter === 'ALL') {
+      return this.activeFleets;
+    }
+
+    return this.activeFleets.filter((fleet) => fleet.missionType === this.selectedMissionTypeFilter);
+  }
+
+  protected filteredFleetCountLabel(): string | null {
+    if (this.selectedMissionTypeFilter === 'ALL') {
+      return null;
+    }
+
+    return `Showing ${this.filteredActiveFleets().length} of ${this.activeFleets.length} active fleets.`;
+  }
+
+  protected missionTypeFilterChanged(value: MissionTypeFilterValue): void {
+    this.selectedMissionTypeFilter = value;
   }
 
   protected shipSummary(fleet: Fleet): string {
@@ -223,6 +259,10 @@ export class OperationsViewComponent implements OnInit {
 
   protected missionLabel(fleet: Fleet): string {
     return fleet.missionType === FleetMissionType.DEFEND ? 'Guard' : fleet.missionType;
+  }
+
+  protected missionFilterLabel(missionType: FleetMissionType): string {
+    return missionType === FleetMissionType.DEFEND ? 'Guard' : missionType;
   }
 
   protected isAttackMission(fleet: Fleet): boolean {

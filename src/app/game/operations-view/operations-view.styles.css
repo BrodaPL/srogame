@@ -25,6 +25,35 @@
   align-content: start;
 }
 
+.operations-view__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1rem;
+  align-items: end;
+}
+
+.operations-view__filter-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: min(16rem, 100%);
+}
+
+.operations-view__filter-field span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.operations-view__filter-field select {
+  min-height: 2.35rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  padding: 0.45rem 0.65rem;
+}
+
 .operations-view__ships {
   margin: 0;
   color: var(--muted);

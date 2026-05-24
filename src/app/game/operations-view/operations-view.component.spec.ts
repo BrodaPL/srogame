@@ -5,6 +5,7 @@ import type { ClientCoordinates, ClientPlanetDto, PlayerSession } from '../../mo
 import { PlanetType } from '../../models/enums/planet-type';
 import { PlayerType } from '../../models/enums/player-type';
 import { TechnologyType } from '../../models/enums/technology-type';
+import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 
 describe('OperationsViewComponent', () => {
   it('shows active fleet count against the maximum fleet cap', () => {
@@ -65,6 +66,36 @@ describe('OperationsViewComponent', () => {
         }
       }
     );
+  });
+
+  it('filters active fleets by selected mission type', () => {
+    const component = new OperationsViewComponent(
+      {} as never,
+      {} as never,
+      {
+        load: vi.fn().mockReturnValue(createPlayerSession())
+      } as never,
+      {
+        markForCheck: vi.fn()
+      } as never,
+      {
+        autoOpenTutorial: vi.fn()
+      } as never,
+      createRouter() as never
+    );
+
+    (component as { activeFleets: Array<{ fleetId: number; missionType: FleetMissionType }> }).activeFleets = [
+      { fleetId: 1, missionType: FleetMissionType.SPY },
+      { fleetId: 2, missionType: FleetMissionType.TRANSPORT },
+      { fleetId: 3, missionType: FleetMissionType.SPY }
+    ];
+
+    (component as { missionTypeFilterChanged(value: FleetMissionType): void }).missionTypeFilterChanged(FleetMissionType.SPY);
+
+    expect((component as { filteredActiveFleets(): Array<{ fleetId: number }> }).filteredActiveFleets().map((fleet) => fleet.fleetId))
+      .toEqual([1, 3]);
+    expect((component as { filteredFleetCountLabel(): string | null }).filteredFleetCountLabel())
+      .toBe('Showing 2 of 3 active fleets.');
   });
 });
 

@@ -41,8 +41,24 @@
         <p class="overview-muted">Launch a mission in Mission Planner to populate this screen.</p>
       </section>
     } @else {
+      <section class="overview-card operations-view__filters" aria-label="Operations filters">
+        <label class="operations-view__filter-field">
+          <span>Mission type</span>
+          <select
+            [ngModel]="selectedMissionTypeFilter"
+            (ngModelChange)="missionTypeFilterChanged($event)">
+            @for (option of missionTypeFilterOptions(); track option.value) {
+              <option [ngValue]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+        @if (filteredFleetCountLabel(); as countLabel) {
+          <p class="overview-muted">{{ countLabel }}</p>
+        }
+      </section>
+
       <div class="operations-view__grid" data-tutorial-id="operations-main-state">
-        @for (fleet of activeFleets; track fleet.fleetId; let isFirst = $first) {
+        @for (fleet of filteredActiveFleets(); track fleet.fleetId; let isFirst = $first) {
           <article
             class="overview-card operations-view__card"
             [class.operations-view__card--attack]="isAttackMission(fleet)"
@@ -173,6 +189,11 @@
               }
             </div>
           </article>
+        } @empty {
+          <section class="overview-card">
+            <h3>No fleets match this mission filter</h3>
+            <p class="overview-muted">Select another mission type or show all missions.</p>
+          </section>
         }
       </div>
     }
