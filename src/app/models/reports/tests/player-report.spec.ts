@@ -40,6 +40,33 @@ describe('PlayerReport domain', () => {
     expect(player.reports.map((report) => report.reportId)).toEqual([firstReport.reportId]);
   });
 
+  it('keeps favourite reports when deleting selected reports', () => {
+    const player = new Player(1, 'Tester', [], new Map(), [], PlayerType.PLAYER);
+    const favouriteReport = new ProductionReport(
+      {
+        reportId: player.createReportId(),
+        createdTurn: 5,
+        title: 'Favourite report',
+        isFavourite: true
+      },
+      'Alpha'
+    );
+    const regularReport = new ProductionReport(
+      {
+        reportId: player.createReportId(),
+        createdTurn: 6,
+        title: 'Regular report'
+      },
+      'Beta'
+    );
+
+    player.addReport(favouriteReport);
+    player.addReport(regularReport);
+
+    expect(player.deleteReports([favouriteReport.reportId, regularReport.reportId])).toBe(1);
+    expect(player.reports.map((report) => report.reportId)).toEqual([favouriteReport.reportId]);
+  });
+
   it('copies espionage reports without sharing mutable resources or maps', () => {
     const report = new EspionageReportData(
       {

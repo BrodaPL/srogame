@@ -71,16 +71,7 @@ export class EspionageReportData extends PlayerReport {
 
   public override copy(): EspionageReportData {
     return new EspionageReportData(
-      {
-        reportId: this.reportId,
-        createdTurn: this.createdTurn,
-        title: this.title,
-        isRead: this.isRead,
-        sourceCoordinates: this.sourceCoordinates ? { ...this.sourceCoordinates } : null,
-        sourcePlanetName: this.sourcePlanetName,
-        sourceSystemName: this.sourceSystemName,
-        senderPlayerName: this.senderPlayerName
-      },
+      this.copyBaseData(),
       this.diff,
       this.hasTotalDefencesIntel,
       this.hasTotalShipsIntel,

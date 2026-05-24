@@ -45,6 +45,7 @@ import {
   DeletePlayerReportsResponse,
   FleetMaintenanceOptionsDto,
   MarkPlayerReportReadRequest,
+  SetPlayerReportFavouriteRequest,
   MarkMailMessageReadRequest,
   DeleteMailMessagesRequest,
   DeleteMailMessagesResponse,
@@ -674,6 +675,14 @@ export class GameApiService {
   public markPlayerReportAsRead(request: MarkPlayerReportReadRequest, token: string) {
     return this.http.post<PlayerReportDto>(
       `${API_BASE_URL}/game/reports/read`,
+      request,
+      { headers: this.authHeaders(token) }
+    );
+  }
+
+  public setPlayerReportFavourite(request: SetPlayerReportFavouriteRequest, token: string) {
+    return this.http.post<PlayerReportDto>(
+      `${API_BASE_URL}/game/reports/favourite`,
       request,
       { headers: this.authHeaders(token) }
     );

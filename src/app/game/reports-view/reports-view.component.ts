@@ -35,6 +35,7 @@ export class ReportsViewComponent implements OnInit {
   protected activeTab: ReportType | 'All' = 'All';
   protected isLoading = false;
   protected isDeleting = false;
+  protected favouriteUpdatingReportId: number | null = null;
   protected loadError: string | null = null;
   protected actionError: string | null = null;
   protected reports: PlayerReport[] = [];
@@ -104,6 +105,12 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected toggleReportSelection(reportId: number, checked: boolean): void {
+    const report = this.reports.find((entry) => entry.reportId === reportId) ?? null;
+    if (report?.isFavourite) {
+      this.selectedReportIds.delete(reportId);
+      return;
+    }
+
     if (checked) {
       this.selectedReportIds.add(reportId);
     } else {
@@ -112,7 +119,11 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected selectAllVisible(): void {
-    const visibleReports = this.visibleReports();
+    const visibleReports = this.visibleReports().filter((report) => !report.isFavourite);
+    if (visibleReports.length === 0) {
+      return;
+    }
+
     const shouldSelectAll = visibleReports.some((report) => !this.selectedReportIds.has(report.reportId));
 
     if (!shouldSelectAll) {
@@ -125,6 +136,51 @@ export class ReportsViewComponent implements OnInit {
     for (const report of visibleReports) {
       this.selectedReportIds.add(report.reportId);
     }
+  }
+
+  protected toggleReportFavourite(report: PlayerReport, event?: Event): void {
+    event?.stopPropagation();
+    if (this.favouriteUpdatingReportId !== null) {
+      return;
+    }
+
+    const session = this.playerSession.load();
+    if (!session) {
+      this.actionError = 'No player session found.';
+      return;
+    }
+
+    this.favouriteUpdatingReportId = report.reportId;
+    this.actionError = null;
+
+    this.gameApi.setPlayerReportFavourite(
+      {
+        reportId: report.reportId,
+        isFavourite: !report.isFavourite
+      },
+      session.token
+    )
+      .pipe(finalize(() => {
+        this.favouriteUpdatingReportId = null;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (updatedReport) => {
+          const mappedReport = fromPlayerReportDto(updatedReport);
+          const existingReport = this.reports.find((entry) => entry.reportId === mappedReport.reportId) ?? null;
+          if (!existingReport) {
+            return;
+          }
+
+          existingReport.setFavourite(mappedReport.isFavourite);
+          if (existingReport.isFavourite) {
+            this.selectedReportIds.delete(existingReport.reportId);
+          }
+        },
+        error: () => {
+          this.actionError = 'Unable to update favourite marker.';
+        }
+      });
   }
 
   protected openReport(report: PlayerReport): void {
@@ -245,7 +301,13 @@ export class ReportsViewComponent implements OnInit {
 
     this.isDeleting = true;
     this.actionError = null;
-    const reportIds = Array.from(this.selectedReportIds.values());
+    const reportIds = Array.from(this.selectedReportIds.values())
+      .filter((reportId) => !this.reports.find((report) => report.reportId === reportId)?.isFavourite);
+    if (reportIds.length === 0) {
+      this.isDeleting = false;
+      this.selectedReportIds.clear();
+      return;
+    }
 
     this.gameApi.deletePlayerReports({ reportIds }, session.token)
       .pipe(finalize(() => {
@@ -255,9 +317,9 @@ export class ReportsViewComponent implements OnInit {
       .subscribe({
         next: () => {
           const deletedUnreadCount = this.reports.filter((report) =>
-            this.selectedReportIds.has(report.reportId) && !report.isRead
+            reportIds.includes(report.reportId) && !report.isRead
           ).length;
-          this.reports = this.reports.filter((report) => !this.selectedReportIds.has(report.reportId));
+          this.reports = this.reports.filter((report) => !reportIds.includes(report.reportId));
           if (this.selectedReportId !== null && !this.reports.some((report) => report.reportId === this.selectedReportId)) {
             this.selectedReportId = null;
           }

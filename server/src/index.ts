@@ -271,6 +271,7 @@ import type {
   TextPlayerReportDto,
   EspionagePlayerReportDto,
   MarkPlayerReportReadRequest,
+  SetPlayerReportFavouriteRequest,
   DeletePlayerReportsRequest,
   DeletePlayerReportsResponse,
   DiplomaticRelationDto,
@@ -3995,6 +3996,49 @@ app.post('/api/game/reports/read', (req, res) => {
   }
 
   const wasUpdated = player.markReportAsRead(reportId);
+  if (!wasUpdated) {
+    return res.status(404).json({ error: 'Report not found.' });
+  }
+
+  const report = player.reports.find((entry) => entry.reportId === reportId);
+  if (!report) {
+    return res.status(404).json({ error: 'Report not found.' });
+  }
+
+  return res.status(200).json(toPlayerReportDto(report));
+});
+
+app.post('/api/game/reports/favourite', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (!canSessionAccessCurrentGame(currentGalaxy, auth.session)) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const player = resolvePlayerById(currentGalaxy, playerId);
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const body = req.body as SetPlayerReportFavouriteRequest | undefined;
+  const reportId = parseBodyNonNegativeInt(body?.reportId);
+  if (reportId === null || typeof body?.isFavourite !== 'boolean') {
+    return res.status(400).json({ error: 'Invalid favourite report request.' });
+  }
+
+  const wasUpdated = player.setReportFavourite(reportId, body.isFavourite);
   if (!wasUpdated) {
     return res.status(404).json({ error: 'Report not found.' });
   }
@@ -7762,6 +7806,7 @@ function toPlayerReportBaseDto(report: PlayerReport): PlayerReportDtoBase {
     createdTurn: report.createdTurn,
     title: report.title,
     isRead: report.isRead,
+    isFavourite: report.isFavourite,
     sourceCoordinates: report.sourceCoordinates
       ? {
         x: report.sourceCoordinates.x,

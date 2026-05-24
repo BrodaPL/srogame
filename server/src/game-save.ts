@@ -152,6 +152,7 @@ type SavedPlayerReportBase = {
   createdTurn: number;
   title: string;
   isRead: boolean;
+  isFavourite?: boolean;
   sourceCoordinates: SavedCoordinates | null;
   sourcePlanetName: string | null;
   sourceSystemName: string | null;
@@ -961,6 +962,7 @@ function hydrateSavedPlayerReport(savedReport: SavedPlayerReport): PlayerReport 
     createdTurn: savedReport.createdTurn,
     title: savedReport.title,
     isRead: savedReport.isRead,
+    isFavourite: savedReport.isFavourite ?? false,
     sourceCoordinates: savedReport.sourceCoordinates ? serializeCoordinates(savedReport.sourceCoordinates) : null,
     sourcePlanetName: savedReport.sourcePlanetName,
     sourceSystemName: savedReport.sourceSystemName,
@@ -1332,6 +1334,7 @@ function serializePlayerReportBase(report: PlayerReport): SavedPlayerReportBase 
     createdTurn: report.createdTurn,
     title: report.title,
     isRead: report.isRead,
+    isFavourite: report.isFavourite,
     sourceCoordinates: report.sourceCoordinates
       ? serializeCoordinates(report.sourceCoordinates)
       : null,

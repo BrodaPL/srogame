@@ -6,6 +6,7 @@ export type PlayerReportBaseData = {
   createdTurn: number;
   title: string;
   isRead?: boolean;
+  isFavourite?: boolean;
   sourceCoordinates?: ReportCoordinates | null;
   sourcePlanetName?: string | null;
   sourceSystemName?: string | null;
@@ -17,6 +18,7 @@ export abstract class PlayerReport {
   public createdTurn: number;
   public title: string;
   public isRead: boolean;
+  public isFavourite: boolean;
   public sourceCoordinates: ReportCoordinates | null;
   public sourcePlanetName: string | null;
   public sourceSystemName: string | null;
@@ -30,6 +32,7 @@ export abstract class PlayerReport {
     this.createdTurn = data.createdTurn;
     this.title = data.title;
     this.isRead = data.isRead ?? false;
+    this.isFavourite = data.isFavourite ?? false;
     this.sourceCoordinates = data.sourceCoordinates ?? null;
     this.sourcePlanetName = data.sourcePlanetName ?? null;
     this.sourceSystemName = data.sourceSystemName ?? null;
@@ -38,6 +41,24 @@ export abstract class PlayerReport {
 
   public markAsRead(): void {
     this.isRead = true;
+  }
+
+  public setFavourite(isFavourite: boolean): void {
+    this.isFavourite = isFavourite;
+  }
+
+  protected copyBaseData(): PlayerReportBaseData {
+    return {
+      reportId: this.reportId,
+      createdTurn: this.createdTurn,
+      title: this.title,
+      isRead: this.isRead,
+      isFavourite: this.isFavourite,
+      sourceCoordinates: this.sourceCoordinates ? { ...this.sourceCoordinates } : null,
+      sourcePlanetName: this.sourcePlanetName,
+      sourceSystemName: this.sourceSystemName,
+      senderPlayerName: this.senderPlayerName
+    };
   }
 
   public coordinatesLabel(): string | null {

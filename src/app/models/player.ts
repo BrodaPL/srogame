@@ -543,6 +543,16 @@ export class Player {
     return true;
   }
 
+  public setReportFavourite(reportId: number, isFavourite: boolean): boolean {
+    const report = this.reports.find((entry) => entry.reportId === reportId);
+    if (!report) {
+      return false;
+    }
+
+    report.setFavourite(isFavourite);
+    return true;
+  }
+
   public deleteReports(reportIds: number[]): number {
     const selected = new Set(reportIds);
     if (selected.size === 0) {
@@ -550,7 +560,7 @@ export class Player {
     }
 
     const before = this.reports.length;
-    this.reports = this.reports.filter((report) => !selected.has(report.reportId));
+    this.reports = this.reports.filter((report) => report.isFavourite || !selected.has(report.reportId));
     return before - this.reports.length;
   }
 

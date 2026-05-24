@@ -28,6 +28,7 @@ function toBaseData(report: PlayerReportDto) {
     createdTurn: report.createdTurn,
     title: report.title,
     isRead: report.isRead,
+    isFavourite: report.isFavourite,
     sourceCoordinates: report.sourceCoordinates,
     sourcePlanetName: report.sourcePlanetName,
     sourceSystemName: report.sourceSystemName,

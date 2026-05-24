@@ -121,6 +121,10 @@
   background: rgba(60, 201, 189, 0.08);
 }
 
+.reports-view__item--favourite {
+  border-color: rgba(216, 191, 70, 0.48);
+}
+
 .reports-view__checkbox {
   display: flex;
   align-items: flex-start;
@@ -142,6 +146,50 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.45rem;
+}
+
+.reports-view__title-line,
+.reports-view__detail-title-line {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.reports-view__item-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.reports-view__favourite-button {
+  flex: 0 0 auto;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.62);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reports-view__favourite-button--large {
+  width: 1.8rem;
+  height: 1.8rem;
+  font-size: 1rem;
+}
+
+.reports-view__favourite-button--active {
+  border-color: rgba(216, 191, 70, 0.7);
+  color: #f0d86c;
+  background: rgba(216, 191, 70, 0.14);
+}
+
+.reports-view__favourite-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .reports-view__item-head h4 {

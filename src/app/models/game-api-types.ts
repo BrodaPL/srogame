@@ -919,6 +919,7 @@ export type ClientReportDataDto = {
   createdTurn: number;
   title: string;
   isRead: boolean;
+  isFavourite?: boolean;
   sourceCoordinates: ClientCoordinates | null;
   sourcePlanetName: string | null;
   sourceSystemName: string | null;
@@ -1297,6 +1298,11 @@ export type ResolveSupportRequestRequest = {
 
 export type MarkPlayerReportReadRequest = {
   reportId: number;
+};
+
+export type SetPlayerReportFavouriteRequest = {
+  reportId: number;
+  isFavourite?: boolean;
 };
 
 export type DeletePlayerReportsRequest = {

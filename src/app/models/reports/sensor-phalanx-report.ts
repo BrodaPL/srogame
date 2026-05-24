@@ -12,16 +12,7 @@ export class SensorPhalanxReport extends TextPlayerReport {
 
   public override copy(): SensorPhalanxReport {
     return new SensorPhalanxReport(
-      {
-        reportId: this.reportId,
-        createdTurn: this.createdTurn,
-        title: this.title,
-        isRead: this.isRead,
-        sourceCoordinates: this.sourceCoordinates ? { ...this.sourceCoordinates } : null,
-        sourcePlanetName: this.sourcePlanetName,
-        sourceSystemName: this.sourceSystemName,
-        senderPlayerName: this.senderPlayerName
-      },
+      this.copyBaseData(),
       this.body
     );
   }
