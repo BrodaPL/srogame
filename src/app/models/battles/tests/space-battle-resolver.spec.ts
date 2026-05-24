@@ -502,6 +502,46 @@ describe('SpaceBattleResolver', () => {
     expect(result.defender.ships[0].hull).toBe(80);
   });
 
+  it('skips non-fireable weapons without blocking later valid shooters', () => {
+    const resolver = new SpaceBattleResolver();
+    const attacker = createPlayer(1, 'Attacker');
+    const defender = createPlayer(2, 'Defender');
+    const attackerShip = createShip(
+      ShipType.CRUISER,
+      [new Weapon(WeaponType.BEAM, 10, 1)]
+    );
+    const defenderShip = createShip(
+      ShipType.FIGHTER,
+      [new Weapon(WeaponType.BEAM, 10, 1)]
+    );
+    const groundOnlyDefence = createDefence(
+      DefenceType.SAM_SITE,
+      HullClass.SMALL_DEFENCE,
+      [new Weapon(WeaponType.MISSILE, 10, 4)],
+      { canShootToOrbit: false }
+    );
+
+    const result = resolver.resolve({
+      attacker: { player: attacker, ships: [createShipInstance(attackerShip)] },
+      defender: {
+        player: defender,
+        ships: [createShipInstance(defenderShip)],
+        defences: [createDefenceInstance(groundOnlyDefence)]
+      },
+      reportContext: { createdTurn: 7 },
+      maxRounds: 1,
+      randomSource: new SequenceRandomSource([0])
+    });
+
+    expect(result.roundSummaries[0].attackerShots).toBe(1);
+    expect(result.roundSummaries[0].defenderShots).toBe(1);
+    expect(result.roundSummaries[0].shots.map((shot) => shot.shooterShipType)).toEqual([
+      ShipType.FIGHTER,
+      ShipType.CRUISER
+    ]);
+    expect(result.attacker.ships[0].hull).toBe(95);
+  });
+
   it('checks critical destruction after the round when damaged hull drops under the threshold', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');

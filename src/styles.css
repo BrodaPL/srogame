@@ -2123,6 +2123,24 @@ app-root {
   padding: 0.25rem 0.55rem;
 }
 
+.planet-building-card__purpose-tag--warning {
+  border-color: rgba(246, 180, 76, 0.55);
+  background: rgba(246, 180, 76, 0.14);
+  color: #f6c76d;
+}
+
+.planet-building-card__purpose-tag--good {
+  border-color: rgba(106, 223, 158, 0.45);
+  background: rgba(106, 223, 158, 0.12);
+  color: #8ce8b7;
+}
+
+.planet-building-card__purpose-tag--muted {
+  border-color: rgba(159, 176, 202, 0.22);
+  background: rgba(159, 176, 202, 0.08);
+  color: #9fb0ca;
+}
+
 .planet-building-card__cost,
 .planet-building-card__requirements {
   display: grid;

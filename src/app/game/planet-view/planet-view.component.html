@@ -473,6 +473,9 @@
                     @for (purpose of shipPurposeTags(ship); track purpose) {
                       <span class="planet-building-card__purpose-tag">{{ purpose }}</span>
                     }
+                    @if (!ship.canJump) {
+                      <span class="planet-building-card__purpose-tag planet-building-card__purpose-tag--warning">No hyperspace drive.</span>
+                    }
                   </div>
                 </div>
                 <div class="planet-building-card__cost">
@@ -644,6 +647,13 @@
                   } @else {
                     <p class="planet-building-card__meta">Can shoot to orbit: {{ defence.canShootToOrbit ? 'Yes' : 'No' }}</p>
                   }
+                  <div class="planet-building-card__purpose-tags">
+                    @if (defence.canShootToOrbit) {
+                      <span class="planet-building-card__purpose-tag planet-building-card__purpose-tag--good">Can shoot to orbit.</span>
+                    } @else {
+                      <span class="planet-building-card__purpose-tag planet-building-card__purpose-tag--muted">Atmosphere guard only.</span>
+                    }
+                  </div>
                 </div>
                 <div class="planet-building-card__cost">
                   <p class="planet-building-card__section-title">Single defence cost</p>

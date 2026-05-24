@@ -177,6 +177,9 @@
                       @for (purpose of shipPurposeTags(ship); track purpose) {
                         <span class="production-view__purpose-tag">{{ purpose }}</span>
                       }
+                      @if (!ship.canJump) {
+                        <span class="production-view__purpose-tag production-view__purpose-tag--warning">No hyperspace drive.</span>
+                      }
                     </div>
                   </div>
 
@@ -289,6 +292,13 @@
                         {{ defence.canShootToOrbit ? 'Can engage orbit targets' : 'Atmosphere guard only' }}
                       </p>
                     }
+                    <div class="production-view__purpose-tags">
+                      @if (defence.canShootToOrbit) {
+                        <span class="production-view__purpose-tag production-view__purpose-tag--good">Can shoot to orbit.</span>
+                      } @else {
+                        <span class="production-view__purpose-tag production-view__purpose-tag--muted">Atmosphere guard only.</span>
+                      }
+                    </div>
 
                   </div>
 

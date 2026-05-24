@@ -599,24 +599,12 @@ export class SpaceBattleResolver {
     roundSummary: BattleRoundSummary,
     randomSource: BattleRandomSource
   ): boolean {
-    const shooter = shootingSide.combatants.find((combatant) =>
-      combatant.combatant.hull > 0 && combatant.queuedWeapons.length > 0
-    );
-    if (!shooter) {
+    const shotCandidate = this.findNextFireableShot(shootingSide, targetSide);
+    if (!shotCandidate) {
       return false;
     }
 
-    const weapon = shooter.queuedWeapons.shift();
-    if (!weapon) {
-      return false;
-    }
-
-    const aliveTargets = targetSide.combatants.filter((combatant) =>
-      combatant.combatant.hull > 0 && this.canTargetCombatant(shooter, combatant, weapon.type)
-    );
-    if (aliveTargets.length === 0) {
-      return false;
-    }
+    const { shooter, weapon, aliveTargets } = shotCandidate;
 
     const targetIndex = this.randomIndex(aliveTargets.length, randomSource);
     const target = aliveTargets[targetIndex];
@@ -630,6 +618,42 @@ export class SpaceBattleResolver {
     }
 
     return true;
+  }
+
+  private findNextFireableShot(
+    shootingSide: BattleSideState,
+    targetSide: BattleSideState
+  ): { shooter: BattleCombatantState; weapon: BattleQueuedWeapon; aliveTargets: BattleCombatantState[] } | null {
+    for (const shooter of shootingSide.combatants) {
+      if (shooter.combatant.hull <= 0 || shooter.queuedWeapons.length <= 0) {
+        continue;
+      }
+
+      const weaponIndex = shooter.queuedWeapons.findIndex((weapon) =>
+        targetSide.combatants.some((combatant) =>
+          combatant.combatant.hull > 0 && this.canTargetCombatant(shooter, combatant, weapon.type)
+        )
+      );
+      if (weaponIndex < 0) {
+        continue;
+      }
+
+      const weapon = shooter.queuedWeapons.splice(weaponIndex, 1)[0];
+      if (!weapon) {
+        continue;
+      }
+
+      const aliveTargets = targetSide.combatants.filter((combatant) =>
+        combatant.combatant.hull > 0 && this.canTargetCombatant(shooter, combatant, weapon.type)
+      );
+      if (aliveTargets.length <= 0) {
+        continue;
+      }
+
+      return { shooter, weapon, aliveTargets };
+    }
+
+    return null;
   }
 
   private applyWeaponDamage(
