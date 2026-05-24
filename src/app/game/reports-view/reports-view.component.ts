@@ -12,6 +12,7 @@ import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-plane
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { AuthStateService } from '../../core/auth-state.service';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 
 type ReportDossierMetric = {
   label: string;
@@ -26,7 +27,7 @@ type ReportDossierRow = {
 
 @Component({
   selector: 'app-reports-view',
-  imports: [TopMenuComponent, MiniPlanetPreviewComponent],
+  imports: [TopMenuComponent, MiniPlanetPreviewComponent, TooltipDirective],
   templateUrl: './reports-view.component.html'
 })
 export class ReportsViewComponent implements OnInit {

@@ -10,10 +10,11 @@ import { I18nService } from '../../../i18n/i18n.service';
 import { TutorialOverlayComponent } from '../../../tutorial/tutorial-overlay.component';
 import { TutorialService } from '../../../tutorial/tutorial.service';
 import { formatDurationLabel, getMultiplayerAutoSkipIdleMs } from '../../multiplayer-test-timing';
+import { TooltipDirective } from '../../../shared/tooltip/tooltip.directive';
 
 @Component({
   selector: 'app-top-menu',
-  imports: [RouterLink, RouterLinkActive, TutorialOverlayComponent],
+  imports: [RouterLink, RouterLinkActive, TutorialOverlayComponent, TooltipDirective],
   templateUrl: './top-menu.component.html',
   styleUrl: './top-menu.component.css'
 })

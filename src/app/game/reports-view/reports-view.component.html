@@ -46,12 +46,17 @@
         <p class="overview-muted">{{ visibleReports().length }} visible report(s) | {{ selectedReportIds.size }} selected</p>
 
         <div class="reports-view__actions">
-          <button class="reports-view__compact-button" type="button" (click)="selectAllVisible()">
+          <button
+            class="reports-view__compact-button"
+            type="button"
+            appTooltip="Select all visible reports except favourites."
+            (click)="selectAllVisible()">
             Select all visible
           </button>
           <button
             class="reports-view__compact-button reports-view__compact-button--danger"
             type="button"
+            appTooltip="Delete selected reports. Favourite reports are protected."
             [disabled]="selectedReportIds.size === 0 || isDeleting"
             (click)="deleteSelectedReports()">
             Delete selected
@@ -97,6 +102,7 @@
                         class="reports-view__favourite-button"
                         [class.reports-view__favourite-button--active]="report.isFavourite"
                         [disabled]="favouriteUpdatingReportId === report.reportId"
+                        [appTooltip]="report.isFavourite ? 'Remove favourite marker.' : 'Favourite reports are protected from Select all and Delete selected.'"
                         [attr.aria-label]="report.isFavourite ? 'Remove favourite marker' : 'Mark report as favourite'"
                         (click)="toggleReportFavourite(report, $event)">
                         {{ report.isFavourite ? '★' : '☆' }}
@@ -144,6 +150,7 @@
                   class="reports-view__favourite-button reports-view__favourite-button--large"
                   [class.reports-view__favourite-button--active]="report.isFavourite"
                   [disabled]="favouriteUpdatingReportId === report.reportId"
+                  [appTooltip]="report.isFavourite ? 'Remove favourite marker.' : 'Favourite reports are protected from Select all and Delete selected.'"
                   [attr.aria-label]="report.isFavourite ? 'Remove favourite marker' : 'Mark report as favourite'"
                   (click)="toggleReportFavourite(report, $event)">
                   {{ report.isFavourite ? '★' : '☆' }}

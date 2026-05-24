@@ -29,6 +29,29 @@ app-root {
   display: block;
 }
 
+.app-tooltip {
+  position: fixed;
+  z-index: 10000;
+  max-width: min(18rem, calc(100vw - 1rem));
+  padding: 0.42rem 0.58rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(8, 11, 16, 0.96);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+  color: #f3f7fb;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 80ms ease, transform 80ms ease;
+}
+
+.app-tooltip--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .page {
   --ink: #e6edf5;
   --panel: #1a2029;
