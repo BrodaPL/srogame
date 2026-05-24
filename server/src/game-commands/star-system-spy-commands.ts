@@ -7,7 +7,7 @@ import type { Planet } from '../../../src/app/models/planets/planet.ts';
 import type { GameCommandContext } from './command-context.ts';
 import type { CommandResult } from './command-result.ts';
 import {
-  calculateFuelCost,
+  calculatePlayerFuelCost,
   calculatePlayerMaxActiveFleets,
   calculateTravelDistance,
   commandError,
@@ -122,7 +122,7 @@ export function createStarSystemSpyMissions(
       y: targetPlanet.basicInfo.solarSystem.coordinates.y,
       z: Math.max(0, targetPlanet.basicInfo.order - 1)
     });
-    requiredFuel += calculateFuelCost([{ type: ShipType.SPY_PROBE, amount: 1 }], distance, 1);
+    requiredFuel += calculatePlayerFuelCost([{ type: ShipType.SPY_PROBE, amount: 1 }], distance, 1, player);
   }
 
   if (originPlanet.rBDSFTQ.resources.deuterium < requiredFuel) {

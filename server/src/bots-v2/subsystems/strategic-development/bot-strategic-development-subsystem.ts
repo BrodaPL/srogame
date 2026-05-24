@@ -765,7 +765,13 @@ function createColonizeMissionRequest(
   }
 
   const distance = calculateTravelDistance(originPlanet.coordinates, targetCoordinates);
-  const fuelCost = calculateFuelCost([{ type: ShipType.COLONIZER, amount: 1 }], distance, 2);
+  const fuelCost = calculateFuelCost(
+    [{ type: ShipType.COLONIZER, amount: 1 }],
+    distance,
+    2,
+    originPlanet.tech.fusionDriveLevel,
+    originPlanet.tech.hyperspaceTechnologyLevel
+  );
   if (originPlanet.localResources.deuterium < fuelCost) {
     return null;
   }

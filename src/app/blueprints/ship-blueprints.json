@@ -269,7 +269,7 @@
       "hullPointsCapacity": 140,
       "criticalThreshold": 40,
       "shieldCapacity": 80,
-      "armor": 4,
+      "armor": 3,
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 1 },
         { "type": "MISSILE", "dmg": 30, "shots": 1 }
@@ -401,7 +401,7 @@
       "hullPointsCapacity": 300,
       "criticalThreshold": 40,
       "shieldCapacity": 120,
-      "armor": 5,
+      "armor": 4,
       "weapons": [
         { "type": "BEAM", "dmg": 20, "shots": 3 },
         { "type": "MISSILE", "dmg": 30, "shots": 1 },
@@ -437,7 +437,7 @@
       "hullPointsCapacity": 250,
       "criticalThreshold": 40,
       "shieldCapacity": 160,
-      "armor": 6,
+      "armor": 4,
       "weapons": [
         { "type": "MISSILE", "dmg": 30, "shots": 1 },
         { "type": "RAIL_GUN", "dmg": 30, "shots": 2 }
@@ -470,7 +470,7 @@
       "hullPointsCapacity": 220,
       "criticalThreshold": 40,
       "shieldCapacity": 220,
-      "armor": 6,
+      "armor": 5,
       "weapons": [
         { "type": "BEAM", "dmg": 40, "shots": 1 },
         { "type": "MISSILE", "dmg": 60, "shots": 2 },
@@ -504,7 +504,7 @@
       "hullPointsCapacity": 220,
       "criticalThreshold": 35,
       "shieldCapacity": 180,
-      "armor": 5,
+      "armor": 6,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 2 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 4 },

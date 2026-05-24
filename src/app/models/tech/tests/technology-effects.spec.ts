@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fleetFuelConsumptionMultiplier,
+  fleetFuelCostForDistance,
   fleetTravelTurnsForDistance,
   fleetTravelWorstShipModifier,
   industryPowerMultiplier,
@@ -56,5 +58,17 @@ describe('technology effects', () => {
       { type: ShipType.SPY_PROBE, amount: 1 },
       { type: ShipType.CRUISER, amount: 1 }
     ])).toBe(3);
+  });
+
+  it('reduces total fleet fuel cost from Fusion Drive and Hyperspace Technology', () => {
+    expect(fleetFuelConsumptionMultiplier(3, 4)).toBe(0.89);
+    expect(fleetFuelCostForDistance(10, [{ type: ShipType.COLONIZER, amount: 1 }], 2, 3, 4)).toBe(178);
+  });
+
+  it('ignores ships without hyperspace drive when calculating fleet fuel cost', () => {
+    expect(fleetFuelCostForDistance(5, [
+      { type: ShipType.FIGHTER, amount: 20 },
+      { type: ShipType.TRANSPORTER, amount: 2 }
+    ])).toBe(10);
   });
 });

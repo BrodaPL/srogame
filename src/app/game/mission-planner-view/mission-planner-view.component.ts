@@ -43,6 +43,7 @@ import { FleetMissionRegistry } from '../../models/missions/fleet-mission-regist
 import type { MissionPlannerContext } from '../../models/missions/mission-context';
 import { calculateRepairCapabilityFromEntries } from '../../models/repairs/ship-repair-capability';
 import {
+  fleetFuelCostForDistance,
   fleetTravelTurnsForDistance,
   fleetTravelWorstShipModifier,
   maxActiveFleets
@@ -632,23 +633,13 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected fuelCostPreview(): number {
-    const distance = this.distancePreview();
-    const fuelMultiplier = this.currentMission().minimumFuelReserves;
-    let totalFuel = 0;
-    for (const entry of this.selectedShipEntries()) {
-      const blueprint = this.shipBlueprintsByType.get(entry.type);
-      if (!blueprint) {
-        continue;
-      }
-
-      if (!blueprint.canJump) {
-        continue;
-      }
-
-      totalFuel += blueprint.jumpCost * Math.max(1, distance) * this.selectedShipSelectionAmount(entry);
-    }
-
-    return Math.max(0, totalFuel * fuelMultiplier);
+    return fleetFuelCostForDistance(
+      this.distancePreview(),
+      this.selectedTravelShipAmounts(),
+      this.currentMission().minimumFuelReserves,
+      this.techLevel(TechnologyType.FUSION_DRIVE),
+      this.techLevel(TechnologyType.HYPERSPACE_TECHNOLOGY)
+    );
   }
 
   protected onMissionTypeChange(): void {

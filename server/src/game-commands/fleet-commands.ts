@@ -26,7 +26,7 @@ import {
   calculateBombHangarUsage,
   calculateFleetCargoCapacity,
   calculateFleetTravelTurns,
-  calculateFuelCost,
+  calculatePlayerFuelCost,
   calculatePlayerMaxActiveFleets,
   calculateTravelDistance,
   commandError,
@@ -234,7 +234,7 @@ export function createFleetMission(
 
   const travelDistance = calculateTravelDistance(command.origin, command.target);
   const travelTurns = command.useJumpGate ? 1 : calculateFleetTravelTurns(travelDistance, player, totalShipAmounts);
-  const fuelCost = calculateFuelCost(totalShipAmounts, travelDistance, mission.minimumFuelReserves);
+  const fuelCost = calculatePlayerFuelCost(totalShipAmounts, travelDistance, mission.minimumFuelReserves, player);
 
   const hasMilitaryShips = totalShipAmounts.some((entry) => {
     const blueprint = SHIP_BLUEPRINTS.shipsMap.get(entry.type);

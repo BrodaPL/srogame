@@ -3,7 +3,7 @@ import { TechnologyType } from '../../../src/app/models/enums/technology-type.js
 import { PlayerType } from '../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../src/app/models/enums/ship-type.js';
 import { Player } from '../../../src/app/models/player.js';
-import { calculateFleetTravelTurns } from './command-helpers.js';
+import { calculateFleetTravelTurns, calculatePlayerFuelCost } from './command-helpers.js';
 
 describe('command helpers', () => {
   it('uses player drive technologies when calculating fleet travel turns', () => {
@@ -36,5 +36,13 @@ describe('command helpers', () => {
       { type: ShipType.CRUISER, amount: 1 },
       { type: ShipType.MOTHER_SHIP, amount: 1 }
     ])).toBe(6);
+  });
+
+  it('uses player Fusion Drive and Hyperspace Technology when calculating fuel cost', () => {
+    const player = new Player(1, 'Alpha', [], new Map(), [], PlayerType.PLAYER);
+    player.setTechLevel(TechnologyType.FUSION_DRIVE, 3);
+    player.setTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY, 4);
+
+    expect(calculatePlayerFuelCost([{ type: ShipType.COLONIZER, amount: 1 }], 10, 2, player)).toBe(178);
   });
 });

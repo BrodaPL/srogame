@@ -62,7 +62,7 @@ const { calculateJumpGateCapacity } = resolveModule(jumpGateCapacityModule) as t
 const { createJumpGateRequest } = resolveModule(jumpGateRequestModule) as typeof import('../../../src/app/models/requests/jump-gate-request.js');
 const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
 const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../../src/app/models/tech/research-helper-for.js');
-const { fleetTravelTurnsForDistance, maxActiveFleets } = resolveModule(technologyEffectsModule) as typeof import('../../../src/app/models/tech/technology-effects.js');
+const { fleetFuelCostForDistance, fleetTravelTurnsForDistance, maxActiveFleets } = resolveModule(technologyEffectsModule) as typeof import('../../../src/app/models/tech/technology-effects.js');
 const { ShipyardQueueEntry } = resolveModule(shipyardQueueEntryModule) as typeof import('../../../src/app/models/fleets/shipyard-queue-entry.js');
 const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as typeof import('../../../src/app/models/tech/technology-queue-entry.js');
 const { countPlanetaryBombs, isPlanetaryBombDefenceType } = resolveModule(planetaryBombModule) as typeof import('../../../src/app/models/defences/planetary-bomb.js');
@@ -400,19 +400,26 @@ export function calculateFleetTravelTurns(
 export function calculateFuelCost(
   ships: Array<{ type: ShipTypeType; amount: number }>,
   distance: number,
-  multiplier = 1
+  multiplier = 1,
+  fusionDriveLevel = 0,
+  hyperspaceTechnologyLevel = 0
 ): number {
-  let totalFuel = 0;
-  for (const ship of ships) {
-    const blueprint = SHIP_BLUEPRINTS.shipsMap.get(ship.type);
-    if (!blueprint || !blueprint.canJump) {
-      continue;
-    }
+  return fleetFuelCostForDistance(distance, ships, multiplier, fusionDriveLevel, hyperspaceTechnologyLevel);
+}
 
-    totalFuel += blueprint.jumpCost * Math.max(1, distance) * ship.amount;
-  }
-
-  return Math.max(0, totalFuel * Math.max(1, multiplier));
+export function calculatePlayerFuelCost(
+  ships: Array<{ type: ShipTypeType; amount: number }>,
+  distance: number,
+  multiplier: number,
+  player: Player
+): number {
+  return calculateFuelCost(
+    ships,
+    distance,
+    multiplier,
+    player.getTechLevel(TechnologyType.FUSION_DRIVE as TechnologyTypeType),
+    player.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY as TechnologyTypeType)
+  );
 }
 
 export function resolveDiplomaticStatus(

@@ -6521,7 +6521,10 @@ function hasEnoughDeuteriumForShips(
       type: ship.type,
       amount: ship.undamagedAmount + ship.damagedAmount
     })),
-    distance
+    distance,
+    1,
+    originPlanet.tech.fusionDriveLevel,
+    originPlanet.tech.hyperspaceTechnologyLevel
   );
   return originPlanet.localResources.deuterium >= fuelCost;
 }
@@ -6554,7 +6557,13 @@ function selectSpyOrigin(
     .map((originPlanet) => {
       const travelDistance = calculateTravelDistance(originPlanet.coordinates, targetCoordinates);
       const travelTurns = resolveTravelTurns(originPlanet, travelDistance);
-      const fuelCost = calculateFuelCost([{ type: ShipType.SPY_PROBE, amount: probeAmount }], travelDistance);
+      const fuelCost = calculateFuelCost(
+        [{ type: ShipType.SPY_PROBE, amount: probeAmount }],
+        travelDistance,
+        1,
+        originPlanet.tech.fusionDriveLevel,
+        originPlanet.tech.hyperspaceTechnologyLevel
+      );
       return {
         originPlanet,
         travelDistance,

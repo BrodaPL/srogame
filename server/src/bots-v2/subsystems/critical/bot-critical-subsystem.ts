@@ -1756,7 +1756,10 @@ function hasEnoughDeuteriumForShips(
       type: ship.type,
       amount: ship.undamagedAmount + ship.damagedAmount
     })),
-    distance
+    distance,
+    1,
+    originPlanet.tech.fusionDriveLevel,
+    originPlanet.tech.hyperspaceTechnologyLevel
   );
   return originPlanet.localResources.deuterium >= fuelCost;
 }

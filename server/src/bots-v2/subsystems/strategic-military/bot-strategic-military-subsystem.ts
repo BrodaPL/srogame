@@ -365,7 +365,13 @@ function createProbeMissionRequest(
 
       const distance = calculateTravelDistance(originPlanet.coordinates, target.coordinates);
       const travelTurns = resolveTravelTurns(originPlanet, distance);
-      const fuelCost = calculateFuelCost([{ type: probeShipType, amount: 1 }], distance);
+      const fuelCost = calculateFuelCost(
+        [{ type: probeShipType, amount: 1 }],
+        distance,
+        1,
+        originPlanet.tech.fusionDriveLevel,
+        originPlanet.tech.hyperspaceTechnologyLevel
+      );
       if (originPlanet.localResources.deuterium < fuelCost) {
         return null;
       }
@@ -517,7 +523,10 @@ function createBreakMissionRequest(
         type: ship.type,
         amount: ship.undamagedAmount + ship.damagedAmount
       })),
-      distance
+      distance,
+      1,
+      originPlanet.tech.fusionDriveLevel,
+      originPlanet.tech.hyperspaceTechnologyLevel
     );
     if (originPlanet.localResources.deuterium < fuelCost) {
       continue;
@@ -621,7 +630,10 @@ function createPlunderMissionRequest(
         type: ship.type,
         amount: ship.undamagedAmount + ship.damagedAmount
       })),
-      distance
+      distance,
+      1,
+      originPlanet.tech.fusionDriveLevel,
+      originPlanet.tech.hyperspaceTechnologyLevel
     );
     if (originPlanet.localResources.deuterium < fuelCost) {
       continue;
@@ -678,7 +690,13 @@ function selectSpyOrigin(
     .map((originPlanet) => {
       const travelDistance = calculateTravelDistance(originPlanet.coordinates, target.coordinates);
       const travelTurns = resolveTravelTurns(originPlanet, travelDistance);
-      const fuelCost = calculateFuelCost([{ type: ShipType.SPY_PROBE, amount: 1 }], travelDistance);
+      const fuelCost = calculateFuelCost(
+        [{ type: ShipType.SPY_PROBE, amount: 1 }],
+        travelDistance,
+        1,
+        originPlanet.tech.fusionDriveLevel,
+        originPlanet.tech.hyperspaceTechnologyLevel
+      );
       return {
         originPlanet,
         travelDistance,
@@ -1921,7 +1939,10 @@ function hasEnoughDeuteriumForSelection(
       type: ship.type,
       amount: ship.undamagedAmount + ship.damagedAmount
     })),
-    distance
+    distance,
+    1,
+    originPlanet.tech.fusionDriveLevel,
+    originPlanet.tech.hyperspaceTechnologyLevel
   );
   return originPlanet.localResources.deuterium >= fuelCost;
 }

@@ -269,13 +269,13 @@ export class EncyclopediaMechanicsComponent {
         'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2',
         'travelTurns = ceil((4 / (1 + FUSION_DRIVE / 3) + distance / (1 + HYPERSPACE_DRIVE / 6) - GRAVITON_TECHNOLOGY) * shipModifier), minimum 1',
         'Jump Gate travelTurns = 1',
-        'fuelCost = sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves'
+        'fuelCost = ceil(sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves * max(0, 1 - FUSION_DRIVE * 0.01 - HYPERSPACE_TECHNOLOGY * 0.02))'
       ],
       notes: [
         'Distance is still the raw coordinate delta sum abs(dx) + abs(dy) + abs(dz).',
         'shipModifier uses the slowest selected ship: Small -40%, Medium -25%, Big 0%, Titan +35%, Station +100%.',
         'SPY_PROBE is a Small hull, so it uses the same -40% modifier as other Small ships.',
-        'Fuel cost still uses raw distance only; drive technologies change ETA but do not reduce deuterium reserve cost.'
+        'Fuel cost uses raw distance, then Fusion Drive and Hyperspace Technology reduce the total deuterium reserve after the mission reserve multiplier.'
       ]
     },
     {

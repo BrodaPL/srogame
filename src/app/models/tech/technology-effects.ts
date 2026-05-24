@@ -65,6 +65,46 @@ export function fleetTravelTurnsForDistance(
   return Math.max(1, Math.ceil(rawTurns));
 }
 
+export function fleetFuelCostForDistance(
+  distance: number,
+  ships: FleetTravelShipSelection[] = [],
+  minimumFuelReserves = 1,
+  fusionDriveLevel = 0,
+  hyperspaceTechnologyLevel = 0
+): number {
+  const sanitizedDistance = Math.max(1, Math.max(0, distance));
+  const sanitizedMinimumFuelReserves = Math.max(1, minimumFuelReserves);
+  let baseFuelCost = 0;
+
+  for (const entry of ships) {
+    const normalizedAmount = Math.max(0, Math.floor(entry.amount));
+    if (normalizedAmount <= 0) {
+      continue;
+    }
+
+    const blueprint = SHIP_BLUEPRINTS.get(entry.type);
+    if (!blueprint || !blueprint.canJump) {
+      continue;
+    }
+
+    baseFuelCost += blueprint.jumpCost * sanitizedDistance * normalizedAmount;
+  }
+
+  const fuelDiscountMultiplier = fleetFuelConsumptionMultiplier(fusionDriveLevel, hyperspaceTechnologyLevel);
+  return Math.max(0, Math.ceil(baseFuelCost * sanitizedMinimumFuelReserves * fuelDiscountMultiplier));
+}
+
+export function fleetFuelConsumptionMultiplier(
+  fusionDriveLevel: number,
+  hyperspaceTechnologyLevel: number
+): number {
+  const discountPercent = (
+    sanitizeTechLevel(fusionDriveLevel)
+    + (sanitizeTechLevel(hyperspaceTechnologyLevel) * 2)
+  );
+  return Math.max(0, 1 - (discountPercent / 100));
+}
+
 export function fleetTravelWorstShipModifier(ships: FleetTravelShipSelection[] = []): number {
   let worstModifier: number | null = null;
 

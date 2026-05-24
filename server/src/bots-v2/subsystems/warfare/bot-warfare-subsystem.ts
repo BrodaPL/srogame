@@ -550,7 +550,7 @@ function buildRecycleCandidate(
   const fuelCost = calculateFuelCost([
     { type: ShipType.RECYCLER, amount: desiredRecyclerCount },
     ...(escortShipType ? [{ type: escortShipType, amount: escortShipCount }] : [])
-  ], travelDistance);
+  ], travelDistance, 1, originPlanet.tech.fusionDriveLevel, originPlanet.tech.hyperspaceTechnologyLevel);
   if (originPlanet.localResources.deuterium < fuelCost) {
     return null;
   }
