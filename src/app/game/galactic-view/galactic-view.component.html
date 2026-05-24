@@ -265,6 +265,31 @@
             <p class="overview-empty">No own fleets currently stationed in this system.</p>
           }
         </section>
+
+        <section class="star-system-preview__fleet-section">
+          <div class="star-system-preview__fleet-head">
+            <h4>Own Fleets Flying To This System</h4>
+            <span class="badge">{{ selectedSystemInboundOwnFleets.length }}</span>
+          </div>
+
+          @if (selectedSystemInboundOwnFleets.length > 0) {
+            <div class="star-system-preview__fleet-list">
+              @for (fleet of selectedSystemInboundOwnFleets; track fleet.fleetId) {
+                <article class="star-system-preview__fleet-card">
+                  <div class="star-system-preview__fleet-card-head">
+                    <strong>Fleet #{{ fleet.fleetId }}</strong>
+                    <span class="badge">{{ ownFleetMissionLabel(fleet) }}</span>
+                  </div>
+                  <p class="star-system-preview__fleet-line">{{ ownFleetStatusLabel(fleet) }} | {{ ownFleetEtaLabel(fleet) }}</p>
+                  <p class="star-system-preview__fleet-line">Ships: {{ fleet.shipCount }}</p>
+                  <p class="star-system-preview__fleet-line">{{ ownFleetRouteLabel(fleet) }}</p>
+                </article>
+              }
+            </div>
+          } @else {
+            <p class="overview-empty">No own fleets currently flying to this system.</p>
+          }
+        </section>
       }
     }
   </aside>

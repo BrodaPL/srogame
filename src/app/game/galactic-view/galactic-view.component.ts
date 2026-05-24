@@ -124,6 +124,7 @@ export class GalacticViewComponent implements OnInit {
   protected selectedSystemPlanets: ClientPlanetDto[] = [];
   protected selectedPlanetZ: number | null = null;
   protected selectedSystemOwnFleets: GalaxyOwnFleetMovementDto[] = [];
+  protected selectedSystemInboundOwnFleets: GalaxyOwnFleetMovementDto[] = [];
   protected ownFleetRoutes: GalacticRouteVm[] = [];
   protected noteActionError: string | null = null;
   protected isSpySolarSystemDialogOpen = false;
@@ -234,6 +235,7 @@ export class GalacticViewComponent implements OnInit {
     this.selectedSystemLoading = false;
     this.selectedSystemRequestKey = null;
     this.selectedSystemOwnFleets = this.listOwnFleetsForSystem(cell.x, cell.y);
+    this.selectedSystemInboundOwnFleets = this.listInboundOwnFleetsForSystem(cell.x, cell.y);
 
     const key = this.buildCoordinatesKey(cell.x, cell.y);
     const cached = this.starSystemCache.get(key);
@@ -1020,6 +1022,27 @@ export class GalacticViewComponent implements OnInit {
         return current?.x === x && current.y === y;
       })
       .sort((left, right) => left.fleetId - right.fleetId);
+  }
+
+  private listInboundOwnFleetsForSystem(x: number, y: number): GalaxyOwnFleetMovementDto[] {
+    const fleets = this.galaxyPresentation?.ownFleetMovements ?? [];
+    return fleets
+      .filter((fleet) => {
+        const destination = this.resolveFleetDestinationSystemCoordinates(fleet);
+        const current = fleet.currentSystemCoordinates;
+        return destination.x === x
+          && destination.y === y
+          && !(current?.x === x && current.y === y);
+      })
+      .sort((left, right) => left.fleetId - right.fleetId);
+  }
+
+  private resolveFleetDestinationSystemCoordinates(
+    fleet: GalaxyOwnFleetMovementDto
+  ): { x: number; y: number } {
+    return fleet.routeKind === 'RETURNING'
+      ? fleet.originSystemCoordinates
+      : fleet.targetSystemCoordinates;
   }
 
   private buildStarSystemNotesMap(starSystemNotes: StarSystemNoteDto[]): Map<string, StarSystemNoteDto> {

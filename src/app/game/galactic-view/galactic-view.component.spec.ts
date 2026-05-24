@@ -7,6 +7,7 @@ import type {
   ClientCoordinates,
   ClientPlanetDto,
   ClientStarSystemDto,
+  GalaxyOwnFleetMovementDto,
   GalaxyPresentationDataDto,
   PlayerSession
 } from '../../models/game-api-types';
@@ -50,6 +51,58 @@ describe('GalacticViewComponent', () => {
     expect((component as { isHighlightedPlanet(planet: ClientPlanetDto): boolean }).isHighlightedPlanet(targetPlanet)).toBe(true);
     expect(gameApi.getClientStarSystem).toHaveBeenCalledWith(1, 0, 'token');
   });
+
+  it('separates stationed fleets from fleets flying to the selected system', () => {
+    const targetPlanet = createPlanet('Target', { x: 1, y: 0, z: 1 }, false);
+    const targetSystem = createStarSystem(targetPlanet);
+    const gameApi = {
+      getGalaxyPresentationData: vi.fn().mockReturnValue(of(createGalaxyPresentationData([
+        createOwnFleetMovement({
+          fleetId: 10,
+          routeKind: 'OUTBOUND',
+          currentSystemCoordinates: { x: 1, y: 0 },
+          targetSystemCoordinates: { x: 1, y: 0 }
+        }),
+        createOwnFleetMovement({
+          fleetId: 11,
+          routeKind: 'OUTBOUND',
+          currentSystemCoordinates: { x: 0, y: 0 },
+          targetSystemCoordinates: { x: 1, y: 0 }
+        }),
+        createOwnFleetMovement({
+          fleetId: 12,
+          routeKind: 'RETURNING',
+          currentSystemCoordinates: { x: 2, y: 0 },
+          originSystemCoordinates: { x: 1, y: 0 },
+          targetSystemCoordinates: { x: 2, y: 0 }
+        })
+      ]))),
+      getClientStarSystem: vi.fn().mockReturnValue(of(targetSystem))
+    };
+    const component = new GalacticViewComponent(
+      {
+        queryParamMap: of(convertToParamMap({ x: '1', y: '0' }))
+      } as never,
+      gameApi as never,
+      {
+        load: vi.fn().mockReturnValue(createPlayerSession())
+      } as never,
+      {
+        galaxy: { name: 'Test Galaxy' }
+      } as never,
+      {
+        markForCheck: vi.fn()
+      } as never,
+      {
+        autoOpenTutorial: vi.fn()
+      } as never
+    );
+
+    component.ngOnInit();
+
+    expect((component as { selectedSystemOwnFleets: GalaxyOwnFleetMovementDto[] }).selectedSystemOwnFleets.map((fleet) => fleet.fleetId)).toEqual([10]);
+    expect((component as { selectedSystemInboundOwnFleets: GalaxyOwnFleetMovementDto[] }).selectedSystemInboundOwnFleets.map((fleet) => fleet.fleetId)).toEqual([11, 12]);
+  });
 });
 
 function createPlayerSession(): PlayerSession {
@@ -67,7 +120,9 @@ function createPlayerSession(): PlayerSession {
   };
 }
 
-function createGalaxyPresentationData(): GalaxyPresentationDataDto {
+function createGalaxyPresentationData(
+  ownFleetMovements: GalaxyOwnFleetMovementDto[] = []
+): GalaxyPresentationDataDto {
   return {
     galaxyBytes: [
       [
@@ -82,7 +137,7 @@ function createGalaxyPresentationData(): GalaxyPresentationDataDto {
       ]
     ],
     ownedPlanets: [createPlanet('Home', { x: 0, y: 0, z: 1 }, true)],
-    ownFleetMovements: [],
+    ownFleetMovements,
     starSystemNotes: []
   };
 }
@@ -152,5 +207,23 @@ function createPlanet(name: string, coordinates: ClientCoordinates, ownedByViewe
       tradePortOffers: []
     },
     reportData: null
+  };
+}
+
+function createOwnFleetMovement(
+  overrides: Partial<GalaxyOwnFleetMovementDto> & Pick<GalaxyOwnFleetMovementDto, 'fleetId'>
+): GalaxyOwnFleetMovementDto {
+  return {
+    fleetId: overrides.fleetId,
+    missionType: overrides.missionType ?? 'Move',
+    state: overrides.state ?? 'MOVING_TO_TARGET',
+    routeKind: overrides.routeKind ?? 'OUTBOUND',
+    originSystemCoordinates: overrides.originSystemCoordinates ?? { x: 0, y: 0 },
+    targetSystemCoordinates: overrides.targetSystemCoordinates ?? { x: 1, y: 0 },
+    currentSystemCoordinates: overrides.currentSystemCoordinates ?? { x: 0, y: 0 },
+    shipCount: overrides.shipCount ?? 1,
+    etaTurns: overrides.etaTurns ?? 3,
+    originPlanetName: overrides.originPlanetName ?? 'Origin',
+    targetPlanetName: overrides.targetPlanetName ?? 'Target'
   };
 }
