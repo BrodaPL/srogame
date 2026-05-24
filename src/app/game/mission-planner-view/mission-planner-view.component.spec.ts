@@ -131,15 +131,15 @@ describe('MissionPlannerViewComponent', () => {
     (component as { selectedTargetPlanet: ClientPlanetDto | null }).selectedTargetPlanet = targetPlanet;
     (component as { undamagedShipSelectionByType: Map<ShipType, number> }).undamagedShipSelectionByType.set(ShipType.FIGHTER, 1);
 
-    expect((component as { travelTurnsPreview(): number }).travelTurnsPreview()).toBe(3);
+    expect((component as { travelTurnsPreview(): number }).travelTurnsPreview()).toBe(2);
     expect((component as { travelFormulaLabel(): string }).travelFormulaLabel()).toBe(
-      'ETA formula: ceil((4 / (1 + Fusion Drive / 3) + distance / (1 + Hyperspace Drive / 6) - Graviton Technology) * worst-ship multiplier)'
+      'ETA formula: ceil((4 / (1 + Fusion Drive / 3) + distance / (1 + Hyperspace Drive / 6) - Graviton Technology) * ship modifier)'
     );
     expect((component as { travelFormulaDetailLabel(): string }).travelFormulaDetailLabel()).toBe(
-      'Current: ceil((1.71 + 2.25 - 2) * 1.5) = 3 turns'
+      'Current: ceil((1.71 + 2.25 - 2) * 0.6) = 2 turns'
     );
     expect((component as { travelShipModifierSummaryLabel(): string }).travelShipModifierSummaryLabel()).toBe(
-      'Fleet speed modifier: worst selected ship applies +50% to the full ETA.'
+      'Fleet speed modifier: slowest selected ship applies -40% to the full ETA.'
     );
     expect((component as { travelTechSummaryLabel(): string }).travelTechSummaryLabel()).toBe(
       'Tech levels: Fusion Drive 4 | Hyperspace Drive 10 | Graviton Technology 2'

@@ -543,7 +543,7 @@
         { "type": "REPAIR_EQUIPMENT", "dmg": 10, "shots": 4 }
       ],
       "cargoCapacity": 400,
-      "hangarCapacity": 15,
+      "hangarCapacity": 18,
       "purposes": ["MILITARY", "CARGO", "CARRIER"],
       "jumpCost": 3,
       "cost": { "metal": 300, "crystal": 120, "deuterium": 80 },
@@ -750,7 +750,7 @@
         { "type": "REPAIR_EQUIPMENT", "dmg": 20, "shots": 10 }
       ],
       "cargoCapacity": 600,
-      "hangarCapacity": 80,
+      "hangarCapacity": 90,
       "purposes": ["MILITARY", "UTILITY", "CARRIER"],
       "jumpCost": 8,
       "cost": { "metal": 1600, "crystal": 600, "deuterium": 400 },
@@ -791,7 +791,7 @@
         { "type": "REPAIR_EQUIPMENT", "dmg": 400, "shots": 2 }
       ],
       "cargoCapacity": 10000,
-      "hangarCapacity": 100,
+      "hangarCapacity": 120,
       "purposes": ["MILITARY", "BOMBER", "CARGO", "UTILITY", "CARRIER"],
       "jumpCost": 100,
       "cost": { "metal": 20000, "crystal": 16000, "deuterium": 10000 },

@@ -252,7 +252,7 @@ export class EncyclopediaMechanicsComponent {
       status: 'Live',
       summary: 'Mission Planner is live for launch across the currently supported mission set, with mission-first validation and shared mission definitions.',
       details: [
-        'Mission Planner currently supports Attack, Move, Guard, Transport, Spy, Bombard, Siege, Recycle, Repair, and Colonize.',
+        'Mission Planner currently supports Attack, Move, Guard, Transport, Armament Delivery, Spy, Bombard, Siege, Recycle, Repair, and Colonize.',
         'Validation includes coordinates, ownership/diplomacy constraints, ship capability checks, cargo rules, fuel reserves, and active-fleet-cap checks.',
         'Fleet composition splits launch selection into Ready and Damaged counters, and damaged hull entries can still be launched for now.',
         'Fleet lifecycle states are meaningful: fleets can be PENDING_JUMP_GATE, MOVING_TO_TARGET, ORBITING, RETURNING, MISSION_FAILURE_RETURNING, or MISSION_FAILURE_IDLE.',
@@ -263,17 +263,18 @@ export class EncyclopediaMechanicsComponent {
         'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn.',
         'Foreign Jump Gate targets require known gate intel from the latest espionage report and create a Mail request for the target owner unless diplomacy auto-approves it.',
         'Mission Planner can also be prefilled from other screens, for example Spy Planet actions from reports or planet previews.',
-        'The Travel Summary now shows the live ETA formula, the current substituted values, the worst-ship fleet modifier, and the relevant drive-tech levels taken from the selected origin player.'
+        'The Travel Summary now shows the live ETA formula, the current substituted values, the active ship modifier, and the relevant drive-tech levels taken from the selected origin player.'
       ],
       formulas: [
         'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2',
-        'travelTurns = ceil((4 / (1 + FUSION_DRIVE / 3) + distance / (1 + HYPERSPACE_DRIVE / 6) - GRAVITON_TECHNOLOGY) * worstShipMultiplier), minimum 1',
+        'travelTurns = ceil((4 / (1 + FUSION_DRIVE / 3) + distance / (1 + HYPERSPACE_DRIVE / 6) - GRAVITON_TECHNOLOGY) * shipModifier), minimum 1',
         'Jump Gate travelTurns = 1',
         'fuelCost = sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves'
       ],
       notes: [
         'Distance is still the raw coordinate delta sum abs(dx) + abs(dy) + abs(dz).',
-        'worstShipMultiplier uses the slowest selected hull class in the fleet: Small 1.5, Medium 1.25, Big 1, Titan 0.65, Station 2.',
+        'shipModifier uses the slowest selected ship: Small -40%, Medium -25%, Big 0%, Titan +35%, Station +100%.',
+        'SPY_PROBE is a Small hull, so it uses the same -40% modifier as other Small ships.',
         'Fuel cost still uses raw distance only; drive technologies change ETA but do not reduce deuterium reserve cost.'
       ]
     },

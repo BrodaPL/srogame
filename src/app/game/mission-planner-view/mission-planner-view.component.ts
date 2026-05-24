@@ -591,7 +591,7 @@ export class MissionPlannerViewComponent implements OnInit {
       return 'Jump Gate override: travel time is fixed at 1 turn.';
     }
 
-    return 'ETA formula: ceil((4 / (1 + Fusion Drive / 3) + distance / (1 + Hyperspace Drive / 6) - Graviton Technology) * worst-ship multiplier)';
+    return 'ETA formula: ceil((4 / (1 + Fusion Drive / 3) + distance / (1 + Hyperspace Drive / 6) - Graviton Technology) * ship modifier)';
   }
 
   protected travelFormulaDetailLabel(): string {
@@ -614,12 +614,12 @@ export class MissionPlannerViewComponent implements OnInit {
   protected travelShipModifierSummaryLabel(): string {
     const modifier = this.travelShipModifier();
     if (modifier === 0) {
-      return 'Fleet speed modifier: Big hull baseline 0% (or no ships selected yet).';
+      return 'Fleet speed modifier: 0% (Big hull baseline).';
     }
 
     const percent = Math.round(modifier * 100);
     const sign = percent > 0 ? '+' : '';
-    return `Fleet speed modifier: worst selected ship applies ${sign}${percent}% to the full ETA.`;
+    return `Fleet speed modifier: slowest selected ship applies ${sign}${percent}% to the full ETA.`;
   }
 
   protected travelFormulaTooltipLabel(): string {

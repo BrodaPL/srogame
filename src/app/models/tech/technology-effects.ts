@@ -5,10 +5,10 @@ import { ShipType } from '../enums/ship-type';
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
 
 const HULL_CLASS_TRAVEL_MODIFIERS: ReadonlyMap<HullClass, number> = new Map<HullClass, number>([
-  [HullClass.SMALL, 0.5],
-  [HullClass.MEDIUM, 0.25],
+  [HullClass.SMALL, -0.4],
+  [HullClass.MEDIUM, -0.25],
   [HullClass.BIG, 0],
-  [HullClass.TITAN, -0.35],
+  [HullClass.TITAN, 0.35],
   [HullClass.STATION, 1]
 ]);
 
@@ -74,18 +74,22 @@ export function fleetTravelWorstShipModifier(ships: FleetTravelShipSelection[] =
       continue;
     }
 
-    const hullClass = SHIP_BLUEPRINTS.get(entry.type)?.hullClass;
-    if (!hullClass) {
+    const blueprint = SHIP_BLUEPRINTS.get(entry.type);
+    if (!blueprint) {
       continue;
     }
 
-    const modifier = HULL_CLASS_TRAVEL_MODIFIERS.get(hullClass) ?? 0;
+    const modifier = resolveShipTravelModifier(blueprint.hullClass);
     if (worstModifier === null || modifier > worstModifier) {
       worstModifier = modifier;
     }
   }
 
   return worstModifier ?? 0;
+}
+
+function resolveShipTravelModifier(hullClass: HullClass): number {
+  return HULL_CLASS_TRAVEL_MODIFIERS.get(hullClass) ?? 0;
 }
 
 function sanitizeTechLevel(level: number): number {
