@@ -79,18 +79,36 @@
                 class="reports-view__item"
                 [class.reports-view__item--active]="selectedReportId === report.reportId"
                 [class.reports-view__item--unread]="!report.isRead"
+                [class.reports-view__item--favourite]="report.isFavourite"
                 (click)="openReport(report)">
                 <label class="reports-view__checkbox" (click)="$event.stopPropagation()">
                   <input
                     type="checkbox"
                     [checked]="isSelected(report.reportId)"
+                    [disabled]="report.isFavourite"
                     (change)="toggleReportSelection(report.reportId, $any($event.target).checked)" />
                 </label>
 
                 <div class="reports-view__item-main">
                   <div class="reports-view__item-head">
-                    <h4>{{ report.title }}</h4>
-                    <span class="badge" [class.badge--jump]="!report.isRead">{{ report.reportType }}</span>
+                    <div class="reports-view__title-line">
+                      <button
+                        type="button"
+                        class="reports-view__favourite-button"
+                        [class.reports-view__favourite-button--active]="report.isFavourite"
+                        [disabled]="favouriteUpdatingReportId === report.reportId"
+                        [attr.aria-label]="report.isFavourite ? 'Remove favourite marker' : 'Mark report as favourite'"
+                        (click)="toggleReportFavourite(report, $event)">
+                        {{ report.isFavourite ? '★' : '☆' }}
+                      </button>
+                      <h4>{{ report.title }}</h4>
+                    </div>
+                    <div class="reports-view__item-badges">
+                      @if (report.isFavourite) {
+                        <span class="badge badge--jump">Favourite</span>
+                      }
+                      <span class="badge" [class.badge--jump]="!report.isRead">{{ report.reportType }}</span>
+                    </div>
                   </div>
                   <div class="reports-view__item-meta">
                     <span>Turn {{ report.createdTurn }}</span>
@@ -120,8 +138,21 @@
           <div class="reports-view__detail-head" data-tutorial-id="reports-detail-head">
             <div>
               <p class="eyebrow">Report Detail</p>
-              <h3>{{ report.title }}</h3>
-              <p class="overview-muted">{{ report.reportType }} | Turn {{ report.createdTurn }}</p>
+              <div class="reports-view__detail-title-line">
+                <button
+                  type="button"
+                  class="reports-view__favourite-button reports-view__favourite-button--large"
+                  [class.reports-view__favourite-button--active]="report.isFavourite"
+                  [disabled]="favouriteUpdatingReportId === report.reportId"
+                  [attr.aria-label]="report.isFavourite ? 'Remove favourite marker' : 'Mark report as favourite'"
+                  (click)="toggleReportFavourite(report, $event)">
+                  {{ report.isFavourite ? '★' : '☆' }}
+                </button>
+                <h3>{{ report.title }}</h3>
+              </div>
+              <p class="overview-muted">
+                {{ report.reportType }} | Turn {{ report.createdTurn }}{{ report.isFavourite ? ' | Favourite' : '' }}
+              </p>
             </div>
 
             <div class="reports-view__detail-preview">
