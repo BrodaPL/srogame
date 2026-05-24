@@ -3,7 +3,13 @@
     <p class="planet-data__owner">{{ ownerLabel() }}</p>
     <h2 class="planet-data__name">{{ planetNameLabel() }}</h2>
     @if (planetImagePath) {
-      <img class="planet-data__image" [src]="planetImagePath" [alt]="planetNameLabel() + ' image'" />
+      <img
+        class="planet-data__image"
+        [src]="planetImagePath"
+        [alt]="planetNameLabel() + ' image'"
+        [style.transform]="planetImageTransform()"
+        [style.filter]="planetImageFilter()"
+      />
     }
     <p class="planet-data__meta">{{ planetSizeLabel() }} | {{ planetTypeLabel() }}</p>
   </div>

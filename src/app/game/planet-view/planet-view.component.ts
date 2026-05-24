@@ -37,6 +37,7 @@ import type {
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
 import { resolveFusionReactorOperation, type FusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
 import { PlanetImageHelper } from '../../models/planets/planet-image-helper';
+import { planetImageVariantToStyle } from '../../models/planets/planet-image-variant';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
@@ -611,6 +612,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       this.planet.basicInfo.size,
       'normal'
     );
+  }
+
+  protected planetHeroImageTransform(): string {
+    if (!this.planet) {
+      return '';
+    }
+
+    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type).transform;
+  }
+
+  protected planetHeroImageFilter(): string {
+    if (!this.planet) {
+      return '';
+    }
+
+    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type).filter;
   }
 
   protected buildingBuildLabel(building: Building): string {

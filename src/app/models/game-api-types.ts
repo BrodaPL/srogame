@@ -22,6 +22,7 @@ import type { DiplomaticStatus } from './diplomacy/diplomatic-status';
 import type { DiplomaticProposalState } from './diplomacy/diplomatic-proposal-state';
 import type { BombardmentPriorities } from './bombardment/bombardment-priority';
 import type { TradeResourceType } from './trade/trade-resource-type';
+import type { PlanetImageVariant } from './planets/planet-image-variant';
 import { StartingHomeworldPreset } from './enums/starting-homeworld-preset';
 import { BOT_PROFILE_IDS } from './player';
 import type { BotGoalType, BotProfileId } from './player';
@@ -1003,6 +1004,7 @@ export type ClientPlanetDto = {
     colonizationDifficulty: number;
     order: number;
     image: string;
+    iv?: PlanetImageVariant;
     size: number;
   };
   info: {

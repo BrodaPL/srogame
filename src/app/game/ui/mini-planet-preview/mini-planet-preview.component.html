@@ -11,7 +11,13 @@
 
   <div class="mini-planet-preview__media">
     @if (planetImagePath(); as imagePath) {
-      <img class="mini-planet-preview__image" [src]="imagePath" [alt]="planetNameLabel() + ' image'" />
+      <img
+        class="mini-planet-preview__image"
+        [src]="imagePath"
+        [alt]="planetNameLabel() + ' image'"
+        [style.transform]="planetImageTransform()"
+        [style.filter]="planetImageFilter()"
+      />
     }
     <p class="mini-planet-preview__owner">{{ ownershipLabel() }}</p>
   </div>

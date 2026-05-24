@@ -77,6 +77,8 @@
               class="planet-view__planet-image"
               [src]="imagePath"
               [alt]="planet.basicInfo.name + ' image'"
+              [style.transform]="planetHeroImageTransform()"
+              [style.filter]="planetHeroImageFilter()"
             />
           }
           <button

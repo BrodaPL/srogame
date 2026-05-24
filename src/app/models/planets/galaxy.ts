@@ -80,7 +80,8 @@ export class Galaxy {
       planet.basicInfo.solarSystem,
       planet.basicInfo.image,
       planet.basicInfo.baseSize,
-      planet.basicInfo.terraformerSizeBonus
+      planet.basicInfo.terraformerSizeBonus,
+      planet.basicInfo.iv
     );
 
     const isOwnedByPlayer = actualOwnerId === playerId;

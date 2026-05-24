@@ -3,6 +3,7 @@ import type { Planet } from '../../../models/planets/planet';
 import type { EspionageReportData } from '../../../models/reports/espionage-report-data';
 import type { PlanetaryParameters } from '../../../models/planets/planetary-parameters';
 import type { ResourcesPack } from '../../../models/resources-pack';
+import { planetImageVariantToStyle } from '../../../models/planets/planet-image-variant';
 
 @Component({
   selector: 'app-planet-data',
@@ -32,6 +33,22 @@ export class PlanetDataComponent {
 
   protected planetTypeLabel(): string {
     return `Type: ${this.planet?.basicInfo.type ?? '--'}`;
+  }
+
+  protected planetImageTransform(): string {
+    if (!this.planet) {
+      return '';
+    }
+
+    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type).transform;
+  }
+
+  protected planetImageFilter(): string {
+    if (!this.planet) {
+      return '';
+    }
+
+    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type).filter;
   }
 
   protected planetaryParametersTooltip(): string {

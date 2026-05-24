@@ -22,6 +22,11 @@ import {
 } from '../sensor-phalanx/sensor-phalanx';
 import type { TradePortOffer } from '../trade/trade-port-offer';
 import { resolveFusionReactorOperation, type FusionReactorOperation } from './fusion-reactor-operation';
+import {
+  createRandomPlanetImageVariant,
+  DEFAULT_PLANET_IMAGE_VARIANT,
+  type PlanetImageVariant
+} from './planet-image-variant';
 
 type ModifierKey = keyof Omit<PlanetaryParameters, 'copy'>;
 
@@ -39,7 +44,8 @@ export class PlanetBasicInfo {
     public solarSystem: SolarSystem,
     public image: string,
     public baseSize: number,
-    public terraformerSizeBonus = 0
+    public terraformerSizeBonus = 0,
+    public iv: PlanetImageVariant = [...DEFAULT_PLANET_IMAGE_VARIANT]
   ) {}
 
   public get size(): number {
@@ -114,7 +120,9 @@ export class Planet {
         order,
         solarSystem,
         PlanetImageHelper.getPlanetImage(type, size),
-        size
+        size,
+        0,
+        createRandomPlanetImageVariant(type, size)
       ),
       new PlanetInfo(
         ownerId,
@@ -171,7 +179,9 @@ export class Planet {
         order,
         solarSystem,
         PlanetImageHelper.getPlanetImage(type, size),
-        size
+        size,
+        0,
+        createRandomPlanetImageVariant(type, size)
       ),
       new PlanetInfo(
         ownerId,

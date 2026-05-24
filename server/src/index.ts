@@ -7851,6 +7851,7 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       colonizationDifficulty: clientPlanet.basicInfo.colonizationDifficulty,
       order: clientPlanet.basicInfo.order,
       image: clientPlanet.basicInfo.image,
+      iv: clientPlanet.basicInfo.iv,
       size: clientPlanet.basicInfo.size
     },
     info: {

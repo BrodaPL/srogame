@@ -11,6 +11,7 @@ import * as playerModule from '../../src/app/models/player.js';
 import * as galaxyModule from '../../src/app/models/planets/galaxy.js';
 import * as planetModule from '../../src/app/models/planets/planet.js';
 import * as planetaryParametersModule from '../../src/app/models/planets/planetary-parameters.js';
+import * as planetImageVariantModule from '../../src/app/models/planets/planet-image-variant.js';
 import * as solarSystemModule from '../../src/app/models/planets/solar-system.js';
 import * as starSystemNoteModule from '../../src/app/models/planets/star-system-note.js';
 import * as supportRequestModule from '../../src/app/models/requests/support-request.js';
@@ -61,6 +62,7 @@ import type { DefenceType } from '../../src/app/models/enums/defence-type.ts';
 import type { TechnologyQueueEntry as TechnologyQueueEntryModel } from '../../src/app/models/tech/technology-queue-entry.ts';
 import type { ResearchHelperFor as ResearchHelperForModel } from '../../src/app/models/tech/research-helper-for.ts';
 import type { SupportRequest } from '../../src/app/models/requests/support-request.ts';
+import type { PlanetImageVariant } from '../../src/app/models/planets/planet-image-variant.ts';
 
 function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
   return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
@@ -76,6 +78,10 @@ const { Player } = resolveModule(playerModule) as typeof import('../../src/app/m
 const { Galaxy } = resolveModule(galaxyModule) as typeof import('../../src/app/models/planets/galaxy.js');
 const { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ } = resolveModule(planetModule) as typeof import('../../src/app/models/planets/planet.js');
 const { PlanetaryParameters: PlanetaryParametersModel } = resolveModule(planetaryParametersModule) as typeof import('../../src/app/models/planets/planetary-parameters.js');
+const {
+  createDeterministicPlanetImageVariant,
+  normalizePlanetImageVariant
+} = resolveModule(planetImageVariantModule) as typeof import('../../src/app/models/planets/planet-image-variant.js');
 const { SolarSystem } = resolveModule(solarSystemModule) as typeof import('../../src/app/models/planets/solar-system.js');
 const { StarSystemNote: StarSystemNoteModel } = resolveModule(starSystemNoteModule) as typeof import('../../src/app/models/planets/star-system-note.js');
 const { normalizeSupportResources } = resolveModule(supportRequestModule) as typeof import('../../src/app/models/requests/support-request.js');
@@ -284,6 +290,7 @@ type SavedPlanet = {
     colonizationDifficulty: number;
     order: number;
     image: string;
+    iv?: PlanetImageVariant;
     baseSize: number;
     terraformerSizeBonus: number;
   };
@@ -849,7 +856,16 @@ function hydrateSavedPlanet(savedPlanet: SavedPlanet, system: SolarSystemModel):
       system,
       savedPlanet.basicInfo.image,
       savedPlanet.basicInfo.baseSize,
-      savedPlanet.basicInfo.terraformerSizeBonus
+      savedPlanet.basicInfo.terraformerSizeBonus,
+      normalizePlanetImageVariant(
+        savedPlanet.basicInfo.iv
+          ?? createDeterministicPlanetImageVariant(
+            `${system.coordinates.x}:${system.coordinates.y}:${savedPlanet.basicInfo.order}:${savedPlanet.basicInfo.type}:${savedPlanet.basicInfo.image}:${savedPlanet.basicInfo.baseSize}`,
+            savedPlanet.basicInfo.type,
+            savedPlanet.basicInfo.baseSize
+          ),
+        savedPlanet.basicInfo.type
+      )
     ),
     new PlanetInfo(
       savedPlanet.info.ownerId,
@@ -1083,6 +1099,7 @@ function serializePlanet(planet: PlanetModel): SavedPlanet {
       colonizationDifficulty: planet.basicInfo.colonizationDifficulty,
       order: planet.basicInfo.order,
       image: planet.basicInfo.image,
+      iv: planet.basicInfo.iv,
       baseSize: planet.basicInfo.baseSize,
       terraformerSizeBonus: planet.basicInfo.terraformerSizeBonus
     },

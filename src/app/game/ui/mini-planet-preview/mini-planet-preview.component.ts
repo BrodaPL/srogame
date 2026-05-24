@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { ClientPlanetDto, ClientReportDataDto } from '../../../models/game-api-types';
 import { PlayerType } from '../../../models/enums/player-type';
 import { PlanetImageHelper } from '../../../models/planets/planet-image-helper';
+import { planetImageVariantToStyle } from '../../../models/planets/planet-image-variant';
 import { SpyLaunchDialogComponent } from '../spy-launch-dialog/spy-launch-dialog.component';
 
 type MiniPlanetTagVm = {
@@ -47,6 +48,22 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       this.planet.basicInfo.size,
       'small'
     );
+  }
+
+  protected planetImageTransform(): string {
+    if (!this.planet) {
+      return '';
+    }
+
+    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type).transform;
+  }
+
+  protected planetImageFilter(): string {
+    if (!this.planet) {
+      return '';
+    }
+
+    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type).filter;
   }
 
   protected coordinatesLabel(): string {
