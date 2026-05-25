@@ -137,3 +137,10 @@
   white-space: nowrap;
   border: 0;
 }
+.settings-tooltip-wrapper {
+  display: inline-block;
+}
+
+.settings-tooltip-wrapper .start-button {
+  width: 100%;
+}

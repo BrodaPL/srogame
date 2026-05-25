@@ -32,6 +32,7 @@ import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-plane
 import { PlanetPowersDisplay, ResourceDisplay, ResourcesComponent } from '../ui/resources/resources.component';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { TutorialService } from '../../tutorial/tutorial.service';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 
 type ImperiumSortOption =
   | 'coordinates'
@@ -122,7 +123,8 @@ type ImperiumBuildingStatsVm = {
     ResourcesComponent,
     MiniPlanetPreviewComponent,
     FormsModule,
-    RouterLink
+    RouterLink,
+    TooltipDirective
   ],
   templateUrl: './imperium-view.component.html',
   styleUrl: './imperium-view.component.css'

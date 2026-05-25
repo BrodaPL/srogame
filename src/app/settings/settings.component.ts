@@ -9,6 +9,7 @@ import { I18nService } from '../i18n/i18n.service';
 import type { LanguagePreference } from '../models/game-api-types';
 import { BOT_PROFILE_IDS, type BotProfileId } from '../models/player';
 import type { AccountSettingsResponse, PlayerSession } from '../models/game-api-types';
+import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 
 type LanguageOption = {
   id: LanguagePreference;
@@ -19,7 +20,7 @@ type LanguageOption = {
 
 @Component({
   selector: 'app-settings',
-  imports: [FormsModule, RouterLink, I18nPipe],
+  imports: [FormsModule, RouterLink, I18nPipe, TooltipDirective],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.css'
 })

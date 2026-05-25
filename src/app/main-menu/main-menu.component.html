@@ -36,14 +36,15 @@
           {{ 'mainMenu.actions.loginRegister' | t }}
         </button>
       } @else {
-        <button
-          class="menu-button menu-button--primary"
-          type="button"
-          (click)="resumeCurrentGame()"
-          [disabled]="!canResumeCurrentGame() || isLoadingCurrentGameStatus || isClosingCurrentGame"
-          [title]="resumeUnavailableReason() ?? ''">
-          {{ 'mainMenu.actions.resumeCurrentGame' | t }}
-        </button>
+        <span class="menu-button-tooltip-wrapper" [appTooltip]="resumeUnavailableReason() ?? ''">
+          <button
+            class="menu-button menu-button--primary"
+            type="button"
+            (click)="resumeCurrentGame()"
+            [disabled]="!canResumeCurrentGame() || isLoadingCurrentGameStatus || isClosingCurrentGame">
+            {{ 'mainMenu.actions.resumeCurrentGame' | t }}
+          </button>
+        </span>
         @if (shouldShowCloseCurrentGame()) {
           <button
             class="menu-button menu-button--secondary"

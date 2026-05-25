@@ -8,10 +8,11 @@ import { resolveApiErrorMessage, resolveApiText } from '../i18n/api-message.util
 import { I18nPipe } from '../i18n/i18n.pipe';
 import { I18nService } from '../i18n/i18n.service';
 import type { CurrentGameStatusResponse } from '../models/game-api-types';
+import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 
 @Component({
   selector: 'app-main-menu',
-  imports: [RouterLink, I18nPipe],
+  imports: [RouterLink, I18nPipe, TooltipDirective],
   templateUrl: './main-menu.component.html',
   styleUrl: './main-menu.component.css'
 })

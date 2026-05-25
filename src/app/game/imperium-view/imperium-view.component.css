@@ -245,6 +245,14 @@
   gap: 0.45rem;
 }
 
+.imperium-view__tooltip-wrapper {
+  display: block;
+}
+
+.imperium-view__tooltip-wrapper .imperium-view__danger-button {
+  width: 100%;
+}
+
 .imperium-view__action-hint,
 .imperium-view__action-warning,
 .imperium-view__confirm-panel p {

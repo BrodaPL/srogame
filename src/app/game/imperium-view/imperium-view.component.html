@@ -190,15 +190,18 @@
               <div class="imperium-view__queue-group imperium-view__queue-group--actions">
                 <p class="imperium-view__queue-title">Planet Action</p>
                 <div class="imperium-view__planet-actions">
-                  <button
-                    type="button"
-                    class="imperium-view__danger-button"
-                    [disabled]="!canAbandonPlanet(planetVm) || activeAbandonPlanetId !== null"
-                    [title]="canAbandonPlanet(planetVm) ? 'Turn this planet into a passive neutral world.' : abandonBlockedCopy()"
-                    (click)="beginAbandonPlanet(planetVm)"
-                  >
-                    {{ isAbandonPending(planetVm) ? 'Abandoning...' : 'Abandon planet' }}
-                  </button>
+                  <span
+                    class="imperium-view__tooltip-wrapper"
+                    [appTooltip]="canAbandonPlanet(planetVm) ? 'Turn this planet into a passive neutral world.' : abandonBlockedCopy()">
+                    <button
+                      type="button"
+                      class="imperium-view__danger-button"
+                      [disabled]="!canAbandonPlanet(planetVm) || activeAbandonPlanetId !== null"
+                      (click)="beginAbandonPlanet(planetVm)"
+                    >
+                      {{ isAbandonPending(planetVm) ? 'Abandoning...' : 'Abandon planet' }}
+                    </button>
+                  </span>
                   <p class="imperium-view__action-hint">
                     Queues and research are canceled. Resources, stationed ships, and defences stay behind.
                   </p>

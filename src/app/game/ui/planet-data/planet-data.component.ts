@@ -4,9 +4,11 @@ import type { EspionageReportData } from '../../../models/reports/espionage-repo
 import type { PlanetaryParameters } from '../../../models/planets/planetary-parameters';
 import type { ResourcesPack } from '../../../models/resources-pack';
 import { planetImageVariantToStyle } from '../../../models/planets/planet-image-variant';
+import { TooltipDirective } from '../../../shared/tooltip/tooltip.directive';
 
 @Component({
   selector: 'app-planet-data',
+  imports: [TooltipDirective],
   templateUrl: './planet-data.component.html'
 })
 export class PlanetDataComponent {

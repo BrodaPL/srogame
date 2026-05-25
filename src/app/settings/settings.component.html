@@ -52,9 +52,11 @@
             <p><strong>{{ 'settings.security.forgotPassword' | t }}</strong></p>
             <p>{{ forgotPasswordInfoLabel() }}</p>
           </div>
-          <button class="start-button" type="button" disabled [title]="'settings.security.resetPasswordUnavailableTitle' | t">
-            {{ 'settings.security.resetPassword' | t }}
-          </button>
+          <span class="settings-tooltip-wrapper" [appTooltip]="'settings.security.resetPasswordUnavailableTitle' | t">
+            <button class="start-button" type="button" disabled>
+              {{ 'settings.security.resetPassword' | t }}
+            </button>
+          </span>
         </section>
 
         <section class="settings-card">
