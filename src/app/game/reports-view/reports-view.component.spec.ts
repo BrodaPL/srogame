@@ -64,6 +64,39 @@ describe('ReportsViewComponent', () => {
     expect([...selectedIds]).toEqual([regularReport.reportId]);
     expect(selectedIds.has(favouriteReport.reportId)).toBe(false);
   });
+
+  it('formats plain report text for display without changing report content', () => {
+    const component = new ReportsViewComponent(
+      {} as never,
+      {} as never,
+      {
+        markForCheck: vi.fn()
+      } as never,
+      {
+        autoOpenTutorial: vi.fn()
+      } as never,
+      {} as never,
+      createRouter() as never
+    );
+    const report = createProductionReport(
+      7,
+      'Production Report',
+      false,
+      'Resources: M 10, C 20, D 30\nProduction finished successfully.'
+    );
+
+    const view = (component as {
+      plainReportView(report: ProductionReport): {
+        metadataRows: Array<{ label: string; value: string }>;
+        bodySections: Array<{ title: string; rows: Array<{ label: string; value: string }>; notes: string[] }>;
+      };
+    }).plainReportView(report);
+
+    expect(report.show()).toContain('Resources: M 10, C 20, D 30');
+    expect(view.metadataRows.some((row) => row.label === 'Title' && row.value === 'Production Report')).toBe(true);
+    expect(view.bodySections[0].rows).toEqual([{ label: 'Resources', value: 'M 10, C 20, D 30', tone: 'neutral' }]);
+    expect(view.bodySections[0].notes).toEqual(['Production finished successfully.']);
+  });
 });
 
 function createRouter() {
@@ -72,7 +105,12 @@ function createRouter() {
   };
 }
 
-function createProductionReport(reportId: number, title: string, isFavourite = false): ProductionReport {
+function createProductionReport(
+  reportId: number,
+  title: string,
+  isFavourite = false,
+  body = title
+): ProductionReport {
   return new ProductionReport(
     {
       reportId,
@@ -80,6 +118,6 @@ function createProductionReport(reportId: number, title: string, isFavourite = f
       title,
       isFavourite
     },
-    title
+    body
   );
 }

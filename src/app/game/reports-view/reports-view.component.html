@@ -371,7 +371,73 @@
                 </section>
               </div>
             } @else {
-              <pre class="reports-view__detail-body">{{ report.show() }}</pre>
+              @let plainReport = plainReportView(report);
+              <div class="reports-view__plain-report">
+                <section class="reports-view__plain-banner">
+                  <div>
+                    <p class="reports-view__dossier-kicker">Report Record</p>
+                    <h4 class="reports-view__dossier-title">{{ report.title }}</h4>
+                    <p class="reports-view__dossier-copy">Structured display of the original report text. The underlying report body is unchanged.</p>
+                  </div>
+                  <div class="reports-view__dossier-badges">
+                    <span class="badge badge--jump">{{ report.reportType }}</span>
+                    <span class="badge">Turn {{ report.createdTurn }}</span>
+                  </div>
+                </section>
+
+                <section class="reports-view__plain-section">
+                  <div class="reports-view__dossier-section-head">
+                    <div>
+                      <p class="reports-view__dossier-section-kicker">Header</p>
+                      <h5 class="reports-view__dossier-section-title">Metadata</h5>
+                    </div>
+                  </div>
+                  <div class="reports-view__dossier-list reports-view__dossier-list--parameters">
+                    @for (row of plainReport.metadataRows; track trackDossierRow($index, row)) {
+                      <div class="reports-view__dossier-row">
+                        <span class="reports-view__dossier-row-label">{{ row.label }}</span>
+                        <span class="reports-view__dossier-row-value">{{ row.value }}</span>
+                      </div>
+                    }
+                  </div>
+                </section>
+
+                @for (section of plainReport.bodySections; track section.title) {
+                  <section class="reports-view__plain-section">
+                    <div class="reports-view__dossier-section-head">
+                      <div>
+                        <p class="reports-view__dossier-section-kicker">Log</p>
+                        <h5 class="reports-view__dossier-section-title">{{ section.title }}</h5>
+                      </div>
+                    </div>
+
+                    @if (section.rows.length > 0) {
+                      <div class="reports-view__dossier-list">
+                        @for (row of section.rows; track trackDossierRow($index, row)) {
+                          <div class="reports-view__dossier-row">
+                            <span class="reports-view__dossier-row-label">{{ row.label }}</span>
+                            <span
+                              class="reports-view__dossier-row-value"
+                              [class.reports-view__dossier-row-value--positive]="row.tone === 'positive'"
+                              [class.reports-view__dossier-row-value--negative]="row.tone === 'negative'"
+                              [class.reports-view__dossier-row-value--neutral]="row.tone === 'neutral'">
+                              {{ row.value }}
+                            </span>
+                          </div>
+                        }
+                      </div>
+                    }
+
+                    @if (section.notes.length > 0) {
+                      <div class="reports-view__plain-notes">
+                        @for (note of section.notes; track $index) {
+                          <p>{{ note }}</p>
+                        }
+                      </div>
+                    }
+                  </section>
+                }
+              </div>
             }
           </section>
         } @else {

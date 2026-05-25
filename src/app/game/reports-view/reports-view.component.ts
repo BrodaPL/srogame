@@ -25,6 +25,17 @@ type ReportDossierRow = {
   tone?: 'positive' | 'negative' | 'neutral';
 };
 
+type PlainReportView = {
+  metadataRows: ReportDossierRow[];
+  bodySections: PlainReportSection[];
+};
+
+type PlainReportSection = {
+  title: string;
+  rows: ReportDossierRow[];
+  notes: string[];
+};
+
 @Component({
   selector: 'app-reports-view',
   imports: [TopMenuComponent, MiniPlanetPreviewComponent, TooltipDirective],
@@ -418,6 +429,16 @@ export class ReportsViewComponent implements OnInit {
     return `Scanner capture for ${this.sourceLabel(report)}. Known assets and planetary modifiers are organized below.`;
   }
 
+  protected plainReportView(report: PlayerReport): PlainReportView {
+    const [metadataBlock, ...bodyBlocks] = report.show().split(/\n\s*\n/);
+    const metadataRows = this.parsePlainReportRows(metadataBlock.split('\n'));
+    const bodyLines = bodyBlocks.join('\n\n').split('\n');
+    return {
+      metadataRows,
+      bodySections: this.parsePlainReportBodySections(bodyLines)
+    };
+  }
+
   protected trackDossierRow(_: number, row: ReportDossierRow): string {
     return row.label;
   }
@@ -439,6 +460,108 @@ export class ReportsViewComponent implements OnInit {
         label: String(label),
         value: this.formatMetricValue(value)
       }));
+  }
+
+  private parsePlainReportBodySections(lines: string[]): PlainReportSection[] {
+    const sections: PlainReportSection[] = [];
+    let currentSection = this.createPlainReportSection('Report Details');
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) {
+        continue;
+      }
+
+      if (this.isPlainReportSectionHeading(line)) {
+        if (currentSection.rows.length > 0 || currentSection.notes.length > 0) {
+          sections.push(currentSection);
+        }
+        currentSection = this.createPlainReportSection(line.replace(/:$/, ''));
+        continue;
+      }
+
+      const row = this.parsePlainReportRow(line);
+      if (row) {
+        currentSection.rows.push(row);
+      } else {
+        currentSection.notes.push(line);
+      }
+    }
+
+    if (currentSection.rows.length > 0 || currentSection.notes.length > 0) {
+      sections.push(currentSection);
+    }
+
+    return sections;
+  }
+
+  private parsePlainReportRows(lines: string[]): ReportDossierRow[] {
+    return lines
+      .map((line) => this.parsePlainReportRow(line.trim()))
+      .filter((row): row is ReportDossierRow => row !== null);
+  }
+
+  private parsePlainReportRow(line: string): ReportDossierRow | null {
+    const separatorIndex = line.indexOf(':');
+    if (separatorIndex <= 0) {
+      return null;
+    }
+
+    const label = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1).trim();
+    if (!label || !value) {
+      return null;
+    }
+
+    return {
+      label,
+      value,
+      tone: this.plainReportTone(label, value)
+    };
+  }
+
+  private isPlainReportSectionHeading(line: string): boolean {
+    if (!line.endsWith(':')) {
+      return false;
+    }
+
+    return line.length <= 48 && !line.includes(',') && !line.includes('|');
+  }
+
+  private createPlainReportSection(title: string): PlainReportSection {
+    return {
+      title,
+      rows: [],
+      notes: []
+    };
+  }
+
+  private plainReportTone(label: string, value: string): 'positive' | 'negative' | 'neutral' {
+    const text = `${label} ${value}`.toLowerCase();
+    if (
+      text.includes('success')
+      || text.includes('survived')
+      || text.includes('stolen')
+      || text.includes('repaired')
+      || text.includes('delivered')
+      || text.includes('created')
+    ) {
+      return 'positive';
+    }
+
+    if (
+      text.includes('failure')
+      || text.includes('lost')
+      || text.includes('losses')
+      || text.includes('destroyed')
+      || text.includes('damage')
+      || text.includes('blocked')
+      || text.includes('none')
+    ) {
+      return 'negative';
+    }
+
+    return 'neutral';
   }
 
   private formatMetricValue(value: number): string {
