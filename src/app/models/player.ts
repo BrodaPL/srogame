@@ -156,6 +156,16 @@ export type BotMemoryV2SupervisorPendingStatus =
   | 'EXPIRED'
   | 'CANCELLED';
 
+export type BotMemoryV2BudgetLane =
+  | 'PLANETARY'
+  | 'IMPERIUM';
+
+export type BotMemoryV2ProposalBudgetScope =
+  | 'PLANETARY'
+  | 'IMPERIUM'
+  | 'BOTH'
+  | 'NONE';
+
 export type BotMemoryV2SupervisorPendingCommitment = {
   commitmentKey: string;
   dedupeKey: string;
@@ -165,6 +175,9 @@ export type BotMemoryV2SupervisorPendingCommitment = {
   targetCoordinates: BotMemoryCoordinates | null;
   requestedResources: BotMemoryResources;
   weightedResourceValue: number;
+  budgetScope: BotMemoryV2ProposalBudgetScope;
+  budgetPlanetKey: string | null;
+  budgetIntentSubsystemId: BotV2SubsystemId;
   score: number;
   status: BotMemoryV2SupervisorPendingStatus;
   createdTurn: number;
@@ -181,6 +194,22 @@ export type BotMemoryV2SupervisorSpendingEntry = {
   subsystemId: BotV2SubsystemId;
   kind: BotMemoryV2ProposalKind;
   targetCoordinates: BotMemoryCoordinates | null;
+  resources: BotMemoryResources;
+  weightedResourceValue: number;
+  budgetScope: BotMemoryV2ProposalBudgetScope;
+  budgetPlanetKey: string | null;
+  budgetIntentSubsystemId: BotV2SubsystemId;
+};
+
+export type BotMemoryV2SupervisorBudgetSpendingEntry = {
+  turn: number;
+  proposalId: string;
+  dedupeKey: string;
+  subsystemId: BotV2SubsystemId;
+  kind: BotMemoryV2ProposalKind;
+  targetCoordinates: BotMemoryCoordinates | null;
+  planetKey: string | null;
+  lane: BotMemoryV2BudgetLane;
   resources: BotMemoryResources;
   weightedResourceValue: number;
 };
@@ -373,6 +402,12 @@ export type BotMemoryV2WeightManagerPlanetFocus =
   | 'MILITARY'
   | 'DEVELOPMENT';
 
+export type BotMemoryV2BudgetScope =
+  | 'PLANETARY_ONLY'
+  | 'PLANETARY_DOMINANT'
+  | 'HYBRID'
+  | 'IMPERIUM_ONLY';
+
 export type BotMemoryV2WeightManagerPlanetEntry = {
   coordinates: BotMemoryCoordinates;
   economicWeight: number;
@@ -385,6 +420,11 @@ export type BotMemoryV2WeightManagerPlanetEntry = {
   selectedFocus: BotMemoryV2WeightManagerPlanetFocus | null;
   immaturePlanet: boolean;
   maturePlanet: boolean;
+  developingPlanet: boolean;
+  developedPlanet: boolean;
+  hubPlanet: boolean;
+  oldPlanet: boolean;
+  budgetScope: BotMemoryV2BudgetScope;
   industryFocused: boolean;
   defenceFocused: boolean;
   militaryFocused: boolean;
@@ -428,6 +468,8 @@ export type BotMemoryV2WeightManager = {
 export type BotMemoryV2Supervisor = {
   pendingCommitments: BotMemoryV2SupervisorPendingCommitment[];
   spendingHistory: BotMemoryV2SupervisorSpendingEntry[];
+  planetarySpendingHistory: BotMemoryV2SupervisorBudgetSpendingEntry[];
+  imperiumSpendingHistory: BotMemoryV2SupervisorBudgetSpendingEntry[];
   proposalHistory: BotMemoryV2SupervisorProposalEntry[];
   fleetSlotHistory: BotMemoryV2SupervisorFleetSlotEntry[];
   fuelSpendingHistory: BotMemoryV2SupervisorFuelSpendingEntry[];
@@ -1474,6 +1516,11 @@ export class Player {
           selectedFocus,
           immaturePlanet: Boolean(planet?.immaturePlanet),
           maturePlanet: Boolean(planet?.maturePlanet),
+          developingPlanet: Boolean(planet?.developingPlanet),
+          developedPlanet: Boolean(planet?.developedPlanet),
+          hubPlanet: Boolean(planet?.hubPlanet ?? planet?.industryHubPlanet),
+          oldPlanet: Boolean(planet?.oldPlanet),
+          budgetScope: Player.normalizeBotMemoryV2BudgetScope(planet?.budgetScope),
           industryFocused: Boolean(planet?.industryFocused),
           defenceFocused: Boolean(planet?.defenceFocused),
           militaryFocused: Boolean(planet?.militaryFocused),
@@ -1501,6 +1548,14 @@ export class Player {
         supervisor?.pendingCommitments
       ),
       spendingHistory: Player.normalizeBotMemoryV2SupervisorSpendingHistory(supervisor?.spendingHistory),
+      planetarySpendingHistory: Player.normalizeBotMemoryV2SupervisorBudgetSpendingHistory(
+        supervisor?.planetarySpendingHistory,
+        'PLANETARY'
+      ),
+      imperiumSpendingHistory: Player.normalizeBotMemoryV2SupervisorBudgetSpendingHistory(
+        supervisor?.imperiumSpendingHistory,
+        'IMPERIUM'
+      ),
       proposalHistory: Player.normalizeBotMemoryV2SupervisorProposalHistory(supervisor?.proposalHistory),
       fleetSlotHistory: Player.normalizeBotMemoryV2SupervisorFleetSlotHistory(supervisor?.fleetSlotHistory),
       fuelSpendingHistory: Player.normalizeBotMemoryV2SupervisorFuelSpendingHistory(supervisor?.fuelSpendingHistory)
@@ -1542,6 +1597,11 @@ export class Player {
           targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
           requestedResources: Player.normalizeBotMemoryResources(entry?.requestedResources),
           weightedResourceValue: Player.normalizeBotMemoryV2AverageValue(entry?.weightedResourceValue),
+          budgetScope: Player.normalizeBotMemoryV2ProposalBudgetScope(entry?.budgetScope),
+          budgetPlanetKey: Player.normalizeBotMemoryV2String(entry?.budgetPlanetKey, 120),
+          budgetIntentSubsystemId: Player.isBotV2SubsystemId(entry?.budgetIntentSubsystemId)
+            ? entry.budgetIntentSubsystemId
+            : entry.subsystemId,
           score: Player.normalizeBotMemoryV2AverageValue(entry?.score),
           status: entry.status,
           createdTurn: Math.max(0, entry.createdTurn),
@@ -1584,11 +1644,55 @@ export class Player {
           kind: entry.kind,
           targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
           resources: Player.normalizeBotMemoryResources(entry?.resources),
-          weightedResourceValue: Player.normalizeBotMemoryV2AverageValue(entry?.weightedResourceValue)
+          weightedResourceValue: Player.normalizeBotMemoryV2AverageValue(entry?.weightedResourceValue),
+          budgetScope: Player.normalizeBotMemoryV2ProposalBudgetScope(entry?.budgetScope),
+          budgetPlanetKey: Player.normalizeBotMemoryV2String(entry?.budgetPlanetKey, 120),
+          budgetIntentSubsystemId: Player.isBotV2SubsystemId(entry?.budgetIntentSubsystemId)
+            ? entry.budgetIntentSubsystemId
+            : entry.subsystemId
         };
       })
       .filter((entry): entry is BotMemoryV2SupervisorSpendingEntry => entry !== null)
       .slice(-200);
+  }
+
+  private static normalizeBotMemoryV2SupervisorBudgetSpendingHistory(
+    entries: BotMemoryV2SupervisorBudgetSpendingEntry[] | null | undefined,
+    expectedLane: BotMemoryV2BudgetLane
+  ): BotMemoryV2SupervisorBudgetSpendingEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const proposalId = Player.normalizeBotMemoryV2String(entry?.proposalId, 200);
+        const dedupeKey = Player.normalizeBotMemoryV2String(entry?.dedupeKey, 200);
+        if (
+          !proposalId
+          || !dedupeKey
+          || !Player.isBotV2SubsystemId(entry?.subsystemId)
+          || !Player.isBotMemoryV2ProposalKind(entry?.kind)
+          || !Number.isInteger(entry?.turn)
+        ) {
+          return null;
+        }
+
+        return {
+          turn: Math.max(0, entry.turn),
+          proposalId,
+          dedupeKey,
+          subsystemId: entry.subsystemId,
+          kind: entry.kind,
+          targetCoordinates: Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates),
+          planetKey: Player.normalizeBotMemoryV2String(entry?.planetKey, 120),
+          lane: expectedLane,
+          resources: Player.normalizeBotMemoryResources(entry?.resources),
+          weightedResourceValue: Player.normalizeBotMemoryV2AverageValue(entry?.weightedResourceValue)
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorBudgetSpendingEntry => entry !== null)
+      .slice(-300);
   }
 
   private static normalizeBotMemoryV2SupervisorProposalHistory(
@@ -1730,6 +1834,32 @@ export class Player {
         return focus;
       default:
         return null;
+    }
+  }
+
+  private static normalizeBotMemoryV2BudgetScope(
+    scope: BotMemoryV2BudgetScope | null | undefined
+  ): BotMemoryV2BudgetScope {
+    switch (scope) {
+      case 'PLANETARY_DOMINANT':
+      case 'HYBRID':
+      case 'IMPERIUM_ONLY':
+        return scope;
+      default:
+        return 'PLANETARY_ONLY';
+    }
+  }
+
+  private static normalizeBotMemoryV2ProposalBudgetScope(
+    scope: BotMemoryV2ProposalBudgetScope | null | undefined
+  ): BotMemoryV2ProposalBudgetScope {
+    switch (scope) {
+      case 'IMPERIUM':
+      case 'BOTH':
+      case 'NONE':
+        return scope;
+      default:
+        return 'PLANETARY';
     }
   }
 

@@ -46,6 +46,237 @@ This document is a working engineering spec, not a final behavior design for all
 - score tuning
 - behavior parity with the removed V1 bot
 
+## Budgeting Contract Draft
+
+This is the implementation-facing contract for the next Weight Manager / Supervisor budgeting upgrade. It is not fully implemented yet.
+
+### Budget Lanes
+
+Supervisor budgeting should split resource spending into two lanes:
+
+- `PLANETARY`: per-planet budgeting for local growth and local safety.
+- `IMPERIUM`: empire-wide budgeting for mature/developed planets, research, strategic production, farming, colonization, diplomacy, and large coordinated upgrades.
+
+The current single `supervisor.spendingHistory` is too flat for this model. The future memory shape should track both:
+
+```ts
+planetarySpendingHistory: Array<{
+  turn: number;
+  planetKey: string;
+  subsystemId: BotV2SubsystemId;
+  weightedResourceValue: number;
+}>;
+
+imperiumSpendingHistory: Array<{
+  turn: number;
+  subsystemId: BotV2SubsystemId;
+  weightedResourceValue: number;
+}>;
+```
+
+Pending commitments should receive the same budget attribution as accepted spending, because accepted but waiting work still reserves budget intent.
+
+### Planet Stage Flags
+
+Weight Manager should establish these canonical planet flags from `avgIndustry`:
+
+- `maturePlanet`: `avgIndustry >= 3.6`
+- `developingPlanet`: `maturePlanet && (avgIndustry + 1.2) < highestAvgIndustry`
+- `developedPlanet`: `maturePlanet && (avgIndustry + 1.2) >= highestAvgIndustry`
+- `hubPlanet`: planet with the current highest `avgIndustry`
+- `oldPlanet`: `avgIndustry >= 6.8`
+
+The thresholds are tuning constants and can be adjusted after longer benchmark and human-log data.
+
+### Budget Scope By Stage
+
+Each planet should get a derived budget scope:
+
+```ts
+type BotBudgetScope =
+  | 'PLANETARY_ONLY'
+  | 'PLANETARY_DOMINANT'
+  | 'HYBRID'
+  | 'IMPERIUM_ONLY';
+```
+
+Recommended mapping:
+
+- `!maturePlanet`: `PLANETARY_ONLY`
+- `!maturePlanet && hubPlanet`: still mostly planetary, but allowed to support early research, small military buildup, and farm-break staging
+- `developingPlanet`: `PLANETARY_DOMINANT`
+- `developedPlanet`: `HYBRID`
+- `maturePlanet && hubPlanet`: `HYBRID`, with extra importance for research starts, main shipyard pressure, and farm-break force buildup
+- `oldPlanet`: `IMPERIUM_ONLY`
+
+### Stage Behavior
+
+`!maturePlanet`:
+- Focused only on economic growth unless directly blocked or threatened.
+- Should not be treated as a normal empire contributor.
+
+`!maturePlanet && hubPlanet`:
+- Usually the early homeworld.
+- Focused mostly on economic and research growth.
+- May build a small military force and gather fleet for breaking neutral farms.
+
+`developingPlanet`:
+- Mostly local Economic.
+- Can occasionally export surplus resources.
+- Should not be treated as a full imperium contributor.
+- Should still perform small military and defence buildup.
+
+`developedPlanet`:
+- Participates in normal empire-wide budgeting.
+- Can execute normal local growth, military, defence, logistics, and strategic plans.
+
+`maturePlanet && hubPlanet`:
+- Main place for military ship production.
+- Main place for starting technology research.
+- Important staging/source planet for farm breaking.
+
+`oldPlanet`:
+- No longer judged mainly by local growth.
+- Participates mostly in imperium budget and large concentrated upgrades.
+- Performs normal military and defence buildup.
+- Further growth often requires transporting resources from multiple planets.
+- Old planets should grow mostly evenly relative to other old planets by `avgIndustry`.
+
+### Proposal Budget Attribution
+
+`BotProposal` should gain budget attribution metadata before Supervisor can enforce this cleanly:
+
+```ts
+type BotProposalBudgetAttribution = {
+  scope: 'PLANETARY' | 'IMPERIUM' | 'BOTH' | 'NONE';
+  planetKey: string | null;
+  intentSubsystemId: BotV2SubsystemId;
+  executorSubsystemId: BotV2SubsystemId;
+};
+```
+
+`executorSubsystemId` is the existing `proposal.subsystemId`.
+
+`intentSubsystemId` is the subsystem whose budget should pay for the work. This is important because some subsystems create demand while another subsystem emits the executable proposal.
+
+`BOTH` spending is split by the Weight Manager planet scope:
+
+- `PLANETARY_ONLY`: `100% PLANETARY`
+- `PLANETARY_DOMINANT`: `75% PLANETARY / 25% IMPERIUM`
+- `HYBRID`: `50% PLANETARY / 50% IMPERIUM`
+- `IMPERIUM_ONLY`: `100% IMPERIUM`
+
+Examples:
+
+- Mine upgrade on immature planet:
+  - `scope = PLANETARY`
+  - `intentSubsystemId = ECONOMIC`
+
+- Local defence on threatened developing planet:
+  - `scope = PLANETARY`
+  - `intentSubsystemId = DEFENSIVE`
+
+- Research started from mature hub:
+  - `scope = IMPERIUM`
+  - `intentSubsystemId = RESEARCH`
+
+- Cruiser built because Strategic Military needs farm-break force:
+  - `scope = IMPERIUM`
+  - `executorSubsystemId = WARFARE`
+  - `intentSubsystemId = STRATEGIC_MILITARY`
+
+- Transporter built for Strategic Development logistics:
+  - `scope = IMPERIUM`
+  - `executorSubsystemId = WARFARE` or `STRATEGIC_DEVELOPMENT`, depending on the proposal source
+  - `intentSubsystemId = STRATEGIC_DEVELOPMENT`
+
+- Defence built as part of normal local hardening on an old planet:
+  - `scope = IMPERIUM`
+  - `intentSubsystemId = DEFENSIVE`
+
+### Supervisor Budget Windows
+
+The primary candidate window is:
+
+```ts
+clamp(5 + Fibonacci(floor(avgIndustry * 1.5)) + floor(avgIndustry * 4), 10, 100)
+```
+
+The simple comparison candidate is:
+
+```ts
+clamp(10 + floor(avgIndustry * 5), 10, 100)
+```
+
+Both should remain visible in analysis reports until enough benchmark data exists to choose one.
+
+### Current Global Modes
+
+Current global modes remain useful, but they should modify budget pressure instead of replacing planet-stage logic:
+
+- `economicRecoveryMode`: emergency/recovery pressure, not normal immature growth.
+- `warEmergencyMode`: increases Defence/Warfare pressure, but immature planets still avoid normal full war spending unless directly threatened.
+- `expansionMode`: increases colonization, logistics, farm-breaking, and strategic military pressure.
+- `diplomaticCautionMode`: mostly affects Strategic Diplomatic and should not steal local growth budget from immature/developing planets.
+- `normalSituationMode`: default behavior.
+
+### Farm Counters
+
+Current neutral-farm counters should feed imperium budgeting:
+
+- `actionable`: Strategic Military needs attention on at least one farm.
+- `breakNeed`: imperium should fund combat force for farm breaking.
+- `raidReady`: imperium should fund repeat attack/farming missions and cargo capacity.
+
+Strategic Military may not spend resources directly, so farm-break ship production must be able to charge its budget to `STRATEGIC_MILITARY` even when the executable shipyard proposal comes from `WARFARE`.
+
+### Implementation Order
+
+1. Add Weight Manager planet flags and budget scope output.
+2. Add budget attribution fields to `BotProposal`.
+3. Add Supervisor memory fields for planetary and imperium spending history.
+4. Teach Supervisor scoring to read budget attribution while keeping current scoring as fallback.
+5. Move accepted spending and active pending commitments into the correct budget lane.
+6. Add tests proving over-budget local spending cannot starve under-budget imperium priorities, and over-budget imperium spending cannot starve immature planet growth.
+7. Only after this, retune profile weights.
+
+### Phase 2 Budget Arbitration Decisions
+
+Phase 2 should turn budget attribution and history into active Supervisor arbitration.
+
+Locked decisions:
+
+- Budget drift thresholds:
+  - `UNDER_BUDGET`: current share is at least `10%` below target share.
+  - `OVER_BUDGET`: current share is at least `10%` above target share.
+  - `SEVERELY_OVER_BUDGET`: current share is at least `20%` above target share.
+- Trickle rule:
+  - Allow an over-budget proposal only when no under-budget viable proposal competes for the same constrained resource/slot.
+  - Do not add arbitrary timed trickle yet.
+- Viable under-budget proposal:
+  - Must be affordable/executable now.
+- Budget window source:
+  - Planetary budget uses the proposal target planet `avgIndustry`.
+  - Imperium budget uses mature/developed empire average.
+- Over-budget proposal outcome:
+  - Reject with reason `budget_overrun`.
+
+Resource accumulation requirement:
+
+- The budget gate must not prevent legitimate resource accumulation for costly investments across several turns.
+- Pending commitments and accepted reservations are allowed when they are still within budget and represent a coherent investment path.
+- Rejected over-budget proposals should not become pending automatically, because pending over-budget work would still reserve budget and worsen starvation.
+- A large investment can accumulate resources through normal pending/commitment flow only while its budget intent remains not over-budget, or when no viable under-budget competitor exists for the same constraint.
+
+Recommended Phase 2 implementation steps:
+
+1. Add `bot-supervisor-budgeting.ts` with budget window formulas, budget state calculation, attribution split helpers, and budget status helpers.
+2. Refactor scoring/history code to use the shared budgeting helper.
+3. Add budget debug fields to scored proposals.
+4. Add a Supervisor arbitration gate before normal queue/fleet acceptance.
+5. Add tests for `budget_overrun`, `CRITICAL` bypass, pending commitment budget pressure, `BOTH` splits, and resource accumulation not being blocked while still within budget.
+6. Verify with focused Supervisor tests, deterministic 30-turn smoke, then a 170-turn benchmark.
+
 ## Proposed location
 
 V2 lives beside the old monolithic runner instead of being merged into it.

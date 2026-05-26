@@ -16,9 +16,14 @@ import * as technologyTypeModule from '../../../../src/app/models/enums/technolo
 import {
   calculateWeightedResourceValue,
   pruneSupervisorHistory,
+  resolveProposalBudgetAttribution,
   resolveTargetShares,
   scoreSupervisorProposal
 } from './bot-supervisor-scoring.js';
+import {
+  resolveProposalBudgetState,
+  type ProposalBudgetState
+} from './bot-supervisor-budgeting.js';
 import { normalizeFleetExecutionProposal } from '../execution/bot-fleet-execution-adapters.js';
 import { normalizeQueueExecutionProposal } from '../execution/bot-execution-adapters.js';
 import { normalizeRequestDecisionProposal } from '../execution/bot-request-decision-adapters.js';
@@ -61,6 +66,7 @@ type ScoredProposal = {
   score: number;
   adapterReason: string | null;
   retryCommitment: boolean;
+  budgetState: ProposalBudgetState;
 };
 
 export class BotSupervisorV2 implements BotSupervisor {
@@ -154,6 +160,7 @@ export class BotSupervisorV2 implements BotSupervisor {
     const fleetSlotCaps = resolveFleetSlotCaps(scored, maxFleetExecutions, memory);
     const fleetSlotsBySubsystem = new Map<string, number>();
     const criticalAccepted = scored.some((entry) => entry.proposal.subsystemId === 'CRITICAL');
+    let budgetOverrunRejectedCount = 0;
 
     for (const entry of scored) {
       if (entry.score <= 0) {
@@ -210,6 +217,26 @@ export class BotSupervisorV2 implements BotSupervisor {
           continue;
         }
 
+        if (isBlockedByBudgetOverrun({
+          entry,
+          scored,
+          snapshot,
+          memory,
+          turn: snapshot.turn,
+          usedPlanetBuildSlots,
+          usedPlanetShipyardSlots,
+          researchAccepted,
+          reservedFleetShipsByOrigin,
+          reservedFleetCargoByOrigin,
+          reservedFleetFuelByOrigin,
+          reservedQueueResourcesByPlanet,
+          reservedColonizeDeuteriumByOrigin
+        })) {
+          rejected.push({ proposalId: entry.proposal.proposalId, reason: 'budget_overrun' });
+          budgetOverrunRejectedCount += 1;
+          continue;
+        }
+
         if (fleetDecision.accepted) {
           accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
           reserveFleetResources(
@@ -222,10 +249,10 @@ export class BotSupervisorV2 implements BotSupervisor {
         } else {
           pending.push({ ...entry.proposal, status: 'ACCEPTED' });
           if (fleetDecision.pendingStatus === 'PENDING_RESOURCES') {
-            upsertPendingCommitment(memory, entry, snapshot.turn);
+            upsertPendingCommitment(memory, entry, snapshot, snapshot.turn);
             reservePendingColonizeDeuterium(entry.proposal, reservedColonizeDeuteriumByOrigin);
           } else {
-            upsertPendingFleetCommitment(memory, entry, snapshot.turn);
+            upsertPendingFleetCommitment(memory, entry, snapshot, snapshot.turn);
           }
         }
         acceptedFleetCount += 1;
@@ -248,12 +275,32 @@ export class BotSupervisorV2 implements BotSupervisor {
         continue;
       }
 
+      if (isBlockedByBudgetOverrun({
+        entry,
+        scored,
+        snapshot,
+        memory,
+        turn: snapshot.turn,
+        usedPlanetBuildSlots,
+        usedPlanetShipyardSlots,
+        researchAccepted,
+        reservedFleetShipsByOrigin,
+        reservedFleetCargoByOrigin,
+        reservedFleetFuelByOrigin,
+        reservedQueueResourcesByPlanet,
+        reservedColonizeDeuteriumByOrigin
+      })) {
+        rejected.push({ proposalId: entry.proposal.proposalId, reason: 'budget_overrun' });
+        budgetOverrunRejectedCount += 1;
+        continue;
+      }
+
       if (queueDecision.accepted) {
         accepted.push({ ...entry.proposal, status: 'ACCEPTED' });
         reserveQueueResources(entry.proposal, queueDecision.planetKey, reservedQueueResourcesByPlanet);
       } else {
         pending.push({ ...entry.proposal, status: 'ACCEPTED' });
-        upsertPendingCommitment(memory, entry, snapshot.turn);
+        upsertPendingCommitment(memory, entry, snapshot, snapshot.turn);
       }
 
       if (queueDecision.kind === 'RESEARCH') {
@@ -280,6 +327,7 @@ export class BotSupervisorV2 implements BotSupervisor {
         rejectedCount: rejected.length,
         acceptedFleetCount,
         expiredCommitmentCount: expiredCommitments,
+        budgetOverrunRejectedCount,
         criticalAccepted
       }
     };
@@ -299,7 +347,8 @@ export class BotSupervisorV2 implements BotSupervisor {
         proposal,
         score: 0,
         adapterReason: 'proposal_blocked',
-        retryCommitment
+        retryCommitment,
+        budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
       };
     }
 
@@ -312,7 +361,13 @@ export class BotSupervisorV2 implements BotSupervisor {
         ) {
           console.warn(`[BotV2 Supervisor] Invalid fleet proposal ${proposal.proposalId}: ${normalized.reason}`);
         }
-        return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
+        return {
+          proposal,
+          score: 0,
+          adapterReason: normalized.reason,
+          retryCommitment,
+          budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
+        };
       }
       const score = scoreSupervisorProposal({
         proposal,
@@ -325,18 +380,31 @@ export class BotSupervisorV2 implements BotSupervisor {
         proposal,
         score,
         adapterReason: null,
-        retryCommitment
+        retryCommitment,
+        budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
       };
     }
     if (proposal.kind === 'MAINTENANCE_REQUEST') {
       // TODO: Extract request command policy before enabling Supervisor request handling.
-      return { proposal, score: 0, adapterReason: 'request_handling_phase4_deferred', retryCommitment };
+      return {
+        proposal,
+        score: 0,
+        adapterReason: 'request_handling_phase4_deferred',
+        retryCommitment,
+        budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
+      };
     }
     if (proposal.kind === 'REQUEST_DECISION') {
       const normalized = normalizeRequestDecisionProposal(proposal);
       if (!normalized.ok) {
         console.warn(`[BotV2 Supervisor] Invalid request decision proposal ${proposal.proposalId}: ${normalized.reason}`);
-        return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
+        return {
+          proposal,
+          score: 0,
+          adapterReason: normalized.reason,
+          retryCommitment,
+          budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
+        };
       }
       const score = scoreSupervisorProposal({
         proposal,
@@ -349,14 +417,21 @@ export class BotSupervisorV2 implements BotSupervisor {
         proposal,
         score: score + 10000,
         adapterReason: null,
-        retryCommitment
+        retryCommitment,
+        budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
       };
     }
     if (proposal.kind === 'REQUEST_CREATION') {
       const normalized = normalizeRequestCreationProposal(proposal);
       if (!normalized.ok) {
         console.warn(`[BotV2 Supervisor] Invalid request creation proposal ${proposal.proposalId}: ${normalized.reason}`);
-        return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
+        return {
+          proposal,
+          score: 0,
+          adapterReason: normalized.reason,
+          retryCommitment,
+          budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
+        };
       }
       const score = scoreSupervisorProposal({
         proposal,
@@ -369,14 +444,21 @@ export class BotSupervisorV2 implements BotSupervisor {
         proposal,
         score,
         adapterReason: null,
-        retryCommitment
+        retryCommitment,
+        budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
       };
     }
     if (proposal.kind === 'DIPLOMACY_DECISION') {
       const normalized = normalizeDiplomacyDecisionProposal(proposal);
       if (!normalized.ok) {
         console.warn(`[BotV2 Supervisor] Invalid diplomacy decision proposal ${proposal.proposalId}: ${normalized.reason}`);
-        return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
+        return {
+          proposal,
+          score: 0,
+          adapterReason: normalized.reason,
+          retryCommitment,
+          budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
+        };
       }
       const expiringBoost = proposal.expiresOnTurn !== null && proposal.expiresOnTurn <= snapshot.turn + 1
         ? 10000
@@ -392,14 +474,21 @@ export class BotSupervisorV2 implements BotSupervisor {
         proposal,
         score: score + expiringBoost,
         adapterReason: null,
-        retryCommitment
+        retryCommitment,
+        budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
       };
     }
     if (proposal.kind === 'DIPLOMACY_PROPOSAL') {
       const normalized = normalizeDiplomacyProposal(proposal);
       if (!normalized.ok) {
         console.warn(`[BotV2 Supervisor] Invalid diplomacy proposal ${proposal.proposalId}: ${normalized.reason}`);
-        return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
+        return {
+          proposal,
+          score: 0,
+          adapterReason: normalized.reason,
+          retryCommitment,
+          budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
+        };
       }
       const score = scoreSupervisorProposal({
         proposal,
@@ -412,11 +501,18 @@ export class BotSupervisorV2 implements BotSupervisor {
         proposal,
         score,
         adapterReason: null,
-        retryCommitment
+        retryCommitment,
+        budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
       };
     }
     if (!QUEUE_ACTION_KINDS.has(proposal.kind)) {
-      return { proposal, score: 0, adapterReason: 'unsupported_execution_kind', retryCommitment };
+      return {
+        proposal,
+        score: 0,
+        adapterReason: 'unsupported_execution_kind',
+        retryCommitment,
+        budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
+      };
     }
 
     const normalized = normalizeQueueExecutionProposal(proposal);
@@ -424,7 +520,13 @@ export class BotSupervisorV2 implements BotSupervisor {
       if (normalized.reason !== 'ship_need_pressure_only') {
         console.warn(`[BotV2 Supervisor] Invalid queue proposal ${proposal.proposalId}: ${normalized.reason}`);
       }
-      return { proposal, score: 0, adapterReason: normalized.reason, retryCommitment };
+      return {
+        proposal,
+        score: 0,
+        adapterReason: normalized.reason,
+        retryCommitment,
+        budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
+      };
     }
 
     const pressure = proposal.kind === 'SHIPYARD'
@@ -453,7 +555,8 @@ export class BotSupervisorV2 implements BotSupervisor {
       proposal,
       score,
       adapterReason: null,
-      retryCommitment
+      retryCommitment,
+      budgetState: resolveProposalBudgetState({ proposal, snapshot, memory })
     };
   }
 
@@ -470,6 +573,142 @@ export class BotSupervisorV2 implements BotSupervisor {
       }
     };
   }
+}
+
+function isBlockedByBudgetOverrun(input: {
+  entry: ScoredProposal;
+  scored: ScoredProposal[];
+  snapshot: BotWorldSnapshot;
+  memory: BotMemoryV2;
+  turn: number;
+  usedPlanetBuildSlots: Set<string>;
+  usedPlanetShipyardSlots: Set<string>;
+  researchAccepted: boolean;
+  reservedFleetShipsByOrigin: Map<string, Map<ShipType, { undamaged: number; damaged: number }>>;
+  reservedFleetCargoByOrigin: Map<string, { metal: number; crystal: number; deuterium: number }>;
+  reservedFleetFuelByOrigin: Map<string, number>;
+  reservedQueueResourcesByPlanet: Map<string, { metal: number; crystal: number; deuterium: number }>;
+  reservedColonizeDeuteriumByOrigin: Map<string, number>;
+}): boolean {
+  if (input.entry.proposal.subsystemId === 'CRITICAL' || !isOverBudget(input.entry.budgetState)) {
+    return false;
+  }
+
+  const currentConstraintKey = resolveBudgetConstraintKey(input.entry.proposal);
+  if (!currentConstraintKey) {
+    return false;
+  }
+
+  return input.scored.some((candidate) => {
+    if (
+      candidate.proposal.proposalId === input.entry.proposal.proposalId
+      || candidate.score <= 0
+      || candidate.proposal.subsystemId === 'CRITICAL'
+      || !isUnderBudget(candidate.budgetState)
+      || resolveBudgetConstraintKey(candidate.proposal) !== currentConstraintKey
+    ) {
+      return false;
+    }
+
+    return isViableNow({
+      entry: candidate,
+      snapshot: input.snapshot,
+      memory: input.memory,
+      turn: input.turn,
+      usedPlanetBuildSlots: input.usedPlanetBuildSlots,
+      usedPlanetShipyardSlots: input.usedPlanetShipyardSlots,
+      researchAccepted: input.researchAccepted,
+      reservedFleetShipsByOrigin: input.reservedFleetShipsByOrigin,
+      reservedFleetCargoByOrigin: input.reservedFleetCargoByOrigin,
+      reservedFleetFuelByOrigin: input.reservedFleetFuelByOrigin,
+      reservedQueueResourcesByPlanet: input.reservedQueueResourcesByPlanet,
+      reservedColonizeDeuteriumByOrigin: input.reservedColonizeDeuteriumByOrigin
+    });
+  });
+}
+
+function isOverBudget(budgetState: ProposalBudgetState): boolean {
+  return budgetState.lanes.some((lane) =>
+    lane.status === 'OVER_BUDGET' || lane.status === 'SEVERELY_OVER_BUDGET'
+  );
+}
+
+function isUnderBudget(budgetState: ProposalBudgetState): boolean {
+  return budgetState.lanes.some((lane) => lane.status === 'UNDER_BUDGET');
+}
+
+function isViableNow(input: {
+  entry: ScoredProposal;
+  snapshot: BotWorldSnapshot;
+  memory: BotMemoryV2;
+  turn: number;
+  usedPlanetBuildSlots: Set<string>;
+  usedPlanetShipyardSlots: Set<string>;
+  researchAccepted: boolean;
+  reservedFleetShipsByOrigin: Map<string, Map<ShipType, { undamaged: number; damaged: number }>>;
+  reservedFleetCargoByOrigin: Map<string, { metal: number; crystal: number; deuterium: number }>;
+  reservedFleetFuelByOrigin: Map<string, number>;
+  reservedQueueResourcesByPlanet: Map<string, { metal: number; crystal: number; deuterium: number }>;
+  reservedColonizeDeuteriumByOrigin: Map<string, number>;
+}): boolean {
+  if (QUEUE_ACTION_KINDS.has(input.entry.proposal.kind)) {
+    const decision = evaluateQueueProposal(
+      input.snapshot,
+      input.memory,
+      input.entry,
+      input.usedPlanetBuildSlots,
+      input.usedPlanetShipyardSlots,
+      input.researchAccepted,
+      input.reservedQueueResourcesByPlanet,
+      input.reservedColonizeDeuteriumByOrigin
+    );
+    return decision.ok && decision.accepted;
+  }
+
+  if (FLEET_ACTION_KINDS.has(input.entry.proposal.kind)) {
+    if (input.entry.retryCommitment) {
+      return false;
+    }
+    const decision = evaluateFleetProposal(
+      input.snapshot,
+      input.memory,
+      input.entry,
+      input.turn,
+      input.reservedFleetShipsByOrigin,
+      input.reservedFleetCargoByOrigin,
+      input.reservedFleetFuelByOrigin,
+      input.reservedQueueResourcesByPlanet,
+      input.reservedColonizeDeuteriumByOrigin
+    );
+    return decision.ok && decision.accepted;
+  }
+
+  return false;
+}
+
+function resolveBudgetConstraintKey(proposal: BotProposal): string | null {
+  if (QUEUE_ACTION_KINDS.has(proposal.kind)) {
+    const normalized = normalizeQueueExecutionProposal(proposal);
+    const coordinates = readQueueProposalCoordinates(proposal);
+    if (!normalized.ok || !coordinates) {
+      return null;
+    }
+    const planetKey = toCoordinatesKey(coordinates);
+    if (normalized.value.kind === 'RESEARCH') {
+      return 'QUEUE:RESEARCH';
+    }
+    if (normalized.value.kind === 'SHIPYARD') {
+      return `QUEUE:SHIPYARD:${planetKey}`;
+    }
+    return `QUEUE:BUILD:${planetKey}`;
+  }
+
+  if (FLEET_ACTION_KINDS.has(proposal.kind)) {
+    const origin = readFleetOriginCoordinates(proposal);
+    return origin ? `FLEET:${toCoordinatesKey(origin)}` : null;
+  }
+
+  return null;
 }
 
 function precheckQueue(
@@ -826,6 +1065,12 @@ function buildPendingRetryProposals(memory: BotMemoryV2, turn: number): BotPropo
       risk: 0,
       confidence: 100,
       requestedResources: { ...commitment.requestedResources },
+      budgetAttribution: {
+        scope: commitment.budgetScope,
+        planetKey: commitment.budgetPlanetKey,
+        intentSubsystemId: commitment.budgetIntentSubsystemId,
+        executorSubsystemId: commitment.subsystemId
+      },
       requestPayload: { ...commitment.executionPayload },
       blockers: [],
       expiresOnTurn: commitment.expiresOnTurn,
@@ -849,11 +1094,17 @@ function expirePendingCommitments(memory: BotMemoryV2, turn: number): number {
   return expired;
 }
 
-function upsertPendingCommitment(memory: BotMemoryV2, entry: ScoredProposal, turn: number): void {
+function upsertPendingCommitment(
+  memory: BotMemoryV2,
+  entry: ScoredProposal,
+  snapshot: BotWorldSnapshot,
+  turn: number
+): void {
   const existingIndex = memory.supervisor.pendingCommitments.findIndex((commitment) =>
     isActivePendingCommitment(commitment.status)
     && commitment.dedupeKey === entry.proposal.dedupeKey
   );
+  const budgetAttribution = resolveProposalBudgetAttribution(entry.proposal, snapshot, memory);
   const commitment = {
     commitmentKey: `${entry.proposal.subsystemId}:${entry.proposal.kind}:${entry.proposal.dedupeKey}`,
     dedupeKey: entry.proposal.dedupeKey,
@@ -863,6 +1114,9 @@ function upsertPendingCommitment(memory: BotMemoryV2, entry: ScoredProposal, tur
     targetCoordinates: entry.proposal.targetCoordinates,
     requestedResources: { ...entry.proposal.requestedResources },
     weightedResourceValue: calculateWeightedResourceValue(entry.proposal.requestedResources),
+    budgetScope: budgetAttribution.scope,
+    budgetPlanetKey: budgetAttribution.planetKey,
+    budgetIntentSubsystemId: budgetAttribution.intentSubsystemId,
     score: entry.score,
     status: 'PENDING_RESOURCES' as const,
     createdTurn: existingIndex >= 0
@@ -881,11 +1135,17 @@ function upsertPendingCommitment(memory: BotMemoryV2, entry: ScoredProposal, tur
   }
 }
 
-function upsertPendingFleetCommitment(memory: BotMemoryV2, entry: ScoredProposal, turn: number): void {
+function upsertPendingFleetCommitment(
+  memory: BotMemoryV2,
+  entry: ScoredProposal,
+  snapshot: BotWorldSnapshot,
+  turn: number
+): void {
   const existingIndex = memory.supervisor.pendingCommitments.findIndex((commitment) =>
     isActivePendingCommitment(commitment.status)
     && commitment.dedupeKey === entry.proposal.dedupeKey
   );
+  const budgetAttribution = resolveProposalBudgetAttribution(entry.proposal, snapshot, memory);
   const commitment = {
     commitmentKey: `${entry.proposal.subsystemId}:${entry.proposal.kind}:${entry.proposal.dedupeKey}`,
     dedupeKey: entry.proposal.dedupeKey,
@@ -895,6 +1155,9 @@ function upsertPendingFleetCommitment(memory: BotMemoryV2, entry: ScoredProposal
     targetCoordinates: entry.proposal.targetCoordinates,
     requestedResources: { ...entry.proposal.requestedResources },
     weightedResourceValue: calculateWeightedResourceValue(entry.proposal.requestedResources),
+    budgetScope: budgetAttribution.scope,
+    budgetPlanetKey: budgetAttribution.planetKey,
+    budgetIntentSubsystemId: budgetAttribution.intentSubsystemId,
     score: entry.score,
     status: 'PENDING_SHIPS_NEXT_TURN' as const,
     createdTurn: existingIndex >= 0

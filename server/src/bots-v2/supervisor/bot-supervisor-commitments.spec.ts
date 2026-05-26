@@ -51,6 +51,51 @@ describe('bot supervisor commitments', () => {
     expect(decision.accepted[0]?.kind).toBe('BUILDING');
   });
 
+  it('rejects an over-budget local proposal when an under-budget same-slot proposal is viable now', () => {
+    const memory = createDefaultBotMemoryV2();
+    memory.weightManager.planets = [createWeightManagerPlanet({
+      economicWeight: 0,
+      defensiveWeight: 80,
+      warfareWeight: 20,
+      budgetScope: 'PLANETARY_ONLY'
+    })];
+    memory.supervisor.planetarySpendingHistory.push({
+      turn: 1,
+      proposalId: 'old-warfare',
+      dedupeKey: 'old-warfare',
+      subsystemId: 'WARFARE',
+      kind: 'SHIPYARD',
+      targetCoordinates: { x: 0, y: 0, z: 1 },
+      planetKey: '0:0:1',
+      lane: 'PLANETARY',
+      resources: { metal: 1000, crystal: 0, deuterium: 0 },
+      weightedResourceValue: 1000
+    });
+
+    const warfare = createShipyardProposal('warfare', 'WARFARE', ShipType.FIGHTER);
+    const defensive = createShipyardProposal('defensive', 'DEFENSIVE', ShipType.SPY_PROBE);
+    const boostedWarfare = {
+      ...warfare,
+      expectedValue: 1000,
+      requestedResources: { metal: 100, crystal: 0, deuterium: 0 }
+    };
+
+    const decision = createSupervisor().decide(
+      createSnapshot(
+        { metal: 1000, crystal: 1000, deuterium: 1000 },
+        { shipyardLevel: 10, defaultTechLevel: 10 }
+      ),
+      memory,
+      [boostedWarfare, defensive]
+    );
+
+    expect(decision.accepted.map((proposal) => proposal.proposalId)).toEqual(['defensive']);
+    expect(decision.rejected.find((entry) => entry.proposalId === 'warfare')).toMatchObject({
+      reason: 'budget_overrun'
+    });
+    expect(decision.debug.budgetOverrunRejectedCount).toBe(1);
+  });
+
   it('does not oversubscribe same-turn local queue resources on one planet', () => {
     const memory = createDefaultBotMemoryV2();
     const decision = createSupervisor().decide(
@@ -84,6 +129,9 @@ describe('bot supervisor commitments', () => {
       targetCoordinates: { x: 0, y: 0, z: 1 },
       requestedResources: { metal: 100, crystal: 0, deuterium: 0 },
       weightedResourceValue: 100,
+      budgetScope: 'PLANETARY',
+      budgetPlanetKey: '0:0:1',
+      budgetIntentSubsystemId: 'ECONOMIC',
       score: 100,
       status: 'PENDING_RESOURCES',
       createdTurn: 1,
@@ -199,6 +247,9 @@ describe('bot supervisor commitments', () => {
       targetCoordinates: { x: 1, y: 0, z: 1 },
       requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
       weightedResourceValue: 0,
+      budgetScope: 'IMPERIUM',
+      budgetPlanetKey: '0:0:1',
+      budgetIntentSubsystemId: 'STRATEGIC_DEVELOPMENT',
       score: 500,
       status: 'PENDING_RESOURCES',
       createdTurn: 1,
@@ -352,6 +403,9 @@ describe('bot supervisor commitments', () => {
       targetCoordinates: { x: 0, y: 0, z: 1 },
       requestedResources: { metal: 100, crystal: 0, deuterium: 0 },
       weightedResourceValue: 100,
+      budgetScope: 'PLANETARY',
+      budgetPlanetKey: '0:0:1',
+      budgetIntentSubsystemId: 'ECONOMIC',
       score: 100,
       status: 'PENDING_RESOURCES',
       createdTurn: 1,
@@ -368,6 +422,9 @@ describe('bot supervisor commitments', () => {
       targetCoordinates: { x: 0, y: 0, z: 1 },
       requestedResources: { metal: 100, crystal: 0, deuterium: 0 },
       weightedResourceValue: 100,
+      budgetScope: 'PLANETARY',
+      budgetPlanetKey: '0:0:1',
+      budgetIntentSubsystemId: 'ECONOMIC',
       score: 100,
       status: 'PENDING_RESOURCES',
       createdTurn: 1,
@@ -401,6 +458,9 @@ describe('bot supervisor commitments', () => {
       targetCoordinates: { x: 0, y: 0, z: 1 },
       requestedResources: { metal: 100, crystal: 0, deuterium: 0 },
       weightedResourceValue: 100,
+      budgetScope: 'PLANETARY',
+      budgetPlanetKey: '0:0:1',
+      budgetIntentSubsystemId: 'ECONOMIC',
       score: 1000,
       status: 'EXPIRED',
       createdTurn: 1,
@@ -561,6 +621,39 @@ function createRequestDecisionProposal(): BotProposal {
     blockers: [],
     expiresOnTurn: null,
     debug: {}
+  };
+}
+
+function createWeightManagerPlanet(overrides: Partial<ReturnType<typeof createDefaultBotMemoryV2>['weightManager']['planets'][number]> = {}): ReturnType<typeof createDefaultBotMemoryV2>['weightManager']['planets'][number] {
+  return {
+    coordinates: { x: 0, y: 0, z: 1 },
+    economicWeight: 50,
+    defensiveWeight: 30,
+    warfareWeight: 20,
+    avgIndustry: 4,
+    avgMilitary: 0,
+    avgDefence: 0,
+    avgDevelopment: 0,
+    selectedFocus: null,
+    immaturePlanet: false,
+    maturePlanet: true,
+    developingPlanet: false,
+    developedPlanet: true,
+    hubPlanet: true,
+    oldPlanet: false,
+    budgetScope: 'HYBRID',
+    industryFocused: false,
+    defenceFocused: false,
+    militaryFocused: false,
+    developmentFocused: false,
+    industryHubPlanet: true,
+    damagedPlanet: false,
+    inDangerPlanet: false,
+    constantlyAttackedPlanet: false,
+    veryHeavilyAttackedPlanet: false,
+    knownByWarFaction: false,
+    recentHostileAttackCountLast20Turns: 0,
+    ...overrides
   };
 }
 

@@ -1,5 +1,4 @@
 import type {
-  BotPlanetSnapshot,
   BotProposal,
   BotWorldSnapshot
 } from '../bot-v2-types.ts';
@@ -8,18 +7,18 @@ import type {
   BotMemoryV2SupervisorSpendingEntry,
   BotV2SubsystemId
 } from '../../../../src/app/models/player.ts';
+import {
+  LOCAL_SUBSYSTEMS,
+  NORMAL_WEIGHTED_SUBSYSTEMS,
+  resolveMatchingPlanet,
+  resolveProposalBudgetState,
+  resolveStrategicProposalWeight
+} from './bot-supervisor-budgeting.js';
 
-const NORMAL_WEIGHTED_SUBSYSTEMS: BotV2SubsystemId[] = [
-  'ECONOMIC',
-  'DEFENSIVE',
-  'WARFARE',
-  'RESEARCH',
-  'STRATEGIC_DEVELOPMENT',
-  'STRATEGIC_MILITARY',
-  'STRATEGIC_DIPLOMATIC'
-];
-
-const LOCAL_SUBSYSTEMS = new Set<BotV2SubsystemId>(['ECONOMIC', 'DEFENSIVE', 'WARFARE']);
+export {
+  resolveProposalBudgetAttribution,
+  resolveTargetShares
+} from './bot-supervisor-budgeting.js';
 
 export function calculateWeightedResourceValue(resources: {
   metal: number;
@@ -52,7 +51,7 @@ export function scoreSupervisorProposal(input: {
   const weightMultiplier = weight <= 0 ? 0 : Math.max(0.25, weight / 50);
   const alignmentMultiplier = input.criticalAccepted
     ? 1
-    : resolveResourceAlignmentMultiplier(input.proposal.subsystemId, input.snapshot.turn, input.memory);
+    : resolveResourceAlignmentMultiplier(input.proposal, input.snapshot, input.memory);
   const shipNeedMultiplier = input.shipNeedPressure > 0
     ? 1 + Math.min(0.5, input.shipNeedPressure / 100)
     : 1;
@@ -65,12 +64,13 @@ export function resolveProposalWeight(
   snapshot: BotWorldSnapshot,
   memory: BotMemoryV2
 ): number {
-  if (!NORMAL_WEIGHTED_SUBSYSTEMS.includes(proposal.subsystemId)) {
+  const weightedSubsystemId = proposal.budgetAttribution?.intentSubsystemId ?? proposal.subsystemId;
+  if (!NORMAL_WEIGHTED_SUBSYSTEMS.includes(weightedSubsystemId)) {
     return 0;
   }
 
-  if (LOCAL_SUBSYSTEMS.has(proposal.subsystemId)) {
-    const planet = findMatchingPlanet(snapshot, proposal);
+  if (LOCAL_SUBSYSTEMS.has(weightedSubsystemId)) {
+    const planet = resolveMatchingPlanet(snapshot, proposal);
     const weightEntry = planet
       ? memory.weightManager.planets.find((entry) =>
         entry.coordinates.x === planet.coordinates.x
@@ -82,7 +82,7 @@ export function resolveProposalWeight(
       return 50;
     }
 
-    switch (proposal.subsystemId) {
+    switch (weightedSubsystemId) {
       case 'ECONOMIC':
         return weightEntry.economicWeight;
       case 'DEFENSIVE':
@@ -94,63 +94,24 @@ export function resolveProposalWeight(
     }
   }
 
-  return resolveStrategicProposalWeight(proposal.subsystemId, memory);
-}
-
-export function resolveStrategicProposalWeight(
-  subsystemId: BotV2SubsystemId,
-  memory: BotMemoryV2
-): number {
-  switch (subsystemId) {
-    case 'RESEARCH':
-      return memory.weightManager.researchWeight || 50;
-    case 'STRATEGIC_DEVELOPMENT':
-      return memory.weightManager.strategicDevelopmentWeight || 50;
-    case 'STRATEGIC_MILITARY':
-      return memory.weightManager.strategicMilitaryWeight || 50;
-    case 'STRATEGIC_DIPLOMATIC':
-      return memory.weightManager.strategicDiplomaticWeight || 50;
-    default:
-      return 50;
-  }
-}
-
-export function resolveTargetShares(weights: Partial<Record<BotV2SubsystemId, number>>): Partial<Record<BotV2SubsystemId, number>> {
-  const active = NORMAL_WEIGHTED_SUBSYSTEMS.map((subsystemId) => ({
-    subsystemId,
-    weight: Math.max(0, weights[subsystemId] ?? 50)
-  }));
-  const total = active.reduce((sum, entry) => sum + entry.weight, 0) || active.length;
-  const result: Partial<Record<BotV2SubsystemId, number>> = {};
-  for (const entry of active) {
-    result[entry.subsystemId] = entry.weight / total;
-  }
-  return result;
+  return resolveStrategicProposalWeight(weightedSubsystemId, memory);
 }
 
 function resolveResourceAlignmentMultiplier(
-  subsystemId: BotV2SubsystemId,
-  turn: number,
+  proposal: BotProposal,
+  snapshot: BotWorldSnapshot,
   memory: BotMemoryV2
 ): number {
-  if (!NORMAL_WEIGHTED_SUBSYSTEMS.includes(subsystemId)) {
+  const budgetState = resolveProposalBudgetState({ proposal, snapshot, memory });
+  if (budgetState.lanes.length === 0) {
     return 1;
   }
 
-  const weights = resolveMemoryWeights(memory);
-  const shares = resolveTargetShares(weights);
-  const targetShare = shares[subsystemId] ?? (1 / NORMAL_WEIGHTED_SUBSYSTEMS.length);
-  const spending = memory.supervisor.spendingHistory
-    .filter((entry) => turn - entry.turn <= 40);
-  const total = spending.reduce((sum, entry) => sum + entry.weightedResourceValue, 0);
-  if (total <= 0) {
-    return 1;
-  }
+  return budgetState.lanes.reduce((sum, lane) => sum + resolveLaneAlignmentMultiplier(lane.drift), 0)
+    / budgetState.lanes.length;
+}
 
-  const currentShare = spending
-    .filter((entry) => entry.subsystemId === subsystemId)
-    .reduce((sum, entry) => sum + entry.weightedResourceValue, 0) / total;
-  const drift = targetShare - currentShare;
+function resolveLaneAlignmentMultiplier(drift: number): number {
   if (drift > 0) {
     return 1 + Math.min(0.25, Math.floor((drift * 100) / 10) * 0.05);
   }
@@ -158,63 +119,17 @@ function resolveResourceAlignmentMultiplier(
   return 1 - Math.min(0.4, Math.floor((Math.abs(drift) * 100) / 10) * 0.05);
 }
 
-function resolveMemoryWeights(memory: BotMemoryV2): Partial<Record<BotV2SubsystemId, number>> {
-  return {
-    ECONOMIC: averageLocalWeight(memory, 'economicWeight'),
-    DEFENSIVE: averageLocalWeight(memory, 'defensiveWeight'),
-    WARFARE: averageLocalWeight(memory, 'warfareWeight'),
-    RESEARCH: memory.weightManager.researchWeight || 50,
-    STRATEGIC_DEVELOPMENT: memory.weightManager.strategicDevelopmentWeight || 50,
-    STRATEGIC_MILITARY: memory.weightManager.strategicMilitaryWeight || 50,
-    STRATEGIC_DIPLOMATIC: memory.weightManager.strategicDiplomaticWeight || 50
-  };
-}
-
-function averageLocalWeight(
-  memory: BotMemoryV2,
-  key: 'economicWeight' | 'defensiveWeight' | 'warfareWeight'
-): number {
-  if (memory.weightManager.planets.length === 0) {
-    return 50;
-  }
-
-  return memory.weightManager.planets.reduce((sum, planet) => sum + planet[key], 0)
-    / memory.weightManager.planets.length;
-}
-
-function findMatchingPlanet(snapshot: BotWorldSnapshot, proposal: BotProposal): BotPlanetSnapshot | null {
-  const target = proposal.targetCoordinates ?? readPayloadCoordinates(proposal.requestPayload);
-  if (!target) {
-    return null;
-  }
-
-  return snapshot.planets.find((planet) =>
-    planet.coordinates.x === target.x
-    && planet.coordinates.y === target.y
-    && planet.coordinates.z === target.z
-  ) ?? null;
-}
-
-function readPayloadCoordinates(payload: Record<string, unknown>): { x: number; y: number; z: number } | null {
-  const source = payload.targetCoordinates && typeof payload.targetCoordinates === 'object'
-    ? payload.targetCoordinates as Record<string, unknown>
-    : payload;
-  const x = Number(source.x);
-  const y = Number(source.y);
-  const z = Number(source.z);
-  if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(z)) {
-    return null;
-  }
-  return { x, y, z };
-}
-
 export function pruneSupervisorHistory(memory: BotMemoryV2, turn: number): void {
   memory.supervisor.spendingHistory = memory.supervisor.spendingHistory
     .filter((entry: BotMemoryV2SupervisorSpendingEntry) => turn - entry.turn <= 40);
+  memory.supervisor.planetarySpendingHistory = memory.supervisor.planetarySpendingHistory
+    .filter((entry) => turn - entry.turn <= 100);
+  memory.supervisor.imperiumSpendingHistory = memory.supervisor.imperiumSpendingHistory
+    .filter((entry) => turn - entry.turn <= 100);
   memory.supervisor.fuelSpendingHistory = memory.supervisor.fuelSpendingHistory
     .filter((entry) => turn - entry.turn <= 40);
   memory.supervisor.proposalHistory = memory.supervisor.proposalHistory
     .filter((entry) => turn - entry.turn <= 40);
   memory.supervisor.pendingCommitments = memory.supervisor.pendingCommitments
-    .filter((entry) => turn - entry.updatedTurn <= 40);
+    .filter((entry) => turn - entry.updatedTurn <= 100);
 }

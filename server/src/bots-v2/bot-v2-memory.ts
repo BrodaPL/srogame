@@ -65,6 +65,8 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
     supervisor: {
       pendingCommitments: [],
       spendingHistory: [],
+      planetarySpendingHistory: [],
+      imperiumSpendingHistory: [],
       proposalHistory: [],
       fleetSlotHistory: [],
       fuelSpendingHistory: []

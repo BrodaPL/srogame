@@ -6,6 +6,7 @@ import type { BotProposal, BotWorldSnapshot } from '../bot-v2-types.ts';
 import {
   calculateRawProposalScore,
   calculateWeightedResourceValue,
+  resolveProposalBudgetAttribution,
   resolveTargetShares,
   scoreSupervisorProposal
 } from './bot-supervisor-scoring.js';
@@ -96,6 +97,11 @@ describe('bot supervisor scoring', () => {
       selectedFocus: null,
       immaturePlanet: true,
       maturePlanet: false,
+      developingPlanet: false,
+      developedPlanet: false,
+      hubPlanet: true,
+      oldPlanet: false,
+      budgetScope: 'PLANETARY_ONLY',
       industryFocused: true,
       defenceFocused: false,
       militaryFocused: false,
@@ -124,6 +130,106 @@ describe('bot supervisor scoring', () => {
     });
 
     expect(warfare).toBe(0);
+  });
+
+  it('can charge a Warfare shipyard proposal to Strategic Military budget intent', () => {
+    const memory = createDefaultBotMemoryV2();
+    memory.weightManager.strategicMilitaryWeight = 90;
+    memory.weightManager.planets = [{
+      coordinates: { x: 0, y: 0, z: 1 },
+      economicWeight: 80,
+      defensiveWeight: 20,
+      warfareWeight: 0,
+      avgIndustry: 5,
+      avgMilitary: 0,
+      avgDefence: 0,
+      avgDevelopment: 0,
+      selectedFocus: null,
+      immaturePlanet: false,
+      maturePlanet: true,
+      developingPlanet: false,
+      developedPlanet: true,
+      hubPlanet: true,
+      oldPlanet: false,
+      budgetScope: 'HYBRID',
+      industryFocused: false,
+      defenceFocused: false,
+      militaryFocused: false,
+      developmentFocused: false,
+      industryHubPlanet: true,
+      damagedPlanet: false,
+      inDangerPlanet: false,
+      constantlyAttackedPlanet: false,
+      veryHeavilyAttackedPlanet: false,
+      knownByWarFaction: false,
+      recentHostileAttackCountLast20Turns: 0
+    }];
+
+    const score = scoreSupervisorProposal({
+      proposal: createProposal({
+        subsystemId: 'WARFARE',
+        kind: 'SHIPYARD',
+        budgetAttribution: {
+          scope: 'IMPERIUM',
+          planetKey: '0:0:1',
+          intentSubsystemId: 'STRATEGIC_MILITARY',
+          executorSubsystemId: 'WARFARE'
+        },
+        requestPayload: { x: 0, y: 0, z: 1, itemKind: 'ship', shipType: ShipType.CRUISER, amount: 1 }
+      }),
+      snapshot: createSnapshot([{ coordinates: { x: 0, y: 0, z: 1 } }]),
+      memory,
+      shipNeedPressure: 0,
+      criticalAccepted: false
+    });
+
+    expect(score).toBeGreaterThan(0);
+  });
+
+  it('derives BOTH budget attribution for local proposals on hybrid planets', () => {
+    const memory = createDefaultBotMemoryV2();
+    memory.weightManager.planets = [{
+      coordinates: { x: 0, y: 0, z: 1 },
+      economicWeight: 50,
+      defensiveWeight: 30,
+      warfareWeight: 20,
+      avgIndustry: 4,
+      avgMilitary: 0,
+      avgDefence: 0,
+      avgDevelopment: 0,
+      selectedFocus: null,
+      immaturePlanet: false,
+      maturePlanet: true,
+      developingPlanet: false,
+      developedPlanet: true,
+      hubPlanet: true,
+      oldPlanet: false,
+      budgetScope: 'HYBRID',
+      industryFocused: false,
+      defenceFocused: false,
+      militaryFocused: false,
+      developmentFocused: false,
+      industryHubPlanet: true,
+      damagedPlanet: false,
+      inDangerPlanet: false,
+      constantlyAttackedPlanet: false,
+      veryHeavilyAttackedPlanet: false,
+      knownByWarFaction: false,
+      recentHostileAttackCountLast20Turns: 0
+    }];
+
+    const attribution = resolveProposalBudgetAttribution(
+      createProposal({ subsystemId: 'ECONOMIC' }),
+      createSnapshot([{ coordinates: { x: 0, y: 0, z: 1 } }]),
+      memory
+    );
+
+    expect(attribution).toMatchObject({
+      scope: 'BOTH',
+      planetKey: '0:0:1',
+      intentSubsystemId: 'ECONOMIC',
+      executorSubsystemId: 'ECONOMIC'
+    });
   });
 });
 

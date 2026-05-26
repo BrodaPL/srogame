@@ -36,6 +36,13 @@ export type BotProposalStatus =
   | 'EXPIRED'
   | 'BLOCKED';
 
+export type BotProposalBudgetAttribution = {
+  scope: 'PLANETARY' | 'IMPERIUM' | 'BOTH' | 'NONE';
+  planetKey: string | null;
+  intentSubsystemId: BotV2SubsystemId;
+  executorSubsystemId: BotV2SubsystemId;
+};
+
 export type BotV2FeatureFlags = {
   mode: 'DISABLED' | 'SHADOW' | 'LIVE';
   enabledSubsystems: {
@@ -490,6 +497,7 @@ export type BotProposal = {
     crystal: number;
     deuterium: number;
   };
+  budgetAttribution?: BotProposalBudgetAttribution;
   requestPayload: Record<string, unknown>;
   blockers: string[];
   expiresOnTurn: number | null;

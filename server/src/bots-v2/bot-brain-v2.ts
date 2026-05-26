@@ -10,6 +10,7 @@ import type {
   BotDecisionTraceV2,
   BotExecutionOutcome,
   BotProposal,
+  BotProposalBudgetAttribution,
   BotSubsystem,
   BotV2FeatureFlags
 } from './bot-v2-types.ts';
@@ -26,6 +27,7 @@ import { BotStrategicMilitarySubsystem } from './subsystems/strategic-military/b
 import { BotWarfareSubsystem } from './subsystems/warfare/bot-warfare-subsystem.js';
 import { BotWeightManagerSubsystem } from './subsystems/weight-manager/bot-weight-manager-subsystem.js';
 import { BotSupervisorV2 } from './supervisor/bot-supervisor.js';
+import { resolveProposalBudgetAttribution } from './supervisor/bot-supervisor-scoring.js';
 import { resolveModule } from '../esm-module.js';
 
 const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-status.js');
@@ -82,7 +84,7 @@ export class BotBrainV2 {
       ? new LiveQueueBotExecutor(galaxy, player.playerId)
       : new NoopBotExecutor();
     const executionOutcomes = executor.executeAcceptedTasks(supervisorDecision.accepted);
-    recordExecutedSpending(memory, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);
+    recordExecutedSpending(memory, snapshot, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);
     applyRecycleHostilitySideEffects(galaxy, player, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);
     const trace: BotDecisionTraceV2 = {
       playerId: player.playerId,
@@ -190,6 +192,7 @@ function buildEnabledSubsystems(flags: BotV2FeatureFlags): BotSubsystem[] {
 
 function recordExecutedSpending(
   memory: ReturnType<typeof ensureBotMemoryV2>,
+  snapshot: ReturnType<typeof buildBotWorldSnapshot>,
   accepted: BotProposal[],
   outcomes: BotExecutionOutcome[],
   turn: number
@@ -224,16 +227,22 @@ function recordExecutedSpending(
       continue;
     }
 
+    const budgetAttribution = resolveProposalBudgetAttribution(proposal, snapshot, memory);
+    const weightedResourceValue = outcome.spent.metal + (outcome.spent.crystal * 1.8) + (outcome.spent.deuterium * 2.6);
     memory.supervisor.spendingHistory.push({
       turn,
       proposalId: proposal.proposalId,
       dedupeKey: proposal.dedupeKey,
-      subsystemId: proposal.subsystemId,
+      subsystemId: budgetAttribution.intentSubsystemId,
       kind: proposal.kind,
       targetCoordinates: proposal.targetCoordinates,
       resources: { ...outcome.spent },
-      weightedResourceValue: outcome.spent.metal + (outcome.spent.crystal * 1.8) + (outcome.spent.deuterium * 2.6)
+      weightedResourceValue,
+      budgetScope: budgetAttribution.scope,
+      budgetPlanetKey: budgetAttribution.planetKey,
+      budgetIntentSubsystemId: budgetAttribution.intentSubsystemId
     });
+    appendBudgetSpendingEntries(memory, proposal, budgetAttribution, outcome.spent, weightedResourceValue, turn);
     if (proposal.kind === 'FLEET_MISSION' && outcome.fleetSlotsUsed && outcome.missionType) {
       memory.supervisor.fleetSlotHistory.push({
         missionKey: `${proposal.subsystemId}:${outcome.missionType}:${proposal.dedupeKey}`,
@@ -271,6 +280,104 @@ function isSupportRequestType(value: string | undefined): value is SupportReques
     || value === 'ATTACK_TARGET'
     || value === 'BOMBARD_TARGET'
     || value === 'SIEGE_TARGET';
+}
+
+function appendBudgetSpendingEntries(
+  memory: ReturnType<typeof ensureBotMemoryV2>,
+  proposal: BotProposal,
+  budgetAttribution: BotProposalBudgetAttribution,
+  resources: { metal: number; crystal: number; deuterium: number },
+  weightedResourceValue: number,
+  turn: number
+): void {
+  if (budgetAttribution.scope === 'NONE') {
+    return;
+  }
+
+  const planetaryShare = resolvePlanetaryBudgetShare(budgetAttribution, memory);
+  const imperiumShare = 1 - planetaryShare;
+  if (planetaryShare > 0) {
+    memory.supervisor.planetarySpendingHistory.push({
+      turn,
+      proposalId: proposal.proposalId,
+      dedupeKey: proposal.dedupeKey,
+      subsystemId: budgetAttribution.intentSubsystemId,
+      kind: proposal.kind,
+      targetCoordinates: proposal.targetCoordinates,
+      planetKey: budgetAttribution.planetKey,
+      lane: 'PLANETARY',
+      resources: multiplyResources(resources, planetaryShare),
+      weightedResourceValue: roundToTwoDecimals(weightedResourceValue * planetaryShare)
+    });
+  }
+  if (imperiumShare > 0) {
+    memory.supervisor.imperiumSpendingHistory.push({
+      turn,
+      proposalId: proposal.proposalId,
+      dedupeKey: proposal.dedupeKey,
+      subsystemId: budgetAttribution.intentSubsystemId,
+      kind: proposal.kind,
+      targetCoordinates: proposal.targetCoordinates,
+      planetKey: budgetAttribution.planetKey,
+      lane: 'IMPERIUM',
+      resources: multiplyResources(resources, imperiumShare),
+      weightedResourceValue: roundToTwoDecimals(weightedResourceValue * imperiumShare)
+    });
+  }
+}
+
+function resolvePlanetaryBudgetShare(
+  budgetAttribution: BotProposalBudgetAttribution,
+  memory: ReturnType<typeof ensureBotMemoryV2>
+): number {
+  switch (budgetAttribution.scope) {
+    case 'PLANETARY':
+      return 1;
+    case 'IMPERIUM':
+      return 0;
+    case 'BOTH':
+      return resolveBothBudgetPlanetaryShare(budgetAttribution, memory);
+    default:
+      return 0;
+  }
+}
+
+function resolveBothBudgetPlanetaryShare(
+  budgetAttribution: BotProposalBudgetAttribution,
+  memory: ReturnType<typeof ensureBotMemoryV2>
+): number {
+  if (!budgetAttribution.planetKey) {
+    return 0.5;
+  }
+  const planet = memory.weightManager.planets.find((entry) =>
+    `${entry.coordinates.x}:${entry.coordinates.y}:${entry.coordinates.z}` === budgetAttribution.planetKey
+  );
+  switch (planet?.budgetScope) {
+    case 'PLANETARY_ONLY':
+      return 1;
+    case 'PLANETARY_DOMINANT':
+      return 0.75;
+    case 'IMPERIUM_ONLY':
+      return 0;
+    case 'HYBRID':
+    default:
+      return 0.5;
+  }
+}
+
+function multiplyResources(
+  resources: { metal: number; crystal: number; deuterium: number },
+  multiplier: number
+): { metal: number; crystal: number; deuterium: number } {
+  return {
+    metal: Math.round(resources.metal * multiplier),
+    crystal: Math.round(resources.crystal * multiplier),
+    deuterium: Math.round(resources.deuterium * multiplier)
+  };
+}
+
+function roundToTwoDecimals(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function applyRecycleHostilitySideEffects(

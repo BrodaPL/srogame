@@ -1,5 +1,6 @@
 import type {
   BotMemoryV2,
+  BotMemoryV2BudgetScope,
   BotMemoryV2WeightManagerMode,
   BotMemoryV2WeightManagerPlanetEntry,
   BotMemoryV2WeightManagerPlanetFocus,
@@ -50,6 +51,9 @@ type WeightProfile = {
 
 const PERSONALITY_VARIANCE_RETENTION = 0.8;
 const DEFENSIVE_WEIGHT_RETENTION = 0.68;
+const MATURE_AVG_INDUSTRY_THRESHOLD = 3.6;
+const DEVELOPED_AVG_INDUSTRY_GAP = 1.2;
+const OLD_AVG_INDUSTRY_THRESHOLD = 6.8;
 
 type GlobalModeScores = {
   ECONOMIC_RECOVERY: number;
@@ -70,6 +74,11 @@ type PlanetFlags = {
   selectedFocus: BotMemoryV2WeightManagerPlanetFocus | null;
   immaturePlanet: boolean;
   maturePlanet: boolean;
+  developingPlanet: boolean;
+  developedPlanet: boolean;
+  hubPlanet: boolean;
+  oldPlanet: boolean;
+  budgetScope: BotMemoryV2BudgetScope;
   industryFocused: boolean;
   defenceFocused: boolean;
   militaryFocused: boolean;
@@ -215,6 +224,9 @@ export class BotWeightManagerSubsystem implements BotSubsystem {
         neutralStatusCount: statusCounts.NEUTRAL,
         warStatusCount: statusCounts.WAR,
         immaturePlanetCount: planetEntries.filter((planet) => planet.immaturePlanet).length,
+        developingPlanetCount: planetEntries.filter((planet) => planet.developingPlanet).length,
+        developedPlanetCount: planetEntries.filter((planet) => planet.developedPlanet).length,
+        oldPlanetCount: planetEntries.filter((planet) => planet.oldPlanet).length,
         damagedPlanetCount: planetEntries.filter((planet) => planet.damagedPlanet).length,
         inDangerPlanetCount: planetEntries.filter((planet) => planet.inDangerPlanet).length,
         constantlyAttackedPlanetCount: planetEntries.filter((planet) => planet.constantlyAttackedPlanet).length,
@@ -376,8 +388,17 @@ function buildPlanetFlags(
 ): PlanetFlags {
   const { planet } = entry;
   const localStage = resolveLocalDevelopmentStage(entry.avgIndustry);
-  const immaturePlanet = localStage === 'IMMATURE';
-  const maturePlanet = localStage !== 'IMMATURE';
+  const maturePlanet = entry.avgIndustry >= MATURE_AVG_INDUSTRY_THRESHOLD;
+  const immaturePlanet = !maturePlanet;
+  const hubPlanet = entry.avgIndustry >= highestAverages.industry;
+  const developingPlanet = maturePlanet && (entry.avgIndustry + DEVELOPED_AVG_INDUSTRY_GAP) < highestAverages.industry;
+  const developedPlanet = maturePlanet && !developingPlanet;
+  const oldPlanet = entry.avgIndustry >= OLD_AVG_INDUSTRY_THRESHOLD;
+  const budgetScope = resolveBudgetScope({
+    maturePlanet,
+    developingPlanet,
+    oldPlanet
+  });
   const knownByWarFaction = planet.defense.knownByWarFaction;
   const recentHostileAttackCountLast20Turns = planet.defense.recentHostileAttackCountLast20Turns;
   const damagedPlanet = resolveStructuralDamagePercent(planet) >= 25;
@@ -385,7 +406,7 @@ function buildPlanetFlags(
   const inDangerPlanet = poorDefences && knownByWarFaction;
   const constantlyAttackedPlanet = recentHostileAttackCountLast20Turns >= 3;
   const veryHeavilyAttackedPlanet = constantlyAttackedPlanet && damagedPlanet;
-  const industryHubPlanet = localStage === 'DEVELOPED' && entry.avgIndustry + 1.5 >= highestAverages.industry;
+  const industryHubPlanet = hubPlanet;
 
   const selectedFocus = resolveSelectedFocus(entry, highestAverages, localStage, atWar);
 
@@ -393,6 +414,11 @@ function buildPlanetFlags(
     selectedFocus,
     immaturePlanet,
     maturePlanet,
+    developingPlanet,
+    developedPlanet,
+    hubPlanet,
+    oldPlanet,
+    budgetScope,
     industryFocused: selectedFocus === 'INDUSTRY',
     defenceFocused: selectedFocus === 'DEFENCE',
     militaryFocused: selectedFocus === 'MILITARY',
@@ -405,6 +431,23 @@ function buildPlanetFlags(
     knownByWarFaction,
     recentHostileAttackCountLast20Turns
   };
+}
+
+function resolveBudgetScope(flags: {
+  maturePlanet: boolean;
+  developingPlanet: boolean;
+  oldPlanet: boolean;
+}): BotMemoryV2BudgetScope {
+  if (!flags.maturePlanet) {
+    return 'PLANETARY_ONLY';
+  }
+  if (flags.oldPlanet) {
+    return 'IMPERIUM_ONLY';
+  }
+  if (flags.developingPlanet) {
+    return 'PLANETARY_DOMINANT';
+  }
+  return 'HYBRID';
 }
 
 function resolveSelectedFocus(
@@ -625,6 +668,11 @@ function buildWeightManagerPlanetEntry(
     defensiveWeight -= 8;
     warfareWeight -= 35;
   }
+  if (flags.developingPlanet) {
+    economicWeight += 24;
+    warfareWeight = Math.max(warfareWeight, Math.round(profile.localWeights.warfare * 0.35));
+    defensiveWeight -= 2;
+  }
   if (localStage === 'MATURING') {
     economicWeight += 16;
     warfareWeight = Math.max(warfareWeight, Math.round(profile.localWeights.warfare * 0.5));
@@ -695,6 +743,17 @@ function buildWeightManagerPlanetEntry(
     if (!flags.inDangerPlanet) {
       defensiveWeight = Math.min(defensiveWeight, 35);
     }
+    if (flags.hubPlanet && !flags.inDangerPlanet) {
+      warfareWeight = Math.max(warfareWeight, 12);
+      defensiveWeight = Math.min(defensiveWeight, 30);
+    }
+  }
+  if (flags.developingPlanet) {
+    economicWeight = Math.max(economicWeight, 70);
+    if (!flags.inDangerPlanet) {
+      defensiveWeight = Math.min(defensiveWeight, 42);
+    }
+    warfareWeight = Math.max(warfareWeight, 10);
   }
   if (localStage === 'MATURING') {
     economicWeight = Math.max(economicWeight, 60);
@@ -727,6 +786,11 @@ function buildWeightManagerPlanetEntry(
     selectedFocus: flags.selectedFocus,
     immaturePlanet: flags.immaturePlanet,
     maturePlanet: flags.maturePlanet,
+    developingPlanet: flags.developingPlanet,
+    developedPlanet: flags.developedPlanet,
+    hubPlanet: flags.hubPlanet,
+    oldPlanet: flags.oldPlanet,
+    budgetScope: flags.budgetScope,
     industryFocused: flags.industryFocused,
     defenceFocused: flags.defenceFocused,
     militaryFocused: flags.militaryFocused,
@@ -746,6 +810,11 @@ function createDefaultPlanetFlags(planet: BotPlanetSnapshot): PlanetFlags {
     selectedFocus: null,
     immaturePlanet: false,
     maturePlanet: true,
+    developingPlanet: false,
+    developedPlanet: true,
+    hubPlanet: true,
+    oldPlanet: false,
+    budgetScope: 'HYBRID',
     industryFocused: false,
     defenceFocused: false,
     militaryFocused: false,
