@@ -15,6 +15,8 @@
     "bot:sim:initial": "npx tsx scripts/run-bot-v2-simulation.ts --scenario=initial",
     "bot:sim:advanced": "npx tsx scripts/run-bot-v2-simulation.ts --scenario=advanced",
     "bot:sim:baseline": "npx tsx scripts/run-bot-sim-baselines.ts",
+    "analyze:player-log": "npx tsx scripts/analyze-player-action-log.ts",
+    "analyze:bot-budget": "npx tsx scripts/analyze-bot-budget-benchmark.ts",
     "ships:descr": "node scripts/generate-ships-descr.ts",
     "defences:descr": "node scripts/generate-defences-descr.ts"
   },

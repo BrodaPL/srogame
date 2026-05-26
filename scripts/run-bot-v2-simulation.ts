@@ -324,7 +324,7 @@ async function main(): Promise<void> {
   clearBotDecisionTracesV2();
 
   const startedAt = new Date().toISOString();
-  const context = buildSimulationContext(scenario, options.saveId, seed);
+  const context = withSeededRandom(seed, () => buildSimulationContext(scenario, options.saveId, seed));
   const anomalies: SimulationAnomalyReport = {
     hardFailures: [],
     activityFailures: [],
