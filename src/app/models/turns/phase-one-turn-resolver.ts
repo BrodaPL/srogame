@@ -173,6 +173,41 @@ function snapshotResourcesPack(pack: ResourcesPack): ResourceSnapshot {
   };
 }
 
+function snapshotVisibleResourcesPack(pack: ResourcesPack): ResourcesPack {
+  return new ResourcesPack(
+    Math.max(0, Math.floor(pack.metal)),
+    Math.max(0, Math.floor(pack.crystal)),
+    Math.max(0, Math.floor(pack.deuterium))
+  );
+}
+
+function formatCurrentDebrisFieldLine(debris: ResourcesPack): string {
+  const visibleDebris = snapshotVisibleResourcesPack(debris);
+  return `Current debris field: Metal ${visibleDebris.metal}, Crystal ${visibleDebris.crystal}, Deuterium ${visibleDebris.deuterium}`;
+}
+
+function appendCurrentDebrisFieldToBattleReports(reports: SpaceBattleReports, debris: ResourcesPack): void {
+  const line = formatCurrentDebrisFieldLine(debris);
+  reports.attacker.body = appendBodyLine(reports.attacker.body, line);
+  reports.defender.body = appendBodyLine(reports.defender.body, line);
+}
+
+function appendBodyLine(body: string, line: string): string {
+  const trimmedBody = body.trimEnd();
+  return trimmedBody.length > 0 ? `${trimmedBody}\n${line}` : line;
+}
+
+function updateExistingEspionageDebrisData(planet: Planet): void {
+  if (planet.lastReportData.size <= 0) {
+    return;
+  }
+
+  const debris = snapshotVisibleResourcesPack(planet.rBDSFTQ.spaceDebris);
+  for (const report of planet.lastReportData.values()) {
+    report.spaceDebrisAmount = new ResourcesPack(debris.metal, debris.crystal, debris.deuterium);
+  }
+}
+
 function createFleetLaunchSummary(fleet: Fleet): string {
   return `${fleet.missionType} ${fleet.origin.x}:${fleet.origin.y}:${fleet.origin.z} -> ${fleet.target.x}:${fleet.target.y}:${fleet.target.z} (fleet ${fleet.fleetId})`;
 }
@@ -2648,6 +2683,8 @@ function resolvePlanetBattle(
   // TODO: Surface `spaceDebris` in the UI and add recycler/recovery gameplay once that layer is implemented.
   targetPlanet.rBDSFTQ.spaceDebris.addResourcePack(calculateBattleDebris(battleResult, fleet, overflowShips));
   targetPlanet.rBDSFTQ.resources.addResourcePack(calculateDefenceBattleRecovery(battleResult));
+  appendCurrentDebrisFieldToBattleReports(battleResult.reports, targetPlanet.rBDSFTQ.spaceDebris);
+  updateExistingEspionageDebrisData(targetPlanet);
 
   addBattleFleetReport(attacker, battleResult.reports.attacker);
   addBattleFleetReport(defender, battleResult.reports.defender);

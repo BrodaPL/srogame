@@ -73,6 +73,41 @@ const MISSION_PRIORITY: Record<FleetMissionType, number> = {
   [FleetMissionType.HOLD]: 16
 };
 
+function snapshotVisibleResourcesPack(pack: ResourcesPack): ResourcesPack {
+  return new ResourcesPack(
+    Math.max(0, Math.floor(pack.metal)),
+    Math.max(0, Math.floor(pack.crystal)),
+    Math.max(0, Math.floor(pack.deuterium))
+  );
+}
+
+function formatCurrentDebrisFieldLine(debris: ResourcesPack): string {
+  const visibleDebris = snapshotVisibleResourcesPack(debris);
+  return `Current debris field: Metal ${visibleDebris.metal}, Crystal ${visibleDebris.crystal}, Deuterium ${visibleDebris.deuterium}`;
+}
+
+function appendCurrentDebrisFieldToBattleReports(reports: SpaceBattleReports, debris: ResourcesPack): void {
+  const line = formatCurrentDebrisFieldLine(debris);
+  reports.attacker.body = appendBodyLine(reports.attacker.body, line);
+  reports.defender.body = appendBodyLine(reports.defender.body, line);
+}
+
+function appendBodyLine(body: string, line: string): string {
+  const trimmedBody = body.trimEnd();
+  return trimmedBody.length > 0 ? `${trimmedBody}\n${line}` : line;
+}
+
+function updateExistingEspionageDebrisData(planet: Planet): void {
+  if (planet.lastReportData.size <= 0) {
+    return;
+  }
+
+  const debris = snapshotVisibleResourcesPack(planet.rBDSFTQ.spaceDebris);
+  for (const report of planet.lastReportData.values()) {
+    report.spaceDebrisAmount = new ResourcesPack(debris.metal, debris.crystal, debris.deuterium);
+  }
+}
+
 export class EncounterResolver {
   constructor(
     private readonly diplomacyResolver = new DiplomacyResolver(),
@@ -450,6 +485,8 @@ export class EncounterResolver {
       this.calculateBattleDebris(battleResult, overflowShips, lostAttackerCargo)
     );
     targetPlanet.rBDSFTQ.resources.addResourcePack(this.calculateDefenceDebris(battleResult));
+    appendCurrentDebrisFieldToBattleReports(battleResult.reports, targetPlanet.rBDSFTQ.spaceDebris);
+    updateExistingEspionageDebrisData(targetPlanet);
 
     return {
       coalitionSurvivors,

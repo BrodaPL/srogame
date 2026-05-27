@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { EspionageReportGenerator } from '../../../generators/espionage-report-generator';
 import { BuildingBlueprintsFactory } from '../../../factories/building-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
 import { BuildingQueueEntry } from '../../buildings/building-queue-entry';
@@ -141,10 +142,25 @@ describe('resolvePhaseOneTurn battle integration', () => {
       solarSystem.planets[1].rBDSFTQ.ships = ManyShips.fromShipInstances([shipInstance(ShipType.SPY_PROBE)]);
       solarSystem.planets[3].info.ownerId = 2;
     });
+    const staleEspionageReport = new EspionageReportGenerator().createEspionageReport(
+      attacker,
+      defender,
+      system.planets[1],
+      1,
+      {
+        forcedReportLevel: 8,
+        reportId: attacker.createReportId(),
+        createdTurn: 1
+      }
+    );
+    staleEspionageReport.spaceDebrisAmount = new ResourcesPack(0, 0, 0);
+    system.planets[1].lastReportData.set(attacker.playerId, staleEspionageReport);
 
     resolvePhaseOneTurn(galaxy);
 
     const destroyedSpyProbeCost = blueprints.get(ShipType.SPY_PROBE)!.cost;
+    const currentDebris = system.planets[1].rBDSFTQ.spaceDebris;
+    const expectedDebrisLine = `Current debris field: Metal ${currentDebris.metal}, Crystal ${currentDebris.crystal}, Deuterium ${currentDebris.deuterium}`;
     expect(galaxy.activeFleets).toHaveLength(1);
     expect(galaxy.activeFleets[0].state).toBe(FleetState.MISSION_FAILURE_RETURNING);
     expect(ManyShips.countByType(galaxy.activeFleets[0].ships).get(ShipType.TITAN)).toBe(1);
@@ -161,9 +177,20 @@ describe('resolvePhaseOneTurn battle integration', () => {
       && report.show().includes('Enemy ship losses by type: Spy Probe x1')
     )).toBe(true);
     expect(attacker.reports.some((report) =>
+      report.title.startsWith('Battle Report:')
+      && report.show().includes(expectedDebrisLine)
+    )).toBe(true);
+    expect(attacker.reports.some((report) =>
       report.title.startsWith('Fleet Failed: Move')
     )).toBe(true);
-    expect(defender.reports.some((report) => report.title.startsWith('Battle Report:'))).toBe(true);
+    expect(defender.reports.some((report) =>
+      report.title.startsWith('Battle Report:')
+      && report.show().includes(expectedDebrisLine)
+    )).toBe(true);
+    const refreshedEspionageReport = system.planets[1].lastReportData.get(attacker.playerId);
+    expect(refreshedEspionageReport?.spaceDebrisAmount.metal).toBe(currentDebris.metal);
+    expect(refreshedEspionageReport?.spaceDebrisAmount.crystal).toBe(currentDebris.crystal);
+    expect(refreshedEspionageReport?.spaceDebrisAmount.deuterium).toBe(currentDebris.deuterium);
   });
 
   it('creates battle and fleet outcome reports for bots', () => {
