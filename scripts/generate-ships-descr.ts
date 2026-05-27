@@ -16,6 +16,7 @@ type ShipBlueprint = {
   hullClass: ShipHullClass;
   canJump: boolean;
   size: number;
+  evasionChance: number;
   criticalThreshold: number;
   shieldCapacity: number;
   armor: number;
@@ -45,21 +46,34 @@ type BucketDefinition = {
   ships: string[];
 };
 
+type HangarLoad = {
+  addedAlpha: number;
+  addedCost: number;
+  label: string;
+};
+
 type ShipMetrics = {
   ship: ShipBlueprint;
   buildCost: number;
   travelCost: number;
   operatingCost: number;
-  baseAlpha: number;
-  loadedAlpha: number;
+  normalShipFire: number;
+  railFire: number;
+  expectedBombardmentVsShips: number;
+  shipAlpha: number;
+  loadedShipAlpha: number;
   loadedCost: number;
+  antiDefenceAlpha: number;
+  nonRailEhpToCrit: number;
+  nonRailEhpToZero: number;
+  railEhpToCrit: number;
+  railEhpToZero: number;
+  criticalHull: number;
   hangarLoadLabel: string;
-  durability: number;
-  siege: number;
-  cargo: number;
-  hangar: number;
-  baseAlphaPerOperatingCost: number;
+  shipAlphaPerOperatingCost: number;
   loadedAlphaPerLoadedCost: number;
+  antiDefenceAlphaPerOperatingCost: number;
+  nonRailEhpPerOperatingCost: number;
   cargoPerOperatingCost: number;
 };
 
@@ -67,6 +81,8 @@ const projectRoot = process.cwd();
 const blueprintsDir = join(projectRoot, 'src', 'app', 'blueprints');
 const shipBlueprintPath = join(blueprintsDir, 'ship-blueprints.json');
 const shipsDescrPath = join(blueprintsDir, 'SHIPS_DESCR.md');
+
+const BOMBARDMENT_SHIP_HIT_CHANCE = 0.1;
 
 const bucketDefinitions: BucketDefinition[] = [
   {
@@ -94,69 +110,136 @@ const bucketDefinitions: BucketDefinition[] = [
 function sumWeaponDamage(weapons: ShipBlueprint['weapons'], type: ShipWeaponType): number {
   return weapons
     .filter((weapon) => weapon.type === type)
-    .reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
+    .reduce((sum, weapon) => sum + Math.max(0, weapon.dmg) * Math.max(0, Math.floor(weapon.shots)), 0);
 }
 
 function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0';
+  }
+
+  if (Math.abs(value) >= 100) {
+    return String(Math.round(value));
+  }
+
   if (Number.isInteger(value)) {
     return String(value);
   }
 
-  return value.toFixed(2).replace(/\.?0+$/, '');
+  return value.toFixed(3).replace(/\.?0+$/, '');
 }
 
-function calculateWeightedCost(ship: ShipBlueprint): number {
-  return ship.cost.metal + (ship.cost.crystal * 2) + (ship.cost.deuterium * 3);
+function calculateWeightedCost(cost: ShipBlueprint['cost']): number {
+  return cost.metal + cost.crystal * 2 + cost.deuterium * 3;
 }
 
-function calculateSpaceAlpha(ship: ShipBlueprint): number {
-  const beam = sumWeaponDamage(ship.weapons, 'BEAM');
-  const missile = sumWeaponDamage(ship.weapons, 'MISSILE');
-  const railGun = sumWeaponDamage(ship.weapons, 'RAIL_GUN');
-  const bombardment = sumWeaponDamage(ship.weapons, 'BOMBARDMENT_WEAPONS');
-
-  return beam + missile + (railGun * 1.4) + (bombardment * 0.33);
+function calculateTravelCost(ship: ShipBlueprint): number {
+  return ship.jumpCost * 3;
 }
 
-function calculateDurability(ship: ShipBlueprint): number {
-  const baseDurability = ship.hullPointsCapacity + (ship.shieldCapacity * 0.5);
-  const armorFactor = 1 + (ship.armor * 0.12);
-  const criticalFactor = 1 + ((50 - ship.criticalThreshold) * 0.01);
-  return baseDurability * armorFactor * criticalFactor;
+function calculateNormalShipFire(ship: ShipBlueprint): number {
+  return sumWeaponDamage(ship.weapons, 'BEAM')
+    + sumWeaponDamage(ship.weapons, 'MISSILE')
+    + sumWeaponDamage(ship.weapons, 'RAIL_GUN');
+}
+
+function calculateExpectedBombardmentVsShips(ship: ShipBlueprint): number {
+  return sumWeaponDamage(ship.weapons, 'BOMBARDMENT_WEAPONS') * BOMBARDMENT_SHIP_HIT_CHANCE;
+}
+
+function calculateShipAlpha(ship: ShipBlueprint): number {
+  return calculateNormalShipFire(ship) + calculateExpectedBombardmentVsShips(ship);
+}
+
+function calculateAntiDefenceAlpha(ship: ShipBlueprint): number {
+  return sumWeaponDamage(ship.weapons, 'BOMBARDMENT_WEAPONS');
+}
+
+function hitChance(ship: ShipBlueprint): number {
+  return Math.max(0.01, 1 - Math.max(0, Math.min(0.99, ship.evasionChance)));
+}
+
+function criticalHull(ship: ShipBlueprint): number {
+  return ship.hullPointsCapacity * (ship.criticalThreshold / 100);
+}
+
+function calculateNonRailEhpToCrit(ship: ShipBlueprint): number {
+  const protectedHull = Math.max(0, ship.hullPointsCapacity - criticalHull(ship));
+  return (ship.shieldCapacity + protectedHull * 2) / hitChance(ship);
+}
+
+function calculateNonRailEhpToZero(ship: ShipBlueprint): number {
+  return (ship.shieldCapacity + ship.hullPointsCapacity * 2) / hitChance(ship);
+}
+
+function calculateRailEhpToCrit(ship: ShipBlueprint): number {
+  return Math.max(0, ship.hullPointsCapacity - criticalHull(ship)) / hitChance(ship);
+}
+
+function calculateRailEhpToZero(ship: ShipBlueprint): number {
+  return ship.hullPointsCapacity / hitChance(ship);
 }
 
 function createHangarLoadCalculator(shipsByType: Map<string, ShipBlueprint>) {
-  const fighter = shipsByType.get('FIGHTER');
-  const assaultFighter = shipsByType.get('ASSAULT_FIGHTER');
+  const candidates = [...shipsByType.values()]
+    .filter((ship) =>
+      ship.hullClass === 'SMALL'
+      && ship.size > 0
+      && ship.purposes.includes('MILITARY')
+      && ship.hangarCapacity <= 0
+      && calculateShipAlpha(ship) > 0
+    )
+    .sort((left, right) => calculateShipAlpha(right) - calculateShipAlpha(left));
 
-  if (!fighter || !assaultFighter) {
-    throw new Error('Required fighter blueprints are missing.');
+  if (candidates.length <= 0) {
+    throw new Error('No small military ship candidates found for hangar packing.');
   }
 
-  const fighterAlpha = calculateSpaceAlpha(fighter);
-  const assaultAlpha = calculateSpaceAlpha(assaultFighter);
-  const fighterCost = calculateWeightedCost(fighter);
-  const assaultCost = calculateWeightedCost(assaultFighter);
-
   return {
-    fighter: {
-      alpha: fighterAlpha,
-      cost: fighterCost
-    },
-    assault: {
-      alpha: assaultAlpha,
-      cost: assaultCost,
-      size: assaultFighter.size
-    },
-    calculate(capacity: number): { addedAlpha: number; addedCost: number; label: string } {
-      const assaultCount = Math.floor(capacity / assaultFighter.size);
-      const remainingCapacity = capacity % assaultFighter.size;
-      const fighterCount = remainingCapacity;
+    candidates,
+    calculate(capacity: number): HangarLoad {
+      const normalizedCapacity = Math.max(0, Math.floor(capacity));
+      const best: Array<HangarLoad & { counts: Map<string, number> }> = Array.from(
+        { length: normalizedCapacity + 1 },
+        () => ({ addedAlpha: 0, addedCost: 0, label: '-', counts: new Map<string, number>() })
+      );
+
+      for (let size = 1; size <= normalizedCapacity; size += 1) {
+        for (const candidate of candidates) {
+          if (candidate.size > size) {
+            continue;
+          }
+
+          const previous = best[size - candidate.size];
+          const candidateAlpha = previous.addedAlpha + calculateShipAlpha(candidate);
+          const candidateCost = previous.addedCost + calculateWeightedCost(candidate.cost);
+          const current = best[size];
+          if (
+            candidateAlpha > current.addedAlpha
+            || (candidateAlpha === current.addedAlpha && candidateCost < current.addedCost)
+          ) {
+            const counts = new Map(previous.counts);
+            counts.set(candidate.type, (counts.get(candidate.type) ?? 0) + 1);
+            best[size] = {
+              addedAlpha: candidateAlpha,
+              addedCost: candidateCost,
+              label: '-',
+              counts
+            };
+          }
+        }
+      }
+
+      const load = best[normalizedCapacity];
+      const label = [...load.counts.entries()]
+        .sort((left, right) => left[0].localeCompare(right[0]))
+        .map(([type, amount]) => `${amount}x ${type}`)
+        .join(' + ');
 
       return {
-        addedAlpha: (assaultCount * assaultAlpha) + (fighterCount * fighterAlpha),
-        addedCost: (assaultCount * assaultCost) + (fighterCount * fighterCost),
-        label: fighterCount > 0 ? `${assaultCount}A+${fighterCount}F` : `${assaultCount}A`
+        addedAlpha: load.addedAlpha,
+        addedCost: load.addedCost,
+        label: label || '-'
       };
     }
   };
@@ -166,41 +249,120 @@ function calculateShipMetrics(
   ship: ShipBlueprint,
   hangarLoadCalculator: ReturnType<typeof createHangarLoadCalculator>
 ): ShipMetrics {
-  const buildCost = calculateWeightedCost(ship);
-  const travelCost = ship.jumpCost * 3;
+  const buildCost = calculateWeightedCost(ship.cost);
+  const travelCost = calculateTravelCost(ship);
   const operatingCost = buildCost + travelCost;
-  const baseAlpha = calculateSpaceAlpha(ship);
+  const shipAlpha = calculateShipAlpha(ship);
   const hangarLoad = hangarLoadCalculator.calculate(ship.hangarCapacity);
-  const durability = calculateDurability(ship);
-  const siege = sumWeaponDamage(ship.weapons, 'BOMBARDMENT_WEAPONS');
+  const loadedCost = operatingCost + hangarLoad.addedCost;
+  const loadedShipAlpha = shipAlpha + hangarLoad.addedAlpha;
+  const antiDefenceAlpha = calculateAntiDefenceAlpha(ship);
+  const nonRailEhpToZero = calculateNonRailEhpToZero(ship);
 
   return {
     ship,
     buildCost,
     travelCost,
     operatingCost,
-    baseAlpha,
-    loadedAlpha: baseAlpha + hangarLoad.addedAlpha,
-    loadedCost: operatingCost + hangarLoad.addedCost,
+    normalShipFire: calculateNormalShipFire(ship),
+    railFire: sumWeaponDamage(ship.weapons, 'RAIL_GUN'),
+    expectedBombardmentVsShips: calculateExpectedBombardmentVsShips(ship),
+    shipAlpha,
+    loadedShipAlpha,
+    loadedCost,
+    antiDefenceAlpha,
+    nonRailEhpToCrit: calculateNonRailEhpToCrit(ship),
+    nonRailEhpToZero,
+    railEhpToCrit: calculateRailEhpToCrit(ship),
+    railEhpToZero: calculateRailEhpToZero(ship),
+    criticalHull: criticalHull(ship),
     hangarLoadLabel: hangarLoad.label,
-    durability,
-    siege,
-    cargo: ship.cargoCapacity,
-    hangar: ship.hangarCapacity,
-    baseAlphaPerOperatingCost: operatingCost > 0 ? baseAlpha / operatingCost : 0,
-    loadedAlphaPerLoadedCost: (operatingCost + hangarLoad.addedCost) > 0
-      ? (baseAlpha + hangarLoad.addedAlpha) / (operatingCost + hangarLoad.addedCost)
-      : 0,
+    shipAlphaPerOperatingCost: operatingCost > 0 ? shipAlpha / operatingCost : 0,
+    loadedAlphaPerLoadedCost: loadedCost > 0 ? loadedShipAlpha / loadedCost : 0,
+    antiDefenceAlphaPerOperatingCost: operatingCost > 0 ? antiDefenceAlpha / operatingCost : 0,
+    nonRailEhpPerOperatingCost: operatingCost > 0 ? nonRailEhpToZero / operatingCost : 0,
     cargoPerOperatingCost: operatingCost > 0 ? ship.cargoCapacity / operatingCost : 0
   };
+}
+
+function median(values: number[]): number {
+  const sorted = values.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+  if (sorted.length <= 0) {
+    return 0;
+  }
+
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) {
+    return sorted[middle];
+  }
+
+  return (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function createBucketWatchlist(bucket: BucketDefinition, metricsByType: Map<string, ShipMetrics>): string[] {
+  const metrics = bucket.ships
+    .map((type) => metricsByType.get(type))
+    .filter((entry): entry is ShipMetrics => Boolean(entry));
+  const combatMetrics = metrics.filter((entry) => entry.shipAlpha > 0 || entry.antiDefenceAlpha > 0);
+  const shipAlphaMedian = median(combatMetrics.map((entry) => entry.shipAlphaPerOperatingCost));
+  const durabilityMedian = median(combatMetrics.map((entry) => entry.nonRailEhpPerOperatingCost));
+  const notes: string[] = [];
+
+  for (const entry of combatMetrics) {
+    if (shipAlphaMedian > 0 && entry.shipAlphaPerOperatingCost >= shipAlphaMedian * 1.6) {
+      const localDisposableNote = !entry.ship.canJump && entry.ship.hullClass === 'SMALL'
+        ? ' This is expected for cheap local disposable craft, but still worth tracking.'
+        : '';
+      notes.push(`${entry.ship.type}: high ship-alpha efficiency in ${bucket.name} (${formatNumber(entry.shipAlphaPerOperatingCost)} vs median ${formatNumber(shipAlphaMedian)}).${localDisposableNote}`);
+    }
+
+    if (
+      entry.ship.purposes.includes('MILITARY')
+      && entry.antiDefenceAlpha <= 0
+      && shipAlphaMedian > 0
+      && entry.shipAlphaPerOperatingCost <= shipAlphaMedian * 0.45
+    ) {
+      notes.push(`${entry.ship.type}: low ship-alpha efficiency for a military hull (${formatNumber(entry.shipAlphaPerOperatingCost)} vs median ${formatNumber(shipAlphaMedian)}).`);
+    }
+
+    if (durabilityMedian > 0 && entry.nonRailEhpPerOperatingCost >= durabilityMedian * 1.6) {
+      notes.push(`${entry.ship.type}: high non-rail durability efficiency (${formatNumber(entry.nonRailEhpPerOperatingCost)} vs median ${formatNumber(durabilityMedian)}).`);
+    }
+
+    if (entry.antiDefenceAlpha > 0 && entry.shipAlpha <= entry.antiDefenceAlpha * 0.2) {
+      notes.push(`${entry.ship.type}: bomber-specialist profile; low ship combat is expected because normal ship combat only gets the live 10% bombardment hit chance.`);
+    }
+
+    if (!entry.ship.canJump && entry.operatingCost > 0 && !entry.ship.purposes.includes('UTILITY')) {
+      notes.push(`${entry.ship.type}: local-only hull; good efficiency may be acceptable because it needs carriers or local production.`);
+    }
+  }
+
+  return notes;
+}
+
+function createWatchlist(metricsByType: Map<string, ShipMetrics>): string {
+  const lines: string[] = ['## Automated Balance Watchlist', ''];
+  const notes = bucketDefinitions.flatMap((bucket) => createBucketWatchlist(bucket, metricsByType));
+
+  if (notes.length <= 0) {
+    lines.push('No large ratio outliers were detected by the simple bucket checks.');
+  } else {
+    for (const note of notes) {
+      lines.push(`- ${note}`);
+    }
+  }
+
+  lines.push('');
+  return lines.join('\n');
 }
 
 function createTable(bucket: BucketDefinition, metricsByType: Map<string, ShipMetrics>): string {
   const lines: string[] = [];
   lines.push(`### ${bucket.name}`);
   lines.push('');
-  lines.push('| Ship | Build | Travel | OpCost | Base Alpha | Loaded Alpha | Loaded Cost | Hangar Load | Durability | Siege | Cargo | Hangar | BaseA/Op | LoadedA/LoadedCost | Cargo/Op | Notes |');
-  lines.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
+  lines.push('| Ship | Build | Travel | OpCost | Hull/Sh/Arm | Evade | Crit Hull | Normal Fire | Rail | Bomb vs Ship | Ship Alpha | Anti-Def | Loaded Alpha | Loaded Cost | Hangar Load | NonRail EHP0 | Rail EHP0 | ShipA/Op | LoadedA/Cost | AntiDef/Op | Cargo/Op | Notes |');
+  lines.push('| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
 
   for (const shipType of bucket.ships) {
     const metrics = metricsByType.get(shipType);
@@ -208,12 +370,20 @@ function createTable(bucket: BucketDefinition, metricsByType: Map<string, ShipMe
       continue;
     }
 
+    const ship = metrics.ship;
+    const notes = [
+      ship.canJump ? 'jump' : 'local',
+      ...ship.purposes
+    ].join(', ');
+
     lines.push(
-      `| ${metrics.ship.type} | ${formatNumber(metrics.buildCost)} | ${formatNumber(metrics.travelCost)} | ${formatNumber(metrics.operatingCost)} | `
-      + `${formatNumber(metrics.baseAlpha)} | ${formatNumber(metrics.loadedAlpha)} | ${formatNumber(metrics.loadedCost)} | ${metrics.hangarLoadLabel} | `
-      + `${formatNumber(metrics.durability)} | ${formatNumber(metrics.siege)} | ${formatNumber(metrics.cargo)} | ${formatNumber(metrics.hangar)} | `
-      + `${formatNumber(metrics.baseAlphaPerOperatingCost)} | ${formatNumber(metrics.loadedAlphaPerLoadedCost)} | ${formatNumber(metrics.cargoPerOperatingCost)} | `
-      + `${metrics.ship.purposes.join(', ')} |`
+      `| ${ship.type} | ${formatNumber(metrics.buildCost)} | ${formatNumber(metrics.travelCost)} | ${formatNumber(metrics.operatingCost)} | `
+      + `${formatNumber(ship.hullPointsCapacity)}/${formatNumber(ship.shieldCapacity)}/${formatNumber(ship.armor)} | `
+      + `${formatNumber(ship.evasionChance)} | ${formatNumber(metrics.criticalHull)} | ${formatNumber(metrics.normalShipFire)} | `
+      + `${formatNumber(metrics.railFire)} | ${formatNumber(metrics.expectedBombardmentVsShips)} | ${formatNumber(metrics.shipAlpha)} | `
+      + `${formatNumber(metrics.antiDefenceAlpha)} | ${formatNumber(metrics.loadedShipAlpha)} | ${formatNumber(metrics.loadedCost)} | ${metrics.hangarLoadLabel} | `
+      + `${formatNumber(metrics.nonRailEhpToZero)} | ${formatNumber(metrics.railEhpToZero)} | ${formatNumber(metrics.shipAlphaPerOperatingCost)} | `
+      + `${formatNumber(metrics.loadedAlphaPerLoadedCost)} | ${formatNumber(metrics.antiDefenceAlphaPerOperatingCost)} | ${formatNumber(metrics.cargoPerOperatingCost)} | ${notes} |`
     );
   }
 
@@ -228,202 +398,61 @@ function buildMarkdown(blueprints: ShipBlueprintFile): string {
     blueprints.ships.map((ship) => [ship.type, calculateShipMetrics(ship, hangarLoadCalculator)])
   );
 
+  const hangarCandidateLines = hangarLoadCalculator.candidates
+    .map((ship) => `- ${ship.type}: size ${ship.size}, shipAlpha ${formatNumber(calculateShipAlpha(ship))}, weighted cost ${formatNumber(calculateWeightedCost(ship.cost))}`)
+    .join('\n');
+
   const sections: string[] = [
-    '# Ship Balance Comparison Template',
+    '# Ship Battle Balance Reference',
     '',
-    'This file is a lightweight balance reference for ships in `ship-blueprints.json`.',
+    'This file is generated from `ship-blueprints.json` by `scripts/generate-ships-descr.ts`.',
+    'The formulas below mirror the live space battle resolver in `src/app/models/battles/space-battle-resolver.ts` at the blueprint, no-tech level.',
     '',
-    'The goal is not to calculate one perfect score. The goal is to compare ships in the same role bucket and quickly find suspicious numbers, likely traps, and likely overperformers.',
+    '## Live Battle Rules Captured',
     '',
-    '## Role Buckets',
+    '- Battles run for up to 4 rounds.',
+    '- Every living unit refills all combat weapon shots each round.',
+    '- `BEAM`, `MISSILE`, and `RAIL_GUN` can hit ships; ships can hit defences only with `BOMBARDMENT_WEAPONS`.',
+    '- `BOMBARDMENT_WEAPONS` have a 10% hit chance against ships and a 100% hit chance against defences.',
+    '- Target evasion applies to non-bombardment ship targets. Defences have no evasion.',
+    '- `RAIL_GUN` applies full damage directly to hull and ignores shield and armor.',
+    '- Other weapons remove shield first, then only half of spillover can become hull damage.',
+    '- Armor is subtracted from hull spillover; missiles subtract double armor.',
+    '- Critical destruction is checked only after hull damage in a round. Below the critical hull threshold, destruction chance scales with missing hull inside that critical band.',
     '',
-    'Compare ships only inside the same bucket.',
-    '',
-    '- Local bombardment hulls',
-    '- Small combat ships',
-    '- Medium combat ships',
-    '- Big combat ships',
-    '- Cargo ships',
-    '- Support ships',
-    '- Prestige / titan ships',
-    '',
-    '## Core Cost Marker',
-    '',
-    'Use weighted resource cost instead of plain resource sum.',
+    '## Cost And Output Markers',
     '',
     '```text',
     'weightedCost = metal * 1 + crystal * 2 + deuterium * 3',
+    'travelCost = jumpCost * 3',
+    'operatingCost = weightedCost + travelCost',
+    'normalShipFire = beamDamage + missileDamage + railGunDamage',
+    'bombVsShip = bombardmentDamage * 0.1',
+    'shipAlpha = normalShipFire + bombVsShip',
+    'antiDefenceAlpha = bombardmentDamage',
     '```',
     '',
-    '## Combat Markers',
+    'Important: `shipAlpha` is an outgoing pressure marker before shield, armor, random target choice, and critical rolls. It is intentionally not a full simulator.',
     '',
-    '### Space Alpha',
-    '',
-    'This is the rough ship-to-ship battle damage marker.',
+    '## Durability Markers',
     '',
     '```text',
-    'spaceAlpha =',
-    '  beamDamage',
-    '  + missileDamage',
-    '  + railGunDamage * 1.4',
-    '  + bombardmentDamage * 0.33',
+    'hitChanceAgainstShip = 1 - evasionChance',
+    'criticalHull = hullPointsCapacity * criticalThreshold / 100',
+    'nonRailEhpToZero = (shieldCapacity + hullPointsCapacity * 2) / hitChanceAgainstShip',
+    'railEhpToZero = hullPointsCapacity / hitChanceAgainstShip',
     '```',
     '',
-    'Rules:',
+    'The non-rail marker reflects the live half-spillover rule. Armor is not baked into EHP because its value depends heavily on enemy shot size and weapon type.',
     '',
-    '- `BEAM` counts at full value',
-    '- `MISSILE` counts at full value',
-    '- `RAIL_GUN` counts above raw damage because it is shield and armor piercing',
-    '- `BOMBARDMENT_WEAPONS` count only at `0.33` in space combat',
-    '- `REPAIR_EQUIPMENT` counts as `0` in battle value',
-    '- `RECYCLE_EQUIPMENT` counts as `0` in battle value',
+    '## Hangar Loading',
     '',
-    '### Siege Alpha',
+    'Loaded carrier alpha uses whole-ship packing with the current best small military ships under the same `shipAlpha` formula:',
     '',
-    'This is the rough planetary attack marker.',
+    hangarCandidateLines,
     '',
-    '```text',
-    'siegeAlpha = bombardmentDamage',
-    '```',
-    '',
-    'Optional later extension:',
-    '',
-    '```text',
-    'siegeAlpha = bombardmentDamage + planetaryBombSupportValue',
-    '```',
-    '',
-    '### Durability',
-    '',
-    'Hull matters more than shield because hull damage persists while shield replenishes after battle.',
-    'Armor matters because it reduces `BEAM` and `MISSILE` damage.',
-    'Critical threshold matters because ships below threshold can be destroyed after a round.',
-    '',
-    '```text',
-    'baseDurability = (hullPointsCapacity * 1.0 + shieldCapacity * 0.5)',
-    'armorFactor = 1 + armor * 0.12',
-    'criticalFactor = 1 + (50 - criticalThreshold) * 0.01',
-    'durabilityScore = baseDurability * armorFactor * criticalFactor',
-    '```',
-    '',
-    'Notes:',
-    '',
-    '- Lower `criticalThreshold` is better',
-    '- Higher `armor` is better',
-    '- This is a rough comparison marker, not a simulator replacement',
-    '',
-    '## Utility Markers',
-    '',
-    'These should stay separate from battle value.',
-    '',
-    '```text',
-    'cargoValue = cargoCapacity',
-    'hangarValue = hangarCapacity',
-    'repairValue = totalRepairEquipmentDamage',
-    'recycleValue = totalRecycleEquipmentDamage',
-    '```',
-    '',
-    'Suggested ratios:',
-    '',
-    '```text',
-    'cargoEfficiency = cargoValue / weightedCost',
-    'hangarEfficiency = hangarValue / weightedCost',
-    'repairEfficiency = repairValue / weightedCost',
-    'recycleEfficiency = recycleValue / weightedCost',
-    '```',
-    '',
-    '## Mobility Marker',
-    '',
-    'Mobility should not be hidden inside combat or utility scores.',
-    '',
-    'Rules:',
-    '',
-    '- `canJump == false` is a major strategic drawback',
-    '- `jumpCost` is a deuterium operating cost and should be tracked separately',
-    '- `size` matters mostly for carrier interactions',
-    '',
-    'Recommended interpretation:',
-    '',
-    '- Local-only ships can be numerically efficient and still be balanced',
-    '- Independent jump-capable ships can be priced higher',
-    '',
-    '## Main Efficiency Ratios',
-    '',
-    'Use these for quick comparison inside the same role bucket.',
-    '',
-    '```text',
-    'spaceCombatEfficiency = spaceAlpha / weightedCost',
-    'durabilityEfficiency = durabilityScore / weightedCost',
-    'siegeEfficiency = siegeAlpha / weightedCost',
-    'cargoEfficiency = cargoValue / weightedCost',
-    'hangarEfficiency = hangarValue / weightedCost',
-    'repairEfficiency = repairValue / weightedCost',
-    'recycleEfficiency = recycleValue / weightedCost',
-    '```',
-    '',
-    '## Comparison Template',
-    '',
-    'Copy this block when reviewing a ship group.',
-    '',
-    '```text',
-    'Bucket:',
-    '',
-    'Ships compared:',
-    '',
-    'Anchor ship:',
-    '',
-    'Formulas:',
-    '- weightedCost = metal * 1 + crystal * 2 + deuterium * 3',
-    '- spaceAlpha = beam + missile + railGun * 1.4 + bombardment * 0.33',
-    '- durabilityScore = (hull * 1.0 + shield * 0.5) * (1 + armor * 0.12) * (1 + (50 - criticalThreshold) * 0.01)',
-    '- travelCost = jumpCost * 3',
-    '',
-    'Table columns:',
-    '- Ship',
-    '- Build cost',
-    '- Travel cost',
-    '- Operating cost',
-    '- Base alpha',
-    '- Loaded alpha',
-    '- Loaded cost',
-    '- Hangar load',
-    '- Durability score',
-    '- Siege alpha',
-    '- Cargo',
-    '- Hangar',
-    '- Notes',
-    '',
-    'Questions:',
-    '- Is there an obvious direct upgrade with no real downside?',
-    '- Is there a likely trap ship?',
-    '- Is a specialist ship too good outside its specialty?',
-    '- Does the ship match its intended role?',
-    '- Does mobility justify the numbers?',
-    '```',
-    '',
-    '## Quick Review Rules',
-    '',
-    '- Compare ships inside their own bucket only',
-    '- Do not judge support ships by battle damage alone',
-    '- Do not judge bombardment ships by normal fleet combat alone',
-    '- Treat `canJump == false` as a real drawback',
-    '- Treat `RAIL_GUN` as premium combat value',
-    '- Treat `REPAIR_EQUIPMENT` as non-combat value',
-    '- Use these markers to find suspicious numbers, not to replace judgment',
-    '',
+    createWatchlist(metricsByType),
     '## Current Blueprint Calculations',
-    '',
-    'These tables are generated from the current `ship-blueprints.json` values using the formulas above, plus two extra assumptions:',
-    '',
-    '- `travelCost = jumpCost * 3`',
-    '- `loadedAlpha` uses real whole-ship hangar packing with current combat-optimal small ships:',
-    '  as many `ASSAULT_FIGHTER`s as fit, plus one `FIGHTER` if one hangar slot remains',
-    '',
-    'Benchmark used for loaded carriers:',
-    '',
-    '```text',
-    `ASSAULT_FIGHTER: size ${hangarLoadCalculator.assault.size}, alpha ${formatNumber(hangarLoadCalculator.assault.alpha)}, weighted cost ${formatNumber(hangarLoadCalculator.assault.cost)}`,
-    `FIGHTER: size 1, alpha ${formatNumber(hangarLoadCalculator.fighter.alpha)}, weighted cost ${formatNumber(hangarLoadCalculator.fighter.cost)}`,
-    '```',
     ''
   ];
 

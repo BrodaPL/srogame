@@ -1,246 +1,121 @@
-# Ship Balance Comparison Template
+# Ship Battle Balance Reference
 
-This file is a lightweight balance reference for ships in `ship-blueprints.json`.
+This file is generated from `ship-blueprints.json` by `scripts/generate-ships-descr.ts`.
+The formulas below mirror the live space battle resolver in `src/app/models/battles/space-battle-resolver.ts` at the blueprint, no-tech level.
 
-The goal is not to calculate one perfect score. The goal is to compare ships in the same role bucket and quickly find suspicious numbers, likely traps, and likely overperformers.
+## Live Battle Rules Captured
 
-## Role Buckets
+- Battles run for up to 4 rounds.
+- Every living unit refills all combat weapon shots each round.
+- `BEAM`, `MISSILE`, and `RAIL_GUN` can hit ships; ships can hit defences only with `BOMBARDMENT_WEAPONS`.
+- `BOMBARDMENT_WEAPONS` have a 10% hit chance against ships and a 100% hit chance against defences.
+- Target evasion applies to non-bombardment ship targets. Defences have no evasion.
+- `RAIL_GUN` applies full damage directly to hull and ignores shield and armor.
+- Other weapons remove shield first, then only half of spillover can become hull damage.
+- Armor is subtracted from hull spillover; missiles subtract double armor.
+- Critical destruction is checked only after hull damage in a round. Below the critical hull threshold, destruction chance scales with missing hull inside that critical band.
 
-Compare ships only inside the same bucket.
-
-- Local bombardment hulls
-- Small combat ships
-- Medium combat ships
-- Big combat ships
-- Cargo ships
-- Support ships
-- Prestige / titan ships
-
-## Core Cost Marker
-
-Use weighted resource cost instead of plain resource sum.
+## Cost And Output Markers
 
 ```text
 weightedCost = metal * 1 + crystal * 2 + deuterium * 3
+travelCost = jumpCost * 3
+operatingCost = weightedCost + travelCost
+normalShipFire = beamDamage + missileDamage + railGunDamage
+bombVsShip = bombardmentDamage * 0.1
+shipAlpha = normalShipFire + bombVsShip
+antiDefenceAlpha = bombardmentDamage
 ```
 
-## Combat Markers
+Important: `shipAlpha` is an outgoing pressure marker before shield, armor, random target choice, and critical rolls. It is intentionally not a full simulator.
 
-### Space Alpha
-
-This is the rough ship-to-ship battle damage marker.
+## Durability Markers
 
 ```text
-spaceAlpha =
-  beamDamage
-  + missileDamage
-  + railGunDamage * 1.4
-  + bombardmentDamage * 0.33
+hitChanceAgainstShip = 1 - evasionChance
+criticalHull = hullPointsCapacity * criticalThreshold / 100
+nonRailEhpToZero = (shieldCapacity + hullPointsCapacity * 2) / hitChanceAgainstShip
+railEhpToZero = hullPointsCapacity / hitChanceAgainstShip
 ```
 
-Rules:
+The non-rail marker reflects the live half-spillover rule. Armor is not baked into EHP because its value depends heavily on enemy shot size and weapon type.
 
-- `BEAM` counts at full value
-- `MISSILE` counts at full value
-- `RAIL_GUN` counts above raw damage because it is shield and armor piercing
-- `BOMBARDMENT_WEAPONS` count only at `0.33` in space combat
-- `REPAIR_EQUIPMENT` counts as `0` in battle value
-- `RECYCLE_EQUIPMENT` counts as `0` in battle value
+## Hangar Loading
 
-### Siege Alpha
+Loaded carrier alpha uses whole-ship packing with the current best small military ships under the same `shipAlpha` formula:
 
-This is the rough planetary attack marker.
+- ASSAULT_FIGHTER: size 2, shipAlpha 36, weighted cost 85
+- CORVETTE: size 3, shipAlpha 30, weighted cost 190
+- FIGHTER: size 1, shipAlpha 9, weighted cost 25
+- ATMOSPHERIC_BOMBER: size 3, shipAlpha 6, weighted cost 190
+- ATMOSPHERIC_FIGHTER: size 1, shipAlpha 2, weighted cost 60
 
-```text
-siegeAlpha = bombardmentDamage
-```
+## Automated Balance Watchlist
 
-Optional later extension:
-
-```text
-siegeAlpha = bombardmentDamage + planetaryBombSupportValue
-```
-
-### Durability
-
-Hull matters more than shield because hull damage persists while shield replenishes after battle.
-Armor matters because it reduces `BEAM` and `MISSILE` damage.
-Critical threshold matters because ships below threshold can be destroyed after a round.
-
-```text
-baseDurability = (hullPointsCapacity * 1.0 + shieldCapacity * 0.5)
-armorFactor = 1 + armor * 0.12
-criticalFactor = 1 + (50 - criticalThreshold) * 0.01
-durabilityScore = baseDurability * armorFactor * criticalFactor
-```
-
-Notes:
-
-- Lower `criticalThreshold` is better
-- Higher `armor` is better
-- This is a rough comparison marker, not a simulator replacement
-
-## Utility Markers
-
-These should stay separate from battle value.
-
-```text
-cargoValue = cargoCapacity
-hangarValue = hangarCapacity
-repairValue = totalRepairEquipmentDamage
-recycleValue = totalRecycleEquipmentDamage
-```
-
-Suggested ratios:
-
-```text
-cargoEfficiency = cargoValue / weightedCost
-hangarEfficiency = hangarValue / weightedCost
-repairEfficiency = repairValue / weightedCost
-recycleEfficiency = recycleValue / weightedCost
-```
-
-## Mobility Marker
-
-Mobility should not be hidden inside combat or utility scores.
-
-Rules:
-
-- `canJump == false` is a major strategic drawback
-- `jumpCost` is a deuterium operating cost and should be tracked separately
-- `size` matters mostly for carrier interactions
-
-Recommended interpretation:
-
-- Local-only ships can be numerically efficient and still be balanced
-- Independent jump-capable ships can be priced higher
-
-## Main Efficiency Ratios
-
-Use these for quick comparison inside the same role bucket.
-
-```text
-spaceCombatEfficiency = spaceAlpha / weightedCost
-durabilityEfficiency = durabilityScore / weightedCost
-siegeEfficiency = siegeAlpha / weightedCost
-cargoEfficiency = cargoValue / weightedCost
-hangarEfficiency = hangarValue / weightedCost
-repairEfficiency = repairValue / weightedCost
-recycleEfficiency = recycleValue / weightedCost
-```
-
-## Comparison Template
-
-Copy this block when reviewing a ship group.
-
-```text
-Bucket:
-
-Ships compared:
-
-Anchor ship:
-
-Formulas:
-- weightedCost = metal * 1 + crystal * 2 + deuterium * 3
-- spaceAlpha = beam + missile + railGun * 1.4 + bombardment * 0.33
-- durabilityScore = (hull * 1.0 + shield * 0.5) * (1 + armor * 0.12) * (1 + (50 - criticalThreshold) * 0.01)
-- travelCost = jumpCost * 3
-
-Table columns:
-- Ship
-- Build cost
-- Travel cost
-- Operating cost
-- Base alpha
-- Loaded alpha
-- Loaded cost
-- Hangar load
-- Durability score
-- Siege alpha
-- Cargo
-- Hangar
-- Notes
-
-Questions:
-- Is there an obvious direct upgrade with no real downside?
-- Is there a likely trap ship?
-- Is a specialist ship too good outside its specialty?
-- Does the ship match its intended role?
-- Does mobility justify the numbers?
-```
-
-## Quick Review Rules
-
-- Compare ships inside their own bucket only
-- Do not judge support ships by battle damage alone
-- Do not judge bombardment ships by normal fleet combat alone
-- Treat `canJump == false` as a real drawback
-- Treat `RAIL_GUN` as premium combat value
-- Treat `REPAIR_EQUIPMENT` as non-combat value
-- Use these markers to find suspicious numbers, not to replace judgment
+- FIGHTER: high ship-alpha efficiency in Small Combat And Local Assault (0.36 vs median 0.158). This is expected for cheap local disposable craft, but still worth tracking.
+- FIGHTER: high non-rail durability efficiency (2.462 vs median 1.256).
+- FIGHTER: local-only hull; good efficiency may be acceptable because it needs carriers or local production.
+- ASSAULT_FIGHTER: high ship-alpha efficiency in Small Combat And Local Assault (0.424 vs median 0.158). This is expected for cheap local disposable craft, but still worth tracking.
+- ASSAULT_FIGHTER: local-only hull; good efficiency may be acceptable because it needs carriers or local production.
+- ATMOSPHERIC_FIGHTER: bomber-specialist profile; low ship combat is expected because normal ship combat only gets the live 10% bombardment hit chance.
+- ATMOSPHERIC_FIGHTER: local-only hull; good efficiency may be acceptable because it needs carriers or local production.
+- ATMOSPHERIC_BOMBER: bomber-specialist profile; low ship combat is expected because normal ship combat only gets the live 10% bombardment hit chance.
+- ATMOSPHERIC_BOMBER: local-only hull; good efficiency may be acceptable because it needs carriers or local production.
+- CORVETTE: local-only hull; good efficiency may be acceptable because it needs carriers or local production.
+- ORBITAL_BOMBER: bomber-specialist profile; low ship combat is expected because normal ship combat only gets the live 10% bombardment hit chance.
+- ARMAGEDDON_BOMBER: bomber-specialist profile; low ship combat is expected because normal ship combat only gets the live 10% bombardment hit chance.
+- BEHEMOTH: high ship-alpha efficiency in Titan And Prestige (0.127 vs median 0.062).
+- FLEET_CARRIER: low ship-alpha efficiency for a military hull (0.017 vs median 0.062).
 
 ## Current Blueprint Calculations
 
-These tables are generated from the current `ship-blueprints.json` values using the formulas above, plus two extra assumptions:
-
-- `travelCost = jumpCost * 3`
-- `loadedAlpha` uses real whole-ship hangar packing with current combat-optimal small ships:
-  as many `ASSAULT_FIGHTER`s as fit, plus one `FIGHTER` if one hangar slot remains
-
-Benchmark used for loaded carriers:
-
-```text
-ASSAULT_FIGHTER: size 2, alpha 40, weighted cost 100
-FIGHTER: size 1, alpha 10, weighted cost 40
-```
-
 ### Small Combat And Local Assault
 
-| Ship | Build | Travel | OpCost | Base Alpha | Loaded Alpha | Loaded Cost | Hangar Load | Durability | Siege | Cargo | Hangar | BaseA/Op | LoadedA/LoadedCost | Cargo/Op | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| FIGHTER | 40 | 0 | 40 | 10 | 10 | 40 | 0A | 20 | 0 | 0 | 0 | 0.25 | 0.25 | 0 | MILITARY, BOMBER |
-| ASSAULT_FIGHTER | 100 | 0 | 100 | 40 | 40 | 100 | 0A | 30 | 0 | 0 | 0 | 0.4 | 0.4 | 0 | MILITARY, BOMBER |
-| ATMOSPHERIC_FIGHTER | 120 | 0 | 120 | 6.6 | 6.6 | 120 | 0A | 31.92 | 20 | 0 | 0 | 0.06 | 0.06 | 0 | MILITARY, BOMBER |
-| ATMOSPHERIC_BOMBER | 190 | 0 | 190 | 19.8 | 19.8 | 190 | 0A | 130.2 | 60 | 20 | 0 | 0.1 | 0.1 | 0.11 | MILITARY, BOMBER |
-| CORVETTE | 190 | 0 | 190 | 30 | 30 | 190 | 0A | 130.2 | 0 | 10 | 0 | 0.16 | 0.16 | 0.05 | MILITARY |
+| Ship | Build | Travel | OpCost | Hull/Sh/Arm | Evade | Crit Hull | Normal Fire | Rail | Bomb vs Ship | Ship Alpha | Anti-Def | Loaded Alpha | Loaded Cost | Hangar Load | NonRail EHP0 | Rail EHP0 | ShipA/Op | LoadedA/Cost | AntiDef/Op | Cargo/Op | Notes |
+| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| FIGHTER | 25 | 0 | 25 | 20/0/0 | 0.35 | 10 | 9 | 0 | 0 | 9 | 0 | 9 | 25 | - | 61.538 | 30.769 | 0.36 | 0.36 | 0 | 0 | local, MILITARY |
+| ASSAULT_FIGHTER | 85 | 0 | 85 | 30/0/0 | 0.2 | 15 | 36 | 0 | 0 | 36 | 0 | 36 | 85 | - | 75 | 37.5 | 0.424 | 0.424 | 0 | 0 | local, MILITARY |
+| ATMOSPHERIC_FIGHTER | 60 | 0 | 60 | 30/0/1 | 0.22 | 16.5 | 0 | 0 | 2 | 2 | 20 | 2 | 60 | - | 76.923 | 38.462 | 0.033 | 0.033 | 0.333 | 0 | local, MILITARY, BOMBER |
+| ATMOSPHERIC_BOMBER | 190 | 0 | 190 | 90/30/2 | 0.12 | 45 | 0 | 0 | 6 | 6 | 60 | 6 | 190 | - | 239 | 102 | 0.032 | 0.032 | 0.316 | 0.105 | local, MILITARY, BOMBER |
+| CORVETTE | 190 | 0 | 190 | 80/40/2 | 0.1 | 36 | 30 | 0 | 0 | 30 | 0 | 30 | 190 | - | 222 | 88.889 | 0.158 | 0.158 | 0 | 0.053 | local, MILITARY |
 
 ### Medium Combat
 
-| Ship | Build | Travel | OpCost | Base Alpha | Loaded Alpha | Loaded Cost | Hangar Load | Durability | Siege | Cargo | Hangar | BaseA/Op | LoadedA/LoadedCost | Cargo/Op | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| CRUISER | 300 | 3 | 303 | 44 | 54 | 343 | 0A+1F | 171.36 | 0 | 50 | 1 | 0.15 | 0.16 | 0.17 | MILITARY |
-| BATTLE_SHIP | 540 | 6 | 546 | 50 | 130 | 746 | 2A | 293.04 | 0 | 120 | 4 | 0.09 | 0.17 | 0.22 | MILITARY, CARRIER |
-| FRIGATE | 520 | 3 | 523 | 68 | 68 | 523 | 0A | 317.46 | 0 | 40 | 0 | 0.13 | 0.13 | 0.08 | MILITARY |
+| Ship | Build | Travel | OpCost | Hull/Sh/Arm | Evade | Crit Hull | Normal Fire | Rail | Bomb vs Ship | Ship Alpha | Anti-Def | Loaded Alpha | Loaded Cost | Hangar Load | NonRail EHP0 | Rail EHP0 | ShipA/Op | LoadedA/Cost | AntiDef/Op | Cargo/Op | Notes |
+| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| CRUISER | 300 | 3 | 303 | 100/40/3 | 0 | 45 | 40 | 10 | 0 | 40 | 0 | 49 | 328 | 1x FIGHTER | 240 | 100 | 0.132 | 0.149 | 0 | 0.165 | jump, MILITARY |
+| BATTLE_SHIP | 500 | 6 | 506 | 140/80/3 | 0 | 56 | 50 | 0 | 0 | 50 | 0 | 122 | 676 | 2x ASSAULT_FIGHTER | 360 | 140 | 0.099 | 0.18 | 0 | 0.237 | jump, MILITARY, CARRIER |
+| FRIGATE | 490 | 3 | 493 | 160/70/4 | 0 | 64 | 60 | 20 | 0 | 60 | 0 | 60 | 493 | - | 390 | 160 | 0.122 | 0.122 | 0 | 0.081 | jump, MILITARY |
 
 ### Big Combat And Siege
 
-| Ship | Build | Travel | OpCost | Base Alpha | Loaded Alpha | Loaded Cost | Hangar Load | Durability | Siege | Cargo | Hangar | BaseA/Op | LoadedA/LoadedCost | Cargo/Op | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| BATTLE_CRUISER | 1200 | 6 | 1206 | 133.9 | 133.9 | 1206 | 0A | 700.04 | 30 | 200 | 0 | 0.11 | 0.11 | 0.17 | MILITARY |
-| DESTROYER | 1100 | 6 | 1106 | 124 | 124 | 1106 | 0A | 624.36 | 0 | 150 | 0 | 0.11 | 0.11 | 0.14 | MILITARY |
-| DREADNOUGHT | 1590 | 9 | 1599 | 196.5 | 196.5 | 1599 | 0A | 624.36 | 50 | 100 | 0 | 0.12 | 0.12 | 0.06 | MILITARY |
-| ORBITAL_BOMBER | 1260 | 18 | 1278 | 135.6 | 215.6 | 1478 | 2A | 570.4 | 320 | 60 | 4 | 0.11 | 0.15 | 0.05 | MILITARY |
+| Ship | Build | Travel | OpCost | Hull/Sh/Arm | Evade | Crit Hull | Normal Fire | Rail | Bomb vs Ship | Ship Alpha | Anti-Def | Loaded Alpha | Loaded Cost | Hangar Load | NonRail EHP0 | Rail EHP0 | ShipA/Op | LoadedA/Cost | AntiDef/Op | Cargo/Op | Notes |
+| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| BATTLE_CRUISER | 1020 | 6 | 1026 | 300/120/4 | 0 | 120 | 100 | 10 | 3 | 103 | 30 | 103 | 1026 | - | 720 | 300 | 0.1 | 0.1 | 0.029 | 0.097 | jump, MILITARY |
+| DESTROYER | 1100 | 6 | 1106 | 250/160/4 | 0 | 100 | 90 | 60 | 0 | 90 | 0 | 90 | 1106 | - | 660 | 250 | 0.081 | 0.081 | 0 | 0.09 | jump, MILITARY |
+| DREADNOUGHT | 1540 | 9 | 1549 | 220/220/5 | 0 | 88 | 160 | 0 | 6 | 166 | 60 | 166 | 1549 | - | 660 | 220 | 0.107 | 0.107 | 0.039 | 0.065 | jump, MILITARY |
+| ORBITAL_BOMBER | 1260 | 18 | 1278 | 220/180/6 | 0 | 77 | 20 | 0 | 32 | 52 | 320 | 124 | 1448 | 2x ASSAULT_FIGHTER | 620 | 220 | 0.041 | 0.086 | 0.25 | 0.047 | jump, MILITARY, BOMBER |
 
 ### Logistics And Support
 
-| Ship | Build | Travel | OpCost | Base Alpha | Loaded Alpha | Loaded Cost | Hangar Load | Durability | Siege | Cargo | Hangar | BaseA/Op | LoadedA/LoadedCost | Cargo/Op | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| SPY_PROBE | 70 | 0 | 70 | 0 | 0 | 70 | 0A | 8 | 0 | 0 | 0 | 0 | 0 | 0 | UTILITY |
-| REPAIR_DRONE | 105 | 3 | 108 | 0 | 0 | 108 | 0A | 9 | 0 | 0 | 0 | 0 | 0 | 0 | UTILITY |
-| RECYCLER | 820 | 9 | 829 | 0 | 0 | 829 | 0A | 260.48 | 0 | 1200 | 0 | 0 | 0 | 1.45 | CARGO, UTILITY, RECYCLING |
-| TRANSPORTER | 240 | 3 | 243 | 10 | 10 | 243 | 0A | 91.14 | 0 | 600 | 0 | 0.04 | 0.04 | 2.47 | CARGO |
-| CARGO_SUPPORT | 650 | 6 | 656 | 20 | 20 | 656 | 0A | 396 | 0 | 1000 | 0 | 0.03 | 0.03 | 1.52 | CARGO, UTILITY |
-| MASS_HAULER | 740 | 9 | 749 | 10 | 10 | 749 | 0A | 242.76 | 0 | 2500 | 0 | 0.01 | 0.01 | 3.34 | CARGO |
-| CARRIER | 900 | 9 | 909 | 20 | 310 | 1649 | 7A+1F | 570.4 | 0 | 400 | 15 | 0.02 | 0.19 | 0.44 | MILITARY, CARGO, CARRIER |
-| COLONIZER | 1500 | 15 | 1515 | 10 | 130 | 1815 | 3A | 341 | 0 | 500 | 6 | 0.01 | 0.07 | 0.33 | UTILITY |
+| Ship | Build | Travel | OpCost | Hull/Sh/Arm | Evade | Crit Hull | Normal Fire | Rail | Bomb vs Ship | Ship Alpha | Anti-Def | Loaded Alpha | Loaded Cost | Hangar Load | NonRail EHP0 | Rail EHP0 | ShipA/Op | LoadedA/Cost | AntiDef/Op | Cargo/Op | Notes |
+| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| SPY_PROBE | 70 | 0 | 70 | 10/0/0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 70 | - | 20 | 10 | 0 | 0 | 0 | 0 | jump, UTILITY |
+| REPAIR_DRONE | 105 | 3 | 108 | 10/0/0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 108 | - | 20 | 10 | 0 | 0 | 0 | 0 | local, UTILITY |
+| RECYCLER | 820 | 9 | 829 | 120/80/4 | 0 | 48 | 0 | 0 | 0 | 0 | 0 | 0 | 829 | - | 320 | 120 | 0 | 0 | 0 | 1.448 | jump, CARGO, UTILITY, RECYCLING |
+| TRANSPORTER | 240 | 3 | 243 | 60/20/2 | 0 | 27 | 6 | 0 | 0 | 6 | 0 | 6 | 243 | - | 140 | 60 | 0.025 | 0.025 | 0 | 2.469 | jump, CARGO |
+| CARGO_SUPPORT | 650 | 6 | 656 | 150/150/5 | 0 | 60 | 20 | 0 | 0 | 20 | 0 | 20 | 656 | - | 450 | 150 | 0.03 | 0.03 | 0 | 1.524 | jump, CARGO, UTILITY |
+| MASS_HAULER | 740 | 9 | 749 | 120/100/3 | 0 | 54 | 12 | 0 | 0 | 12 | 0 | 12 | 749 | - | 340 | 120 | 0.016 | 0.016 | 0 | 3.338 | jump, CARGO |
+| CARRIER | 780 | 9 | 789 | 220/180/5 | 0 | 77 | 20 | 0 | 0 | 20 | 0 | 344 | 1554 | 9x ASSAULT_FIGHTER | 620 | 220 | 0.025 | 0.221 | 0 | 0.507 | jump, MILITARY, CARGO, CARRIER |
+| COLONIZER | 1700 | 30 | 1730 | 200/80/2 | 0 | 80 | 10 | 0 | 0 | 10 | 0 | 82 | 1900 | 2x ASSAULT_FIGHTER | 480 | 200 | 0.006 | 0.043 | 0 | 0.289 | jump, UTILITY |
 
 ### Titan And Prestige
 
-| Ship | Build | Travel | OpCost | Base Alpha | Loaded Alpha | Loaded Cost | Hangar Load | Durability | Siege | Cargo | Hangar | BaseA/Op | LoadedA/LoadedCost | Cargo/Op | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| TITAN | 5400 | 27 | 5427 | 585 | 825 | 6027 | 6A | 2870.4 | 100 | 1000 | 12 | 0.11 | 0.14 | 0.18 | MILITARY, CARRIER |
-| ARMAGEDDON_BOMBER | 6100 | 24 | 6124 | 393.5 | 553.5 | 6524 | 4A | 2318.4 | 950 | 1000 | 8 | 0.06 | 0.08 | 0.16 | MILITARY |
-| BEHEMOTH | 6300 | 30 | 6330 | 856 | 856 | 6330 | 0A | 2649.6 | 0 | 1000 | 0 | 0.14 | 0.14 | 0.16 | MILITARY |
-| FLEET_CARRIER | 4000 | 24 | 4024 | 70 | 1670 | 8024 | 40A | 2683.2 | 0 | 600 | 80 | 0.02 | 0.21 | 0.15 | MILITARY, UTILITY, CARRIER |
-| MOTHER_SHIP | 80000 | 300 | 80300 | 5129 | 7129 | 85300 | 50A | 49000 | 2500 | 25000 | 100 | 0.06 | 0.08 | 0.31 | MILITARY, BOMBER, CARGO, UTILITY, CARRIER |
+| Ship | Build | Travel | OpCost | Hull/Sh/Arm | Evade | Crit Hull | Normal Fire | Rail | Bomb vs Ship | Ship Alpha | Anti-Def | Loaded Alpha | Loaded Cost | Hangar Load | NonRail EHP0 | Rail EHP0 | ShipA/Op | LoadedA/Cost | AntiDef/Op | Cargo/Op | Notes |
+| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| TITAN | 5400 | 27 | 5427 | 800/1000/7 | 0 | 240 | 520 | 80 | 10 | 530 | 100 | 746 | 5937 | 6x ASSAULT_FIGHTER | 2600 | 800 | 0.098 | 0.126 | 0.018 | 0.184 | jump, MILITARY, CARRIER |
+| ARMAGEDDON_BOMBER | 6100 | 24 | 6124 | 700/700/7 | 0 | 210 | 20 | 0 | 95 | 115 | 950 | 259 | 6464 | 4x ASSAULT_FIGHTER | 2100 | 700 | 0.019 | 0.04 | 0.155 | 0.163 | jump, MILITARY, BOMBER |
+| BEHEMOTH | 6600 | 30 | 6630 | 800/800/7 | 0 | 240 | 840 | 40 | 0 | 840 | 0 | 840 | 6630 | - | 2400 | 800 | 0.127 | 0.127 | 0 | 0.151 | jump, MILITARY |
+| FLEET_CARRIER | 4000 | 24 | 4024 | 800/1000/6 | 0 | 240 | 70 | 0 | 0 | 70 | 0 | 1690 | 7849 | 45x ASSAULT_FIGHTER | 2600 | 800 | 0.017 | 0.215 | 0 | 0.149 | jump, MILITARY, UTILITY, CARRIER |
+| MOTHER_SHIP | 82000 | 300 | 82300 | 10000/20000/8 | 0 | 2500 | 4820 | 280 | 250 | 5070 | 2500 | 7230 | 87400 | 60x ASSAULT_FIGHTER | 40000 | 10000 | 0.062 | 0.083 | 0.03 | 0.122 | jump, MILITARY, BOMBER, CARGO, UTILITY, CARRIER |
 

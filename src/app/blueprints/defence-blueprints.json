@@ -56,9 +56,9 @@
       "shieldCapacity": 50,
       "armor": 4,
       "weapons": [
-        { "type": "BEAM", "dmg": 40, "shots": 1 }
+        { "type": "BEAM", "dmg": 60, "shots": 1 }
       ],
-      "cost": { "metal": 180, "crystal": 100, "deuterium": 0 },
+      "cost": { "metal": 150, "crystal": 90, "deuterium": 0 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 4 }
       ],
@@ -139,7 +139,7 @@
       "type": "RAIL_GUN_CANNON",
       "imagePath": "images/defence/normal/RAIL_GUN_CANNON.jpg",
       "hullClass": "BIG",
-      "canShootToOrbit": false,
+      "canShootToOrbit": true,
       "size": 3,
       "hullPointsCapacity": 160,
       "criticalThreshold": 16,
@@ -171,7 +171,7 @@
       "weapons": [
         { "type": "ORBIT_TO_SURFACE_BOMB", "dmg": 100, "shots": 1 }
       ],
-      "cost": { "metal": 10, "crystal": 0, "deuterium": 0 },
+      "cost": { "metal": 20, "crystal": 5, "deuterium": 0 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 1 },
         { "building": "BOMB_DEPOT", "level": 1 }
@@ -193,7 +193,7 @@
       "weapons": [
         { "type": "ORBIT_TO_SURFACE_BOMB", "dmg": 20, "shots": 10 }
       ],
-      "cost": { "metal": 20, "crystal": 10, "deuterium": 0 },
+      "cost": { "metal": 25, "crystal": 20, "deuterium": 0 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 2 },
         { "building": "BOMB_DEPOT", "level": 2 }
@@ -216,7 +216,7 @@
       "weapons": [
         { "type": "ORBIT_TO_SURFACE_BOMB", "dmg": 600, "shots": 1 }
       ],
-      "cost": { "metal": 100, "crystal": 10, "deuterium": 10 },
+      "cost": { "metal": 100, "crystal": 20, "deuterium": 10 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 3 },
         { "building": "BOMB_DEPOT", "level": 3 }

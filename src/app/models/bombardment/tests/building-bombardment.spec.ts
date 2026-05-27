@@ -97,7 +97,8 @@ describe('applyBuildingBombardment', () => {
 
   it('lets ship-mounted bombardment weapons always hit defences once the shot fires', () => {
     const planet = createTargetPlanet();
-    planet.rBDSFTQ.defences = manyDefences({ type: DefenceType.LIGHT_BEAM_CANNON, amount: 1 });
+    planet.rBDSFTQ.buildingsLevels.clear();
+    planet.rBDSFTQ.defences = manyDefences({ type: DefenceType.SAM_SITE, amount: 1 });
 
     vi.spyOn(Math, 'random').mockReturnValue(0.95);
 
@@ -109,7 +110,7 @@ describe('applyBuildingBombardment', () => {
     );
 
     expect(summary.hits).toBeGreaterThan(0);
-    expect(summary.defenceTargets.some((target) => target.type === DefenceType.LIGHT_BEAM_CANNON)).toBe(true);
+    expect(summary.defenceTargets.some((target) => target.type === DefenceType.SAM_SITE)).toBe(true);
     expect(summary.defenceTargets.some((target) => target.damage > 0)).toBe(true);
   });
 });

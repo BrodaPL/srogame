@@ -12,7 +12,7 @@
       "shieldCapacity": 0,
       "armor": 0,
       "weapons": [
-        { "type": "BEAM", "dmg": 10, "shots": 1 }
+        { "type": "BEAM", "dmg": 9, "shots": 1 }
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
@@ -39,13 +39,13 @@
       "shieldCapacity": 0,
       "armor": 0,
       "weapons": [
-        { "type": "MISSILE", "dmg": 20, "shots": 2 }
+        { "type": "MISSILE", "dmg": 18, "shots": 2 }
       ],
       "cargoCapacity": 0,
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 0,
-      "cost": { "metal": 30, "crystal": 20, "deuterium": 10 },
+      "cost": { "metal": 25, "crystal": 15, "deuterium": 10 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 1 }
       ],
@@ -278,7 +278,7 @@
       "hangarCapacity": 4,
       "purposes": ["MILITARY", "CARRIER"],
       "jumpCost": 2,
-      "cost": { "metal": 260, "crystal": 80, "deuterium": 20 },
+      "cost": { "metal": 260, "crystal": 90, "deuterium": 20 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 4 }
       ],
@@ -311,7 +311,7 @@
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 1,
-      "cost": { "metal": 300, "crystal": 100, "deuterium": 30 },
+      "cost": { "metal": 320, "crystal": 70, "deuterium": 10 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 4 }
       ],
@@ -337,7 +337,7 @@
       "shieldCapacity": 20,
       "armor": 2,
       "weapons": [
-        { "type": "BEAM", "dmg": 10, "shots": 1 }
+        { "type": "BEAM", "dmg": 6, "shots": 1 }
       ],
       "cargoCapacity": 600,
       "hangarCapacity": 0,
@@ -604,7 +604,7 @@
       "shieldCapacity": 100,
       "armor": 3,
       "weapons": [
-        { "type": "BEAM", "dmg": 10, "shots": 1 }
+        { "type": "BEAM", "dmg": 6, "shots": 2 }
       ],
       "cargoCapacity": 2500,
       "hangarCapacity": 0,
@@ -674,9 +674,9 @@
       "armor": 7,
       "weapons": [
         { "type": "BEAM", "dmg": 10, "shots": 2 },
-        { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 10 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 30, "shots": 12 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 100, "shots": 4 },
-        { "type": "BOMBARDMENT_WEAPONS", "dmg": 250, "shots": 1 }
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 320, "shots": 1 }
 
       ],
       "cargoCapacity": 1000,
@@ -718,7 +718,7 @@
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
       "jumpCost": 10,
-      "cost": { "metal": 1600, "crystal": 1000, "deuterium": 900 },
+      "cost": { "metal": 1600, "crystal": 1000, "deuterium": 1000 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 8 }
       ],
@@ -780,14 +780,15 @@
       "shieldCapacity": 20000,
       "armor": 8,
       "weapons": [
-        { "type": "BEAM", "dmg": 20, "shots": 40 },
-        { "type": "BEAM", "dmg": 300, "shots": 8 },
+        { "type": "BEAM", "dmg": 20, "shots": 48 },
+        { "type": "BEAM", "dmg": 300, "shots": 9 },
         { "type": "MISSILE", "dmg": 30, "shots": 16 },
         { "type": "MISSILE", "dmg": 50, "shots": 8 },
         { "type": "RAIL_GUN", "dmg": 10, "shots": 16 },
-        { "type": "BOMBARDMENT_WEAPONS", "dmg": 50, "shots": 10 },
+        { "type": "RAIL_GUN", "dmg": 30, "shots": 4 },
+        { "type": "BOMBARDMENT_WEAPONS", "dmg": 50, "shots": 12 },
         { "type": "BOMBARDMENT_WEAPONS", "dmg": 500, "shots": 4 },
-        { "type": "REPAIR_EQUIPMENT", "dmg": 20, "shots": 10 },
+        { "type": "REPAIR_EQUIPMENT", "dmg": 20, "shots": 16 },
         { "type": "REPAIR_EQUIPMENT", "dmg": 400, "shots": 2 }
       ],
       "cargoCapacity": 10000,

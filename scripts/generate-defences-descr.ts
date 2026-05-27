@@ -38,7 +38,9 @@ type ShipWeaponType =
   | 'BEAM'
   | 'MISSILE'
   | 'RAIL_GUN'
-  | 'BOMBARDMENT_WEAPONS';
+  | 'BOMBARDMENT_WEAPONS'
+  | 'REPAIR_EQUIPMENT'
+  | 'RECYCLE_EQUIPMENT';
 
 type ShipHullClass = 'SMALL' | 'MEDIUM' | 'BIG' | 'TITAN' | 'STATION';
 
@@ -46,6 +48,7 @@ type ShipBlueprint = {
   type: string;
   hullClass: ShipHullClass;
   purposes: string[];
+  evasionChance: number;
   criticalThreshold: number;
   shieldCapacity: number;
   armor: number;
@@ -70,18 +73,25 @@ type ShipBlueprintFile = {
 type DefenceMetrics = {
   defence: DefenceBlueprint;
   buildCost: number;
-  spaceAlpha: number;
-  bombAlpha: number;
-  durability: number;
-  spaceAlphaPerCost: number;
-  durabilityPerCost: number;
-  bombAlphaPerCost: number;
+  orbitFireAlpha: number;
+  localAntiBomberAlpha: number;
+  bombPayloadAlpha: number;
+  antiDefenceBattleBombAlpha: number;
+  nonRailEhpToCrit: number;
+  nonRailEhpToZero: number;
+  railEhpToCrit: number;
+  railEhpToZero: number;
+  criticalHull: number;
+  orbitFirePerCost: number;
+  localAntiBomberPerCost: number;
+  antiDefenceBattleBombPerCost: number;
+  nonRailEhpPerCost: number;
 };
 
 type ShipHullBenchmark = {
   hullClass: ShipHullClass;
-  averageSpaceAlphaPerOperatingCost: number;
-  averageDurabilityPerOperatingCost: number;
+  averageShipAlphaPerOperatingCost: number;
+  averageNonRailEhpPerOperatingCost: number;
 };
 
 const projectRoot = process.cwd();
@@ -89,6 +99,8 @@ const blueprintsDir = join(projectRoot, 'src', 'app', 'blueprints');
 const defenceBlueprintPath = join(blueprintsDir, 'defence-blueprints.json');
 const shipBlueprintPath = join(blueprintsDir, 'ship-blueprints.json');
 const defencesDescrPath = join(blueprintsDir, 'DEFENCES_DESCR.md');
+
+const BOMBARDMENT_SHIP_HIT_CHANCE = 0.1;
 
 const defenceOrder = [
   'LIGHT_BEAM_CANNON',
@@ -110,75 +122,122 @@ function sumWeaponDamage<TWeaponType extends string>(
 ): number {
   return weapons
     .filter((weapon) => weapon.type === type)
-    .reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
+    .reduce((sum, weapon) => sum + Math.max(0, weapon.dmg) * Math.max(0, Math.floor(weapon.shots)), 0);
 }
 
 function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0';
+  }
+
+  if (Math.abs(value) >= 100) {
+    return String(Math.round(value));
+  }
+
   if (Number.isInteger(value)) {
     return String(value);
   }
 
-  return value.toFixed(2).replace(/\.?0+$/, '');
+  return value.toFixed(3).replace(/\.?0+$/, '');
 }
 
 function calculateWeightedCost(cost: { metal: number; crystal: number; deuterium: number }): number {
-  return cost.metal + (cost.crystal * 2) + (cost.deuterium * 3);
+  return cost.metal + cost.crystal * 2 + cost.deuterium * 3;
 }
 
-function calculateDefenceSpaceAlpha(defence: DefenceBlueprint): number {
-  const beam = sumWeaponDamage(defence.weapons, 'BEAM');
-  const missile = sumWeaponDamage(defence.weapons, 'MISSILE');
-  const railGun = sumWeaponDamage(defence.weapons, 'RAIL_GUN');
-
-  return beam + missile + (railGun * 1.4);
+function calculateDefenceFire(defence: DefenceBlueprint): number {
+  return sumWeaponDamage(defence.weapons, 'BEAM')
+    + sumWeaponDamage(defence.weapons, 'MISSILE')
+    + sumWeaponDamage(defence.weapons, 'RAIL_GUN');
 }
 
-function calculateShipSpaceAlpha(ship: ShipBlueprint): number {
-  const beam = sumWeaponDamage(ship.weapons, 'BEAM');
-  const missile = sumWeaponDamage(ship.weapons, 'MISSILE');
-  const railGun = sumWeaponDamage(ship.weapons, 'RAIL_GUN');
-  const bombardment = sumWeaponDamage(ship.weapons, 'BOMBARDMENT_WEAPONS');
-
-  return beam + missile + (railGun * 1.4) + (bombardment * 0.33);
+function calculateOrbitFireAlpha(defence: DefenceBlueprint): number {
+  return defence.canShootToOrbit ? calculateDefenceFire(defence) : 0;
 }
 
-function calculateDurability(
-  hullPointsCapacity: number,
-  shieldCapacity: number,
-  armor: number,
-  criticalThreshold: number
-): number {
-  const baseDurability = hullPointsCapacity + (shieldCapacity * 0.5);
-  const armorFactor = 1 + (armor * 0.12);
-  const criticalFactor = 1 + ((50 - criticalThreshold) * 0.01);
-  return baseDurability * armorFactor * criticalFactor;
+function calculateLocalAntiBomberAlpha(defence: DefenceBlueprint): number {
+  return defence.canShootToOrbit ? 0 : calculateDefenceFire(defence);
+}
+
+function calculateBombPayloadAlpha(defence: DefenceBlueprint): number {
+  return sumWeaponDamage(defence.weapons, 'ORBIT_TO_SURFACE_BOMB');
+}
+
+function calculateAntiDefenceBattleBombAlpha(defence: DefenceBlueprint): number {
+  if (defence.hullClass !== 'PLANETARY_BOMB' || defence.size !== 1) {
+    return 0;
+  }
+
+  return calculateBombPayloadAlpha(defence);
+}
+
+function criticalHull(defence: DefenceBlueprint): number {
+  return defence.hullPointsCapacity * (defence.criticalThreshold / 100);
+}
+
+function calculateNonRailEhpToCrit(defence: DefenceBlueprint): number {
+  const protectedHull = Math.max(0, defence.hullPointsCapacity - criticalHull(defence));
+  return defence.shieldCapacity + protectedHull * 2;
+}
+
+function calculateNonRailEhpToZero(defence: DefenceBlueprint): number {
+  return defence.shieldCapacity + defence.hullPointsCapacity * 2;
+}
+
+function calculateRailEhpToCrit(defence: DefenceBlueprint): number {
+  return Math.max(0, defence.hullPointsCapacity - criticalHull(defence));
+}
+
+function calculateRailEhpToZero(defence: DefenceBlueprint): number {
+  return defence.hullPointsCapacity;
 }
 
 function calculateDefenceMetrics(defence: DefenceBlueprint): DefenceMetrics {
   const buildCost = calculateWeightedCost(defence.cost);
-  const spaceAlpha = calculateDefenceSpaceAlpha(defence);
-  const bombAlpha = sumWeaponDamage(defence.weapons, 'ORBIT_TO_SURFACE_BOMB');
-  const durability = calculateDurability(
-    defence.hullPointsCapacity,
-    defence.shieldCapacity,
-    defence.armor,
-    defence.criticalThreshold
-  );
+  const orbitFireAlpha = calculateOrbitFireAlpha(defence);
+  const localAntiBomberAlpha = calculateLocalAntiBomberAlpha(defence);
+  const antiDefenceBattleBombAlpha = calculateAntiDefenceBattleBombAlpha(defence);
+  const nonRailEhpToZero = calculateNonRailEhpToZero(defence);
 
   return {
     defence,
     buildCost,
-    spaceAlpha,
-    bombAlpha,
-    durability,
-    spaceAlphaPerCost: buildCost > 0 ? spaceAlpha / buildCost : 0,
-    durabilityPerCost: buildCost > 0 ? durability / buildCost : 0,
-    bombAlphaPerCost: buildCost > 0 ? bombAlpha / buildCost : 0
+    orbitFireAlpha,
+    localAntiBomberAlpha,
+    bombPayloadAlpha: calculateBombPayloadAlpha(defence),
+    antiDefenceBattleBombAlpha,
+    nonRailEhpToCrit: calculateNonRailEhpToCrit(defence),
+    nonRailEhpToZero,
+    railEhpToCrit: calculateRailEhpToCrit(defence),
+    railEhpToZero: calculateRailEhpToZero(defence),
+    criticalHull: criticalHull(defence),
+    orbitFirePerCost: buildCost > 0 ? orbitFireAlpha / buildCost : 0,
+    localAntiBomberPerCost: buildCost > 0 ? localAntiBomberAlpha / buildCost : 0,
+    antiDefenceBattleBombPerCost: buildCost > 0 ? antiDefenceBattleBombAlpha / buildCost : 0,
+    nonRailEhpPerCost: buildCost > 0 ? nonRailEhpToZero / buildCost : 0
   };
 }
 
+function calculateShipAlpha(ship: ShipBlueprint): number {
+  const normalShipFire = sumWeaponDamage(ship.weapons, 'BEAM')
+    + sumWeaponDamage(ship.weapons, 'MISSILE')
+    + sumWeaponDamage(ship.weapons, 'RAIL_GUN');
+  const expectedBombardmentVsShips =
+    sumWeaponDamage(ship.weapons, 'BOMBARDMENT_WEAPONS') * BOMBARDMENT_SHIP_HIT_CHANCE;
+
+  return normalShipFire + expectedBombardmentVsShips;
+}
+
+function hitChance(ship: ShipBlueprint): number {
+  return Math.max(0.01, 1 - Math.max(0, Math.min(0.99, ship.evasionChance)));
+}
+
+function calculateShipNonRailEhpToZero(ship: ShipBlueprint): number {
+  return (ship.shieldCapacity + ship.hullPointsCapacity * 2) / hitChance(ship);
+}
+
 function calculateShipBenchmarks(blueprints: ShipBlueprintFile): ShipHullBenchmark[] {
-  const grouped = new Map<ShipHullClass, Array<{ space: number; durability: number; operatingCost: number }>>();
+  const grouped = new Map<ShipHullClass, Array<{ alpha: number; durability: number; operatingCost: number }>>();
 
   for (const ship of blueprints.ships) {
     if (!ship.purposes.includes('MILITARY')) {
@@ -186,56 +245,86 @@ function calculateShipBenchmarks(blueprints: ShipBlueprintFile): ShipHullBenchma
     }
 
     const buildCost = calculateWeightedCost(ship.cost);
-    const operatingCost = buildCost + (ship.jumpCost * 3);
-    const spaceAlpha = calculateShipSpaceAlpha(ship);
-    const durability = calculateDurability(
-      ship.hullPointsCapacity,
-      ship.shieldCapacity,
-      ship.armor,
-      ship.criticalThreshold
-    );
+    const operatingCost = buildCost + ship.jumpCost * 3;
+    if (operatingCost <= 0) {
+      continue;
+    }
 
     if (!grouped.has(ship.hullClass)) {
       grouped.set(ship.hullClass, []);
     }
 
-    grouped.get(ship.hullClass)!.push({ space: spaceAlpha, durability, operatingCost });
+    grouped.get(ship.hullClass)!.push({
+      alpha: calculateShipAlpha(ship),
+      durability: calculateShipNonRailEhpToZero(ship),
+      operatingCost
+    });
   }
 
   return Array.from(grouped.entries()).map(([hullClass, values]) => {
-    const averageSpaceAlphaPerOperatingCost = values.reduce((sum, value) => sum + (value.space / value.operatingCost), 0) / values.length;
-    const averageDurabilityPerOperatingCost = values.reduce((sum, value) => sum + (value.durability / value.operatingCost), 0) / values.length;
+    const averageShipAlphaPerOperatingCost =
+      values.reduce((sum, value) => sum + value.alpha / value.operatingCost, 0) / values.length;
+    const averageNonRailEhpPerOperatingCost =
+      values.reduce((sum, value) => sum + value.durability / value.operatingCost, 0) / values.length;
 
     return {
       hullClass,
-      averageSpaceAlphaPerOperatingCost,
-      averageDurabilityPerOperatingCost
+      averageShipAlphaPerOperatingCost,
+      averageNonRailEhpPerOperatingCost
     };
   });
+}
+
+function targetingLabel(defence: DefenceBlueprint, metrics: DefenceMetrics): string {
+  if (defence.canShootToOrbit) {
+    return 'all orbit ships';
+  }
+
+  if (metrics.localAntiBomberAlpha > 0) {
+    return 'small bombers only';
+  }
+
+  if (defence.hullClass === 'PLANETARY_BOMB') {
+    return defence.size === 1 ? 'anti-defence or building bomb' : 'building bomb';
+  }
+
+  return '-';
 }
 
 function createTable(title: string, defences: DefenceMetrics[]): string {
   const lines: string[] = [];
   lines.push(`### ${title}`);
   lines.push('');
-  lines.push('| Defence | Hull | Orbit Fire | Build | Space Alpha | Bomb Alpha | Durability | SpaceA/Cost | Bomb/Cost | Dur/Cost | Notes |');
-  lines.push('| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
+  lines.push('| Defence | Hull | Targeting | Build | Hull/Sh/Arm | Crit Hull | Orbit Fire | Local Anti-Bomber | Ground Bomb Payload | Anti-Def Battle Bomb | NonRail EHP0 | Rail EHP0 | Orbit/Cost | Local/Cost | AntiDefBomb/Cost | EHP/Cost | Notes |');
+  lines.push('| --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
 
   for (const metrics of defences) {
+    const defence = metrics.defence;
     const notes: string[] = [];
-    if (metrics.defence.canShootToOrbit) {
+
+    if (defence.canShootToOrbit) {
       notes.push('anti-orbit');
-    } else if (metrics.spaceAlpha > 0) {
-      notes.push('surface/local only');
+    } else if (metrics.localAntiBomberAlpha > 0) {
+      notes.push('surface/local interception');
     }
-    if (metrics.bombAlpha > 0) {
-      notes.push('planetary bombardment');
+
+    if (defence.hullClass === 'PLANETARY_BOMB') {
+      notes.push(defence.size === 1
+        ? 'can hit defences in space battle and buildings in bombardment'
+        : 'building-focused bombardment payload');
+    }
+
+    if (sumWeaponDamage(defence.weapons, 'RAIL_GUN') > 0) {
+      notes.push('rail ignores shield and armor');
     }
 
     lines.push(
-      `| ${metrics.defence.type} | ${metrics.defence.hullClass} | ${metrics.defence.canShootToOrbit ? 'Yes' : 'No'} | ${formatNumber(metrics.buildCost)} | `
-      + `${formatNumber(metrics.spaceAlpha)} | ${formatNumber(metrics.bombAlpha)} | ${formatNumber(metrics.durability)} | `
-      + `${formatNumber(metrics.spaceAlphaPerCost)} | ${formatNumber(metrics.bombAlphaPerCost)} | ${formatNumber(metrics.durabilityPerCost)} | `
+      `| ${defence.type} | ${defence.hullClass} | ${targetingLabel(defence, metrics)} | ${formatNumber(metrics.buildCost)} | `
+      + `${formatNumber(defence.hullPointsCapacity)}/${formatNumber(defence.shieldCapacity)}/${formatNumber(defence.armor)} | `
+      + `${formatNumber(metrics.criticalHull)} | ${formatNumber(metrics.orbitFireAlpha)} | ${formatNumber(metrics.localAntiBomberAlpha)} | `
+      + `${formatNumber(metrics.bombPayloadAlpha)} | ${formatNumber(metrics.antiDefenceBattleBombAlpha)} | `
+      + `${formatNumber(metrics.nonRailEhpToZero)} | ${formatNumber(metrics.railEhpToZero)} | ${formatNumber(metrics.orbitFirePerCost)} | `
+      + `${formatNumber(metrics.localAntiBomberPerCost)} | ${formatNumber(metrics.antiDefenceBattleBombPerCost)} | ${formatNumber(metrics.nonRailEhpPerCost)} | `
       + `${notes.join(', ')} |`
     );
   }
@@ -249,15 +338,52 @@ function createShipBenchmarkTable(benchmarks: ShipHullBenchmark[]): string {
   lines.push('## Current Military Ship Hull Benchmarks');
   lines.push('');
   lines.push('These are pulled from the live ship blueprint file and use only ships with the `MILITARY` purpose.');
-  lines.push('They use the same weighted-cost and durability formulas and serve only as comparison anchors for the "defences should be a little more effective than ships" target.');
+  lines.push('They use the same battle-aware alpha and non-rail EHP markers as the defence tables.');
   lines.push('');
-  lines.push('| Ship Hull Class | Avg SpaceA/OpCost | Avg Dur/OpCost |');
+  lines.push('| Ship Hull Class | Avg ShipAlpha/OpCost | Avg NonRailEHP/OpCost |');
   lines.push('| --- | ---: | ---: |');
 
   for (const benchmark of benchmarks.sort((a, b) => a.hullClass.localeCompare(b.hullClass))) {
     lines.push(
-      `| ${benchmark.hullClass} | ${formatNumber(benchmark.averageSpaceAlphaPerOperatingCost)} | ${formatNumber(benchmark.averageDurabilityPerOperatingCost)} |`
+      `| ${benchmark.hullClass} | ${formatNumber(benchmark.averageShipAlphaPerOperatingCost)} | ${formatNumber(benchmark.averageNonRailEhpPerOperatingCost)} |`
     );
+  }
+
+  lines.push('');
+  return lines.join('\n');
+}
+
+function createWatchlist(metrics: DefenceMetrics[], shipBenchmarks: ShipHullBenchmark[]): string {
+  const lines: string[] = ['## Automated Balance Watchlist', ''];
+  const averageShipAlphaBenchmark = shipBenchmarks.length > 0
+    ? shipBenchmarks.reduce((sum, entry) => sum + entry.averageShipAlphaPerOperatingCost, 0) / shipBenchmarks.length
+    : 0;
+
+  let notes = 0;
+  for (const metric of metrics) {
+    const defence = metric.defence;
+    if (
+      defence.canShootToOrbit
+      && averageShipAlphaBenchmark > 0
+      && metric.orbitFirePerCost >= averageShipAlphaBenchmark * 1.6
+    ) {
+      lines.push(`- ${defence.type}: high orbit-fire efficiency compared with military ship averages (${formatNumber(metric.orbitFirePerCost)} vs ${formatNumber(averageShipAlphaBenchmark)}).`);
+      notes += 1;
+    }
+
+    if (!defence.canShootToOrbit && metric.localAntiBomberAlpha > 0) {
+      lines.push(`- ${defence.type}: live targeting is narrow; it can only shoot SMALL ships that carry bombardment weapons.`);
+      notes += 1;
+    }
+
+    if (defence.hullClass === 'PLANETARY_BOMB' && defence.size !== 1 && metric.bombPayloadAlpha > 0) {
+      lines.push(`- ${defence.type}: building-focused bomb payload ${formatNumber(metric.bombPayloadAlpha)}; it is intentionally skipped by the size-1 anti-defence space-battle bomb step.`);
+      notes += 1;
+    }
+  }
+
+  if (notes <= 0) {
+    lines.push('No large ratio or live-rule outliers were detected by the simple checks.');
   }
 
   lines.push('');
@@ -283,49 +409,47 @@ function buildMarkdown(defences: DefenceBlueprintFile, ships: ShipBlueprintFile)
   );
 
   const sections: string[] = [
-    '# Planetary Defence Balance Comparison Template',
+    '# Planetary Defence Battle Balance Reference',
     '',
-    'This file is a lightweight balance reference for `defence-blueprints.json`.',
+    'This file is generated from `defence-blueprints.json` by `scripts/generate-defences-descr.ts`.',
+    'The formulas below mirror the live space battle resolver in `src/app/models/battles/space-battle-resolver.ts` at the blueprint, no-tech level.',
     '',
-    'The same basic weighted-cost logic is used as in the ship reference, but the markers are simpler because defences do not move, do not carry hangars, and do not pay travel cost.',
+    '## Live Battle Rules Captured',
     '',
-    '## Core Cost Marker',
+    '- Defences participate in the same 4-round space battle loop as ships.',
+    '- Orbit-capable defences can target all ship hull classes.',
+    '- Surface-only defences can target only `SMALL` ships that carry `BOMBARDMENT_WEAPONS`.',
+    '- Defences cannot shoot other defences in normal space combat.',
+    '- Ships can damage defences only with `BOMBARDMENT_WEAPONS`.',
+    '- `BOMBARDMENT_WEAPONS` always hit defences once fired.',
+    '- `RAIL_GUN` applies full damage directly to hull and ignores shield and armor.',
+    '- Other weapons remove shield first, then only half of spillover can become hull damage.',
+    '- Armor is subtracted from hull spillover; missiles subtract double armor.',
+    '- Current planetary bomb activation inside the space battle resolver only considers size-1 planetary bombs for anti-defence battle damage.',
+    '- Bombard and Siege building bombardment use all carried planetary bomb sizes through `applyBuildingBombardment(...)`.',
+    '',
+    '## Cost And Output Markers',
     '',
     '```text',
     'weightedCost = metal * 1 + crystal * 2 + deuterium * 3',
+    'orbitFireAlpha = beamDamage + missileDamage + railGunDamage, only when canShootToOrbit',
+    'localAntiBomberAlpha = beamDamage + missileDamage + railGunDamage, only for surface-only local anti-bomber fire',
+    'groundBombPayloadAlpha = orbitToSurfaceBombDamage',
+    'antiDefenceBattleBombAlpha = groundBombPayloadAlpha only for size-1 planetary bombs',
     '```',
     '',
-    '## Combat Markers',
+    '## Durability Markers',
     '',
     '```text',
-    'spaceAlpha = beamDamage + missileDamage + railGunDamage * 1.4',
-    'bombAlpha = orbitToSurfaceBombDamage',
-    'durabilityScore = (hull * 1.0 + shield * 0.5) * (1 + armor * 0.12) * (1 + (50 - criticalThreshold) * 0.01)',
+    'criticalHull = hullPointsCapacity * criticalThreshold / 100',
+    'nonRailEhpToZero = shieldCapacity + hullPointsCapacity * 2',
+    'railEhpToZero = hullPointsCapacity',
     '```',
     '',
-    'Interpretation:',
-    '',
-    '- `spaceAlpha` is for defence-vs-ship combat',
-    '- `bombAlpha` is only for the bomb stockpile entries',
-    '- `durabilityScore` uses the same rough comparison marker as ships',
-    '- `canShootToOrbit` matters a lot; surface-only entries should not be judged like orbital cannons',
-    '',
-    '## Main Efficiency Ratios',
-    '',
-    '```text',
-    'spaceCombatEfficiency = spaceAlpha / weightedCost',
-    'bombEfficiency = bombAlpha / weightedCost',
-    'durabilityEfficiency = durabilityScore / weightedCost',
-    '```',
-    '',
-    '## Review Rules',
-    '',
-    '- Orbit-capable defences should usually be a bit more efficient than comparable mobile ships',
-    '- Surface-only defences and bombs should be judged by their niche, not by orbit combat',
-    '- Rail-gun defences are expected to look stronger than raw damage suggests',
-    '- Planetary bombs are consumable attack stockpile, not line defences',
+    'The non-rail marker reflects the live half-spillover rule. Armor is reported separately because its value depends on enemy shot size and weapon type.',
     '',
     createShipBenchmarkTable(shipBenchmarks),
+    createWatchlist(orderedMetrics, shipBenchmarks),
     '## Current Blueprint Calculations',
     ''
   ];
