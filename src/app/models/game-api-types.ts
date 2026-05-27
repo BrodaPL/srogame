@@ -950,6 +950,7 @@ export type PlayerReportDtoBase = {
   createdTurn: number;
   title: string;
   isRead: boolean;
+  isFavourite?: boolean;
   sourceCoordinates: ClientCoordinates | null;
   sourcePlanetName: string | null;
   sourceSystemName: string | null;
