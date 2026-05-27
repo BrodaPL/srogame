@@ -153,7 +153,7 @@ describe('BotWarfareSubsystem', () => {
     )).toBe(true);
   });
 
-  it('reserves exactly one cargo production request when cargo ships are unlocked', () => {
+  it('reserves capped cargo production requests when cargo ships are unlocked', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseWarfarePlanet(planet);
     planet.setBuildingLevel(BuildingType.METAL_MINE, 5);
@@ -186,9 +186,11 @@ describe('BotWarfareSubsystem', () => {
     const productionProposals = result.proposals.filter((proposal) => proposal.kind === 'SHIPYARD');
 
     expect(result.goals?.length).toBeGreaterThanOrEqual(5);
-    expect(result.proposals).toHaveLength(5);
+    expect(result.proposals.length).toBeGreaterThan(5);
+    expect(result.proposals.length).toBeLessThanOrEqual(12);
     expect(productionProposals.length).toBeGreaterThanOrEqual(3);
-    expect(cargoProposals).toHaveLength(1);
+    expect(cargoProposals.length).toBeGreaterThan(0);
+    expect(cargoProposals.length).toBeLessThanOrEqual(2);
   });
 
   it('does not emit transporter production only because one transporter is installed when build prerequisites are missing', () => {
@@ -357,6 +359,9 @@ describe('BotWarfareSubsystem', () => {
       targetCoordinates: { x: 0, y: 0, z: 1 },
       requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
       weightedResourceValue: 0,
+      budgetScope: 'PLANETARY',
+      budgetPlanetKey: '0:0:1',
+      budgetIntentSubsystemId: 'WARFARE',
       score: 1,
       status: 'PENDING_SHIPS_NEXT_TURN',
       createdTurn: galaxy.currentTurn,
@@ -374,6 +379,9 @@ describe('BotWarfareSubsystem', () => {
       targetCoordinates: { x: 0, y: 0, z: 1 },
       requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
       weightedResourceValue: 0,
+      budgetScope: 'PLANETARY',
+      budgetPlanetKey: '0:0:1',
+      budgetIntentSubsystemId: 'WARFARE',
       score: 1,
       status: 'PENDING_SHIPS_NEXT_TURN',
       createdTurn: galaxy.currentTurn,

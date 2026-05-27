@@ -96,6 +96,51 @@ describe('bot supervisor commitments', () => {
     expect(decision.debug.budgetOverrunRejectedCount).toBe(1);
   });
 
+  it('charges matching Warfare ship production to Strategic Military budget intent', () => {
+    const memory = createDefaultBotMemoryV2();
+    memory.weightManager.planets = [createWeightManagerPlanet()];
+    memory.weightManager.strategicMilitaryWeight = 80;
+    const warfareCruiser = createShipyardProposal('warfare-cruiser', 'WARFARE', ShipType.CRUISER);
+    const strategicNeed: BotProposal = {
+      ...createShipyardProposal('strategic-need-cruiser', 'STRATEGIC_MILITARY', ShipType.CRUISER),
+      requestPayload: {
+        x: 0,
+        y: 0,
+        z: 1,
+        itemKind: 'ship',
+        shipType: ShipType.CRUISER,
+        amount: 4,
+        demandOnly: true
+      },
+      expectedValue: 100,
+      urgency: 100,
+      debug: { queueType: 'SHIP_NEED' }
+    };
+
+    const decision = createSupervisor().decide(
+      createSnapshot(
+        { metal: 1000, crystal: 1000, deuterium: 1000 },
+        { shipyardLevel: 10, defaultTechLevel: 10 }
+      ),
+      memory,
+      [warfareCruiser, strategicNeed]
+    );
+
+    expect(decision.accepted[0]).toMatchObject({
+      proposalId: 'warfare-cruiser',
+      budgetAttribution: {
+        scope: 'IMPERIUM',
+        planetKey: '0:0:1',
+        intentSubsystemId: 'STRATEGIC_MILITARY',
+        executorSubsystemId: 'WARFARE'
+      }
+    });
+    expect(decision.accepted[0]?.debug.matchedStrategicMilitaryShipNeedPressure).toBeGreaterThan(0);
+    expect(decision.rejected.find((entry) => entry.proposalId === 'strategic-need-cruiser')).toMatchObject({
+      reason: 'ship_need_pressure_only'
+    });
+  });
+
   it('does not oversubscribe same-turn local queue resources on one planet', () => {
     const memory = createDefaultBotMemoryV2();
     const decision = createSupervisor().decide(

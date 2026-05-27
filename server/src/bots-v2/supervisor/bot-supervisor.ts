@@ -69,6 +69,12 @@ type ScoredProposal = {
   budgetState: ProposalBudgetState;
 };
 
+type ShipNeedPressure = {
+  total: number;
+  strategicMilitary: number;
+  amount: number;
+};
+
 export class BotSupervisorV2 implements BotSupervisor {
   constructor(private readonly flags: BotV2FeatureFlags) {}
 
@@ -337,11 +343,13 @@ export class BotSupervisorV2 implements BotSupervisor {
     proposal: BotProposal,
     snapshot: BotWorldSnapshot,
     memory: BotMemoryV2,
-    shipNeedPressure: Map<string, number>,
+    shipNeedPressure: Map<string, ShipNeedPressure>,
     researchOverlapBonus: Map<string, number>,
     shipyardOverlapBonus: Map<string, number>,
     retryCommitment = false
   ): ScoredProposal | null {
+    proposal = applyStrategicMilitaryShipNeedAttribution(proposal, shipNeedPressure);
+
     if (proposal.status === 'BLOCKED' || proposal.blockers.length > 0) {
       return {
         proposal,
@@ -530,7 +538,7 @@ export class BotSupervisorV2 implements BotSupervisor {
     }
 
     const pressure = proposal.kind === 'SHIPYARD'
-      ? shipNeedPressure.get(resolveShipyardNeedKey(proposal) ?? '') ?? 0
+      ? shipNeedPressure.get(resolveShipyardNeedKey(proposal) ?? '')?.total ?? 0
       : 0;
 
     let score = scoreSupervisorProposal({
@@ -1250,8 +1258,8 @@ function appendProposalHistory(
   );
 }
 
-function buildShipNeedPressure(proposals: BotProposal[]): Map<string, number> {
-  const pressure = new Map<string, number>();
+function buildShipNeedPressure(proposals: BotProposal[]): Map<string, ShipNeedPressure> {
+  const pressure = new Map<string, ShipNeedPressure>();
   for (const proposal of proposals) {
     if (proposal.kind !== 'SHIPYARD' || proposal.requestPayload.demandOnly !== true) {
       continue;
@@ -1262,9 +1270,51 @@ function buildShipNeedPressure(proposals: BotProposal[]): Map<string, number> {
     }
     const amount = Math.max(1, Number(proposal.requestPayload.amount ?? 1));
     const urgency = Math.max(0, proposal.urgency);
-    pressure.set(key, (pressure.get(key) ?? 0) + amount + urgency);
+    const existing = pressure.get(key) ?? { total: 0, strategicMilitary: 0, amount: 0 };
+    const value = amount + urgency;
+    existing.total += value;
+    existing.amount += amount;
+    if (proposal.subsystemId === 'STRATEGIC_MILITARY') {
+      existing.strategicMilitary += value;
+    }
+    pressure.set(key, existing);
   }
   return pressure;
+}
+
+function applyStrategicMilitaryShipNeedAttribution(
+  proposal: BotProposal,
+  shipNeedPressure: Map<string, ShipNeedPressure>
+): BotProposal {
+  if (
+    proposal.kind !== 'SHIPYARD'
+    || proposal.requestPayload.demandOnly === true
+    || proposal.subsystemId !== 'WARFARE'
+  ) {
+    return proposal;
+  }
+
+  const key = resolveShipyardNeedKey(proposal);
+  const pressure = key ? shipNeedPressure.get(key) : null;
+  if (!pressure || pressure.strategicMilitary <= 0) {
+    return proposal;
+  }
+
+  return {
+    ...proposal,
+    budgetAttribution: {
+      scope: 'IMPERIUM',
+      planetKey: proposal.targetCoordinates ? toCoordinatesKey(proposal.targetCoordinates) : null,
+      intentSubsystemId: 'STRATEGIC_MILITARY',
+      executorSubsystemId: proposal.subsystemId
+    },
+    debug: {
+      ...proposal.debug,
+      budgetIntentSubsystemId: 'STRATEGIC_MILITARY',
+      matchedStrategicMilitaryShipNeedPressure: Math.round(pressure.strategicMilitary),
+      matchedStrategicMilitaryShipNeedAmount: pressure.amount
+    }
+  };
 }
 
 function buildResearchOverlapBonus(proposals: BotProposal[]): Map<string, number> {

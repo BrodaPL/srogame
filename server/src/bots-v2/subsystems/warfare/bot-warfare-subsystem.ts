@@ -24,6 +24,10 @@ import {
   TECHNOLOGY_BLUEPRINTS
 } from '../../../game-commands/command-helpers.js';
 import { resolveModule } from '../../../esm-module.js';
+import {
+  resolveBudgetWindowForAvgIndustry,
+  toCoordinatesKey
+} from '../../supervisor/bot-supervisor-budgeting.js';
 
 const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../../src/app/models/enums/building-type.js');
 const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../../../../src/app/models/diplomacy/diplomatic-status.js');
@@ -186,13 +190,18 @@ const ALLOWED_WARFARE_BUILDING_SCOPE = new Set<BuildingTypeT>([
 
 const BONUS_FACTOR_CEILING = 3;
 const NANITE_WEIGHTED_ETC_PENALTY = 1.2;
-const MAX_VISIBLE_GOALS = 5;
+const MAX_VISIBLE_GOALS = 12;
+const MAX_STRUCTURAL_GOALS_PER_PLANET = 2;
+const MAX_PRODUCTION_GOALS_PER_PLANET = 10;
+const MAX_CARGO_PRODUCTION_GOALS_PER_PLANET = 2;
 const STRUCTURAL_VISIBILITY_THRESHOLD = 1.5;
 const FOREIGN_RECYCLE_INTEL_MAX_AGE = 20;
 const CRUISER_FOCUS_AVG_INDUSTRY_THRESHOLD = 3.8;
 const CRUISER_BREAK_FLEET_TARGET = 8;
 const MIN_HOME_GUARD_JUMP_SHIPS = 2;
 const MAX_WARFARE_RECYCLE_FLEET_SLOTS = 2;
+const WARFARE_PRODUCTION_BUDGET_SLICE = 0.25;
+const MAX_SINGLE_PRODUCTION_ORDER_TURNS = 8;
 
 export class BotWarfareSubsystem implements BotSubsystem {
   public readonly subsystemId = 'WARFARE' as const;
@@ -1159,8 +1168,11 @@ function evaluateProductionGoal(
   if (!canProduceShipNow(planet, shipType)) {
     return null;
   }
+  if (shipType === ShipType.TRANSPORTER && isTransporterOverSoftCap(context, planet)) {
+    return null;
+  }
 
-  const immediateRequest = resolveProductionRequest(planet, shipType);
+  const immediateRequest = resolveProductionRequest(context, planet, shipType);
   const blueprint = SHIP_BLUEPRINTS.get(shipType);
   if (!blueprint) {
     return null;
@@ -1267,14 +1279,22 @@ function resolveSelectedGoals(
       || bestStructural.weightedEtc <= (bestProduction.weightedEtc * STRUCTURAL_VISIBILITY_THRESHOLD)
     );
   const initialStructuralLimit = allowStructural
-    ? Math.min(2, actionableStructuralGoals.length)
+    ? Math.min(MAX_STRUCTURAL_GOALS_PER_PLANET, actionableStructuralGoals.length)
     : 0;
 
-  pushUniqueGoals(planet, actionableStructuralGoals, selectedGoals, selectedRequestKeys, selectedShipTypes, initialStructuralLimit);
+  pushUniqueGoals(planet, actionableStructuralGoals, selectedGoals, selectedRequestKeys, selectedShipTypes, initialStructuralLimit, MAX_VISIBLE_GOALS);
 
   const cargoProductionGoals = actionableProductionGoals.filter((goal) => isCargoShipType(goal.finalShipType));
   if (cargoProductionGoals.length > 0) {
-    pushUniqueGoals(planet, cargoProductionGoals, selectedGoals, selectedRequestKeys, selectedShipTypes, 1);
+    pushUniqueGoals(
+      planet,
+      cargoProductionGoals,
+      selectedGoals,
+      selectedRequestKeys,
+      selectedShipTypes,
+      MAX_CARGO_PRODUCTION_GOALS_PER_PLANET,
+      MAX_VISIBLE_GOALS
+    );
   }
 
   const nonCargoProductionGoals = actionableProductionGoals.filter((goal) => !isCargoShipType(goal.finalShipType));
@@ -1284,7 +1304,8 @@ function resolveSelectedGoals(
     selectedGoals,
     selectedRequestKeys,
     selectedShipTypes,
-    Math.max(0, MAX_VISIBLE_GOALS - selectedGoals.length)
+    Math.max(0, MAX_PRODUCTION_GOALS_PER_PLANET - countProductionGoals(selectedGoals)),
+    MAX_VISIBLE_GOALS
   );
 
   pushUniqueGoals(
@@ -1293,7 +1314,8 @@ function resolveSelectedGoals(
     selectedGoals,
     selectedRequestKeys,
     selectedShipTypes,
-    Math.max(0, MAX_VISIBLE_GOALS - selectedGoals.length)
+    Math.max(0, MAX_PRODUCTION_GOALS_PER_PLANET - countProductionGoals(selectedGoals)),
+    MAX_VISIBLE_GOALS
   );
 
   pushUniqueGoals(
@@ -1302,7 +1324,8 @@ function resolveSelectedGoals(
     selectedGoals,
     selectedRequestKeys,
     selectedShipTypes,
-    Math.max(0, MAX_VISIBLE_GOALS - selectedGoals.length)
+    Math.max(0, MAX_STRUCTURAL_GOALS_PER_PLANET - countStructuralGoals(selectedGoals)),
+    MAX_VISIBLE_GOALS
   );
 
   const branch = selectedGoals[0]?.branch ?? resolveFallbackBranch(actionableStructuralGoals, actionableProductionGoals);
@@ -1318,14 +1341,15 @@ function pushUniqueGoals(
   selectedGoals: WarfareGoalEvaluation[],
   selectedRequestKeys: Set<string>,
   selectedShipTypes: Set<ShipTypeT>,
-  limit: number
+  limit: number,
+  maxTotal: number
 ): void {
   if (limit <= 0) {
     return;
   }
 
   for (const candidate of candidates) {
-    if (selectedGoals.length >= MAX_VISIBLE_GOALS || limit <= 0) {
+    if (selectedGoals.length >= maxTotal || limit <= 0) {
       break;
     }
     if (!candidate.immediateRequest) {
@@ -1347,6 +1371,23 @@ function pushUniqueGoals(
     }
     limit -= 1;
   }
+}
+
+function isTransporterOverSoftCap(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot
+): boolean {
+  const cap = resolveTransporterCap(context, planet);
+  const installed = planet.ships.installedCountByType[ShipType.TRANSPORTER] ?? 0;
+  return installed > cap;
+}
+
+function countProductionGoals(goals: WarfareGoalEvaluation[]): number {
+  return goals.filter((goal) => goal.goalFamily === 'PRODUCTION').length;
+}
+
+function countStructuralGoals(goals: WarfareGoalEvaluation[]): number {
+  return goals.filter((goal) => goal.goalFamily !== 'PRODUCTION').length;
 }
 
 function resolveFallbackBranch(
@@ -1745,6 +1786,7 @@ function resolveActionableResearchRequest(
 }
 
 function resolveProductionRequest(
+  context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
   shipType: ShipTypeT
 ): ProductionStep | null {
@@ -1757,7 +1799,7 @@ function resolveProductionRequest(
     return null;
   }
 
-  const amount = resolveProductionOrderAmount(planet, shipType);
+  const amount = resolveProductionOrderAmount(context, planet, shipType);
   return {
     kind: 'SHIPYARD',
     shipType,
@@ -1768,6 +1810,7 @@ function resolveProductionRequest(
 }
 
 function resolveProductionOrderAmount(
+  context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
   shipType: ShipTypeT
 ): number {
@@ -1777,13 +1820,59 @@ function resolveProductionOrderAmount(
   }
 
   const localIncomeTotal = planet.economy.income.metal + planet.economy.income.crystal + planet.economy.income.deuterium;
-  const targetBudget = Math.max(
-    1,
-    Math.floor(localIncomeTotal * resolveDeterministicOrderFactor(planet, shipType))
-  );
+  const budgetEnvelope = resolveWarfareProductionBudgetEnvelope(context, planet);
+  const deterministicShare = resolveDeterministicOrderFactor(planet, shipType);
+  const targetBudget = Math.max(1, Math.floor(budgetEnvelope * deterministicShare));
   const totalCost = Math.max(1, Math.floor(blueprint.cost.getTotalResourceAmount()));
 
   return Math.max(1, Math.floor(targetBudget / totalCost));
+}
+
+function resolveWarfareProductionBudgetEnvelope(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot
+): number {
+  const localIncomeTotal = planet.economy.income.metal + planet.economy.income.crystal + planet.economy.income.deuterium;
+  const planetKey = toCoordinatesKey(planet.coordinates);
+  const weightEntry = context.memory.weightManager.planets.find((entry) => toCoordinatesKey(entry.coordinates) === planetKey);
+  const economicWeight = Math.max(0, weightEntry?.economicWeight ?? 50);
+  const defensiveWeight = Math.max(0, weightEntry?.defensiveWeight ?? 50);
+  const warfareWeight = Math.max(0, weightEntry?.warfareWeight ?? 50);
+  const localWeightTotal = economicWeight + defensiveWeight + warfareWeight;
+  const warfareShare = localWeightTotal > 0 ? warfareWeight / localWeightTotal : 1 / 3;
+  const avgIndustry = weightEntry?.avgIndustry ?? planet.defense.avgIndustryLevel;
+  const windowTurns = resolveBudgetWindowForAvgIndustry(avgIndustry);
+  const usableWindowTurns = Math.min(windowTurns, MAX_SINGLE_PRODUCTION_ORDER_TURNS);
+  const currentBudgetMultiplier = resolveCurrentWarfareBudgetMultiplier(context, planetKey);
+  return Math.max(
+    localIncomeTotal,
+    localIncomeTotal * usableWindowTurns * warfareShare * WARFARE_PRODUCTION_BUDGET_SLICE * currentBudgetMultiplier
+  );
+}
+
+function resolveCurrentWarfareBudgetMultiplier(
+  context: BotSubsystemContext,
+  planetKey: string
+): number {
+  const recentPlanetarySpend = context.memory.supervisor.planetarySpendingHistory
+    .filter((entry) => entry.planetKey === planetKey)
+    .slice(-20);
+  const totalSpend = recentPlanetarySpend.reduce((sum, entry) => sum + entry.weightedResourceValue, 0);
+  if (totalSpend <= 0) {
+    return 1.25;
+  }
+
+  const warfareSpend = recentPlanetarySpend
+    .filter((entry) => entry.subsystemId === 'WARFARE')
+    .reduce((sum, entry) => sum + entry.weightedResourceValue, 0);
+  const warfareShare = warfareSpend / totalSpend;
+  if (warfareShare < 0.15) {
+    return 1.35;
+  }
+  if (warfareShare > 0.45) {
+    return 0.7;
+  }
+  return 1;
 }
 
 function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, shipType: ShipTypeT): number {
@@ -1793,8 +1882,7 @@ function resolveDeterministicOrderFactor(planet: BotPlanetSnapshot, shipType: Sh
     hash = ((hash * 31) + character.charCodeAt(0)) % 100000;
   }
 
-  const maxExtraFactor = Math.max(0, planet.defense.avgIndustryLevel);
-  return 1 + (((hash % 1000) / 1000) * maxExtraFactor);
+  return 0.85 + (((hash % 1000) / 1000) * 0.3);
 }
 
 function resolveCapacityBonusFactor(
@@ -2184,12 +2272,38 @@ function createProposalFromGoal(
           ? request.technologyType
           : request.shipType,
       immediateRequestAmount: request.kind === 'SHIPYARD' ? request.amount : null,
+      shipRole: request.kind === 'SHIPYARD' ? resolveShipRole(request.shipType) : null,
+      isJumpCapable: request.kind === 'SHIPYARD' ? Boolean(SHIP_BLUEPRINTS.get(request.shipType)?.canJump) : null,
+      cargoCapacity: request.kind === 'SHIPYARD' ? (SHIP_BLUEPRINTS.get(request.shipType)?.cargoCapacity ?? 0) : null,
+      combatValue: request.kind === 'SHIPYARD' ? resolveShipCombatValue(request.shipType) : null,
       primaryGoalKey: goal.goalKey,
       secondaryGoalKey: selectedIndex === 1 ? goal.goalKey : null,
       selectedIndex: selectedIndex + 1,
       sharedImmediateRequest: false
     }
   };
+}
+
+function resolveShipRole(shipType: ShipTypeT): string {
+  if (isCargoShipType(shipType)) {
+    return 'CARGO';
+  }
+  if (isJumpCapableCombatShipType(shipType)) {
+    return 'JUMP_COMBAT';
+  }
+  if (isSmallSupportShipType(shipType)) {
+    return 'SMALL_COMBAT';
+  }
+  return 'COMBAT';
+}
+
+function resolveShipCombatValue(shipType: ShipTypeT): number {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint) {
+    return 0;
+  }
+  const weaponValue = blueprint.weapons.reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
+  return Math.max(0, blueprint.hullPointsCapacity + blueprint.shieldCapacity + weaponValue);
 }
 
 function resolveDedupeKey(
