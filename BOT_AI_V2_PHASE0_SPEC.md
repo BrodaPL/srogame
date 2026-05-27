@@ -283,6 +283,7 @@ Budget follow-up TODOs:
 - Track occasional same-turn affordability / reservation leaks. One `INSUFFICIENT_RESOURCES` in a 6-bot 170-turn benchmark is acceptable for now, but repeated cases should become a Supervisor reservation bugfix.
 - Revisit planetary vs imperium budget split ratios after the next tuning pass. Current `PLANETARY_ONLY` / `PLANETARY_DOMINANT` / `HYBRID` / `IMPERIUM_ONLY` behavior is a first working contract, not final balancing.
 - With real human gameplay logs, identify additional planetary and imperium flags for Weight Manager and Supervisor situation handling before final profile tuning.
+- TODO: Future Strategic Diplomatic `ALLIANCE_DEPOT` policy should support allied bombard/siege logistics: bombs, fuel, and carried small ships in request creation/approval, without allowing allied support to bypass local reserve or mission-legality rules.
 
 ## Proposed location
 

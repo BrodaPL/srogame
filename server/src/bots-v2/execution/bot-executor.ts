@@ -44,6 +44,7 @@ import {
   validateJumpGateLaunchAccess
 } from '../../game-commands/command-helpers.js';
 import type { BotExecutionOutcome, BotExecutor, BotProposal } from '../bot-v2-types.ts';
+import { estimateShipCountsAntiFleetStrength } from '../ship-payload-planning.js';
 import { normalizeFleetExecutionProposal } from './bot-fleet-execution-adapters.js';
 import { normalizeQueueExecutionProposal } from './bot-execution-adapters.js';
 import { normalizeRequestDecisionProposal } from './bot-request-decision-adapters.js';
@@ -76,6 +77,8 @@ const RELATIONS_REQUIRING_OFFENSIVE_RECALL = new Set<DiplomaticStatusT>([
   DiplomaticStatus.ALLIED
 ]);
 
+const UNSAFE_BOMBARDMENT_RECALL_RATIO = 0.8;
+
 export class NoopBotExecutor implements BotExecutor {
   public executeAcceptedTasks(accepted: BotProposal[]): BotExecutionOutcome[] {
     return accepted.map((proposal) => ({
@@ -102,6 +105,7 @@ export class LiveQueueBotExecutor implements BotExecutor {
     }
 
     outcomes.push(...this.recallInvalidOffensiveFleets());
+    outcomes.push(...this.recallUnsafeBombardmentFleets());
 
     for (const proposal of accepted) {
       if (proposal.kind === 'DIPLOMACY_DECISION') {
@@ -569,6 +573,86 @@ export class LiveQueueBotExecutor implements BotExecutor {
         message: result.value.restoredToOrigin
           ? 'Pending Jump Gate fleet restored to origin.'
           : 'Fleet recalled because diplomacy no longer permits offensive action.'
+      });
+    }
+
+    return outcomes;
+  }
+
+  private recallUnsafeBombardmentFleets(): BotExecutionOutcome[] {
+    const diplomacyResolver = new DiplomacyResolver(this.galaxy.diplomaticRelations);
+    const outcomes: BotExecutionOutcome[] = [];
+    const candidates = [...this.galaxy.activeFleets]
+      .filter((fleet) =>
+        fleet.ownerId === this.playerId
+        && (fleet.missionType === FleetMissionType.BOMBARD || fleet.missionType === FleetMissionType.SIEGE)
+        && (fleet.state === FleetState.MOVING_TO_TARGET || fleet.state === FleetState.PENDING_JUMP_GATE)
+      )
+      .sort((left, right) => left.fleetId - right.fleetId);
+
+    for (const fleet of candidates) {
+      const targetResult = resolvePlanetOrError(this.galaxy, fleet.target);
+      if (!targetResult.ok || targetResult.value.info.ownerId === null) {
+        continue;
+      }
+
+      const targetPlayerId = targetResult.value.info.ownerId;
+      const targetPlayer = this.galaxy.players.find((entry) => entry.playerId === targetPlayerId) ?? null;
+      if (!targetPlayer || targetPlayer.type === PlayerType.NEUTRAL) {
+        continue;
+      }
+      if (diplomacyResolver.getStatus(this.playerId, targetPlayerId) !== DiplomaticStatus.WAR) {
+        continue;
+      }
+
+      const report = targetResult.value.lastReportData.get(this.playerId) ?? null;
+      if (!report || report.createdTurn <= fleet.createdAtTurn || !report.hasTotalShipsIntel) {
+        continue;
+      }
+
+      const ownStrength = estimateShipCountsAntiFleetStrength(fleet.ships.undamagedShipsCount);
+      const enemyStrength = estimateShipCountsAntiFleetStrength(Object.fromEntries(report.ships.entries()));
+      const recallThreshold = ownStrength * UNSAFE_BOMBARDMENT_RECALL_RATIO;
+      if (ownStrength <= 0 || enemyStrength <= recallThreshold) {
+        continue;
+      }
+
+      const outcomeBase = {
+        proposalId: `lifecycle:bombardment-safety-recall:${fleet.fleetId}:${this.galaxy.currentTurn}`,
+        lifecycleAction: 'FLEET_RECALL' as const,
+        fleetId: fleet.fleetId,
+        missionType: fleet.missionType,
+        targetCoordinates: {
+          x: fleet.target.x,
+          y: fleet.target.y,
+          z: fleet.target.z
+        },
+        targetPlayerId,
+        currentStatus: DiplomaticStatus.WAR
+      };
+      const result = returnActiveFleetCommand(
+        {
+          galaxy: this.galaxy,
+          playerId: this.playerId
+        },
+        { fleetId: fleet.fleetId }
+      );
+      if (!result.ok) {
+        outcomes.push({
+          ...outcomeBase,
+          executed: true,
+          success: false,
+          message: result.error.message,
+          commandErrorCode: result.error.code
+        });
+        continue;
+      }
+
+      outcomes.push({
+        ...outcomeBase,
+        executed: true,
+        success: true,
+        message: `Bombardment fleet recalled after fresh intel found stronger anti-fleet defenders (${Math.round(enemyStrength)} > ${Math.round(recallThreshold)}).`
       });
     }
 

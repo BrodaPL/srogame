@@ -84,6 +84,7 @@ export type BotEmpireSnapshot = {
   maxActiveFleetCount: number;
   activeColonizeFleetCount: number;
   activeRecycleFleetCount?: number;
+  activeBombardmentFleets?: BotActiveBombardmentFleetSnapshot[];
   totalResources: {
     metal: number;
     crystal: number;
@@ -95,6 +96,18 @@ export type BotEmpireSnapshot = {
   intelCandidates: BotIntelCandidateSnapshot[];
   strategicMilitaryTargets: BotStrategicMilitaryTargetSnapshot[];
   strategicDiplomaticFactions: BotStrategicDiplomaticFactionSnapshot[];
+};
+
+export type BotActiveBombardmentFleetSnapshot = {
+  fleetId: number;
+  missionType: FleetMissionType;
+  originCoordinates: { x: number; y: number; z: number };
+  targetCoordinates: { x: number; y: number; z: number };
+  createdTurn: number;
+  travelTurns: number;
+  state: string;
+  ships: Partial<Record<ShipType, number>>;
+  antiFleetStrength: number;
 };
 
 export type BotStrategicDiplomaticFactionSnapshot = {

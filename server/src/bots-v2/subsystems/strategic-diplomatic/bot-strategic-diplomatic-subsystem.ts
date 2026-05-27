@@ -39,6 +39,18 @@ import {
   hasEmergencyInfrastructureDamage,
   resolveEffectiveInfrastructureDamagePercent
 } from '../../infrastructure-damage.js';
+import {
+  addSmallPayloadFromCandidates,
+  estimateSelectionAntiFleetStrength,
+  isStrategicWarshipType,
+  resolveBestProducibleSmallShipType,
+  resolveMilitaryHangarCapacity,
+  resolveOriginSmallPayloadCandidates,
+  resolveSelectionHangarCapacity as resolveSharedSelectionHangarCapacity,
+  resolveSelectionPayloadSize,
+  resolveSmallPayloadStock,
+  shipTypeHasBombardmentWeapons
+} from '../../ship-payload-planning.js';
 import { resolveModule } from '../../../esm-module.js';
 
 const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../../src/app/models/enums/building-type.js');
@@ -180,7 +192,7 @@ type WarShipNeedRequest = {
   score: number;
   reason: string;
   targetCoordinates: { x: number; y: number; z: number };
-  needKind: 'ATTACK' | 'GUARD' | 'REPAIR' | 'BOMBARD' | 'SIEGE' | 'MOVE' | 'ARMAMENT_DELIVERY';
+  needKind: 'ATTACK' | 'GUARD' | 'REPAIR' | 'BOMBARD' | 'SIEGE' | 'MOVE' | 'ARMAMENT_DELIVERY' | 'SMALL_BOMBER' | 'SMALL_COMBAT';
 };
 
 type BombardmentMissionRequest = {
@@ -393,13 +405,21 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
       context.snapshot.empire.maxActiveFleetCount - context.snapshot.empire.activeFleetCount
     );
     const spyPlanning = createSpyMissionRequests(context, evaluatedFactions, availableFleetSlots);
+    const safetyScoutPlanning = createBombardmentSafetyScoutRequests(
+      context,
+      evaluatedFactions,
+      Math.max(0, availableFleetSlots - spyPlanning.requests.length)
+    );
     const diplomaticProbeNeedRequests = createProbeShipNeedRequests(
       context,
       spyPlanning.globalProbeDeficit,
       spyPlanning.blockedDueToProbeShortage
     );
     const warState = resolveDiplomaticWarState(context, evaluatedFactions);
-    const remainingFleetSlots = Math.max(0, availableFleetSlots - spyPlanning.requests.length);
+    const remainingFleetSlots = Math.max(
+      0,
+      availableFleetSlots - spyPlanning.requests.length - safetyScoutPlanning.spyRequests.length - safetyScoutPlanning.scoutAttackRequests.length
+    );
     const combatPlanning = createCombatMissionRequests(
       context,
       evaluatedFactions,
@@ -441,6 +461,8 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         return proposal ? [proposal] : [];
       }),
       ...spyPlanning.requests.map((request, index) => createSpyMissionProposal(context, request, index)),
+      ...safetyScoutPlanning.spyRequests.map((request, index) => createSpyMissionProposal(context, request, index + spyPlanning.requests.length)),
+      ...safetyScoutPlanning.scoutAttackRequests.map((request, index) => createAttackMissionProposal(context, request, index)),
       ...diplomaticProbeNeedRequests.map((request, index) => createProbeShipNeedProposal(context, request, index)),
       ...combatPlanning.relocationRequests.map((request, index) => createRelocationMissionProposal(context, request, index)),
       ...combatPlanning.attackRequests.map((request, index) => createAttackMissionProposal(context, request, index)),
@@ -510,6 +532,7 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         proposalCap,
         proposalCount: proposals.length,
         spyMissionCount: spyPlanning.requests.length,
+        bombardmentSafetyScoutCount: safetyScoutPlanning.spyRequests.length + safetyScoutPlanning.scoutAttackRequests.length,
         spyTargetCount: spyPlanning.targetedFactionIds.size,
         blockedSpyShortageCount: spyPlanning.blockedDueToProbeShortage.length,
         probeShipNeedCount: diplomaticProbeNeedRequests.length,
@@ -2327,7 +2350,19 @@ function createBombardmentPlanFromOrigin(
   const travelTurns = resolveTravelTurns(originPlanet, distance);
   const bombardmentShips = selectBombardmentShipsForStrength(originPlanet, requiredStrength, distance);
   const carriedBombs = selectCarryableBombPayload(originPlanet, bombardmentShips.ships);
-  const hasBombardCapability = bombardmentShips.hasBombardmentShip || carriedBombs.length > 0;
+  const smallPayloadStrength = addDiplomaticBombardmentSmallPayload(
+    originPlanet,
+    bombardmentShips.ships,
+    carriedBombs,
+    missionType,
+    requiredStrength,
+    bombardmentShips.combatStrength,
+    resolvePayloadTargetProfile(faction)
+  );
+  bombardmentShips.combatStrength += smallPayloadStrength;
+  const hasBombardCapability = bombardmentShips.hasBombardmentShip
+    || carriedBombs.length > 0
+    || bombardmentShips.ships.some((ship) => shipTypeHasBombardmentWeapons(ship.type));
   if (!hasBombardCapability || bombardmentShips.combatStrength < requiredStrength) {
     return null;
   }
@@ -2497,8 +2532,12 @@ function createBombardmentShipNeed(
     return null;
   }
   const requiredStrength = resolveBombardmentRequiredStrength(targetPlanet, missionType);
-  const availableStrength = estimateBestAvailableBombardmentStrength(context, targetPlanet.coordinates);
+  const availableStrength = estimateBestAvailableBombardmentStrength(context, faction, targetPlanet, missionType, requiredStrength);
   const bombardmentType = resolveBestProducibleBombardmentShipType(context);
+  const smallBomberNeed = createBombardmentSmallPayloadNeed(context, faction, targetPlanet, missionType, 'SMALL_BOMBER');
+  if (smallBomberNeed && availableStrength >= BOMBARDMENT_ATTACK_THRESHOLD * requiredStrength) {
+    return smallBomberNeed;
+  }
   if (availableStrength < BOMBARDMENT_ATTACK_THRESHOLD * requiredStrength && bombardmentType) {
     return {
       originPlanet: preferredOrigin,
@@ -2511,6 +2550,11 @@ function createBombardmentShipNeed(
       targetCoordinates: { ...targetPlanet.coordinates },
       needKind: missionType === FleetMissionType.SIEGE ? 'SIEGE' : 'BOMBARD'
     };
+  }
+
+  const smallCombatNeed = createBombardmentSmallPayloadNeed(context, faction, targetPlanet, missionType, 'SMALL_COMBAT');
+  if (smallCombatNeed && availableStrength < requiredStrength) {
+    return smallCombatNeed;
   }
 
   return combatType
@@ -2528,13 +2572,95 @@ function createBombardmentShipNeed(
     : null;
 }
 
+function createBombardmentSmallPayloadNeed(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  missionType: typeof FleetMissionType.BOMBARD | typeof FleetMissionType.SIEGE,
+  role: 'SMALL_BOMBER' | 'SMALL_COMBAT'
+): WarShipNeedRequest | null {
+  const profile = resolvePayloadTargetProfile(faction);
+  const candidateOrigins = context.snapshot.planets
+    .filter((planet) => resolveMilitaryHangarCapacity(planet) > 0)
+    .sort((left, right) =>
+      calculateTravelDistance(left.coordinates, targetPlanet.coordinates) - calculateTravelDistance(right.coordinates, targetPlanet.coordinates)
+      || right.defense.avgIndustryLevel - left.defense.avgIndustryLevel
+    );
+  const originPlanet = candidateOrigins[0] ?? null;
+  if (!originPlanet) {
+    return null;
+  }
+
+  const hangarCapacity = resolveMilitaryHangarCapacity(originPlanet);
+  const stock = resolveSmallPayloadStock(originPlanet);
+  const bomberTarget = Math.ceil(hangarCapacity * profile.bomberRatio);
+  const combatTarget = Math.ceil(hangarCapacity * profile.combatRatio);
+  const totalCeiling = Math.ceil(hangarCapacity * profile.maxRatio);
+  if (stock.totalSize >= totalCeiling) {
+    return null;
+  }
+
+  const currentSize = role === 'SMALL_BOMBER' ? stock.bomberSize : stock.generalSize;
+  const targetSize = role === 'SMALL_BOMBER' ? bomberTarget : combatTarget;
+  if (currentSize >= targetSize) {
+    return null;
+  }
+
+  const shipType = resolveBestProducibleSmallShipType(context.snapshot.planets, role, originPlanet);
+  if (!shipType) {
+    return null;
+  }
+
+  const shipSize = Math.max(1, SHIP_BLUEPRINTS.get(shipType)?.size ?? 1);
+  return {
+    originPlanet,
+    shipType,
+    amount: Math.max(1, Math.ceil((targetSize - currentSize) / shipSize)),
+    score: (role === 'SMALL_BOMBER' ? 490 : 390)
+      + ((targetSize - currentSize) * (role === 'SMALL_BOMBER' ? 20 : 12))
+      + (missionType === FleetMissionType.SIEGE ? 60 : 30),
+    reason: role === 'SMALL_BOMBER'
+      ? 'Need carried bomber small ships for diplomatic bombardment and siege payloads.'
+      : 'Need carried small combat ships to protect diplomatic bombardment and siege fleets.',
+    targetCoordinates: { ...targetPlanet.coordinates },
+    needKind: role
+  };
+}
+
+function resolvePayloadTargetProfile(faction: EvaluatedFaction): {
+  bomberRatio: number;
+  combatRatio: number;
+  maxRatio: number;
+} {
+  if (faction.warAdvantageLevel > 0) {
+    return { bomberRatio: 1, combatRatio: 1, maxRatio: 2.5 };
+  }
+  if (faction.warAdvantageLevel < 0) {
+    return { bomberRatio: 0.5, combatRatio: 0.5, maxRatio: 1.5 };
+  }
+  return { bomberRatio: 0.75, combatRatio: 0.75, maxRatio: 2 };
+}
+
 function estimateBestAvailableBombardmentStrength(
   context: BotSubsystemContext,
-  targetCoordinates: { x: number; y: number; z: number }
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  missionType: typeof FleetMissionType.BOMBARD | typeof FleetMissionType.SIEGE,
+  requiredStrength: number
 ): number {
   return context.snapshot.planets.reduce((best, originPlanet) => {
-    const distance = calculateTravelDistance(originPlanet.coordinates, targetCoordinates);
+    const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
     const selection = selectBombardmentShipsForStrength(originPlanet, Number.MAX_SAFE_INTEGER, distance);
+    const carriedBombs = selectCarryableBombPayload(originPlanet, selection.ships);
+    selection.combatStrength += addDiplomaticBombardmentSmallPayload(
+      originPlanet,
+      selection.ships,
+      carriedBombs,
+      missionType,
+      requiredStrength,
+      selection.combatStrength,
+      resolvePayloadTargetProfile(faction)
+    );
     return Math.max(best, selection.combatStrength);
   }, 0);
 }
@@ -2741,6 +2867,8 @@ function selectBombardmentShipsForStrength(
     .filter((entry) =>
       entry.amount > 0
       && entry.combatPower > 0
+      && entry.blueprint?.canJump === true
+      && isStrategicWarshipType(entry.type)
       && entry.type !== ShipType.SPY_PROBE
       && entry.type !== ShipType.REPAIR_DRONE
       && entry.type !== ShipType.COLONIZER
@@ -2794,6 +2922,62 @@ function selectBombardmentShipsForStrength(
   };
 }
 
+function addDiplomaticBombardmentSmallPayload(
+  originPlanet: BotPlanetSnapshot,
+  selection: CombatShipSelection['ships'],
+  carriedBombs: Array<{ type: DefenceType; amount: number }>,
+  missionType: typeof FleetMissionType.BOMBARD | typeof FleetMissionType.SIEGE,
+  requiredStrength: number,
+  currentStrength: number,
+  targetProfile: { bomberRatio: number; combatRatio: number; maxRatio: number }
+): number {
+  const hangarCapacity = resolveSharedSelectionHangarCapacity(selection);
+  const bombPayloadSize = resolveBombPayloadSize(carriedBombs);
+  let remainingHangar = Math.max(0, hangarCapacity - bombPayloadSize - resolveSelectionPayloadSize(selection));
+  if (remainingHangar <= 0) {
+    return 0;
+  }
+
+  let addedStrength = 0;
+  const bomberPayloadTarget = Math.min(
+    remainingHangar,
+    Math.ceil(hangarCapacity * targetProfile.bomberRatio)
+  );
+  if (bomberPayloadTarget > 0) {
+    const result = addSmallPayloadFromCandidates(
+      selection,
+      resolveOriginSmallPayloadCandidates(originPlanet, 'SMALL_BOMBER'),
+      remainingHangar,
+      bomberPayloadTarget
+    );
+    addedStrength += result.addedStrength;
+    remainingHangar -= result.addedSize;
+  }
+
+  const antiFleetStrength = estimateSelectionAntiFleetStrength(selection);
+  const needsSmallCombatSupport = antiFleetStrength < requiredStrength * (missionType === FleetMissionType.SIEGE ? 0.9 : 0.75);
+  if (!needsSmallCombatSupport || remainingHangar <= 0) {
+    return addedStrength;
+  }
+
+  const combatPayloadTarget = Math.min(
+    remainingHangar,
+    Math.ceil(hangarCapacity * targetProfile.combatRatio)
+  );
+  if (combatPayloadTarget <= 0) {
+    return addedStrength;
+  }
+
+  addedStrength += addSmallPayloadFromCandidates(
+    selection,
+    resolveOriginSmallPayloadCandidates(originPlanet, 'SMALL_COMBAT'),
+    remainingHangar,
+    combatPayloadTarget
+  ).addedStrength;
+
+  return addedStrength;
+}
+
 function selectCarryableBombPayload(
   originPlanet: BotPlanetSnapshot,
   selectedShips: CombatShipSelection['ships']
@@ -2842,6 +3026,11 @@ function selectCarryableBombPayload(
   }
 
   return payload;
+}
+
+function resolveBombPayloadSize(carriedBombs: Array<{ type: DefenceType; amount: number }>): number {
+  return carriedBombs.reduce((sum, bomb) =>
+    sum + ((DEFENCE_BLUEPRINTS.get(bomb.type)?.size ?? 0) * bomb.amount), 0);
 }
 
 function canUseOwnJumpGate(
@@ -4779,7 +4968,7 @@ function selectTopWarShipNeedsPerPlanet(requests: WarShipNeedRequest[]): WarShip
   const bestByPlanet = new Map<string, WarShipNeedRequest>();
 
   for (const request of requests) {
-    const key = `${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}`;
+    const key = `${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.needKind}`;
     const existing = bestByPlanet.get(key);
     if (!existing || request.score > existing.score) {
       bestByPlanet.set(key, request);
@@ -5812,6 +6001,198 @@ function createSpyMissionRequestForFaction(
     };
 }
 
+function createBombardmentSafetyScoutRequests(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[],
+  availableFleetSlots: number
+): { spyRequests: SpyMissionRequest[]; scoutAttackRequests: AttackMissionRequest[] } {
+  if (availableFleetSlots <= 0) {
+    return { spyRequests: [], scoutAttackRequests: [] };
+  }
+
+  const requests: Array<SpyMissionRequest | AttackMissionRequest> = [];
+  const warFactions = factions.filter((faction) => faction.faction.currentStatus === DiplomaticStatus.WAR);
+  const activeBombardmentFleets = context.snapshot.empire.activeBombardmentFleets ?? [];
+  for (const fleet of activeBombardmentFleets) {
+    if (requests.length >= availableFleetSlots) {
+      break;
+    }
+    if (fleet.state !== 'MOVING_TO_TARGET' && fleet.state !== 'PENDING_JUMP_GATE') {
+      continue;
+    }
+
+    const age = Math.max(0, context.snapshot.turn - fleet.createdTurn);
+    if (age < Math.min(2, Math.max(1, fleet.travelTurns - 1))) {
+      continue;
+    }
+
+    const target = resolveKnownWarTargetByCoordinates(warFactions, fleet.targetCoordinates);
+    if (!target) {
+      continue;
+    }
+
+    const lastReportTurn = context.snapshot.turn - target.planet.lastRelevantReportAge;
+    if (lastReportTurn > fleet.createdTurn) {
+      continue;
+    }
+    if (!shouldRunBombardmentSafetyScout(context, target.faction, fleet.fleetId)) {
+      continue;
+    }
+
+    const desiredReportLevel = Math.max(12, resolveDesiredReportLevel(DiplomaticStatus.WAR));
+    const estimatedDifficulty = resolveEstimatedProbeDifficulty(context, target.faction, target.planet, desiredReportLevel);
+    const probeAmount = Math.max(
+      1,
+      Math.min(
+        resolveAffordableProbeCap(context),
+        Math.ceil(resolveProbeAmountForDifficulty(estimatedDifficulty, DiplomaticStatus.WAR) * 1.5)
+      )
+    );
+    const spyOrigin = selectSpyOrigin(context, target.planet.coordinates, probeAmount);
+    if (spyOrigin) {
+      requests.push({
+        faction: target.faction,
+        originPlanet: spyOrigin.originPlanet,
+        targetCoordinates: { ...target.planet.coordinates },
+        probeAmount,
+        targetIntelDepth: target.planet.intelDepth,
+        targetReportAge: target.planet.lastRelevantReportAge,
+        estimatedDifficulty,
+        travelDistance: spyOrigin.travelDistance,
+        travelTurns: spyOrigin.travelTurns,
+        score: 700 + Math.round(fleet.antiFleetStrength / 10) - target.planet.lastRelevantReportAge
+      });
+      continue;
+    }
+
+    const scoutAttack = createBombardmentSafetyScoutAttackRequest(context, target.faction, target.planet, fleet.antiFleetStrength);
+    if (scoutAttack) {
+      requests.push(scoutAttack);
+    }
+  }
+
+  return {
+    spyRequests: requests.filter((request): request is SpyMissionRequest => 'probeAmount' in request),
+    scoutAttackRequests: requests.filter((request): request is AttackMissionRequest => 'scoutOnly' in request)
+  };
+}
+
+function createBombardmentSafetyScoutAttackRequest(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  fleetAntiStrength: number
+): AttackMissionRequest | null {
+  const candidates = context.snapshot.planets
+    .map((originPlanet) => {
+      const scoutType = resolvePreferredScoutShipType(originPlanet);
+      if (!scoutType) {
+        return null;
+      }
+      const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+      const ships = [{ type: scoutType, undamagedAmount: 1, damagedAmount: 0 }];
+      if (!hasEnoughDeuteriumForShips(originPlanet, ships, distance)) {
+        return null;
+      }
+      return {
+        originPlanet,
+        scoutType,
+        distance,
+        travelTurns: resolveTravelTurns(originPlanet, distance),
+        strength: estimateShipCombatPower(scoutType)
+      };
+    })
+    .filter((entry): entry is {
+      originPlanet: BotPlanetSnapshot;
+      scoutType: ShipType;
+      distance: number;
+      travelTurns: number;
+      strength: number;
+    } => entry !== null)
+    .sort((left, right) =>
+      left.travelTurns - right.travelTurns
+      || left.distance - right.distance
+      || right.strength - left.strength
+    );
+  const selected = candidates[0] ?? null;
+  if (!selected) {
+    return null;
+  }
+
+  return {
+    kind: 'ATTACK',
+    phase: 'DIRECT',
+    faction,
+    targetPlanet,
+    originPlanet: selected.originPlanet,
+    ships: [{
+      type: selected.scoutType,
+      undamagedAmount: 1,
+      damagedAmount: 0
+    }],
+    requiredStrength: 1,
+    selectedStrength: selected.strength,
+    travelDistance: selected.distance,
+    travelTurns: selected.travelTurns,
+    score: 620 + Math.round(fleetAntiStrength / 12),
+    scoutOnly: true,
+    estimatedPlunder: 0,
+    cargoCapacity: 0,
+    ambushRisk: 0
+  };
+}
+
+function shouldRunBombardmentSafetyScout(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  fleetId: number
+): boolean {
+  const baseChance = faction.warAdvantageLevel > 0
+    ? 20
+    : faction.warAdvantageLevel < 0
+      ? 45
+      : 35;
+  const profileModifier = context.snapshot.profileId === 'AVOIDER' || context.snapshot.profileId === 'BUNKERER'
+    ? 10
+    : context.snapshot.profileId === 'AGGRESSOR'
+      ? -8
+      : 0;
+  const chance = Math.max(10, Math.min(60, baseChance + profileModifier));
+  return deterministicPercent(
+    context.snapshot.playerId,
+    faction.faction.playerId,
+    fleetId,
+    Math.floor(context.snapshot.turn / 3)
+  ) < chance;
+}
+
+function deterministicPercent(...values: number[]): number {
+  let hash = 2166136261;
+  for (const value of values) {
+    hash ^= Math.floor(value);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash % 100);
+}
+
+function resolveKnownWarTargetByCoordinates(
+  factions: EvaluatedFaction[],
+  coordinates: { x: number; y: number; z: number }
+): { faction: EvaluatedFaction; planet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number] } | null {
+  for (const faction of factions) {
+    for (const planet of faction.faction.knownPlanets) {
+      if (
+        planet.coordinates.x === coordinates.x
+        && planet.coordinates.y === coordinates.y
+        && planet.coordinates.z === coordinates.z
+      ) {
+        return { faction, planet };
+      }
+    }
+  }
+  return null;
+}
+
 function resolvePriorityWarSpyTarget(
   context: BotSubsystemContext,
   faction: EvaluatedFaction
@@ -6087,17 +6468,17 @@ function createWarShipNeedProposal(
   index: number
 ): BotProposal {
   return {
-    proposalId: `strategic-diplomatic:war-need:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.shipType}:${context.snapshot.turn}`,
+    proposalId: `strategic-diplomatic:war-need:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.shipType}:${request.needKind}:${context.snapshot.turn}`,
     subsystemId: 'STRATEGIC_DIPLOMATIC',
     kind: 'SHIPYARD',
     status: 'PROPOSED',
-    goalKey: `strategic-diplomatic:war-need:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}`,
-    dedupeKey: `strategic-diplomatic:war-need:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}`,
+    goalKey: `strategic-diplomatic:war-need:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.needKind}`,
+    dedupeKey: `strategic-diplomatic:war-need:${request.originPlanet.coordinates.x}:${request.originPlanet.coordinates.y}:${request.originPlanet.coordinates.z}:${request.needKind}`,
     summary: `War ship need #${index + 1}: produce ${request.amount} ${request.shipType} on ${request.originPlanet.name}.`,
     planetId: request.originPlanet.planetId,
     targetCoordinates: { ...request.originPlanet.coordinates },
     expectedValue: Math.max(1, Math.round(request.score)),
-    urgency: 71,
+    urgency: request.needKind === 'SMALL_BOMBER' ? 76 : request.needKind === 'SMALL_COMBAT' ? 68 : 71,
     risk: 9,
     confidence: 68,
     requestedResources: emptyResources(),

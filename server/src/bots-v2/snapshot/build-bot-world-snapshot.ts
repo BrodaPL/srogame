@@ -30,6 +30,7 @@ import type {
   BotWorldSnapshot
 } from '../bot-v2-types.ts';
 import { resolveInfrastructureDamageSummary } from '../infrastructure-damage.js';
+import { estimateShipCountsAntiFleetStrength } from '../ship-payload-planning.js';
 import type { EspionageReportData } from '../../../../src/app/models/reports/espionage-report-data.ts';
 import {
   BUILDING_BLUEPRINTS,
@@ -133,6 +134,27 @@ function buildEmpireSnapshot(
     maxActiveFleetCount: maxActiveFleets(computerTechnologyLevel),
     activeColonizeFleetCount: activeFleets.filter((fleet) => fleet.missionType === FleetMissionType.COLONIZE).length,
     activeRecycleFleetCount: activeFleets.filter((fleet) => fleet.missionType === FleetMissionType.RECYCLE).length,
+    activeBombardmentFleets: activeFleets
+      .filter((fleet) => fleet.missionType === FleetMissionType.BOMBARD || fleet.missionType === FleetMissionType.SIEGE)
+      .map((fleet) => ({
+        fleetId: fleet.fleetId,
+        missionType: fleet.missionType,
+        originCoordinates: {
+          x: fleet.origin.x,
+          y: fleet.origin.y,
+          z: fleet.origin.z + 1
+        },
+        targetCoordinates: {
+          x: fleet.target.x,
+          y: fleet.target.y,
+          z: fleet.target.z + 1
+        },
+        createdTurn: fleet.createdAtTurn,
+        travelTurns: fleet.travelTurns,
+        state: fleet.state,
+        ships: { ...fleet.ships.undamagedShipsCount },
+        antiFleetStrength: estimateShipCountsAntiFleetStrength(fleet.ships.undamagedShipsCount as Partial<Record<ShipTypeId, number>>)
+      })),
     totalResources,
     atWar,
     hasCriticalEnergyProblem: planets.some((planet) => planet.blockers.energyStarved),

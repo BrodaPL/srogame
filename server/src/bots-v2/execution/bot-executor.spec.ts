@@ -192,6 +192,41 @@ describe('bot executor', () => {
     expect(galaxy.activeFleets[0]?.state).toBe(FleetState.MOVING_TO_TARGET);
   });
 
+  it('recalls bombardment fleets when fresh intel shows stronger defending ships', () => {
+    const { galaxy, origin, target, bot, targetPlayer } = createRecallGalaxy();
+    galaxy.diplomaticRelations.push(createDiplomaticRelation(bot.playerId, targetPlayer.playerId, DiplomaticStatus.WAR));
+    target.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 10);
+    addEspionageReport(bot, targetPlayer, target, 3);
+    galaxy.activeFleets.push(createBombardmentFleet(origin, target));
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const outcomes = executor.executeAcceptedTasks([]);
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({
+      lifecycleAction: 'FLEET_RECALL',
+      fleetId: 1,
+      missionType: FleetMissionType.BOMBARD,
+      currentStatus: DiplomaticStatus.WAR,
+      success: true
+    });
+    expect(galaxy.activeFleets[0]?.state).toBe(FleetState.RETURNING);
+  });
+
+  it('does not recall bombardment fleets from stale defending-ship intel', () => {
+    const { galaxy, origin, target, bot, targetPlayer } = createRecallGalaxy();
+    galaxy.diplomaticRelations.push(createDiplomaticRelation(bot.playerId, targetPlayer.playerId, DiplomaticStatus.WAR));
+    target.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 10);
+    addEspionageReport(bot, targetPlayer, target, 1);
+    galaxy.activeFleets.push(createBombardmentFleet(origin, target));
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const outcomes = executor.executeAcceptedTasks([]);
+
+    expect(outcomes).toHaveLength(0);
+    expect(galaxy.activeFleets[0]?.state).toBe(FleetState.MOVING_TO_TARGET);
+  });
+
   it('preserves proposal-owned Jump Gate intent and creates pending foreign Jump Gate requests', () => {
     const { galaxy, origin, target, bot, ally } = createJumpGateGalaxy();
     const executor = new LiveQueueBotExecutor(galaxy, 1);
@@ -272,8 +307,10 @@ function createFleetGalaxy(): { galaxy: Galaxy; origin: Planet } {
   const system = new SolarSystem('BotSys', 3, false, false, { x: 0, y: 0 }, new Set(), new Map());
   const origin = Planet.createStartingPlanet('Origin', 1, system, 1);
   const target = Planet.createStartingPlanet('Target', 2, system, 1);
+  const visibleRequesterPlanet = Planet.createStartingPlanet('VisibleRequester', 3, system, 2);
   system.planets[0] = origin;
   system.planets[1] = target;
+  system.planets[2] = visibleRequesterPlanet;
   origin.rBDSFTQ.resources = new ResourcesPack(5000, 5000, 5000);
   origin.rBDSFTQ.ships = new ManyShips({ [ShipType.TRANSPORTER]: 1 }, []);
 
@@ -289,12 +326,13 @@ function createFleetGalaxy(): { galaxy: Galaxy; origin: Planet } {
   const requester = new Player(
     2,
     'Requester-2',
-    [target],
+    [target, visibleRequesterPlanet],
     new Map(),
     [],
     PlayerType.BOT,
     createTutorialReadState(true)
   );
+  addEspionageReport(bot, requester, visibleRequesterPlanet, 1);
 
   const galaxy = new Galaxy(
     'Fleet Test',
@@ -476,6 +514,35 @@ function createAttackFleet(
     FleetState.MOVING_TO_TARGET,
     1
   );
+}
+
+function createBombardmentFleet(origin: Planet, target: Planet): Fleet {
+  return new Fleet(
+    1,
+    1,
+    FleetMissionType.BOMBARD,
+    new Destination(origin.basicInfo.solarSystem.coordinates.x, origin.basicInfo.solarSystem.coordinates.y, origin.basicInfo.order - 1),
+    new Destination(target.basicInfo.solarSystem.coordinates.x, target.basicInfo.solarSystem.coordinates.y, target.basicInfo.order - 1),
+    origin.basicInfo.name,
+    target.basicInfo.name,
+    new ManyShips({ [ShipType.ORBITAL_BOMBER]: 1 }, []),
+    new ResourcesPack(0, 0, 0),
+    0,
+    0,
+    0,
+    4,
+    4,
+    FleetState.MOVING_TO_TARGET,
+    1
+  );
+}
+
+function addEspionageReport(bot: Player, targetPlayer: Player, target: Planet, createdTurn: number): void {
+  const report = new EspionageReportGenerator().createEspionageReport(bot, targetPlayer, target, 6, {
+    createdTurn,
+    forcedReportLevel: 12
+  });
+  target.lastReportData.set(bot.playerId, report);
 }
 
 function createRequestDecisionProposal(): BotProposal {

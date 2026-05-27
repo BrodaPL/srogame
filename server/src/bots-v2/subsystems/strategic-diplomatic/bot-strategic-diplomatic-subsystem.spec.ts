@@ -638,6 +638,80 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(bombardProposal?.debug.missionType).toBe(FleetMissionType.BOMBARD);
   });
 
+  it('does not launch non-jump atmospheric bombers directly for bombardment', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ATMOSPHERIC_BOMBER, 4);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.factionLedger.push(createFactionLedgerSeed(playerEnemy.playerId, 40));
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+
+    expect(result.result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.BOMBARD
+    )).toBe(false);
+  });
+
+  it('carries atmospheric bombers as payload behind jump-capable bombardment fleets', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 2);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ATMOSPHERIC_BOMBER, 2);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.factionLedger.push(createFactionLedgerSeed(playerEnemy.playerId, 40));
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const bombardProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.BOMBARD
+    );
+    const ships = Array.isArray(bombardProposal?.requestPayload.ships)
+      ? bombardProposal.requestPayload.ships
+      : [];
+
+    expect(bombardProposal).toBeDefined();
+    expect(ships.some((ship) => ship.type === ShipType.BATTLE_SHIP)).toBe(true);
+    expect(ships.some((ship) => ship.type === ShipType.ATMOSPHERIC_BOMBER)).toBe(true);
+  });
+
+  it('loads planetary bombs before carried small bomber payload', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ATMOSPHERIC_BOMBER, 2);
+    botPlanet.rBDSFTQ.defences.addUndamaged(DefenceType.HEAVY_BOMB, 1);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.factionLedger.push(createFactionLedgerSeed(playerEnemy.playerId, 40));
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const bombardProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.BOMBARD
+    );
+    const bombs = Array.isArray(bombardProposal?.requestPayload.carriedBombs)
+      ? bombardProposal.requestPayload.carriedBombs
+      : [];
+
+    expect(bombardProposal).toBeDefined();
+    expect(bombs.some((bomb) => bomb.type === DefenceType.HEAVY_BOMB)).toBe(true);
+  });
+
   it('does not emit bombardment below the hostility threshold even during war', () => {
     const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     galaxy.diplomaticRelations.push(
@@ -690,9 +764,9 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     );
     enableAdvancedWarProduction(botPlanet, bot);
     enableAdvancedWarProduction(reservePlanet, bot);
-    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ATMOSPHERIC_BOMBER, 1);
-    reservePlanet.rBDSFTQ.ships.addUndamaged(ShipType.ATMOSPHERIC_BOMBER, 1);
-    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 60);
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.ORBITAL_BOMBER, 1);
+    reservePlanet.rBDSFTQ.ships.addUndamaged(ShipType.ORBITAL_BOMBER, 1);
+    playerEnemyPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 500);
     markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
     const memory = createDefaultBotMemoryV2();
     memory.strategicDiplomatic.factionLedger.push(createFactionLedgerSeed(playerEnemy.playerId, 40));
