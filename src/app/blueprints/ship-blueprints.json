@@ -72,7 +72,7 @@
       "hangarCapacity": 0,
       "purposes": ["MILITARY", "BOMBER"],
       "jumpCost": 0,
-      "cost": { "metal": 40, "crystal": 10, "deuterium": 20 },
+      "cost": { "metal": 25, "crystal": 10, "deuterium": 5 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 2 }
       ],
@@ -806,7 +806,8 @@
         { "tech": "SHIELDING_TECHNOLOGY", "level": 8 },
         { "tech": "BEAMS_WEAPONS", "level": 5 },
         { "tech": "MISSILES_WEAPONS", "level": 3 },
-        { "tech": "COMPUTER_TECHNOLOGY", "level": 8 }
+        { "tech": "COMPUTER_TECHNOLOGY", "level": 8 },
+        { "tech": "GRAVITON_TECHNOLOGY", "level": 1}
       ]
     }
   ]

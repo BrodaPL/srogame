@@ -1,6 +1,7 @@
 import * as buildingTypeModule from '../../../../../src/app/models/enums/building-type.js';
 import * as defenceTypeModule from '../../../../../src/app/models/enums/defence-type.js';
 import * as fleetMissionTypeModule from '../../../../../src/app/models/enums/fleet-mission-type.js';
+import * as shipPurposeModule from '../../../../../src/app/models/enums/ship-purpose.js';
 import * as shipTypeModule from '../../../../../src/app/models/enums/ship-type.js';
 import * as technologyTypeModule from '../../../../../src/app/models/enums/technology-type.js';
 import * as weaponTypeModule from '../../../../../src/app/models/enums/weapon-type.js';
@@ -25,6 +26,7 @@ import { resolveModule } from '../../../esm-module.js';
 const { BuildingType } = resolveModule(buildingTypeModule) as typeof import('../../../../../src/app/models/enums/building-type.js');
 const { DefenceType } = resolveModule(defenceTypeModule) as typeof import('../../../../../src/app/models/enums/defence-type.js');
 const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../../src/app/models/enums/fleet-mission-type.js');
+const { ShipPurpose } = resolveModule(shipPurposeModule) as typeof import('../../../../../src/app/models/enums/ship-purpose.js');
 const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../../src/app/models/enums/ship-type.js');
 const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../../src/app/models/enums/technology-type.js');
 const { WeaponType } = resolveModule(weaponTypeModule) as typeof import('../../../../../src/app/models/enums/weapon-type.js');
@@ -33,6 +35,7 @@ const { fleetTravelTurnsForDistance } = resolveModule(technologyEffectsModule) a
 type BuildingTypeT = buildingTypeModule.BuildingType;
 type DefenceTypeT = defenceTypeModule.DefenceType;
 type FleetMissionTypeT = fleetMissionTypeModule.MissionType;
+type ShipPurposeT = shipPurposeModule.ShipPurpose;
 type ShipTypeT = shipTypeModule.ShipType;
 type TechnologyTypeT = technologyTypeModule.TechnologyType;
 
@@ -59,7 +62,7 @@ type ShipNeedRequest = {
   kind: 'SHIP_NEED';
   shipType: ShipTypeT;
   amount: number;
-  shortageKind: 'BOMBARDMENT' | 'COMBAT' | 'CARGO';
+  shortageKind: 'BOMBARDMENT' | 'COMBAT' | 'CARGO' | 'SMALL_COMBAT' | 'SMALL_BOMBER';
   targetCoordinates: { x: number; y: number; z: number };
   preferredOrigin: { x: number; y: number; z: number } | null;
   score: number;
@@ -126,6 +129,10 @@ const BREAK_FAILURE_COOLDOWN_TURNS = 4;
 const BREAK_RETRY_MULTIPLIER_LIGHT = 1.5;
 const BREAK_RETRY_MULTIPLIER_MEDIUM = 2;
 const BREAK_RETRY_MULTIPLIER_DEFEAT = 3.5;
+const BASELINE_SMALL_STOCK_RATIO = 1;
+const MAX_SMALL_STOCK_RATIO = 2;
+const DEFENDED_SMALL_BOMBER_RATIO = 0.75;
+const DEFENDED_SMALL_COMBAT_RATIO = 0.75;
 
 export class BotStrategicMilitarySubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_MILITARY' as const;
@@ -214,6 +221,8 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
         }
       }
     }
+
+    shipNeeds.push(...createSmallPayloadShipNeeds(context, neutralFarmTargets, farmLedger));
 
     context.memory.strategicMilitary.farmLedger = [...farmLedger.values()]
       .sort(compareFarmLedgerEntries);
@@ -728,17 +737,15 @@ function buildBreakSelection(
 
   if (requireBombardmentBreaker) {
     const bombardmentShip = combatCandidates.find((candidate) => candidate.hasBombardmentWeapons) ?? null;
-    if (!bombardmentShip) {
-      return { ships: [], combatStrength: 0 };
+    if (bombardmentShip) {
+      selection.push({
+        type: bombardmentShip.type,
+        undamagedAmount: 1,
+        damagedAmount: 0
+      });
+      totalStrength += bombardmentShip.power;
+      bombardmentShip.amount -= 1;
     }
-
-    selection.push({
-      type: bombardmentShip.type,
-      undamagedAmount: 1,
-      damagedAmount: 0
-    });
-    totalStrength += bombardmentShip.power;
-    bombardmentShip.amount -= 1;
   }
 
   for (const candidate of combatCandidates) {
@@ -772,9 +779,107 @@ function buildBreakSelection(
     return { ships: [], combatStrength: totalStrength };
   }
 
+  const payloadStrength = addSmallBreakPayload(originPlanet, selection, {
+    requireBomber: requireBombardmentBreaker && !selection.some((ship) => shipTypeHasBombardmentWeapons(ship.type)),
+    requiredStrength,
+    currentStrength: totalStrength
+  });
+  totalStrength += payloadStrength;
+
+  if (requireBombardmentBreaker && !selection.some((ship) => shipTypeHasBombardmentWeapons(ship.type))) {
+    return { ships: [], combatStrength: totalStrength };
+  }
+
   return totalStrength >= requiredStrength
     ? { ships: selection, combatStrength: totalStrength }
     : { ships: [], combatStrength: totalStrength };
+}
+
+function addSmallBreakPayload(
+  originPlanet: BotPlanetSnapshot,
+  selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>,
+  options: { requireBomber: boolean; requiredStrength: number; currentStrength: number }
+): number {
+  let remainingHangar = resolveSelectionHangarCapacity(selection);
+  if (remainingHangar <= 0) {
+    return 0;
+  }
+
+  let addedStrength = 0;
+  if (options.requireBomber) {
+    addedStrength += addSmallPayloadFromCandidates(
+      selection,
+      resolveOriginSmallPayloadCandidates(originPlanet, 'SMALL_BOMBER'),
+      remainingHangar,
+      1
+    ).addedStrength;
+    remainingHangar = resolveSelectionHangarCapacity(selection) - resolveSelectionPayloadSize(selection);
+    if (!selection.some((ship) => shipTypeHasBombardmentWeapons(ship.type))) {
+      return addedStrength;
+    }
+  }
+
+  const desiredPayloadSize = Math.min(
+    remainingHangar,
+    Math.max(0, Math.ceil(options.requiredStrength - options.currentStrength - addedStrength))
+  );
+  if (desiredPayloadSize <= 0) {
+    return addedStrength;
+  }
+
+  addedStrength += addSmallPayloadFromCandidates(
+    selection,
+    resolveOriginSmallPayloadCandidates(originPlanet, 'SMALL_COMBAT'),
+    remainingHangar,
+    desiredPayloadSize
+  ).addedStrength;
+
+  return addedStrength;
+}
+
+function addSmallPayloadFromCandidates(
+  selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>,
+  candidates: Array<{ type: ShipTypeT; amount: number; size: number; power: number }>,
+  availableHangar: number,
+  desiredPayloadSize: number
+): { addedStrength: number; addedSize: number } {
+  let remainingHangar = availableHangar;
+  let remainingDesiredSize = Math.max(1, desiredPayloadSize);
+  let addedStrength = 0;
+  let addedSize = 0;
+
+  for (const candidate of candidates) {
+    if (candidate.amount <= 0 || candidate.size <= 0 || remainingHangar < candidate.size || remainingDesiredSize <= 0) {
+      continue;
+    }
+
+    const amountToAdd = Math.min(
+      candidate.amount,
+      Math.floor(remainingHangar / candidate.size),
+      Math.max(1, Math.ceil(remainingDesiredSize / candidate.size))
+    );
+    if (amountToAdd <= 0) {
+      continue;
+    }
+
+    const existing = selection.find((ship) => ship.type === candidate.type);
+    if (existing) {
+      existing.undamagedAmount += amountToAdd;
+    } else {
+      selection.push({
+        type: candidate.type,
+        undamagedAmount: amountToAdd,
+        damagedAmount: 0
+      });
+    }
+    const usedSize = amountToAdd * candidate.size;
+    remainingHangar -= usedSize;
+    remainingDesiredSize -= usedSize;
+    addedSize += usedSize;
+    addedStrength += candidate.power * amountToAdd;
+  }
+
+  return { addedStrength, addedSize };
 }
 
 function createBreakRelocationPlan(
@@ -1094,6 +1199,60 @@ function resolveOriginCombatCandidates(originPlanet: BotPlanetSnapshot): Array<{
     );
 }
 
+function resolveOriginSmallPayloadCandidates(
+  originPlanet: BotPlanetSnapshot,
+  role: 'SMALL_COMBAT' | 'SMALL_BOMBER'
+): Array<{ type: ShipTypeT; amount: number; size: number; power: number }> {
+  return Object.entries(originPlanet.ships.undamagedCountByType)
+    .map(([type, amount]) => ({
+      type: type as ShipTypeT,
+      amount: amount ?? 0,
+      blueprint: SHIP_BLUEPRINTS.get(type as ShipTypeT) ?? null
+    }))
+    .filter((entry) =>
+      entry.amount > 0
+      && entry.blueprint !== null
+      && isSmallCombatShipType(entry.type)
+      && (role === 'SMALL_COMBAT' || isSmallBomberShipType(entry.type))
+    )
+    .map((entry) => ({
+      type: entry.type,
+      amount: entry.amount,
+      size: Math.max(1, entry.blueprint?.size ?? 1),
+      power: estimateShipCombatPower(entry.type)
+    }))
+    .sort((left, right) =>
+      resolveSmallPayloadPriority(right.type, role) - resolveSmallPayloadPriority(left.type, role)
+      || right.power - left.power
+      || left.size - right.size
+      || left.type.localeCompare(right.type)
+    );
+}
+
+function resolveSelectionHangarCapacity(
+  selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>
+): number {
+  return selection.reduce((sum, ship) => {
+    const blueprint = SHIP_BLUEPRINTS.get(ship.type);
+    if (!blueprint || blueprint.hangarCapacity <= 0) {
+      return sum;
+    }
+    return sum + (blueprint.hangarCapacity * (ship.undamagedAmount + ship.damagedAmount));
+  }, 0);
+}
+
+function resolveSelectionPayloadSize(
+  selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>
+): number {
+  return selection.reduce((sum, ship) => {
+    const blueprint = SHIP_BLUEPRINTS.get(ship.type);
+    if (!blueprint || blueprint.canJump || blueprint.size <= 0) {
+      return sum;
+    }
+    return sum + (blueprint.size * (ship.undamagedAmount + ship.damagedAmount));
+  }, 0);
+}
+
 function isNeutralFarmWarshipType(shipType: ShipTypeT): boolean {
   return shipType !== ShipType.SPY_PROBE
     && shipType !== ShipType.REPAIR_DRONE
@@ -1102,6 +1261,62 @@ function isNeutralFarmWarshipType(shipType: ShipTypeT): boolean {
     && shipType !== ShipType.CARGO_SUPPORT
     && shipType !== ShipType.MASS_HAULER
     && shipType !== ShipType.RECYCLER;
+}
+
+function isMilitaryHangarShipType(shipType: ShipTypeT): boolean {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  return Boolean(
+    blueprint
+    && blueprint.canJump
+    && blueprint.weapons.length > 0
+    && blueprint.hangarCapacity > 0
+    && isNeutralFarmWarshipType(shipType)
+  );
+}
+
+function isSmallCombatShipType(shipType: ShipTypeT): boolean {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  return Boolean(
+    blueprint
+    && !blueprint.canJump
+    && blueprint.size > 0
+    && blueprint.weapons.length > 0
+    && blueprint.purposes.has(ShipPurpose.MILITARY as ShipPurposeT)
+  );
+}
+
+function isSmallBomberShipType(shipType: ShipTypeT): boolean {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  return Boolean(
+    blueprint
+    && isSmallCombatShipType(shipType)
+    && (
+      blueprint.purposes.has(ShipPurpose.BOMBER as ShipPurposeT)
+      || shipTypeHasBombardmentWeapons(shipType)
+    )
+  );
+}
+
+function resolveSmallPayloadPriority(shipType: ShipTypeT, role: 'SMALL_COMBAT' | 'SMALL_BOMBER'): number {
+  if (role === 'SMALL_BOMBER') {
+    if (shipType === ShipType.ATMOSPHERIC_BOMBER) {
+      return 10_000;
+    }
+    if (shipType === ShipType.ATMOSPHERIC_FIGHTER) {
+      return 9_000;
+    }
+  }
+
+  if (shipType === ShipType.ASSAULT_FIGHTER) {
+    return 8_000;
+  }
+  if (shipType === ShipType.FIGHTER) {
+    return 7_000;
+  }
+  if (shipType === ShipType.CORVETTE) {
+    return 6_000;
+  }
+  return 1_000 + estimateShipCombatPower(shipType);
 }
 
 function isHeavyNeutralBreakWarshipType(shipType: ShipTypeT | null): boolean {
@@ -1132,6 +1347,20 @@ function createBreakShipNeed(
   }
 
   if ((target.currentDefencesCount ?? 0) > 0 && !hasBombardmentPresence) {
+    const smallBomberType = resolveBestProducibleSmallShipType(context, 'SMALL_BOMBER', closestOrigin);
+    if (smallBomberType) {
+      return {
+        kind: 'SHIP_NEED',
+        shipType: smallBomberType,
+        amount: 1,
+        shortageKind: 'SMALL_BOMBER',
+        targetCoordinates: { ...target.coordinates },
+        preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
+        score: 560 + requiredStrength + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
+        reason: 'Need a carried bomber small ship to break neutral planetary defenses.'
+      };
+    }
+
     const bombardmentType = resolveBestProducibleShipType(context, 'BOMBARDMENT');
     if (!bombardmentType) {
       return null;
@@ -1162,6 +1391,110 @@ function createBreakShipNeed(
   combatNeed.amount = Math.max(1, Math.ceil(Math.max(0, requiredStrength - bestAvailableStrength) / combatPower));
   combatNeed.score = 620 + requiredStrength + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin);
   return combatNeed;
+}
+
+function createSmallPayloadShipNeeds(
+  context: BotSubsystemContext,
+  neutralFarmTargets: BotStrategicMilitaryTargetSnapshot[],
+  farmLedger: FarmLedgerMap
+): ShipNeedRequest[] {
+  if (!context.snapshot.planets.some((planet) => isNeutralFarmProductionPlanet(planet))) {
+    return [];
+  }
+
+  const activeFarmTargets = neutralFarmTargets.filter((target) => {
+    const entry = resolveFarmLedgerEntry(farmLedger, target.coordinates);
+    return entry.farmIntelEnough || entry.initialDefenseBroken || (target.currentShipsCount ?? 0) > 0 || (target.currentDefencesCount ?? 0) > 0;
+  });
+  if (activeFarmTargets.length <= 0) {
+    return [];
+  }
+
+  const hasDefendedFarm = activeFarmTargets.some((target) => {
+    const entry = resolveFarmLedgerEntry(farmLedger, target.coordinates);
+    return !entry.initialDefenseBroken && ((target.currentDefencesCount ?? 0) > 0 || sumRecordCounts(entry.knownDefenceCountsByType) > 0);
+  });
+
+  const requests: ShipNeedRequest[] = [];
+  for (const originPlanet of context.snapshot.planets) {
+    const hangarCapacity = resolveMilitaryHangarCapacity(originPlanet);
+    if (hangarCapacity <= 0) {
+      continue;
+    }
+
+    const stock = resolveSmallPayloadStock(originPlanet);
+    const totalCeiling = Math.ceil(hangarCapacity * MAX_SMALL_STOCK_RATIO);
+    if (stock.totalSize >= totalCeiling) {
+      continue;
+    }
+
+    const closestTarget = resolveClosestTargetForOrigin(originPlanet, activeFarmTargets);
+    if (!closestTarget) {
+      continue;
+    }
+
+    if (hasDefendedFarm) {
+      const bomberTarget = Math.ceil(hangarCapacity * DEFENDED_SMALL_BOMBER_RATIO);
+      const combatTarget = Math.ceil(hangarCapacity * DEFENDED_SMALL_COMBAT_RATIO);
+      if (stock.bomberSize < bomberTarget) {
+        const shipType = resolveBestProducibleSmallShipType(context, 'SMALL_BOMBER', originPlanet);
+        const shipSize = Math.max(1, SHIP_BLUEPRINTS.get(shipType ?? ShipType.ATMOSPHERIC_FIGHTER)?.size ?? 1);
+        if (shipType) {
+          requests.push({
+            kind: 'SHIP_NEED',
+            shipType,
+            amount: Math.max(1, Math.ceil((bomberTarget - stock.bomberSize) / shipSize)),
+            shortageKind: 'SMALL_BOMBER',
+            targetCoordinates: { ...closestTarget.coordinates },
+            preferredOrigin: { ...originPlanet.coordinates },
+            score: 500 + ((bomberTarget - stock.bomberSize) * 20) + resolvePostEarlyNeutralShipNeedScoreBonus(originPlanet),
+            reason: 'Need carried bomber small ships for defended neutral-farm breaks.'
+          });
+        }
+      }
+
+      if (stock.generalSize < combatTarget) {
+        const shipType = resolveBestProducibleSmallShipType(context, 'SMALL_COMBAT', originPlanet);
+        const shipSize = Math.max(1, SHIP_BLUEPRINTS.get(shipType ?? ShipType.FIGHTER)?.size ?? 1);
+        if (shipType) {
+          requests.push({
+            kind: 'SHIP_NEED',
+            shipType,
+            amount: Math.max(1, Math.ceil((combatTarget - stock.generalSize) / shipSize)),
+            shortageKind: 'SMALL_COMBAT',
+            targetCoordinates: { ...closestTarget.coordinates },
+            preferredOrigin: { ...originPlanet.coordinates },
+            score: 430 + ((combatTarget - stock.generalSize) * 14) + resolvePostEarlyNeutralShipNeedScoreBonus(originPlanet),
+            reason: 'Need carried small combat ships to fill military hangars for neutral-farm operations.'
+          });
+        }
+      }
+      continue;
+    }
+
+    const baselineTarget = Math.ceil(hangarCapacity * BASELINE_SMALL_STOCK_RATIO);
+    if (stock.totalSize >= baselineTarget) {
+      continue;
+    }
+
+    const shipType = resolveBestProducibleSmallShipType(context, 'SMALL_COMBAT', originPlanet);
+    const shipSize = Math.max(1, SHIP_BLUEPRINTS.get(shipType ?? ShipType.FIGHTER)?.size ?? 1);
+    if (!shipType) {
+      continue;
+    }
+    requests.push({
+      kind: 'SHIP_NEED',
+      shipType,
+      amount: Math.max(1, Math.ceil((baselineTarget - stock.totalSize) / shipSize)),
+      shortageKind: 'SMALL_COMBAT',
+      targetCoordinates: { ...closestTarget.coordinates },
+      preferredOrigin: { ...originPlanet.coordinates },
+      score: 360 + ((baselineTarget - stock.totalSize) * 12) + resolvePostEarlyNeutralShipNeedScoreBonus(originPlanet),
+      reason: 'Need baseline carried small combat ships to fill military hangars.'
+    });
+  }
+
+  return requests;
 }
 
 function createPlunderShipNeed(
@@ -1244,6 +1577,65 @@ function resolveBestProducibleShipType(
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] ?? null;
 }
 
+function resolveBestProducibleSmallShipType(
+  context: BotSubsystemContext,
+  role: 'SMALL_COMBAT' | 'SMALL_BOMBER',
+  preferredOrigin: BotPlanetSnapshot | null
+): ShipTypeT | null {
+  const candidates = new Map<ShipTypeT, number>();
+  const maxMilitaryHangarCapacity = Math.max(
+    0,
+    ...context.snapshot.planets.map((planet) => resolveLargestMilitaryHangarCapacity(planet))
+  );
+
+  for (const planet of context.snapshot.planets) {
+    for (const [shipType, blueprint] of SHIP_BLUEPRINTS.shipsMap.entries()) {
+      if (!snapshotHasShipBuildingRequirements(planet, blueprint) || !snapshotHasShipTechnologyRequirements(planet, blueprint)) {
+        continue;
+      }
+      if (!isShipTypeEligibleForSmallRole(shipType, role, maxMilitaryHangarCapacity)) {
+        continue;
+      }
+
+      const localOriginBonus = preferredOrigin
+        && planet.coordinates.x === preferredOrigin.coordinates.x
+        && planet.coordinates.y === preferredOrigin.coordinates.y
+        && planet.coordinates.z === preferredOrigin.coordinates.z
+        ? 250
+        : 0;
+      const score = localOriginBonus
+        + resolveSmallPayloadPriority(shipType, role)
+        + estimateShipCombatPower(shipType)
+        - ((blueprint.cost.metal + blueprint.cost.crystal + blueprint.cost.deuterium) / 100);
+      const previous = candidates.get(shipType) ?? -1;
+      if (score > previous) {
+        candidates.set(shipType, score);
+      }
+    }
+  }
+
+  return [...candidates.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] ?? null;
+}
+
+function isShipTypeEligibleForSmallRole(
+  shipType: ShipTypeT,
+  role: 'SMALL_COMBAT' | 'SMALL_BOMBER',
+  maxMilitaryHangarCapacity: number
+): boolean {
+  const blueprint = SHIP_BLUEPRINTS.get(shipType);
+  if (!blueprint || !isSmallCombatShipType(shipType)) {
+    return false;
+  }
+  if (shipType === ShipType.CORVETTE && maxMilitaryHangarCapacity <= 1) {
+    return false;
+  }
+  if (blueprint.size > Math.max(1, maxMilitaryHangarCapacity)) {
+    return false;
+  }
+  return role === 'SMALL_COMBAT' || isSmallBomberShipType(shipType);
+}
+
 function isShipTypeEligibleForRole(
   shipType: ShipTypeT,
   role: 'BOMBARDMENT' | 'COMBAT' | 'CARGO'
@@ -1296,6 +1688,67 @@ function resolvePreferredFarmOrigin(
       || left.coordinates.y - right.coordinates.y
       || left.coordinates.z - right.coordinates.z
     )[0] ?? null;
+}
+
+function resolveClosestTargetForOrigin(
+  originPlanet: BotPlanetSnapshot,
+  targets: BotStrategicMilitaryTargetSnapshot[]
+): BotStrategicMilitaryTargetSnapshot | null {
+  return [...targets]
+    .sort((left, right) =>
+      calculateTravelDistance(originPlanet.coordinates, left.coordinates) - calculateTravelDistance(originPlanet.coordinates, right.coordinates)
+      || left.coordinates.x - right.coordinates.x
+      || left.coordinates.y - right.coordinates.y
+      || left.coordinates.z - right.coordinates.z
+    )[0] ?? null;
+}
+
+function resolveMilitaryHangarCapacity(originPlanet: BotPlanetSnapshot): number {
+  return Object.entries(originPlanet.ships.undamagedCountByType).reduce((sum, [shipType, amount]) => {
+    const blueprint = SHIP_BLUEPRINTS.get(shipType as ShipTypeT);
+    if (!blueprint || !isMilitaryHangarShipType(shipType as ShipTypeT)) {
+      return sum;
+    }
+    return sum + (blueprint.hangarCapacity * (amount ?? 0));
+  }, 0);
+}
+
+function resolveLargestMilitaryHangarCapacity(originPlanet: BotPlanetSnapshot): number {
+  return Object.entries(originPlanet.ships.undamagedCountByType).reduce((largest, [shipType, amount]) => {
+    const blueprint = SHIP_BLUEPRINTS.get(shipType as ShipTypeT);
+    if (!blueprint || !isMilitaryHangarShipType(shipType as ShipTypeT) || (amount ?? 0) <= 0) {
+      return largest;
+    }
+    return Math.max(largest, blueprint.hangarCapacity);
+  }, 0);
+}
+
+function resolveSmallPayloadStock(originPlanet: BotPlanetSnapshot): {
+  totalSize: number;
+  bomberSize: number;
+  generalSize: number;
+} {
+  let totalSize = 0;
+  let bomberSize = 0;
+  let generalSize = 0;
+
+  for (const [shipType, amount] of Object.entries(originPlanet.ships.undamagedCountByType)) {
+    const typedShipType = shipType as ShipTypeT;
+    const blueprint = SHIP_BLUEPRINTS.get(typedShipType);
+    if (!blueprint || !isSmallCombatShipType(typedShipType)) {
+      continue;
+    }
+
+    const size = blueprint.size * (amount ?? 0);
+    totalSize += size;
+    if (isSmallBomberShipType(typedShipType)) {
+      bomberSize += size;
+    } else {
+      generalSize += size;
+    }
+  }
+
+  return { totalSize, bomberSize, generalSize };
 }
 
 function createFarmCombatShipNeed(
@@ -1490,9 +1943,10 @@ function selectTopShipNeedsPerPlanet(requests: ShipNeedRequest[]): ShipNeedReque
 
   for (const request of requests) {
     const preferredOrigin = request.preferredOrigin;
-    const key = preferredOrigin
+    const originKey = preferredOrigin
       ? `${preferredOrigin.x}:${preferredOrigin.y}:${preferredOrigin.z}`
       : 'global';
+    const key = `${originKey}:${request.shortageKind}`;
     const existing = merged.get(key);
     if (!existing) {
       merged.set(key, request);
@@ -1584,7 +2038,11 @@ function createShipNeedProposal(
     planetId: null,
     targetCoordinates: { ...request.targetCoordinates },
     expectedValue: Math.max(1, Math.round(request.score)),
-    urgency: request.shortageKind === 'CARGO' ? 78 : 84,
+    urgency: request.shortageKind === 'CARGO'
+      ? 78
+      : request.shortageKind === 'SMALL_COMBAT'
+        ? 80
+        : 84,
     risk: 9,
     confidence: 64,
     requestedResources: emptyResources(),

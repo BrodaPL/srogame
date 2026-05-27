@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BuildingType } from '../../../../../src/app/models/enums/building-type.js';
+import { DefenceType } from '../../../../../src/app/models/enums/defence-type.js';
 import { FleetMissionType } from '../../../../../src/app/models/enums/fleet-mission-type.js';
 import { PlayerType } from '../../../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../../../src/app/models/enums/ship-type.js';
@@ -110,6 +111,69 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(attackProposal?.debug.missionPhase).toBe('BREAK');
     expect(attackProposal?.requestPayload.origin).toEqual({ x: 0, y: 0, z: 1 });
     expect(attackProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 2 });
+  });
+
+  it('adds carried bomber payload to defended neutral-farm break attacks when hangar capacity is available', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.ATMOSPHERIC_BOMBER, 1);
+    neutralPlanet.rBDSFTQ.defences.addUndamaged(DefenceType.SAM_SITE, 1);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const attackProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'BREAK'
+    );
+
+    expect(attackProposal).toBeDefined();
+    const attackShipTypes = readProposalShipTypes(attackProposal);
+    expect(attackShipTypes).toContain(ShipType.BATTLE_SHIP);
+    expect(attackShipTypes).toContain(ShipType.ATMOSPHERIC_BOMBER);
+  });
+
+  it('requests carried bomber small ships for defended neutral farms when hangars are empty', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 1);
+    neutralPlanet.rBDSFTQ.defences.addUndamaged(DefenceType.SAM_SITE, 1);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const bomberNeed = result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.demandOnly === true
+      && proposal.requestPayload.shortageKind === 'SMALL_BOMBER'
+    );
+
+    expect(bomberNeed).toBeDefined();
+    expect(bomberNeed?.requestPayload.shipType).toBe(ShipType.ATMOSPHERIC_BOMBER);
+    expect(bomberNeed?.subsystemId).toBe('STRATEGIC_MILITARY');
+  });
+
+  it('does not request Corvettes for baseline hangar fill when only one-slot military hangars exist', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    bot.setTechLevel(TechnologyType.MATERIAL_TECHNOLOGY, 1);
+    bot.setTechLevel(TechnologyType.MISSILES_WEAPONS, 2);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    markPlanetScanned(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const smallCombatNeed = result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.demandOnly === true
+      && proposal.requestPayload.shortageKind === 'SMALL_COMBAT'
+    );
+
+    expect(smallCombatNeed).toBeDefined();
+    expect(smallCombatNeed?.requestPayload.shipType).not.toBe(ShipType.CORVETTE);
   });
 
   it('emits a one-ship probing attack when spy intel is insufficient for neutral defense estimation', () => {
@@ -580,6 +644,8 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(result.proposals.some((proposal) =>
       proposal.kind === 'SHIPYARD'
       && proposal.requestPayload.demandOnly === true
+      && proposal.requestPayload.shortageKind !== 'SMALL_COMBAT'
+      && proposal.requestPayload.shortageKind !== 'SMALL_BOMBER'
     )).toBe(false);
   });
 
