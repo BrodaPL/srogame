@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Planet, PlanetBasicInfo, PlanetInfo, rBDSFTQ } from '../planet';
 import { PlanetType } from '../../enums/planet-type';
 import { SolarSystem } from '../solar-system';
@@ -63,6 +63,10 @@ describe('Planet', () => {
       new Map()
     );
   };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('returns production1 values for building levels and 0 for missing levels', () => {
     const planet = createPlanet();
@@ -329,16 +333,85 @@ describe('Planet', () => {
     expect(parameters.hyperspaceParameters).toBe(1);
   });
 
-  it('uses direct multiplier ranges for forced BARREN random planets', () => {
+  it('applies weighted difficulty bonus to positive and negative modifiers', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    const rolled = new PlanetaryParameters(
+      1.4,
+      1,
+      0.8,
+      1,
+      1,
+      1,
+      1,
+      0.85,
+      1.2
+    );
+
+    const result = Planet.applyDifficultyBonusToRolledParameters(PlanetType.BARREN, 10, rolled);
+
+    expect(result.metalModifier).toBeCloseTo(1.895, 8);
+    expect(result.deuteriumModifier).toBeCloseTo(1.295, 8);
+    expect(result.crystalModifier).toBe(1);
+    expect(result.anomaliesAndNoise).toBe(0.85);
+    expect(result.hyperspaceParameters).toBe(1.2);
+  });
+
+  it('equalizes near-neutral difficulty-boosted planets across all relevant parameters', () => {
+    const rolled = new PlanetaryParameters(
+      1,
+      1.01,
+      0.99,
+      1,
+      1.01,
+      0.99,
+      1,
+      0.7,
+      1.35
+    );
+
+    const result = Planet.applyDifficultyBonusToRolledParameters(PlanetType.DRY, 10, rolled);
+
+    expect(result.metalModifier).toBe(1.14);
+    expect(result.crystalModifier).toBe(1.14);
+    expect(result.deuteriumModifier).toBe(1.14);
+    expect(result.energyModifierRES).toBe(1.14);
+    expect(result.energyModifierNuclear).toBe(1.14);
+    expect(result.scienceModifier).toBe(1.14);
+    expect(result.industryModifier).toBe(1.14);
+    expect(result.anomaliesAndNoise).toBe(0.7);
+    expect(result.hyperspaceParameters).toBe(1.35);
+  });
+
+  it('leaves asteroid parameters unchanged by the new difficulty bonus pass', () => {
+    const rolled = new PlanetaryParameters(
+      1.5,
+      0.45,
+      1.7,
+      0.1,
+      1.25,
+      1.3,
+      0.55,
+      1.55,
+      0.35
+    );
+
+    const result = Planet.applyDifficultyBonusToRolledParameters(PlanetType.ASTEROIDS, 50, rolled);
+
+    expect(result).not.toBe(rolled);
+    expect(result).toEqual(rolled);
+  });
+
+  it('uses updated ranges and keeps irrelevant parameters fully random for forced BARREN random planets', () => {
     const system = createSystem();
     for (let index = 0; index < 60; index += 1) {
       const planet = Planet.createRandomEmpty(`Barren-${index}`, 1, system, null, PlanetType.BARREN);
       const parameters = planet.info.planetaryParameters;
 
-      expect(parameters.metalModifier).toBeGreaterThanOrEqual(0.7);
-      expect(parameters.metalModifier).toBeLessThanOrEqual(1.5);
-      expect(parameters.scienceModifier).toBeGreaterThanOrEqual(0.9);
-      expect(parameters.scienceModifier).toBeLessThanOrEqual(1.5);
+      expect(planet.basicInfo.colonizationDifficulty).toBeGreaterThanOrEqual(6);
+      expect(planet.basicInfo.colonizationDifficulty).toBeLessThanOrEqual(9);
+      expect(parameters.metalModifier).toBeGreaterThanOrEqual(0.95);
+      expect(parameters.scienceModifier).toBeGreaterThanOrEqual(1);
       expect(parameters.anomaliesAndNoise).toBeGreaterThanOrEqual(0.8);
       expect(parameters.anomaliesAndNoise).toBeLessThanOrEqual(1.6);
       expect(parameters.hyperspaceParameters).toBeGreaterThanOrEqual(0.2);

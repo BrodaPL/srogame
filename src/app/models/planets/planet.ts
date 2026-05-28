@@ -29,6 +29,14 @@ import {
 } from './planet-image-variant';
 
 type ModifierKey = keyof Omit<PlanetaryParameters, 'copy'>;
+type BalancedModifierKey =
+  | 'metalModifier'
+  | 'crystalModifier'
+  | 'deuteriumModifier'
+  | 'energyModifierRES'
+  | 'energyModifierNuclear'
+  | 'scienceModifier'
+  | 'industryModifier';
 
 type ModifierRange = {
   min: number;
@@ -85,6 +93,15 @@ export class rBDSFTQ {
 
 export class Planet {
   private static buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
+  private static readonly BALANCED_MODIFIER_KEYS: BalancedModifierKey[] = [
+    'metalModifier',
+    'crystalModifier',
+    'deuteriumModifier',
+    'energyModifierRES',
+    'energyModifierNuclear',
+    'scienceModifier',
+    'industryModifier'
+  ];
   private static readonly TERRAFORMER_AFFECTED_PARAMETER_KEYS: Array<
     keyof Pick<
       PlanetaryParameters,
@@ -166,16 +183,28 @@ export class Planet {
     forcedType?: PlanetType
   ): Planet {
     const type = forcedType ?? Planet.randomPlanetType();
-    // Pick modifier ranges based on planet type, then roll actual values within those ranges.
     const modifierRanges = Planet.modifierRangesFor(type);
     const colonizationRange = Planet.colonizationDifficultyRangeFor(type);
     const size = Planet.randomInt(100, 220);
+    const difficulty = Planet.randomInt(colonizationRange.min, colonizationRange.max);
+    const rolledParameters = new PlanetaryParameters(
+      Planet.randomFloat(modifierRanges.metalModifier.min, modifierRanges.metalModifier.max),
+      Planet.randomFloat(modifierRanges.crystalModifier.min, modifierRanges.crystalModifier.max),
+      Planet.randomFloat(modifierRanges.deuteriumModifier.min, modifierRanges.deuteriumModifier.max),
+      Planet.randomFloat(modifierRanges.energyModifierRES.min, modifierRanges.energyModifierRES.max),
+      Planet.randomFloat(modifierRanges.energyModifierNuclear.min, modifierRanges.energyModifierNuclear.max),
+      Planet.randomFloat(modifierRanges.scienceModifier.min, modifierRanges.scienceModifier.max),
+      Planet.randomFloat(modifierRanges.industryModifier.min, modifierRanges.industryModifier.max),
+      Planet.randomSteppedFloat(modifierRanges.anomaliesAndNoise.min, modifierRanges.anomaliesAndNoise.max, 0.05),
+      Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05)
+    );
+    const finalParameters = Planet.applyDifficultyBonusToRolledParameters(type, difficulty, rolledParameters);
 
     return new Planet(
       new PlanetBasicInfo(
         name,
         type,
-        Planet.randomInt(colonizationRange.min, colonizationRange.max),
+        difficulty,
         order,
         solarSystem,
         PlanetImageHelper.getPlanetImage(type, size),
@@ -183,20 +212,7 @@ export class Planet {
         0,
         createRandomPlanetImageVariant(type, size)
       ),
-      new PlanetInfo(
-        ownerId,
-        new PlanetaryParameters(
-          Planet.randomFloat(modifierRanges.metalModifier.min, modifierRanges.metalModifier.max),
-          Planet.randomFloat(modifierRanges.crystalModifier.min, modifierRanges.crystalModifier.max),
-          Planet.randomFloat(modifierRanges.deuteriumModifier.min, modifierRanges.deuteriumModifier.max),
-          Planet.randomFloat(modifierRanges.energyModifierRES.min, modifierRanges.energyModifierRES.max),
-          Planet.randomFloat(modifierRanges.energyModifierNuclear.min, modifierRanges.energyModifierNuclear.max),
-          Planet.randomFloat(modifierRanges.scienceModifier.min, modifierRanges.scienceModifier.max),
-          Planet.randomFloat(modifierRanges.industryModifier.min, modifierRanges.industryModifier.max),
-          Planet.randomSteppedFloat(modifierRanges.anomaliesAndNoise.min, modifierRanges.anomaliesAndNoise.max, 0.05),
-          Planet.randomSteppedFloat(modifierRanges.hyperspaceParameters.min, modifierRanges.hyperspaceParameters.max, 0.05)
-        )
-      ),
+      new PlanetInfo(ownerId, finalParameters),
       new rBDSFTQ(
         new ResourcesPack(0, 0, 0),
         new Map<BuildingType, number>(),
@@ -215,6 +231,58 @@ export class Planet {
       ),
       new Map<number, EspionageReportData>()
     );
+  }
+
+  public static applyDifficultyBonusToRolledParameters(
+    type: PlanetType,
+    difficulty: number,
+    rolledParameters: PlanetaryParameters
+  ): PlanetaryParameters {
+    const result = rolledParameters.copy();
+    if (type === PlanetType.ASTEROIDS) {
+      return result;
+    }
+
+    const normalizedDifficulty = Number.isFinite(difficulty) ? Math.max(0, Math.floor(difficulty)) : 0;
+    const difficultyBonusPoints = Math.max(0, (normalizedDifficulty * normalizedDifficulty) - 1);
+    if (difficultyBonusPoints <= 0) {
+      return result;
+    }
+
+    if (Planet.areBalancedModifiersNearNeutral(result)) {
+      const perStatBonusPoints = Math.floor(difficultyBonusPoints / Planet.BALANCED_MODIFIER_KEYS.length);
+      const equalizedModifier = Planet.roundModifier(1 + (perStatBonusPoints / 100));
+      for (const key of Planet.BALANCED_MODIFIER_KEYS) {
+        result[key] = equalizedModifier;
+      }
+      return result;
+    }
+
+    const splitRatio = 0.1 + (Math.random() * 0.8);
+    let bonusToPositive = difficultyBonusPoints * splitRatio;
+    let bonusToNegative = difficultyBonusPoints - bonusToPositive;
+
+    const positiveWeights = Planet.collectPositiveWeights(result);
+    const negativeWeights = Planet.collectNegativeWeights(result);
+
+    if (positiveWeights.total <= 0) {
+      bonusToNegative += bonusToPositive;
+      bonusToPositive = 0;
+    }
+
+    if (negativeWeights.total <= 0) {
+      bonusToPositive += bonusToNegative;
+      bonusToNegative = 0;
+    }
+
+    Planet.applyWeightedBonus(result, positiveWeights.entries, positiveWeights.total, bonusToPositive);
+    Planet.applyWeightedBonus(result, negativeWeights.entries, negativeWeights.total, bonusToNegative);
+
+    for (const key of Planet.BALANCED_MODIFIER_KEYS) {
+      result[key] = Planet.roundModifier(result[key]);
+    }
+
+    return result;
   }
 
   constructor(
@@ -940,79 +1008,79 @@ export class Planet {
     PlanetType,
     Record<ModifierKey, ModifierRange>> = {
     [PlanetType.BARREN]: {
-      metalModifier: Planet.percentRange(0.7, 1.5),
-      crystalModifier: Planet.percentRange(0.7, 1.5),
-      deuteriumModifier: Planet.percentRange(0.7, 1.5),
-      energyModifierRES: Planet.percentRange(0.8, 1.5),
-      energyModifierNuclear: Planet.percentRange(0.8, 1.5),
-      scienceModifier: Planet.percentRange(0.9, 1.5),
-      industryModifier: Planet.percentRange(0.7, 1.5),
+      metalModifier: Planet.percentRange(0.95, 1.45),
+      crystalModifier: Planet.percentRange(0.8, 1.25),
+      deuteriumModifier: Planet.percentRange(0.65, 1.1),
+      energyModifierRES: Planet.percentRange(0.75, 1.15),
+      energyModifierNuclear: Planet.percentRange(0.95, 1.25),
+      scienceModifier: Planet.percentRange(1.0, 1.4),
+      industryModifier: Planet.percentRange(0.95, 1.3),
       anomaliesAndNoise: Planet.percentRange(0.8, 1.6),
       hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.DRY]: {
-      metalModifier: Planet.percentRange(0.7, 1.5),
-      crystalModifier: Planet.percentRange(0.7, 1.5),
-      deuteriumModifier: Planet.percentRange(0.5, 0.8),
-      energyModifierRES: Planet.percentRange(0.5, 1.3),
-      energyModifierNuclear: Planet.percentRange(0.5, 1.3),
-      scienceModifier: Planet.percentRange(0.5, 1.5),
-      industryModifier: Planet.percentRange(0.5, 1.3),
+      metalModifier: Planet.percentRange(0.75, 1.2),
+      crystalModifier: Planet.percentRange(0.95, 1.4),
+      deuteriumModifier: Planet.percentRange(0.5, 0.9),
+      energyModifierRES: Planet.percentRange(1.05, 1.45),
+      energyModifierNuclear: Planet.percentRange(0.7, 1.1),
+      scienceModifier: Planet.percentRange(0.75, 1.15),
+      industryModifier: Planet.percentRange(0.95, 1.3),
       anomaliesAndNoise: Planet.percentRange(0.6, 1.6),
       hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.ICE]: {
-      metalModifier: Planet.percentRange(0.5, 1.5),
-      crystalModifier: Planet.percentRange(0.5, 1.5),
-      deuteriumModifier: Planet.percentRange(0.8, 1.5),
-      energyModifierRES: Planet.percentRange(0.5, 1.1),
-      energyModifierNuclear: Planet.percentRange(0.7, 1.5),
-      scienceModifier: Planet.percentRange(0.5, 1.5),
-      industryModifier: Planet.percentRange(0.5, 1.3),
+      metalModifier: Planet.percentRange(0.65, 1.1),
+      crystalModifier: Planet.percentRange(0.65, 1.1),
+      deuteriumModifier: Planet.percentRange(1.1, 1.55),
+      energyModifierRES: Planet.percentRange(0.5, 0.95),
+      energyModifierNuclear: Planet.percentRange(1.0, 1.35),
+      scienceModifier: Planet.percentRange(0.95, 1.35),
+      industryModifier: Planet.percentRange(0.65, 1.0),
       anomaliesAndNoise: Planet.percentRange(0.7, 1.6),
       hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.JUNGLE]: {
-      metalModifier: Planet.percentRange(0.5, 1.5),
-      crystalModifier: Planet.percentRange(0.5, 1.5),
-      deuteriumModifier: Planet.percentRange(0.5, 1.5),
-      energyModifierRES: Planet.percentRange(0.6, 1.5),
-      energyModifierNuclear: Planet.percentRange(0.5, 1.5),
-      scienceModifier: Planet.percentRange(0.5, 1.4),
-      industryModifier: Planet.percentRange(0.5, 1.4),
+      metalModifier: Planet.percentRange(0.75, 1.25),
+      crystalModifier: Planet.percentRange(0.75, 1.25),
+      deuteriumModifier: Planet.percentRange(0.75, 1.2),
+      energyModifierRES: Planet.percentRange(0.85, 1.3),
+      energyModifierNuclear: Planet.percentRange(0.75, 1.2),
+      scienceModifier: Planet.percentRange(0.8, 1.15),
+      industryModifier: Planet.percentRange(0.8, 1.15),
       anomaliesAndNoise: Planet.percentRange(0.4, 1.4),
       hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.SAVANNA]: {
-      metalModifier: Planet.percentRange(0.5, 1.3),
-      crystalModifier: Planet.percentRange(0.5, 1.3),
-      deuteriumModifier: Planet.percentRange(0.5, 1.3),
-      energyModifierRES: Planet.percentRange(0.6, 1.4),
-      energyModifierNuclear: Planet.percentRange(0.5, 1.5),
-      scienceModifier: Planet.percentRange(0.6, 1.4),
-      industryModifier: Planet.percentRange(0.7, 1.5),
+      metalModifier: Planet.percentRange(0.75, 1.25),
+      crystalModifier: Planet.percentRange(0.75, 1.2),
+      deuteriumModifier: Planet.percentRange(0.7, 1.1),
+      energyModifierRES: Planet.percentRange(0.95, 1.35),
+      energyModifierNuclear: Planet.percentRange(0.85, 1.2),
+      scienceModifier: Planet.percentRange(0.8, 1.1),
+      industryModifier: Planet.percentRange(1.0, 1.3),
       anomaliesAndNoise: Planet.percentRange(0.4, 1.4),
       hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.OCEANIC]: {
-      metalModifier: Planet.percentRange(0.5, 1.4),
-      crystalModifier: Planet.percentRange(0.5, 1.4),
-      deuteriumModifier: Planet.percentRange(0.9, 1.5),
-      energyModifierRES: Planet.percentRange(0.6, 1.5),
-      energyModifierNuclear: Planet.percentRange(0.7, 1.5),
-      scienceModifier: Planet.percentRange(0.6, 1.4),
-      industryModifier: Planet.percentRange(0.5, 1.2),
+      metalModifier: Planet.percentRange(0.7, 1.2),
+      crystalModifier: Planet.percentRange(0.7, 1.2),
+      deuteriumModifier: Planet.percentRange(0.95, 1.45),
+      energyModifierRES: Planet.percentRange(0.85, 1.25),
+      energyModifierNuclear: Planet.percentRange(0.95, 1.3),
+      scienceModifier: Planet.percentRange(0.9, 1.25),
+      industryModifier: Planet.percentRange(0.75, 1.1),
       anomaliesAndNoise: Planet.percentRange(0.4, 1.4),
       hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
     [PlanetType.VOLCANIC]: {
       metalModifier: Planet.percentRange(1.1, 1.5),
-      crystalModifier: Planet.percentRange(0.9, 1.5),
-      deuteriumModifier: Planet.percentRange(0.7, 1.4),
-      energyModifierRES: Planet.percentRange(1.1, 1.5),
-      energyModifierNuclear: Planet.percentRange(1.2, 1.5),
-      scienceModifier: Planet.percentRange(0.9, 1.5),
-      industryModifier: Planet.percentRange(0.7, 1.4),
+      crystalModifier: Planet.percentRange(0.9, 1.3),
+      deuteriumModifier: Planet.percentRange(0.6, 1.0),
+      energyModifierRES: Planet.percentRange(0.65, 1.05),
+      energyModifierNuclear: Planet.percentRange(1.1, 1.4),
+      scienceModifier: Planet.percentRange(0.7, 1.1),
+      industryModifier: Planet.percentRange(1.05, 1.4),
       anomaliesAndNoise: Planet.percentRange(0.4, 1.2),
       hyperspaceParameters: Planet.percentRange(0.2, 1.5),
     },
@@ -1088,6 +1156,70 @@ export class Planet {
     const steps = Math.floor((max - min) / step);
     const value = min + step * Planet.randomInt(0, steps);
     const factor = Math.pow(10, decimals);
+    return Math.round(value * factor) / factor;
+  }
+
+  private static areBalancedModifiersNearNeutral(parameters: PlanetaryParameters): boolean {
+    return Planet.BALANCED_MODIFIER_KEYS.every((key) => {
+      const value = parameters[key];
+      return value >= 0.99 && value <= 1.01;
+    });
+  }
+
+  private static collectPositiveWeights(parameters: PlanetaryParameters): {
+    entries: Array<{ key: BalancedModifierKey; weight: number }>;
+    total: number;
+  } {
+    return Planet.collectWeightedEntries(parameters, (value) => Math.max(0, value - 1));
+  }
+
+  private static collectNegativeWeights(parameters: PlanetaryParameters): {
+    entries: Array<{ key: BalancedModifierKey; weight: number }>;
+    total: number;
+  } {
+    return Planet.collectWeightedEntries(parameters, (value) => Math.max(0, 1 - value));
+  }
+
+  private static collectWeightedEntries(
+    parameters: PlanetaryParameters,
+    weightResolver: (value: number) => number
+  ): {
+    entries: Array<{ key: BalancedModifierKey; weight: number }>;
+    total: number;
+  } {
+    const entries: Array<{ key: BalancedModifierKey; weight: number }> = [];
+    let total = 0;
+
+    for (const key of Planet.BALANCED_MODIFIER_KEYS) {
+      const weight = weightResolver(parameters[key]);
+      if (weight <= 0) {
+        continue;
+      }
+
+      entries.push({ key, weight });
+      total += weight;
+    }
+
+    return { entries, total };
+  }
+
+  private static applyWeightedBonus(
+    parameters: PlanetaryParameters,
+    entries: Array<{ key: BalancedModifierKey; weight: number }>,
+    totalWeight: number,
+    bonusPoints: number
+  ): void {
+    if (bonusPoints <= 0 || totalWeight <= 0 || entries.length <= 0) {
+      return;
+    }
+
+    for (const entry of entries) {
+      parameters[entry.key] += (bonusPoints * (entry.weight / totalWeight)) / 100;
+    }
+  }
+
+  private static roundModifier(value: number): number {
+    const factor = 10000;
     return Math.round(value * factor) / factor;
   }
 }
