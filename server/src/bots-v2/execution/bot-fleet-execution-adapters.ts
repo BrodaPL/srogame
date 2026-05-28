@@ -80,11 +80,17 @@ export function normalizeFleetExecutionProposal(proposal: BotProposal): BotFleet
     return { ok: false, reason: 'missing_or_invalid_cargo' };
   }
 
+  const originFleetId = readOptionalPositiveInteger(proposal.requestPayload.originFleetId);
+  if (originFleetId === false) {
+    return { ok: false, reason: 'invalid_origin_fleet_id' };
+  }
+
   return {
     ok: true,
     value: {
       missionType,
       origin,
+      originFleetId,
       target,
       ships,
       carriedBombs,
@@ -105,6 +111,19 @@ function readRecordOrNull(value: unknown): Record<string, unknown> | null {
 
 function readCoordinates(value: unknown): ClientCoordinates | null {
   return readV2ProposalCoordinates(value);
+}
+
+function readOptionalPositiveInteger(value: unknown): number | null | false {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = Number(value);
+  if (!Number.isInteger(normalized) || normalized <= 0) {
+    return false;
+  }
+
+  return normalized;
 }
 
 function readShips(value: unknown): CreateFleetShipSelectionEntry[] | null {

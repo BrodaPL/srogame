@@ -70,10 +70,10 @@
             data-tutorial-id="mission-planner-details-card"
           >
             <h3>Mission Details</h3>
-            <p class="overview-muted mission-planner__microcopy">Origin must be one of your planets. Planets with ships are preferred.</p>
+            <p class="overview-muted mission-planner__microcopy">Origins can be owned planets or orbiting fleets with fuel in cargo.</p>
             <p class="mission-planner__detail-line">
               Origin:
-              {{ selectedOriginPlanet ? selectedOriginPlanet.basicInfo.name + ' (' + originCoordinatesInput + ')' : 'No origin selected' }}
+              {{ currentOriginNameLabel() }}
             </p>
             <div class="overview-stat mission-planner__detail-stat">
               <span class="overview-stat__label">Active fleets</span>
@@ -292,9 +292,9 @@
               Cargo: {{ usedCargoCapacity() }} |
               Fuel reserve: {{ fuelCostPreview() }}
             </p>
-            @if (selectedOriginPlanet && selectedTargetPlanet) {
+            @if ((selectedOriginPlanet || selectedOriginFleet) && selectedTargetPlanet) {
               <p class="overview-muted">
-                From {{ selectedOriginPlanet.basicInfo.name }} ({{ originCoordinatesInput }})
+                From {{ currentOriginNameLabel() }}
                 to {{ selectedTargetPlanet.basicInfo.name }} ({{ targetCoordinatesInput }})
               </p>
             }
@@ -486,7 +486,7 @@
               <input
                 class="mission-planner__origin-input"
                 type="text"
-                [value]="selectedOriginPlanet ? originCoordinatesInput : 'No origin selected'"
+                [value]="currentOriginNameLabel()"
                 readonly
               />
               <button
@@ -529,33 +529,29 @@
 
         <section class="overview-card">
           <h3>Remote Origins</h3>
-          <p class="overview-muted mission-planner__microcopy">Non-owned planets where your ships are currently present can also be used as origin points.</p>
+          <p class="overview-muted mission-planner__microcopy">Orbiting fleets can launch follow-up missions from their current location. Fuel is taken from fleet cargo.</p>
           <div class="mission-planner__rail-list">
-            @for (planet of foreignPlanetsWithPlayerShips(); track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z) {
+            @for (fleet of remoteOriginFleets(); track fleet.fleetId) {
               <div
                 class="game-dashboard__planet-option"
-                [class.game-dashboard__planet-option--selected]="selectedOriginMatches(planet)"
-                (click)="selectOriginPlanet(planet)"
+                [class.game-dashboard__planet-option--selected]="selectedOriginFleetMatches(fleet)"
+                (click)="selectOriginFleet(fleet)"
               >
                 <div class="game-dashboard__planet-select-row">
                   <span
                     class="game-dashboard__planet-radio"
-                    [class.game-dashboard__planet-radio--selected]="selectedOriginMatches(planet)"
+                    [class.game-dashboard__planet-radio--selected]="selectedOriginFleetMatches(fleet)"
                   ></span>
                   <span class="game-dashboard__planet-select-label">
-                    {{ selectedOriginMatches(planet) ? 'Selected' : 'Select' }}
+                    {{ selectedOriginFleetMatches(fleet) ? 'Selected' : 'Select' }}
                   </span>
                 </div>
-
-                <app-mini-planet-preview
-                  [planet]="planet"
-                  [showDefaultActions]="false"
-                  [isSelected]="selectedOriginMatches(planet)"
-                ></app-mini-planet-preview>
+                <p class="overview-muted">Fleet #{{ fleet.fleetId }} orbiting {{ fleet.targetPlanetName }}</p>
+                <p class="overview-muted">Ships: {{ totalFleetShips(fleet) }} | Cargo fuel: {{ fleet.cargo.deuterium }}</p>
               </div>
             }
-            @if (foreignPlanetsWithPlayerShips().length === 0) {
-              <p class="overview-empty">No non-owned planets with your ships are available yet.</p>
+            @if (remoteOriginFleets().length === 0) {
+              <p class="overview-empty">No orbiting fleets are available as remote origins yet.</p>
             }
           </div>
         </section>

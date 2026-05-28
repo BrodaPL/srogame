@@ -24,6 +24,7 @@ import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship
 import { calculateRecycleCapabilityForManyShips } from '../../models/recycling/recycling-capability';
 import { maxActiveFleets } from '../../models/tech/technology-effects';
 import { TutorialService } from '../../tutorial/tutorial.service';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
 type CoordinateSegmentVm = {
@@ -36,7 +37,7 @@ type MissionTypeFilterValue = FleetMissionType | 'ALL';
 
 @Component({
   selector: 'app-operations-view',
-  imports: [TopMenuComponent, RouterLink, FormsModule],
+  imports: [TopMenuComponent, RouterLink, FormsModule, TooltipDirective],
   templateUrl: './operations-view.component.html',
   styleUrl: './operations-view.styles.css'
 })
@@ -80,6 +81,10 @@ export class OperationsViewComponent implements OnInit {
 
   protected totalShips(fleet: Fleet): number {
     return ManyShips.totalShipsCount(fleet.ships);
+  }
+
+  protected isRemoteOriginFleet(fleet: Fleet): boolean {
+    return fleet.isRemoteOrigin === true;
   }
 
   protected primaryFleet(): Fleet | null {

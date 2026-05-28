@@ -3,6 +3,7 @@ import * as fleetMissionRegistryModule from '../../../src/app/models/missions/fl
 import * as destinationModule from '../../../src/app/models/fleets/destination.js';
 import * as fleetModelModule from '../../../src/app/models/fleets/fleet.js';
 import * as manyShipsModule from '../../../src/app/models/fleets/many-ships.js';
+import * as manyDefencesModule from '../../../src/app/models/defences/many-defences.js';
 import * as resourcesPackModule from '../../../src/app/models/resources-pack.js';
 import * as fleetMissionTypeEnumModule from '../../../src/app/models/enums/fleet-mission-type.js';
 import type {
@@ -19,6 +20,7 @@ import type { Planet } from '../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../src/app/models/player.ts';
 import type { Fleet as FleetType } from '../../../src/app/models/fleets/fleet.ts';
 import type { ManyShips as ManyShipsType } from '../../../src/app/models/fleets/many-ships.ts';
+import type { ManyDefences as ManyDefencesType } from '../../../src/app/models/defences/many-defences.ts';
 import type { GameCommandContext } from './command-context.ts';
 import type { CommandResult } from './command-result.ts';
 import {
@@ -53,6 +55,7 @@ const { FleetMissionRegistry } = resolveModule(fleetMissionRegistryModule) as ty
 const { Destination } = resolveModule(destinationModule) as typeof import('../../../src/app/models/fleets/destination.js');
 const { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } = resolveModule(fleetModelModule) as typeof import('../../../src/app/models/fleets/fleet.js');
 const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../../src/app/models/fleets/many-ships.js');
+const { ManyDefences } = resolveModule(manyDefencesModule) as typeof import('../../../src/app/models/defences/many-defences.js');
 const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
 const { FleetMissionType } = resolveModule(fleetMissionTypeEnumModule) as typeof import('../../../src/app/models/enums/fleet-mission-type.js');
 
@@ -74,6 +77,7 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
 export type CreateFleetMissionCommand = {
   missionType: FleetMissionTypeType;
   origin: ClientCoordinates;
+  originFleetId?: number | null;
   target: ClientCoordinates;
   ships: CreateFleetShipSelectionEntry[];
   carriedBombs: CreateFleetBombSelectionEntry[];
@@ -109,19 +113,6 @@ export function createFleetMission(
     };
   }
 
-  const originPlanetResult = resolvePlanetOrError(context.galaxy, command.origin);
-  if (!originPlanetResult.ok) {
-    return {
-      ok: false,
-      error: {
-        ...originPlanetResult.error,
-        message: originPlanetResult.error.code === 'SYSTEM_NOT_FOUND'
-          ? 'Origin planet not found.'
-          : originPlanetResult.error.message
-      }
-    };
-  }
-
   const targetPlanetResult = resolvePlanetOrError(context.galaxy, command.target);
   if (!targetPlanetResult.ok) {
     return {
@@ -135,15 +126,7 @@ export function createFleetMission(
     };
   }
 
-  const originPlanet = originPlanetResult.value;
   const targetPlanet = targetPlanetResult.value;
-  if (originPlanet.info.ownerId !== context.playerId) {
-    return {
-      ok: false,
-      error: commandError(403, 'FORBIDDEN', 'Origin planet must be owned by you.')
-    };
-  }
-
   const player = resolvePlayerById(context.galaxy, context.playerId);
   if (!player) {
     return {
@@ -152,16 +135,35 @@ export function createFleetMission(
     };
   }
 
-  const playerActiveFleetCount = context.galaxy.activeFleets.filter((fleet) => fleet.ownerId === context.playerId).length;
-  const playerMaxActiveFleets = calculatePlayerMaxActiveFleets(player);
-  if (playerActiveFleetCount >= playerMaxActiveFleets) {
+  const remoteOrigin = command.originFleetId !== null && command.originFleetId !== undefined
+    ? resolveRemoteOriginContext(context, command.originFleetId)
+    : null;
+  if (remoteOrigin && !remoteOrigin.ok) {
     return {
       ok: false,
-      error: commandError(
-        400,
-        'ACTIVE_FLEET_LIMIT',
-        'Active fleet limit reached. Upgrade COMPUTER_TECHNOLOGY to control more fleets.'
-      )
+      error: remoteOrigin.error
+    };
+  }
+
+  const remoteOriginContext = remoteOrigin?.ok ? remoteOrigin.value : null;
+  const originPlanet = remoteOriginContext?.originPlanet ?? resolveOwnedOriginPlanetOrError(context, command.origin);
+  if ('error' in originPlanet) {
+    return {
+      ok: false,
+      error: originPlanet.error
+    };
+  }
+
+  const originCoordinates = remoteOriginContext
+    ? toClientCoordinates(remoteOriginContext.originPlanet)
+    : command.origin;
+  const playerActiveFleetCount = context.galaxy.activeFleets.filter((fleet) => fleet.ownerId === context.playerId).length;
+  const playerMaxActiveFleets = calculatePlayerMaxActiveFleets(player);
+
+  if (remoteOriginContext && command.useJumpGate) {
+    return {
+      ok: false,
+      error: commandError(400, 'JUMP_GATE_INVALID', 'Remote-origin launches cannot use Jump Gate travel yet.')
     };
   }
 
@@ -172,14 +174,18 @@ export function createFleetMission(
     };
   }
 
-  const availableUndamagedShipsByType = countPlanetUndamagedShipsByType(originPlanet);
-  const availableDamagedShipsByType = countPlanetDamagedShipsByType(originPlanet);
+  const availableUndamagedShipsByType = remoteOriginContext
+    ? ManyShips.undamagedCountByType(remoteOriginContext.fleet.ships)
+    : countPlanetUndamagedShipsByType(originPlanet);
+  const availableDamagedShipsByType = remoteOriginContext
+    ? ManyShips.damagedCountByType(remoteOriginContext.fleet.ships)
+    : countPlanetDamagedShipsByType(originPlanet);
   for (const ship of command.ships) {
     const availableUndamagedAmount = availableUndamagedShipsByType.get(ship.type) ?? 0;
     if (availableUndamagedAmount < ship.undamagedAmount) {
       return {
         ok: false,
-        error: commandError(400, 'CONFLICT', `${ship.type}: not enough ready ships on origin planet.`)
+        error: commandError(400, 'CONFLICT', `${ship.type}: not enough ready ships on origin.`)
       };
     }
 
@@ -187,18 +193,20 @@ export function createFleetMission(
     if (availableDamagedAmount < ship.damagedAmount) {
       return {
         ok: false,
-        error: commandError(400, 'CONFLICT', `${ship.type}: not enough damaged ships on origin planet.`)
+        error: commandError(400, 'CONFLICT', `${ship.type}: not enough damaged ships on origin.`)
       };
     }
   }
 
-  const availableBombsByType = countPlanetBombsByType(originPlanet);
+  const availableBombsByType = remoteOriginContext
+    ? ManyDefences.countByType(remoteOriginContext.fleet.carriedBombs)
+    : countPlanetBombsByType(originPlanet);
   for (const bomb of command.carriedBombs) {
     const availableAmount = availableBombsByType.get(bomb.type) ?? 0;
     if (availableAmount < bomb.amount) {
       return {
         ok: false,
-        error: commandError(400, 'CONFLICT', `${bomb.type}: not enough bombs in BOMB_DEPOT.`)
+        error: commandError(400, 'CONFLICT', `${bomb.type}: not enough carried bombs on origin.`)
       };
     }
   }
@@ -232,9 +240,23 @@ export function createFleetMission(
     };
   }
 
-  const travelDistance = calculateTravelDistance(command.origin, command.target);
+  const travelDistance = calculateTravelDistance(originCoordinates, command.target);
   const travelTurns = command.useJumpGate ? 1 : calculateFleetTravelTurns(travelDistance, player, totalShipAmounts);
   const fuelCost = calculatePlayerFuelCost(totalShipAmounts, travelDistance, mission.minimumFuelReserves, player);
+  const wholeRemoteFleetLaunch = remoteOriginContext
+    ? isWholeRemoteFleetSelection(remoteOriginContext.fleet, command.ships, command.carriedBombs)
+    : false;
+  const createsNewFleet = !remoteOriginContext || !wholeRemoteFleetLaunch;
+  if (createsNewFleet && playerActiveFleetCount >= playerMaxActiveFleets) {
+    return {
+      ok: false,
+      error: commandError(
+        400,
+        'ACTIVE_FLEET_LIMIT',
+        'Active fleet limit reached. Upgrade COMPUTER_TECHNOLOGY to control more fleets.'
+      )
+    };
+  }
 
   const hasMilitaryShips = totalShipAmounts.some((entry) => {
     const blueprint = SHIP_BLUEPRINTS.shipsMap.get(entry.type);
@@ -253,7 +275,7 @@ export function createFleetMission(
     targetOwner: targetPlanet.info.ownerId === null
       ? null
       : resolvePlayerById(context.galaxy, targetPlanet.info.ownerId),
-    activeFleetCount: playerActiveFleetCount,
+    activeFleetCount: createsNewFleet ? playerActiveFleetCount : Math.max(0, playerActiveFleetCount - 1),
     maxActiveFleetCount: playerMaxActiveFleets,
     totalCargoCapacity,
     usedCargoCapacity,
@@ -261,6 +283,7 @@ export function createFleetMission(
     usedHangarCapacity,
     hasMilitaryShips,
     fuelCost,
+    availableDeuterium: remoteOriginContext ? remoteOriginContext.fleet.cargo.deuterium : originPlanet.rBDSFTQ.resources.deuterium,
     diplomacyResolver: new DiplomacyResolver(context.galaxy.diplomaticRelations)
   };
   const missionErrors = mission.validateLaunch(missionLaunchContext);
@@ -276,10 +299,13 @@ export function createFleetMission(
     command.cargo.crystal,
     command.cargo.deuterium + fuelCost
   );
-  if (!originPlanet.rBDSFTQ.resources.isSufficient(totalRequiredResources)) {
+  const availableLaunchResources = remoteOriginContext ? remoteOriginContext.fleet.cargo : originPlanet.rBDSFTQ.resources;
+  if (!availableLaunchResources.isSufficient(totalRequiredResources)) {
     return {
       ok: false,
-      error: commandError(400, 'INSUFFICIENT_RESOURCES', 'Insufficient resources for cargo and fuel.')
+      error: commandError(400, 'INSUFFICIENT_RESOURCES', remoteOriginContext
+        ? 'Insufficient fleet cargo resources for selected cargo and fuel.'
+        : 'Insufficient resources for cargo and fuel.')
     };
   }
 
@@ -312,24 +338,83 @@ export function createFleetMission(
     jumpGateTargetOwner = jumpGateAccess.targetOwner;
   }
 
-  let fleetShips: ManyShipsType;
-  try {
-    fleetShips = originPlanet.rBDSFTQ.ships.extractSelectedShips(command.ships);
-  } catch {
+  if (remoteOriginContext && wholeRemoteFleetLaunch) {
+    remoteOriginContext.fleet.cargo.subtractResourcePack(totalRequiredResources);
+    remoteOriginContext.fleet.cargo.addResourcePack(new ResourcesPack(
+      command.cargo.metal,
+      command.cargo.crystal,
+      command.cargo.deuterium
+    ));
+    remoteOriginContext.fleet.usedCargoCapacity = remoteOriginContext.fleet.cargo.metal
+      + remoteOriginContext.fleet.cargo.crystal
+      + remoteOriginContext.fleet.cargo.deuterium;
+    remoteOriginContext.fleet.missionType = command.missionType;
+    remoteOriginContext.fleet.origin = new Destination(originCoordinates.x, originCoordinates.y, originCoordinates.z);
+    remoteOriginContext.fleet.target = new Destination(command.target.x, command.target.y, command.target.z);
+    remoteOriginContext.fleet.originPlanetName = originPlanet.basicInfo.name;
+    remoteOriginContext.fleet.targetPlanetName = targetPlanet.basicInfo.name;
+    remoteOriginContext.fleet.fuelCost = fuelCost;
+    remoteOriginContext.fleet.totalCargoCapacity = totalCargoCapacity;
+    remoteOriginContext.fleet.travelTurns = travelTurns;
+    remoteOriginContext.fleet.returnTurns = travelTurns;
+    remoteOriginContext.fleet.state = FleetState.MOVING_TO_TARGET;
+    remoteOriginContext.fleet.orbitActivity = FleetOrbitActivity.IDLE;
+    remoteOriginContext.fleet.suspendedMissionType = null;
+    remoteOriginContext.fleet.returnReason = FleetReturnReason.NORMAL;
+    remoteOriginContext.fleet.usesJumpGate = false;
+    remoteOriginContext.fleet.pendingJumpGateRequestId = null;
+    remoteOriginContext.fleet.bombardmentPriorities = command.bombardmentPriorities;
+    remoteOriginContext.fleet.remainingFuelReserve = fuelCost;
+    remoteOriginContext.fleet.isRemoteOrigin = true;
+    remoteOriginContext.fleet.remoteOriginSourceFleetId = remoteOriginContext.fleet.fleetId;
+
+    return commandOk({
+      fleet: remoteOriginContext.fleet,
+      mode: 'LAUNCHED',
+      message: 'Remote-origin fleet is en route.',
+      originPlanet,
+      targetPlanet
+    });
+  }
+
+  const parentRemoteFleetAfterDetach = remoteOriginContext
+    ? validateRemoteDetachRemainder(remoteOriginContext.fleet, command.ships, command.carriedBombs, totalRequiredResources)
+    : null;
+  if (parentRemoteFleetAfterDetach && !parentRemoteFleetAfterDetach.ok) {
     return {
       ok: false,
-      error: commandError(400, 'CONFLICT', 'Requested ship selection is no longer available on origin planet.')
+      error: parentRemoteFleetAfterDetach.error
     };
   }
 
-  const fleetBombs = originPlanet.rBDSFTQ.defences.extractAnyDefencesByType(command.carriedBombs);
-  originPlanet.rBDSFTQ.resources.subtractResourcePack(totalRequiredResources);
+  let fleetShips: ManyShipsType;
+  try {
+    fleetShips = remoteOriginContext
+      ? remoteOriginContext.fleet.ships.extractSelectedShips(command.ships)
+      : originPlanet.rBDSFTQ.ships.extractSelectedShips(command.ships);
+  } catch {
+    return {
+      ok: false,
+      error: commandError(400, 'CONFLICT', 'Requested ship selection is no longer available on origin.')
+    };
+  }
+
+  const fleetBombs = remoteOriginContext
+    ? remoteOriginContext.fleet.carriedBombs.extractAnyDefencesByType(command.carriedBombs)
+    : originPlanet.rBDSFTQ.defences.extractAnyDefencesByType(command.carriedBombs);
+  availableLaunchResources.subtractResourcePack(totalRequiredResources);
+  if (remoteOriginContext) {
+    remoteOriginContext.fleet.usedCargoCapacity = remoteOriginContext.fleet.cargo.metal
+      + remoteOriginContext.fleet.cargo.crystal
+      + remoteOriginContext.fleet.cargo.deuterium;
+    remoteOriginContext.fleet.totalCargoCapacity = ManyShips.totalCargoCapacity(remoteOriginContext.fleet.ships);
+  }
 
   const fleet = new Fleet(
     context.galaxy.nextFleetId,
     context.playerId,
     command.missionType,
-    new Destination(command.origin.x, command.origin.y, command.origin.z),
+    new Destination(originCoordinates.x, originCoordinates.y, originCoordinates.z),
     new Destination(command.target.x, command.target.y, command.target.z),
     originPlanet.basicInfo.name,
     targetPlanet.basicInfo.name,
@@ -354,7 +439,9 @@ export function createFleetMission(
     null,
     null,
     command.bombardmentPriorities,
-    fuelCost
+    fuelCost,
+    remoteOriginContext !== null,
+    remoteOriginContext?.fleet.fleetId ?? null
   );
 
   context.galaxy.nextFleetId += 1;
@@ -385,4 +472,179 @@ export function createFleetMission(
     originPlanet,
     targetPlanet
   });
+}
+
+function resolveOwnedOriginPlanetOrError(
+  context: GameCommandContext,
+  origin: ClientCoordinates
+): Planet | { error: ReturnType<typeof commandError> } {
+  const originPlanetResult = resolvePlanetOrError(context.galaxy, origin);
+  if (!originPlanetResult.ok) {
+    return {
+      error: {
+        ...originPlanetResult.error,
+        message: originPlanetResult.error.code === 'SYSTEM_NOT_FOUND'
+          ? 'Origin planet not found.'
+          : originPlanetResult.error.message
+      }
+    };
+  }
+
+  const originPlanet = originPlanetResult.value;
+  if (originPlanet.info.ownerId !== context.playerId) {
+    return {
+      error: commandError(403, 'FORBIDDEN', 'Origin planet must be owned by you.')
+    };
+  }
+
+  return originPlanet;
+}
+
+function resolveRemoteOriginContext(
+  context: GameCommandContext,
+  originFleetId: number
+): CommandResult<{ fleet: FleetType; originPlanet: Planet }> {
+  if (!Number.isInteger(originFleetId) || originFleetId <= 0) {
+    return {
+      ok: false,
+      error: commandError(400, 'INVALID_INPUT', 'Invalid origin fleet id.')
+    };
+  }
+
+  const fleet = context.galaxy.activeFleets.find((entry) =>
+    entry.fleetId === originFleetId && entry.ownerId === context.playerId
+  ) ?? null;
+  if (!fleet) {
+    return {
+      ok: false,
+      error: commandError(404, 'CONFLICT', 'Origin fleet not found.')
+    };
+  }
+
+  if (fleet.state !== FleetState.ORBITING) {
+    return {
+      ok: false,
+      error: commandError(409, 'CONFLICT', 'Remote origin requires an orbiting fleet.')
+    };
+  }
+
+  if (fleet.pendingMaintenanceRequestId !== null) {
+    return {
+      ok: false,
+      error: commandError(409, 'CONFLICT', 'Remote origin fleet has a pending maintenance request.')
+    };
+  }
+
+  const originPlanetResult = resolvePlanetOrError(context.galaxy, {
+    x: fleet.target.x,
+    y: fleet.target.y,
+    z: fleet.target.z
+  });
+  if (!originPlanetResult.ok) {
+    return {
+      ok: false,
+      error: commandError(404, 'PLANET_NOT_FOUND', 'Remote origin planet not found.')
+    };
+  }
+
+  const originPlanet = originPlanetResult.value;
+  return commandOk({ fleet, originPlanet });
+}
+
+function toClientCoordinates(planet: Planet): ClientCoordinates {
+  return {
+    x: planet.basicInfo.solarSystem.coordinates.x,
+    y: planet.basicInfo.solarSystem.coordinates.y,
+    z: Math.max(0, planet.basicInfo.order - 1)
+  };
+}
+
+function isWholeRemoteFleetSelection(
+  fleet: FleetType,
+  ships: CreateFleetShipSelectionEntry[],
+  bombs: CreateFleetBombSelectionEntry[]
+): boolean {
+  return selectionsMatchShips(fleet.ships, ships) && selectionsMatchBombs(fleet.carriedBombs, bombs);
+}
+
+function selectionsMatchShips(source: ManyShipsType, ships: CreateFleetShipSelectionEntry[]): boolean {
+  const sourceUndamaged = ManyShips.undamagedCountByType(source);
+  const sourceDamaged = ManyShips.damagedCountByType(source);
+  const selectedUndamaged = new Map<string, number>();
+  const selectedDamaged = new Map<string, number>();
+  for (const ship of ships) {
+    selectedUndamaged.set(ship.type, (selectedUndamaged.get(ship.type) ?? 0) + Math.max(0, Math.floor(ship.undamagedAmount)));
+    selectedDamaged.set(ship.type, (selectedDamaged.get(ship.type) ?? 0) + Math.max(0, Math.floor(ship.damagedAmount)));
+  }
+
+  return mapsMatchCounts(sourceUndamaged, selectedUndamaged) && mapsMatchCounts(sourceDamaged, selectedDamaged);
+}
+
+function selectionsMatchBombs(source: ManyDefencesType, bombs: CreateFleetBombSelectionEntry[]): boolean {
+  const sourceCounts = ManyDefences.countByType(source);
+  const selectedCounts = new Map<string, number>();
+  for (const bomb of bombs) {
+    selectedCounts.set(bomb.type, (selectedCounts.get(bomb.type) ?? 0) + Math.max(0, Math.floor(bomb.amount)));
+  }
+
+  return mapsMatchCounts(sourceCounts, selectedCounts);
+}
+
+function mapsMatchCounts(left: Map<unknown, number>, right: Map<unknown, number>): boolean {
+  const keys = new Set([...left.keys(), ...right.keys()]);
+  for (const key of keys) {
+    if ((left.get(key) ?? 0) !== (right.get(key) ?? 0)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function validateRemoteDetachRemainder(
+  fleet: FleetType,
+  ships: CreateFleetShipSelectionEntry[],
+  bombs: CreateFleetBombSelectionEntry[],
+  spentResources: InstanceType<typeof ResourcesPack>
+): CommandResult<null> {
+  const remainingShips = ManyShips.fromData(fleet.ships);
+  const remainingBombs = ManyDefences.fromData(fleet.carriedBombs);
+  try {
+    remainingShips.extractSelectedShips(ships);
+    remainingBombs.extractAnyDefencesByType(bombs);
+  } catch {
+    return {
+      ok: false,
+      error: commandError(400, 'CONFLICT', 'Remote origin selection is no longer available.')
+    };
+  }
+
+  const remainingCargo = new ResourcesPack(fleet.cargo.metal, fleet.cargo.crystal, fleet.cargo.deuterium);
+  remainingCargo.subtractResourcePack(spentResources);
+  const remainingCargoAmount = remainingCargo.metal + remainingCargo.crystal + remainingCargo.deuterium;
+  if (remainingCargoAmount > ManyShips.totalCargoCapacity(remainingShips)) {
+    return {
+      ok: false,
+      error: commandError(400, 'CONFLICT', 'Detached fleet would leave too much cargo on the remote parent fleet.')
+    };
+  }
+
+  const remainingBombEntries = [...ManyDefences.countByType(remainingBombs).entries()]
+    .map(([type, amount]) => ({ type, amount }));
+  const remainingBombHangarUsage = calculateBombHangarUsage(remainingBombEntries);
+  if (ManyShips.totalRequiredHangarCapacity(remainingShips) + remainingBombHangarUsage > ManyShips.totalTravelHangarCapacity(remainingShips)) {
+    return {
+      ok: false,
+      error: commandError(400, 'CONFLICT', 'Detached fleet would leave non-jump ships or bombs without carrier capacity.')
+    };
+  }
+
+  if (remainingBombHangarUsage > ManyShips.totalBomberHangarCapacity(remainingShips)) {
+    return {
+      ok: false,
+      error: commandError(400, 'CONFLICT', 'Detached fleet would leave bombs without bomber hangar capacity.')
+    };
+  }
+
+  return commandOk(null);
 }

@@ -26,7 +26,7 @@ import { ShipType } from '../../models/enums/ship-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import { Defence } from '../../models/defences/defence';
 import { countPlanetaryBombs, isPlanetaryBombDefenceType } from '../../models/defences/planetary-bomb';
-import { Fleet } from '../../models/fleets/fleet';
+import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyDefences } from '../../models/defences/many-defences';
 import { ManyShips } from '../../models/fleets/many-ships';
 import type {
@@ -152,6 +152,7 @@ export class MissionPlannerViewComponent implements OnInit {
   protected ownedPlanets: ClientPlanetDto[] = [];
   protected activeFleets: Fleet[] = [];
   protected selectedOriginPlanet: ClientPlanetDto | null = null;
+  protected selectedOriginFleet: Fleet | null = null;
   protected selectedTargetPlanet: ClientPlanetDto | null = null;
   protected originCoordinatesInput = '';
   protected targetCoordinatesInput = '';
@@ -274,13 +275,19 @@ export class MissionPlannerViewComponent implements OnInit {
     return this.ownedPlanets.filter((planet) => this.totalAvailableShips(planet) > 0);
   }
 
-  protected foreignPlanetsWithPlayerShips(): ClientPlanetDto[] {
-    return [];
+  protected remoteOriginFleets(): Fleet[] {
+    return this.activeFleets.filter((fleet) =>
+      fleet.state === FleetState.ORBITING && ManyShips.totalShipsCount(fleet.ships) > 0
+    );
   }
 
   protected totalAvailableShips(planet: ClientPlanetDto): number {
     // TODO: Distinguish damaged-vs-ready launch availability once fleet readiness is redesigned.
     return ManyShips.totalShipsCount(planet.objects.ships);
+  }
+
+  protected totalFleetShips(fleet: Fleet): number {
+    return ManyShips.totalShipsCount(fleet.ships);
   }
 
   protected totalSelectedShips(): number {
@@ -367,6 +374,16 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected activeFleetCountLabel(): string {
     return `${this.activeFleetCount()}/${this.maxActiveFleetCount()}`;
+  }
+
+  protected currentOriginNameLabel(): string {
+    if (this.selectedOriginFleet) {
+      return `Fleet #${this.selectedOriginFleet.fleetId} @ ${this.selectedOriginFleet.targetPlanetName}`;
+    }
+
+    return this.selectedOriginPlanet
+      ? `${this.selectedOriginPlanet.basicInfo.name} (${this.originCoordinatesInput})`
+      : 'No origin selected';
   }
 
   protected totalCargoCapacity(): number {
@@ -472,7 +489,7 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected canToggleJumpGate(): boolean {
-    return this.supportsJumpGate() && this.targetHasKnownJumpGate();
+    return !this.selectedOriginFleet && this.supportsJumpGate() && this.targetHasKnownJumpGate();
   }
 
   protected jumpGateHint(): string {
@@ -482,6 +499,10 @@ export class MissionPlannerViewComponent implements OnInit {
 
     if (!this.selectedTargetPlanet) {
       return 'Select a target planet to check Jump Gate availability.';
+    }
+
+    if (this.selectedOriginFleet) {
+      return 'Remote-origin launches cannot use Jump Gate travel yet.';
     }
 
     if (!this.targetHasKnownJumpGate()) {
@@ -567,11 +588,14 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected distancePreview(): number {
-    if (!this.selectedOriginPlanet || !this.selectedTargetPlanet) {
+    if (!this.currentOriginCoordinates() || !this.selectedTargetPlanet) {
       return 0;
     }
 
-    const origin = this.selectedOriginPlanet.coordinates;
+    const origin = this.currentOriginCoordinates();
+    if (!origin) {
+      return 0;
+    }
     const target = this.selectedTargetPlanet.coordinates;
     return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
   }
@@ -678,6 +702,7 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected selectOriginPlanet(planet: ClientPlanetDto): void {
     this.selectedOriginPlanet = planet;
+    this.selectedOriginFleet = null;
     this.originCoordinatesInput = this.coordinatesLabel(planet.coordinates);
     this.launchError = null;
     this.launchNotice = null;
@@ -687,12 +712,30 @@ export class MissionPlannerViewComponent implements OnInit {
     this.normalizeShipSelectionForMission();
   }
 
+  protected selectOriginFleet(fleet: Fleet): void {
+    this.selectedOriginFleet = fleet;
+    this.selectedOriginPlanet = null;
+    this.originCoordinatesInput = this.coordinatesLabel({
+      x: fleet.target.x,
+      y: fleet.target.y,
+      z: fleet.target.z
+    });
+    this.useJumpGate = false;
+    this.launchError = null;
+    this.launchNotice = null;
+    this.normalizeShipSelectionForMission();
+  }
+
   protected chooseTargetPlanet(planet: ClientPlanetDto): void {
     this.resolveTargetPlanet(planet.coordinates, planet);
   }
 
   protected selectedOriginMatches(planet: ClientPlanetDto): boolean {
-    return this.selectedOriginPlanet ? this.sameCoordinates(this.selectedOriginPlanet.coordinates, planet.coordinates) : false;
+    return !this.selectedOriginFleet && this.selectedOriginPlanet ? this.sameCoordinates(this.selectedOriginPlanet.coordinates, planet.coordinates) : false;
+  }
+
+  protected selectedOriginFleetMatches(fleet: Fleet): boolean {
+    return this.selectedOriginFleet?.fleetId === fleet.fleetId;
   }
 
   protected selectedTargetMatches(planet: ClientPlanetDto): boolean {
@@ -809,7 +852,8 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected launchMission(): void {
-    if (!this.canLaunch() || !this.selectedOriginPlanet || !this.selectedTargetPlanet) {
+    const originCoordinates = this.currentOriginCoordinates();
+    if (!this.canLaunch() || !originCoordinates || !this.selectedTargetPlanet) {
       return;
     }
 
@@ -821,7 +865,8 @@ export class MissionPlannerViewComponent implements OnInit {
 
     const request: CreateFleetMissionRequest = {
       missionType: this.selectedMissionType,
-      origin: this.selectedOriginPlanet.coordinates,
+      origin: originCoordinates,
+      originFleetId: this.selectedOriginFleet?.fleetId ?? null,
       target: this.selectedTargetPlanet.coordinates,
       ships: this.selectedShipEntries(),
       carriedBombs: this.selectedBombEntries(),
@@ -851,6 +896,12 @@ export class MissionPlannerViewComponent implements OnInit {
           this.activeFleets = [...response.activeFleets];
           this.launchNotice = response.message ?? null;
           this.selectedOriginPlanet = this.findOwnedPlanet(this.selectedOriginPlanet?.coordinates ?? null);
+          this.selectedOriginFleet = this.selectedOriginFleet
+            ? this.activeFleets.find((fleet) => fleet.fleetId === this.selectedOriginFleet?.fleetId) ?? null
+            : null;
+          if (this.selectedOriginFleet?.state !== FleetState.ORBITING) {
+            this.selectedOriginFleet = null;
+          }
           this.selectedTargetPlanet = this.findOwnedPlanet(this.selectedTargetPlanet?.coordinates ?? null) ?? this.selectedTargetPlanet;
           this.clearAllShips();
           this.clearAllBombs();
@@ -969,6 +1020,9 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   private availableShipCounts(planet: ClientPlanetDto | null): Map<ShipType, number> {
+    if (this.selectedOriginFleet) {
+      return ManyShips.countByType(this.selectedOriginFleet.ships);
+    }
     if (!planet) {
       return new Map<ShipType, number>();
     }
@@ -978,6 +1032,9 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   private availableUndamagedShipCounts(planet: ClientPlanetDto | null): Map<ShipType, number> {
+    if (this.selectedOriginFleet) {
+      return ManyShips.undamagedCountByType(this.selectedOriginFleet.ships);
+    }
     if (!planet) {
       return new Map<ShipType, number>();
     }
@@ -986,6 +1043,9 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   private availableDamagedShipCounts(planet: ClientPlanetDto | null): Map<ShipType, number> {
+    if (this.selectedOriginFleet) {
+      return ManyShips.damagedCountByType(this.selectedOriginFleet.ships);
+    }
     if (!planet) {
       return new Map<ShipType, number>();
     }
@@ -1046,6 +1106,17 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   private availableBombCounts(planet: ClientPlanetDto | null): Map<DefenceType, number> {
+    if (this.selectedOriginFleet) {
+      const counts = new Map<DefenceType, number>();
+      for (const [type, amount] of ManyDefences.countByType(this.selectedOriginFleet.carriedBombs).entries()) {
+        if (!isPlanetaryBombDefenceType(type)) {
+          continue;
+        }
+
+        counts.set(type, amount);
+      }
+      return counts;
+    }
     if (!planet) {
       return new Map<DefenceType, number>();
     }
@@ -1107,7 +1178,9 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   private techLevel(technologyType: TechnologyType): number {
-    const techLevels = this.selectedOriginPlanet?.reportData?.techLevels
+    const techLevels = (this.selectedOriginFleet
+      ? this.ownedPlanets[0]?.reportData?.techLevels
+      : this.selectedOriginPlanet?.reportData?.techLevels)
       ?? this.ownedPlanets[0]?.reportData?.techLevels
       ?? [];
     const matchingEntry = techLevels.find((entry) => entry.type === technologyType);
@@ -1137,7 +1210,7 @@ export class MissionPlannerViewComponent implements OnInit {
       return warnings;
     }
 
-    if (!this.selectedOriginPlanet || !this.selectedTargetPlanet) {
+    if (!this.selectedOriginPlanet || !this.selectedTargetPlanet || this.selectedOriginFleet) {
       return warnings;
     }
 
@@ -1360,9 +1433,11 @@ export class MissionPlannerViewComponent implements OnInit {
 
     return {
       selection,
-      selectedOriginPlanet: this.selectedOriginPlanet,
+      selectedOriginPlanet: this.selectedOriginFleet
+        ? this.ownedPlanets[0] ?? null
+        : this.selectedOriginPlanet,
       selectedTargetPlanet: this.selectedTargetPlanet,
-      activeFleetCount: this.activeFleets.length,
+      activeFleetCount: this.selectedOriginFleet ? Math.max(0, this.activeFleets.length - 1) : this.activeFleets.length,
       maxActiveFleetCount: this.maxActiveFleetCount(),
       totalSelectedShips: this.totalSelectedShips(),
       totalCargoCapacity: this.totalCargoCapacity(),
@@ -1370,10 +1445,24 @@ export class MissionPlannerViewComponent implements OnInit {
       totalHangarCapacity: this.totalHangarCapacity(),
       usedHangarCapacity: this.usedHangarCapacity(),
       hasMilitaryShips,
-      availableDeuterium: this.selectedOriginPlanet?.objects.resources.deuterium ?? null,
+      availableDeuterium: this.selectedOriginFleet?.cargo.deuterium
+        ?? this.selectedOriginPlanet?.objects.resources.deuterium
+        ?? null,
       fuelCost: this.fuelCostPreview(),
       diplomacyResolver: this.gameState.diplomacyResolver()
     };
+  }
+
+  private currentOriginCoordinates(): ClientCoordinates | null {
+    if (this.selectedOriginFleet) {
+      return {
+        x: this.selectedOriginFleet.target.x,
+        y: this.selectedOriginFleet.target.y,
+        z: this.selectedOriginFleet.target.z
+      };
+    }
+
+    return this.selectedOriginPlanet?.coordinates ?? null;
   }
 
   private applyNormalizedSelection(selection: {

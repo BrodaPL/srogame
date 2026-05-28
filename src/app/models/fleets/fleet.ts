@@ -54,6 +54,8 @@ export class Fleet {
     public pendingJumpGateRequestId: number | null = null,
     public lastMaintenanceRequestTurn: number | null = null,
     public bombardmentPriorities: BombardmentPriorities | null = null,
-    public remainingFuelReserve: number = fuelCost
+    public remainingFuelReserve: number = fuelCost,
+    public isRemoteOrigin: boolean = false,
+    public remoteOriginSourceFleetId: number | null = null
   ) {}
 }

@@ -103,7 +103,7 @@ export class FleetMission {
       hasMilitaryShips: context.hasMilitaryShips,
       activeFleetCount: context.activeFleetCount,
       maxActiveFleetCount: context.maxActiveFleetCount,
-      availableDeuterium: context.originPlanet.rBDSFTQ.resources.deuterium,
+      availableDeuterium: context.availableDeuterium ?? context.originPlanet.rBDSFTQ.resources.deuterium,
       fuelCost: context.fuelCost,
       targetOwnerId: context.targetPlanet.info.ownerId,
       playerOwnerId: context.playerId,

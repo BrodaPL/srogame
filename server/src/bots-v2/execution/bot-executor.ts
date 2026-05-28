@@ -7,6 +7,7 @@ import * as diplomacyResolverModule from '../../../../src/app/models/diplomacy/d
 import * as fleetMissionTypeModule from '../../../../src/app/models/enums/fleet-mission-type.js';
 import * as playerTypeModule from '../../../../src/app/models/enums/player-type.js';
 import * as technologyTypeModule from '../../../../src/app/models/enums/technology-type.js';
+import * as destinationModule from '../../../../src/app/models/fleets/destination.js';
 import * as fleetModule from '../../../../src/app/models/fleets/fleet.js';
 import type { CreateFleetMissionCommand } from '../../game-commands/fleet-commands.ts';
 import { startBuildingConstruction } from '../../game-commands/building-commands.js';
@@ -34,6 +35,8 @@ import {
   rejectSupportRequestCommand
 } from '../../game-commands/support-request-commands.js';
 import {
+  calculateFleetTravelTurns,
+  calculateTravelDistance,
   calculateMaxLabsPerTechnology,
   isJumpGateAutoApprovedStatus,
   isJumpGateMissionAllowed,
@@ -59,7 +62,8 @@ const { DiplomacyResolver } = resolveModule(diplomacyResolverModule) as typeof i
 const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../src/app/models/enums/fleet-mission-type.js');
 const { PlayerType } = resolveModule(playerTypeModule) as typeof import('../../../../src/app/models/enums/player-type.js');
 const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../src/app/models/enums/technology-type.js');
-const { FleetState } = resolveModule(fleetModule) as typeof import('../../../../src/app/models/fleets/fleet.js');
+const { Destination } = resolveModule(destinationModule) as typeof import('../../../../src/app/models/fleets/destination.js');
+const { FleetOrbitActivity, FleetReturnReason, FleetState } = resolveModule(fleetModule) as typeof import('../../../../src/app/models/fleets/fleet.js');
 
 type DiplomaticStatusT = diplomaticStatusModule.DiplomaticStatus;
 type FleetMissionTypeT = fleetMissionTypeModule.MissionType;
@@ -98,6 +102,7 @@ export class LiveQueueBotExecutor implements BotExecutor {
 
   public executeAcceptedTasks(accepted: BotProposal[]): BotExecutionOutcome[] {
     const outcomes: BotExecutionOutcome[] = [];
+    const sameTurnRemoteOriginFleetIds = this.collectAcceptedRemoteOriginFleetIds(accepted);
 
     const diplomacyDecisions = accepted.filter((proposal) => proposal.kind === 'DIPLOMACY_DECISION');
     for (const proposal of diplomacyDecisions) {
@@ -113,8 +118,25 @@ export class LiveQueueBotExecutor implements BotExecutor {
       }
       outcomes.push(this.executeAcceptedTask(proposal));
     }
+    outcomes.push(...this.recallIdleRemoteOriginFleetsHome(sameTurnRemoteOriginFleetIds));
     outcomes.push(...this.assignIdleResearchHelpers());
     return outcomes;
+  }
+
+  private collectAcceptedRemoteOriginFleetIds(accepted: BotProposal[]): Set<number> {
+    const fleetIds = new Set<number>();
+    for (const proposal of accepted) {
+      if (proposal.kind !== 'FLEET_MISSION') {
+        continue;
+      }
+
+      const originFleetId = Number(proposal.requestPayload.originFleetId);
+      if (Number.isInteger(originFleetId) && originFleetId > 0) {
+        fleetIds.add(originFleetId);
+      }
+    }
+
+    return fleetIds;
   }
 
   private executeAcceptedTask(proposal: BotProposal): BotExecutionOutcome {
@@ -466,7 +488,7 @@ export class LiveQueueBotExecutor implements BotExecutor {
       spent,
       fuelSpent: result.value.fleet.fuelCost,
       fleetId: result.value.fleet.fleetId,
-      fleetSlotsUsed: 1,
+      fleetSlotsUsed: command.originFleetId && result.value.fleet.fleetId === command.originFleetId ? 0 : 1,
       missionType: command.missionType,
       originCoordinates: command.origin,
       targetCoordinates: command.target
@@ -657,6 +679,106 @@ export class LiveQueueBotExecutor implements BotExecutor {
     }
 
     return outcomes;
+  }
+
+  private recallIdleRemoteOriginFleetsHome(skipFleetIds: ReadonlySet<number>): BotExecutionOutcome[] {
+    const player = this.galaxy.players.find((entry) => entry.playerId === this.playerId) ?? null;
+    if (!player || player.planets.length <= 0) {
+      return [];
+    }
+
+    const outcomes: BotExecutionOutcome[] = [];
+    const candidates = [...this.galaxy.activeFleets]
+      .filter((fleet) =>
+        fleet.ownerId === this.playerId
+        && fleet.isRemoteOrigin === true
+        && !skipFleetIds.has(fleet.fleetId)
+        && fleet.state === FleetState.ORBITING
+        && fleet.pendingMaintenanceRequestId === null
+        && (
+          fleet.orbitActivity === FleetOrbitActivity.IDLE
+          || fleet.orbitActivity === FleetOrbitActivity.PASSIVE_HOLD
+        )
+      )
+      .sort((left, right) => left.fleetId - right.fleetId);
+
+    for (const fleet of candidates) {
+      const currentCoordinates = {
+        x: fleet.target.x,
+        y: fleet.target.y,
+        z: fleet.target.z
+      };
+      const currentPlanetResult = resolvePlanetOrError(this.galaxy, currentCoordinates);
+      if (currentPlanetResult.ok && currentPlanetResult.value.info.ownerId === this.playerId) {
+        continue;
+      }
+
+      const homePlanet = this.resolveNearestOwnedPlanet(player, currentCoordinates);
+      if (!homePlanet) {
+        continue;
+      }
+
+      const homeCoordinates = {
+        x: homePlanet.basicInfo.solarSystem.coordinates.x,
+        y: homePlanet.basicInfo.solarSystem.coordinates.y,
+        z: Math.max(0, homePlanet.basicInfo.order - 1)
+      };
+      const shipAmounts = [...fleet.ships.countByType().entries()]
+        .map(([type, amount]) => ({ type, amount }))
+        .filter((entry) => entry.amount > 0);
+      if (shipAmounts.length <= 0) {
+        continue;
+      }
+
+      const travelDistance = calculateTravelDistance(currentCoordinates, homeCoordinates);
+      const travelTurns = calculateFleetTravelTurns(travelDistance, player, shipAmounts);
+      fleet.origin = new Destination(homeCoordinates.x, homeCoordinates.y, homeCoordinates.z);
+      fleet.originPlanetName = homePlanet.basicInfo.name;
+      fleet.state = FleetState.RETURNING;
+      fleet.orbitActivity = FleetOrbitActivity.IDLE;
+      fleet.suspendedMissionType = null;
+      fleet.returnReason = FleetReturnReason.MANUAL_RECALL;
+      fleet.createdAtTurn = this.galaxy.currentTurn;
+      fleet.travelTurns = travelTurns;
+      fleet.returnTurns = travelTurns;
+
+      outcomes.push({
+        proposalId: `lifecycle:remote-origin-home-recall:${fleet.fleetId}:${this.galaxy.currentTurn}`,
+        executed: true,
+        success: true,
+        message: `Remote-origin fleet recalled home to ${homePlanet.basicInfo.name} after idle remote work completed.`,
+        lifecycleAction: 'FLEET_RECALL',
+        fleetId: fleet.fleetId,
+        missionType: fleet.missionType,
+        originCoordinates: homeCoordinates,
+        targetCoordinates: currentCoordinates
+      });
+    }
+
+    return outcomes;
+  }
+
+  private resolveNearestOwnedPlanet(
+    player: Player,
+    from: { x: number; y: number; z: number }
+  ): Planet | null {
+    return [...player.planets]
+      .sort((left, right) => {
+        const leftCoordinates = {
+          x: left.basicInfo.solarSystem.coordinates.x,
+          y: left.basicInfo.solarSystem.coordinates.y,
+          z: Math.max(0, left.basicInfo.order - 1)
+        };
+        const rightCoordinates = {
+          x: right.basicInfo.solarSystem.coordinates.x,
+          y: right.basicInfo.solarSystem.coordinates.y,
+          z: Math.max(0, right.basicInfo.order - 1)
+        };
+        return calculateTravelDistance(from, leftCoordinates) - calculateTravelDistance(from, rightCoordinates)
+          || leftCoordinates.x - rightCoordinates.x
+          || leftCoordinates.y - rightCoordinates.y
+          || leftCoordinates.z - rightCoordinates.z;
+      })[0] ?? null;
   }
 
   private assignIdleResearchHelpers(): BotExecutionOutcome[] {

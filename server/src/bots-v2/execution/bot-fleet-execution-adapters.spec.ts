@@ -15,8 +15,9 @@ describe('bot fleet execution adapters', () => {
       ok: true,
       value: {
         missionType: FleetMissionType.SPY,
-        origin: { x: 0, y: 0, z: 1 },
-        target: { x: 1, y: 0, z: 1 },
+        origin: { x: 0, y: 0, z: 0 },
+        originFleetId: null,
+        target: { x: 1, y: 0, z: 0 },
         ships: [{ type: ShipType.SPY_PROBE, undamagedAmount: 1, damagedAmount: 0 }],
         carriedBombs: [],
         cargo: { metal: 0, crystal: 0, deuterium: 0 },
@@ -72,6 +73,22 @@ describe('bot fleet execution adapters', () => {
     });
   });
 
+  it('preserves optional remote-origin fleet id', () => {
+    const result = normalizeFleetExecutionProposal(createFleetProposal({
+      missionType: FleetMissionType.SPY,
+      originFleetId: 77,
+      ships: [{ type: ShipType.SPY_PROBE, undamagedAmount: 1, damagedAmount: 0 }]
+    }));
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        missionType: FleetMissionType.SPY,
+        originFleetId: 77
+      }
+    });
+  });
+
   it('rejects proposals without exact ships', () => {
     const result = normalizeFleetExecutionProposal(createFleetProposal({
       missionType: FleetMissionType.SPY,
@@ -87,6 +104,7 @@ describe('bot fleet execution adapters', () => {
 
 function createFleetProposal(input: {
   missionType: FleetMissionType;
+  originFleetId?: number;
   ships: Array<{ type: ShipType; undamagedAmount: number; damagedAmount: number }>;
 }): BotProposal {
   return {
@@ -107,6 +125,7 @@ function createFleetProposal(input: {
     requestPayload: {
       missionType: input.missionType,
       origin: { x: 0, y: 0, z: 1 },
+      originFleetId: input.originFleetId,
       target: { x: 1, y: 0, z: 1 },
       ships: input.ships,
       carriedBombs: [],

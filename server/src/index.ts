@@ -4294,6 +4294,9 @@ app.post('/api/game/active-fleets', (req, res) => {
   const body = req.body as CreateFleetMissionRequest | undefined;
   const missionType = normalizeFleetMissionType(body?.missionType);
   const origin = parseMissionCoordinates(body?.origin);
+  const originFleetId = body?.originFleetId === null || body?.originFleetId === undefined
+    ? null
+    : Number(body.originFleetId);
   const target = parseMissionCoordinates(body?.target);
   const ships = parseFleetShipSelections(body?.ships);
   const carriedBombs = parseFleetBombSelections(body?.carriedBombs);
@@ -4308,6 +4311,7 @@ app.post('/api/game/active-fleets', (req, res) => {
     || !ships
     || !carriedBombs
     || !cargo
+    || (originFleetId !== null && (!Number.isInteger(originFleetId) || originFleetId <= 0))
     || (body?.bombardmentPriorities !== undefined
       && body?.bombardmentPriorities !== null
       && bombardmentPriorities === null)
@@ -4318,7 +4322,7 @@ app.post('/api/game/active-fleets', (req, res) => {
 
   const result = createFleetMission(
     { galaxy: currentGalaxy, playerId },
-    { missionType, origin, target, ships, carriedBombs, cargo, useJumpGate, bombardmentPriorities }
+    { missionType, origin, originFleetId, target, ships, carriedBombs, cargo, useJumpGate, bombardmentPriorities }
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -4328,7 +4332,7 @@ app.post('/api/game/active-fleets', (req, res) => {
     turn: currentGalaxy.currentTurn,
     playerId,
     kind: 'FLEET_MISSION_CREATE',
-    summary: `${auth.session.playerName} launched ${missionType} from ${origin.x}:${origin.y}:${origin.z} to ${target.x}:${target.y}:${target.z}; fleetId=${result.value.fleet.fleetId}; eta=${result.value.fleet.travelTurns}; fuel=${result.value.fleet.fuelCost}; cargo=M${cargo.metal} C${cargo.crystal} D${cargo.deuterium}`,
+    summary: `${auth.session.playerName} launched ${missionType} from ${originFleetId ? `Fleet #${originFleetId}` : `${origin.x}:${origin.y}:${origin.z}`} to ${target.x}:${target.y}:${target.z}; fleetId=${result.value.fleet.fleetId}; eta=${result.value.fleet.travelTurns}; fuel=${result.value.fleet.fuelCost}; cargo=M${cargo.metal} C${cargo.crystal} D${cargo.deuterium}`,
     coordinates: origin,
     targetCoordinates: target,
     payload: {

@@ -51,6 +51,7 @@ export type MissionLaunchContext = MissionSelectionContext & {
   usedHangarCapacity: number;
   hasMilitaryShips: boolean;
   fuelCost: number;
+  availableDeuterium?: number | null;
   diplomacyResolver?: DiplomacyResolver | null;
 };
 

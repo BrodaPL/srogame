@@ -3127,6 +3127,14 @@ For offensive requests, helper selection priority should be:
 - increase the chance that support requests are worth sending
 - increase the chance that support requests are worth accepting
 
+Remote-origin follow-up after depot support:
+
+- accepted depot maintenance changes approved fuel, small ships, and bombs into the orbiting fleet payload
+- the orbiting fleet, not the allied planet, is the mission origin
+- initial bot usage should only consider fleets orbiting planets with usable `ALLIANCE_DEPOT`
+- bot lifecycle recalls idle/passive remote-origin fleets to the nearest owned planet after useful remote work is complete
+- TODO: later improve bot insufficient-fuel handling and non-depot remote-origin use
+
 ### Strategic Diplomatic phase-9 explicit non-goals
 
 This phase should explicitly exclude:

@@ -1242,6 +1242,7 @@ export type UpdateResearchHelpersRequest = {
 export type CreateFleetMissionRequest = {
   missionType: FleetMissionType;
   origin: ClientCoordinates;
+  originFleetId?: number | null;
   target: ClientCoordinates;
   ships: CreateFleetShipSelectionEntry[];
   carriedBombs: CreateFleetBombSelectionEntry[];

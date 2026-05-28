@@ -77,6 +77,13 @@
                 </span>
               </div>
               <div class="operations-view__card-head-actions">
+                @if (isRemoteOriginFleet(fleet)) {
+                  <span
+                    class="badge badge--jump"
+                    appTooltip="REMOTE ORIGIN: this fleet launched from an orbiting fleet position and returns to that remote orbit planet instead of a normal owned-planet homeworld.">
+                    REMOTE ORIGIN
+                  </span>
+                }
                 <span class="badge badge--jump">{{ totalShips(fleet) }} ships</span>
                 @if (canReturn(fleet)) {
                   <button

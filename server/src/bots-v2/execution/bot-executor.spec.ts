@@ -8,7 +8,7 @@ import { DiplomaticProposalState } from '../../../../src/app/models/diplomacy/di
 import { createDiplomaticRelation } from '../../../../src/app/models/diplomacy/diplomatic-relation.js';
 import { createDiplomaticProposal } from '../../../../src/app/models/diplomacy/diplomatic-proposal.js';
 import { DiplomaticStatus } from '../../../../src/app/models/diplomacy/diplomatic-status.js';
-import { Fleet, FleetState } from '../../../../src/app/models/fleets/fleet.js';
+import { Fleet, FleetOrbitActivity, FleetState } from '../../../../src/app/models/fleets/fleet.js';
 import { Destination } from '../../../../src/app/models/fleets/destination.js';
 import { ManyShips } from '../../../../src/app/models/fleets/many-ships.js';
 import { Galaxy } from '../../../../src/app/models/planets/galaxy.js';
@@ -225,6 +225,59 @@ describe('bot executor', () => {
 
     expect(outcomes).toHaveLength(0);
     expect(galaxy.activeFleets[0]?.state).toBe(FleetState.MOVING_TO_TARGET);
+  });
+
+  it('recalls idle remote-origin fleets home after useful work is done', () => {
+    const { galaxy, remoteFleet, home } = createRemoteOriginRecallGalaxy(FleetOrbitActivity.PASSIVE_HOLD);
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const outcomes = executor.executeAcceptedTasks([]);
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({
+      lifecycleAction: 'FLEET_RECALL',
+      fleetId: remoteFleet.fleetId,
+      missionType: FleetMissionType.HOLD,
+      originCoordinates: { x: 0, y: 0, z: 0 },
+      targetCoordinates: { x: 0, y: 0, z: 1 },
+      success: true
+    });
+    expect(remoteFleet.state).toBe(FleetState.RETURNING);
+    expect(remoteFleet.origin).toMatchObject({
+      x: home.basicInfo.solarSystem.coordinates.x,
+      y: home.basicInfo.solarSystem.coordinates.y,
+      z: home.basicInfo.order - 1
+    });
+    expect(remoteFleet.originPlanetName).toBe(home.basicInfo.name);
+    expect(remoteFleet.returnTurns).toBeGreaterThan(0);
+  });
+
+  it('does not recall remote-origin fleets while a mission is still in progress', () => {
+    const { galaxy, remoteFleet } = createRemoteOriginRecallGalaxy(FleetOrbitActivity.MISSION_IN_PROGRESS);
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const outcomes = executor.executeAcceptedTasks([]);
+
+    expect(outcomes).toHaveLength(0);
+    expect(remoteFleet.state).toBe(FleetState.ORBITING);
+    expect(remoteFleet.orbitActivity).toBe(FleetOrbitActivity.MISSION_IN_PROGRESS);
+  });
+
+  it('does not recall a remote-origin parent fleet used for a detached sub-mission in the same turn', () => {
+    const { galaxy, remoteFleet } = createRemoteOriginRecallGalaxy(FleetOrbitActivity.PASSIVE_HOLD, 2);
+    const executor = new LiveQueueBotExecutor(galaxy, 1);
+
+    const outcomes = executor.executeAcceptedTasks([createRemoteOriginMoveHomeProposal(remoteFleet.fleetId)]);
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({
+      proposalId: 'remote-origin-move',
+      success: true,
+      missionType: FleetMissionType.MOVE
+    });
+    expect(galaxy.activeFleets).toHaveLength(2);
+    expect(remoteFleet.state).toBe(FleetState.ORBITING);
+    expect(ManyShips.countByType(remoteFleet.ships).get(ShipType.TRANSPORTER)).toBe(1);
   });
 
   it('preserves proposal-owned Jump Gate intent and creates pending foreign Jump Gate requests', () => {
@@ -488,6 +541,116 @@ function createNeutralRecallGalaxy(): { galaxy: Galaxy; origin: Planet; target: 
   );
 
   return { galaxy, origin, target, bot, targetPlayer };
+}
+
+function createRemoteOriginRecallGalaxy(
+  orbitActivity: FleetOrbitActivity,
+  transporterAmount = 1
+): { galaxy: Galaxy; home: Planet; remote: Planet; remoteFleet: Fleet } {
+  const system = new SolarSystem('RemoteRecallSys', 2, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const home = Planet.createStartingPlanet('Home', 1, system, 1);
+  const remote = Planet.createStartingPlanet('Remote Orbit', 2, system, 2);
+  system.planets[0] = home;
+  system.planets[1] = remote;
+
+  const remoteFleet = new Fleet(
+    7,
+    1,
+    FleetMissionType.HOLD,
+    new Destination(remote.basicInfo.solarSystem.coordinates.x, remote.basicInfo.solarSystem.coordinates.y, remote.basicInfo.order - 1),
+    new Destination(remote.basicInfo.solarSystem.coordinates.x, remote.basicInfo.solarSystem.coordinates.y, remote.basicInfo.order - 1),
+    remote.basicInfo.name,
+    remote.basicInfo.name,
+    new ManyShips({ [ShipType.TRANSPORTER]: transporterAmount }, []),
+    new ResourcesPack(0, 0, 30),
+    1,
+    transporterAmount * 600,
+    30,
+    1,
+    1,
+    FleetState.ORBITING,
+    4,
+    undefined,
+    orbitActivity,
+    null,
+    undefined,
+    false,
+    null,
+    false,
+    null,
+    null,
+    null,
+    1,
+    true,
+    7
+  );
+
+  const bot = new Player(
+    1,
+    'Bot-1',
+    [home],
+    new Map([[TechnologyType.FUSION_DRIVE, 2], [TechnologyType.HYPERSPACE_DRIVE, 1]]),
+    [remoteFleet],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+  const ally = new Player(
+    2,
+    'Ally-2',
+    [remote],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+
+  const galaxy = new Galaxy(
+    'Remote Recall Test',
+    [bot, ally],
+    [[system]],
+    6,
+    [remoteFleet],
+    8,
+    new Map(),
+    new Map([[1, bot], [2, ally]]),
+    new Map(),
+    new Map([[bot.playerName, bot.playerId], [ally.playerName, ally.playerId]])
+  );
+
+  return { galaxy, home, remote, remoteFleet };
+}
+
+function createRemoteOriginMoveHomeProposal(originFleetId: number): BotProposal {
+  return {
+    proposalId: 'remote-origin-move',
+    subsystemId: 'STRATEGIC_DIPLOMATIC',
+    kind: 'FLEET_MISSION',
+    status: 'ACCEPTED',
+    goalKey: 'remote-origin-move',
+    dedupeKey: 'remote-origin-move',
+    summary: 'Remote origin detached move home',
+    planetId: null,
+    targetCoordinates: { x: 0, y: 0, z: 1 },
+    expectedValue: 100,
+    urgency: 50,
+    risk: 0,
+    confidence: 100,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      missionType: FleetMissionType.MOVE,
+      origin: { x: 0, y: 0, z: 2 },
+      originFleetId,
+      target: { x: 0, y: 0, z: 1 },
+      ships: [{ type: ShipType.TRANSPORTER, undamagedAmount: 1, damagedAmount: 0 }],
+      carriedBombs: [],
+      cargo: { metal: 0, crystal: 0, deuterium: 0 },
+      useJumpGate: false,
+      bombardmentPriorities: null
+    },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {}
+  };
 }
 
 function createAttackFleet(

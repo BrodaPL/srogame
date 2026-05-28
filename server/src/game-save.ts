@@ -252,6 +252,8 @@ type SavedFleet = {
   lastMaintenanceRequestTurn: number | null;
   bombardmentPriorities: FleetModel['bombardmentPriorities'];
   remainingFuelReserve: number;
+  isRemoteOrigin: boolean;
+  remoteOriginSourceFleetId: number | null;
 };
 
 type SavedResourceSupportRequest = Omit<
@@ -941,7 +943,9 @@ function hydrateSavedFleet(savedFleet: SavedFleet): FleetModel {
     savedFleet.pendingJumpGateRequestId,
     savedFleet.lastMaintenanceRequestTurn,
     savedFleet.bombardmentPriorities ? { ...savedFleet.bombardmentPriorities } : null,
-    savedFleet.remainingFuelReserve
+    savedFleet.remainingFuelReserve,
+    savedFleet.isRemoteOrigin ?? false,
+    savedFleet.remoteOriginSourceFleetId ?? null
   );
 
   return fleet;
@@ -1275,7 +1279,9 @@ function serializeFleet(fleet: FleetModel): SavedFleet {
     bombardmentPriorities: fleet.bombardmentPriorities
       ? { ...fleet.bombardmentPriorities }
       : null,
-    remainingFuelReserve: fleet.remainingFuelReserve
+    remainingFuelReserve: fleet.remainingFuelReserve,
+    isRemoteOrigin: fleet.isRemoteOrigin,
+    remoteOriginSourceFleetId: fleet.remoteOriginSourceFleetId
   };
 }
 

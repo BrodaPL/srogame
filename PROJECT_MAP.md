@@ -778,14 +778,19 @@ Change mission rules or add a mission:
 - `src/app/game/mission-planner-view/`
 - `src/app/game/operations-view/`
 - `server/src/index.ts` for launch endpoint validation if needed
+- `server/src/game-commands/fleet-commands.ts` for shared launch execution, including owned-planet origins and remote-origin launches from orbiting fleets
 
 Change maintenance-request / `ALLIANCE_DEPOT` logistics:
 - `src/app/models/requests/maintenance-request.ts`
+- `src/app/models/fleets/fleet.ts` for orbiting-fleet cargo/payload state and remote-origin markers
 - `src/app/models/game-api-types.ts`
 - `src/app/core/game-api.service.ts`
 - `src/app/game/operations-view/`
+- `src/app/game/mission-planner-view/` when maintenance-delivered fuel/small ships/bombs should be reused as a remote mission origin
 - `src/app/game/mail-view/`
 - `server/src/index.ts`
+- `server/src/game-commands/fleet-commands.ts`
+- `server/src/game-commands/maintenance-commands.ts`
 - `src/app/models/planets/planet.ts` if depot cap formulas change
 
 Change Trade Port offers and local exchange flow:

@@ -2088,6 +2088,14 @@ Helper selection should use:
 * improve support and maintenance attractiveness,
 * and raise the chance that support requests are worth sending or accepting.
 
+Remote-origin follow-up after depot support:
+
+* accepted depot maintenance transfers approved fuel, small ships, and bombs into the orbiting fleet,
+* the orbiting fleet is the launch origin, not the allied planet,
+* initial bot usage should only consider fleets orbiting planets with usable `ALLIANCE_DEPOT`,
+* bot lifecycle recalls idle/passive remote-origin fleets to the nearest owned planet after useful remote work is complete,
+* TODO: later improve bot insufficient-fuel handling and non-depot remote-origin use.
+
 Explicit non-goals:
 
 * no multi-front global allocator now,
