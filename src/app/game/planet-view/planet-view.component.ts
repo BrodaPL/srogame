@@ -71,6 +71,7 @@ import type {
   PlanetObjectDetailRow,
   PlanetObjectDetailSection
 } from './planet-object-dialog.component';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 
 type PlanetTab = 'resources' | 'facilities' | 'ships' | 'defences' | 'operations' | 'queues';
 
@@ -145,7 +146,8 @@ type ResearchQueueRowVm = {
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
-    PlanetObjectDialogComponent
+    PlanetObjectDialogComponent,
+    TooltipDirective
   ],
   templateUrl: './planet-view.component.html',
   styleUrl: './planet-view.component.css'
@@ -1889,6 +1891,28 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       { label: 'Anomalies and Noise', value: parameters.anomaliesAndNoise },
       { label: 'Hyperspace parameters', value: parameters.hyperspaceParameters }
     ];
+  }
+
+  protected effectiveAveragePlanetIndustryLevel(): number | null {
+    const parameters = this.planet?.info.planetaryParameters;
+    if (!parameters) {
+      return null;
+    }
+
+    const terraformerPenaltyReduction = this.terraformerPenaltyReduction();
+    if (parameters.industryModifier >= 1 || terraformerPenaltyReduction <= 0) {
+      return parameters.industryModifier;
+    }
+
+    return Math.min(1, parameters.industryModifier + terraformerPenaltyReduction);
+  }
+
+  protected averagePlanetIndustryTooltip(): string {
+    return 'Current effective planet-wide industry efficiency. This affects building construction, shipyard production, and repair drone output. Terraformer mitigation is included when applicable.';
+  }
+
+  protected bombDepotOverviewValue(): string {
+    return `${this.currentPlanetaryBombStorageUsed()} / ${this.bombDepotCapacity()} used`;
   }
 
   protected usedPlanetSize(): number {
@@ -4226,6 +4250,36 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     return Math.min(1, 0.02 + (this.buildingLevel(BuildingType.BUNKER_NETWORK) * 0.01));
+  }
+
+  private terraformerPenaltyReduction(): number {
+    const terraformerLevel = this.buildingLevel(BuildingType.TERRAFORMER);
+    if (terraformerLevel <= 0) {
+      return 0;
+    }
+
+    const blueprint = this.buildingBlueprintsByType.get(BuildingType.TERRAFORMER);
+    if (!blueprint) {
+      return 0;
+    }
+
+    const powerUtilization = this.powerUtilizationAtLevel(
+      BuildingType.TERRAFORMER,
+      terraformerLevel,
+      blueprint.powerConsumption ?? 0
+    );
+    const maxStructuralPoints = this.maxBuildingStructuralPoints(BuildingType.TERRAFORMER, terraformerLevel);
+    const structuralUtilization = maxStructuralPoints <= 0
+      ? 1
+      : Math.min(
+        1,
+        Math.max(
+          this.minimumStructuralUtilization(BuildingType.TERRAFORMER),
+          this.currentBuildingStructuralPoints(BuildingType.TERRAFORMER) / maxStructuralPoints
+        )
+      );
+
+    return Math.max(0, (terraformerLevel * powerUtilization * structuralUtilization) / 100);
   }
 
   private minimumStructuralUtilizationForPlanet(planet: ClientPlanetDto, buildingType: BuildingType): number {
