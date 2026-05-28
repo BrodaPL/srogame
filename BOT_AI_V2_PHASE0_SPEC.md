@@ -304,6 +304,7 @@ server/src/bots-v2/
   bot-v2-types.ts
   bot-v2-memory.ts
   bot-v2-trace.ts
+  ship-payload-planning.ts
   bot-v2-shadow-runner.ts
   snapshot/
     build-bot-world-snapshot.ts
@@ -326,6 +327,7 @@ Notes:
 - V2 is the active bot runtime from the end-turn hook
 - only the Supervisor/Executor layer may mutate game state
 - V2 can reuse shared models and command helpers from the existing server code
+- `scripts/run-bot-v2-simulation.ts` should be read with its scenario split in mind: `advanced` is a no-neutral smoke run, while neutral-farm validation belongs to `benchmark20x20`
 
 ## Current V2 Runtime Flow
 
@@ -613,6 +615,7 @@ Current behavior:
 - outgoing maintenance request creation and standalone outgoing Jump Gate request creation are deferred and traced
 - accepted diplomacy decisions execute before lifecycle recall, then normal accepted actions execute after recall
 - Supervisor lifecycle recall returns own `ATTACK`, `BOMBARD`, `SIEGE`, and `SPY` fleets in `MOVING_TO_TARGET`, `PENDING_JUMP_GATE`, or `ORBITING` when the target owner relation is now `NEUTRAL`, `PEACE`, or `ALLIED`
+- fresh-intel bombardment safety is now also enforced at execution time: active `BOMBARD` / `SIEGE` fleets can be recalled when new defender anti-fleet strength exceeds the configured threshold relative to the planned bot fleet
 - `SHIP_NEED` / `demandOnly` proposals are pressure only; they boost matching executable shipyard proposals instead of being converted directly
 - non-critical unaffordable queue proposals can become pending commitments instead of being lost
 - pending queue commitments are retried before new proposals and expired after the current 40-turn horizon
@@ -1702,6 +1705,13 @@ That remains the responsibility of the planetary-focused `Warfare` subsystem.
 - plan initial defense-break attacks,
 - plan repeatable plunder attacks,
 - emit ship-shortage demand when current fleets are insufficient for good farm plans.
+
+Current runtime note:
+
+- relocation `MOVE` planning is already live,
+- remembered farm state is report-driven and stored in `BotMemoryV2`,
+- the shared payload helper can now attach bombs or carried small combat ships behind jump-capable fleets when a farm plan benefits from them,
+- neutral-farm validation should be checked in `benchmark20x20`, not `advanced`.
 
 ### Strategic Military phase-1 outputs
 
@@ -2948,6 +2958,12 @@ This phase now shares:
 - siege reports
 
 It still does not add hostile attack-intent prediction.
+
+Current runtime note:
+
+- Strategic Diplomatic now also owns executable `REQUEST_DECISION`, outgoing support `REQUEST_CREATION`, pending `DIPLOMACY_DECISION`, and outgoing `DIPLOMACY_PROPOSAL` handling in the live runtime.
+- Bombard/siege planning now reuses the shared payload helper so carried `PLANETARY_BOMB`s are prioritized before carried small ships, and carried small bombers/combat ships are only attached behind jump-capable warships.
+- Snapshot data now exposes active bombardment fleets so Strategic Diplomatic can schedule safety `SPY` / scout refreshes, while the executor can recall an already launched `BOMBARD` / `SIEGE` fleet when fresh defender intel says the fleet is now too weak.
 
 ### Strategic Diplomatic phase-8 relation scope
 

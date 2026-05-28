@@ -976,7 +976,10 @@ Current implementation note:
 
 * the first executable `Strategic Military` slice already emits `SPY`, `BREAK`, `PLUNDER`, and `SHIP_NEED`,
 * snapshot data for this subsystem should hold only currently visible facts,
-* persistent remembered farm state now lives in `BotMemoryV2`.
+* persistent remembered farm state now lives in `BotMemoryV2`,
+* relocation `MOVE` planning is now live when no single origin can satisfy `BREAK`,
+* shared carried-payload planning now exists in `server/src/bots-v2/ship-payload-planning.ts` for bombs and carried small combat ships behind jump-capable warships,
+* the neutral-enabled `benchmark20x20` simulation now confirms live farm opening plus repeat plunder, but profile conversion timing is still uneven and remains a tuning target.
 
 Follow-up ledger rules:
 
@@ -2015,6 +2018,12 @@ The current executable request-creation slice focuses on:
 * outgoing support requests,
 * and request-driven cooperation instead of global multi-front orchestration.
 
+Current implementation note:
+
+* Strategic Diplomatic now owns executable incoming `REQUEST_DECISION`, outgoing support `REQUEST_CREATION`, pending `DIPLOMACY_DECISION`, and outgoing `DIPLOMACY_PROPOSAL` proposals in the live runtime.
+* Bombard/siege follow-up now uses the shared payload helper to prioritize carried `PLANETARY_BOMB`s before carried small combat ships, while still refusing to direct-launch non-jump small bombers.
+* The live slice can emit safety `SPY` / scout checks for active bombard/siege fleets, and the executor now recalls those fleets when fresh intel shows defender anti-fleet strength above the current safety threshold.
+
 Deferred follow-ups remain:
 
 * `ALLIANCE_DEPOT` usage beyond current request decisions,
@@ -2675,6 +2684,12 @@ Supervisor fleet execution rules:
 * deuterium fuel is recorded separately in lightweight `fuelSpendingHistory`,
 * own-planet Jump Gate use is selected by default when legal and auto-approved,
 * foreign/allied Jump Gate request creation happens only through accepted `FLEET_MISSION` proposals whose owning subsystem set `useJumpGate: true`; Supervisor does not emit standalone Jump Gate requests.
+
+Simulation note:
+
+* `scripts/run-bot-v2-simulation.ts` now seeds scenario setup through the same deterministic RNG path as the turn loop.
+* `advanced` is the fast no-neutral smoke scenario.
+* `benchmark20x20` is the neutral-enabled benchmark that should be used for Strategic Military farm validation.
 
 `SHIP_NEED` and `demandOnly` shipyard proposals are pressure signals only. They are not executable by themselves; they increase priority for matching concrete shipyard proposals emitted by other subsystems.
 
