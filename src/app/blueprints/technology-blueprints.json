@@ -27,7 +27,7 @@
     {
       "type": "HYPERSPACE_TECHNOLOGY",
       "imagePath": "images/technologies/normal/HYPERSPACE_TECHNOLOGY.jpg",
-      "description": "Gives +2% bonus to Sensor Phlanx range, increases Jump Gate and Interstellar Trade Port capacity by 5%, and reduces total fleet fuel consumption by 2%.",
+      "description": "Gives +2% bonus to Sensor Phlanx range, increases Jump Gate and Interstellar Trade Port capacity by 5%, and reduces total fleet travel fuel cost by 2% per level.",
       "basicCost": { "metal": 0, "crystal": 20, "deuterium": 30 },
       "energyRequired": [0],
       "researchTime": [1.5],
@@ -200,7 +200,7 @@
     {
       "type": "FUSION_DRIVE",
       "imagePath": "images/technologies/normal/FUSION_DRIVE.jpg",
-      "description": "Increases in star system ship speed by 1, increases evasion chance by 3%, and reduces total fleet fuel consumption by 1%.",
+      "description": "Increases in star system ship speed by 1, increases evasion chance by 3%, and reduces total fleet travel fuel cost by 1% per level.",
       "basicCost": { "metal": 40, "crystal": 30, "deuterium": 20 },
       "energyRequired": [0],
       "researchTime": [2],
@@ -215,7 +215,7 @@
     {
       "type": "HYPERSPACE_DRIVE",
       "imagePath": "images/technologies/normal/HYPERSPACE_DRIVE.jpg",
-      "description": "Increases jump range by 1.",
+      "description": "Increases jump range by 1 and reduces total fleet travel fuel cost by 1% per level.",
       "basicCost": { "metal": 20, "crystal": 60, "deuterium": 100 },
       "energyRequired": [0],
       "researchTime": [2],

@@ -402,9 +402,17 @@ export function calculateFuelCost(
   distance: number,
   multiplier = 1,
   fusionDriveLevel = 0,
-  hyperspaceTechnologyLevel = 0
+  hyperspaceTechnologyLevel = 0,
+  hyperspaceDriveLevel = 0
 ): number {
-  return fleetFuelCostForDistance(distance, ships, multiplier, fusionDriveLevel, hyperspaceTechnologyLevel);
+  return fleetFuelCostForDistance(
+    distance,
+    ships,
+    multiplier,
+    fusionDriveLevel,
+    hyperspaceTechnologyLevel,
+    hyperspaceDriveLevel
+  );
 }
 
 export function calculatePlayerFuelCost(
@@ -418,7 +426,8 @@ export function calculatePlayerFuelCost(
     distance,
     multiplier,
     player.getTechLevel(TechnologyType.FUSION_DRIVE as TechnologyTypeType),
-    player.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY as TechnologyTypeType)
+    player.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY as TechnologyTypeType),
+    player.getTechLevel(TechnologyType.HYPERSPACE_DRIVE as TechnologyTypeType)
   );
 }
 

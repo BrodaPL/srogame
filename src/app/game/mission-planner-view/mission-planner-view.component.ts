@@ -638,7 +638,8 @@ export class MissionPlannerViewComponent implements OnInit {
       this.selectedTravelShipAmounts(),
       this.currentMission().minimumFuelReserves,
       this.techLevel(TechnologyType.FUSION_DRIVE),
-      this.techLevel(TechnologyType.HYPERSPACE_TECHNOLOGY)
+      this.techLevel(TechnologyType.HYPERSPACE_TECHNOLOGY),
+      this.techLevel(TechnologyType.HYPERSPACE_DRIVE)
     );
   }
 

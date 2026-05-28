@@ -38,11 +38,12 @@ describe('command helpers', () => {
     ])).toBe(6);
   });
 
-  it('uses player Fusion Drive and Hyperspace Technology when calculating fuel cost', () => {
+  it('uses player Fusion Drive, Hyperspace Technology, and Hyperspace Drive when calculating fuel cost', () => {
     const player = new Player(1, 'Alpha', [], new Map(), [], PlayerType.PLAYER);
     player.setTechLevel(TechnologyType.FUSION_DRIVE, 3);
     player.setTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY, 4);
+    player.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 5);
 
-    expect(calculatePlayerFuelCost([{ type: ShipType.COLONIZER, amount: 1 }], 10, 2, player)).toBe(178);
+    expect(calculatePlayerFuelCost([{ type: ShipType.COLONIZER, amount: 1 }], 10, 2, player)).toBe(135);
   });
 });

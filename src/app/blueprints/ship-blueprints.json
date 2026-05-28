@@ -373,7 +373,7 @@
       "cargoCapacity": 500,
       "hangarCapacity": 4,
       "purposes": ["UTILITY"],
-      "jumpCost": 10,
+      "jumpCost": 8,
       "cost": { "metal": 600, "crystal": 400, "deuterium": 100 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 3 }

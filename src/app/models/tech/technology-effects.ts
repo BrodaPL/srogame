@@ -70,7 +70,8 @@ export function fleetFuelCostForDistance(
   ships: FleetTravelShipSelection[] = [],
   minimumFuelReserves = 1,
   fusionDriveLevel = 0,
-  hyperspaceTechnologyLevel = 0
+  hyperspaceTechnologyLevel = 0,
+  hyperspaceDriveLevel = 0
 ): number {
   const sanitizedDistance = Math.max(1, Math.max(0, distance));
   const sanitizedMinimumFuelReserves = Math.max(1, minimumFuelReserves);
@@ -90,17 +91,23 @@ export function fleetFuelCostForDistance(
     baseFuelCost += blueprint.jumpCost * sanitizedDistance * normalizedAmount;
   }
 
-  const fuelDiscountMultiplier = fleetFuelConsumptionMultiplier(fusionDriveLevel, hyperspaceTechnologyLevel);
+  const fuelDiscountMultiplier = fleetFuelConsumptionMultiplier(
+    fusionDriveLevel,
+    hyperspaceTechnologyLevel,
+    hyperspaceDriveLevel
+  );
   return Math.max(0, Math.ceil(baseFuelCost * sanitizedMinimumFuelReserves * fuelDiscountMultiplier));
 }
 
 export function fleetFuelConsumptionMultiplier(
   fusionDriveLevel: number,
-  hyperspaceTechnologyLevel: number
+  hyperspaceTechnologyLevel: number,
+  hyperspaceDriveLevel = 0
 ): number {
   const discountPercent = (
     sanitizeTechLevel(fusionDriveLevel)
     + (sanitizeTechLevel(hyperspaceTechnologyLevel) * 2)
+    + sanitizeTechLevel(hyperspaceDriveLevel)
   );
   return Math.max(0, 1 - (discountPercent / 100));
 }
