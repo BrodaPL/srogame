@@ -50,7 +50,7 @@ import { Planet } from '../planets/planet';
 import { Player } from '../player';
 import { PlayerMessage } from '../mail/player-message';
 import { BuildingsReport } from '../reports/buildings-report';
-import { FleetReport } from '../reports/fleet-report';
+import { appendFleetReportShips, FleetReport } from '../reports/fleet-report';
 import {
   calculateRepairCapabilityForManyShips,
   collectRepairEquipmentBurstGroupsForManyShips,
@@ -3231,7 +3231,7 @@ function addFleetSuccessReport(
       sourcePlanetName: fleet.targetPlanetName,
       senderPlayerName: player.playerName
     },
-    body
+    appendFleetReportShips(body, fleet.ships)
   );
   player.addReport(report);
 }

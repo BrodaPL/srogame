@@ -3,7 +3,7 @@ import { FleetMissionType } from '../enums/fleet-mission-type';
 import { ShipType } from '../enums/ship-type';
 import { FleetState } from '../fleets/fleet';
 import type { Fleet } from '../fleets/fleet';
-import { FleetReport } from '../reports/fleet-report';
+import { appendFleetReportShips, FleetReport } from '../reports/fleet-report';
 import type { Ship } from '../fleets/ship';
 import type { FleetMissionBlueprint } from './fleet-mission-blueprint';
 import type { MissionCheck } from './mission-check';
@@ -212,7 +212,7 @@ export class FleetMission {
         originPlanetName: context.fleet.originPlanetName,
         senderPlayerName: context.player.playerName
       },
-      body
+      appendFleetReportShips(body, context.fleet.ships)
     );
   }
 

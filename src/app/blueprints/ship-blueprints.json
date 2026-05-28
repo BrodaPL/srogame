@@ -146,7 +146,7 @@
       "imagePath": "images/ships/normal/SPY_PROBE.jpg",
       "hullClass": "SMALL",
       "canJump": true,
-      "size": 0,
+      "size": 1,
       "evasionChance": 0,
       "hullPointsCapacity": 10,
       "criticalThreshold": 70,
