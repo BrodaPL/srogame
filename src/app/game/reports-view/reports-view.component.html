@@ -208,6 +208,23 @@
                 }
               </span>
             </div>
+            @if (report.originCoordinates) {
+              <div class="overview-stat">
+                <span class="overview-stat__label">Origin</span>
+                <span class="overview-stat__value">
+                  @if (canOpenOriginInGalaxy(report)) {
+                    <button
+                      class="reports-view__coordinate-link"
+                      type="button"
+                      (click)="openOriginInGalaxy(report)">
+                      {{ originLabel(report) }}
+                    </button>
+                  } @else {
+                    <span>{{ originLabel(report) }}</span>
+                  }
+                </span>
+              </div>
+            }
             <div class="overview-stat">
               <span class="overview-stat__label">Sender</span>
               <span class="overview-stat__value">{{ report.senderPlayerName ?? 'N/A' }}</span>

@@ -30,6 +30,9 @@ export type SpaceBattleReportContext = {
   sourceCoordinates?: ReportCoordinates | null;
   sourcePlanetName?: string | null;
   sourceSystemName?: string | null;
+  originCoordinates?: ReportCoordinates | null;
+  originPlanetName?: string | null;
+  originSystemName?: string | null;
 };
 
 export type SpaceBattleInput = {
@@ -1188,6 +1191,9 @@ export class SpaceBattleResolver {
           sourceCoordinates: reportContext.sourceCoordinates ?? null,
           sourcePlanetName: reportContext.sourcePlanetName ?? null,
           sourceSystemName: reportContext.sourceSystemName ?? null,
+          originCoordinates: reportContext.originCoordinates ?? null,
+          originPlanetName: reportContext.originPlanetName ?? null,
+          originSystemName: reportContext.originSystemName ?? null,
           senderPlayerName: defenderPlayer.playerName
         },
         this.buildReportBody(result, 'attacker')
@@ -1200,6 +1206,9 @@ export class SpaceBattleResolver {
           sourceCoordinates: reportContext.sourceCoordinates ?? null,
           sourcePlanetName: reportContext.sourcePlanetName ?? null,
           sourceSystemName: reportContext.sourceSystemName ?? null,
+          originCoordinates: reportContext.originCoordinates ?? null,
+          originPlanetName: reportContext.originPlanetName ?? null,
+          originSystemName: reportContext.originSystemName ?? null,
           senderPlayerName: attackerPlayer.playerName
         },
         this.buildReportBody(result, 'defender')

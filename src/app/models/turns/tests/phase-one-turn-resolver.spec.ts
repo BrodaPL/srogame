@@ -187,6 +187,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       report.title.startsWith('Battle Report:')
       && report.show().includes(expectedDebrisLine)
     )).toBe(true);
+    const attackerBattleReport = attacker.reports.find((report) => report.title.startsWith('Battle Report:')) ?? null;
+    expect(attackerBattleReport?.originCoordinates).toEqual({ x: 1, y: 1, z: 1 });
+    expect(attackerBattleReport?.originPlanetName).toBe('Alpha Prime');
     const refreshedEspionageReport = system.planets[1].lastReportData.get(attacker.playerId);
     expect(refreshedEspionageReport?.spaceDebrisAmount.metal).toBe(currentDebris.metal);
     expect(refreshedEspionageReport?.spaceDebrisAmount.crystal).toBe(currentDebris.crystal);
@@ -1543,6 +1546,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
       report.title.startsWith('Plunder Report: Beta Storehouse')
       && report.show().includes('Fleet cargo after looting: 600/600')
     )).toBe(true);
+    const plunderReport = attacker.reports.find((report) => report.title.startsWith('Plunder Report: Beta Storehouse')) ?? null;
+    expect(plunderReport?.originCoordinates).toEqual({ x: 1, y: 1, z: 1 });
+    expect(plunderReport?.originPlanetName).toBe('Alpha Prime');
   });
 
   it('creates plunder reports for bot attackers on no-battle Attack missions', () => {

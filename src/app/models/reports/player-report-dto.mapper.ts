@@ -32,6 +32,9 @@ function toBaseData(report: PlayerReportDto) {
     sourceCoordinates: report.sourceCoordinates,
     sourcePlanetName: report.sourcePlanetName,
     sourceSystemName: report.sourceSystemName,
+    originCoordinates: report.originCoordinates ?? null,
+    originPlanetName: report.originPlanetName ?? null,
+    originSystemName: report.originSystemName ?? null,
     senderPlayerName: report.senderPlayerName
   };
 }

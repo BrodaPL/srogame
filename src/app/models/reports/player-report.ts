@@ -10,6 +10,9 @@ export type PlayerReportBaseData = {
   sourceCoordinates?: ReportCoordinates | null;
   sourcePlanetName?: string | null;
   sourceSystemName?: string | null;
+  originCoordinates?: ReportCoordinates | null;
+  originPlanetName?: string | null;
+  originSystemName?: string | null;
   senderPlayerName?: string | null;
 };
 
@@ -22,6 +25,9 @@ export abstract class PlayerReport {
   public sourceCoordinates: ReportCoordinates | null;
   public sourcePlanetName: string | null;
   public sourceSystemName: string | null;
+  public originCoordinates: ReportCoordinates | null;
+  public originPlanetName: string | null;
+  public originSystemName: string | null;
   public senderPlayerName: string | null;
 
   protected constructor(
@@ -36,6 +42,9 @@ export abstract class PlayerReport {
     this.sourceCoordinates = data.sourceCoordinates ?? null;
     this.sourcePlanetName = data.sourcePlanetName ?? null;
     this.sourceSystemName = data.sourceSystemName ?? null;
+    this.originCoordinates = data.originCoordinates ?? null;
+    this.originPlanetName = data.originPlanetName ?? null;
+    this.originSystemName = data.originSystemName ?? null;
     this.senderPlayerName = data.senderPlayerName ?? null;
   }
 
@@ -57,6 +66,9 @@ export abstract class PlayerReport {
       sourceCoordinates: this.sourceCoordinates ? { ...this.sourceCoordinates } : null,
       sourcePlanetName: this.sourcePlanetName,
       sourceSystemName: this.sourceSystemName,
+      originCoordinates: this.originCoordinates ? { ...this.originCoordinates } : null,
+      originPlanetName: this.originPlanetName,
+      originSystemName: this.originSystemName,
       senderPlayerName: this.senderPlayerName
     };
   }
@@ -67,6 +79,14 @@ export abstract class PlayerReport {
     }
 
     return `${this.sourceCoordinates.x}:${this.sourceCoordinates.y}:${this.sourceCoordinates.z}`;
+  }
+
+  public originCoordinatesLabel(): string | null {
+    if (!this.originCoordinates) {
+      return null;
+    }
+
+    return `${this.originCoordinates.x}:${this.originCoordinates.y}:${this.originCoordinates.z}`;
   }
 
   protected buildMetadataLines(): string[] {

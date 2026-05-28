@@ -2005,11 +2005,12 @@ function applyAttackPlunderIfNeeded(
   const summary = resolveAttackPlunder(fleet, targetPlanet);
   appendAttackPlunderToBattleReports(battleReports, targetPlanet, summary);
   if (!battleReports) {
-    addAttackPlunderSummaryReport(owner, targetOwner, targetPlanet, summary, resolvedTurnNumber);
+    addAttackPlunderSummaryReport(owner, targetOwner, fleet, targetPlanet, summary, resolvedTurnNumber);
     if (owner && targetOwner && targetOwner.type !== PlayerType.NEUTRAL) {
       const incomingReport = createIncomingAttackReport(
         targetOwner.createReportId(),
         owner,
+        fleet,
         targetPlanet,
         summary,
         resolvedTurnNumber
@@ -2221,6 +2222,7 @@ function appendAttackPlunderToBattleReports(
 function addAttackPlunderSummaryReport(
   player: Player | null,
   targetOwner: Player | null,
+  fleet: Fleet,
   targetPlanet: Planet,
   summary: AttackPlunderSummary,
   resolvedTurnNumber: number
@@ -2262,6 +2264,12 @@ function addAttackPlunderSummaryReport(
       sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
       sourcePlanetName: targetPlanet.basicInfo.name,
       sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      originCoordinates: {
+        x: fleet.origin.x,
+        y: fleet.origin.y,
+        z: fleet.origin.z + 1
+      },
+      originPlanetName: fleet.originPlanetName,
       senderPlayerName: targetOwner?.playerName ?? player.playerName
     },
     body.join('\n')
@@ -2272,6 +2280,7 @@ function addAttackPlunderSummaryReport(
 function createIncomingAttackReport(
   reportId: number,
   attacker: Player,
+  fleet: Fleet,
   targetPlanet: Planet,
   summary: AttackPlunderSummary,
   resolvedTurnNumber: number
@@ -2288,6 +2297,12 @@ function createIncomingAttackReport(
       sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
       sourcePlanetName: targetPlanet.basicInfo.name,
       sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      originCoordinates: {
+        x: fleet.origin.x,
+        y: fleet.origin.y,
+        z: fleet.origin.z + 1
+      },
+      originPlanetName: fleet.originPlanetName,
       senderPlayerName: attacker.playerName
     },
     [
@@ -2666,7 +2681,13 @@ function resolvePlanetBattle(
       createdTurn: resolvedTurnNumber,
       sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
       sourcePlanetName: targetPlanet.basicInfo.name,
-      sourceSystemName: targetPlanet.basicInfo.solarSystem.name
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      originCoordinates: {
+        x: fleet.origin.x,
+        y: fleet.origin.y,
+        z: fleet.origin.z + 1
+      },
+      originPlanetName: fleet.originPlanetName
     },
     maxRounds
   });

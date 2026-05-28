@@ -923,6 +923,9 @@ export type ClientReportDataDto = {
   sourceCoordinates: ClientCoordinates | null;
   sourcePlanetName: string | null;
   sourceSystemName: string | null;
+  originCoordinates?: ClientCoordinates | null;
+  originPlanetName?: string | null;
+  originSystemName?: string | null;
   senderPlayerName: string | null;
   diff: number;
   size: number;
@@ -954,6 +957,9 @@ export type PlayerReportDtoBase = {
   sourceCoordinates: ClientCoordinates | null;
   sourcePlanetName: string | null;
   sourceSystemName: string | null;
+  originCoordinates?: ClientCoordinates | null;
+  originPlanetName?: string | null;
+  originSystemName?: string | null;
   senderPlayerName: string | null;
 };
 

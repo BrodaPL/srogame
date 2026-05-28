@@ -156,6 +156,9 @@ type SavedPlayerReportBase = {
   sourceCoordinates: SavedCoordinates | null;
   sourcePlanetName: string | null;
   sourceSystemName: string | null;
+  originCoordinates?: SavedCoordinates | null;
+  originPlanetName?: string | null;
+  originSystemName?: string | null;
   senderPlayerName: string | null;
 };
 
@@ -966,6 +969,9 @@ function hydrateSavedPlayerReport(savedReport: SavedPlayerReport): PlayerReport 
     sourceCoordinates: savedReport.sourceCoordinates ? serializeCoordinates(savedReport.sourceCoordinates) : null,
     sourcePlanetName: savedReport.sourcePlanetName,
     sourceSystemName: savedReport.sourceSystemName,
+    originCoordinates: savedReport.originCoordinates ? serializeCoordinates(savedReport.originCoordinates) : null,
+    originPlanetName: savedReport.originPlanetName ?? null,
+    originSystemName: savedReport.originSystemName ?? null,
     senderPlayerName: savedReport.senderPlayerName
   };
 
@@ -1340,6 +1346,11 @@ function serializePlayerReportBase(report: PlayerReport): SavedPlayerReportBase 
       : null,
     sourcePlanetName: report.sourcePlanetName,
     sourceSystemName: report.sourceSystemName,
+    originCoordinates: report.originCoordinates
+      ? serializeCoordinates(report.originCoordinates)
+      : null,
+    originPlanetName: report.originPlanetName,
+    originSystemName: report.originSystemName,
     senderPlayerName: report.senderPlayerName
   };
 }

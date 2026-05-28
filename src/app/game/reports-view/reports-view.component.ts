@@ -241,6 +241,12 @@ export class ReportsViewComponent implements OnInit {
       && report.sourceCoordinates.y >= 0;
   }
 
+  protected canOpenOriginInGalaxy(report: PlayerReport | null): boolean {
+    return !!report?.originCoordinates
+      && report.originCoordinates.x >= 0
+      && report.originCoordinates.y >= 0;
+  }
+
   protected openInGalaxy(report: PlayerReport | null, event?: Event): void {
     event?.stopPropagation();
     if (!report || !this.canOpenInGalaxy(report) || !report.sourceCoordinates) {
@@ -254,6 +260,24 @@ export class ReportsViewComponent implements OnInit {
           x: report.sourceCoordinates.x,
           y: report.sourceCoordinates.y,
           z: report.sourceCoordinates.z
+        }
+      }
+    );
+  }
+
+  protected openOriginInGalaxy(report: PlayerReport | null, event?: Event): void {
+    event?.stopPropagation();
+    if (!report || !this.canOpenOriginInGalaxy(report) || !report.originCoordinates) {
+      return;
+    }
+
+    void this.router.navigate(
+      ['/game/galactic'],
+      {
+        queryParams: {
+          x: report.originCoordinates.x,
+          y: report.originCoordinates.y,
+          z: report.originCoordinates.z
         }
       }
     );
@@ -348,6 +372,23 @@ export class ReportsViewComponent implements OnInit {
 
   protected coordinatesLabel(report: PlayerReport): string {
     return report.coordinatesLabel() ?? 'No coordinates';
+  }
+
+  protected originCoordinatesLabel(report: PlayerReport): string {
+    return report.originCoordinatesLabel() ?? 'No origin coordinates';
+  }
+
+  protected originLabel(report: PlayerReport): string {
+    const originParts = [report.originSystemName, report.originPlanetName].filter((entry): entry is string => !!entry);
+    if (originParts.length > 0) {
+      return `${originParts.join(' | ')} (${this.originCoordinatesLabel(report)})`;
+    }
+
+    if (report.originPlanetName) {
+      return `${report.originPlanetName} (${this.originCoordinatesLabel(report)})`;
+    }
+
+    return this.originCoordinatesLabel(report);
   }
 
   protected sourceLabel(report: PlayerReport): string {

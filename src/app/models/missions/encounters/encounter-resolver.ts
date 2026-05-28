@@ -431,7 +431,14 @@ export class EncounterResolver {
           z: targetPlanet.basicInfo.order
         },
         sourcePlanetName: targetPlanet.basicInfo.name,
-        sourceSystemName: targetPlanet.basicInfo.solarSystem.name
+        sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+        originCoordinates: {
+          x: arrivals[0].fleet.origin.x,
+          y: arrivals[0].fleet.origin.y,
+          z: arrivals[0].fleet.origin.z + 1
+        },
+        originPlanetName: arrivals[0].fleet.originPlanetName,
+        originSystemName: arrivals[0].originPlanet?.basicInfo.solarSystem.name ?? null
       },
       maxRounds: arrivals[0].mission.getBattleRounds()
     });

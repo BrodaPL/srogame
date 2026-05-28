@@ -208,6 +208,8 @@ export class FleetMission {
         title: `Fleet Arrived: ${context.fleet.missionType} to ${context.fleet.targetPlanetName}`,
         sourceCoordinates: { ...context.fleet.target },
         sourcePlanetName: context.fleet.targetPlanetName,
+        originCoordinates: { ...context.fleet.origin },
+        originPlanetName: context.fleet.originPlanetName,
         senderPlayerName: context.player.playerName
       },
       body
@@ -222,6 +224,8 @@ export class FleetMission {
         title: `Fleet Failed: ${context.fleet.missionType} to ${context.fleet.targetPlanetName}`,
         sourceCoordinates: { ...context.fleet.target },
         sourcePlanetName: context.fleet.targetPlanetName,
+        originCoordinates: { ...context.fleet.origin },
+        originPlanetName: context.fleet.originPlanetName,
         senderPlayerName: context.player.playerName
       },
       body
@@ -236,6 +240,8 @@ export class FleetMission {
         title: `Fleet Draw: ${context.fleet.missionType} at ${context.fleet.targetPlanetName}`,
         sourceCoordinates: { ...context.fleet.target },
         sourcePlanetName: context.fleet.targetPlanetName,
+        originCoordinates: { ...context.fleet.origin },
+        originPlanetName: context.fleet.originPlanetName,
         senderPlayerName: context.player.playerName
       },
       body

@@ -41,6 +41,43 @@ describe('ReportsViewComponent', () => {
     );
   });
 
+  it('navigates to Galaxy View from report origin coordinates', () => {
+    const router = createRouter();
+    const component = new ReportsViewComponent(
+      {} as never,
+      {} as never,
+      {
+        markForCheck: vi.fn()
+      } as never,
+      {
+        autoOpenTutorial: vi.fn()
+      } as never,
+      {} as never,
+      router as never
+    );
+
+    const report = {
+      originCoordinates: {
+        x: 3,
+        y: 4,
+        z: 5
+      }
+    };
+
+    (component as { openOriginInGalaxy(report: unknown): void }).openOriginInGalaxy(report);
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/game/galactic'],
+      {
+        queryParams: {
+          x: 3,
+          y: 4,
+          z: 5
+        }
+      }
+    );
+  });
+
   it('selects all visible reports except favourites', () => {
     const component = new ReportsViewComponent(
       {} as never,

@@ -7816,6 +7816,15 @@ function toPlayerReportBaseDto(report: PlayerReport): PlayerReportDtoBase {
       : null,
     sourcePlanetName: report.sourcePlanetName,
     sourceSystemName: report.sourceSystemName,
+    originCoordinates: report.originCoordinates
+      ? {
+        x: report.originCoordinates.x,
+        y: report.originCoordinates.y,
+        z: report.originCoordinates.z
+      }
+      : null,
+    originPlanetName: report.originPlanetName,
+    originSystemName: report.originSystemName,
     senderPlayerName: report.senderPlayerName
   };
 }
