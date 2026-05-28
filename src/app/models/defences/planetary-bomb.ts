@@ -27,6 +27,20 @@ export function countPlanetaryBombs(defences: ManyDefencesLike | null | undefine
   return total;
 }
 
+export function totalPlanetaryBombSize(defences: ManyDefencesLike | null | undefined): number {
+  let total = 0;
+  for (const [type, amount] of ManyDefences.countByType(defences).entries()) {
+    if (!isPlanetaryBombDefenceType(type)) {
+      continue;
+    }
+
+    const blueprint = DEFENCE_BLUEPRINTS.get(type);
+    total += (blueprint?.size ?? 0) * amount;
+  }
+
+  return total;
+}
+
 export function splitPlanetaryBombDefences(
   defences: ManyDefencesLike | null | undefined
 ): { activeDefences: ManyDefences; planetaryBombs: ManyDefences } {

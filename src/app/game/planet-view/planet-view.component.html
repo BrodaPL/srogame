@@ -645,7 +645,7 @@
                   <p class="planet-building-card__meta">Hull class: {{ defence.hullClass }}</p>
                   @if (defence.hullClass === HullClass.PLANETARY_BOMB) {
                     <p class="planet-building-card__meta">Stored in Bomb Depot. Not active in combat yet.</p>
-                    <p class="planet-building-card__meta">{{ currentPlanetaryBombCount() }}/{{ bombDepotCapacity() }} stored</p>
+                    <p class="planet-building-card__meta">{{ currentPlanetaryBombStorageUsed() }}/{{ bombDepotCapacity() }} stored</p>
                   } @else {
                     <p class="planet-building-card__meta">Can shoot to orbit: {{ defence.canShootToOrbit ? 'Yes' : 'No' }}</p>
                   }

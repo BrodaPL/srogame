@@ -39,7 +39,7 @@ import {
   TECHNOLOGY_BLUEPRINTS,
   calculateMaxBuildingQueueLength,
   calculateMaxShipyardQueueLength,
-  countPlanetaryBombs,
+  totalPlanetaryBombSize,
   isPlanetaryBombDefenceType
 } from '../../game-commands/command-helpers.js';
 import { resolveModule } from '../../esm-module.js';
@@ -589,9 +589,13 @@ function resolveShipyardQueueRemainingEtc(planet: Planet, shipyardPower: number)
       entry.itemKind === 'defence'
       && entry.defenceType
       && isPlanetaryBombDefenceType(entry.defenceType)
-      && countPlanetaryBombs(planet.rBDSFTQ.defences) >= planet.getBuildingProductionValue1(BuildingType.BOMB_DEPOT)
     ) {
-      break;
+      const bombBlueprint = DEFENCE_BLUEPRINTS.get(entry.defenceType);
+      const currentStorageUsed = totalPlanetaryBombSize(planet.rBDSFTQ.defences);
+      const storageCapacity = planet.getBuildingProductionValue1(BuildingType.BOMB_DEPOT);
+      if (currentStorageUsed + (bombBlueprint?.size ?? 0) > storageCapacity) {
+        break;
+      }
     }
 
     const blueprint = entry.itemKind === 'defence'

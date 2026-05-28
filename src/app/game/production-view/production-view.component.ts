@@ -22,7 +22,7 @@ import { ManyShips } from '../../models/fleets/many-ships';
 import { Weapon } from '../../models/fleets/weapon';
 import { Defence } from '../../models/defences/defence';
 import { ManyDefences } from '../../models/defences/many-defences';
-import { countPlanetaryBombs, isPlanetaryBombDefenceType } from '../../models/defences/planetary-bomb';
+import { isPlanetaryBombDefenceType, totalPlanetaryBombSize } from '../../models/defences/planetary-bomb';
 import type {
   CancelShipyardQueueEntryRequest,
   ClientPlanetDto,
@@ -652,21 +652,25 @@ export class ProductionViewComponent implements OnInit {
     return Math.max(0, Math.floor(this.currentBuildingProduction(BuildingType.BOMB_DEPOT)));
   }
 
-  protected currentPlanetaryBombCount(): number {
-    return countPlanetaryBombs(this.selectedPlanet()?.objects.defences);
+  protected currentPlanetaryBombStorageUsed(): number {
+    return totalPlanetaryBombSize(this.selectedPlanet()?.objects.defences);
   }
 
-  protected queuedPlanetaryBombCount(): number {
+  protected queuedPlanetaryBombStorageUsed(): number {
     return (this.selectedPlanet()?.objects.shipyardQueue ?? [])
       .filter((entry) => this.queueEntryItemKind(entry) === 'defence')
       .filter((entry) => isPlanetaryBombDefenceType(this.queueEntryDefenceType(entry)))
-      .reduce((sum, entry) => sum + this.queueEntryShipAmount(entry), 0);
+      .reduce((sum, entry) => {
+        const defenceType = this.queueEntryDefenceType(entry);
+        const blueprint = defenceType ? this.defenceBlueprintsByType.get(defenceType) : null;
+        return sum + ((blueprint?.size ?? 0) * this.queueEntryShipAmount(entry));
+      }, 0);
   }
 
   protected bombDepotStorageSummary(): string | null {
     const capacity = this.bombDepotCapacity();
-    const current = this.currentPlanetaryBombCount();
-    const queued = this.queuedPlanetaryBombCount();
+    const current = this.currentPlanetaryBombStorageUsed();
+    const queued = this.queuedPlanetaryBombStorageUsed();
     if (capacity <= 0 && current <= 0 && queued <= 0) {
       return null;
     }
@@ -719,7 +723,7 @@ export class ProductionViewComponent implements OnInit {
     if (isPlanetaryBomb) {
       stateRows.push({
         label: 'Bomb depot storage',
-        value: `${this.currentPlanetaryBombCount()} / ${this.bombDepotCapacity()}${this.queuedPlanetaryBombCount() > 0 ? ` (+${this.queuedPlanetaryBombCount()} queued)` : ''}`,
+        value: `${this.currentPlanetaryBombStorageUsed()} / ${this.bombDepotCapacity()}${this.queuedPlanetaryBombStorageUsed() > 0 ? ` (+${this.queuedPlanetaryBombStorageUsed()} queued)` : ''}`,
         tone: 'warn'
       });
     }
@@ -1693,7 +1697,9 @@ export class ProductionViewComponent implements OnInit {
       return false;
     }
 
-    return this.currentPlanetaryBombCount() + this.queuedPlanetaryBombCount() + requestedAmount > this.bombDepotCapacity();
+    const blueprint = this.defenceBlueprintsByType.get(defenceType);
+    const requestedStorage = (blueprint?.size ?? 0) * requestedAmount;
+    return this.currentPlanetaryBombStorageUsed() + this.queuedPlanetaryBombStorageUsed() + requestedStorage > this.bombDepotCapacity();
   }
 
   private isBuildingNotUsingFullPower(buildingType: BuildingType): boolean {

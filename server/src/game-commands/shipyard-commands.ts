@@ -13,7 +13,6 @@ import {
   calculateMaxShipyardQueueLength,
   commandError,
   commandOk,
-  countPlanetaryBombs,
   hasDefenceBuildingRequirements,
   hasDefenceTechnologyRequirements,
   hasShipBuildingRequirements,
@@ -21,7 +20,8 @@ import {
   isPlanetaryBombDefenceType,
   multiplyResourcePack,
   resolveOwnedPlanetOrError,
-  resolvePlayerOrError
+  resolvePlayerOrError,
+  totalPlanetaryBombSize
 } from './command-helpers.ts';
 
 export type StartShipyardConstructionCommand = {
@@ -111,11 +111,15 @@ export function startShipyardConstruction(
     && isPlanetaryBombDefenceType(command.defenceType)
   ) {
     const bombDepotCapacity = Math.max(0, Math.floor(planet.getBuildingProductionValue1(BuildingType.BOMB_DEPOT)));
+    const requestedBombSize = Math.max(0, defence?.size ?? 0) * command.amount;
     const queuedBombs = planet.rBDSFTQ.shipyardQueue
       .filter((entry) => entry.itemKind === 'defence' && entry.defenceType && isPlanetaryBombDefenceType(entry.defenceType))
-      .reduce((sum, entry) => sum + Math.max(0, Math.floor(entry.amount)), 0);
-    const totalBombsAfterQueue = countPlanetaryBombs(planet.rBDSFTQ.defences) + queuedBombs + command.amount;
-    if (totalBombsAfterQueue > bombDepotCapacity) {
+      .reduce((sum, entry) => {
+        const queuedBlueprint = entry.defenceType ? DEFENCE_BLUEPRINTS.defencesMap.get(entry.defenceType) : null;
+        return sum + ((queuedBlueprint?.size ?? 0) * Math.max(0, Math.floor(entry.amount)));
+      }, 0);
+    const totalBombSizeAfterQueue = totalPlanetaryBombSize(planet.rBDSFTQ.defences) + queuedBombs + requestedBombSize;
+    if (totalBombSizeAfterQueue > bombDepotCapacity) {
       return {
         ok: false,
         error: commandError(400, 'CONFLICT', 'Bomb Depot capacity reached.')

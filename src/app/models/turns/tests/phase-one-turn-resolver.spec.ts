@@ -562,6 +562,31 @@ describe('resolvePhaseOneTurn battle integration', () => {
     );
   });
 
+  it('does not advance queued planetary bombs when the next bomb would exceed Bomb Depot storage by size', () => {
+    const { galaxy, system } = createGalaxyWithPlayers(
+      [],
+      (solarSystem) => {
+        solarSystem.planets[0].info.ownerId = 1;
+        solarSystem.planets[0].setBuildingLevel(BuildingType.SHIPYARD, 4);
+        solarSystem.planets[0].setBuildingLevel(BuildingType.BOMB_DEPOT, 1);
+        solarSystem.planets[0].rBDSFTQ.defences = manyDefences({ type: DefenceType.MEDIUM_BOMB, amount: 1 });
+        solarSystem.planets[0].rBDSFTQ.shipyardQueue = [
+          ShipyardQueueEntry.defence(DefenceType.MEDIUM_BOMB, 1, 0)
+        ];
+      },
+      (solarSystem) => ([
+        new Player(1, 'Alpha', [solarSystem.planets[0]], new Map(), [], PlayerType.PLAYER),
+        new Player(2, 'Beta', [solarSystem.planets[1]], new Map(), [], PlayerType.PLAYER)
+      ])
+    );
+
+    resolvePhaseOneTurn(galaxy);
+
+    expect(ManyDefences.undamagedCountByType(system.planets[0].rBDSFTQ.defences).get(DefenceType.MEDIUM_BOMB) ?? 0).toBe(1);
+    expect(system.planets[0].rBDSFTQ.shipyardQueue).toHaveLength(1);
+    expect(system.planets[0].rBDSFTQ.shipyardQueue[0]?.defenceType).toBe(DefenceType.MEDIUM_BOMB);
+  });
+
   it('lets same-turn hostile arrivals meet fleets that already entered orbit earlier in the same encounter group', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
 

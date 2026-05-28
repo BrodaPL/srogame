@@ -286,7 +286,7 @@
                     </p>
                     @if (defence.hullClass === HullClass.PLANETARY_BOMB) {
                       <p class="production-view__ship-meta">Stored in Bomb Depot. Not active in combat yet.</p>
-                      <p class="production-view__ship-meta">{{ currentPlanetaryBombCount() }}/{{ bombDepotCapacity() }} stored</p>
+                      <p class="production-view__ship-meta">{{ currentPlanetaryBombStorageUsed() }}/{{ bombDepotCapacity() }} stored</p>
                     } @else {
                       <p class="production-view__ship-meta">
                         {{ defence.canShootToOrbit ? 'Can engage orbit targets' : 'Atmosphere guard only' }}

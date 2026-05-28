@@ -44,7 +44,7 @@ import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/t
 import { Fleet, FleetState } from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { ManyDefences } from '../../models/defences/many-defences';
-import { countPlanetaryBombs, isPlanetaryBombDefenceType } from '../../models/defences/planetary-bomb';
+import { isPlanetaryBombDefenceType, totalPlanetaryBombSize } from '../../models/defences/planetary-bomb';
 import { Defence } from '../../models/defences/defence';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { Ship } from '../../models/fleets/ship';
@@ -896,21 +896,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return Math.max(0, Math.floor(this.getProductionAtLevelByType(BuildingType.BOMB_DEPOT, this.buildingLevel(BuildingType.BOMB_DEPOT))));
   }
 
-  protected currentPlanetaryBombCount(): number {
-    return countPlanetaryBombs(this.planet?.objects.defences);
+  protected currentPlanetaryBombStorageUsed(): number {
+    return totalPlanetaryBombSize(this.planet?.objects.defences);
   }
 
-  protected queuedPlanetaryBombCount(): number {
+  protected queuedPlanetaryBombStorageUsed(): number {
     return (this.planet?.objects.shipyardQueue ?? [])
       .filter((entry) => this.queueEntryItemKind(entry) === 'defence')
       .filter((entry) => isPlanetaryBombDefenceType(this.queueEntryDefenceType(entry)))
-      .reduce((sum, entry) => sum + this.queueEntryShipAmount(entry), 0);
+      .reduce((sum, entry) => {
+        const defenceType = this.queueEntryDefenceType(entry);
+        const blueprint = defenceType ? this.defenceBlueprintsByType.get(defenceType) : null;
+        return sum + ((blueprint?.size ?? 0) * this.queueEntryShipAmount(entry));
+      }, 0);
   }
 
   protected bombDepotStorageSummary(): string | null {
     const capacity = this.bombDepotCapacity();
-    const current = this.currentPlanetaryBombCount();
-    const queued = this.queuedPlanetaryBombCount();
+    const current = this.currentPlanetaryBombStorageUsed();
+    const queued = this.queuedPlanetaryBombStorageUsed();
     if (capacity <= 0 && current <= 0 && queued <= 0) {
       return null;
     }
@@ -2402,7 +2406,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     if (isPlanetaryBomb) {
       stateRows.push({
         label: 'Bomb depot storage',
-        value: `${this.currentPlanetaryBombCount()} / ${this.bombDepotCapacity()}${this.queuedPlanetaryBombCount() > 0 ? ` (+${this.queuedPlanetaryBombCount()} queued)` : ''}`,
+        value: `${this.currentPlanetaryBombStorageUsed()} / ${this.bombDepotCapacity()}${this.queuedPlanetaryBombStorageUsed() > 0 ? ` (+${this.queuedPlanetaryBombStorageUsed()} queued)` : ''}`,
         tone: 'warn'
       });
     }
@@ -4243,7 +4247,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return false;
     }
 
-    return this.currentPlanetaryBombCount() + this.queuedPlanetaryBombCount() + requestedAmount > this.bombDepotCapacity();
+    const blueprint = this.defenceBlueprintsByType.get(defenceType);
+    const requestedStorage = (blueprint?.size ?? 0) * requestedAmount;
+    return this.currentPlanetaryBombStorageUsed() + this.queuedPlanetaryBombStorageUsed() + requestedStorage > this.bombDepotCapacity();
   }
 
   private buildingNextLevel(building: Building): number {

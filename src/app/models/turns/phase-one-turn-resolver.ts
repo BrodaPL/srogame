@@ -23,7 +23,7 @@ import {
 import { DefenceInstance } from '../defences/defence-instance';
 import { ManyDefences } from '../defences/many-defences';
 import { Defence } from '../defences/defence';
-import { countPlanetaryBombs, isPlanetaryBombDefenceType, splitPlanetaryBombDefences } from '../defences/planetary-bomb';
+import { isPlanetaryBombDefenceType, splitPlanetaryBombDefences, totalPlanetaryBombSize } from '../defences/planetary-bomb';
 import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
 import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
 import { BuildingType } from '../enums/building-type';
@@ -699,9 +699,13 @@ function advanceShipyardQueue(planet: Planet, shipyardPower: number): void {
       queueEntry.itemKind === 'defence'
       && queueEntry.defenceType
       && isPlanetaryBombDefenceType(queueEntry.defenceType)
-      && countPlanetaryBombs(planet.rBDSFTQ.defences) >= planet.getBuildingProductionValue1(BuildingType.BOMB_DEPOT)
     ) {
-      break;
+      const bombBlueprint = DEFENCE_BLUEPRINTS.get(queueEntry.defenceType);
+      const currentStorageUsed = totalPlanetaryBombSize(planet.rBDSFTQ.defences);
+      const storageCapacity = planet.getBuildingProductionValue1(BuildingType.BOMB_DEPOT);
+      if (currentStorageUsed + (bombBlueprint?.size ?? 0) > storageCapacity) {
+        break;
+      }
     }
 
     const blueprint = queueEntry.itemKind === 'defence'

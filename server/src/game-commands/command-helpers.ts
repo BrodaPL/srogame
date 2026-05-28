@@ -65,7 +65,11 @@ const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof i
 const { fleetFuelCostForDistance, fleetTravelTurnsForDistance, maxActiveFleets } = resolveModule(technologyEffectsModule) as typeof import('../../../src/app/models/tech/technology-effects.js');
 const { ShipyardQueueEntry } = resolveModule(shipyardQueueEntryModule) as typeof import('../../../src/app/models/fleets/shipyard-queue-entry.js');
 const { TechnologyQueueEntry } = resolveModule(technologyQueueEntryModule) as typeof import('../../../src/app/models/tech/technology-queue-entry.js');
-const { countPlanetaryBombs, isPlanetaryBombDefenceType } = resolveModule(planetaryBombModule) as typeof import('../../../src/app/models/defences/planetary-bomb.js');
+const {
+  countPlanetaryBombs,
+  totalPlanetaryBombSize,
+  isPlanetaryBombDefenceType
+} = resolveModule(planetaryBombModule) as typeof import('../../../src/app/models/defences/planetary-bomb.js');
 
 export const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
 export const DEFENCE_BLUEPRINTS = DefenceBlueprintsFactory.fromDefaultJson();
@@ -597,5 +601,6 @@ export {
   ShipyardQueueEntry,
   TechnologyQueueEntry,
   countPlanetaryBombs,
+  totalPlanetaryBombSize,
   isPlanetaryBombDefenceType
 };
