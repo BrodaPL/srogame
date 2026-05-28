@@ -48,6 +48,7 @@ import {
   fleetTravelWorstShipModifier,
   maxActiveFleets
 } from '../../models/tech/technology-effects';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
@@ -122,7 +123,7 @@ const MISSION_REGISTRY = FleetMissionRegistry.createDefault();
 
 @Component({
   selector: 'app-mission-planner-view',
-  imports: [FormsModule, TopMenuComponent, MiniPlanetPreviewComponent],
+  imports: [FormsModule, TopMenuComponent, MiniPlanetPreviewComponent, TooltipDirective],
   templateUrl: './mission-planner-view.component.html'
 })
 export class MissionPlannerViewComponent implements OnInit {

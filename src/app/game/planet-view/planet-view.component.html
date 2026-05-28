@@ -116,7 +116,7 @@
           <button
             type="button"
             class="planet-view__coordinates-button"
-            [attr.title]="'Copy: ' + coordinatesLabel"
+            [appTooltip]="'Copy: ' + coordinatesLabel"
             (click)="copyCoordinates()"
           >
             {{ coordinatesLabel }}
@@ -127,7 +127,7 @@
           type="button"
           class="planet-view__trade-port-button"
           [disabled]="!hasTradePort()"
-          [attr.title]="hasTradePort() ? 'Open local Trade Port offers.' : 'Build Interstellar Trade Port to unlock trade offers.'"
+          [appTooltip]="hasTradePort() ? 'Open local Trade Port offers.' : 'Build Interstellar Trade Port to unlock trade offers.'"
           (click)="openTradePortDialog()"
         >
           Trade Port
@@ -156,7 +156,7 @@
           type="button"
           class="planet-tabs__tab"
           [class.planet-tabs__tab--active]="isActiveTab('queues')"
-          [attr.title]="queueTabTitle()"
+          [appTooltip]="queueTabTitle()"
           (click)="setTab('queues')"
         >
           {{ queueTabLabel() }}
@@ -274,7 +274,7 @@
                   type="button"
                   class="planet-building-card__action"
                   [disabled]="!canBuildBuilding(building)"
-                  [attr.title]="buildingBuildTitle(building)"
+                  [appTooltip]="buildingBuildTitle(building)"
                   (click)="onBuildBuilding(building)"
                 >
                   {{ buildingBuildLabel(building) }}
@@ -397,7 +397,7 @@
                   type="button"
                   class="planet-building-card__action"
                   [disabled]="!canBuildBuilding(building)"
-                  [attr.title]="buildingBuildTitle(building)"
+                  [appTooltip]="buildingBuildTitle(building)"
                   (click)="onBuildBuilding(building)"
                 >
                   {{ buildingBuildLabel(building) }}
@@ -421,7 +421,7 @@
                   [class.planet-ships-status__card--yellow]="planetShipDamageTone() === 'yellow'"
                   [class.planet-ships-status__card--orange]="planetShipDamageTone() === 'orange'"
                   [class.planet-ships-status__card--red]="planetShipDamageTone() === 'red'"
-                  [attr.title]="planetUndamagedShipsTooltip()"
+                  [appTooltip]="planetUndamagedShipsTooltip()"
                 >
                   <span class="planet-ships-status__label">Undamaged ships:</span>
                   <strong class="planet-ships-status__value">{{ planetUndamagedShipsPercent() }}%</strong>
@@ -432,7 +432,7 @@
                   [class.planet-ships-status__card--yellow]="planetShipDamageTone() === 'yellow'"
                   [class.planet-ships-status__card--orange]="planetShipDamageTone() === 'orange'"
                   [class.planet-ships-status__card--red]="planetShipDamageTone() === 'red'"
-                  [attr.title]="planetDamagedShipsTooltip()"
+                  [appTooltip]="planetDamagedShipsTooltip()"
                 >
                   <span class="planet-ships-status__label">Damaged ships:</span>
                   <strong class="planet-ships-status__value">{{ planetDamagedShipsPercent() }}%</strong>
@@ -556,7 +556,7 @@
                     type="button"
                     class="planet-building-card__action"
                     [disabled]="!canBuildShip(ship)"
-                    [attr.title]="shipBuildTitle(ship)"
+                    [appTooltip]="shipBuildTitle(ship)"
                     (click)="onBuildShip(ship)"
                   >
                     {{ shipBuildLabel(ship) }}
@@ -584,7 +584,7 @@
                   [class.planet-ships-status__card--yellow]="planetDefenceDamageTone() === 'yellow'"
                   [class.planet-ships-status__card--orange]="planetDefenceDamageTone() === 'orange'"
                   [class.planet-ships-status__card--red]="planetDefenceDamageTone() === 'red'"
-                  [attr.title]="planetUndamagedDefencesTooltip()"
+                  [appTooltip]="planetUndamagedDefencesTooltip()"
                 >
                   <span class="planet-ships-status__label">Undamaged defences:</span>
                   <strong class="planet-ships-status__value">{{ planetUndamagedDefencesPercent() }}%</strong>
@@ -596,7 +596,7 @@
                   [class.planet-ships-status__card--yellow]="planetDefenceDamageTone() === 'yellow'"
                   [class.planet-ships-status__card--orange]="planetDefenceDamageTone() === 'orange'"
                   [class.planet-ships-status__card--red]="planetDefenceDamageTone() === 'red'"
-                  [attr.title]="planetDamagedDefencesTooltip()"
+                  [appTooltip]="planetDamagedDefencesTooltip()"
                 >
                   <span class="planet-ships-status__label">Damaged defences:</span>
                   <strong class="planet-ships-status__value">{{ planetDamagedDefencesPercent() }}%</strong>
@@ -730,7 +730,7 @@
                     type="button"
                     class="planet-building-card__action"
                     [disabled]="!canBuildDefence(defence)"
-                    [attr.title]="defenceBuildTitle(defence)"
+                    [appTooltip]="defenceBuildTitle(defence)"
                     (click)="onBuildDefence(defence)"
                   >
                     {{ defenceBuildLabel(defence) }}
@@ -802,7 +802,7 @@
                             type="button"
                             class="queue-management__cancel-button"
                             [disabled]="isBuildingQueueInteractionDisabled()"
-                            [attr.title]="buildingQueueCancelTitle(queuedBuilding)"
+                            [appTooltip]="buildingQueueCancelTitle(queuedBuilding)"
                             (click)="onCancelBuildingQueue(queuedBuilding)"
                           >
                             Cancel
@@ -874,7 +874,7 @@
                             type="button"
                             class="queue-management__cancel-button"
                             [disabled]="isShipyardQueueInteractionDisabled()"
-                            [attr.title]="shipyardQueueCancelTitle(queueRow)"
+                            [appTooltip]="shipyardQueueCancelTitle(queueRow)"
                             (click)="onCancelShipyardQueue(queueRow)"
                           >
                             Cancel
@@ -993,7 +993,7 @@
                 type="button"
                 class="planet-view__trade-port-action"
                 [disabled]="!canUseTradePortOffer(offer)"
-                [attr.title]="tradePortOfferActionTitle(offer)"
+                [appTooltip]="tradePortOfferActionTitle(offer)"
                 (click)="useTradePortOffer(offer)"
               >
                 {{ offer.used ? 'Used' : tradePortActionOfferId === offer.offerId ? 'Trading...' : 'Use offer' }}

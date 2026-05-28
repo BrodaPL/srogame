@@ -32,6 +32,7 @@ import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-plane
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
 import { PlanetObjectDialogComponent } from '../planet-view/planet-object-dialog.component';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import type {
   PlanetObjectDetailDialogData,
   PlanetObjectDetailRow,
@@ -83,7 +84,7 @@ type ResearchQueueRowVm = {
 
 @Component({
   selector: 'app-researches-view',
-  imports: [TopMenuComponent, MiniPlanetPreviewComponent, FormsModule, PlanetObjectDialogComponent],
+  imports: [TopMenuComponent, MiniPlanetPreviewComponent, FormsModule, PlanetObjectDialogComponent, TooltipDirective],
   templateUrl: './researches-view.component.html'
 })
 export class ResearchesViewComponent implements OnInit {

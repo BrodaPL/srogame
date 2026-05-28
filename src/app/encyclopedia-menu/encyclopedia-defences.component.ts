@@ -6,10 +6,11 @@ import { DefenceBlueprintsFactory } from '../factories/defence-blueprints.factor
 import { Defence } from '../models/defences/defence';
 import { HullClass } from '../models/enums/hull-class';
 import { toRawImagePath } from './encyclopedia-image-paths';
+import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 
 @Component({
   selector: 'app-encyclopedia-defences',
-  imports: [NgFor, NgIf, RouterLink, EncyclopediaImageDialogComponent],
+  imports: [NgFor, NgIf, RouterLink, EncyclopediaImageDialogComponent, TooltipDirective],
   templateUrl: './encyclopedia-defences.component.html'
 })
 export class EncyclopediaDefencesComponent {

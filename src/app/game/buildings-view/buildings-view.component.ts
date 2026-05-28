@@ -42,6 +42,7 @@ import {
   ResourcesComponent,
   ResourceTitleLink
 } from '../ui/resources/resources.component';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 
 type BuildingsMode = 'r' | 'f';
@@ -83,7 +84,8 @@ type BuildingQueueRowVm = {
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
-    PlanetObjectDialogComponent
+    PlanetObjectDialogComponent,
+    TooltipDirective
   ],
   templateUrl: './buildings-view.component.html',
   styleUrl: './buildings-view.component.css'

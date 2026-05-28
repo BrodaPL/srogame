@@ -6,10 +6,11 @@ import { ShipBlueprintsFactory } from '../factories/ship-blueprints.factory';
 import { ShipPurpose } from '../models/enums/ship-purpose';
 import { Ship } from '../models/fleets/ship';
 import { toRawImagePath } from './encyclopedia-image-paths';
+import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 
 @Component({
   selector: 'app-encyclopedia-ships',
-  imports: [NgFor, NgIf, RouterLink, EncyclopediaImageDialogComponent],
+  imports: [NgFor, NgIf, RouterLink, EncyclopediaImageDialogComponent, TooltipDirective],
   templateUrl: './encyclopedia-ships.component.html'
 })
 export class EncyclopediaShipsComponent {

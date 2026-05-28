@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { AuthStateService } from '../core/auth-state.service';
+import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 import { NAMES_LIST } from '../models/enums/names-list';
 import { GameType } from '../models/enums/game-type';
 import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
@@ -54,7 +55,7 @@ type GalaxySetupForm = {
 
 @Component({
   selector: 'app-galaxy-setup',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, TooltipDirective],
   templateUrl: './galaxy.setup.component.html'
 })
 export class GalaxySetupComponent {

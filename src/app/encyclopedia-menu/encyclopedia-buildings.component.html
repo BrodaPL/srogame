@@ -16,7 +16,7 @@
         <button
           type="button"
           class="ship-media ship-media-button"
-          [attr.title]="'Open large image for ' + building.type"
+          [appTooltip]="'Open large image for ' + building.type"
           (click)="openImageDialog(building)">
           <img
             class="building-image"

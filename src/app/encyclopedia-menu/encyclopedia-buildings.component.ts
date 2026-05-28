@@ -5,10 +5,11 @@ import { EncyclopediaImageDialogComponent } from './encyclopedia-image-dialog.co
 import { BuildingBlueprintsFactory } from '../factories/building-blueprints.factory';
 import { Building } from '../models/buildings/building';
 import { toRawImagePath } from './encyclopedia-image-paths';
+import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 
 @Component({
   selector: 'app-encyclopedia-buildings',
-  imports: [NgFor, NgIf, RouterLink, EncyclopediaImageDialogComponent],
+  imports: [NgFor, NgIf, RouterLink, EncyclopediaImageDialogComponent, TooltipDirective],
   templateUrl: './encyclopedia-buildings.component.html'
 })
 export class EncyclopediaBuildingsComponent {

@@ -100,7 +100,7 @@
                           type="button"
                           class="queue-management__cancel-button"
                           [disabled]="isBuildingQueueInteractionDisabled()"
-                          [attr.title]="buildingQueueCancelTitle(queueRow)"
+                          [appTooltip]="buildingQueueCancelTitle(queueRow)"
                           (click)="onCancelBuildingQueue(queueRow)"
                         >
                           Cancel
@@ -169,7 +169,7 @@
                   @if (unmetRequirementsLabel(building); as unmetLabel) {
                     <span
                       class="game-dashboard__req-warning"
-                      [attr.title]="unmetRequirementsTooltip(building)"
+                      [appTooltip]="unmetRequirementsTooltip(building) ?? ''"
                     >
                       {{ unmetLabel }}
                     </span>
@@ -183,7 +183,7 @@
                     type="button"
                     class="game-dashboard__action-button"
                     [disabled]="!canBuildBuilding(building)"
-                    [attr.title]="buildingBuildTitle(building)"
+                    [appTooltip]="buildingBuildTitle(building)"
                     (click)="onBuildBuilding(building)"
                   >
                     {{ buildingBuildLabel(building) }}

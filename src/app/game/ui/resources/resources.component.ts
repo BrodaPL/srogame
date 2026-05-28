@@ -1,5 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TooltipDirective } from '../../../shared/tooltip/tooltip.directive';
 
 export type ResourceDisplay = {
   current?: number | null;
@@ -42,7 +43,7 @@ export type ResourceTitleLink = {
 
 @Component({
   selector: 'app-resources',
-  imports: [RouterLink],
+  imports: [RouterLink, TooltipDirective],
   templateUrl: './resources.component.html'
 })
 export class ResourcesComponent {

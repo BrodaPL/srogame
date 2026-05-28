@@ -113,7 +113,7 @@
                   [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
                   [class.galaxy-cell--with-note]="cell.noteBorderColor"
                   [style.--note-border-color]="cell.noteBorderColor"
-                  [attr.title]="cell.tooltip"
+                  [appTooltip]="cell.tooltip"
                   (click)="onCellClick(cell)"
                 >
                   @if (cell.valueLabel) {
@@ -166,7 +166,7 @@
           type="button"
           class="star-system-preview__button"
           [disabled]="!canOpenSpySolarSystemDialog()"
-          [attr.title]="spySolarSystemButtonTitle()"
+          [appTooltip]="spySolarSystemButtonTitle()"
           (click)="openSpySolarSystemDialog()"
         >
           Spy solar system

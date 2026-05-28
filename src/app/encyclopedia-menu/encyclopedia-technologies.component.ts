@@ -5,10 +5,11 @@ import { EncyclopediaImageDialogComponent } from './encyclopedia-image-dialog.co
 import { TechnologyBlueprintsFactory } from '../factories/technology-blueprints.factory';
 import { Technology } from '../models/tech/technology';
 import { toRawImagePath } from './encyclopedia-image-paths';
+import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 
 @Component({
   selector: 'app-encyclopedia-technologies',
-  imports: [NgFor, NgIf, RouterLink, EncyclopediaImageDialogComponent],
+  imports: [NgFor, NgIf, RouterLink, EncyclopediaImageDialogComponent, TooltipDirective],
   templateUrl: './encyclopedia-technologies.component.html'
 })
 export class EncyclopediaTechnologiesComponent {

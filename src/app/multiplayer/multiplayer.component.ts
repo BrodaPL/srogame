@@ -5,6 +5,7 @@ import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
+import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 import { GameType } from '../models/enums/game-type';
 import {
   STARTING_HOMEWORLD_PRESET_TOOLTIPS,
@@ -60,7 +61,7 @@ type LobbySetupForm = {
 
 @Component({
   selector: 'app-multiplayer',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, TooltipDirective],
   templateUrl: './multiplayer.component.html',
   styleUrl: './multiplayer.component.css'
 })

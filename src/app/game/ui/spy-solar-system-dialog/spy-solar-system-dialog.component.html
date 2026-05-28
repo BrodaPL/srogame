@@ -54,7 +54,7 @@
             </article>
           </div>
           @if (targetPlanets.length > 0) {
-            <p class="overview-muted" [attr.title]="targetListLabel()">
+            <p class="overview-muted" [appTooltip]="targetListLabel()">
               Targets: {{ targetListLabel() }}
             </p>
           }

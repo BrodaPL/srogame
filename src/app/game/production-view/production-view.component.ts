@@ -50,6 +50,7 @@ import {
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
 import { PlanetObjectDialogComponent } from '../planet-view/planet-object-dialog.component';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import type {
   PlanetObjectDetailDialogData,
   PlanetObjectDetailRow,
@@ -84,7 +85,8 @@ type ShipyardQueueRowVm = {
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
-    PlanetObjectDialogComponent
+    PlanetObjectDialogComponent,
+    TooltipDirective
   ],
   templateUrl: './production-view.component.html',
   styleUrl: './production-view.component.css'

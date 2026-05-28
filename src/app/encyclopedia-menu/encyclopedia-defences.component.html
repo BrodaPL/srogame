@@ -16,7 +16,7 @@
         <button
           type="button"
           class="ship-media ship-media-button"
-          [attr.title]="'Open large image for ' + defence.getName()"
+          [appTooltip]="'Open large image for ' + defence.getName()"
           (click)="openImageDialog(defence)">
           <img
             class="ship-image"

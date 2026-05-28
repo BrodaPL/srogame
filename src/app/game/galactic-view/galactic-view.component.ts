@@ -28,6 +28,7 @@ import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-plane
 import { NoteBorderColor } from '../../models/enums/note-border-color';
 import { PlanetType } from '../../models/enums/planet-type';
 import { TutorialService } from '../../tutorial/tutorial.service';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import { SpySolarSystemDialogComponent } from '../ui/spy-solar-system-dialog/spy-solar-system-dialog.component';
 
 type CellFillKind =
@@ -83,7 +84,7 @@ type ReloadGalaxyPresentationOptions = {
 
 @Component({
   selector: 'app-galactic-view',
-  imports: [TopMenuComponent, MiniPlanetPreviewComponent, SpySolarSystemDialogComponent, FormsModule],
+  imports: [TopMenuComponent, MiniPlanetPreviewComponent, SpySolarSystemDialogComponent, FormsModule, TooltipDirective],
   templateUrl: './galactic-view.component.html',
   styleUrl: './galactic-view.styles.css'
 })

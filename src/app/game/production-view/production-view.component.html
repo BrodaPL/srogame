@@ -110,7 +110,7 @@
                             type="button"
                             class="queue-management__cancel-button"
                             [disabled]="isShipyardQueueInteractionDisabled()"
-                            [attr.title]="shipyardQueueCancelTitle(queueRow)"
+                            [appTooltip]="shipyardQueueCancelTitle(queueRow)"
                             (click)="onCancelShipyardQueue(queueRow)"
                           >
                             Cancel
@@ -221,7 +221,7 @@
 
                   <div class="production-view__ship-req">
                     @if (unmetRequirementsLabel(ship); as unmetLabel) {
-                      <span class="game-dashboard__req-warning" [attr.title]="unmetRequirementsTooltip(ship)">
+                      <span class="game-dashboard__req-warning" [appTooltip]="unmetRequirementsTooltip(ship) ?? ''">
                         {{ unmetLabel }}
                       </span>
                     } @else {
@@ -246,7 +246,7 @@
                       type="button"
                       class="game-dashboard__action-button"
                       [disabled]="!canBuildShip(ship)"
-                      [attr.title]="shipBuildTitle(ship)"
+                      [appTooltip]="shipBuildTitle(ship)"
                       (click)="onBuildShip(ship)"
                     >
                       {{ shipBuildLabel(ship) }}
@@ -340,7 +340,7 @@
 
                   <div class="production-view__ship-req">
                     @if (unmetDefenceRequirementsLabel(defence); as unmetLabel) {
-                      <span class="game-dashboard__req-warning" [attr.title]="unmetDefenceRequirementsTooltip(defence)">
+                      <span class="game-dashboard__req-warning" [appTooltip]="unmetDefenceRequirementsTooltip(defence) ?? ''">
                         {{ unmetLabel }}
                       </span>
                     } @else {
@@ -365,7 +365,7 @@
                       type="button"
                       class="game-dashboard__action-button"
                       [disabled]="!canBuildDefence(defence)"
-                      [attr.title]="defenceBuildTitle(defence)"
+                      [appTooltip]="defenceBuildTitle(defence)"
                       (click)="onBuildDefence(defence)"
                     >
                       {{ defenceBuildLabel(defence) }}

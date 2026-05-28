@@ -7,7 +7,7 @@
           class="resources-bar__title-link"
           [routerLink]="titleLink.routerLink"
           [queryParams]="titleLink.queryParams ?? null"
-          [attr.title]="titleLink.title ?? null"
+          [appTooltip]="titleLink.title ?? ''"
         >
           {{ titleLink.label }}
         </a>
@@ -23,7 +23,7 @@
             class="resources-bar__indicator-link"
             [routerLink]="'/game/planet'"
             [queryParams]="indicator.queryParams"
-            [attr.title]="indicator.title ?? null"
+            [appTooltip]="indicator.title ?? ''"
           >
             <span
               class="resources-bar__indicator"
@@ -104,7 +104,7 @@
         <span class="resource__sub-value">{{ income }}</span>
       }
     </div>
-    <div class="resource" [attr.title]="energyTooltip">
+    <div class="resource" [appTooltip]="energyTooltip ?? ''">
       <img class="resource__icon resource__icon--compact" [src]="resourceIcons.energy" alt="" aria-hidden="true" />
       <span class="resource__label">Energy</span>
       <span

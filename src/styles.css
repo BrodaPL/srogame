@@ -43,13 +43,10 @@ app-root {
   line-height: 1.25;
   pointer-events: none;
   opacity: 0;
-  transform: translateY(2px);
-  transition: opacity 80ms ease, transform 80ms ease;
 }
 
 .app-tooltip--visible {
   opacity: 1;
-  transform: translateY(0);
 }
 
 .page {

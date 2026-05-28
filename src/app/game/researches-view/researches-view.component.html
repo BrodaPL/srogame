@@ -118,7 +118,7 @@
             <button
               type="button"
               class="research-tech-card__image-button"
-              [attr.title]="'Open details for ' + technology.type"
+              [appTooltip]="'Open details for ' + technology.type"
               (click)="openTechnologyDetails(technology)">
               <img class="research-tech-card__image" [src]="technology.imagePath" [alt]="technology.type + ' image'" />
             </button>
@@ -194,7 +194,7 @@
                 class="research-tech-card__action"
                 [class.research-tech-card__action--ready]="canStartResearch(technology)"
                 [disabled]="!canStartResearch(technology)"
-                [attr.title]="researchButtonTitle(technology)"
+                [appTooltip]="researchButtonTitle(technology)"
                 (click)="onStartResearch(technology)"
               >
                 {{ researchButtonLabel(technology) }}

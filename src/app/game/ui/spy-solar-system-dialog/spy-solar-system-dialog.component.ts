@@ -11,6 +11,7 @@ import { TechnologyType } from '../../../models/enums/technology-type';
 import type { ClientCoordinates, ClientPlanetDto, ClientStarSystemDto, CreateStarSystemSpyRequest } from '../../../models/game-api-types';
 import { ManyShips } from '../../../models/fleets/many-ships';
 import { maxActiveFleets } from '../../../models/tech/technology-effects';
+import { TooltipDirective } from '../../../shared/tooltip/tooltip.directive';
 
 type SpySystemOriginVm = {
   planet: ClientPlanetDto;
@@ -25,7 +26,7 @@ type SpySystemOriginVm = {
 
 @Component({
   selector: 'app-spy-solar-system-dialog',
-  imports: [FormsModule],
+  imports: [FormsModule, TooltipDirective],
   templateUrl: './spy-solar-system-dialog.component.html',
   styleUrl: './spy-solar-system-dialog.component.css'
 })

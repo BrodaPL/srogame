@@ -536,14 +536,14 @@
                       <label
                         class="checkbox-field"
                         for="lobby-startingHomeworldPreset-{{ preset }}"
-                        [attr.title]="startingHomeworldPresetTooltips[preset]">
+                        [appTooltip]="startingHomeworldPresetTooltips[preset]">
                         <input
                           id="lobby-startingHomeworldPreset-{{ preset }}"
                           name="lobby-startingHomeworldPreset"
                           type="radio"
                           [value]="preset"
                           [(ngModel)]="setupForm.startingHomeworldPreset"
-                          [attr.title]="startingHomeworldPresetTooltips[preset]" />
+                          [appTooltip]="startingHomeworldPresetTooltips[preset]" />
                         <span>{{ preset }}</span>
                       </label>
                     }

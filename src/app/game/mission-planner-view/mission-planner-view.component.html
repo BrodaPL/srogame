@@ -237,11 +237,11 @@
                   <span class="overview-stat__label">Distance</span>
                   <span class="overview-stat__value">{{ distancePreview() }}</span>
                 </div>
-                <div class="overview-stat" [attr.title]="travelFormulaTooltipLabel()">
+                <div class="overview-stat" [appTooltip]="travelFormulaTooltipLabel()">
                   <span class="overview-stat__label">ETA</span>
                   <span class="overview-stat__value">{{ travelTurnsPreview() }}</span>
                 </div>
-                <div class="overview-stat" [attr.title]="travelFormulaTooltipLabel()">
+                <div class="overview-stat" [appTooltip]="travelFormulaTooltipLabel()">
                   <span class="overview-stat__label">Return ETA</span>
                   <span class="overview-stat__value">{{ travelTurnsPreview() }}</span>
                 </div>

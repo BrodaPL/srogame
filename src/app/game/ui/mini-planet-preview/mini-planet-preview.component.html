@@ -24,7 +24,7 @@
 
   <div class="mini-planet-preview__tags">
     @for (tag of tags; track tag.label) {
-      <span class="mini-planet-preview__tag" [attr.title]="tag.tooltip">
+      <span class="mini-planet-preview__tag" [appTooltip]="tag.tooltip">
         {{ tag.label }}
       </span>
     }
@@ -49,7 +49,7 @@
       <button
         type="button"
         class="mini-planet-preview__button"
-        [attr.title]="'Copy: ' + coordinatesLabel()"
+        [appTooltip]="'Copy: ' + coordinatesLabel()"
         (click)="copyCoordinates()"
       >
         Copy coordinates
@@ -61,7 +61,7 @@
         type="button"
         class="mini-planet-preview__button mini-planet-preview__button--intel"
         [disabled]="!canViewPlanet()"
-        [attr.title]="canViewPlanet() ? 'Open planet intel view' : 'Planet intel is unavailable'"
+        [appTooltip]="canViewPlanet() ? 'Open planet intel view' : 'Planet intel is unavailable'"
         (click)="openPlanetView()"
       >
         View Planet
@@ -70,7 +70,7 @@
         type="button"
         class="mini-planet-preview__button mini-planet-preview__button--mission"
         [disabled]="!canUseAsMissionOrigin()"
-        [attr.title]="canUseAsMissionOrigin() ? 'Open Mission Planner with origin ' + coordinatesLabel() : 'Only owned planets can be used as mission origin here'"
+        [appTooltip]="canUseAsMissionOrigin() ? 'Open Mission Planner with origin ' + coordinatesLabel() : 'Only owned planets can be used as mission origin here'"
         (click)="openMissionPlannerAsOrigin()"
       >
         Mission: origin
@@ -78,7 +78,7 @@
       <button
         type="button"
         class="mini-planet-preview__button mini-planet-preview__button--mission"
-        [attr.title]="'Open Mission Planner with target ' + coordinatesLabel()"
+        [appTooltip]="'Open Mission Planner with target ' + coordinatesLabel()"
         (click)="openMissionPlannerAsTarget()"
       >
         Mission: target
@@ -87,7 +87,7 @@
         <button
           type="button"
           class="mini-planet-preview__button mini-planet-preview__button--spy"
-          [attr.title]="'Launch espionage probes at ' + coordinatesLabel()"
+          [appTooltip]="'Launch espionage probes at ' + coordinatesLabel()"
           (click)="openSpyDialog()"
         >
           Spy
@@ -96,7 +96,7 @@
       <button
         type="button"
         class="mini-planet-preview__button mini-planet-preview__button--utility"
-        [attr.title]="'Copy: ' + coordinatesLabel()"
+        [appTooltip]="'Copy: ' + coordinatesLabel()"
         (click)="copyCoordinates()"
       >
         Copy coordinates

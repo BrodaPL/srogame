@@ -4,6 +4,7 @@ import type { ClientPlanetDto, ClientReportDataDto } from '../../../models/game-
 import { PlayerType } from '../../../models/enums/player-type';
 import { PlanetImageHelper } from '../../../models/planets/planet-image-helper';
 import { planetImageVariantToStyle } from '../../../models/planets/planet-image-variant';
+import { TooltipDirective } from '../../../shared/tooltip/tooltip.directive';
 import { SpyLaunchDialogComponent } from '../spy-launch-dialog/spy-launch-dialog.component';
 
 type MiniPlanetTagVm = {
@@ -13,7 +14,7 @@ type MiniPlanetTagVm = {
 
 @Component({
   selector: 'app-mini-planet-preview',
-  imports: [SpyLaunchDialogComponent],
+  imports: [SpyLaunchDialogComponent, TooltipDirective],
   templateUrl: './mini-planet-preview.component.html'
 })
 export class MiniPlanetPreviewComponent implements OnChanges {
