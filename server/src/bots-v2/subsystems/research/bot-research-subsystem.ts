@@ -27,6 +27,20 @@ type ResearchCandidate = {
   adaptiveColonizationBias: number;
 };
 
+type ResearchEvaluation = {
+  bestCandidate: ResearchCandidate | null;
+  bestConcentrationCandidate: ResearchCandidate | null;
+  availableTechnologyCount: number;
+  blockedByBuildingRequirementsCount: number;
+  blockedByTechRequirementsCount: number;
+  candidatePairCount: number;
+  concentrationCandidateCount: number;
+  adaptiveColonizationPressure: {
+    active: boolean;
+    blockedCandidateCount: number;
+  };
+};
+
 const MIN_AFFORDABILITY_WINDOW_TURNS = 5;
 const ADAPTIVE_COLONIZATION_PRIORITY_BONUS = 1;
 
@@ -85,7 +99,9 @@ export class BotResearchSubsystem implements BotSubsystem {
 
     const proposal = evaluation.bestCandidate
       ? createResearchProposal(context, evaluation.bestCandidate, affordabilityWindowTurns, widenedThisTurn)
-      : null;
+      : evaluation.bestConcentrationCandidate
+        ? createResearchConcentrationSignal(context, evaluation.bestConcentrationCandidate, affordabilityWindowTurns)
+        : null;
 
     // TODO: future phase can reevaluate and reassign helper labs for already running researches.
     return {
@@ -102,6 +118,7 @@ export class BotResearchSubsystem implements BotSubsystem {
         blockedByBuildingRequirementsCount: evaluation.blockedByBuildingRequirementsCount,
         blockedByTechRequirementsCount: evaluation.blockedByTechRequirementsCount,
         candidatePairCount: evaluation.candidatePairCount,
+        concentrationCandidateCount: evaluation.concentrationCandidateCount,
         adaptiveColonizationPressureActive: evaluation.adaptiveColonizationPressure.active,
         adaptiveColonizationBlockedCandidateCount: evaluation.adaptiveColonizationPressure.blockedCandidateCount,
         selectedTechnologyType: evaluation.bestCandidate?.technology.type ?? null,
@@ -124,22 +141,14 @@ function evaluateBestResearchCandidate(input: {
     active: boolean;
     blockedCandidateCount: number;
   };
-}): {
-  bestCandidate: ResearchCandidate | null;
-  availableTechnologyCount: number;
-  blockedByBuildingRequirementsCount: number;
-  blockedByTechRequirementsCount: number;
-  candidatePairCount: number;
-  adaptiveColonizationPressure: {
-    active: boolean;
-    blockedCandidateCount: number;
-  };
-} {
+}): ResearchEvaluation {
   let bestCandidate: ResearchCandidate | null = null;
+  let bestConcentrationCandidate: ResearchCandidate | null = null;
   let availableTechnologyCount = 0;
   let blockedByBuildingRequirementsCount = 0;
   let blockedByTechRequirementsCount = 0;
   let candidatePairCount = 0;
+  let concentrationCandidateCount = 0;
 
   for (const technology of input.snapshot.planets.length > 0
     ? inputTechnologies()
@@ -166,10 +175,6 @@ function evaluateBestResearchCandidate(input: {
     for (const mainPlanet of mainCandidates) {
       const cost = normalizeResources(technology.getCostForLevel(nextLevel));
       const affordabilityEta = estimateAffordabilityEta(mainPlanet, cost);
-      if (affordabilityEta > input.affordabilityWindowTurns) {
-        continue;
-      }
-
       const helperPlanets = selectHelperPlanets(
         input.planetsWithLabs,
         mainPlanet,
@@ -195,8 +200,17 @@ function evaluateBestResearchCandidate(input: {
           input.adaptiveColonizationPressure
         )
       };
-      candidatePairCount += 1;
+      if (affordabilityEta > input.affordabilityWindowTurns) {
+        if (isResearchConcentrationCandidate(candidate)) {
+          concentrationCandidateCount += 1;
+          if (!bestConcentrationCandidate || compareCandidates(candidate, bestConcentrationCandidate) < 0) {
+            bestConcentrationCandidate = candidate;
+          }
+        }
+        continue;
+      }
 
+      candidatePairCount += 1;
       if (!bestCandidate || compareCandidates(candidate, bestCandidate) < 0) {
         bestCandidate = candidate;
       }
@@ -205,10 +219,12 @@ function evaluateBestResearchCandidate(input: {
 
   return {
     bestCandidate,
+    bestConcentrationCandidate,
     availableTechnologyCount,
     blockedByBuildingRequirementsCount,
     blockedByTechRequirementsCount,
     candidatePairCount,
+    concentrationCandidateCount,
     adaptiveColonizationPressure: input.adaptiveColonizationPressure
   };
 }
@@ -257,6 +273,71 @@ function createResearchProposal(
       helperCount: helperPlanets.length,
       helperPlanets: helperPlanets.map(toCoordinatesKey).join(',') || 'none'
     }
+  };
+}
+
+function createResearchConcentrationSignal(
+  context: BotSubsystemContext,
+  candidate: ResearchCandidate,
+  affordabilityWindowTurns: number
+): BotProposal {
+  const cost = normalizeResources(candidate.technology.getCostForLevel(candidate.nextLevel));
+  const shortage = resolveResourceShortage(candidate.mainPlanet, cost);
+
+  return {
+    proposalId: `research:concentration:${candidate.technology.type}:${candidate.nextLevel}:${context.snapshot.turn}`,
+    subsystemId: 'RESEARCH',
+    kind: 'NO_OP',
+    status: 'PROPOSED',
+    goalKey: `research:${candidate.technology.type}:${candidate.nextLevel}`,
+    dedupeKey: `research:concentration:${candidate.technology.type}`,
+    summary: `Request resource concentration for ${candidate.technology.type} on ${candidate.mainPlanet.name}.`,
+    planetId: candidate.mainPlanet.planetId,
+    targetCoordinates: { ...candidate.mainPlanet.coordinates },
+    expectedValue: Math.max(1, Math.round((900 / Math.max(1, candidate.estimatedResearchEtc)) * 100)),
+    urgency: 55,
+    risk: 4,
+    confidence: 76,
+    requestedResources: cost,
+    requestPayload: {
+      concentrationSignal: true,
+      targetKind: 'RESEARCH',
+      x: candidate.mainPlanet.coordinates.x,
+      y: candidate.mainPlanet.coordinates.y,
+      z: candidate.mainPlanet.coordinates.z,
+      technologyType: candidate.technology.type,
+      nextLevel: candidate.nextLevel,
+      requiredResources: cost,
+      shortage
+    },
+    blockers: [],
+    expiresOnTurn: context.snapshot.turn + 1,
+    debug: {
+      resourceConcentrationRequest: true,
+      concentrationTargetKind: 'RESEARCH',
+      affordabilityWindowTurns,
+      technologyType: candidate.technology.type,
+      nextLevel: candidate.nextLevel,
+      affordabilityEta: candidate.affordabilityEta,
+      estimatedResearchEtc: candidate.estimatedResearchEtc
+    }
+  };
+}
+
+function isResearchConcentrationCandidate(candidate: ResearchCandidate): boolean {
+  return candidate.affordabilityEta > 8
+    && getTotalResourceAmount(candidate.technology.getCostForLevel(candidate.nextLevel))
+      > getTotalResourceAmount(candidate.mainPlanet.economy.income) * 8;
+}
+
+function resolveResourceShortage(
+  planet: BotPlanetSnapshot,
+  required: ResourceAmounts
+): ResourceAmounts {
+  return {
+    metal: Math.max(0, Math.floor(required.metal - planet.localResources.metal)),
+    crystal: Math.max(0, Math.floor(required.crystal - planet.localResources.crystal)),
+    deuterium: Math.max(0, Math.floor(required.deuterium - planet.localResources.deuterium))
   };
 }
 

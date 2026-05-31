@@ -157,6 +157,63 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     )).toBe(false);
   });
 
+  it('emits resource concentration transport from surplus planets for blocked research', () => {
+    const { galaxy, bot, sourcePlanet, targetPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    configureLowIndustrySupportTarget(targetPlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(250000, 200000, 180000);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 100);
+    targetPlanet.rBDSFTQ.resources = new ResourcesPack(100, 100, 100);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot, [{
+      proposalId: 'research:concentration:test',
+      subsystemId: 'RESEARCH',
+      kind: 'NO_OP',
+      status: 'PROPOSED',
+      goalKey: `research:${TechnologyType.ASTROPHYSICS_TECHNOLOGY}:6`,
+      dedupeKey: `research:concentration:${TechnologyType.ASTROPHYSICS_TECHNOLOGY}`,
+      summary: 'Research concentration marker.',
+      planetId: null,
+      targetCoordinates: {
+        x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+        y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+        z: targetPlanet.basicInfo.order
+      },
+      expectedValue: 1,
+      urgency: 1,
+      risk: 1,
+      confidence: 1,
+      requestedResources: { metal: 10000, crystal: 8000, deuterium: 5000 },
+      requestPayload: {
+        concentrationSignal: true,
+        targetKind: 'RESEARCH',
+        x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+        y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+        z: targetPlanet.basicInfo.order,
+        technologyType: TechnologyType.ASTROPHYSICS_TECHNOLOGY,
+        nextLevel: 6,
+        requiredResources: { metal: 10000, crystal: 8000, deuterium: 5000 }
+      },
+      blockers: [],
+      expiresOnTurn: galaxy.currentTurn + 1,
+      debug: {
+        resourceConcentrationRequest: true,
+        concentrationTargetKind: 'RESEARCH'
+      }
+    }]);
+    const transport = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.TRANSPORT
+      && proposal.debug.resourceConcentrationTransport === true
+    );
+
+    expect(transport).toBeDefined();
+    expect(transport?.budgetAttribution?.intentSubsystemId).toBe('RESEARCH');
+    expect(transport?.requestPayload.origin).toEqual({ x: 0, y: 0, z: 1 });
+    expect(transport?.requestPayload.target).toEqual({ x: 0, y: 0, z: 2 });
+  });
+
   it('does not produce support cargo hulls for a one-planet empire', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureDevelopedSupportSource(planet);

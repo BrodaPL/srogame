@@ -694,6 +694,7 @@ export type BotExecutionOutcome = {
   };
   fuelSpent?: number;
   fleetId?: number;
+  travelTurns?: number;
   fleetSlotsUsed?: number;
   missionType?: FleetMissionType;
   originCoordinates?: { x: number; y: number; z: number };

@@ -1,5 +1,7 @@
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { Player } from '../../../src/app/models/player.ts';
+import type { BuildingType } from '../../../src/app/models/enums/building-type.ts';
+import type { TechnologyType } from '../../../src/app/models/enums/technology-type.ts';
 import * as diplomaticStatusModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
 import * as fleetMissionTypeModule from '../../../src/app/models/enums/fleet-mission-type.js';
 import type { SupportRequestType } from '../../../src/app/models/requests/support-request.ts';
@@ -85,6 +87,7 @@ export class BotBrainV2 {
       : new NoopBotExecutor();
     const executionOutcomes = executor.executeAcceptedTasks(supervisorDecision.accepted);
     recordExecutedSpending(memory, snapshot, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);
+    recordIncomingResourceReservations(memory, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);
     applyRecycleHostilitySideEffects(galaxy, player, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);
     const trace: BotDecisionTraceV2 = {
       playerId: player.playerId,
@@ -156,6 +159,93 @@ export class BotBrainV2 {
     };
     recordBotDecisionTraceV2(trace);
   }
+}
+
+function recordIncomingResourceReservations(
+  memory: ReturnType<typeof ensureBotMemoryV2>,
+  accepted: BotProposal[],
+  outcomes: BotExecutionOutcome[],
+  turn: number
+): void {
+  memory.supervisor.incomingResourceReservations = memory.supervisor.incomingResourceReservations
+    .filter((reservation) => reservation.active && reservation.expiresOnTurn >= turn);
+
+  const proposalById = new Map(accepted.map((proposal) => [proposal.proposalId, proposal]));
+  for (const outcome of outcomes) {
+    if (!outcome.success || !outcome.fleetId || !outcome.originCoordinates || !outcome.targetCoordinates) {
+      continue;
+    }
+
+    const proposal = proposalById.get(outcome.proposalId);
+    if (!proposal || proposal.kind !== 'FLEET_MISSION' || proposal.debug.resourceConcentrationTransport !== true) {
+      continue;
+    }
+
+    const targetKey = typeof proposal.debug.resourceConcentrationTargetKey === 'string'
+      ? proposal.debug.resourceConcentrationTargetKey
+      : null;
+    const targetKind = proposal.debug.resourceConcentrationTargetKind === 'OLD_BUILDING'
+      || proposal.debug.resourceConcentrationTargetKind === 'RESEARCH'
+      ? proposal.debug.resourceConcentrationTargetKind
+      : null;
+    const intentSubsystemId = isBotV2SubsystemId(proposal.debug.budgetIntentSubsystemId)
+      ? proposal.debug.budgetIntentSubsystemId
+      : proposal.budgetAttribution?.intentSubsystemId ?? proposal.subsystemId;
+    if (!targetKey || !targetKind || !isBotV2SubsystemId(intentSubsystemId)) {
+      continue;
+    }
+
+    const resources = normalizeResourcePayload(proposal.requestPayload.cargo);
+    if (resources.metal + resources.crystal + resources.deuterium <= 0) {
+      continue;
+    }
+
+    memory.supervisor.incomingResourceReservations.push({
+      reservationKey: `${targetKey}:${outcome.fleetId}:${turn}`,
+      targetKey,
+      targetKind,
+      intentSubsystemId,
+      fleetId: outcome.fleetId,
+      sourceCoordinates: { ...outcome.originCoordinates },
+      targetCoordinates: { ...outcome.targetCoordinates },
+      buildingType: typeof proposal.debug.resourceConcentrationBuildingType === 'string'
+        ? proposal.debug.resourceConcentrationBuildingType as BuildingType
+        : null,
+      technologyType: typeof proposal.debug.resourceConcentrationTechnologyType === 'string'
+        ? proposal.debug.resourceConcentrationTechnologyType as TechnologyType
+        : null,
+      nextLevel: Math.max(1, Math.floor(Number(proposal.debug.resourceConcentrationNextLevel) || 1)),
+      resources,
+      createdTurn: turn,
+      expiresOnTurn: turn + Math.max(1, Math.floor(outcome.travelTurns ?? 1)) + 2,
+      active: true
+    });
+  }
+
+  memory.supervisor.incomingResourceReservations = memory.supervisor.incomingResourceReservations.slice(-120);
+}
+
+function normalizeResourcePayload(value: unknown): { metal: number; crystal: number; deuterium: number } {
+  const resources = value && typeof value === 'object'
+    ? value as Partial<{ metal: number; crystal: number; deuterium: number }>
+    : {};
+  return {
+    metal: Number.isFinite(resources.metal) ? Math.max(0, Math.floor(resources.metal!)) : 0,
+    crystal: Number.isFinite(resources.crystal) ? Math.max(0, Math.floor(resources.crystal!)) : 0,
+    deuterium: Number.isFinite(resources.deuterium) ? Math.max(0, Math.floor(resources.deuterium!)) : 0
+  };
+}
+
+function isBotV2SubsystemId(value: unknown): value is BotProposal['subsystemId'] {
+  return value === 'ECONOMIC'
+    || value === 'DEFENSIVE'
+    || value === 'WARFARE'
+    || value === 'RESEARCH'
+    || value === 'CRITICAL'
+    || value === 'STRATEGIC_DEVELOPMENT'
+    || value === 'STRATEGIC_MILITARY'
+    || value === 'STRATEGIC_DIPLOMATIC'
+    || value === 'WEIGHT_MANAGER';
 }
 
 function buildEnabledSubsystems(flags: BotV2FeatureFlags): BotSubsystem[] {

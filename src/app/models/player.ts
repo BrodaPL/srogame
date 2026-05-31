@@ -1,5 +1,6 @@
 import { Planet } from './planets/planet';
 import { TechnologyType } from './enums/technology-type';
+import type { BuildingType } from './enums/building-type';
 import { Fleet } from './fleets/fleet';
 import { PlayerType } from './enums/player-type';
 import { PlayerReport } from './reports/player-report';
@@ -245,6 +246,46 @@ export type BotMemoryV2SupervisorFuelSpendingEntry = {
   deuterium: number;
 };
 
+export type BotMemoryV2ResourceConcentrationKind =
+  | 'OLD_BUILDING'
+  | 'RESEARCH';
+
+export type BotMemoryV2SupervisorIncomingResourceReservation = {
+  reservationKey: string;
+  targetKey: string;
+  targetKind: BotMemoryV2ResourceConcentrationKind;
+  intentSubsystemId: BotV2SubsystemId;
+  fleetId: number | null;
+  sourceCoordinates: BotMemoryCoordinates;
+  targetCoordinates: BotMemoryCoordinates;
+  buildingType: BuildingType | null;
+  technologyType: TechnologyType | null;
+  nextLevel: number;
+  resources: BotMemoryResources;
+  createdTurn: number;
+  expiresOnTurn: number;
+  active: boolean;
+};
+
+export type BotMemoryV2StrategicDevelopmentResourceConcentrationTarget = {
+  targetKey: string;
+  targetKind: BotMemoryV2ResourceConcentrationKind;
+  intentSubsystemId: BotV2SubsystemId;
+  targetCoordinates: BotMemoryCoordinates;
+  buildingType: BuildingType | null;
+  technologyType: TechnologyType | null;
+  nextLevel: number;
+  requiredResources: BotMemoryResources;
+  safetyReserve: BotMemoryResources;
+  createdTurn: number;
+  updatedTurn: number;
+  expiresOnTurn: number;
+};
+
+export type BotMemoryV2StrategicDevelopment = {
+  activeResourceConcentrationTarget: BotMemoryV2StrategicDevelopmentResourceConcentrationTarget | null;
+};
+
 export type BotMemoryV2StrategicMilitaryFarmLedgerEntry = {
   coordinates: BotMemoryCoordinates;
   intelPhase: 'UNSCANNED' | 'SPY_SENT' | 'PROBE_REQUIRED' | 'COMBAT_INTEL_READY';
@@ -473,6 +514,7 @@ export type BotMemoryV2Supervisor = {
   proposalHistory: BotMemoryV2SupervisorProposalEntry[];
   fleetSlotHistory: BotMemoryV2SupervisorFleetSlotEntry[];
   fuelSpendingHistory: BotMemoryV2SupervisorFuelSpendingEntry[];
+  incomingResourceReservations: BotMemoryV2SupervisorIncomingResourceReservation[];
 };
 
 export type BotMemoryV2 = {
@@ -488,6 +530,7 @@ export type BotMemoryV2 = {
   acceptedLongTermCommitments: BotMemoryV2LongTermCommitment[];
   critical: BotMemoryV2Critical;
   research: BotMemoryV2Research;
+  strategicDevelopment: BotMemoryV2StrategicDevelopment;
   strategicMilitary: BotMemoryV2StrategicMilitary;
   strategicDiplomatic: BotMemoryV2StrategicDiplomatic;
   weightManager: BotMemoryV2WeightManager;
@@ -737,6 +780,7 @@ export class Player {
       ),
       critical: Player.normalizeBotMemoryV2Critical(memory.critical),
       research: Player.normalizeBotMemoryV2Research(memory.research),
+      strategicDevelopment: Player.normalizeBotMemoryV2StrategicDevelopment(memory.strategicDevelopment),
       strategicMilitary: Player.normalizeBotMemoryV2StrategicMilitary(memory.strategicMilitary),
       strategicDiplomatic: Player.normalizeBotMemoryV2StrategicDiplomatic(memory.strategicDiplomatic),
       weightManager: Player.normalizeBotMemoryV2WeightManager(memory.weightManager),
@@ -1050,6 +1094,51 @@ export class Player {
       lastWindowIncreaseTurn: Number.isInteger(research?.lastWindowIncreaseTurn)
         ? Math.max(0, research!.lastWindowIncreaseTurn!)
         : null
+    };
+  }
+
+  private static normalizeBotMemoryV2StrategicDevelopment(
+    strategicDevelopment: BotMemoryV2StrategicDevelopment | null | undefined
+  ): BotMemoryV2StrategicDevelopment {
+    return {
+      activeResourceConcentrationTarget: Player.normalizeBotMemoryV2ResourceConcentrationTarget(
+        strategicDevelopment?.activeResourceConcentrationTarget
+      )
+    };
+  }
+
+  private static normalizeBotMemoryV2ResourceConcentrationTarget(
+    target: BotMemoryV2StrategicDevelopmentResourceConcentrationTarget | null | undefined
+  ): BotMemoryV2StrategicDevelopmentResourceConcentrationTarget | null {
+    const targetKey = Player.normalizeBotMemoryV2String(target?.targetKey, 200);
+    const targetKind = Player.normalizeBotMemoryV2ResourceConcentrationKind(target?.targetKind);
+    const targetCoordinates = Player.normalizeBotMemoryCoordinates(target?.targetCoordinates);
+    if (
+      !targetKey
+      || !targetKind
+      || !targetCoordinates
+      || !Player.isBotV2SubsystemId(target?.intentSubsystemId)
+      || !Number.isInteger(target?.nextLevel)
+      || !Number.isInteger(target?.createdTurn)
+      || !Number.isInteger(target?.updatedTurn)
+      || !Number.isInteger(target?.expiresOnTurn)
+    ) {
+      return null;
+    }
+
+    return {
+      targetKey,
+      targetKind,
+      intentSubsystemId: target.intentSubsystemId,
+      targetCoordinates,
+      buildingType: Player.normalizeBotMemoryV2BuildingType(target?.buildingType),
+      technologyType: Player.normalizeBotMemoryV2TechnologyType(target?.technologyType),
+      nextLevel: Math.max(1, target.nextLevel),
+      requiredResources: Player.normalizeBotMemoryResources(target?.requiredResources),
+      safetyReserve: Player.normalizeBotMemoryResources(target?.safetyReserve),
+      createdTurn: Math.max(0, target.createdTurn),
+      updatedTurn: Math.max(0, target.updatedTurn),
+      expiresOnTurn: Math.max(0, target.expiresOnTurn)
     };
   }
 
@@ -1558,7 +1647,10 @@ export class Player {
       ),
       proposalHistory: Player.normalizeBotMemoryV2SupervisorProposalHistory(supervisor?.proposalHistory),
       fleetSlotHistory: Player.normalizeBotMemoryV2SupervisorFleetSlotHistory(supervisor?.fleetSlotHistory),
-      fuelSpendingHistory: Player.normalizeBotMemoryV2SupervisorFuelSpendingHistory(supervisor?.fuelSpendingHistory)
+      fuelSpendingHistory: Player.normalizeBotMemoryV2SupervisorFuelSpendingHistory(supervisor?.fuelSpendingHistory),
+      incomingResourceReservations: Player.normalizeBotMemoryV2SupervisorIncomingResourceReservations(
+        supervisor?.incomingResourceReservations
+      )
     };
   }
 
@@ -1799,6 +1891,55 @@ export class Player {
       .slice(-200);
   }
 
+  private static normalizeBotMemoryV2SupervisorIncomingResourceReservations(
+    entries: BotMemoryV2SupervisorIncomingResourceReservation[] | null | undefined
+  ): BotMemoryV2SupervisorIncomingResourceReservation[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const reservationKey = Player.normalizeBotMemoryV2String(entry?.reservationKey, 220);
+        const targetKey = Player.normalizeBotMemoryV2String(entry?.targetKey, 200);
+        const targetKind = Player.normalizeBotMemoryV2ResourceConcentrationKind(entry?.targetKind);
+        const sourceCoordinates = Player.normalizeBotMemoryCoordinates(entry?.sourceCoordinates);
+        const targetCoordinates = Player.normalizeBotMemoryCoordinates(entry?.targetCoordinates);
+        if (
+          !reservationKey
+          || !targetKey
+          || !targetKind
+          || !sourceCoordinates
+          || !targetCoordinates
+          || !Player.isBotV2SubsystemId(entry?.intentSubsystemId)
+          || !Number.isInteger(entry?.nextLevel)
+          || !Number.isInteger(entry?.createdTurn)
+          || !Number.isInteger(entry?.expiresOnTurn)
+        ) {
+          return null;
+        }
+
+        return {
+          reservationKey,
+          targetKey,
+          targetKind,
+          intentSubsystemId: entry.intentSubsystemId,
+          fleetId: Number.isInteger(entry?.fleetId) ? Math.max(0, entry.fleetId!) : null,
+          sourceCoordinates,
+          targetCoordinates,
+          buildingType: Player.normalizeBotMemoryV2BuildingType(entry?.buildingType),
+          technologyType: Player.normalizeBotMemoryV2TechnologyType(entry?.technologyType),
+          nextLevel: Math.max(1, entry.nextLevel),
+          resources: Player.normalizeBotMemoryResources(entry?.resources),
+          createdTurn: Math.max(0, entry.createdTurn),
+          expiresOnTurn: Math.max(0, entry.expiresOnTurn),
+          active: entry?.active !== false
+        };
+      })
+      .filter((entry): entry is BotMemoryV2SupervisorIncomingResourceReservation => entry !== null)
+      .slice(-120);
+  }
+
   private static normalizeBotMemoryV2Record(
     value: Record<string, unknown> | null | undefined
   ): Record<string, unknown> {
@@ -1861,6 +2002,24 @@ export class Player {
       default:
         return 'PLANETARY';
     }
+  }
+
+  private static normalizeBotMemoryV2ResourceConcentrationKind(
+    kind: BotMemoryV2ResourceConcentrationKind | null | undefined
+  ): BotMemoryV2ResourceConcentrationKind | null {
+    return kind === 'OLD_BUILDING' || kind === 'RESEARCH' ? kind : null;
+  }
+
+  private static normalizeBotMemoryV2BuildingType(
+    buildingType: BuildingType | null | undefined
+  ): BuildingType | null {
+    return typeof buildingType === 'string' && buildingType.length > 0 ? buildingType : null;
+  }
+
+  private static normalizeBotMemoryV2TechnologyType(
+    technologyType: TechnologyType | null | undefined
+  ): TechnologyType | null {
+    return typeof technologyType === 'string' && technologyType.length > 0 ? technologyType : null;
   }
 
   private static isBotMemoryV2ProposalKind(

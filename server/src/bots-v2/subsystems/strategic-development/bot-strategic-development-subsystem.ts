@@ -5,6 +5,7 @@ import * as technologyTypeModule from '../../../../../src/app/models/enums/techn
 import * as technologyEffectsModule from '../../../../../src/app/models/tech/technology-effects.js';
 import * as repairDroneProductionModule from '../../../../../src/app/models/turns/repair-drone-production.js';
 import type { Technology } from '../../../../../src/app/models/tech/technology.ts';
+import type { BotV2SubsystemId } from '../../../../../src/app/models/player.ts';
 import type {
   BotPlanetSnapshot,
   BotProposal,
@@ -103,6 +104,14 @@ type FleetMissionImmediateRequest = {
   priorityBand: number;
   sourceDistance: number;
   summaryLabel: string;
+  budgetIntentSubsystemId?: BotV2SubsystemId;
+  resourceConcentration?: {
+    targetKey: string;
+    targetKind: 'OLD_BUILDING' | 'RESEARCH';
+    buildingType: BuildingTypeT | null;
+    technologyType: TechnologyTypeT | null;
+    nextLevel: number;
+  };
 };
 
 type PlanetStrategicDevelopmentEvaluationResult = {
@@ -267,6 +276,10 @@ function createGlobalMissionProposals(
   const requests: FleetMissionImmediateRequest[] = [];
   const requestCap = resolveMissionRequestCap(context);
   const remainingLogisticsCapacity = resolveRemainingLogisticsCapacity(context);
+  const concentrationRequests = remainingLogisticsCapacity > 0
+    ? createResourceConcentrationRequests(context, localResults, remainingLogisticsCapacity)
+    : [];
+  requests.push(...concentrationRequests);
 
   for (const localResult of localResults) {
     const targetPlanet = resolvePlanetByCoordinates(context, localResult.planetResult.targetCoordinates);
@@ -275,14 +288,14 @@ function createGlobalMissionProposals(
     }
 
     const targetNeed = resolveTargetSupportNeed(targetPlanet, localResult);
-    if (remainingLogisticsCapacity > 0 && targetNeed.repairPriorityBand !== null) {
+    if (remainingLogisticsCapacity > concentrationRequests.length && targetNeed.repairPriorityBand !== null) {
       const repairRequest = buildRepairSupportRequest(context, targetPlanet, targetNeed, localResults);
       if (repairRequest) {
         requests.push(repairRequest);
       }
     }
 
-    if (remainingLogisticsCapacity > 0 && getTotalResourceAmount(targetNeed.resourceNeed) > 0) {
+    if (remainingLogisticsCapacity > concentrationRequests.length && getTotalResourceAmount(targetNeed.resourceNeed) > 0) {
       const resourceRequest = buildTargetResourceSupportRequest(context, targetPlanet, targetNeed, localResults);
       if (resourceRequest) {
         requests.push(resourceRequest);
@@ -296,7 +309,7 @@ function createGlobalMissionProposals(
       continue;
     }
 
-    const exportRequests = remainingLogisticsCapacity > 0
+    const exportRequests = remainingLogisticsCapacity > concentrationRequests.length
       ? buildSourceDrivenResourceSupportRequests(context, sourcePlanet, localResults)
       : [];
     requests.push(...exportRequests);
@@ -510,6 +523,222 @@ function buildSourceDrivenResourceSupportRequests(
   }
 
   return requests;
+}
+
+function createResourceConcentrationRequests(
+  context: BotSubsystemContext,
+  localResults: PlanetStrategicDevelopmentEvaluationResult[],
+  remainingLogisticsCapacity: number
+): FleetMissionImmediateRequest[] {
+  const target = resolveResourceConcentrationTarget(context, localResults);
+  context.memory.strategicDevelopment.activeResourceConcentrationTarget = target;
+  if (!target || remainingLogisticsCapacity <= 0) {
+    return [];
+  }
+
+  const targetPlanet = resolvePlanetByCoordinates(context, target.targetCoordinates);
+  if (!targetPlanet) {
+    context.memory.strategicDevelopment.activeResourceConcentrationTarget = null;
+    return [];
+  }
+
+  const incoming = resolveIncomingConcentrationResources(context, target.targetKey);
+  const targetResources = addResources(target.requiredResources, target.safetyReserve);
+  const stillNeeded = subtractResources(targetResources, addResources(targetPlanet.localResources, incoming));
+  if (getTotalResourceAmount(stillNeeded) <= 0) {
+    return [];
+  }
+
+  const sourceLocalCostByKey = buildLocalSelectedCostByPlanetKey(localResults);
+  const reservedCargoByOrigin = collectStrategicMilitaryReservedCargoByOrigin(context.priorProposals ?? []);
+  const requests: FleetMissionImmediateRequest[] = [];
+
+  for (const sourcePlanet of context.snapshot.planets) {
+    if (sameCoordinates(sourcePlanet.coordinates, targetPlanet.coordinates)) {
+      continue;
+    }
+
+    const sourceKey = toCoordinatesKey(sourcePlanet.coordinates);
+    const sourceSurplus = resolveStageAwareSourceSurplus(
+      sourcePlanet,
+      sourceLocalCostByKey.get(sourceKey) ?? emptyResources()
+    );
+    const cargo = minResources(stillNeeded, sourceSurplus);
+    if (getTotalResourceAmount(cargo) <= 0) {
+      continue;
+    }
+
+    const request = createTransportSupportRequest(sourcePlanet, targetPlanet, cargo, {
+      sourceSurplus,
+      reservedCargoShips: reservedCargoByOrigin.get(sourceKey) ?? new Map(),
+      budgetIntentSubsystemId: target.intentSubsystemId,
+      resourceConcentration: {
+        targetKey: target.targetKey,
+        targetKind: target.targetKind,
+        buildingType: target.buildingType,
+        technologyType: target.technologyType,
+        nextLevel: target.nextLevel
+      }
+    });
+    if (!request) {
+      continue;
+    }
+
+    requests.push({
+      ...request,
+      priorityBand: 2,
+      summaryLabel: target.targetKind === 'RESEARCH'
+        ? 'research resource concentration'
+        : 'old-planet building concentration'
+    });
+  }
+
+  return requests
+    .sort(compareMissionSourceScore)
+    .slice(0, Math.min(3, remainingLogisticsCapacity));
+}
+
+function resolveResourceConcentrationTarget(
+  context: BotSubsystemContext,
+  localResults: PlanetStrategicDevelopmentEvaluationResult[]
+): NonNullable<typeof context.memory.strategicDevelopment.activeResourceConcentrationTarget> | null {
+  const current = context.memory.strategicDevelopment.activeResourceConcentrationTarget;
+  if (current && current.expiresOnTurn >= context.snapshot.turn && isResourceConcentrationTargetStillUseful(context, current)) {
+    return {
+      ...current,
+      updatedTurn: context.snapshot.turn
+    };
+  }
+
+  const candidates = [
+    ...buildOldBuildingConcentrationCandidates(context, localResults),
+    ...buildResearchConcentrationCandidates(context)
+  ];
+  if (candidates.length <= 0) {
+    return null;
+  }
+
+  return candidates
+    .sort((left, right) =>
+      resolveResourceConcentrationPriority(right, context) - resolveResourceConcentrationPriority(left, context)
+      || left.targetKey.localeCompare(right.targetKey)
+    )[0] ?? null;
+}
+
+function isResourceConcentrationTargetStillUseful(
+  context: BotSubsystemContext,
+  target: NonNullable<typeof context.memory.strategicDevelopment.activeResourceConcentrationTarget>
+): boolean {
+  const planet = resolvePlanetByCoordinates(context, target.targetCoordinates);
+  if (!planet) {
+    return false;
+  }
+
+  const incoming = resolveIncomingConcentrationResources(context, target.targetKey);
+  const targetResources = addResources(target.requiredResources, target.safetyReserve);
+  return getTotalResourceAmount(subtractResources(targetResources, addResources(planet.localResources, incoming))) > 0;
+}
+
+function buildOldBuildingConcentrationCandidates(
+  context: BotSubsystemContext,
+  localResults: PlanetStrategicDevelopmentEvaluationResult[]
+): NonNullable<typeof context.memory.strategicDevelopment.activeResourceConcentrationTarget>[] {
+  const result: NonNullable<typeof context.memory.strategicDevelopment.activeResourceConcentrationTarget>[] = [];
+  for (const localResult of localResults) {
+    const planet = resolvePlanetByCoordinates(context, localResult.planetResult.targetCoordinates);
+    if (!planet || !isOldPlanet(context, planet)) {
+      continue;
+    }
+
+    for (const goal of localResult.selectedBuildingGoals) {
+      const request = goal.immediateRequest;
+      if (!request || request.kind !== 'BUILDING') {
+        continue;
+      }
+      if (!isExpensiveLocalInvestment(planet, request.cost)) {
+        continue;
+      }
+
+      const requiredResources = normalizeResources(request.cost);
+      result.push({
+        targetKey: `old-building:${toCoordinatesKey(planet.coordinates)}:${request.buildingType}:${request.nextLevel}`,
+        targetKind: 'OLD_BUILDING',
+        intentSubsystemId: 'STRATEGIC_DEVELOPMENT',
+        targetCoordinates: { ...planet.coordinates },
+        buildingType: request.buildingType,
+        technologyType: null,
+        nextLevel: request.nextLevel,
+        requiredResources,
+        safetyReserve: resolveSafetyReserve(planet),
+        createdTurn: context.snapshot.turn,
+        updatedTurn: context.snapshot.turn,
+        expiresOnTurn: context.snapshot.turn + 20
+      });
+    }
+  }
+  return result;
+}
+
+function buildResearchConcentrationCandidates(
+  context: BotSubsystemContext
+): NonNullable<typeof context.memory.strategicDevelopment.activeResourceConcentrationTarget>[] {
+  const result: NonNullable<typeof context.memory.strategicDevelopment.activeResourceConcentrationTarget>[] = [];
+  for (const proposal of context.priorProposals ?? []) {
+    if (
+      proposal.subsystemId !== 'RESEARCH'
+      || proposal.kind !== 'NO_OP'
+      || proposal.debug.resourceConcentrationRequest !== true
+    ) {
+      continue;
+    }
+
+    const targetCoordinates = proposal.targetCoordinates;
+    const technologyType = typeof proposal.requestPayload.technologyType === 'string'
+      ? proposal.requestPayload.technologyType as TechnologyTypeT
+      : null;
+    const nextLevel = Number(proposal.requestPayload.nextLevel);
+    const requiredResources = normalizeResources(
+      proposal.requestPayload.requiredResources as ResourceAmounts | undefined ?? proposal.requestedResources
+    );
+    if (!targetCoordinates || !technologyType || !Number.isInteger(nextLevel) || getTotalResourceAmount(requiredResources) <= 0) {
+      continue;
+    }
+
+    result.push({
+      targetKey: `research:${toCoordinatesKey(targetCoordinates)}:${technologyType}:${nextLevel}`,
+      targetKind: 'RESEARCH',
+      intentSubsystemId: 'RESEARCH',
+      targetCoordinates: { ...targetCoordinates },
+      buildingType: null,
+      technologyType,
+      nextLevel: Math.max(1, nextLevel),
+      requiredResources,
+      safetyReserve: resolveSafetyReserve(resolvePlanetByCoordinates(context, targetCoordinates)),
+      createdTurn: context.snapshot.turn,
+      updatedTurn: context.snapshot.turn,
+      expiresOnTurn: context.snapshot.turn + 20
+    });
+  }
+  return result;
+}
+
+function resolveResourceConcentrationPriority(
+  target: NonNullable<BotSubsystemContext['memory']['strategicDevelopment']['activeResourceConcentrationTarget']>,
+  context: BotSubsystemContext
+): number {
+  const planet = resolvePlanetByCoordinates(context, target.targetCoordinates);
+  const lagBoost = planet ? Math.max(0, resolveHighestAvgIndustry(context) - planet.defense.avgIndustryLevel) * 20 : 0;
+  return getTotalResourceAmount(target.requiredResources) + lagBoost + (target.targetKind === 'RESEARCH' ? 500 : 0);
+}
+
+function resolveIncomingConcentrationResources(context: BotSubsystemContext, targetKey: string): ResourceAmounts {
+  return context.memory.supervisor.incomingResourceReservations
+    .filter((reservation) =>
+      reservation.active
+      && reservation.targetKey === targetKey
+      && reservation.expiresOnTurn >= context.snapshot.turn
+    )
+    .reduce((sum, reservation) => addResources(sum, reservation.resources), emptyResources());
 }
 
 function createIntelScanRequests(
@@ -1874,6 +2103,12 @@ function createFleetMissionProposal(
     risk: request.missionType === FleetMissionType.SPY ? 5 : 11,
     confidence: request.missionType === FleetMissionType.SPY ? 74 : 68,
     requestedResources: { ...request.cargo },
+    budgetAttribution: {
+      scope: 'IMPERIUM',
+      planetKey: toCoordinatesKey(request.targetCoordinates),
+      intentSubsystemId: request.budgetIntentSubsystemId ?? 'STRATEGIC_DEVELOPMENT',
+      executorSubsystemId: 'STRATEGIC_DEVELOPMENT'
+    },
     requestPayload: {
       missionType: request.missionType,
       origin: { ...request.originPlanet.coordinates },
@@ -1897,7 +2132,14 @@ function createFleetMissionProposal(
       sourceDistance: request.sourceDistance,
       repairDroneAmount: request.repairDroneAmount,
       totalRequestedResources,
-      summaryLabel: request.summaryLabel
+      summaryLabel: request.summaryLabel,
+      resourceConcentrationTransport: request.resourceConcentration ? true : null,
+      resourceConcentrationTargetKey: request.resourceConcentration?.targetKey ?? null,
+      resourceConcentrationTargetKind: request.resourceConcentration?.targetKind ?? null,
+      resourceConcentrationBuildingType: request.resourceConcentration?.buildingType ?? null,
+      resourceConcentrationTechnologyType: request.resourceConcentration?.technologyType ?? null,
+      resourceConcentrationNextLevel: request.resourceConcentration?.nextLevel ?? null,
+      budgetIntentSubsystemId: request.budgetIntentSubsystemId ?? null
     }
   };
 }
@@ -1925,6 +2167,8 @@ function mergeFleetMissionRequests(
     if (request.ships.length > existing.ships.length) {
       existing.ships = request.ships.map((ship) => ({ ...ship }));
     }
+    existing.budgetIntentSubsystemId = existing.budgetIntentSubsystemId ?? request.budgetIntentSubsystemId;
+    existing.resourceConcentration = existing.resourceConcentration ?? request.resourceConcentration;
   }
 
   return [...merged.values()];
@@ -1949,15 +2193,26 @@ function compareMissionSourceScore(left: FleetMissionImmediateRequest, right: Fl
 function createTransportSupportRequest(
   originPlanet: BotPlanetSnapshot,
   targetPlanet: BotPlanetSnapshot,
-  targetNeed: ResourceAmounts
+  targetNeed: ResourceAmounts,
+  options: {
+    sourceSurplus?: ResourceAmounts;
+    reservedCargoShips?: Map<ShipTypeT, number>;
+    budgetIntentSubsystemId?: BotV2SubsystemId;
+    resourceConcentration?: FleetMissionImmediateRequest['resourceConcentration'];
+  } = {}
 ): FleetMissionImmediateRequest | null {
-  const sourceSurplus = resolveSourceSurplus(originPlanet);
+  const sourceSurplus = options.sourceSurplus ?? resolveSourceSurplus(originPlanet);
   const transferableResources = minResources(targetNeed, sourceSurplus);
   if (getTotalResourceAmount(transferableResources) <= 0) {
     return null;
   }
 
-  const cargoSelection = selectCargoShips(originPlanet, getTotalResourceAmount(transferableResources));
+  const cargoSelection = selectCargoShips(
+    originPlanet,
+    getTotalResourceAmount(transferableResources),
+    new Set(),
+    options.reservedCargoShips ?? new Map()
+  );
   if (!cargoSelection) {
     return null;
   }
@@ -1972,7 +2227,9 @@ function createTransportSupportRequest(
     repairDroneAmount: 0,
     priorityBand: 4,
     sourceDistance: calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates),
-    summaryLabel: 'resource support'
+    summaryLabel: 'resource support',
+    budgetIntentSubsystemId: options.budgetIntentSubsystemId,
+    resourceConcentration: options.resourceConcentration
   };
 }
 
@@ -2110,6 +2367,146 @@ function resolveSourceSurplus(planet: BotPlanetSnapshot): ResourceAmounts {
   };
 }
 
+function resolveStageAwareSourceSurplus(
+  planet: BotPlanetSnapshot,
+  localSelectedCosts: ResourceAmounts
+): ResourceAmounts {
+  const stage = resolveBudgetStage(planet);
+  const incomeTurns = stage === 'IMMATURE'
+    ? 8
+    : stage === 'DEVELOPING'
+      ? 6
+      : stage === 'DEVELOPED'
+        ? 4
+        : 3;
+  const storageShare = stage === 'IMMATURE'
+    ? 0.5
+    : stage === 'DEVELOPING'
+      ? 0.35
+      : stage === 'DEVELOPED'
+        ? 0.25
+        : 0.2;
+
+  const reserveFloor = {
+    metal: Math.max(planet.economy.income.metal * incomeTurns, Math.floor(planet.economy.storageCapacity.metal * storageShare))
+      + localSelectedCosts.metal,
+    crystal: Math.max(planet.economy.income.crystal * incomeTurns, Math.floor(planet.economy.storageCapacity.crystal * storageShare))
+      + localSelectedCosts.crystal,
+    deuterium: Math.max(planet.economy.income.deuterium * incomeTurns, Math.floor(planet.economy.storageCapacity.deuterium * storageShare))
+      + localSelectedCosts.deuterium
+  };
+
+  return {
+    metal: Math.max(0, Math.floor(planet.localResources.metal - reserveFloor.metal)),
+    crystal: Math.max(0, Math.floor(planet.localResources.crystal - reserveFloor.crystal)),
+    deuterium: Math.max(0, Math.floor(planet.localResources.deuterium - reserveFloor.deuterium))
+  };
+}
+
+function resolveBudgetStage(planet: BotPlanetSnapshot): 'IMMATURE' | 'DEVELOPING' | 'DEVELOPED' | 'OLD' {
+  if (planet.defense.avgIndustryLevel >= 6.8) {
+    return 'OLD';
+  }
+  if (planet.defense.avgIndustryLevel >= 3.6) {
+    return 'DEVELOPED';
+  }
+  if (planet.defense.avgIndustryLevel >= 2.4) {
+    return 'DEVELOPING';
+  }
+  return 'IMMATURE';
+}
+
+function buildLocalSelectedCostByPlanetKey(
+  localResults: PlanetStrategicDevelopmentEvaluationResult[]
+): Map<string, ResourceAmounts> {
+  const result = new Map<string, ResourceAmounts>();
+  for (const localResult of localResults) {
+    result.set(
+      toCoordinatesKey(localResult.planetResult.targetCoordinates),
+      sumGoalImmediateRequestCosts([
+        ...localResult.selectedBuildingGoals,
+        ...localResult.selectedProductionGoals
+      ])
+    );
+  }
+  return result;
+}
+
+function collectStrategicMilitaryReservedCargoByOrigin(priorProposals: BotProposal[]): Map<string, Map<ShipTypeT, number>> {
+  const result = new Map<string, Map<ShipTypeT, number>>();
+  for (const proposal of priorProposals) {
+    if (
+      proposal.subsystemId !== 'STRATEGIC_MILITARY'
+      || proposal.kind !== 'FLEET_MISSION'
+      || proposal.requestPayload.missionType !== FleetMissionType.ATTACK
+    ) {
+      continue;
+    }
+
+    const origin = proposal.requestPayload.origin as { x?: number; y?: number; z?: number } | undefined;
+    if (!origin || !Number.isInteger(origin.x) || !Number.isInteger(origin.y) || !Number.isInteger(origin.z)) {
+      continue;
+    }
+    const originKey = `${origin.x}:${origin.y}:${origin.z}`;
+    const ships = Array.isArray(proposal.requestPayload.ships)
+      ? proposal.requestPayload.ships as Array<{ type?: ShipTypeT; undamagedAmount?: number }>
+      : [];
+    for (const ship of ships) {
+      if (!ship.type || !isStrategicDevelopmentSupportCargoShipType(ship.type)) {
+        continue;
+      }
+      const byType = result.get(originKey) ?? new Map<ShipTypeT, number>();
+      byType.set(ship.type, (byType.get(ship.type) ?? 0) + Math.max(0, Math.floor(ship.undamagedAmount ?? 0)));
+      result.set(originKey, byType);
+    }
+  }
+  return result;
+}
+
+function isOldPlanet(context: BotSubsystemContext, planet: BotPlanetSnapshot): boolean {
+  const planetKey = toCoordinatesKey(planet.coordinates);
+  const memoryEntry = context.memory.weightManager.planets.find((entry) => toCoordinatesKey(entry.coordinates) === planetKey);
+  return memoryEntry?.oldPlanet === true || planet.defense.avgIndustryLevel >= 6.8;
+}
+
+function resolveHighestAvgIndustry(context: BotSubsystemContext): number {
+  return context.snapshot.planets.reduce((max, planet) => Math.max(max, planet.defense.avgIndustryLevel), 0);
+}
+
+function isExpensiveLocalInvestment(planet: BotPlanetSnapshot, cost: ResourceAmounts): boolean {
+  return getTotalResourceAmount(cost) > getTotalResourceAmount(planet.economy.income) * 8
+    || estimateAffordabilityEta(planet, cost) > 8;
+}
+
+function estimateAffordabilityEta(planet: BotPlanetSnapshot, cost: ResourceAmounts): number {
+  return Math.max(
+    resolveResourceAffordabilityEta(planet.localResources.metal, planet.economy.income.metal, cost.metal),
+    resolveResourceAffordabilityEta(planet.localResources.crystal, planet.economy.income.crystal, cost.crystal),
+    resolveResourceAffordabilityEta(planet.localResources.deuterium, planet.economy.income.deuterium, cost.deuterium)
+  );
+}
+
+function resolveResourceAffordabilityEta(current: number, income: number, required: number): number {
+  if (current >= required) {
+    return 0;
+  }
+  if (income <= 0) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return Math.max(1, Math.ceil((required - current) / income));
+}
+
+function resolveSafetyReserve(planet: BotPlanetSnapshot | null): ResourceAmounts {
+  if (!planet) {
+    return emptyResources();
+  }
+  return {
+    metal: Math.max(0, Math.floor(planet.economy.income.metal)),
+    crystal: Math.max(0, Math.floor(planet.economy.income.crystal)),
+    deuterium: Math.max(0, Math.floor(planet.economy.income.deuterium))
+  };
+}
+
 function resolveRemainingLogisticsCapacity(context: BotSubsystemContext): number {
   const hardCap = Math.max(0, context.snapshot.empire.ownedPlanetCount - 1);
   if (hardCap <= 0) {
@@ -2209,7 +2606,8 @@ function isRareBroadSurplusSourcePlanet(
 function selectCargoShips(
   planet: BotPlanetSnapshot,
   requiredCargo: number,
-  excludedTypes: Set<ShipTypeT> = new Set()
+  excludedTypes: Set<ShipTypeT> = new Set(),
+  reservedCountsByType: Map<ShipTypeT, number> = new Map()
 ): Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> | null {
   if (requiredCargo <= 0) {
     return [];
@@ -2218,7 +2616,7 @@ function selectCargoShips(
   const candidates = Object.entries(planet.ships.undamagedCountByType)
     .map(([type, amount]) => ({
       type: type as ShipTypeT,
-      amount: amount ?? 0,
+      amount: Math.max(0, (amount ?? 0) - (reservedCountsByType.get(type as ShipTypeT) ?? 0)),
       blueprint: SHIP_BLUEPRINTS.get(type as ShipTypeT) ?? null
     }))
     .filter((entry) =>

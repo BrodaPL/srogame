@@ -162,6 +162,45 @@ describe('BotResearchSubsystem', () => {
     expect(result.proposals[0]?.requestPayload.technologyType).toBe(TechnologyType.ADAPTIVE_TECHNOLOGY);
     expect(result.proposals[0]?.debug.adaptiveColonizationBias).toBeGreaterThan(0);
   });
+
+  it('emits a concentration signal for expensive old-planet research outside the affordability window', () => {
+    const { galaxy, bot, planets } = createResearchWorld(1, new Map([
+      [TechnologyType.ENERGY_TECHNOLOGY, 5],
+      [TechnologyType.MATERIAL_TECHNOLOGY, 5],
+      [TechnologyType.HYPERSPACE_TECHNOLOGY, 5],
+      [TechnologyType.ESPIONAGE_TECHNOLOGY, 5],
+      [TechnologyType.COMPUTER_TECHNOLOGY, 5],
+      [TechnologyType.ASTROPHYSICS_TECHNOLOGY, 5],
+      [TechnologyType.ADAPTIVE_TECHNOLOGY, 5],
+      [TechnologyType.INTERGALACTIC_RESEARCH_NETWORK, 5],
+      [TechnologyType.SHIELDING_TECHNOLOGY, 5],
+      [TechnologyType.ARMOUR_TECHNOLOGY, 5],
+      [TechnologyType.RAILGUNS_WEAPONS, 5],
+      [TechnologyType.BEAMS_WEAPONS, 5],
+      [TechnologyType.MISSILES_WEAPONS, 5],
+      [TechnologyType.FUSION_DRIVE, 5],
+      [TechnologyType.HYPERSPACE_DRIVE, 5]
+    ]));
+    const [planet] = planets;
+    configureResearchPlanet(planet, {
+      researchLabLevel: 12,
+      resources: new ResourcesPack(0, 0, 0)
+    });
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 2);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 2);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 2);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 8);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 8);
+    planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 5);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 8);
+
+    const result = runResearchSubsystem(galaxy, bot);
+
+    expect(result.proposals).toHaveLength(1);
+    expect(result.proposals[0]?.kind).toBe('NO_OP');
+    expect(result.proposals[0]?.debug.resourceConcentrationRequest).toBe(true);
+    expect(result.proposals[0]?.requestPayload.targetKind).toBe('RESEARCH');
+  });
 });
 
 function runResearchSubsystem(

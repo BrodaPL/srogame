@@ -268,6 +268,17 @@ Resource accumulation requirement:
 - Rejected over-budget proposals should not become pending automatically, because pending over-budget work would still reserve budget and worsen starvation.
 - A large investment can accumulate resources through normal pending/commitment flow only while its budget intent remains not over-budget, or when no viable under-budget competitor exists for the same constraint.
 
+Implemented resource-concentration slice:
+
+- `Research` emits a non-executable `NO_OP` concentration signal when the best otherwise-valid research candidate is too expensive for the current affordability window.
+- `Strategic Development` owns one persistent `activeResourceConcentrationTarget` in `player.botMemoryV2.strategicDevelopment`.
+- `Strategic Development` can emit up to 3 `TRANSPORT` proposals per turn toward that target from surplus source planets.
+- Source export reserves are stage-aware: immature/developing planets keep higher reserve floors than developed/old planets, plus local selected costs.
+- Strategic Military farm cargo requests are treated as reserved when choosing cargo ships for concentration transports.
+- Accepted concentration transports create `supervisor.incomingResourceReservations` after fleet launch succeeds. The reservation expires at travel ETA + 2 turns.
+- Supervisor treats active incoming reservations as resource locks on the target planet, except when selecting the matching building/research investment itself.
+- Research concentration transports charge `intentSubsystemId = RESEARCH`; old-building concentration transports charge `intentSubsystemId = STRATEGIC_DEVELOPMENT`.
+
 Recommended Phase 2 implementation steps:
 
 1. Add `bot-supervisor-budgeting.ts` with budget window formulas, budget state calculation, attribution split helpers, and budget status helpers.

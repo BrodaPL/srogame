@@ -488,6 +488,7 @@ export class LiveQueueBotExecutor implements BotExecutor {
       spent,
       fuelSpent: result.value.fleet.fuelCost,
       fleetId: result.value.fleet.fleetId,
+      travelTurns: result.value.fleet.travelTurns,
       fleetSlotsUsed: command.originFleetId && result.value.fleet.fleetId === command.originFleetId ? 0 : 1,
       missionType: command.missionType,
       originCoordinates: command.origin,

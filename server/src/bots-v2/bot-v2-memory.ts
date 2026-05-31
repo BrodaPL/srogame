@@ -26,6 +26,9 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
       affordabilityWindowTurns: 5,
       lastWindowIncreaseTurn: null
     },
+    strategicDevelopment: {
+      activeResourceConcentrationTarget: null
+    },
     strategicMilitary: {
       farmLedger: []
     },
@@ -69,7 +72,8 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
       imperiumSpendingHistory: [],
       proposalHistory: [],
       fleetSlotHistory: [],
-      fuelSpendingHistory: []
+      fuelSpendingHistory: [],
+      incomingResourceReservations: []
     }
   };
 }
