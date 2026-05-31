@@ -50,7 +50,11 @@ import { Planet } from '../planets/planet';
 import { Player } from '../player';
 import { PlayerMessage } from '../mail/player-message';
 import { BuildingsReport } from '../reports/buildings-report';
-import { appendFleetReportShips, FleetReport } from '../reports/fleet-report';
+import {
+  appendFleetReportManifest,
+  FleetReport,
+  type FleetReportCargoLike
+} from '../reports/fleet-report';
 import {
   calculateRepairCapabilityForManyShips,
   collectRepairEquipmentBurstGroupsForManyShips,
@@ -2462,6 +2466,8 @@ function applyMissionResolution(
   difficultyConfig: TurnDifficultyConfig,
   attackPlunderSummary: AttackPlunderSummary | null = null
 ): Fleet | null {
+  const reportShips = ManyShips.fromData(context.fleet.ships);
+  const reportCargo = snapshotResourcesPack(context.fleet.cargo);
   const beforeCargo = snapshotResourcesPack(context.fleet.cargo);
   const beforeDebris = context.targetPlanet
     ? snapshotResourcesPack(context.targetPlanet.rBDSFTQ.spaceDebris)
@@ -2482,7 +2488,11 @@ function applyMissionResolution(
       context.owner,
       context.fleet,
       context.resolvedTurnNumber,
-      resolution.reports
+      resolution.reports,
+      {
+        ships: reportShips,
+        cargo: reportCargo
+      }
     );
   }
 
@@ -3216,7 +3226,11 @@ function addFleetSuccessReport(
   player: Player,
   fleet: Fleet,
   resolvedTurnNumber: number,
-  body: string
+  body: string,
+  manifest: {
+    ships: ManyShipsLike;
+    cargo: FleetReportCargoLike;
+  } | null = null
 ): void {
   if (player.type === PlayerType.NEUTRAL) {
     return;
@@ -3231,7 +3245,7 @@ function addFleetSuccessReport(
       sourcePlanetName: fleet.targetPlanetName,
       senderPlayerName: player.playerName
     },
-    appendFleetReportShips(body, fleet.ships)
+    appendFleetReportManifest(body, manifest?.ships ?? fleet.ships, manifest?.cargo ?? fleet.cargo)
   );
   player.addReport(report);
 }
@@ -3288,12 +3302,16 @@ function addMissionReports(
   player: Player,
   fleet: Fleet,
   resolvedTurnNumber: number,
-  reports: Array<{ kind: 'success' | 'failure' | 'draw'; body: string }>
+  reports: Array<{ kind: 'success' | 'failure' | 'draw'; body: string }>,
+  manifest: {
+    ships: ManyShipsLike;
+    cargo: FleetReportCargoLike;
+  } | null = null
 ): void {
   for (const report of reports) {
     switch (report.kind) {
       case 'success':
-        addFleetSuccessReport(player, fleet, resolvedTurnNumber, report.body);
+        addFleetSuccessReport(player, fleet, resolvedTurnNumber, report.body, manifest);
         break;
       case 'failure':
         addFleetFailureReport(player, fleet, resolvedTurnNumber, report.body);
