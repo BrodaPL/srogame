@@ -340,6 +340,7 @@ Notes:
 - V2 can reuse shared models and command helpers from the existing server code
 - `scripts/run-bot-v2-simulation.ts` should be read with its scenario split in mind: `advanced` is a no-neutral smoke run, while neutral-farm validation belongs to `benchmark20x20`
 - strict benchmark artifacts include `resource-concentration-summary.json`; it is derived from V2 proposal debug payloads and tracks old-planet/expensive-research concentration signals, target selections, transports, incoming reservations, expired reservations, matching investments, and active locked resources
+- TODO: Do not tune resource-concentration thresholds, source reserves, follow-up transport cadence, or target replacement rules from `benchmark20x20` alone. Add a deterministic high-industry concentration benchmark first, because the regular 170-turn benchmark can complete with zero concentration signals.
 
 ## Current V2 Runtime Flow
 

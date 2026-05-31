@@ -455,8 +455,8 @@ function collectRecycleTargets(context: BotSubsystemContext): RecycleTarget[] {
       const thresholdValue = averageDevelopedIncomeValue * 4;
       if (
         !target.isNeutral
-        || target.reportAge === null
-        || target.reportAge > FOREIGN_RECYCLE_INTEL_MAX_AGE
+        || target.spaceDebrisIntelAge === null
+        || target.spaceDebrisIntelAge > FOREIGN_RECYCLE_INTEL_MAX_AGE
         || (target.currentDefencesCount ?? 0) > 0
         || (target.currentShipsCount ?? 0) > 0
         || debrisValue < thresholdValue
@@ -474,7 +474,7 @@ function collectRecycleTargets(context: BotSubsystemContext): RecycleTarget[] {
         debris,
         debrisValue,
         thresholdValue,
-        intelAge: target.reportAge,
+        intelAge: target.spaceDebrisIntelAge,
         knownShipsCount: target.currentShipsCount ?? 0,
         knownDefencesCount: target.currentDefencesCount ?? 0
       };
@@ -488,7 +488,8 @@ function collectRecycleTargets(context: BotSubsystemContext): RecycleTarget[] {
         const debrisValue = calculateWeightedValue(debris);
         const thresholdValue = averageDevelopedIncomeValue * 8;
         if (
-          planet.lastRelevantReportAge > FOREIGN_RECYCLE_INTEL_MAX_AGE
+          planet.spaceDebrisIntelAge === null
+          || planet.spaceDebrisIntelAge > FOREIGN_RECYCLE_INTEL_MAX_AGE
           || debrisValue < thresholdValue
           || getTotalResourceAmount(debris) <= 0
         ) {
@@ -504,7 +505,7 @@ function collectRecycleTargets(context: BotSubsystemContext): RecycleTarget[] {
           debris,
           debrisValue,
           thresholdValue,
-          intelAge: planet.lastRelevantReportAge,
+          intelAge: planet.spaceDebrisIntelAge,
           knownShipsCount: planet.totalShipsAmount,
           knownDefencesCount: planet.totalDefencesAmount
         };

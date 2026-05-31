@@ -211,6 +211,8 @@ export type BotStrategicDiplomaticKnownPlanetSnapshot = {
     crystal: number;
     deuterium: number;
   };
+  spaceDebrisIntelTurn: number | null;
+  spaceDebrisIntelAge: number | null;
 };
 
 export type BotStrategicDiplomaticJumpGateRequestSnapshot = {
@@ -340,6 +342,8 @@ export type BotStrategicMilitaryTargetSnapshot = {
     crystal: number;
     deuterium: number;
   };
+  spaceDebrisIntelTurn: number | null;
+  spaceDebrisIntelAge: number | null;
 };
 
 export type BotPlanetSnapshot = {

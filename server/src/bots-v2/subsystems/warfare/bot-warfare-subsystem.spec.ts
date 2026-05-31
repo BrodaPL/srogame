@@ -10,6 +10,7 @@ import { TechnologyType } from '../../../../../src/app/models/enums/technology-t
 import { EspionageReportGenerator } from '../../../../../src/app/generators/espionage-report-generator.js';
 import { ManyShips } from '../../../../../src/app/models/fleets/many-ships.js';
 import { ShipyardQueueEntry } from '../../../../../src/app/models/fleets/shipyard-queue-entry.js';
+import { FleetReport } from '../../../../../src/app/models/reports/fleet-report.js';
 import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
 import { TechnologyQueueEntry } from '../../../../../src/app/models/tech/technology-queue-entry.js';
 import { Player } from '../../../../../src/app/models/player.js';
@@ -327,6 +328,47 @@ describe('BotWarfareSubsystem', () => {
     expect(recyclePayload?.ships.some((entry) => entry.type === ShipType.CRUISER)).toBe(true);
   });
 
+  it('does not recycle foreign debris that is only visible in live planet state', () => {
+    const { galaxy, bot, homePlanet, foreignPlayer, foreignPlanet } = createRecoveryWorld();
+    configureBaseWarfarePlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.RECYCLER, 10);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    markPlanetScanned(bot, foreignPlayer, foreignPlanet, galaxy.currentTurn);
+    foreignPlanet.rBDSFTQ.spaceDebris = new ResourcesPack(6000, 4000, 2000);
+
+    const result = runWarfareSubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.RECYCLE
+      && proposal.targetCoordinates?.z === foreignPlanet.basicInfo.order
+    )).toBe(false);
+  });
+
+  it('uses newer battle report debris over older espionage debris for foreign recycle', () => {
+    const { galaxy, bot, homePlanet, foreignPlayer, foreignPlanet } = createRecoveryWorld();
+    configureBaseWarfarePlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.RECYCLER, 10);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    markPlanetScanned(bot, foreignPlayer, foreignPlanet, galaxy.currentTurn - 2);
+    addBattleDebrisReport(bot, foreignPlayer, foreignPlanet, galaxy.currentTurn - 1, {
+      metal: 6000,
+      crystal: 4000,
+      deuterium: 2000
+    });
+
+    const result = runWarfareSubsystem(galaxy, bot);
+    const recycleProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.RECYCLE
+      && proposal.targetCoordinates?.z === foreignPlanet.basicInfo.order
+    );
+
+    expect(recycleProposal).toBeDefined();
+    expect(recycleProposal?.debug.recycleScope).toBe('NEUTRAL_FOREIGN');
+    expect(recycleProposal?.debug.debrisValue).toBeGreaterThan(0);
+  });
+
   it('emits recycler ship-need pressure when debris is valuable and no recyclers exist', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseWarfarePlanet(planet);
@@ -626,4 +668,36 @@ function markPlanetScanned(
     forcedReportLevel: 12
   });
   planet.lastReportData.set(bot.playerId, report);
+}
+
+function addBattleDebrisReport(
+  bot: Player,
+  owner: Player,
+  planet: Planet,
+  createdTurn: number,
+  debris: { metal: number; crystal: number; deuterium: number }
+): void {
+  bot.addReport(new FleetReport(
+    {
+      reportId: 10000 + createdTurn,
+      createdTurn,
+      title: `Battle Report: ${planet.basicInfo.solarSystem.coordinates.x}:${planet.basicInfo.solarSystem.coordinates.y}:${planet.basicInfo.order}`,
+      sourceCoordinates: {
+        x: planet.basicInfo.solarSystem.coordinates.x,
+        y: planet.basicInfo.solarSystem.coordinates.y,
+        z: planet.basicInfo.order
+      },
+      sourcePlanetName: planet.basicInfo.name,
+      sourceSystemName: planet.basicInfo.solarSystem.name,
+      senderPlayerName: owner.playerName
+    },
+    [
+      'Battle result: Attacker',
+      'Enemy survivors by type: none',
+      'Enemy defense survivors by type: none',
+      'Own survivors by type: Cruiser x1',
+      'Own ship losses by type: none',
+      `Current debris field: Metal ${debris.metal}, Crystal ${debris.crystal}, Deuterium ${debris.deuterium}`
+    ].join('\n')
+  ));
 }

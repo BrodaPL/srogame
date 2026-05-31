@@ -72,6 +72,12 @@ type DefenceTypeId = (typeof DefenceType)[keyof typeof DefenceType];
 type ShipTypeId = (typeof ShipType)[keyof typeof ShipType];
 type DiplomaticStatusId = (typeof DiplomaticStatus)[keyof typeof DiplomaticStatus];
 type DiplomacyResolverInstance = InstanceType<typeof DiplomacyResolver>;
+type ResourceAmounts = { metal: number; crystal: number; deuterium: number };
+type DebrisIntelSnapshot = {
+  spaceDebris: ResourceAmounts;
+  spaceDebrisIntelTurn: number | null;
+  spaceDebrisIntelAge: number | null;
+};
 
 const ALL_BUILDING_TYPES = Array.from(BUILDING_BLUEPRINTS.buildingsMap.keys());
 const SHARED_HOSTILE_EVENT_REPORT_WINDOW = 40;
@@ -946,6 +952,12 @@ function resolveStrategicMilitaryTargets(
         const knownDefenceCountsByType = report === null
           ? (latestBattleObservation?.survivingDefencesByType ?? {})
           : resolveKnownDefenceCountsForStrategicMilitary(report, latestBattleObservation);
+        const debrisIntel = resolveLatestForeignDebrisIntel(
+          player,
+          planet,
+          report,
+          galaxy.currentTurn
+        );
 
         targets.push({
           coordinates: {
@@ -991,11 +1003,7 @@ function resolveStrategicMilitaryTargets(
           lastPlunderTurn: latestPlunderObservation?.turn ?? null,
           latestPlunderedResources: latestPlunderObservation?.stolenResources ?? null,
           combatObservationTurn: latestBattleObservation?.turn ?? reportTurn,
-          spaceDebris: {
-            metal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.metal)),
-            crystal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.crystal)),
-            deuterium: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.deuterium))
-          }
+          ...debrisIntel
         });
       }
     }
@@ -1186,6 +1194,12 @@ function resolveStrategicDiplomaticFactions(
 
           const latestBattleObservation = resolveLatestBattleObservation(player, planet);
           const latestPlunderObservation = resolveLatestPlunderObservation(player, planet);
+          const debrisIntel = resolveLatestForeignDebrisIntel(
+            player,
+            planet,
+            report,
+            galaxy.currentTurn
+          );
           const adaptiveTechnologyLevel = report.techLevels.get(TechnologyType.ADAPTIVE_TECHNOLOGY)
             ?? foreignPlayer.getTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY)
             ?? 0;
@@ -1230,11 +1244,7 @@ function resolveStrategicDiplomaticFactions(
             lastCombatObservationTurn: latestBattleObservation?.turn ?? null,
             lastPlunderTurn: latestPlunderObservation?.turn ?? null,
             latestPlunderedResources: latestPlunderObservation?.stolenResources ?? null,
-            spaceDebris: {
-              metal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.metal)),
-              crystal: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.crystal)),
-              deuterium: Math.max(0, Math.floor(planet.rBDSFTQ.spaceDebris.deuterium))
-            }
+            ...debrisIntel
           } satisfies BotStrategicDiplomaticKnownPlanetSnapshot;
         })
         .filter((entry): entry is BotStrategicDiplomaticKnownPlanetSnapshot => entry !== null)
@@ -2174,6 +2184,85 @@ function resolveLatestBattleObservation(
     ownInitialCombatStrength,
     ownLossRatio,
     ownFleetDestroyed: ownInitialCombatStrength > 0 && ownSurvivingCombatStrength <= 0
+  };
+}
+
+function resolveLatestForeignDebrisIntel(
+  player: Player,
+  planet: Planet,
+  espionageReport: EspionageReportData | null,
+  currentTurn: number
+): DebrisIntelSnapshot {
+  const espionageDebris = espionageReport === null
+    ? null
+    : {
+      turn: espionageReport.createdTurn,
+      debris: normalizeResourceAmounts(espionageReport.spaceDebrisAmount)
+    };
+  const battleDebris = resolveLatestBattleDebrisObservation(player, planet);
+  const latest = [espionageDebris, battleDebris]
+    .filter((entry): entry is { turn: number; debris: ResourceAmounts } => entry !== null)
+    .sort((left, right) => right.turn - left.turn)[0] ?? null;
+
+  if (latest === null) {
+    return {
+      spaceDebris: emptyResourceAmounts(),
+      spaceDebrisIntelTurn: null,
+      spaceDebrisIntelAge: null
+    };
+  }
+
+  return {
+    spaceDebris: latest.debris,
+    spaceDebrisIntelTurn: latest.turn,
+    spaceDebrisIntelAge: Math.max(0, currentTurn - latest.turn)
+  };
+}
+
+function normalizeResourceAmounts(resources: { metal: number; crystal: number; deuterium: number }): ResourceAmounts {
+  return {
+    metal: Math.max(0, Math.floor(resources.metal)),
+    crystal: Math.max(0, Math.floor(resources.crystal)),
+    deuterium: Math.max(0, Math.floor(resources.deuterium))
+  };
+}
+
+function emptyResourceAmounts(): ResourceAmounts {
+  return {
+    metal: 0,
+    crystal: 0,
+    deuterium: 0
+  };
+}
+
+function resolveLatestBattleDebrisObservation(
+  player: Player,
+  planet: Planet
+): { turn: number; debris: ResourceAmounts } | null {
+  const latestReport = resolveLatestFleetReport(player, planet, 'Battle Report:');
+  if (!latestReport?.body) {
+    return null;
+  }
+
+  const debrisLine = latestReport.body.split('\n')
+    .find((line) => line.startsWith('Current debris field:'))
+    ?? null;
+  if (!debrisLine) {
+    return null;
+  }
+
+  const match = debrisLine.match(/Current debris field: Metal (\d+), Crystal (\d+), Deuterium (\d+)/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    turn: latestReport.createdTurn,
+    debris: {
+      metal: Math.max(0, Number.parseInt(match[1] ?? '0', 10)),
+      crystal: Math.max(0, Number.parseInt(match[2] ?? '0', 10)),
+      deuterium: Math.max(0, Number.parseInt(match[3] ?? '0', 10))
+    }
   };
 }
 
