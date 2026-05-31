@@ -53,7 +53,7 @@ export function scoreSupervisorProposal(input: {
     ? 1
     : resolveResourceAlignmentMultiplier(input.proposal, input.snapshot, input.memory);
   const shipNeedMultiplier = input.shipNeedPressure > 0
-    ? 1 + Math.min(0.5, input.shipNeedPressure / 100)
+    ? 1 + Math.min(0.75, input.shipNeedPressure / 100)
     : 1;
 
   return rawScore * weightMultiplier * alignmentMultiplier * shipNeedMultiplier;
