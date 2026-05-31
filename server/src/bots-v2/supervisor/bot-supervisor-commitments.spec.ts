@@ -331,6 +331,78 @@ describe('bot supervisor commitments', () => {
     expect(decision.pending.some((proposal) => proposal.proposalId === 'deuterium-build')).toBe(true);
   });
 
+  it('locks incoming concentration resources against unrelated queue spending', () => {
+    const memory = createDefaultBotMemoryV2();
+    memory.supervisor.incomingResourceReservations.push({
+      reservationKey: 'reservation',
+      targetKey: 'old-building:0:0:1:Metal Mine:2',
+      targetKind: 'OLD_BUILDING',
+      intentSubsystemId: 'STRATEGIC_DEVELOPMENT',
+      fleetId: 10,
+      sourceCoordinates: { x: 1, y: 0, z: 1 },
+      targetCoordinates: { x: 0, y: 0, z: 1 },
+      buildingType: BuildingType.METAL_MINE,
+      technologyType: null,
+      nextLevel: 2,
+      resources: { metal: 500, crystal: 0, deuterium: 0 },
+      createdTurn: 1,
+      expiresOnTurn: 4,
+      active: true
+    });
+
+    const decision = createSupervisor().decide(
+      createSnapshot({ metal: 700, crystal: 1000, deuterium: 1000 }, { turn: 2 }),
+      memory,
+      [createBuildingProposal({
+        proposalId: 'unrelated',
+        dedupeKey: 'economic:building:0:0:1:CRYSTAL_MINE',
+        requestedResources: { metal: 300, crystal: 0, deuterium: 0 },
+        requestPayload: { x: 0, y: 0, z: 1, buildingType: BuildingType.CRYSTAL_MINE }
+      })]
+    );
+
+    expect(decision.accepted).toHaveLength(0);
+    expect(decision.pending.map((proposal) => proposal.proposalId)).toEqual(['unrelated']);
+  });
+
+  it('allows the matching concentration investment to spend locked resources', () => {
+    const memory = createDefaultBotMemoryV2();
+    memory.supervisor.incomingResourceReservations.push({
+      reservationKey: 'reservation',
+      targetKey: 'old-building:0:0:1:Metal Mine:2',
+      targetKind: 'OLD_BUILDING',
+      intentSubsystemId: 'STRATEGIC_DEVELOPMENT',
+      fleetId: 10,
+      sourceCoordinates: { x: 1, y: 0, z: 1 },
+      targetCoordinates: { x: 0, y: 0, z: 1 },
+      buildingType: BuildingType.METAL_MINE,
+      technologyType: null,
+      nextLevel: 2,
+      resources: { metal: 500, crystal: 0, deuterium: 0 },
+      createdTurn: 1,
+      expiresOnTurn: 4,
+      active: true
+    });
+
+    const decision = createSupervisor().decide(
+      createSnapshot({ metal: 700, crystal: 1000, deuterium: 1000 }, { turn: 2 }),
+      memory,
+      [createBuildingProposal({
+        proposalId: 'matching',
+        dedupeKey: 'strategic-development:building:0:0:1:Metal Mine',
+        subsystemId: 'STRATEGIC_DEVELOPMENT',
+        requestedResources: { metal: 300, crystal: 0, deuterium: 0 },
+        requestPayload: { x: 0, y: 0, z: 1, buildingType: BuildingType.METAL_MINE },
+        debug: {
+          finalBuildingType: BuildingType.METAL_MINE,
+          finalLevel: 2
+        }
+      })]
+    );
+
+    expect(decision.accepted.map((proposal) => proposal.proposalId)).toEqual(['matching']);
+  });
+
   it('rejects non-colonize fleets that lack enough deuterium for cargo and fuel', () => {
     const decision = createSupervisor().decide(
       createSnapshot(

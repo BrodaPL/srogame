@@ -735,12 +735,13 @@ Advisory bot simulation runner:
 Strict V2 bot simulation runner:
 - `scripts/run-bot-v2-simulation.ts`
 - package entries: `npm.cmd run bot:sim`, `npm.cmd run bot:sim:initial`, `npm.cmd run bot:sim:advanced`
-- writes `tmp/bot-v2-sim/<timestamp>-*/summary.json`, `traces.jsonl`, `turn-summary.jsonl`, and `anomalies.json`
+- writes `tmp/bot-v2-sim/<timestamp>-*/summary.json`, `traces.jsonl`, `turn-summary.jsonl`, `anomalies.json`, `battle-summary.json`, `final-state-summary.json`, and `resource-concentration-summary.json`
 - supports fresh-game and `--load-save-id=<saveId>` execution modes
 - supports scenario selection including `initial`, `advanced`, and `benchmark20x20`; `advanced` is the fast no-neutral smoke scenario, while `benchmark20x20` is the neutral-enabled farming benchmark
 - runs `runBotTurnPhaseV2(..., { mode: 'LIVE' })` plus `resolvePhaseOneTurn(...)`
 - performs first-pass invariant checks and groups unexpected bot command failures for stabilization work
 - now seeds galaxy/context creation through the same deterministic RNG path so repeated runs with the same seed are actually comparable
+- includes resource-concentration counters for old-planet/expensive-research logistics: concentration signals, target selections, transport proposals/acceptances/executions, incoming reservations, reservation expiry, matching investments, and active locked resources
 
 Advisory simulation baseline compare:
 - `scripts/run-bot-sim-baselines.ts`

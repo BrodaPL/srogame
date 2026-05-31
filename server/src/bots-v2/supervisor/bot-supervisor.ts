@@ -84,7 +84,7 @@ export class BotSupervisorV2 implements BotSupervisor {
     proposals: BotProposal[]
   ): BotSupervisorDecision {
     const expiredCommitments = expirePendingCommitments(memory, snapshot.turn);
-    expireIncomingResourceReservations(memory, snapshot.turn);
+    const expiredIncomingResourceReservations = expireIncomingResourceReservations(memory, snapshot.turn);
     pruneSupervisorHistory(memory, snapshot.turn);
 
     if (this.flags.mode === 'DISABLED') {
@@ -339,6 +339,8 @@ export class BotSupervisorV2 implements BotSupervisor {
         rejectedCount: rejected.length,
         acceptedFleetCount,
         expiredCommitmentCount: expiredCommitments,
+        expiredIncomingResourceReservationCount: expiredIncomingResourceReservations,
+        activeIncomingResourceReservationCount: memory.supervisor.incomingResourceReservations.length,
         budgetOverrunRejectedCount,
         criticalAccepted
       }
@@ -1746,9 +1748,11 @@ function buildReservedColonizeDeuteriumMap(memory: BotMemoryV2, turn: number): M
   return reservations;
 }
 
-function expireIncomingResourceReservations(memory: BotMemoryV2, turn: number): void {
+function expireIncomingResourceReservations(memory: BotMemoryV2, turn: number): number {
+  const before = memory.supervisor.incomingResourceReservations.length;
   memory.supervisor.incomingResourceReservations = memory.supervisor.incomingResourceReservations
     .filter((reservation) => reservation.active && reservation.expiresOnTurn >= turn);
+  return before - memory.supervisor.incomingResourceReservations.length;
 }
 
 function buildIncomingResourceLocksByPlanet(

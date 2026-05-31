@@ -124,6 +124,14 @@ type SimulationSummary = {
     rejectedActions: number;
     successfulExecutions: number;
     failedExecutions: number;
+    resourceConcentrationSignals: number;
+    resourceConcentrationTargetsSelected: number;
+    resourceConcentrationTransportsProposed: number;
+    resourceConcentrationTransportsAccepted: number;
+    resourceConcentrationTransportsExecuted: number;
+    resourceConcentrationReservationsCreated: number;
+    resourceConcentrationReservationsExpired: number;
+    resourceConcentrationInvestmentsStarted: number;
   };
   players: Array<{
     playerId: number;
@@ -140,7 +148,48 @@ type SimulationSummary = {
     anomaliesJson: string;
     finalStateSummaryJson: string;
     battleSummaryJson: string;
+    resourceConcentrationSummaryJson: string;
   };
+};
+
+type ResourceConcentrationPlayerSummary = {
+  playerId: number;
+  playerName: string;
+  profileId: BotProfileId | null;
+  signalsEmitted: number;
+  targetSelections: number;
+  transportsProposed: number;
+  transportsAccepted: number;
+  transportsExecuted: number;
+  reservationsCreated: number;
+  reservationsExpired: number;
+  matchingInvestmentsStarted: number;
+  activeReservationCount: number;
+  activeLockedResources: { metal: number; crystal: number; deuterium: number };
+  activeTargets: string[];
+};
+
+type ResourceConcentrationSummary = {
+  scenario: SimulationScenarioKey;
+  seed: number;
+  finalTurn: number;
+  totals: {
+    signalsEmitted: number;
+    targetSelections: number;
+    transportsProposed: number;
+    transportsAccepted: number;
+    transportsExecuted: number;
+    reservationsCreated: number;
+    reservationsExpired: number;
+    matchingInvestmentsStarted: number;
+    activeReservationCount: number;
+    activeLockedResources: { metal: number; crystal: number; deuterium: number };
+  };
+  players: ResourceConcentrationPlayerSummary[];
+};
+
+type MutableResourceConcentrationPlayerSummary = ResourceConcentrationPlayerSummary & {
+  knownTargetKeys: Set<string>;
 };
 
 type FinalStateSummary = {
@@ -341,10 +390,12 @@ async function main(): Promise<void> {
     turnSummaryJsonl: logMode !== 'summary' ? path.join(outputDir, 'turn-summary.jsonl') : null,
     anomaliesJson: path.join(outputDir, 'anomalies.json'),
     finalStateSummaryJson: path.join(outputDir, 'final-state-summary.json'),
-    battleSummaryJson: path.join(outputDir, 'battle-summary.json')
+    battleSummaryJson: path.join(outputDir, 'battle-summary.json'),
+    resourceConcentrationSummaryJson: path.join(outputDir, 'resource-concentration-summary.json')
   };
   initializeJsonlArtifacts(artifactPaths.tracesJsonl, artifactPaths.turnSummaryJsonl);
   const acceptedActionCounts = new Map<number, number>();
+  const concentrationSummaries = initializeResourceConcentrationSummaries(context.contenders);
   const pendingProposalCounts = new Map<string, number>();
   const dedupeKeyCounts = new Map<string, number>();
   let turnsCompleted = 0;
@@ -371,6 +422,7 @@ async function main(): Promise<void> {
           rejectedActions += trace.supervisorDecision.rejectedCount;
 
           const acceptedProposalIds = new Set(trace.supervisorDecision.acceptedProposalIds);
+          recordResourceConcentrationTrace(concentrationSummaries, trace, acceptedProposalIds);
           const acceptedProposalKinds = trace.proposals
             .filter((proposal) => acceptedProposalIds.has(proposal.proposalId))
             .map((proposal) => proposal.proposalKind);
@@ -492,6 +544,17 @@ async function main(): Promise<void> {
     `${JSON.stringify(buildBattleSummary(scenario.key, seed, context.contenders, context.galaxy.currentTurn), null, 2)}\n`,
     'utf8'
   );
+  const resourceConcentrationSummary = buildResourceConcentrationSummary(
+    scenario.key,
+    seed,
+    context,
+    concentrationSummaries
+  );
+  fs.writeFileSync(
+    artifactPaths.resourceConcentrationSummaryJson,
+    `${JSON.stringify(resourceConcentrationSummary, null, 2)}\n`,
+    'utf8'
+  );
 
   const summary: SimulationSummary = {
     scenario: scenario.key,
@@ -513,7 +576,15 @@ async function main(): Promise<void> {
       pendingActions,
       rejectedActions,
       successfulExecutions,
-      failedExecutions
+      failedExecutions,
+      resourceConcentrationSignals: resourceConcentrationSummary.totals.signalsEmitted,
+      resourceConcentrationTargetsSelected: resourceConcentrationSummary.totals.targetSelections,
+      resourceConcentrationTransportsProposed: resourceConcentrationSummary.totals.transportsProposed,
+      resourceConcentrationTransportsAccepted: resourceConcentrationSummary.totals.transportsAccepted,
+      resourceConcentrationTransportsExecuted: resourceConcentrationSummary.totals.transportsExecuted,
+      resourceConcentrationReservationsCreated: resourceConcentrationSummary.totals.reservationsCreated,
+      resourceConcentrationReservationsExpired: resourceConcentrationSummary.totals.reservationsExpired,
+      resourceConcentrationInvestmentsStarted: resourceConcentrationSummary.totals.matchingInvestmentsStarted
     },
     players: context.contenders.map((player) => ({
       playerId: player.playerId,
@@ -657,6 +728,193 @@ function appendActivityFailures(
   }
 }
 
+function initializeResourceConcentrationSummaries(
+  contenders: Player[]
+): Map<number, MutableResourceConcentrationPlayerSummary> {
+  return new Map(contenders.map((player) => [player.playerId, {
+    playerId: player.playerId,
+    playerName: player.playerName,
+    profileId: player.botProfileId,
+    signalsEmitted: 0,
+    targetSelections: 0,
+    transportsProposed: 0,
+    transportsAccepted: 0,
+    transportsExecuted: 0,
+    reservationsCreated: 0,
+    reservationsExpired: 0,
+    matchingInvestmentsStarted: 0,
+    activeReservationCount: 0,
+    activeLockedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    activeTargets: [],
+    knownTargetKeys: new Set<string>()
+  }]));
+}
+
+function recordResourceConcentrationTrace(
+  summaries: Map<number, MutableResourceConcentrationPlayerSummary>,
+  trace: BotDecisionTraceV2,
+  acceptedProposalIds: Set<string>
+): void {
+  const summary = summaries.get(trace.playerId);
+  if (!summary) {
+    return;
+  }
+
+  const proposalById = new Map(trace.proposals.map((proposal) => [proposal.proposalId, proposal]));
+  for (const proposal of trace.proposals) {
+    if (proposal.debug.resourceConcentrationRequest === true) {
+      summary.signalsEmitted += 1;
+      const key = resolveConcentrationKeyFromProposal(proposal);
+      if (key) {
+        summary.knownTargetKeys.add(key);
+      }
+    }
+    if (proposal.debug.resourceConcentrationTransport === true) {
+      summary.transportsProposed += 1;
+      const key = typeof proposal.debug.resourceConcentrationTargetKey === 'string'
+        ? proposal.debug.resourceConcentrationTargetKey
+        : null;
+      if (key) {
+        summary.knownTargetKeys.add(key);
+      }
+      if (acceptedProposalIds.has(proposal.proposalId)) {
+        summary.transportsAccepted += 1;
+      }
+    }
+    if (acceptedProposalIds.has(proposal.proposalId)) {
+      const key = resolveConcentrationKeyFromProposal(proposal);
+      if (key && summary.knownTargetKeys.has(key)) {
+        summary.matchingInvestmentsStarted += 1;
+      }
+    }
+  }
+
+  const strategicDevelopmentDebug = trace.subsystemResults.find((result) =>
+    result.subsystemId === 'STRATEGIC_DEVELOPMENT'
+  )?.debug;
+  if (strategicDevelopmentDebug?.resourceConcentrationTargetActive === true) {
+    summary.targetSelections += 1;
+    if (typeof strategicDevelopmentDebug.resourceConcentrationTargetKey === 'string') {
+      summary.knownTargetKeys.add(strategicDevelopmentDebug.resourceConcentrationTargetKey);
+    }
+  }
+
+  summary.reservationsExpired += Math.max(
+    0,
+    Math.floor(Number(trace.supervisorDecision.debug?.expiredIncomingResourceReservationCount ?? 0))
+  );
+
+  for (const outcome of trace.executionOutcomes) {
+    const proposal = proposalById.get(outcome.proposalId);
+    if (outcome.success && proposal?.debug.resourceConcentrationTransport === true) {
+      summary.transportsExecuted += 1;
+      summary.reservationsCreated += 1;
+    }
+  }
+}
+
+function resolveConcentrationKeyFromProposal(
+  proposal: BotDecisionTraceV2['proposals'][number]
+): string | null {
+  if (!proposal.targetCoordinates) {
+    return null;
+  }
+  const coordinateKey = `${proposal.targetCoordinates.x}:${proposal.targetCoordinates.y}:${proposal.targetCoordinates.z}`;
+  if (proposal.proposalKind === 'BUILDING' && typeof proposal.debug.finalBuildingType === 'string') {
+    const level = Math.floor(Number(proposal.debug.finalLevel ?? 0));
+    return level > 0 ? `old-building:${coordinateKey}:${proposal.debug.finalBuildingType}:${level}` : null;
+  }
+  if (proposal.proposalKind === 'RESEARCH') {
+    const technologyType = typeof proposal.debug.technologyType === 'string'
+      ? proposal.debug.technologyType
+      : typeof proposal.debug.finalTechnologyType === 'string'
+        ? proposal.debug.finalTechnologyType
+        : null;
+    const level = Math.floor(Number(proposal.debug.nextLevel ?? proposal.debug.finalLevel ?? 0));
+    return technologyType && level > 0 ? `research:${coordinateKey}:${technologyType}:${level}` : null;
+  }
+  return null;
+}
+
+function buildResourceConcentrationSummary(
+  scenario: SimulationScenarioKey,
+  seed: number,
+  context: SimulationContext,
+  summaries: Map<number, MutableResourceConcentrationPlayerSummary>
+): ResourceConcentrationSummary {
+  const players = context.contenders.map((player) => {
+    const summary = summaries.get(player.playerId) ?? initializeResourceConcentrationSummaries([player]).get(player.playerId)!;
+    const activeReservations = player.botMemoryV2?.supervisor.incomingResourceReservations
+      .filter((reservation) => reservation.active && reservation.expiresOnTurn >= context.galaxy.currentTurn)
+      ?? [];
+    const activeLockedResources = activeReservations.reduce(
+      (sum, reservation) => ({
+        metal: sum.metal + reservation.resources.metal,
+        crystal: sum.crystal + reservation.resources.crystal,
+        deuterium: sum.deuterium + reservation.resources.deuterium
+      }),
+      { metal: 0, crystal: 0, deuterium: 0 }
+    );
+    const activeTarget = player.botMemoryV2?.strategicDevelopment.activeResourceConcentrationTarget;
+
+    return {
+      playerId: summary.playerId,
+      playerName: summary.playerName,
+      profileId: summary.profileId,
+      signalsEmitted: summary.signalsEmitted,
+      targetSelections: summary.targetSelections,
+      transportsProposed: summary.transportsProposed,
+      transportsAccepted: summary.transportsAccepted,
+      transportsExecuted: summary.transportsExecuted,
+      reservationsCreated: summary.reservationsCreated,
+      reservationsExpired: summary.reservationsExpired,
+      matchingInvestmentsStarted: summary.matchingInvestmentsStarted,
+      activeReservationCount: activeReservations.length,
+      activeLockedResources,
+      activeTargets: activeTarget ? [activeTarget.targetKey] : []
+    };
+  });
+
+  const totals = players.reduce(
+    (sum, player) => ({
+      signalsEmitted: sum.signalsEmitted + player.signalsEmitted,
+      targetSelections: sum.targetSelections + player.targetSelections,
+      transportsProposed: sum.transportsProposed + player.transportsProposed,
+      transportsAccepted: sum.transportsAccepted + player.transportsAccepted,
+      transportsExecuted: sum.transportsExecuted + player.transportsExecuted,
+      reservationsCreated: sum.reservationsCreated + player.reservationsCreated,
+      reservationsExpired: sum.reservationsExpired + player.reservationsExpired,
+      matchingInvestmentsStarted: sum.matchingInvestmentsStarted + player.matchingInvestmentsStarted,
+      activeReservationCount: sum.activeReservationCount + player.activeReservationCount,
+      activeLockedResources: {
+        metal: sum.activeLockedResources.metal + player.activeLockedResources.metal,
+        crystal: sum.activeLockedResources.crystal + player.activeLockedResources.crystal,
+        deuterium: sum.activeLockedResources.deuterium + player.activeLockedResources.deuterium
+      }
+    }),
+    {
+      signalsEmitted: 0,
+      targetSelections: 0,
+      transportsProposed: 0,
+      transportsAccepted: 0,
+      transportsExecuted: 0,
+      reservationsCreated: 0,
+      reservationsExpired: 0,
+      matchingInvestmentsStarted: 0,
+      activeReservationCount: 0,
+      activeLockedResources: { metal: 0, crystal: 0, deuterium: 0 }
+    }
+  );
+
+  return {
+    scenario,
+    seed,
+    finalTurn: context.galaxy.currentTurn,
+    totals,
+    players
+  };
+}
+
 function isFiniteNumber(value: number): boolean {
   return Number.isFinite(value) && !Number.isNaN(value);
 }
@@ -722,6 +980,7 @@ function printConsoleSummary(summary: SimulationSummary, anomalies: SimulationAn
   console.log(`Anomalies: ${summary.artifactPaths.anomaliesJson}`);
   console.log(`Final state: ${summary.artifactPaths.finalStateSummaryJson}`);
   console.log(`Battle summary: ${summary.artifactPaths.battleSummaryJson}`);
+  console.log(`Resource concentration: ${summary.artifactPaths.resourceConcentrationSummaryJson}`);
 }
 
 function parseCliOptions(args: string[]): SimulationCliOptions {

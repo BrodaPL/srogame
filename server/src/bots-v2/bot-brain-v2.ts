@@ -110,12 +110,14 @@ export class BotBrainV2 {
         proposalId: proposal.proposalId,
         subsystemId: proposal.subsystemId,
         proposalKind: proposal.kind,
+        targetCoordinates: proposal.targetCoordinates ? { ...proposal.targetCoordinates } : null,
         summary: proposal.summary,
         expectedValue: proposal.expectedValue,
         urgency: proposal.urgency,
         risk: proposal.risk,
         confidence: proposal.confidence,
-        dedupeKey: proposal.dedupeKey
+        dedupeKey: proposal.dedupeKey,
+        debug: { ...proposal.debug }
       })),
       goals: subsystemResults.flatMap((result) =>
         (result.goals ?? []).map((goal) => ({
@@ -161,7 +163,7 @@ export class BotBrainV2 {
   }
 }
 
-function recordIncomingResourceReservations(
+export function recordIncomingResourceReservations(
   memory: ReturnType<typeof ensureBotMemoryV2>,
   accepted: BotProposal[],
   outcomes: BotExecutionOutcome[],

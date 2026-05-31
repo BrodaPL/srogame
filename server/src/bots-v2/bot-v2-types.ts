@@ -741,12 +741,14 @@ export type BotDecisionTraceV2 = {
     proposalId: string;
     subsystemId: BotV2SubsystemId;
     proposalKind: BotProposalKind;
+    targetCoordinates: { x: number; y: number; z: number } | null;
     summary: string;
     expectedValue: number;
     urgency: number;
     risk: number;
     confidence: number;
     dedupeKey: string;
+    debug: Record<string, string | number | boolean | null>;
   }>;
   goals?: Array<{
     goalKey: string;

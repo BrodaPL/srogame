@@ -214,6 +214,48 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     expect(transport?.requestPayload.target).toEqual({ x: 0, y: 0, z: 2 });
   });
 
+  it('limits resource concentration transports to three source planets per turn', () => {
+    const { galaxy, bot, targetPlanet, sourcePlanets } = createMultiSupportWorld(4);
+    configureLowIndustrySupportTarget(targetPlanet);
+    targetPlanet.rBDSFTQ.resources = new ResourcesPack(100, 100, 100);
+    for (const source of sourcePlanets) {
+      configureDevelopedSupportSource(source);
+      source.rBDSFTQ.resources = new ResourcesPack(250000, 200000, 180000);
+      source.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 100);
+    }
+    setSupportShipTech(bot);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot, [
+      createResearchConcentrationProposal(galaxy, targetPlanet, { metal: 10000, crystal: 8000, deuterium: 5000 })
+    ]);
+    const concentrationTransports = result.proposals.filter((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.TRANSPORT
+      && proposal.debug.resourceConcentrationTransport === true
+    );
+
+    expect(concentrationTransports).toHaveLength(3);
+  });
+
+  it('does not use cargo ships already requested by Strategic Military farm attacks', () => {
+    const { galaxy, bot, sourcePlanet, targetPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    configureLowIndustrySupportTarget(targetPlanet);
+    setSupportShipTech(bot);
+    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(250000, 200000, 180000);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 1);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot, [
+      createResearchConcentrationProposal(galaxy, targetPlanet, { metal: 100, crystal: 0, deuterium: 0 }),
+      createStrategicMilitaryFarmAttackProposal(sourcePlanet, targetPlanet)
+    ]);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.debug.resourceConcentrationTransport === true
+    )).toBe(false);
+  });
+
   it('does not produce support cargo hulls for a one-planet empire', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureDevelopedSupportSource(planet);
@@ -717,6 +759,43 @@ function createSupportWorld() {
   return { galaxy, bot, sourcePlanet, targetPlanet, unownedPlanet };
 }
 
+function createMultiSupportWorld(sourceCount: number) {
+  const system = new SolarSystem('BotSys', 1, false, false, { x: 0, y: 0 }, new Set(), new Map());
+  const targetPlanet = Planet.createStartingPlanet('BotSys I', 1, system, 1);
+  system.planets[0] = targetPlanet;
+  const sourcePlanets: Planet[] = [];
+  for (let index = 0; index < sourceCount; index += 1) {
+    const order = index + 2;
+    const source = Planet.createStartingPlanet(`BotSys ${order}`, order, system, 1);
+    system.planets[order - 1] = source;
+    sourcePlanets.push(source);
+  }
+
+  const bot = new Player(
+    1,
+    'Bot-1',
+    [targetPlanet, ...sourcePlanets],
+    new Map(),
+    [],
+    PlayerType.BOT,
+    createTutorialReadState(true)
+  );
+  const galaxy = new Galaxy(
+    'Bot Test',
+    [bot],
+    [[system]],
+    1,
+    [],
+    1,
+    new Map(),
+    new Map([[1, bot]]),
+    new Map(),
+    new Map([[bot.playerName, bot.playerId]])
+  );
+
+  return { galaxy, bot, targetPlanet, sourcePlanets };
+}
+
 function configureBaseStrategicDevelopmentPlanet(planet: Planet): void {
   planet.setBuildingLevel(BuildingType.METAL_MINE, 1);
   planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 1);
@@ -781,6 +860,95 @@ function setSupportShipTech(bot: Player): void {
   bot.setTechLevel(TechnologyType.COMPUTER_TECHNOLOGY, 2);
   bot.setTechLevel(TechnologyType.ENERGY_TECHNOLOGY, 2);
   bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 2);
+}
+
+function createResearchConcentrationProposal(
+  galaxy: Galaxy,
+  targetPlanet: Planet,
+  requiredResources: { metal: number; crystal: number; deuterium: number }
+): BotProposal {
+  return {
+    proposalId: `research:concentration:test:${targetPlanet.basicInfo.order}`,
+    subsystemId: 'RESEARCH',
+    kind: 'NO_OP',
+    status: 'PROPOSED',
+    goalKey: `research:${TechnologyType.ASTROPHYSICS_TECHNOLOGY}:6`,
+    dedupeKey: `research:concentration:${TechnologyType.ASTROPHYSICS_TECHNOLOGY}`,
+    summary: 'Research concentration marker.',
+    planetId: null,
+    targetCoordinates: {
+      x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+      y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+      z: targetPlanet.basicInfo.order
+    },
+    expectedValue: 1,
+    urgency: 1,
+    risk: 1,
+    confidence: 1,
+    requestedResources: { ...requiredResources },
+    requestPayload: {
+      concentrationSignal: true,
+      targetKind: 'RESEARCH',
+      x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+      y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+      z: targetPlanet.basicInfo.order,
+      technologyType: TechnologyType.ASTROPHYSICS_TECHNOLOGY,
+      nextLevel: 6,
+      requiredResources: { ...requiredResources }
+    },
+    blockers: [],
+    expiresOnTurn: galaxy.currentTurn + 1,
+    debug: {
+      resourceConcentrationRequest: true,
+      concentrationTargetKind: 'RESEARCH'
+    }
+  };
+}
+
+function createStrategicMilitaryFarmAttackProposal(sourcePlanet: Planet, targetPlanet: Planet): BotProposal {
+  return {
+    proposalId: 'strategic-military:farm-attack',
+    subsystemId: 'STRATEGIC_MILITARY',
+    kind: 'FLEET_MISSION',
+    status: 'PROPOSED',
+    goalKey: 'strategic-military:farm-attack',
+    dedupeKey: 'strategic-military:farm-attack',
+    summary: 'Farm attack.',
+    planetId: null,
+    targetCoordinates: {
+      x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+      y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+      z: targetPlanet.basicInfo.order
+    },
+    expectedValue: 100,
+    urgency: 80,
+    risk: 10,
+    confidence: 80,
+    requestedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    requestPayload: {
+      missionType: FleetMissionType.ATTACK,
+      origin: {
+        x: sourcePlanet.basicInfo.solarSystem.coordinates.x,
+        y: sourcePlanet.basicInfo.solarSystem.coordinates.y,
+        z: sourcePlanet.basicInfo.order
+      },
+      target: {
+        x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+        y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+        z: targetPlanet.basicInfo.order
+      },
+      ships: [{ type: ShipType.TRANSPORTER, undamagedAmount: 1, damagedAmount: 0 }],
+      carriedBombs: [],
+      cargo: { metal: 0, crystal: 0, deuterium: 0 },
+      useJumpGate: false,
+      bombardmentPriorities: null
+    },
+    blockers: [],
+    expiresOnTurn: null,
+    debug: {
+      missionPhase: 'PLUNDER'
+    }
+  };
 }
 
 function markPlanetScanned(bot: Player, planet: Planet, createdTurn: number): void {
