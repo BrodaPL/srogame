@@ -17,7 +17,7 @@ import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
   styleUrl: './main-menu.component.css'
 })
 export class MainMenuComponent {
-  protected readonly appVersion = '0.910';
+  protected readonly appVersion = '0.920';
   protected readonly session: AuthStateService['session'];
   protected currentGameStatus: CurrentGameStatusResponse | null = null;
   protected isLoadingCurrentGameStatus = false;

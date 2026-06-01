@@ -40,6 +40,8 @@
 }
 
 .planet-view__parameters {
+  display: flex;
+  flex-direction: column;
   justify-self: start;
   width: 100%;
   max-width: 460px;
@@ -81,6 +83,16 @@
 .planet-parameters-grid {
   display: grid;
   gap: 0.28rem;
+}
+
+.planet-parameters-grid--footer {
+  margin-top: auto;
+  padding-top: 0.55rem;
+}
+
+.planet-parameters-grid--footer .planet-parameters-grid__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .planet-parameters-grid__row {
