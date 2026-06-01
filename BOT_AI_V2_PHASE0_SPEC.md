@@ -635,6 +635,7 @@ Current behavior:
 - exact fleet proposals can become `PENDING_SHIPS_NEXT_TURN` only when the missing exact ship type/count is completing next turn
 - fleet-slot usage is accounted separately from resource spending, using the same target-share policy as a soft alignment input
 - own-planet Jump Gate use is enabled by default when the shared command validation says it is legal and auto-approved
+- own-planet Jump Gate auto-selection runs through `jump-gate-operating-cost-policy.ts`; the current quote is zero because Jump Gates have no operating-cost model yet, and future paid costs should be centralized there instead of embedded in individual subsystems
 - foreign/allied Jump Gate request creation is not a standalone Supervisor proposal; it can happen through an accepted `FLEET_MISSION` whose owning subsystem set `useJumpGate: true`
 - Strategic Diplomatic allied `DEFEND` support can set `useJumpGate: true` when both the chosen origin and known allied target expose Jump Gates; the shared fleet command then creates the pending foreign/allied Jump Gate request for that waiting fleet
 - incoming foreign/allied Jump Gate approval is request-driven: Strategic Diplomatic emits `REQUEST_DECISION`, then Supervisor executes the shared Jump Gate request command

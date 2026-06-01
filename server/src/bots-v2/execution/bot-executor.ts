@@ -37,10 +37,12 @@ import {
 import {
   calculateFleetTravelTurns,
   calculateTravelDistance,
+  calculatePlayerFuelCost,
   calculateMaxLabsPerTechnology,
   isJumpGateAutoApprovedStatus,
   isJumpGateMissionAllowed,
   resolvePlanetOrError,
+  resolvePlayerById,
   sameCoordinates,
   TECHNOLOGY_BLUEPRINTS,
   toShipAmountEntriesFromSelections,
@@ -48,6 +50,7 @@ import {
 } from '../../game-commands/command-helpers.js';
 import type { BotExecutionOutcome, BotExecutor, BotProposal } from '../bot-v2-types.ts';
 import { estimateShipCountsAntiFleetStrength } from '../ship-payload-planning.js';
+import { evaluateJumpGateOperatingCostPolicy } from '../jump-gate-operating-cost-policy.js';
 import { normalizeFleetExecutionProposal } from './bot-fleet-execution-adapters.js';
 import { normalizeQueueExecutionProposal } from './bot-execution-adapters.js';
 import { normalizeRequestDecisionProposal } from './bot-request-decision-adapters.js';
@@ -497,7 +500,6 @@ export class LiveQueueBotExecutor implements BotExecutor {
   }
 
   private shouldUseOwnJumpGate(command: CreateFleetMissionCommand): boolean {
-    // TODO: Future Supervisor phases should account for Jump Gate operating costs once they exist.
     if (!isJumpGateMissionAllowed(command.missionType)) {
       return false;
     }
@@ -508,8 +510,13 @@ export class LiveQueueBotExecutor implements BotExecutor {
       return false;
     }
 
-    const totalSelectedShips = toShipAmountEntriesFromSelections(command.ships)
-      .reduce((sum, entry) => sum + entry.amount, 0);
+    const player = resolvePlayerById(this.galaxy, this.playerId);
+    if (!player) {
+      return false;
+    }
+
+    const selectedShipEntries = toShipAmountEntriesFromSelections(command.ships);
+    const totalSelectedShips = selectedShipEntries.reduce((sum, entry) => sum + entry.amount, 0);
     const jumpGateAccess = validateJumpGateLaunchAccess(
       this.galaxy,
       this.playerId,
@@ -518,7 +525,19 @@ export class LiveQueueBotExecutor implements BotExecutor {
       targetResult.value,
       totalSelectedShips
     );
-    return !('error' in jumpGateAccess) && isJumpGateAutoApprovedStatus(jumpGateAccess.status);
+    if ('error' in jumpGateAccess || !isJumpGateAutoApprovedStatus(jumpGateAccess.status)) {
+      return false;
+    }
+
+    const travelDistance = calculateTravelDistance(command.origin, command.target);
+    const operatingCostDecision = evaluateJumpGateOperatingCostPolicy({
+      missionType: command.missionType,
+      selectedShipCount: totalSelectedShips,
+      normalTravelTurns: calculateFleetTravelTurns(travelDistance, player, selectedShipEntries),
+      jumpGateTravelTurns: 1,
+      fuelCost: calculatePlayerFuelCost(selectedShipEntries, travelDistance, 1, player)
+    });
+    return operatingCostDecision.allowed;
   }
 
   private recallInvalidOffensiveFleets(): BotExecutionOutcome[] {
