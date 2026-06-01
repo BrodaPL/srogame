@@ -42,7 +42,7 @@ This document is a working engineering spec, not a final behavior design for all
 - full reservation system
 - full long-term commitment engine
 - outgoing maintenance request creation
-- standalone outgoing Jump Gate request creation; foreign/allied Jump Gate requests are created only as a side effect of accepted fleet proposals with `useJumpGate: true`
+- standalone outgoing Jump Gate request creation is intentionally not a separate proposal path; Jump Gate requests require a waiting fleet, so foreign/allied requests are created as a side effect of accepted fleet proposals with `useJumpGate: true`
 - score tuning
 - behavior parity with the removed V1 bot
 
@@ -625,7 +625,7 @@ Current behavior:
 - `RECYCLE` stays deferred until a subsystem emits and owns explicit recycle proposals
 - `BOMBARD` and `SIEGE` get a simple Supervisor trace precheck when proposal metadata says the target is not `WAR`
 - Strategic Diplomatic now also persists a per-faction `warAdvantageLevel` (`-2 .. +2`) from the 20-turn war-evaluation cadence; ship-loss value is dominant, structural damage is medium-high, and plunder is light
-- outgoing maintenance request creation and standalone outgoing Jump Gate request creation are deferred and traced
+- outgoing maintenance request creation is deferred and traced; standalone outgoing Jump Gate request creation is not a separate proposal path because Jump Gate requests require a waiting fleet
 - accepted diplomacy decisions execute before lifecycle recall, then normal accepted actions execute after recall
 - Supervisor lifecycle recall returns own `ATTACK`, `BOMBARD`, `SIEGE`, and `SPY` fleets in `MOVING_TO_TARGET`, `PENDING_JUMP_GATE`, or `ORBITING` when the target owner relation is now `NEUTRAL`, `PEACE`, or `ALLIED`
 - fresh-intel bombardment safety is now also enforced at execution time: active `BOMBARD` / `SIEGE` fleets can be recalled when new defender anti-fleet strength exceeds the configured threshold relative to the planned bot fleet
@@ -636,6 +636,7 @@ Current behavior:
 - fleet-slot usage is accounted separately from resource spending, using the same target-share policy as a soft alignment input
 - own-planet Jump Gate use is enabled by default when the shared command validation says it is legal and auto-approved
 - foreign/allied Jump Gate request creation is not a standalone Supervisor proposal; it can happen through an accepted `FLEET_MISSION` whose owning subsystem set `useJumpGate: true`
+- Strategic Diplomatic allied `DEFEND` support can set `useJumpGate: true` when both the chosen origin and known allied target expose Jump Gates; the shared fleet command then creates the pending foreign/allied Jump Gate request for that waiting fleet
 - incoming foreign/allied Jump Gate approval is request-driven: Strategic Diplomatic emits `REQUEST_DECISION`, then Supervisor executes the shared Jump Gate request command
 - TODO: check whether shared `DEFEND` launch/arrival logic fully supports own + allied/peace guard targets as intended
 

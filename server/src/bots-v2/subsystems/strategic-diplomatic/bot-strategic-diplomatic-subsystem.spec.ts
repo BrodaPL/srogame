@@ -1031,9 +1031,11 @@ describe('BotStrategicDiplomaticSubsystem', () => {
       createDiplomaticRelation(bot.playerId, alliedContact.playerId, DiplomaticStatus.ALLIED)
     );
     enableAdvancedWarProduction(botPlanet, bot);
+    botPlanet.setBuildingLevel(BuildingType.JUMP_GATE, 1);
+    alliedContact.planets[0]!.setBuildingLevel(BuildingType.JUMP_GATE, 1);
     botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
     markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn, { forcedReportLevel: 12 });
-    markPlanetScanned(bot, alliedContact, alliedContact.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 10 });
+    markPlanetScanned(bot, alliedContact, alliedContact.planets[0]!, galaxy.currentTurn, { forcedReportLevel: 12 });
     addDirectVictimBattleReport(alliedContact, playerEnemy, alliedContact.planets[0]!, galaxy.currentTurn, 5, 2);
 
     const result = runStrategicDiplomaticSubsystem(galaxy, bot);
@@ -1044,6 +1046,8 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     );
 
     expect(supportProposal).toBeDefined();
+    expect(supportProposal?.requestPayload.useJumpGate).toBe(true);
+    expect(supportProposal?.debug.useJumpGate).toBe(true);
     expect(result.memory.strategicDiplomatic.sharedHostileEvents.some((entry) =>
       entry.sharedFromPlayerId === alliedContact.playerId
       && entry.attackerPlayerId === playerEnemy.playerId

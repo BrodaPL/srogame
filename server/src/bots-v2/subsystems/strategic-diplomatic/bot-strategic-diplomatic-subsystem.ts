@@ -183,6 +183,7 @@ type SupportMissionRequest = {
   travelTurns: number;
   score: number;
   needReason: 'EXPLICIT_REQUEST' | 'RECENT_ATTACK';
+  useJumpGate: boolean;
 };
 
 type WarShipNeedRequest = {
@@ -3052,6 +3053,25 @@ function canUseOwnJumpGate(
   return toCoordinatesKey(destinationPlanet.coordinates) !== toCoordinatesKey(originPlanet.coordinates);
 }
 
+function canUseFriendlyJumpGate(
+  originPlanet: BotPlanetSnapshot,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  faction: EvaluatedFaction,
+  missionType: FleetMissionType
+): boolean {
+  if (!isJumpGateMissionAllowed(missionType)) {
+    return false;
+  }
+  if (originPlanet.economy.jumpGateLevel <= 0 || (targetPlanet.jumpGateLevel ?? 0) <= 0) {
+    return false;
+  }
+  if (toCoordinatesKey(originPlanet.coordinates) === toCoordinatesKey(targetPlanet.coordinates)) {
+    return false;
+  }
+
+  return faction.faction.currentStatus === DiplomaticStatus.ALLIED;
+}
+
 function resolveBestArmamentCarrier(
   originPlanet: BotPlanetSnapshot
 ): { type: ShipType; hangarCapacity: number } | null {
@@ -4723,7 +4743,8 @@ function createRepairSupportPlan(
         travelDistance: distance,
         travelTurns: resolveTravelTurns(originPlanet, distance),
         score: 380 + (targetPlanet.recentBattleReportCount * 18) + sharedUrgency + (needReason === 'EXPLICIT_REQUEST' ? 36 : 0),
-        needReason
+        needReason,
+        useJumpGate: false
       } satisfies SupportMissionRequest;
     })
     .filter((entry): entry is SupportMissionRequest => entry !== null)
@@ -4746,7 +4767,13 @@ function createGuardSupportPlan(
   const validPlans = context.snapshot.planets
     .map((originPlanet): SupportMissionRequest | null => {
       const distance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
-      const travelTurns = resolveTravelTurns(originPlanet, distance);
+      const useJumpGate = canUseFriendlyJumpGate(
+        originPlanet,
+        targetPlanet,
+        faction,
+        FleetMissionType.DEFEND
+      );
+      const travelTurns = useJumpGate ? 1 : resolveTravelTurns(originPlanet, distance);
       const selection = selectCombatShipsForStrength(originPlanet, requiredStrength, distance);
       if (selection.ships.length <= 0 || selection.combatStrength < requiredStrength) {
         return null;
@@ -4764,7 +4791,8 @@ function createGuardSupportPlan(
         travelDistance: distance,
         travelTurns,
         score: 420 + (targetPlanet.recentBattleReportCount * 22) + sharedUrgency + (needReason === 'EXPLICIT_REQUEST' ? 28 : 0),
-        needReason
+        needReason,
+        useJumpGate
       } satisfies SupportMissionRequest;
     })
     .filter((entry): entry is SupportMissionRequest => entry !== null)
@@ -6444,7 +6472,7 @@ function createSupportMissionProposal(
       ships: request.ships.map((ship) => ({ ...ship })),
       carriedBombs: [],
       cargo: emptyResources(),
-      useJumpGate: false,
+      useJumpGate: request.useJumpGate,
       bombardmentPriorities: null
     },
     blockers: [],
@@ -6457,7 +6485,8 @@ function createSupportMissionProposal(
       requiredStrength: request.requiredStrength,
       selectedStrength: Math.round(request.selectedStrength),
       travelDistance: request.travelDistance,
-      travelTurns: request.travelTurns
+      travelTurns: request.travelTurns,
+      useJumpGate: request.useJumpGate
     }
   };
 }
