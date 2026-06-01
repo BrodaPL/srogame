@@ -42,6 +42,7 @@ import type {
 } from '../../src/app/models/game-api-types.ts';
 import type { BuildingQueueEntry as BuildingQueueEntryModel } from '../../src/app/models/buildings/building-queue-entry.ts';
 import type { Fleet as FleetModel } from '../../src/app/models/fleets/fleet.ts';
+import type { FleetOperationHistoryEntry } from '../../src/app/models/fleets/fleet-operation-history.ts';
 import type { ShipyardQueueEntry as ShipyardQueueEntryModel } from '../../src/app/models/fleets/shipyard-queue-entry.ts';
 import type { PlayerReport } from '../../src/app/models/reports/player-report.ts';
 import type { EspionageReportData } from '../../src/app/models/reports/espionage-report-data.ts';
@@ -256,6 +257,11 @@ type SavedFleet = {
   remoteOriginSourceFleetId: number | null;
 };
 
+type SavedFleetOperationHistoryEntry = Omit<FleetOperationHistoryEntry, 'origin' | 'target'> & {
+  origin: SavedCoordinates;
+  target: SavedCoordinates;
+};
+
 type SavedResourceSupportRequest = Omit<
   Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' }>,
   'targetCoordinates' | 'requestedResources' | 'approvedResources' | 'reservedSourceCoordinates'
@@ -351,6 +357,7 @@ type SavedGalaxy = {
   players: SavedPlayer[];
   stars: SavedSolarSystem[][];
   activeFleets: SavedFleet[];
+  recentFleetOperations?: SavedFleetOperationHistoryEntry[];
   diplomaticRelations: GalaxyModel['diplomaticRelations'];
   diplomaticProposals: GalaxyModel['diplomaticProposals'];
   jumpGateRequests: GalaxyModel['jumpGateRequests'];
@@ -438,6 +445,7 @@ export function createGameSave(
         planets: system.planets.map((planet) => serializePlanet(planet))
       }))),
       activeFleets: galaxy.activeFleets.map((fleet) => serializeFleet(fleet)),
+      recentFleetOperations: galaxy.recentFleetOperations.map((entry) => serializeFleetOperationHistoryEntry(entry)),
       diplomaticRelations: galaxy.diplomaticRelations.map((relation) => ({ ...relation })),
       diplomaticProposals: galaxy.diplomaticProposals.map((proposal) => ({ ...proposal })),
       jumpGateRequests: galaxy.jumpGateRequests.map((request) => ({
@@ -746,7 +754,8 @@ export function hydrateGameSave(save: SavedGameFile): HydratedGameSave {
     })),
     save.galaxy.nextMaintenanceRequestId ?? 1,
     (save.galaxy.supportRequests ?? []).map((request) => hydrateSupportRequest(request)),
-    save.galaxy.nextSupportRequestId ?? 1
+    save.galaxy.nextSupportRequestId ?? 1,
+    (save.galaxy.recentFleetOperations ?? []).map((entry) => hydrateFleetOperationHistoryEntry(entry))
   );
 
   return {
@@ -949,6 +958,16 @@ function hydrateSavedFleet(savedFleet: SavedFleet): FleetModel {
   );
 
   return fleet;
+}
+
+function hydrateFleetOperationHistoryEntry(entry: SavedFleetOperationHistoryEntry): FleetOperationHistoryEntry {
+  return {
+    ...entry,
+    origin: serializeCoordinates(entry.origin),
+    target: serializeCoordinates(entry.target),
+    payload: entry.payload ? { ...entry.payload } : undefined,
+    deltas: entry.deltas ? { ...entry.deltas } : undefined
+  };
 }
 
 function hydrateSavedPlayerMessage(savedMessage: SavedPlayerMessage): PlayerMessageModelType {
@@ -1282,6 +1301,16 @@ function serializeFleet(fleet: FleetModel): SavedFleet {
     remainingFuelReserve: fleet.remainingFuelReserve,
     isRemoteOrigin: fleet.isRemoteOrigin,
     remoteOriginSourceFleetId: fleet.remoteOriginSourceFleetId
+  };
+}
+
+function serializeFleetOperationHistoryEntry(entry: FleetOperationHistoryEntry): SavedFleetOperationHistoryEntry {
+  return {
+    ...entry,
+    origin: serializeCoordinates(entry.origin),
+    target: serializeCoordinates(entry.target),
+    payload: entry.payload ? { ...entry.payload } : undefined,
+    deltas: entry.deltas ? { ...entry.deltas } : undefined
   };
 }
 

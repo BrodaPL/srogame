@@ -34,6 +34,7 @@ import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
 import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../fleets/fleet';
 import { Destination } from '../fleets/destination';
+import type { FleetOperationHistoryEntry, FleetOperationOutcomeType } from '../fleets/fleet-operation-history';
 import { ManyShips, type ManyShipsLike } from '../fleets/many-ships';
 import { Ship } from '../fleets/ship';
 import { ShipInstance } from '../fleets/ship-instance';
@@ -120,32 +121,7 @@ type AttackBattleOutcomeDetails = {
   enemyDefencesLost: Record<string, number>;
 };
 
-export type PlayerFleetOutcomeLogEvent = {
-  fleetId: number;
-  ownerId: number;
-  missionType: FleetMissionType;
-  origin: { x: number; y: number; z: number };
-  target: { x: number; y: number; z: number };
-  createdAtTurn: number;
-  resolvedTurn: number;
-  outcomeType:
-    | 'ATTACK'
-    | 'BOMBARD'
-    | 'SIEGE'
-    | 'TRANSPORT'
-    | 'ARMAMENT_DELIVERY'
-    | 'COLONIZE'
-    | 'RECYCLE'
-    | 'REPAIR'
-    | 'RETURN'
-    | 'FAILURE'
-    | 'DESTROYED';
-  launchSummary: string;
-  resultSummary: string;
-  payload?: Record<string, unknown>;
-  deltas?: Record<string, unknown>;
-  terminal?: boolean;
-};
+export type PlayerFleetOutcomeLogEvent = FleetOperationHistoryEntry;
 
 export type TurnDifficultyConfig = {
   botDifficultyPercent?: number;
@@ -277,7 +253,7 @@ function createAttackOutcomeSummary(
 
 function resolveMissionOutcomeType(
   missionType: FleetMissionType
-): PlayerFleetOutcomeLogEvent['outcomeType'] | null {
+): FleetOperationOutcomeType | null {
   switch (missionType) {
     case FleetMissionType.TRANSPORT:
       return 'TRANSPORT';

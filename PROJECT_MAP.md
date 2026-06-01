@@ -141,6 +141,7 @@ Researches route note:
 Shared game UI components:
 - `src/app/game/ui/`
 - `src/app/game/ui/top-menu/` owns the shared in-game navigation, including the local-admin `Bot AI` link
+- `src/app/game/ui/fleet-operation-card/` owns the reusable active/resolved fleet operation row used by Operations View and Planet View operation sections
 - `src/app/game/game.component.ts` also owns client-side multiplayer AFK detection, presence heartbeats, and the auto-skip return notice overlay
 
 ## Client State Ownership
@@ -353,6 +354,7 @@ Queue command ownership note:
 
 Fleet operations:
 - `/api/game/active-fleets`
+- `/api/game/planet-operations`
 - `/api/game/active-fleets/:fleetId/maintenance-options`
 - `/api/game/active-fleets/:fleetId/maintenance-request`
 - `/api/game/active-fleets/:fleetId/return`
@@ -361,6 +363,7 @@ Fleet operations:
 
 Fleet command ownership note:
 - `server/src/index.ts` owns auth/session checks, mission payload parsing, and HTTP response DTO shaping for fleet launch
+- `server/src/index.ts::buildPlanetOperationsResponse(...)` owns the planet-scoped operation feed for Planet View: own outgoing fleets, own plus Sensor-Phalanx-known incoming fleets, and recent resolved operations from `Galaxy.recentFleetOperations`
 - `server/src/game-commands/fleet-commands.ts` owns fleet-launch validation + mutation, including mission validation, cargo/fuel checks, and Jump Gate launch side effects
 - `server/src/game-commands/maintenance-commands.ts` owns fleet-maintenance option validation, request creation, and auto-approved depot transfer side effects for maintenance requests
 - `server/src/game-commands/jump-gate-request-commands.ts` owns Jump Gate mail-request approval/reject/cancel validation + mutation

@@ -319,7 +319,8 @@ import type {
   SensorPhalanxCapabilitiesDto,
   SensorPhalanxFleetContactDto,
   SensorPhalanxScanRequest,
-  SensorPhalanxScanResponse
+  SensorPhalanxScanResponse,
+  PlanetOperationsResponse
 } from '../../src/app/models/game-api-types.ts';
 import type { MultiplayerLobbyState } from './multiplayer-lobby.js';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
@@ -351,6 +352,7 @@ import type { Player } from '../../src/app/models/player.ts';
 import type { BotProfileId } from '../../src/app/models/player.ts';
 import type { PlayerMessage } from '../../src/app/models/mail/player-message.ts';
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
+import type { FleetOperationHistoryEntry } from '../../src/app/models/fleets/fleet-operation-history.ts';
 import type {
   BombardmentPriorities as BombardmentPrioritiesType,
   BombardmentPrioritySelection as BombardmentPrioritySelectionType
@@ -517,6 +519,8 @@ const { ResourcesPack } = resourcesPackModule as {
   ResourcesPack: typeof import('../../src/app/models/resources-pack.js').ResourcesPack;
 };
 export const app = express();
+const RECENT_FLEET_OPERATION_HISTORY_TURNS = 10;
+const MAX_RECENT_FLEET_OPERATION_HISTORY_ENTRIES = 500;
 const PORT = Number(process.env.PORT ?? 3000);
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN?.trim();
 
@@ -4156,6 +4160,40 @@ app.get('/api/game/active-fleets', (req, res) => {
   return res.status(200).json(response);
 });
 
+app.get('/api/game/planet-operations', (req, res) => {
+  if (!currentGalaxy || currentGameOwnerId === null) {
+    return res.status(404).json({ error: 'No active game.' });
+  }
+
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  if (!canSessionAccessCurrentGame(currentGalaxy, auth.session)) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const playerId = resolvePlayerId(currentGalaxy, auth.session);
+  if (playerId === null) {
+    return res.status(404).json({ error: 'Player not found in galaxy.' });
+  }
+
+  const coordinates = parseQueryCoordinates(req.query);
+  if (!coordinates) {
+    return res.status(400).json({ error: 'Invalid planet coordinates.' });
+  }
+
+  const planet = resolvePlanetAtCoordinates(currentGalaxy, coordinates);
+  if (!planet || planet.info.ownerId !== playerId) {
+    return res.status(404).json({ error: 'Owned planet not found.' });
+  }
+
+  const resolvedTurns = Math.max(1, Math.min(RECENT_FLEET_OPERATION_HISTORY_TURNS, parseOptionalInt(req.query.resolvedTurns) ?? 1));
+  const response = buildPlanetOperationsResponse(currentGalaxy, playerId, coordinates, resolvedTurns);
+  return res.status(200).json(response);
+});
+
 app.get('/api/game/active-fleets/:fleetId/maintenance-options', (req, res) => {
   const authPlayer = resolveAuthenticatedGamePlayer(req);
   if ('error' in authPlayer) {
@@ -6612,6 +6650,8 @@ function handleEndTurnRequest(
     resolvePhaseOneTurn(access.galaxy, resolvedTurnNumber, {
       botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0,
       fleetOutcomeLogger: (event) => {
+        recordRecentFleetOperation(access.galaxy, event);
+
         if (!currentGameOwnerPlayerName || !currentTrackedPlayerActionFleetIds.has(event.fleetId)) {
           return;
         }
@@ -6972,6 +7012,17 @@ function parseOptionalInt(value: unknown): number | null {
   }
 
   return parsed;
+}
+
+function parseQueryCoordinates(query: Record<string, unknown>): ClientCoordinates | null {
+  const x = parseOptionalInt(query['x']);
+  const y = parseOptionalInt(query['y']);
+  const z = parseOptionalInt(query['z']);
+  if (x === null || y === null || z === null || x < 0 || y < 0 || z < 0) {
+    return null;
+  }
+
+  return { x, y, z };
 }
 
 function parseNonNegativeInt(value: unknown): number | null {
@@ -8848,6 +8899,104 @@ function buildOwnedActiveFleetsResponse(galaxy: Galaxy, playerId: number): Fleet
   return galaxy.activeFleets
     .filter((fleet) => fleet.ownerId === playerId)
     .map((fleet) => annotateFleetRequestMetadata(galaxy, fleet));
+}
+
+function buildPlanetOperationsResponse(
+  galaxy: Galaxy,
+  playerId: number,
+  coordinates: ClientCoordinates,
+  resolvedTurns: number
+): PlanetOperationsResponse {
+  synchronizeJumpGateRequests(galaxy);
+  synchronizeMaintenanceRequests(galaxy);
+  synchronizeSupportRequests(galaxy);
+
+  const planet = resolvePlanetAtCoordinates(galaxy, coordinates);
+  const knownIncomingFleetIds = new Set(planet?.rBDSFTQ.sensorPhalanxKnownIncomingFleetIds ?? []);
+  const minimumResolvedTurn = Math.max(1, galaxy.currentTurn - Math.max(1, resolvedTurns) + 1);
+
+  const outgoing = galaxy.activeFleets
+    .filter((fleet) => fleet.ownerId === playerId && sameCoordinates(fleet.origin, coordinates))
+    .map((fleet) => annotateFleetRequestMetadata(galaxy, fleet))
+    .sort(compareFleetsForOperations);
+
+  const incoming = galaxy.activeFleets
+    .filter((fleet) =>
+      sameCoordinates(fleet.target, coordinates)
+      && (
+        fleet.ownerId === playerId
+        || knownIncomingFleetIds.has(fleet.fleetId)
+      )
+    )
+    .map((fleet) => fleet.ownerId === playerId ? annotateFleetRequestMetadata(galaxy, fleet) : fleet)
+    .sort(compareFleetsForOperations);
+
+  const resolved = galaxy.recentFleetOperations
+    .filter((entry) =>
+      entry.resolvedTurn >= minimumResolvedTurn
+      && (
+        (
+          entry.ownerId === playerId
+          && (
+            sameCoordinates(entry.origin, coordinates)
+            || sameCoordinates(entry.target, coordinates)
+          )
+        )
+        || sameCoordinates(entry.target, coordinates)
+      )
+    )
+    .map((entry) => normalizeFleetOperationHistoryEntry(galaxy, entry))
+    .sort((left, right) =>
+      right.resolvedTurn - left.resolvedTurn
+      || right.fleetId - left.fleetId
+    );
+
+  return {
+    outgoing,
+    incoming,
+    resolved
+  };
+}
+
+function compareFleetsForOperations(left: Fleet, right: Fleet): number {
+  return left.createdAtTurn - right.createdAtTurn
+    || left.fleetId - right.fleetId;
+}
+
+function recordRecentFleetOperation(galaxy: Galaxy, event: PlayerFleetOutcomeLogEvent): void {
+  const entry = normalizeFleetOperationHistoryEntry(galaxy, event);
+  const minimumTurn = Math.max(1, entry.resolvedTurn - RECENT_FLEET_OPERATION_HISTORY_TURNS + 1);
+
+  galaxy.recentFleetOperations = [
+    ...galaxy.recentFleetOperations.filter((existing) =>
+      existing.resolvedTurn >= minimumTurn
+      && !(existing.fleetId === entry.fleetId && existing.resolvedTurn === entry.resolvedTurn && existing.outcomeType === entry.outcomeType)
+    ),
+    entry
+  ]
+    .sort((left, right) =>
+      right.resolvedTurn - left.resolvedTurn
+      || right.fleetId - left.fleetId
+    )
+    .slice(0, MAX_RECENT_FLEET_OPERATION_HISTORY_ENTRIES);
+}
+
+function normalizeFleetOperationHistoryEntry(
+  galaxy: Galaxy,
+  entry: FleetOperationHistoryEntry
+): FleetOperationHistoryEntry {
+  const originPlanet = resolvePlanetAtCoordinates(galaxy, entry.origin);
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, entry.target);
+
+  return {
+    ...entry,
+    origin: { ...entry.origin },
+    target: { ...entry.target },
+    originPlanetName: entry.originPlanetName ?? originPlanet?.basicInfo.name ?? `Planet ${entry.origin.x}:${entry.origin.y}:${entry.origin.z}`,
+    targetPlanetName: entry.targetPlanetName ?? targetPlanet?.basicInfo.name ?? `Planet ${entry.target.x}:${entry.target.y}:${entry.target.z}`,
+    payload: entry.payload ? { ...entry.payload } : undefined,
+    deltas: entry.deltas ? { ...entry.deltas } : undefined
+  };
 }
 
 function annotateFleetRequestMetadata(galaxy: Galaxy, fleet: Fleet): Fleet {

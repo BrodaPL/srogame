@@ -1,0 +1,184 @@
+:host {
+  display: block;
+}
+
+.fleet-operation-card {
+  --operations-row-accent: rgba(255, 255, 255, 0.12);
+  --operations-row-tint: transparent;
+  display: grid;
+  gap: 0.7rem;
+  align-content: start;
+  padding-top: 0.5rem;
+  padding-bottom: 0.1rem;
+  border-left: 4px solid var(--operations-row-accent);
+  background:
+    linear-gradient(90deg, var(--operations-row-tint), transparent 30%),
+    var(--panel);
+}
+
+.fleet-operation-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.fleet-operation-card__fleet-meta {
+  min-width: 0;
+}
+
+.fleet-operation-card__fleet-meta-line {
+  display: block;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.fleet-operation-card__head-actions,
+.fleet-operation-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.fleet-operation-card__head-actions {
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.fleet-operation-card__ships {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-family: var(--font-mono), serif;
+}
+
+.fleet-operation-card__coordinate-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.32rem;
+  align-items: center;
+}
+
+.fleet-operation-card__coordinate-segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  align-items: center;
+}
+
+.fleet-operation-card__coordinate-segment[data-relation='own'] {
+  color: #63c874;
+}
+
+.fleet-operation-card__coordinate-segment[data-relation='war'] {
+  color: #e45b5b;
+}
+
+.fleet-operation-card__coordinate-segment[data-relation='allied'] {
+  color: #5f92e8;
+}
+
+.fleet-operation-card__coordinate-segment[data-relation='peace'] {
+  color: #d8bf46;
+}
+
+.fleet-operation-card__coordinate-link {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12rem;
+  cursor: pointer;
+}
+
+.fleet-operation-card__coordinate-link:hover {
+  color: #fff;
+}
+
+.fleet-operation-card__coordinate-owner,
+.fleet-operation-card__coordinate-arrow {
+  color: inherit;
+}
+
+.fleet-operation-card__action {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.42rem 0.82rem;
+  cursor: pointer;
+}
+
+.fleet-operation-card__action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fleet-operation-card__action--header {
+  padding: 0.35rem 0.75rem;
+}
+
+.fleet-operation-card--attack {
+  --operations-row-accent: #f08c2f;
+  --operations-row-tint: rgba(240, 140, 47, 0.18);
+}
+
+.fleet-operation-card--repair {
+  --operations-row-accent: #d8bf46;
+  --operations-row-tint: rgba(216, 191, 70, 0.18);
+}
+
+.fleet-operation-card--transport {
+  --operations-row-accent: #3e86e8;
+  --operations-row-tint: rgba(62, 134, 232, 0.18);
+}
+
+.fleet-operation-card--colonize {
+  --operations-row-accent: #84d66d;
+  --operations-row-tint: rgba(132, 214, 109, 0.18);
+}
+
+.fleet-operation-card--movement {
+  --operations-row-accent: #1f7a48;
+  --operations-row-tint: rgba(31, 122, 72, 0.2);
+}
+
+.fleet-operation-card--spy {
+  --operations-row-accent: #8a63d2;
+  --operations-row-tint: rgba(138, 99, 210, 0.2);
+}
+
+.fleet-operation-card--bombard {
+  --operations-row-accent: #c93b3b;
+  --operations-row-tint: rgba(201, 59, 59, 0.22);
+}
+
+.fleet-operation-card--defend {
+  --operations-row-accent: #214f9a;
+  --operations-row-tint: rgba(33, 79, 154, 0.2);
+}
+
+.fleet-operation-card--resolved {
+  --operations-row-accent: rgba(255, 255, 255, 0.26);
+  --operations-row-tint: rgba(255, 255, 255, 0.06);
+  filter: grayscale(0.55);
+  opacity: 0.68;
+}
+
+@media (max-width: 720px) {
+  .fleet-operation-card__head {
+    display: grid;
+  }
+
+  .fleet-operation-card__head-actions {
+    justify-content: flex-start;
+  }
+}

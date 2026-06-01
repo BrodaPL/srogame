@@ -2,7 +2,7 @@ import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/d
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { finalize, forkJoin, timeout } from 'rxjs';
+import { catchError, finalize, forkJoin, of, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
@@ -32,7 +32,13 @@ import type {
   StartShipyardConstructionRequest,
   TechnologyQueueEntryDto,
   TradePortOfferDto,
-  UseTradePortOfferRequest
+  UseTradePortOfferRequest,
+  PlanetOperationsResponse,
+  CreateMaintenanceRequestResponse,
+  FleetMaintenanceBombOptionDto,
+  FleetMaintenanceOptionsDto,
+  FleetMaintenanceShipOptionDto,
+  MaintenanceTransferPayloadDto
 } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
 import { resolveFusionReactorOperation, type FusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
@@ -42,6 +48,7 @@ import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
 import { Fleet, FleetState } from '../../models/fleets/fleet';
+import type { FleetOperationHistoryEntry } from '../../models/fleets/fleet-operation-history';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { ManyDefences } from '../../models/defences/many-defences';
 import { isPlanetaryBombDefenceType, totalPlanetaryBombSize } from '../../models/defences/planetary-bomb';
@@ -72,6 +79,7 @@ import type {
   PlanetObjectDetailSection
 } from './planet-object-dialog.component';
 import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
+import { FleetOperationCardComponent } from '../ui/fleet-operation-card/fleet-operation-card.component';
 
 type PlanetTab = 'resources' | 'facilities' | 'ships' | 'defences' | 'operations' | 'queues';
 
@@ -147,7 +155,8 @@ type ResearchQueueRowVm = {
     CdkDrag,
     CdkDragHandle,
     PlanetObjectDialogComponent,
-    TooltipDirective
+    TooltipDirective,
+    FleetOperationCardComponent
   ],
   templateUrl: './planet-view.component.html',
   styleUrl: './planet-view.component.css'
@@ -163,6 +172,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected isAttentionHighlightActive = false;
   protected activeTab: PlanetTab = 'resources';
   protected activeFleets: Fleet[] = [];
+  protected planetOutgoingFleets: Fleet[] = [];
+  protected planetIncomingFleets: Fleet[] = [];
+  protected planetResolvedOperations: FleetOperationHistoryEntry[] = [];
+  protected planetOperationsError: string | null = null;
+  protected planetOperationsActionMessage: string | null = null;
+  protected planetOperationsActionError: string | null = null;
+  protected planetOperationsActionFleetId: number | null = null;
+  protected planetOperationOwnerInfoByCoordinates = new Map<string, { ownerId: number | null; ownerName: string | null }>();
+  protected planetMaintenanceDialogFleetId: number | null = null;
+  protected planetMaintenanceOptions: FleetMaintenanceOptionsDto | null = null;
+  protected planetMaintenanceDialogError: string | null = null;
+  protected planetMaintenanceDialogLoading = false;
+  protected planetMaintenanceSubmitting = false;
+  protected planetMaintenanceRequestedFuel = 0;
+  protected planetMaintenanceRequestedShipAmounts: Partial<Record<string, number>> = {};
+  protected planetMaintenanceRequestedBombAmounts: Partial<Record<string, number>> = {};
   protected coordinatesLabel = '--:--:--';
 
   protected metalDisplay: ResourceDisplay | null = null;
@@ -308,6 +333,173 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected isActiveTab(tab: PlanetTab): boolean {
     return this.activeTab === tab;
+  }
+
+  protected ownPlayerId(): number | null {
+    return this.planet?.info.ownerId ?? null;
+  }
+
+  protected hasPlanetOperations(): boolean {
+    return this.planetOutgoingFleets.length > 0
+      || this.planetIncomingFleets.length > 0
+      || this.planetResolvedOperations.length > 0;
+  }
+
+  protected isPlanetOperationActionPending(fleet: Fleet): boolean {
+    return this.planetOperationsActionFleetId === fleet.fleetId;
+  }
+
+  protected planetOperationOwnerInfos(): Map<string, { ownerId: number | null; ownerName: string | null }> {
+    return this.planetOperationOwnerInfoByCoordinates;
+  }
+
+  protected returnPlanetOperationFleet(fleet: Fleet): void {
+    this.runPlanetOperationFleetAction(
+      fleet,
+      (token) => this.gameApi.returnFleet(fleet.fleetId, token),
+      'Fleet return command sent.',
+      'Unable to return fleet.'
+    );
+  }
+
+  protected delayPlanetOperationFleet(fleet: Fleet): void {
+    this.runPlanetOperationFleetAction(
+      fleet,
+      (token) => this.gameApi.delayFleet(fleet.fleetId, token),
+      'Fleet delay command sent.',
+      'Unable to delay fleet.'
+    );
+  }
+
+  protected planetMaintenanceDialogOpen(): boolean {
+    return this.planetMaintenanceDialogFleetId !== null;
+  }
+
+  protected planetMaintenanceShipOptions(): FleetMaintenanceShipOptionDto[] {
+    return this.planetMaintenanceOptions?.availableShips ?? [];
+  }
+
+  protected planetMaintenanceBombOptions(): FleetMaintenanceBombOptionDto[] {
+    return this.planetMaintenanceOptions?.availableBombs ?? [];
+  }
+
+  protected selectedPlanetMaintenanceSupportUsage(): number {
+    return this.planetMaintenanceShipOptions().reduce((sum, option) =>
+      sum + ((this.planetMaintenanceRequestedShipAmounts[option.type] ?? 0) * option.size), 0)
+      + this.planetMaintenanceBombOptions().reduce((sum, option) =>
+        sum + ((this.planetMaintenanceRequestedBombAmounts[option.type] ?? 0) * option.size), 0);
+  }
+
+  protected hasPlanetMaintenanceSelection(): boolean {
+    return this.planetMaintenanceRequestedFuel > 0
+      || this.planetMaintenanceShipOptions().some((option) => (this.planetMaintenanceRequestedShipAmounts[option.type] ?? 0) > 0)
+      || this.planetMaintenanceBombOptions().some((option) => (this.planetMaintenanceRequestedBombAmounts[option.type] ?? 0) > 0);
+  }
+
+  protected canSubmitPlanetMaintenanceRequest(): boolean {
+    if (this.planetMaintenanceSubmitting || !this.planetMaintenanceOptions || !this.hasPlanetMaintenanceSelection()) {
+      return false;
+    }
+
+    if (this.planetMaintenanceRequestedFuel > Math.min(
+      this.planetMaintenanceOptions.fuelCap,
+      this.planetMaintenanceOptions.availableFuel,
+      this.planetMaintenanceOptions.remainingCargoCapacity
+    )) {
+      return false;
+    }
+
+    return this.selectedPlanetMaintenanceSupportUsage() <= this.planetMaintenanceOptions.supportCap;
+  }
+
+  protected updatePlanetMaintenanceRequestedFuel(value: number | string): void {
+    this.planetMaintenanceRequestedFuel = this.normalizeAmount(value);
+  }
+
+  protected updatePlanetMaintenanceRequestedShipAmount(type: string, value: number | string): void {
+    this.planetMaintenanceRequestedShipAmounts[type] = this.normalizeAmount(value);
+  }
+
+  protected updatePlanetMaintenanceRequestedBombAmount(type: string, value: number | string): void {
+    this.planetMaintenanceRequestedBombAmounts[type] = this.normalizeAmount(value);
+  }
+
+  protected openPlanetMaintenanceRequest(fleet: Fleet): void {
+    const session = this.playerSession.load();
+    if (!session) {
+      this.planetOperationsActionError = 'No player session found.';
+      return;
+    }
+
+    this.planetMaintenanceDialogFleetId = fleet.fleetId;
+    this.planetMaintenanceDialogLoading = true;
+    this.planetMaintenanceDialogError = null;
+    this.planetMaintenanceOptions = null;
+    this.planetMaintenanceRequestedFuel = 0;
+    this.planetMaintenanceRequestedShipAmounts = {};
+    this.planetMaintenanceRequestedBombAmounts = {};
+
+    this.gameApi.getFleetMaintenanceOptions(fleet.fleetId, session.token)
+      .pipe(finalize(() => {
+        this.planetMaintenanceDialogLoading = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (options) => {
+          this.planetMaintenanceOptions = options;
+        },
+        error: (error) => {
+          this.planetMaintenanceDialogError = error?.error?.error ?? 'Unable to load maintenance options.';
+        }
+      });
+  }
+
+  protected closePlanetMaintenanceRequest(): void {
+    if (this.planetMaintenanceSubmitting) {
+      return;
+    }
+
+    this.planetMaintenanceDialogFleetId = null;
+    this.planetMaintenanceOptions = null;
+    this.planetMaintenanceDialogError = null;
+    this.planetMaintenanceRequestedFuel = 0;
+    this.planetMaintenanceRequestedShipAmounts = {};
+    this.planetMaintenanceRequestedBombAmounts = {};
+  }
+
+  protected submitPlanetMaintenanceRequest(): void {
+    if (!this.canSubmitPlanetMaintenanceRequest() || this.planetMaintenanceDialogFleetId === null) {
+      return;
+    }
+
+    const session = this.playerSession.load();
+    if (!session) {
+      this.planetMaintenanceDialogError = 'No player session found.';
+      return;
+    }
+
+    this.planetMaintenanceSubmitting = true;
+    this.planetMaintenanceDialogError = null;
+    this.planetOperationsActionError = null;
+    this.planetOperationsActionMessage = null;
+
+    this.gameApi.createMaintenanceRequest(
+      this.planetMaintenanceDialogFleetId,
+      this.buildPlanetMaintenancePayload(),
+      session.token
+    )
+      .pipe(finalize(() => {
+        this.planetMaintenanceSubmitting = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (response) => {
+          this.handlePlanetMaintenanceResponse(response, session.token);
+        },
+        error: (error) => {
+          this.planetMaintenanceDialogError = error?.error?.error ?? 'Unable to submit maintenance request.';
+        }
+      });
   }
 
   protected buildingLevel(buildingType: BuildingType): number {
@@ -2639,7 +2831,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     forkJoin({
       planet: this.gameApi.getClientPlanet(x, y, z, session.token, { ownedOnly: true }),
       ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
-      activeFleets: this.gameApi.getActiveFleets(session.token)
+      activeFleets: this.gameApi.getActiveFleets(session.token),
+      planetOperations: this.gameApi.getPlanetOperations(x, y, z, session.token, 1)
     })
       .pipe(
         timeout(10000),
@@ -2654,7 +2847,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         })
       )
       .subscribe({
-        next: ({ planet, ownedPlanets, activeFleets }) => {
+        next: ({ planet, ownedPlanets, activeFleets, planetOperations }) => {
           if (this.currentPlanetRequestKey !== requestKey) {
             return;
           }
@@ -2670,6 +2863,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
             this.planet = planet;
             this.ownedPlanets = this.sortOwnedPlanets(ownedPlanets);
             this.activeFleets = [...activeFleets];
+            this.applyPlanetOperations(planetOperations, session.token);
             this.coordinatesLabel = `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`;
             this.shipAmountInputs.clear();
             this.rebuildPlanetState();
@@ -2691,6 +2885,98 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.cdr.markForCheck();
         }
       });
+  }
+
+  private runPlanetOperationFleetAction(
+    fleet: Fleet,
+    action: (token: string) => ReturnType<GameApiService['getActiveFleets']>,
+    successMessage: string,
+    fallbackError: string
+  ): void {
+    const session = this.playerSession.load();
+    const planet = this.planet;
+    if (!session || !planet || this.planetOperationsActionFleetId !== null) {
+      return;
+    }
+
+    this.planetOperationsActionFleetId = fleet.fleetId;
+    this.planetOperationsActionError = null;
+    this.planetOperationsActionMessage = null;
+    this.cdr.markForCheck();
+
+    action(session.token)
+      .pipe(finalize(() => {
+        this.planetOperationsActionFleetId = null;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (activeFleets) => {
+          this.activeFleets = [...activeFleets];
+          this.planetOperationsActionMessage = successMessage;
+          this.reloadPlanetOperations(planet.coordinates, session.token);
+        },
+        error: (error) => {
+          this.planetOperationsActionError = error?.error?.error ?? fallbackError;
+        }
+      });
+  }
+
+  private reloadPlanetOperations(coordinates: ClientCoordinates, token: string): void {
+    this.gameApi.getPlanetOperations(coordinates.x, coordinates.y, coordinates.z, token, 1)
+      .subscribe({
+        next: (operations) => {
+          this.applyPlanetOperations(operations, token);
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          this.planetOperationsError = error?.error?.error ?? 'Unable to refresh planet operations.';
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  private applyPlanetOperations(operations: PlanetOperationsResponse, token: string): void {
+    this.planetOutgoingFleets = [...operations.outgoing];
+    this.planetIncomingFleets = [...operations.incoming];
+    this.planetResolvedOperations = [...operations.resolved];
+    this.planetOperationsError = null;
+    this.refreshPlanetOperationOwnerNames(token);
+  }
+
+  private buildPlanetMaintenancePayload(): MaintenanceTransferPayloadDto {
+    return {
+      fuel: this.planetMaintenanceRequestedFuel,
+      ships: this.planetMaintenanceShipOptions()
+        .map((option) => ({
+          type: option.type,
+          amount: Math.min(this.planetMaintenanceRequestedShipAmounts[option.type] ?? 0, option.available)
+        }))
+        .filter((entry) => entry.amount > 0),
+      bombs: this.planetMaintenanceBombOptions()
+        .map((option) => ({
+          type: option.type,
+          amount: Math.min(this.planetMaintenanceRequestedBombAmounts[option.type] ?? 0, option.available)
+        }))
+        .filter((entry) => entry.amount > 0)
+    };
+  }
+
+  private handlePlanetMaintenanceResponse(response: CreateMaintenanceRequestResponse, token: string): void {
+    this.activeFleets = [...response.activeFleets];
+    this.planetOperationsActionMessage = response.message;
+    this.closePlanetMaintenanceRequest();
+    if (this.planet) {
+      this.reloadPlanetOperations(this.planet.coordinates, token);
+    }
+  }
+
+  private normalizeAmount(value: number | string): number {
+    const numericValue = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(numericValue));
   }
 
   private rebuildPlanetState(): void {
@@ -4012,8 +4298,87 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.ownedPlanets = this.sortOwnedPlanets(this.ownedPlanets);
   }
 
+  private refreshPlanetOperationOwnerNames(token: string): void {
+    const ownerInfoByCoordinates = new Map<string, { ownerId: number | null; ownerName: string | null }>();
+    for (const planet of this.ownedPlanets) {
+      ownerInfoByCoordinates.set(this.coordinatesKey(planet.coordinates), {
+        ownerId: planet.info.ownerId,
+        ownerName: planet.info.ownerPlayerName ?? null
+      });
+    }
+
+    if (this.planet) {
+      ownerInfoByCoordinates.set(this.coordinatesKey(this.planet.coordinates), {
+        ownerId: this.planet.info.ownerId,
+        ownerName: this.planet.info.ownerPlayerName ?? null
+      });
+    }
+
+    const coordinatesToFetch = new Map<string, ClientCoordinates>();
+    for (const fleet of [...this.planetOutgoingFleets, ...this.planetIncomingFleets]) {
+      for (const coordinates of [fleet.origin, fleet.target]) {
+        const key = this.coordinatesKey(coordinates);
+        if (!ownerInfoByCoordinates.has(key) && !coordinatesToFetch.has(key)) {
+          coordinatesToFetch.set(key, { x: coordinates.x, y: coordinates.y, z: coordinates.z });
+        }
+      }
+    }
+
+    for (const operation of this.planetResolvedOperations) {
+      for (const coordinates of [operation.origin, operation.target]) {
+        const key = this.coordinatesKey(coordinates);
+        if (!ownerInfoByCoordinates.has(key) && !coordinatesToFetch.has(key)) {
+          coordinatesToFetch.set(key, { x: coordinates.x, y: coordinates.y, z: coordinates.z });
+        }
+      }
+    }
+
+    if (coordinatesToFetch.size <= 0) {
+      this.replacePlanetOperationOwnerInfos(ownerInfoByCoordinates);
+      return;
+    }
+
+    const coordinateEntries = [...coordinatesToFetch.entries()];
+    forkJoin(
+      coordinateEntries.map(([_, coordinates]) =>
+        this.gameApi.getClientPlanet(coordinates.x, coordinates.y, coordinates.z, token).pipe(
+          catchError(() => of(null))
+        )
+      )
+    ).subscribe({
+      next: (planets) => {
+        planets.forEach((planet, index) => {
+          const [key] = coordinateEntries[index] ?? [];
+          if (!key) {
+            return;
+          }
+          ownerInfoByCoordinates.set(key, {
+            ownerId: planet?.info.ownerId ?? null,
+            ownerName: planet?.info.ownerPlayerName ?? null
+          });
+        });
+        this.replacePlanetOperationOwnerInfos(ownerInfoByCoordinates);
+      },
+      error: () => {
+        this.replacePlanetOperationOwnerInfos(ownerInfoByCoordinates);
+      }
+    });
+  }
+
+  private replacePlanetOperationOwnerInfos(entries: Map<string, { ownerId: number | null; ownerName: string | null }>): void {
+    this.planetOperationOwnerInfoByCoordinates.clear();
+    for (const [key, ownerInfo] of entries.entries()) {
+      this.planetOperationOwnerInfoByCoordinates.set(key, ownerInfo);
+    }
+    this.cdr.markForCheck();
+  }
+
   private coordinatesLabelForPlanet(planet: ClientPlanetDto): string {
     return `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`;
+  }
+
+  private coordinatesKey(coordinates: ClientCoordinates): string {
+    return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
   }
 
   private sameCoordinates(

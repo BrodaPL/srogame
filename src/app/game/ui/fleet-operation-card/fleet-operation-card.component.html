@@ -1,0 +1,190 @@
+<article
+  class="overview-card fleet-operation-card"
+  [ngClass]="cardModifierClass()"
+  [attr.data-tutorial-id]="tutorialId">
+  <div class="fleet-operation-card__head">
+    <div class="fleet-operation-card__fleet-meta">
+      <span class="fleet-operation-card__fleet-meta-line">
+        {{ missionLabel() }} |
+        @if (activeFleet(); as fleet) {
+          {{ stateLabel(fleet) }}
+        } @else if (resolvedOperation; as operation) {
+          {{ resolvedStateLabel(operation) }}
+        }
+        @if (fleetId(); as id) {
+          | Fleet #{{ id }}
+        }
+      </span>
+    </div>
+    <div class="fleet-operation-card__head-actions">
+      @if (activeFleet(); as fleet) {
+        @if (isRemoteOriginFleet(fleet)) {
+          <span
+            class="badge badge--jump"
+            appTooltip="REMOTE ORIGIN: this fleet launched from an orbiting fleet position and returns to that remote orbit planet instead of a normal owned-planet homeworld.">
+            REMOTE ORIGIN
+          </span>
+        }
+        <span class="badge badge--jump">{{ totalShips(fleet) }} ships</span>
+        @if (canReturn(fleet)) {
+          <button
+            type="button"
+            class="fleet-operation-card__action fleet-operation-card__action--header"
+            [disabled]="actionPending"
+            (click)="requestReturn(fleet)">
+            Return now
+          </button>
+        }
+        @if (canDelay(fleet)) {
+          <button
+            type="button"
+            class="fleet-operation-card__action fleet-operation-card__action--header"
+            [disabled]="actionPending"
+            (click)="requestDelay(fleet)">
+            Delay +1
+          </button>
+        }
+      } @else {
+        <span class="badge badge--jump">Resolved</span>
+      }
+    </div>
+  </div>
+
+  @if (activeFleet(); as fleet) {
+    <div class="overview-stats">
+      <div class="overview-stat">
+        <span class="overview-stat__label">Current Position</span>
+        <span class="overview-stat__value">{{ currentLocationPlanetName(fleet) }}</span>
+        <span class="overview-muted fleet-operation-card__coordinate-line">
+          @for (segment of currentLocationSegments(fleet); track $index) {
+            @if ($index > 0) {
+              <span class="fleet-operation-card__coordinate-arrow">-></span>
+            }
+            <span
+              class="fleet-operation-card__coordinate-segment"
+              [attr.data-relation]="segment.relation">
+              <button
+                type="button"
+                class="fleet-operation-card__coordinate-link"
+                (click)="openCoordinatesInGalaxy(segment.coordinates)">
+                {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
+              </button>
+              @if (segment.ownerName) {
+                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerName }}</span>
+              }
+            </span>
+          }
+        </span>
+      </div>
+      <div class="overview-stat">
+        <span class="overview-stat__label">Destination</span>
+        <span class="overview-stat__value">{{ destinationPlanetName(fleet) }}</span>
+        <span class="overview-muted fleet-operation-card__coordinate-line">
+          @for (segment of destinationSegments(fleet); track $index) {
+            @if ($index > 0) {
+              <span class="fleet-operation-card__coordinate-arrow">-></span>
+            }
+            <span
+              class="fleet-operation-card__coordinate-segment"
+              [attr.data-relation]="segment.relation">
+              <button
+                type="button"
+                class="fleet-operation-card__coordinate-link"
+                (click)="openCoordinatesInGalaxy(segment.coordinates)">
+                {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
+              </button>
+              @if (segment.ownerName) {
+                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerName }}</span>
+              }
+            </span>
+          }
+        </span>
+      </div>
+      <div class="overview-stat">
+        <span class="overview-stat__label">ETA</span>
+        <span class="overview-stat__value">{{ hasEta(fleet) ? remainingEta(fleet) : 'Idle' }}</span>
+        <span class="overview-muted">{{ progressLabel(fleet) }}</span>
+      </div>
+      <div class="overview-stat">
+        <span class="overview-stat__label">Fuel</span>
+        <span class="overview-stat__value">{{ fleet.fuelCost }}</span>
+      </div>
+      <div class="overview-stat">
+        <span class="overview-stat__label">Cargo</span>
+        <span class="overview-stat__value">{{ fleet.usedCargoCapacity }} / {{ fleet.totalCargoCapacity }}</span>
+      </div>
+    </div>
+
+    <p class="fleet-operation-card__ships">{{ shipSummary(fleet) }}</p>
+    <p class="overview-muted">
+      Repair capability: Ship {{ shipRepairCapability(fleet) }} | Drone repair {{ droneRepairCapability(fleet) }} | Cargo manifest: M {{ fleet.cargo.metal }}, C {{ fleet.cargo.crystal }}, D {{ fleet.cargo.deuterium }}
+    </p>
+    @if (operationDetail(fleet); as detail) {
+      <p class="overview-muted">{{ detail }}</p>
+    }
+
+    @if (canRequestMaintenance(fleet)) {
+      <div class="fleet-operation-card__actions">
+        <button
+          type="button"
+          class="fleet-operation-card__action"
+          [disabled]="actionPending"
+          (click)="requestMaintenance(fleet)">
+          Request maintenance
+        </button>
+      </div>
+    }
+  } @else if (resolvedOperation; as operation) {
+    <div class="overview-stats">
+      <div class="overview-stat">
+        <span class="overview-stat__label">Origin</span>
+        <span class="overview-stat__value">{{ operationOriginName(operation) }}</span>
+        <span class="overview-muted fleet-operation-card__coordinate-line">
+          @for (segment of operationOriginSegments(operation); track $index) {
+            <span
+              class="fleet-operation-card__coordinate-segment"
+              [attr.data-relation]="segment.relation">
+              <button
+                type="button"
+                class="fleet-operation-card__coordinate-link"
+                (click)="openCoordinatesInGalaxy(segment.coordinates)">
+                {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
+              </button>
+              @if (segment.ownerName) {
+                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerName }}</span>
+              }
+            </span>
+          }
+        </span>
+      </div>
+      <div class="overview-stat">
+        <span class="overview-stat__label">Target</span>
+        <span class="overview-stat__value">{{ operationTargetName(operation) }}</span>
+        <span class="overview-muted fleet-operation-card__coordinate-line">
+          @for (segment of operationTargetSegments(operation); track $index) {
+            <span
+              class="fleet-operation-card__coordinate-segment"
+              [attr.data-relation]="segment.relation">
+              <button
+                type="button"
+                class="fleet-operation-card__coordinate-link"
+                (click)="openCoordinatesInGalaxy(segment.coordinates)">
+                {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
+              </button>
+              @if (segment.ownerName) {
+                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerName }}</span>
+              }
+            </span>
+          }
+        </span>
+      </div>
+      <div class="overview-stat">
+        <span class="overview-stat__label">Resolved</span>
+        <span class="overview-stat__value">Turn {{ operation.resolvedTurn }}</span>
+        <span class="overview-muted">{{ operation.outcomeType }}</span>
+      </div>
+    </div>
+    <p class="overview-muted">{{ operation.launchSummary }}</p>
+    <p class="overview-muted">{{ operation.resultSummary }}</p>
+  }
+</article>

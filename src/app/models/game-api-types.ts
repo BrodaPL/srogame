@@ -12,6 +12,7 @@ import type { DefencesQueue } from './reports/defences-queue';
 import type { ResearchQueue } from './reports/research-queue';
 import type { BuildingQueue } from './reports/building-queue';
 import type { Fleet } from './fleets/fleet';
+import type { FleetOperationHistoryEntry } from './fleets/fleet-operation-history';
 import type { NoteBorderColor } from './enums/note-border-color';
 import type { PlayerType } from './enums/player-type';
 import type { FleetMissionType } from './enums/fleet-mission-type';
@@ -1256,6 +1257,12 @@ export type CreateFleetMissionResponse = {
   activeFleets: Fleet[];
   mode?: 'LAUNCHED' | 'PENDING_JUMP_GATE';
   message?: string | null;
+};
+
+export type PlanetOperationsResponse = {
+  outgoing: Fleet[];
+  incoming: Fleet[];
+  resolved: FleetOperationHistoryEntry[];
 };
 
 export type CreateStarSystemSpyRequest = {

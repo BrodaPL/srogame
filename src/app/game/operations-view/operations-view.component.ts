@@ -24,8 +24,8 @@ import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship
 import { calculateRecycleCapabilityForManyShips } from '../../models/recycling/recycling-capability';
 import { maxActiveFleets } from '../../models/tech/technology-effects';
 import { TutorialService } from '../../tutorial/tutorial.service';
-import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
+import { FleetOperationCardComponent } from '../ui/fleet-operation-card/fleet-operation-card.component';
 
 type CoordinateSegmentVm = {
   coordinates: { x: number; y: number; z: number };
@@ -37,7 +37,7 @@ type MissionTypeFilterValue = FleetMissionType | 'ALL';
 
 @Component({
   selector: 'app-operations-view',
-  imports: [TopMenuComponent, RouterLink, FormsModule, TooltipDirective],
+  imports: [TopMenuComponent, RouterLink, FormsModule, FleetOperationCardComponent],
   templateUrl: './operations-view.component.html',
   styleUrl: './operations-view.styles.css'
 })
@@ -85,6 +85,14 @@ export class OperationsViewComponent implements OnInit {
 
   protected isRemoteOriginFleet(fleet: Fleet): boolean {
     return fleet.isRemoteOrigin === true;
+  }
+
+  protected ownPlayerId(): number | null {
+    return this.ownedPlanets[0]?.info.ownerId ?? null;
+  }
+
+  protected coordinateOwnerInfos(): Map<string, { ownerId: number | null; ownerName: string | null }> {
+    return this.ownerInfoByCoordinates;
   }
 
   protected primaryFleet(): Fleet | null {

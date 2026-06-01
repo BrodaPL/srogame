@@ -748,7 +748,168 @@
         }
 
         @if (isActiveTab('operations')) {
-          <p class="planet-tab-placeholder">Go away. Operations are not implemented yet.</p>
+          <div class="planet-operations">
+            @if (planetOperationsActionError) {
+              <p class="planet-operations__message planet-operations__message--error">{{ planetOperationsActionError }}</p>
+            }
+            @if (planetOperationsActionMessage) {
+              <p class="planet-operations__message planet-operations__message--success">{{ planetOperationsActionMessage }}</p>
+            }
+            @if (planetOperationsError) {
+              <p class="planet-operations__message planet-operations__message--error">{{ planetOperationsError }}</p>
+            }
+
+            <section class="planet-operations__section">
+              <header class="planet-operations__section-head">
+                <h4 class="planet-view__section-title">Outgoing</h4>
+                <span class="overview-muted">{{ planetOutgoingFleets.length }} active</span>
+              </header>
+              <div class="planet-operations__grid">
+                @for (fleet of planetOutgoingFleets; track fleet.fleetId) {
+                  <app-fleet-operation-card
+                    [fleet]="fleet"
+                    [ownPlayerId]="ownPlayerId()"
+                    [ownedPlanets]="ownedPlanets"
+                    [ownerInfoByCoordinates]="planetOperationOwnerInfos()"
+                    [actionPending]="isPlanetOperationActionPending(fleet)"
+                    (returnRequested)="returnPlanetOperationFleet($event)"
+                    (delayRequested)="delayPlanetOperationFleet($event)"
+                    (maintenanceRequested)="openPlanetMaintenanceRequest($event)"
+                  />
+                } @empty {
+                  <p class="planet-tab-placeholder">No outgoing fleets from this planet.</p>
+                }
+              </div>
+            </section>
+
+            <section class="planet-operations__section">
+              <header class="planet-operations__section-head">
+                <h4 class="planet-view__section-title">Incoming</h4>
+                <span class="overview-muted">{{ planetIncomingFleets.length }} known</span>
+              </header>
+              <div class="planet-operations__grid">
+                @for (fleet of planetIncomingFleets; track fleet.fleetId) {
+                  <app-fleet-operation-card
+                    [fleet]="fleet"
+                    [ownPlayerId]="ownPlayerId()"
+                    [ownedPlanets]="ownedPlanets"
+                    [ownerInfoByCoordinates]="planetOperationOwnerInfos()"
+                    [actionPending]="isPlanetOperationActionPending(fleet)"
+                    (returnRequested)="returnPlanetOperationFleet($event)"
+                    (delayRequested)="delayPlanetOperationFleet($event)"
+                    (maintenanceRequested)="openPlanetMaintenanceRequest($event)"
+                  />
+                } @empty {
+                  <p class="planet-tab-placeholder">No known incoming fleets to this planet.</p>
+                }
+              </div>
+            </section>
+
+            <section class="planet-operations__section">
+              <header class="planet-operations__section-head">
+                <h4 class="planet-view__section-title">Resolved</h4>
+                <span class="overview-muted">{{ planetResolvedOperations.length }} last turn</span>
+              </header>
+              <div class="planet-operations__grid">
+                @for (operation of planetResolvedOperations; track operation.resolvedTurn + ':' + operation.fleetId + ':' + operation.outcomeType) {
+                  <app-fleet-operation-card
+                    [resolvedOperation]="operation"
+                    [ownPlayerId]="ownPlayerId()"
+                    [ownedPlanets]="ownedPlanets"
+                    [ownerInfoByCoordinates]="planetOperationOwnerInfos()"
+                    [showActions]="false"
+                  />
+                } @empty {
+                  <p class="planet-tab-placeholder">No operations resolved here last turn.</p>
+                }
+              </div>
+            </section>
+
+            @if (planetMaintenanceDialogOpen()) {
+              <div class="planet-operations__modal-backdrop" (click)="closePlanetMaintenanceRequest()"></div>
+              <section class="planet-operations__modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+                <div class="planet-operations__modal-head">
+                  <div>
+                    <h3>Request maintenance</h3>
+                    <p class="overview-muted">Transfer fuel, ships, or bombs from this planet to the orbiting fleet.</p>
+                  </div>
+                  <button type="button" class="planet-operations__action" (click)="closePlanetMaintenanceRequest()">Close</button>
+                </div>
+
+                @if (planetMaintenanceDialogLoading) {
+                  <p class="overview-muted">Loading maintenance options...</p>
+                } @else if (planetMaintenanceOptions; as options) {
+                  <div class="planet-operations__modal-body">
+                    @if (planetMaintenanceDialogError) {
+                      <p class="planet-operations__message planet-operations__message--error">{{ planetMaintenanceDialogError }}</p>
+                    }
+                    <label class="planet-operations__field">
+                      <span>Fuel</span>
+                      <input
+                        type="number"
+                        min="0"
+                        [max]="options.fuelCap"
+                        [ngModel]="planetMaintenanceRequestedFuel"
+                        (ngModelChange)="updatePlanetMaintenanceRequestedFuel($event)"
+                      />
+                      <small>Available {{ options.availableFuel }} | Fleet cargo room {{ options.remainingCargoCapacity }} | Fuel cap {{ options.fuelCap }}</small>
+                    </label>
+
+                    @if (planetMaintenanceShipOptions().length > 0) {
+                      <section class="planet-operations__request-group">
+                        <h4>Ships</h4>
+                        @for (option of planetMaintenanceShipOptions(); track option.type) {
+                          <label class="planet-operations__field">
+                            <span>{{ option.type }} | available {{ option.available }} | size {{ option.size }}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              [max]="option.available"
+                              [ngModel]="planetMaintenanceRequestedShipAmounts[option.type] ?? 0"
+                              (ngModelChange)="updatePlanetMaintenanceRequestedShipAmount(option.type, $event)"
+                            />
+                          </label>
+                        }
+                      </section>
+                    }
+
+                    @if (planetMaintenanceBombOptions().length > 0) {
+                      <section class="planet-operations__request-group">
+                        <h4>Bombs</h4>
+                        @for (option of planetMaintenanceBombOptions(); track option.type) {
+                          <label class="planet-operations__field">
+                            <span>{{ option.type }} | available {{ option.available }} | size {{ option.size }}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              [max]="option.available"
+                              [ngModel]="planetMaintenanceRequestedBombAmounts[option.type] ?? 0"
+                              (ngModelChange)="updatePlanetMaintenanceRequestedBombAmount(option.type, $event)"
+                            />
+                          </label>
+                        }
+                      </section>
+                    }
+
+                    <p class="overview-muted">Support cargo usage: {{ selectedPlanetMaintenanceSupportUsage() }} / {{ options.supportCap }}</p>
+                  </div>
+                } @else if (planetMaintenanceDialogError) {
+                  <p class="planet-operations__message planet-operations__message--error">{{ planetMaintenanceDialogError }}</p>
+                }
+
+                <div class="planet-operations__actions">
+                  <button type="button" class="planet-operations__action" (click)="closePlanetMaintenanceRequest()">Cancel</button>
+                  <button
+                    type="button"
+                    class="planet-operations__action"
+                    [disabled]="!canSubmitPlanetMaintenanceRequest()"
+                    (click)="submitPlanetMaintenanceRequest()">
+                    Submit request
+                  </button>
+                </div>
+              </section>
+            }
+          </div>
         }
 
         @if (isActiveTab('queues')) {

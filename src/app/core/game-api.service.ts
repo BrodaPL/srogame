@@ -38,6 +38,7 @@ import {
   CreateFleetMissionResponse,
   CreateStarSystemSpyRequest,
   CreateStarSystemSpyResponse,
+  PlanetOperationsResponse,
   CreateMaintenanceRequestRequest,
   CreateMaintenanceRequestResponse,
   CreateSupportRequestRequest,
@@ -528,6 +529,27 @@ export class GameApiService {
     return this.http.get<CreateFleetMissionResponse['activeFleets']>(
       `${API_BASE_URL}/game/active-fleets`,
       { headers: this.authHeaders(token) }
+    );
+  }
+
+  public getPlanetOperations(
+    x: number,
+    y: number,
+    z: number,
+    token: string,
+    resolvedTurns = 1
+  ) {
+    return this.http.get<PlanetOperationsResponse>(
+      `${API_BASE_URL}/game/planet-operations`,
+      {
+        headers: this.authHeaders(token),
+        params: {
+          x,
+          y,
+          z,
+          resolvedTurns
+        }
+      }
     );
   }
 

@@ -59,143 +59,17 @@
 
       <div class="operations-view__grid" data-tutorial-id="operations-main-state">
         @for (fleet of filteredActiveFleets(); track fleet.fleetId; let isFirst = $first) {
-          <article
-            class="overview-card operations-view__card"
-            [class.operations-view__card--attack]="isAttackMission(fleet)"
-            [class.operations-view__card--repair]="isRepairMission(fleet)"
-            [class.operations-view__card--transport]="isTransportMission(fleet)"
-            [class.operations-view__card--colonize]="isColonizeMission(fleet)"
-            [class.operations-view__card--movement]="isMovementMission(fleet)"
-            [class.operations-view__card--spy]="isSpyMission(fleet)"
-            [class.operations-view__card--bombard]="isBombardMission(fleet)"
-            [class.operations-view__card--defend]="isDefendMission(fleet)"
-            [attr.data-tutorial-id]="isFirst ? 'operations-primary-card' : null">
-            <div class="operations-view__card-head">
-              <div class="operations-view__fleet-meta">
-                <span class="operations-view__fleet-meta-line">
-                  {{ missionLabel(fleet) }} | {{ stateLabel(fleet) }} | Fleet #{{ fleet.fleetId }}
-                </span>
-              </div>
-              <div class="operations-view__card-head-actions">
-                @if (isRemoteOriginFleet(fleet)) {
-                  <span
-                    class="badge badge--jump"
-                    appTooltip="REMOTE ORIGIN: this fleet launched from an orbiting fleet position and returns to that remote orbit planet instead of a normal owned-planet homeworld.">
-                    REMOTE ORIGIN
-                  </span>
-                }
-                <span class="badge badge--jump">{{ totalShips(fleet) }} ships</span>
-                @if (canReturn(fleet)) {
-                  <button
-                    type="button"
-                    class="operations-view__action operations-view__action--header"
-                    [disabled]="isActionPending(fleet)"
-                    (click)="returnFleet(fleet)">
-                    Return now
-                  </button>
-                }
-                @if (canDelay(fleet)) {
-                  <button
-                    type="button"
-                    class="operations-view__action operations-view__action--header"
-                    [disabled]="isActionPending(fleet)"
-                    (click)="delayFleet(fleet)">
-                    Delay +1
-                  </button>
-                }
-              </div>
-            </div>
-
-            <div class="overview-stats">
-              <div class="overview-stat">
-                <span class="overview-stat__label">Current Position</span>
-                <span class="overview-stat__value">{{ currentLocationPlanetName(fleet) }}</span>
-                <span
-                  class="overview-muted operations-view__coordinate-line"
-                >
-                  @for (segment of currentLocationSegments(fleet); track $index) {
-                    @if ($index > 0) {
-                      <span class="operations-view__coordinate-arrow">-></span>
-                    }
-                    <span
-                      class="operations-view__coordinate-segment"
-                      [attr.data-relation]="segment.relation">
-                      <button
-                        type="button"
-                        class="operations-view__coordinate-link"
-                        (click)="openCoordinatesInGalaxy(segment.coordinates)">
-                        {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
-                      </button>
-                      @if (segment.ownerName) {
-                        <span class="operations-view__coordinate-owner"> - {{ segment.ownerName }}</span>
-                      }
-                    </span>
-                  }
-                </span>
-              </div>
-              <div class="overview-stat">
-                <span class="overview-stat__label">Destination</span>
-                <span class="overview-stat__value">{{ destinationPlanetName(fleet) }}</span>
-                <span
-                  class="overview-muted operations-view__coordinate-line"
-                >
-                  @for (segment of destinationSegments(fleet); track $index) {
-                    @if ($index > 0) {
-                      <span class="operations-view__coordinate-arrow">-></span>
-                    }
-                    <span
-                      class="operations-view__coordinate-segment"
-                      [attr.data-relation]="segment.relation">
-                      <button
-                        type="button"
-                        class="operations-view__coordinate-link"
-                        (click)="openCoordinatesInGalaxy(segment.coordinates)">
-                        {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
-                      </button>
-                      @if (segment.ownerName) {
-                        <span class="operations-view__coordinate-owner"> - {{ segment.ownerName }}</span>
-                      }
-                    </span>
-                  }
-                </span>
-              </div>
-              <div class="overview-stat">
-                <span class="overview-stat__label">ETA</span>
-                <span class="overview-stat__value">{{ hasEta(fleet) ? remainingEta(fleet) : 'Idle' }}</span>
-                <span class="overview-muted">{{ progressLabel(fleet) }}</span>
-              </div>
-              <div class="overview-stat">
-                <span class="overview-stat__label">Fuel</span>
-                <span class="overview-stat__value">{{ fleet.fuelCost }}</span>
-              </div>
-              <div class="overview-stat">
-                <span class="overview-stat__label">Cargo</span>
-                <span class="overview-stat__value">{{ fleet.usedCargoCapacity }} / {{ fleet.totalCargoCapacity }}</span>
-              </div>
-            </div>
-
-            <p class="operations-view__ships">{{ shipSummary(fleet) }}</p>
-            <p class="overview-muted">
-              Repair capability: Ship {{ shipRepairCapability(fleet) }} | Drone {{ droneRepairCapability(fleet) }} | Cargo manifest: M {{ fleet.cargo.metal }}, C {{ fleet.cargo.crystal }}, D {{ fleet.cargo.deuterium }}
-            </p>
-            @if (operationDetail(fleet); as detail) {
-              <p class="overview-muted">{{ detail }}</p>
-            }
-
-            <div
-              class="operations-view__actions"
-              [attr.data-tutorial-id]="isFirst ? 'operations-card-actions' : null">
-              @if (canRequestMaintenance(fleet)) {
-                <button
-                  type="button"
-                  class="operations-view__action"
-                  [disabled]="isActionPending(fleet)"
-                  (click)="openMaintenanceRequest(fleet)">
-                  Request maintenance
-                </button>
-              }
-            </div>
-          </article>
+          <app-fleet-operation-card
+            [fleet]="fleet"
+            [ownPlayerId]="ownPlayerId()"
+            [ownedPlanets]="ownedPlanets"
+            [ownerInfoByCoordinates]="coordinateOwnerInfos()"
+            [actionPending]="isActionPending(fleet)"
+            [tutorialId]="isFirst ? 'operations-primary-card' : null"
+            (returnRequested)="returnFleet($event)"
+            (delayRequested)="delayFleet($event)"
+            (maintenanceRequested)="openMaintenanceRequest($event)"
+          />
         } @empty {
           <section class="overview-card">
             <h3>No fleets match this mission filter</h3>
