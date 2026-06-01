@@ -111,6 +111,7 @@
                   [class.galaxy-cell--human-or-neutral]="cell.fillKind === 'humanOrNeutral'"
                   [class.galaxy-cell--human-bot-any-neutral]="cell.fillKind === 'humanBotAnyNeutral'"
                   [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
+                  [class.galaxy-cell--sensor-scannable]="cell.isSensorScannable"
                   [class.galaxy-cell--with-note]="cell.noteBorderColor"
                   [style.--note-border-color]="cell.noteBorderColor"
                   [appTooltip]="cell.tooltip"
@@ -233,7 +234,11 @@
               <div
                 class="star-system-preview__planet-slot"
                 [class.star-system-preview__planet-slot--highlighted]="isHighlightedPlanet(planet)">
-                <app-mini-planet-preview [planet]="planet" />
+                <app-mini-planet-preview
+                  [planet]="planet"
+                  [showSensorPhalanxAction]="canSensorPhalanxScanPlanet(planet)"
+                  (sensorPhalanxScan)="openSensorPhalanxDialog($event)"
+                />
               </div>
             }
           </div>
@@ -370,3 +375,78 @@
   </section>
 }
 
+@if (isSensorPhalanxDialogOpen) {
+  <div class="note-modal-backdrop" (click)="closeSensorPhalanxDialog()"></div>
+  <section class="sensor-phalanx-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <div class="sensor-phalanx-modal__head">
+      <div>
+        <p class="note-modal__meta">Sensor Phalanx</p>
+        <h4 class="note-modal__title">{{ sensorPhalanxTargetLabel() }}</h4>
+      </div>
+      <button type="button" class="star-system-preview__button" (click)="closeSensorPhalanxDialog()">Close</button>
+    </div>
+
+    <label class="note-modal__label" for="sensor-phalanx-origin">Origin</label>
+    <select
+      id="sensor-phalanx-origin"
+      class="note-modal__select"
+      [ngModel]="selectedSensorPhalanxOriginKey"
+      (ngModelChange)="onSensorPhalanxOriginChanged($event)"
+    >
+      @for (origin of sensorPhalanxOriginOptions; track origin.key) {
+        <option [ngValue]="origin.key">
+          {{ origin.label }} | range {{ origin.activeScanRange }} | cost {{ origin.scanCostDeuterium }}
+        </option>
+      }
+    </select>
+
+    @if (selectedSensorPhalanxOrigin(); as origin) {
+      <div class="sensor-phalanx-modal__stats">
+        <span>Distance {{ origin.distance }}</span>
+        <span>Normal range {{ origin.normalRange }}</span>
+        <span>Active range {{ origin.activeScanRange }}</span>
+        <span>Deuterium {{ origin.availableDeuterium }}</span>
+      </div>
+    }
+
+    @if (sensorPhalanxCapabilities; as capabilities) {
+      <div class="sensor-phalanx-modal__stats sensor-phalanx-modal__stats--strong">
+        <span>Level {{ capabilities.level }}</span>
+        <span>Scans {{ capabilities.remainingScans }} / {{ capabilities.scansPerTurn }}</span>
+        <span>Used {{ capabilities.scansUsedThisTurn }}</span>
+        <span>Cost {{ capabilities.scanCostDeuterium }} D</span>
+      </div>
+    }
+
+    @if (sensorPhalanxError) {
+      <p class="form-error">{{ sensorPhalanxError }}</p>
+    }
+
+    <div class="note-modal__actions">
+      <button
+        type="button"
+        class="star-system-preview__button"
+        [disabled]="!canSubmitSensorPhalanxScan()"
+        (click)="executeSensorPhalanxScan()"
+      >
+        {{ sensorPhalanxScanning ? 'Scanning...' : (sensorPhalanxLoading ? 'Loading...' : 'Scan') }}
+      </button>
+    </div>
+
+    @if (sensorPhalanxResult; as result) {
+      <section class="sensor-phalanx-modal__results">
+        <h5>Scan result</h5>
+        <p class="note-modal__meta">{{ result.targetPlanetName }} | {{ result.target.x }}:{{ result.target.y }}:{{ result.target.z }}</p>
+        @if (result.contacts.length > 0) {
+          <div class="sensor-phalanx-modal__contacts">
+            @for (contact of result.contacts; track $index) {
+              <p>{{ sensorPhalanxContactLabel(contact) }}</p>
+            }
+          </div>
+        } @else {
+          <p class="overview-empty">No fleet contacts detected.</p>
+        }
+      </section>
+    }
+  </section>
+}

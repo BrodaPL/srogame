@@ -944,22 +944,26 @@
                     "buildingRequirements":  [
                                                  {
                                                      "building":  "SHIPYARD",
-                                                     "level":  1
+                                                     "level":  0.66
                                                  },
                                                  {
                                                      "building":  "ROBOTICS_FACTORY",
-                                                     "level":  1
+                                                     "level":  0.66
                                                  }
                                              ],
                     "techRequirements":  [
                                              {
                                                  "tech":  "ASTROPHYSICS_TECHNOLOGY",
-                                                 "level":  1.5
+                                                 "level":  0.75
                                              },
                                              {
                                                  "tech":  "ESPIONAGE_TECHNOLOGY",
-                                                 "level":  1.5
+                                                 "level":  0.5
                                              },
+                                            {
+                                              "tech":  "HYPERSPACE_TECHNOLOGY",
+                                              "level":  0.75
+                                            },
                                              {
                                                  "tech":  "COMPUTER_TECHNOLOGY",
                                                  "level":  0.5

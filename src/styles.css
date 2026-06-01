@@ -1931,6 +1931,11 @@ app-root {
   background: linear-gradient(135deg, rgba(60, 201, 189, 0.24), rgba(60, 201, 189, 0.08));
 }
 
+.mini-planet-preview__button--sensor {
+  border-color: rgba(119, 158, 255, 0.38);
+  background: linear-gradient(135deg, rgba(119, 158, 255, 0.26), rgba(119, 158, 255, 0.08));
+}
+
 .mini-planet-preview__button--utility,
 .mini-planet-preview__button--intel {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03));

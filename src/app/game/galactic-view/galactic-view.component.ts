@@ -20,7 +20,11 @@ import type {
   StarSystemNoteDto,
   ClientStarSystemDto,
   ClientPlanetDto,
-  GalaxySetup
+  GalaxySetup,
+  SensorPhalanxCapabilitiesDto,
+  SensorPhalanxFleetContactDto,
+  SensorPhalanxScanResponse,
+  ClientCoordinates
 } from '../../models/game-api-types';
 import { finalize } from 'rxjs';
 import { GameStateService } from '../../core/game-state.service';
@@ -30,6 +34,12 @@ import { PlanetType } from '../../models/enums/planet-type';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import { SpySolarSystemDialogComponent } from '../ui/spy-solar-system-dialog/spy-solar-system-dialog.component';
+import { BuildingType } from '../../models/enums/building-type';
+import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
+import {
+  calculateSensorPhalanxActiveScanRange,
+  calculateSensorPhalanxNormalRange
+} from '../../models/sensor-phalanx/sensor-phalanx';
 
 type CellFillKind =
   | 'void'
@@ -53,6 +63,7 @@ type GalacticCellVm = {
   valueLabel: string;
   ownedPlanetsDotsLabel: string;
   hasOwnFleetPresence: boolean;
+  isSensorScannable: boolean;
   noteBorderColor: string | null;
   coordsLabel: string;
   tooltip: string;
@@ -82,6 +93,17 @@ type ReloadGalaxyPresentationOptions = {
   spyLaunchNotice?: string | null;
 };
 
+type SensorPhalanxOriginOption = {
+  key: string;
+  planet: ClientPlanetDto;
+  label: string;
+  distance: number;
+  normalRange: number;
+  activeScanRange: number;
+  scanCostDeuterium: number;
+  availableDeuterium: number;
+};
+
 @Component({
   selector: 'app-galactic-view',
   imports: [TopMenuComponent, MiniPlanetPreviewComponent, SpySolarSystemDialogComponent, FormsModule, TooltipDirective],
@@ -89,6 +111,7 @@ type ReloadGalaxyPresentationOptions = {
   styleUrl: './galactic-view.styles.css'
 })
 export class GalacticViewComponent implements OnInit {
+  private static readonly buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
   protected readonly gridCellSize = 22;
   protected readonly gridCellGap = 2;
   protected readonly gridPadding = 12;
@@ -137,12 +160,22 @@ export class GalacticViewComponent implements OnInit {
   protected noteEditorColor: NoteBorderColor = NoteBorderColor.WHITE;
   protected noteEditorError: string | null = null;
   protected isDeleteNoteConfirmOpen = false;
+  protected isSensorPhalanxDialogOpen = false;
+  protected sensorPhalanxTarget: ClientPlanetDto | null = null;
+  protected sensorPhalanxOriginOptions: SensorPhalanxOriginOption[] = [];
+  protected selectedSensorPhalanxOriginKey = '';
+  protected sensorPhalanxCapabilities: SensorPhalanxCapabilitiesDto | null = null;
+  protected sensorPhalanxResult: SensorPhalanxScanResponse | null = null;
+  protected sensorPhalanxError: string | null = null;
+  protected sensorPhalanxLoading = false;
+  protected sensorPhalanxScanning = false;
   @ViewChild('topScroll') private topScrollRef?: ElementRef<HTMLDivElement>;
   @ViewChild('bottomScroll') private bottomScrollRef?: ElementRef<HTMLDivElement>;
   private isSyncingScroll = false;
   private starSystemNotesByCoordinates = new Map<string, StarSystemNoteDto>();
   private starSystemCache = new Map<string, ClientStarSystemDto>();
   private ownFleetPresenceBySystemKey = new Set<string>();
+  private sensorPhalanxScannableSystemKeys = new Set<string>();
   private selectedSystemRequestKey: string | null = null;
   private pendingRouteFocus: { x: number; y: number; z: number | null } | null = null;
 
@@ -230,6 +263,7 @@ export class GalacticViewComponent implements OnInit {
       this.spySolarSystemNotice = null;
     }
     this.isSpySolarSystemDialogOpen = false;
+    this.closeSensorPhalanxDialog();
     this.noteEditorError = null;
     this.isNoteEditorOpen = false;
     this.isDeleteNoteConfirmOpen = false;
@@ -467,6 +501,115 @@ export class GalacticViewComponent implements OnInit {
     );
   }
 
+  protected canSensorPhalanxScanPlanet(planet: ClientPlanetDto): boolean {
+    return this.resolveSensorPhalanxOriginOptions(planet).length > 0;
+  }
+
+  protected openSensorPhalanxDialog(planet: ClientPlanetDto): void {
+    const origins = this.resolveSensorPhalanxOriginOptions(planet);
+    if (origins.length <= 0) {
+      return;
+    }
+
+    this.sensorPhalanxTarget = planet;
+    this.sensorPhalanxOriginOptions = origins;
+    this.selectedSensorPhalanxOriginKey = origins[0].key;
+    this.sensorPhalanxCapabilities = null;
+    this.sensorPhalanxResult = null;
+    this.sensorPhalanxError = null;
+    this.isSensorPhalanxDialogOpen = true;
+    this.loadSelectedSensorPhalanxCapabilities();
+  }
+
+  protected closeSensorPhalanxDialog(): void {
+    this.isSensorPhalanxDialogOpen = false;
+    this.sensorPhalanxTarget = null;
+    this.sensorPhalanxOriginOptions = [];
+    this.selectedSensorPhalanxOriginKey = '';
+    this.sensorPhalanxCapabilities = null;
+    this.sensorPhalanxResult = null;
+    this.sensorPhalanxError = null;
+    this.sensorPhalanxLoading = false;
+    this.sensorPhalanxScanning = false;
+  }
+
+  protected selectedSensorPhalanxOrigin(): SensorPhalanxOriginOption | null {
+    return this.sensorPhalanxOriginOptions.find((origin) => origin.key === this.selectedSensorPhalanxOriginKey) ?? null;
+  }
+
+  protected onSensorPhalanxOriginChanged(originKey: string): void {
+    this.selectedSensorPhalanxOriginKey = originKey;
+    this.sensorPhalanxCapabilities = null;
+    this.sensorPhalanxResult = null;
+    this.sensorPhalanxError = null;
+    this.loadSelectedSensorPhalanxCapabilities();
+  }
+
+  protected canSubmitSensorPhalanxScan(): boolean {
+    const origin = this.selectedSensorPhalanxOrigin();
+    const capabilities = this.sensorPhalanxCapabilities;
+    return !!this.sensorPhalanxTarget
+      && !!origin
+      && !!capabilities
+      && !this.sensorPhalanxLoading
+      && !this.sensorPhalanxScanning
+      && capabilities.remainingScans > 0
+      && origin.availableDeuterium >= capabilities.scanCostDeuterium;
+  }
+
+  protected executeSensorPhalanxScan(): void {
+    const session = this.playerSession.load();
+    const origin = this.selectedSensorPhalanxOrigin();
+    const target = this.sensorPhalanxTarget;
+    if (!session || !origin || !target || !this.canSubmitSensorPhalanxScan()) {
+      return;
+    }
+
+    this.sensorPhalanxScanning = true;
+    this.sensorPhalanxError = null;
+
+    this.gameApi.scanSensorPhalanx({
+      origin: origin.planet.coordinates,
+      target: target.coordinates
+    }, session.token)
+      .pipe(finalize(() => {
+        this.sensorPhalanxScanning = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (response) => {
+          this.sensorPhalanxResult = response;
+          this.sensorPhalanxCapabilities = response.capabilities;
+          this.sensorPhalanxOriginOptions = this.sensorPhalanxOriginOptions.map((option) =>
+            option.key === origin.key
+              ? {
+                ...option,
+                availableDeuterium: Math.max(0, option.availableDeuterium - response.capabilities.scanCostDeuterium)
+              }
+              : option
+          );
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.sensorPhalanxError = error?.error?.error ?? 'Unable to run Sensor Phalanx scan.';
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  protected sensorPhalanxTargetLabel(): string {
+    const target = this.sensorPhalanxTarget;
+    if (!target) {
+      return 'No target selected';
+    }
+
+    return `${target.basicInfo.name} (${target.coordinates.x}:${target.coordinates.y}:${target.coordinates.z})`;
+  }
+
+  protected sensorPhalanxContactLabel(contact: SensorPhalanxFleetContactDto): string {
+    return `${contact.direction} | Size ${contact.fleetSize} | ETA ${contact.etaTurns} | ${contact.isAllied ? 'Allied' : 'Unknown or hostile'}`;
+  }
+
   protected openAddNoteDialog(): void {
     if (this.areNoteActionsDisabled() || this.selectedStarSystemNote()) {
       return;
@@ -629,6 +772,7 @@ export class GalacticViewComponent implements OnInit {
           this.galaxyPresentation = response;
           this.starSystemNotesByCoordinates = this.buildStarSystemNotesMap(response.starSystemNotes);
           this.ownFleetPresenceBySystemKey = this.buildOwnFleetPresenceBySystemKey(response);
+          this.sensorPhalanxScannableSystemKeys = this.buildSensorPhalanxScannableSystemKeys(response);
           this.ownFleetRoutes = this.buildOwnFleetRoutes(response.ownFleetMovements);
           this.starSystemCache.clear();
           this.grid = this.buildGrid(response);
@@ -666,6 +810,188 @@ export class GalacticViewComponent implements OnInit {
           this.cdr.markForCheck();
         }
       });
+  }
+
+  private loadSelectedSensorPhalanxCapabilities(): void {
+    const session = this.playerSession.load();
+    const origin = this.selectedSensorPhalanxOrigin();
+    if (!session || !origin) {
+      this.sensorPhalanxError = 'No Sensor Phalanx origin selected.';
+      return;
+    }
+
+    this.sensorPhalanxLoading = true;
+    this.sensorPhalanxError = null;
+
+    const coordinates = origin.planet.coordinates;
+    this.gameApi.getSensorPhalanxCapabilities(
+      coordinates.x,
+      coordinates.y,
+      coordinates.z,
+      session.token
+    )
+      .pipe(finalize(() => {
+        this.sensorPhalanxLoading = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (capabilities) => {
+          this.sensorPhalanxCapabilities = capabilities;
+          this.cdr.markForCheck();
+        },
+        error: (error: { error?: { error?: string } }) => {
+          this.sensorPhalanxError = error?.error?.error ?? 'Unable to load Sensor Phalanx capability.';
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  private resolveSensorPhalanxOriginOptions(target: ClientPlanetDto): SensorPhalanxOriginOption[] {
+    const ownedPlanets = this.galaxyPresentation?.ownedPlanets ?? [];
+    return ownedPlanets
+      .map((planet) => this.toSensorPhalanxOriginOption(planet, target.coordinates))
+      .filter((option): option is SensorPhalanxOriginOption => option !== null)
+      .sort((left, right) =>
+        (right.activeScanRange - right.distance) - (left.activeScanRange - left.distance)
+          || left.scanCostDeuterium - right.scanCostDeuterium
+          || left.label.localeCompare(right.label)
+      );
+  }
+
+  private toSensorPhalanxOriginOption(
+    planet: ClientPlanetDto,
+    target: ClientCoordinates
+  ): SensorPhalanxOriginOption | null {
+    const level = this.getBuildingLevel(planet, BuildingType.SENSOR_PHALANX);
+    if (level <= 0) {
+      return null;
+    }
+
+    const blueprint = GalacticViewComponent.buildingBlueprints.get(BuildingType.SENSOR_PHALANX);
+    if (!blueprint) {
+      return null;
+    }
+
+    const baseRange = blueprint.production1[level - 1] ?? 0;
+    const effectiveness = this.getBuildingEffectiveness(planet, BuildingType.SENSOR_PHALANX, blueprint.powerConsumption);
+    const normalRange = calculateSensorPhalanxNormalRange(
+      baseRange,
+      planet.info.planetaryParameters.anomaliesAndNoise,
+      effectiveness
+    );
+    const activeScanRange = calculateSensorPhalanxActiveScanRange(normalRange);
+    const distance = this.calculatePlanetDistance(planet.coordinates, target);
+    if (activeScanRange <= 0 || distance > activeScanRange) {
+      return null;
+    }
+
+    return {
+      key: this.buildPlanetCoordinatesKey(planet.coordinates),
+      planet,
+      label: `${planet.basicInfo.name} (${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z})`,
+      distance,
+      normalRange,
+      activeScanRange,
+      scanCostDeuterium: Math.max(0, Math.floor(blueprint.production2[level - 1] ?? 0)),
+      availableDeuterium: Math.max(0, Math.floor(planet.objects.resources.deuterium))
+    };
+  }
+
+  private getBuildingLevel(planet: ClientPlanetDto, type: BuildingType): number {
+    return Math.max(0, Math.floor(
+      planet.objects.buildingsLevels.find((entry) => entry.type === type)?.level ?? 0
+    ));
+  }
+
+  private getBuildingEffectiveness(planet: ClientPlanetDto, type: BuildingType, powerConsumption: number): number {
+    return this.getBuildingPowerUtilization(planet, type, powerConsumption)
+      * this.getBuildingStructuralUtilization(planet, type);
+  }
+
+  private getBuildingPowerUtilization(planet: ClientPlanetDto, type: BuildingType, powerConsumption: number): number {
+    const level = this.getBuildingLevel(planet, type);
+    const maxPower = level * Math.max(0, powerConsumption);
+    if (maxPower <= 0) {
+      return 1;
+    }
+
+    const currentPower = planet.objects.buildingsCurrentPowerConsumption
+      .find((entry) => entry.type === type)?.currentPowerConsumption ?? maxPower;
+    if (!Number.isFinite(currentPower) || currentPower <= 0) {
+      return 0;
+    }
+
+    return Math.min(1, Math.max(0, currentPower / maxPower));
+  }
+
+  private getBuildingStructuralUtilization(planet: ClientPlanetDto, type: BuildingType): number {
+    const structural = planet.objects.buildingsCurrentStructuralPoints.find((entry) => entry.type === type);
+    if (!structural || structural.maxStructuralPoints <= 0) {
+      return 1;
+    }
+
+    const ratio = structural.currentStructuralPoints > 0
+      ? structural.currentStructuralPoints / structural.maxStructuralPoints
+      : 0;
+    return Math.min(1, Math.max(0, ratio));
+  }
+
+  private calculatePlanetDistance(origin: ClientCoordinates, target: ClientCoordinates): number {
+    return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
+  }
+
+  private buildSensorPhalanxScannableSystemKeys(data: GalaxyPresentationDataDto): Set<string> {
+    const keys = new Set<string>();
+    const origins = data.ownedPlanets
+      .map((planet) => this.toSensorPhalanxCoverage(planet))
+      .filter((coverage): coverage is { coordinates: ClientCoordinates; activeScanRange: number } => coverage !== null);
+
+    if (origins.length <= 0) {
+      return keys;
+    }
+
+    for (let y = 0; y < data.galaxyBytes.length; y += 1) {
+      const row = data.galaxyBytes[y] ?? [];
+      for (let x = 0; x < row.length; x += 1) {
+        const cell = row[x];
+        if (!cell || cell.planetsAndAsteroids[0] <= 0) {
+          continue;
+        }
+
+        const planetCount = Math.max(0, cell.planetsAndAsteroids[0]);
+        for (let z = 0; z < planetCount; z += 1) {
+          const target = { x, y, z };
+          if (origins.some((origin) => this.calculatePlanetDistance(origin.coordinates, target) <= origin.activeScanRange)) {
+            keys.add(this.buildCoordinatesKey(x, y));
+            break;
+          }
+        }
+      }
+    }
+
+    return keys;
+  }
+
+  private toSensorPhalanxCoverage(planet: ClientPlanetDto): { coordinates: ClientCoordinates; activeScanRange: number } | null {
+    const level = this.getBuildingLevel(planet, BuildingType.SENSOR_PHALANX);
+    if (level <= 0) {
+      return null;
+    }
+
+    const blueprint = GalacticViewComponent.buildingBlueprints.get(BuildingType.SENSOR_PHALANX);
+    if (!blueprint) {
+      return null;
+    }
+
+    const normalRange = calculateSensorPhalanxNormalRange(
+      blueprint.production1[level - 1] ?? 0,
+      planet.info.planetaryParameters.anomaliesAndNoise,
+      this.getBuildingEffectiveness(planet, BuildingType.SENSOR_PHALANX, blueprint.powerConsumption)
+    );
+    const activeScanRange = calculateSensorPhalanxActiveScanRange(normalRange);
+    return activeScanRange > 0
+      ? { coordinates: planet.coordinates, activeScanRange }
+      : null;
   }
 
   private syncScrollbars(): void {
@@ -811,6 +1137,9 @@ export class GalacticViewComponent implements OnInit {
     const valueLabel = this.buildValueLabel(planets, asteroids, isVoid, isCenter);
     const ownedPlanetsDotsLabel = this.buildOwnedPlanetsDotsLabel(ownership, isVoid, isCenter);
     const hasOwnFleetPresence = this.ownFleetPresenceBySystemKey.has(this.buildCoordinatesKey(x, y));
+    const isSensorScannable = !isVoid
+      && !isCenter
+      && this.sensorPhalanxScannableSystemKeys.has(this.buildCoordinatesKey(x, y));
     const noteBorderColor = note?.borderColor ?? null;
     const noteText = note?.text?.trim() ? note.text.trim() : null;
 
@@ -825,6 +1154,7 @@ export class GalacticViewComponent implements OnInit {
       valueLabel,
       ownedPlanetsDotsLabel,
       hasOwnFleetPresence,
+      isSensorScannable,
       noteBorderColor,
       coordsLabel: `${x}:${y}`,
       tooltip: this.buildTooltip(
@@ -942,6 +1272,10 @@ export class GalacticViewComponent implements OnInit {
 
   private buildCoordinatesKey(x: number, y: number): string {
     return `${x}:${y}`;
+  }
+
+  private buildPlanetCoordinatesKey(coordinates: ClientCoordinates): string {
+    return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
   }
 
   private buildOwnFleetPresenceBySystemKey(data: GalaxyPresentationDataDto): Set<string> {

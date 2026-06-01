@@ -3088,6 +3088,15 @@ app.post('/api/game/sensor-phalanx/scan', (req, res) => {
     targetPlanet,
     target
   );
+  authPlayer.player.addReport(createSensorPhalanxActiveScanReport(
+    authPlayer.player,
+    originPlanet,
+    origin,
+    targetPlanet,
+    target,
+    response.contacts,
+    authPlayer.galaxy.currentTurn
+  ));
 
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(authPlayer.galaxy);
   return res.status(200).json(response);
@@ -7663,6 +7672,38 @@ function createSensorPhalanxPassiveReport(
       sourceCoordinates,
       sourcePlanetName: detectorPlanet.basicInfo.name,
       sourceSystemName: detectorPlanet.basicInfo.solarSystem.name
+    },
+    body
+  );
+}
+
+function createSensorPhalanxActiveScanReport(
+  player: Player,
+  originPlanet: Planet,
+  originCoordinates: ClientCoordinates,
+  targetPlanet: Planet,
+  targetCoordinates: ClientCoordinates,
+  contacts: SensorPhalanxFleetContactDto[],
+  currentTurn: number
+): SensorPhalanxReport {
+  const body = contacts.length > 0
+    ? contacts.map((contact) =>
+      `${contact.direction} fleet contact | Size: ${contact.fleetSize} | ETA: ${contact.etaTurns} | Allied: ${contact.isAllied ? 'Yes' : 'No'}`
+    ).join('\n')
+    : 'No fleet contacts detected.';
+
+  return new SensorPhalanxReportModel(
+    {
+      reportId: player.createReportId(),
+      createdTurn: currentTurn,
+      title: `Sensor Phalanx Scan: ${targetPlanet.basicInfo.name} (${targetCoordinates.x}:${targetCoordinates.y}:${targetCoordinates.z})`,
+      sourceCoordinates: targetCoordinates,
+      sourcePlanetName: targetPlanet.basicInfo.name,
+      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+      originCoordinates,
+      originPlanetName: originPlanet.basicInfo.name,
+      originSystemName: originPlanet.basicInfo.solarSystem.name,
+      senderPlayerName: player.playerName
     },
     body
   );

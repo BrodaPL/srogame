@@ -21,9 +21,11 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   @Input() planet: ClientPlanetDto | null = null;
   @Input() showDefaultActions = true;
   @Input() showSelectionActions = false;
+  @Input() showSensorPhalanxAction = false;
   @Input() isSelected = false;
   @Output() chooseAsOrigin = new EventEmitter<ClientPlanetDto>();
   @Output() chooseAsTarget = new EventEmitter<ClientPlanetDto>();
+  @Output() sensorPhalanxScan = new EventEmitter<ClientPlanetDto>();
 
   protected tags: MiniPlanetTagVm[] = [];
   protected isSpyDialogOpen = false;
@@ -233,6 +235,14 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     this.chooseAsTarget.emit(this.planet);
+  }
+
+  protected emitSensorPhalanxScan(): void {
+    if (!this.planet || !this.showSensorPhalanxAction) {
+      return;
+    }
+
+    this.sensorPhalanxScan.emit(this.planet);
   }
 
   private buildTags(): MiniPlanetTagVm[] {

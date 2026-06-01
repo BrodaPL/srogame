@@ -93,6 +93,16 @@
           Spy
         </button>
       }
+      @if (showSensorPhalanxAction) {
+        <button
+          type="button"
+          class="mini-planet-preview__button mini-planet-preview__button--sensor"
+          [appTooltip]="'Open Sensor Phalanx scan for ' + coordinatesLabel()"
+          (click)="emitSensorPhalanxScan()"
+        >
+          Sensor scan
+        </button>
+      }
       <button
         type="button"
         class="mini-planet-preview__button mini-planet-preview__button--utility"

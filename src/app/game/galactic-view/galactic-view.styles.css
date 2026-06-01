@@ -124,6 +124,77 @@
   z-index: 40;
 }
 
+.sensor-phalanx-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 1.5rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(119, 158, 255, 0.24);
+  background: rgba(12, 16, 22, 0.98);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+  z-index: 40;
+}
+
+.sensor-phalanx-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sensor-phalanx-modal__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.sensor-phalanx-modal__stats span {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-family: var(--font-mono), serif;
+  padding: 0.22rem 0.48rem;
+}
+
+.sensor-phalanx-modal__stats--strong span {
+  border-color: rgba(119, 158, 255, 0.26);
+  color: #dce6ff;
+}
+
+.sensor-phalanx-modal__results {
+  display: grid;
+  gap: 0.35rem;
+  border-radius: 12px;
+  border: 1px solid rgba(119, 158, 255, 0.18);
+  background: rgba(33, 55, 104, 0.14);
+  padding: 0.65rem 0.75rem;
+}
+
+.sensor-phalanx-modal__results h5,
+.sensor-phalanx-modal__contacts p {
+  margin: 0;
+}
+
+.sensor-phalanx-modal__contacts {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.sensor-phalanx-modal__contacts p {
+  color: #e5ecff;
+  font-size: 0.82rem;
+  font-family: var(--font-mono), serif;
+}
+
 .note-modal__title {
   margin: 0;
 }
@@ -434,6 +505,31 @@
 .galaxy-cell--selected {
   border-color: #f6b44c;
   box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.4);
+}
+
+.galaxy-cell--sensor-scannable::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 6px;
+  border: 1px solid rgba(119, 158, 255, 0.7);
+  box-shadow: 0 0 10px rgba(119, 158, 255, 0.28);
+  opacity: 0.5;
+  pointer-events: none;
+  animation: sensor-phalanx-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes sensor-phalanx-pulse {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.96);
+  }
+
+  50% {
+    opacity: 0.76;
+    transform: scale(1.08);
+  }
 }
 
 .galaxy-cell--void {
