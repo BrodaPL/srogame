@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Fleet, FleetOrbitActivity, FleetState } from '../../../src/app/models/fleets/fleet.js';
 import { Destination } from '../../../src/app/models/fleets/destination.js';
 import { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.js';
+import { BuildingType } from '../../../src/app/models/enums/building-type.js';
 import { PlayerType } from '../../../src/app/models/enums/player-type.js';
 import { ShipType } from '../../../src/app/models/enums/ship-type.js';
 import { TechnologyType } from '../../../src/app/models/enums/technology-type.js';
@@ -80,6 +81,37 @@ describe('fleet commands', () => {
     expect(sourceFleet.cargo.deuterium).toBe(120 - result.value.fleet.fuelCost);
     expect(sourceFleet.cargo.metal).toBe(0);
   });
+
+  it('uses Jump Gate travel cost instead of distance fuel when Jump Gate is selected', () => {
+    const { galaxy, origin } = createOwnedJumpGateGalaxy();
+
+    const result = createFleetMission(
+      { galaxy, playerId: 1 },
+      {
+        missionType: FleetMissionType.MOVE,
+        origin: { x: 0, y: 0, z: 0 },
+        target: { x: 0, y: 0, z: 1 },
+        ships: [
+          { type: ShipType.CRUISER, undamagedAmount: 2, damagedAmount: 0 },
+          { type: ShipType.SPY_PROBE, undamagedAmount: 1, damagedAmount: 0 }
+        ],
+        carriedBombs: [],
+        cargo: { metal: 0, crystal: 0, deuterium: 0 },
+        useJumpGate: true,
+        bombardmentPriorities: null
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.fleet.usesJumpGate).toBe(true);
+    expect(result.value.fleet.travelTurns).toBe(1);
+    expect(result.value.fleet.fuelCost).toBe(17);
+    expect(origin.rBDSFTQ.resources.deuterium).toBe(100 - 17);
+  });
 });
 
 function createRemoteOriginGalaxy(options: {
@@ -138,4 +170,37 @@ function createRemoteOriginGalaxy(options: {
     galaxy,
     sourceFleet
   };
+}
+
+function createOwnedJumpGateGalaxy() {
+  const system = new SolarSystem('Jump Cost Test', 2, false, false, { x: 0, y: 0 }, new Set<number>(), new Map());
+  const [origin, target] = system.planets;
+
+  origin.basicInfo.name = 'Origin';
+  origin.info.ownerId = 1;
+  origin.rBDSFTQ.resources = new ResourcesPack(0, 0, 100);
+  origin.rBDSFTQ.ships = ManyShips.empty();
+  origin.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+  origin.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 1);
+  origin.setBuildingLevel(BuildingType.JUMP_GATE, 3);
+
+  target.basicInfo.name = 'Target';
+  target.info.ownerId = 1;
+  target.setBuildingLevel(BuildingType.JUMP_GATE, 2);
+
+  const player = new Player(
+    1,
+    'Alpha',
+    [origin, target],
+    new Map([
+      [TechnologyType.COMPUTER_TECHNOLOGY, 4],
+      [TechnologyType.HYPERSPACE_TECHNOLOGY, 3],
+      [TechnologyType.HYPERSPACE_DRIVE, 4]
+    ]),
+    [],
+    PlayerType.PLAYER
+  );
+
+  const galaxy = new Galaxy('Jump Gate Cost Galaxy', [player], [[system]], 9, [], 1);
+  return { galaxy, origin, target };
 }

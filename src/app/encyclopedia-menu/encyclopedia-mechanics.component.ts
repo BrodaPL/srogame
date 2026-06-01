@@ -95,7 +95,7 @@ export class EncyclopediaMechanicsComponent {
         'offerAmount = floor(tradePortCapacity * step), where step is one of 20%, 40%, 60%, 80%, 100%',
         'value ratio = 3 metal = 2 crystal = 1 deuterium',
         'totalCost = ceil(baseCost * (1 + rolledModifier - levelDiscount))',
-        'rolledModifier = 5%..40%, levelDiscount = 1% per Trade Port level + 1% per Jump Gate level'
+        'rolledModifier = 5%..40%, levelDiscount = floor((Trade Port level + Jump Gate level) * 1.5%)'
       ],
       notes: [
         'High Trade Port and Jump Gate levels can fully offset the rolled surcharge and produce zero-cost offers, but the final cost never goes below zero.'
@@ -260,7 +260,7 @@ export class EncyclopediaMechanicsComponent {
         'Attack can target WAR, NEUTRAL, and PASSIVE owned planets, resolves hostile arrival combat, and steals metal, crystal, and deuterium after successful arrival resolution if cargo space remains.',
         'Bombard and Siege can store optional Main, Secondary, and Tertiary bombard priorities, which persist on the fleet for later siege turns.',
         'Ship-mounted BOMBARDMENT_WEAPONS now always hit buildings and planetary defences once a bombardment shot actually fires; Siege still keeps its separate 50 percent per-shot trigger failure before that hit step.',
-        'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn.',
+        'Move, Guard, and Transport can optionally use Jump Gate travel when both endpoints have enough capacity; approved Jump Gate launches always use exactly 1 travel turn and pay Jump Gate travel cost instead of normal distance fuel.',
         'Foreign Jump Gate targets require known gate intel from the latest espionage report and create a Mail request for the target owner unless diplomacy auto-approves it.',
         'Mission Planner can also be prefilled from other screens, for example Spy Planet actions from reports or planet previews.',
         'The Travel Summary now shows the live ETA formula, the current substituted values, the active ship modifier, and the relevant drive-tech levels taken from the selected origin player.'
@@ -269,13 +269,15 @@ export class EncyclopediaMechanicsComponent {
         'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2',
         'travelTurns = ceil((4 / (1 + FUSION_DRIVE / 3) + distance / (1 + HYPERSPACE_DRIVE / 6) - GRAVITON_TECHNOLOGY) * shipModifier), minimum 1',
         'Jump Gate travelTurns = 1',
-        'fuelCost = ceil(sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves * max(0, 1 - FUSION_DRIVE * 0.01 - HYPERSPACE_TECHNOLOGY * 0.02 - HYPERSPACE_DRIVE * 0.01))'
+        'fuelCost = ceil(sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves * max(0, 1 - FUSION_DRIVE * 0.01 - HYPERSPACE_TECHNOLOGY * 0.02 - HYPERSPACE_DRIVE * 0.01))',
+        'jumpGateFuelCost = ceil(nonSpyJumpCapableShips * 10 * max(0, 1 - HYPERSPACE_TECHNOLOGY * 0.02 - HYPERSPACE_DRIVE * 0.01 - max(0, min(originGateLevel, targetGateLevel) - 1) * 0.05))'
       ],
       notes: [
         'Distance is still the raw coordinate delta sum abs(dx) + abs(dy) + abs(dz).',
         'shipModifier uses the slowest selected ship: Small -40%, Medium -25%, Big 0%, Titan +35%, Station +100%.',
         'SPY_PROBE is a Small hull, so it uses the same -40% modifier as other Small ships.',
-        'Fuel cost uses raw distance, then Fusion Drive, Hyperspace Technology, and Hyperspace Drive reduce the total deuterium reserve after the mission reserve multiplier.'
+        'Normal fuel cost uses raw distance, then Fusion Drive, Hyperspace Technology, and Hyperspace Drive reduce the total deuterium reserve after the mission reserve multiplier.',
+        'Jump Gate fuel cost counts only jump-capable ships except Spy Probes, then Hyperspace Technology, Hyperspace Drive, and the lower endpoint Jump Gate level reduce the total.'
       ]
     },
     {

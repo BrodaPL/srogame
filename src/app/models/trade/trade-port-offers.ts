@@ -97,8 +97,12 @@ export function createTradePortOffer(input: CreateTradePortOfferInput): TradePor
   const getAmount = Math.max(1, Math.floor(Math.max(0, input.tradePortCapacity) * amountStep));
   const baseCost = calculateBaseCost(getResourceType, costResourceType, getAmount);
   const rolledModifierPercent = 5 + Math.floor(nextRandom(randomSource) * 36);
-  const levelDiscountPercent = Math.max(0, Math.floor(input.tradePortLevel))
-    + Math.max(0, Math.floor(input.jumpGateLevel));
+  const levelDiscountPercent = Math.floor(
+    (
+      Math.max(0, Math.floor(input.tradePortLevel))
+      + Math.max(0, Math.floor(input.jumpGateLevel))
+    ) * 1.5
+  );
   const costModifierPercent = rolledModifierPercent - levelDiscountPercent;
   const totalCost = Math.max(0, Math.ceil(baseCost * (1 + (costModifierPercent / 100))));
 

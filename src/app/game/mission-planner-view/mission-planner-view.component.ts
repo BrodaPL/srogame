@@ -39,6 +39,7 @@ import type {
 } from '../../models/game-api-types';
 import { Ship } from '../../models/fleets/ship';
 import { calculateJumpGateCapacity } from '../../models/jump-gates/jump-gate-capacity';
+import { calculateJumpGateTravelCost } from '../../models/jump-gates/jump-gate-travel-cost';
 import { FleetMissionRegistry } from '../../models/missions/fleet-mission-registry';
 import type { MissionPlannerContext } from '../../models/missions/mission-context';
 import { calculateRepairCapabilityFromEntries } from '../../models/repairs/ship-repair-capability';
@@ -658,6 +659,10 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected fuelCostPreview(): number {
+    if (this.useJumpGate) {
+      return this.jumpGateTravelCostPreview();
+    }
+
     return fleetFuelCostForDistance(
       this.distancePreview(),
       this.selectedTravelShipAmounts(),
@@ -1293,6 +1298,31 @@ export class MissionPlannerViewComponent implements OnInit {
       this.techLevelFromReport(reportData, TechnologyType.HYPERSPACE_TECHNOLOGY),
       1
     );
+  }
+
+  private jumpGateTravelCostPreview(): number {
+    if (!this.selectedOriginPlanet || !this.selectedTargetPlanet) {
+      return 0;
+    }
+
+    return calculateJumpGateTravelCost(
+      this.selectedTravelShipAmounts(),
+      this.techLevel(TechnologyType.HYPERSPACE_TECHNOLOGY),
+      this.techLevel(TechnologyType.HYPERSPACE_DRIVE),
+      Math.min(
+        this.jumpGateLevelForOwnedPlanet(this.selectedOriginPlanet),
+        this.jumpGateTargetLevelEstimate(this.selectedTargetPlanet)
+      )
+    );
+  }
+
+  private jumpGateTargetLevelEstimate(planet: ClientPlanetDto): number {
+    const ownedPlanet = this.findOwnedPlanet(planet.coordinates);
+    if (ownedPlanet) {
+      return this.jumpGateLevelForOwnedPlanet(ownedPlanet);
+    }
+
+    return this.jumpGateLevelFromReport(planet.reportData);
   }
 
   private ownedPlanetBuildingEffectiveness(planet: ClientPlanetDto, buildingType: BuildingType): number {

@@ -31,9 +31,9 @@ describe('trade-port-offers', () => {
     expect(offer.getAmount).toBe(600);
     expect(offer.baseCost).toBe(200);
     expect(offer.rolledModifierPercent).toBe(5);
-    expect(offer.levelDiscountPercent).toBe(13);
-    expect(offer.costModifierPercent).toBe(-8);
-    expect(offer.totalCost).toBe(184);
+    expect(offer.levelDiscountPercent).toBe(19);
+    expect(offer.costModifierPercent).toBe(-14);
+    expect(offer.totalCost).toBe(172);
     expect(offer.used).toBe(false);
   });
 
@@ -50,9 +50,22 @@ describe('trade-port-offers', () => {
     });
 
     expect(offer.rolledModifierPercent).toBe(5);
-    expect(offer.levelDiscountPercent).toBe(120);
-    expect(offer.costModifierPercent).toBe(-115);
+    expect(offer.levelDiscountPercent).toBe(180);
+    expect(offer.costModifierPercent).toBe(-175);
     expect(offer.totalCost).toBe(0);
+  });
+
+  it('floors the combined 1.5 percent Trade Port and Jump Gate discount', () => {
+    const offer = createTradePortOffer({
+      offerId: 9,
+      turn: 5,
+      tradePortLevel: 1,
+      jumpGateLevel: 2,
+      tradePortCapacity: 1000,
+      randomSource: () => 0
+    });
+
+    expect(offer.levelDiscountPercent).toBe(4);
   });
 
   it('refreshes offers on a new turn and keeps same-turn offers fixed', () => {

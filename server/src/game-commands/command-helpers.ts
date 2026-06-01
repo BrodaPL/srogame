@@ -13,6 +13,7 @@ import * as fleetMissionTypeEnumModule from '../../../src/app/models/enums/fleet
 import * as fleetModelModule from '../../../src/app/models/fleets/fleet.js';
 import * as manyShipsModule from '../../../src/app/models/fleets/many-ships.js';
 import * as jumpGateCapacityModule from '../../../src/app/models/jump-gates/jump-gate-capacity.js';
+import * as jumpGateTravelCostModule from '../../../src/app/models/jump-gates/jump-gate-travel-cost.js';
 import * as jumpGateRequestModule from '../../../src/app/models/requests/jump-gate-request.js';
 import * as resourcesPackModule from '../../../src/app/models/resources-pack.js';
 import * as researchHelperForModule from '../../../src/app/models/tech/research-helper-for.js';
@@ -59,6 +60,7 @@ const { FleetMissionType } = resolveModule(fleetMissionTypeEnumModule) as typeof
 const { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } = resolveModule(fleetModelModule) as typeof import('../../../src/app/models/fleets/fleet.js');
 const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../../src/app/models/fleets/many-ships.js');
 const { calculateJumpGateCapacity } = resolveModule(jumpGateCapacityModule) as typeof import('../../../src/app/models/jump-gates/jump-gate-capacity.js');
+const { calculateJumpGateTravelCost } = resolveModule(jumpGateTravelCostModule) as typeof import('../../../src/app/models/jump-gates/jump-gate-travel-cost.js');
 const { createJumpGateRequest } = resolveModule(jumpGateRequestModule) as typeof import('../../../src/app/models/requests/jump-gate-request.js');
 const { ResourcesPack } = resolveModule(resourcesPackModule) as typeof import('../../../src/app/models/resources-pack.js');
 const { ResearchHelperFor } = resolveModule(researchHelperForModule) as typeof import('../../../src/app/models/tech/research-helper-for.js');
@@ -432,6 +434,25 @@ export function calculatePlayerFuelCost(
     player.getTechLevel(TechnologyType.FUSION_DRIVE as TechnologyTypeType),
     player.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY as TechnologyTypeType),
     player.getTechLevel(TechnologyType.HYPERSPACE_DRIVE as TechnologyTypeType)
+  );
+}
+
+export function calculatePlayerJumpGateTravelCost(
+  ships: Array<{ type: ShipTypeType; amount: number }>,
+  originPlanet: Planet,
+  targetPlanet: Planet,
+  player: Player
+): number {
+  const jumpGateLevel = Math.min(
+    originPlanet.getBuildingLevel(BuildingType.JUMP_GATE as BuildingTypeType),
+    targetPlanet.getBuildingLevel(BuildingType.JUMP_GATE as BuildingTypeType)
+  );
+
+  return calculateJumpGateTravelCost(
+    ships,
+    player.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY as TechnologyTypeType),
+    player.getTechLevel(TechnologyType.HYPERSPACE_DRIVE as TechnologyTypeType),
+    jumpGateLevel
   );
 }
 

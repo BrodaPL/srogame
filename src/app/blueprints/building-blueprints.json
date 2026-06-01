@@ -1008,7 +1008,7 @@
                 },
                 {
                     "type":  "JUMP_GATE",
-                    "description":  "Makes possible to jump between systems. Every level increases Interstellar Trade Port capacity by 20%, and decreases its trade cost by 1%.",
+                    "description":  "Makes possible to jump between systems. Every level increases Interstellar Trade Port capacity by 20%, and decreases its trade cost by 1.5%.",
                     "imagePath":  "images/buildings/normal/JUMP_GATE.jpg",
                     "basicCost":  {
                                       "metal":  800,

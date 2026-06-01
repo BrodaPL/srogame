@@ -38,6 +38,7 @@ import {
   calculateFleetTravelTurns,
   calculateTravelDistance,
   calculatePlayerFuelCost,
+  calculatePlayerJumpGateTravelCost,
   calculateMaxLabsPerTechnology,
   isJumpGateAutoApprovedStatus,
   isJumpGateMissionAllowed,
@@ -530,12 +531,25 @@ export class LiveQueueBotExecutor implements BotExecutor {
     }
 
     const travelDistance = calculateTravelDistance(command.origin, command.target);
+    const jumpGateTravelCost = calculatePlayerJumpGateTravelCost(
+      selectedShipEntries,
+      originResult.value,
+      targetResult.value,
+      player
+    );
     const operatingCostDecision = evaluateJumpGateOperatingCostPolicy({
       missionType: command.missionType,
       selectedShipCount: totalSelectedShips,
       normalTravelTurns: calculateFleetTravelTurns(travelDistance, player, selectedShipEntries),
       jumpGateTravelTurns: 1,
-      fuelCost: calculatePlayerFuelCost(selectedShipEntries, travelDistance, 1, player)
+      fuelCost: calculatePlayerFuelCost(selectedShipEntries, travelDistance, 1, player),
+      costQuote: {
+        active: jumpGateTravelCost > 0,
+        payer: 'REQUESTER',
+        resources: { metal: 0, crystal: 0, deuterium: jumpGateTravelCost },
+        weightedResourceValue: jumpGateTravelCost * 2.6,
+        reason: 'JUMP_GATE_TRAVEL_COST'
+      }
     });
     return operatingCostDecision.allowed;
   }

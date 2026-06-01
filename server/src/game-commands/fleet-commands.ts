@@ -29,6 +29,7 @@ import {
   calculateFleetCargoCapacity,
   calculateFleetTravelTurns,
   calculatePlayerFuelCost,
+  calculatePlayerJumpGateTravelCost,
   calculatePlayerMaxActiveFleets,
   calculateTravelDistance,
   commandError,
@@ -242,7 +243,9 @@ export function createFleetMission(
 
   const travelDistance = calculateTravelDistance(originCoordinates, command.target);
   const travelTurns = command.useJumpGate ? 1 : calculateFleetTravelTurns(travelDistance, player, totalShipAmounts);
-  const fuelCost = calculatePlayerFuelCost(totalShipAmounts, travelDistance, mission.minimumFuelReserves, player);
+  const fuelCost = command.useJumpGate
+    ? calculatePlayerJumpGateTravelCost(totalShipAmounts, originPlanet, targetPlanet, player)
+    : calculatePlayerFuelCost(totalShipAmounts, travelDistance, mission.minimumFuelReserves, player);
   const wholeRemoteFleetLaunch = remoteOriginContext
     ? isWholeRemoteFleetSelection(remoteOriginContext.fleet, command.ships, command.carriedBombs)
     : false;
