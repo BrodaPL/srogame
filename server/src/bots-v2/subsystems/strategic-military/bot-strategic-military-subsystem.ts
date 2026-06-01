@@ -191,6 +191,11 @@ export class BotStrategicMilitarySubsystem implements BotSubsystem {
         farmEntry.intelPhase = 'COMBAT_INTEL_READY';
       }
 
+      if (hasKnownDefenderTotalsWithoutEnoughCompositionIntel(target)) {
+        farmEntry.farmIntelEnough = false;
+        farmEntry.intelPhase = 'PROBE_REQUIRED';
+      }
+
       if (!farmEntry.farmIntelEnough) {
         if (farmEntry.intelPhase === 'UNSCANNED') {
           const spyRequest = createTargetedSpyMissionRequest(
@@ -2621,8 +2626,11 @@ function updateFarmLedgerEntryFromTarget(
   }
 
   entry.farmIntelEnough = entry.farmIntelEnough || target.spyCombatIntelEnough || target.lastAttackTurn !== null;
-  entry.initialDefenseBroken = sumRecordCounts(entry.knownShipCountsByType) <= 0
-    && sumRecordCounts(entry.knownDefenceCountsByType) <= 0;
+  if (hasKnownDefenderTotalsWithoutEnoughCompositionIntel(target)) {
+    entry.farmIntelEnough = false;
+    entry.intelPhase = 'PROBE_REQUIRED';
+  }
+  entry.initialDefenseBroken = isFarmDefenseConfirmedBroken(target, entry);
 
   if (
     target.lastAttackTurn !== null
@@ -2659,6 +2667,37 @@ function updateFarmLedgerEntryFromTarget(
 
   farmLedger.set(key, entry);
   return entry;
+}
+
+function hasKnownDefenderTotalsWithoutEnoughCompositionIntel(
+  target: BotStrategicMilitaryTargetSnapshot
+): boolean {
+  if (target.spyCombatIntelEnough || target.lastAttackTurn !== null) {
+    return false;
+  }
+  return (target.currentShipsCount ?? 0) > 0 || (target.currentDefencesCount ?? 0) > 0;
+}
+
+function isFarmDefenseConfirmedBroken(
+  target: BotStrategicMilitaryTargetSnapshot,
+  entry: BotMemoryV2StrategicMilitaryFarmLedgerEntry
+): boolean {
+  const typedShipCount = sumRecordCounts(entry.knownShipCountsByType);
+  const typedDefenceCount = sumRecordCounts(entry.knownDefenceCountsByType);
+  const currentShipCount = target.currentShipsCount;
+  const currentDefenceCount = target.currentDefencesCount;
+
+  if ((currentShipCount ?? 0) > 0 || (currentDefenceCount ?? 0) > 0) {
+    return false;
+  }
+  if (target.lastAttackTurn !== null || target.spyCombatIntelEnough) {
+    return typedShipCount <= 0
+      && typedDefenceCount <= 0
+      && (currentShipCount ?? 0) <= 0
+      && (currentDefenceCount ?? 0) <= 0;
+  }
+
+  return entry.initialDefenseBroken && typedShipCount <= 0 && typedDefenceCount <= 0;
 }
 
 function createEmptyFarmLedgerEntry(

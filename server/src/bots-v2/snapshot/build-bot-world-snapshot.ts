@@ -900,10 +900,15 @@ function resolveStrategicMilitaryTargets(
           ? null
           : galaxy.players.find((entry) => entry.playerId === planet.info.ownerId) ?? null;
         const reportTurn = report?.createdTurn ?? null;
-        const spyCombatIntelEnough = report !== null && (
-          (report.hasTotalDefencesIntel || report.defences.length > 0)
-          && (report.hasTotalShipsIntel || report.ships.size > 0)
+        const spyShipIntelEnough = report !== null && (
+          report.ships.size > 0
+          || (report.hasTotalShipsIntel && report.totalShipsAmount <= 0)
         );
+        const spyDefenceIntelEnough = report !== null && (
+          report.defences.length > 0
+          || (report.hasTotalDefencesIntel && report.totalDefencesAmount <= 0)
+        );
+        const spyCombatIntelEnough = spyShipIntelEnough && spyDefenceIntelEnough;
         const mineLevels = report === null
           ? null
           : {
@@ -977,12 +982,8 @@ function resolveStrategicMilitaryTargets(
           hasForeignGuard,
           hasOwnActiveFarmMission,
           mineLevels,
-          currentShipsCount: (report === null && latestBattleObservation === null)
-            ? null
-            : sumCountsByType(knownShipCountsByType),
-          currentDefencesCount: (report === null && latestBattleObservation === null)
-            ? null
-            : sumCountsByType(knownDefenceCountsByType),
+          currentShipsCount: resolveStrategicMilitaryCurrentShipCount(report, latestBattleObservation, knownShipCountsByType),
+          currentDefencesCount: resolveStrategicMilitaryCurrentDefenceCount(report, latestBattleObservation, knownDefenceCountsByType),
           knownShipCountsByType,
           knownDefenceCountsByType,
           currentResources,
@@ -2500,6 +2501,40 @@ function resolveKnownDefenceCountsForStrategicMilitary(
   return Object.fromEntries(
     report.defences.map((entry) => [entry.type, entry.amount] satisfies [DefenceTypeId, number])
   ) as Partial<Record<DefenceTypeId, number>>;
+}
+
+function resolveStrategicMilitaryCurrentShipCount(
+  report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never> | null,
+  latestBattleObservation: ReturnType<typeof resolveLatestBattleObservation>,
+  knownShipCountsByType: Partial<Record<ShipTypeId, number>>
+): number | null {
+  if (latestBattleObservation && (report === null || latestBattleObservation.turn > report.createdTurn)) {
+    return sumCountsByType(latestBattleObservation.survivingShipsByType);
+  }
+  if (report?.hasTotalShipsIntel) {
+    return Math.max(0, Math.floor(report.totalShipsAmount));
+  }
+  if (report !== null || latestBattleObservation !== null) {
+    return sumCountsByType(knownShipCountsByType);
+  }
+  return null;
+}
+
+function resolveStrategicMilitaryCurrentDefenceCount(
+  report: NonNullable<Planet['lastReportData'] extends Map<number, infer T> ? T : never> | null,
+  latestBattleObservation: ReturnType<typeof resolveLatestBattleObservation>,
+  knownDefenceCountsByType: Partial<Record<DefenceTypeId, number>>
+): number | null {
+  if (latestBattleObservation && (report === null || latestBattleObservation.turn > report.createdTurn)) {
+    return sumCountsByType(latestBattleObservation.survivingDefencesByType);
+  }
+  if (report?.hasTotalDefencesIntel) {
+    return Math.max(0, Math.floor(report.totalDefencesAmount));
+  }
+  if (report !== null || latestBattleObservation !== null) {
+    return sumCountsByType(knownDefenceCountsByType);
+  }
+  return null;
 }
 
 function sumCountsByType<T extends string>(counts: Partial<Record<T, number>>): number {

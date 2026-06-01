@@ -1822,6 +1822,9 @@ Transition rule:
 
 - a neutral farm becomes `PLUNDER`-ready only when known ships and known defenses are both gone
 - `initialDefenseBroken = true` only under that same condition
+- total-only nonzero ship/defence intel is not enough to open a farm and is not enough for detailed break composition
+- total-only zero ship and zero defence intel can open a farm
+- total-only nonzero defender intel should force the one jump-capable ship INTEL attack path so battle reports can provide composition data
 
 ### Strategic Military phase-1 firepower rule
 

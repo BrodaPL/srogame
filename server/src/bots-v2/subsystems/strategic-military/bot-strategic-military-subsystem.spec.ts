@@ -357,6 +357,45 @@ describe('BotStrategicMilitarySubsystem', () => {
     expect(plunderProposal).toBeDefined();
   });
 
+  it('does not treat total-only nonzero defender intel as an opened neutral farm', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    neutralPlanet.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 3);
+    markPlanetScannedWithTotalOnlyCombatIntel(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'PLUNDER'
+    )).toBe(false);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'INTEL'
+    )).toBe(true);
+  });
+
+  it('allows total-only zero defender intel to open a neutral farm', () => {
+    const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 2);
+    markPlanetScannedWithTotalOnlyCombatIntel(bot, neutralOwner, neutralPlanet, galaxy.currentTurn);
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot);
+    const plunderProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionPhase === 'PLUNDER'
+    );
+
+    expect(plunderProposal).toBeDefined();
+  });
+
   it('emits a ship-need request when current fleets cannot clear a scanned neutral target', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
@@ -980,6 +1019,19 @@ function markPlanetScannedWithLowIntel(
   const report = new EspionageReportGenerator().createEspionageReport(bot, owner, planet, 1, {
     createdTurn,
     forcedReportLevel: 4
+  });
+  planet.lastReportData.set(bot.playerId, report);
+}
+
+function markPlanetScannedWithTotalOnlyCombatIntel(
+  bot: Player,
+  owner: Player,
+  planet: Planet,
+  createdTurn: number
+): void {
+  const report = new EspionageReportGenerator().createEspionageReport(bot, owner, planet, 1, {
+    createdTurn,
+    forcedReportLevel: 6
   });
   planet.lastReportData.set(bot.playerId, report);
 }
