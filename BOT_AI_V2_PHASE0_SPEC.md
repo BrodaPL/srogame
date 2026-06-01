@@ -1831,13 +1831,23 @@ For initial defense-break attacks:
 - scale that estimate by:
 
 ```text
-1.5
+1.75
 ```
 
-Phase-1 origin rule:
+Retry/interference rule:
 
-- use the best single valid origin only
-- do not combine ships from multiple origins yet
+- normal failed breaks wait briefly before retrying and scale the next required force by observed loss severity
+- if a failed break suddenly observes extra enemy ships compared with prior farm intel, treat it as likely third-party interference instead of pure weak-force failure
+- suspected interference uses a longer pause but does not multiply the next break force from the failed attempt
+
+Composition rule:
+
+- split required `BREAK` force into anti-ship / anti-defence targets from remembered defender mix
+- defence-heavy farms target roughly `25%` anti-ship and `75%` anti-defence force
+- mixed ship/defence farms target roughly `60%` anti-ship and `40%` anti-defence force
+- ship-heavy farms with only light defences target roughly `85%` anti-ship and `15%` anti-defence force
+- carried `SMALL_BOMBER` payload is the preferred anti-defence answer when hangar capacity is available
+- TODO: tune these composition thresholds after stable benchmark data
 
 ### Strategic Military phase-1 plunder rule
 
@@ -1845,6 +1855,7 @@ Repeatable plunder fleets should use:
 
 - cargo ships
 - plus `1-2` military ships
+- opened farms receive stronger repeat-use scoring and reserve more Strategic Military operation room when multiple opened farms exist
 
 ### Strategic Military farm-regrowth model
 

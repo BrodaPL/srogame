@@ -22,6 +22,7 @@ import {
 import {
   addSmallPayloadFromCandidates,
   estimateShipCombatPower,
+  estimateShipAntiFleetPower,
   resolveBestProducibleSmallShipType as resolveSharedBestProducibleSmallShipType,
   resolveMilitaryHangarCapacity,
   resolveOriginSmallPayloadCandidates,
@@ -78,14 +79,40 @@ type ShipNeedRequest = {
 type BreakSelection = {
   ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>;
   combatStrength: number;
+  antiShipStrength: number;
+  antiDefenceStrength: number;
+};
+
+type FarmBreakCompositionProfile = 'SHIP_HEAVY' | 'MIXED' | 'DEFENCE_HEAVY';
+
+type FarmBreakCompositionPlan = {
+  profile: FarmBreakCompositionProfile;
+  antiShipShare: number;
+  antiDefenceShare: number;
+  antiShipStrengthTarget: number;
+  antiDefenceStrengthTarget: number;
+  requireBombardmentBreaker: boolean;
+  shipPressure: number;
+  defencePressure: number;
 };
 
 type RelocationBreakPlan = {
   requests: MissionRequest[];
   stagingPlanet: BotPlanetSnapshot;
   combinedStrength: number;
+  combinedAntiShipStrength: number;
+  combinedAntiDefenceStrength: number;
   totalEtaScore: number;
   hasBombardmentPresence: boolean;
+};
+
+type OriginCombatCandidate = {
+  type: ShipTypeT;
+  amount: number;
+  power: number;
+  antiShipPower: number;
+  antiDefencePower: number;
+  hasBombardmentWeapons: boolean;
 };
 
 type PlunderSelection = {
@@ -108,7 +135,7 @@ type FarmMissionReservation = {
 };
 
 const STRATEGIC_MILITARY_AVAILABILITY = 0.4;
-const BREAK_FORCE_MULTIPLIER = 1.5;
+const BREAK_FORCE_MULTIPLIER = 1.75;
 const MIN_PLUNDER_ESCORTS = 1;
 const MAX_PLUNDER_ESCORTS = 1;
 const DEFAULT_ESCORT_SHIP_NEED = 1;
@@ -118,9 +145,9 @@ const POST_EARLY_NEUTRAL_WARFARE_AVG_INDUSTRY_THRESHOLD = 4;
 const POST_EARLY_BREAK_SCORE_BONUS = 180;
 const POST_EARLY_PLUNDER_SCORE_MULTIPLIER = 1.6;
 const POST_EARLY_SHIP_NEED_SCORE_BONUS = 180;
-const OPENED_FARM_REPEAT_BASE_SCORE_BONUS = 160;
-const OPENED_FARM_RECENT_PLUNDER_MAX_BONUS = 120;
-const OPENED_FARM_EXTRA_CARGO_SCORE_BONUS = 18;
+const OPENED_FARM_REPEAT_BASE_SCORE_BONUS = 260;
+const OPENED_FARM_RECENT_PLUNDER_MAX_BONUS = 180;
+const OPENED_FARM_EXTRA_CARGO_SCORE_BONUS = 24;
 const NEUTRAL_FARM_UNLOCK_AVG_INDUSTRY_THRESHOLD = 3;
 const NEUTRAL_FARM_PRODUCTION_AVG_INDUSTRY_THRESHOLD = 3.3;
 const DEFAULT_FARM_TRANSPORTER_COUNT = 6;
@@ -131,7 +158,8 @@ const RESERVED_FARM_INTEL_SLOTS = 1;
 const BASE_RESERVED_FARM_OPERATION_SLOTS = 2;
 const MAX_ACTIVE_BREAK_FLEETS = 1;
 const NEAREST_FARMS_PER_PLANET = 5;
-const BREAK_FAILURE_COOLDOWN_TURNS = 4;
+const BREAK_FAILURE_COOLDOWN_TURNS = 2;
+const BREAK_INTERFERENCE_COOLDOWN_TURNS = 6;
 const BREAK_RETRY_MULTIPLIER_LIGHT = 1.5;
 const BREAK_RETRY_MULTIPLIER_MEDIUM = 2;
 const BREAK_RETRY_MULTIPLIER_DEFEAT = 3.5;
@@ -512,18 +540,23 @@ function createBreakMissionRequest(
 } {
   const targetStrength = estimateTargetCombatStrength(farmEntry);
   const requiredStrength = resolveRequiredBreakStrength(farmEntry, targetStrength);
+  const composition = createFarmBreakCompositionPlan(farmEntry, requiredStrength);
   const hasKnownDefenders = (target.currentShipsCount ?? 0) > 0 || (target.currentDefencesCount ?? 0) > 0;
   const validPlans: MissionRequest[] = [];
   let bestAvailableStrength = 0;
+  let bestAvailableAntiShipStrength = 0;
+  let bestAvailableAntiDefenceStrength = 0;
   let closestOrigin: BotPlanetSnapshot | null = null;
   let hasBombardmentPresence = false;
 
   for (const originPlanet of context.snapshot.planets) {
     const distance = calculateTravelDistance(originPlanet.coordinates, target.coordinates);
     const travelTurns = resolveTravelTurns(originPlanet, distance);
-    const selection = buildBreakSelection(originPlanet, requiredStrength, (target.currentDefencesCount ?? 0) > 0, hasKnownDefenders);
+    const selection = buildBreakSelection(originPlanet, requiredStrength, composition, hasKnownDefenders);
     if (selection.combatStrength > bestAvailableStrength) {
       bestAvailableStrength = selection.combatStrength;
+      bestAvailableAntiShipStrength = selection.antiShipStrength;
+      bestAvailableAntiDefenceStrength = selection.antiDefenceStrength;
       closestOrigin = originPlanet;
     }
     if (selection.ships.some((ship) => shipTypeHasBombardmentWeapons(ship.type))) {
@@ -589,7 +622,7 @@ function createBreakMissionRequest(
       context,
       target,
       requiredStrength,
-      (target.currentDefencesCount ?? 0) > 0,
+      composition,
       hasKnownDefenders
     );
   if (relocationPlan && !isBreakRetryCoolingDown) {
@@ -607,7 +640,10 @@ function createBreakMissionRequest(
       target,
       requiredStrength,
       Math.max(bestAvailableStrength, relocationPlan?.combinedStrength ?? 0),
+      Math.max(bestAvailableAntiShipStrength, relocationPlan?.combinedAntiShipStrength ?? 0),
+      Math.max(bestAvailableAntiDefenceStrength, relocationPlan?.combinedAntiDefenceStrength ?? 0),
       hasBombardmentPresence || Boolean(relocationPlan?.hasBombardmentPresence),
+      composition,
       closestOrigin
     ),
     preferredOriginCoordinates: closestOrigin ? { ...closestOrigin.coordinates } : null
@@ -734,44 +770,35 @@ function selectSpyOrigin(
 function buildBreakSelection(
   originPlanet: BotPlanetSnapshot,
   requiredStrength: number,
-  requireBombardmentBreaker: boolean,
+  composition: FarmBreakCompositionPlan,
   requireMultiWarshipBreak: boolean
 ): BreakSelection {
-  const combatCandidates = resolveOriginCombatCandidates(originPlanet);
+  const combatCandidates = resolveOriginCombatCandidates(originPlanet, composition);
   const selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> = [];
-  let totalStrength = 0;
 
-  if (requireBombardmentBreaker) {
+  if (composition.requireBombardmentBreaker) {
     const bombardmentShip = combatCandidates.find((candidate) => candidate.hasBombardmentWeapons) ?? null;
     if (bombardmentShip) {
-      selection.push({
-        type: bombardmentShip.type,
-        undamagedAmount: 1,
-        damagedAmount: 0
-      });
-      totalStrength += bombardmentShip.power;
+      addShipsToSelection(selection, bombardmentShip.type, 1);
       bombardmentShip.amount -= 1;
     }
   }
 
   for (const candidate of combatCandidates) {
-    if (candidate.amount <= 0 || candidate.power <= 0) {
+    if (candidate.amount <= 0 || candidate.antiShipPower <= 0) {
       continue;
     }
-    if (totalStrength >= requiredStrength) {
+    const currentAntiShipStrength = estimateSelectionAntiShipStrength(selection);
+    if (currentAntiShipStrength >= composition.antiShipStrengthTarget) {
       break;
     }
 
     const amountToSend = Math.min(
       candidate.amount,
-      Math.max(1, Math.ceil((requiredStrength - totalStrength) / candidate.power))
+      Math.max(1, Math.ceil((composition.antiShipStrengthTarget - currentAntiShipStrength) / candidate.antiShipPower))
     );
-    selection.push({
-      type: candidate.type,
-      undamagedAmount: amountToSend,
-      damagedAmount: 0
-    });
-    totalStrength += candidate.power * amountToSend;
+    addShipsToSelection(selection, candidate.type, amountToSend);
+    candidate.amount -= amountToSend;
   }
 
   const selectedWarshipCount = selection.reduce(
@@ -782,72 +809,89 @@ function buildBreakSelection(
     && selectedWarshipCount === 1
     && isHeavyNeutralBreakWarshipType(selection[0]?.type ?? null);
   if (requireMultiWarshipBreak && selectedWarshipCount < MIN_DEFENDED_BREAK_WARSHIPS && !hasSingleHeavyBreakShip) {
-    return { ships: [], combatStrength: totalStrength };
+    return createBreakSelectionResult([], selection);
   }
 
-  const payloadStrength = addSmallBreakPayload(originPlanet, selection, {
-    requireBomber: requireBombardmentBreaker && !selection.some((ship) => shipTypeHasBombardmentWeapons(ship.type)),
-    requiredStrength,
-    currentStrength: totalStrength
-  });
-  totalStrength += payloadStrength;
+  addSmallBreakPayload(originPlanet, selection, requiredStrength, composition);
 
-  if (requireBombardmentBreaker && !selection.some((ship) => shipTypeHasBombardmentWeapons(ship.type))) {
-    return { ships: [], combatStrength: totalStrength };
+  if (composition.requireBombardmentBreaker && !selection.some((ship) => shipTypeHasBombardmentWeapons(ship.type))) {
+    return createBreakSelectionResult([], selection);
+  }
+
+  let totalStrength = estimateSelectionTotalStrength(selection);
+  for (const candidate of combatCandidates) {
+    if (candidate.amount <= 0 || candidate.power <= 0 || totalStrength >= requiredStrength) {
+      continue;
+    }
+
+    const amountToSend = Math.min(
+      candidate.amount,
+      Math.max(1, Math.ceil((requiredStrength - totalStrength) / candidate.power))
+    );
+    addShipsToSelection(selection, candidate.type, amountToSend);
+    candidate.amount -= amountToSend;
+    totalStrength = estimateSelectionTotalStrength(selection);
   }
 
   return totalStrength >= requiredStrength
-    ? { ships: selection, combatStrength: totalStrength }
-    : { ships: [], combatStrength: totalStrength };
+    ? createBreakSelectionResult(selection, selection)
+    : createBreakSelectionResult([], selection);
 }
 
 function addSmallBreakPayload(
   originPlanet: BotPlanetSnapshot,
   selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>,
-  options: { requireBomber: boolean; requiredStrength: number; currentStrength: number }
-): number {
-  let remainingHangar = resolveSelectionHangarCapacity(selection);
+  requiredStrength: number,
+  composition: FarmBreakCompositionPlan
+): void {
+  const hangarCapacity = resolveSelectionHangarCapacity(selection);
+  let remainingHangar = hangarCapacity - resolveSelectionPayloadSize(selection);
   if (remainingHangar <= 0) {
-    return 0;
+    return;
   }
 
-  let addedStrength = 0;
-  if (options.requireBomber) {
-    addedStrength += addSmallPayloadFromCandidates(
+  const currentAntiDefenceStrength = estimateSelectionAntiDefenceStrength(selection);
+  const neededAntiDefenceStrength = Math.max(0, composition.antiDefenceStrengthTarget - currentAntiDefenceStrength);
+  const bomberPayloadTarget = composition.requireBombardmentBreaker
+    ? Math.max(
+      1,
+      Math.min(
+        remainingHangar,
+        Math.ceil(Math.max(neededAntiDefenceStrength, hangarCapacity * composition.antiDefenceShare))
+      )
+    )
+    : 0;
+  if (bomberPayloadTarget > 0) {
+    addSmallPayloadFromCandidates(
       selection,
       resolveOriginSmallPayloadCandidates(originPlanet, 'SMALL_BOMBER'),
       remainingHangar,
-      1
-    ).addedStrength;
+      bomberPayloadTarget
+    );
     remainingHangar = resolveSelectionHangarCapacity(selection) - resolveSelectionPayloadSize(selection);
-    if (!selection.some((ship) => shipTypeHasBombardmentWeapons(ship.type))) {
-      return addedStrength;
-    }
   }
 
   const desiredPayloadSize = Math.min(
     remainingHangar,
-    Math.max(0, Math.ceil(options.requiredStrength - options.currentStrength - addedStrength))
+    Math.max(0, Math.ceil(requiredStrength - estimateSelectionTotalStrength(selection)))
   );
   if (desiredPayloadSize <= 0) {
-    return addedStrength;
+    return;
   }
 
-  addedStrength += addSmallPayloadFromCandidates(
+  addSmallPayloadFromCandidates(
     selection,
     resolveOriginSmallPayloadCandidates(originPlanet, 'SMALL_COMBAT'),
     remainingHangar,
     desiredPayloadSize
-  ).addedStrength;
-
-  return addedStrength;
+  );
 }
 
 function createBreakRelocationPlan(
   context: BotSubsystemContext,
   target: BotStrategicMilitaryTargetSnapshot,
   requiredStrength: number,
-  requireBombardmentBreaker: boolean,
+  composition: FarmBreakCompositionPlan,
   requireMultiWarshipBreak: boolean
 ): RelocationBreakPlan | null {
   const stagePlans = context.snapshot.planets
@@ -856,7 +900,7 @@ function createBreakRelocationPlan(
       target,
       stagingPlanet,
       requiredStrength,
-      requireBombardmentBreaker,
+      composition,
       requireMultiWarshipBreak
     ))
     .filter((plan): plan is RelocationBreakPlan => plan !== null)
@@ -876,7 +920,7 @@ function buildBreakRelocationPlanForStage(
   target: BotStrategicMilitaryTargetSnapshot,
   stagingPlanet: BotPlanetSnapshot,
   requiredStrength: number,
-  requireBombardmentBreaker: boolean,
+  composition: FarmBreakCompositionPlan,
   requireMultiWarshipBreak: boolean
 ): RelocationBreakPlan | null {
   const originCandidates = context.snapshot.planets
@@ -887,7 +931,7 @@ function buildBreakRelocationPlanForStage(
         originPlanet,
         distanceToStage,
         travelTurnsToStage,
-        combatCandidates: resolveOriginCombatCandidates(originPlanet).map((candidate) => ({ ...candidate }))
+        combatCandidates: resolveOriginCombatCandidates(originPlanet, composition).map((candidate) => ({ ...candidate }))
       };
     })
     .filter((candidate) => candidate.combatCandidates.length > 0)
@@ -905,11 +949,13 @@ function buildBreakRelocationPlanForStage(
 
   const selections = new Map<string, Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>>();
   let combinedStrength = 0;
+  let combinedAntiShipStrength = 0;
+  let combinedAntiDefenceStrength = 0;
   let hasBombardmentPresence = originCandidates.some((origin) =>
     origin.combatCandidates.some((candidate) => candidate.hasBombardmentWeapons)
   );
 
-  if (requireBombardmentBreaker) {
+  if (composition.requireBombardmentBreaker) {
     let selectedBombardment = false;
     for (const origin of originCandidates) {
       const bombardmentCandidate = origin.combatCandidates.find((candidate) =>
@@ -931,6 +977,8 @@ function buildBreakRelocationPlanForStage(
       }
 
       combinedStrength += estimateShipCombatPower(bombardmentCandidate.type) * added;
+      combinedAntiShipStrength += estimateShipAntiFleetPower(bombardmentCandidate.type) * added;
+      combinedAntiDefenceStrength += estimateShipBombardmentPower(bombardmentCandidate.type) * added;
       bombardmentCandidate.amount -= added;
       selectedBombardment = true;
       break;
@@ -942,16 +990,48 @@ function buildBreakRelocationPlanForStage(
   }
 
   for (const origin of originCandidates) {
+    if (combinedAntiShipStrength >= composition.antiShipStrengthTarget) {
+      break;
+    }
+
+    for (const candidate of origin.combatCandidates) {
+      if (candidate.amount <= 0 || candidate.antiShipPower <= 0) {
+        continue;
+      }
+      if (combinedAntiShipStrength >= composition.antiShipStrengthTarget) {
+        break;
+      }
+
+      const neededAmount = Math.min(
+        candidate.amount,
+        Math.max(1, Math.ceil((composition.antiShipStrengthTarget - combinedAntiShipStrength) / candidate.antiShipPower))
+      );
+      const added = tryAddShipsToSelection(
+        selections,
+        origin.originPlanet,
+        candidate.type,
+        neededAmount,
+        origin.distanceToStage
+      );
+      if (added <= 0) {
+        continue;
+      }
+
+      combinedStrength += candidate.power * added;
+      combinedAntiShipStrength += candidate.antiShipPower * added;
+      combinedAntiDefenceStrength += candidate.antiDefencePower * added;
+      candidate.amount -= added;
+    }
+  }
+
+  for (const origin of originCandidates) {
     if (combinedStrength >= requiredStrength) {
       break;
     }
 
     for (const candidate of origin.combatCandidates) {
-      if (candidate.amount <= 0 || candidate.power <= 0) {
+      if (candidate.amount <= 0 || candidate.power <= 0 || combinedStrength >= requiredStrength) {
         continue;
-      }
-      if (combinedStrength >= requiredStrength) {
-        break;
       }
 
       const neededAmount = Math.min(
@@ -970,6 +1050,8 @@ function buildBreakRelocationPlanForStage(
       }
 
       combinedStrength += candidate.power * added;
+      combinedAntiShipStrength += candidate.antiShipPower * added;
+      combinedAntiDefenceStrength += candidate.antiDefencePower * added;
       candidate.amount -= added;
     }
   }
@@ -1033,6 +1115,8 @@ function buildBreakRelocationPlanForStage(
     requests,
     stagingPlanet,
     combinedStrength,
+    combinedAntiShipStrength,
+    combinedAntiDefenceStrength,
     totalEtaScore: totalMoveTurns + attackTurns,
     hasBombardmentPresence
   };
@@ -1127,12 +1211,10 @@ function buildPlunderCargoSelection(
   return { ships, cargoCapacity };
 }
 
-function resolveOriginCombatCandidates(originPlanet: BotPlanetSnapshot): Array<{
-  type: ShipTypeT;
-  amount: number;
-  power: number;
-  hasBombardmentWeapons: boolean;
-}> {
+function resolveOriginCombatCandidates(
+  originPlanet: BotPlanetSnapshot,
+  composition: FarmBreakCompositionPlan | null = null
+): OriginCombatCandidate[] {
   return Object.entries(originPlanet.ships.undamagedCountByType)
     .map(([type, amount]) => ({
       type: type as ShipTypeT,
@@ -1150,14 +1232,35 @@ function resolveOriginCombatCandidates(originPlanet: BotPlanetSnapshot): Array<{
       type: entry.type,
       amount: entry.amount,
       power: estimateShipCombatPower(entry.type),
+      antiShipPower: estimateShipAntiFleetPower(entry.type),
+      antiDefencePower: estimateShipBombardmentPower(entry.type),
       hasBombardmentWeapons: shipTypeHasBombardmentWeapons(entry.type)
     }))
-    .sort((left, right) =>
-      Number(right.type === ShipType.CRUISER) - Number(left.type === ShipType.CRUISER)
+    .sort((left, right) => compareOriginCombatCandidates(left, right, composition));
+}
+
+function compareOriginCombatCandidates(
+  left: OriginCombatCandidate,
+  right: OriginCombatCandidate,
+  composition: FarmBreakCompositionPlan | null
+): number {
+  if (composition) {
+    // TODO: Tune neutral-farm anti-ship/anti-defence weights after the next stable benchmark pass.
+    const leftWeightedPower = (left.antiShipPower * composition.antiShipShare)
+      + (left.antiDefencePower * composition.antiDefenceShare);
+    const rightWeightedPower = (right.antiShipPower * composition.antiShipShare)
+      + (right.antiDefencePower * composition.antiDefenceShare);
+    return rightWeightedPower - leftWeightedPower
+      || Number(right.type === ShipType.CRUISER) - Number(left.type === ShipType.CRUISER)
       || Number(right.hasBombardmentWeapons) - Number(left.hasBombardmentWeapons)
       || right.power - left.power
-      || left.type.localeCompare(right.type)
-    );
+      || left.type.localeCompare(right.type);
+  }
+
+  return Number(right.type === ShipType.CRUISER) - Number(left.type === ShipType.CRUISER)
+    || Number(right.hasBombardmentWeapons) - Number(left.hasBombardmentWeapons)
+    || right.power - left.power
+    || left.type.localeCompare(right.type);
 }
 
 function isNeutralFarmWarshipType(shipType: ShipTypeT): boolean {
@@ -1190,25 +1293,34 @@ function createBreakShipNeed(
   target: BotStrategicMilitaryTargetSnapshot,
   requiredStrength: number,
   bestAvailableStrength: number,
+  bestAvailableAntiShipStrength: number,
+  bestAvailableAntiDefenceStrength: number,
   hasBombardmentPresence: boolean,
+  composition: FarmBreakCompositionPlan,
   closestOrigin: BotPlanetSnapshot | null
 ): ShipNeedRequest | null {
   if (!context.snapshot.planets.some((planet) => isNeutralFarmProductionPlanet(planet))) {
     return null;
   }
 
-  if ((target.currentDefencesCount ?? 0) > 0 && !hasBombardmentPresence) {
+  const missingAntiDefenceStrength = Math.max(
+    0,
+    composition.antiDefenceStrengthTarget - bestAvailableAntiDefenceStrength
+  );
+  if (composition.requireBombardmentBreaker && (!hasBombardmentPresence || missingAntiDefenceStrength > 0)) {
     const smallBomberType = resolveBestProducibleSmallShipType(context, 'SMALL_BOMBER', closestOrigin);
     if (smallBomberType) {
+      const bomberPower = Math.max(1, estimateShipBombardmentPower(smallBomberType));
       return {
         kind: 'SHIP_NEED',
         shipType: smallBomberType,
-        amount: 1,
+        amount: Math.max(1, Math.ceil(Math.max(1, missingAntiDefenceStrength) / bomberPower)),
         shortageKind: 'SMALL_BOMBER',
         targetCoordinates: { ...target.coordinates },
         preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
-        score: 560 + requiredStrength + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
-        reason: 'Need a carried bomber small ship to break neutral planetary defenses.'
+        score: 600 + requiredStrength + Math.round(missingAntiDefenceStrength)
+          + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
+        reason: 'Need carried bomber small ships to match neutral-farm defence-heavy break composition.'
       };
     }
 
@@ -1216,31 +1328,43 @@ function createBreakShipNeed(
     if (!bombardmentType) {
       return null;
     }
+    const bombardmentPower = Math.max(1, estimateShipBombardmentPower(bombardmentType));
     return {
       kind: 'SHIP_NEED',
       shipType: bombardmentType,
-      amount: 1,
+      amount: Math.max(1, Math.ceil(Math.max(1, missingAntiDefenceStrength) / bombardmentPower)),
       shortageKind: 'BOMBARDMENT',
       targetCoordinates: { ...target.coordinates },
       preferredOrigin: closestOrigin ? { ...closestOrigin.coordinates } : null,
-      score: 500 + requiredStrength + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
-      reason: 'Need a bombardment-capable ship to break neutral defenses.'
+      score: 540 + requiredStrength + Math.round(missingAntiDefenceStrength)
+        + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin),
+      reason: 'Need bombardment-capable ships to match neutral-farm defence-heavy break composition.'
     };
   }
 
+  const missingAntiShipStrength = Math.max(
+    0,
+    composition.antiShipStrengthTarget - bestAvailableAntiShipStrength
+  );
   const combatNeed = createFarmCombatShipNeed(
     context,
     target,
     closestOrigin,
-    'Need more jump-capable combat ships to clear neutral defenders.'
+    composition.profile === 'SHIP_HEAVY'
+      ? 'Need more anti-ship jump-capable combat ships to clear neutral defenders.'
+      : 'Need more jump-capable combat ships to complete neutral-farm break composition.'
   );
   if (!combatNeed) {
     return null;
   }
 
-  const combatPower = Math.max(1, estimateShipCombatPower(combatNeed.shipType));
-  combatNeed.amount = Math.max(1, Math.ceil(Math.max(0, requiredStrength - bestAvailableStrength) / combatPower));
-  combatNeed.score = 620 + requiredStrength + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin);
+  const combatPower = Math.max(1, estimateShipAntiFleetPower(combatNeed.shipType));
+  combatNeed.amount = Math.max(
+    1,
+    Math.ceil(Math.max(missingAntiShipStrength, requiredStrength - bestAvailableStrength, 1) / combatPower)
+  );
+  combatNeed.score = 620 + requiredStrength + Math.round(missingAntiShipStrength)
+    + resolvePostEarlyNeutralShipNeedScoreBonus(closestOrigin);
   return combatNeed;
 }
 
@@ -1623,6 +1747,124 @@ function estimateTargetCombatStrength(farmEntry: BotMemoryV2StrategicMilitaryFar
   return total;
 }
 
+function createFarmBreakCompositionPlan(
+  farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry,
+  requiredStrength: number
+): FarmBreakCompositionPlan {
+  const shipPressure = estimateKnownShipPressure(farmEntry.knownShipCountsByType);
+  const defencePressure = estimateKnownDefencePressure(farmEntry.knownDefenceCountsByType);
+  const totalPressure = shipPressure + defencePressure;
+  let profile: FarmBreakCompositionProfile = 'SHIP_HEAVY';
+  let antiShipShare = 1;
+  let antiDefenceShare = 0;
+
+  if (defencePressure > 0 && totalPressure > 0) {
+    const defenceRatio = defencePressure / totalPressure;
+    // TODO: These neutral-farm composition thresholds are likely tuning points after benchmark analysis.
+    if (defenceRatio >= 0.65 || shipPressure <= 0) {
+      profile = 'DEFENCE_HEAVY';
+      antiShipShare = 0.25;
+      antiDefenceShare = 0.75;
+    } else if (defenceRatio <= 0.3) {
+      profile = 'SHIP_HEAVY';
+      antiShipShare = 0.85;
+      antiDefenceShare = 0.15;
+    } else {
+      profile = 'MIXED';
+      antiShipShare = 0.6;
+      antiDefenceShare = 0.4;
+    }
+  }
+
+  return {
+    profile,
+    antiShipShare,
+    antiDefenceShare,
+    antiShipStrengthTarget: Math.ceil(requiredStrength * antiShipShare),
+    antiDefenceStrengthTarget: Math.ceil(requiredStrength * antiDefenceShare),
+    requireBombardmentBreaker: defencePressure > 0,
+    shipPressure,
+    defencePressure
+  };
+}
+
+function estimateKnownShipPressure(countsByType: Partial<Record<ShipTypeT, number>>): number {
+  return Object.entries(countsByType).reduce(
+    (total, [shipType, amount]) => total + (estimateShipAntiFleetPower(shipType as ShipTypeT) * Math.max(0, amount ?? 0)),
+    0
+  );
+}
+
+function estimateKnownDefencePressure(countsByType: Partial<Record<DefenceTypeT, number>>): number {
+  return Object.entries(countsByType).reduce(
+    (total, [defenceType, amount]) => total + (estimateDefenceCombatPower(defenceType as DefenceTypeT) * Math.max(0, amount ?? 0)),
+    0
+  );
+}
+
+function createBreakSelectionResult(
+  ships: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>,
+  measuredShips: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>
+): BreakSelection {
+  return {
+    ships,
+    combatStrength: estimateSelectionTotalStrength(measuredShips),
+    antiShipStrength: estimateSelectionAntiShipStrength(measuredShips),
+    antiDefenceStrength: estimateSelectionAntiDefenceStrength(measuredShips)
+  };
+}
+
+function addShipsToSelection(
+  selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>,
+  shipType: ShipTypeT,
+  amount: number
+): void {
+  if (amount <= 0) {
+    return;
+  }
+  const entry = selection.find((candidate) => candidate.type === shipType);
+  if (entry) {
+    entry.undamagedAmount += amount;
+    return;
+  }
+  selection.push({
+    type: shipType,
+    undamagedAmount: amount,
+    damagedAmount: 0
+  });
+}
+
+function estimateSelectionTotalStrength(
+  selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>
+): number {
+  return selection.reduce(
+    (total, ship) => total + (estimateShipCombatPower(ship.type) * (ship.undamagedAmount + ship.damagedAmount)),
+    0
+  );
+}
+
+function estimateSelectionAntiShipStrength(
+  selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>
+): number {
+  return selection.reduce(
+    (total, ship) => total + (estimateShipAntiFleetPower(ship.type) * (ship.undamagedAmount + ship.damagedAmount)),
+    0
+  );
+}
+
+function estimateSelectionAntiDefenceStrength(
+  selection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }>
+): number {
+  return selection.reduce(
+    (total, ship) => total + (estimateShipBombardmentPower(ship.type) * (ship.undamagedAmount + ship.damagedAmount)),
+    0
+  );
+}
+
+function estimateShipBombardmentPower(shipType: ShipTypeT): number {
+  return shipTypeHasBombardmentWeapons(shipType) ? estimateShipCombatPower(shipType) : 0;
+}
+
 function estimateDefenceCombatPower(defenceType: DefenceTypeT): number {
   const blueprint = DEFENCE_BLUEPRINTS.get(defenceType);
   if (!blueprint) {
@@ -1913,6 +2155,7 @@ function resolveFarmMissionReservation(
   missionCap: number
 ): FarmMissionReservation {
   const actionableFarmCount = countActionableFarms(targets, farmLedger);
+  const openedActionableFarmCount = countOpenedActionableFarms(targets, farmLedger);
   const activeFarmIntelMissionCount = countActiveFarmIntelMissions(targets, farmLedger);
   const activeFarmBreakMissionCount = countActiveFarmBreakMissions(targets, farmLedger);
   const activeFarmPlunderMissionCount = countActiveFarmPlunderMissions(targets, farmLedger);
@@ -1923,7 +2166,9 @@ function resolveFarmMissionReservation(
 
   let reservedOperationSlots = 0;
   if (actionableFarmCount > 0) {
-    reservedOperationSlots = BASE_RESERVED_FARM_OPERATION_SLOTS + Math.floor(actionableFarmCount / 2);
+    reservedOperationSlots = BASE_RESERVED_FARM_OPERATION_SLOTS
+      + openedActionableFarmCount
+      + Math.floor(Math.max(0, actionableFarmCount - openedActionableFarmCount) / 2);
     if (availableFleetSlots > 0) {
       reservedOperationSlots = Math.min(
         reservedOperationSlots,
@@ -1935,7 +2180,10 @@ function resolveFarmMissionReservation(
 
   const baseReservedPlunderSlots = reservedOperationSlots <= 0
     ? 0
-    : 1 + Math.max(0, reservedOperationSlots - 2);
+    : Math.max(
+      1 + Math.max(0, reservedOperationSlots - 2),
+      Math.min(openedActionableFarmCount, reservedOperationSlots)
+    );
   const baseReservedBreakSlots = reservedOperationSlots >= 2 ? 1 : 0;
   const availableIntelSlots = Math.max(0, RESERVED_FARM_INTEL_SLOTS - activeFarmIntelMissionCount);
   const availableBreakSlots = Math.max(0, Math.min(MAX_ACTIVE_BREAK_FLEETS, baseReservedBreakSlots) - activeFarmBreakMissionCount);
@@ -2204,6 +2452,23 @@ function countActionableFarms(
   return actionable.size;
 }
 
+function countOpenedActionableFarms(
+  targets: BotStrategicMilitaryTargetSnapshot[],
+  farmLedger: FarmLedgerMap
+): number {
+  const opened = new Set<string>();
+  for (const target of targets) {
+    if (!target.isNeutral || !target.inOwnedSystem || target.hasForeignGuard) {
+      continue;
+    }
+    const entry = resolveFarmLedgerEntry(farmLedger, target.coordinates);
+    if (entry?.initialDefenseBroken) {
+      opened.add(toCoordinatesKey(target.coordinates));
+    }
+  }
+  return opened.size;
+}
+
 function countActiveFarmIntelMissions(
   targets: BotStrategicMilitaryTargetSnapshot[],
   farmLedger: FarmLedgerMap
@@ -2277,6 +2542,9 @@ function updateFarmLedgerEntryFromTarget(
   const existing = farmLedger.get(key);
   const entry = existing ?? createEmptyFarmLedgerEntry(target.coordinates);
   const wasDefenseBroken = entry.initialDefenseBroken;
+  const previousKnownTargetStrength = estimateTargetCombatStrength(entry);
+  const previousKnownShipCount = sumRecordCounts(entry.knownShipCountsByType);
+  const previousKnownDefenceCount = sumRecordCounts(entry.knownDefenceCountsByType);
 
   if (target.reportTurn !== null) {
     if (entry.lastSpyTurn === null || target.reportTurn > entry.lastSpyTurn) {
@@ -2367,9 +2635,21 @@ function updateFarmLedgerEntryFromTarget(
       entry.nextBreakAllowedTurn = null;
       entry.lastBreakFailureLossBracket = null;
     } else {
-      entry.nextBreakAllowedTurn = target.lastAttackTurn + BREAK_FAILURE_COOLDOWN_TURNS;
-      entry.lastBreakFailureLossBracket = resolveBreakFailureLossBracket(target);
-      // TODO: A failed neutral-farm break can also mean third-party fleets interfered, not only that our force was too weak.
+      const suspectedInterference = isBreakFailureLikelyThirdPartyInterference(
+        target,
+        entry,
+        previousKnownTargetStrength,
+        previousKnownShipCount,
+        previousKnownDefenceCount
+      );
+      entry.nextBreakAllowedTurn = target.lastAttackTurn + (
+        suspectedInterference
+          ? BREAK_INTERFERENCE_COOLDOWN_TURNS
+          : BREAK_FAILURE_COOLDOWN_TURNS
+      );
+      entry.lastBreakFailureLossBracket = suspectedInterference
+        ? 'NONE'
+        : resolveBreakFailureLossBracket(target);
     }
   }
 
@@ -2431,6 +2711,32 @@ function resolveBreakFailureLossBracket(
     return 'MEDIUM';
   }
   return 'LIGHT';
+}
+
+function isBreakFailureLikelyThirdPartyInterference(
+  target: BotStrategicMilitaryTargetSnapshot,
+  farmEntry: BotMemoryV2StrategicMilitaryFarmLedgerEntry,
+  previousKnownTargetStrength: number,
+  previousKnownShipCount: number,
+  previousKnownDefenceCount: number
+): boolean {
+  if (target.lastAttackTurn === null || farmEntry.initialDefenseBroken) {
+    return false;
+  }
+  if (previousKnownShipCount + previousKnownDefenceCount <= 0) {
+    return false;
+  }
+
+  const currentShipCount = sumRecordCounts(farmEntry.knownShipCountsByType);
+  const currentDefenceCount = sumRecordCounts(farmEntry.knownDefenceCountsByType);
+  const currentTargetStrength = estimateTargetCombatStrength(farmEntry);
+  const newUnexpectedShips = currentShipCount > previousKnownShipCount;
+  const defensesDidNotGrow = currentDefenceCount <= previousKnownDefenceCount;
+  const strengthSpike = previousKnownTargetStrength <= 0
+    ? currentTargetStrength >= 80
+    : currentTargetStrength >= Math.max(previousKnownTargetStrength * 1.75, previousKnownTargetStrength + 80);
+
+  return newUnexpectedShips && defensesDidNotGrow && strengthSpike;
 }
 
 function hasFarmResourceModel(entry: BotMemoryV2StrategicMilitaryFarmLedgerEntry): boolean {

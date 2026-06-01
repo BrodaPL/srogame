@@ -581,6 +581,58 @@ describe('BotStrategicMilitarySubsystem', () => {
     )).toBe(true);
   });
 
+  it('treats sudden extra ships on a failed break as likely third-party interference', () => {
+    const memory = createDefaultBotMemoryV2();
+    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 2);
+    memory.strategicMilitary.farmLedger.push(createFarmLedgerEntry(neutralPlanet, {
+      intelPhase: 'COMBAT_INTEL_READY',
+      farmIntelEnough: true,
+      knownShipCountsByType: { [ShipType.FIGHTER]: 1 },
+      lastCombatObservationTurn: galaxy.currentTurn - 2
+    }));
+    addBattleReport(bot, neutralPlanet, galaxy.currentTurn, {
+      survivingShipsLine: 'Enemy survivors by type: Battle Ship x4',
+      survivingDefencesLine: 'Enemy defense survivors by type: none',
+      ownShipsLine: 'Own ships (attacker): 0/2 survived, 2 lost.',
+      ownShipLossesLine: 'Own ship losses by type: Cruiser x2',
+      ownSurvivorsLine: 'Own survivors by type: none'
+    });
+
+    runStrategicMilitarySubsystem(galaxy, bot, memory);
+
+    const farmEntry = memory.strategicMilitary.farmLedger.find((entry) =>
+      entry.coordinates.x === neutralPlanet.basicInfo.solarSystem.coordinates.x
+      && entry.coordinates.y === neutralPlanet.basicInfo.solarSystem.coordinates.y
+      && entry.coordinates.z === neutralPlanet.basicInfo.order
+    );
+    expect(farmEntry?.lastBreakFailureLossBracket).toBe('NONE');
+    expect(farmEntry?.nextBreakAllowedTurn).toBe(galaxy.currentTurn + 6);
+  });
+
+  it('reserves more farm-operation room once a farm is opened', () => {
+    const memory = createDefaultBotMemoryV2();
+    const { galaxy, bot, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
+    configureOriginPlanet(homePlanet);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 1);
+    homePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 6);
+    memory.strategicMilitary.farmLedger.push(createFarmLedgerEntry(neutralPlanet, {
+      intelPhase: 'COMBAT_INTEL_READY',
+      farmIntelEnough: true,
+      initialDefenseBroken: true,
+      lastSuccessfulPlunderTurn: galaxy.currentTurn - 1
+    }));
+
+    const result = runStrategicMilitarySubsystem(galaxy, bot, memory);
+
+    expect(result.debug.reservedFarmOperationSlots).toBeGreaterThanOrEqual(3);
+    expect(result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.debug.missionPhase === 'PLUNDER'
+    )).toBe(true);
+  });
+
   it('keeps BREAK as a hard gate before PLUNDER is considered', () => {
     const { galaxy, bot, neutralOwner, homePlanet, neutralPlanet } = createStrategicMilitaryWorld();
     configureOriginPlanet(homePlanet);
@@ -843,6 +895,53 @@ function createActiveNeutralFarmAttackFleet(ownerId: number, originPlanet: Plane
     null,
     FleetReturnReason.NORMAL
   );
+}
+
+function createFarmLedgerEntry(
+  planet: Planet,
+  overrides: Partial<BotMemoryV2['strategicMilitary']['farmLedger'][number]> = {}
+): BotMemoryV2['strategicMilitary']['farmLedger'][number] {
+  const coordinates = overrides.coordinates ?? {
+    x: planet.basicInfo.solarSystem.coordinates.x,
+    y: planet.basicInfo.solarSystem.coordinates.y,
+    z: planet.basicInfo.order
+  };
+  return {
+    intelPhase: 'UNSCANNED',
+    lastSpyTurn: null,
+    lastAttackTurn: null,
+    lastProcessedAttackTurn: null,
+    lastSuccessfulPlunderTurn: null,
+    lastBreakAttemptCombatStrength: null,
+    nextBreakAllowedTurn: null,
+    lastBreakFailureLossBracket: null,
+    knownMineLevels: {
+      metalMineLevel: 0,
+      crystalMineLevel: 0,
+      deuteriumSynthesizerLevel: 0
+    },
+    knownStorageCapacity: { metal: 0, crystal: 0, deuterium: 0 },
+    knownIncome: { metal: 0, crystal: 0, deuterium: 0 },
+    knownBunkerReductionPercent: 0,
+    knownPlanetaryModifiers: {
+      industryModifier: 1,
+      metalModifier: 1,
+      crystalModifier: 1,
+      deuteriumModifier: 1
+    },
+    knownShipCountsByType: {},
+    knownDefenceCountsByType: {},
+    farmIntelEnough: false,
+    initialDefenseBroken: false,
+    lastObservedResources: { metal: 0, crystal: 0, deuterium: 0 },
+    lastResourceObservationTurn: null,
+    lastCombatObservationTurn: null,
+    estimatedNextGoodAttackTurn: null,
+    preferredPlunderTransporterCount: 6,
+    preferredOriginCoordinates: null,
+    ...overrides,
+    coordinates
+  };
 }
 
 function configureOriginPlanet(planet: Planet): void {
