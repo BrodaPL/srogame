@@ -790,6 +790,11 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return `${Math.round(normalized * 100)}%`;
   }
 
+  protected formatAveragePlanetIndustryLevel(value: number): string {
+    const normalized = Number.isFinite(value) ? value : 0;
+    return this.roundNumber(normalized, 2).toString();
+  }
+
   protected copyCoordinates(): void {
     if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
       return;
@@ -2087,22 +2092,47 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     ];
   }
 
-  protected effectiveAveragePlanetIndustryLevel(): number | null {
-    const parameters = this.planet?.info.planetaryParameters;
-    if (!parameters) {
+  protected averagePlanetIndustryLevel(): number | null {
+    if (!this.planet) {
       return null;
     }
 
-    const terraformerPenaltyReduction = this.terraformerPenaltyReduction();
-    if (parameters.industryModifier >= 1 || terraformerPenaltyReduction <= 0) {
-      return parameters.industryModifier;
+    const includedBuildings: Array<{ buildingType: BuildingType; existenceBonus: number }> = [
+      { buildingType: BuildingType.METAL_MINE, existenceBonus: 0 },
+      { buildingType: BuildingType.CRYSTAL_MINE, existenceBonus: 0 },
+      { buildingType: BuildingType.DEUTERIUM_SYNTHESIZER, existenceBonus: 0 },
+      { buildingType: BuildingType.METAL_STORAGE, existenceBonus: 0 },
+      { buildingType: BuildingType.CRYSTAL_STORAGE, existenceBonus: 0 },
+      { buildingType: BuildingType.DEUTERIUM_TANK, existenceBonus: 0 },
+      { buildingType: BuildingType.SOLAR_WIND_GEOTHERMAL, existenceBonus: 0 },
+      { buildingType: BuildingType.NUCLEAR_PLANT, existenceBonus: 0 },
+      { buildingType: BuildingType.FUSION_REACTOR, existenceBonus: 1 },
+      { buildingType: BuildingType.ROBOTICS_FACTORY, existenceBonus: 0 },
+      { buildingType: BuildingType.SHIPYARD, existenceBonus: 0 },
+      { buildingType: BuildingType.NANITE_FACTORY, existenceBonus: 3 }
+    ];
+
+    let totalEffectiveLevel = 0;
+    let includedCount = 0;
+    for (const entry of includedBuildings) {
+      const level = this.buildingLevel(entry.buildingType);
+      if (level <= 0) {
+        continue;
+      }
+
+      totalEffectiveLevel += level + entry.existenceBonus;
+      includedCount += 1;
     }
 
-    return Math.min(1, parameters.industryModifier + terraformerPenaltyReduction);
+    if (includedCount <= 0) {
+      return 0;
+    }
+
+    return totalEffectiveLevel / includedCount;
   }
 
   protected averagePlanetIndustryTooltip(): string {
-    return 'Current effective planet-wide industry efficiency. This affects building construction, shipyard production, and repair drone output. Terraformer mitigation is included when applicable.';
+    return 'Average effective level of completed industry infrastructure on this planet. Fusion Reactor adds +1 effective level when present, and Nanite Factory adds +3 effective levels when present.';
   }
 
   protected bombDepotOverviewValue(): string {

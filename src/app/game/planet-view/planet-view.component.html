@@ -50,12 +50,9 @@
               Average planet industry level
             </span>
             <span
-              class="planet-parameters-grid__value"
-              [class.planet-parameters-grid__value--negative]="(effectiveAveragePlanetIndustryLevel() ?? 1) < 0.9"
-              [class.planet-parameters-grid__value--positive]="(effectiveAveragePlanetIndustryLevel() ?? 1) > 1.1"
-              [class.planet-parameters-grid__value--neutral]="(effectiveAveragePlanetIndustryLevel() ?? 1) >= 0.9 && (effectiveAveragePlanetIndustryLevel() ?? 1) <= 1.1"
+              class="planet-parameters-grid__value planet-parameters-grid__value--neutral"
             >
-              {{ formatPlanetaryParameterPercent(effectiveAveragePlanetIndustryLevel() ?? 0) }}
+              {{ formatAveragePlanetIndustryLevel(averagePlanetIndustryLevel() ?? 0) }}
             </span>
           </div>
           <div class="planet-parameters-grid__row">

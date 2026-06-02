@@ -102,6 +102,34 @@ describe('BotWeightManagerSubsystem', () => {
     expect(damagedEntry?.damagedPlanet).toBe(true);
   });
 
+  it('calculates average industry with static existence bonuses for Fusion Reactor and Nanite Factory', () => {
+    const { galaxy, bot, matureHubPlanet } = createWeightManagerWorld();
+    resetAverageIndustryBuildings(matureHubPlanet);
+    matureHubPlanet.setBuildingLevel(BuildingType.METAL_MINE, 2);
+    matureHubPlanet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 4);
+    matureHubPlanet.setBuildingLevel(BuildingType.FUSION_REACTOR, 1);
+    matureHubPlanet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+
+    const snapshot = buildBotWorldSnapshot(galaxy, bot, {
+      mode: 'SHADOW',
+      enabledSubsystems: {
+        economic: false,
+        defensive: false,
+        warfare: false,
+        critical: false,
+        strategicDevelopment: false,
+        strategicMilitary: false,
+        strategicDiplomatic: false,
+        weightManager: true
+      },
+    });
+    const targetSnapshot = snapshot.planets.find((planet) =>
+      sameCoordinates(planet.coordinates, matureHubPlanet)
+    );
+
+    expect(targetSnapshot?.defense.avgIndustryLevel).toBe(3);
+  });
+
   it('removes industry focus during active war without forcing a replacement focus', () => {
     const { galaxy, bot, enemy, matureLaggingPlanet, matureHubPlanet } = createWeightManagerWorld();
     configureIndustryPlanet(matureHubPlanet, 12);
@@ -397,6 +425,25 @@ function configureIndustryPlanet(planet: Planet, level: number): void {
   planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, Math.max(1, level - 1));
   planet.setBuildingLevel(BuildingType.SHIPYARD, Math.max(1, level - 1));
   planet.setBuildingLevel(BuildingType.NANITE_FACTORY, level >= 6 ? 1 : 0);
+}
+
+function resetAverageIndustryBuildings(planet: Planet): void {
+  for (const buildingType of [
+    BuildingType.METAL_MINE,
+    BuildingType.CRYSTAL_MINE,
+    BuildingType.DEUTERIUM_SYNTHESIZER,
+    BuildingType.METAL_STORAGE,
+    BuildingType.CRYSTAL_STORAGE,
+    BuildingType.DEUTERIUM_TANK,
+    BuildingType.SOLAR_WIND_GEOTHERMAL,
+    BuildingType.NUCLEAR_PLANT,
+    BuildingType.FUSION_REACTOR,
+    BuildingType.ROBOTICS_FACTORY,
+    BuildingType.SHIPYARD,
+    BuildingType.NANITE_FACTORY
+  ]) {
+    planet.setBuildingLevel(buildingType, 0);
+  }
 }
 
 function markPlanetDiscoveredByForeignPlayer(

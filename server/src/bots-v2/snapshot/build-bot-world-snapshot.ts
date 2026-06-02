@@ -678,22 +678,22 @@ function resolveMaturityStage(averageMineLevel: number): BotPlanetMaturityStage 
 }
 
 function resolveAverageIndustryLevel(planet: Planet): number {
-  const includedBuildings: Array<{ buildingType: BuildingTypeId; weight: number }> = [
-    { buildingType: BuildingType.METAL_MINE, weight: 1 },
-    { buildingType: BuildingType.CRYSTAL_MINE, weight: 1 },
-    { buildingType: BuildingType.DEUTERIUM_SYNTHESIZER, weight: 1 },
-    { buildingType: BuildingType.METAL_STORAGE, weight: 1 },
-    { buildingType: BuildingType.CRYSTAL_STORAGE, weight: 1 },
-    { buildingType: BuildingType.DEUTERIUM_TANK, weight: 1 },
-    { buildingType: BuildingType.SOLAR_WIND_GEOTHERMAL, weight: 1 },
-    { buildingType: BuildingType.NUCLEAR_PLANT, weight: 1 },
-    { buildingType: BuildingType.FUSION_REACTOR, weight: 1.25 },
-    { buildingType: BuildingType.ROBOTICS_FACTORY, weight: 1 },
-    { buildingType: BuildingType.SHIPYARD, weight: 1 },
-    { buildingType: BuildingType.NANITE_FACTORY, weight: 2 }
+  const includedBuildings: Array<{ buildingType: BuildingTypeId; existenceBonus: number }> = [
+    { buildingType: BuildingType.METAL_MINE, existenceBonus: 0 },
+    { buildingType: BuildingType.CRYSTAL_MINE, existenceBonus: 0 },
+    { buildingType: BuildingType.DEUTERIUM_SYNTHESIZER, existenceBonus: 0 },
+    { buildingType: BuildingType.METAL_STORAGE, existenceBonus: 0 },
+    { buildingType: BuildingType.CRYSTAL_STORAGE, existenceBonus: 0 },
+    { buildingType: BuildingType.DEUTERIUM_TANK, existenceBonus: 0 },
+    { buildingType: BuildingType.SOLAR_WIND_GEOTHERMAL, existenceBonus: 0 },
+    { buildingType: BuildingType.NUCLEAR_PLANT, existenceBonus: 0 },
+    { buildingType: BuildingType.FUSION_REACTOR, existenceBonus: 1 },
+    { buildingType: BuildingType.ROBOTICS_FACTORY, existenceBonus: 0 },
+    { buildingType: BuildingType.SHIPYARD, existenceBonus: 0 },
+    { buildingType: BuildingType.NANITE_FACTORY, existenceBonus: 3 }
   ];
 
-  let weightedSum = 0;
+  let totalEffectiveLevel = 0;
   let includedCount = 0;
   for (const entry of includedBuildings) {
     const level = planet.getBuildingLevel(entry.buildingType);
@@ -701,7 +701,7 @@ function resolveAverageIndustryLevel(planet: Planet): number {
       continue;
     }
 
-    weightedSum += level * entry.weight;
+    totalEffectiveLevel += level + entry.existenceBonus;
     includedCount += 1;
   }
 
@@ -709,7 +709,7 @@ function resolveAverageIndustryLevel(planet: Planet): number {
     return 0;
   }
 
-  return weightedSum / includedCount;
+  return totalEffectiveLevel / includedCount;
 }
 
 function resolveInstalledDefenseValues(
