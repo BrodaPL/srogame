@@ -9,9 +9,13 @@ import type { DiplomacyResolver } from '../../src/app/models/diplomacy/diplomacy
 import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 
-const { DiplomaticStatus } = diplomaticStatusModule as typeof import('../../src/app/models/diplomacy/diplomatic-status.js');
-const { FleetState } = fleetModule as typeof import('../../src/app/models/fleets/fleet.js');
-const { ManyShips } = manyShipsModule as typeof import('../../src/app/models/fleets/many-ships.js');
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { DiplomaticStatus } = resolveModule(diplomaticStatusModule) as typeof import('../../src/app/models/diplomacy/diplomatic-status.js');
+const { FleetState } = resolveModule(fleetModule) as typeof import('../../src/app/models/fleets/fleet.js');
+const { ManyShips } = resolveModule(manyShipsModule) as typeof import('../../src/app/models/fleets/many-ships.js');
 
 export type SensorPhalanxPassiveDetection = {
   fleetId: number;
