@@ -413,6 +413,66 @@ export class GalacticViewComponent implements OnInit {
     return `${fleet.etaTurns} turn${fleet.etaTurns === 1 ? '' : 's'}`;
   }
 
+  protected ownFleetTooltip(fleet: GalaxyOwnFleetMovementDto): string {
+    const lines = [
+      `Fleet #${fleet.fleetId}`,
+      `Mission: ${this.ownFleetMissionLabel(fleet)}`,
+      `State: ${this.ownFleetStatusLabel(fleet)}`,
+      `Route: ${this.ownFleetRouteLabel(fleet)}`,
+      `Origin: ${fleet.originPlanetName} (${this.coordinatesLabel(fleet.originCoordinates)})`,
+      `Target: ${fleet.targetPlanetName} (${this.coordinatesLabel(fleet.targetCoordinates)})`,
+      `ETA: ${this.ownFleetEtaLabel(fleet)}`,
+      `Travel: ${fleet.travelTurns} out / ${fleet.returnTurns} return | Created turn ${fleet.createdAtTurn}`,
+      `Cargo: Metal ${this.formatInteger(fleet.cargo.metal)}, Crystal ${this.formatInteger(fleet.cargo.crystal)}, Deuterium ${this.formatInteger(fleet.cargo.deuterium)}`,
+      `Cargo capacity: ${this.formatInteger(fleet.usedCargoCapacity)} / ${this.formatInteger(fleet.totalCargoCapacity)}`,
+      `Fuel: cost ${this.formatInteger(fleet.fuelCost)} | reserve ${this.formatInteger(fleet.remainingFuelReserve)}`,
+      `Ships: ${this.formatAmountEntries(fleet.undamagedShips)}`,
+      `Total ships: ${this.formatInteger(fleet.shipCount)}`
+    ];
+
+    if (fleet.damagedShips.length > 0) {
+      lines.push(`Damaged ships: ${this.formatDamagedShipEntries(fleet.damagedShips)}`);
+    }
+
+    if (fleet.carriedBombs.length > 0) {
+      lines.push(`Carried bombs: ${this.formatAmountEntries(fleet.carriedBombs)}`);
+    }
+
+    lines.push(
+      `Repair capability: Ship ${this.formatInteger(fleet.repairCapability.shipRepair)} | Drone repair ${this.formatInteger(fleet.repairCapability.droneRepair)}`,
+      `Industry repair contribution: ${this.formatInteger(fleet.repairCapability.industryRepair)}`,
+      `Repair equipment: Ship ${this.formatInteger(fleet.repairCapability.nonDroneEquipmentCount)} | Drone ${this.formatInteger(fleet.repairCapability.droneEquipmentCount)}`,
+      `Recycle capability: ${this.formatInteger(fleet.recycleCapability)} / turn`
+    );
+
+    if (fleet.orbitActivity !== 'IDLE') {
+      lines.push(`Orbit activity: ${fleet.orbitActivity.replaceAll('_', ' ')}`);
+    }
+    if (fleet.returnReason !== 'NORMAL') {
+      lines.push(`Return reason: ${fleet.returnReason.replaceAll('_', ' ')}`);
+    }
+    if (fleet.usesJumpGate) {
+      lines.push('Jump Gate: used for this route');
+    }
+    if (fleet.pendingJumpGateRequestId !== null) {
+      lines.push(`Pending Jump Gate request: #${fleet.pendingJumpGateRequestId}`);
+    }
+    if (fleet.maintenanceRequestAvailable) {
+      lines.push('Maintenance request: available');
+    }
+    if (fleet.pendingMaintenanceRequestId !== null) {
+      lines.push(`Pending maintenance request: #${fleet.pendingMaintenanceRequestId}`);
+    }
+    if (fleet.lastMaintenanceRequestTurn !== null) {
+      lines.push(`Last maintenance request turn: ${fleet.lastMaintenanceRequestTurn}`);
+    }
+    if (fleet.isRemoteOrigin) {
+      lines.push(`Remote origin: yes${fleet.remoteOriginSourceFleetId !== null ? ` | source fleet #${fleet.remoteOriginSourceFleetId}` : ''}`);
+    }
+
+    return lines.join('\n');
+  }
+
   protected visibleOwnFleetRoutes(): GalacticRouteVm[] {
     return this.showFleetRoutes ? this.ownFleetRoutes : [];
   }
@@ -1272,6 +1332,38 @@ export class GalacticViewComponent implements OnInit {
 
   private buildCoordinatesKey(x: number, y: number): string {
     return `${x}:${y}`;
+  }
+
+  private coordinatesLabel(coordinates: ClientCoordinates): string {
+    return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+  }
+
+  private formatAmountEntries(entries: Array<{ type: string; amount: number }>): string {
+    if (entries.length <= 0) {
+      return 'none';
+    }
+
+    return entries
+      .map((entry) => `${entry.type} x${this.formatInteger(entry.amount)}`)
+      .join(', ');
+  }
+
+  private formatDamagedShipEntries(
+    entries: Array<{ type: string; amount: number; totalMissingHull: number; averageDamagePercent: number }>
+  ): string {
+    if (entries.length <= 0) {
+      return 'none';
+    }
+
+    return entries
+      .map((entry) =>
+        `${entry.type} x${this.formatInteger(entry.amount)} (${this.formatInteger(entry.averageDamagePercent)}% avg damage, missing hull ${this.formatInteger(entry.totalMissingHull)})`
+      )
+      .join(', ');
+  }
+
+  private formatInteger(value: number): string {
+    return Math.max(0, Math.floor(Number.isFinite(value) ? value : 0)).toLocaleString('en-US');
   }
 
   private buildPlanetCoordinatesKey(coordinates: ClientCoordinates): string {

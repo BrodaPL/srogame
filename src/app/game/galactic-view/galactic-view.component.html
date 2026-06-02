@@ -255,7 +255,10 @@
           @if (selectedSystemOwnFleets.length > 0) {
             <div class="star-system-preview__fleet-list">
               @for (fleet of selectedSystemOwnFleets; track fleet.fleetId) {
-                <article class="star-system-preview__fleet-card">
+                <article
+                  class="star-system-preview__fleet-card"
+                  [appTooltip]="ownFleetTooltip(fleet)"
+                >
                   <div class="star-system-preview__fleet-card-head">
                     <strong>Fleet #{{ fleet.fleetId }}</strong>
                     <span class="badge">{{ ownFleetMissionLabel(fleet) }}</span>
@@ -280,7 +283,10 @@
           @if (selectedSystemInboundOwnFleets.length > 0) {
             <div class="star-system-preview__fleet-list">
               @for (fleet of selectedSystemInboundOwnFleets; track fleet.fleetId) {
-                <article class="star-system-preview__fleet-card">
+                <article
+                  class="star-system-preview__fleet-card"
+                  [appTooltip]="ownFleetTooltip(fleet)"
+                >
                   <div class="star-system-preview__fleet-card-head">
                     <strong>Fleet #{{ fleet.fleetId }}</strong>
                     <span class="badge">{{ ownFleetMissionLabel(fleet) }}</span>

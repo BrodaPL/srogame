@@ -6,7 +6,7 @@ import { Galaxy } from '../galaxy';
 import { ManyShips } from '../../fleets/many-ships';
 import { ShipType } from '../../enums/ship-type';
 import { Destination } from '../../fleets/destination';
-import { Fleet, FleetState } from '../../fleets/fleet';
+import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../fleets/fleet';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
 import { ResourcesPack } from '../../resources-pack';
 import { GalaxyPresentationData } from '../galaxy-presentation-data';
@@ -28,7 +28,7 @@ describe('GalaxyPresentationData', () => {
     const otherPlayer = new Player(2, 'Beta', [planetC], new Map(), [], PlayerType.PLAYER);
 
     const enRouteShips = ManyShips.empty();
-    enRouteShips.addUndamaged(ShipType.LIGHT_FIGHTER, 3);
+    enRouteShips.addUndamaged(ShipType.FIGHTER, 3);
     const orbitingShips = ManyShips.empty();
     orbitingShips.addUndamaged(ShipType.SPY_PROBE, 1);
     const returningShips = ManyShips.empty();
@@ -105,11 +105,42 @@ describe('GalaxyPresentationData', () => {
         routeKind: 'OUTBOUND',
         originSystemCoordinates: { x: 0, y: 0 },
         targetSystemCoordinates: { x: 2, y: 1 },
+        originCoordinates: { x: 0, y: 0, z: 0 },
+        targetCoordinates: { x: 2, y: 1, z: 0 },
         currentSystemCoordinates: { x: 0, y: 0 },
         shipCount: 3,
+        undamagedShips: [{ type: ShipType.FIGHTER, amount: 3 }],
+        damagedShips: [],
+        carriedBombs: [],
+        cargo: { metal: 0, crystal: 0, deuterium: 0 },
+        usedCargoCapacity: 0,
+        totalCargoCapacity: 0,
+        fuelCost: 0,
+        remainingFuelReserve: 0,
+        travelTurns: 4,
+        returnTurns: 4,
+        createdAtTurn: 10,
         etaTurns: 4,
         originPlanetName: planetA.basicInfo.name,
-        targetPlanetName: planetB.basicInfo.name
+        targetPlanetName: planetB.basicInfo.name,
+        orbitActivity: FleetOrbitActivity.IDLE,
+        returnReason: FleetReturnReason.NORMAL,
+        usesJumpGate: false,
+        pendingJumpGateRequestId: null,
+        maintenanceRequestAvailable: false,
+        pendingMaintenanceRequestId: null,
+        lastMaintenanceRequestTurn: null,
+        repairCapability: {
+          shipRepair: 0,
+          industryRepair: 0,
+          droneRepair: 0,
+          nonDroneShipRepair: 0,
+          droneEquipmentCount: 0,
+          nonDroneEquipmentCount: 0
+        },
+        recycleCapability: 0,
+        isRemoteOrigin: false,
+        remoteOriginSourceFleetId: null
       },
       {
         fleetId: 2,
@@ -118,11 +149,42 @@ describe('GalaxyPresentationData', () => {
         routeKind: 'OUTBOUND',
         originSystemCoordinates: { x: 0, y: 0 },
         targetSystemCoordinates: { x: 2, y: 1 },
+        originCoordinates: { x: 0, y: 0, z: 0 },
+        targetCoordinates: { x: 2, y: 1, z: 0 },
         currentSystemCoordinates: { x: 2, y: 1 },
         shipCount: 1,
+        undamagedShips: [{ type: ShipType.SPY_PROBE, amount: 1 }],
+        damagedShips: [],
+        carriedBombs: [],
+        cargo: { metal: 0, crystal: 0, deuterium: 0 },
+        usedCargoCapacity: 0,
+        totalCargoCapacity: 0,
+        fuelCost: 0,
+        remainingFuelReserve: 0,
+        travelTurns: 3,
+        returnTurns: 3,
+        createdAtTurn: 9,
         etaTurns: null,
         originPlanetName: planetA.basicInfo.name,
-        targetPlanetName: planetB.basicInfo.name
+        targetPlanetName: planetB.basicInfo.name,
+        orbitActivity: FleetOrbitActivity.IDLE,
+        returnReason: FleetReturnReason.NORMAL,
+        usesJumpGate: false,
+        pendingJumpGateRequestId: null,
+        maintenanceRequestAvailable: false,
+        pendingMaintenanceRequestId: null,
+        lastMaintenanceRequestTurn: null,
+        repairCapability: {
+          shipRepair: 0,
+          industryRepair: 0,
+          droneRepair: 0,
+          nonDroneShipRepair: 0,
+          droneEquipmentCount: 0,
+          nonDroneEquipmentCount: 0
+        },
+        recycleCapability: 0,
+        isRemoteOrigin: false,
+        remoteOriginSourceFleetId: null
       },
       {
         fleetId: 3,
@@ -131,11 +193,42 @@ describe('GalaxyPresentationData', () => {
         routeKind: 'RETURNING',
         originSystemCoordinates: { x: 0, y: 0 },
         targetSystemCoordinates: { x: 4, y: 0 },
+        originCoordinates: { x: 0, y: 0, z: 0 },
+        targetCoordinates: { x: 4, y: 0, z: 0 },
         currentSystemCoordinates: null,
         shipCount: 2,
+        undamagedShips: [{ type: ShipType.RECYCLER, amount: 2 }],
+        damagedShips: [],
+        carriedBombs: [],
+        cargo: { metal: 0, crystal: 0, deuterium: 0 },
+        usedCargoCapacity: 0,
+        totalCargoCapacity: 0,
+        fuelCost: 0,
+        remainingFuelReserve: 0,
+        travelTurns: 5,
+        returnTurns: 2,
+        createdAtTurn: 11,
         etaTurns: 2,
         originPlanetName: planetA.basicInfo.name,
-        targetPlanetName: planetC.basicInfo.name
+        targetPlanetName: planetC.basicInfo.name,
+        orbitActivity: FleetOrbitActivity.IDLE,
+        returnReason: FleetReturnReason.NORMAL,
+        usesJumpGate: false,
+        pendingJumpGateRequestId: null,
+        maintenanceRequestAvailable: false,
+        pendingMaintenanceRequestId: null,
+        lastMaintenanceRequestTurn: null,
+        repairCapability: {
+          shipRepair: 0,
+          industryRepair: 0,
+          droneRepair: 0,
+          nonDroneShipRepair: 0,
+          droneEquipmentCount: 0,
+          nonDroneEquipmentCount: 0
+        },
+        recycleCapability: 480,
+        isRemoteOrigin: false,
+        remoteOriginSourceFleetId: null
       }
     ]);
   });

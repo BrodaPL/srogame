@@ -13,6 +13,7 @@ import type {
 } from '../../models/game-api-types';
 import { PlanetType } from '../../models/enums/planet-type';
 import { PlayerType } from '../../models/enums/player-type';
+import { ShipType } from '../../models/enums/ship-type';
 
 describe('GalacticViewComponent', () => {
   it('selects the route-focused system and highlights the route-focused planet', () => {
@@ -222,8 +223,39 @@ function createOwnFleetMovement(
     targetSystemCoordinates: overrides.targetSystemCoordinates ?? { x: 1, y: 0 },
     currentSystemCoordinates: overrides.currentSystemCoordinates ?? { x: 0, y: 0 },
     shipCount: overrides.shipCount ?? 1,
+    undamagedShips: overrides.undamagedShips ?? [{ type: ShipType.TRANSPORTER, amount: 1 }],
+    damagedShips: overrides.damagedShips ?? [],
+    carriedBombs: overrides.carriedBombs ?? [],
+    cargo: overrides.cargo ?? { metal: 0, crystal: 0, deuterium: 0 },
+    usedCargoCapacity: overrides.usedCargoCapacity ?? 0,
+    totalCargoCapacity: overrides.totalCargoCapacity ?? 0,
+    fuelCost: overrides.fuelCost ?? 0,
+    remainingFuelReserve: overrides.remainingFuelReserve ?? 0,
+    travelTurns: overrides.travelTurns ?? 3,
+    returnTurns: overrides.returnTurns ?? 3,
+    createdAtTurn: overrides.createdAtTurn ?? 1,
     etaTurns: overrides.etaTurns ?? 3,
     originPlanetName: overrides.originPlanetName ?? 'Origin',
-    targetPlanetName: overrides.targetPlanetName ?? 'Target'
+    targetPlanetName: overrides.targetPlanetName ?? 'Target',
+    originCoordinates: overrides.originCoordinates ?? { x: 0, y: 0, z: 1 },
+    targetCoordinates: overrides.targetCoordinates ?? { x: 1, y: 0, z: 1 },
+    orbitActivity: overrides.orbitActivity ?? 'IDLE',
+    returnReason: overrides.returnReason ?? 'NORMAL',
+    usesJumpGate: overrides.usesJumpGate ?? false,
+    pendingJumpGateRequestId: overrides.pendingJumpGateRequestId ?? null,
+    maintenanceRequestAvailable: overrides.maintenanceRequestAvailable ?? false,
+    pendingMaintenanceRequestId: overrides.pendingMaintenanceRequestId ?? null,
+    lastMaintenanceRequestTurn: overrides.lastMaintenanceRequestTurn ?? null,
+    repairCapability: overrides.repairCapability ?? {
+      shipRepair: 0,
+      industryRepair: 0,
+      droneRepair: 0,
+      nonDroneShipRepair: 0,
+      droneEquipmentCount: 0,
+      nonDroneEquipmentCount: 0
+    },
+    recycleCapability: overrides.recycleCapability ?? 0,
+    isRemoteOrigin: overrides.isRemoteOrigin ?? false,
+    remoteOriginSourceFleetId: overrides.remoteOriginSourceFleetId ?? null
   };
 }

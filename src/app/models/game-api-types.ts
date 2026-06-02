@@ -1457,6 +1457,8 @@ export type GalaxyOwnFleetMovementDto = {
   fleetId: number;
   missionType: FleetMissionType;
   state: Fleet['state'];
+  orbitActivity: Fleet['orbitActivity'];
+  returnReason: Fleet['returnReason'];
   routeKind: GalaxyFleetRouteKind;
   originSystemCoordinates: {
     x: number;
@@ -1466,12 +1468,44 @@ export type GalaxyOwnFleetMovementDto = {
     x: number;
     y: number;
   };
+  originCoordinates: ClientCoordinates;
+  targetCoordinates: ClientCoordinates;
   currentSystemCoordinates: {
     x: number;
     y: number;
   } | null;
   shipCount: number;
+  undamagedShips: ShipAmountEntry[];
+  damagedShips: Array<ShipAmountEntry & {
+    totalMissingHull: number;
+    averageDamagePercent: number;
+  }>;
+  carriedBombs: DefenceAmountEntry[];
+  cargo: ResourcesPackDto;
+  usedCargoCapacity: number;
+  totalCargoCapacity: number;
+  fuelCost: number;
+  remainingFuelReserve: number;
+  travelTurns: number;
+  returnTurns: number;
+  createdAtTurn: number;
   etaTurns: number | null;
   originPlanetName: string;
   targetPlanetName: string;
+  usesJumpGate: boolean;
+  pendingJumpGateRequestId: number | null;
+  maintenanceRequestAvailable: boolean;
+  pendingMaintenanceRequestId: number | null;
+  lastMaintenanceRequestTurn: number | null;
+  repairCapability: {
+    shipRepair: number;
+    industryRepair: number;
+    droneRepair: number;
+    nonDroneShipRepair: number;
+    droneEquipmentCount: number;
+    nonDroneEquipmentCount: number;
+  };
+  recycleCapability: number;
+  isRemoteOrigin: boolean;
+  remoteOriginSourceFleetId: number | null;
 };

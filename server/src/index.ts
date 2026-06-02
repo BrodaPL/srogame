@@ -8256,13 +8256,37 @@ function toGalaxyOwnFleetMovementDto(movement: FleetMovementSummary): GalaxyPres
     routeKind: movement.routeKind,
     originSystemCoordinates: { ...movement.originSystemCoordinates },
     targetSystemCoordinates: { ...movement.targetSystemCoordinates },
+    originCoordinates: { ...movement.originCoordinates },
+    targetCoordinates: { ...movement.targetCoordinates },
     currentSystemCoordinates: movement.currentSystemCoordinates
       ? { ...movement.currentSystemCoordinates }
       : null,
     shipCount: movement.shipCount,
+    undamagedShips: movement.undamagedShips.map((entry) => ({ ...entry })),
+    damagedShips: movement.damagedShips.map((entry) => ({ ...entry })),
+    carriedBombs: movement.carriedBombs.map((entry) => ({ ...entry })),
+    cargo: { ...movement.cargo },
+    usedCargoCapacity: movement.usedCargoCapacity,
+    totalCargoCapacity: movement.totalCargoCapacity,
+    fuelCost: movement.fuelCost,
+    remainingFuelReserve: movement.remainingFuelReserve,
+    travelTurns: movement.travelTurns,
+    returnTurns: movement.returnTurns,
+    createdAtTurn: movement.createdAtTurn,
     etaTurns: movement.etaTurns,
     originPlanetName: movement.originPlanetName,
-    targetPlanetName: movement.targetPlanetName
+    targetPlanetName: movement.targetPlanetName,
+    orbitActivity: movement.orbitActivity,
+    returnReason: movement.returnReason,
+    usesJumpGate: movement.usesJumpGate,
+    pendingJumpGateRequestId: movement.pendingJumpGateRequestId,
+    maintenanceRequestAvailable: movement.maintenanceRequestAvailable,
+    pendingMaintenanceRequestId: movement.pendingMaintenanceRequestId,
+    lastMaintenanceRequestTurn: movement.lastMaintenanceRequestTurn,
+    repairCapability: { ...movement.repairCapability },
+    recycleCapability: movement.recycleCapability,
+    isRemoteOrigin: movement.isRemoteOrigin,
+    remoteOriginSourceFleetId: movement.remoteOriginSourceFleetId
   };
 }
 
