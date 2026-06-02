@@ -185,7 +185,7 @@ export class Planet {
     const type = forcedType ?? Planet.randomPlanetType();
     const modifierRanges = Planet.modifierRangesFor(type);
     const colonizationRange = Planet.colonizationDifficultyRangeFor(type);
-    const size = Planet.randomInt(90, 210);
+    const size = Planet.randomInt(90, 200);
     const difficulty = Planet.randomInt(colonizationRange.min, colonizationRange.max);
     const rolledParameters = new PlanetaryParameters(
       Planet.randomFloat(modifierRanges.metalModifier.min, modifierRanges.metalModifier.max),
