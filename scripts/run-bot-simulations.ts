@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { ShipBlueprintsFactory } from '../src/app/factories/ship-blueprints.factory.js';
 import { EspionageReportGenerator } from '../src/app/generators/espionage-report-generator.js';
 import { createDiplomaticRelation } from '../src/app/models/diplomacy/diplomatic-relation.js';
+import { expirePendingDiplomaticProposals } from '../src/app/models/diplomacy/diplomatic-proposal.js';
 import { DiplomaticProposalState } from '../src/app/models/diplomacy/diplomatic-proposal-state.js';
 import { DiplomaticStatus } from '../src/app/models/diplomacy/diplomatic-status.js';
 import { PlanetType } from '../src/app/models/enums/planet-type.js';
@@ -925,13 +926,7 @@ function expirePendingDiplomaticProposalsForSimulation(
   galaxy: ReturnType<GalaxyCreator['createGalaxy']>,
   resolvedTurnNumber: number
 ): void {
-  for (const proposal of galaxy.diplomaticProposals) {
-    if (proposal.state !== DiplomaticProposalState.PENDING || proposal.expiresOnTurn > resolvedTurnNumber) {
-      continue;
-    }
-
-    proposal.state = DiplomaticProposalState.EXPIRED;
-  }
+  expirePendingDiplomaticProposals(galaxy.diplomaticProposals, resolvedTurnNumber);
 }
 
 function resolvePresetSelection(args: string[]): SimulationPresetKey[] {

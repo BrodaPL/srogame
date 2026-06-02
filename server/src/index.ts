@@ -445,6 +445,8 @@ const { DiplomaticProposalState } = diplomaticProposalStateModule as {
   DiplomaticProposalState: typeof import('../../src/app/models/diplomacy/diplomatic-proposal-state.js').DiplomaticProposalState;
 };
 const {
+  expirePendingDiplomaticProposals: expirePendingDiplomaticProposalsForTurn,
+  hasPendingDiplomaticItemExpired,
   isPendingDiplomaticProposalForPair
 } = diplomaticProposalModule as typeof import('../../src/app/models/diplomacy/diplomatic-proposal.js');
 const {
@@ -9626,7 +9628,7 @@ function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
       continue;
     }
 
-    if (request.expiresOnTurn <= galaxy.currentTurn) {
+    if (hasPendingDiplomaticItemExpired(request, galaxy.currentTurn)) {
       request.state = DiplomaticProposalState.EXPIRED;
       request.approved = normalizeMaintenanceTransferPayload(null);
       fleet.pendingMaintenanceRequestId = null;
@@ -9762,7 +9764,7 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
         continue;
       }
 
-      if (request.expiresOnTurn <= galaxy.currentTurn) {
+      if (hasPendingDiplomaticItemExpired(request, galaxy.currentTurn)) {
         request.state = DiplomaticProposalState.EXPIRED;
         request.resolutionNote = 'Support request expired before it was answered.';
         addSupportRequestMessages(
@@ -11246,16 +11248,7 @@ function summarizeMaintenanceTransfer(payload: MaintenanceRequest['approved'] | 
 }
 
 function expirePendingDiplomaticProposals(galaxy: Galaxy, resolvedTurnNumber: number): void {
-  for (const proposal of galaxy.diplomaticProposals) {
-    if (
-      proposal.state !== DiplomaticProposalState.PENDING
-      || proposal.expiresOnTurn > resolvedTurnNumber
-    ) {
-      continue;
-    }
-
-    proposal.state = DiplomaticProposalState.EXPIRED;
-  }
+  expirePendingDiplomaticProposalsForTurn(galaxy.diplomaticProposals, resolvedTurnNumber);
 }
 
 function isValidSetup(setup: GalaxySetup): boolean {

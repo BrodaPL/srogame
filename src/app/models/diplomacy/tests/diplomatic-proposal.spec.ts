@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createDiplomaticProposal, isPendingDiplomaticProposalForPair } from '../diplomatic-proposal';
+import {
+  createDiplomaticProposal,
+  expirePendingDiplomaticProposals,
+  hasPendingDiplomaticItemExpired,
+  isPendingDiplomaticProposalForPair
+} from '../diplomatic-proposal';
 import { DiplomaticProposalState } from '../diplomatic-proposal-state';
 import { DiplomaticStatus } from '../diplomatic-status';
 
@@ -31,5 +36,17 @@ describe('DiplomaticProposal helpers', () => {
     proposal.state = DiplomaticProposalState.CANCELLED;
 
     expect(isPendingDiplomaticProposalForPair(proposal, 1, 8)).toBe(false);
+  });
+
+  it('keeps pending proposals answerable through their expiry turn', () => {
+    const proposal = createDiplomaticProposal(11, 2, 6, DiplomaticStatus.PEACE, 3, 4);
+
+    expect(hasPendingDiplomaticItemExpired(proposal, 4)).toBe(false);
+    expirePendingDiplomaticProposals([proposal], 4);
+    expect(proposal.state).toBe(DiplomaticProposalState.PENDING);
+
+    expect(hasPendingDiplomaticItemExpired(proposal, 5)).toBe(true);
+    expirePendingDiplomaticProposals([proposal], 5);
+    expect(proposal.state).toBe(DiplomaticProposalState.EXPIRED);
   });
 });

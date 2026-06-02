@@ -6,7 +6,7 @@ import {
   type BotProfileId,
   type Player
 } from '../src/app/models/player.js';
-import { DiplomaticProposalState } from '../src/app/models/diplomacy/diplomatic-proposal-state.js';
+import { expirePendingDiplomaticProposals } from '../src/app/models/diplomacy/diplomatic-proposal.js';
 import { GameType } from '../src/app/models/enums/game-type.js';
 import { ReportType } from '../src/app/models/enums/report-type.js';
 import {
@@ -923,12 +923,7 @@ function expirePendingDiplomaticProposalsForSimulation(
   galaxy: SimulationContext['galaxy'],
   resolvedTurnNumber: number
 ): void {
-  for (const proposal of galaxy.diplomaticProposals) {
-    if (proposal.state !== DiplomaticProposalState.PENDING || proposal.expiresOnTurn > resolvedTurnNumber) {
-      continue;
-    }
-    proposal.state = DiplomaticProposalState.EXPIRED;
-  }
+  expirePendingDiplomaticProposals(galaxy.diplomaticProposals, resolvedTurnNumber);
 }
 
 function initializeJsonlArtifacts(...filePaths: Array<string | null>): void {

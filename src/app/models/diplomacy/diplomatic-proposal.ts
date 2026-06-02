@@ -12,6 +12,11 @@ export type DiplomaticProposal = {
   state: DiplomaticProposalState;
 };
 
+export type PendingDiplomaticExpiryItem = {
+  state: DiplomaticProposalState;
+  expiresOnTurn: number;
+};
+
 export function createDiplomaticProposal(
   proposalId: number,
   fromPlayerId: number,
@@ -33,6 +38,27 @@ export function createDiplomaticProposal(
 
 export function isDiplomaticProposalResolved(proposal: DiplomaticProposal): boolean {
   return proposal.state !== DiplomaticProposalState.PENDING;
+}
+
+export function hasPendingDiplomaticItemExpired(
+  item: PendingDiplomaticExpiryItem,
+  currentTurn: number
+): boolean {
+  return item.state === DiplomaticProposalState.PENDING
+    && item.expiresOnTurn < Math.floor(currentTurn);
+}
+
+export function expirePendingDiplomaticProposals(
+  proposals: DiplomaticProposal[],
+  currentTurn: number
+): void {
+  for (const proposal of proposals) {
+    if (!hasPendingDiplomaticItemExpired(proposal, currentTurn)) {
+      continue;
+    }
+
+    proposal.state = DiplomaticProposalState.EXPIRED;
+  }
 }
 
 export function isPendingDiplomaticProposalForPair(
