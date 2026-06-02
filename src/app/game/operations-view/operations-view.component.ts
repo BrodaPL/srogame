@@ -34,6 +34,26 @@ type CoordinateSegmentVm = {
 };
 
 type MissionTypeFilterValue = FleetMissionType | 'ALL';
+type OperationsViewMode = 'AGGREGATE_BY_ORIGIN' | 'GROUP_BY_MISSION_TYPE' | 'SORT_BY_ETA';
+type FleetOperationCategoryKey = 'OUTGOING' | 'RETURNING' | 'ORBITING' | 'PENDING_JUMP_GATE' | 'ACTIVE';
+
+type OperationsViewModeOption = {
+  value: OperationsViewMode;
+  label: string;
+};
+
+type FleetOperationCategoryVm = {
+  key: FleetOperationCategoryKey;
+  label: string;
+  fleets: Fleet[];
+};
+
+type FleetOperationGroupVm = {
+  key: string;
+  label: string;
+  subtitle: string | null;
+  categories: FleetOperationCategoryVm[];
+};
 
 @Component({
   selector: 'app-operations-view',
@@ -52,6 +72,7 @@ export class OperationsViewComponent implements OnInit {
   protected actionSuccess: string | null = null;
   protected activeFleets: Fleet[] = [];
   protected selectedMissionTypeFilter: MissionTypeFilterValue = 'ALL';
+  protected selectedViewMode: OperationsViewMode = 'AGGREGATE_BY_ORIGIN';
   protected ownedPlanets: ClientPlanetDto[] = [];
   protected activeActionFleetId: number | null = null;
   protected maintenanceDialogFleetId: number | null = null;
@@ -77,6 +98,18 @@ export class OperationsViewComponent implements OnInit {
 
   public ngOnInit(): void {
     this.loadActiveFleets();
+  }
+
+  protected viewModeOptions(): OperationsViewModeOption[] {
+    return [
+      { value: 'AGGREGATE_BY_ORIGIN', label: 'Aggregate by origin' },
+      { value: 'GROUP_BY_MISSION_TYPE', label: 'Sort by mission type' },
+      { value: 'SORT_BY_ETA', label: 'Sort by ETA' }
+    ];
+  }
+
+  protected viewModeChanged(value: OperationsViewMode): void {
+    this.selectedViewMode = value;
   }
 
   protected totalShips(fleet: Fleet): number {
@@ -124,12 +157,56 @@ export class OperationsViewComponent implements OnInit {
     return this.activeFleets.filter((fleet) => fleet.missionType === this.selectedMissionTypeFilter);
   }
 
+  protected operationGroups(): FleetOperationGroupVm[] {
+    const fleets = this.filteredActiveFleets();
+    if (fleets.length <= 0) {
+      return [];
+    }
+
+    if (this.selectedViewMode === 'SORT_BY_ETA') {
+      return [{
+        key: 'eta',
+        label: 'Sorted by ETA',
+        subtitle: 'Traveling fleets first, then pending and orbiting fleets.',
+        categories: [{
+          key: 'ACTIVE',
+          label: 'All visible operations',
+          fleets: this.sortFleetsByEta(fleets)
+        }]
+      }];
+    }
+
+    const groups = this.selectedViewMode === 'GROUP_BY_MISSION_TYPE'
+      ? this.groupFleetsByMissionType(fleets)
+      : this.groupFleetsByOrigin(fleets);
+
+    return groups
+      .map((group) => ({
+        ...group,
+        categories: this.buildStateCategories(group.categories.flatMap((category) => category.fleets))
+      }))
+      .filter((group) => group.categories.length > 0)
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }
+
   protected filteredFleetCountLabel(): string | null {
     if (this.selectedMissionTypeFilter === 'ALL') {
       return null;
     }
 
     return `Showing ${this.filteredActiveFleets().length} of ${this.activeFleets.length} active fleets.`;
+  }
+
+  protected operationModeSummary(): string {
+    switch (this.selectedViewMode) {
+      case 'GROUP_BY_MISSION_TYPE':
+        return 'Grouped by mission type, with state categories inside each mission.';
+      case 'SORT_BY_ETA':
+        return 'Flat list sorted by soonest travel ETA.';
+      case 'AGGREGATE_BY_ORIGIN':
+      default:
+        return 'Grouped by origin planet, with state categories inside each origin.';
+    }
   }
 
   protected missionTypeFilterChanged(value: MissionTypeFilterValue): void {
@@ -672,6 +749,141 @@ export class OperationsViewComponent implements OnInit {
     if (token) {
       this.refreshCoordinateOwnerNames(token, this.activeFleets);
     }
+  }
+
+  private groupFleetsByOrigin(fleets: Fleet[]): FleetOperationGroupVm[] {
+    const groups = new Map<string, Fleet[]>();
+    for (const fleet of fleets) {
+      const key = this.coordinatesKey(fleet.origin);
+      groups.set(key, [...(groups.get(key) ?? []), fleet]);
+    }
+
+    return [...groups.entries()].map(([key, groupFleets]) => {
+      const firstFleet = groupFleets[0];
+      return {
+        key,
+        label: firstFleet?.originPlanetName ?? key,
+        subtitle: firstFleet ? this.coordinatesWithOwnerLabel(firstFleet.origin) : key,
+        categories: [{
+          key: 'ACTIVE',
+          label: 'All visible operations',
+          fleets: groupFleets
+        }]
+      };
+    });
+  }
+
+  private groupFleetsByMissionType(fleets: Fleet[]): FleetOperationGroupVm[] {
+    const groups = new Map<FleetMissionType, Fleet[]>();
+    for (const fleet of fleets) {
+      groups.set(fleet.missionType, [...(groups.get(fleet.missionType) ?? []), fleet]);
+    }
+
+    return [...groups.entries()]
+      .sort(([left], [right]) => this.missionFilterLabel(left).localeCompare(this.missionFilterLabel(right)))
+      .map(([missionType, groupFleets]) => ({
+        key: missionType,
+        label: this.missionFilterLabel(missionType),
+        subtitle: `${groupFleets.length} fleet${groupFleets.length === 1 ? '' : 's'}`,
+        categories: [{
+          key: 'ACTIVE',
+          label: 'All visible operations',
+          fleets: groupFleets
+        }]
+      }));
+  }
+
+  private buildStateCategories(fleets: Fleet[]): FleetOperationCategoryVm[] {
+    const categoryOrder: FleetOperationCategoryKey[] = [
+      'OUTGOING',
+      'RETURNING',
+      'ORBITING',
+      'PENDING_JUMP_GATE',
+      'ACTIVE'
+    ];
+    const grouped = new Map<FleetOperationCategoryKey, Fleet[]>();
+
+    for (const fleet of fleets) {
+      const category = this.operationCategory(fleet);
+      grouped.set(category, [...(grouped.get(category) ?? []), fleet]);
+    }
+
+    return categoryOrder
+      .map((key) => ({
+        key,
+        label: this.operationCategoryLabel(key),
+        fleets: this.sortFleetsWithinCategory(grouped.get(key) ?? [])
+      }))
+      .filter((category) => category.fleets.length > 0);
+  }
+
+  private operationCategory(fleet: Fleet): FleetOperationCategoryKey {
+    switch (fleet.state) {
+      case FleetState.MOVING_TO_TARGET:
+        return 'OUTGOING';
+      case FleetState.RETURNING:
+      case FleetState.MISSION_FAILURE_RETURNING:
+        return 'RETURNING';
+      case FleetState.ORBITING:
+        return 'ORBITING';
+      case FleetState.PENDING_JUMP_GATE:
+        return 'PENDING_JUMP_GATE';
+      default:
+        return 'ACTIVE';
+    }
+  }
+
+  private operationCategoryLabel(category: FleetOperationCategoryKey): string {
+    switch (category) {
+      case 'OUTGOING':
+        return 'Outgoing';
+      case 'RETURNING':
+        return 'Returning';
+      case 'ORBITING':
+        return 'Orbiting';
+      case 'PENDING_JUMP_GATE':
+        return 'Pending Jump Gate';
+      case 'ACTIVE':
+      default:
+        return 'Active';
+    }
+  }
+
+  private sortFleetsWithinCategory(fleets: Fleet[]): Fleet[] {
+    return [...fleets].sort((left, right) =>
+      this.etaSortValue(left) - this.etaSortValue(right)
+      || left.createdAtTurn - right.createdAtTurn
+      || left.fleetId - right.fleetId
+    );
+  }
+
+  private sortFleetsByEta(fleets: Fleet[]): Fleet[] {
+    return [...fleets].sort((left, right) =>
+      this.etaSortRank(left) - this.etaSortRank(right)
+      || this.etaSortValue(left) - this.etaSortValue(right)
+      || left.createdAtTurn - right.createdAtTurn
+      || left.fleetId - right.fleetId
+    );
+  }
+
+  private etaSortRank(fleet: Fleet): number {
+    if (this.hasEta(fleet)) {
+      return 0;
+    }
+
+    if (fleet.state === FleetState.PENDING_JUMP_GATE) {
+      return 1;
+    }
+
+    return 2;
+  }
+
+  private etaSortValue(fleet: Fleet): number {
+    if (this.hasEta(fleet)) {
+      return this.remainingEta(fleet);
+    }
+
+    return Number.MAX_SAFE_INTEGER;
   }
 
   private runFleetAction(

@@ -42,6 +42,24 @@
       </section>
     } @else {
       <section class="overview-card operations-view__filters" aria-label="Operations filters">
+        <fieldset class="operations-view__mode-field">
+          <legend>Display</legend>
+          <div class="operations-view__mode-options">
+            @for (option of viewModeOptions(); track option.value) {
+              <label class="operations-view__mode-option">
+                <input
+                  type="radio"
+                  name="operationsViewMode"
+                  [ngModel]="selectedViewMode"
+                  [value]="option.value"
+                  (ngModelChange)="viewModeChanged($event)"
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            }
+          </div>
+        </fieldset>
+
         <label class="operations-view__filter-field">
           <span>Mission type</span>
           <select
@@ -52,24 +70,48 @@
             }
           </select>
         </label>
+        <p class="overview-muted operations-view__mode-summary">{{ operationModeSummary() }}</p>
         @if (filteredFleetCountLabel(); as countLabel) {
           <p class="overview-muted">{{ countLabel }}</p>
         }
       </section>
 
       <div class="operations-view__grid" data-tutorial-id="operations-main-state">
-        @for (fleet of filteredActiveFleets(); track fleet.fleetId; let isFirst = $first) {
-          <app-fleet-operation-card
-            [fleet]="fleet"
-            [ownPlayerId]="ownPlayerId()"
-            [ownedPlanets]="ownedPlanets"
-            [ownerInfoByCoordinates]="coordinateOwnerInfos()"
-            [actionPending]="isActionPending(fleet)"
-            [tutorialId]="isFirst ? 'operations-primary-card' : null"
-            (returnRequested)="returnFleet($event)"
-            (delayRequested)="delayFleet($event)"
-            (maintenanceRequested)="openMaintenanceRequest($event)"
-          />
+        @for (group of operationGroups(); track group.key; let isFirstGroup = $first) {
+          <section class="operations-view__group">
+            <header class="operations-view__group-head">
+              <div>
+                <h3>{{ group.label }}</h3>
+                @if (group.subtitle) {
+                  <p class="overview-muted">{{ group.subtitle }}</p>
+                }
+              </div>
+            </header>
+
+            @for (category of group.categories; track category.key) {
+              <section class="operations-view__category">
+                <header class="operations-view__category-head">
+                  <h4>{{ category.label }}</h4>
+                  <span class="overview-muted">{{ category.fleets.length }} fleet{{ category.fleets.length === 1 ? '' : 's' }}</span>
+                </header>
+                <div class="operations-view__category-grid">
+                  @for (fleet of category.fleets; track fleet.fleetId; let isFirstFleet = $first) {
+                    <app-fleet-operation-card
+                      [fleet]="fleet"
+                      [ownPlayerId]="ownPlayerId()"
+                      [ownedPlanets]="ownedPlanets"
+                      [ownerInfoByCoordinates]="coordinateOwnerInfos()"
+                      [actionPending]="isActionPending(fleet)"
+                      [tutorialId]="isFirstGroup && isFirstFleet ? 'operations-primary-card' : null"
+                      (returnRequested)="returnFleet($event)"
+                      (delayRequested)="delayFleet($event)"
+                      (maintenanceRequested)="openMaintenanceRequest($event)"
+                    />
+                  }
+                </div>
+              </section>
+            }
+          </section>
         } @empty {
           <section class="overview-card">
             <h3>No fleets match this mission filter</h3>

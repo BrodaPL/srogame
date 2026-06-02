@@ -32,17 +32,57 @@
   align-items: end;
 }
 
+.operations-view__mode-field {
+  display: grid;
+  gap: 0.45rem;
+  min-width: min(28rem, 100%);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .operations-view__filter-field {
   display: grid;
   gap: 0.35rem;
   min-width: min(16rem, 100%);
 }
 
+.operations-view__mode-field legend,
 .operations-view__filter-field span {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.operations-view__mode-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+}
+
+.operations-view__mode-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.2rem;
+  padding: 0.36rem 0.58rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f4f8ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.operations-view__mode-option input {
+  accent-color: #7db7ff;
+}
+
+.operations-view__mode-summary {
+  flex-basis: 100%;
+  margin: 0;
 }
 
 .operations-view__filter-field select {
@@ -58,6 +98,43 @@
 .operations-view__filter-field select option {
   background: #121821;
   color: #f4f8ff;
+}
+
+.operations-view__group,
+.operations-view__category,
+.operations-view__category-grid {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.operations-view__group {
+  padding: 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.operations-view__group-head,
+.operations-view__category-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.operations-view__group-head h3,
+.operations-view__category-head h4 {
+  margin: 0;
+}
+
+.operations-view__category {
+  gap: 0.5rem;
+}
+
+.operations-view__category-head h4 {
+  color: #fff;
+  font-size: 0.9rem;
 }
 
 .operations-view__ships {
