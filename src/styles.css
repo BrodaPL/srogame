@@ -41,6 +41,8 @@ app-root {
   color: #f3f7fb;
   font-size: 0.72rem;
   line-height: 1.25;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
   pointer-events: none;
   opacity: 0;
 }

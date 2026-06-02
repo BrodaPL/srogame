@@ -185,7 +185,7 @@
       "cargoCapacity": 0,
       "hangarCapacity": 0,
       "purposes": ["UTILITY"],
-      "jumpCost": 1,
+      "jumpCost": 0,
       "cost": { "metal": 40, "crystal": 25, "deuterium": 5 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 2 }
@@ -513,7 +513,7 @@
       "cargoCapacity": 60,
       "hangarCapacity": 4,
       "purposes": ["MILITARY", "BOMBER"],
-      "jumpCost": 6,
+      "jumpCost": 5,
       "cost": { "metal": 400, "crystal": 160, "deuterium": 180 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 6 }
@@ -645,7 +645,7 @@
       "cargoCapacity": 1000,
       "hangarCapacity": 12,
       "purposes": ["MILITARY", "CARRIER"],
-      "jumpCost": 9,
+      "jumpCost": 6,
       "cost": { "metal": 1800, "crystal": 1200, "deuterium": 400 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 7 }
@@ -717,7 +717,7 @@
       "cargoCapacity": 1000,
       "hangarCapacity": 0,
       "purposes": ["MILITARY"],
-      "jumpCost": 10,
+      "jumpCost": 8,
       "cost": { "metal": 1600, "crystal": 1000, "deuterium": 1000 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 8 }
