@@ -9043,7 +9043,8 @@ function findPendingJumpGateRequestForFleet(
 function isJumpGateMissionAllowed(missionType: FleetMissionTypeType): boolean {
   return missionType === FleetMissionType.MOVE
     || missionType === FleetMissionType.DEFEND
-    || missionType === FleetMissionType.TRANSPORT;
+    || missionType === FleetMissionType.TRANSPORT
+    || missionType === FleetMissionType.REPAIR;
 }
 
 function isJumpGateAutoApprovedStatus(status: DiplomaticStatusType): boolean {
@@ -9078,7 +9079,7 @@ function validateJumpGateLaunchAccess(
   totalSelectedShips: number
 ): { status: DiplomaticStatusType; targetOwner: Player | null } | { status: number; error: string } {
   if (!isJumpGateMissionAllowed(missionType)) {
-    return { status: 400, error: 'Jump Gate is available only for Move, Guard, and Transport.' };
+    return { status: 400, error: 'Jump Gate is available only for Move, Guard, Transport, and Repair.' };
   }
 
   if (totalSelectedShips <= 0) {

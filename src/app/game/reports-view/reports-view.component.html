@@ -42,27 +42,6 @@
         }
       </div>
 
-      <div class="reports-view__tabs-footer" data-tutorial-id="reports-actions">
-        <p class="overview-muted">{{ visibleReports().length }} visible report(s) | {{ selectedReportIds.size }} selected</p>
-
-        <div class="reports-view__actions">
-          <button
-            class="reports-view__compact-button"
-            type="button"
-            appTooltip="Select all visible reports except favourites."
-            (click)="selectAllVisible()">
-            Select all visible
-          </button>
-          <button
-            class="reports-view__compact-button reports-view__compact-button--danger"
-            type="button"
-            appTooltip="Delete selected reports. Favourite reports are protected."
-            [disabled]="selectedReportIds.size === 0 || isDeleting"
-            (click)="deleteSelectedReports()">
-            Delete selected
-          </button>
-        </div>
-      </div>
     </section>
 
     <section class="reports-view__layout">
@@ -72,7 +51,26 @@
             <h3>Inbox</h3>
             <p class="overview-muted">{{ visibleReports().length }} visible report(s)</p>
           </div>
-          <span class="badge">{{ selectedReportIds.size }} selected</span>
+          <div class="reports-view__inbox-actions" data-tutorial-id="reports-actions">
+            <span class="badge">{{ selectedReportIds.size }} selected</span>
+            <div class="reports-view__actions">
+              <button
+                class="reports-view__compact-button"
+                type="button"
+                appTooltip="Select all visible reports except favourites."
+                (click)="selectAllVisible()">
+                Select all visible
+              </button>
+              <button
+                class="reports-view__compact-button reports-view__compact-button--danger"
+                type="button"
+                appTooltip="Delete selected reports. Favourite reports are protected."
+                [disabled]="selectedReportIds.size === 0 || isDeleting"
+                (click)="deleteSelectedReports()">
+                Delete selected
+              </button>
+            </div>
+          </div>
         </div>
 
         @if (visibleReports().length === 0) {

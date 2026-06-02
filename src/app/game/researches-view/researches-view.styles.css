@@ -77,11 +77,19 @@
   display: grid;
   grid-template-columns: 258px minmax(0, 14ch) minmax(220px, 0.95fr) minmax(360px, 1.4fr) max-content;
   align-items: start;
-  gap: 0.72rem;
-  padding: 0.52rem 0.6rem;
+  gap: 0.55rem 0.72rem;
+  padding: 0.45rem 0.56rem;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.03);
+}
+
+.research-tech-card__media {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: grid;
+  gap: 0.25rem;
+  justify-items: start;
 }
 
 .research-tech-card__image {
@@ -91,7 +99,6 @@
 }
 
 .research-tech-card__image-button {
-  grid-column: 1;
   width: 256px;
   padding: 0;
   border: 0;
@@ -113,11 +120,10 @@
 }
 
 .research-tech-card__title {
-  grid-column: 1;
   margin: 0;
   font-size: 0.86rem;
   max-width: 256px;
-  line-height: 1.25;
+  line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
@@ -173,6 +179,7 @@
 
 .research-tech-card__description {
   grid-column: 2 / -1;
+  grid-row: 2;
   display: grid;
   gap: 0.25rem;
   align-content: start;
@@ -228,6 +235,7 @@
 
   .research-tech-card__description {
     grid-column: auto;
+    grid-row: auto;
   }
 
   .research-tech-card__action {

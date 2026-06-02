@@ -486,7 +486,8 @@ export class MissionPlannerViewComponent implements OnInit {
   protected supportsJumpGate(): boolean {
     return this.selectedMissionType === FleetMissionType.MOVE
       || this.selectedMissionType === FleetMissionType.DEFEND
-      || this.selectedMissionType === FleetMissionType.TRANSPORT;
+      || this.selectedMissionType === FleetMissionType.TRANSPORT
+      || this.selectedMissionType === FleetMissionType.REPAIR;
   }
 
   protected canToggleJumpGate(): boolean {
@@ -495,7 +496,7 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected jumpGateHint(): string {
     if (!this.supportsJumpGate()) {
-      return 'Jump Gate is available only for Move, Guard, and Transport.';
+      return 'Jump Gate is available only for Move, Guard, Transport, and Repair.';
     }
 
     if (!this.selectedTargetPlanet) {
@@ -1211,7 +1212,7 @@ export class MissionPlannerViewComponent implements OnInit {
   private jumpGateWarningRows(): MissionWarningVm[] {
     const warnings: MissionWarningVm[] = [];
     if (!this.supportsJumpGate()) {
-      warnings.push({ text: 'Jump Gate is available only for Move, Guard, and Transport.', severity: 'error' });
+      warnings.push({ text: 'Jump Gate is available only for Move, Guard, Transport, and Repair.', severity: 'error' });
       return warnings;
     }
 

@@ -134,18 +134,37 @@
                 Save as fleet template (later)
               </button>
             </div>
+
+            @if (supportsJumpGate()) {
+              <div class="mission-planner__jump-gate-footer">
+                <div>
+                  <h4>Jump Gate</h4>
+                  <p class="overview-muted mission-planner__compact-copy">{{ jumpGateHint() }}</p>
+                </div>
+                <label class="mission-planner__purpose-filter">
+                  <input
+                    type="checkbox"
+                    [ngModel]="useJumpGate"
+                    [disabled]="!canToggleJumpGate()"
+                    (ngModelChange)="setUseJumpGate($event)"
+                  />
+                  <span>Use Jump Gate</span>
+                </label>
+              </div>
+            }
           </article>
 
           @if (supportsBombardmentPriorities()) {
-            <article class="overview-card mission-planner__details-card">
+            <article class="overview-card mission-planner__details-card mission-planner__bombard-card">
               <h3>Bombard Priorities</h3>
               <p class="overview-muted mission-planner__compact-copy">
                 Empty priorities keep current random targeting. Used options are disabled in the other dropdowns.
               </p>
-              <div class="mission-planner__cargo-grid">
+              <div class="mission-planner__bombard-grid">
                 <label class="mission-planner__cargo-field">
                   <span>Main</span>
                   <select
+                    class="mission-planner__bombard-select"
                     [ngModel]="bombardmentPriorityValue('main')"
                     (ngModelChange)="setBombardmentPriority('main', $event)"
                   >
@@ -167,6 +186,7 @@
                 <label class="mission-planner__cargo-field">
                   <span>Secondary</span>
                   <select
+                    class="mission-planner__bombard-select"
                     [ngModel]="bombardmentPriorityValue('secondary')"
                     (ngModelChange)="setBombardmentPriority('secondary', $event)"
                   >
@@ -188,6 +208,7 @@
                 <label class="mission-planner__cargo-field">
                   <span>Tertiary</span>
                   <select
+                    class="mission-planner__bombard-select"
                     [ngModel]="bombardmentPriorityValue('tertiary')"
                     (ngModelChange)="setBombardmentPriority('tertiary', $event)"
                   >
@@ -207,22 +228,6 @@
                   </select>
                 </label>
               </div>
-            </article>
-          }
-
-          @if (supportsJumpGate()) {
-            <article class="overview-card mission-planner__details-card">
-              <h3>Jump Gate</h3>
-              <label class="mission-planner__purpose-filter">
-                <input
-                  type="checkbox"
-                  [ngModel]="useJumpGate"
-                  [disabled]="!canToggleJumpGate()"
-                  (ngModelChange)="setUseJumpGate($event)"
-                />
-                <span>Use Jump Gate</span>
-              </label>
-              <p class="overview-muted mission-planner__compact-copy">{{ jumpGateHint() }}</p>
             </article>
           }
 
