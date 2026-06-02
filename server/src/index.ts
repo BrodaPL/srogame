@@ -7556,6 +7556,20 @@ function calculateFleetCargoCapacity(ships: Array<{ type: ShipTypeType; amount: 
   return capacity;
 }
 
+function countJumpGateCapacityShips(ships: Array<{ type: ShipTypeType; amount: number }>): number {
+  let total = 0;
+  for (const ship of ships) {
+    const blueprint = SHIP_BLUEPRINTS.shipsMap.get(ship.type);
+    if (!blueprint?.canJump) {
+      continue;
+    }
+
+    total += Math.max(0, Math.floor(ship.amount));
+  }
+
+  return total;
+}
+
 function calculateTravelDistance(origin: ClientCoordinates, target: ClientCoordinates): number {
   return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
 }
@@ -9076,7 +9090,8 @@ function validateJumpGateLaunchAccess(
   missionType: FleetMissionTypeType,
   originPlanet: Planet,
   targetPlanet: Planet,
-  totalSelectedShips: number
+  totalSelectedShips: number,
+  jumpGateCapacityShipCount: number
 ): { status: DiplomaticStatusType; targetOwner: Player | null } | { status: number; error: string } {
   if (!isJumpGateMissionAllowed(missionType)) {
     return { status: 400, error: 'Jump Gate is available only for Move, Guard, Transport, and Repair.' };
@@ -9101,8 +9116,8 @@ function validateJumpGateLaunchAccess(
 
   const originOwner = resolvePlayerById(galaxy, originPlanet.info.ownerId ?? playerId);
   const originCapacity = resolveJumpGateCapacityForPlanet(originPlanet, originOwner);
-  if (originCapacity < totalSelectedShips) {
-    return { status: 409, error: `Origin Jump Gate capacity is too low for ${totalSelectedShips} ships.` };
+  if (originCapacity < jumpGateCapacityShipCount) {
+    return { status: 409, error: `Origin Jump Gate capacity is too low for ${jumpGateCapacityShipCount} jump-capable ships.` };
   }
 
   const targetOwner = targetPlanet.info.ownerId === null
@@ -9112,8 +9127,8 @@ function validateJumpGateLaunchAccess(
     ? resolveDiplomaticStatus(galaxy, playerId, targetOwner.playerId)
     : DiplomaticStatus.SELF;
   const targetCapacity = resolveJumpGateCapacityForPlanet(targetPlanet, targetOwner);
-  if (targetCapacity < totalSelectedShips) {
-    return { status: 409, error: `Target Jump Gate capacity is too low for ${totalSelectedShips} ships.` };
+  if (targetCapacity < jumpGateCapacityShipCount) {
+    return { status: 409, error: `Target Jump Gate capacity is too low for ${jumpGateCapacityShipCount} jump-capable ships.` };
   }
 
   return {
@@ -9220,7 +9235,8 @@ function approveJumpGateRequest(
     fleet.missionType,
     originPlanet,
     targetPlanet,
-    request.totalShips
+    request.totalShips,
+    countJumpGateCapacityShips(Array.from(ManyShips.countByType(fleet.ships).entries()).map(([type, amount]) => ({ type, amount })))
   );
   if ('error' in access) {
     return access;

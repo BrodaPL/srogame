@@ -303,6 +303,22 @@ export class MissionPlannerViewComponent implements OnInit {
     return total;
   }
 
+  protected jumpGateCapacitySelectedShips(): number {
+    let total = 0;
+    for (const [shipType, amount] of this.undamagedShipSelectionByType.entries()) {
+      if (this.shipBlueprintsByType.get(shipType)?.canJump) {
+        total += amount;
+      }
+    }
+    for (const [shipType, amount] of this.damagedShipSelectionByType.entries()) {
+      if (this.shipBlueprintsByType.get(shipType)?.canJump) {
+        total += amount;
+      }
+    }
+
+    return total;
+  }
+
   protected selectedShipRows(): ShipSelectionRowVm[] {
     const originPlanet = this.selectedOriginPlanet;
     const availableByType = this.availableShipCounts(originPlanet);
@@ -1229,24 +1245,24 @@ export class MissionPlannerViewComponent implements OnInit {
       return warnings;
     }
 
-    const selectedShips = this.totalSelectedShips();
-    if (selectedShips <= 0) {
+    if (this.totalSelectedShips() <= 0) {
       return warnings;
     }
 
+    const capacityShips = this.jumpGateCapacitySelectedShips();
     const originCapacity = this.jumpGateCapacityForOwnedPlanet(this.selectedOriginPlanet);
-    if (originCapacity < selectedShips) {
+    if (originCapacity < capacityShips) {
       warnings.push({
-        text: `Origin Jump Gate capacity is ${originCapacity}, but ${selectedShips} ships are selected.`,
+        text: `Origin Jump Gate capacity is ${originCapacity}, but ${capacityShips} jump-capable ships are selected.`,
         severity: 'error'
       });
     }
 
     if (this.selectedTargetPlanet.info.ownerId !== null) {
       const targetCapacity = this.jumpGateCapacityForOwnedPlanet(this.selectedTargetPlanet);
-      if (targetCapacity < selectedShips) {
+      if (targetCapacity < capacityShips) {
         warnings.push({
-          text: `Target Jump Gate capacity is ${targetCapacity}, but ${selectedShips} ships are selected.`,
+          text: `Target Jump Gate capacity is ${targetCapacity}, but ${capacityShips} jump-capable ships are selected.`,
           severity: 'error'
         });
       }
@@ -1254,9 +1270,9 @@ export class MissionPlannerViewComponent implements OnInit {
     }
 
     const estimatedTargetCapacity = this.jumpGateCapacityEstimateFromReport(this.selectedTargetPlanet.reportData);
-    if (estimatedTargetCapacity < selectedShips) {
+    if (estimatedTargetCapacity < capacityShips) {
       warnings.push({
-        text: `Known target Jump Gate capacity is at most ${estimatedTargetCapacity}, but ${selectedShips} ships are selected.`,
+        text: `Known target Jump Gate capacity is at most ${estimatedTargetCapacity}, but ${capacityShips} jump-capable ships are selected.`,
         severity: 'error'
       });
     } else {

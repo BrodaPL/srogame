@@ -40,6 +40,7 @@ import {
   calculatePlayerFuelCost,
   calculatePlayerJumpGateTravelCost,
   calculateMaxLabsPerTechnology,
+  countJumpGateCapacityShips,
   isJumpGateAutoApprovedStatus,
   isJumpGateMissionAllowed,
   resolvePlanetOrError,
@@ -524,7 +525,8 @@ export class LiveQueueBotExecutor implements BotExecutor {
       command.missionType,
       originResult.value,
       targetResult.value,
-      totalSelectedShips
+      totalSelectedShips,
+      countJumpGateCapacityShips(selectedShipEntries)
     );
     if ('error' in jumpGateAccess || !isJumpGateAutoApprovedStatus(jumpGateAccess.status)) {
       return false;

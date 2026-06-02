@@ -34,6 +34,7 @@ import {
   calculateTravelDistance,
   commandError,
   commandOk,
+  countJumpGateCapacityShips,
   countPlanetBombsByType,
   countPlanetDamagedShipsByType,
   countPlanetUndamagedShipsByType,
@@ -321,7 +322,8 @@ export function createFleetMission(
       command.missionType,
       originPlanet,
       targetPlanet,
-      selectedFleetShips.totalShipsCount()
+      selectedFleetShips.totalShipsCount(),
+      countJumpGateCapacityShips(totalShipAmounts)
     );
     if ('error' in jumpGateAccess) {
       return {

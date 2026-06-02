@@ -5,6 +5,7 @@ import type { CommandResult } from './command-result.ts';
 import {
   commandError,
   commandOk,
+  countJumpGateCapacityShips,
   dispatchJumpGateFleet,
   resolvePlanetAtCoordinates,
   resolvePlayerById,
@@ -83,7 +84,8 @@ export function approveJumpGateRequestCommand(
     fleet.missionType,
     originPlanet,
     targetPlanet,
-    request.totalShips
+    request.totalShips,
+    countJumpGateCapacityShips(Array.from(fleet.ships.countByType().entries()).map(([type, amount]) => ({ type, amount })))
   );
   if ('error' in access) {
     return {

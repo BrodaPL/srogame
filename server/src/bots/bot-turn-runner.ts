@@ -74,6 +74,7 @@ import {
   calculateMaxLabsPerTechnology,
   calculateMaxShipyardQueueLength,
   calculateTravelDistance,
+  countJumpGateCapacityShips,
   hasBuildingRequirements,
   hasResearchBuildingRequirements,
   hasResearchTechnologyRequirements,
@@ -82,6 +83,7 @@ import {
   hasTechnologyRequirements,
   resolveDiplomaticStatus,
   resolvePlayerById,
+  toShipAmountEntriesFromSelections,
   validateJumpGateLaunchAccess
 } from '../game-commands/command-helpers.js';
 import { createFleetMission } from '../game-commands/fleet-commands.js';
@@ -6525,7 +6527,8 @@ function shouldUseJumpGateRoute(
     missionType,
     originPlanet,
     targetPlanet,
-    totalSelectedShips
+    totalSelectedShips,
+    countJumpGateCapacityShips(toShipAmountEntriesFromSelections(ships))
   );
 
   return !('error' in jumpGateAccess);

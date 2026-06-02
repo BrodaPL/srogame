@@ -112,6 +112,41 @@ describe('fleet commands', () => {
     expect(result.value.fleet.fuelCost).toBe(17);
     expect(origin.rBDSFTQ.resources.deuterium).toBe(100 - 17);
   });
+
+  it('counts only jump-capable ships against Jump Gate capacity', () => {
+    const { galaxy, origin, target } = createOwnedJumpGateGalaxy();
+    origin.rBDSFTQ.resources = new ResourcesPack(0, 0, 1000);
+    origin.rBDSFTQ.ships = ManyShips.empty();
+    origin.rBDSFTQ.ships.addUndamaged(ShipType.CARRIER, 20);
+    origin.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 100);
+    origin.setBuildingLevel(BuildingType.JUMP_GATE, 2);
+    target.setBuildingLevel(BuildingType.JUMP_GATE, 2);
+
+    const result = createFleetMission(
+      { galaxy, playerId: 1 },
+      {
+        missionType: FleetMissionType.MOVE,
+        origin: { x: 0, y: 0, z: 0 },
+        target: { x: 0, y: 0, z: 1 },
+        ships: [
+          { type: ShipType.CARRIER, undamagedAmount: 20, damagedAmount: 0 },
+          { type: ShipType.FIGHTER, undamagedAmount: 100, damagedAmount: 0 }
+        ],
+        carriedBombs: [],
+        cargo: { metal: 0, crystal: 0, deuterium: 0 },
+        useJumpGate: true,
+        bombardmentPriorities: null
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.fleet.usesJumpGate).toBe(true);
+    expect(ManyShips.totalShipsCount(result.value.fleet.ships)).toBe(120);
+  });
 });
 
 function createRemoteOriginGalaxy(options: {
