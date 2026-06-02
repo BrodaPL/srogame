@@ -69,6 +69,34 @@ describe('star system spy commands', () => {
     }
     expect(galaxy.activeFleets).toHaveLength(2);
   });
+
+  it('launches star-system spy missions from an orbiting fleet with probes', () => {
+    const { galaxy, originPlanet } = createStarSystemSpyGalaxy({ availableProbes: 0, deuterium: 0, computerTech: 2 });
+    const sourceFleet = createExistingFleet(77, { x: 2, y: 3, z: 0 }, { x: 2, y: 3, z: 0 });
+    sourceFleet.state = FleetState.ORBITING;
+    sourceFleet.ships.addUndamaged(ShipType.SPY_PROBE, 2);
+    galaxy.activeFleets.push(sourceFleet);
+
+    const result = createStarSystemSpyMissions(
+      { galaxy, playerId: 1 },
+      {
+        systemX: 2,
+        systemY: 3,
+        origin: { x: 2, y: 3, z: 0 },
+        originFleetId: sourceFleet.fleetId
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.launchedFleetCount).toBe(2);
+    expect(ManyShips.countByType(sourceFleet.ships).get(ShipType.SPY_PROBE)).toBe(1);
+    expect(ManyShips.countByType(originPlanet.rBDSFTQ.ships).get(ShipType.SPY_PROBE) ?? 0).toBe(0);
+    expect(galaxy.activeFleets.filter((fleet) => fleet.isRemoteOrigin && fleet.missionType === FleetMissionType.SPY)).toHaveLength(2);
+  });
 });
 
 function createStarSystemSpyGalaxy(options: {

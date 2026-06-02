@@ -4436,13 +4436,16 @@ app.post('/api/game/star-system-spy', (req, res) => {
   const body = req.body as CreateStarSystemSpyRequest | undefined;
   const systemCoordinates = parseStarSystemCoordinates(body?.systemCoordinates);
   const origin = parseMissionCoordinates(body?.origin);
-  if (!systemCoordinates || !origin) {
+  const originFleetId = body?.originFleetId === null || body?.originFleetId === undefined
+    ? null
+    : Number(body.originFleetId);
+  if (!systemCoordinates || !origin || (originFleetId !== null && (!Number.isInteger(originFleetId) || originFleetId <= 0))) {
     return res.status(400).json({ error: 'Invalid star system spy payload.' });
   }
 
   const result = createStarSystemSpyMissions(
     { galaxy: currentGalaxy, playerId },
-    { systemX: systemCoordinates.x, systemY: systemCoordinates.y, origin }
+    { systemX: systemCoordinates.x, systemY: systemCoordinates.y, origin, originFleetId }
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);

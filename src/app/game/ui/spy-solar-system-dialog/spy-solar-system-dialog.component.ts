@@ -10,11 +10,17 @@ import { ShipType } from '../../../models/enums/ship-type';
 import { TechnologyType } from '../../../models/enums/technology-type';
 import type { ClientCoordinates, ClientPlanetDto, ClientStarSystemDto, CreateStarSystemSpyRequest } from '../../../models/game-api-types';
 import { ManyShips } from '../../../models/fleets/many-ships';
+import { FleetState } from '../../../models/fleets/fleet';
+import type { Fleet } from '../../../models/fleets/fleet';
 import { maxActiveFleets } from '../../../models/tech/technology-effects';
 import { TooltipDirective } from '../../../shared/tooltip/tooltip.directive';
 
 type SpySystemOriginVm = {
-  planet: ClientPlanetDto;
+  key: string;
+  kind: 'PLANET' | 'FLEET';
+  originFleetId: number | null;
+  originName: string;
+  coordinates: ClientCoordinates;
   label: string;
   coordinatesLabel: string;
   totalProbes: number;
@@ -87,7 +93,7 @@ export class SpySolarSystemDialogComponent implements OnChanges {
   }
 
   protected selectedOrigin(): SpySystemOriginVm | null {
-    return this.eligibleOrigins.find((entry) => entry.coordinatesLabel === this.selectedOriginCoordinates) ?? null;
+    return this.eligibleOrigins.find((entry) => entry.key === this.selectedOriginCoordinates) ?? null;
   }
 
   protected requiredProbeCount(): number {
@@ -125,7 +131,7 @@ export class SpySolarSystemDialogComponent implements OnChanges {
       return 'No non-owned, non-asteroid planets are available in this star system.';
     }
 
-    return `No owned planets with at least ${this.requiredProbeCount()} espionage probes are available.`;
+    return `No owned planets or orbiting fleets with at least ${this.requiredProbeCount()} espionage probes are available.`;
   }
 
   protected canLaunch(): boolean {
@@ -159,7 +165,8 @@ export class SpySolarSystemDialogComponent implements OnChanges {
         x: this.starSystem.coordinates.x,
         y: this.starSystem.coordinates.y
       },
-      origin: selectedOrigin.planet.coordinates
+      origin: selectedOrigin.coordinates,
+      originFleetId: selectedOrigin.originFleetId
     };
 
     this.isLaunching = true;
@@ -229,21 +236,24 @@ export class SpySolarSystemDialogComponent implements OnChanges {
         next: ({ ownedPlanets, activeFleets }) => {
           this.activeFleetCount = activeFleets.length;
           this.maxActiveFleetCount = maxActiveFleets(this.techLevel(ownedPlanets, TechnologyType.COMPUTER_TECHNOLOGY));
-          this.eligibleOrigins = ownedPlanets
-            .map((planet) => this.buildEligibleOriginVm(planet, this.targetPlanets))
+          this.eligibleOrigins = [
+            ...ownedPlanets.map((planet) => this.buildPlanetOriginVm(planet, this.targetPlanets)),
+            ...activeFleets.map((fleet) => this.buildFleetOriginVm(fleet, this.targetPlanets))
+          ]
             .filter((entry): entry is SpySystemOriginVm => entry !== null)
             .filter((entry) => entry.totalProbes >= this.requiredProbeCount())
             .sort((left, right) =>
               left.totalDistance - right.totalDistance
               || left.maxDistance - right.maxDistance
-              || left.planet.coordinates.y - right.planet.coordinates.y
-              || left.planet.coordinates.x - right.planet.coordinates.x
-              || left.planet.coordinates.z - right.planet.coordinates.z
-              || left.planet.basicInfo.name.localeCompare(right.planet.basicInfo.name)
+              || left.coordinates.y - right.coordinates.y
+              || left.coordinates.x - right.coordinates.x
+              || left.coordinates.z - right.coordinates.z
+              || left.kind.localeCompare(right.kind)
+              || left.originName.localeCompare(right.originName)
             );
 
           if (this.eligibleOrigins.length > 0) {
-            this.selectedOriginCoordinates = this.eligibleOrigins[0].coordinatesLabel;
+            this.selectedOriginCoordinates = this.eligibleOrigins[0].key;
           }
         },
         error: (error) => {
@@ -258,7 +268,7 @@ export class SpySolarSystemDialogComponent implements OnChanges {
     return matchingEntry?.level ?? 0;
   }
 
-  private buildEligibleOriginVm(
+  private buildPlanetOriginVm(
     planet: ClientPlanetDto,
     targetPlanets: ClientPlanetDto[]
   ): SpySystemOriginVm | null {
@@ -283,8 +293,57 @@ export class SpySolarSystemDialogComponent implements OnChanges {
       : `${totalProbes} probe${totalProbes === 1 ? '' : 's'}`;
 
     return {
-      planet,
+      key: `planet:${coordinatesLabel}`,
+      kind: 'PLANET',
+      originFleetId: null,
+      originName: planet.basicInfo.name,
+      coordinates: planet.coordinates,
       label: `${planet.basicInfo.name} (${coordinatesLabel}) | ${probeLabel}`,
+      coordinatesLabel,
+      totalProbes,
+      undamagedProbes,
+      damagedProbes,
+      totalDistance,
+      maxDistance
+    };
+  }
+
+  private buildFleetOriginVm(
+    fleet: Fleet,
+    targetPlanets: ClientPlanetDto[]
+  ): SpySystemOriginVm | null {
+    if (fleet.state !== FleetState.ORBITING || fleet.pendingMaintenanceRequestId !== null) {
+      return null;
+    }
+
+    const undamagedProbes = ManyShips.undamagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const damagedProbes = ManyShips.damagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const totalProbes = undamagedProbes + damagedProbes;
+    if (totalProbes <= 0) {
+      return null;
+    }
+
+    const coordinates = fleet.target;
+    let totalDistance = 0;
+    let maxDistance = 0;
+    for (const targetPlanet of targetPlanets) {
+      const distance = this.calculateDistance(coordinates, targetPlanet.coordinates);
+      totalDistance += distance;
+      maxDistance = Math.max(maxDistance, distance);
+    }
+
+    const coordinatesLabel = this.formatCoordinates(coordinates);
+    const probeLabel = damagedProbes > 0
+      ? `${totalProbes} probe${totalProbes === 1 ? '' : 's'} (${damagedProbes} damaged)`
+      : `${totalProbes} probe${totalProbes === 1 ? '' : 's'}`;
+
+    return {
+      key: `fleet:${fleet.fleetId}`,
+      kind: 'FLEET',
+      originFleetId: fleet.fleetId,
+      originName: `Fleet #${fleet.fleetId}`,
+      coordinates,
+      label: `Fleet #${fleet.fleetId} orbiting ${fleet.targetPlanetName} (${coordinatesLabel}) | ${probeLabel}`,
       coordinatesLabel,
       totalProbes,
       undamagedProbes,

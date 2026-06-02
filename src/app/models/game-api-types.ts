@@ -1272,6 +1272,7 @@ export type CreateStarSystemSpyRequest = {
     y: number;
   };
   origin: ClientCoordinates;
+  originFleetId?: number | null;
 };
 
 export type CreateStarSystemSpyResponse = {

@@ -32,19 +32,19 @@
 
     <div class="spy-launch-dialog__body">
       @if (isLoading) {
-        <p class="overview-muted">Loading owned planets with available probes.</p>
+        <p class="overview-muted">Loading available probe origins.</p>
       } @else if (eligibleOrigins.length === 0) {
-        <p class="overview-muted">No owned planets with espionage probes are available.</p>
+        <p class="overview-muted">No owned planets or orbiting fleets with espionage probes are available.</p>
       } @else {
         <fieldset class="spy-launch-dialog__fieldset">
           <legend>Mission origin</legend>
           <div class="spy-launch-dialog__origin-list">
-            @for (origin of eligibleOrigins; track origin.coordinatesLabel) {
+            @for (origin of eligibleOrigins; track origin.key) {
               <label class="spy-launch-dialog__origin-option">
                 <input
                   type="radio"
                   name="spy-origin"
-                  [value]="origin.coordinatesLabel"
+                  [value]="origin.key"
                   [(ngModel)]="selectedOriginCoordinates"
                   (ngModelChange)="setSelectedOrigin($event)"
                 />

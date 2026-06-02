@@ -10,10 +10,16 @@ import { TechnologyType } from '../../../models/enums/technology-type';
 import type { ClientCoordinates, ClientPlanetDto, CreateFleetMissionRequest } from '../../../models/game-api-types';
 import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
 import { ManyShips } from '../../../models/fleets/many-ships';
+import { FleetState } from '../../../models/fleets/fleet';
+import type { Fleet } from '../../../models/fleets/fleet';
 import { maxActiveFleets } from '../../../models/tech/technology-effects';
 
 type SpyLaunchOriginVm = {
-  planet: ClientPlanetDto;
+  key: string;
+  kind: 'PLANET' | 'FLEET';
+  originFleetId: number | null;
+  originName: string;
+  coordinates: ClientCoordinates;
   label: string;
   coordinatesLabel: string;
   distance: number;
@@ -85,7 +91,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
   }
 
   protected selectedOrigin(): SpyLaunchOriginVm | null {
-    return this.eligibleOrigins.find((entry) => entry.coordinatesLabel === this.selectedOriginCoordinates) ?? null;
+    return this.eligibleOrigins.find((entry) => entry.key === this.selectedOriginCoordinates) ?? null;
   }
 
   protected selectedOriginMaxProbeAmount(): number {
@@ -130,7 +136,8 @@ export class SpyLaunchDialogComponent implements OnChanges {
     const damagedAmount = Math.max(0, this.probeAmount - undamagedAmount);
     const request: CreateFleetMissionRequest = {
       missionType: FleetMissionType.SPY,
-      origin: selectedOrigin.planet.coordinates,
+      origin: selectedOrigin.coordinates,
+      originFleetId: selectedOrigin.originFleetId,
       target: this.targetPlanet.coordinates,
       ships: [
         {
@@ -159,7 +166,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
         next: (response) => {
           const message = response.message?.trim().length
             ? response.message
-            : `Spy mission launched from ${selectedOrigin.planet.basicInfo.name}.`;
+            : `Spy mission launched from ${selectedOrigin.originName}.`;
           this.launched.emit({ message });
           this.closed.emit();
         },
@@ -208,19 +215,22 @@ export class SpyLaunchDialogComponent implements OnChanges {
         next: ({ ownedPlanets, activeFleets }) => {
           this.activeFleetCount = activeFleets.length;
           this.maxActiveFleetCount = maxActiveFleets(this.techLevel(ownedPlanets, TechnologyType.COMPUTER_TECHNOLOGY));
-          this.eligibleOrigins = ownedPlanets
-            .map((planet) => this.buildEligibleOriginVm(planet, this.targetPlanet!.coordinates))
+          this.eligibleOrigins = [
+            ...ownedPlanets.map((planet) => this.buildPlanetOriginVm(planet, this.targetPlanet!.coordinates)),
+            ...activeFleets.map((fleet) => this.buildFleetOriginVm(fleet, this.targetPlanet!.coordinates))
+          ]
             .filter((entry): entry is SpyLaunchOriginVm => entry !== null)
             .sort((left, right) =>
               left.distance - right.distance
-              || left.planet.coordinates.y - right.planet.coordinates.y
-              || left.planet.coordinates.x - right.planet.coordinates.x
-              || left.planet.coordinates.z - right.planet.coordinates.z
-              || left.planet.basicInfo.name.localeCompare(right.planet.basicInfo.name)
+              || left.coordinates.y - right.coordinates.y
+              || left.coordinates.x - right.coordinates.x
+              || left.coordinates.z - right.coordinates.z
+              || left.kind.localeCompare(right.kind)
+              || left.originName.localeCompare(right.originName)
             );
 
           if (this.eligibleOrigins.length > 0) {
-            this.selectedOriginCoordinates = this.eligibleOrigins[0].coordinatesLabel;
+            this.selectedOriginCoordinates = this.eligibleOrigins[0].key;
             this.probeAmount = 1;
           }
         },
@@ -236,7 +246,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
     return matchingEntry?.level ?? 0;
   }
 
-  private buildEligibleOriginVm(
+  private buildPlanetOriginVm(
     planet: ClientPlanetDto,
     targetCoordinates: ClientCoordinates
   ): SpyLaunchOriginVm | null {
@@ -254,8 +264,49 @@ export class SpyLaunchDialogComponent implements OnChanges {
       : `${totalProbes} probe${totalProbes === 1 ? '' : 's'}`;
 
     return {
-      planet,
+      key: `planet:${coordinatesLabel}`,
+      kind: 'PLANET',
+      originFleetId: null,
+      originName: planet.basicInfo.name,
+      coordinates: planet.coordinates,
       label: `${planet.basicInfo.name} (${coordinatesLabel}) | ${probeLabel}`,
+      coordinatesLabel,
+      distance,
+      totalProbes,
+      undamagedProbes,
+      damagedProbes
+    };
+  }
+
+  private buildFleetOriginVm(
+    fleet: Fleet,
+    targetCoordinates: ClientCoordinates
+  ): SpyLaunchOriginVm | null {
+    if (fleet.state !== FleetState.ORBITING || fleet.pendingMaintenanceRequestId !== null) {
+      return null;
+    }
+
+    const undamagedProbes = ManyShips.undamagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const damagedProbes = ManyShips.damagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const totalProbes = undamagedProbes + damagedProbes;
+    if (totalProbes <= 0) {
+      return null;
+    }
+
+    const coordinates = fleet.target;
+    const coordinatesLabel = this.formatCoordinates(coordinates);
+    const distance = this.calculateDistance(coordinates, targetCoordinates);
+    const probeLabel = damagedProbes > 0
+      ? `${totalProbes} probe${totalProbes === 1 ? '' : 's'} (${damagedProbes} damaged)`
+      : `${totalProbes} probe${totalProbes === 1 ? '' : 's'}`;
+
+    return {
+      key: `fleet:${fleet.fleetId}`,
+      kind: 'FLEET',
+      originFleetId: fleet.fleetId,
+      originName: `Fleet #${fleet.fleetId}`,
+      coordinates,
+      label: `Fleet #${fleet.fleetId} orbiting ${fleet.targetPlanetName} (${coordinatesLabel}) | ${probeLabel}`,
       coordinatesLabel,
       distance,
       totalProbes,

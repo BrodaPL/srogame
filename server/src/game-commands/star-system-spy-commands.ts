@@ -1,9 +1,11 @@
 import * as planetTypeEnumModule from '../../../src/app/models/enums/planet-type.js';
 import * as shipTypeEnumModule from '../../../src/app/models/enums/ship-type.js';
 import * as fleetMissionTypeEnumModule from '../../../src/app/models/enums/fleet-mission-type.js';
+import * as fleetModule from '../../../src/app/models/fleets/fleet.js';
 import type { ClientCoordinates } from '../../../src/app/models/game-api-types.ts';
 import type { Fleet as FleetType } from '../../../src/app/models/fleets/fleet.ts';
 import type { Planet } from '../../../src/app/models/planets/planet.ts';
+import type { Player } from '../../../src/app/models/player.ts';
 import type { GameCommandContext } from './command-context.ts';
 import type { CommandResult } from './command-result.ts';
 import {
@@ -27,11 +29,13 @@ function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
 const { PlanetType } = resolveModule(planetTypeEnumModule) as typeof import('../../../src/app/models/enums/planet-type.js');
 const { ShipType } = resolveModule(shipTypeEnumModule) as typeof import('../../../src/app/models/enums/ship-type.js');
 const { FleetMissionType } = resolveModule(fleetMissionTypeEnumModule) as typeof import('../../../src/app/models/enums/fleet-mission-type.js');
+const { FleetState } = resolveModule(fleetModule) as typeof import('../../../src/app/models/fleets/fleet.js');
 
 export type CreateStarSystemSpyCommand = {
   systemX: number;
   systemY: number;
   origin: ClientCoordinates;
+  originFleetId?: number | null;
 };
 
 export type CreateStarSystemSpyResult = {
@@ -49,27 +53,6 @@ export function createStarSystemSpyMissions(
     return systemResult;
   }
 
-  const originPlanetResult = resolvePlanetOrError(context.galaxy, command.origin);
-  if (!originPlanetResult.ok) {
-    return {
-      ok: false,
-      error: {
-        ...originPlanetResult.error,
-        message: originPlanetResult.error.code === 'SYSTEM_NOT_FOUND'
-          ? 'Origin planet not found.'
-          : originPlanetResult.error.message
-      }
-    };
-  }
-
-  const originPlanet = originPlanetResult.value;
-  if (originPlanet.info.ownerId !== context.playerId) {
-    return {
-      ok: false,
-      error: commandError(403, 'FORBIDDEN', 'Origin planet must be owned by you.')
-    };
-  }
-
   const player = resolvePlayerById(context.galaxy, context.playerId);
   if (!player) {
     return {
@@ -77,6 +60,12 @@ export function createStarSystemSpyMissions(
       error: commandError(404, 'PLAYER_NOT_FOUND', 'Player not found.')
     };
   }
+
+  const originContextResult = resolveStarSystemSpyOriginContext(context, command, player);
+  if (!originContextResult.ok) {
+    return originContextResult;
+  }
+  const originContext = originContextResult.value;
 
   const targetPlanets = systemResult.value.planets.filter((planet) =>
     planet.basicInfo.type !== PlanetType.ASTEROIDS && planet.info.ownerId !== context.playerId
@@ -101,8 +90,8 @@ export function createStarSystemSpyMissions(
     };
   }
 
-  const availableUndamagedProbes = countPlanetUndamagedShipsByType(originPlanet).get(ShipType.SPY_PROBE) ?? 0;
-  const availableDamagedProbes = countPlanetDamagedShipsByType(originPlanet).get(ShipType.SPY_PROBE) ?? 0;
+  const availableUndamagedProbes = originContext.availableUndamagedProbes;
+  const availableDamagedProbes = originContext.availableDamagedProbes;
   const availableTotalProbes = availableUndamagedProbes + availableDamagedProbes;
   if (availableTotalProbes < targetPlanets.length) {
     return {
@@ -110,14 +99,14 @@ export function createStarSystemSpyMissions(
       error: commandError(
         409,
         'CONFLICT',
-        `Origin planet needs ${targetPlanets.length} espionage probes for this star system, but only ${availableTotalProbes} are available.`
+        `${originContext.label} needs ${targetPlanets.length} espionage probes for this star system, but only ${availableTotalProbes} are available.`
       )
     };
   }
 
   let requiredFuel = 0;
   for (const targetPlanet of targetPlanets) {
-    const distance = calculateTravelDistance(command.origin, {
+    const distance = calculateTravelDistance(originContext.coordinates, {
       x: targetPlanet.basicInfo.solarSystem.coordinates.x,
       y: targetPlanet.basicInfo.solarSystem.coordinates.y,
       z: Math.max(0, targetPlanet.basicInfo.order - 1)
@@ -125,13 +114,13 @@ export function createStarSystemSpyMissions(
     requiredFuel += calculatePlayerFuelCost([{ type: ShipType.SPY_PROBE, amount: 1 }], distance, 1, player);
   }
 
-  if (originPlanet.rBDSFTQ.resources.deuterium < requiredFuel) {
+  if (originContext.availableDeuterium < requiredFuel) {
     return {
       ok: false,
       error: commandError(
         400,
         'INSUFFICIENT_RESOURCES',
-        `Star system espionage needs ${requiredFuel} deuterium, but origin planet has only ${originPlanet.rBDSFTQ.resources.deuterium}.`
+        `Star system espionage needs ${requiredFuel} deuterium, but ${originContext.label} has only ${originContext.availableDeuterium}.`
       )
     };
   }
@@ -150,7 +139,8 @@ export function createStarSystemSpyMissions(
       context,
       {
         missionType: FleetMissionType.SPY,
-        origin: command.origin,
+        origin: originContext.coordinates,
+        originFleetId: command.originFleetId ?? null,
         target: targetCoordinates,
         ships: [{
           type: ShipType.SPY_PROBE,
@@ -183,5 +173,98 @@ export function createStarSystemSpyMissions(
     fleets: createdFleets,
     launchedFleetCount: createdFleets.length,
     targetPlanets
+  });
+}
+
+function resolveStarSystemSpyOriginContext(
+  context: GameCommandContext,
+  command: CreateStarSystemSpyCommand,
+  player: Player
+): CommandResult<{
+  coordinates: ClientCoordinates;
+  availableUndamagedProbes: number;
+  availableDamagedProbes: number;
+  availableDeuterium: number;
+  label: string;
+}> {
+  if (command.originFleetId !== null && command.originFleetId !== undefined) {
+    if (!Number.isInteger(command.originFleetId) || command.originFleetId <= 0) {
+      return {
+        ok: false,
+        error: commandError(400, 'INVALID_INPUT', 'Invalid origin fleet id.')
+      };
+    }
+
+    const fleet = context.galaxy.activeFleets.find((entry) =>
+      entry.fleetId === command.originFleetId && entry.ownerId === context.playerId
+    ) ?? null;
+    if (!fleet) {
+      return {
+        ok: false,
+        error: commandError(404, 'CONFLICT', 'Origin fleet not found.')
+      };
+    }
+    if (fleet.state !== FleetState.ORBITING) {
+      return {
+        ok: false,
+        error: commandError(409, 'CONFLICT', 'Remote origin requires an orbiting fleet.')
+      };
+    }
+    if (fleet.pendingMaintenanceRequestId !== null) {
+      return {
+        ok: false,
+        error: commandError(409, 'CONFLICT', 'Remote origin fleet has a pending maintenance request.')
+      };
+    }
+
+    const originCoordinates = {
+      x: fleet.target.x,
+      y: fleet.target.y,
+      z: fleet.target.z
+    };
+    const originPlanetResult = resolvePlanetOrError(context.galaxy, originCoordinates);
+    if (!originPlanetResult.ok) {
+      return {
+        ok: false,
+        error: commandError(404, 'PLANET_NOT_FOUND', 'Remote origin planet not found.')
+      };
+    }
+
+    return commandOk({
+      coordinates: originCoordinates,
+      availableUndamagedProbes: fleet.ships.undamagedShipsCount[ShipType.SPY_PROBE] ?? 0,
+      availableDamagedProbes: fleet.ships.damagedShips.filter((entry) => entry.type === ShipType.SPY_PROBE).length,
+      availableDeuterium: Math.max(0, Math.floor(fleet.cargo.deuterium)),
+      label: `Origin fleet #${fleet.fleetId}`
+    });
+  }
+
+  const originPlanetResult = resolvePlanetOrError(context.galaxy, command.origin);
+  if (!originPlanetResult.ok) {
+    return {
+      ok: false,
+      error: {
+        ...originPlanetResult.error,
+        message: originPlanetResult.error.code === 'SYSTEM_NOT_FOUND'
+          ? 'Origin planet not found.'
+          : originPlanetResult.error.message
+      }
+    };
+  }
+
+  const originPlanet = originPlanetResult.value;
+  if (originPlanet.info.ownerId !== player.playerId) {
+    return {
+      ok: false,
+      error: commandError(403, 'FORBIDDEN', 'Origin planet must be owned by you.')
+    };
+  }
+
+  return commandOk({
+    coordinates: command.origin,
+    availableUndamagedProbes: countPlanetUndamagedShipsByType(originPlanet).get(ShipType.SPY_PROBE) ?? 0,
+    availableDamagedProbes: countPlanetDamagedShipsByType(originPlanet).get(ShipType.SPY_PROBE) ?? 0,
+    availableDeuterium: Math.max(0, Math.floor(originPlanet.rBDSFTQ.resources.deuterium)),
+    label: 'Origin planet'
   });
 }

@@ -7,6 +7,10 @@ import { PlanetType } from '../../../models/enums/planet-type';
 import { PlayerType } from '../../../models/enums/player-type';
 import { ShipType } from '../../../models/enums/ship-type';
 import { TechnologyType } from '../../../models/enums/technology-type';
+import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
+import { Fleet, FleetState } from '../../../models/fleets/fleet';
+import { ManyShips } from '../../../models/fleets/many-ships';
+import { ResourcesPack } from '../../../models/resources-pack';
 
 describe('SpyLaunchDialogComponent', () => {
   it('sorts eligible origin planets by distance to the target', () => {
@@ -32,9 +36,56 @@ describe('SpyLaunchDialogComponent', () => {
       isOpen: createSimpleChange(false, true)
     });
 
-    expect((component as { eligibleOrigins: Array<{ planet: ClientPlanetDto }> }).eligibleOrigins.map((entry) => entry.planet.basicInfo.name))
+    expect((component as { eligibleOrigins: Array<{ originName: string }> }).eligibleOrigins.map((entry) => entry.originName))
       .toEqual(['Near', 'Middle', 'Far']);
-    expect((component as { selectedOriginCoordinates: string }).selectedOriginCoordinates).toBe('3:3:3');
+    expect((component as { selectedOriginCoordinates: string }).selectedOriginCoordinates).toBe('planet:3:3:3');
+  });
+
+  it('includes orbiting fleets with spy probes as remote origins', () => {
+    const remoteFleet = createOrbitingFleet(77, { x: 4, y: 4, z: 4 }, 2);
+    const createFleetMission = vi.fn().mockReturnValue(of({
+      ownedPlanets: [],
+      activeFleets: [],
+      message: 'Remote spy launched.'
+    } satisfies CreateFleetMissionResponse));
+    const component = new SpyLaunchDialogComponent(
+      {
+        getOwnedPlanets: vi.fn().mockReturnValue(of([
+          createPlanet('No Probes', { x: 2, y: 2, z: 2 }, 0)
+        ])),
+        getActiveFleets: vi.fn().mockReturnValue(of([remoteFleet])),
+        createFleetMission
+      } as never,
+      createPlayerSessionService() as never,
+      createChangeDetectorRef() as never,
+      createI18nService() as never
+    );
+
+    component.isOpen = true;
+    component.targetPlanet = createForeignPlanet('Target', { x: 5, y: 5, z: 5 });
+    component.ngOnChanges({
+      isOpen: createSimpleChange(false, true)
+    });
+
+    expect((component as { eligibleOrigins: Array<{ key: string; originFleetId: number | null }> }).eligibleOrigins)
+      .toEqual([expect.objectContaining({ key: 'fleet:77', originFleetId: 77 })]);
+
+    (component as { launch(): void }).launch();
+
+    expect(createFleetMission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        origin: { x: 4, y: 4, z: 4 },
+        originFleetId: 77,
+        ships: [
+          {
+            type: ShipType.SPY_PROBE,
+            undamagedAmount: 1,
+            damagedAmount: 0
+          }
+        ]
+      }),
+      'token'
+    );
   });
 
   it('launches spy missions with undamaged probes first and then damaged probes', () => {
@@ -126,6 +177,33 @@ function createPlayerSessionService() {
       pendingRequestCount: 0
     } satisfies PlayerSession)
   };
+}
+
+function createOrbitingFleet(
+  fleetId: number,
+  coordinates: ClientCoordinates,
+  spyProbes: number
+): Fleet {
+  const ships = ManyShips.empty();
+  ships.addUndamaged(ShipType.SPY_PROBE, spyProbes);
+  return new Fleet(
+    fleetId,
+    1,
+    FleetMissionType.SPY,
+    { x: 0, y: 0, z: 0 },
+    coordinates,
+    'Origin',
+    'Remote Orbit',
+    ships,
+    new ResourcesPack(0, 0, 100),
+    0,
+    0,
+    0,
+    1,
+    1,
+    FleetState.ORBITING,
+    1
+  );
 }
 
 function createChangeDetectorRef() {
