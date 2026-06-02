@@ -308,6 +308,7 @@
   background: rgba(8, 12, 18, 0.75);
   color: #dce7f5;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-family: var(--font-mono), serif;
   font-size: 0.82rem;
 }
@@ -445,6 +446,7 @@
   color: #dce7f5;
   font-size: 0.82rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .reports-view__dossier-section--wide {
@@ -475,24 +477,31 @@
   display: flex;
   justify-content: space-between;
   gap: 0.55rem;
-  align-items: baseline;
+  align-items: flex-start;
+  min-width: 0;
   padding-bottom: 0.22rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .reports-view__dossier-row-label {
+  flex: 0 1 auto;
+  min-width: 0;
   color: #c1ccdc;
   font-size: 0.78rem;
   line-height: 1.24;
+  overflow-wrap: anywhere;
 }
 
 .reports-view__dossier-row-value {
+  flex: 1 1 auto;
+  min-width: 0;
   color: #f2f6fd;
   font-family: var(--font-mono), serif;
   font-size: 0.78rem;
-  line-height: 1.1;
+  line-height: 1.24;
   text-align: right;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .reports-view__dossier-row-value--positive {
