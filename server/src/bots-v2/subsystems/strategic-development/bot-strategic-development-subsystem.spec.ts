@@ -649,14 +649,14 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     )).toBe(false);
   });
 
-  it('accepts colonization targets down to size 110', () => {
+  it('accepts colonization targets down to size 100', () => {
     const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
     configureDevelopedSupportSource(sourcePlanet);
     setSupportShipTech(bot);
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
     sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 80000);
     unownedPlanet.basicInfo.colonizationDifficulty = 1;
-    unownedPlanet.basicInfo.baseSize = 115;
+    unownedPlanet.basicInfo.baseSize = 105;
     markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
 
     const result = runStrategicDevelopmentSubsystem(galaxy, bot);

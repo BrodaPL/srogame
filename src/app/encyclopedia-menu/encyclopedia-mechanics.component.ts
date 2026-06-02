@@ -150,14 +150,14 @@ export class EncyclopediaMechanicsComponent {
       status: 'Live',
       summary: 'Random planets roll type-based parameter ranges and base sizes, while starting planets are normalized and terraformer later expands size permanently.',
       details: [
-        'Random planets roll base size in range 90..200 with type-specific modifier ranges.',
-        'Starting planets are fixed to base size 160 and all planetary multipliers at 1.0.',
+        'Random planets roll base size in range 90..210 with type-specific modifier ranges.',
+        'Starting planets are fixed to base size 150 and all planetary multipliers at 1.0.',
         'anomaliesAndNoise and hyperspaceParameters are rolled in 0.05 steps.',
         'Terraformer permanently increases planet size once a level finishes, using the blueprint production1 value of the highest completed terraformer level reached.'
       ],
       formulas: [
-        'randomPlanetBaseSize = randomInt(100, 220)',
-        'startingPlanetBaseSize = 160',
+        'randomPlanetBaseSize = randomInt(90, 210)',
+        'startingPlanetBaseSize = 150',
         'currentPlanetSize = baseSize + permanentTerraformerSizeBonus'
       ]
     },
