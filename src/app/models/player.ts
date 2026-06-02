@@ -414,6 +414,20 @@ export type BotMemoryV2StrategicDiplomaticSharedHostileEventEntry = {
   propagatedOnTurn: number | null;
 };
 
+export type BotMemoryV2StrategicDiplomaticCounterIntelEventType =
+  | 'SPY'
+  | 'STAR_SYSTEM_SPY'
+  | 'HOSTILE_FLEET';
+
+export type BotMemoryV2StrategicDiplomaticCounterIntelEventEntry = {
+  attackerPlayerId: number;
+  originCoordinates: BotMemoryCoordinates;
+  targetCoordinates: BotMemoryCoordinates;
+  eventType: BotMemoryV2StrategicDiplomaticCounterIntelEventType;
+  eventTurn: number;
+  responseTurn: number | null;
+};
+
 export type BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry = {
   requestId: number;
   supportType: SupportRequestType;
@@ -427,6 +441,7 @@ export type BotMemoryV2StrategicDiplomatic = {
   primaryWarBreakTarget: BotMemoryV2StrategicDiplomaticPrimaryWarBreakTarget | null;
   openedWarTargets: BotMemoryV2StrategicDiplomaticOpenedWarTargetEntry[];
   sharedHostileEvents: BotMemoryV2StrategicDiplomaticSharedHostileEventEntry[];
+  counterIntelEvents: BotMemoryV2StrategicDiplomaticCounterIntelEventEntry[];
   outgoingSupportRequests: BotMemoryV2StrategicDiplomaticOutgoingSupportRequestEntry[];
 };
 
@@ -1311,6 +1326,9 @@ export class Player {
       sharedHostileEvents: Player.normalizeBotMemoryV2StrategicDiplomaticSharedHostileEvents(
         strategicDiplomatic?.sharedHostileEvents
       ),
+      counterIntelEvents: Player.normalizeBotMemoryV2StrategicDiplomaticCounterIntelEvents(
+        strategicDiplomatic?.counterIntelEvents
+      ),
       outgoingSupportRequests: Player.normalizeBotMemoryV2StrategicDiplomaticOutgoingSupportRequests(
         strategicDiplomatic?.outgoingSupportRequests
       )
@@ -1541,6 +1559,49 @@ export class Player {
       })
       .filter((entry): entry is BotMemoryV2StrategicDiplomaticSharedHostileEventEntry => entry !== null)
       .slice(-400);
+  }
+
+  private static normalizeBotMemoryV2StrategicDiplomaticCounterIntelEvents(
+    entries: BotMemoryV2StrategicDiplomaticCounterIntelEventEntry[] | null | undefined
+  ): BotMemoryV2StrategicDiplomaticCounterIntelEventEntry[] {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        if (!entry || !Number.isInteger(entry.attackerPlayerId)) {
+          return null;
+        }
+
+        const originCoordinates = Player.normalizeBotMemoryCoordinates(entry.originCoordinates);
+        const targetCoordinates = Player.normalizeBotMemoryCoordinates(entry.targetCoordinates);
+        if (!originCoordinates || !targetCoordinates) {
+          return null;
+        }
+
+        const eventType = entry.eventType === 'SPY'
+          || entry.eventType === 'STAR_SYSTEM_SPY'
+          || entry.eventType === 'HOSTILE_FLEET'
+          ? entry.eventType
+          : null;
+        if (!eventType) {
+          return null;
+        }
+
+        return {
+          attackerPlayerId: Math.max(0, Math.floor(entry.attackerPlayerId)),
+          originCoordinates,
+          targetCoordinates,
+          eventType,
+          eventTurn: Number.isInteger(entry.eventTurn) ? Math.max(0, entry.eventTurn) : 0,
+          responseTurn: Number.isInteger(entry.responseTurn)
+            ? Math.max(0, entry.responseTurn!)
+            : null
+        };
+      })
+      .filter((entry): entry is BotMemoryV2StrategicDiplomaticCounterIntelEventEntry => entry !== null)
+      .slice(-200);
   }
 
   private static normalizeBotMemoryV2WeightManager(

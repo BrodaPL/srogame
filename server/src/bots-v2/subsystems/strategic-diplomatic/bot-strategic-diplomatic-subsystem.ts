@@ -121,6 +121,7 @@ type SpyMissionRequest = {
   travelDistance: number;
   travelTurns: number;
   score: number;
+  counterIntelEventTurn?: number | null;
 };
 
 type BlockedSpyNeed = {
@@ -128,6 +129,7 @@ type BlockedSpyNeed = {
   targetCoordinates: { x: number; y: number; z: number };
   probeAmount: number;
   score: number;
+  counterIntelEventTurn?: number | null;
 };
 
 type ProbeShipNeedRequest = {
@@ -5918,9 +5920,15 @@ function createSpyMissionRequests(
   targetedFactionIds: Set<number>;
   globalProbeDeficit: number;
 } {
-  const candidates = factions
+  const counterIntelCandidates = factions
+    .flatMap((faction) => createCounterIntelSpyMissionRequestsForFaction(context, faction));
+  const normalCandidates = factions
     .filter((faction) => faction.intelInsufficient || hasStaleOpenedWarTargetForSpy(context, faction))
-    .map((faction) => createSpyMissionRequestForFaction(context, faction))
+    .map((faction) => createSpyMissionRequestForFaction(context, faction));
+  const candidates = [
+    ...counterIntelCandidates,
+    ...normalCandidates
+  ]
     .filter((entry): entry is SpyMissionRequest | BlockedSpyNeed => entry !== null)
     .sort(compareSpyCandidates);
   const cappedCandidates = candidates.slice(0, Math.max(0, availableFleetSlots));
@@ -5961,6 +5969,84 @@ function hasStaleOpenedWarTargetForSpy(
     && faction.faction.knownPlanets.some((planet) =>
       isKnownOpenedWarTargetForRefresh(planet) && isOpenedWarTargetRaidStale(context, planet)
     );
+}
+
+function createCounterIntelSpyMissionRequestsForFaction(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction
+): Array<SpyMissionRequest | BlockedSpyNeed> {
+  return faction.faction.counterIntelEvents
+    .filter((event) => event.responseTurn === null && event.eventAge <= 40)
+    .map((event) => createCounterIntelSpyMissionRequest(context, faction, event));
+}
+
+function createCounterIntelSpyMissionRequest(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  event: BotStrategicDiplomaticFactionSnapshot['counterIntelEvents'][number]
+): SpyMissionRequest | BlockedSpyNeed {
+  const knownTarget = faction.faction.knownPlanets.find((planet) =>
+    planet.coordinates.x === event.originCoordinates.x
+    && planet.coordinates.y === event.originCoordinates.y
+    && planet.coordinates.z === event.originCoordinates.z
+  ) ?? null;
+  const desiredReportLevel = Math.max(10, resolveDesiredReportLevel(faction.faction.currentStatus));
+  const estimatedDifficulty = knownTarget
+    ? resolveEstimatedProbeDifficulty(context, faction, knownTarget, desiredReportLevel)
+    : resolveUnknownCounterIntelProbeDifficulty(context, faction, desiredReportLevel);
+  const probeAmount = Math.max(
+    1,
+    Math.min(
+      resolveAffordableProbeCap(context),
+      resolveProbeAmountForDifficulty(estimatedDifficulty, faction.faction.currentStatus)
+    )
+  );
+  const score = Math.round(
+    360
+    + (faction.statusPriorityWeight * 12)
+    + (event.eventType === 'HOSTILE_FLEET' ? 55 : 30)
+    - (event.eventAge * 3)
+    - (probeAmount * 1.5)
+  );
+  const selectedOrigin = selectSpyOrigin(context, event.originCoordinates, probeAmount);
+
+  return selectedOrigin
+    ? {
+      faction,
+      originPlanet: selectedOrigin.originPlanet,
+      targetCoordinates: { ...event.originCoordinates },
+      probeAmount,
+      targetIntelDepth: knownTarget?.intelDepth ?? 0,
+      targetReportAge: knownTarget?.lastRelevantReportAge ?? 999,
+      estimatedDifficulty,
+      travelDistance: selectedOrigin.travelDistance,
+      travelTurns: selectedOrigin.travelTurns,
+      score,
+      counterIntelEventTurn: event.eventTurn
+    }
+    : {
+      faction,
+      targetCoordinates: { ...event.originCoordinates },
+      probeAmount,
+      score,
+      counterIntelEventTurn: event.eventTurn
+    };
+}
+
+function resolveUnknownCounterIntelProbeDifficulty(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  desiredReportLevel: number
+): number {
+  const ownEspionageTech = Math.max(
+    0,
+    ...context.snapshot.planets.map((originPlanet) => originPlanet.tech.espionageTechnologyLevel)
+  );
+  const estimatedDefenderTech = Math.max(0, Math.round(faction.faction.averageKnownTechLevel * 0.85));
+  return Math.max(
+    0,
+    desiredReportLevel - ownEspionageTech + Math.floor(Math.sqrt(estimatedDefenderTech) * 2)
+  );
 }
 
 function createSpyMissionRequestForFaction(
@@ -6347,7 +6433,9 @@ function createSpyMissionProposal(
       targetIntelDepth: request.targetIntelDepth,
       targetReportAge: request.targetReportAge,
       estimatedDifficulty: request.estimatedDifficulty,
-      enemyEspionageSuperiority: request.faction.enemyEspionageSuperiority
+      enemyEspionageSuperiority: request.faction.enemyEspionageSuperiority,
+      counterIntelEventTurn: request.counterIntelEventTurn ?? null,
+      counterIntelRefresh: request.counterIntelEventTurn !== undefined && request.counterIntelEventTurn !== null
     }
   };
 }

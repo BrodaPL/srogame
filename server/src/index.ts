@@ -138,6 +138,7 @@ import {
 } from './auth-account-security.js';
 import { consumeRateLimit } from './auth-rate-limit.js';
 import { clearBotDecisionTracesV2, getBotDecisionTracesV2 } from './bots-v2/bot-v2-trace.js';
+import { ensureBotMemoryV2 } from './bots-v2/bot-v2-memory.js';
 import {
   clearBotMemory,
   listBotAdminStates,
@@ -198,7 +199,10 @@ import sensorPhalanxReportModule from '../../src/app/models/reports/sensor-phala
 import resourcesPackModule from '../../src/app/models/resources-pack.js';
 import type { GameCommandError } from './game-commands/command-result.ts';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
-import type { PlayerFleetOutcomeLogEvent } from '../../src/app/models/turns/phase-one-turn-resolver.ts';
+import type {
+  CounterIntelEventLogEvent,
+  PlayerFleetOutcomeLogEvent
+} from '../../src/app/models/turns/phase-one-turn-resolver.ts';
 import type {
   BotAdminActionResponse,
   BotAdminStatesResponse,
@@ -6656,6 +6660,7 @@ function handleEndTurnRequest(
       botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0,
       fleetOutcomeLogger: (event) => {
         recordRecentFleetOperation(access.galaxy, event);
+        recordBotCounterIntelFromFleetOutcome(access.galaxy, event);
 
         if (!currentGameOwnerPlayerName || !currentTrackedPlayerActionFleetIds.has(event.fleetId)) {
           return;
@@ -6684,6 +6689,9 @@ function handleEndTurnRequest(
         if (event.terminal) {
           untrackCurrentPlayerActionFleet(event.fleetId);
         }
+      },
+      counterIntelLogger: (event) => {
+        recordBotCounterIntelFromCounterIntelEvent(access.galaxy, event);
       }
     });
     access.galaxy.currentTurn = resolvedTurnNumber;
@@ -9042,6 +9050,129 @@ function recordRecentFleetOperation(galaxy: Galaxy, event: PlayerFleetOutcomeLog
       || right.fleetId - left.fleetId
     )
     .slice(0, MAX_RECENT_FLEET_OPERATION_HISTORY_ENTRIES);
+}
+
+function recordBotCounterIntelFromFleetOutcome(galaxy: Galaxy, event: PlayerFleetOutcomeLogEvent): void {
+  if (!isCounterIntelHostileMissionType(event.missionType)) {
+    return;
+  }
+
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, event.target);
+  const originPlanet = resolvePlanetAtCoordinates(galaxy, event.origin);
+  if (!targetPlanet || !originPlanet || targetPlanet.info.ownerId === null) {
+    return;
+  }
+
+  recordBotCounterIntelEvent(galaxy, {
+    attackerPlayerId: event.ownerId,
+    victimPlayerId: targetPlanet.info.ownerId,
+    originCoordinates: toPlanetCoordinates(originPlanet),
+    targetCoordinates: toPlanetCoordinates(targetPlanet),
+    eventType: 'HOSTILE_FLEET',
+    eventTurn: event.resolvedTurn
+  });
+}
+
+function recordBotCounterIntelFromCounterIntelEvent(galaxy: Galaxy, event: CounterIntelEventLogEvent): void {
+  const originPlanet = resolvePlanetAtCoordinates(galaxy, event.origin);
+  const targetPlanet = resolvePlanetAtCoordinates(galaxy, event.target);
+  if (!originPlanet || !targetPlanet) {
+    return;
+  }
+
+  if (event.missionType === FleetMissionType.SPY || event.missionType === FleetMissionType.STAR_SYSTEM_SPY) {
+    markBotCounterIntelResponse(galaxy, event.attackerPlayerId, toPlanetCoordinates(targetPlanet), event.resolvedTurn);
+  }
+
+  recordBotCounterIntelEvent(galaxy, {
+    attackerPlayerId: event.attackerPlayerId,
+    victimPlayerId: event.victimPlayerId,
+    originCoordinates: toPlanetCoordinates(originPlanet),
+    targetCoordinates: toPlanetCoordinates(targetPlanet),
+    eventType: event.missionType === FleetMissionType.STAR_SYSTEM_SPY ? 'STAR_SYSTEM_SPY' : 'SPY',
+    eventTurn: event.resolvedTurn
+  });
+}
+
+function recordBotCounterIntelEvent(
+  galaxy: Galaxy,
+  event: {
+    attackerPlayerId: number;
+    victimPlayerId: number;
+    originCoordinates: ClientCoordinates;
+    targetCoordinates: ClientCoordinates;
+    eventType: 'SPY' | 'STAR_SYSTEM_SPY' | 'HOSTILE_FLEET';
+    eventTurn: number;
+  }
+): void {
+  if (event.attackerPlayerId === event.victimPlayerId) {
+    return;
+  }
+
+  const victim = resolvePlayerById(galaxy, event.victimPlayerId);
+  const attacker = resolvePlayerById(galaxy, event.attackerPlayerId);
+  if (!victim || victim.type !== 'BOT' || !attacker || attacker.type === PLAYER_TYPE_NEUTRAL) {
+    return;
+  }
+
+  const memory = ensureBotMemoryV2(victim);
+  const existing = memory.strategicDiplomatic.counterIntelEvents.find((entry) =>
+    entry.attackerPlayerId === event.attackerPlayerId
+    && sameCoordinates(entry.originCoordinates, event.originCoordinates)
+  );
+  if (existing) {
+    existing.targetCoordinates = { ...event.targetCoordinates };
+    existing.eventType = event.eventType;
+    existing.eventTurn = Math.max(existing.eventTurn, event.eventTurn);
+    existing.responseTurn = null;
+  } else {
+    memory.strategicDiplomatic.counterIntelEvents.push({
+      attackerPlayerId: event.attackerPlayerId,
+      originCoordinates: { ...event.originCoordinates },
+      targetCoordinates: { ...event.targetCoordinates },
+      eventType: event.eventType,
+      eventTurn: Math.max(0, Math.floor(event.eventTurn)),
+      responseTurn: null
+    });
+  }
+
+  const oldestUsefulTurn = Math.max(0, Math.floor(event.eventTurn) - 40);
+  memory.strategicDiplomatic.counterIntelEvents = memory.strategicDiplomatic.counterIntelEvents
+    .filter((entry) => entry.eventTurn >= oldestUsefulTurn)
+    .sort((left, right) =>
+      right.eventTurn - left.eventTurn
+      || left.attackerPlayerId - right.attackerPlayerId
+      || left.originCoordinates.x - right.originCoordinates.x
+      || left.originCoordinates.y - right.originCoordinates.y
+      || left.originCoordinates.z - right.originCoordinates.z
+    )
+    .slice(0, 200);
+}
+
+function markBotCounterIntelResponse(
+  galaxy: Galaxy,
+  botPlayerId: number,
+  targetCoordinates: ClientCoordinates,
+  responseTurn: number
+): void {
+  const bot = resolvePlayerById(galaxy, botPlayerId);
+  if (!bot || bot.type !== 'BOT') {
+    return;
+  }
+
+  const memory = ensureBotMemoryV2(bot);
+  for (const entry of memory.strategicDiplomatic.counterIntelEvents) {
+    if (entry.responseTurn === null && sameCoordinates(entry.originCoordinates, targetCoordinates)) {
+      entry.responseTurn = Math.max(0, Math.floor(responseTurn));
+    }
+  }
+}
+
+function isCounterIntelHostileMissionType(missionType: FleetMissionTypeType): boolean {
+  return missionType === FleetMissionType.ATTACK
+    || missionType === FleetMissionType.PLUNDER
+    || missionType === FleetMissionType.BOMBARD
+    || missionType === FleetMissionType.SIEGE;
 }
 
 function normalizeFleetOperationHistoryEntry(

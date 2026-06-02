@@ -22,6 +22,7 @@ import type {
   BotPlanetMaturityStage,
   BotPlanetSnapshot,
   BotStrategicDiplomaticFactionSnapshot,
+  BotStrategicDiplomaticCounterIntelEventSnapshot,
   BotStrategicDiplomaticSharedHostileEventSnapshot,
   BotStrategicDiplomaticKnownPlanetSnapshot,
   BotStrategicDiplomaticSupportRequestSnapshot,
@@ -1032,7 +1033,12 @@ function resolveStrategicDiplomaticFactions(
       const knownReports = foreignPlayer.planets
         .map((planet) => planet.lastReportData.get(player.playerId) ?? null)
         .filter((report): report is EspionageReportData => report !== null);
-      if (knownReports.length <= 0) {
+      const counterIntelEvents = resolveCounterIntelEventsForFaction(
+        player,
+        foreignPlayer,
+        galaxy.currentTurn
+      );
+      if (knownReports.length <= 0 && counterIntelEvents.length <= 0) {
         return null;
       }
 
@@ -1291,6 +1297,7 @@ function resolveStrategicDiplomaticFactions(
         lastSuccessfulOutgoingBombardTurn: outgoingCoercion.lastSuccessfulBombardTurn,
         lastSuccessfulOutgoingSiegeTurn: outgoingCoercion.lastSuccessfulSiegeTurn,
         sharedHostileEvents,
+        counterIntelEvents,
         pendingIncomingRequestedStatuses,
         pendingOutgoingRequestedStatuses,
         pendingIncomingDiplomacyProposals,
@@ -1653,6 +1660,36 @@ function resolveSharedHostileEventsForFaction(
       || left.victimPlayerId - right.victimPlayerId
     )
     .slice(0, 120);
+}
+
+function resolveCounterIntelEventsForFaction(
+  player: Player,
+  foreignPlayer: Player,
+  currentTurn: number
+): BotStrategicDiplomaticCounterIntelEventSnapshot[] {
+  const events = player.botMemoryV2?.strategicDiplomatic?.counterIntelEvents ?? [];
+  return events
+    .filter((entry) =>
+      entry.attackerPlayerId === foreignPlayer.playerId
+      && entry.responseTurn === null
+      && Math.max(0, currentTurn - entry.eventTurn) <= 40
+    )
+    .map((entry) => ({
+      attackerPlayerId: entry.attackerPlayerId,
+      originCoordinates: { ...entry.originCoordinates },
+      targetCoordinates: { ...entry.targetCoordinates },
+      eventType: entry.eventType,
+      eventTurn: entry.eventTurn,
+      eventAge: Math.max(0, currentTurn - entry.eventTurn),
+      responseTurn: entry.responseTurn
+    }))
+    .sort((left, right) =>
+      right.eventTurn - left.eventTurn
+      || left.originCoordinates.x - right.originCoordinates.x
+      || left.originCoordinates.y - right.originCoordinates.y
+      || left.originCoordinates.z - right.originCoordinates.z
+    )
+    .slice(0, 20);
 }
 
 function parseSharedHostileEventFromReport(

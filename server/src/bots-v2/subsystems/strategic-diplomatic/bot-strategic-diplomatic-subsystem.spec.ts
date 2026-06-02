@@ -59,6 +59,55 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(diplomacyProposal).toBeUndefined();
   });
 
+  it('emits counter-intel spy against an unscanned attacker origin', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const memory = createDefaultBotMemoryV2();
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.SPY_PROBE, 80);
+    botPlanet.rBDSFTQ.resources.deuterium = 10000;
+    memory.strategicDiplomatic.counterIntelEvents.push({
+      attackerPlayerId: playerEnemy.playerId,
+      originCoordinates: toTestCoordinates(playerEnemyPlanet),
+      targetCoordinates: toTestCoordinates(botPlanet),
+      eventType: 'SPY',
+      eventTurn: galaxy.currentTurn,
+      responseTurn: null
+    });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const spyProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.SPY
+      && proposal.debug.counterIntelRefresh === true
+    );
+
+    expect(result.result.debug.discoveredFactionCount).toBe(1);
+    expect(spyProposal).toBeDefined();
+    expect(spyProposal?.debug.counterIntelRefresh).toBe(true);
+    expect(spyProposal?.targetCoordinates).toEqual(toTestCoordinates(playerEnemyPlanet));
+  });
+
+  it('emits spy-probe need when counter-intel target cannot be refreshed', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const memory = createDefaultBotMemoryV2();
+    memory.strategicDiplomatic.counterIntelEvents.push({
+      attackerPlayerId: playerEnemy.playerId,
+      originCoordinates: toTestCoordinates(playerEnemyPlanet),
+      targetCoordinates: toTestCoordinates(botPlanet),
+      eventType: 'HOSTILE_FLEET',
+      eventTurn: galaxy.currentTurn,
+      responseTurn: null
+    });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const probeNeed = result.result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && proposal.requestPayload.shipType === ShipType.SPY_PROBE
+    );
+
+    expect(probeNeed).toBeDefined();
+    expect(probeNeed?.debug.reason).toBe('Global diplomatic probe deficit for real-player espionage.');
+  });
+
   it('prefers peace-oriented diplomatic changes for miner profile', () => {
     const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     bot.botProfileId = 'MINER';
@@ -1270,6 +1319,7 @@ function runStrategicDiplomaticSubsystem(
   bot: Player,
   memory = createDefaultBotMemoryV2()
 ): { result: ReturnType<BotStrategicDiplomaticSubsystem['generate']>; memory: ReturnType<typeof createDefaultBotMemoryV2> } {
+  bot.botMemoryV2 = memory;
   const snapshot = buildBotWorldSnapshot(galaxy, bot, {
       mode: 'SHADOW',
     enabledSubsystems: {
@@ -1342,6 +1392,14 @@ function configureKnownPlanet(planet: Planet): void {
   planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 2);
   planet.setBuildingLevel(BuildingType.SHIPYARD, 2);
   planet.rBDSFTQ.resources = new ResourcesPack(5000, 4000, 3000);
+}
+
+function toTestCoordinates(planet: Planet): { x: number; y: number; z: number } {
+  return {
+    x: planet.basicInfo.solarSystem.coordinates.x,
+    y: planet.basicInfo.solarSystem.coordinates.y,
+    z: planet.basicInfo.order
+  };
 }
 
 function markPlanetScanned(

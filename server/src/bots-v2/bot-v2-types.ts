@@ -10,7 +10,10 @@ import type { TechnologyType } from '../../../src/app/models/enums/technology-ty
 import type { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { PlayerType } from '../../../src/app/models/enums/player-type.ts';
 import type { FleetMissionType } from '../../../src/app/models/enums/fleet-mission-type.ts';
-import type { BotMemoryV2StrategicDiplomaticSharedHostileEventType } from '../../../src/app/models/player.ts';
+import type {
+  BotMemoryV2StrategicDiplomaticCounterIntelEventType,
+  BotMemoryV2StrategicDiplomaticSharedHostileEventType
+} from '../../../src/app/models/player.ts';
 import type {
   BotInfrastructureBuildingDamageEntry,
   BotInfrastructureDamageCategory,
@@ -139,6 +142,7 @@ export type BotStrategicDiplomaticFactionSnapshot = {
   lastSuccessfulOutgoingBombardTurn: number | null;
   lastSuccessfulOutgoingSiegeTurn: number | null;
   sharedHostileEvents: BotStrategicDiplomaticSharedHostileEventSnapshot[];
+  counterIntelEvents: BotStrategicDiplomaticCounterIntelEventSnapshot[];
   pendingIncomingRequestedStatuses: DiplomaticStatus[];
   pendingOutgoingRequestedStatuses: DiplomaticStatus[];
   pendingIncomingDiplomacyProposals: BotStrategicDiplomaticProposalSnapshot[];
@@ -147,6 +151,16 @@ export type BotStrategicDiplomaticFactionSnapshot = {
   pendingIncomingMaintenanceRequests: BotStrategicDiplomaticMaintenanceRequestSnapshot[];
   pendingIncomingSupportRequests: BotStrategicDiplomaticSupportRequestSnapshot[];
   knownPlanets: BotStrategicDiplomaticKnownPlanetSnapshot[];
+};
+
+export type BotStrategicDiplomaticCounterIntelEventSnapshot = {
+  attackerPlayerId: number;
+  originCoordinates: { x: number; y: number; z: number };
+  targetCoordinates: { x: number; y: number; z: number };
+  eventType: BotMemoryV2StrategicDiplomaticCounterIntelEventType;
+  eventTurn: number;
+  eventAge: number;
+  responseTurn: number | null;
 };
 
 export type BotStrategicDiplomaticProposalSnapshot = {

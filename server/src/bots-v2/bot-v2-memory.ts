@@ -37,6 +37,7 @@ export function createDefaultBotMemoryV2(): BotMemoryV2 {
       primaryWarBreakTarget: null,
       openedWarTargets: [],
       sharedHostileEvents: [],
+      counterIntelEvents: [],
       outgoingSupportRequests: []
     },
     weightManager: {

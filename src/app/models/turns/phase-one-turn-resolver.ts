@@ -123,9 +123,19 @@ type AttackBattleOutcomeDetails = {
 
 export type PlayerFleetOutcomeLogEvent = FleetOperationHistoryEntry;
 
+export type CounterIntelEventLogEvent = {
+  attackerPlayerId: number;
+  victimPlayerId: number;
+  missionType: FleetMissionType;
+  origin: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+  resolvedTurn: number;
+};
+
 export type TurnDifficultyConfig = {
   botDifficultyPercent?: number;
   fleetOutcomeLogger?: (event: PlayerFleetOutcomeLogEvent) => void;
+  counterIntelLogger?: (event: CounterIntelEventLogEvent) => void;
 };
 
 const BUILDING_BLUEPRINTS = BuildingBlueprintsFactory.fromDefaultJson();
@@ -273,6 +283,13 @@ function emitFleetOutcome(
   event: PlayerFleetOutcomeLogEvent
 ): void {
   difficultyConfig.fleetOutcomeLogger?.(event);
+}
+
+function emitCounterIntelEvent(
+  difficultyConfig: TurnDifficultyConfig,
+  event: CounterIntelEventLogEvent
+): void {
+  difficultyConfig.counterIntelLogger?.(event);
 }
 
 export function resolvePhaseOneTurn(
@@ -2483,6 +2500,21 @@ function applyMissionResolution(
       ManyShips.countByType(context.fleet.ships).get(ShipType.SPY_PROBE) ?? 0,
       context.resolvedTurnNumber
     );
+    if (
+      context.owner
+      && context.targetOwner
+      && context.owner.playerId !== context.targetOwner.playerId
+      && context.targetOwner.type !== PlayerType.NEUTRAL
+    ) {
+      emitCounterIntelEvent(difficultyConfig, {
+        attackerPlayerId: context.owner.playerId,
+        victimPlayerId: context.targetOwner.playerId,
+        missionType: context.fleet.missionType,
+        origin: { x: context.fleet.origin.x, y: context.fleet.origin.y, z: context.fleet.origin.z },
+        target: { x: context.fleet.target.x, y: context.fleet.target.y, z: context.fleet.target.z },
+        resolvedTurn: context.resolvedTurnNumber
+      });
+    }
   }
 
   const outcomeType = resolveMissionOutcomeType(context.fleet.missionType);
