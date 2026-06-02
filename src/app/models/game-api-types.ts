@@ -1261,6 +1261,7 @@ export type CreateFleetMissionResponse = {
 
 export type PlanetOperationsResponse = {
   outgoing: Fleet[];
+  returning: Fleet[];
   incoming: Fleet[];
   resolved: FleetOperationHistoryEntry[];
 };

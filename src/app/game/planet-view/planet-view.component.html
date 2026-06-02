@@ -786,6 +786,29 @@
 
             <section class="planet-operations__section">
               <header class="planet-operations__section-head">
+                <h4 class="planet-view__section-title">Returning</h4>
+                <span class="overview-muted">{{ planetReturningFleets.length }} active</span>
+              </header>
+              <div class="planet-operations__grid">
+                @for (fleet of planetReturningFleets; track fleet.fleetId) {
+                  <app-fleet-operation-card
+                    [fleet]="fleet"
+                    [ownPlayerId]="ownPlayerId()"
+                    [ownedPlanets]="ownedPlanets"
+                    [ownerInfoByCoordinates]="planetOperationOwnerInfos()"
+                    [actionPending]="isPlanetOperationActionPending(fleet)"
+                    (returnRequested)="returnPlanetOperationFleet($event)"
+                    (delayRequested)="delayPlanetOperationFleet($event)"
+                    (maintenanceRequested)="openPlanetMaintenanceRequest($event)"
+                  />
+                } @empty {
+                  <p class="planet-tab-placeholder">No fleets returning to this planet.</p>
+                }
+              </div>
+            </section>
+
+            <section class="planet-operations__section">
+              <header class="planet-operations__section-head">
                 <h4 class="planet-view__section-title">Incoming</h4>
                 <span class="overview-muted">{{ planetIncomingFleets.length }} known</span>
               </header>

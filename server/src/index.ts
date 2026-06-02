@@ -8916,13 +8916,27 @@ function buildPlanetOperationsResponse(
   const minimumResolvedTurn = Math.max(1, galaxy.currentTurn - Math.max(1, resolvedTurns) + 1);
 
   const outgoing = galaxy.activeFleets
-    .filter((fleet) => fleet.ownerId === playerId && sameCoordinates(fleet.origin, coordinates))
+    .filter((fleet) =>
+      fleet.ownerId === playerId
+      && sameCoordinates(fleet.origin, coordinates)
+      && !isReturningFleet(fleet)
+    )
+    .map((fleet) => annotateFleetRequestMetadata(galaxy, fleet))
+    .sort(compareFleetsForOperations);
+
+  const returning = galaxy.activeFleets
+    .filter((fleet) =>
+      fleet.ownerId === playerId
+      && sameCoordinates(fleet.origin, coordinates)
+      && isReturningFleet(fleet)
+    )
     .map((fleet) => annotateFleetRequestMetadata(galaxy, fleet))
     .sort(compareFleetsForOperations);
 
   const incoming = galaxy.activeFleets
     .filter((fleet) =>
       sameCoordinates(fleet.target, coordinates)
+      && !isReturningFleet(fleet)
       && (
         fleet.ownerId === playerId
         || knownIncomingFleetIds.has(fleet.fleetId)
@@ -8953,9 +8967,15 @@ function buildPlanetOperationsResponse(
 
   return {
     outgoing,
+    returning,
     incoming,
     resolved
   };
+}
+
+function isReturningFleet(fleet: Fleet): boolean {
+  return fleet.state === FleetState.RETURNING
+    || fleet.state === FleetState.MISSION_FAILURE_RETURNING;
 }
 
 function compareFleetsForOperations(left: Fleet, right: Fleet): number {

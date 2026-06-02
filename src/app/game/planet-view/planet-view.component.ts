@@ -173,6 +173,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected activeTab: PlanetTab = 'resources';
   protected activeFleets: Fleet[] = [];
   protected planetOutgoingFleets: Fleet[] = [];
+  protected planetReturningFleets: Fleet[] = [];
   protected planetIncomingFleets: Fleet[] = [];
   protected planetResolvedOperations: FleetOperationHistoryEntry[] = [];
   protected planetOperationsError: string | null = null;
@@ -341,6 +342,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected hasPlanetOperations(): boolean {
     return this.planetOutgoingFleets.length > 0
+      || this.planetReturningFleets.length > 0
       || this.planetIncomingFleets.length > 0
       || this.planetResolvedOperations.length > 0;
   }
@@ -2937,6 +2939,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   private applyPlanetOperations(operations: PlanetOperationsResponse, token: string): void {
     this.planetOutgoingFleets = [...operations.outgoing];
+    this.planetReturningFleets = [...operations.returning];
     this.planetIncomingFleets = [...operations.incoming];
     this.planetResolvedOperations = [...operations.resolved];
     this.planetOperationsError = null;
@@ -4315,7 +4318,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     const coordinatesToFetch = new Map<string, ClientCoordinates>();
-    for (const fleet of [...this.planetOutgoingFleets, ...this.planetIncomingFleets]) {
+    for (const fleet of [...this.planetOutgoingFleets, ...this.planetReturningFleets, ...this.planetIncomingFleets]) {
       for (const coordinates of [fleet.origin, fleet.target]) {
         const key = this.coordinatesKey(coordinates);
         if (!ownerInfoByCoordinates.has(key) && !coordinatesToFetch.has(key)) {

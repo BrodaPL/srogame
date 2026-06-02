@@ -363,7 +363,7 @@ Fleet operations:
 
 Fleet command ownership note:
 - `server/src/index.ts` owns auth/session checks, mission payload parsing, and HTTP response DTO shaping for fleet launch
-- `server/src/index.ts::buildPlanetOperationsResponse(...)` owns the planet-scoped operation feed for Planet View: own outgoing fleets, own plus Sensor-Phalanx-known incoming fleets, and recent resolved operations from `Galaxy.recentFleetOperations`
+- `server/src/index.ts::buildPlanetOperationsResponse(...)` owns the planet-scoped operation feed for Planet View: own outgoing fleets, own returning fleets, own plus Sensor-Phalanx-known incoming fleets, and recent resolved operations from `Galaxy.recentFleetOperations`
 - `server/src/game-commands/fleet-commands.ts` owns fleet-launch validation + mutation, including mission validation, cargo/fuel checks, and Jump Gate launch side effects
 - `server/src/game-commands/maintenance-commands.ts` owns fleet-maintenance option validation, request creation, and auto-approved depot transfer side effects for maintenance requests
 - `server/src/game-commands/jump-gate-request-commands.ts` owns Jump Gate mail-request approval/reject/cancel validation + mutation
