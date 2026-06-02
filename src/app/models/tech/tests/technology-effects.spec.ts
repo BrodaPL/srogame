@@ -21,8 +21,24 @@ describe('technology effects', () => {
   it('calculates the owned planet cap from Adaptive Technology', () => {
     expect(maxOwnedPlanets(0)).toBe(1);
     expect(maxOwnedPlanets(1)).toBe(2);
-    expect(maxOwnedPlanets(2)).toBe(3);
+    expect(maxOwnedPlanets(2)).toBe(2);
+    expect(maxOwnedPlanets(3)).toBe(3);
+    expect(maxOwnedPlanets(4)).toBe(3);
+    expect(maxOwnedPlanets(5)).toBe(4);
+    expect(maxOwnedPlanets(6)).toBe(4);
+    expect(maxOwnedPlanets(7)).toBe(5);
     expect(maxOwnedPlanets(8)).toBe(5);
+    expect(maxOwnedPlanets(9)).toBe(6);
+    expect(maxOwnedPlanets(10)).toBe(6);
+    expect(maxOwnedPlanets(11)).toBe(6);
+    expect(maxOwnedPlanets(12)).toBe(7);
+    expect(maxOwnedPlanets(13)).toBe(7);
+    expect(maxOwnedPlanets(14)).toBe(7);
+    expect(maxOwnedPlanets(15)).toBe(8);
+    expect(maxOwnedPlanets(16)).toBe(8);
+    expect(maxOwnedPlanets(17)).toBe(8);
+    expect(maxOwnedPlanets(18)).toBe(9);
+    expect(maxOwnedPlanets(25)).toBe(9);
   });
 
   it('calculates the industry multiplier from Adaptive Technology', () => {

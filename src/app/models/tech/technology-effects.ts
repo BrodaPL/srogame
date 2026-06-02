@@ -12,6 +12,28 @@ const HULL_CLASS_TRAVEL_MODIFIERS: ReadonlyMap<HullClass, number> = new Map<Hull
   [HullClass.STATION, 1]
 ]);
 
+const MAX_OWNED_PLANETS_BY_ADAPTIVE_LEVEL = [
+  1,
+  2,
+  2,
+  3,
+  3,
+  4,
+  4,
+  5,
+  5,
+  6,
+  6,
+  6,
+  7,
+  7,
+  7,
+  8,
+  8,
+  8,
+  9
+] as const;
+
 export type FleetTravelShipSelection = {
   type: ShipType;
   amount: number;
@@ -22,7 +44,10 @@ export function maxActiveFleets(computerTechnologyLevel: number): number {
 }
 
 export function maxOwnedPlanets(adaptiveTechnologyLevel: number): number {
-  return Math.floor(Math.sqrt(sanitizeTechLevel(adaptiveTechnologyLevel) * 2)) + 1;
+  const normalizedLevel = Math.floor(sanitizeTechLevel(adaptiveTechnologyLevel));
+  return MAX_OWNED_PLANETS_BY_ADAPTIVE_LEVEL[
+    Math.min(normalizedLevel, MAX_OWNED_PLANETS_BY_ADAPTIVE_LEVEL.length - 1)
+  ];
 }
 
 export function industryPowerMultiplier(adaptiveTechnologyLevel: number): number {

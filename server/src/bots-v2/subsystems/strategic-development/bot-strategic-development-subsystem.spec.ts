@@ -387,10 +387,12 @@ describe('BotStrategicDevelopmentSubsystem', () => {
   });
 
   it('annotates adaptive colonization pressure when a scanned target is blocked by exactly one adaptive level', () => {
-    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    const { galaxy, bot, sourcePlanet, targetPlanet, unownedPlanet } = createSupportWorld();
     configureDevelopedSupportSource(sourcePlanet);
     setSupportShipTech(bot);
     bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 2);
+    targetPlanet.info.ownerId = null;
+    bot.planets = [sourcePlanet];
     unownedPlanet.basicInfo.colonizationDifficulty = 3;
     markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
 
@@ -408,6 +410,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
     configureDevelopedSupportSource(sourcePlanet);
     setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
     unownedPlanet.basicInfo.colonizationDifficulty = 1;
     markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
@@ -450,6 +453,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
     configureDevelopedSupportSource(sourcePlanet);
     setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
     unownedPlanet.basicInfo.colonizationDifficulty = 1;
     markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
@@ -468,6 +472,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
     configureDevelopedSupportSource(sourcePlanet);
     setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
     sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 80000);
     unownedPlanet.basicInfo.colonizationDifficulty = 1;
@@ -498,6 +503,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     galaxy.currentTurn = 101;
     configureDevelopedSupportSource(sourcePlanet);
     setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
     sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 80000);
     unownedPlanet.basicInfo.colonizationDifficulty = 1;
@@ -535,6 +541,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     galaxy.currentTurn = 101;
     configureDevelopedSupportSource(sourcePlanet);
     setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
     sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 80000);
     unownedPlanet.basicInfo.colonizationDifficulty = 1;
@@ -653,6 +660,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
     configureDevelopedSupportSource(sourcePlanet);
     setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
     sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 80000);
     unownedPlanet.basicInfo.colonizationDifficulty = 1;

@@ -82,7 +82,7 @@
     {
       "type": "ADAPTIVE_TECHNOLOGY",
       "imagePath": "images/technologies/normal/ADAPTIVE_TECHNOLOGY.jpg",
-      "description": "Make possible to colonise more types of planets. Increases all resources income, research and industry by +1%.",
+      "description": "Make possible to colonise more types of planets and increases the owned planet cap at defined levels: 1=>2, 3=>3, 5=>4, 7=>5, 9=>6, 12=>7, 15=>8, 18=>9. Increases all resources income, research and industry by +1%.",
       "basicCost": { "metal": 50, "crystal": 30, "deuterium": 10 },
       "energyRequired": [0],
       "researchTime": [2.5],

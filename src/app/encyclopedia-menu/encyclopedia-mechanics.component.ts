@@ -372,7 +372,7 @@ export class EncyclopediaMechanicsComponent {
         'Colonize launch and arrival both fail once the player already owns their current maximum number of planets.'
       ],
       formulas: [
-        'maxOwnedPlanets = floor(sqrt(ADAPTIVE_TECHNOLOGY * 2)) + 1'
+        'maxOwnedPlanets by ADAPTIVE_TECHNOLOGY: 0=>1, 1=>2, 2=>2, 3=>3, 4=>3, 5=>4, 6=>4, 7=>5, 8=>5, 9=>6, 10=>6, 11=>6, 12=>7, 13=>7, 14=>7, 15=>8, 16=>8, 17=>8, 18+=>9'
       ]
     },
     {
