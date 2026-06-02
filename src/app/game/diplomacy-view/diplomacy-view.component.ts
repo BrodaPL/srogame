@@ -136,10 +136,18 @@ export class DiplomacyViewComponent implements OnInit {
 
   protected proposalAvailabilityCopy(contact: DiplomacyContactDto): string {
     if (contact.canSendProposal) {
-      return 'Send one diplomacy proposal to this player this turn. It applies immediately if they accept.';
+      return 'Send one diplomacy action to this player this turn. WAR declarations apply immediately; treaties require acceptance.';
     }
 
     return contact.proposalBlockedReason ?? 'Diplomacy proposals are unavailable for this contact.';
+  }
+
+  protected proposalActionLabel(contact: DiplomacyContactDto): string {
+    if (this.isContactActionPending(contact)) {
+      return 'Sending...';
+    }
+
+    return this.selectedProposalStatus(contact) === DiplomaticStatus.WAR ? 'Declare war' : 'Send proposal';
   }
 
   protected availableSupportTypes(contact: DiplomacyContactDto): SupportRequestType[] {

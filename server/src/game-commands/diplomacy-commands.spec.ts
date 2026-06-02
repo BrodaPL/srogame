@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { DiplomacyResolver } from '../../../src/app/models/diplomacy/diplomacy-resolver.js';
+import { DiplomaticProposalState } from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
 import { DiplomaticStatus } from '../../../src/app/models/diplomacy/diplomatic-status.js';
 import { PlayerType } from '../../../src/app/models/enums/player-type.js';
 import { Galaxy } from '../../../src/app/models/planets/galaxy.js';
@@ -46,7 +48,7 @@ describe('diplomacy commands', () => {
     expect(galaxy.diplomaticProposals[0].requestedStatus).toBe(DiplomaticStatus.PEACE);
   });
 
-  it('allows NEUTRAL to WAR proposals', () => {
+  it('applies NEUTRAL to WAR declarations immediately', () => {
     const galaxy = createDiplomacyTestGalaxy();
     markPlayerVisibleInDiplomacy(galaxy, 1, 2);
 
@@ -58,6 +60,8 @@ describe('diplomacy commands', () => {
     expect(result.ok).toBe(true);
     expect(galaxy.diplomaticProposals).toHaveLength(1);
     expect(galaxy.diplomaticProposals[0].requestedStatus).toBe(DiplomaticStatus.WAR);
+    expect(galaxy.diplomaticProposals[0].state).toBe(DiplomaticProposalState.ACCEPTED);
+    expect(new DiplomacyResolver(galaxy.diplomaticRelations).getStatus(1, 2)).toBe(DiplomaticStatus.WAR);
   });
 
   it('rejects proposals without prior diplomacy visibility', () => {

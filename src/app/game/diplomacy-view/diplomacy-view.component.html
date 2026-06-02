@@ -141,7 +141,7 @@
                   class="diplomacy-view__action-button"
                   [disabled]="!contact.canSendProposal || isContactActionPending(contact)"
                   (click)="sendProposal(contact)">
-                  {{ isContactActionPending(contact) ? 'Sending...' : 'Send proposal' }}
+                  {{ proposalActionLabel(contact) }}
                 </button>
               </div>
             </section>

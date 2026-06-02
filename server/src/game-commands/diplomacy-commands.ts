@@ -136,6 +136,12 @@ export function createDiplomaticProposalCommand(
     context.galaxy.currentTurn + 1
   );
   context.galaxy.nextDiplomaticProposalId += 1;
+
+  if (command.requestedStatus === DiplomaticStatus.WAR) {
+    proposal.state = DiplomaticProposalState.ACCEPTED;
+    upsertDiplomaticRelation(context.galaxy, sourcePlayer.playerId, targetPlayer.playerId, DiplomaticStatus.WAR as DiplomaticStatusType);
+  }
+
   context.galaxy.diplomaticProposals.push(proposal);
 
   return commandOk({ proposal });
