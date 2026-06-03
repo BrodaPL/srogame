@@ -11,7 +11,7 @@
       "shieldCapacity": 20,
       "armor": 1,
       "weapons": [
-        { "type": "BEAM", "dmg": 10, "shots": 1 }
+        { "type": "BEAM", "dmg": 15, "shots": 1 }
       ],
       "cost": { "metal": 15, "crystal": 10, "deuterium": 0 },
       "buildingRequirements": [
@@ -33,7 +33,7 @@
       "shieldCapacity": 30,
       "armor": 2,
       "weapons": [
-        { "type": "BEAM", "dmg": 20, "shots": 1 }
+        { "type": "BEAM", "dmg": 30, "shots": 1 }
       ],
       "cost": { "metal": 40, "crystal": 30, "deuterium": 0 },
       "buildingRequirements": [
@@ -56,7 +56,7 @@
       "shieldCapacity": 50,
       "armor": 4,
       "weapons": [
-        { "type": "BEAM", "dmg": 60, "shots": 1 }
+        { "type": "BEAM", "dmg": 80, "shots": 1 }
       ],
       "cost": { "metal": 150, "crystal": 90, "deuterium": 0 },
       "buildingRequirements": [
@@ -79,7 +79,7 @@
       "shieldCapacity": 0,
       "armor": 1,
       "weapons": [
-        { "type": "MISSILE", "dmg": 20, "shots": 1 }
+        { "type": "MISSILE", "dmg": 25, "shots": 1 }
       ],
       "cost": { "metal": 30, "crystal": 0, "deuterium": 0 },
       "buildingRequirements": [
@@ -100,7 +100,7 @@
       "shieldCapacity": 0,
       "armor": 2,
       "weapons": [
-        { "type": "MISSILE", "dmg": 30, "shots": 1 }
+        { "type": "MISSILE", "dmg": 50, "shots": 1 }
       ],
       "cost": { "metal": 70, "crystal": 20, "deuterium": 10 },
       "buildingRequirements": [
@@ -122,7 +122,7 @@
       "shieldCapacity": 60,
       "armor": 4,
       "weapons": [
-        { "type": "MISSILE", "dmg": 100, "shots": 1 }
+        { "type": "MISSILE", "dmg": 150, "shots": 1 }
       ],
       "cost": { "metal": 200, "crystal": 80, "deuterium": 60 },
       "buildingRequirements": [
@@ -146,9 +146,9 @@
       "shieldCapacity": 80,
       "armor": 5,
       "weapons": [
-        { "type": "RAIL_GUN", "dmg": 30, "shots": 1 }
+        { "type": "RAIL_GUN", "dmg": 40, "shots": 1 }
       ],
-      "cost": { "metal": 160, "crystal": 80, "deuterium": 10 },
+      "cost": { "metal": 160, "crystal": 60, "deuterium": 10 },
       "buildingRequirements": [
         { "building": "SHIPYARD", "level": 5 }
       ],
