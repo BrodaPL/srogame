@@ -219,6 +219,126 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(decisionProposal?.requestPayload.proposalId).toBe(1);
   });
 
+  it('does not propose downgrading an allied relation to peace without a break-alliance reason', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    bot.botProfileId = 'BALANCED';
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.ALLIED)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const downgradeProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
+      && proposal.requestPayload.requestedStatus === DiplomaticStatus.PEACE
+    );
+
+    expect(downgradeProposal).toBeUndefined();
+  });
+
+  it('rejects incoming allied-to-peace downgrade proposals without a break-alliance reason', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    bot.botProfileId = 'BALANCED';
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.ALLIED)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
+    galaxy.diplomaticProposals.push(
+      createDiplomaticProposal(1, playerEnemy.playerId, bot.playerId, DiplomaticStatus.PEACE, galaxy.currentTurn, galaxy.currentTurn + 3)
+    );
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const decisionProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
+      && proposal.requestPayload.requestedStatus === DiplomaticStatus.PEACE
+    );
+
+    expect(decisionProposal).toBeDefined();
+    expect(decisionProposal?.requestPayload.decision).toBe('REJECT');
+  });
+
+  it('allows allied-to-peace downgrade proposals when hostility is high enough', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const memory = createDefaultBotMemoryV2();
+    bot.botProfileId = 'BALANCED';
+    memory.strategicDiplomatic.factionLedger.push(createDiplomaticLedgerEntry(playerEnemy.playerId, {
+      hostilityScore: 60
+    }));
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.ALLIED)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const downgradeProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_PROPOSAL'
+      && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
+      && proposal.requestPayload.requestedStatus === DiplomaticStatus.PEACE
+    );
+
+    expect(downgradeProposal).toBeDefined();
+  });
+
+  it('rejects incoming peace-to-neutral downgrade proposals without hostility or direct hostile evidence', () => {
+    const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    bot.botProfileId = 'BALANCED';
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.PEACE)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
+    galaxy.diplomaticProposals.push(
+      createDiplomaticProposal(1, playerEnemy.playerId, bot.playerId, DiplomaticStatus.NEUTRAL, galaxy.currentTurn, galaxy.currentTurn + 3)
+    );
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const decisionProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
+      && proposal.requestPayload.requestedStatus === DiplomaticStatus.NEUTRAL
+    );
+
+    expect(decisionProposal).toBeDefined();
+    expect(decisionProposal?.requestPayload.decision).toBe('REJECT');
+  });
+
+  it('allows incoming peace-to-neutral downgrade proposals after direct hostile evidence', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    const memory = createDefaultBotMemoryV2();
+    bot.botProfileId = 'BALANCED';
+    memory.strategicDiplomatic.counterIntelEvents.push({
+      attackerPlayerId: playerEnemy.playerId,
+      originCoordinates: toTestCoordinates(playerEnemyPlanet),
+      targetCoordinates: toTestCoordinates(botPlanet),
+      eventType: 'SPY',
+      eventTurn: galaxy.currentTurn,
+      responseTurn: null
+    });
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.PEACE)
+    );
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
+    galaxy.diplomaticProposals.push(
+      createDiplomaticProposal(1, playerEnemy.playerId, bot.playerId, DiplomaticStatus.NEUTRAL, galaxy.currentTurn, galaxy.currentTurn + 3)
+    );
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot, memory);
+    const decisionProposal = result.result.proposals.find((proposal) =>
+      proposal.kind === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.actionType === 'DIPLOMACY_DECISION'
+      && proposal.requestPayload.targetPlayerId === playerEnemy.playerId
+      && proposal.requestPayload.requestedStatus === DiplomaticStatus.NEUTRAL
+    );
+
+    expect(decisionProposal).toBeDefined();
+    expect(decisionProposal?.requestPayload.decision).toBe('ACCEPT');
+  });
+
   it('rejects incoming allied proposal when current relation is still neutral', () => {
     const { galaxy, bot, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, galaxy.currentTurn);
@@ -1339,6 +1459,33 @@ function runStrategicDiplomaticSubsystem(
       memory
     }),
     memory
+  };
+}
+
+function createDiplomaticLedgerEntry(
+  playerId: number,
+  overrides: Partial<ReturnType<typeof createDefaultBotMemoryV2>['strategicDiplomatic']['factionLedger'][number]> = {}
+): ReturnType<typeof createDefaultBotMemoryV2>['strategicDiplomatic']['factionLedger'][number] {
+  return {
+    playerId,
+    hostilityScore: 0,
+    warAdvantageLevel: 0,
+    lastSuccessfulBombardTurn: null,
+    lastSuccessfulSiegeTickTurn: null,
+    recentOutgoingCoercionPressure: 0,
+    recentIncomingCoercionPressure: 0,
+    lastWarEvaluationTurn: null,
+    shortWindowWarScore: 0,
+    longWindowWarScore: 0,
+    currentWarExitPressure: 0,
+    lastComputedStanceScore: 0,
+    lastComputedStrengthEstimate: 0,
+    lastKnownStatus: null,
+    lastSeenTurn: null,
+    nonAggressionUntilTurn: null,
+    nonAggressionStartedTurn: null,
+    nonAggressionReason: null,
+    ...overrides
   };
 }
 

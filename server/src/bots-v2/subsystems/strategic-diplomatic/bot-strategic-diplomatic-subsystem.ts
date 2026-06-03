@@ -321,6 +321,9 @@ const STRATEGIC_DIPLOMATIC_AVAILABILITY = 0.4;
 const WAR_HOSTILITY_THRESHOLD = 35;
 const RETALIATION_THRESHOLD = 18;
 const RELATION_PROPOSAL_MIN_UTILITY = 8;
+const ALLIED_TO_PEACE_HOSTILITY_THRESHOLD = 30;
+const PEACE_TO_NEUTRAL_HOSTILITY_THRESHOLD = 20;
+const DIPLOMACY_PROPOSAL_REJECTION_COOLDOWN_TURNS = 15;
 const MAX_PROBE_SHIP_NEED_REQUESTS = 2;
 const HOSTILE_NEUTRAL_ATTACK_THRESHOLD = 50;
 const WEAKER_NEUTRAL_ATTACK_RATIO = 1.5;
@@ -1430,6 +1433,7 @@ function createRelationChangeProposals(
       faction.bestEscalationStatus !== null
       && faction.bestEscalationUtility !== null
       && faction.bestEscalationUtility >= RELATION_PROPOSAL_MIN_UTILITY
+      && canChangeStableTreaty(context, faction, faction.bestEscalationStatus)
     ) {
       factionCandidates.push({
         requestedStatus: faction.bestEscalationStatus,
@@ -1440,6 +1444,7 @@ function createRelationChangeProposals(
       faction.bestDeescalationStatus !== null
       && faction.bestDeescalationUtility !== null
       && faction.bestDeescalationUtility >= RELATION_PROPOSAL_MIN_UTILITY
+      && canChangeStableTreaty(context, faction, faction.bestDeescalationStatus)
     ) {
       factionCandidates.push({
         requestedStatus: faction.bestDeescalationStatus,
@@ -1459,6 +1464,10 @@ function createRelationChangeProposals(
 
     const best = factionCandidates.sort((left, right) => right.utility - left.utility)[0] ?? null;
     if (!best) {
+      continue;
+    }
+
+    if (hasRecentRejectedDiplomacyProposal(context, faction.faction.playerId, best.requestedStatus)) {
       continue;
     }
 
@@ -1556,14 +1565,17 @@ function createProposalManagementPreferences(
         },
         faction.nonAggressionActive
       );
-      const decision = validTransition && utility >= RELATION_PROPOSAL_MIN_UTILITY ? 'ACCEPT' : 'REJECT';
+      const stableTreatyAllowed = canChangeStableTreaty(context, faction, requestedStatus);
+      const decision = validTransition && stableTreatyAllowed && utility >= RELATION_PROPOSAL_MIN_UTILITY ? 'ACCEPT' : 'REJECT';
       proposals.push({
         faction,
         proposalId: pendingProposal.proposalId,
         decision,
         requestedStatus,
         score: Math.max(1, Math.round(Math.abs(utility) * 8)),
-        reason: validTransition ? `utility_${Math.round(utility)}` : 'invalid_treaty_ladder',
+        reason: validTransition
+          ? stableTreatyAllowed ? `utility_${Math.round(utility)}` : 'stable_treaty_guard'
+          : 'invalid_treaty_ladder',
         expiresOnTurn: pendingProposal.expiresOnTurn
       });
     }
@@ -1611,6 +1623,70 @@ function createProposalManagementPreferences(
   }
 
   return proposals;
+}
+
+function canChangeStableTreaty(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  requestedStatus: DiplomaticStatus
+): boolean {
+  if (
+    faction.faction.currentStatus === DiplomaticStatus.ALLIED
+    && requestedStatus === DiplomaticStatus.PEACE
+  ) {
+    return faction.hostilityScore >= ALLIED_TO_PEACE_HOSTILITY_THRESHOLD
+      || hasDirectHostileActionEvidence(context, faction);
+  }
+
+  if (
+    faction.faction.currentStatus === DiplomaticStatus.PEACE
+    && requestedStatus === DiplomaticStatus.NEUTRAL
+  ) {
+    return faction.hostilityScore >= PEACE_TO_NEUTRAL_HOSTILITY_THRESHOLD
+      || hasDirectHostileActionEvidence(context, faction);
+  }
+
+  return true;
+}
+
+function hasDirectHostileActionEvidence(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction
+): boolean {
+  const recentCounterIntel = faction.faction.counterIntelEvents.some((event) =>
+    event.attackerPlayerId === faction.faction.playerId
+    && event.eventAge <= SHARED_HOSTILE_EVENT_WINDOW
+  );
+
+  return faction.faction.recentIncomingCoercionPressureShort > 0
+    || faction.faction.recentIncomingDamagePercentShort > 0
+    || faction.faction.recentIncomingPlunderValueShort > 0
+    || faction.faction.recentIncomingShipLossValueShort > 0
+    || faction.faction.recentBattleReportCount > 0
+    || faction.recentIncomingCoercionPressure > 0
+    || faction.faction.pendingIncomingRequestedStatuses.includes(DiplomaticStatus.WAR)
+    || recentCounterIntel
+    || context.memory.strategicDiplomatic.sharedHostileEvents.some((event) =>
+      event.attackerPlayerId === faction.faction.playerId
+      && event.victimPlayerId === context.snapshot.playerId
+      && event.eventTurn >= context.snapshot.turn - SHARED_HOSTILE_EVENT_WINDOW
+    );
+}
+
+function hasRecentRejectedDiplomacyProposal(
+  context: BotSubsystemContext,
+  targetPlayerId: number,
+  requestedStatus: DiplomaticStatus
+): boolean {
+  const dedupeKey = `strategic-diplomatic:relation:${targetPlayerId}:${requestedStatus}`;
+  return context.memory.supervisor.proposalHistory.some((entry) =>
+    entry.kind === 'DIPLOMACY_PROPOSAL'
+    && entry.dedupeKey === dedupeKey
+    && entry.accepted === false
+    && entry.pending === false
+    && entry.reason !== null
+    && entry.turn >= context.snapshot.turn - DIPLOMACY_PROPOSAL_REJECTION_COOLDOWN_TURNS
+  );
 }
 
 function createDiplomacyDecisionProposal(
