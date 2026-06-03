@@ -6246,6 +6246,7 @@ function toPlayerSession(session: AuthSession, galaxy: Galaxy | null = currentGa
   const player = galaxy ? resolvePlayerFromSession(galaxy, session) : null;
   return {
     id: session.accountId,
+    playerId: player?.playerId ?? null,
     playerName: session.playerName,
     token: session.token,
     localAdmin: session.localAdmin === true,

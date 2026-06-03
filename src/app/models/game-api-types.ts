@@ -198,6 +198,7 @@ export function expandBotProfileCounts(counts: Partial<Record<BotProfileId, numb
 
 export type PlayerSession = {
   id: number;
+  playerId?: number | null;
   playerName: string;
   token: string;
   localAdmin: boolean;

@@ -1,13 +1,14 @@
 import '@angular/compiler';
 import { describe, expect, it, vi } from 'vitest';
 import { MiniPlanetPreviewComponent } from './mini-planet-preview.component';
-import type { ClientCoordinates, ClientPlanetDto } from '../../../models/game-api-types';
+import type { ClientCoordinates, ClientPlanetDto, PlayerSession } from '../../../models/game-api-types';
+import { DiplomaticStatus } from '../../../models/diplomacy/diplomatic-status';
 import { PlanetType } from '../../../models/enums/planet-type';
 import { PlayerType } from '../../../models/enums/player-type';
 
 describe('MiniPlanetPreviewComponent', () => {
   it('shows spy action only for non-owned planets', () => {
-    const component = new MiniPlanetPreviewComponent(createRouter() as never);
+    const component = createComponent();
 
     component.planet = createPlanet('Owned', { x: 1, y: 1, z: 1 }, 5);
     expect((component as { showSpyAction(): boolean }).showSpyAction()).toBe(false);
@@ -20,7 +21,7 @@ describe('MiniPlanetPreviewComponent', () => {
 
   it('does not treat a revealed foreign owner as viewer-owned', () => {
     const router = createRouter();
-    const component = new MiniPlanetPreviewComponent(router as never);
+    const component = createComponent(router);
 
     component.planet = createRevealedForeignPlanet('Foreign', { x: 4, y: 4, z: 4 });
 
@@ -35,7 +36,7 @@ describe('MiniPlanetPreviewComponent', () => {
 
   it('navigates to Mission Planner with origin or target prefills', () => {
     const router = createRouter();
-    const component = new MiniPlanetPreviewComponent(router as never);
+    const component = createComponent(router);
 
     component.planet = createPlanet('Owned', { x: 5, y: 6, z: 7 }, 1);
     (component as { openMissionPlannerAsOrigin(): void }).openMissionPlannerAsOrigin();
@@ -66,7 +67,7 @@ describe('MiniPlanetPreviewComponent', () => {
   });
 
   it('shows a separate debris tag only when report debris is non-zero', () => {
-    const component = new MiniPlanetPreviewComponent(createRouter() as never);
+    const component = createComponent();
     component.planet = createRevealedForeignPlanet('Foreign', { x: 4, y: 4, z: 4 });
 
     component.ngOnChanges();
@@ -79,11 +80,77 @@ describe('MiniPlanetPreviewComponent', () => {
     expect(debrisTag).toBeTruthy();
     expect(debrisTag?.tooltip).toBe('Metal: 7, Crystal: 8, Deuterium: 9');
   });
+
+  it('adds diplomacy status to owned-by labels', () => {
+    const component = createComponent(
+      createRouter(),
+      createGameStateService([
+        { playerAId: 1, playerBId: 9, status: DiplomaticStatus.WAR }
+      ]),
+      createPlayerSessionService(createPlayerSession({ playerId: 1 }))
+    );
+
+    component.planet = createPlanet('Home', { x: 1, y: 1, z: 1 }, 1);
+    expect((component as { ownershipLabel(): string }).ownershipLabel()).toBe('Owned by: Player (SELF)');
+
+    component.planet = createRevealedForeignPlanet('Foreign', { x: 4, y: 4, z: 4 });
+    expect((component as { ownershipLabel(): string }).ownershipLabel()).toBe('Owned by: Enemy (WAR)');
+  });
 });
+
+function createComponent(
+  router = createRouter(),
+  gameState = createGameStateService(),
+  playerSession = createPlayerSessionService()
+): MiniPlanetPreviewComponent {
+  return new MiniPlanetPreviewComponent(router as never, gameState as never, playerSession as never);
+}
 
 function createRouter() {
   return {
     navigate: vi.fn().mockResolvedValue(true)
+  };
+}
+
+function createGameStateService(relations: Array<{ playerAId: number; playerBId: number; status: DiplomaticStatus }> = []) {
+  return {
+    diplomacyResolver: () => ({
+      getStatus: (leftOwnerId: number | null, rightOwnerId: number | null): DiplomaticStatus => {
+        if (leftOwnerId !== null && rightOwnerId !== null && leftOwnerId === rightOwnerId) {
+          return DiplomaticStatus.SELF;
+        }
+
+        const relation = relations.find((entry) =>
+          (entry.playerAId === leftOwnerId && entry.playerBId === rightOwnerId)
+          || (entry.playerAId === rightOwnerId && entry.playerBId === leftOwnerId)
+        );
+
+        return relation?.status ?? DiplomaticStatus.NEUTRAL;
+      }
+    })
+  };
+}
+
+function createPlayerSessionService(session: PlayerSession | null = createPlayerSession()) {
+  return {
+    load: vi.fn().mockReturnValue(session)
+  };
+}
+
+function createPlayerSession(overrides: Partial<PlayerSession> = {}): PlayerSession {
+  return {
+    id: 1,
+    playerId: 1,
+    playerName: 'Player',
+    token: 'token',
+    localAdmin: false,
+    language: null,
+    tutorialRead: {} as never,
+    unreadReportCount: 0,
+    unreadMailCount: 0,
+    pendingRequestCount: 0,
+    currentGameId: null,
+    ...overrides
   };
 }
 

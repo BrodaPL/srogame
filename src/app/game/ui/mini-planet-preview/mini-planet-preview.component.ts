@@ -1,6 +1,9 @@
 import { Component, EventEmitter, Input, OnChanges, Output } from '@angular/core';
 import { Router } from '@angular/router';
-import type { ClientPlanetDto, ClientReportDataDto } from '../../../models/game-api-types';
+import { GameStateService } from '../../../core/game-state.service';
+import { PlayerSessionService } from '../../../core/player-session.service';
+import type { ClientPlanetDto, ClientReportDataDto, PlayerSession } from '../../../models/game-api-types';
+import { DiplomaticStatus } from '../../../models/diplomacy/diplomatic-status';
 import { PlayerType } from '../../../models/enums/player-type';
 import { PlanetImageHelper } from '../../../models/planets/planet-image-helper';
 import { planetImageVariantToStyle } from '../../../models/planets/planet-image-variant';
@@ -31,7 +34,11 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   protected isSpyDialogOpen = false;
   protected spyLaunchNotice: string | null = null;
 
-  constructor(private readonly router: Router) {}
+  constructor(
+    private readonly router: Router,
+    private readonly gameState: GameStateService,
+    private readonly playerSession: PlayerSessionService
+  ) {}
 
   public ngOnChanges(): void {
     this.tags = this.buildTags();
@@ -95,11 +102,11 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     if (this.planet.info.isOwnedByViewer) {
-      return `Owned by: ${this.planet.info.ownerPlayerName ?? 'YOU'}`;
+      return `Owned by: ${this.ownerLabelWithDiplomacy(this.planet.info.ownerPlayerName ?? 'YOU', this.planet.info.ownerId)}`;
     }
 
     if (this.planet.info.ownerId !== null) {
-      return `Owned by: ${this.planet.info.ownerPlayerName ?? 'UNKNOWN'}`;
+      return `Owned by: ${this.ownerLabelWithDiplomacy(this.planet.info.ownerPlayerName ?? 'UNKNOWN', this.planet.info.ownerId)}`;
     }
 
     if (this.planet.info.ownerPlayerType === PlayerType.NEUTRAL) {
@@ -303,6 +310,42 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     return tags;
+  }
+
+  private ownerLabelWithDiplomacy(ownerName: string, ownerId: number | null): string {
+    const status = this.diplomacyStatusForOwner(ownerId);
+    return status ? `${ownerName} (${status})` : ownerName;
+  }
+
+  private diplomacyStatusForOwner(ownerId: number | null): DiplomaticStatus | null {
+    if (ownerId === null) {
+      return null;
+    }
+
+    const viewerId = this.viewerPlayerId(this.playerSession.load());
+    if (viewerId === null) {
+      return null;
+    }
+
+    return this.gameState.diplomacyResolver().getStatus(viewerId, ownerId);
+  }
+
+  private viewerPlayerId(session: PlayerSession | null): number | null {
+    if (!session) {
+      return this.planet?.info.isOwnedByViewer === true
+        ? this.planet.info.ownerId
+        : null;
+    }
+
+    if (Number.isInteger(session.playerId)) {
+      return session.playerId ?? null;
+    }
+
+    if (this.planet?.info.isOwnedByViewer === true) {
+      return this.planet.info.ownerId;
+    }
+
+    return session.id;
   }
 
   private buildBasicInfoTooltip(planet: ClientPlanetDto): string {
