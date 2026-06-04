@@ -73,7 +73,7 @@
               <article class="mail-view__card">
                 <div class="mail-view__card-head">
                   <h4>{{ requestCardTitle(request) }}</h4>
-                  <span class="badge">{{ requestBadge(request) }}</span>
+                  <span [class]="requestBadgeClass(request)">{{ requestBadge(request) }}</span>
                 </div>
                 <p class="overview-muted">{{ requestSummary(request) }}</p>
                 <p class="overview-muted">{{ requestTimingLine(request) }}</p>
@@ -240,7 +240,7 @@
               <article class="mail-view__card">
                 <div class="mail-view__card-head">
                   <h4>{{ requestCardTitle(request) }}</h4>
-                  <span class="badge">{{ requestBadge(request) }}</span>
+                  <span [class]="requestBadgeClass(request)">{{ requestBadge(request) }}</span>
                 </div>
                 <p class="overview-muted">{{ requestSummary(request) }}</p>
                 <p class="overview-muted">Created on turn {{ request.createdTurn }} | {{ requestDetailLine(request) }}</p>
@@ -288,7 +288,7 @@
                         [class.mail-view__message-row--selected]="selectedMessageId === message.messageId"
                         (click)="openMessage(message)">
                         <strong>{{ message.title }}</strong>
-                        <span>{{ message.senderPlayerName ?? 'Unknown sender' }}</span>
+                        <span>{{ senderLabel(message) }}</span>
                         <small>Turn {{ message.createdTurn }}</small>
                       </button>
                     }
@@ -312,7 +312,7 @@
                         [class.mail-view__message-row--selected]="selectedMessageId === message.messageId"
                         (click)="openMessage(message)">
                         <strong>{{ message.title }}</strong>
-                        <span>{{ message.senderPlayerName ?? 'Unknown sender' }}</span>
+                        <span>{{ senderLabel(message) }}</span>
                         <small>Turn {{ message.createdTurn }}</small>
                       </button>
                     }
@@ -327,7 +327,7 @@
                   <h4>{{ message.title }}</h4>
                   <span class="badge">{{ message.isRead ? 'Read' : 'Unread' }}</span>
                 </div>
-                <p class="overview-muted">From {{ message.senderPlayerName ?? 'Unknown sender' }} | Turn {{ message.createdTurn }}</p>
+                <p class="overview-muted">From {{ senderLabel(message) }} | Turn {{ message.createdTurn }}</p>
                 <div class="mail-view__message-body">{{ message.body }}</div>
                 <div class="mail-view__actions">
                   <button

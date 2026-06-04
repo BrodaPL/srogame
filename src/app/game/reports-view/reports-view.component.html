@@ -227,6 +227,14 @@
               <span class="overview-stat__label">Sender</span>
               <span class="overview-stat__value">{{ report.senderPlayerName ?? 'N/A' }}</span>
             </div>
+            @if (previewOwnerLabel(); as ownerLabel) {
+              <div class="overview-stat">
+                <span class="overview-stat__label">Owner</span>
+                <span [class]="'overview-stat__value diplomacy-status diplomacy-status--' + previewOwnerRelationKey()">
+                  {{ ownerLabel }}
+                </span>
+              </div>
+            }
           </div>
 
           <section class="reports-view__detail-scroll" data-tutorial-id="reports-detail-body">

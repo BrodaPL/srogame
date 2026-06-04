@@ -16,7 +16,8 @@ describe('ReportsViewComponent', () => {
         autoOpenTutorial: vi.fn()
       } as never,
       {} as never,
-      router as never
+      router as never,
+      createGameState() as never
     );
 
     const report = {
@@ -53,7 +54,8 @@ describe('ReportsViewComponent', () => {
         autoOpenTutorial: vi.fn()
       } as never,
       {} as never,
-      router as never
+      router as never,
+      createGameState() as never
     );
 
     const report = {
@@ -89,7 +91,8 @@ describe('ReportsViewComponent', () => {
         autoOpenTutorial: vi.fn()
       } as never,
       {} as never,
-      createRouter() as never
+      createRouter() as never,
+      createGameState() as never
     );
     const regularReport = createProductionReport(1, 'Regular report');
     const favouriteReport = createProductionReport(2, 'Favourite report', true);
@@ -113,7 +116,8 @@ describe('ReportsViewComponent', () => {
         autoOpenTutorial: vi.fn()
       } as never,
       {} as never,
-      createRouter() as never
+      createRouter() as never,
+      createGameState() as never
     );
     const report = createProductionReport(
       7,
@@ -139,6 +143,14 @@ describe('ReportsViewComponent', () => {
 function createRouter() {
   return {
     navigate: vi.fn().mockResolvedValue(true)
+  };
+}
+
+function createGameState() {
+  return {
+    diplomacyResolver: vi.fn(() => ({
+      getStatus: vi.fn(() => 'SELF')
+    }))
   };
 }
 

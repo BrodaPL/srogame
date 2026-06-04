@@ -6,6 +6,7 @@
   [class.mini-planet-preview--human]="isHumanOwnedPlanet()"
   [class.mini-planet-preview--bot]="isBotOwnedPlanet()"
   [class.mini-planet-preview--selected]="isSelected"
+  [attr.data-relation]="diplomacyRelationKey()"
 >
   <h4 class="mini-planet-preview__name">{{ planetNameLabel() }}</h4>
 

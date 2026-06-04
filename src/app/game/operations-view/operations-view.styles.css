@@ -185,20 +185,24 @@
   word-break: break-word;
 }
 
-.operations-view__coordinate-segment[data-relation='own'] {
-  color: #63c874;
+.operations-view__coordinate-segment[data-relation='self'] {
+  color: var(--diplomacy-self);
 }
 
 .operations-view__coordinate-segment[data-relation='war'] {
-  color: #e45b5b;
+  color: var(--diplomacy-war);
+}
+
+.operations-view__coordinate-segment[data-relation='neutral'] {
+  color: var(--diplomacy-neutral);
 }
 
 .operations-view__coordinate-segment[data-relation='allied'] {
-  color: #5f92e8;
+  color: var(--diplomacy-allied);
 }
 
 .operations-view__coordinate-segment[data-relation='peace'] {
-  color: #d8bf46;
+  color: var(--diplomacy-peace);
 }
 
 .operations-view__coordinate-line {

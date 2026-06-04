@@ -10,6 +10,21 @@
   --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
   --ui-wrap-gap: 0.35rem;
   --ui-section-gap: 0.8rem;
+  --diplomacy-self: #63c874;
+  --diplomacy-self-bg: rgba(99, 200, 116, 0.24);
+  --diplomacy-self-border: rgba(99, 200, 116, 0.56);
+  --diplomacy-war: #ff6969;
+  --diplomacy-war-bg: rgba(160, 39, 47, 0.82);
+  --diplomacy-war-border: rgba(255, 105, 105, 0.62);
+  --diplomacy-neutral: #b58d22;
+  --diplomacy-neutral-bg: rgba(116, 87, 24, 0.82);
+  --diplomacy-neutral-border: rgba(181, 141, 34, 0.62);
+  --diplomacy-peace: #8fd4ff;
+  --diplomacy-peace-bg: rgba(28, 82, 118, 0.82);
+  --diplomacy-peace-border: rgba(143, 212, 255, 0.62);
+  --diplomacy-allied: #4f8dff;
+  --diplomacy-allied-bg: rgba(31, 74, 149, 0.86);
+  --diplomacy-allied-border: rgba(79, 141, 255, 0.68);
 }
 
 *,
@@ -276,6 +291,67 @@ app-root {
   border-color: rgba(60, 201, 189, 0.4);
   color: var(--teal);
   background: rgba(60, 201, 189, 0.16);
+}
+
+.diplomacy-status {
+  color: var(--diplomacy-neutral);
+  font-weight: 700;
+}
+
+.diplomacy-status--self {
+  color: var(--diplomacy-self);
+}
+
+.diplomacy-status--war {
+  color: var(--diplomacy-war);
+}
+
+.diplomacy-status--neutral {
+  color: var(--diplomacy-neutral);
+}
+
+.diplomacy-status--peace {
+  color: var(--diplomacy-peace);
+}
+
+.diplomacy-status--allied {
+  color: var(--diplomacy-allied);
+}
+
+.diplomacy-badge {
+  border-color: var(--diplomacy-neutral-border);
+  color: var(--diplomacy-neutral);
+  background: rgba(181, 141, 34, 0.16);
+}
+
+.diplomacy-badge--self {
+  border-color: var(--diplomacy-self-border);
+  color: var(--diplomacy-self);
+  background: rgba(99, 200, 116, 0.16);
+}
+
+.diplomacy-badge--war {
+  border-color: var(--diplomacy-war-border);
+  color: var(--diplomacy-war);
+  background: rgba(255, 105, 105, 0.16);
+}
+
+.diplomacy-badge--neutral {
+  border-color: var(--diplomacy-neutral-border);
+  color: var(--diplomacy-neutral);
+  background: rgba(181, 141, 34, 0.16);
+}
+
+.diplomacy-badge--peace {
+  border-color: var(--diplomacy-peace-border);
+  color: var(--diplomacy-peace);
+  background: rgba(143, 212, 255, 0.16);
+}
+
+.diplomacy-badge--allied {
+  border-color: var(--diplomacy-allied-border);
+  color: var(--diplomacy-allied);
+  background: rgba(79, 141, 255, 0.16);
 }
 
 .ship-stats {
@@ -1859,6 +1935,31 @@ app-root {
 
 .mini-planet-preview--bot {
   background: #7a262d;
+}
+
+.mini-planet-preview[data-relation='self'] {
+  border-color: var(--diplomacy-self-border);
+  background: linear-gradient(135deg, rgba(35, 102, 58, 0.98), rgba(23, 72, 45, 0.94));
+}
+
+.mini-planet-preview[data-relation='war'] {
+  border-color: var(--diplomacy-war-border);
+  background: linear-gradient(135deg, var(--diplomacy-war-bg), rgba(83, 22, 28, 0.94));
+}
+
+.mini-planet-preview[data-relation='neutral'] {
+  border-color: var(--diplomacy-neutral-border);
+  background: linear-gradient(135deg, var(--diplomacy-neutral-bg), rgba(72, 56, 21, 0.94));
+}
+
+.mini-planet-preview[data-relation='peace'] {
+  border-color: var(--diplomacy-peace-border);
+  background: linear-gradient(135deg, var(--diplomacy-peace-bg), rgba(18, 57, 83, 0.94));
+}
+
+.mini-planet-preview[data-relation='allied'] {
+  border-color: var(--diplomacy-allied-border);
+  background: linear-gradient(135deg, var(--diplomacy-allied-bg), rgba(19, 49, 102, 0.94));
 }
 
 .mini-planet-preview__name {

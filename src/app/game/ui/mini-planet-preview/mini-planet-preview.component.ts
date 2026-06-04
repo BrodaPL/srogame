@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { GameStateService } from '../../../core/game-state.service';
 import { PlayerSessionService } from '../../../core/player-session.service';
 import type { ClientPlanetDto, ClientReportDataDto, PlayerSession } from '../../../models/game-api-types';
+import { diplomacyVisualKey, ownerLabelWithDiplomacy, type DiplomacyVisualKey } from '../../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../../models/diplomacy/diplomatic-status';
 import { PlayerType } from '../../../models/enums/player-type';
 import { PlanetImageHelper } from '../../../models/planets/planet-image-helper';
@@ -102,11 +103,11 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     if (this.planet.info.isOwnedByViewer) {
-      return `Owned by: ${this.ownerLabelWithDiplomacy(this.planet.info.ownerPlayerName ?? 'YOU', this.planet.info.ownerId)}`;
+      return `Owned by: ${ownerLabelWithDiplomacy(this.planet.info.ownerPlayerName ?? 'YOU', this.diplomacyStatusForOwner(this.planet.info.ownerId))}`;
     }
 
     if (this.planet.info.ownerId !== null) {
-      return `Owned by: ${this.ownerLabelWithDiplomacy(this.planet.info.ownerPlayerName ?? 'UNKNOWN', this.planet.info.ownerId)}`;
+      return `Owned by: ${ownerLabelWithDiplomacy(this.planet.info.ownerPlayerName ?? 'UNKNOWN', this.diplomacyStatusForOwner(this.planet.info.ownerId))}`;
     }
 
     if (this.planet.info.ownerPlayerType === PlayerType.NEUTRAL) {
@@ -149,6 +150,11 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     return !!this.planet
       && !this.planet.info.isOwnedByViewer
       && this.planet?.info.ownerPlayerType === PlayerType.BOT;
+  }
+
+  protected diplomacyRelationKey(): DiplomacyVisualKey | 'none' {
+    const status = this.diplomacyStatusForOwner(this.planet?.info.ownerId ?? null);
+    return status ? diplomacyVisualKey(status) : 'none';
   }
 
   protected openPlanetView(): void {
@@ -310,11 +316,6 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     return tags;
-  }
-
-  private ownerLabelWithDiplomacy(ownerName: string, ownerId: number | null): string {
-    const status = this.diplomacyStatusForOwner(ownerId);
-    return status ? `${ownerName} (${status})` : ownerName;
   }
 
   private diplomacyStatusForOwner(ownerId: number | null): DiplomaticStatus | null {

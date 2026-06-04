@@ -70,20 +70,24 @@
   align-items: center;
 }
 
-.fleet-operation-card__coordinate-segment[data-relation='own'] {
-  color: #63c874;
+.fleet-operation-card__coordinate-segment[data-relation='self'] {
+  color: var(--diplomacy-self);
 }
 
 .fleet-operation-card__coordinate-segment[data-relation='war'] {
-  color: #e45b5b;
+  color: var(--diplomacy-war);
+}
+
+.fleet-operation-card__coordinate-segment[data-relation='neutral'] {
+  color: var(--diplomacy-neutral);
 }
 
 .fleet-operation-card__coordinate-segment[data-relation='allied'] {
-  color: #5f92e8;
+  color: var(--diplomacy-allied);
 }
 
 .fleet-operation-card__coordinate-segment[data-relation='peace'] {
-  color: #d8bf46;
+  color: var(--diplomacy-peace);
 }
 
 .fleet-operation-card__coordinate-link {

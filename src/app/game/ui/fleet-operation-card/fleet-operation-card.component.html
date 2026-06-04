@@ -69,8 +69,8 @@
                 (click)="openCoordinatesInGalaxy(segment.coordinates)">
                 {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
               </button>
-              @if (segment.ownerName) {
-                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerName }}</span>
+              @if (segment.ownerLabel) {
+                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerLabel }}</span>
               }
             </span>
           }
@@ -93,8 +93,8 @@
                 (click)="openCoordinatesInGalaxy(segment.coordinates)">
                 {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
               </button>
-              @if (segment.ownerName) {
-                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerName }}</span>
+              @if (segment.ownerLabel) {
+                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerLabel }}</span>
               }
             </span>
           }
@@ -150,8 +150,8 @@
                 (click)="openCoordinatesInGalaxy(segment.coordinates)">
                 {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
               </button>
-              @if (segment.ownerName) {
-                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerName }}</span>
+              @if (segment.ownerLabel) {
+                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerLabel }}</span>
               }
             </span>
           }
@@ -171,8 +171,8 @@
                 (click)="openCoordinatesInGalaxy(segment.coordinates)">
                 {{ coordinatesLabel(segment.coordinates.x, segment.coordinates.y, segment.coordinates.z) }}
               </button>
-              @if (segment.ownerName) {
-                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerName }}</span>
+              @if (segment.ownerLabel) {
+                <span class="fleet-operation-card__coordinate-owner"> - {{ segment.ownerLabel }}</span>
               }
             </span>
           }

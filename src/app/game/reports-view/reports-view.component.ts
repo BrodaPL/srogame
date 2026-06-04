@@ -2,8 +2,11 @@ import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
+import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { ClientPlanetDto } from '../../models/game-api-types';
+import { diplomacyVisualKey, ownerLabelWithDiplomacy, type DiplomacyVisualKey } from '../../models/diplomacy/diplomacy-display';
+import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { ReportType } from '../../models/enums/report-type';
 import { EspionageReportData } from '../../models/reports/espionage-report-data';
 import { PlayerReport } from '../../models/reports/player-report';
@@ -63,7 +66,8 @@ export class ReportsViewComponent implements OnInit {
     private readonly cdr: ChangeDetectorRef,
     private readonly tutorialService: TutorialService,
     private readonly authState: AuthStateService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly gameState: GameStateService
   ) {}
 
   public ngOnInit(): void {
@@ -400,6 +404,22 @@ export class ReportsViewComponent implements OnInit {
     return report.senderPlayerName ?? 'No source metadata';
   }
 
+  protected previewOwnerLabel(): string | null {
+    if (this.previewPlanet?.info.ownerId === null || this.previewPlanet?.info.ownerId === undefined || !this.previewPlanet.info.ownerPlayerName) {
+      return null;
+    }
+
+    return ownerLabelWithDiplomacy(
+      this.previewPlanet.info.ownerPlayerName,
+      this.previewOwnerStatus()
+    );
+  }
+
+  protected previewOwnerRelationKey(): DiplomacyVisualKey | 'none' {
+    const status = this.previewOwnerStatus();
+    return status ? diplomacyVisualKey(status) : 'none';
+  }
+
   protected espionageSummaryMetrics(report: EspionageReportData): ReportDossierMetric[] {
     return [
       { label: 'Avg building', value: this.formatMetricValue(report.averageBuildingLevel) },
@@ -645,6 +665,20 @@ export class ReportsViewComponent implements OnInit {
     this.previewPlanet = null;
     this.previewLoading = false;
     this.previewError = null;
+  }
+
+  private previewOwnerStatus(): DiplomaticStatus | null {
+    if (this.previewPlanet?.info.ownerId === null || this.previewPlanet?.info.ownerId === undefined) {
+      return null;
+    }
+
+    const session = this.playerSession.load();
+    const viewerId = session?.playerId ?? (this.previewPlanet.info.isOwnedByViewer ? this.previewPlanet.info.ownerId : null);
+    if (viewerId === null || viewerId === undefined) {
+      return null;
+    }
+
+    return this.gameState.diplomacyResolver().getStatus(viewerId, this.previewPlanet.info.ownerId);
   }
 
   private loadReports(): void {

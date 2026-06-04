@@ -14,6 +14,7 @@ import {
   FleetMaintenanceShipOptionDto,
   MaintenanceTransferPayloadDto
 } from '../../models/game-api-types';
+import { diplomacyVisualKey, ownerLabelWithDiplomacy, type DiplomacyVisualKey } from '../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { TechnologyType } from '../../models/enums/technology-type';
@@ -29,8 +30,8 @@ import { FleetOperationCardComponent } from '../ui/fleet-operation-card/fleet-op
 
 type CoordinateSegmentVm = {
   coordinates: { x: number; y: number; z: number };
-  ownerName: string | null;
-  relation: string;
+  ownerLabel: string | null;
+  relation: DiplomacyVisualKey | 'none';
 };
 
 type MissionTypeFilterValue = FleetMissionType | 'ALL';
@@ -1008,41 +1009,39 @@ export class OperationsViewComponent implements OnInit {
   private coordinatesWithOwnerLabel(coordinates: { x: number; y: number; z: number }): string {
     const coordinatesLabel = this.coordinatesLabel(coordinates.x, coordinates.y, coordinates.z);
     const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
-    return ownerInfo?.ownerName ? `${coordinatesLabel} - ${ownerInfo.ownerName}` : coordinatesLabel;
+    if (!ownerInfo?.ownerName) {
+      return coordinatesLabel;
+    }
+
+    return `${coordinatesLabel} - ${ownerLabelWithDiplomacy(ownerInfo.ownerName, this.coordinatesDiplomaticStatus(coordinates))}`;
   }
 
-  private coordinatesRelation(coordinates: { x: number; y: number; z: number }): string {
+  private coordinatesRelation(coordinates: { x: number; y: number; z: number }): DiplomacyVisualKey | 'none' {
+    const status = this.coordinatesDiplomaticStatus(coordinates);
+    return status ? diplomacyVisualKey(status) : 'none';
+  }
+
+  private coordinatesDiplomaticStatus(coordinates: { x: number; y: number; z: number }): DiplomaticStatus | null {
     const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
-    if (!ownerInfo?.ownerId) {
-      return 'none';
+    if (ownerInfo?.ownerId === null || ownerInfo?.ownerId === undefined) {
+      return null;
     }
 
     const ownPlayerId = this.ownedPlanets[0]?.info.ownerId ?? null;
     if (ownPlayerId === null) {
-      return 'none';
+      return null;
     }
 
-    const status = this.gameState.diplomacyResolver().getStatus(ownPlayerId, ownerInfo.ownerId);
-    switch (status) {
-      case DiplomaticStatus.SELF:
-        return 'own';
-      case DiplomaticStatus.WAR:
-        return 'war';
-      case DiplomaticStatus.ALLIED:
-        return 'allied';
-      case DiplomaticStatus.PEACE:
-        return 'peace';
-      default:
-        return 'none';
-    }
+    return this.gameState.diplomacyResolver().getStatus(ownPlayerId, ownerInfo.ownerId);
   }
 
   private toCoordinateSegment(coordinates: { x: number; y: number; z: number }): CoordinateSegmentVm {
     const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
+    const status = this.coordinatesDiplomaticStatus(coordinates);
     return {
       coordinates,
-      ownerName: ownerInfo?.ownerName ?? null,
-      relation: this.coordinatesRelation(coordinates)
+      ownerLabel: ownerInfo?.ownerName ? ownerLabelWithDiplomacy(ownerInfo.ownerName, status) : null,
+      relation: status ? diplomacyVisualKey(status) : 'none'
     };
   }
 

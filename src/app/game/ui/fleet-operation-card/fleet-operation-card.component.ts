@@ -3,6 +3,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Router } from '@angular/router';
 import { GameStateService } from '../../../core/game-state.service';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
+import { diplomacyVisualKey, ownerLabelWithDiplomacy, type DiplomacyVisualKey } from '../../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../../models/diplomacy/diplomatic-status';
 import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
 import { WeaponType } from '../../../models/enums/weapon-type';
@@ -16,8 +17,8 @@ import { TooltipDirective } from '../../../shared/tooltip/tooltip.directive';
 
 type CoordinateSegmentVm = {
   coordinates: { x: number; y: number; z: number };
-  ownerName: string | null;
-  relation: string;
+  ownerLabel: string | null;
+  relation: DiplomacyVisualKey | 'none';
 };
 
 type CoordinateOwnerInfo = {
@@ -426,32 +427,21 @@ export class FleetOperationCardComponent {
 
   private toCoordinateSegment(coordinates: { x: number; y: number; z: number }): CoordinateSegmentVm {
     const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
+    const status = this.coordinatesDiplomaticStatus(coordinates);
     return {
       coordinates,
-      ownerName: ownerInfo?.ownerName ?? null,
-      relation: this.coordinatesRelation(coordinates)
+      ownerLabel: ownerInfo?.ownerName ? ownerLabelWithDiplomacy(ownerInfo.ownerName, status) : null,
+      relation: status ? diplomacyVisualKey(status) : 'none'
     };
   }
 
-  private coordinatesRelation(coordinates: { x: number; y: number; z: number }): string {
+  private coordinatesDiplomaticStatus(coordinates: { x: number; y: number; z: number }): DiplomaticStatus | null {
     const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
-    if (!ownerInfo?.ownerId || this.ownPlayerId === null) {
-      return 'none';
+    if (ownerInfo?.ownerId === null || ownerInfo?.ownerId === undefined || this.ownPlayerId === null) {
+      return null;
     }
 
-    const status = this.gameState.diplomacyResolver().getStatus(this.ownPlayerId, ownerInfo.ownerId);
-    switch (status) {
-      case DiplomaticStatus.SELF:
-        return 'own';
-      case DiplomaticStatus.WAR:
-        return 'war';
-      case DiplomaticStatus.ALLIED:
-        return 'allied';
-      case DiplomaticStatus.PEACE:
-        return 'peace';
-      default:
-        return 'none';
-    }
+    return this.gameState.diplomacyResolver().getStatus(this.ownPlayerId, ownerInfo.ownerId);
   }
 
   private coordinatesKey(coordinates: { x: number; y: number; z: number }): string {

@@ -78,11 +78,14 @@
                 (click)="selectContact(contact)">
                 <div>
                   <h4>{{ contact.playerName }}</h4>
-                  <p class="overview-muted">{{ contactStatusLabel(contact) }}</p>
+                  <p class="overview-muted">
+                    {{ contact.playerType }} |
+                    <span [class]="diplomacyStatusTextClass(contact.currentStatus)">{{ diplomacyStatusLabel(contact.currentStatus) }}</span>
+                  </p>
                   <p class="overview-muted">{{ contactMetaLabel(contact) }}</p>
                 </div>
                 <div class="diplomacy-view__contact-flags">
-                  <span class="badge">{{ contact.currentStatus }}</span>
+                  <span [class]="diplomacyBadgeClass(contact.currentStatus)">{{ diplomacyStatusLabel(contact.currentStatus) }}</span>
                   @if (!contact.canSendProposal && contact.proposalBlockedReason) {
                     <span class="diplomacy-view__contact-note">{{ contact.proposalBlockedReason }}</span>
                   }
@@ -100,7 +103,7 @@
               <h3>{{ contact.playerName }}</h3>
               <p class="overview-muted">{{ contact.playerType }} contact</p>
             </div>
-            <span class="badge badge--jump">{{ contact.currentStatus }}</span>
+            <span [class]="diplomacyBadgeClass(contact.currentStatus)">{{ diplomacyStatusLabel(contact.currentStatus) }}</span>
           </div>
 
           <div class="overview-stats diplomacy-view__detail-stats">
@@ -110,7 +113,9 @@
             </div>
             <div class="overview-stat">
               <span class="overview-stat__label">Current status</span>
-              <span class="overview-stat__value">{{ contact.currentStatus }}</span>
+              <span class="overview-stat__value">
+                <span [class]="diplomacyStatusTextClass(contact.currentStatus)">{{ diplomacyStatusLabel(contact.currentStatus) }}</span>
+              </span>
             </div>
             <div class="overview-stat">
               <span class="overview-stat__label">Known planets</span>
@@ -343,7 +348,7 @@
               <div class="diplomacy-view__proposal-copy">
                 <div class="diplomacy-view__proposal-head">
                   <h4>{{ proposal.direction === 'incoming' ? 'Incoming proposal' : 'Outgoing proposal' }}</h4>
-                  <span class="badge">{{ proposal.requestedStatus }}</span>
+                  <span [class]="diplomacyBadgeClass(proposal.requestedStatus)">{{ diplomacyStatusLabel(proposal.requestedStatus) }}</span>
                 </div>
                 <p class="overview-muted">{{ proposalCounterpartyLabel(proposal) }}</p>
                 <p class="overview-muted">Created on turn {{ proposal.createdTurn }} | Expires on turn {{ proposal.expiresOnTurn }}</p>

@@ -14,6 +14,8 @@ import {
   PlayerMailMessageDto,
   SupportMailRequestDto
 } from '../../models/game-api-types';
+import { diplomacyStatusLabel, diplomacyVisualKey, ownerLabelWithDiplomacy } from '../../models/diplomacy/diplomacy-display';
+import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MessageComposeDialogComponent } from '../ui/message-compose-dialog/message-compose-dialog.component';
@@ -191,39 +193,48 @@ export class MailViewComponent implements OnInit {
       return request.state === 'PENDING' ? request.supportType : request.state;
     }
 
-    return request.state === 'PENDING' ? request.requestedStatus : request.state;
+    return request.state === 'PENDING' ? diplomacyStatusLabel(request.requestedStatus) : request.state;
+  }
+
+  protected requestBadgeClass(request: MailRequestDto): string {
+    const status = this.requestDisplayStatus(request);
+    if (!status) {
+      return 'badge';
+    }
+
+    return `badge diplomacy-badge diplomacy-badge--${diplomacyVisualKey(status)}`;
   }
 
   protected requestSummary(request: MailRequestDto): string {
     if (request.requestType === 'JUMP_GATE') {
       if (request.direction === 'incoming') {
-        return `${request.counterpartyPlayerName} requests Jump Gate access for Fleet #${request.fleetId} to ${request.targetPlanetName}.`;
+        return `${this.counterpartyLabel(request)} requests Jump Gate access for Fleet #${request.fleetId} to ${request.targetPlanetName}.`;
       }
 
-      return `Fleet #${request.fleetId} is waiting for Jump Gate access from ${request.counterpartyPlayerName}.`;
+      return `Fleet #${request.fleetId} is waiting for Jump Gate access from ${this.counterpartyLabel(request)}.`;
     }
 
     if (request.requestType === 'MAINTENANCE') {
       if (request.direction === 'incoming') {
-        return `${request.counterpartyPlayerName} requests maintenance for Fleet #${request.fleetId} at ${request.targetPlanetName}.`;
+        return `${this.counterpartyLabel(request)} requests maintenance for Fleet #${request.fleetId} at ${request.targetPlanetName}.`;
       }
 
-      return `Fleet #${request.fleetId} requested maintenance from ${request.counterpartyPlayerName} at ${request.targetPlanetName}.`;
+      return `Fleet #${request.fleetId} requested maintenance from ${this.counterpartyLabel(request)} at ${request.targetPlanetName}.`;
     }
 
     if (request.requestType === 'SUPPORT') {
       if (request.direction === 'incoming') {
-        return `${request.counterpartyPlayerName} requested ${this.supportTypeLabel(request)} for ${request.targetPlanetName}.`;
+        return `${this.counterpartyLabel(request)} requested ${this.supportTypeLabel(request)} for ${request.targetPlanetName}.`;
       }
 
-      return `You requested ${this.supportTypeLabel(request)} from ${request.counterpartyPlayerName} for ${request.targetPlanetName}.`;
+      return `You requested ${this.supportTypeLabel(request)} from ${this.counterpartyLabel(request)} for ${request.targetPlanetName}.`;
     }
 
     if (request.direction === 'incoming') {
-      return `${request.counterpartyPlayerName} requested ${request.requestedStatus}.`;
+      return `${this.counterpartyLabel(request)} requested ${diplomacyStatusLabel(request.requestedStatus)}.`;
     }
 
-    return `You requested ${request.requestedStatus} with ${request.counterpartyPlayerName}.`;
+    return `You requested ${diplomacyStatusLabel(request.requestedStatus)} with ${this.counterpartyLabel(request)}.`;
   }
 
   protected requestDetailLine(request: MailRequestDto): string {
@@ -255,7 +266,7 @@ export class MailViewComponent implements OnInit {
 
       if (request.minimumShips && request.minimumShips.length > 0) {
         const shipsSummary = request.minimumShips.map((entry) => `${entry.type} x${entry.amount}`).join(', ');
-        const targetOwnerSummary = request.targetOwnerPlayerName ? ` | Target owner: ${request.targetOwnerPlayerName}` : '';
+        const targetOwnerSummary = request.targetOwnerPlayerName ? ` | Target owner: ${this.playerLabelByName(request.targetOwnerPlayerName)}` : '';
         const prioritySummary = request.bombardmentPriorities
           ? ` | Priorities: ${request.bombardmentPriorities.main ?? 'Random'} / ${request.bombardmentPriorities.secondary ?? 'Random'} / ${request.bombardmentPriorities.tertiary ?? 'Random'}`
           : '';
@@ -268,7 +279,7 @@ export class MailViewComponent implements OnInit {
       return request.resolutionNote ?? `Target ${request.targetPlanetName}`;
     }
 
-    return `Requested status ${request.requestedStatus}`;
+    return `Requested status ${diplomacyStatusLabel(request.requestedStatus)}`;
   }
 
   protected requestTimingLine(request: MailRequestDto): string {
@@ -323,6 +334,14 @@ export class MailViewComponent implements OnInit {
 
   protected maintenanceRequest(request: MailRequestDto): MaintenanceMailRequestDto | null {
     return request.requestType === 'MAINTENANCE' ? request : null;
+  }
+
+  protected senderLabel(message: PlayerMailMessageDto): string {
+    if (message.senderPlayerId === null || !message.senderPlayerName) {
+      return message.senderPlayerName ?? 'Unknown sender';
+    }
+
+    return ownerLabelWithDiplomacy(message.senderPlayerName, this.playerStatus(message.senderPlayerId));
   }
 
   protected jumpGateRequest(request: MailRequestDto): JumpGateMailRequestDto | null {
@@ -652,6 +671,34 @@ export class MailViewComponent implements OnInit {
 
   private requestKey(request: MailRequestDto): string {
     return `${request.requestType}:${request.requestId}`;
+  }
+
+  private counterpartyLabel(request: MailRequestDto): string {
+    return ownerLabelWithDiplomacy(
+      request.counterpartyPlayerName,
+      this.playerStatus(request.counterpartyPlayerId)
+    );
+  }
+
+  private requestDisplayStatus(request: MailRequestDto): DiplomaticStatus | null {
+    if (request.requestType === 'DIPLOMACY_PROPOSAL' && request.state === 'PENDING') {
+      return request.requestedStatus;
+    }
+
+    return this.playerStatus(request.counterpartyPlayerId);
+  }
+
+  private playerStatus(playerId: number): DiplomaticStatus | null {
+    if (playerId === this.currentPlayerId) {
+      return DiplomaticStatus.SELF;
+    }
+
+    return this.recipients.find((recipient) => recipient.playerId === playerId)?.currentStatus ?? null;
+  }
+
+  private playerLabelByName(playerName: string): string {
+    const recipient = this.recipients.find((entry) => entry.playerName === playerName) ?? null;
+    return ownerLabelWithDiplomacy(playerName, recipient?.currentStatus ?? null);
   }
 
   private maintenancePayloadSummary(payload: MaintenanceTransferPayloadDto): string {

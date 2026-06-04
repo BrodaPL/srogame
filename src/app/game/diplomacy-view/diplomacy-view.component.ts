@@ -21,6 +21,7 @@ import {
   BombardmentPriorityTarget,
   emptyBombardmentPriorities
 } from '../../models/bombardment/bombardment-priority';
+import { diplomacyStatusLabel, diplomacyVisualKey, ownerLabelWithDiplomacy } from '../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { allowedDiplomaticProposalStatuses } from '../../models/diplomacy/diplomatic-proposal-rules';
 import { BuildingType } from '../../models/enums/building-type';
@@ -345,7 +346,10 @@ export class DiplomacyViewComponent implements OnInit {
   }
 
   protected supportTargetLabel(planet: ClientPlanetDto): string {
-    const owner = planet.info.ownerPlayerName ? `${planet.info.ownerPlayerName} - ` : '';
+    const ownerStatus = this.planetDiplomaticStatus(planet);
+    const owner = planet.info.ownerPlayerName
+      ? `${ownerLabelWithDiplomacy(planet.info.ownerPlayerName, ownerStatus)} - `
+      : '';
     return `${owner}${planet.basicInfo.name} (${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z})`;
   }
 
@@ -362,7 +366,19 @@ export class DiplomacyViewComponent implements OnInit {
   }
 
   protected contactStatusLabel(contact: DiplomacyContactDto): string {
-    return `${contact.playerType} | ${contact.currentStatus}`;
+    return `${contact.playerType} | ${diplomacyStatusLabel(contact.currentStatus)}`;
+  }
+
+  protected diplomacyBadgeClass(status: DiplomaticStatus): string {
+    return `badge diplomacy-badge diplomacy-badge--${diplomacyVisualKey(status)}`;
+  }
+
+  protected diplomacyStatusLabel(status: DiplomaticStatus): string {
+    return diplomacyStatusLabel(status);
+  }
+
+  protected diplomacyStatusTextClass(status: DiplomaticStatus): string {
+    return `diplomacy-status diplomacy-status--${diplomacyVisualKey(status)}`;
   }
 
   protected contactMetaLabel(contact: DiplomacyContactDto): string {
@@ -546,6 +562,19 @@ export class DiplomacyViewComponent implements OnInit {
 
     this.ensureVisibleSelection();
     this.openTutorialAfterRender();
+  }
+
+  private planetDiplomaticStatus(planet: ClientPlanetDto): DiplomaticStatus | null {
+    if (planet.info.ownerId === null || this.currentPlayerId === null) {
+      return null;
+    }
+
+    if (planet.info.ownerId === this.currentPlayerId) {
+      return DiplomaticStatus.SELF;
+    }
+
+    const contact = this.contacts.find((entry) => entry.playerId === planet.info.ownerId) ?? null;
+    return contact?.currentStatus ?? DiplomaticStatus.NEUTRAL;
   }
 
   private syncProposalSelections(): void {
