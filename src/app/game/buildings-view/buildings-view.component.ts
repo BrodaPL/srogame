@@ -7,6 +7,7 @@ import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.f
 import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
 import { I18nService } from '../../i18n/i18n.service';
 import { Building } from '../../models/buildings/building';
+import { buildingProductionLabel, contextualBuildingProductionLabel } from '../../models/buildings/building-production-label';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
 import { ShipType } from '../../models/enums/ship-type';
@@ -213,6 +214,10 @@ export class BuildingsViewComponent implements OnInit {
 
   protected buildingLevel(buildingType: BuildingType): number {
     return this.buildingLevelsByType.get(buildingType) ?? 0;
+  }
+
+  protected buildingProductionLabel(building: Building): string {
+    return buildingProductionLabel(building.type);
   }
 
   protected openBuildingDetails(building: Building): void {
@@ -977,7 +982,7 @@ export class BuildingsViewComponent implements OnInit {
 
     if (building.production1.length > 0) {
       summaryRows.push({
-        label: currentLevel > 0 ? 'Current output' : 'Level 1 output',
+        label: contextualBuildingProductionLabel(building.type, currentLevel > 0 ? 'Current' : 'Level 1'),
         value: String(currentLevel > 0 ? this.currentBuildingDetailProduction(building) : this.detailProductionAtLevel(building, 1))
       });
     }
@@ -1026,7 +1031,7 @@ export class BuildingsViewComponent implements OnInit {
     } else {
       if (building.production1.length > 0) {
         stateRows.push({
-          label: 'Current production',
+          label: contextualBuildingProductionLabel(building.type, 'Current'),
           value: String(this.currentBuildingDetailProduction(building))
         });
       }

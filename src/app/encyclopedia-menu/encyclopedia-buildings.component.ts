@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { EncyclopediaImageDialogComponent } from './encyclopedia-image-dialog.component';
 import { BuildingBlueprintsFactory } from '../factories/building-blueprints.factory';
 import { Building } from '../models/buildings/building';
+import { buildingProductionLabel } from '../models/buildings/building-production-label';
 import { toRawImagePath } from './encyclopedia-image-paths';
 import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 
@@ -26,6 +27,10 @@ export class EncyclopediaBuildingsComponent {
 
   protected closeImageDialog(): void {
     this.selectedImage = null;
+  }
+
+  protected buildingProductionLabel(building: Building): string {
+    return buildingProductionLabel(building.type);
   }
 
   private loadBuildings(): Building[] {

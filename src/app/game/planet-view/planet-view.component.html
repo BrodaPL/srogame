@@ -185,7 +185,7 @@
                   <p class="planet-building-card__meta">Level: {{ buildingLevel(building.type) }}</p>
                   @if (buildingLevel(building.type) > 0) {
                     <p class="planet-building-card__meta">
-                      Production: {{ buildingProductionAtCurrentLevel(building) }}
+                      {{ buildingProductionLabel(building) }}: {{ buildingProductionAtCurrentLevel(building) }}
                     </p>
                     <p class="planet-building-card__meta">
                       Structural points: {{ buildingCurrentStructuralPoints(building) }} / {{ buildingMaxStructuralPoints(building) }}
@@ -308,7 +308,7 @@
                   <p class="planet-building-card__meta">Level: {{ buildingLevel(building.type) }}</p>
                   @if (buildingLevel(building.type) > 0) {
                     <p class="planet-building-card__meta">
-                      Production: {{ buildingProductionAtCurrentLevel(building) }}
+                      {{ buildingProductionLabel(building) }}: {{ buildingProductionAtCurrentLevel(building) }}
                     </p>
                     <p class="planet-building-card__meta">
                       Structural points: {{ buildingCurrentStructuralPoints(building) }} / {{ buildingMaxStructuralPoints(building) }}

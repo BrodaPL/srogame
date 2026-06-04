@@ -10,6 +10,7 @@ import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.fac
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
 import { Building } from '../../models/buildings/building';
+import { buildingProductionLabel, contextualBuildingProductionLabel } from '../../models/buildings/building-production-label';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
 import { DefenceType } from '../../models/enums/defence-type';
@@ -515,6 +516,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     return this.getProductionAtLevel(building, level);
+  }
+
+  protected buildingProductionLabel(building: Building): string {
+    return buildingProductionLabel(building.type);
   }
 
   protected buildingCurrentPowerConsumption(building: Building): number {
@@ -2442,7 +2447,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     if (building.production1.length > 0) {
       summaryRows.push({
-        label: currentLevel > 0 ? 'Current output' : 'Level 1 output',
+        label: contextualBuildingProductionLabel(building.type, currentLevel > 0 ? 'Current' : 'Level 1'),
         value: String(currentLevel > 0 ? this.buildingProductionAtCurrentLevel(building) : this.getProductionAtLevel(building, 1))
       });
     }
@@ -2491,7 +2496,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     } else {
       if (building.production1.length > 0) {
         stateRows.push({
-          label: 'Current production',
+          label: contextualBuildingProductionLabel(building.type, 'Current'),
           value: String(this.buildingProductionAtCurrentLevel(building))
         });
       }

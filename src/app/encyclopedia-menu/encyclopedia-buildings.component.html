@@ -95,9 +95,9 @@
         </div>
 
         <div class="ship-section" *ngIf="building.production1.length > 0; else noProduction">
-          <p class="ship-section__title">Production</p>
+          <p class="ship-section__title">{{ buildingProductionLabel(building) }}</p>
           <p class="ship-card__subtitle ship-card__subtitle--wide">
-            Base output: {{ building.production1[0] }}
+            Base value: {{ building.production1[0] }}
           </p>
           <p class="ship-card__subtitle ship-card__subtitle--wide">
             Structural Points use current level cost and integrity now reduces live building effectiveness.
@@ -105,8 +105,8 @@
         </div>
         <ng-template #noProduction>
           <div class="ship-section">
-            <p class="ship-section__title">Production</p>
-            <p class="ship-card__subtitle ship-card__subtitle--wide">No production output</p>
+            <p class="ship-section__title">Output</p>
+            <p class="ship-card__subtitle ship-card__subtitle--wide">No output value</p>
           </div>
         </ng-template>
       </article>
