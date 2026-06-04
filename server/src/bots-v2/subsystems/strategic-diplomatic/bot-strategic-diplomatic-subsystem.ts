@@ -324,6 +324,7 @@ const RELATION_PROPOSAL_MIN_UTILITY = 8;
 const ALLIED_TO_PEACE_HOSTILITY_THRESHOLD = 30;
 const PEACE_TO_NEUTRAL_HOSTILITY_THRESHOLD = 20;
 const DIPLOMACY_PROPOSAL_REJECTION_COOLDOWN_TURNS = 15;
+const DIPLOMATIC_COMBAT_INTEL_TARGET_DEPTH = 8;
 const MAX_PROBE_SHIP_NEED_REQUESTS = 2;
 const HOSTILE_NEUTRAL_ATTACK_THRESHOLD = 50;
 const WEAKER_NEUTRAL_ATTACK_RATIO = 1.5;
@@ -467,6 +468,7 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         return proposal ? [proposal] : [];
       }),
       ...spyPlanning.requests.map((request, index) => createSpyMissionProposal(context, request, index)),
+      ...spyPlanning.combatIntelRequests.map((request, index) => createAttackMissionProposal(context, request, index)),
       ...safetyScoutPlanning.spyRequests.map((request, index) => createSpyMissionProposal(context, request, index + spyPlanning.requests.length)),
       ...safetyScoutPlanning.scoutAttackRequests.map((request, index) => createAttackMissionProposal(context, request, index)),
       ...diplomaticProbeNeedRequests.map((request, index) => createProbeShipNeedProposal(context, request, index)),
@@ -538,6 +540,7 @@ export class BotStrategicDiplomaticSubsystem implements BotSubsystem {
         proposalCap,
         proposalCount: proposals.length,
         spyMissionCount: spyPlanning.requests.length,
+        combatIntelScoutCount: spyPlanning.combatIntelRequests.length,
         bombardmentSafetyScoutCount: safetyScoutPlanning.spyRequests.length + safetyScoutPlanning.scoutAttackRequests.length,
         spyTargetCount: spyPlanning.targetedFactionIds.size,
         blockedSpyShortageCount: spyPlanning.blockedDueToProbeShortage.length,
@@ -5992,6 +5995,7 @@ function createSpyMissionRequests(
   availableFleetSlots: number
 ): {
   requests: SpyMissionRequest[];
+  combatIntelRequests: AttackMissionRequest[];
   blockedDueToProbeShortage: BlockedSpyNeed[];
   targetedFactionIds: Set<number>;
   globalProbeDeficit: number;
@@ -6021,6 +6025,10 @@ function createSpyMissionRequests(
       blockedDueToProbeShortage.push(candidate);
     }
   }
+  const targetedSpyKeys = new Set(requests.map((request) => toCoordinatesKey(request.targetCoordinates)));
+  const combatIntelSlots = Math.max(0, availableFleetSlots - requests.length);
+  const combatIntelRequests = createCombatIntelScoutRequests(context, factions, targetedSpyKeys)
+    .slice(0, combatIntelSlots);
 
   const availableTotalProbes = context.snapshot.planets.reduce((sum, planet) =>
     sum + (planet.ships.undamagedCountByType[ShipType.SPY_PROBE] ?? 0), 0);
@@ -6031,10 +6039,148 @@ function createSpyMissionRequests(
 
   return {
     requests,
+    combatIntelRequests,
     blockedDueToProbeShortage,
     targetedFactionIds: new Set(cappedCandidates.map((candidate) => candidate.faction.faction.playerId)),
     globalProbeDeficit
   };
+}
+
+function createCombatIntelScoutRequests(
+  context: BotSubsystemContext,
+  factions: EvaluatedFaction[],
+  targetedSpyKeys: Set<string>
+): AttackMissionRequest[] {
+  return factions
+    .filter((faction) => faction.faction.currentStatus === DiplomaticStatus.WAR)
+    .flatMap((faction) =>
+      faction.faction.knownPlanets.map((planet) => createCombatIntelScoutRequest(context, faction, planet, targetedSpyKeys))
+    )
+    .filter((request): request is AttackMissionRequest => request !== null)
+    .sort(compareCombatIntelScoutRequests);
+}
+
+function createCombatIntelScoutRequest(
+  context: BotSubsystemContext,
+  faction: EvaluatedFaction,
+  targetPlanet: BotStrategicDiplomaticFactionSnapshot['knownPlanets'][number],
+  targetedSpyKeys: Set<string>
+): AttackMissionRequest | null {
+  if (targetPlanet.lastRelevantReportAge === null || targetPlanet.lastRelevantReportAge > 120) {
+    return null;
+  }
+  if (targetPlanet.intelDepth >= DIPLOMATIC_COMBAT_INTEL_TARGET_DEPTH) {
+    return null;
+  }
+  const targetKey = toCoordinatesKey(targetPlanet.coordinates);
+  if (targetedSpyKeys.has(targetKey)) {
+    return null;
+  }
+
+  const candidate = context.snapshot.planets
+    .map((originPlanet) => createCombatIntelScoutOriginCandidate(originPlanet, targetPlanet.coordinates))
+    .filter((entry): entry is {
+      originPlanet: BotPlanetSnapshot;
+      scoutType: ShipType;
+      travelDistance: number;
+      travelTurns: number;
+      strength: number;
+    } => entry !== null)
+    .sort((left, right) =>
+      left.travelTurns - right.travelTurns
+      || resolveScoutShipPreference(left.scoutType) - resolveScoutShipPreference(right.scoutType)
+      || right.strength - left.strength
+      || left.originPlanet.coordinates.x - right.originPlanet.coordinates.x
+      || left.originPlanet.coordinates.y - right.originPlanet.coordinates.y
+      || left.originPlanet.coordinates.z - right.originPlanet.coordinates.z
+    )[0] ?? null;
+
+  if (!candidate) {
+    return null;
+  }
+
+  return {
+    kind: 'ATTACK',
+    phase: 'DIRECT',
+    faction,
+    targetPlanet,
+    originPlanet: candidate.originPlanet,
+    ships: [{
+      type: candidate.scoutType,
+      undamagedAmount: 1,
+      damagedAmount: 0
+    }],
+    requiredStrength: 1,
+    selectedStrength: candidate.strength,
+    travelDistance: candidate.travelDistance,
+    travelTurns: candidate.travelTurns,
+    score: Math.round(
+      470
+      + (faction.statusPriorityWeight * 5)
+      + ((DIPLOMATIC_COMBAT_INTEL_TARGET_DEPTH - targetPlanet.intelDepth) * 18)
+      - (candidate.travelTurns * 8)
+      - (targetPlanet.lastRelevantReportAge * 0.5)
+    ),
+    scoutOnly: true,
+    estimatedPlunder: 0,
+    cargoCapacity: 0,
+    ambushRisk: Math.max(25, Math.round(targetPlanet.totalShipsAmount + targetPlanet.totalDefencesAmount))
+  };
+}
+
+function createCombatIntelScoutOriginCandidate(
+  originPlanet: BotPlanetSnapshot,
+  targetCoordinates: { x: number; y: number; z: number }
+): {
+  originPlanet: BotPlanetSnapshot;
+  scoutType: ShipType;
+  travelDistance: number;
+  travelTurns: number;
+  strength: number;
+} | null {
+  const scoutType = resolvePreferredScoutShipType(originPlanet);
+  if (!scoutType) {
+    return null;
+  }
+
+  const travelDistance = calculateTravelDistance(originPlanet.coordinates, targetCoordinates);
+  const ships = [{ type: scoutType, undamagedAmount: 1, damagedAmount: 0 }];
+  if (!hasEnoughDeuteriumForShips(originPlanet, ships, travelDistance)) {
+    return null;
+  }
+
+  return {
+    originPlanet,
+    scoutType,
+    travelDistance,
+    travelTurns: resolveTravelTurns(originPlanet, travelDistance),
+    strength: estimateShipCombatPower(scoutType)
+  };
+}
+
+function resolveScoutShipPreference(shipType: ShipType): number {
+  switch (shipType) {
+    case ShipType.CRUISER:
+      return 0;
+    case ShipType.BATTLE_SHIP:
+      return 1;
+    case ShipType.FRIGATE:
+      return 2;
+    default:
+      return 9;
+  }
+}
+
+function compareCombatIntelScoutRequests(
+  left: AttackMissionRequest,
+  right: AttackMissionRequest
+): number {
+  return right.score - left.score
+    || left.travelTurns - right.travelTurns
+    || left.travelDistance - right.travelDistance
+    || left.originPlanet.coordinates.x - right.originPlanet.coordinates.x
+    || left.originPlanet.coordinates.y - right.originPlanet.coordinates.y
+    || left.originPlanet.coordinates.z - right.originPlanet.coordinates.z;
 }
 
 function hasStaleOpenedWarTargetForSpy(
@@ -6591,8 +6737,9 @@ function createAttackMissionProposal(
     blockers: [],
     expiresOnTurn: context.snapshot.turn + 1,
     debug: {
-      missionSection: 'GLOBAL',
+      missionSection: request.scoutOnly ? 'DIPLOMATIC_INTEL' : 'GLOBAL',
       missionType: FleetMissionType.ATTACK,
+      missionPhase: request.scoutOnly ? 'COMBAT_INTEL' : request.phase,
       attackKind: request.scoutOnly ? 'SCOUT' : isPostBreakRaid ? 'RAID' : 'FULL',
       attackPhase: request.phase,
       targetPlayerId: request.faction.faction.playerId,

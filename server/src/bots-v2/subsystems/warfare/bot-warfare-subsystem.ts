@@ -198,6 +198,7 @@ const STRUCTURAL_VISIBILITY_THRESHOLD = 1.5;
 const FOREIGN_RECYCLE_INTEL_MAX_AGE = 20;
 const CRUISER_FOCUS_AVG_INDUSTRY_THRESHOLD = 3.8;
 const CRUISER_BREAK_FLEET_TARGET = 8;
+const LOCAL_CRUISER_BASELINE_TARGET = 4;
 const MIN_HOME_GUARD_JUMP_SHIPS = 2;
 const MAX_WARFARE_RECYCLE_FLEET_SLOTS = 2;
 const WARFARE_PRODUCTION_BUDGET_SLICE = 0.25;
@@ -1205,6 +1206,10 @@ function evaluateProductionGoal(
   }
 
   const bonusFactor = resolveProductionBonusFactor(planet, shipType);
+  const localCruiserBaselineBonusFactor = resolveLocalCruiserBaselineBonusFactor(planet, shipType);
+  const localCruiserBaselineDeficit = shipType === ShipType.CRUISER
+    ? resolveLocalCruiserBaselineDeficit(planet)
+    : 0;
   const smallShipPenaltyMultiplier = resolveSmallShipPenaltyMultiplier(context, planet, shipType);
   const postCruiserSmallShipPenaltyMultiplier = resolvePostCruiserSmallShipPenaltyMultiplier(planet, shipType);
   const transporterPenaltyMultiplier = resolveTransporterPenaltyMultiplier(context, planet, shipType);
@@ -1243,6 +1248,9 @@ function evaluateProductionGoal(
       isCargoShip: isCargoShipType(shipType),
       orderAmount: immediateRequest.amount,
       queueRemainingEtc: planet.power.shipyardQueueRemainingEtc,
+      localCruiserBaselineTarget: shipType === ShipType.CRUISER ? LOCAL_CRUISER_BASELINE_TARGET : null,
+      localCruiserBaselineDeficit,
+      localCruiserBaselineBonusFactor: roundToTwoDecimals(localCruiserBaselineBonusFactor),
       smallShipPenaltyMultiplier: roundToTwoDecimals(smallShipPenaltyMultiplier),
       postCruiserSmallShipPenaltyMultiplier: roundToTwoDecimals(postCruiserSmallShipPenaltyMultiplier),
       transporterPenaltyMultiplier: roundToTwoDecimals(transporterPenaltyMultiplier),
@@ -1826,7 +1834,15 @@ function resolveProductionOrderAmount(
   const targetBudget = Math.max(1, Math.floor(budgetEnvelope * deterministicShare));
   const totalCost = Math.max(1, Math.floor(blueprint.cost.getTotalResourceAmount()));
 
-  return Math.max(1, Math.floor(targetBudget / totalCost));
+  const budgetAmount = Math.max(1, Math.floor(targetBudget / totalCost));
+  const localCruiserBaselineDeficit = shipType === ShipType.CRUISER
+    ? resolveLocalCruiserBaselineDeficit(planet)
+    : 0;
+  if (localCruiserBaselineDeficit > 0) {
+    return Math.min(localCruiserBaselineDeficit, budgetAmount);
+  }
+
+  return budgetAmount;
 }
 
 function resolveWarfareProductionBudgetEnvelope(
@@ -1905,8 +1921,42 @@ function resolveProductionBonusFactor(
 ): number {
   let bonusFactor = 1;
   bonusFactor *= 1 + resolveDistributionBonusRatio(planet, shipType);
+  bonusFactor *= resolveLocalCruiserBaselineBonusFactor(planet, shipType);
   bonusFactor *= resolveFollowThroughBonusFactor(planet, shipType);
   return Math.min(BONUS_FACTOR_CEILING, Math.max(1, bonusFactor));
+}
+
+function resolveLocalCruiserBaselineBonusFactor(
+  planet: BotPlanetSnapshot,
+  shipType: ShipTypeT
+): number {
+  if (shipType !== ShipType.CRUISER) {
+    return 1;
+  }
+
+  const deficit = resolveLocalCruiserBaselineDeficit(planet);
+  if (deficit <= 0) {
+    return 1;
+  }
+
+  return 1 + Math.min(1.2, deficit * 0.35);
+}
+
+function resolveLocalCruiserBaselineDeficit(planet: BotPlanetSnapshot): number {
+  if (!isLocalCruiserBaselinePlanet(planet)) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    LOCAL_CRUISER_BASELINE_TARGET - (planet.ships.installedCountByType[ShipType.CRUISER] ?? 0)
+  );
+}
+
+function isLocalCruiserBaselinePlanet(planet: BotPlanetSnapshot): boolean {
+  return planet.maturityStage === 'DEVELOPED'
+    || planet.maturityStage === 'MILITARY_CAPABLE'
+    || planet.maturityStage === 'STRATEGIC_HUB';
 }
 
 function resolveUnlockBonusFactor(

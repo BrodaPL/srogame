@@ -380,6 +380,69 @@ describe('BotStrategicDiplomaticSubsystem', () => {
     expect(spyProposals[0]?.debug.targetStatus).toBe(DiplomaticStatus.WAR);
   });
 
+  it('uses a single cruiser combat-intel attack when war spy intel remains insufficient', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.currentTurn = 80;
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 3);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 70, { forcedReportLevel: 4 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const combatIntelAttack = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionSection === 'DIPLOMATIC_INTEL'
+      && proposal.debug.missionPhase === 'COMBAT_INTEL'
+    );
+
+    expect(combatIntelAttack).toBeDefined();
+    expect(combatIntelAttack?.requestPayload.ships).toEqual([
+      { type: ShipType.CRUISER, undamagedAmount: 1, damagedAmount: 0 }
+    ]);
+    expect(combatIntelAttack?.debug.attackKind).toBe('SCOUT');
+  });
+
+  it('falls back to one available jump-capable warship for combat-intel attacks', () => {
+    const { galaxy, bot, botPlanet, playerEnemy, playerEnemyPlanet } = createStrategicDiplomaticWorld();
+    galaxy.currentTurn = 80;
+    galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(bot.playerId, playerEnemy.playerId, DiplomaticStatus.WAR)
+    );
+    botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.BATTLE_SHIP, 2);
+    markPlanetScanned(bot, playerEnemy, playerEnemyPlanet, 70, { forcedReportLevel: 4 });
+
+    const result = runStrategicDiplomaticSubsystem(galaxy, bot);
+    const combatIntelAttack = result.result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionSection === 'DIPLOMATIC_INTEL'
+    );
+
+    expect(combatIntelAttack).toBeDefined();
+    expect(combatIntelAttack?.requestPayload.ships).toEqual([
+      { type: ShipType.BATTLE_SHIP, undamagedAmount: 1, damagedAmount: 0 }
+    ]);
+  });
+
+  it('does not use combat-intel attacks against non-war contacts', () => {
+    const alliedWorld = createStrategicDiplomaticWorld();
+    alliedWorld.galaxy.diplomaticRelations.push(
+      createDiplomaticRelation(alliedWorld.bot.playerId, alliedWorld.playerEnemy.playerId, DiplomaticStatus.ALLIED)
+    );
+    alliedWorld.botPlanet.rBDSFTQ.ships.addUndamaged(ShipType.CRUISER, 3);
+    markPlanetScanned(alliedWorld.bot, alliedWorld.playerEnemy, alliedWorld.playerEnemyPlanet, 0, { forcedReportLevel: 4 });
+
+    const alliedResult = runStrategicDiplomaticSubsystem(alliedWorld.galaxy, alliedWorld.bot);
+
+    expect(alliedResult.result.proposals.some((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.ATTACK
+      && proposal.debug.missionSection === 'DIPLOMATIC_INTEL'
+    )).toBe(false);
+  });
+
   it('emits up to two per-planet probe ship-need requests from global diplomatic deficit', () => {
     const { galaxy, bot, playerEnemy, botPlanet, playerEnemyPlanet } = createStrategicDiplomaticWorld();
     const secondSystem = new SolarSystem('DipAux', 4, false, false, { x: 1, y: 0 }, new Set(), new Map());

@@ -154,6 +154,71 @@ describe('BotWarfareSubsystem', () => {
     )).toBe(true);
   });
 
+  it('adds local cruiser baseline pressure on mature military-capable planets', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 6);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 5);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 7);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 5);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 4);
+    planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+    setBaselineShipTech(bot, 5);
+    bot.setTechLevel(TechnologyType.RAILGUNS_WEAPONS, 1);
+
+    const result = runWarfareSubsystem(galaxy, bot);
+    const cruiserGoal = result.goals?.find((goal) =>
+      goal.goalFamily === 'PRODUCTION'
+      && goal.finalShipType === ShipType.CRUISER
+    );
+    const cruiserProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'SHIPYARD'
+      && (proposal.requestPayload as { shipType?: ShipType }).shipType === ShipType.CRUISER
+    );
+
+    expect(cruiserGoal).toBeDefined();
+    expect(cruiserGoal?.debug.localCruiserBaselineTarget).toBe(4);
+    expect(cruiserGoal?.debug.localCruiserBaselineDeficit).toBe(4);
+    expect(cruiserGoal?.debug.localCruiserBaselineBonusFactor).toBeGreaterThan(1);
+    expect(cruiserProposal).toBeDefined();
+    expect(cruiserProposal?.requestPayload.amount).toBeLessThanOrEqual(4);
+  });
+
+  it('removes local cruiser baseline pressure once the mature planet has four cruisers', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseWarfarePlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 6);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 6);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 5);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 5);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 7);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 5);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 4);
+    planet.setBuildingLevel(BuildingType.NANITE_FACTORY, 1);
+    setBaselineShipTech(bot, 5);
+    bot.setTechLevel(TechnologyType.RAILGUNS_WEAPONS, 1);
+    addInstalledShips(planet, {
+      [ShipType.CRUISER]: 4
+    });
+
+    const result = runWarfareSubsystem(galaxy, bot);
+    const cruiserGoal = result.goals?.find((goal) =>
+      goal.goalFamily === 'PRODUCTION'
+      && goal.finalShipType === ShipType.CRUISER
+    );
+
+    expect(cruiserGoal).toBeDefined();
+    expect(cruiserGoal?.debug.localCruiserBaselineTarget).toBe(4);
+    expect(cruiserGoal?.debug.localCruiserBaselineDeficit).toBe(0);
+    expect(cruiserGoal?.debug.localCruiserBaselineBonusFactor).toBe(1);
+  });
+
   it('reserves capped cargo production requests when cargo ships are unlocked', () => {
     const { galaxy, bot, planet } = createBotWorld();
     configureBaseWarfarePlanet(planet);
