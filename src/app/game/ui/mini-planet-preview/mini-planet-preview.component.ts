@@ -153,6 +153,10 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   }
 
   protected diplomacyRelationKey(): DiplomacyVisualKey | 'none' {
+    if (this.planet?.info.ownerPlayerType === PlayerType.NEUTRAL) {
+      return 'none';
+    }
+
     const status = this.diplomacyStatusForOwner(this.planet?.info.ownerId ?? null);
     return status ? diplomacyVisualKey(status) : 'none';
   }
