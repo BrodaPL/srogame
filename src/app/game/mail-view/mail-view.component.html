@@ -13,14 +13,14 @@
     </section>
   } @else {
     @if (actionError) {
-      <section class="status status--error">
+      <section class="status status--error mail-view__status">
         <h3>Mail action failed</h3>
         <p>{{ actionError }}</p>
       </section>
     }
 
     @if (actionSuccess) {
-      <section class="status status--success">
+      <section class="status status--success mail-view__status">
         <h3>Mail updated</h3>
         <p>{{ actionSuccess }}</p>
       </section>
@@ -30,325 +30,287 @@
       <div>
         <p class="eyebrow">Communications</p>
         <h1>Mail</h1>
-        <p class="overview-muted">Manage requests, read player messages, and compose new outgoing mail.</p>
       </div>
-      <div class="overview-stats mail-view__summary">
-        <div class="overview-stat">
-          <span class="overview-stat__label">Current turn</span>
-          <span class="overview-stat__value">{{ currentTurn ?? '--' }}</span>
-        </div>
-        <div class="overview-stat">
-          <span class="overview-stat__label">Unread messages</span>
-          <span class="overview-stat__value">{{ unreadMessages().length }}</span>
-        </div>
-        <div class="overview-stat">
-          <span class="overview-stat__label">Pending requests</span>
-          <span class="overview-stat__value">{{ pendingRequests().length }}</span>
-        </div>
+      <div class="mail-view__summary">
+        <span>Turn {{ currentTurn ?? '--' }}</span>
+        <span>{{ unreadMessages().length }} unread</span>
+        <span>{{ actionRequiredRequests().length }} action required</span>
       </div>
       <button
         type="button"
-        class="top-menu__button top-menu__button--help"
+        class="mail-view__button mail-view__button--primary"
         data-tutorial-id="mail-compose-action"
         (click)="openNewMessageComposer()">
         Send message
       </button>
     </header>
 
-    <section class="mail-view__layout">
-      <section class="overview-card mail-view__requests">
-        <div class="mail-view__panel-head" data-tutorial-id="mail-pending-requests">
+    <section class="mail-view__console">
+      <aside class="overview-card mail-view__folders">
+        <div class="mail-view__pane-head">
+          <h3>Folders</h3>
+        </div>
+        <nav class="mail-view__folder-list" aria-label="Mail folders">
+          @for (folder of mailFolders(); track folder.id) {
+            <button
+              type="button"
+              class="mail-view__folder"
+              [class.mail-view__folder--active]="activeFolderId === folder.id"
+              [class.mail-view__folder--urgent]="folder.tone === 'urgent'"
+              [class.mail-view__folder--muted]="folder.tone === 'muted'"
+              [attr.data-tutorial-id]="folder.id === 'actionRequired' ? 'mail-pending-requests' : folder.id === 'history' ? 'mail-resolved-requests' : null"
+              (click)="selectFolder(folder.id)">
+              <span>{{ folder.label }}</span>
+              <strong>{{ folder.count }}</strong>
+            </button>
+          }
+        </nav>
+      </aside>
+
+      <section class="overview-card mail-view__list-pane" data-tutorial-id="mail-messages">
+        <div class="mail-view__pane-head">
           <div>
-            <h3>Pending Requests</h3>
-            <p class="overview-muted">Incoming requests must be resolved before End Turn becomes available.</p>
+            <h3>{{ activeFolder().label }}</h3>
+            <p class="overview-muted">{{ activeFolder().count }} item(s)</p>
           </div>
-          <span class="badge badge--jump">{{ pendingRequests().length }}</span>
         </div>
 
-        @if (pendingRequests().length === 0) {
-          <p class="overview-muted">No pending requests.</p>
+        @if (visibleItems().length === 0) {
+          <p class="overview-empty">No items in this folder.</p>
         } @else {
-          <div class="mail-view__card-list">
-            @for (request of pendingRequests(); track request.requestId) {
-              <article class="mail-view__card">
-                <div class="mail-view__card-head">
-                  <h4>{{ requestCardTitle(request) }}</h4>
-                  <span [class]="requestBadgeClass(request)">{{ requestBadge(request) }}</span>
-                </div>
-                <p class="overview-muted">{{ requestSummary(request) }}</p>
-                <p class="overview-muted">{{ requestTimingLine(request) }}</p>
-                <p class="overview-muted">{{ requestDetailLine(request) }}</p>
-                <div class="mail-view__actions">
-                  @if (canAccept(request)) {
-                    <button
-                      type="button"
-                      class="top-menu__button"
-                      [disabled]="isRequestActionPending(request)"
-                      (click)="acceptRequest(request)">
-                      Accept
-                    </button>
-                  }
-                  @if (canPartialApprove(request)) {
-                    <button
-                      type="button"
-                      class="top-menu__button"
-                      [disabled]="isRequestActionPending(request)"
-                      (click)="isPartialApprovalOpen(request) ? closePartialApproval() : openPartialApproval(request)">
-                      {{ isPartialApprovalOpen(request) ? 'Close partial' : 'Partial approve' }}
-                    </button>
-                  }
-                  @if (canReject(request)) {
-                    <button
-                      type="button"
-                      class="top-menu__button mail-view__button--danger"
-                      [disabled]="isRequestActionPending(request)"
-                      (click)="rejectRequest(request)">
-                      Reject
-                    </button>
-                  }
-                  @if (canCancel(request)) {
-                    <button
-                      type="button"
-                      class="top-menu__button mail-view__button--danger"
-                      [disabled]="isRequestActionPending(request)"
-                      (click)="cancelRequest(request)">
-                      Cancel
-                    </button>
-                  }
-                </div>
-                @if (isPartialApprovalOpen(request)) {
-                  @if (maintenanceRequest(request); as maintenance) {
-                    <section class="mail-view__partial-approval">
-                      <label class="mail-view__partial-field">
-                        <span>Fuel (deuterium)</span>
-                        <input
-                          type="number"
-                          min="0"
-                          [max]="maintenance.requested.fuel"
-                          [ngModel]="partialApprovalFuel"
-                          (ngModelChange)="updatePartialApprovalFuel($event)" />
-                      </label>
-
-                      @if (maintenance.requested.ships.length > 0) {
-                        <div class="mail-view__partial-group">
-                          <h5>Ships</h5>
-                          @for (entry of maintenance.requested.ships; track entry.type) {
-                            <label class="mail-view__partial-field">
-                              <span>{{ entry.type }} (max {{ entry.amount }})</span>
-                              <input
-                                type="number"
-                                min="0"
-                                [max]="entry.amount"
-                                [ngModel]="partialApprovalShipAmounts[entry.type] ?? 0"
-                                (ngModelChange)="updatePartialShipAmount(entry.type, $event)" />
-                            </label>
-                          }
-                        </div>
-                      }
-
-                      @if (maintenance.requested.bombs.length > 0) {
-                        <div class="mail-view__partial-group">
-                          <h5>Bombs</h5>
-                          @for (entry of maintenance.requested.bombs; track entry.type) {
-                            <label class="mail-view__partial-field">
-                              <span>{{ entry.type }} (max {{ entry.amount }})</span>
-                              <input
-                                type="number"
-                                min="0"
-                                [max]="entry.amount"
-                                [ngModel]="partialApprovalBombAmounts[entry.type] ?? 0"
-                                (ngModelChange)="updatePartialBombAmount(entry.type, $event)" />
-                            </label>
-                          }
-                        </div>
-                      }
-
-                      <div class="mail-view__actions">
-                        <button
-                          type="button"
-                          class="top-menu__button"
-                          [disabled]="isRequestActionPending(request)"
-                          (click)="submitPartialApproval(maintenance)">
-                          Send partial approval
-                        </button>
-                      </div>
-                    </section>
-                  }
-                  @if (supportRequest(request); as support) {
-                    @if (support.supportType === 'RESOURCE_SUPPORT') {
-                      <section class="mail-view__partial-approval">
-                        <label class="mail-view__partial-field">
-                          <span>Metal</span>
-                          <input
-                            type="number"
-                            min="0"
-                            [max]="support.requestedResources?.metal ?? 0"
-                            [ngModel]="partialApprovalMetal"
-                            (ngModelChange)="updatePartialResourceMetal($event)" />
-                        </label>
-                        <label class="mail-view__partial-field">
-                          <span>Crystal</span>
-                          <input
-                            type="number"
-                            min="0"
-                            [max]="support.requestedResources?.crystal ?? 0"
-                            [ngModel]="partialApprovalCrystal"
-                            (ngModelChange)="updatePartialResourceCrystal($event)" />
-                        </label>
-                        <label class="mail-view__partial-field">
-                          <span>Deuterium</span>
-                          <input
-                            type="number"
-                            min="0"
-                            [max]="support.requestedResources?.deuterium ?? 0"
-                            [ngModel]="partialApprovalDeuterium"
-                            (ngModelChange)="updatePartialResourceDeuterium($event)" />
-                        </label>
-                        <div class="mail-view__actions">
-                          <button
-                            type="button"
-                            class="top-menu__button"
-                            [disabled]="isRequestActionPending(request)"
-                            (click)="submitPartialApproval(support)">
-                            Send partial approval
-                          </button>
-                        </div>
-                      </section>
-                    }
-                  }
-                }
-              </article>
-            }
-          </div>
-        }
-
-        <div
-          class="mail-view__panel-head mail-view__panel-head--spaced"
-          data-tutorial-id="mail-resolved-requests">
-          <div>
-            <h3>Resolved Requests</h3>
-            <p class="overview-muted">Resolved requests stay here until you delete them manually.</p>
-          </div>
-          <span class="badge">{{ resolvedRequests().length }}</span>
-        </div>
-
-        @if (resolvedRequests().length === 0) {
-          <p class="overview-muted">No resolved request history yet.</p>
-        } @else {
-          <div class="mail-view__card-list">
-            @for (request of resolvedRequests(); track request.requestId) {
-              <article class="mail-view__card">
-                <div class="mail-view__card-head">
-                  <h4>{{ requestCardTitle(request) }}</h4>
-                  <span [class]="requestBadgeClass(request)">{{ requestBadge(request) }}</span>
-                </div>
-                <p class="overview-muted">{{ requestSummary(request) }}</p>
-                <p class="overview-muted">Created on turn {{ request.createdTurn }} | {{ requestDetailLine(request) }}</p>
-                <div class="mail-view__actions">
-                  <button
-                    type="button"
-                    class="top-menu__button"
-                    [disabled]="!canDeleteResolvedRequest(request)"
-                    (click)="deleteResolvedRequest(request)">
-                    Delete
-                  </button>
-                </div>
-              </article>
+          <div class="mail-view__item-list">
+            @for (item of visibleItems(); track item.key) {
+              <button
+                type="button"
+                class="mail-view__item"
+                [class.mail-view__item--selected]="isItemSelected(item)"
+                [class.mail-view__item--unread]="item.isUnread"
+                (click)="selectItem(item)">
+                <span class="mail-view__item-head">
+                  <strong>{{ item.title }}</strong>
+                  <span [class]="item.badgeClass">{{ item.badgeLabel }}</span>
+                </span>
+                <span class="mail-view__item-summary">{{ item.summary }}</span>
+                <span class="mail-view__item-meta">{{ item.meta }}</span>
+              </button>
             }
           </div>
         }
       </section>
 
-      <section class="overview-card mail-view__messages" data-tutorial-id="mail-messages">
-        <div class="mail-view__panel-head">
-          <div>
-            <h3>Messages</h3>
-            <p class="overview-muted">Opening a message marks it as read immediately.</p>
-          </div>
-        </div>
-
-        @if (messages.length === 0) {
-          <p class="overview-muted">No messages yet.</p>
-        } @else {
-          <div class="mail-view__message-layout">
-            <div class="mail-view__message-groups">
-              <section>
-                <div class="mail-view__group-head">
-                  <h4>Unread</h4>
-                  <span class="badge badge--jump">{{ unreadMessages().length }}</span>
-                </div>
-                @if (unreadMessages().length === 0) {
-                  <p class="overview-muted">No unread messages.</p>
-                } @else {
-                  <div class="mail-view__message-list">
-                    @for (message of unreadMessages(); track message.messageId) {
-                      <button
-                        type="button"
-                        class="mail-view__message-row"
-                        [class.mail-view__message-row--selected]="selectedMessageId === message.messageId"
-                        (click)="openMessage(message)">
-                        <strong>{{ message.title }}</strong>
-                        <span>{{ senderLabel(message) }}</span>
-                        <small>Turn {{ message.createdTurn }}</small>
-                      </button>
-                    }
-                  </div>
-                }
-              </section>
-
-              <section>
-                <div class="mail-view__group-head">
-                  <h4>Read</h4>
-                  <span class="badge">{{ readMessages().length }}</span>
-                </div>
-                @if (readMessages().length === 0) {
-                  <p class="overview-muted">No read messages.</p>
-                } @else {
-                  <div class="mail-view__message-list">
-                    @for (message of readMessages(); track message.messageId) {
-                      <button
-                        type="button"
-                        class="mail-view__message-row mail-view__message-row--read"
-                        [class.mail-view__message-row--selected]="selectedMessageId === message.messageId"
-                        (click)="openMessage(message)">
-                        <strong>{{ message.title }}</strong>
-                        <span>{{ senderLabel(message) }}</span>
-                        <small>Turn {{ message.createdTurn }}</small>
-                      </button>
-                    }
-                  </div>
-                }
-              </section>
+      <section class="overview-card mail-view__detail-pane">
+        @if (selectedItem(); as item) {
+          @if (item.request; as request) {
+            <div class="mail-view__detail-head">
+              <div>
+                <p class="eyebrow">{{ request.direction === 'incoming' ? 'Incoming request' : 'Outgoing request' }}</p>
+                <h3>{{ requestCardTitle(request) }}</h3>
+              </div>
+              <span [class]="requestBadgeClass(request)">{{ requestBadge(request) }}</span>
             </div>
 
-            <div class="mail-view__message-detail">
-              @if (selectedMessage(); as message) {
-                <div class="mail-view__card-head">
-                  <h4>{{ message.title }}</h4>
-                  <span class="badge">{{ message.isRead ? 'Read' : 'Unread' }}</span>
+            <div class="mail-view__detail-grid">
+              @for (row of requestDetailRows(request); track row.label) {
+                <div class="mail-view__detail-row">
+                  <span>{{ row.label }}</span>
+                  <strong>{{ row.value }}</strong>
                 </div>
-                <p class="overview-muted">From {{ senderLabel(message) }} | Turn {{ message.createdTurn }}</p>
-                <div class="mail-view__message-body">{{ message.body }}</div>
-                <div class="mail-view__actions">
-                  <button
-                    type="button"
-                    class="top-menu__button"
-                    [disabled]="!canReply(message)"
-                    (click)="openReplyComposer(message)">
-                    Reply
-                  </button>
-                  <button
-                    type="button"
-                    class="top-menu__button"
-                    [disabled]="activeMessageDeleteId === message.messageId"
-                    (click)="deleteMessage(message)">
-                    Delete
-                  </button>
-                </div>
-              } @else {
-                <p class="overview-muted">Select a message to read it and open reply controls.</p>
               }
             </div>
+
+            @if (canPartialApprove(request) && isPartialApprovalOpen(request)) {
+              @if (maintenanceRequest(request); as maintenance) {
+                <section class="mail-view__partial-approval">
+                  <div class="mail-view__partial-head">
+                    <h4>Partial maintenance approval</h4>
+                    <button type="button" class="mail-view__text-button" (click)="closePartialApproval()">Close</button>
+                  </div>
+                  <label class="mail-view__partial-field">
+                    <span>Fuel (deuterium)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      [max]="maintenance.requested.fuel"
+                      [ngModel]="partialApprovalFuel"
+                      (ngModelChange)="updatePartialApprovalFuel($event)" />
+                  </label>
+
+                  @if (maintenance.requested.ships.length > 0) {
+                    <div class="mail-view__partial-group">
+                      <h5>Ships</h5>
+                      @for (entry of maintenance.requested.ships; track entry.type) {
+                        <label class="mail-view__partial-field">
+                          <span>{{ entry.type }} (max {{ entry.amount }})</span>
+                          <input
+                            type="number"
+                            min="0"
+                            [max]="entry.amount"
+                            [ngModel]="partialApprovalShipAmounts[entry.type] ?? 0"
+                            (ngModelChange)="updatePartialShipAmount(entry.type, $event)" />
+                        </label>
+                      }
+                    </div>
+                  }
+
+                  @if (maintenance.requested.bombs.length > 0) {
+                    <div class="mail-view__partial-group">
+                      <h5>Bombs</h5>
+                      @for (entry of maintenance.requested.bombs; track entry.type) {
+                        <label class="mail-view__partial-field">
+                          <span>{{ entry.type }} (max {{ entry.amount }})</span>
+                          <input
+                            type="number"
+                            min="0"
+                            [max]="entry.amount"
+                            [ngModel]="partialApprovalBombAmounts[entry.type] ?? 0"
+                            (ngModelChange)="updatePartialBombAmount(entry.type, $event)" />
+                        </label>
+                      }
+                    </div>
+                  }
+
+                  <button
+                    type="button"
+                    class="mail-view__button mail-view__button--primary"
+                    [disabled]="isRequestActionPending(request)"
+                    (click)="submitPartialApproval(maintenance)">
+                    Send partial approval
+                  </button>
+                </section>
+              }
+
+              @if (supportRequest(request); as support) {
+                @if (support.supportType === 'RESOURCE_SUPPORT') {
+                  <section class="mail-view__partial-approval">
+                    <div class="mail-view__partial-head">
+                      <h4>Partial resource approval</h4>
+                      <button type="button" class="mail-view__text-button" (click)="closePartialApproval()">Close</button>
+                    </div>
+                    <label class="mail-view__partial-field">
+                      <span>Metal</span>
+                      <input
+                        type="number"
+                        min="0"
+                        [max]="support.requestedResources?.metal ?? 0"
+                        [ngModel]="partialApprovalMetal"
+                        (ngModelChange)="updatePartialResourceMetal($event)" />
+                    </label>
+                    <label class="mail-view__partial-field">
+                      <span>Crystal</span>
+                      <input
+                        type="number"
+                        min="0"
+                        [max]="support.requestedResources?.crystal ?? 0"
+                        [ngModel]="partialApprovalCrystal"
+                        (ngModelChange)="updatePartialResourceCrystal($event)" />
+                    </label>
+                    <label class="mail-view__partial-field">
+                      <span>Deuterium</span>
+                      <input
+                        type="number"
+                        min="0"
+                        [max]="support.requestedResources?.deuterium ?? 0"
+                        [ngModel]="partialApprovalDeuterium"
+                        (ngModelChange)="updatePartialResourceDeuterium($event)" />
+                    </label>
+                    <button
+                      type="button"
+                      class="mail-view__button mail-view__button--primary"
+                      [disabled]="isRequestActionPending(request)"
+                      (click)="submitPartialApproval(support)">
+                      Send partial approval
+                    </button>
+                  </section>
+                }
+              }
+            }
+
+            <div class="mail-view__actions">
+              @if (canAccept(request)) {
+                <button
+                  type="button"
+                  class="mail-view__button mail-view__button--primary"
+                  [disabled]="isRequestActionPending(request)"
+                  (click)="acceptRequest(request)">
+                  Accept
+                </button>
+              }
+              @if (canPartialApprove(request)) {
+                <button
+                  type="button"
+                  class="mail-view__button"
+                  [disabled]="isRequestActionPending(request)"
+                  (click)="isPartialApprovalOpen(request) ? closePartialApproval() : openPartialApproval(request)">
+                  {{ isPartialApprovalOpen(request) ? 'Close partial' : 'Partial approve' }}
+                </button>
+              }
+              @if (canReject(request)) {
+                <button
+                  type="button"
+                  class="mail-view__button mail-view__button--danger"
+                  [disabled]="isRequestActionPending(request)"
+                  (click)="rejectRequest(request)">
+                  Reject
+                </button>
+              }
+              @if (canCancel(request)) {
+                <button
+                  type="button"
+                  class="mail-view__button mail-view__button--danger"
+                  [disabled]="isRequestActionPending(request)"
+                  (click)="cancelRequest(request)">
+                  Cancel
+                </button>
+              }
+              @if (canDeleteResolvedRequest(request)) {
+                <button
+                  type="button"
+                  class="mail-view__button"
+                  [disabled]="isDeletingRequest(request)"
+                  (click)="deleteResolvedRequest(request)">
+                  Delete history item
+                </button>
+              }
+            </div>
+          }
+
+          @if (item.message; as message) {
+            <div class="mail-view__detail-head">
+              <div>
+                <p class="eyebrow">Message</p>
+                <h3>{{ message.title }}</h3>
+              </div>
+              <span [class]="message.isRead ? 'badge' : 'badge badge--jump'">{{ message.isRead ? 'Read' : 'Unread' }}</span>
+            </div>
+
+            <div class="mail-view__message-meta">
+              <span>From {{ senderLabel(message) }}</span>
+              <span>Turn {{ message.createdTurn }}</span>
+            </div>
+
+            <div class="mail-view__message-body">{{ message.body }}</div>
+
+            <div class="mail-view__actions">
+              <button
+                type="button"
+                class="mail-view__button mail-view__button--primary"
+                [disabled]="!canReply(message)"
+                (click)="openReplyComposer(message)">
+                Reply
+              </button>
+              <button
+                type="button"
+                class="mail-view__button mail-view__button--danger"
+                [disabled]="activeMessageDeleteId === message.messageId"
+                (click)="deleteMessage(message)">
+                Delete
+              </button>
+            </div>
+          }
+        } @else {
+          <div class="mail-view__empty-detail">
+            <h3>No mail selected</h3>
+            <p class="overview-muted">Choose a folder item to inspect details and available actions.</p>
           </div>
         }
       </section>

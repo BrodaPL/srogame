@@ -20,6 +20,33 @@ import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
 import { MessageComposeDialogComponent } from '../ui/message-compose-dialog/message-compose-dialog.component';
 
+type MailFolderId = 'actionRequired' | 'waiting' | 'inbox' | 'history';
+
+type MailFolderVm = {
+  id: MailFolderId;
+  label: string;
+  count: number;
+  tone: 'urgent' | 'normal' | 'muted';
+};
+
+type MailListItemVm = {
+  key: string;
+  kind: 'request' | 'message';
+  title: string;
+  summary: string;
+  meta: string;
+  badgeLabel: string;
+  badgeClass: string;
+  isUnread: boolean;
+  request: MailRequestDto | null;
+  message: PlayerMailMessageDto | null;
+};
+
+type MailDetailRowVm = {
+  label: string;
+  value: string;
+};
+
 @Component({
   selector: 'app-mail-view',
   imports: [TopMenuComponent, MessageComposeDialogComponent, FormsModule],
@@ -37,6 +64,8 @@ export class MailViewComponent implements OnInit {
   protected requests: MailRequestDto[] = [];
   protected recipients: MailRecipientDto[] = [];
   protected allianceRecipientCount = 0;
+  protected activeFolderId: MailFolderId = 'actionRequired';
+  protected selectedItemKey: string | null = null;
   protected selectedMessageId: number | null = null;
   protected activeRequestActionKey: string | null = null;
   protected activeMessageDeleteId: number | null = null;
@@ -78,6 +107,18 @@ export class MailViewComponent implements OnInit {
     return this.requests.filter((request) => request.state !== 'PENDING');
   }
 
+  protected actionRequiredRequests(): MailRequestDto[] {
+    return this.sortRequests(this.requests.filter((request) =>
+      request.state === 'PENDING' && request.direction === 'incoming'
+    ));
+  }
+
+  protected waitingRequests(): MailRequestDto[] {
+    return this.sortRequests(this.requests.filter((request) =>
+      request.state === 'PENDING' && request.direction === 'outgoing'
+    ));
+  }
+
   protected unreadMessages(): PlayerMailMessageDto[] {
     return this.messages.filter((message) => !message.isRead);
   }
@@ -92,6 +133,91 @@ export class MailViewComponent implements OnInit {
     }
 
     return this.messages.find((message) => message.messageId === this.selectedMessageId) ?? null;
+  }
+
+  protected mailFolders(): MailFolderVm[] {
+    return [
+      {
+        id: 'actionRequired',
+        label: 'Action Required',
+        count: this.actionRequiredRequests().length,
+        tone: this.actionRequiredRequests().length > 0 ? 'urgent' : 'normal'
+      },
+      {
+        id: 'waiting',
+        label: 'Waiting',
+        count: this.waitingRequests().length,
+        tone: 'normal'
+      },
+      {
+        id: 'inbox',
+        label: 'Inbox',
+        count: this.messages.length,
+        tone: this.unreadMessages().length > 0 ? 'urgent' : 'normal'
+      },
+      {
+        id: 'history',
+        label: 'History',
+        count: this.resolvedRequests().length,
+        tone: 'muted'
+      }
+    ];
+  }
+
+  protected activeFolder(): MailFolderVm {
+    return this.mailFolders().find((folder) => folder.id === this.activeFolderId)
+      ?? this.mailFolders()[0];
+  }
+
+  protected visibleItems(): MailListItemVm[] {
+    switch (this.activeFolderId) {
+      case 'actionRequired':
+        return this.actionRequiredRequests().map((request) => this.requestListItem(request));
+      case 'waiting':
+        return this.waitingRequests().map((request) => this.requestListItem(request));
+      case 'history':
+        return this.sortRequests(this.resolvedRequests()).map((request) => this.requestListItem(request));
+      case 'inbox':
+      default:
+        return this.sortedMessages().map((message) => this.messageListItem(message));
+    }
+  }
+
+  protected selectedItem(): MailListItemVm | null {
+    const items = this.visibleItems();
+    if (items.length === 0) {
+      return null;
+    }
+
+    return items.find((item) => item.key === this.selectedItemKey) ?? items[0];
+  }
+
+  protected selectedRequest(): MailRequestDto | null {
+    const item = this.selectedItem();
+    return item?.kind === 'request' ? item.request : null;
+  }
+
+  protected selectFolder(folderId: MailFolderId): void {
+    this.activeFolderId = folderId;
+    this.closePartialApproval();
+    this.syncSelectedMailItem(null);
+  }
+
+  protected selectItem(item: MailListItemVm): void {
+    this.selectedItemKey = item.key;
+    this.closePartialApproval();
+    if (item.kind === 'message' && item.message) {
+      this.openMessage(item.message);
+      return;
+    }
+
+    this.selectedMessageId = null;
+    this.actionError = null;
+    this.actionSuccess = null;
+  }
+
+  protected isItemSelected(item: MailListItemVm): boolean {
+    return this.selectedItem()?.key === item.key;
   }
 
   protected openMessage(message: PlayerMailMessageDto): void {
@@ -296,6 +422,17 @@ export class MailViewComponent implements OnInit {
     return `Created on turn ${request.createdTurn} | Expires on turn ${request.expiresOnTurn}`;
   }
 
+  protected requestDetailRows(request: MailRequestDto): MailDetailRowVm[] {
+    return [
+      { label: 'Counterparty', value: this.counterpartyLabel(request) },
+      { label: 'State', value: request.state },
+      { label: 'Direction', value: request.direction === 'incoming' ? 'Incoming' : 'Outgoing' },
+      { label: 'Timing', value: this.requestTimingLine(request) },
+      { label: 'Summary', value: this.requestSummary(request) },
+      { label: 'Details', value: this.requestDetailLine(request) }
+    ];
+  }
+
   protected canAccept(request: MailRequestDto): boolean {
     return request.state === 'PENDING' && request.direction === 'incoming' && !this.isRequestActionPending(request);
   }
@@ -438,9 +575,10 @@ export class MailViewComponent implements OnInit {
       }))
       .subscribe({
         next: () => {
+          const deletedItemKey = `message:${message.messageId}`;
           this.messages = this.messages.filter((entry) => entry.messageId !== message.messageId);
-          if (this.selectedMessageId === message.messageId) {
-            this.selectedMessageId = this.messages[0]?.messageId ?? null;
+          if (this.selectedItemKey === deletedItemKey || this.selectedMessageId === message.messageId) {
+            this.syncSelectedMailItem(null);
           }
           this.syncMailCounts();
           this.actionSuccess = 'Message deleted.';
@@ -470,7 +608,11 @@ export class MailViewComponent implements OnInit {
       }))
       .subscribe({
         next: () => {
+          const deletedItemKey = this.requestKey(request);
           this.requests = this.requests.filter((entry) => this.requestKey(entry) !== this.requestKey(request));
+          if (this.selectedItemKey === deletedItemKey) {
+            this.syncSelectedMailItem(null);
+          }
           this.syncMailCounts();
           this.actionSuccess = 'Request deleted.';
         },
@@ -612,17 +754,16 @@ export class MailViewComponent implements OnInit {
   }
 
   private applyMailResponse(response: MailViewResponse): void {
-    const previousSelectedId = this.selectedMessageId;
+    const previousSelectedItemKey = this.selectedItemKey
+      ?? (this.selectedMessageId !== null ? `message:${this.selectedMessageId}` : null);
     this.currentTurn = response.currentTurn;
     this.currentPlayerId = response.currentPlayerId;
     this.messages = [...response.messages];
     this.requests = [...response.requests];
     this.recipients = [...response.recipients];
     this.allianceRecipientCount = response.allianceRecipientCount;
-    this.selectedMessageId = previousSelectedId !== null && this.messages.some((entry) => entry.messageId === previousSelectedId)
-      ? previousSelectedId
-      : this.messages[0]?.messageId ?? null;
     this.closePartialApproval();
+    this.syncSelectedMailItem(previousSelectedItemKey);
     this.syncMailCounts();
     this.openTutorialAfterRender();
   }
@@ -671,6 +812,79 @@ export class MailViewComponent implements OnInit {
 
   private requestKey(request: MailRequestDto): string {
     return `${request.requestType}:${request.requestId}`;
+  }
+
+  private requestListItem(request: MailRequestDto): MailListItemVm {
+    return {
+      key: this.requestKey(request),
+      kind: 'request',
+      title: this.requestCardTitle(request),
+      summary: this.requestSummary(request),
+      meta: this.requestTimingLine(request),
+      badgeLabel: this.requestBadge(request),
+      badgeClass: this.requestBadgeClass(request),
+      isUnread: request.state === 'PENDING' && request.direction === 'incoming',
+      request,
+      message: null
+    };
+  }
+
+  private messageListItem(message: PlayerMailMessageDto): MailListItemVm {
+    return {
+      key: `message:${message.messageId}`,
+      kind: 'message',
+      title: message.title,
+      summary: this.senderLabel(message),
+      meta: `Turn ${message.createdTurn}`,
+      badgeLabel: message.isRead ? 'Read' : 'Unread',
+      badgeClass: message.isRead ? 'badge' : 'badge badge--jump',
+      isUnread: !message.isRead,
+      request: null,
+      message
+    };
+  }
+
+  private sortedMessages(): PlayerMailMessageDto[] {
+    return [...this.messages].sort((left, right) =>
+      right.createdTurn - left.createdTurn || right.messageId - left.messageId
+    );
+  }
+
+  private sortRequests(requests: MailRequestDto[]): MailRequestDto[] {
+    return [...requests].sort((left, right) =>
+      left.expiresOnTurn - right.expiresOnTurn || right.createdTurn - left.createdTurn || left.requestId - right.requestId
+    );
+  }
+
+  private syncSelectedMailItem(preferredKey: string | null): void {
+    const activeItems = this.visibleItems();
+    const preferredActiveItem = preferredKey
+      ? activeItems.find((item) => item.key === preferredKey) ?? null
+      : null;
+
+    if (preferredActiveItem) {
+      this.selectedItemKey = preferredActiveItem.key;
+      this.selectedMessageId = preferredActiveItem.message?.messageId ?? null;
+      return;
+    }
+
+    if (activeItems.length > 0) {
+      this.selectedItemKey = activeItems[0].key;
+      this.selectedMessageId = activeItems[0].message?.messageId ?? null;
+      return;
+    }
+
+    const fallbackFolder = this.mailFolders().find((folder) => folder.count > 0) ?? null;
+    if (!fallbackFolder) {
+      this.selectedItemKey = null;
+      this.selectedMessageId = null;
+      return;
+    }
+
+    this.activeFolderId = fallbackFolder.id;
+    const fallbackItem = this.visibleItems()[0] ?? null;
+    this.selectedItemKey = fallbackItem?.key ?? null;
+    this.selectedMessageId = fallbackItem?.message?.messageId ?? null;
   }
 
   private counterpartyLabel(request: MailRequestDto): string {
