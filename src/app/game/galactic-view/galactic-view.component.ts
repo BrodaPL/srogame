@@ -52,6 +52,13 @@ type CellFillKind =
   | 'humanBotAnyNeutral'
   | 'playerAndEnemyAnyNeutral';
 
+type CellRelationKey =
+  | 'self'
+  | 'war'
+  | 'neutral'
+  | 'peace'
+  | 'allied';
+
 type GalacticCellVm = {
   x: number;
   y: number;
@@ -65,6 +72,7 @@ type GalacticCellVm = {
   hasOwnFleetPresence: boolean;
   isSensorScannable: boolean;
   noteBorderColor: string | null;
+  relationBackground: string | null;
   coordsLabel: string;
   tooltip: string;
 };
@@ -1194,6 +1202,7 @@ export class GalacticViewComponent implements OnInit {
     const asteroidsCount = isVoid || isCenter ? 0 : Math.max(0, asteroids);
     const ownership = ownershipCell?.ownership ?? null;
     const fillKind = this.resolveFillKind(ownership, isVoid, isCenter);
+    const relationBackground = this.resolveRelationBackground(ownershipCell, isVoid, isCenter);
     const valueLabel = this.buildValueLabel(planets, asteroids, isVoid, isCenter);
     const ownedPlanetsDotsLabel = this.buildOwnedPlanetsDotsLabel(ownership, isVoid, isCenter);
     const hasOwnFleetPresence = this.ownFleetPresenceBySystemKey.has(this.buildCoordinatesKey(x, y));
@@ -1216,6 +1225,7 @@ export class GalacticViewComponent implements OnInit {
       hasOwnFleetPresence,
       isSensorScannable,
       noteBorderColor,
+      relationBackground,
       coordsLabel: `${x}:${y}`,
       tooltip: this.buildTooltip(
         x,
@@ -1271,6 +1281,78 @@ export class GalacticViewComponent implements OnInit {
     }
 
     return 'noData';
+  }
+
+  private resolveRelationBackground(
+    ownershipCell: OwnershipByteCellDto | null,
+    isVoid: boolean,
+    isCenter: boolean
+  ): string | null {
+    if (isVoid || isCenter || !ownershipCell?.relationOwnership) {
+      return null;
+    }
+
+    const relationKeys = this.resolveRelationKeys(ownershipCell.relationOwnership);
+    if (relationKeys.length === 0) {
+      return null;
+    }
+
+    if (relationKeys.length === 1) {
+      return this.relationCellColor(relationKeys[0]);
+    }
+
+    const step = 100 / relationKeys.length;
+    const bands = relationKeys.flatMap((key, index) => {
+      const start = (step * index).toFixed(3);
+      const end = (step * (index + 1)).toFixed(3);
+      const color = this.relationCellColor(key);
+      return [`${color} ${start}%`, `${color} ${end}%`];
+    });
+
+    return `linear-gradient(135deg, ${bands.join(', ')})`;
+  }
+
+  private resolveRelationKeys(relationOwnership: [number, number, number, number, number, number]): CellRelationKey[] {
+    const [selfOwned, unmanagedNeutralOwned, warOwned, neutralOwned, peaceOwned, alliedOwned] = relationOwnership;
+    const keys: CellRelationKey[] = [];
+
+    if (selfOwned > 0) {
+      keys.push('self');
+    }
+    if (warOwned > 0) {
+      keys.push('war');
+    }
+    if (neutralOwned > 0) {
+      keys.push('neutral');
+    }
+    if (peaceOwned > 0) {
+      keys.push('peace');
+    }
+    if (alliedOwned > 0) {
+      keys.push('allied');
+    }
+    if (keys.length === 0 && unmanagedNeutralOwned > 0) {
+      return [];
+    }
+
+    return keys;
+  }
+
+  private relationCellColor(key: CellRelationKey): string {
+    switch (key) {
+      case 'self':
+        return 'var(--diplomacy-self-cell)';
+      case 'war':
+        return 'var(--diplomacy-war-cell)';
+      case 'neutral':
+        return 'var(--diplomacy-neutral-cell)';
+      case 'peace':
+        return 'var(--diplomacy-peace-cell)';
+      case 'allied':
+        return 'var(--diplomacy-allied-cell)';
+      default:
+        return '#121418';
+    }
   }
 
   private buildValueLabel(

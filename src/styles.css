@@ -11,18 +11,23 @@
   --ui-wrap-gap: 0.35rem;
   --ui-section-gap: 0.8rem;
   --diplomacy-self: #63c874;
+  --diplomacy-self-cell: #23663a;
   --diplomacy-self-bg: rgba(99, 200, 116, 0.24);
   --diplomacy-self-border: rgba(99, 200, 116, 0.56);
   --diplomacy-war: #ff6969;
+  --diplomacy-war-cell: #7a262d;
   --diplomacy-war-bg: rgba(160, 39, 47, 0.82);
   --diplomacy-war-border: rgba(255, 105, 105, 0.62);
   --diplomacy-neutral: #b58d22;
+  --diplomacy-neutral-cell: #705719;
   --diplomacy-neutral-bg: rgba(116, 87, 24, 0.82);
   --diplomacy-neutral-border: rgba(181, 141, 34, 0.62);
   --diplomacy-peace: #8fd4ff;
+  --diplomacy-peace-cell: #1c5276;
   --diplomacy-peace-bg: rgba(28, 82, 118, 0.82);
   --diplomacy-peace-border: rgba(143, 212, 255, 0.62);
   --diplomacy-allied: #4f8dff;
+  --diplomacy-allied-cell: #1f4a95;
   --diplomacy-allied-bg: rgba(31, 74, 149, 0.86);
   --diplomacy-allied-border: rgba(79, 141, 255, 0.68);
 }

@@ -8232,7 +8232,15 @@ function toOwnershipByteCellDto(cell: OwnershipByteCell | null): OwnershipByteCe
   }
 
   return {
-    ownership: [cell.ownership[0], cell.ownership[1], cell.ownership[2], cell.ownership[3]]
+    ownership: [cell.ownership[0], cell.ownership[1], cell.ownership[2], cell.ownership[3]],
+    relationOwnership: [
+      cell.relationOwnership[0],
+      cell.relationOwnership[1],
+      cell.relationOwnership[2],
+      cell.relationOwnership[3],
+      cell.relationOwnership[4],
+      cell.relationOwnership[5]
+    ]
   };
 }
 

@@ -113,6 +113,7 @@
                   [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
                   [class.galaxy-cell--sensor-scannable]="cell.isSensorScannable"
                   [class.galaxy-cell--with-note]="cell.noteBorderColor"
+                  [style.background]="cell.relationBackground"
                   [style.--note-border-color]="cell.noteBorderColor"
                   [appTooltip]="cell.tooltip"
                   (click)="onCellClick(cell)"

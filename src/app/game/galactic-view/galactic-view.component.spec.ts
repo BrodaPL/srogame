@@ -104,7 +104,53 @@ describe('GalacticViewComponent', () => {
     expect((component as { selectedSystemOwnFleets: GalaxyOwnFleetMovementDto[] }).selectedSystemOwnFleets.map((fleet) => fleet.fleetId)).toEqual([10]);
     expect((component as { selectedSystemInboundOwnFleets: GalaxyOwnFleetMovementDto[] }).selectedSystemInboundOwnFleets.map((fleet) => fleet.fleetId)).toEqual([11, 12]);
   });
+
+  it('builds equal relation color bands for mixed real-owner galaxy cells', () => {
+    const component = createComponentWithPresentation(createGalaxyPresentationData());
+    const buildGrid = component as {
+      buildGrid(data: GalaxyPresentationDataDto): Array<Array<{ relationBackground: string | null }>>;
+    };
+    const grid = buildGrid.buildGrid({
+      ...createGalaxyPresentationData(),
+      ownershipBytes: [
+        [
+          { ownership: [1, 1, 1, 0], relationOwnership: [1, 1, 1, 0, 1, 0] },
+          { ownership: [0, 1, 0, 0], relationOwnership: [0, 1, 0, 0, 0, 0] }
+        ]
+      ]
+    });
+
+    expect(grid[0][0].relationBackground).toContain('linear-gradient');
+    expect(grid[0][0].relationBackground).toContain('var(--diplomacy-self-cell) 0.000%');
+    expect(grid[0][0].relationBackground).toContain('var(--diplomacy-war-cell) 33.333%');
+    expect(grid[0][0].relationBackground).toContain('var(--diplomacy-peace-cell) 66.667%');
+    expect(grid[0][1].relationBackground).toBeNull();
+  });
 });
+
+function createComponentWithPresentation(data: GalaxyPresentationDataDto): GalacticViewComponent {
+  return new GalacticViewComponent(
+    {
+      queryParamMap: of(convertToParamMap({}))
+    } as never,
+    {
+      getGalaxyPresentationData: vi.fn().mockReturnValue(of(data)),
+      getClientStarSystem: vi.fn()
+    } as never,
+    {
+      load: vi.fn().mockReturnValue(createPlayerSession())
+    } as never,
+    {
+      galaxy: { name: 'Test Galaxy' }
+    } as never,
+    {
+      markForCheck: vi.fn()
+    } as never,
+    {
+      autoOpenTutorial: vi.fn()
+    } as never
+  );
+}
 
 function createPlayerSession(): PlayerSession {
   return {
@@ -133,8 +179,8 @@ function createGalaxyPresentationData(
     ],
     ownershipBytes: [
       [
-        { ownership: [1, 0, 0, 0] },
-        { ownership: [0, 1, 0, 0] }
+        { ownership: [1, 0, 0, 0], relationOwnership: [1, 0, 0, 0, 0, 0] },
+        { ownership: [0, 1, 0, 0], relationOwnership: [0, 1, 0, 0, 0, 0] }
       ]
     ],
     ownedPlanets: [createPlanet('Home', { x: 0, y: 0, z: 1 }, true)],

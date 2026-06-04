@@ -1427,6 +1427,7 @@ export type GalaxyByteCellDto = {
 
 export type OwnershipByteCellDto = {
   ownership: [number, number, number, number];
+  relationOwnership: [number, number, number, number, number, number];
 };
 
 export type StarSystemNoteDto = {

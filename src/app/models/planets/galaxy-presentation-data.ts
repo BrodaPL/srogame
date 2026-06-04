@@ -3,6 +3,7 @@ import type { Galaxy } from './galaxy';
 import { GalaxyByteCell } from './galaxy-byte-cell';
 import { OwnershipByteCell } from './ownership-byte-cell';
 import { PlayerType } from '../enums/player-type';
+import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
 import { FleetOrbitActivity, FleetReturnReason, FleetState } from '../fleets/fleet';
 import { ManyShips } from '../fleets/many-ships';
 import { ManyDefences } from '../defences/many-defences';
@@ -74,6 +75,7 @@ export class GalaxyPresentationData {
     const ownershipBytes: Array<Array<OwnershipByteCell | null>> = [];
     const ownedPlanets: ClientPlanet[] = [];
     const playerTypeById = new Map<number, PlayerType>();
+    const diplomacyResolver = new DiplomacyResolver(galaxy.diplomaticRelations);
 
     for (const player of galaxy.players) {
       playerTypeById.set(player.playerId, player.type);
@@ -84,7 +86,14 @@ export class GalaxyPresentationData {
       const ownershipRow: Array<OwnershipByteCell | null> = [];
       for (const system of row) {
         byteRow.push(GalaxyByteCell.fromSolarSystem(system));
-        ownershipRow.push(OwnershipByteCell.fromSolarSystem(system, playerId, playerTypeById));
+        ownershipRow.push(
+          OwnershipByteCell.fromSolarSystem(
+            system,
+            playerId,
+            playerTypeById,
+            (leftOwnerId, rightOwnerId) => diplomacyResolver.getStatus(leftOwnerId, rightOwnerId)
+          )
+        );
         for (let index = 0; index < system.planets.length; index += 1) {
           const planet = system.planets[index];
           if (planet.info.ownerId === playerId) {
