@@ -250,7 +250,13 @@
 .planet-tabs__tab--active {
   border-color: var(--accent);
   background: linear-gradient(135deg, rgba(246, 180, 76, 0.35), rgba(246, 180, 76, 0.12));
-  color: #11161e;
+  color: #e8edf6;
+}
+
+.planet-tabs__tab--active:hover,
+.planet-tabs__tab--active:focus-visible,
+.planet-tabs__tab--active:active {
+  color: #f4f7fb;
 }
 
 .planet-tabs__content {
