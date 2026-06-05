@@ -232,6 +232,9 @@ function createTurnStatusResponse(overrides: Partial<TurnStatusResponse> = {}): 
   return {
     currentTurn: 1,
     requiresAllPlayersReady: false,
+    scheduledTurnsEnabled: false,
+    scheduledTurnsNextTurnAt: null,
+    scheduledTurnsServerTime: null,
     onlineHumanCount: 1,
     minimumOnlineHumanCount: 1,
     progressionBlockedReason: null,

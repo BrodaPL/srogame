@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthStateService } from '../../../core/auth-state.service';
@@ -20,8 +20,11 @@ import { TooltipDirective } from '../../../shared/tooltip/tooltip.directive';
 })
 export class TopMenuComponent {
   protected endTurnError: string | null = null;
+  private nowMs = Date.now();
+  private readonly countdownHandle: number;
 
   constructor(
+    private readonly cdr: ChangeDetectorRef,
     private readonly router: Router,
     private readonly tutorialService: TutorialService,
     private readonly gameApi: GameApiService,
@@ -29,7 +32,16 @@ export class TopMenuComponent {
     private readonly playerSession: PlayerSessionService,
     private readonly authState: AuthStateService,
     private readonly i18n: I18nService
-  ) {}
+  ) {
+    this.countdownHandle = window.setInterval(() => {
+      this.nowMs = Date.now();
+      this.cdr.markForCheck();
+    }, 1000);
+  }
+
+  public ngOnDestroy(): void {
+    window.clearInterval(this.countdownHandle);
+  }
 
   protected hasCurrentTutorial(): boolean {
     return this.tutorialService.hasTutorial(this.currentTutorialKey());
@@ -45,8 +57,37 @@ export class TopMenuComponent {
   }
 
   protected endTurnLabel(): string {
+    if (this.isScheduledTurnsEnabled()) {
+      return 'Scheduled Turns';
+    }
     const currentTurn = this.gameState.currentTurn();
     return currentTurn === null ? 'End Turn --' : `End Turn ${currentTurn}`;
+  }
+
+  protected scheduledTurnsCountdownLabel(): string {
+    const nextTurnAt = this.gameState.turnStatus?.scheduledTurnsNextTurnAt ?? null;
+    if (!nextTurnAt) {
+      return 'Next scheduled turn --';
+    }
+
+    const nextMs = Date.parse(nextTurnAt);
+    if (Number.isNaN(nextMs)) {
+      return 'Next scheduled turn --';
+    }
+
+    const remainingSeconds = Math.max(0, Math.ceil((nextMs - this.nowMs) / 1000));
+    const hours = Math.floor(remainingSeconds / 3600);
+    const minutes = Math.floor((remainingSeconds % 3600) / 60);
+    const seconds = remainingSeconds % 60;
+    const parts = hours > 0
+      ? [hours, minutes, seconds]
+      : [minutes, seconds];
+    const time = parts.map((part) => String(part).padStart(2, '0')).join(':');
+    return `Next turn in ${time}`;
+  }
+
+  protected isScheduledTurnsEnabled(): boolean {
+    return this.gameState.turnStatus?.scheduledTurnsEnabled === true;
   }
 
   protected unreadReportsCount(): number {
@@ -66,6 +107,9 @@ export class TopMenuComponent {
   }
 
   protected isEndTurnBlockedByMail(): boolean {
+    if (this.isScheduledTurnsEnabled()) {
+      return false;
+    }
     return this.unreadMailCount() > 0 || this.pendingRequestCount() > 0;
   }
 
@@ -112,7 +156,7 @@ export class TopMenuComponent {
   }
 
   protected showAutoSkipTurnControl(): boolean {
-    return (this.gameState.turnStatus?.minimumOnlineHumanCount ?? 1) > 1;
+    return this.isScheduledTurnsEnabled() || (this.gameState.turnStatus?.minimumOnlineHumanCount ?? 1) > 1;
   }
 
   protected isAutoSkipTurnEnabled(): boolean {
@@ -169,11 +213,14 @@ export class TopMenuComponent {
   protected endTurn(): void {
     if (
       this.gameState.isProcessingTurn
+      || this.isScheduledTurnsEnabled()
       || this.isEndTurnBlockedByMail()
       || this.isEndTurnBlockedByOnlineRequirement()
       || this.isWaitingForOtherPlayers()
     ) {
-      if (this.isEndTurnBlockedByMail()) {
+      if (this.isScheduledTurnsEnabled()) {
+        this.endTurnError = this.scheduledTurnsCountdownLabel();
+      } else if (this.isEndTurnBlockedByMail()) {
         this.endTurnError = this.endTurnBlockedMessage();
       } else if (this.isEndTurnBlockedByOnlineRequirement()) {
         this.endTurnError = this.onlineRequirementMessage();

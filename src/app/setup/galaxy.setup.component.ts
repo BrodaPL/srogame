@@ -185,6 +185,10 @@ export class GalaxySetupComponent {
       neutralBotsAmount: Number(this.form.neutralBotsAmount),
       neutralBotsDifficulty: Number(this.form.neutralBotsDifficulty),
       autoSaveTurns: Number(this.form.autoSaveTurns),
+      scheduledTurns: {
+        enabled: false,
+        enabledHours: []
+      },
       enablePlayerActionLogging: this.form.enablePlayerActionLogging,
       startingHomeworldPreset: this.form.startingHomeworldPreset,
       createRandomPlanets: this.form.createRandomPlanets,

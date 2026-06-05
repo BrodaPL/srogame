@@ -24,6 +24,9 @@ describe('active-game-turn', () => {
     expect(buildTurnStatusResponse(galaxy, readyPlayerIds, 1, false)).toEqual({
       currentTurn: 1,
       requiresAllPlayersReady: true,
+      scheduledTurnsEnabled: false,
+      scheduledTurnsNextTurnAt: null,
+      scheduledTurnsServerTime: null,
       onlineHumanCount: 3,
       minimumOnlineHumanCount: 1,
       progressionBlockedReason: null,
@@ -60,6 +63,9 @@ describe('active-game-turn', () => {
     })).toEqual({
       currentTurn: 1,
       requiresAllPlayersReady: true,
+      scheduledTurnsEnabled: false,
+      scheduledTurnsNextTurnAt: null,
+      scheduledTurnsServerTime: null,
       onlineHumanCount: 2,
       minimumOnlineHumanCount: 2,
       progressionBlockedReason: null,

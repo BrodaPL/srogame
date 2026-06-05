@@ -39,6 +39,10 @@ export function buildTurnStatusResponse(
     progressionBlockedReason?: string | null;
     progressionBlockedReasonKey?: string | null;
     progressionBlockedReasonParams?: TurnStatusResponse['progressionBlockedReasonParams'];
+    scheduledTurnsEnabled?: boolean;
+    scheduledTurnsNextTurnAt?: string | null;
+    scheduledTurnsServerTime?: string | null;
+    requiresAllPlayersReady?: boolean;
     blockingPlayerIds?: ReadonlySet<number>;
     currentPlayerPresenceState?: TurnStatusResponse['currentPlayerPresenceState'];
     currentPlayerAutoSkipEnabled?: boolean;
@@ -48,7 +52,10 @@ export function buildTurnStatusResponse(
   } = {}
 ): TurnStatusResponse {
   const humans = activeHumanPlayers(galaxy);
-  const blockingPlayerIds = options.blockingPlayerIds;
+  const scheduledTurnsEnabled = options.scheduledTurnsEnabled ?? false;
+  const blockingPlayerIds = scheduledTurnsEnabled
+    ? new Set<number>()
+    : options.blockingPlayerIds;
   const blockingHumans = blockingPlayerIds
     ? humans.filter((player) => blockingPlayerIds.has(player.playerId))
     : humans;
@@ -57,7 +64,10 @@ export function buildTurnStatusResponse(
 
   return {
     currentTurn: galaxy.currentTurn,
-    requiresAllPlayersReady: humans.length > 1,
+    requiresAllPlayersReady: options.requiresAllPlayersReady ?? (scheduledTurnsEnabled ? false : humans.length > 1),
+    scheduledTurnsEnabled,
+    scheduledTurnsNextTurnAt: options.scheduledTurnsNextTurnAt ?? null,
+    scheduledTurnsServerTime: options.scheduledTurnsServerTime ?? null,
     onlineHumanCount: options.onlineHumanCount ?? humans.length,
     minimumOnlineHumanCount: options.minimumOnlineHumanCount ?? 1,
     progressionBlockedReason: options.progressionBlockedReason ?? null,

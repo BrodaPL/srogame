@@ -16,6 +16,7 @@ import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
 import {
   type BotProfileCountMap,
   DEFAULT_NEUTRAL_PLANET_PERCENT,
+  DEFAULT_SCHEDULED_TURN_HOURS,
   DEFAULT_STARTING_HOMEWORLD_PRESET,
   type GameSaveSummary,
   type GalaxySetup,
@@ -29,6 +30,7 @@ import {
   type MultiplayerLobbyDto,
   type MultiplayerLobbyLoadSeatDto,
   type MultiplayerRunningMemberDto,
+  SCHEDULED_TURN_HOURS,
   createDefaultBotProfileCounts,
   hasExactBotProfileCountMatch,
   normalizeGalaxySetup
@@ -49,6 +51,8 @@ type LobbySetupForm = {
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
   autoSaveTurns: string;
+  scheduledTurnsEnabled: boolean;
+  scheduledTurnHours: Record<number, boolean>;
   startingHomeworldPreset: StartingHomeworldPreset;
   botProfileCounts: Record<string, string>;
   createRandomPlanets: boolean;
@@ -69,6 +73,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected readonly fixedGameType = GameType.SANDBOX;
   protected readonly botProfileIds = BOT_PROFILE_IDS;
   protected readonly botProfileLabels = BOT_PROFILE_LABELS;
+  protected readonly scheduledTurnHours = SCHEDULED_TURN_HOURS;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
   protected readonly startingHomeworldPresetTooltips = STARTING_HOMEWORLD_PRESET_TOOLTIPS;
   protected readonly session: AuthStateService['session'];
@@ -86,6 +91,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected showArchivedGames = false;
   protected selectedSaveId = '';
   protected setupForm: LobbySetupForm = this.createForm(this.defaultSetup());
+  protected showScheduledTurnsModal = false;
   private readonly refreshHandle: number;
   private browserRequestVersion = 0;
   private detailRequestVersion = 0;
@@ -649,6 +655,36 @@ export class MultiplayerComponent implements OnDestroy {
     this.hasUnsavedSetupChanges = true;
   }
 
+  protected openScheduledTurnsModal(): void {
+    this.showScheduledTurnsModal = true;
+  }
+
+  protected closeScheduledTurnsModal(): void {
+    this.showScheduledTurnsModal = false;
+  }
+
+  protected selectedScheduledTurnCount(): number {
+    return this.scheduledTurnHours.filter((hour) => this.setupForm.scheduledTurnHours[hour]).length;
+  }
+
+  protected scheduledTurnsSummary(): string {
+    const selected = this.scheduledTurnHours.filter((hour) => this.setupForm.scheduledTurnHours[hour]);
+    if (!this.setupForm.scheduledTurnsEnabled) {
+      return 'Disabled';
+    }
+
+    return `${selected.length} turn${selected.length === 1 ? '' : 's'} per day`;
+  }
+
+  protected scheduledHourLabel(hour: number): string {
+    return hour === 24 ? '00:00' : `${String(hour).padStart(2, '0')}:00`;
+  }
+
+  protected setDefaultScheduledTurns(): void {
+    this.setupForm.scheduledTurnHours = this.createScheduledTurnHourMap(DEFAULT_SCHEDULED_TURN_HOURS);
+    this.markSetupDirty();
+  }
+
   protected loadBrowser(resetError = true): void {
     const requestVersion = ++this.browserRequestVersion;
     this.isLoadingBrowser = true;
@@ -876,6 +912,7 @@ export class MultiplayerComponent implements OnDestroy {
     const startingCrystal = this.parseIntegerInRange(this.setupForm.startingCrystal, 0, 999999);
     const startingDeuterium = this.parseIntegerInRange(this.setupForm.startingDeuterium, 0, 999999);
     const galaxyName = this.setupForm.galaxyName.trim();
+    const scheduledTurnHours = this.scheduledTurnHours.filter((hour) => this.setupForm.scheduledTurnHours[hour]);
 
     if (
       !this.isValidGameType(this.setupForm.gameType)
@@ -892,6 +929,7 @@ export class MultiplayerComponent implements OnDestroy {
       || neutralBotsAmount === null
       || neutralBotsDifficulty === null
       || autoSaveTurns === null
+      || (this.setupForm.scheduledTurnsEnabled && scheduledTurnHours.length === 0)
       || startingMetal === null
       || startingCrystal === null
       || startingDeuterium === null
@@ -914,6 +952,10 @@ export class MultiplayerComponent implements OnDestroy {
       neutralBotsAmount,
       neutralBotsDifficulty,
       autoSaveTurns,
+      scheduledTurns: {
+        enabled: this.setupForm.scheduledTurnsEnabled,
+        enabledHours: scheduledTurnHours.length > 0 ? scheduledTurnHours : [...DEFAULT_SCHEDULED_TURN_HOURS]
+      },
       startingHomeworldPreset: this.setupForm.startingHomeworldPreset,
       createRandomPlanets: this.setupForm.createRandomPlanets,
       createStartingShips: this.setupForm.createStartingShips,
@@ -937,6 +979,8 @@ export class MultiplayerComponent implements OnDestroy {
       neutralBotsAmount: String(setup.neutralBotsAmount),
       neutralBotsDifficulty: String(setup.neutralBotsDifficulty),
       autoSaveTurns: String(setup.autoSaveTurns),
+      scheduledTurnsEnabled: setup.scheduledTurns.enabled,
+      scheduledTurnHours: this.createScheduledTurnHourMap(setup.scheduledTurns.enabledHours),
       startingHomeworldPreset: setup.startingHomeworldPreset,
       botProfileCounts: this.formStringsFromBotProfileCounts(
         setup.botProfileCounts ?? createDefaultBotProfileCounts(setup.botsAmount)
@@ -948,6 +992,13 @@ export class MultiplayerComponent implements OnDestroy {
       startingCrystal: String(setup.startingResources.crystal),
       startingDeuterium: String(setup.startingResources.deuterium)
     };
+  }
+
+  private createScheduledTurnHourMap(enabledHours: number[]): Record<number, boolean> {
+    const selected = new Set(enabledHours);
+    return Object.fromEntries(
+      this.scheduledTurnHours.map((hour) => [hour, selected.has(hour)])
+    ) as Record<number, boolean>;
   }
 
   private syncSetupForm(setup: GalaxySetup, force: boolean): void {

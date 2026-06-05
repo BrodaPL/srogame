@@ -7,7 +7,7 @@
         Browse many draft lobbies and running multiplayer games. Joining a draft lobby removes you from any other draft lobby.
       </p>
       <p class="subtitle">
-        If a running multiplayer member enabled logout replacement, their seat can continue as a bot until they return. Multiplayer turns still require at least 2 human players to be online, and players who keep that option disabled may still block ready-state when absent.
+        If a running multiplayer member enabled logout replacement, their seat can continue as a bot until they return. Standard multiplayer turns still require online humans and ready-state; Scheduled Turns games progress by server schedule.
       </p>
     </header>
 
@@ -333,6 +333,9 @@
                 @if (selectedLobby()!.startBlockedReason) {
                   <p class="form-error">{{ selectedLobby()!.startBlockedReason }}</p>
                 }
+                @if (selectedLobby()!.setup.scheduledTurns.enabled) {
+                  <p>Scheduled Turns: {{ selectedLobby()!.setup.scheduledTurns.enabledHours.length }} turn(s) per day.</p>
+                }
               </section>
 
               <section class="saved">
@@ -357,7 +360,7 @@
                 </div>
                 <div class="multiplayer-callout">
                   <p class="multiplayer-callout__title">Logout replacement</p>
-                  <p>Players who enable logout replacement can be temporarily bot-controlled in the running game, but multiplayer turns still require at least 2 human players online. Disabled players will still block readiness while absent.</p>
+                  <p>Players who enable logout replacement can be temporarily bot-controlled in the running game. Standard games still require online humans; Scheduled Turns games keep progressing by schedule.</p>
                 </div>
 
                 @if (selectedLobby()!.canToggleReady) {
@@ -529,6 +532,28 @@
                   <small>Use 0 to disable autosaving.</small>
                 </div>
 
+                <div class="field scheduled-turns-field">
+                  <label class="checkbox-field" for="scheduledTurnsEnabled">
+                    <input
+                      id="scheduledTurnsEnabled"
+                      name="scheduledTurnsEnabled"
+                      type="checkbox"
+                      [(ngModel)]="setupForm.scheduledTurnsEnabled"
+                      (ngModelChange)="markSetupDirty()" />
+                    <span>Scheduled Turns</span>
+                  </label>
+                  <div class="scheduled-turns-field__summary">
+                    <span>{{ scheduledTurnsSummary() }}</span>
+                    <button class="start-button" type="button" (click)="openScheduledTurnsModal()">
+                      Edit schedule
+                    </button>
+                  </div>
+                  @if (setupForm.scheduledTurnsEnabled && selectedScheduledTurnCount() === 0) {
+                    <p class="form-error">Select at least one scheduled turn hour.</p>
+                  }
+                  <small>Only one running Scheduled Turns multiplayer game can be active on this server.</small>
+                </div>
+
                 <div class="field">
                   <label>Starting homeworld preset</label>
                   <div class="test-options">
@@ -628,8 +653,8 @@
             }
           }
         }
-      </section>
-    </div>
+  </section>
+</div>
 
     <div class="field-row">
       <button class="start-button" type="button" (click)="loadBrowser()" [disabled]="isLoadingBrowser || isActing">
@@ -639,3 +664,42 @@
     </div>
   </section>
 </main>
+
+@if (showScheduledTurnsModal) {
+  <div class="multiplayer-modal-backdrop" (click)="closeScheduledTurnsModal()">
+    <section class="multiplayer-modal" (click)="$event.stopPropagation()">
+      <header class="multiplayer-modal__header">
+        <div>
+          <p class="saved__title">Scheduled Turns</p>
+          <h2>Turn hours</h2>
+        </div>
+        <button class="top-menu__button" type="button" (click)="closeScheduledTurnsModal()">Close</button>
+      </header>
+
+      <div class="scheduled-turn-grid">
+        @for (hour of scheduledTurnHours; track hour) {
+          <label
+            class="scheduled-turn-hour"
+            [class.scheduled-turn-hour--active]="setupForm.scheduledTurnHours[hour]"
+            for="scheduled-turn-hour-{{ hour }}">
+            <input
+              id="scheduled-turn-hour-{{ hour }}"
+              name="scheduled-turn-hour-{{ hour }}"
+              type="checkbox"
+              [(ngModel)]="setupForm.scheduledTurnHours[hour]"
+              (ngModelChange)="markSetupDirty()" />
+            <span>{{ hour }}</span>
+            <small>{{ scheduledHourLabel(hour) }}</small>
+          </label>
+        }
+      </div>
+
+      <footer class="multiplayer-modal__footer">
+        <span>{{ selectedScheduledTurnCount() }} selected</span>
+        <button class="start-button" type="button" (click)="setDefaultScheduledTurns()">
+          Restore default
+        </button>
+      </footer>
+    </section>
+  </div>
+}

@@ -116,6 +116,7 @@ Multiplayer route note:
   - `Other Multiplayer Games` is where stale drafts and unloaded running games (`Saved / Inactive`) now appear
   - `Archived Multiplayer Games` is split out so history does not clutter the normal recovery flow
   - the selected draft detail panel owns join/leave/ready state, host setup/save/seat/start controls, and uses the shared save list only for save binding while the old singleton lobby UI is being phased out
+  - multiplayer lobby setup now also owns the `Scheduled Turns` editor: a multiplayer-only setup flag plus 24 hour-slot checkboxes stored compactly as selected hour numbers in `GalaxySetup.scheduledTurns`
   - resumed lobbies now get a clearer locked-snapshot callout, and the selected running-game detail now also exposes `Leave current game` for the current account
 
 Game child routes:
@@ -140,7 +141,7 @@ Researches route note:
 
 Shared game UI components:
 - `src/app/game/ui/`
-- `src/app/game/ui/top-menu/` owns the shared in-game navigation, including the local-admin `Bot AI` link
+- `src/app/game/ui/top-menu/` owns the shared in-game navigation, including the local-admin `Bot AI` link, multiplayer ready/auto-skip controls, and the Scheduled Turns countdown/disabled manual turn state
 - `src/app/game/ui/fleet-operation-card/` owns the reusable active/resolved fleet operation row used by Operations View and Planet View operation sections
 - `src/app/game/game.component.ts` also owns client-side multiplayer AFK detection, presence heartbeats, and the auto-skip return notice overlay
 
@@ -164,7 +165,7 @@ Game snapshot/state:
 - `src/app/core/game-api.service.ts`: game HTTP calls; now includes the first game-registry/current-game endpoints and supports optional explicit `gameId` for state/turn/save/end-turn calls
 - `src/app/core/game-api.service.ts` also now exposes the full per-game multiplayer browser/draft management endpoints under `/api/multiplayer/games*`
 - `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` plus active turn-status owner on the client, selected/current `gameId`, and an observable turn-status stream used by the game shell
-- `src/app/models/game-api-types.ts`: shared `GalaxySetup` normalization, including count-based bot-profile setup validation/helpers
+- `src/app/models/game-api-types.ts`: shared `GalaxySetup` normalization, including count-based bot-profile setup validation/helpers and compact Scheduled Turns setup (`enabled` + selected `1..24` hour numbers)
 
 Load/save note:
 - `src/app/load-game/` now scopes its save list to the selected/current `gameId` when one exists, instead of always showing one undifferentiated global save list
@@ -217,6 +218,7 @@ Auth/session note:
 - `localAdmin` is required for single-player start, direct save load, and multiplayer lobby host/control actions
 - active-game turn advancement is no longer controller-only: in multiplayer-scale active games every human player must mark ready through `/api/game/end-turn`, while singleplayer still resolves immediately
 - running multiplayer games now also require at least 2 human players to be online in that specific game before turn progression is allowed; this rule is exposed through `TurnStatusResponse.onlineHumanCount`, `minimumOnlineHumanCount`, and `progressionBlockedReason`
+- Scheduled Turns multiplayer games are the exception to manual ready/presence/mail progression gates: they disable manual `/end-turn`, stay loaded while offline, and advance through the server-side scheduler in `server/src/index.ts`
 - running multiplayer presence is now tracked separately in `server/src/multiplayer-presence.ts`; it now powers AFK auto-skip state, return notices, and the presence-aware multiplayer progression gate
 - running multiplayer progression is now presence-aware: `ACTIVE` plus `AUTO_SKIP_TURN` counts as present humans, but only `ACTIVE` humans block ready-state and appear in waiting lists
 - running multiplayer presence now has a second timeout tier: after 30 minutes with no meaningful activity, the server removes that player from presence, clears their ready-state, and can switch their seat to offline bot control if the account enabled replacement
@@ -300,11 +302,13 @@ Lifecycle persistence note:
 - `/api/game/saves/:saveId` deletes a selected save file
 - `/api/game/turn-status` is the lightweight active-game polling endpoint used by the Angular game shell to detect ready-state and turn-number changes without reloading the full game snapshot every poll
 - `/api/game/turn-status` and `/api/games/:gameId/turn-status` now also report the multiplayer online-human gate, so the top menu can show when a running multiplayer game is blocked because fewer than 2 human players are online
+- `/api/game/turn-status` and `/api/games/:gameId/turn-status` now also carry Scheduled Turns metadata (`scheduledTurnsEnabled`, `scheduledTurnsNextTurnAt`, `scheduledTurnsServerTime`) for the top-menu countdown and manual End Turn lockout
 - `/api/game/turn-status` and `/api/games/:gameId/turn-status` now also carry the current player's multiplayer presence metadata: `currentPlayerPresenceState`, `currentPlayerAutoSkipEnabled`, `currentPlayerAutoSkipActivatedAt`, `showAutoSkipReturnNotice`, and `showPresenceRemovedReturnNotice`
 - `/api/game/end-turn` and `/api/games/:gameId/end-turn` now interpret running multiplayer readiness through presence: `ACTIVE + AUTO_SKIP_TURN` must be at least `2`, but only `ACTIVE` humans are counted as ready blockers; all-auto-skip presence is blocked with `At least 1 active human player must be present to progress this multiplayer game.`
+- `/api/game/end-turn` and `/api/games/:gameId/end-turn` reject manual progression for Scheduled Turns games; those games reuse the same extracted turn-resolution path from the server scheduler instead
 - `/api/game/end-turn` writes rotating autosaves into `server/data/saves/` when `GalaxySetup.autoSaveTurns` is greater than `0` and the configured cadence is reached
 - `/api/game/end-turn` now also updates the persistent game registry turn/update metadata for the currently loaded runtime game
-- `server/src/game-runtime-store.ts` now persists the in-memory per-game runtime payload plus per-game ready-state, turn-processing state, offline-bot-controlled seats, and `emptyPresenceUnloadAt`, which is used by the game-scoped runtime read/select endpoints and the multiplayer empty-runtime unload flow
+- `server/src/game-runtime-store.ts` now persists the in-memory per-game runtime payload plus per-game ready-state, turn-processing state, offline-bot-controlled seats, `emptyPresenceUnloadAt`, and `lastScheduledTurnSlot`, which is used by the game-scoped runtime read/select endpoints, multiplayer empty-runtime unload flow, and Scheduled Turns duplicate-hour guard
 - legacy gameplay endpoints under `/api/game/*` now resolve their runtime via the authenticated account `currentGameId` first; if that selected game is not loaded, they return the same unavailable/resume-needed behavior instead of silently acting on another loaded game
 - `/api/game/end-turn` now also runs the server-side bot planning phase before shared turn resolution; for active games with more than one human player it first records per-player readiness and resolves only after every human has clicked End Turn for that turn
 - `/api/game/turn-status` and `/api/games/:gameId/turn-status` now also carry optional `progressionBlockedReasonKey` + `progressionBlockedReasonParams` metadata for localization-ready active-play blockers
@@ -892,11 +896,20 @@ Change auth/session behavior:
 Change setup/start-game flow:
 - `src/app/setup/`
 - `src/app/load-game/`
+- `src/app/multiplayer/` for multiplayer lobby setup controls, including Scheduled Turns schedule editing
 - `src/app/models/game-api-types.ts`
 - `server/src/game-save.ts`
 - `server/src/index.ts`
 - `src/app/models/planets/galaxy-creator.ts`
 - `server/src/multiplayer-lobby.ts` if saved-human seat conversion or bot defaults change
+
+Change Scheduled Turns multiplayer behavior:
+- `src/app/models/game-api-types.ts` for setup/DTO fields and default hour normalization
+- `src/app/multiplayer/` for the lobby checkbox and 24-hour schedule editor
+- `src/app/game/ui/top-menu/` for countdown, manual End Turn lockout, and Auto visibility
+- `src/app/game/game.component.ts` for presence/auto-skip polling behavior in scheduled games
+- `server/src/index.ts` for scheduled-loop execution, one-active-game enforcement, turn-status metadata, and manual End Turn rejection
+- `server/src/game-runtime-store.ts` for duplicate scheduled-hour runtime markers
 
 Change bot AI:
 - `server/src/bots-v2/` for active bot planning/runtime changes

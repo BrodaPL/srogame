@@ -584,6 +584,10 @@ function buildTestSave() {
     neutralBotsAmount: 1,
     neutralBotsDifficulty: 0,
     autoSaveTurns: 5,
+    scheduledTurns: {
+      enabled: false,
+      enabledHours: []
+    },
     createRandomPlanets: false,
     createStartingShips: false,
     skipTutorial: true,

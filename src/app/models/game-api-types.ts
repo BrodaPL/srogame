@@ -30,6 +30,11 @@ import type { BotGoalType, BotProfileId } from './player';
 
 export type BotProfileCountMap = Record<BotProfileId, number>;
 
+export type ScheduledTurnsSetup = {
+  enabled: boolean;
+  enabledHours: number[];
+};
+
 export type GalaxySetup = {
   gameType: GameType;
   galaxyName: string;
@@ -45,6 +50,7 @@ export type GalaxySetup = {
   neutralBotsAmount: number;
   neutralBotsDifficulty: number;
   autoSaveTurns: number;
+  scheduledTurns: ScheduledTurnsSetup;
   enablePlayerActionLogging?: boolean;
   startingHomeworldPreset: StartingHomeworldPreset;
   createRandomPlanets?: boolean;
@@ -61,6 +67,8 @@ export type GalaxySetup = {
 export const DEFAULT_AUTO_SAVE_TURNS = 5;
 export const MIN_AUTO_SAVE_TURNS = 0;
 export const MAX_AUTO_SAVE_TURNS = 999;
+export const SCHEDULED_TURN_HOURS = Array.from({ length: 24 }, (_, index) => index + 1);
+export const DEFAULT_SCHEDULED_TURN_HOURS = [5, 9, 11, 13, 15, 17, 19, 21, 22, 23];
 export const DEFAULT_STARTING_HOMEWORLD_PRESET = StartingHomeworldPreset.MEDIUM;
 export const MIN_NEUTRAL_PLANET_PERCENT = 0;
 export const MAX_NEUTRAL_PLANET_PERCENT = 100;
@@ -68,10 +76,11 @@ export const DEFAULT_NEUTRAL_PLANET_PERCENT = 10;
 
 export type GalaxySetupWithOptionalAutoSaveTurns = Omit<
   GalaxySetup,
-  'autoSaveTurns' | 'botProfileCounts' | 'startingHomeworldPreset'
+  'autoSaveTurns' | 'botProfileCounts' | 'scheduledTurns' | 'startingHomeworldPreset'
 > & {
   autoSaveTurns?: unknown;
   botProfileCounts?: Partial<Record<BotProfileId, unknown>>;
+  scheduledTurns?: unknown;
   startingHomeworldPreset?: unknown;
 };
 
@@ -106,8 +115,28 @@ export function normalizeGalaxySetup(
       botsAmount
     ),
     autoSaveTurns: normalizeAutoSaveTurns(setup.autoSaveTurns),
+    scheduledTurns: normalizeScheduledTurnsSetup((setup as Partial<GalaxySetup>).scheduledTurns),
     enablePlayerActionLogging: setup.enablePlayerActionLogging === true,
     startingHomeworldPreset: normalizeStartingHomeworldPreset(setup.startingHomeworldPreset)
+  };
+}
+
+export function normalizeScheduledTurnsSetup(value: unknown): ScheduledTurnsSetup {
+  const setup = value && typeof value === 'object'
+    ? value as Partial<ScheduledTurnsSetup>
+    : null;
+  const rawHours = Array.isArray(setup?.enabledHours)
+    ? setup.enabledHours
+    : DEFAULT_SCHEDULED_TURN_HOURS;
+  const enabledHours = [...new Set(
+    rawHours
+      .map((hour) => typeof hour === 'string' ? Number.parseInt(hour, 10) : hour)
+      .filter((hour): hour is number => Number.isInteger(hour) && hour >= 1 && hour <= 24)
+  )].sort((left, right) => left - right);
+
+  return {
+    enabled: setup?.enabled === true,
+    enabledHours: enabledHours.length > 0 ? enabledHours : [...DEFAULT_SCHEDULED_TURN_HOURS]
   };
 }
 
@@ -500,6 +529,9 @@ export type EndTurnResponse = {
 export type TurnStatusResponse = {
   currentTurn: number;
   requiresAllPlayersReady: boolean;
+  scheduledTurnsEnabled: boolean;
+  scheduledTurnsNextTurnAt: string | null;
+  scheduledTurnsServerTime: string | null;
   onlineHumanCount: number;
   minimumOnlineHumanCount: number;
   progressionBlockedReason: string | null;

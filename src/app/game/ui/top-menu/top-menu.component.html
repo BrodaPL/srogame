@@ -54,10 +54,15 @@
       Auto
     </button>
   }
+  @if (isScheduledTurnsEnabled()) {
+    <span class="top-menu__turn top-menu__turn--scheduled">
+      {{ scheduledTurnsCountdownLabel() }}
+    </span>
+  }
   <button
     class="top-menu__button top-menu__button--end-turn"
     type="button"
-    [disabled]="isProcessingTurn() || isEndTurnBlockedByMail() || isEndTurnBlockedByOnlineRequirement() || isWaitingForOtherPlayers()"
+    [disabled]="isProcessingTurn() || isScheduledTurnsEnabled() || isEndTurnBlockedByMail() || isEndTurnBlockedByOnlineRequirement() || isWaitingForOtherPlayers()"
     (click)="endTurn()">
     {{ endTurnLabel() }}
   </button>

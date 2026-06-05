@@ -35,14 +35,16 @@ describe('game-runtime-store', () => {
         currentTurnReadyPlayerIds: new Set([1]),
         isTurnProcessing: false,
         offlineBotControlledPlayerIds: new Set<number>(),
-        emptyPresenceUnloadAt: null
+        emptyPresenceUnloadAt: null,
+        lastScheduledTurnSlot: null
       });
 
       updateGameRuntime('game-a', {
         isDirty: true,
         currentTurnReadyPlayerIds: new Set([1, 2]),
         isTurnProcessing: true,
-        emptyPresenceUnloadAt: '2026-04-09T10:03:00.000Z'
+        emptyPresenceUnloadAt: '2026-04-09T10:03:00.000Z',
+        lastScheduledTurnSlot: '2026-04-09:10'
       });
 
       const runtime = getGameRuntime('game-a');
@@ -50,6 +52,7 @@ describe('game-runtime-store', () => {
       expect([...((runtime?.currentTurnReadyPlayerIds ?? new Set<number>()).values())]).toEqual([1, 2]);
       expect(runtime?.isTurnProcessing).toBe(true);
       expect(runtime?.emptyPresenceUnloadAt).toBe('2026-04-09T10:03:00.000Z');
+      expect(runtime?.lastScheduledTurnSlot).toBe('2026-04-09:10');
     } finally {
       clearGameRuntimes();
     }

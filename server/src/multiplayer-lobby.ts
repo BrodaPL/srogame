@@ -21,6 +21,7 @@ const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../
 const { defaultBotProfileIdForPlayerId } = resolveModule(playerModule) as typeof import('../../src/app/models/player.js');
 const {
   DEFAULT_AUTO_SAVE_TURNS,
+  DEFAULT_SCHEDULED_TURN_HOURS,
   normalizeGalaxySetup
 } = resolveModule(gameApiTypesModule) as typeof import('../../src/app/models/game-api-types.js');
 
@@ -67,6 +68,10 @@ export function createDefaultMultiplayerLobbySetup(): GalaxySetup {
     neutralBotsAmount: 10,
     neutralBotsDifficulty: 0,
     autoSaveTurns: DEFAULT_AUTO_SAVE_TURNS,
+    scheduledTurns: {
+      enabled: false,
+      enabledHours: [...DEFAULT_SCHEDULED_TURN_HOURS]
+    },
     createRandomPlanets: false,
     createStartingShips: false,
     skipTutorial: true,

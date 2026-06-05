@@ -1043,6 +1043,13 @@ app-root {
   text-transform: uppercase;
 }
 
+.top-menu__turn--scheduled {
+  border-color: rgba(99, 177, 255, 0.32);
+  background: rgba(99, 177, 255, 0.12);
+  color: #b6d8ff;
+  letter-spacing: 0.03em;
+}
+
 .top-menu__error {
   margin: 0.35rem 0 0;
   color: #ff9d9d;

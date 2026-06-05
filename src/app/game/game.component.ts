@@ -400,7 +400,10 @@ export class GameComponent implements OnInit, OnDestroy {
   private shouldManageMultiplayerPresence(): boolean {
     return this.isGameReady
       && !this.isLoading
-      && (this.gameState.turnStatus?.minimumOnlineHumanCount ?? 1) > 1;
+      && (
+        this.gameState.turnStatus?.scheduledTurnsEnabled === true
+        || (this.gameState.turnStatus?.minimumOnlineHumanCount ?? 1) > 1
+      );
   }
 
   private resetAutoSkipTimer(): void {

@@ -384,10 +384,12 @@ const { GalaxyCreator } = galaxyCreatorModule as {
 };
 const {
   MAX_AUTO_SAVE_TURNS,
+  SCHEDULED_TURN_HOURS,
   hasExactBotProfileCountMatch,
   normalizeGalaxySetup
 } = gameApiTypesModule as {
   MAX_AUTO_SAVE_TURNS: typeof import('../../src/app/models/game-api-types.js').MAX_AUTO_SAVE_TURNS;
+  SCHEDULED_TURN_HOURS: typeof import('../../src/app/models/game-api-types.js').SCHEDULED_TURN_HOURS;
   hasExactBotProfileCountMatch: typeof import('../../src/app/models/game-api-types.js').hasExactBotProfileCountMatch;
   normalizeGalaxySetup: typeof import('../../src/app/models/game-api-types.js').normalizeGalaxySetup;
 };
@@ -626,6 +628,7 @@ let currentGalaxyPresentationByPlayer = new Map<number, GalaxyPresentationDataTy
 let isTurnProcessing = false;
 let currentTurnReadyPlayerIds = new Set<number>();
 const ACTIVE_MULTIPLAYER_DRAFT_WINDOW_MS = 60 * 60 * 1000;
+const SCHEDULED_TURN_POLL_MS = 30 * 1000;
 
 function resetActiveTurnState(): void {
   currentTurnReadyPlayerIds = new Set<number>();
@@ -1688,7 +1691,7 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
 
   const presenceSummary = buildMultiplayerPresenceSummary(auth.data, req.params.gameId, runtime);
   let message: string | null = null;
-  if (presenceSummary.presentHumanCount < 2) {
+  if (runtime.setup.scheduledTurns.enabled !== true && presenceSummary.presentHumanCount < 2) {
     saveAndUnloadRunningMultiplayerGame(req.params.gameId, runtime, record, 'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS');
     message = 'Not enough online players, saving and stopping the game.';
   } else {
@@ -2002,6 +2005,16 @@ app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
   const blockedReason = getMultiplayerLobbyStartBlockedReason(managed.lobby);
   if (blockedReason) {
     return res.status(409).json({ error: blockedReason });
+  }
+
+  const setup = normalizeGalaxySetup(managed.lobby.setup);
+  if (setup.scheduledTurns.enabled === true) {
+    const existingScheduledGameId = findLoadedScheduledMultiplayerGame(req.params.gameId);
+    if (existingScheduledGameId) {
+      return res.status(409).json({
+        error: 'Only one running Scheduled Turns multiplayer game can be active on this server.'
+      });
+    }
   }
 
   try {
@@ -4480,6 +4493,7 @@ if (isMainModule) {
     // eslint-disable-next-line no-console
     console.log(`SroGame server listening on http://localhost:${actualPort}`);
   });
+  startScheduledTurnLoop();
 }
 
 function withApiMessage<T extends { message: string }>(
@@ -5167,6 +5181,12 @@ function reconcileRunningMultiplayerLifecycle(
   }
 
   const presenceSummary = buildMultiplayerPresenceSummary(authData, gameId, runtimeAfterBotControl);
+  if (runtimeAfterBotControl.setup.scheduledTurns.enabled === true) {
+    if (runtimeAfterBotControl.emptyPresenceUnloadAt !== null) {
+      updateGameRuntime(gameId, { emptyPresenceUnloadAt: null });
+    }
+    return { unloaded: false };
+  }
   const unloaded = reconcileEmptyPresenceUnloadState(gameId, runtimeAfterBotControl, record, presenceSummary.presentHumanCount, nowMs);
   return { unloaded };
 }
@@ -5215,8 +5235,76 @@ function buildCurrentPlayerPresenceOptions(gameId: string, session: AuthSession)
 }
 
 function minimumOnlineHumansRequiredForGame(gameId: string): number {
+  const runtime = getGameRuntime(gameId);
+  if (runtime?.setup.scheduledTurns.enabled === true) {
+    return 1;
+  }
   const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
   return record?.kind === 'MULTIPLAYER' && record.status === 'RUNNING' ? 2 : 1;
+}
+
+function scheduledTurnHourFromDate(date: Date): number {
+  const hour = date.getHours();
+  return hour === 0 ? 24 : hour;
+}
+
+function buildScheduledTurnSlot(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(scheduledTurnHourFromDate(date)).padStart(2, '0');
+  return `${year}-${month}-${day}:${hour}`;
+}
+
+function initialScheduledTurnSlotForSetup(setup: GalaxySetup, now = new Date()): string | null {
+  return isScheduledTurnDue(setup, now) ? buildScheduledTurnSlot(now) : null;
+}
+
+function isScheduledTurnDue(setup: GalaxySetup, now = new Date()): boolean {
+  if (setup.scheduledTurns.enabled !== true) {
+    return false;
+  }
+
+  return setup.scheduledTurns.enabledHours.includes(scheduledTurnHourFromDate(now));
+}
+
+function calculateNextScheduledTurnAt(setup: GalaxySetup, now = new Date()): string | null {
+  if (setup.scheduledTurns.enabled !== true || setup.scheduledTurns.enabledHours.length === 0) {
+    return null;
+  }
+
+  const enabledHours = new Set(setup.scheduledTurns.enabledHours);
+  const candidate = new Date(now);
+  candidate.setMinutes(0, 0, 0);
+  candidate.setHours(candidate.getHours() + 1);
+
+  for (let offset = 0; offset < 48; offset += 1) {
+    if (enabledHours.has(scheduledTurnHourFromDate(candidate))) {
+      return candidate.toISOString();
+    }
+    candidate.setHours(candidate.getHours() + 1);
+  }
+
+  return null;
+}
+
+function findLoadedScheduledMultiplayerGame(exceptGameId: string | null = null): string | null {
+  for (const gameId of listLoadedGameIds()) {
+    if (gameId === exceptGameId) {
+      continue;
+    }
+    const runtime = getGameRuntime(gameId);
+    const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+    if (
+      runtime?.setup.scheduledTurns.enabled === true
+      && record?.kind === 'MULTIPLAYER'
+      && record.status === 'RUNNING'
+    ) {
+      return gameId;
+    }
+  }
+
+  return null;
 }
 
 function buildOnlineHumansRequiredMessage(gameId: string): string | null {
@@ -5277,12 +5365,15 @@ function buildGameTurnStatusResponse(
   const isProcessing = currentRuntimeGameId === access.gameId
     ? isTurnProcessing
     : access.isProcessing;
+  const scheduledTurnsEnabled = access.runtime.setup.scheduledTurns.enabled === true;
   const minimumOnlineHumansRequired = minimumOnlineHumansRequiredForGame(access.gameId);
-  const progressionBlockedReason = presenceSummary.presentHumanCount < minimumOnlineHumansRequired
-    ? buildOnlineHumansRequiredMessageMetadata(access.gameId)
-    : presenceSummary.activeHumanCount < 1
-      ? buildActiveHumanRequiredMessageMetadata(access.gameId)
-      : { message: null, key: null, params: null };
+  const progressionBlockedReason = scheduledTurnsEnabled
+    ? { message: null, key: null, params: null }
+    : presenceSummary.presentHumanCount < minimumOnlineHumansRequired
+      ? buildOnlineHumansRequiredMessageMetadata(access.gameId)
+      : presenceSummary.activeHumanCount < 1
+        ? buildActiveHumanRequiredMessageMetadata(access.gameId)
+        : { message: null, key: null, params: null };
   return buildTurnStatusResponse(
     access.galaxy,
     readyPlayerIds,
@@ -5294,6 +5385,10 @@ function buildGameTurnStatusResponse(
       progressionBlockedReason: progressionBlockedReason.message,
       progressionBlockedReasonKey: progressionBlockedReason.key,
       progressionBlockedReasonParams: progressionBlockedReason.params,
+      scheduledTurnsEnabled,
+      scheduledTurnsNextTurnAt: calculateNextScheduledTurnAt(access.runtime.setup),
+      scheduledTurnsServerTime: scheduledTurnsEnabled ? new Date().toISOString() : null,
+      requiresAllPlayersReady: scheduledTurnsEnabled ? false : undefined,
       blockingPlayerIds: presenceSummary.blockingPlayerIds,
       ...buildCurrentPlayerPresenceOptions(access.gameId, access.auth.session)
     }
@@ -5419,7 +5514,8 @@ function persistCurrentRuntimeStoreState(): void {
       currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
       isTurnProcessing,
       offlineBotControlledPlayerIds: new Set<number>(),
-      emptyPresenceUnloadAt: null
+      emptyPresenceUnloadAt: null,
+      lastScheduledTurnSlot: initialScheduledTurnSlotForSetup(currentGameSetup)
     });
     return;
   }
@@ -5432,6 +5528,7 @@ function persistCurrentRuntimeStoreState(): void {
     currentTurnReadyPlayerIds: new Set(currentTurnReadyPlayerIds),
     offlineBotControlledPlayerIds: new Set(existingRuntime.offlineBotControlledPlayerIds),
     emptyPresenceUnloadAt: existingRuntime.emptyPresenceUnloadAt,
+    lastScheduledTurnSlot: existingRuntime.lastScheduledTurnSlot,
     isTurnProcessing,
     isDirty: false
   });
@@ -6571,6 +6668,116 @@ function resolveAuthenticatedGamePlayer(req: Request):
   };
 }
 
+function resolveMountedTurn(galaxy: Galaxy): void {
+  const resolvedTurnNumber = galaxy.currentTurn + 1;
+  runBotTurnPhaseV2(galaxy);
+  resolvePhaseOneTurn(galaxy, resolvedTurnNumber, {
+    botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0,
+    fleetOutcomeLogger: (event) => {
+      recordRecentFleetOperation(galaxy, event);
+      recordBotCounterIntelFromFleetOutcome(galaxy, event);
+
+      if (!currentGameOwnerPlayerName || !currentTrackedPlayerActionFleetIds.has(event.fleetId)) {
+        return;
+      }
+
+      appendCurrentPlayerActionLog(currentGameOwnerPlayerName, {
+        turn: event.resolvedTurn,
+        playerId: event.ownerId,
+        kind: resolvePlayerFleetOutcomeLogKind(event.outcomeType),
+        summary: `${currentGameOwnerPlayerName} ${event.resultSummary}`,
+        coordinates: event.origin,
+        targetCoordinates: event.target,
+        payload: {
+          fleetId: event.fleetId,
+          missionType: event.missionType,
+          createdAtTurn: event.createdAtTurn,
+          resolvedTurn: event.resolvedTurn,
+          outcomeType: event.outcomeType,
+          launchSummary: event.launchSummary,
+          resultSummary: event.resultSummary,
+          ...(event.payload ?? {})
+        },
+        deltas: event.deltas
+      });
+
+      if (event.terminal) {
+        untrackCurrentPlayerActionFleet(event.fleetId);
+      }
+    },
+    counterIntelLogger: (event) => {
+      recordBotCounterIntelFromCounterIntelEvent(galaxy, event);
+    }
+  });
+  galaxy.currentTurn = resolvedTurnNumber;
+  processSensorPhalanxTurnStart(galaxy, galaxy.currentTurn);
+  expirePendingDiplomaticProposals(galaxy, galaxy.currentTurn);
+  synchronizeJumpGateRequests(galaxy);
+  synchronizeMaintenanceRequests(galaxy);
+  synchronizeSupportRequests(galaxy);
+  synchronizeTradePortState(galaxy);
+  refreshOwnedPlanetSelfReportsForHumanPlayers(galaxy, galaxy.currentTurn);
+  currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(galaxy);
+  currentTurnReadyPlayerIds = new Set<number>();
+  persistCurrentRuntimeStoreState();
+  if (currentGameSetup && shouldAutoSaveAfterTurn(galaxy.currentTurn, currentGameSetup.autoSaveTurns)) {
+    try {
+      saveCurrentGameSnapshot();
+    } catch (error) {
+      console.error(`Auto save failed on turn ${galaxy.currentTurn}.`, error);
+    }
+  }
+  updateCurrentRuntimeGameRegistryRecord();
+}
+
+function processScheduledTurnsForLoadedGames(now = new Date()): void {
+  for (const gameId of listLoadedGameIds()) {
+    const runtime = getGameRuntime(gameId);
+    const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+    if (
+      !runtime
+      || !record
+      || record.kind !== 'MULTIPLAYER'
+      || record.status !== 'RUNNING'
+      || runtime.setup.scheduledTurns.enabled !== true
+      || runtime.isTurnProcessing
+      || !isScheduledTurnDue(runtime.setup, now)
+    ) {
+      continue;
+    }
+
+    const slot = buildScheduledTurnSlot(now);
+    if (runtime.lastScheduledTurnSlot === slot) {
+      continue;
+    }
+
+    if (!switchCurrentRuntime(gameId)) {
+      continue;
+    }
+
+    isTurnProcessing = true;
+    persistCurrentRuntimeStoreState();
+
+    try {
+      resolveMountedTurn(runtime.galaxy);
+      updateGameRuntime(gameId, { lastScheduledTurnSlot: slot });
+    } catch (error) {
+      currentTurnReadyPlayerIds = new Set<number>();
+      console.error(`Scheduled turn processing failed for game ${gameId}.`, error);
+    } finally {
+      isTurnProcessing = false;
+      persistCurrentRuntimeStoreState();
+    }
+  }
+}
+
+function startScheduledTurnLoop(): ReturnType<typeof setInterval> {
+  processScheduledTurnsForLoadedGames();
+  return setInterval(() => {
+    processScheduledTurnsForLoadedGames();
+  }, SCHEDULED_TURN_POLL_MS);
+}
+
 function handleEndTurnRequest(
   req: Request,
   res: express.Response,
@@ -6595,6 +6802,15 @@ function handleEndTurnRequest(
   const player = resolvePlayerById(access.galaxy, access.playerId);
   if (!player) {
     return sendApiError(res, 404, 'Player not found in galaxy.', 'api.errors.playerNotFoundInGame');
+  }
+
+  if (access.runtime.setup.scheduledTurns.enabled === true) {
+    return sendApiError(
+      res,
+      409,
+      'This multiplayer game uses Scheduled Turns. Manual End Turn is disabled.',
+      'api.gameplay.endTurn.scheduledTurnsManualDisabled'
+    );
   }
 
   const playerId = player.playerId;
@@ -6655,65 +6871,7 @@ function handleEndTurnRequest(
   persistCurrentRuntimeStoreState();
 
   try {
-    const resolvedTurnNumber = access.galaxy.currentTurn + 1;
-    runBotTurnPhaseV2(access.galaxy);
-    resolvePhaseOneTurn(access.galaxy, resolvedTurnNumber, {
-      botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0,
-      fleetOutcomeLogger: (event) => {
-        recordRecentFleetOperation(access.galaxy, event);
-        recordBotCounterIntelFromFleetOutcome(access.galaxy, event);
-
-        if (!currentGameOwnerPlayerName || !currentTrackedPlayerActionFleetIds.has(event.fleetId)) {
-          return;
-        }
-
-        appendCurrentPlayerActionLog(currentGameOwnerPlayerName, {
-          turn: event.resolvedTurn,
-          playerId: event.ownerId,
-          kind: resolvePlayerFleetOutcomeLogKind(event.outcomeType),
-          summary: `${currentGameOwnerPlayerName} ${event.resultSummary}`,
-          coordinates: event.origin,
-          targetCoordinates: event.target,
-          payload: {
-            fleetId: event.fleetId,
-            missionType: event.missionType,
-            createdAtTurn: event.createdAtTurn,
-            resolvedTurn: event.resolvedTurn,
-            outcomeType: event.outcomeType,
-            launchSummary: event.launchSummary,
-            resultSummary: event.resultSummary,
-            ...(event.payload ?? {})
-          },
-          deltas: event.deltas
-        });
-
-        if (event.terminal) {
-          untrackCurrentPlayerActionFleet(event.fleetId);
-        }
-      },
-      counterIntelLogger: (event) => {
-        recordBotCounterIntelFromCounterIntelEvent(access.galaxy, event);
-      }
-    });
-    access.galaxy.currentTurn = resolvedTurnNumber;
-    processSensorPhalanxTurnStart(access.galaxy, access.galaxy.currentTurn);
-    expirePendingDiplomaticProposals(access.galaxy, access.galaxy.currentTurn);
-    synchronizeJumpGateRequests(access.galaxy);
-    synchronizeMaintenanceRequests(access.galaxy);
-    synchronizeSupportRequests(access.galaxy);
-    synchronizeTradePortState(access.galaxy);
-    refreshOwnedPlanetSelfReportsForHumanPlayers(access.galaxy, access.galaxy.currentTurn);
-    currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(access.galaxy);
-    currentTurnReadyPlayerIds = new Set<number>();
-    persistCurrentRuntimeStoreState();
-    if (currentGameSetup && shouldAutoSaveAfterTurn(access.galaxy.currentTurn, currentGameSetup.autoSaveTurns)) {
-      try {
-        saveCurrentGameSnapshot();
-      } catch (error) {
-        console.error(`Auto save failed on turn ${access.galaxy.currentTurn}.`, error);
-      }
-    }
-    updateCurrentRuntimeGameRegistryRecord();
+    resolveMountedTurn(access.galaxy);
 
     const response: EndTurnResponse = {
       player: toPlayerSession(access.auth.session, access.galaxy),
@@ -11444,6 +11602,10 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Number.isInteger(setup.autoSaveTurns) &&
     setup.autoSaveTurns >= 0 &&
     setup.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&
+    typeof setup.scheduledTurns?.enabled === 'boolean' &&
+    Array.isArray(setup.scheduledTurns.enabledHours) &&
+    setup.scheduledTurns.enabledHours.length >= 1 &&
+    setup.scheduledTurns.enabledHours.every((hour) => SCHEDULED_TURN_HOURS.includes(hour)) &&
     (setup.enablePlayerActionLogging === undefined || typeof setup.enablePlayerActionLogging === 'boolean') &&
     (setup.startingHomeworldPreset === 'Low'
       || setup.startingHomeworldPreset === 'Medium'
