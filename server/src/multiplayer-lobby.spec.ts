@@ -9,6 +9,7 @@ import type { SavedGameFile } from './game-save.js';
 import {
   applyLobbyLoadSeatsToGalaxy,
   bindSaveToLobby,
+  buildMultiplayerLobbyDto,
   getMultiplayerLobbyStartBlockedReason,
   joinMultiplayerLobby,
   leaveMultiplayerLobby,
@@ -117,6 +118,41 @@ describe('multiplayer-lobby', () => {
     expect(nextLobby).not.toBeNull();
     expect(nextLobby?.hostAccountId).toBe(3);
     expect(nextLobby?.hostPlayerName).toBe('OtherAdmin');
+  });
+
+  it('uses a larger human cap only for Scheduled Turns lobbies', () => {
+    let standardLobby = openMultiplayerLobby(1, 'Admin', '2026-04-02T10:00:00.000Z');
+    for (let accountId = 2; accountId <= 4; accountId += 1) {
+      standardLobby = joinMultiplayerLobby(
+        standardLobby,
+        { accountId, playerName: `Player ${accountId}`, isLocalAdmin: false },
+        `2026-04-02T10:0${accountId}:00.000Z`
+      );
+      standardLobby = setMultiplayerLobbyMemberReady(standardLobby, accountId, true);
+    }
+
+    expect(getMultiplayerLobbyStartBlockedReason(standardLobby)).toBeNull();
+    expect(buildMultiplayerLobbyDto(standardLobby, 5, false).canJoin).toBe(false);
+
+    let scheduledLobby = openMultiplayerLobby(1, 'Admin', '2026-04-02T10:00:00.000Z', normalizeGalaxySetup({
+      ...standardLobby.setup,
+      playerAmount: 2,
+      scheduledTurns: {
+        enabled: true,
+        enabledHours: [5, 9, 11]
+      }
+    }));
+    for (let accountId = 2; accountId <= 10; accountId += 1) {
+      scheduledLobby = joinMultiplayerLobby(
+        scheduledLobby,
+        { accountId, playerName: `Scheduled ${accountId}`, isLocalAdmin: false },
+        `2026-04-02T10:${String(accountId).padStart(2, '0')}:00.000Z`
+      );
+      scheduledLobby = setMultiplayerLobbyMemberReady(scheduledLobby, accountId, true);
+    }
+
+    expect(getMultiplayerLobbyStartBlockedReason(scheduledLobby)).toBeNull();
+    expect(buildMultiplayerLobbyDto(scheduledLobby, 11, false).canJoin).toBe(false);
   });
 });
 

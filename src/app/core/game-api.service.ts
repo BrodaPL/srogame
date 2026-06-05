@@ -186,6 +186,14 @@ export class GameApiService {
     );
   }
 
+  public joinRunningScheduledMultiplayerGame(gameId: string, token: string) {
+    return this.http.post<LoadGameResponse>(
+      `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/join-running`,
+      {},
+      { headers: this.authHeaders(token) }
+    );
+  }
+
   public leaveMultiplayerLobby(gameId: string, token: string) {
     return this.http.post<MultiplayerGameDetailResponse | null>(
       `${API_BASE_URL}/multiplayer/games/${encodeURIComponent(gameId)}/leave-lobby`,

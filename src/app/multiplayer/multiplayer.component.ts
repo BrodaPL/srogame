@@ -21,8 +21,11 @@ import {
   type GameSaveSummary,
   type GalaxySetup,
   type GameSavesResponse,
+  MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS,
+  MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS,
   MAX_NEUTRAL_PLANET_PERCENT,
   MAX_AUTO_SAVE_TURNS,
+  MIN_SCHEDULED_TURNS_GALAXY_SIZE,
   MIN_NEUTRAL_PLANET_PERCENT,
   type MultiplayerGameBrowserResponse,
   type MultiplayerGameDetailResponse,
@@ -74,6 +77,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected readonly botProfileIds = BOT_PROFILE_IDS;
   protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly scheduledTurnHours = SCHEDULED_TURN_HOURS;
+  protected readonly minScheduledTurnsGalaxySize = MIN_SCHEDULED_TURNS_GALAXY_SIZE;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
   protected readonly startingHomeworldPresetTooltips = STARTING_HOMEWORLD_PRESET_TOOLTIPS;
   protected readonly session: AuthStateService['session'];
@@ -300,6 +304,40 @@ export class MultiplayerComponent implements OnDestroy {
       () => this.gameApi.joinMultiplayerGame(gameId, session.token),
       'Joined draft lobby. Any previous draft-lobby membership was cleared.'
     );
+  }
+
+  protected joinSelectedRunningGame(item?: MultiplayerGameListItem | null): void {
+    const session = this.session();
+    const target = item ?? this.selectedBrowserItem();
+    if (!session || !target) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    if (!target.canJoin || target.status !== 'RUNNING') {
+      this.error = 'This running game is not currently joinable.';
+      return;
+    }
+
+    this.isActing = true;
+    this.error = null;
+    this.infoMessage = null;
+    this.gameApi.joinRunningScheduledMultiplayerGame(target.gameId, session.token).subscribe({
+      next: (response) => {
+        this.authState.setSession(response.player);
+        this.gameState.setGalaxy(response.galaxy);
+        this.isActing = false;
+        this.cdr.markForCheck();
+        this.router.navigate(['/game/imperium']);
+      },
+      error: (error) => {
+        this.error = error?.error?.error ?? 'Unable to join the running Scheduled Turns game.';
+        this.isActing = false;
+        this.cdr.markForCheck();
+        this.loadSelectedGameDetail(false);
+        this.loadBrowser(false);
+      }
+    });
   }
 
   protected leaveSelectedLobby(): void {
@@ -667,6 +705,14 @@ export class MultiplayerComponent implements OnDestroy {
     return this.scheduledTurnHours.filter((hour) => this.setupForm.scheduledTurnHours[hour]).length;
   }
 
+  protected isScheduledMapTooSmall(): boolean {
+    const width = Number(this.setupForm.galaxyWidth);
+    const height = Number(this.setupForm.galaxyHeight);
+    return Number.isFinite(width)
+      && Number.isFinite(height)
+      && (width < MIN_SCHEDULED_TURNS_GALAXY_SIZE || height < MIN_SCHEDULED_TURNS_GALAXY_SIZE);
+  }
+
   protected scheduledTurnsSummary(): string {
     const selected = this.scheduledTurnHours.filter((hour) => this.setupForm.scheduledTurnHours[hour]);
     if (!this.setupForm.scheduledTurnsEnabled) {
@@ -913,6 +959,9 @@ export class MultiplayerComponent implements OnDestroy {
     const startingDeuterium = this.parseIntegerInRange(this.setupForm.startingDeuterium, 0, 999999);
     const galaxyName = this.setupForm.galaxyName.trim();
     const scheduledTurnHours = this.scheduledTurnHours.filter((hour) => this.setupForm.scheduledTurnHours[hour]);
+    const maxHumanPlayers = this.setupForm.scheduledTurnsEnabled
+      ? MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS
+      : MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS;
 
     if (
       !this.isValidGameType(this.setupForm.gameType)
@@ -929,7 +978,13 @@ export class MultiplayerComponent implements OnDestroy {
       || neutralBotsAmount === null
       || neutralBotsDifficulty === null
       || autoSaveTurns === null
+      || playerAmount < 1
+      || playerAmount > maxHumanPlayers
       || (this.setupForm.scheduledTurnsEnabled && scheduledTurnHours.length === 0)
+      || (this.setupForm.scheduledTurnsEnabled && (
+        (width !== null && width < MIN_SCHEDULED_TURNS_GALAXY_SIZE) ||
+        (height !== null && height < MIN_SCHEDULED_TURNS_GALAXY_SIZE)
+      ))
       || startingMetal === null
       || startingCrystal === null
       || startingDeuterium === null

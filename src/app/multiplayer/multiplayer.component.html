@@ -125,6 +125,11 @@
                       Enter
                     </button>
                   }
+                  @if (item.canJoin) {
+                    <button class="start-button multiplayer-browser-card__action" type="button" (click)="joinSelectedRunningGame(item)" [disabled]="isActing">
+                      Join
+                    </button>
+                  }
                 </article>
               }
             </div>
@@ -246,6 +251,11 @@
               @if (selectedBrowserItem()?.canEnter) {
                 <button class="start-button" type="button" (click)="enterRunningGame()" [disabled]="isActing">
                   {{ enterButtonLabel() }}
+                </button>
+              }
+              @if (!selectedLobby() && selectedBrowserItem()?.canJoin) {
+                <button class="start-button" type="button" (click)="joinSelectedRunningGame()" [disabled]="isActing">
+                  Join running game
                 </button>
               }
               @if (canResumeSelectedLobby()) {
@@ -550,6 +560,9 @@
                   </div>
                   @if (setupForm.scheduledTurnsEnabled && selectedScheduledTurnCount() === 0) {
                     <p class="form-error">Select at least one scheduled turn hour.</p>
+                  }
+                  @if (setupForm.scheduledTurnsEnabled && isScheduledMapTooSmall()) {
+                    <p class="form-error">Scheduled Turns games require at least {{ minScheduledTurnsGalaxySize }}x{{ minScheduledTurnsGalaxySize }} galaxy size.</p>
                   }
                   <small>Only one running Scheduled Turns multiplayer game can be active on this server.</small>
                 </div>

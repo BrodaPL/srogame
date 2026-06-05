@@ -111,6 +111,7 @@ import {
   getMultiplayerLobbyStartBlockedReason,
   joinMultiplayerLobby,
   leaveMultiplayerLobby,
+  maxLobbyMembersForSetup,
   openMultiplayerLobby,
   setMultiplayerLobbyMemberReady,
   updateMultiplayerLobbySetup
@@ -330,6 +331,7 @@ import type { MultiplayerLobbyState } from './multiplayer-lobby.js';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
 import type { ClientStarSystem } from '../../src/app/models/planets/client-star-system.ts';
 import type { ClientPlanet } from '../../src/app/models/planets/client-planet.ts';
+import type { SolarSystem } from '../../src/app/models/planets/solar-system.ts';
 import type { Planet } from '../../src/app/models/planets/planet.ts';
 import type { PlanetaryParameters } from '../../src/app/models/planets/planetary-parameters.ts';
 import type { ResourcesPack as ResourcesPackType } from '../../src/app/models/resources-pack.ts';
@@ -384,11 +386,17 @@ const { GalaxyCreator } = galaxyCreatorModule as {
 };
 const {
   MAX_AUTO_SAVE_TURNS,
+  MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS,
+  MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS,
+  MIN_SCHEDULED_TURNS_GALAXY_SIZE,
   SCHEDULED_TURN_HOURS,
   hasExactBotProfileCountMatch,
   normalizeGalaxySetup
 } = gameApiTypesModule as {
   MAX_AUTO_SAVE_TURNS: typeof import('../../src/app/models/game-api-types.js').MAX_AUTO_SAVE_TURNS;
+  MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS: typeof import('../../src/app/models/game-api-types.js').MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS;
+  MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS: typeof import('../../src/app/models/game-api-types.js').MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS;
+  MIN_SCHEDULED_TURNS_GALAXY_SIZE: typeof import('../../src/app/models/game-api-types.js').MIN_SCHEDULED_TURNS_GALAXY_SIZE;
   SCHEDULED_TURN_HOURS: typeof import('../../src/app/models/game-api-types.js').SCHEDULED_TURN_HOURS;
   hasExactBotProfileCountMatch: typeof import('../../src/app/models/game-api-types.js').hasExactBotProfileCountMatch;
   normalizeGalaxySetup: typeof import('../../src/app/models/game-api-types.js').normalizeGalaxySetup;
@@ -1601,6 +1609,11 @@ app.post('/api/multiplayer/games/:gameId/join', (req, res) => {
     return res.status(404).json({ error: 'Joinable multiplayer lobby not found.' });
   }
 
+  const alreadyJoinedLobby = joinable.lobby.members.some((member) => member.accountId === auth.session.accountId);
+  if (!alreadyJoinedLobby && joinable.lobby.members.length >= maxLobbyMembersForSetup(joinable.lobby.setup)) {
+    return res.status(409).json({ error: 'This multiplayer lobby already has the maximum number of human players.' });
+  }
+
   removeAccountFromOtherDraftMultiplayerLobbies(auth.session.accountId, req.params.gameId);
   const nextLobby = joinMultiplayerLobby(joinable.lobby, {
     accountId: auth.session.accountId,
@@ -1615,6 +1628,92 @@ app.post('/api/multiplayer/games/:gameId/join', (req, res) => {
   });
 
   return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
+});
+
+app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
+  const auth = getAuthSession(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  const gameId = req.params.gameId;
+  const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
+  const runtime = getGameRuntime(gameId);
+  if (!isRunningScheduledMultiplayerRuntime(record, runtime)) {
+    return res.status(404).json({ error: 'Running Scheduled Turns multiplayer game not found.' });
+  }
+
+  if (isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, gameId, auth.session.accountId)) {
+    return res.status(409).json({ error: 'This account already belongs to the selected game.' });
+  }
+
+  if (countHumanPlayersInGalaxy(runtime.galaxy) >= MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS) {
+    return res.status(409).json({ error: 'This Scheduled Turns game already has the maximum number of human players.' });
+  }
+
+  if (runtime.galaxy.playerNameMap.has(auth.session.playerName)) {
+    return res.status(409).json({ error: 'A player with this name already exists in the selected game.' });
+  }
+
+  if (!switchCurrentRuntime(gameId) || !currentGalaxy || !currentGameSetup) {
+    return res.status(409).json({ error: 'The selected game is not currently available.' });
+  }
+
+  const creator = new GalaxyCreator(currentGameSetup);
+  const replacementCoordinates = pickLateJoinReplacementSystem(currentGalaxy, creator);
+  if (!replacementCoordinates) {
+    return res.status(409).json({ error: 'No safe starting system is available for late join.' });
+  }
+
+  const player = creator.replaceSystemWithLateJoinHomeworld(
+    currentGalaxy,
+    replacementCoordinates,
+    auth.session.playerName
+  );
+  if (!player) {
+    return res.status(409).json({ error: 'Unable to create a safe late-join homeworld.' });
+  }
+
+  synchronizeTradePortState(currentGalaxy);
+  generateSelfReportsForHumanPlayer(currentGalaxy, player, currentGalaxy.currentTurn);
+  for (const recipient of currentGalaxy.players) {
+    if (recipient.type !== PLAYER_TYPE_PLAYER) {
+      continue;
+    }
+
+    addPlayerMessage(
+      recipient,
+      currentGalaxy.currentTurn,
+      'New Player Joined',
+      `${player.playerName} joined the scheduled multiplayer game.`,
+      null,
+      'System'
+    );
+  }
+
+  const now = new Date().toISOString();
+  upsertMembership(GAME_MEMBERSHIPS_DATA_PATH, {
+    gameId,
+    accountId: auth.session.accountId,
+    playerName: auth.session.playerName,
+    role: 'MEMBER',
+    joinedAt: now,
+    lastSeenAt: now,
+    isActive: true
+  });
+  setAccountCurrentGameId(auth.data, auth.session.accountId, gameId);
+  auth.session.currentGameId = gameId;
+  markPresenceSeen(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, auth.session.accountId, now);
+  currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
+  updateCurrentRuntimeGameRegistryRecord();
+  persistCurrentRuntimeStoreState();
+  saveCurrentGameSnapshot();
+  saveAuthData(auth.data);
+
+  return res.status(200).json({
+    player: toPlayerSession(auth.session, currentGalaxy),
+    galaxy: buildGalaxySnapshot(currentGalaxy)
+  });
 });
 
 app.post(['/api/multiplayer/games/:gameId/leave', '/api/multiplayer/games/:gameId/leave-lobby'], (req, res) => {
@@ -5811,12 +5910,14 @@ function buildMultiplayerGameDetailResponse(
   }
 
   const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
-  const canViewRunning = !!session && (session.localAdmin === true || canSessionViewGameRecord(record.gameId, session));
+  const runtime = getGameRuntime(gameId);
+  const canViewScheduledRunning = !!session && isRunningScheduledMultiplayerRuntime(record, runtime);
+  const canViewRunning = canViewScheduledRunning
+    || (!!session && (session.localAdmin === true || canSessionViewGameRecord(record.gameId, session)));
   if (record.status !== 'DRAFT' && !lobby && !canViewRunning) {
     return null;
   }
 
-  const runtime = getGameRuntime(gameId);
   return {
     game: buildGameSummary(record, session),
     lobby: lobby
@@ -5837,6 +5938,9 @@ function buildMultiplayerGameListItem(
   session: AuthSession | null
 ): MultiplayerGameBrowserResponse['activeDraftLobbies'][number] {
   const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId);
+  const runtime = record.status === 'RUNNING'
+    ? getGameRuntime(record.gameId)
+    : null;
   const membershipCount = lobby
     ? (lobby?.members.length ?? 0)
     : listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId)
@@ -5847,10 +5951,11 @@ function buildMultiplayerGameListItem(
       ? lobby.members.some((member) => member.accountId === session.accountId)
       : isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId, session.accountId)
   );
-  const runtime = record.status === 'RUNNING'
-    ? getGameRuntime(record.gameId)
-    : null;
   const canEnter = record.status === 'RUNNING' && !lobby && !!session && canSessionViewGameRecord(record.gameId, session);
+  const canJoinRunningScheduled = !!session
+    && !isMember
+    && isRunningScheduledMultiplayerRuntime(record, runtime)
+    && countHumanPlayersInGalaxy(runtime.galaxy) < MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS;
   return {
     gameId: record.gameId,
     name: record.name,
@@ -5864,7 +5969,8 @@ function buildMultiplayerGameListItem(
     offlineBotControlledCount: runtime?.offlineBotControlledPlayerIds.size ?? 0,
     isMember,
     isCurrentGame: session?.currentGameId === record.gameId,
-    canJoin: !!lobby && !!session && !isMember,
+    canJoin: (!!lobby && !!session && !isMember && lobby.members.length < maxLobbyMembersForSetup(lobby.setup))
+      || canJoinRunningScheduled,
     canEnter,
     canReturnToGame: canEnter && isMember && session?.currentGameId !== record.gameId,
     canResumeLobby: record.status === 'RUNNING' && !runtime && !lobby && session?.localAdmin === true,
@@ -5882,7 +5988,72 @@ function canSessionViewMultiplayerBrowserRecord(
     return true;
   }
 
+  const runtime = record.status === 'RUNNING' ? getGameRuntime(record.gameId) : null;
+  if (!!session && isRunningScheduledMultiplayerRuntime(record, runtime)) {
+    return true;
+  }
+
   return session?.localAdmin === true || (session ? canSessionViewGameRecord(record.gameId, session) : false);
+}
+
+function isRunningScheduledMultiplayerRuntime(
+  record: ReturnType<typeof listGames>[number] | null,
+  runtime: ReturnType<typeof getGameRuntime>
+): runtime is NonNullable<ReturnType<typeof getGameRuntime>> {
+  return !!record
+    && record.kind === 'MULTIPLAYER'
+    && record.status === 'RUNNING'
+    && !!runtime
+    && runtime.setup.scheduledTurns.enabled === true;
+}
+
+function countHumanPlayersInGalaxy(galaxy: Galaxy): number {
+  return galaxy.players.filter((player) => player.type === PLAYER_TYPE_PLAYER).length;
+}
+
+function pickLateJoinReplacementSystem(
+  galaxy: Galaxy,
+  creator: InstanceType<typeof GalaxyCreator>
+): { x: number; y: number } | null {
+  const candidates: SolarSystem[] = [];
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      if (isLateJoinReplacementCandidate(galaxy, creator, system)) {
+        candidates.push(system);
+      }
+    }
+  }
+
+  const voidCandidates = candidates.filter((system) => system.isVoid);
+  const pool = voidCandidates.length > 0 ? voidCandidates : candidates;
+  if (pool.length <= 0) {
+    return null;
+  }
+
+  const selected = pool[Math.floor(Math.random() * pool.length)];
+  return selected ? { ...selected.coordinates } : null;
+}
+
+function isLateJoinReplacementCandidate(
+  galaxy: Galaxy,
+  creator: InstanceType<typeof GalaxyCreator>,
+  system: SolarSystem
+): boolean {
+  if (system.isGalaxyCenter) {
+    return false;
+  }
+
+  if (creator.distanceFromCenter(system.coordinates.x, system.coordinates.y) > creator.galaxyRadius) {
+    return false;
+  }
+
+  if (system.planets.some((planet) => planet.info.ownerId !== null)) {
+    return false;
+  }
+
+  return !galaxy.activeFleets.some((fleet) =>
+    fleet.target.x === system.coordinates.x && fleet.target.y === system.coordinates.y
+  );
 }
 
 function isActiveDraftLobbyForBrowser(record: ReturnType<typeof listGames>[number], nowMs: number): boolean {
@@ -8267,68 +8438,74 @@ function getPresentationData(galaxy: Galaxy, playerId: number): GalaxyPresentati
 }
 
 function generateSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber: number): void {
+  for (const player of galaxy.players) {
+    if (player.type === PLAYER_TYPE_PLAYER) {
+      generateSelfReportsForHumanPlayer(galaxy, player, turnNumber);
+    }
+  }
+}
+
+function generateSelfReportsForHumanPlayer(
+  galaxy: Galaxy,
+  player: Player,
+  turnNumber: number
+): void {
   const reportGenerator = new EspionageReportGenerator();
   const playersById = new Map<number, (typeof galaxy.players)[number]>();
   for (const entry of galaxy.players) {
     playersById.set(entry.playerId, entry);
   }
 
-  for (const player of galaxy.players) {
-    if (player.type !== PLAYER_TYPE_PLAYER) {
-      continue;
-    }
+  for (const row of galaxy.stars) {
+    for (const system of row) {
+      for (const planet of system.planets) {
+        if (planet.info.ownerId !== player.playerId) {
+          continue;
+        }
 
-    for (const row of galaxy.stars) {
-      for (const system of row) {
-        for (const planet of system.planets) {
-          if (planet.info.ownerId !== player.playerId) {
-            continue;
+        const report = reportGenerator.createEspionageReport(
+          player,
+          player,
+          planet,
+          0,
+          {
+            reportId: player.createReportId(),
+            forcedReportLevel: SELF_REPORT_LEVEL,
+            createdTurn: turnNumber
           }
-
-          const report = reportGenerator.createEspionageReport(
-            player,
-            player,
-            planet,
-            0,
-            {
-              reportId: player.createReportId(),
-              forcedReportLevel: SELF_REPORT_LEVEL,
-              createdTurn: turnNumber
-            }
-          );
-          planet.lastReportData.set(player.playerId, report.copy());
-          player.addReport(report.copy());
-        }
+        );
+        planet.lastReportData.set(player.playerId, report.copy());
+        player.addReport(report.copy());
       }
     }
+  }
 
-    const homePlanet = player.planets[0];
-    const startingSystem = homePlanet?.basicInfo.solarSystem;
-    if (!homePlanet || !startingSystem) {
+  const homePlanet = player.planets[0];
+  const startingSystem = homePlanet?.basicInfo.solarSystem;
+  if (!homePlanet || !startingSystem) {
+    return;
+  }
+
+  for (const planet of startingSystem.planets) {
+    if (planet === homePlanet || planet.lastReportData.has(player.playerId)) {
       continue;
     }
 
-    for (const planet of startingSystem.planets) {
-      if (planet === homePlanet || planet.lastReportData.has(player.playerId)) {
-        continue;
+    const ownerId = planet.info.ownerId;
+    const planetOwner = ownerId === null ? null : playersById.get(ownerId) ?? null;
+    const report = reportGenerator.createEspionageReport(
+      player,
+      planetOwner,
+      planet,
+      0,
+      {
+        reportId: player.createReportId(),
+        forcedReportLevel: STARTING_SYSTEM_REPORT_LEVEL,
+        createdTurn: turnNumber
       }
-
-      const ownerId = planet.info.ownerId;
-      const planetOwner = ownerId === null ? null : playersById.get(ownerId) ?? null;
-      const report = reportGenerator.createEspionageReport(
-        player,
-        planetOwner,
-        planet,
-        0,
-        {
-          reportId: player.createReportId(),
-          forcedReportLevel: STARTING_SYSTEM_REPORT_LEVEL,
-          createdTurn: turnNumber
-        }
-      );
-      planet.lastReportData.set(player.playerId, report.copy());
-      player.addReport(report.copy());
-    }
+    );
+    planet.lastReportData.set(player.playerId, report.copy());
+    player.addReport(report.copy());
   }
 }
 
@@ -11557,6 +11734,9 @@ function isValidSetup(setup: GalaxySetup): boolean {
     gameTypeValue === 'PvPvE' ||
     gameTypeValue === 'PvE' ||
     gameTypeValue === 'Sandbox';
+  const maxHumanPlayers = setup?.scheduledTurns?.enabled === true
+    ? MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS
+    : MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS;
 
   return (
     !!setup &&
@@ -11585,7 +11765,7 @@ function isValidSetup(setup: GalaxySetup): boolean {
     setup.starsAmountModifier[1] <= 9 &&
     Number.isInteger(setup.playerAmount) &&
     setup.playerAmount >= 1 &&
-    setup.playerAmount <= 4 &&
+    setup.playerAmount <= maxHumanPlayers &&
     Number.isInteger(setup.botsAmount) &&
     setup.botsAmount >= 0 &&
     setup.botsAmount <= 12 &&
@@ -11606,6 +11786,10 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Array.isArray(setup.scheduledTurns.enabledHours) &&
     setup.scheduledTurns.enabledHours.length >= 1 &&
     setup.scheduledTurns.enabledHours.every((hour) => SCHEDULED_TURN_HOURS.includes(hour)) &&
+    (!setup.scheduledTurns.enabled || (
+      setup.galaxyWidth >= MIN_SCHEDULED_TURNS_GALAXY_SIZE &&
+      setup.galaxyHeight >= MIN_SCHEDULED_TURNS_GALAXY_SIZE
+    )) &&
     (setup.enablePlayerActionLogging === undefined || typeof setup.enablePlayerActionLogging === 'boolean') &&
     (setup.startingHomeworldPreset === 'Low'
       || setup.startingHomeworldPreset === 'Medium'

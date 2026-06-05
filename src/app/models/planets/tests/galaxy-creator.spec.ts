@@ -120,6 +120,37 @@ describe('GalaxyCreator', () => {
     expect(homeSystemNeutralPlanets.length).toBe(0);
   });
 
+  it('replaces an unused system with a late-join human homeworld and updates player maps', () => {
+    const setup = createSetup({ neutralBotsAmount: 0 });
+    const creator = new GalaxyCreator(setup);
+    const galaxy = creator.createGalaxy(['Human']);
+    const existingHomeSystem = galaxy.players[0].planets[0].basicInfo.solarSystem;
+    const targetSystem = galaxy.stars
+      .flat()
+      .find((system) =>
+        !system.isGalaxyCenter &&
+        system !== existingHomeSystem &&
+        system.planets.every((planet) => planet.info.ownerId === null)
+      );
+
+    expect(targetSystem).toBeTruthy();
+
+    const player = creator.replaceSystemWithLateJoinHomeworld(galaxy, targetSystem!.coordinates, 'Late Human');
+
+    expect(player).toBeTruthy();
+    expect(player!.type).toBe(PlayerType.PLAYER);
+    expect(player!.playerName).toBe('Late Human');
+    expect(galaxy.players).toContain(player);
+    expect(galaxy.humanPlayerMap.get(player!.playerId)).toBe(player);
+    expect(galaxy.playerNameMap.get('Late Human')).toBe(player!.playerId);
+
+    const replacementSystem = galaxy.stars[targetSystem!.coordinates.y][targetSystem!.coordinates.x];
+    const homePlanet = player!.planets[0];
+    expect(homePlanet.info.ownerId).toBe(player!.playerId);
+    expect(homePlanet.basicInfo.solarSystem).toBe(replacementSystem);
+    expect(replacementSystem.planets).toContain(homePlanet);
+  });
+
   it('does not seed extra random neutrals inside home systems', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
 

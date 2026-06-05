@@ -29,6 +29,12 @@ import { createTutorialReadState } from '../../tutorial/tutorial-types';
 
 const DEFENCE_BLUEPRINTS = DefenceBlueprintsFactory.fromDefaultJson();
 
+type PlanetSlot = {
+  system: SolarSystem;
+  planet: Planet;
+  index: number;
+};
+
 export class GalaxyCreator {
   private static readonly BOT_NAME_POOL_SIZE = 24;
   private static readonly HOMEWORLD_INDUSTRY_MODIFIER = 1.25;
@@ -162,6 +168,26 @@ export class GalaxyCreator {
     }
 
     return stars;
+  }
+
+  public replaceSystemWithLateJoinHomeworld(
+    galaxy: Galaxy,
+    coordinates: { x: number; y: number },
+    playerName: string
+  ): Player | null {
+    const existingSystem = galaxy.stars[coordinates.y]?.[coordinates.x] ?? null;
+    if (!existingSystem || existingSystem.isGalaxyCenter) {
+      return null;
+    }
+
+    const nextSystem = this.createLateJoinHomeSystem(galaxy, coordinates, existingSystem.isCenterEdge);
+    galaxy.stars[coordinates.y][coordinates.x] = nextSystem;
+    const slot = this.chooseStartingSlot(nextSystem);
+    if (!slot) {
+      return null;
+    }
+
+    return this.createHumanStartingPlayerAtSlot(galaxy, slot, playerName);
   }
 
   public distanceFromCenter(x: number, y: number): number {
@@ -428,6 +454,78 @@ export class GalaxyCreator {
 
       this.ensureHomeSystemNeutralPlanet(galaxy, player);
     }
+  }
+
+  private createLateJoinHomeSystem(
+    galaxy: Galaxy,
+    coordinates: { x: number; y: number },
+    isCenterEdge: boolean
+  ): SolarSystem {
+    const existingNames = new Set(galaxy.stars.flat().map((system) => system.name));
+    const name = Galaxy.buildSolarSystemNamePool(true)
+      .find((candidate) => !existingNames.has(candidate))
+      ?? `Sector ${coordinates.x}-${coordinates.y}`;
+    const planetNumber = this.randomInt(1, Math.max(1, this.setup.starsAmountModifier[1]));
+    const system = new SolarSystem(
+      name,
+      planetNumber,
+      false,
+      false,
+      { x: coordinates.x, y: coordinates.y },
+      new Set(),
+      new Map()
+    );
+    system.isCenterEdge = isCenterEdge;
+    return system;
+  }
+
+  private chooseStartingSlot(system: SolarSystem): PlanetSlot | null {
+    if (system.planets.length <= 0) {
+      return null;
+    }
+
+    const index = this.randomInt(0, system.planets.length - 1);
+    const planet = system.planets[index];
+    return planet ? { system, planet, index } : null;
+  }
+
+  private createHumanStartingPlayerAtSlot(
+    galaxy: Galaxy,
+    slot: PlanetSlot,
+    playerName: string
+  ): Player {
+    const playerId = this.nextAvailablePlayerId(galaxy);
+    const startingPlanet = Planet.createStartingPlanet(
+      slot.planet.basicInfo.name,
+      slot.planet.basicInfo.order,
+      slot.system,
+      playerId
+    );
+    startingPlanet.basicInfo.name = this.buildPlanetName(
+      slot.system.name,
+      slot.planet.basicInfo.order,
+      startingPlanet.basicInfo.type
+    );
+    this.applyHomeworldPlanetaryModifiers(startingPlanet);
+    this.applyStartingHomeworldPreset(startingPlanet);
+
+    slot.system.planets[slot.index] = startingPlanet;
+
+    const player = new Player(
+      playerId,
+      playerName,
+      [startingPlanet],
+      this.createStartingTechLevels(),
+      [],
+      PlayerType.PLAYER,
+      createTutorialReadState(this.setup.skipTutorial === true)
+    );
+
+    galaxy.players.push(player);
+    galaxy.humanPlayerMap.set(playerId, player);
+    galaxy.playerNameMap.set(player.playerName, playerId);
+    this.ensureHomeSystemNeutralPlanet(galaxy, player);
+    return player;
   }
 
   private ensureHomeSystemNeutralPlanet(galaxy: Galaxy, player: Player): void {

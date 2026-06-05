@@ -22,6 +22,8 @@ const { defaultBotProfileIdForPlayerId } = resolveModule(playerModule) as typeof
 const {
   DEFAULT_AUTO_SAVE_TURNS,
   DEFAULT_SCHEDULED_TURN_HOURS,
+  MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS,
+  MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS,
   normalizeGalaxySetup
 } = resolveModule(gameApiTypesModule) as typeof import('../../src/app/models/game-api-types.js');
 
@@ -273,6 +275,7 @@ export function buildMultiplayerLobbyDto(
   currentPlayerIsLocalAdmin: boolean
 ): MultiplayerLobbyDto {
   const startBlockedReason = getMultiplayerLobbyStartBlockedReason(lobby);
+  const maxHumanPlayers = maxLobbyMembersForSetup(lobby.setup);
 
   return {
     hostAccountId: lobby.hostAccountId,
@@ -308,7 +311,9 @@ export function buildMultiplayerLobbyDto(
     }),
     canManage: currentPlayerIsLocalAdmin && currentAccountId === lobby.hostAccountId,
     isMember: currentAccountId !== null && lobby.members.some((member) => member.accountId === currentAccountId),
-    canJoin: !!currentAccountId && !lobby.members.some((member) => member.accountId === currentAccountId),
+    canJoin: !!currentAccountId
+      && lobby.members.length < maxHumanPlayers
+      && !lobby.members.some((member) => member.accountId === currentAccountId),
     canLeave: !!currentAccountId && lobby.members.some((member) => member.accountId === currentAccountId),
     canToggleReady: !!currentAccountId
       && lobby.members.some((member) => member.accountId === currentAccountId && !member.isLocalAdmin),
@@ -320,8 +325,16 @@ export function buildMultiplayerLobbyDto(
 }
 
 export function getMultiplayerLobbyStartBlockedReason(lobby: MultiplayerLobbyState): string | null {
+  const maxHumanPlayers = maxLobbyMembersForSetup(lobby.setup);
+
   if (lobby.members.length < 2) {
     return 'At least two joined players are required.';
+  }
+
+  if (lobby.members.length > maxHumanPlayers) {
+    return lobby.setup.scheduledTurns.enabled
+      ? `Scheduled Turns games can have at most ${MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS} human players.`
+      : `Standard multiplayer games can have at most ${MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS} human players.`;
   }
 
   if (lobby.members.some((member) => !member.isLocalAdmin && !member.isReady)) {
@@ -345,6 +358,12 @@ export function getMultiplayerLobbyStartBlockedReason(lobby: MultiplayerLobbySta
   }
 
   return null;
+}
+
+export function maxLobbyMembersForSetup(setup: GalaxySetup): number {
+  return setup.scheduledTurns.enabled
+    ? MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS
+    : MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS;
 }
 
 export function applyLobbyLoadSeatsToGalaxy(

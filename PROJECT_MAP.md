@@ -117,6 +117,7 @@ Multiplayer route note:
   - `Archived Multiplayer Games` is split out so history does not clutter the normal recovery flow
   - the selected draft detail panel owns join/leave/ready state, host setup/save/seat/start controls, and uses the shared save list only for save binding while the old singleton lobby UI is being phased out
   - multiplayer lobby setup now also owns the `Scheduled Turns` editor: a multiplayer-only setup flag plus 24 hour-slot checkboxes stored compactly as selected hour numbers in `GalaxySetup.scheduledTurns`
+  - loaded running Scheduled Turns games are visible to non-members until they hit the human-player cap, and `/multiplayer` can join them directly as a late human player
   - resumed lobbies now get a clearer locked-snapshot callout, and the selected running-game detail now also exposes `Leave current game` for the current account
 
 Game child routes:
@@ -257,6 +258,7 @@ Multiplayer lobby lifecycle:
 - `/api/multiplayer/games`
 - `/api/multiplayer/games/:gameId`
 - `/api/multiplayer/games/:gameId/join`
+- `/api/multiplayer/games/:gameId/join-running`
 - `/api/multiplayer/games/:gameId/leave`
 - `/api/multiplayer/games/:gameId/leave-lobby`
 - `/api/multiplayer/games/:gameId/leave-current-game`
@@ -288,6 +290,7 @@ Lifecycle persistence note:
 - `/api/multiplayer/games/:gameId/resume-lobby` lets localAdmin reopen a `Saved / Inactive` multiplayer game as a locked `Resumed lobby` bound to that game's latest save; resumed lobbies appear under `Active Draft Lobbies` instead of duplicating the game under `Other Multiplayer Games`
 - `/api/multiplayer/games/:gameId/archive` lets localAdmin archive an unloaded multiplayer game after it is no longer relevant
 - `/api/multiplayer/games/:gameId/setup`, `/bind-save`, `/clear-save`, `/assign-seat`, and `/start` now move draft-lobby management onto the per-game API family; `/start` keeps the same `gameId`, promotes the draft record to a running multiplayer game, switches all lobby members to that `currentGameId`, deletes the stored draft-lobby record, and preserves any previously mounted runtime in `server/src/game-runtime-store.ts`
+- `/api/multiplayer/games/:gameId/join-running` is the Scheduled Turns late-join endpoint: it is available only for loaded running scheduled games, enforces the 10-human cap, prefers safe void-system replacement, creates a normal homeworld through `GalaxyCreator.replaceSystemWithLateJoinHomeworld(...)`, adds membership/presence/current-game state, sends a location-free system mail to human players, and returns a normal `LoadGameResponse`
 - `server/src/multiplayer-presence.ts` now persists per-game running-multiplayer presence records (`ACTIVE` vs `AUTO_SKIP_TURN`, auto-skip enabled flag, last seen timestamp, and return notice state)
 - `/api/multiplayer/games/:gameId/presence` is the explicit heartbeat endpoint the Angular game shell uses for meaningful multiplayer activity; passive turn-status polling intentionally does not count as AFK-preventing activity
 - `/api/multiplayer/games/:gameId/auto-skip-turn` enables or disables the player's per-game AFK auto-skip flag and can also force immediate `AUTO_SKIP_TURN` activation when the client inactivity timer fires
@@ -905,11 +908,12 @@ Change setup/start-game flow:
 
 Change Scheduled Turns multiplayer behavior:
 - `src/app/models/game-api-types.ts` for setup/DTO fields and default hour normalization
-- `src/app/multiplayer/` for the lobby checkbox and 24-hour schedule editor
+- `src/app/multiplayer/` for the lobby checkbox, 24-hour schedule editor, and late-join browser actions
 - `src/app/game/ui/top-menu/` for countdown, manual End Turn lockout, and Auto visibility
 - `src/app/game/game.component.ts` for presence/auto-skip polling behavior in scheduled games
-- `server/src/index.ts` for scheduled-loop execution, one-active-game enforcement, turn-status metadata, and manual End Turn rejection
+- `server/src/index.ts` for scheduled-loop execution, one-active-game enforcement, turn-status metadata, manual End Turn rejection, and late-join placement policy
 - `server/src/game-runtime-store.ts` for duplicate scheduled-hour runtime markers
+- `src/app/models/planets/galaxy-creator.ts` for creating replacement home systems/homeworlds for late joins
 
 Change bot AI:
 - `server/src/bots-v2/` for active bot planning/runtime changes
