@@ -1005,6 +1005,7 @@ function resolveFleetState(
     case FleetState.MISSION_FAILURE_RETURNING:
       return resolveReturnArrival(
         fleet,
+        playersById,
         planetById,
         resolvedTurnNumber,
         difficultyConfig
@@ -2319,6 +2320,7 @@ function createIncomingAttackReport(
 
 function resolveReturnArrival(
   fleet: Fleet,
+  playersById: Map<number, Player>,
   planetById: Map<string, Planet>,
   resolvedTurnNumber: number,
   difficultyConfig: TurnDifficultyConfig
@@ -2339,6 +2341,10 @@ function resolveReturnArrival(
   const returningCargo = snapshotResourcesPack(fleet.cargo);
   const survivingShips = snapshotFleetShipCounts(fleet);
   const returningBombs = snapshotBombCounts(fleet);
+  addFleetReturnedReport(playersById.get(fleet.ownerId) ?? null, fleet, originPlanet, resolvedTurnNumber, {
+    ships: fleet.ships,
+    cargo: returningCargo
+  });
   addFleetShipsToPlanet(originPlanet, fleet.ships);
   addFleetBombsToPlanet(originPlanet, fleet.carriedBombs);
   originPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
@@ -3254,6 +3260,45 @@ function addFleetSuccessReport(
       senderPlayerName: player.playerName
     },
     appendFleetReportManifest(body, manifest?.ships ?? fleet.ships, manifest?.cargo ?? fleet.cargo)
+  );
+  player.addReport(report);
+}
+
+function addFleetReturnedReport(
+  player: Player | null,
+  fleet: Fleet,
+  originPlanet: Planet,
+  resolvedTurnNumber: number,
+  manifest: {
+    ships: ManyShipsLike;
+    cargo: FleetReportCargoLike;
+  }
+): void {
+  if (!player || player.type === PlayerType.NEUTRAL) {
+    return;
+  }
+
+  const report = new FleetReport(
+    {
+      reportId: player.createReportId(),
+      createdTurn: resolvedTurnNumber,
+      title: `Fleet Returned: ${fleet.missionType} to ${originPlanet.basicInfo.name}`,
+      sourceCoordinates: toPlanetReportCoordinates(originPlanet),
+      sourcePlanetName: originPlanet.basicInfo.name,
+      sourceSystemName: originPlanet.basicInfo.solarSystem.name,
+      originCoordinates: {
+        x: fleet.origin.x,
+        y: fleet.origin.y,
+        z: fleet.origin.z + 1
+      },
+      originPlanetName: originPlanet.basicInfo.name,
+      senderPlayerName: player.playerName
+    },
+    appendFleetReportManifest(
+      `Fleet ${fleet.fleetId} returned to ${originPlanet.basicInfo.name}.`,
+      manifest.ships,
+      manifest.cargo
+    )
   );
   player.addReport(report);
 }

@@ -379,6 +379,13 @@ describe('resolvePhaseOneTurn battle integration', () => {
       event.fleetId === 92
       && event.outcomeType === 'RETURN'
     )).toBe(true);
+
+    const player = galaxy.players[0];
+    const returnedReport = player.reports.find((report) => report.title === 'Fleet Returned: Transport to Alpha Prime');
+    expect(returnedReport).toBeTruthy();
+    expect(returnedReport!.body).toContain('Fleet 92 returned to Alpha Prime.');
+    expect(returnedReport!.body).toContain('Fleet ships: Transporter x2');
+    expect(returnedReport!.body).toContain('Fleet cargo: Metal 50, Crystal 20, Deuterium 10');
   });
 
   it('destroys a hostile transport that loses its arrival battle before cargo delivery', () => {
