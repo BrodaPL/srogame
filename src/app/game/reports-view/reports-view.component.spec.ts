@@ -1,5 +1,6 @@
 import '@angular/compiler';
 import { describe, expect, it, vi } from 'vitest';
+import { of } from 'rxjs';
 import { ReportsViewComponent } from './reports-view.component';
 import { ProductionReport } from '../../models/reports/production-report';
 
@@ -78,6 +79,38 @@ describe('ReportsViewComponent', () => {
         }
       }
     );
+  });
+
+  it('converts report planet order to client planet index when previewing a location', () => {
+    const getClientPlanet = vi.fn(() => of({
+      info: {
+        ownerId: null
+      }
+    }));
+    const component = new ReportsViewComponent(
+      { getClientPlanet } as never,
+      { load: vi.fn(() => ({ token: 'token' })) } as never,
+      {
+        markForCheck: vi.fn()
+      } as never,
+      {
+        autoOpenTutorial: vi.fn()
+      } as never,
+      {} as never,
+      createRouter() as never,
+      createGameState() as never
+    );
+    const report = {
+      sourceCoordinates: {
+        x: 15,
+        y: 17,
+        z: 2
+      }
+    };
+
+    (component as { previewLocation(report: unknown): void }).previewLocation(report);
+
+    expect(getClientPlanet).toHaveBeenCalledWith(15, 17, 1, 'token');
   });
 
   it('selects all visible reports except favourites', () => {

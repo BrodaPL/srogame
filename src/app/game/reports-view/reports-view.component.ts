@@ -313,7 +313,8 @@ export class ReportsViewComponent implements OnInit {
     this.previewError = null;
     this.previewPlanet = null;
 
-    this.gameApi.getClientPlanet(coordinates.x, coordinates.y, coordinates.z, session.token)
+    const previewCoordinates = this.toPreviewClientCoordinates(coordinates);
+    this.gameApi.getClientPlanet(previewCoordinates.x, previewCoordinates.y, previewCoordinates.z, session.token)
       .pipe(finalize(() => {
         this.previewLoading = false;
         this.cdr.markForCheck();
@@ -326,6 +327,14 @@ export class ReportsViewComponent implements OnInit {
           this.previewError = 'Unable to load the planet preview.';
         }
       });
+  }
+
+  private toPreviewClientCoordinates(coordinates: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+    return {
+      x: coordinates.x,
+      y: coordinates.y,
+      z: Math.max(0, coordinates.z - 1)
+    };
   }
 
   protected deleteSelectedReports(): void {

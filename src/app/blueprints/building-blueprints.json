@@ -1015,9 +1015,9 @@
                     "description":  "Makes possible to jump between systems. Every level increases Interstellar Trade Port capacity by 20%, and decreases its trade cost by 1.5%.",
                     "imagePath":  "images/buildings/normal/JUMP_GATE.jpg",
                     "basicCost":  {
-                                      "metal":  800,
-                                      "crystal":  1000,
-                                      "deuterium":  1200
+                                      "metal":  600,
+                                      "crystal":  800,
+                                      "deuterium":  1000
                                   },
                     "level":  0,
                     "currentPowerConsumption":  0,
@@ -1098,9 +1098,9 @@
                     "description":  "Makes possible to exchange resources in ratio 3:2:1 with 5-40% operational cost. Every level above 1 decreases op. cost by 1%.",
                     "imagePath":  "images/buildings/normal/INTERSTELLAR_TRADE_PORT.jpg",
                     "basicCost":  {
-                                      "metal":  1000,
-                                      "crystal":  500,
-                                      "deuterium":  300
+                                      "metal":  800,
+                                      "crystal":  400,
+                                      "deuterium":  200
                                   },
                     "level":  0,
                     "currentPowerConsumption":  0,
