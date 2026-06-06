@@ -15,6 +15,8 @@ import { TechnologyType } from '../../enums/technology-type';
 import { ManyDefences } from '../../defences/many-defences';
 import { isPlanetaryBombDefenceType } from '../../defences/planetary-bomb';
 import { ManyShips } from '../../fleets/many-ships';
+import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
+import { DiplomacyResolver } from '../../diplomacy/diplomacy-resolver';
 import type { GalaxySetup } from '../../game-api-types';
 
 describe('GalaxyCreator', () => {
@@ -35,6 +37,7 @@ describe('GalaxyCreator', () => {
     botDifficulty: 0,
     neutralBotsAmount: 1,
     neutralBotsDifficulty: 0,
+    botsUnitedAgainstHumans: false,
     startingHomeworldPreset: StartingHomeworldPreset.MEDIUM,
     startingResources: {
       metal: 1000,
@@ -432,6 +435,34 @@ describe('GalaxyCreator', () => {
 
       expect(ownedPlanets).toHaveLength(1);
       expect(ownedPlanets[0]).toBe(player.planets[0]);
+    }
+  });
+
+  it('seeds permanent bot alliances and bot-human wars when bots are united against humans', () => {
+    const galaxy = new GalaxyCreator(createSetup({
+      playerAmount: 2,
+      botsAmount: 2,
+      neutralBotsAmount: 1,
+      botsUnitedAgainstHumans: true
+    })).createGalaxy(['Human-A', 'Human-B']);
+
+    const humans = galaxy.players.filter((player) => player.type === PlayerType.PLAYER);
+    const bots = galaxy.players.filter((player) => player.type === PlayerType.BOT);
+    const neutral = galaxy.players.find((player) => player.type === PlayerType.NEUTRAL) ?? null;
+    const resolver = new DiplomacyResolver(galaxy.diplomaticRelations);
+
+    expect(humans).toHaveLength(2);
+    expect(bots).toHaveLength(2);
+    expect(resolver.getStatus(bots[0].playerId, bots[1].playerId)).toBe(DiplomaticStatus.ALLIED);
+    for (const bot of bots) {
+      for (const human of humans) {
+        expect(resolver.getStatus(bot.playerId, human.playerId)).toBe(DiplomaticStatus.WAR);
+      }
+    }
+    expect(resolver.getStatus(humans[0].playerId, humans[1].playerId)).toBe(DiplomaticStatus.NEUTRAL);
+    if (neutral) {
+      expect(resolver.getStatus(neutral.playerId, humans[0].playerId)).toBe(DiplomaticStatus.NEUTRAL);
+      expect(resolver.getStatus(neutral.playerId, bots[0].playerId)).toBe(DiplomaticStatus.NEUTRAL);
     }
   });
 });

@@ -3,6 +3,7 @@ import * as diplomacyResolverModule from '../../../src/app/models/diplomacy/dipl
 import * as diplomaticProposalStateModule from '../../../src/app/models/diplomacy/diplomatic-proposal-state.js';
 import * as diplomaticProposalModule from '../../../src/app/models/diplomacy/diplomatic-proposal.js';
 import * as diplomaticProposalRulesModule from '../../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
+import * as botsUnitedAgainstHumansModule from '../../../src/app/models/diplomacy/bots-united-against-humans.js';
 import * as playerTypeEnumModule from '../../../src/app/models/enums/player-type.js';
 import type { DiplomaticStatus as DiplomaticStatusType } from '../../../src/app/models/diplomacy/diplomatic-status.ts';
 import type { DiplomaticProposal } from '../../../src/app/models/diplomacy/diplomatic-proposal.ts';
@@ -32,6 +33,10 @@ const {
   allowedDiplomaticProposalStatuses,
   isDiplomaticProposalRequestedStatus
 } = resolveModule(diplomaticProposalRulesModule) as typeof import('../../../src/app/models/diplomacy/diplomatic-proposal-rules.js');
+const {
+  expectedBotsUnitedAgainstHumansStatus,
+  isBotsUnitedAgainstHumansDiplomacyStatusAllowed
+} = resolveModule(botsUnitedAgainstHumansModule) as typeof import('../../../src/app/models/diplomacy/bots-united-against-humans.js');
 const { PlayerType } = resolveModule(playerTypeEnumModule) as typeof import('../../../src/app/models/enums/player-type.js');
 
 export type CreateDiplomaticProposalCommand = {
@@ -118,7 +123,8 @@ export function createDiplomaticProposalCommand(
     context.galaxy,
     sourcePlayer,
     targetPlayer,
-    command.requestedStatus
+    command.requestedStatus,
+    context.setup
   );
   if (validationError) {
     return {
@@ -168,6 +174,31 @@ export function approveDiplomaticProposalCommand(
     return {
       ok: false,
       error: commandError(403, 'FORBIDDEN', 'Only the target player can accept this proposal.')
+    };
+  }
+
+  if (!isBotsUnitedAgainstHumansDiplomacyStatusAllowed(
+    context.galaxy,
+    proposal.fromPlayerId,
+    proposal.toPlayerId,
+    proposal.requestedStatus,
+    context.setup
+  )) {
+    const expectedStatus = expectedBotsUnitedAgainstHumansStatus(
+      context.galaxy,
+      proposal.fromPlayerId,
+      proposal.toPlayerId,
+      context.setup
+    );
+    return {
+      ok: false,
+      error: commandError(
+        409,
+        'CONFLICT',
+        expectedStatus === DiplomaticStatus.ALLIED
+          ? 'This game mode keeps permanent bot empires allied with each other.'
+          : 'This game mode keeps permanent bot empires at war with human players.'
+      )
     };
   }
 
@@ -236,7 +267,8 @@ function validateDiplomaticProposalCreation(
   galaxy: Galaxy,
   sourcePlayer: Player,
   targetPlayer: Player,
-  requestedStatus: DiplomaticStatusType
+  requestedStatus: DiplomaticStatusType,
+  setup: GameCommandContext['setup'] = null
 ) {
   if (targetPlayer.type === PlayerType.NEUTRAL) {
     return commandError(403, 'FORBIDDEN', 'Neutral factions do not participate in treaty proposals.');
@@ -248,6 +280,28 @@ function validateDiplomaticProposalCreation(
 
   if (!isDiplomaticProposalRequestedStatus(requestedStatus)) {
     return commandError(400, 'INVALID_INPUT', 'Requested diplomacy status is not proposeable.');
+  }
+
+  if (!isBotsUnitedAgainstHumansDiplomacyStatusAllowed(
+    galaxy,
+    sourcePlayer.playerId,
+    targetPlayer.playerId,
+    requestedStatus,
+    setup
+  )) {
+    const expectedStatus = expectedBotsUnitedAgainstHumansStatus(
+      galaxy,
+      sourcePlayer.playerId,
+      targetPlayer.playerId,
+      setup
+    );
+    return commandError(
+      409,
+      'CONFLICT',
+      expectedStatus === DiplomaticStatus.ALLIED
+        ? 'This game mode keeps permanent bot empires allied with each other.'
+        : 'This game mode keeps permanent bot empires at war with human players.'
+    );
   }
 
   const currentStatus = currentDiplomaticStatusForPair(galaxy, sourcePlayer.playerId, targetPlayer.playerId);

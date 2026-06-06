@@ -2,6 +2,7 @@ import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
 import type { Player } from '../../../src/app/models/player.ts';
 import type { BuildingType } from '../../../src/app/models/enums/building-type.ts';
 import type { TechnologyType } from '../../../src/app/models/enums/technology-type.ts';
+import type { BotsUnitedAgainstHumansSetup } from '../../../src/app/models/diplomacy/bots-united-against-humans.ts';
 import * as diplomaticStatusModule from '../../../src/app/models/diplomacy/diplomatic-status.js';
 import * as fleetMissionTypeModule from '../../../src/app/models/enums/fleet-mission-type.js';
 import type { SupportRequestType } from '../../../src/app/models/requests/support-request.ts';
@@ -47,7 +48,7 @@ export class BotBrainV2 {
     this.subsystems = buildEnabledSubsystems(flags);
   }
 
-  public runTurn(galaxy: Galaxy): void {
+  public runTurn(galaxy: Galaxy, setup: BotsUnitedAgainstHumansSetup | null = null): void {
     if (this.flags.mode === 'DISABLED') {
       return;
     }
@@ -60,11 +61,15 @@ export class BotBrainV2 {
         continue;
       }
 
-      this.runTurnForBot(galaxy, bot);
+      this.runTurnForBot(galaxy, bot, setup);
     }
   }
 
-  private runTurnForBot(galaxy: Galaxy, player: Player): void {
+  private runTurnForBot(
+    galaxy: Galaxy,
+    player: Player,
+    setup: BotsUnitedAgainstHumansSetup | null
+  ): void {
     player.botProfileId = player.botProfileId ?? defaultBotProfileIdForPlayerId(player.playerId);
     const memory = ensureBotMemoryV2(player);
     const snapshot = buildBotWorldSnapshot(galaxy, player, this.flags);
@@ -83,7 +88,7 @@ export class BotBrainV2 {
 
     const supervisorDecision = this.supervisor.decide(snapshot, memory, proposals);
     const executor = this.flags.mode === 'LIVE'
-      ? new LiveQueueBotExecutor(galaxy, player.playerId)
+      ? new LiveQueueBotExecutor(galaxy, player.playerId, setup)
       : new NoopBotExecutor();
     const executionOutcomes = executor.executeAcceptedTasks(supervisorDecision.accepted);
     recordExecutedSpending(memory, snapshot, supervisorDecision.accepted, executionOutcomes, galaxy.currentTurn);

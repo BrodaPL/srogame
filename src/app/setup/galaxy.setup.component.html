@@ -223,6 +223,26 @@
         </div>
       }
 
+      <div class="field">
+        <label>Bot diplomacy</label>
+        <div class="test-options">
+          <label
+            class="checkbox-field"
+            for="botsUnitedAgainstHumans"
+            [appTooltip]="botsUnitedAgainstHumansTooltip"
+          >
+            <input
+              id="botsUnitedAgainstHumans"
+              name="botsUnitedAgainstHumans"
+              type="checkbox"
+              [(ngModel)]="form.botsUnitedAgainstHumans"
+              [appTooltip]="botsUnitedAgainstHumansTooltip"
+            />
+            <span>Bots united against humans</span>
+          </label>
+        </div>
+      </div>
+
       <div class="field-row">
         <div class="field">
           <label for="neutralBotsAmount">Neutral bots amount (%)</label>

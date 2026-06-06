@@ -53,6 +53,7 @@ type LobbySetupForm = {
   botDifficulty: string;
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
+  botsUnitedAgainstHumans: boolean;
   autoSaveTurns: string;
   scheduledTurnsEnabled: boolean;
   scheduledTurnHours: Record<number, boolean>;
@@ -80,6 +81,7 @@ export class MultiplayerComponent implements OnDestroy {
   protected readonly minScheduledTurnsGalaxySize = MIN_SCHEDULED_TURNS_GALAXY_SIZE;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
   protected readonly startingHomeworldPresetTooltips = STARTING_HOMEWORLD_PRESET_TOOLTIPS;
+  protected readonly botsUnitedAgainstHumansTooltip = 'When enabled, permanent bot empires start allied with each other and at war with every human player. Neutral resource factions are not affected. Useful for PvE or co-op games where bots should act as a shared opposing bloc.';
   protected readonly session: AuthStateService['session'];
   protected browserResponse: MultiplayerGameBrowserResponse | null = null;
   protected detailResponse: MultiplayerGameDetailResponse | null = null;
@@ -1006,6 +1008,7 @@ export class MultiplayerComponent implements OnDestroy {
       botProfileCounts,
       neutralBotsAmount,
       neutralBotsDifficulty,
+      botsUnitedAgainstHumans: this.setupForm.botsUnitedAgainstHumans,
       autoSaveTurns,
       scheduledTurns: {
         enabled: this.setupForm.scheduledTurnsEnabled,
@@ -1033,6 +1036,7 @@ export class MultiplayerComponent implements OnDestroy {
       botDifficulty: String(setup.botDifficulty),
       neutralBotsAmount: String(setup.neutralBotsAmount),
       neutralBotsDifficulty: String(setup.neutralBotsDifficulty),
+      botsUnitedAgainstHumans: setup.botsUnitedAgainstHumans === true,
       autoSaveTurns: String(setup.autoSaveTurns),
       scheduledTurnsEnabled: setup.scheduledTurns.enabled,
       scheduledTurnHours: this.createScheduledTurnHourMap(setup.scheduledTurns.enabledHours),
@@ -1098,6 +1102,7 @@ export class MultiplayerComponent implements OnDestroy {
       botProfileCounts: createDefaultBotProfileCounts(0),
       neutralBotsAmount: DEFAULT_NEUTRAL_PLANET_PERCENT,
       neutralBotsDifficulty: 0,
+      botsUnitedAgainstHumans: false,
       autoSaveTurns: 5,
       startingHomeworldPreset: DEFAULT_STARTING_HOMEWORLD_PRESET,
       createRandomPlanets: false,

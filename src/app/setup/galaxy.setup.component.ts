@@ -41,6 +41,7 @@ type GalaxySetupForm = {
   botDifficulty: string;
   neutralBotsAmount: string;
   neutralBotsDifficulty: string;
+  botsUnitedAgainstHumans: boolean;
   autoSaveTurns: string;
   enablePlayerActionLogging: boolean;
   startingHomeworldPreset: StartingHomeworldPreset;
@@ -64,6 +65,7 @@ export class GalaxySetupComponent {
   protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
   protected readonly startingHomeworldPresetTooltips = STARTING_HOMEWORLD_PRESET_TOOLTIPS;
+  protected readonly botsUnitedAgainstHumansTooltip = 'When enabled, permanent bot empires start allied with each other and at war with every human player. Neutral resource factions are not affected. Useful for PvE or co-op games where bots should act as a shared opposing bloc.';
   protected readonly savedConfig = signal<GalaxySetup | null>(null);
   protected readonly session: AuthStateService['session'];
   protected isStarting = false;
@@ -184,6 +186,7 @@ export class GalaxySetupComponent {
         : this.buildBotProfileCounts(this.form.botProfileCounts),
       neutralBotsAmount: Number(this.form.neutralBotsAmount),
       neutralBotsDifficulty: Number(this.form.neutralBotsDifficulty),
+      botsUnitedAgainstHumans: this.form.botsUnitedAgainstHumans,
       autoSaveTurns: Number(this.form.autoSaveTurns),
       scheduledTurns: {
         enabled: false,
@@ -236,6 +239,7 @@ export class GalaxySetupComponent {
       botDifficulty: '0',
       neutralBotsAmount: String(DEFAULT_NEUTRAL_PLANET_PERCENT),
       neutralBotsDifficulty: '0',
+      botsUnitedAgainstHumans: false,
       autoSaveTurns: '5',
       enablePlayerActionLogging: false,
       startingHomeworldPreset: DEFAULT_STARTING_HOMEWORLD_PRESET,
@@ -264,6 +268,7 @@ export class GalaxySetupComponent {
       botDifficulty: String(config.botDifficulty),
       neutralBotsAmount: String(config.neutralBotsAmount),
       neutralBotsDifficulty: String(config.neutralBotsDifficulty),
+      botsUnitedAgainstHumans: config.botsUnitedAgainstHumans === true,
       autoSaveTurns: String(config.autoSaveTurns),
       enablePlayerActionLogging: config.enablePlayerActionLogging === true,
       startingHomeworldPreset: config.startingHomeworldPreset,
@@ -345,6 +350,7 @@ export class GalaxySetupComponent {
       Number.isInteger(config.neutralBotsDifficulty) &&
       config.neutralBotsDifficulty >= -100 &&
       config.neutralBotsDifficulty <= 200 &&
+      typeof config.botsUnitedAgainstHumans === 'boolean' &&
       Number.isInteger(config.autoSaveTurns) &&
       config.autoSaveTurns >= 0 &&
       config.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&

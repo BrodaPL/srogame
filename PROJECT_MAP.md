@@ -166,7 +166,7 @@ Game snapshot/state:
 - `src/app/core/game-api.service.ts`: game HTTP calls; now includes the first game-registry/current-game endpoints and supports optional explicit `gameId` for state/turn/save/end-turn calls
 - `src/app/core/game-api.service.ts` also now exposes the full per-game multiplayer browser/draft management endpoints under `/api/multiplayer/games*`
 - `src/app/core/game-state.service.ts`: in-memory `GalaxySnapshot` plus active turn-status owner on the client, selected/current `gameId`, and an observable turn-status stream used by the game shell
-- `src/app/models/game-api-types.ts`: shared `GalaxySetup` normalization, including count-based bot-profile setup validation/helpers and compact Scheduled Turns setup (`enabled` + selected `1..24` hour numbers)
+- `src/app/models/game-api-types.ts`: shared `GalaxySetup` normalization, including count-based bot-profile setup validation/helpers, compact Scheduled Turns setup (`enabled` + selected `1..24` hour numbers), and game-mode flags such as `botsUnitedAgainstHumans`
 
 Load/save note:
 - `src/app/load-game/` now scopes its save list to the selected/current `gameId` when one exists, instead of always showing one undifferentiated global save list
@@ -380,6 +380,7 @@ Diplomacy command ownership note:
 - `server/src/index.ts` owns auth/session checks, request parsing, and diplomacy view/mail DTO projection
 - `server/src/game-commands/diplomacy-commands.ts` owns treaty-proposal create/accept/reject/cancel validation + mutation, diplomacy-contact visibility checks, human/bot proposal eligibility, and shared one-outgoing-per-turn / pending-pair enforcement
 - `src/app/models/diplomacy/diplomatic-proposal-rules.ts` owns the shared treaty ladder used by both server and Angular UI (`NEUTRAL -> PEACE/WAR`, `WAR -> PEACE/NEUTRAL`, `PEACE -> ALLIED/NEUTRAL`, `ALLIED -> PEACE`)
+- `src/app/models/diplomacy/bots-united-against-humans.ts` owns the shared co-op PvE diplomacy rule: when `GalaxySetup.botsUnitedAgainstHumans` is enabled, permanent bots are forced `ALLIED` with each other and `WAR` with human players, while neutral factions and human-human relations stay unchanged
 - `src/app/models/requests/support-request.ts` owns the shared phase-1 diplomacy support-request model and resource-payload normalization used by the server, save layer, and Angular UI
 - diplomacy support-request creation/approval/rejection command logic lives in `server/src/game-commands/support-request-commands.ts`; Mail projection, support expiry/synchronization, and accepted support execution still live in `server/src/index.ts`
 - phase-2 offensive support requests (`ATTACK_TARGET`, `BOMBARD_TARGET`, `SIEGE_TARGET`) currently auto-launch via the shared `createFleetMission(...)` command path after acceptance, so mission legality still resolves through the normal fleet-command layer

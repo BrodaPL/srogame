@@ -26,6 +26,7 @@ import { ManyDefences } from '../defences/many-defences';
 import { isPlanetaryBombDefenceType } from '../defences/planetary-bomb';
 import { Defence } from '../defences/defence';
 import { createTutorialReadState } from '../../tutorial/tutorial-types';
+import { applyBotsUnitedAgainstHumansDiplomacy } from '../diplomacy/bots-united-against-humans';
 
 const DEFENCE_BLUEPRINTS = DefenceBlueprintsFactory.fromDefaultJson();
 
@@ -150,6 +151,7 @@ export class GalaxyCreator {
 
     this.assignStartingPlayers(galaxy, playerNames);
     this.assignStartingBots(galaxy);
+    applyBotsUnitedAgainstHumansDiplomacy(galaxy, this.setup);
     this.applyTestingSetupOptions(galaxy, playerNames);
     this.seedExtraNeutralPlanets(galaxy);
 
@@ -187,7 +189,9 @@ export class GalaxyCreator {
       return null;
     }
 
-    return this.createHumanStartingPlayerAtSlot(galaxy, slot, playerName);
+    const player = this.createHumanStartingPlayerAtSlot(galaxy, slot, playerName);
+    applyBotsUnitedAgainstHumansDiplomacy(galaxy, this.setup);
+    return player;
   }
 
   public distanceFromCenter(x: number, y: number): number {

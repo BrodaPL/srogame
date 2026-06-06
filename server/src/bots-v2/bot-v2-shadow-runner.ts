@@ -1,11 +1,13 @@
 import type { Galaxy } from '../../../src/app/models/planets/galaxy.ts';
+import type { BotsUnitedAgainstHumansSetup } from '../../../src/app/models/diplomacy/bots-united-against-humans.ts';
 import type { BotV2FeatureFlags } from './bot-v2-types.ts';
 import { BotBrainV2 } from './bot-brain-v2.js';
 import { resolveBotV2FeatureFlags } from './bot-v2-feature-flags.js';
 
 export function runBotTurnPhaseV2Shadow(
   galaxy: Galaxy,
-  overrides?: Partial<BotV2FeatureFlags>
+  overrides?: Partial<BotV2FeatureFlags>,
+  setup: BotsUnitedAgainstHumansSetup | null = null
 ): void {
   const flags = resolveBotV2FeatureFlags(overrides);
   if (flags.mode !== 'SHADOW') {
@@ -13,12 +15,13 @@ export function runBotTurnPhaseV2Shadow(
   }
 
   const brain = new BotBrainV2(flags);
-  brain.runTurn(galaxy);
+  brain.runTurn(galaxy, setup);
 }
 
 export function runBotTurnPhaseV2(
   galaxy: Galaxy,
-  overrides?: Partial<BotV2FeatureFlags>
+  overrides?: Partial<BotV2FeatureFlags>,
+  setup: BotsUnitedAgainstHumansSetup | null = null
 ): void {
   const flags = resolveBotV2FeatureFlags(overrides);
   if (flags.mode === 'DISABLED') {
@@ -26,5 +29,5 @@ export function runBotTurnPhaseV2(
   }
 
   const brain = new BotBrainV2(flags);
-  brain.runTurn(galaxy);
+  brain.runTurn(galaxy, setup);
 }

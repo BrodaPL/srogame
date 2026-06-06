@@ -583,6 +583,7 @@ function buildTestSave() {
     botDifficulty: 0,
     neutralBotsAmount: 1,
     neutralBotsDifficulty: 0,
+    botsUnitedAgainstHumans: false,
     autoSaveTurns: 5,
     scheduledTurns: {
       enabled: false,

@@ -42,6 +42,7 @@ describe('game-api-types bot profile counts', () => {
     });
     expect(setup.startingHomeworldPreset).toBe(DEFAULT_STARTING_HOMEWORLD_PRESET);
     expect(setup.enablePlayerActionLogging).toBe(false);
+    expect(setup.botsUnitedAgainstHumans).toBe(false);
   });
 
   it('normalizes invalid values to zero and preserves exact totals', () => {
@@ -137,5 +138,35 @@ describe('game-api-types bot profile counts', () => {
 
     expect(disabled.enablePlayerActionLogging).toBe(false);
     expect(enabled.enablePlayerActionLogging).toBe(true);
+  });
+
+  it('normalizes bots united against humans flag to a strict boolean', () => {
+    const disabled = normalizeGalaxySetup({
+      gameType: 'PvE',
+      galaxyName: 'Bot Coalition Disabled',
+      galaxyWidth: 25,
+      galaxyHeight: 20,
+      galaxyCenterSize: 10,
+      voidChance: 5,
+      starsAmountModifier: [-1, 4],
+      playerAmount: 1,
+      botsAmount: 0,
+      botDifficulty: 0,
+      neutralBotsAmount: 1,
+      neutralBotsDifficulty: 0,
+      botsUnitedAgainstHumans: false,
+      startingResources: {
+        metal: 6,
+        crystal: 3,
+        deuterium: 1
+      }
+    });
+    const enabled = normalizeGalaxySetup({
+      ...disabled,
+      botsUnitedAgainstHumans: true
+    });
+
+    expect(disabled.botsUnitedAgainstHumans).toBe(false);
+    expect(enabled.botsUnitedAgainstHumans).toBe(true);
   });
 });

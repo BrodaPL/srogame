@@ -28,6 +28,7 @@ import diplomacyResolverModule from '../../src/app/models/diplomacy/diplomacy-re
 import diplomaticProposalStateModule from '../../src/app/models/diplomacy/diplomatic-proposal-state.js';
 import diplomaticProposalModule from '../../src/app/models/diplomacy/diplomatic-proposal.js';
 import diplomacyProposalRulesModule from '../../src/app/models/diplomacy/diplomatic-proposal-rules.js';
+import botsUnitedAgainstHumansModule from '../../src/app/models/diplomacy/bots-united-against-humans.js';
 import planetaryBombModule from '../../src/app/models/defences/planetary-bomb.js';
 import bombardmentPriorityModule from '../../src/app/models/bombardment/bombardment-priority.js';
 import jumpGateCapacityModule from '../../src/app/models/jump-gates/jump-gate-capacity.js';
@@ -466,6 +467,11 @@ const {
 const {
   allowedDiplomaticProposalStatuses
 } = diplomacyProposalRulesModule as typeof import('../../src/app/models/diplomacy/diplomatic-proposal-rules.js');
+const {
+  applyBotsUnitedAgainstHumansDiplomacy,
+  expectedBotsUnitedAgainstHumansStatus,
+  isBotsUnitedAgainstHumansDiplomacyStatusAllowed
+} = botsUnitedAgainstHumansModule as typeof import('../../src/app/models/diplomacy/bots-united-against-humans.js');
 const {
   countPlanetaryBombs,
   isPlanetaryBombDefenceType
@@ -2314,6 +2320,26 @@ app.post('/api/game/diplomacy', (req, res) => {
     return res.status(404).json({ error: 'One or more diplomacy players were not found.' });
   }
 
+  if (!isBotsUnitedAgainstHumansDiplomacyStatusAllowed(
+    controller.galaxy,
+    playerAId,
+    playerBId,
+    status,
+    currentGameSetup
+  )) {
+    const expectedStatus = expectedBotsUnitedAgainstHumansStatus(
+      controller.galaxy,
+      playerAId,
+      playerBId,
+      currentGameSetup
+    );
+    return res.status(409).json({
+      error: expectedStatus === DiplomaticStatus.ALLIED
+        ? 'This game mode keeps permanent bot empires allied with each other.'
+        : 'This game mode keeps permanent bot empires at war with human players.'
+    });
+  }
+
   upsertDiplomaticRelation(controller.galaxy, playerAId, playerBId, status);
 
   return res.status(200).json(toDiplomaticRelationDtos(controller.galaxy.diplomaticRelations));
@@ -2342,7 +2368,7 @@ app.post('/api/game/diplomacy/proposals', (req, res) => {
   }
 
   const result = createDiplomaticProposalCommand(
-    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId, setup: currentGameSetup },
     { targetPlayerId, requestedStatus }
   );
   if (!result.ok) {
@@ -2364,7 +2390,7 @@ app.post('/api/game/diplomacy/proposals/:proposalId/accept', (req, res) => {
   }
 
   const result = approveDiplomaticProposalCommand(
-    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId, setup: currentGameSetup },
     { proposalId }
   );
   if (!result.ok) {
@@ -2386,7 +2412,7 @@ app.post('/api/game/diplomacy/proposals/:proposalId/reject', (req, res) => {
   }
 
   const result = rejectDiplomaticProposalCommand(
-    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId, setup: currentGameSetup },
     { proposalId }
   );
   if (!result.ok) {
@@ -2408,7 +2434,7 @@ app.post('/api/game/diplomacy/proposals/:proposalId/cancel', (req, res) => {
   }
 
   const result = cancelDiplomaticProposalCommand(
-    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId, setup: currentGameSetup },
     { proposalId }
   );
   if (!result.ok) {
@@ -6841,7 +6867,8 @@ function resolveAuthenticatedGamePlayer(req: Request):
 
 function resolveMountedTurn(galaxy: Galaxy): void {
   const resolvedTurnNumber = galaxy.currentTurn + 1;
-  runBotTurnPhaseV2(galaxy);
+  applyBotsUnitedAgainstHumansDiplomacy(galaxy, currentGameSetup);
+  runBotTurnPhaseV2(galaxy, undefined, currentGameSetup);
   resolvePhaseOneTurn(galaxy, resolvedTurnNumber, {
     botDifficultyPercent: currentGameSetup?.botDifficulty ?? 0,
     fleetOutcomeLogger: (event) => {
@@ -11779,6 +11806,7 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Number.isInteger(setup.neutralBotsDifficulty) &&
     setup.neutralBotsDifficulty >= -100 &&
     setup.neutralBotsDifficulty <= 200 &&
+    typeof setup.botsUnitedAgainstHumans === 'boolean' &&
     Number.isInteger(setup.autoSaveTurns) &&
     setup.autoSaveTurns >= 0 &&
     setup.autoSaveTurns <= MAX_AUTO_SAVE_TURNS &&

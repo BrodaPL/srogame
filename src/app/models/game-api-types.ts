@@ -49,6 +49,7 @@ export type GalaxySetup = {
   botProfileCounts?: BotProfileCountMap;
   neutralBotsAmount: number;
   neutralBotsDifficulty: number;
+  botsUnitedAgainstHumans: boolean;
   autoSaveTurns: number;
   scheduledTurns: ScheduledTurnsSetup;
   enablePlayerActionLogging?: boolean;
@@ -79,10 +80,15 @@ export const DEFAULT_NEUTRAL_PLANET_PERCENT = 10;
 
 export type GalaxySetupWithOptionalAutoSaveTurns = Omit<
   GalaxySetup,
-  'autoSaveTurns' | 'botProfileCounts' | 'scheduledTurns' | 'startingHomeworldPreset'
+  'autoSaveTurns'
+  | 'botProfileCounts'
+  | 'botsUnitedAgainstHumans'
+  | 'scheduledTurns'
+  | 'startingHomeworldPreset'
 > & {
   autoSaveTurns?: unknown;
   botProfileCounts?: Partial<Record<BotProfileId, unknown>>;
+  botsUnitedAgainstHumans?: unknown;
   scheduledTurns?: unknown;
   startingHomeworldPreset?: unknown;
 };
@@ -120,6 +126,7 @@ export function normalizeGalaxySetup(
     autoSaveTurns: normalizeAutoSaveTurns(setup.autoSaveTurns),
     scheduledTurns: normalizeScheduledTurnsSetup((setup as Partial<GalaxySetup>).scheduledTurns),
     enablePlayerActionLogging: setup.enablePlayerActionLogging === true,
+    botsUnitedAgainstHumans: setup.botsUnitedAgainstHumans === true,
     startingHomeworldPreset: normalizeStartingHomeworldPreset(setup.startingHomeworldPreset)
   };
 }

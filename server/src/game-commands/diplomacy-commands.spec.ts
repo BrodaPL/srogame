@@ -228,4 +228,78 @@ describe('diplomacy commands', () => {
       expect(neutralResult.error.status).toBe(403);
     }
   });
+
+  it('blocks bot-human peace proposals when bots are united against humans', () => {
+    const system = new SolarSystem('Bot Coalition', 2, false, false, { x: 1, y: 1 }, new Set<number>(), new Map());
+    system.planets[0].info.ownerId = 1;
+    system.planets[1].info.ownerId = 2;
+    const human = new Player(1, 'Human', [system.planets[0]], new Map(), [], PlayerType.PLAYER);
+    const bot = new Player(2, 'Bot', [system.planets[1]], new Map(), [], PlayerType.BOT);
+    const galaxy = new Galaxy('Bot Coalition Galaxy', [human, bot], [[system]], 12, [], 1);
+    galaxy.diplomaticRelations = [{ playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }];
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
+
+    const result = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1, setup: { botsUnitedAgainstHumans: true } },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.PEACE }
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.status).toBe(409);
+      expect(result.error.message).toContain('at war with human players');
+    }
+  });
+
+  it('blocks bot-bot alliance downgrades when bots are united against humans', () => {
+    const system = new SolarSystem('Bot Coalition', 2, false, false, { x: 1, y: 1 }, new Set<number>(), new Map());
+    system.planets[0].info.ownerId = 1;
+    system.planets[1].info.ownerId = 2;
+    const botAlpha = new Player(1, 'Bot Alpha', [system.planets[0]], new Map(), [], PlayerType.BOT);
+    const botBeta = new Player(2, 'Bot Beta', [system.planets[1]], new Map(), [], PlayerType.BOT);
+    const galaxy = new Galaxy('Bot Coalition Galaxy', [botAlpha, botBeta], [[system]], 12, [], 1);
+    galaxy.diplomaticRelations = [{ playerAId: 1, playerBId: 2, status: DiplomaticStatus.ALLIED }];
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
+
+    const result = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1, setup: { botsUnitedAgainstHumans: true } },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.PEACE }
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.status).toBe(409);
+      expect(result.error.message).toContain('allied with each other');
+    }
+  });
+
+  it('blocks approval of stale proposals that violate bots united against humans', () => {
+    const system = new SolarSystem('Bot Coalition', 2, false, false, { x: 1, y: 1 }, new Set<number>(), new Map());
+    system.planets[0].info.ownerId = 1;
+    system.planets[1].info.ownerId = 2;
+    const human = new Player(1, 'Human', [system.planets[0]], new Map(), [], PlayerType.PLAYER);
+    const bot = new Player(2, 'Bot', [system.planets[1]], new Map(), [], PlayerType.BOT);
+    const galaxy = new Galaxy('Bot Coalition Galaxy', [human, bot], [[system]], 12, [], 1);
+    galaxy.diplomaticRelations = [{ playerAId: 1, playerBId: 2, status: DiplomaticStatus.WAR }];
+    markPlayerVisibleInDiplomacy(galaxy, 1, 2);
+    markPlayerVisibleInDiplomacy(galaxy, 2, 1);
+
+    const proposalResult = createDiplomaticProposalCommand(
+      { galaxy, playerId: 1 },
+      { targetPlayerId: 2, requestedStatus: DiplomaticStatus.PEACE }
+    );
+    expect(proposalResult.ok).toBe(true);
+
+    const approvalResult = approveDiplomaticProposalCommand(
+      { galaxy, playerId: 2, setup: { botsUnitedAgainstHumans: true } },
+      { proposalId: galaxy.diplomaticProposals[0].proposalId }
+    );
+
+    expect(approvalResult.ok).toBe(false);
+    if (!approvalResult.ok) {
+      expect(approvalResult.error.status).toBe(409);
+      expect(approvalResult.error.message).toContain('at war with human players');
+    }
+    expect(new DiplomacyResolver(galaxy.diplomaticRelations).getStatus(1, 2)).toBe(DiplomaticStatus.WAR);
+  });
 });

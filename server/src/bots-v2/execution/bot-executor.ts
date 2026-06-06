@@ -1,6 +1,7 @@
 import type { Galaxy } from '../../../../src/app/models/planets/galaxy.ts';
 import type { Planet } from '../../../../src/app/models/planets/planet.ts';
 import type { Player } from '../../../../src/app/models/player.ts';
+import type { BotsUnitedAgainstHumansSetup } from '../../../../src/app/models/diplomacy/bots-united-against-humans.ts';
 import * as buildingTypeModule from '../../../../src/app/models/enums/building-type.js';
 import * as diplomaticStatusModule from '../../../../src/app/models/diplomacy/diplomatic-status.js';
 import * as diplomacyResolverModule from '../../../../src/app/models/diplomacy/diplomacy-resolver.js';
@@ -102,7 +103,8 @@ export class NoopBotExecutor implements BotExecutor {
 export class LiveQueueBotExecutor implements BotExecutor {
   constructor(
     private readonly galaxy: Galaxy,
-    private readonly playerId: number
+    private readonly playerId: number,
+    private readonly setup: BotsUnitedAgainstHumansSetup | null = null
   ) {}
 
   public executeAcceptedTasks(accepted: BotProposal[]): BotExecutionOutcome[] {
@@ -177,7 +179,8 @@ export class LiveQueueBotExecutor implements BotExecutor {
 
     const context = {
       galaxy: this.galaxy,
-      playerId: this.playerId
+      playerId: this.playerId,
+      setup: this.setup
     };
     const result = normalized.value.kind === 'BUILDING'
       ? startBuildingConstruction(context, normalized.value.command)
@@ -226,7 +229,8 @@ export class LiveQueueBotExecutor implements BotExecutor {
     const decision = normalized.value;
     const context = {
       galaxy: this.galaxy,
-      playerId: this.playerId
+      playerId: this.playerId,
+      setup: this.setup
     };
     const result = decision.decision === 'ACCEPT'
       ? approveDiplomaticProposalCommand(context, { proposalId: decision.proposalId })
@@ -277,7 +281,8 @@ export class LiveQueueBotExecutor implements BotExecutor {
 
     const context = {
       galaxy: this.galaxy,
-      playerId: this.playerId
+      playerId: this.playerId,
+      setup: this.setup
     };
     const request = normalized.value;
     const result = createDiplomaticProposalCommand(context, {
