@@ -92,11 +92,33 @@
   padding: 0.45rem 0.9rem;
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.star-system-preview__button:hover:not(:disabled),
+.star-system-preview__button:focus-visible:not(:disabled) {
+  border-color: rgba(246, 180, 76, 0.58);
+  background: rgba(246, 180, 76, 0.1);
+  color: #f4f7fb;
+  box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.12), 0 0 14px rgba(246, 180, 76, 0.1);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.star-system-preview__button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .star-system-preview__button--danger {
   border-color: rgba(255, 84, 84, 0.32);
   color: #ffb4b4;
+}
+
+.star-system-preview__button--danger:hover:not(:disabled),
+.star-system-preview__button--danger:focus-visible:not(:disabled) {
+  border-color: rgba(255, 84, 84, 0.68);
+  background: rgba(255, 84, 84, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 84, 84, 0.12), 0 0 14px rgba(255, 84, 84, 0.1);
 }
 
 .note-modal-backdrop {

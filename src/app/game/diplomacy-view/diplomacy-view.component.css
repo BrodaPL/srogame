@@ -139,6 +139,21 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.diplomacy-view__action-button:hover:not(:disabled),
+.diplomacy-view__action-button:focus-visible:not(:disabled) {
+  border-color: rgba(246, 180, 76, 0.68);
+  background: linear-gradient(135deg, rgba(246, 180, 76, 0.4), rgba(246, 180, 76, 0.18));
+  color: #f4f7fb;
+  box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.14), 0 0 16px rgba(246, 180, 76, 0.12);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.diplomacy-view__action-button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .diplomacy-view__action-button:disabled {
@@ -150,6 +165,13 @@
   border-color: rgba(220, 96, 96, 0.45);
   background: linear-gradient(135deg, rgba(220, 96, 96, 0.24), rgba(220, 96, 96, 0.1));
   color: #ffdede;
+}
+
+.diplomacy-view__action-button--danger:hover:not(:disabled),
+.diplomacy-view__action-button--danger:focus-visible:not(:disabled) {
+  border-color: rgba(220, 96, 96, 0.72);
+  background: linear-gradient(135deg, rgba(220, 96, 96, 0.34), rgba(220, 96, 96, 0.16));
+  box-shadow: 0 0 0 1px rgba(220, 96, 96, 0.14), 0 0 16px rgba(220, 96, 96, 0.12);
 }
 
 .diplomacy-view__planet-grid {

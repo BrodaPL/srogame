@@ -245,6 +245,16 @@
   font-size: 0.79rem;
   font-weight: 600;
   cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.planet-tabs__tab:hover,
+.planet-tabs__tab:focus-visible {
+  border-color: rgba(246, 180, 76, 0.58);
+  background: rgba(246, 180, 76, 0.1);
+  color: #f4f7fb;
+  box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.12), 0 0 16px rgba(246, 180, 76, 0.1);
+  outline: none;
 }
 
 .planet-tabs__tab--active {
@@ -390,6 +400,20 @@
   font-weight: 700;
   padding: 0.42rem 0.82rem;
   cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.planet-operations__action:hover:not(:disabled),
+.planet-operations__action:focus-visible:not(:disabled) {
+  border-color: rgba(246, 180, 76, 0.58);
+  background: rgba(246, 180, 76, 0.1);
+  color: #f4f7fb;
+  box-shadow: 0 0 0 1px rgba(246, 180, 76, 0.12), 0 0 14px rgba(246, 180, 76, 0.1);
+  outline: none;
+}
+
+.planet-operations__action:active:not(:disabled) {
+  background: rgba(246, 180, 76, 0.16);
 }
 
 .planet-operations__action:disabled {
