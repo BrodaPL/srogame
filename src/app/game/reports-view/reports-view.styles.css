@@ -36,7 +36,7 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  color: #eeeeee;
   padding: 0.24rem 0.46rem;
   font-size: 0.76rem;
   cursor: pointer;
@@ -61,7 +61,7 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  color: #eeeeee;
   padding: 0.22rem 0.42rem;
   font-size: 0.74rem;
   font-weight: 600;
@@ -178,11 +178,11 @@
     inset 4px 0 0 rgba(246, 180, 76, 0.95),
     0 0 0 1px rgba(246, 180, 76, 0.22),
     0 10px 24px rgba(246, 180, 76, 0.16);
-  color: #fff;
+  color: #eeeeee;
 }
 
 .reports-view__item--active .reports-view__item-head h4 {
-  color: #fff;
+  color: #eeeeee;
   font-weight: 700;
 }
 

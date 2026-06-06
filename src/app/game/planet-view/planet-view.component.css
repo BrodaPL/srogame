@@ -162,7 +162,7 @@
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  color: #eeeeee;
   font-size: 1.45rem;
   font-weight: 700;
   cursor: pointer;
@@ -240,7 +240,7 @@
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  color: #eeeeee;
   padding: 0.42rem 0.85rem;
   font-size: 0.79rem;
   font-weight: 600;
@@ -376,7 +376,7 @@
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  color: #eeeeee;
   padding: 0.52rem 0.65rem;
 }
 
@@ -395,7 +395,7 @@
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  color: #eeeeee;
   font-size: 0.76rem;
   font-weight: 700;
   padding: 0.42rem 0.82rem;
@@ -538,7 +538,7 @@
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  color: #eeeeee;
   padding: 0.42rem 0.85rem;
   font-size: 0.76rem;
   cursor: pointer;

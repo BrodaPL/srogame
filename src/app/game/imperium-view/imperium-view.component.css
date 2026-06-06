@@ -32,7 +32,7 @@
   border-radius: 9px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  color: #eeeeee;
   padding: 0.42rem 0.58rem;
   font: inherit;
   color-scheme: dark;
@@ -222,7 +222,7 @@
 }
 
 .imperium-view__ship-value {
-  color: #fff;
+  color: #eeeeee;
   font-family: var(--font-mono), serif;
   font-size: 0.98rem;
   font-weight: 700;

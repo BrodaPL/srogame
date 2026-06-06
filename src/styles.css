@@ -817,7 +817,7 @@ app-root {
   border-radius: 999px;
   border: none;
   background: linear-gradient(120deg, #e66e47, #e67d54);
-  color: #fff;
+  color: #eeeeee;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
@@ -884,7 +884,7 @@ app-root {
   --muted: rgba(255, 255, 255, 0.65);
   --right-feature-space: clamp(220px, 24vw, 520px);
 
-  color: #fff;
+  color: #eeeeee;
   min-height: 100vh;
   padding: 0.55rem calc(0.75rem + var(--right-feature-space)) 0.85rem 0.55rem;
   display: grid;
@@ -925,7 +925,7 @@ app-root {
 }
 
 .game .link {
-  color: #fff;
+  color: #eeeeee;
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: border-color 0.2s ease, color 0.2s ease;
@@ -962,7 +962,7 @@ app-root {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-  color: #fff;
+  color: #eeeeee;
   padding: 0.42rem 0.85rem;
   font-size: 0.78rem;
   font-weight: 600;
@@ -1543,7 +1543,7 @@ app-root {
 
 .overview-nav__button {
   text-decoration: none;
-  color: #fff;
+  color: #eeeeee;
   border: 1px solid var(--line);
   padding: 0.7rem 1.2rem;
   border-radius: 999px;
@@ -1617,7 +1617,7 @@ app-root {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  color: #eeeeee;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1775,7 +1775,7 @@ app-root {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  color: #eeeeee;
   padding: 0.82rem 1.2rem;
   font-size: 0.96rem;
   font-weight: 700;
@@ -1879,7 +1879,7 @@ app-root {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  color: #eeeeee;
   font-size: 0.78rem;
   font-weight: 700;
   padding: 0.5rem 1rem;
@@ -2258,7 +2258,7 @@ app-root {
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  color: #eeeeee;
   padding: 0.55rem 0.55rem;
   font-size: 0.95rem;
   font-weight: 700;
@@ -2385,7 +2385,7 @@ app-root {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  color: #eeeeee;
   font-size: 0.86rem;
   font-weight: 700;
   padding: 0.7rem 1.44rem;

@@ -202,7 +202,7 @@
 
 .research-tech-card__description-text {
   margin: 0;
-  color: #fff;
+  color: #eeeeee;
   font-size: 0.78rem;
   line-height: 1.45;
 }
@@ -216,7 +216,7 @@
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  color: #eeeeee;
   font-size: 0.78rem;
   font-weight: 700;
   min-width: 128px;
