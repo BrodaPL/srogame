@@ -1581,6 +1581,9 @@ describe('resolvePhaseOneTurn battle integration', () => {
     const plunderReport = attacker.reports.find((report) => report.title.startsWith('Plunder Report: Beta Storehouse')) ?? null;
     expect(plunderReport?.originCoordinates).toEqual({ x: 1, y: 1, z: 1 });
     expect(plunderReport?.originPlanetName).toBe('Alpha Prime');
+    expect(plunderReport?.show()).toContain('Fleet ships: Transporter x1');
+    expect(plunderReport?.show()).toContain('Fleet cargo: Metal 200, Crystal 200, Deuterium 200');
+    expect(attacker.reports.some((report) => report.title.startsWith('Fleet Arrived: Attack'))).toBe(false);
   });
 
   it('creates plunder reports for bot attackers on no-battle Attack missions', () => {
@@ -1627,6 +1630,7 @@ describe('resolvePhaseOneTurn battle integration', () => {
       report.title.startsWith('Plunder Report: Beta Storehouse')
       && report.show().includes('Fleet cargo after looting: 600/600')
     )).toBe(true);
+    expect(players[0].reports.some((report) => report.title.startsWith('Fleet Arrived: Attack'))).toBe(false);
   });
 
   it('reduces Attack plunder efficiency by raw Bunker Network production1 value', () => {

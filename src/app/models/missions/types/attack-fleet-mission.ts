@@ -52,10 +52,7 @@ export class AttackFleetMission extends FleetMission {
       nextState: FleetState.RETURNING,
       resetCreatedAtTurn: true,
       effects: [],
-      reports: [{
-        kind: 'success',
-        body: `Attack mission completed at ${context.targetPlanet.basicInfo.name} and started the return flight.`
-      }]
+      reports: []
     };
   }
 

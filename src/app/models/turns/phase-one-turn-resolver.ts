@@ -2274,7 +2274,7 @@ function addAttackPlunderSummaryReport(
       originPlanetName: fleet.originPlanetName,
       senderPlayerName: targetOwner?.playerName ?? player.playerName
     },
-    body.join('\n')
+    appendFleetReportManifest(body.join('\n'), fleet.ships, fleet.cargo)
   );
   player.addReport(report);
 }
