@@ -50,7 +50,7 @@ type WeightProfile = {
 };
 
 const PERSONALITY_VARIANCE_RETENTION = 0.8;
-const DEFENSIVE_WEIGHT_RETENTION = 0.68;
+const DEFENSIVE_WEIGHT_RETENTION = 0.55;
 const MATURE_AVG_INDUSTRY_THRESHOLD = 3.6;
 const DEVELOPED_AVG_INDUSTRY_GAP = 1.2;
 const OLD_AVG_INDUSTRY_THRESHOLD = 6.8;
@@ -595,7 +595,6 @@ function buildGlobalWeights(
   );
   const strategicDevelopmentWeight = clampWeight(
     profile.strategicWeights.strategicDevelopment
-    - 8
     + (modeScores.ECONOMIC_RECOVERY * 0.25)
     + (modeScores.EXPANSION * 0.12)
     + (colonizationPressure * 0.8)
@@ -648,8 +647,12 @@ function resolveColonizationOpportunityPressure(context: BotSubsystemContext): n
     return 0;
   }
 
-  const basePressure = context.snapshot.empire.ownedPlanetCount <= 1 ? 20 : 10;
-  return Math.min(24, basePressure + ((viableCandidates - requiredCandidates) * 2));
+  const basePressure = context.snapshot.empire.ownedPlanetCount <= 1
+    ? 28
+    : context.snapshot.empire.ownedPlanetCount <= 2
+      ? 20
+      : 12;
+  return Math.min(36, basePressure + ((viableCandidates - requiredCandidates) * 3));
 }
 
 function buildWeightManagerPlanetEntry(
@@ -700,7 +703,7 @@ function buildWeightManagerPlanetEntry(
     warfareWeight -= 4;
   }
   if (flags.inDangerPlanet) {
-    defensiveWeight += 20;
+    defensiveWeight += 24;
     warfareWeight += 16;
     economicWeight -= 8;
   }

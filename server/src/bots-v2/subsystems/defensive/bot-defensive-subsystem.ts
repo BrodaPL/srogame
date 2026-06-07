@@ -109,13 +109,14 @@ const ALLOWED_DEFENSIVE_BUILDING_SCOPE = new Set<BuildingTypeT>([
 ]);
 
 const BONUS_FACTOR_CEILING = 3;
-const LOW_TIER_DEFENCE_TARGET_SHARE = 0.25;
-const MID_TIER_DEFENCE_TARGET_SHARE = 0.35;
+const LOW_TIER_DEFENCE_TARGET_SHARE = 0.18;
+const MID_TIER_DEFENCE_TARGET_SHARE = 0.32;
+const PEACEFUL_DEFENCE_LAYER_INCOME_CAP_MULTIPLIER = 5;
 const PEACEFUL_BUNKER_AFFORDABILITY_TURNS = 0;
 const PRESSURED_BUNKER_AFFORDABILITY_TURNS = 6;
-const LOW_TIER_DEFENCE_ORDER_CAP = 4;
-const MID_TIER_DEFENCE_ORDER_CAP = 3;
-const HIGH_TIER_DEFENCE_ORDER_CAP = 2;
+const LOW_TIER_DEFENCE_ORDER_CAP = 3;
+const MID_TIER_DEFENCE_ORDER_CAP = 2;
+const HIGH_TIER_DEFENCE_ORDER_CAP = 1;
 
 const UNLOCK_THRESHOLDS: Array<{ defenceType: DefenceTypeT; threshold: number }> = [
   { defenceType: DefenceType.SAM_SITE, threshold: 2 },
@@ -1068,11 +1069,10 @@ function resolveDefenceSoftCapPenaltyMultiplier(
     return 1;
   }
 
-  const multiplier = 10;
   const capResources = {
-    metal: Math.max(1, planet.economy.income.metal * multiplier),
-    crystal: Math.max(1, planet.economy.income.crystal * multiplier),
-    deuterium: Math.max(1, planet.economy.income.deuterium * multiplier)
+    metal: Math.max(1, planet.economy.income.metal * PEACEFUL_DEFENCE_LAYER_INCOME_CAP_MULTIPLIER),
+    crystal: Math.max(1, planet.economy.income.crystal * PEACEFUL_DEFENCE_LAYER_INCOME_CAP_MULTIPLIER),
+    deuterium: Math.max(1, planet.economy.income.deuterium * PEACEFUL_DEFENCE_LAYER_INCOME_CAP_MULTIPLIER)
   };
   const layerValue = resolveDefenceLayerResources(planet, defenceType);
   const overageRatio = Math.max(
