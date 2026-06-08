@@ -9,6 +9,7 @@ import { ManyDefences } from '../../../../../src/app/models/defences/many-defenc
 import { Destination } from '../../../../../src/app/models/fleets/destination.js';
 import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../../../../src/app/models/fleets/fleet.js';
 import { ManyShips } from '../../../../../src/app/models/fleets/many-ships.js';
+import { ShipyardQueueEntry } from '../../../../../src/app/models/fleets/shipyard-queue-entry.js';
 import { ResourcesPack } from '../../../../../src/app/models/resources-pack.js';
 import { Player } from '../../../../../src/app/models/player.js';
 import { Galaxy } from '../../../../../src/app/models/planets/galaxy.js';
@@ -449,6 +450,50 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     expect(result.goals?.some((goal) => goal.finalShipType === ShipType.COLONIZER)).toBe(false);
   });
 
+  it('does not consider more colonizer production while one colonizer is already queued', () => {
+    const { galaxy, bot, planet } = createBotWorld();
+    configureBaseStrategicDevelopmentPlanet(planet);
+    planet.setBuildingLevel(BuildingType.METAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 4);
+    planet.setBuildingLevel(BuildingType.METAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.CRYSTAL_STORAGE, 4);
+    planet.setBuildingLevel(BuildingType.DEUTERIUM_TANK, 4);
+    planet.setBuildingLevel(BuildingType.SOLAR_WIND_GEOTHERMAL, 5);
+    planet.setBuildingLevel(BuildingType.ROBOTICS_FACTORY, 2);
+    planet.setBuildingLevel(BuildingType.SHIPYARD, 3);
+    setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
+    planet.rBDSFTQ.shipyardQueue = [ShipyardQueueEntry.ship(ShipType.COLONIZER, 1, 0)];
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+
+    expect(result.goals?.some((goal) => goal.finalShipType === ShipType.COLONIZER)).toBe(false);
+  });
+
+  it('raises colonizer production pressure when a scanned colonizable target exists', () => {
+    const { galaxy, bot, sourcePlanet, targetPlanet, unownedPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    targetPlanet.rBDSFTQ.ships = ManyShips.empty();
+    sourcePlanet.setBuildingLevel(BuildingType.METAL_MINE, 7);
+    sourcePlanet.setBuildingLevel(BuildingType.CRYSTAL_MINE, 7);
+    sourcePlanet.setBuildingLevel(BuildingType.DEUTERIUM_SYNTHESIZER, 7);
+    sourcePlanet.setBuildingLevel(BuildingType.SHIPYARD, 7);
+    setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+    const colonizerProposal = result.proposals.find((proposal) =>
+      proposal.debug.finalShipType === ShipType.COLONIZER
+    );
+
+    expect(colonizerProposal).toBeDefined();
+    expect(colonizerProposal?.urgency).toBeGreaterThan(62);
+    expect(colonizerProposal?.debug.colonizerProductionPressureRatio).toBeGreaterThan(0);
+  });
+
   it('does not emit a colonize mission while an active colonize fleet already exists', () => {
     const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
     configureDevelopedSupportSource(sourcePlanet);
@@ -494,6 +539,38 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     );
 
     expect(colonizeProposal).toBeDefined();
+    randomSpy.mockRestore();
+  });
+
+  it('falls back to a launchable colonization target when the best scanned target is not reachable', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { galaxy, bot, sourcePlanet, unownedPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    setSupportShipTech(bot);
+    bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
+    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 40);
+
+    unownedPlanet.basicInfo.baseSize = 140;
+    unownedPlanet.basicInfo.colonizationDifficulty = 1;
+    unownedPlanet.info.planetaryParameters.industryModifier = 1;
+    markPlanetScanned(bot, unownedPlanet, galaxy.currentTurn);
+
+    const unreachableTarget = Planet.createRandomEmpty('BotSys IV', 4, sourcePlanet.basicInfo.solarSystem, null);
+    unreachableTarget.basicInfo.baseSize = 220;
+    unreachableTarget.basicInfo.colonizationDifficulty = 1;
+    unreachableTarget.info.planetaryParameters.industryModifier = 1.5;
+    sourcePlanet.basicInfo.solarSystem.planets[3] = unreachableTarget;
+    markPlanetScanned(bot, unreachableTarget, galaxy.currentTurn);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot);
+    const colonizeProposal = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.COLONIZE
+    );
+
+    expect(colonizeProposal).toBeDefined();
+    expect(colonizeProposal?.requestPayload.target).toEqual({ x: 0, y: 0, z: 3 });
     randomSpy.mockRestore();
   });
 

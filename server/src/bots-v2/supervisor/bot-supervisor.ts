@@ -91,7 +91,7 @@ export class BotSupervisorV2 implements BotSupervisor {
       return this.rejectAll(proposals, 'supervisor_disabled');
     }
 
-    const retryProposals = buildPendingRetryProposals(memory, snapshot.turn);
+    const retryProposals = buildPendingRetryProposals(memory, snapshot, snapshot.turn);
     const allProposals = [...retryProposals, ...proposals];
     if (allProposals.length === 0) {
       return this.rejectAll([], 'no_proposals');
@@ -1072,7 +1072,7 @@ function resolveFleetSlotCaps(
   return result;
 }
 
-function buildPendingRetryProposals(memory: BotMemoryV2, turn: number): BotProposal[] {
+function buildPendingRetryProposals(memory: BotMemoryV2, snapshot: BotWorldSnapshot, turn: number): BotProposal[] {
   return memory.supervisor.pendingCommitments
     .filter((commitment) =>
       (commitment.status === 'PENDING_RESOURCES' || commitment.status === 'PENDING_SHIPS_NEXT_TURN')
@@ -1082,6 +1082,16 @@ function buildPendingRetryProposals(memory: BotMemoryV2, turn: number): BotPropo
         || FLEET_ACTION_KINDS.has(commitment.kind as BotProposal['kind'])
       )
     )
+    .filter((commitment) => {
+      if (!isStaleColonizeCommitment(snapshot, commitment.executionPayload)) {
+        return true;
+      }
+
+      commitment.status = 'EXPIRED';
+      commitment.updatedTurn = turn;
+      commitment.cancelReason = 'colonize_target_no_longer_available';
+      return false;
+    })
     .map((commitment): BotProposal => ({
       proposalId: `${commitment.proposalId}:retry:${turn}`,
       subsystemId: commitment.subsystemId,
@@ -1111,6 +1121,40 @@ function buildPendingRetryProposals(memory: BotMemoryV2, turn: number): BotPropo
         originalProposalId: commitment.proposalId
       }
     }));
+}
+
+function isStaleColonizeCommitment(
+  snapshot: BotWorldSnapshot,
+  executionPayload: Record<string, unknown>
+): boolean {
+  if (!isColonizeFleetPayload(executionPayload)) {
+    return false;
+  }
+
+  const target = readPayloadCoordinates(executionPayload.target as Record<string, unknown>);
+  if (!target) {
+    return true;
+  }
+
+  if (snapshot.planets.some((planet) =>
+    planet.coordinates.x === target.x
+    && planet.coordinates.y === target.y
+    && planet.coordinates.z === target.z
+  )) {
+    return true;
+  }
+
+  if (snapshot.empire.strategicDiplomaticFactions.some((faction) =>
+    faction.knownPlanets.some((planet) =>
+      planet.coordinates.x === target.x
+      && planet.coordinates.y === target.y
+      && planet.coordinates.z === target.z
+    )
+  )) {
+    return true;
+  }
+
+  return false;
 }
 
 function expirePendingCommitments(memory: BotMemoryV2, turn: number): number {

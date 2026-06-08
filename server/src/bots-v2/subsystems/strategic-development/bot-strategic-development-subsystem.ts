@@ -227,9 +227,7 @@ function buildPlanetStrategicDevelopmentResult(
   const selectedBuildingGoals = buildingGoals
     .filter(isActionableGoal)
     .slice(0, MAX_BUILDING_GOALS_PER_PLANET);
-  const selectedProductionGoals = productionGoals
-    .filter(isActionableGoal)
-    .slice(0, MAX_PRODUCTION_GOALS_PER_PLANET);
+  const selectedProductionGoals = selectProductionGoals(context, planet, productionGoals);
   const proposals = createPlanetProposals(context, planet, selectedBuildingGoals, selectedProductionGoals);
   const blockedGoalCount = [...buildingGoals, ...productionGoals]
     .filter((goal) => goal.blockers.length > 0)
@@ -817,23 +815,28 @@ function createColonizationRequests(
     return [];
   }
 
-  const topCandidatePool = eligibleCandidates.slice(0, Math.min(2, eligibleCandidates.length));
+  const launchableCandidates = eligibleCandidates
+    .map((candidate) => ({
+      candidate,
+      source: selectColonizerSource(context, candidate)
+    }))
+    .filter((entry): entry is {
+      candidate: typeof eligibleCandidates[number];
+      source: { request: FleetMissionImmediateRequest };
+    } => entry.source !== null);
+  if (launchableCandidates.length <= 0) {
+    return [];
+  }
+
+  const topCandidatePool = launchableCandidates.slice(0, Math.min(2, launchableCandidates.length));
   const chosenCandidate = forcedPriority.active
-    ? eligibleCandidates[0] ?? null
+    ? launchableCandidates[0] ?? null
     : topCandidatePool[Math.min(
       topCandidatePool.length - 1,
       Math.floor(Math.random() * topCandidatePool.length)
     )] ?? null;
-  if (!chosenCandidate) {
-    return [];
-  }
 
-  const source = selectColonizerSource(context, chosenCandidate);
-  if (!source) {
-    return [];
-  }
-
-  return [source.request];
+  return chosenCandidate ? [chosenCandidate.source.request] : [];
 }
 
 function collectClaimedSpyTargets(priorProposals: BotProposal[]): Set<string> {
@@ -871,6 +874,12 @@ function resolveIdleColonizerCount(context: BotSubsystemContext): number {
   const totalColonizers = context.snapshot.planets.reduce((sum, planet) =>
     sum + Math.max(0, planet.ships.installedCountByType[ShipType.COLONIZER] ?? 0), 0);
   return Math.max(0, totalColonizers - context.snapshot.empire.activeColonizeFleetCount);
+}
+
+function resolveIdleOrQueuedColonizerCount(context: BotSubsystemContext): number {
+  const queuedColonizers = context.snapshot.planets.reduce((sum, planet) =>
+    sum + planet.queues.queuedShipTypes.filter((shipType) => shipType === ShipType.COLONIZER).length, 0);
+  return resolveIdleColonizerCount(context) + queuedColonizers;
 }
 
 function resolveAdaptiveTechnologyLevel(context: BotSubsystemContext): number {
@@ -1208,7 +1217,7 @@ function evaluateProductionGoal(
     });
   }
 
-  const bonusFactor = resolveProductionBonusFactor(planet, shipType);
+  const bonusFactor = resolveProductionBonusFactor(context, planet, shipType);
   const weightedEtc = totalEtc / bonusFactor;
 
   return {
@@ -1329,7 +1338,7 @@ function evaluateUnlockLikeProductionGoal(
     });
   }
 
-  const bonusFactor = resolveProductionBonusFactor(planet, shipType);
+  const bonusFactor = resolveProductionBonusFactor(context, planet, shipType);
   const weightedEtc = totalEtc / bonusFactor;
 
   return {
@@ -1842,15 +1851,69 @@ function shouldPenalizeFurtherRobotics(planet: BotPlanetSnapshot): boolean {
 }
 
 function resolveProductionBonusFactor(
+  context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
   shipType: ShipTypeT
 ): number {
   let bonusFactor = 1;
   bonusFactor *= 1 + resolveProductionDistributionBonusRatio(planet, shipType);
+  if (shipType === ShipType.COLONIZER) {
+    bonusFactor *= 1 + resolveColonizerProductionPressureRatio(context, planet);
+  }
   if (shipType === ShipType.REPAIR_DRONE && isRepairDroneSupportPlanet(planet)) {
     bonusFactor *= 1.1;
   }
   return Math.min(BONUS_FACTOR_CEILING, Math.max(1, bonusFactor));
+}
+
+function resolveColonizerProductionPressureRatio(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot
+): number {
+  if (!canColonizeMorePlanets(context, planet) || hasPendingColonizationPlan(context)) {
+    return 0;
+  }
+
+  if (resolveIdleOrQueuedColonizerCount(context) >= COLONIZER_IDLE_CAP) {
+    return 0;
+  }
+
+  const candidatePressure = resolveColonizationCandidatePressure(context);
+  if (candidatePressure.eligibleCandidateCount <= 0 && candidatePressure.blockedNextAdaptiveCandidateCount <= 0) {
+    return 0;
+  }
+
+  const forcedPriority = resolveForcedColonizationPriority(context);
+  if (forcedPriority.active && !forcedPriority.waitForAdaptive) {
+    return 2;
+  }
+
+  return candidatePressure.eligibleCandidateCount > 0 ? 2 : 0.75;
+}
+
+function resolveColonizationCandidatePressure(context: BotSubsystemContext): {
+  eligibleCandidateCount: number;
+  blockedNextAdaptiveCandidateCount: number;
+} {
+  const adaptiveLevel = resolveAdaptiveTechnologyLevel(context);
+  let eligibleCandidateCount = 0;
+  let blockedNextAdaptiveCandidateCount = 0;
+
+  for (const candidate of context.snapshot.empire.intelCandidates) {
+    if (candidate.needsScan || candidate.colonizationDifficulty === null) {
+      continue;
+    }
+    if (candidate.colonizationDifficulty <= adaptiveLevel) {
+      eligibleCandidateCount += 1;
+    } else if (candidate.colonizationDifficulty <= adaptiveLevel + 1) {
+      blockedNextAdaptiveCandidateCount += 1;
+    }
+  }
+
+  return {
+    eligibleCandidateCount,
+    blockedNextAdaptiveCandidateCount
+  };
 }
 
 function resolveProductionDistributionBonusRatio(
@@ -1885,7 +1948,7 @@ function isProductionShipEligible(
 
   if (shipType === ShipType.COLONIZER) {
     return planet.defense.avgIndustryLevel >= threshold
-      && resolveIdleColonizerCount(context) < COLONIZER_IDLE_CAP
+      && resolveIdleOrQueuedColonizerCount(context) < COLONIZER_IDLE_CAP
       && canColonizeMorePlanets(context, planet);
   }
 
@@ -1951,6 +2014,29 @@ function createPlanetProposals(
   return proposals;
 }
 
+function selectProductionGoals(
+  context: BotSubsystemContext,
+  planet: BotPlanetSnapshot,
+  goals: StrategicDevelopmentGoalEvaluation[]
+): StrategicDevelopmentGoalEvaluation[] {
+  const actionableGoals = goals.filter(isActionableGoal);
+  const selectedGoals = actionableGoals.slice(0, MAX_PRODUCTION_GOALS_PER_PLANET);
+  const colonizerPressureActive = resolveColonizerProductionPressureRatio(context, planet) > 0;
+  const colonizerGoal = colonizerPressureActive
+    ? actionableGoals.find((goal) => goal.finalShipType === ShipType.COLONIZER) ?? null
+    : null;
+
+  if (colonizerGoal && !selectedGoals.includes(colonizerGoal)) {
+    if (selectedGoals.length >= MAX_PRODUCTION_GOALS_PER_PLANET) {
+      selectedGoals[selectedGoals.length - 1] = colonizerGoal;
+    } else {
+      selectedGoals.push(colonizerGoal);
+    }
+  }
+
+  return selectedGoals.sort(compareGoals);
+}
+
 function createSectionProposals(
   context: BotSubsystemContext,
   planet: BotPlanetSnapshot,
@@ -2002,6 +2088,9 @@ function createProposalFromGoal(
       ? `${requestLabel}: research ${request.technologyType} on ${planet.name}.`
       : `${requestLabel}: produce ${request.amount} ${request.shipType} on ${planet.name}.`;
   const adaptiveColonizationPressure = resolveAdaptiveColonizationPressure(context);
+  const colonizerProductionPressureRatio = goal.finalShipType === ShipType.COLONIZER
+    ? resolveColonizerProductionPressureRatio(context, planet)
+    : 0;
 
   return {
     proposalId: `${goal.goalKey}:${queueType}:${selectedIndex}:${context.snapshot.turn}`,
@@ -2014,7 +2103,11 @@ function createProposalFromGoal(
     planetId: planet.planetId,
     targetCoordinates: { ...planet.coordinates },
     expectedValue: Math.max(1, Math.round((1000 / Math.max(1, goal.weightedEtc)) * 100)),
-    urgency: queueType === 'BUILDING' ? 68 : 62,
+    urgency: queueType === 'BUILDING'
+      ? 68
+      : colonizerProductionPressureRatio > 0
+        ? 82
+        : 62,
     risk: 6,
     confidence: 72,
     requestedResources: { ...request.cost },
@@ -2047,6 +2140,7 @@ function createProposalFromGoal(
       adaptiveColonizationPressureActive: adaptiveColonizationPressure.active,
       adaptiveColonizationBlockedCandidateCount: adaptiveColonizationPressure.blockedCandidateCount,
       adaptiveColonizationRequiredLevel: adaptiveColonizationPressure.requiredAdaptiveLevel,
+      colonizerProductionPressureRatio: roundToTwoDecimals(colonizerProductionPressureRatio),
       finalTargetKind: goal.finalTargetKind,
       finalBuildingType: goal.finalBuildingType,
       finalTechnologyType: goal.finalTechnologyType,
