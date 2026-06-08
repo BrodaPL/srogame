@@ -164,6 +164,7 @@ const COLONIZER_IDLE_CAP = 1;
 const FORCED_COLONIZATION_TURN_THRESHOLD = 100;
 const SUPPORT_TRANSFER_BASE_TURNS = 2;
 const REPAIR_DRONE_BASE_INDUSTRY_RATIO = 0.05;
+const LOGISTICS_FUEL_RESERVE_MULTIPLIER = 2;
 
 export class BotStrategicDevelopmentSubsystem implements BotSubsystem {
   public readonly subsystemId = 'STRATEGIC_DEVELOPMENT' as const;
@@ -317,6 +318,8 @@ function createGlobalMissionProposals(
   requests.push(...createIntelScanRequests(context));
 
   const mergedRequests = mergeFleetMissionRequests(requests)
+    .map(normalizeMissionCargoForFuel)
+    .filter((request): request is FleetMissionImmediateRequest => request !== null)
     .sort(compareMissionRequests);
   const selectedRequests: FleetMissionImmediateRequest[] = [];
   let usedLogisticsCapacity = 0;
@@ -2268,6 +2271,40 @@ function mergeFleetMissionRequests(
   return [...merged.values()];
 }
 
+function normalizeMissionCargoForFuel(request: FleetMissionImmediateRequest): FleetMissionImmediateRequest | null {
+  if (getTotalResourceAmount(request.cargo) <= 0) {
+    return request;
+  }
+
+  const fuelCost = calculateFuelCost(
+    request.ships.map((ship) => ({ type: ship.type, amount: ship.undamagedAmount })),
+    request.sourceDistance,
+    LOGISTICS_FUEL_RESERVE_MULTIPLIER,
+    request.originPlanet.tech.fusionDriveLevel,
+    request.originPlanet.tech.hyperspaceTechnologyLevel,
+    request.originPlanet.tech.hyperspaceDriveLevel
+  );
+  if (request.originPlanet.localResources.deuterium < fuelCost) {
+    return null;
+  }
+
+  const normalizedCargo = {
+    ...request.cargo,
+    deuterium: Math.min(
+      request.cargo.deuterium,
+      Math.max(0, Math.floor(request.originPlanet.localResources.deuterium - fuelCost))
+    )
+  };
+  if (request.missionType === FleetMissionType.TRANSPORT && getTotalResourceAmount(normalizedCargo) <= 0) {
+    return null;
+  }
+
+  return {
+    ...request,
+    cargo: normalizedCargo
+  };
+}
+
 function compareMissionRequests(left: FleetMissionImmediateRequest, right: FleetMissionImmediateRequest): number {
   return left.priorityBand - right.priorityBand
     || right.repairDroneAmount - left.repairDroneAmount
@@ -2296,19 +2333,53 @@ function createTransportSupportRequest(
   } = {}
 ): FleetMissionImmediateRequest | null {
   const sourceSurplus = options.sourceSurplus ?? resolveSourceSurplus(originPlanet);
-  const transferableResources = minResources(targetNeed, sourceSurplus);
+  let transferableResources = minResources(targetNeed, sourceSurplus);
   if (getTotalResourceAmount(transferableResources) <= 0) {
     return null;
   }
 
-  const cargoSelection = selectCargoShips(
-    originPlanet,
-    getTotalResourceAmount(transferableResources),
-    new Set(),
-    options.reservedCargoShips ?? new Map()
-  );
-  if (!cargoSelection) {
-    return null;
+  const sourceDistance = calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates);
+  let cargoSelection: Array<{ type: ShipTypeT; undamagedAmount: number; damagedAmount: number }> | null = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    cargoSelection = selectCargoShips(
+      originPlanet,
+      getTotalResourceAmount(transferableResources),
+      new Set(),
+      options.reservedCargoShips ?? new Map()
+    );
+    if (!cargoSelection) {
+      return null;
+    }
+
+    const fuelCost = calculateFuelCost(
+      cargoSelection.map((ship) => ({ type: ship.type, amount: ship.undamagedAmount })),
+      sourceDistance,
+      LOGISTICS_FUEL_RESERVE_MULTIPLIER,
+      originPlanet.tech.fusionDriveLevel,
+      originPlanet.tech.hyperspaceTechnologyLevel,
+      originPlanet.tech.hyperspaceDriveLevel
+    );
+    if (originPlanet.localResources.deuterium < fuelCost) {
+      return null;
+    }
+
+    const adjustedTransferableResources = {
+      ...transferableResources,
+      deuterium: Math.min(
+        transferableResources.deuterium,
+        Math.max(0, Math.floor(sourceSurplus.deuterium - fuelCost)),
+        Math.max(0, Math.floor(originPlanet.localResources.deuterium - fuelCost))
+      )
+    };
+    if (getTotalResourceAmount(adjustedTransferableResources) <= 0) {
+      return null;
+    }
+
+    if (sameResources(adjustedTransferableResources, transferableResources)) {
+      break;
+    }
+    transferableResources = adjustedTransferableResources;
   }
 
   return {
@@ -2320,7 +2391,7 @@ function createTransportSupportRequest(
     cargo: transferableResources,
     repairDroneAmount: 0,
     priorityBand: 4,
-    sourceDistance: calculateTravelDistance(originPlanet.coordinates, targetPlanet.coordinates),
+    sourceDistance,
     summaryLabel: 'resource support',
     budgetIntentSubsystemId: options.budgetIntentSubsystemId,
     resourceConcentration: options.resourceConcentration
@@ -3200,6 +3271,12 @@ function maxResources(left: ResourceAmounts, right: ResourceAmounts): ResourceAm
     crystal: Math.max(left.crystal, right.crystal),
     deuterium: Math.max(left.deuterium, right.deuterium)
   };
+}
+
+function sameResources(left: ResourceAmounts, right: ResourceAmounts): boolean {
+  return left.metal === right.metal
+    && left.crystal === right.crystal
+    && left.deuterium === right.deuterium;
 }
 
 function multiplyResources(resources: ResourceAmounts, multiplier: number): ResourceAmounts {

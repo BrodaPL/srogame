@@ -181,11 +181,13 @@ function findLatestBotAnalysisPath(): string {
   const root = path.resolve(process.cwd(), 'tmp', 'analysis');
   const matches = collectFiles(root)
     .filter((filePath) => filePath.endsWith('-budget-analysis.json'))
-    .filter((filePath) => filePath.includes('benchmark20x20-320'))
+    .filter((filePath) =>
+      filePath.includes('benchmark16x16-320') || filePath.includes('benchmark20x20-320')
+    )
     .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
   const latest = matches[0];
   if (!latest) {
-    throw new Error(`No benchmark20x20-320 budget analysis found under ${root}. Run analyze:bot-budget first or pass --bot-analysis=...`);
+    throw new Error(`No benchmark16x16-320 budget analysis found under ${root}. Run analyze:bot-budget first or pass --bot-analysis=...`);
   }
   return latest;
 }

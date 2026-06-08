@@ -109,8 +109,8 @@ describe('fleet commands', () => {
 
     expect(result.value.fleet.usesJumpGate).toBe(true);
     expect(result.value.fleet.travelTurns).toBe(1);
-    expect(result.value.fleet.fuelCost).toBe(17);
-    expect(origin.rBDSFTQ.resources.deuterium).toBe(100 - 17);
+    expect(result.value.fleet.fuelCost).toBe(9);
+    expect(origin.rBDSFTQ.resources.deuterium).toBe(100 - 9);
   });
 
   it('counts only jump-capable ships against Jump Gate capacity', () => {
@@ -119,8 +119,8 @@ describe('fleet commands', () => {
     origin.rBDSFTQ.ships = ManyShips.empty();
     origin.rBDSFTQ.ships.addUndamaged(ShipType.CARRIER, 20);
     origin.rBDSFTQ.ships.addUndamaged(ShipType.FIGHTER, 100);
-    origin.setBuildingLevel(BuildingType.JUMP_GATE, 2);
-    target.setBuildingLevel(BuildingType.JUMP_GATE, 2);
+    origin.setBuildingLevel(BuildingType.JUMP_GATE, 4);
+    target.setBuildingLevel(BuildingType.JUMP_GATE, 4);
 
     const result = createFleetMission(
       { galaxy, playerId: 1 },

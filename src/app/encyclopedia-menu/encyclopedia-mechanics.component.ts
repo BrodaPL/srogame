@@ -269,8 +269,8 @@ export class EncyclopediaMechanicsComponent {
         'maxActiveFleets = 2 + COMPUTER_TECHNOLOGY * 2',
         'travelTurns = ceil((4 / (1 + FUSION_DRIVE / 3) + distance / (1 + HYPERSPACE_DRIVE / 6) - GRAVITON_TECHNOLOGY) * shipModifier), minimum 1',
         'Jump Gate travelTurns = 1',
-        'fuelCost = ceil(sum(ship.jumpCost * max(1, distance) * amount) * minimumFuelReserves * max(0, 1 - FUSION_DRIVE * 0.01 - HYPERSPACE_TECHNOLOGY * 0.02 - HYPERSPACE_DRIVE * 0.01))',
-        'jumpGateFuelCost = ceil(nonSpyJumpCapableShips * 10 * max(0, 1 - HYPERSPACE_TECHNOLOGY * 0.02 - HYPERSPACE_DRIVE * 0.01 - max(0, min(originGateLevel, targetGateLevel) - 1) * 0.05))'
+        'fuelCost = ceil(sum(ship.jumpCost * max(1, distance) * amount) * 0.5 * minimumFuelReserves * max(0, 1 - FUSION_DRIVE * 0.01 - HYPERSPACE_TECHNOLOGY * 0.02 - HYPERSPACE_DRIVE * 0.01))',
+        'jumpGateFuelCost = ceil(nonSpyJumpCapableShips * 5 * max(0, 1 - HYPERSPACE_TECHNOLOGY * 0.02 - HYPERSPACE_DRIVE * 0.01 - max(0, min(originGateLevel, targetGateLevel) - 1) * 0.05))'
       ],
       notes: [
         'Distance is still the raw coordinate delta sum abs(dx) + abs(dy) + abs(dz).',

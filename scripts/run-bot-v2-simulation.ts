@@ -33,7 +33,7 @@ import {
   type HydratedGameSave
 } from '../server/src/game-save.js';
 
-type SimulationScenarioKey = 'initial' | 'advanced' | 'benchmark20x20' | 'benchmark20x20-320';
+type SimulationScenarioKey = 'initial' | 'advanced' | 'benchmark16x16' | 'benchmark16x16-320';
 type SimulationLogMode = 'full' | 'compact' | 'summary';
 
 type SimulationScenario = {
@@ -281,25 +281,25 @@ const SCENARIOS: Record<SimulationScenarioKey, SimulationScenario> = {
     defaultLogMode: 'full',
     setup: createScenarioSetup(12, 12)
   },
-  benchmark20x20: {
-    key: 'benchmark20x20',
-    description: '170-turn bot-only benchmark on a 20x20 galaxy with 5% neutral bots, star modifier -1..3, 5% voids, medium homeworlds, and low starting resources.',
-    width: 20,
-    height: 20,
+  benchmark16x16: {
+    key: 'benchmark16x16',
+    description: '170-turn bot-only benchmark on a 16x16 galaxy with 5% neutral bots, star modifier -1..3, 5% voids, medium homeworlds, and low starting resources.',
+    width: 16,
+    height: 16,
     turns: 170,
     seed: 2026052001,
     defaultLogMode: 'compact',
-    setup: createBenchmark20x20Setup()
+    setup: createBenchmark16x16Setup()
   },
-  'benchmark20x20-320': {
-    key: 'benchmark20x20-320',
-    description: '320-turn bot-only benchmark on the same 20x20 neutral-enabled setup used for the regular farming benchmark.',
-    width: 20,
-    height: 20,
+  'benchmark16x16-320': {
+    key: 'benchmark16x16-320',
+    description: '320-turn bot-only benchmark on the same 16x16 neutral-enabled setup used for the regular farming benchmark.',
+    width: 16,
+    height: 16,
     turns: 320,
     seed: 2026052001,
     defaultLogMode: 'compact',
-    setup: createBenchmark20x20Setup()
+    setup: createBenchmark16x16Setup()
   }
 };
 
@@ -336,7 +336,7 @@ function createScenarioSetup(width: number, height: number): GalaxySetup {
   });
 }
 
-function createBenchmark20x20Setup(): GalaxySetup {
+function createBenchmark16x16Setup(): GalaxySetup {
   const botProfileCounts = createEmptyBotProfileCounts();
   for (const profileId of BOT_PROFILE_IDS) {
     botProfileCounts[profileId] = 1;
@@ -344,10 +344,10 @@ function createBenchmark20x20Setup(): GalaxySetup {
 
   return normalizeGalaxySetup({
     gameType: GameType.SANDBOX,
-    galaxyName: 'Bot V2 Benchmark 20x20',
-    galaxyWidth: 20,
-    galaxyHeight: 20,
-    galaxyCenterSize: 10,
+    galaxyName: 'Bot V2 Benchmark 16x16',
+    galaxyWidth: 16,
+    galaxyHeight: 16,
+    galaxyCenterSize: 8,
     voidChance: 5,
     starsAmountModifier: [-1, 3],
     playerAmount: 1,
@@ -999,11 +999,12 @@ function parseCliOptions(args: string[]): SimulationCliOptions {
 
   for (const arg of args) {
     if (arg.startsWith('--scenario=')) {
-      const rawScenario = arg.slice('--scenario='.length).trim() as SimulationScenarioKey;
-      if (!isSimulationScenarioKey(rawScenario)) {
-        throw new Error(`Unknown scenario '${rawScenario}'. Use --scenario=initial, --scenario=advanced, --scenario=benchmark20x20, or --scenario=benchmark20x20-320.`);
+      const rawScenario = arg.slice('--scenario='.length).trim();
+      const normalizedScenario = normalizeSimulationScenarioKey(rawScenario);
+      if (!normalizedScenario) {
+        throw new Error(`Unknown scenario '${rawScenario}'. Use --scenario=initial, --scenario=advanced, --scenario=benchmark16x16, or --scenario=benchmark16x16-320.`);
       }
-      scenario = rawScenario;
+      scenario = normalizedScenario;
       continue;
     }
     if (arg.startsWith('--log-mode=')) {
@@ -1049,11 +1050,22 @@ function parseCliOptions(args: string[]): SimulationCliOptions {
   };
 }
 
-function isSimulationScenarioKey(value: string): value is SimulationScenarioKey {
-  return value === 'initial'
+function normalizeSimulationScenarioKey(value: string): SimulationScenarioKey | null {
+  if (value === 'benchmark20x20') {
+    return 'benchmark16x16';
+  }
+  if (value === 'benchmark20x20-320') {
+    return 'benchmark16x16-320';
+  }
+  if (
+    value === 'initial'
     || value === 'advanced'
-    || value === 'benchmark20x20'
-    || value === 'benchmark20x20-320';
+    || value === 'benchmark16x16'
+    || value === 'benchmark16x16-320'
+  ) {
+    return value;
+  }
+  return null;
 }
 
 function parsePositiveInteger(rawValue: string, label: string): number {

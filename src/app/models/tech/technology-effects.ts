@@ -3,6 +3,7 @@ import { HullClass } from '../enums/hull-class';
 import { ShipType } from '../enums/ship-type';
 
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
+const FLEET_FUEL_COST_FACTOR = 0.5;
 
 const HULL_CLASS_TRAVEL_MODIFIERS: ReadonlyMap<HullClass, number> = new Map<HullClass, number>([
   [HullClass.SMALL, -0.4],
@@ -121,7 +122,12 @@ export function fleetFuelCostForDistance(
     hyperspaceTechnologyLevel,
     hyperspaceDriveLevel
   );
-  return Math.max(0, Math.ceil(baseFuelCost * sanitizedMinimumFuelReserves * fuelDiscountMultiplier));
+  return Math.max(0, Math.ceil(
+    baseFuelCost
+    * FLEET_FUEL_COST_FACTOR
+    * sanitizedMinimumFuelReserves
+    * fuelDiscountMultiplier
+  ));
 }
 
 export function fleetFuelConsumptionMultiplier(

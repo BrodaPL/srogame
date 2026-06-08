@@ -19,6 +19,7 @@ import { TechnologyQueueEntry } from '../../../../../src/app/models/tech/technol
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
 import type { BotProposal, BotStrategicDevelopmentPlanetResult } from '../../bot-v2-types.js';
+import { calculateFuelCost, calculateTravelDistance } from '../../../game-commands/command-helpers.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
 import { BotStrategicDevelopmentSubsystem } from './bot-strategic-development-subsystem.js';
 
@@ -236,6 +237,46 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     );
 
     expect(concentrationTransports).toHaveLength(3);
+  });
+
+  it('reserves transport launch fuel before assigning deuterium concentration cargo', () => {
+    const { galaxy, bot, sourcePlanet, targetPlanet } = createSupportWorld();
+    configureDevelopedSupportSource(sourcePlanet);
+    configureLowIndustrySupportTarget(targetPlanet);
+    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(3000, 3000, 8000);
+    sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.TRANSPORTER, 20);
+    targetPlanet.rBDSFTQ.resources = new ResourcesPack(100, 100, 100);
+    setSupportShipTech(bot);
+
+    const result = runStrategicDevelopmentSubsystem(galaxy, bot, [
+      createResearchConcentrationProposal(galaxy, targetPlanet, { metal: 0, crystal: 0, deuterium: 8000 })
+    ]);
+    const transport = result.proposals.find((proposal) =>
+      proposal.kind === 'FLEET_MISSION'
+      && proposal.requestPayload.missionType === FleetMissionType.TRANSPORT
+      && proposal.debug.resourceConcentrationTransport === true
+    );
+
+    expect(transport).toBeDefined();
+    if (!transport || transport.kind !== 'FLEET_MISSION') {
+      return;
+    }
+
+    const ships = transport.requestPayload.ships.map((ship) => ({
+      type: ship.type,
+      amount: ship.undamagedAmount
+    }));
+    const fuelCost = calculateFuelCost(
+      ships,
+      calculateTravelDistance(transport.requestPayload.origin, transport.requestPayload.target),
+      2,
+      bot.getTechLevel(TechnologyType.FUSION_DRIVE),
+      bot.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY),
+      bot.getTechLevel(TechnologyType.HYPERSPACE_DRIVE)
+    );
+
+    expect((transport.requestPayload.cargo.deuterium ?? 0) + fuelCost)
+      .toBeLessThanOrEqual(sourcePlanet.rBDSFTQ.resources.deuterium);
   });
 
   it('does not use cargo ships already requested by Strategic Military farm attacks', () => {
@@ -549,7 +590,7 @@ describe('BotStrategicDevelopmentSubsystem', () => {
     setSupportShipTech(bot);
     bot.setTechLevel(TechnologyType.ADAPTIVE_TECHNOLOGY, 3);
     sourcePlanet.rBDSFTQ.ships.addUndamaged(ShipType.COLONIZER, 1);
-    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 40);
+    sourcePlanet.rBDSFTQ.resources = new ResourcesPack(80000, 80000, 20);
 
     unownedPlanet.basicInfo.baseSize = 140;
     unownedPlanet.basicInfo.colonizationDifficulty = 1;

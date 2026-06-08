@@ -44,6 +44,6 @@ describe('command helpers', () => {
     player.setTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY, 4);
     player.setTechLevel(TechnologyType.HYPERSPACE_DRIVE, 5);
 
-    expect(calculatePlayerFuelCost([{ type: ShipType.COLONIZER, amount: 1 }], 10, 2, player)).toBe(135);
+    expect(calculatePlayerFuelCost([{ type: ShipType.COLONIZER, amount: 1 }], 10, 2, player)).toBe(68);
   });
 });

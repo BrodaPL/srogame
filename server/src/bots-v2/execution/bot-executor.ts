@@ -544,6 +544,10 @@ export class LiveQueueBotExecutor implements BotExecutor {
       targetResult.value,
       player
     );
+    if (command.cargo.deuterium + jumpGateTravelCost > originResult.value.rBDSFTQ.resources.deuterium) {
+      return false;
+    }
+
     const operatingCostDecision = evaluateJumpGateOperatingCostPolicy({
       missionType: command.missionType,
       selectedShipCount: totalSelectedShips,

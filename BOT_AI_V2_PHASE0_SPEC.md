@@ -338,9 +338,9 @@ Notes:
 - V2 is the active bot runtime from the end-turn hook
 - only the Supervisor/Executor layer may mutate game state
 - V2 can reuse shared models and command helpers from the existing server code
-- `scripts/run-bot-v2-simulation.ts` should be read with its scenario split in mind: `advanced` is a no-neutral smoke run, while neutral-farm validation belongs to `benchmark20x20`
+- `scripts/run-bot-v2-simulation.ts` should be read with its scenario split in mind: `advanced` is a no-neutral smoke run, while neutral-farm validation belongs to `benchmark16x16`
 - strict benchmark artifacts include `resource-concentration-summary.json`; it is derived from V2 proposal debug payloads and tracks old-planet/expensive-research concentration signals, target selections, transports, incoming reservations, expired reservations, matching investments, and active locked resources
-- TODO: Do not tune resource-concentration thresholds, source reserves, follow-up transport cadence, or target replacement rules from `benchmark20x20` alone. Add a deterministic high-industry concentration benchmark first, because the regular 170-turn benchmark can complete with zero concentration signals.
+- TODO: Do not tune resource-concentration thresholds, source reserves, follow-up transport cadence, or target replacement rules from `benchmark16x16` alone. Add a deterministic high-industry concentration benchmark first, because the regular 170-turn benchmark can complete with zero concentration signals.
 
 ## Current V2 Runtime Flow
 
@@ -1726,7 +1726,7 @@ Current runtime note:
 - relocation `MOVE` planning is already live,
 - remembered farm state is report-driven and stored in `BotMemoryV2`,
 - the shared payload helper can now attach bombs or carried small combat ships behind jump-capable fleets when a farm plan benefits from them,
-- neutral-farm validation should be checked in `benchmark20x20`, not `advanced`.
+- neutral-farm validation should be checked in `benchmark16x16`, not `advanced`.
 
 ### Strategic Military phase-1 outputs
 

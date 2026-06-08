@@ -749,7 +749,7 @@ Strict V2 bot simulation runner:
 - package entries: `npm.cmd run bot:sim`, `npm.cmd run bot:sim:initial`, `npm.cmd run bot:sim:advanced`
 - writes `tmp/bot-v2-sim/<timestamp>-*/summary.json`, `traces.jsonl`, `turn-summary.jsonl`, `anomalies.json`, `battle-summary.json`, `final-state-summary.json`, and `resource-concentration-summary.json`
 - supports fresh-game and `--load-save-id=<saveId>` execution modes
-- supports scenario selection including `initial`, `advanced`, and `benchmark20x20`; `advanced` is the fast no-neutral smoke scenario, while `benchmark20x20` is the neutral-enabled farming benchmark
+- supports scenario selection including `initial`, `advanced`, and `benchmark16x16`; `advanced` is the fast no-neutral smoke scenario, while `benchmark16x16` is the neutral-enabled farming benchmark
 - runs `runBotTurnPhaseV2(..., { mode: 'LIVE' })` plus `resolvePhaseOneTurn(...)`
 - performs first-pass invariant checks and groups unexpected bot command failures for stabilization work
 - now seeds galaxy/context creation through the same deterministic RNG path so repeated runs with the same seed are actually comparable

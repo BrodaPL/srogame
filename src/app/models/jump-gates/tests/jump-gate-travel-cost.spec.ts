@@ -7,13 +7,13 @@ import {
 import { ShipType } from '../../enums/ship-type';
 
 describe('jump gate travel cost', () => {
-  it('charges 10 deuterium per jump-capable non-spy ship', () => {
+  it('charges 5 deuterium per jump-capable non-spy ship', () => {
     expect(calculateJumpGateTravelCost([
       { type: ShipType.CRUISER, amount: 2 },
       { type: ShipType.TRANSPORTER, amount: 3 },
       { type: ShipType.SPY_PROBE, amount: 5 },
       { type: ShipType.FIGHTER, amount: 4 }
-    ], 0, 0, 1)).toBe(50);
+    ], 0, 0, 1)).toBe(25);
   });
 
   it('counts only jump-capable non-spy ships', () => {
@@ -28,6 +28,6 @@ describe('jump gate travel cost', () => {
     expect(jumpGateTravelCostMultiplier(3, 4, 3)).toBeCloseTo(0.8, 8);
     expect(calculateJumpGateTravelCost([
       { type: ShipType.CRUISER, amount: 5 }
-    ], 3, 4, 3)).toBe(40);
+    ], 3, 4, 3)).toBe(20);
   });
 });

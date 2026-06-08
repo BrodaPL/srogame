@@ -979,7 +979,7 @@ Current implementation note:
 * persistent remembered farm state now lives in `BotMemoryV2`,
 * relocation `MOVE` planning is now live when no single origin can satisfy `BREAK`,
 * shared carried-payload planning now exists in `server/src/bots-v2/ship-payload-planning.ts` for bombs and carried small combat ships behind jump-capable warships,
-* the neutral-enabled `benchmark20x20` simulation now confirms live farm opening plus repeat plunder, but profile conversion timing is still uneven and remains a tuning target.
+* the neutral-enabled `benchmark16x16` simulation now confirms live farm opening plus repeat plunder, but profile conversion timing is still uneven and remains a tuning target.
 
 Follow-up ledger rules:
 
@@ -2697,7 +2697,7 @@ Simulation note:
 
 * `scripts/run-bot-v2-simulation.ts` now seeds scenario setup through the same deterministic RNG path as the turn loop.
 * `advanced` is the fast no-neutral smoke scenario.
-* `benchmark20x20` is the neutral-enabled benchmark that should be used for Strategic Military farm validation.
+* `benchmark16x16` is the neutral-enabled benchmark that should be used for Strategic Military farm validation.
 
 `SHIP_NEED` and `demandOnly` shipyard proposals are pressure signals only. They are not executable by themselves; they increase priority for matching concrete shipyard proposals emitted by other subsystems.
 

@@ -2,7 +2,7 @@ import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { ShipType } from '../enums/ship-type';
 
 const SHIP_BLUEPRINTS = ShipBlueprintsFactory.fromDefaultJson();
-const BASE_DEUTERIUM_COST_PER_JUMP_SHIP = 10;
+const BASE_DEUTERIUM_COST_PER_JUMP_SHIP = 5;
 
 export type JumpGateTravelShipSelection = {
   type: ShipType;

@@ -155,15 +155,19 @@ function findLatestBenchmarkArtifact(): string {
     throw new Error(`No bot simulation artifact directory exists at ${root}`);
   }
   const candidates = fs.readdirSync(root, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.includes('benchmark20x20'))
+    .filter((entry) => entry.isDirectory() && isBenchmarkArtifactDirectory(entry.name))
     .map((entry) => path.join(root, entry.name))
     .filter((entryPath) => fs.existsSync(path.join(entryPath, 'turn-summary.jsonl')))
     .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
   const latest = candidates[0];
   if (!latest) {
-    throw new Error(`No benchmark20x20 artifacts found under ${root}`);
+    throw new Error(`No benchmark16x16 artifacts found under ${root}`);
   }
   return latest;
+}
+
+function isBenchmarkArtifactDirectory(name: string): boolean {
+  return name.includes('benchmark16x16') || name.includes('benchmark20x20');
 }
 
 function readJsonIfExists(filePath: string): unknown {

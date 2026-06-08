@@ -14,7 +14,7 @@
     "bot:sim": "npx tsx scripts/run-bot-v2-simulation.ts",
     "bot:sim:initial": "npx tsx scripts/run-bot-v2-simulation.ts --scenario=initial",
     "bot:sim:advanced": "npx tsx scripts/run-bot-v2-simulation.ts --scenario=advanced",
-    "bot:sim:benchmark320": "npx tsx scripts/run-bot-v2-simulation.ts --scenario=benchmark20x20-320",
+    "bot:sim:benchmark320": "npx tsx scripts/run-bot-v2-simulation.ts --scenario=benchmark16x16-320",
     "bot:sim:baseline": "npx tsx scripts/run-bot-sim-baselines.ts",
     "analyze:player-log": "npx tsx scripts/analyze-player-action-log.ts",
     "analyze:bot-budget": "npx tsx scripts/analyze-bot-budget-benchmark.ts",
