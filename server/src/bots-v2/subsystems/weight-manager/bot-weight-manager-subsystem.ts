@@ -114,9 +114,9 @@ const RAW_PROFILE_TABLES: Record<BotProfileId, WeightProfile> = {
     strategicWeights: { research: 50, strategicDevelopment: 50, strategicMilitary: 50, strategicDiplomatic: 50 }
   },
   AGGRESSOR: {
-    axes: { aggression: 85, industry: 40, diplomacy: 35, defences: 25, caution: 20, development: 45 },
-    localWeights: { economic: 40, defensive: 25, warfare: 78 },
-    strategicWeights: { research: 38, strategicDevelopment: 45, strategicMilitary: 82, strategicDiplomatic: 70 }
+    axes: { aggression: 92, industry: 40, diplomacy: 32, defences: 0, caution: 8, development: 54 },
+    localWeights: { economic: 38, defensive: 0, warfare: 95 },
+    strategicWeights: { research: 36, strategicDevelopment: 58, strategicMilitary: 95, strategicDiplomatic: 78 }
   },
   TURTLE: {
     axes: { aggression: 24, industry: 45, diplomacy: 35, defences: 44, caution: 70, development: 50 },

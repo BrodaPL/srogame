@@ -33,7 +33,7 @@ import {
   type HydratedGameSave
 } from '../server/src/game-save.js';
 
-type SimulationScenarioKey = 'initial' | 'advanced' | 'benchmark20x20';
+type SimulationScenarioKey = 'initial' | 'advanced' | 'benchmark20x20' | 'benchmark20x20-320';
 type SimulationLogMode = 'full' | 'compact' | 'summary';
 
 type SimulationScenario = {
@@ -287,6 +287,16 @@ const SCENARIOS: Record<SimulationScenarioKey, SimulationScenario> = {
     width: 20,
     height: 20,
     turns: 170,
+    seed: 2026052001,
+    defaultLogMode: 'compact',
+    setup: createBenchmark20x20Setup()
+  },
+  'benchmark20x20-320': {
+    key: 'benchmark20x20-320',
+    description: '320-turn bot-only benchmark on the same 20x20 neutral-enabled setup used for the regular farming benchmark.',
+    width: 20,
+    height: 20,
+    turns: 320,
     seed: 2026052001,
     defaultLogMode: 'compact',
     setup: createBenchmark20x20Setup()
@@ -990,8 +1000,8 @@ function parseCliOptions(args: string[]): SimulationCliOptions {
   for (const arg of args) {
     if (arg.startsWith('--scenario=')) {
       const rawScenario = arg.slice('--scenario='.length).trim() as SimulationScenarioKey;
-      if (rawScenario !== 'initial' && rawScenario !== 'advanced' && rawScenario !== 'benchmark20x20') {
-        throw new Error(`Unknown scenario '${rawScenario}'. Use --scenario=initial, --scenario=advanced, or --scenario=benchmark20x20.`);
+      if (!isSimulationScenarioKey(rawScenario)) {
+        throw new Error(`Unknown scenario '${rawScenario}'. Use --scenario=initial, --scenario=advanced, --scenario=benchmark20x20, or --scenario=benchmark20x20-320.`);
       }
       scenario = rawScenario;
       continue;
@@ -1037,6 +1047,13 @@ function parseCliOptions(args: string[]): SimulationCliOptions {
     outputDir,
     verbose
   };
+}
+
+function isSimulationScenarioKey(value: string): value is SimulationScenarioKey {
+  return value === 'initial'
+    || value === 'advanced'
+    || value === 'benchmark20x20'
+    || value === 'benchmark20x20-320';
 }
 
 function parsePositiveInteger(rawValue: string, label: string): number {

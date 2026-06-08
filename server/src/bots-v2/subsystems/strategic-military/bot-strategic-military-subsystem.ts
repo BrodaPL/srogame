@@ -38,7 +38,7 @@ const { DefenceType } = resolveModule(defenceTypeModule) as typeof import('../..
 const { FleetMissionType } = resolveModule(fleetMissionTypeModule) as typeof import('../../../../../src/app/models/enums/fleet-mission-type.js');
 const { ShipType } = resolveModule(shipTypeModule) as typeof import('../../../../../src/app/models/enums/ship-type.js');
 const { TechnologyType } = resolveModule(technologyTypeModule) as typeof import('../../../../../src/app/models/enums/technology-type.js');
-const { fleetTravelTurnsForDistance } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
+const { fleetTravelTurnsForDistance, maxOwnedPlanets } = resolveModule(technologyEffectsModule) as typeof import('../../../../../src/app/models/tech/technology-effects.js');
 
 type BuildingTypeT = buildingTypeModule.BuildingType;
 type DefenceTypeT = defenceTypeModule.DefenceType;
@@ -2207,10 +2207,57 @@ function resolveFarmMissionReservation(
 }
 
 function resolveMissionRequestCap(context: BotSubsystemContext): number {
+  const baseCap = Math.floor(context.snapshot.empire.imperiumFleetCap * STRATEGIC_MILITARY_AVAILABILITY)
+    + context.snapshot.empire.ownedPlanetCount;
+  if (!shouldReserveFleetSlotForColonization(context)) {
+    return Math.max(0, baseCap);
+  }
+
+  const availableFleetSlots = Math.max(
+    0,
+    context.snapshot.empire.maxActiveFleetCount - context.snapshot.empire.activeFleetCount
+  );
+  if (availableFleetSlots <= 1) {
+    return 0;
+  }
+
   return Math.max(
     0,
-    Math.floor(context.snapshot.empire.imperiumFleetCap * STRATEGIC_MILITARY_AVAILABILITY)
-      + context.snapshot.empire.ownedPlanetCount
+    Math.min(baseCap, availableFleetSlots - 1)
+  );
+}
+
+function shouldReserveFleetSlotForColonization(context: BotSubsystemContext): boolean {
+  if (
+    context.snapshot.empire.activeColonizeFleetCount > 0
+    || context.snapshot.empire.activeFleetCount >= context.snapshot.empire.maxActiveFleetCount
+  ) {
+    return false;
+  }
+
+  const adaptiveTechnologyLevel = resolveAdaptiveTechnologyLevel(context);
+  if (context.snapshot.empire.ownedPlanetCount >= maxOwnedPlanets(adaptiveTechnologyLevel)) {
+    return false;
+  }
+
+  const hasIdleColonizer = context.snapshot.planets.some((planet) =>
+    (planet.ships.undamagedCountByType[ShipType.COLONIZER] ?? 0) > 0
+  );
+  if (!hasIdleColonizer) {
+    return false;
+  }
+
+  return context.snapshot.empire.intelCandidates.some((candidate) =>
+    !candidate.needsScan
+    && candidate.colonizationDifficulty !== null
+    && candidate.colonizationDifficulty <= adaptiveTechnologyLevel
+  );
+}
+
+function resolveAdaptiveTechnologyLevel(context: BotSubsystemContext): number {
+  return Math.max(
+    0,
+    ...context.snapshot.planets.map((planet) => planet.tech.adaptiveTechnologyLevel)
   );
 }
 
