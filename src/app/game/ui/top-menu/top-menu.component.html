@@ -1,41 +1,41 @@
 <nav class="top-menu">
   <a class="top-menu__button" routerLink="/game/galactic" routerLinkActive="top-menu__button--active">
-    Galactic
+    {{ 'topMenu.nav.galactic' | t }}
   </a>
   <a class="top-menu__button" routerLink="/game/imperium" routerLinkActive="top-menu__button--active">
-    Imperium
+    {{ 'topMenu.nav.imperium' | t }}
   </a>
   <a class="top-menu__button" routerLink="/game/reports" routerLinkActive="top-menu__button--active">
-    Reports{{ unreadReportsCount() > 0 ? ' (' + unreadReportsCount() + ')' : '' }}
+    {{ reportsLabel() }}
   </a>
   <a
     class="top-menu__button"
     [class.top-menu__button--mail-alert]="mailAttentionCount() > 0"
     routerLink="/game/mail"
     routerLinkActive="top-menu__button--active">
-    Mail{{ mailAttentionCount() > 0 ? ' (' + mailAttentionCount() + ')' : '' }}
+    {{ mailLabel() }}
   </a>
   <a class="top-menu__button" routerLink="/game/diplomacy" routerLinkActive="top-menu__button--active">
-    Diplomacy
+    {{ 'topMenu.nav.diplomacy' | t }}
   </a>
   <a class="top-menu__button" routerLink="/game/researches" routerLinkActive="top-menu__button--active">
-    Researches
+    {{ 'topMenu.nav.researches' | t }}
   </a>
   <a class="top-menu__button" routerLink="/game/production" routerLinkActive="top-menu__button--active">
-    Production
+    {{ 'topMenu.nav.production' | t }}
   </a>
   <a class="top-menu__button" routerLink="/game/buildings" routerLinkActive="top-menu__button--active">
-    Buildings
+    {{ 'topMenu.nav.buildings' | t }}
   </a>
   <a class="top-menu__button" routerLink="/game/operations" routerLinkActive="top-menu__button--active">
-    Operations
+    {{ 'topMenu.nav.operations' | t }}
   </a>
   <a class="top-menu__button" routerLink="/game/mission-planner" routerLinkActive="top-menu__button--active">
-    Mission Planner
+    {{ 'topMenu.nav.missionPlanner' | t }}
   </a>
   @if (canInspectBots()) {
     <a class="top-menu__button" routerLink="/game/bot-debug" routerLinkActive="top-menu__button--active">
-      Bot AI
+      {{ 'topMenu.nav.botAi' | t }}
     </a>
   }
   <span class="top-menu__spacer" aria-hidden="true"></span>
@@ -51,7 +51,7 @@
       [class.top-menu__button--active]="isAutoSkipTurnEnabled()"
       [appTooltip]="autoSkipTurnTooltip()"
       (click)="toggleAutoSkipTurn()">
-      Auto
+      {{ 'topMenu.actions.auto' | t }}
     </button>
   }
   @if (isScheduledTurnsEnabled()) {
@@ -69,7 +69,7 @@
 </nav>
 @if (showStickyMailButton()) {
   <a class="top-menu__mail-sticky" routerLink="/game/mail">
-    Mail requires attention{{ mailAttentionCount() > 0 ? ' (' + mailAttentionCount() + ')' : '' }}
+    {{ stickyMailButtonLabel() }}
   </a>
 }
 @if (isEndTurnBlockedByMail()) {

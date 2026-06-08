@@ -21,7 +21,7 @@ export const apiPl = {
     resendConfirmation: {
       rateLimited: 'Zbyt wiele prob ponownego wyslania potwierdzenia. Sprobuj ponownie za {{retryAfterSeconds}} sekund.',
       invalidEmail: 'Nieprawidlowy email.',
-      cooldown: 'Potwierdzenie mozna wyslac ponownie za {{retryAfterMinutes}} minut{{minuteSuffix}}.',
+      cooldown: 'Potwierdzenie mozna wyslac ponownie za {{retryAfterMinutes}} min.',
       successGeneric: 'Jesli istnieje oczekujace konto dla tego emaila, okno potwierdzenia zostalo odswiezone. Wysylka emaili nie jest jeszcze skonfigurowana na tym serwerze; aktywacja nadal musi zostac wykonana recznie.'
     },
     login: {
@@ -29,8 +29,8 @@ export const apiPl = {
       invalidCredentials: 'Nieprawidlowa nazwa gracza lub haslo.',
       userNotFound: 'Nie ma takiego uzytkownika.',
       pendingConfirmation: 'Konto nie jest jeszcze potwierdzone.',
-      wrongPasswordAttemptsLeft: 'Bledne haslo. Pozostalo {{attemptsLeft}} prob{{attemptSuffix}} przed 10-minutowa blokada.',
-      accountLocked: 'Logowanie na konto jest zablokowane z powodu zbyt wielu blednych hasel. Sprobuj ponownie za {{retryAfterMinutes}} minut{{minuteSuffix}}.'
+      wrongPasswordAttemptsLeft: 'Bledne haslo. Pozostale proby przed 10-minutowa blokada: {{attemptsLeft}}.',
+      accountLocked: 'Logowanie na konto jest zablokowane z powodu zbyt wielu blednych hasel. Sprobuj ponownie za {{retryAfterMinutes}} min.'
     }
   },
   account: {
@@ -45,7 +45,9 @@ export const apiPl = {
   games: {
     current: {
       unavailableResume: 'Nie masz obecnie dostepu do wznowienia tej gry.',
-      inactiveAskAdmin: 'Ta gra nie jest obecnie aktywna. Popros localAdmina o jej wznowienie.'
+      inactiveAskAdmin: 'Ta gra nie jest obecnie aktywna. Popros localAdmina o jej wznowienie.',
+      noSaveAvailable: 'Brak zapisu do ponownego otwarcia tej gry.',
+      savedGameNotFound: 'Nie udalo sie odnalezc zapisu tej gry.'
     },
     closeCurrent: {
       requiresLocalAdmin: 'Do zamkniecia gry jednoosobowej wymagane sa uprawnienia localAdmin.',
@@ -58,9 +60,10 @@ export const apiPl = {
   gameplay: {
     endTurn: {
       processingInProgress: 'Przetwarzanie tury jest juz w toku.',
-      mailBlocked: 'Otworz Poczta i zalatw {{pendingRequestCount}} oczekujac{{pendingRequestSuffix}} prosb{{mailJoinClause}}przeczytaj {{unreadMailCount}} nieprzeczytan{{unreadMailSuffix}} wiadomosc{{unreadMessageSuffix}} przed zakonczeniem tury.',
+      mailBlocked: 'Otworz Poczta przed zakonczeniem tury. Oczekujace prosby: {{pendingRequestCount}}. Nieprzeczytane wiadomosci: {{unreadMailCount}}.',
       notEnoughOnlineHumans: 'Co najmniej 2 ludzkich graczy musi byc online, aby kontynuowac te gre multiplayer.',
       activeHumanRequired: 'Co najmniej 1 aktywny ludzki gracz musi byc obecny, aby kontynuowac te gre multiplayer.',
+      scheduledTurnsManualDisabled: 'Reczne konczenie tury jest wylaczone, gdy wlaczone sa Zaplanowane Tury.',
       processingFailed: 'Przetwarzanie tury nie powiodlo sie.'
     }
   },

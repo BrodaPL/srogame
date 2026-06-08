@@ -262,7 +262,10 @@ function createChangeDetectorRefMock() {
 
 function createI18nMock() {
   const translations: Record<string, string> = {
-    'api.errors.noCurrentGameSelected': 'No current game is selected. Join, resume, or start a game from the main menu.'
+    'api.errors.noCurrentGameSelected': 'No current game is selected. Join, resume, or start a game from the main menu.',
+    'gameShell.state.noActiveGameTitle': 'No active game',
+    'gameShell.state.noActiveGameAssigned': 'This account is not assigned to the current selected game. Join, resume, or start a game from the main menu.',
+    'common.actions.backToMainMenu': 'Back to main menu'
   };
 
   return {

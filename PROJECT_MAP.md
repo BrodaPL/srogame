@@ -101,11 +101,17 @@ Main menu note:
 - `src/app/main-menu/` now also offers a direct `Open Multiplayer` handoff when the current selected game is a saved/inactive multiplayer game that cannot be resumed directly
 - `src/app/main-menu/` now also offers `Close current game` for resumable loaded single-player current games; that action calls `/api/games/:gameId/close-current`, auto-saves, unloads the runtime, and clears the current-game pointer
 - `src/app/main-menu/` now also links authenticated players to `/settings`
-- `src/app/main-menu/` is now the phase-1 runtime localization pilot and consumes the shared `src/app/i18n/` service/pipe plus feature-scoped translation files for all frontend-owned text on that screen
+- `src/app/main-menu/` consumes the shared `src/app/i18n/` service/pipe plus feature-scoped translation files for all frontend-owned text on that screen
 
 Settings route note:
 - `src/app/settings/` now owns the live phase-1 language selector and writes the chosen `en` / `pl` preference back through `/api/account/settings/preferences`
 - `src/app/settings/` now also consumes the shared `src/app/i18n/` runtime localization layer and the public flag assets under `public/images/icons/`
+
+Auth route note:
+- `src/app/auth/` now also consumes the shared `src/app/i18n/` runtime localization layer for all frontend-owned login/register/resend labels, placeholders, and client-side validation fallbacks, while still resolving backend `errorKey` / `messageKey` metadata through `src/app/i18n/api-message.utils.ts`
+
+Game shell note:
+- `src/app/game/game.component.ts` and `src/app/game/ui/top-menu/` now also consume the shared `src/app/i18n/` runtime localization layer for shell overlays, in-game navigation labels, multiplayer auto-skip copy, and local fallback messages
 
 Load route note:
 - `src/app/load-game/` still owns explicit save browsing and reopen flows
@@ -157,10 +163,11 @@ Localization:
 - `src/app/i18n/i18n.service.ts`: runtime translation lookup, active-language signal, interpolation, and locale-aware date formatting for migrated views
 - `src/app/i18n/i18n.pipe.ts`: template translation pipe for standalone components
 - `src/app/i18n/language-preference.service.ts`: guest/local fallback persistence under `srogame:language`
-- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `main-menu`, `settings`) aggregated per language
+- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `api`, `main-menu`, `settings`, `auth`, `game-shell`, `top-menu`) aggregated per language
 - `src/app/i18n/api-message.utils.ts`: client bridge that resolves server `errorKey` / `messageKey` metadata through the runtime i18n layer with raw-message fallback during the Phase 2 migration
 - `src/app/game/ui/top-menu/top-menu.component.ts`: consumes keyed `TurnStatusResponse.progressionBlockedReason*` metadata and keyed end-turn / auto-skip API errors
 - `server/src/game-commands/command-result.ts` + `server/src/index.ts::sendGameCommandError(...)`: shared command-error transport point; common `GameCommandError.message` values are now mapped to `api.commands.*` localization keys before hitting the client
+- `server/src/index.ts`: also shapes localization-ready auth/account/runtime message params for translated minute/attempt/mail blockers without relying on English-only suffix interpolation
 
 Game snapshot/state:
 - `src/app/core/game-api.service.ts`: game HTTP calls; now includes the first game-registry/current-game endpoints and supports optional explicit `gameId` for state/turn/save/end-turn calls

@@ -1,38 +1,38 @@
 <main class="page">
   <section class="panel">
     <header class="panel__header">
-      <p class="eyebrow">Account</p>
-      <h1>Login or Register</h1>
-      <p class="subtitle">Use your player name to access the server. New accounts require email confirmation before login.</p>
+      <p class="eyebrow">{{ 'auth.eyebrow' | t }}</p>
+      <h1>{{ 'auth.title' | t }}</h1>
+      <p class="subtitle">{{ 'auth.subtitle' | t }}</p>
     </header>
 
     <div class="setup-form">
       <section class="field">
-        <h2>Login</h2>
+        <h2>{{ 'auth.sections.login' | t }}</h2>
         <div class="field">
-          <label for="loginName">Player name</label>
+          <label for="loginName">{{ 'auth.fields.playerName' | t }}</label>
           <input
             id="loginName"
             name="loginName"
             type="text"
-            placeholder="Commander"
+            [placeholder]="'auth.placeholders.playerName' | t"
             [(ngModel)]="loginName"
             required
           />
         </div>
         <div class="field">
-          <label for="loginPassword">Password</label>
+          <label for="loginPassword">{{ 'auth.fields.password' | t }}</label>
           <input
             id="loginPassword"
             name="loginPassword"
             type="password"
-            placeholder="********"
+            [placeholder]="'auth.placeholders.password' | t"
             [(ngModel)]="loginPassword"
             required
           />
         </div>
         <button class="start-button" type="button" (click)="login()" [disabled]="isLoggingIn">
-          Log in
+          {{ isLoggingIn ? ('auth.actions.loggingIn' | t) : ('auth.actions.login' | t) }}
         </button>
         @if (loginError) {
           <div class="status status--error">
@@ -42,54 +42,54 @@
       </section>
 
       <section class="field">
-        <h2>Register</h2>
+        <h2>{{ 'auth.sections.register' | t }}</h2>
         <div class="field">
-          <label for="registerName">Player name</label>
+          <label for="registerName">{{ 'auth.fields.playerName' | t }}</label>
           <input
             id="registerName"
             name="registerName"
             type="text"
-            placeholder="Commander"
+            [placeholder]="'auth.placeholders.playerName' | t"
             [(ngModel)]="registerName"
             required
           />
         </div>
         <div class="field">
-          <label for="registerEmail">Email</label>
+          <label for="registerEmail">{{ 'auth.fields.email' | t }}</label>
           <input
             id="registerEmail"
             name="registerEmail"
             type="email"
-            placeholder="commander@example.com"
+            [placeholder]="'auth.placeholders.email' | t"
             [(ngModel)]="registerEmail"
             required
           />
         </div>
         <div class="field">
-          <label for="registerPassword">Password</label>
+          <label for="registerPassword">{{ 'auth.fields.password' | t }}</label>
           <input
             id="registerPassword"
             name="registerPassword"
             type="password"
-            placeholder="********"
+            [placeholder]="'auth.placeholders.password' | t"
             [(ngModel)]="registerPassword"
             required
           />
         </div>
         <div class="field">
-          <label for="registerPasswordConfirm">Confirm password</label>
+          <label for="registerPasswordConfirm">{{ 'auth.fields.confirmPassword' | t }}</label>
           <input
             id="registerPasswordConfirm"
             name="registerPasswordConfirm"
             type="password"
-            placeholder="********"
+            [placeholder]="'auth.placeholders.password' | t"
             [(ngModel)]="registerPasswordConfirm"
             required
           />
         </div>
         @if (registerConfig?.requiresTurnstile) {
           <div class="field">
-            <label>CAPTCHA</label>
+            <label>{{ 'auth.fields.captcha' | t }}</label>
             <div #turnstileHost></div>
           </div>
         }
@@ -99,7 +99,7 @@
           </div>
         }
         <button class="start-button" type="button" (click)="register()" [disabled]="!canRegister()">
-          Create account
+          {{ isRegistering ? ('auth.actions.creatingAccount' | t) : ('auth.actions.createAccount' | t) }}
         </button>
         @if (registerError) {
           <div class="status status--error">
@@ -114,21 +114,21 @@
       </section>
 
       <section class="field">
-        <h2>Resend confirmation</h2>
-        <p class="subtitle">Use the registration email for an unconfirmed account. This refreshes the pending confirmation window, but activation is still manual on this server for now.</p>
+        <h2>{{ 'auth.sections.resendConfirmation' | t }}</h2>
+        <p class="subtitle">{{ 'auth.resend.subtitle' | t }}</p>
         <div class="field">
-          <label for="resendEmail">Email</label>
+          <label for="resendEmail">{{ 'auth.fields.email' | t }}</label>
           <input
             id="resendEmail"
             name="resendEmail"
             type="email"
-            placeholder="commander@example.com"
+            [placeholder]="'auth.placeholders.email' | t"
             [(ngModel)]="resendEmail"
             required
           />
         </div>
         <button class="start-button" type="button" (click)="resendConfirmation()" [disabled]="isResendingConfirmation">
-          {{ isResendingConfirmation ? 'Sending...' : 'Resend confirmation' }}
+          {{ isResendingConfirmation ? ('auth.actions.sending' | t) : ('auth.actions.resendConfirmation' | t) }}
         </button>
         @if (resendError) {
           <div class="status status--error">
@@ -143,7 +143,7 @@
       </section>
 
       <div class="saved">
-        <a class="link button" routerLink="/">Back to main menu</a>
+        <a class="link button" routerLink="/">{{ 'common.actions.backToMainMenu' | t }}</a>
       </div>
     </div>
   </section>

@@ -6,6 +6,7 @@ import { GameApiService } from '../../../core/game-api.service';
 import { GameStateService } from '../../../core/game-state.service';
 import { PlayerSessionService } from '../../../core/player-session.service';
 import { resolveApiErrorMessage, resolveApiText } from '../../../i18n/api-message.utils';
+import { I18nPipe } from '../../../i18n/i18n.pipe';
 import { I18nService } from '../../../i18n/i18n.service';
 import { TutorialOverlayComponent } from '../../../tutorial/tutorial-overlay.component';
 import { TutorialService } from '../../../tutorial/tutorial.service';
@@ -14,7 +15,7 @@ import { TooltipDirective } from '../../../shared/tooltip/tooltip.directive';
 
 @Component({
   selector: 'app-top-menu',
-  imports: [RouterLink, RouterLinkActive, TutorialOverlayComponent, TooltipDirective],
+  imports: [RouterLink, RouterLinkActive, TutorialOverlayComponent, TooltipDirective, I18nPipe],
   templateUrl: './top-menu.component.html',
   styleUrl: './top-menu.component.css'
 })
@@ -58,21 +59,23 @@ export class TopMenuComponent {
 
   protected endTurnLabel(): string {
     if (this.isScheduledTurnsEnabled()) {
-      return 'Scheduled Turns';
+      return this.i18n.t('topMenu.actions.scheduledTurns');
     }
     const currentTurn = this.gameState.currentTurn();
-    return currentTurn === null ? 'End Turn --' : `End Turn ${currentTurn}`;
+    return currentTurn === null
+      ? `${this.i18n.t('topMenu.actions.endTurn', { turn: '--' })}`
+      : this.i18n.t('topMenu.actions.endTurn', { turn: currentTurn });
   }
 
   protected scheduledTurnsCountdownLabel(): string {
     const nextTurnAt = this.gameState.turnStatus?.scheduledTurnsNextTurnAt ?? null;
     if (!nextTurnAt) {
-      return 'Next scheduled turn --';
+      return this.i18n.t('topMenu.status.nextScheduledTurnUnknown');
     }
 
     const nextMs = Date.parse(nextTurnAt);
     if (Number.isNaN(nextMs)) {
-      return 'Next scheduled turn --';
+      return this.i18n.t('topMenu.status.nextScheduledTurnUnknown');
     }
 
     const remainingSeconds = Math.max(0, Math.ceil((nextMs - this.nowMs) / 1000));
@@ -83,7 +86,7 @@ export class TopMenuComponent {
       ? [hours, minutes, seconds]
       : [minutes, seconds];
     const time = parts.map((part) => String(part).padStart(2, '0')).join(':');
-    return `Next turn in ${time}`;
+    return this.i18n.t('topMenu.status.nextScheduledTurnIn', { time });
   }
 
   protected isScheduledTurnsEnabled(): boolean {
@@ -114,15 +117,10 @@ export class TopMenuComponent {
   }
 
   protected endTurnBlockedMessage(): string {
-    const parts: string[] = [];
-    if (this.pendingRequestCount() > 0) {
-      parts.push(`resolve ${this.pendingRequestCount()} pending request${this.pendingRequestCount() === 1 ? '' : 's'}`);
-    }
-    if (this.unreadMailCount() > 0) {
-      parts.push(`read ${this.unreadMailCount()} unread message${this.unreadMailCount() === 1 ? '' : 's'}`);
-    }
-
-    return `Open Mail and ${parts.join(' and ')} before ending the turn.`;
+    return this.i18n.t('api.gameplay.endTurn.mailBlocked', {
+      pendingRequestCount: this.pendingRequestCount(),
+      unreadMailCount: this.unreadMailCount()
+    });
   }
 
   protected isMailRoute(): boolean {
@@ -164,16 +162,20 @@ export class TopMenuComponent {
   }
 
   protected autoSkipTurnTooltip(): string {
-    return `Auto skip turn while AFK. After ${formatDurationLabel(getMultiplayerAutoSkipIdleMs())} of inactivity in this multiplayer game, your turns are skipped automatically. After 30 minutes of inactivity, you are removed from active multiplayer presence.`;
+    return this.i18n.t('topMenu.hints.autoSkipTooltip', {
+      idleDuration: formatDurationLabel(getMultiplayerAutoSkipIdleMs())
+    });
   }
 
   protected waitingForPlayersMessage(): string {
     const turnStatus = this.gameState.turnStatus;
     if (!turnStatus || turnStatus.waitingForPlayerNames.length === 0) {
-      return 'Ready. Waiting for other players.';
+      return this.i18n.t('topMenu.status.readyWaiting');
     }
 
-    return `Ready. Waiting for: ${turnStatus.waitingForPlayerNames.join(', ')}.`;
+    return this.i18n.t('topMenu.status.readyWaitingFor', {
+      players: turnStatus.waitingForPlayerNames.join(', ')
+    });
   }
 
   protected onlineRequirementMessage(): string {
@@ -182,8 +184,22 @@ export class TopMenuComponent {
       text: turnStatus?.progressionBlockedReason ?? null,
       key: turnStatus?.progressionBlockedReasonKey ?? null,
       params: turnStatus?.progressionBlockedReasonParams ?? null
-    }, 'At least 2 human players must be online to progress this multiplayer game.')
-      ?? 'At least 2 human players must be online to progress this multiplayer game.';
+    }, this.i18n.t('api.gameplay.endTurn.notEnoughOnlineHumans'))
+      ?? this.i18n.t('api.gameplay.endTurn.notEnoughOnlineHumans');
+  }
+
+  protected reportsLabel(): string {
+    return this.appendCount(this.i18n.t('topMenu.nav.reports'), this.unreadReportsCount());
+  }
+
+  protected mailLabel(): string {
+    return this.appendCount(this.i18n.t('topMenu.nav.mail'), this.mailAttentionCount());
+  }
+
+  protected stickyMailButtonLabel(): string {
+    return this.i18n.t('topMenu.notices.mailRequiresAttention', {
+      count: this.mailAttentionCount()
+    });
   }
 
   protected toggleAutoSkipTurn(): void {
@@ -193,7 +209,7 @@ export class TopMenuComponent {
 
     const session = this.playerSession.load();
     if (!session?.currentGameId) {
-      this.endTurnError = 'Select a running multiplayer game first.';
+      this.endTurnError = this.i18n.t('topMenu.errors.selectRunningMultiplayerFirst');
       return;
     }
 
@@ -205,7 +221,7 @@ export class TopMenuComponent {
         this.gameState.setTurnStatus(turnStatus);
       },
       error: (error) => {
-        this.endTurnError = resolveApiErrorMessage(this.i18n, error, 'Unable to update auto skip turn.');
+        this.endTurnError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('topMenu.errors.updateAutoSkipFailed'));
       }
     });
   }
@@ -230,7 +246,7 @@ export class TopMenuComponent {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.endTurnError = 'No player session found.';
+      this.endTurnError = this.i18n.t('topMenu.errors.noPlayerSession');
       return;
     }
 
@@ -259,10 +275,14 @@ export class TopMenuComponent {
           window.location.reload();
         },
         error: (error) => {
-          this.endTurnError = resolveApiErrorMessage(this.i18n, error, 'Unable to process turn.');
+          this.endTurnError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('topMenu.errors.processTurnFailed'));
           this.gameState.setProcessingTurn(false);
         }
       });
+  }
+
+  private appendCount(label: string, count: number): string {
+    return count > 0 ? `${label} (${count})` : label;
   }
 
   private currentTutorialKey() {

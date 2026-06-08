@@ -7,12 +7,13 @@ import { PlayerSessionService } from '../core/player-session.service';
 import { AuthStateService } from '../core/auth-state.service';
 import type { ApiErrorResponse, GameStateResponse, TurnStatusResponse } from '../models/game-api-types';
 import { resolveApiErrorMessage } from '../i18n/api-message.utils';
+import { I18nPipe } from '../i18n/i18n.pipe';
 import { I18nService } from '../i18n/i18n.service';
 import { getMultiplayerAutoSkipIdleMs } from './multiplayer-test-timing';
 
 @Component({
   selector: 'app-game',
-  imports: [RouterLink, RouterOutlet],
+  imports: [RouterLink, RouterOutlet, I18nPipe],
   templateUrl: './game.component.html'
 })
 export class GameComponent implements OnInit, OnDestroy {
@@ -20,7 +21,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   protected stateTitle = '';
   protected stateError: string | null = null;
-  protected stateActionLabel = 'Back to main menu';
+  protected stateActionLabel = '';
   protected stateActionRoute = '/';
   protected isLoading = false;
   protected isGameReady = false;
@@ -100,9 +101,9 @@ export class GameComponent implements OnInit, OnDestroy {
     this.isGameReady = false;
     this.showAutoSkipReturnNotice = false;
     this.showPresenceRemovedReturnNotice = false;
-    this.stateTitle = 'Login required';
-    this.stateError = 'Login to continue, then start or join a game.';
-    this.stateActionLabel = 'Go to login';
+    this.stateTitle = this.i18n.t('gameShell.state.loginRequiredTitle');
+    this.stateError = this.i18n.t('gameShell.state.loginRequiredBody');
+    this.stateActionLabel = this.i18n.t('gameShell.actions.goToLogin');
     this.stateActionRoute = '/login';
     this.requestUiRefresh();
   }
@@ -118,34 +119,34 @@ export class GameComponent implements OnInit, OnDestroy {
 
     if (error?.status === 401) {
       this.authState.clearSession();
-      this.stateTitle = 'Login required';
-      this.stateError = 'Login to continue, then start or join a game.';
-      this.stateActionLabel = 'Go to login';
+      this.stateTitle = this.i18n.t('gameShell.state.loginRequiredTitle');
+      this.stateError = this.i18n.t('gameShell.state.loginRequiredBody');
+      this.stateActionLabel = this.i18n.t('gameShell.actions.goToLogin');
       this.stateActionRoute = '/login';
       this.requestUiRefresh();
       return;
     }
 
     if (error?.status === 403 || error?.status === 404 || error?.status === 409) {
-      this.stateTitle = 'No active game';
+      this.stateTitle = this.i18n.t('gameShell.state.noActiveGameTitle');
       this.stateError = resolveApiErrorMessage(
         this.i18n,
         error,
-        'This account is not assigned to the current selected game. Join, resume, or start a game from the main menu.'
+        this.i18n.t('gameShell.state.noActiveGameAssigned')
       );
-      this.stateActionLabel = 'Back to main menu';
+      this.stateActionLabel = this.i18n.t('common.actions.backToMainMenu');
       this.stateActionRoute = '/';
       this.requestUiRefresh();
       return;
     }
 
-    this.stateTitle = 'Unable to load game';
+    this.stateTitle = this.i18n.t('gameShell.state.unableToLoadTitle');
     this.stateError = resolveApiErrorMessage(
       this.i18n,
       error,
-      'The server did not return the current game state.'
+      this.i18n.t('gameShell.state.serverStateMissing')
     );
-    this.stateActionLabel = 'Back to main menu';
+    this.stateActionLabel = this.i18n.t('common.actions.backToMainMenu');
     this.stateActionRoute = '/';
     this.requestUiRefresh();
   }

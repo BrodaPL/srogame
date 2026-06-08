@@ -21,7 +21,7 @@ export const apiEn = {
     resendConfirmation: {
       rateLimited: 'Too many confirmation resend attempts. Try again in {{retryAfterSeconds}} seconds.',
       invalidEmail: 'Invalid email.',
-      cooldown: 'Confirmation can be resent again in {{retryAfterMinutes}} minute{{minuteSuffix}}.',
+      cooldown: 'Confirmation can be resent again in {{retryAfterMinutes}} min.',
       successGeneric: 'If a pending account exists for that email, the confirmation window was refreshed. Email delivery is not configured yet on this server; activation must still be completed manually on the server.'
     },
     login: {
@@ -29,8 +29,8 @@ export const apiEn = {
       invalidCredentials: 'Invalid player name or password.',
       userNotFound: 'No such user.',
       pendingConfirmation: 'Account is not confirmed yet.',
-      wrongPasswordAttemptsLeft: 'Wrong password. {{attemptsLeft}} attempt{{attemptSuffix}} left before a 10 minute lock.',
-      accountLocked: 'Account login is locked due to too many wrong passwords. Try again in {{retryAfterMinutes}} minute{{minuteSuffix}}.'
+      wrongPasswordAttemptsLeft: 'Wrong password. Remaining attempts before a 10 minute lock: {{attemptsLeft}}.',
+      accountLocked: 'Account login is locked due to too many wrong passwords. Try again in {{retryAfterMinutes}} min.'
     }
   },
   account: {
@@ -45,7 +45,9 @@ export const apiEn = {
   games: {
     current: {
       unavailableResume: 'You do not currently have access to resume this game.',
-      inactiveAskAdmin: 'This game is not currently active. Ask localAdmin to resume it.'
+      inactiveAskAdmin: 'This game is not currently active. Ask localAdmin to resume it.',
+      noSaveAvailable: 'No save is available to reopen this game.',
+      savedGameNotFound: 'The saved game could not be found.'
     },
     closeCurrent: {
       requiresLocalAdmin: 'Local admin privileges are required to close a single-player game.',
@@ -58,9 +60,10 @@ export const apiEn = {
   gameplay: {
     endTurn: {
       processingInProgress: 'Turn processing is already in progress.',
-      mailBlocked: 'Open Mail and resolve {{pendingRequestCount}} pending request{{pendingRequestSuffix}}{{mailJoinClause}}read {{unreadMailCount}} unread message{{unreadMailSuffix}} before ending the turn.',
+      mailBlocked: 'Open Mail before ending the turn. Pending requests: {{pendingRequestCount}}. Unread messages: {{unreadMailCount}}.',
       notEnoughOnlineHumans: 'At least 2 human players must be online to progress this multiplayer game.',
       activeHumanRequired: 'At least 1 active human player must be present to progress this multiplayer game.',
+      scheduledTurnsManualDisabled: 'Manual end turn is disabled while Scheduled Turns are enabled.',
       processingFailed: 'Turn processing failed.'
     }
   },

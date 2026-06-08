@@ -5,6 +5,7 @@ import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameStateService } from '../core/game-state.service';
 import { resolveApiErrorMessage, resolveApiMessage } from '../i18n/api-message.utils';
+import { I18nPipe } from '../i18n/i18n.pipe';
 import { I18nService } from '../i18n/i18n.service';
 import type { RegisterConfigResponse } from '../models/game-api-types';
 
@@ -31,7 +32,7 @@ declare global {
 
 @Component({
   selector: 'app-auth',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, I18nPipe],
   templateUrl: './auth.component.html'
 })
 export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -80,7 +81,7 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
           registerEnabled: false,
           requiresTurnstile: false,
           turnstileSiteKey: null,
-          registerUnavailableReason: 'Unable to load registration configuration.'
+          registerUnavailableReason: this.i18n.t('auth.errors.loadRegisterConfig')
         };
         this.turnstileError = this.registerConfig.registerUnavailableReason;
         this.cdr.markForCheck();
@@ -106,7 +107,7 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
     const playerName = this.loginName.trim();
     const password = this.loginPassword;
     if (!playerName || !password) {
-      this.loginError = 'Player name and password are required.';
+      this.loginError = this.i18n.t('auth.errors.loginRequiresCredentials');
       return;
     }
 
@@ -122,7 +123,7 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
         this.router.navigate(['/']);
       },
       error: (err) => {
-        this.loginError = resolveApiErrorMessage(this.i18n, err, 'Login failed.');
+        this.loginError = resolveApiErrorMessage(this.i18n, err, this.i18n.t('auth.errors.loginFailed'));
         this.isLoggingIn = false;
         this.cdr.markForCheck();
       }
@@ -135,7 +136,7 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     if (!this.registerConfig?.registerEnabled) {
-      this.registerError = this.registerConfig?.registerUnavailableReason ?? 'Registration is unavailable right now.';
+      this.registerError = this.registerConfig?.registerUnavailableReason ?? this.i18n.t('auth.errors.registerUnavailable');
       return;
     }
 
@@ -144,17 +145,17 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
     const password = this.registerPassword;
     const confirm = this.registerPasswordConfirm;
     if (!playerName || !email || !password) {
-      this.registerError = 'Player name, email, and password are required.';
+      this.registerError = this.i18n.t('auth.errors.registerRequiresFields');
       return;
     }
 
     if (password !== confirm) {
-      this.registerError = 'Passwords do not match.';
+      this.registerError = this.i18n.t('auth.errors.registerPasswordsMismatch');
       return;
     }
 
     if (this.registerConfig.requiresTurnstile && !this.turnstileToken) {
-      this.registerError = 'Please complete the CAPTCHA challenge.';
+      this.registerError = this.i18n.t('auth.errors.registerCaptchaRequired');
       return;
     }
 
@@ -176,7 +177,7 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
         this.cdr.markForCheck();
       },
       error: (err) => {
-        this.registerError = resolveApiErrorMessage(this.i18n, err, 'Registration failed.');
+        this.registerError = resolveApiErrorMessage(this.i18n, err, this.i18n.t('auth.errors.registerFailed'));
         this.isRegistering = false;
         this.turnstileToken = null;
         this.resetTurnstileWidget();
@@ -192,7 +193,7 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const email = this.resendEmail.trim();
     if (!email) {
-      this.resendError = 'Email is required.';
+      this.resendError = this.i18n.t('auth.errors.resendEmailRequired');
       return;
     }
 
@@ -206,7 +207,7 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
         this.cdr.markForCheck();
       },
       error: (err) => {
-        this.resendError = resolveApiErrorMessage(this.i18n, err, 'Unable to resend confirmation.');
+        this.resendError = resolveApiErrorMessage(this.i18n, err, this.i18n.t('auth.errors.resendFailed'));
         this.isResendingConfirmation = false;
         this.cdr.markForCheck();
       }
@@ -250,12 +251,12 @@ export class AuthComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         'error-callback': () => {
           this.turnstileToken = null;
-          this.turnstileError = 'CAPTCHA failed to load. Refresh the page and try again.';
+          this.turnstileError = this.i18n.t('auth.errors.turnstileLoad');
           this.cdr.markForCheck();
         }
       });
     } catch {
-      this.turnstileError = 'CAPTCHA failed to load. Refresh the page and try again.';
+      this.turnstileError = this.i18n.t('auth.errors.turnstileLoad');
       this.cdr.markForCheck();
     }
   }

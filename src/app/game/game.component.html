@@ -1,8 +1,8 @@
 <main class="game" [class.game--locked]="isUiLocked()">
   @if (isLoading) {
     <section class="empty">
-      <h1>Loading game</h1>
-      <p>Loading the current galaxy state from the server.</p>
+      <h1>{{ 'gameShell.loading.title' | t }}</h1>
+      <p>{{ 'gameShell.loading.body' | t }}</p>
     </section>
   } @else if (stateError) {
     <section class="empty">
@@ -15,21 +15,21 @@
     @if (isUiLocked()) {
       <section class="game-lock-overlay" aria-live="polite" aria-busy="true">
         <div class="game-lock-overlay__card">
-          <p class="game-lock-overlay__eyebrow">Turn Processing</p>
-          <h2>Processing turn...</h2>
-          <p>The server is resolving income, construction, and research.</p>
+          <p class="game-lock-overlay__eyebrow">{{ 'gameShell.overlays.turnProcessing.eyebrow' | t }}</p>
+          <h2>{{ 'gameShell.overlays.turnProcessing.title' | t }}</h2>
+          <p>{{ 'gameShell.overlays.turnProcessing.body' | t }}</p>
         </div>
       </section>
     }
     @if (showPresenceRemovedReturnNotice && !isUiLocked()) {
       <section class="game-lock-overlay" aria-live="polite">
         <div class="game-lock-overlay__card">
-          <p class="game-lock-overlay__eyebrow">Multiplayer Presence</p>
-          <h2>You were removed from active multiplayer presence after being away too long.</h2>
-          <p>You have re-entered the loaded game now, but other players could keep playing only after enough humans were present again.</p>
+          <p class="game-lock-overlay__eyebrow">{{ 'gameShell.overlays.multiplayerPresence.eyebrow' | t }}</p>
+          <h2>{{ 'gameShell.overlays.multiplayerPresence.title' | t }}</h2>
+          <p>{{ 'gameShell.overlays.multiplayerPresence.body' | t }}</p>
           <div class="game-lock-overlay__actions">
             <button class="top-menu__button top-menu__button--end-turn" type="button" (click)="acknowledgePresenceRemovedNotice()">
-              Continue
+              {{ 'gameShell.overlays.multiplayerPresence.continue' | t }}
             </button>
           </div>
         </div>
@@ -37,15 +37,15 @@
     } @else if (showAutoSkipReturnNotice && !isUiLocked()) {
       <section class="game-lock-overlay" aria-live="polite">
         <div class="game-lock-overlay__card">
-          <p class="game-lock-overlay__eyebrow">Auto Skip Turn</p>
-          <h2>Auto skip turn was activated because you were AFK.</h2>
-          <p>Your multiplayer seat is still present, but your turns are being skipped until you disable auto skip.</p>
+          <p class="game-lock-overlay__eyebrow">{{ 'gameShell.overlays.autoSkip.eyebrow' | t }}</p>
+          <h2>{{ 'gameShell.overlays.autoSkip.title' | t }}</h2>
+          <p>{{ 'gameShell.overlays.autoSkip.body' | t }}</p>
           <div class="game-lock-overlay__actions">
             <button class="top-menu__button" type="button" (click)="keepAutoSkipTurnEnabled()">
-              Keep enabled
+              {{ 'gameShell.overlays.autoSkip.keepEnabled' | t }}
             </button>
             <button class="top-menu__button top-menu__button--end-turn" type="button" (click)="disableAutoSkipTurn()">
-              Disable auto skip turn
+              {{ 'gameShell.overlays.autoSkip.disable' | t }}
             </button>
           </div>
         </div>

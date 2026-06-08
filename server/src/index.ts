@@ -957,8 +957,7 @@ app.post('/api/auth/login', (req, res) => {
       `Wrong password. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} left before a 10 minute lock.`,
       'api.auth.login.wrongPasswordAttemptsLeft',
       {
-        attemptsLeft,
-        attemptSuffix: pluralSuffix(attemptsLeft)
+        attemptsLeft
       }
     );
   }
@@ -4685,25 +4684,16 @@ function sendApiRouteError(res: express.Response, routeError: ApiRouteError) {
   );
 }
 
-function pluralSuffix(value: number): string {
-  return value === 1 ? '' : 's';
-}
-
 function buildRetryAfterMinutesParams(retryAfterMinutes: number): ApiMessageParams {
   return {
-    retryAfterMinutes,
-    minuteSuffix: pluralSuffix(retryAfterMinutes)
+    retryAfterMinutes
   };
 }
 
 function buildEndTurnMailBlockParams(unreadMailCount: number, pendingRequestCount: number): ApiMessageParams {
   return {
     pendingRequestCount,
-    pendingRequestSuffix: pendingRequestCount === 1 ? '' : 's',
-    unreadMailCount,
-    unreadMailSuffix: unreadMailCount === 1 ? '' : 's',
-    unreadMessageSuffix: unreadMailCount === 1 ? '' : 'es',
-    mailJoinClause: pendingRequestCount > 0 && unreadMailCount > 0 ? ' and ' : ''
+    unreadMailCount
   };
 }
 
