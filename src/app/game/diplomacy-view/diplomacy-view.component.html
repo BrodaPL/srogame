@@ -1,54 +1,54 @@
-<app-top-menu></app-top-menu>
+﻿<app-top-menu></app-top-menu>
 
 <section class="diplomacy-view">
   @if (isLoading) {
     <section class="status status--info">
-      <h3>Loading Diplomacy</h3>
-      <p>Discovered factions, treaty proposals, and known intel are being synchronized.</p>
+      <h3>{{ 'communications.diplomacy.loading.title' | t }}</h3>
+      <p>{{ 'communications.diplomacy.loading.body' | t }}</p>
     </section>
   } @else if (loadError) {
     <section class="status status--error">
-      <h3>Diplomacy unavailable</h3>
+      <h3>{{ 'communications.diplomacy.unavailable.title' | t }}</h3>
       <p>{{ loadError }}</p>
     </section>
   } @else {
     @if (actionError) {
       <section class="status status--error">
-        <h3>Diplomacy action failed</h3>
+        <h3>{{ 'communications.diplomacy.status.actionFailed' | t }}</h3>
         <p>{{ actionError }}</p>
       </section>
     }
 
     @if (actionSuccess) {
       <section class="status status--success">
-        <h3>Diplomacy updated</h3>
+        <h3>{{ 'communications.diplomacy.status.updated' | t }}</h3>
         <p>{{ actionSuccess }}</p>
       </section>
     }
 
     <header class="overview-card diplomacy-view__header">
       <div>
-        <p class="eyebrow">Interstellar Relations</p>
-        <h1 class="diplomacy-view__title">Diplomacy</h1>
+        <p class="eyebrow">{{ 'communications.diplomacy.header.eyebrow' | t }}</p>
+        <h1 class="diplomacy-view__title">{{ 'communications.diplomacy.header.title' | t }}</h1>
         <p class="overview-muted">
-          Review discovered factions, negotiate status changes, and message known powers directly.
+          {{ 'communications.diplomacy.header.subtitle' | t }}
         </p>
       </div>
       <div class="overview-stats diplomacy-view__summary">
         <div class="overview-stat">
-          <span class="overview-stat__label">Current turn</span>
+          <span class="overview-stat__label">{{ 'communications.diplomacy.header.currentTurn' | t }}</span>
           <span class="overview-stat__value">{{ currentTurn ?? '--' }}</span>
         </div>
         <div class="overview-stat">
-          <span class="overview-stat__label">Discovered contacts</span>
+          <span class="overview-stat__label">{{ 'communications.diplomacy.header.discoveredContacts' | t }}</span>
           <span class="overview-stat__value">{{ visibleContactCountLabel() }}</span>
         </div>
         <div class="overview-stat">
-          <span class="overview-stat__label">Pending proposals</span>
+          <span class="overview-stat__label">{{ 'communications.diplomacy.header.pendingProposals' | t }}</span>
           <span class="overview-stat__value">{{ activeProposals.length }}</span>
         </div>
         <div class="overview-stat">
-          <span class="overview-stat__label">Owned planets</span>
+          <span class="overview-stat__label">{{ 'communications.diplomacy.header.ownedPlanets' | t }}</span>
           <span class="overview-stat__value">{{ ownedPlanets.length }}</span>
         </div>
       </div>
@@ -58,16 +58,16 @@
       <section class="overview-card diplomacy-view__contacts" data-tutorial-id="diplomacy-contacts">
         <div class="diplomacy-view__panel-head">
           <div>
-            <h3>Discovered Contacts</h3>
-            <p class="overview-muted">Only human and bot powers appear here. Neutral resource factions are excluded from diplomacy.</p>
+            <h3>{{ 'communications.diplomacy.contacts.title' | t }}</h3>
+            <p class="overview-muted">{{ 'communications.diplomacy.contacts.subtitle' | t }}</p>
           </div>
           <span class="badge" [class.badge--jump]="outgoingProposalSentThisTurn">
-            {{ outgoingProposalSentThisTurn ? 'Proposal used this turn' : 'Proposal available' }}
+            {{ (outgoingProposalSentThisTurn ? 'communications.diplomacy.contacts.proposalUsed' : 'communications.diplomacy.contacts.proposalAvailable') | t }}
           </span>
         </div>
 
         @if (visibleContacts().length === 0) {
-          <p class="overview-muted">No human or bot diplomatic contacts are available yet.</p>
+          <p class="overview-muted">{{ 'communications.diplomacy.contacts.none' | t }}</p>
         } @else {
           <div class="diplomacy-view__contact-list">
             @for (contact of visibleContacts(); track contact.playerId) {
@@ -79,7 +79,7 @@
                 <div>
                   <h4>{{ contact.playerName }}</h4>
                   <p class="overview-muted">
-                    {{ contact.playerType }} |
+                    {{ playerTypeLabel(contact.playerType) }} |
                     <span [class]="diplomacyStatusTextClass(contact.currentStatus)">{{ diplomacyStatusLabel(contact.currentStatus) }}</span>
                   </p>
                   <p class="overview-muted">{{ contactMetaLabel(contact) }}</p>
@@ -101,35 +101,35 @@
           <div class="diplomacy-view__panel-head">
             <div>
               <h3>{{ contact.playerName }}</h3>
-              <p class="overview-muted">{{ contact.playerType }} contact</p>
+              <p class="overview-muted">{{ 'communications.diplomacy.contacts.contactType' | t:{ type: playerTypeLabel(contact.playerType) } }}</p>
             </div>
             <span [class]="diplomacyBadgeClass(contact.currentStatus)">{{ diplomacyStatusLabel(contact.currentStatus) }}</span>
           </div>
 
           <div class="overview-stats diplomacy-view__detail-stats">
             <div class="overview-stat">
-              <span class="overview-stat__label">Player type</span>
-              <span class="overview-stat__value">{{ contact.playerType }}</span>
+              <span class="overview-stat__label">{{ 'communications.diplomacy.detail.playerType' | t }}</span>
+              <span class="overview-stat__value">{{ playerTypeLabel(contact.playerType) }}</span>
             </div>
             <div class="overview-stat">
-              <span class="overview-stat__label">Current status</span>
+              <span class="overview-stat__label">{{ 'communications.diplomacy.detail.currentStatus' | t }}</span>
               <span class="overview-stat__value">
                 <span [class]="diplomacyStatusTextClass(contact.currentStatus)">{{ diplomacyStatusLabel(contact.currentStatus) }}</span>
               </span>
             </div>
             <div class="overview-stat">
-              <span class="overview-stat__label">Known planets</span>
+              <span class="overview-stat__label">{{ 'communications.diplomacy.detail.knownPlanets' | t }}</span>
               <span class="overview-stat__value">{{ contact.knownPlanets.length }}</span>
             </div>
             <div class="overview-stat">
-              <span class="overview-stat__label">Treaty controls</span>
-              <span class="overview-stat__value">{{ contact.canSendProposal ? 'Available' : 'Blocked' }}</span>
+              <span class="overview-stat__label">{{ 'communications.diplomacy.detail.treatyControls' | t }}</span>
+              <span class="overview-stat__value">{{ (contact.canSendProposal ? 'communications.diplomacy.detail.available' : 'communications.diplomacy.detail.blocked') | t }}</span>
             </div>
           </div>
 
           <div class="diplomacy-view__action-grid">
             <section class="diplomacy-view__action-card" data-tutorial-id="diplomacy-treaty-controls">
-              <h4>Treaty Proposal</h4>
+              <h4>{{ 'communications.diplomacy.treaty.title' | t }}</h4>
               <p class="overview-muted">{{ proposalAvailabilityCopy(contact) }}</p>
               <div class="diplomacy-view__proposal-controls">
                 <select
@@ -138,7 +138,7 @@
                   [ngModel]="selectedProposalStatus(contact)"
                   (ngModelChange)="setSelectedProposalStatus(contact, $event)">
                   @for (status of availableProposalStatuses(contact); track status) {
-                    <option [value]="status">{{ status }}</option>
+                    <option [value]="status">{{ diplomacyStatusLabel(status) }}</option>
                   }
                 </select>
                 <button
@@ -152,29 +152,29 @@
             </section>
 
             <section class="diplomacy-view__action-card" data-tutorial-id="diplomacy-direct-message">
-              <h4>Direct Message</h4>
-              <p class="overview-muted">Messages are now handled through Mail and the shared compose popup.</p>
+              <h4>{{ 'communications.diplomacy.messaging.title' | t }}</h4>
+              <p class="overview-muted">{{ 'communications.diplomacy.messaging.subtitle' | t }}</p>
               <button
                 type="button"
                 class="diplomacy-view__action-button"
                 [disabled]="!contact.canSendMessage"
                 (click)="openMessageComposer(contact)">
-                Send message
+                {{ 'communications.diplomacy.messaging.send' | t }}
               </button>
             </section>
 
             <section class="diplomacy-view__action-card">
-              <h4>Support Request</h4>
+              <h4>{{ 'communications.diplomacy.support.title' | t }}</h4>
               <p class="overview-muted">{{ supportAvailabilityCopy(contact) }}</p>
               <div class="diplomacy-view__field">
-                <span>Support type</span>
+                <span>{{ 'communications.diplomacy.support.type' | t }}</span>
                 <select
                   class="diplomacy-view__select"
                   [disabled]="availableSupportTypes(contact).length === 0 || isContactActionPending(contact)"
                   [ngModel]="selectedSupportType(contact)"
                   (ngModelChange)="setSelectedSupportType(contact, $event)">
                   @for (supportType of availableSupportTypes(contact); track supportType) {
-                    <option [value]="supportType">{{ supportType }}</option>
+                    <option [value]="supportType">{{ supportTypeDisplayLabel(supportType) }}</option>
                   }
                 </select>
               </div>
@@ -197,7 +197,7 @@
               @if (supportNeedsResources(contact)) {
                 <div class="diplomacy-view__support-resources">
                   <label class="diplomacy-view__field">
-                    <span>Metal</span>
+                    <span>{{ 'communications.diplomacy.support.metal' | t }}</span>
                     <input
                       type="number"
                       min="0"
@@ -206,7 +206,7 @@
                       (ngModelChange)="updateRequestedSupportMetal(contact, $event)" />
                   </label>
                   <label class="diplomacy-view__field">
-                    <span>Crystal</span>
+                    <span>{{ 'communications.diplomacy.support.crystal' | t }}</span>
                     <input
                       type="number"
                       min="0"
@@ -215,7 +215,7 @@
                       (ngModelChange)="updateRequestedSupportCrystal(contact, $event)" />
                   </label>
                   <label class="diplomacy-view__field">
-                    <span>Deuterium</span>
+                    <span>{{ 'communications.diplomacy.support.deuterium' | t }}</span>
                     <input
                       type="number"
                       min="0"
@@ -229,8 +229,8 @@
               @if (supportNeedsOffensiveTarget(contact)) {
                 <div class="diplomacy-view__support-offensive">
                   <div class="diplomacy-view__field">
-                    <span>Minimum desired ships</span>
-                    <p class="overview-muted">The ally will auto-launch only when they can meet at least this exact ship mix.</p>
+                    <span>{{ 'communications.diplomacy.support.minimumDesiredShips' | t }}</span>
+                    <p class="overview-muted">{{ 'communications.diplomacy.support.minimumDesiredShipsHelp' | t }}</p>
                   </div>
 
                   <div class="diplomacy-view__support-ships-grid">
@@ -252,42 +252,42 @@
               @if (supportUsesBombardmentPriorities(contact)) {
                 <div class="diplomacy-view__support-bombardment">
                   <div class="diplomacy-view__field">
-                    <span>Bombardment priorities</span>
-                    <p class="overview-muted">Optional priorities are applied if the mission is auto-launched.</p>
+                    <span>{{ 'communications.diplomacy.support.bombardmentPriorities' | t }}</span>
+                    <p class="overview-muted">{{ 'communications.diplomacy.support.bombardmentPrioritiesHelp' | t }}</p>
                   </div>
 
                   <div class="diplomacy-view__support-resources">
                     <label class="diplomacy-view__field">
-                      <span>Main</span>
+                      <span>{{ 'communications.diplomacy.support.main' | t }}</span>
                       <select
                         class="diplomacy-view__select"
                         [ngModel]="selectedSupportBombardmentPriorities(contact).main ?? ''"
                         (ngModelChange)="setSupportBombardmentPriority(contact, 'main', $event)">
-                        <option value="">Random</option>
+                        <option value="">{{ 'communications.shared.labels.random' | t }}</option>
                         @for (priority of bombardmentPriorityOptions(); track priority) {
                           <option [value]="priority">{{ supportPriorityLabel(priority) }}</option>
                         }
                       </select>
                     </label>
                     <label class="diplomacy-view__field">
-                      <span>Secondary</span>
+                      <span>{{ 'communications.diplomacy.support.secondary' | t }}</span>
                       <select
                         class="diplomacy-view__select"
                         [ngModel]="selectedSupportBombardmentPriorities(contact).secondary ?? ''"
                         (ngModelChange)="setSupportBombardmentPriority(contact, 'secondary', $event)">
-                        <option value="">Random</option>
+                        <option value="">{{ 'communications.shared.labels.random' | t }}</option>
                         @for (priority of bombardmentPriorityOptions(); track priority) {
                           <option [value]="priority">{{ supportPriorityLabel(priority) }}</option>
                         }
                       </select>
                     </label>
                     <label class="diplomacy-view__field">
-                      <span>Tertiary</span>
+                      <span>{{ 'communications.diplomacy.support.tertiary' | t }}</span>
                       <select
                         class="diplomacy-view__select"
                         [ngModel]="selectedSupportBombardmentPriorities(contact).tertiary ?? ''"
                         (ngModelChange)="setSupportBombardmentPriority(contact, 'tertiary', $event)">
-                        <option value="">Random</option>
+                        <option value="">{{ 'communications.shared.labels.random' | t }}</option>
                         @for (priority of bombardmentPriorityOptions(); track priority) {
                           <option [value]="priority">{{ supportPriorityLabel(priority) }}</option>
                         }
@@ -302,7 +302,7 @@
                 class="diplomacy-view__action-button"
                 [disabled]="!canSendSupportRequest(contact)"
                 (click)="sendSupportRequest(contact)">
-                {{ isContactActionPending(contact) ? 'Sending...' : 'Send support request' }}
+                {{ isContactActionPending(contact) ? ('communications.diplomacy.support.sending' | t) : ('communications.diplomacy.support.send' | t) }}
               </button>
             </section>
           </div>
@@ -310,13 +310,13 @@
           <section class="diplomacy-view__known-planets">
             <div class="diplomacy-view__panel-head">
               <div>
-                <h4>Known Planets</h4>
-                <p class="overview-muted">Only planets currently owned by this contact and covered by your espionage intel appear here.</p>
+                <h4>{{ 'communications.diplomacy.planets.title' | t }}</h4>
+                <p class="overview-muted">{{ 'communications.diplomacy.planets.subtitle' | t }}</p>
               </div>
             </div>
 
             @if (contact.knownPlanets.length === 0) {
-              <p class="overview-muted">No current planetary intel is available for this contact.</p>
+              <p class="overview-muted">{{ 'communications.diplomacy.planets.none' | t }}</p>
             } @else {
               <div class="diplomacy-view__planet-grid">
                 @for (planet of contact.knownPlanets; track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z) {
@@ -326,7 +326,7 @@
             }
           </section>
         } @else {
-          <p class="overview-muted">Select a contact to inspect known planets, send a message, or prepare a treaty proposal.</p>
+          <p class="overview-muted">{{ 'communications.diplomacy.detail.none' | t }}</p>
         }
       </section>
     </section>
@@ -334,24 +334,24 @@
     <section class="overview-card diplomacy-view__proposals" data-tutorial-id="diplomacy-proposals">
       <div class="diplomacy-view__panel-head">
         <div>
-          <h3>Active Proposals</h3>
-          <p class="overview-muted">Incoming proposals are listed first, followed by your outgoing proposals.</p>
+          <h3>{{ 'communications.diplomacy.proposals.title' | t }}</h3>
+          <p class="overview-muted">{{ 'communications.diplomacy.proposals.subtitle' | t }}</p>
         </div>
       </div>
 
       @if (activeProposals.length === 0) {
-        <p class="overview-muted">No active diplomacy proposals.</p>
+        <p class="overview-muted">{{ 'communications.diplomacy.proposals.none' | t }}</p>
       } @else {
         <div class="diplomacy-view__proposal-list">
           @for (proposal of activeProposals; track proposal.proposalId) {
             <article class="diplomacy-view__proposal-card">
               <div class="diplomacy-view__proposal-copy">
                 <div class="diplomacy-view__proposal-head">
-                  <h4>{{ proposal.direction === 'incoming' ? 'Incoming proposal' : 'Outgoing proposal' }}</h4>
+                  <h4>{{ (proposal.direction === 'incoming' ? 'communications.diplomacy.proposals.incoming' : 'communications.diplomacy.proposals.outgoing') | t }}</h4>
                   <span [class]="diplomacyBadgeClass(proposal.requestedStatus)">{{ diplomacyStatusLabel(proposal.requestedStatus) }}</span>
                 </div>
                 <p class="overview-muted">{{ proposalCounterpartyLabel(proposal) }}</p>
-                <p class="overview-muted">Created on turn {{ proposal.createdTurn }} | Expires on turn {{ proposal.expiresOnTurn }}</p>
+                <p class="overview-muted">{{ 'communications.diplomacy.proposals.createdExpires' | t:{ createdTurn: proposal.createdTurn, expiresOnTurn: proposal.expiresOnTurn } }}</p>
               </div>
 
               <div class="diplomacy-view__proposal-actions">
@@ -374,8 +374,9 @@
   [lockedTargetPlayerId]="composerLockedTargetPlayerId"
   [lockedTargetPlayerName]="composerLockedTargetPlayerName"
   [allowAlliance]="false"
-  [titleText]="'Compose Message'"
-  [submitLabel]="'Send message'"
+  [titleText]="'communications.diplomacy.messaging.composeTitle' | t"
+  [submitLabel]="'communications.diplomacy.messaging.send' | t"
   (closed)="closeComposer()"
   (sent)="handleComposerSent($event)">
 </app-message-compose-dialog>
+

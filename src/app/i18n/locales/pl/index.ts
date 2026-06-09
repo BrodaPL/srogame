@@ -1,6 +1,7 @@
 import { authPl } from './auth.pl';
 import { apiPl } from './api.pl';
 import { commonPl } from './common.pl';
+import { communicationsPl } from './communications.pl';
 import { encyclopediaPl } from './encyclopedia.pl';
 import { gameShellPl } from './game-shell.pl';
 import { helpAboutPl } from './help-about.pl';
@@ -15,6 +16,7 @@ export const plTranslations = {
   auth: authPl,
   api: apiPl,
   common: commonPl,
+  communications: communicationsPl,
   encyclopedia: encyclopediaPl,
   gameShell: gameShellPl,
   helpAbout: helpAboutPl,

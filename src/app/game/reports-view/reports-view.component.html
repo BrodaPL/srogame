@@ -1,20 +1,20 @@
-<app-top-menu></app-top-menu>
+﻿<app-top-menu></app-top-menu>
 
 <section class="reports-view">
   @if (isLoading) {
     <section class="status status--info">
-      <h3>Loading Reports</h3>
-      <p>Player inbox data is being read from the current galaxy state.</p>
+      <h3>{{ 'communications.reports.loading.title' | t }}</h3>
+      <p>{{ 'communications.reports.loading.body' | t }}</p>
     </section>
   } @else if (loadError) {
     <section class="status status--error">
-      <h3>Reports unavailable</h3>
+      <h3>{{ 'communications.reports.unavailable.title' | t }}</h3>
       <p>{{ loadError }}</p>
     </section>
   } @else {
     @if (actionError) {
       <section class="status status--error">
-        <h3>Action failed</h3>
+        <h3>{{ 'communications.reports.actionFailed.title' | t }}</h3>
         <p>{{ actionError }}</p>
       </section>
     }
@@ -26,7 +26,7 @@
           type="button"
           [class.reports-view__tab--active]="isTabActive(allTab)"
           (click)="setActiveTab(allTab)">
-          <span>All</span>
+          <span>{{ reportTabLabel(allTab) }}</span>
           <span class="badge">{{ reportTypeCount(allTab) }}</span>
         </button>
 
@@ -36,45 +36,44 @@
             type="button"
             [class.reports-view__tab--active]="isTabActive(reportType)"
             (click)="setActiveTab(reportType)">
-            <span>{{ reportType }}</span>
+            <span>{{ reportTabLabel(reportType) }}</span>
             <span class="badge">{{ reportTypeCount(reportType) }}</span>
           </button>
         }
       </div>
-
     </section>
 
     <section class="reports-view__layout">
       <section class="overview-card reports-view__list" data-tutorial-id="reports-inbox-list">
         <div class="reports-view__list-head">
           <div>
-            <h3>Inbox</h3>
-            <p class="overview-muted">{{ visibleReports().length }} visible report(s)</p>
+            <h3>{{ 'communications.reports.inbox.title' | t }}</h3>
+            <p class="overview-muted">{{ visibleReportCountLabel() }}</p>
           </div>
           <div class="reports-view__inbox-actions" data-tutorial-id="reports-actions">
-            <span class="badge">{{ selectedReportIds.size }} selected</span>
+            <span class="badge">{{ selectedCountLabel() }}</span>
             <div class="reports-view__actions">
               <button
                 class="reports-view__compact-button"
                 type="button"
-                appTooltip="Select all visible reports except favourites."
+                [appTooltip]="'communications.reports.tooltips.selectAllVisible' | t"
                 (click)="selectAllVisible()">
-                Select all visible
+                {{ 'communications.reports.actions.selectAllVisible' | t }}
               </button>
               <button
                 class="reports-view__compact-button reports-view__compact-button--danger"
                 type="button"
-                appTooltip="Delete selected reports. Favourite reports are protected."
+                [appTooltip]="'communications.reports.tooltips.deleteSelected' | t"
                 [disabled]="selectedReportIds.size === 0 || isDeleting"
                 (click)="deleteSelectedReports()">
-                Delete selected
+                {{ 'communications.reports.actions.deleteSelected' | t }}
               </button>
             </div>
           </div>
         </div>
 
         @if (visibleReports().length === 0) {
-          <p class="overview-muted">No reports in this tab.</p>
+          <p class="overview-muted">{{ 'communications.reports.inbox.noReports' | t }}</p>
         } @else {
           <div class="reports-view__items">
             @for (report of visibleReports(); track report.reportId) {
@@ -100,22 +99,22 @@
                         class="reports-view__favourite-button"
                         [class.reports-view__favourite-button--active]="report.isFavourite"
                         [disabled]="favouriteUpdatingReportId === report.reportId"
-                        [appTooltip]="report.isFavourite ? 'Remove favourite marker.' : 'Favourite reports are protected from Select all and Delete selected.'"
-                        [attr.aria-label]="report.isFavourite ? 'Remove favourite marker' : 'Mark report as favourite'"
+                        [appTooltip]="favouriteTooltip(report.isFavourite)"
+                        [attr.aria-label]="favouriteAriaLabel(report.isFavourite)"
                         (click)="toggleReportFavourite(report, $event)">
-                        {{ report.isFavourite ? '★' : '☆' }}
+                        {{ report.isFavourite ? '?' : '?' }}
                       </button>
                       <h4>{{ report.title }}</h4>
                     </div>
                     <div class="reports-view__item-badges">
                       @if (report.isFavourite) {
-                        <span class="badge badge--jump">Favourite</span>
+                        <span class="badge badge--jump">{{ 'communications.reports.badges.favourite' | t }}</span>
                       }
-                      <span class="badge" [class.badge--jump]="!report.isRead">{{ report.reportType }}</span>
+                      <span class="badge" [class.badge--jump]="!report.isRead">{{ reportTypeLabel(report.reportType) }}</span>
                     </div>
                   </div>
                   <div class="reports-view__item-meta">
-                    <span>Turn {{ report.createdTurn }}</span>
+                    <span>{{ 'communications.shared.labels.turn' | t }} {{ report.createdTurn }}</span>
                     <span>
                       @if (canOpenInGalaxy(report)) {
                         <button
@@ -128,7 +127,7 @@
                         <span>{{ coordinatesLabel(report) }}</span>
                       }
                     </span>
-                    <span>{{ report.isRead ? 'Read' : 'Unread' }}</span>
+                    <span>{{ reportStatusLabel(report.isRead) }}</span>
                   </div>
                 </div>
               </article>
@@ -141,22 +140,25 @@
         @if (selectedReport(); as report) {
           <div class="reports-view__detail-head" data-tutorial-id="reports-detail-head">
             <div>
-              <p class="eyebrow">Report Detail</p>
+              <p class="eyebrow">{{ 'communications.reports.detail.eyebrow' | t }}</p>
               <div class="reports-view__detail-title-line">
                 <button
                   type="button"
                   class="reports-view__favourite-button reports-view__favourite-button--large"
                   [class.reports-view__favourite-button--active]="report.isFavourite"
                   [disabled]="favouriteUpdatingReportId === report.reportId"
-                  [appTooltip]="report.isFavourite ? 'Remove favourite marker.' : 'Favourite reports are protected from Select all and Delete selected.'"
-                  [attr.aria-label]="report.isFavourite ? 'Remove favourite marker' : 'Mark report as favourite'"
+                  [appTooltip]="favouriteTooltip(report.isFavourite)"
+                  [attr.aria-label]="favouriteAriaLabel(report.isFavourite)"
                   (click)="toggleReportFavourite(report, $event)">
-                  {{ report.isFavourite ? '★' : '☆' }}
+                  {{ report.isFavourite ? '?' : '?' }}
                 </button>
                 <h3>{{ report.title }}</h3>
               </div>
               <p class="overview-muted">
-                {{ report.reportType }} | Turn {{ report.createdTurn }}{{ report.isFavourite ? ' | Favourite' : '' }}
+                {{ reportTypeLabel(report.reportType) }} | {{ 'communications.shared.labels.turn' | t }} {{ report.createdTurn }}
+                @if (report.isFavourite) {
+                  <span> | {{ 'communications.reports.badges.favourite' | t }}</span>
+                }
               </p>
             </div>
 
@@ -172,7 +174,7 @@
                   type="button"
                   [disabled]="!canPreviewLocation(report) || previewLoading"
                   (click)="previewLocation(report)">
-                  {{ previewLoading ? 'Loading preview...' : 'Preview location' }}
+                  {{ previewLoading ? ('communications.reports.actions.loadingPreview' | t) : ('communications.reports.actions.previewLocation' | t) }}
                 </button>
               }
 
@@ -184,15 +186,15 @@
 
           <div class="overview-stats reports-view__stats-grid" data-tutorial-id="reports-detail-stats">
             <div class="overview-stat">
-              <span class="overview-stat__label">Status</span>
-              <span class="overview-stat__value">{{ report.isRead ? 'Read' : 'Unread' }}</span>
+              <span class="overview-stat__label">{{ 'communications.reports.stats.status' | t }}</span>
+              <span class="overview-stat__value">{{ reportStatusLabel(report.isRead) }}</span>
             </div>
             <div class="overview-stat">
-              <span class="overview-stat__label">Source</span>
+              <span class="overview-stat__label">{{ 'communications.reports.stats.source' | t }}</span>
               <span class="overview-stat__value">{{ sourceLabel(report) }}</span>
             </div>
             <div class="overview-stat">
-              <span class="overview-stat__label">Coordinates</span>
+              <span class="overview-stat__label">{{ 'communications.reports.stats.coordinates' | t }}</span>
               <span class="overview-stat__value">
                 @if (canOpenInGalaxy(report)) {
                   <button
@@ -208,7 +210,7 @@
             </div>
             @if (report.originCoordinates) {
               <div class="overview-stat">
-                <span class="overview-stat__label">Origin</span>
+                <span class="overview-stat__label">{{ 'communications.reports.stats.origin' | t }}</span>
                 <span class="overview-stat__value">
                   @if (canOpenOriginInGalaxy(report)) {
                     <button
@@ -224,12 +226,12 @@
               </div>
             }
             <div class="overview-stat">
-              <span class="overview-stat__label">Sender</span>
-              <span class="overview-stat__value">{{ report.senderPlayerName ?? 'N/A' }}</span>
+              <span class="overview-stat__label">{{ 'communications.reports.stats.sender' | t }}</span>
+              <span class="overview-stat__value">{{ report.senderPlayerName ?? ('communications.shared.labels.noData' | t) }}</span>
             </div>
             @if (previewOwnerLabel(); as ownerLabel) {
               <div class="overview-stat">
-                <span class="overview-stat__label">Owner</span>
+                <span class="overview-stat__label">{{ 'communications.reports.stats.owner' | t }}</span>
                 <span [class]="'overview-stat__value diplomacy-status diplomacy-status--' + previewOwnerRelationKey()">
                   {{ ownerLabel }}
                 </span>
@@ -242,13 +244,13 @@
               <div class="reports-view__dossier">
                 <section class="reports-view__dossier-banner">
                   <div>
-                    <p class="reports-view__dossier-kicker">Espionage Dossier</p>
+                    <p class="reports-view__dossier-kicker">{{ 'communications.reports.dossier.title' | t }}</p>
                     <h4 class="reports-view__dossier-title">{{ espionageReport.sourcePlanetName ?? report.title }}</h4>
                     <p class="reports-view__dossier-copy">{{ dossierCopy(espionageReport) }}</p>
                   </div>
                   <div class="reports-view__dossier-badges">
-                    <span class="badge badge--jump">Scanner Intel</span>
-                    <span class="badge">Turn {{ espionageReport.createdTurn }}</span>
+                    <span class="badge badge--jump">{{ 'communications.reports.dossier.scannerIntel' | t }}</span>
+                    <span class="badge">{{ 'communications.shared.labels.turn' | t }} {{ espionageReport.createdTurn }}</span>
                   </div>
                 </section>
 
@@ -264,8 +266,8 @@
                 <section class="reports-view__dossier-section reports-view__dossier-section--resources">
                   <div class="reports-view__dossier-section-head">
                     <div>
-                      <p class="reports-view__dossier-section-kicker">Cargo Sweep</p>
-                      <h5 class="reports-view__dossier-section-title">Resources on Site</h5>
+                      <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.cargoSweep' | t }}</p>
+                      <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.resourcesOnSite' | t }}</h5>
                     </div>
                   </div>
 
@@ -283,8 +285,8 @@
                   <article class="reports-view__dossier-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">Surface Scan</p>
-                        <h5 class="reports-view__dossier-section-title">Buildings</h5>
+                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.surfaceScan' | t }}</p>
+                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.buildings' | t }}</h5>
                       </div>
                     </div>
 
@@ -298,15 +300,15 @@
                         }
                       </div>
                     } @else {
-                      <p class="reports-view__dossier-empty">No data.</p>
+                      <p class="reports-view__dossier-empty">{{ 'communications.reports.dossier.empty' | t }}</p>
                     }
                   </article>
 
                   <article class="reports-view__dossier-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">Lab Trace</p>
-                        <h5 class="reports-view__dossier-section-title">Technologies</h5>
+                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.labTrace' | t }}</p>
+                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.technologies' | t }}</h5>
                       </div>
                     </div>
 
@@ -320,15 +322,15 @@
                         }
                       </div>
                     } @else {
-                      <p class="reports-view__dossier-empty">No data.</p>
+                      <p class="reports-view__dossier-empty">{{ 'communications.reports.dossier.empty' | t }}</p>
                     }
                   </article>
 
                   <article class="reports-view__dossier-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">Hangar Sweep</p>
-                        <h5 class="reports-view__dossier-section-title">Ships</h5>
+                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.hangarSweep' | t }}</p>
+                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.ships' | t }}</h5>
                       </div>
                     </div>
 
@@ -342,15 +344,15 @@
                         }
                       </div>
                     } @else {
-                      <p class="reports-view__dossier-empty">No data.</p>
+                      <p class="reports-view__dossier-empty">{{ 'communications.reports.dossier.empty' | t }}</p>
                     }
                   </article>
 
                   <article class="reports-view__dossier-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">Perimeter Check</p>
-                        <h5 class="reports-view__dossier-section-title">Defences</h5>
+                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.perimeterCheck' | t }}</p>
+                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.defences' | t }}</h5>
                       </div>
                     </div>
 
@@ -364,15 +366,15 @@
                         }
                       </div>
                     } @else {
-                      <p class="reports-view__dossier-empty">No data.</p>
+                      <p class="reports-view__dossier-empty">{{ 'communications.reports.dossier.empty' | t }}</p>
                     }
                   </article>
 
                   <article class="reports-view__dossier-section reports-view__dossier-section--wide">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">Profile</p>
-                        <h5 class="reports-view__dossier-section-title">Profile</h5>
+                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.profileKicker' | t }}</p>
+                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.profile' | t }}</h5>
                       </div>
                     </div>
 
@@ -398,21 +400,21 @@
               <div class="reports-view__plain-report">
                 <section class="reports-view__plain-banner">
                   <div>
-                    <p class="reports-view__dossier-kicker">Report Record</p>
+                    <p class="reports-view__dossier-kicker">{{ 'communications.reports.plain.title' | t }}</p>
                     <h4 class="reports-view__dossier-title">{{ report.title }}</h4>
-                    <p class="reports-view__dossier-copy">Structured display of the original report text. The underlying report body is unchanged.</p>
+                    <p class="reports-view__dossier-copy">{{ 'communications.reports.plain.copy' | t }}</p>
                   </div>
                   <div class="reports-view__dossier-badges">
-                    <span class="badge badge--jump">{{ report.reportType }}</span>
-                    <span class="badge">Turn {{ report.createdTurn }}</span>
+                    <span class="badge badge--jump">{{ reportTypeLabel(report.reportType) }}</span>
+                    <span class="badge">{{ 'communications.shared.labels.turn' | t }} {{ report.createdTurn }}</span>
                   </div>
                 </section>
 
                 <section class="reports-view__plain-section">
                   <div class="reports-view__dossier-section-head">
                     <div>
-                      <p class="reports-view__dossier-section-kicker">Header</p>
-                      <h5 class="reports-view__dossier-section-title">Metadata</h5>
+                      <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.plain.sections.header' | t }}</p>
+                      <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.plain.sections.metadata' | t }}</h5>
                     </div>
                   </div>
                   <div class="reports-view__dossier-list reports-view__dossier-list--parameters">
@@ -429,7 +431,7 @@
                   <section class="reports-view__plain-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">Log</p>
+                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.plain.sections.log' | t }}</p>
                         <h5 class="reports-view__dossier-section-title">{{ section.title }}</h5>
                       </div>
                     </div>
@@ -465,13 +467,12 @@
           </section>
         } @else {
           <div class="reports-view__empty-detail">
-            <h3>Select a report</h3>
-            <p class="overview-muted">Choose an inbox entry to inspect its full content and preview its coordinates when planet data is available.</p>
+            <h3>{{ 'communications.reports.detail.title' | t }}</h3>
+            <p class="overview-muted">{{ 'communications.reports.detail.body' | t }}</p>
           </div>
         }
       </section>
     </section>
   }
 </section>
-
 

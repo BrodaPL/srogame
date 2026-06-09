@@ -5,6 +5,9 @@ import { finalize } from 'rxjs';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nPipe } from '../../i18n/i18n.pipe';
+import { I18nService } from '../../i18n/i18n.service';
 import {
   ClientPlanetDto,
   DiplomacyContactDto,
@@ -15,13 +18,12 @@ import {
   SupportRequestType
 } from '../../models/game-api-types';
 import {
-  bombardmentPriorityLabel,
   BombardmentPriorities,
   BombardmentPrioritySelection,
   BombardmentPriorityTarget,
   emptyBombardmentPriorities
 } from '../../models/bombardment/bombardment-priority';
-import { diplomacyStatusLabel, diplomacyVisualKey, ownerLabelWithDiplomacy } from '../../models/diplomacy/diplomacy-display';
+import { diplomacyStatusLabel, diplomacyVisualKey } from '../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { allowedDiplomaticProposalStatuses } from '../../models/diplomacy/diplomatic-proposal-rules';
 import { BuildingType } from '../../models/enums/building-type';
@@ -46,7 +48,7 @@ const BOMBARDMENT_PRIORITY_OPTIONS: BombardmentPrioritySelection[] = [
 
 @Component({
   selector: 'app-diplomacy-view',
-  imports: [FormsModule, RouterLink, TopMenuComponent, MiniPlanetPreviewComponent, MessageComposeDialogComponent],
+  imports: [FormsModule, RouterLink, TopMenuComponent, MiniPlanetPreviewComponent, MessageComposeDialogComponent, I18nPipe],
   templateUrl: './diplomacy-view.component.html',
   styleUrl: './diplomacy-view.component.css'
 })
@@ -80,7 +82,8 @@ export class DiplomacyViewComponent implements OnInit {
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly tutorialService: TutorialService
+    private readonly tutorialService: TutorialService,
+    private readonly i18n: I18nService
   ) {}
 
   public ngOnInit(): void {
@@ -105,6 +108,14 @@ export class DiplomacyViewComponent implements OnInit {
 
   protected visibleContactCountLabel(): string {
     return `${this.visibleContactCount()}/${this.contacts.length}`;
+  }
+
+  protected playerTypeLabel(playerType: string): string {
+    return this.i18n.t(`communications.shared.playerTypes.${playerType}`);
+  }
+
+  protected supportTypeDisplayLabel(supportType: string): string {
+    return this.i18n.t(`communications.shared.supportTypes.${supportType}`);
   }
 
   protected selectContact(contact: DiplomacyContactDto): void {
@@ -137,18 +148,20 @@ export class DiplomacyViewComponent implements OnInit {
 
   protected proposalAvailabilityCopy(contact: DiplomacyContactDto): string {
     if (contact.canSendProposal) {
-      return 'Send one diplomacy action to this player this turn. WAR declarations apply immediately; treaties require acceptance.';
+      return this.i18n.t('communications.diplomacy.treaty.availableCopy');
     }
 
-    return contact.proposalBlockedReason ?? 'Diplomacy proposals are unavailable for this contact.';
+    return contact.proposalBlockedReason ?? this.i18n.t('communications.diplomacy.treaty.unavailableCopy');
   }
 
   protected proposalActionLabel(contact: DiplomacyContactDto): string {
     if (this.isContactActionPending(contact)) {
-      return 'Sending...';
+      return this.i18n.t('communications.diplomacy.treaty.sending');
     }
 
-    return this.selectedProposalStatus(contact) === DiplomaticStatus.WAR ? 'Declare war' : 'Send proposal';
+    return this.selectedProposalStatus(contact) === DiplomaticStatus.WAR
+      ? this.i18n.t('communications.diplomacy.treaty.declareWar')
+      : this.i18n.t('communications.diplomacy.treaty.sendProposal');
   }
 
   protected availableSupportTypes(contact: DiplomacyContactDto): SupportRequestType[] {
@@ -184,14 +197,14 @@ export class DiplomacyViewComponent implements OnInit {
 
   protected supportAvailabilityCopy(contact: DiplomacyContactDto): string {
     if (this.availableSupportTypes(contact).length <= 0) {
-      return 'Support requests are available only for PEACE and ALLIED contacts.';
+      return this.i18n.t('communications.diplomacy.support.unavailableCopy');
     }
 
     if (this.supportNeedsOffensiveTarget(contact)) {
-      return 'Offensive support requests target known hostile planets, carry minimum ship requirements, and after acceptance wait up to 3 turns for auto-launch.';
+      return this.i18n.t('communications.diplomacy.support.offensiveCopy');
     }
 
-    return 'Requests are created here and resolved through Mail. Resource support allows partial approval; all support requests expire after 2 turns.';
+    return this.i18n.t('communications.diplomacy.support.defaultCopy');
   }
 
   protected supportNeedsResources(contact: DiplomacyContactDto): boolean {
@@ -338,17 +351,23 @@ export class DiplomacyViewComponent implements OnInit {
   }
 
   protected supportPriorityLabel(priority: BombardmentPrioritySelection): string {
-    return bombardmentPriorityLabel(priority);
+    if (Object.values(BombardmentPriorityTarget).includes(priority as BombardmentPriorityTarget)) {
+      return this.i18n.t(`communications.shared.bombardmentPriorities.${priority}`);
+    }
+
+    return priority;
   }
 
   protected supportTargetPrompt(contact: DiplomacyContactDto): string {
-    return this.supportNeedsFriendlyTarget(contact) ? 'Target own planet' : 'Requested hostile target';
+    return this.supportNeedsFriendlyTarget(contact)
+      ? this.i18n.t('communications.diplomacy.support.targetOwnPlanet')
+      : this.i18n.t('communications.diplomacy.support.targetHostilePlanet');
   }
 
   protected supportTargetLabel(planet: ClientPlanetDto): string {
     const ownerStatus = this.planetDiplomaticStatus(planet);
     const owner = planet.info.ownerPlayerName
-      ? `${ownerLabelWithDiplomacy(planet.info.ownerPlayerName, ownerStatus)} - `
+      ? `${this.ownerLabelWithStatus(planet.info.ownerPlayerName, ownerStatus)} - `
       : '';
     return `${owner}${planet.basicInfo.name} (${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z})`;
   }
@@ -366,7 +385,7 @@ export class DiplomacyViewComponent implements OnInit {
   }
 
   protected contactStatusLabel(contact: DiplomacyContactDto): string {
-    return `${contact.playerType} | ${diplomacyStatusLabel(contact.currentStatus)}`;
+    return `${this.playerTypeLabel(contact.playerType)} | ${this.diplomacyStatusLabel(contact.currentStatus)}`;
   }
 
   protected diplomacyBadgeClass(status: DiplomaticStatus): string {
@@ -374,7 +393,7 @@ export class DiplomacyViewComponent implements OnInit {
   }
 
   protected diplomacyStatusLabel(status: DiplomaticStatus): string {
-    return diplomacyStatusLabel(status);
+    return this.i18n.t(`communications.shared.diplomaticStatuses.${diplomacyStatusLabel(status)}`);
   }
 
   protected diplomacyStatusTextClass(status: DiplomaticStatus): string {
@@ -382,13 +401,16 @@ export class DiplomacyViewComponent implements OnInit {
   }
 
   protected contactMetaLabel(contact: DiplomacyContactDto): string {
-    return `${contact.knownPlanets.length} known planet(s)`;
+    const key = contact.knownPlanets.length === 1
+      ? 'communications.diplomacy.contacts.knownPlanetsOne'
+      : 'communications.diplomacy.contacts.knownPlanetsMany';
+    return this.i18n.t(key, { count: contact.knownPlanets.length });
   }
 
   protected proposalCounterpartyLabel(proposal: DiplomaticProposalDto): string {
     return proposal.direction === 'incoming'
-      ? `From ${proposal.fromPlayerName}`
-      : `To ${proposal.toPlayerName}`;
+      ? this.i18n.t('communications.diplomacy.proposals.from', { player: proposal.fromPlayerName })
+      : this.i18n.t('communications.diplomacy.proposals.to', { player: proposal.toPlayerName });
   }
 
   protected isContactActionPending(contact: DiplomacyContactDto): boolean {
@@ -397,8 +419,12 @@ export class DiplomacyViewComponent implements OnInit {
 
   protected proposalMailActionLabel(proposal: DiplomaticProposalDto): string {
     return proposal.direction === 'incoming'
-      ? 'Open Mail to answer'
-      : 'Open Mail to review';
+      ? this.i18n.t('communications.diplomacy.proposals.answerInMail')
+      : this.i18n.t('communications.diplomacy.proposals.reviewInMail');
+  }
+
+  protected ownerLabelWithStatus(playerName: string, status: DiplomaticStatus | null): string {
+    return status ? `${playerName} (${this.diplomacyStatusLabel(status)})` : playerName;
   }
 
   protected sendProposal(contact: DiplomacyContactDto): void {
@@ -408,7 +434,7 @@ export class DiplomacyViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.actionError = 'No player session found.';
+      this.actionError = this.i18n.t('communications.diplomacy.errors.noSession');
       return;
     }
 
@@ -433,7 +459,11 @@ export class DiplomacyViewComponent implements OnInit {
           this.applyViewResponse(response);
         },
         error: (error) => {
-          this.actionError = error?.error?.error ?? 'Unable to send diplomacy proposal.';
+          this.actionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.diplomacy.errors.sendDiplomacyProposal')
+          );
         }
       });
   }
@@ -445,14 +475,14 @@ export class DiplomacyViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.actionError = 'No player session found.';
+      this.actionError = this.i18n.t('communications.diplomacy.errors.noSession');
       return;
     }
 
     const targetPlanet = this.availableSupportTargetPlanets(contact)
       .find((planet) => this.planetKey(planet) === this.selectedSupportTargetPlanetKey(contact));
     if (!targetPlanet) {
-      this.actionError = 'Select a target planet for support.';
+      this.actionError = this.i18n.t('communications.diplomacy.errors.selectTargetPlanet');
       return;
     }
 
@@ -487,10 +517,14 @@ export class DiplomacyViewComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.applyViewResponse(response);
-          this.actionSuccess = 'Support request sent.';
+          this.actionSuccess = this.i18n.t('communications.diplomacy.success.supportSent');
         },
         error: (error) => {
-          this.actionError = error?.error?.error ?? 'Unable to send support request.';
+          this.actionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.diplomacy.errors.sendSupportRequest')
+          );
         }
       });
   }
@@ -513,14 +547,16 @@ export class DiplomacyViewComponent implements OnInit {
 
   protected handleComposerSent(event: { deliveredCount: number }): void {
     this.actionSuccess = event.deliveredCount === 1
-      ? `Message sent to ${this.composerLockedTargetPlayerName ?? 'recipient'}.`
-      : `Message sent to ${event.deliveredCount} recipients.`;
+      ? this.i18n.t('communications.diplomacy.success.messageSentSingle', {
+        recipient: this.composerLockedTargetPlayerName ?? this.i18n.t('communications.shared.labels.unknown')
+      })
+      : this.i18n.t('communications.diplomacy.success.messageSentMany', { count: event.deliveredCount });
   }
 
   private loadDiplomacyView(): void {
     const session = this.playerSession.load();
     if (!session) {
-      this.loadError = 'No player session found.';
+      this.loadError = this.i18n.t('communications.diplomacy.errors.noSession');
       return;
     }
 
@@ -538,7 +574,11 @@ export class DiplomacyViewComponent implements OnInit {
           this.applyViewResponse(response);
         },
         error: (error) => {
-          this.loadError = error?.error?.error ?? 'Unable to load diplomacy data.';
+          this.loadError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.diplomacy.errors.load')
+          );
         }
       });
   }

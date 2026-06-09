@@ -1,56 +1,56 @@
-<app-top-menu></app-top-menu>
+﻿<app-top-menu></app-top-menu>
 
 <section class="mail-view">
   @if (isLoading) {
     <section class="status status--info">
-      <h3>Loading Mail</h3>
-      <p>Messages and request queues are being synchronized.</p>
+      <h3>{{ 'communications.mail.loading.title' | t }}</h3>
+      <p>{{ 'communications.mail.loading.body' | t }}</p>
     </section>
   } @else if (loadError) {
     <section class="status status--error">
-      <h3>Mail unavailable</h3>
+      <h3>{{ 'communications.mail.unavailable.title' | t }}</h3>
       <p>{{ loadError }}</p>
     </section>
   } @else {
     @if (actionError) {
       <section class="status status--error mail-view__status">
-        <h3>Mail action failed</h3>
+        <h3>{{ 'communications.mail.status.actionFailed' | t }}</h3>
         <p>{{ actionError }}</p>
       </section>
     }
 
     @if (actionSuccess) {
       <section class="status status--success mail-view__status">
-        <h3>Mail updated</h3>
+        <h3>{{ 'communications.mail.status.updated' | t }}</h3>
         <p>{{ actionSuccess }}</p>
       </section>
     }
 
     <header class="overview-card mail-view__header">
       <div>
-        <p class="eyebrow">Communications</p>
-        <h1>Mail</h1>
+        <p class="eyebrow">{{ 'communications.mail.header.eyebrow' | t }}</p>
+        <h1>{{ 'communications.mail.header.title' | t }}</h1>
       </div>
       <div class="mail-view__summary">
-        <span>Turn {{ currentTurn ?? '--' }}</span>
-        <span>{{ unreadMessages().length }} unread</span>
-        <span>{{ actionRequiredRequests().length }} action required</span>
+        <span>{{ 'communications.shared.labels.turn' | t }} {{ currentTurn ?? '--' }}</span>
+        <span>{{ 'communications.mail.header.unread' | t:{ count: unreadMessages().length } }}</span>
+        <span>{{ 'communications.mail.header.actionRequired' | t:{ count: actionRequiredRequests().length } }}</span>
       </div>
       <button
         type="button"
         class="mail-view__button mail-view__button--primary"
         data-tutorial-id="mail-compose-action"
         (click)="openNewMessageComposer()">
-        Send message
+        {{ 'communications.shared.actions.sendMessage' | t }}
       </button>
     </header>
 
     <section class="mail-view__console">
       <aside class="overview-card mail-view__folders">
         <div class="mail-view__pane-head">
-          <h3>Folders</h3>
+          <h3>{{ 'communications.mail.folders.title' | t }}</h3>
         </div>
-        <nav class="mail-view__folder-list" aria-label="Mail folders">
+        <nav class="mail-view__folder-list" [attr.aria-label]="'communications.mail.folders.title' | t">
           @for (folder of mailFolders(); track folder.id) {
             <button
               type="button"
@@ -71,12 +71,12 @@
         <div class="mail-view__pane-head">
           <div>
             <h3>{{ activeFolder().label }}</h3>
-            <p class="overview-muted">{{ activeFolder().count }} item(s)</p>
+            <p class="overview-muted">{{ folderItemCountLabel(activeFolder().count) }}</p>
           </div>
         </div>
 
         @if (visibleItems().length === 0) {
-          <p class="overview-empty">No items in this folder.</p>
+          <p class="overview-empty">{{ 'communications.mail.folders.empty' | t }}</p>
         } @else {
           <div class="mail-view__item-list">
             @for (item of visibleItems(); track item.key) {
@@ -103,7 +103,7 @@
           @if (item.request; as request) {
             <div class="mail-view__detail-head">
               <div>
-                <p class="eyebrow">{{ request.direction === 'incoming' ? 'Incoming request' : 'Outgoing request' }}</p>
+                <p class="eyebrow">{{ (request.direction === 'incoming' ? 'communications.mail.requestCards.incomingEyebrow' : 'communications.mail.requestCards.outgoingEyebrow') | t }}</p>
                 <h3>{{ requestCardTitle(request) }}</h3>
               </div>
               <span [class]="requestBadgeClass(request)">{{ requestBadge(request) }}</span>
@@ -122,11 +122,11 @@
               @if (maintenanceRequest(request); as maintenance) {
                 <section class="mail-view__partial-approval">
                   <div class="mail-view__partial-head">
-                    <h4>Partial maintenance approval</h4>
-                    <button type="button" class="mail-view__text-button" (click)="closePartialApproval()">Close</button>
+                    <h4>{{ 'communications.mail.partialApproval.maintenanceTitle' | t }}</h4>
+                    <button type="button" class="mail-view__text-button" (click)="closePartialApproval()">{{ 'communications.mail.partialApproval.close' | t }}</button>
                   </div>
                   <label class="mail-view__partial-field">
-                    <span>Fuel (deuterium)</span>
+                    <span>{{ 'communications.mail.partialApproval.fuel' | t }}</span>
                     <input
                       type="number"
                       min="0"
@@ -137,10 +137,10 @@
 
                   @if (maintenance.requested.ships.length > 0) {
                     <div class="mail-view__partial-group">
-                      <h5>Ships</h5>
+                      <h5>{{ 'communications.mail.partialApproval.ships' | t }}</h5>
                       @for (entry of maintenance.requested.ships; track entry.type) {
                         <label class="mail-view__partial-field">
-                          <span>{{ entry.type }} (max {{ entry.amount }})</span>
+                          <span>{{ 'communications.mail.partialApproval.maxAmount' | t:{ type: entry.type, amount: entry.amount } }}</span>
                           <input
                             type="number"
                             min="0"
@@ -154,10 +154,10 @@
 
                   @if (maintenance.requested.bombs.length > 0) {
                     <div class="mail-view__partial-group">
-                      <h5>Bombs</h5>
+                      <h5>{{ 'communications.mail.partialApproval.bombs' | t }}</h5>
                       @for (entry of maintenance.requested.bombs; track entry.type) {
                         <label class="mail-view__partial-field">
-                          <span>{{ entry.type }} (max {{ entry.amount }})</span>
+                          <span>{{ 'communications.mail.partialApproval.maxAmount' | t:{ type: entry.type, amount: entry.amount } }}</span>
                           <input
                             type="number"
                             min="0"
@@ -174,7 +174,7 @@
                     class="mail-view__button mail-view__button--primary"
                     [disabled]="isRequestActionPending(request)"
                     (click)="submitPartialApproval(maintenance)">
-                    Send partial approval
+                    {{ 'communications.mail.partialApproval.send' | t }}
                   </button>
                 </section>
               }
@@ -183,11 +183,11 @@
                 @if (support.supportType === 'RESOURCE_SUPPORT') {
                   <section class="mail-view__partial-approval">
                     <div class="mail-view__partial-head">
-                      <h4>Partial resource approval</h4>
-                      <button type="button" class="mail-view__text-button" (click)="closePartialApproval()">Close</button>
+                      <h4>{{ 'communications.mail.partialApproval.resourceTitle' | t }}</h4>
+                      <button type="button" class="mail-view__text-button" (click)="closePartialApproval()">{{ 'communications.mail.partialApproval.close' | t }}</button>
                     </div>
                     <label class="mail-view__partial-field">
-                      <span>Metal</span>
+                      <span>{{ 'communications.mail.partialApproval.metal' | t }}</span>
                       <input
                         type="number"
                         min="0"
@@ -196,7 +196,7 @@
                         (ngModelChange)="updatePartialResourceMetal($event)" />
                     </label>
                     <label class="mail-view__partial-field">
-                      <span>Crystal</span>
+                      <span>{{ 'communications.mail.partialApproval.crystal' | t }}</span>
                       <input
                         type="number"
                         min="0"
@@ -205,7 +205,7 @@
                         (ngModelChange)="updatePartialResourceCrystal($event)" />
                     </label>
                     <label class="mail-view__partial-field">
-                      <span>Deuterium</span>
+                      <span>{{ 'communications.mail.partialApproval.deuterium' | t }}</span>
                       <input
                         type="number"
                         min="0"
@@ -218,7 +218,7 @@
                       class="mail-view__button mail-view__button--primary"
                       [disabled]="isRequestActionPending(request)"
                       (click)="submitPartialApproval(support)">
-                      Send partial approval
+                      {{ 'communications.mail.partialApproval.send' | t }}
                     </button>
                   </section>
                 }
@@ -232,7 +232,7 @@
                   class="mail-view__button mail-view__button--primary"
                   [disabled]="isRequestActionPending(request)"
                   (click)="acceptRequest(request)">
-                  Accept
+                  {{ 'communications.shared.actions.accept' | t }}
                 </button>
               }
               @if (canPartialApprove(request)) {
@@ -241,7 +241,7 @@
                   class="mail-view__button"
                   [disabled]="isRequestActionPending(request)"
                   (click)="isPartialApprovalOpen(request) ? closePartialApproval() : openPartialApproval(request)">
-                  {{ isPartialApprovalOpen(request) ? 'Close partial' : 'Partial approve' }}
+                  {{ (isPartialApprovalOpen(request) ? 'communications.mail.actions.closePartial' : 'communications.mail.actions.partialApprove') | t }}
                 </button>
               }
               @if (canReject(request)) {
@@ -250,7 +250,7 @@
                   class="mail-view__button mail-view__button--danger"
                   [disabled]="isRequestActionPending(request)"
                   (click)="rejectRequest(request)">
-                  Reject
+                  {{ 'communications.shared.actions.reject' | t }}
                 </button>
               }
               @if (canCancel(request)) {
@@ -259,7 +259,7 @@
                   class="mail-view__button mail-view__button--danger"
                   [disabled]="isRequestActionPending(request)"
                   (click)="cancelRequest(request)">
-                  Cancel
+                  {{ 'communications.shared.actions.cancel' | t }}
                 </button>
               }
               @if (canDeleteResolvedRequest(request)) {
@@ -268,7 +268,7 @@
                   class="mail-view__button"
                   [disabled]="isDeletingRequest(request)"
                   (click)="deleteResolvedRequest(request)">
-                  Delete history item
+                  {{ 'communications.mail.actions.deleteHistoryItem' | t }}
                 </button>
               }
             </div>
@@ -277,15 +277,15 @@
           @if (item.message; as message) {
             <div class="mail-view__detail-head">
               <div>
-                <p class="eyebrow">Message</p>
+                <p class="eyebrow">{{ 'communications.mail.message.eyebrow' | t }}</p>
                 <h3>{{ message.title }}</h3>
               </div>
-              <span [class]="message.isRead ? 'badge' : 'badge badge--jump'">{{ message.isRead ? 'Read' : 'Unread' }}</span>
+              <span [class]="message.isRead ? 'badge' : 'badge badge--jump'">{{ message.isRead ? ('communications.mail.message.read' | t) : ('communications.mail.message.unread' | t) }}</span>
             </div>
 
             <div class="mail-view__message-meta">
-              <span>From {{ senderLabel(message) }}</span>
-              <span>Turn {{ message.createdTurn }}</span>
+              <span>{{ 'communications.mail.message.from' | t:{ sender: senderLabel(message) } }}</span>
+              <span>{{ 'communications.shared.labels.turn' | t }} {{ message.createdTurn }}</span>
             </div>
 
             <div class="mail-view__message-body">{{ message.body }}</div>
@@ -296,21 +296,21 @@
                 class="mail-view__button mail-view__button--primary"
                 [disabled]="!canReply(message)"
                 (click)="openReplyComposer(message)">
-                Reply
+                {{ 'communications.shared.actions.reply' | t }}
               </button>
               <button
                 type="button"
                 class="mail-view__button mail-view__button--danger"
                 [disabled]="activeMessageDeleteId === message.messageId"
                 (click)="deleteMessage(message)">
-                Delete
+                {{ 'communications.shared.actions.delete' | t }}
               </button>
             </div>
           }
         } @else {
           <div class="mail-view__empty-detail">
-            <h3>No mail selected</h3>
-            <p class="overview-muted">Choose a folder item to inspect details and available actions.</p>
+            <h3>{{ 'communications.mail.message.noSelectionTitle' | t }}</h3>
+            <p class="overview-muted">{{ 'communications.mail.message.noSelectionBody' | t }}</p>
           </div>
         }
       </section>
@@ -324,11 +324,12 @@
   [allianceRecipientCount]="allianceRecipientCount"
   [lockedTargetPlayerId]="composerLockedTargetPlayerId"
   [lockedTargetPlayerName]="composerLockedTargetPlayerName"
-  [initialTitle]="composerInitialTitle"
-  [initialBody]="composerInitialBody"
-  [allowAlliance]="composerAllowAlliance"
   [titleText]="composerTitleText"
   [submitLabel]="composerSubmitLabel"
+  [allowAlliance]="composerAllowAlliance"
+  [initialTitle]="composerInitialTitle"
+  [initialBody]="composerInitialBody"
   (closed)="closeComposer()"
   (sent)="handleComposerSent($event)">
 </app-message-compose-dialog>
+

@@ -4,8 +4,11 @@ import { finalize } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nPipe } from '../../i18n/i18n.pipe';
+import { I18nService } from '../../i18n/i18n.service';
 import { ClientPlanetDto } from '../../models/game-api-types';
-import { diplomacyVisualKey, ownerLabelWithDiplomacy, type DiplomacyVisualKey } from '../../models/diplomacy/diplomacy-display';
+import { diplomacyVisualKey, type DiplomacyVisualKey } from '../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { ReportType } from '../../models/enums/report-type';
 import { EspionageReportData } from '../../models/reports/espionage-report-data';
@@ -41,7 +44,7 @@ type PlainReportSection = {
 
 @Component({
   selector: 'app-reports-view',
-  imports: [TopMenuComponent, MiniPlanetPreviewComponent, TooltipDirective],
+  imports: [TopMenuComponent, MiniPlanetPreviewComponent, TooltipDirective, I18nPipe],
   templateUrl: './reports-view.component.html'
 })
 export class ReportsViewComponent implements OnInit {
@@ -67,7 +70,8 @@ export class ReportsViewComponent implements OnInit {
     private readonly tutorialService: TutorialService,
     private readonly authState: AuthStateService,
     private readonly router: Router,
-    private readonly gameState: GameStateService
+    private readonly gameState: GameStateService,
+    private readonly i18n: I18nService
   ) {}
 
   public ngOnInit(): void {
@@ -100,6 +104,46 @@ export class ReportsViewComponent implements OnInit {
 
   protected asEspionageReport(report: PlayerReport | null): EspionageReportData | null {
     return report instanceof EspionageReportData ? report : null;
+  }
+
+  protected reportTabLabel(reportType: ReportType | 'All'): string {
+    if (reportType === this.allTab) {
+      return this.i18n.t('communications.reports.tabs.all');
+    }
+
+    return this.reportTypeLabel(reportType);
+  }
+
+  protected visibleReportCountLabel(): string {
+    const count = this.visibleReports().length;
+    const key = count === 1
+      ? 'communications.reports.inbox.visibleCountOne'
+      : 'communications.reports.inbox.visibleCountMany';
+    return this.i18n.t(key, { count });
+  }
+
+  protected selectedCountLabel(): string {
+    return this.i18n.t('communications.reports.inbox.selectedCount', { count: this.selectedReportIds.size });
+  }
+
+  protected favouriteTooltip(isFavourite: boolean): string {
+    return this.i18n.t(isFavourite
+      ? 'communications.reports.tooltips.favouriteOn'
+      : 'communications.reports.tooltips.favouriteOff');
+  }
+
+  protected favouriteAriaLabel(isFavourite: boolean): string {
+    return this.favouriteTooltip(isFavourite);
+  }
+
+  protected reportStatusLabel(isRead: boolean): string {
+    return this.i18n.t(isRead
+      ? 'communications.reports.badges.read'
+      : 'communications.reports.badges.unread');
+  }
+
+  protected ownerLabelWithStatus(ownerName: string, status: DiplomaticStatus | null): string {
+    return status ? `${ownerName} (${this.localizedDiplomaticStatus(status)})` : ownerName;
   }
 
   protected setActiveTab(reportType: ReportType | 'All'): void {
@@ -162,7 +206,7 @@ export class ReportsViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.actionError = 'No player session found.';
+      this.actionError = this.i18n.t('communications.reports.errors.noSession');
       return;
     }
 
@@ -193,8 +237,12 @@ export class ReportsViewComponent implements OnInit {
             this.selectedReportIds.delete(existingReport.reportId);
           }
         },
-        error: () => {
-          this.actionError = 'Unable to update favourite marker.';
+        error: (error) => {
+          this.actionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.reports.errors.favouriteUpdate')
+          );
         }
       });
   }
@@ -217,7 +265,7 @@ export class ReportsViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.actionError = 'No player session found.';
+      this.actionError = this.i18n.t('communications.reports.errors.noSession');
       return;
     }
 
@@ -228,8 +276,12 @@ export class ReportsViewComponent implements OnInit {
           this.syncUnreadReportCount();
           this.cdr.markForCheck();
         },
-        error: () => {
-          this.actionError = 'Unable to mark report as read.';
+        error: (error) => {
+          this.actionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.reports.errors.markRead')
+          );
           this.cdr.markForCheck();
         }
       });
@@ -293,7 +345,7 @@ export class ReportsViewComponent implements OnInit {
     }
 
     if (!this.canPreviewLocation(report)) {
-      this.previewError = 'Planet preview is unavailable for this report.';
+      this.previewError = this.i18n.t('communications.reports.preview.unavailable');
       this.previewPlanet = null;
       return;
     }
@@ -305,7 +357,7 @@ export class ReportsViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.previewError = 'No player session found.';
+      this.previewError = this.i18n.t('communications.reports.errors.noSession');
       return;
     }
 
@@ -323,8 +375,12 @@ export class ReportsViewComponent implements OnInit {
         next: (planet) => {
           this.previewPlanet = planet;
         },
-        error: () => {
-          this.previewError = 'Unable to load the planet preview.';
+        error: (error) => {
+          this.previewError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.reports.preview.failed')
+          );
         }
       });
   }
@@ -344,7 +400,7 @@ export class ReportsViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.actionError = 'No player session found.';
+      this.actionError = this.i18n.t('communications.reports.errors.noSession');
       return;
     }
 
@@ -377,18 +433,22 @@ export class ReportsViewComponent implements OnInit {
             this.syncUnreadReportCount();
           }
         },
-        error: () => {
-          this.actionError = 'Unable to delete selected reports.';
+        error: (error) => {
+          this.actionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.reports.errors.deleteSelected')
+          );
         }
       });
   }
 
   protected coordinatesLabel(report: PlayerReport): string {
-    return report.coordinatesLabel() ?? 'No coordinates';
+    return report.coordinatesLabel() ?? this.i18n.t('communications.reports.errors.noCoordinates');
   }
 
   protected originCoordinatesLabel(report: PlayerReport): string {
-    return report.originCoordinatesLabel() ?? 'No origin coordinates';
+    return report.originCoordinatesLabel() ?? this.i18n.t('communications.reports.errors.noOriginCoordinates');
   }
 
   protected originLabel(report: PlayerReport): string {
@@ -410,7 +470,7 @@ export class ReportsViewComponent implements OnInit {
       return sourceParts.join(' | ');
     }
 
-    return report.senderPlayerName ?? 'No source metadata';
+    return report.senderPlayerName ?? this.i18n.t('communications.reports.errors.noSourceMetadata');
   }
 
   protected previewOwnerLabel(): string | null {
@@ -418,10 +478,7 @@ export class ReportsViewComponent implements OnInit {
       return null;
     }
 
-    return ownerLabelWithDiplomacy(
-      this.previewPlanet.info.ownerPlayerName,
-      this.previewOwnerStatus()
-    );
+    return this.ownerLabelWithStatus(this.previewPlanet.info.ownerPlayerName, this.previewOwnerStatus());
   }
 
   protected previewOwnerRelationKey(): DiplomacyVisualKey | 'none' {
@@ -431,27 +488,27 @@ export class ReportsViewComponent implements OnInit {
 
   protected espionageSummaryMetrics(report: EspionageReportData): ReportDossierMetric[] {
     return [
-      { label: 'Avg building', value: this.formatMetricValue(report.averageBuildingLevel) },
-      { label: 'Avg tech', value: this.formatMetricValue(report.averageTechLevel) },
-      { label: 'Avg resources', value: this.formatMetricValue(report.averageTotalResources) },
-      { label: 'Total ships', value: this.formatMetricValue(report.totalShipsAmount) },
-      { label: 'Total defences', value: this.formatMetricValue(report.totalDefencesAmount) },
-      { label: 'Known structures', value: this.formatMetricValue(report.buildingsLevels.size) }
+      { label: this.i18n.t('communications.reports.rowLabels.avgBuilding'), value: this.formatMetricValue(report.averageBuildingLevel) },
+      { label: this.i18n.t('communications.reports.rowLabels.avgTech'), value: this.formatMetricValue(report.averageTechLevel) },
+      { label: this.i18n.t('communications.reports.rowLabels.avgResources'), value: this.formatMetricValue(report.averageTotalResources) },
+      { label: this.i18n.t('communications.reports.rowLabels.totalShips'), value: this.formatMetricValue(report.totalShipsAmount) },
+      { label: this.i18n.t('communications.reports.rowLabels.totalDefences'), value: this.formatMetricValue(report.totalDefencesAmount) },
+      { label: this.i18n.t('communications.reports.rowLabels.knownStructures'), value: this.formatMetricValue(report.buildingsLevels.size) }
     ];
   }
 
   protected espionageResourceRows(report: EspionageReportData): ReportDossierRow[] {
     const rows: ReportDossierRow[] = [
-      { label: 'Metal', value: this.formatMetricValue(report.resourcesAmount.metal) },
-      { label: 'Crystal', value: this.formatMetricValue(report.resourcesAmount.crystal) },
-      { label: 'Deuterium', value: this.formatMetricValue(report.resourcesAmount.deuterium) }
+      { label: this.i18n.t('communications.reports.rowLabels.metal'), value: this.formatMetricValue(report.resourcesAmount.metal) },
+      { label: this.i18n.t('communications.reports.rowLabels.crystal'), value: this.formatMetricValue(report.resourcesAmount.crystal) },
+      { label: this.i18n.t('communications.reports.rowLabels.deuterium'), value: this.formatMetricValue(report.resourcesAmount.deuterium) }
     ];
 
     if (report.spaceDebrisAmount.getTotalResourceAmount() > 0) {
       rows.push(
-        { label: 'Debris Metal', value: this.formatMetricValue(report.spaceDebrisAmount.metal) },
-        { label: 'Debris Crystal', value: this.formatMetricValue(report.spaceDebrisAmount.crystal) },
-        { label: 'Debris Deuterium', value: this.formatMetricValue(report.spaceDebrisAmount.deuterium) }
+        { label: this.i18n.t('communications.reports.rowLabels.debrisMetal'), value: this.formatMetricValue(report.spaceDebrisAmount.metal) },
+        { label: this.i18n.t('communications.reports.rowLabels.debrisCrystal'), value: this.formatMetricValue(report.spaceDebrisAmount.crystal) },
+        { label: this.i18n.t('communications.reports.rowLabels.debrisDeuterium'), value: this.formatMetricValue(report.spaceDebrisAmount.deuterium) }
       );
     }
 
@@ -481,22 +538,24 @@ export class ReportsViewComponent implements OnInit {
     const parameters = report.planetaryParameters;
 
     return [
-      { label: 'Size', value: this.formatMetricValue(report.size) },
-      { label: 'Diff.', value: this.formatMetricValue(report.diff) },
-      { label: 'Metal modifier', value: this.formatPlanetaryParameterPercent(parameters.metalModifier), tone: this.parameterTone(parameters.metalModifier) },
-      { label: 'Crystal modifier', value: this.formatPlanetaryParameterPercent(parameters.crystalModifier), tone: this.parameterTone(parameters.crystalModifier) },
-      { label: 'Deuterium modifier', value: this.formatPlanetaryParameterPercent(parameters.deuteriumModifier), tone: this.parameterTone(parameters.deuteriumModifier) },
-      { label: 'Energy modifier RES', value: this.formatPlanetaryParameterPercent(parameters.energyModifierRES), tone: this.parameterTone(parameters.energyModifierRES) },
-      { label: 'Energy modifier Nuclear', value: this.formatPlanetaryParameterPercent(parameters.energyModifierNuclear), tone: this.parameterTone(parameters.energyModifierNuclear) },
-      { label: 'Science modifier', value: this.formatPlanetaryParameterPercent(parameters.scienceModifier), tone: this.parameterTone(parameters.scienceModifier) },
-      { label: 'Industry modifier', value: this.formatPlanetaryParameterPercent(parameters.industryModifier), tone: this.parameterTone(parameters.industryModifier) },
-      { label: 'Anomalies and Noise', value: this.formatPlanetaryParameterPercent(parameters.anomaliesAndNoise), tone: this.parameterTone(parameters.anomaliesAndNoise) },
-      { label: 'Hyperspace parameters', value: this.formatPlanetaryParameterPercent(parameters.hyperspaceParameters), tone: this.parameterTone(parameters.hyperspaceParameters) }
+      { label: this.i18n.t('communications.reports.rowLabels.size'), value: this.formatMetricValue(report.size) },
+      { label: this.i18n.t('communications.reports.rowLabels.diff'), value: this.formatMetricValue(report.diff) },
+      { label: this.i18n.t('communications.reports.rowLabels.metalModifier'), value: this.formatPlanetaryParameterPercent(parameters.metalModifier), tone: this.parameterTone(parameters.metalModifier) },
+      { label: this.i18n.t('communications.reports.rowLabels.crystalModifier'), value: this.formatPlanetaryParameterPercent(parameters.crystalModifier), tone: this.parameterTone(parameters.crystalModifier) },
+      { label: this.i18n.t('communications.reports.rowLabels.deuteriumModifier'), value: this.formatPlanetaryParameterPercent(parameters.deuteriumModifier), tone: this.parameterTone(parameters.deuteriumModifier) },
+      { label: this.i18n.t('communications.reports.rowLabels.energyModifierRes'), value: this.formatPlanetaryParameterPercent(parameters.energyModifierRES), tone: this.parameterTone(parameters.energyModifierRES) },
+      { label: this.i18n.t('communications.reports.rowLabels.energyModifierNuclear'), value: this.formatPlanetaryParameterPercent(parameters.energyModifierNuclear), tone: this.parameterTone(parameters.energyModifierNuclear) },
+      { label: this.i18n.t('communications.reports.rowLabels.scienceModifier'), value: this.formatPlanetaryParameterPercent(parameters.scienceModifier), tone: this.parameterTone(parameters.scienceModifier) },
+      { label: this.i18n.t('communications.reports.rowLabels.industryModifier'), value: this.formatPlanetaryParameterPercent(parameters.industryModifier), tone: this.parameterTone(parameters.industryModifier) },
+      { label: this.i18n.t('communications.reports.rowLabels.anomaliesAndNoise'), value: this.formatPlanetaryParameterPercent(parameters.anomaliesAndNoise), tone: this.parameterTone(parameters.anomaliesAndNoise) },
+      { label: this.i18n.t('communications.reports.rowLabels.hyperspaceParameters'), value: this.formatPlanetaryParameterPercent(parameters.hyperspaceParameters), tone: this.parameterTone(parameters.hyperspaceParameters) }
     ];
   }
 
   protected dossierCopy(report: EspionageReportData): string {
-    return `Scanner capture for ${this.sourceLabel(report)}. Known assets and planetary modifiers are organized below.`;
+    return this.i18n.t('communications.reports.dossier.copy', {
+      source: this.sourceLabel(report)
+    });
   }
 
   protected plainReportView(report: PlayerReport): PlainReportView {
@@ -534,7 +593,9 @@ export class ReportsViewComponent implements OnInit {
 
   private parsePlainReportBodySections(lines: string[]): PlainReportSection[] {
     const sections: PlainReportSection[] = [];
-    let currentSection = this.createPlainReportSection('Report Details');
+    let currentSection = this.createPlainReportSection(
+      this.i18n?.t('communications.reports.plain.sections.defaultTitle') ?? 'Report Details'
+    );
 
     for (const rawLine of lines) {
       const line = rawLine.trim();
@@ -636,7 +697,7 @@ export class ReportsViewComponent implements OnInit {
 
   private formatMetricValue(value: number): string {
     if (!Number.isFinite(value)) {
-      return 'No data.';
+      return this.i18n?.t('communications.shared.labels.noData') ?? 'No data.';
     }
 
     if (Number.isInteger(value)) {
@@ -693,7 +754,7 @@ export class ReportsViewComponent implements OnInit {
   private loadReports(): void {
     const session = this.playerSession.load();
     if (!session) {
-      this.loadError = 'No player session found.';
+      this.loadError = this.i18n.t('communications.reports.errors.noSession');
       return;
     }
 
@@ -715,10 +776,22 @@ export class ReportsViewComponent implements OnInit {
           this.resetPreview();
           this.tutorialService.autoOpenTutorial('reportsView');
         },
-        error: () => {
-          this.loadError = 'Unable to load reports.';
+        error: (error) => {
+          this.loadError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.reports.errors.load')
+          );
         }
       });
+  }
+
+  protected reportTypeLabel(reportType: ReportType): string {
+    return this.i18n.t(`communications.reports.reportTypes.${reportType}`);
+  }
+
+  private localizedDiplomaticStatus(status: DiplomaticStatus): string {
+    return this.i18n.t(`communications.shared.diplomaticStatuses.${status === DiplomaticStatus.PASSIVE ? DiplomaticStatus.NEUTRAL : status}`);
   }
 
   private syncUnreadReportCount(): void {

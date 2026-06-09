@@ -4,6 +4,9 @@ import { finalize, Observable } from 'rxjs';
 import { AuthStateService } from '../../core/auth-state.service';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nPipe } from '../../i18n/i18n.pipe';
+import { I18nService } from '../../i18n/i18n.service';
 import {
   JumpGateMailRequestDto,
   MailRecipientDto,
@@ -14,7 +17,7 @@ import {
   PlayerMailMessageDto,
   SupportMailRequestDto
 } from '../../models/game-api-types';
-import { diplomacyStatusLabel, diplomacyVisualKey, ownerLabelWithDiplomacy } from '../../models/diplomacy/diplomacy-display';
+import { diplomacyStatusLabel, diplomacyVisualKey } from '../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -49,7 +52,7 @@ type MailDetailRowVm = {
 
 @Component({
   selector: 'app-mail-view',
-  imports: [TopMenuComponent, MessageComposeDialogComponent, FormsModule],
+  imports: [TopMenuComponent, MessageComposeDialogComponent, FormsModule, I18nPipe],
   templateUrl: './mail-view.component.html',
   styleUrl: './mail-view.component.css'
 })
@@ -83,15 +86,16 @@ export class MailViewComponent implements OnInit {
   protected composerInitialTitle = '';
   protected composerInitialBody = '';
   protected composerAllowAlliance = true;
-  protected composerTitleText = 'Compose Mail';
-  protected composerSubmitLabel = 'Send message';
+  protected composerTitleText = '';
+  protected composerSubmitLabel = '';
 
   constructor(
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly authState: AuthStateService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly tutorialService: TutorialService
+    private readonly tutorialService: TutorialService,
+    private readonly i18n: I18nService
   ) {}
 
   public ngOnInit(): void {
@@ -139,29 +143,48 @@ export class MailViewComponent implements OnInit {
     return [
       {
         id: 'actionRequired',
-        label: 'Action Required',
+        label: this.i18n.t('communications.mail.folders.actionRequired'),
         count: this.actionRequiredRequests().length,
         tone: this.actionRequiredRequests().length > 0 ? 'urgent' : 'normal'
       },
       {
         id: 'waiting',
-        label: 'Waiting',
+        label: this.i18n.t('communications.mail.folders.waiting'),
         count: this.waitingRequests().length,
         tone: 'normal'
       },
       {
         id: 'inbox',
-        label: 'Inbox',
+        label: this.i18n.t('communications.mail.folders.inbox'),
         count: this.messages.length,
         tone: this.unreadMessages().length > 0 ? 'urgent' : 'normal'
       },
       {
         id: 'history',
-        label: 'History',
+        label: this.i18n.t('communications.mail.folders.history'),
         count: this.resolvedRequests().length,
         tone: 'muted'
       }
     ];
+  }
+
+  protected folderItemCountLabel(count: number): string {
+    const key = count === 1
+      ? 'communications.mail.folders.itemsOne'
+      : 'communications.mail.folders.itemsMany';
+    return this.i18n.t(key, { count });
+  }
+
+  protected supportTypeDisplayLabel(supportType: string): string {
+    return this.i18n.t(`communications.shared.supportTypes.${supportType}`);
+  }
+
+  protected proposalStateLabel(state: string): string {
+    return this.i18n.t(`communications.shared.proposalStates.${state}`);
+  }
+
+  protected directionLabel(direction: 'incoming' | 'outgoing'): string {
+    return this.i18n.t(`communications.shared.directions.${direction}`);
   }
 
   protected activeFolder(): MailFolderVm {
@@ -231,7 +254,7 @@ export class MailViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.actionError = 'No player session found.';
+      this.actionError = this.i18n.t('communications.mail.errors.noSession');
       return;
     }
 
@@ -242,8 +265,12 @@ export class MailViewComponent implements OnInit {
           this.syncMailCounts();
           this.cdr.markForCheck();
         },
-        error: () => {
-          this.actionError = 'Unable to mark message as read.';
+        error: (error) => {
+          this.actionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.mail.errors.markRead')
+          );
           this.cdr.markForCheck();
         }
       });
@@ -261,8 +288,8 @@ export class MailViewComponent implements OnInit {
     this.composerInitialTitle = '';
     this.composerInitialBody = '';
     this.composerAllowAlliance = true;
-    this.composerTitleText = 'Compose Mail';
-    this.composerSubmitLabel = 'Send message';
+    this.composerTitleText = this.i18n.t('communications.compose.defaultTitle');
+    this.composerSubmitLabel = this.i18n.t('communications.compose.defaultSubmit');
     this.composerOpen = true;
   }
 
@@ -276,8 +303,8 @@ export class MailViewComponent implements OnInit {
     this.composerInitialTitle = `Re: ${message.title}`;
     this.composerInitialBody = '';
     this.composerAllowAlliance = false;
-    this.composerTitleText = 'Reply';
-    this.composerSubmitLabel = 'Send reply';
+    this.composerTitleText = this.i18n.t('communications.compose.replyTitle');
+    this.composerSubmitLabel = this.i18n.t('communications.compose.replySubmit');
     this.composerOpen = true;
   }
 
@@ -286,40 +313,57 @@ export class MailViewComponent implements OnInit {
   }
 
   protected handleComposerSent(event: { deliveredCount: number }): void {
-    const targetLabel = event.deliveredCount === 1 ? '1 recipient.' : `${event.deliveredCount} recipients.`;
-    this.actionSuccess = `Message delivered to ${targetLabel}`;
+    this.actionSuccess = event.deliveredCount === 1
+      ? this.i18n.t('communications.mail.success.deliveredOne')
+      : this.i18n.t('communications.mail.success.deliveredMany', { count: event.deliveredCount });
   }
 
   protected requestCardTitle(request: MailRequestDto): string {
     if (request.requestType === 'JUMP_GATE') {
-      return request.direction === 'incoming' ? 'Incoming Jump Gate Request' : 'Outgoing Jump Gate Request';
+      return this.i18n.t(request.direction === 'incoming'
+        ? 'communications.mail.requestCards.incomingJumpGate'
+        : 'communications.mail.requestCards.outgoingJumpGate');
     }
 
     if (request.requestType === 'MAINTENANCE') {
-      return request.direction === 'incoming' ? 'Incoming Maintenance Request' : 'Outgoing Maintenance Request';
+      return this.i18n.t(request.direction === 'incoming'
+        ? 'communications.mail.requestCards.incomingMaintenance'
+        : 'communications.mail.requestCards.outgoingMaintenance');
     }
 
     if (request.requestType === 'SUPPORT') {
-      return request.direction === 'incoming' ? 'Incoming Support Request' : 'Outgoing Support Request';
+      return this.i18n.t(request.direction === 'incoming'
+        ? 'communications.mail.requestCards.incomingSupport'
+        : 'communications.mail.requestCards.outgoingSupport');
     }
 
-    return request.direction === 'incoming' ? 'Incoming Request' : 'Outgoing Request';
+    return this.i18n.t(request.direction === 'incoming'
+      ? 'communications.mail.requestCards.incomingGeneric'
+      : 'communications.mail.requestCards.outgoingGeneric');
   }
 
   protected requestBadge(request: MailRequestDto): string {
     if (request.requestType === 'JUMP_GATE') {
-      return request.state === 'PENDING' ? 'JUMP GATE' : request.state;
+      return request.state === 'PENDING'
+        ? this.i18n.t('communications.mail.requestBadges.jumpGate')
+        : this.proposalStateLabel(request.state);
     }
 
     if (request.requestType === 'MAINTENANCE') {
-      return request.state === 'PENDING' ? 'MAINTENANCE' : request.state;
+      return request.state === 'PENDING'
+        ? this.i18n.t('communications.mail.requestBadges.maintenance')
+        : this.proposalStateLabel(request.state);
     }
 
     if (request.requestType === 'SUPPORT') {
-      return request.state === 'PENDING' ? request.supportType : request.state;
+      return request.state === 'PENDING'
+        ? this.supportTypeDisplayLabel(request.supportType)
+        : this.proposalStateLabel(request.state);
     }
 
-    return request.state === 'PENDING' ? diplomacyStatusLabel(request.requestedStatus) : request.state;
+    return request.state === 'PENDING'
+      ? this.diplomaticStatusLabel(request.requestedStatus)
+      : this.proposalStateLabel(request.state);
   }
 
   protected requestBadgeClass(request: MailRequestDto): string {
@@ -334,102 +378,185 @@ export class MailViewComponent implements OnInit {
   protected requestSummary(request: MailRequestDto): string {
     if (request.requestType === 'JUMP_GATE') {
       if (request.direction === 'incoming') {
-        return `${this.counterpartyLabel(request)} requests Jump Gate access for Fleet #${request.fleetId} to ${request.targetPlanetName}.`;
+        return this.i18n.t('communications.mail.summaries.jumpGateIncoming', {
+          player: this.counterpartyLabel(request),
+          fleetId: request.fleetId,
+          targetPlanet: request.targetPlanetName
+        });
       }
 
-      return `Fleet #${request.fleetId} is waiting for Jump Gate access from ${this.counterpartyLabel(request)}.`;
+      return this.i18n.t('communications.mail.summaries.jumpGateOutgoing', {
+        fleetId: request.fleetId,
+        player: this.counterpartyLabel(request)
+      });
     }
 
     if (request.requestType === 'MAINTENANCE') {
       if (request.direction === 'incoming') {
-        return `${this.counterpartyLabel(request)} requests maintenance for Fleet #${request.fleetId} at ${request.targetPlanetName}.`;
+        return this.i18n.t('communications.mail.summaries.maintenanceIncoming', {
+          player: this.counterpartyLabel(request),
+          fleetId: request.fleetId,
+          targetPlanet: request.targetPlanetName
+        });
       }
 
-      return `Fleet #${request.fleetId} requested maintenance from ${this.counterpartyLabel(request)} at ${request.targetPlanetName}.`;
+      return this.i18n.t('communications.mail.summaries.maintenanceOutgoing', {
+        fleetId: request.fleetId,
+        player: this.counterpartyLabel(request),
+        targetPlanet: request.targetPlanetName
+      });
     }
 
     if (request.requestType === 'SUPPORT') {
       if (request.direction === 'incoming') {
-        return `${this.counterpartyLabel(request)} requested ${this.supportTypeLabel(request)} for ${request.targetPlanetName}.`;
+        return this.i18n.t('communications.mail.summaries.supportIncoming', {
+          player: this.counterpartyLabel(request),
+          supportType: this.supportTypeLabel(request),
+          targetPlanet: request.targetPlanetName
+        });
       }
 
-      return `You requested ${this.supportTypeLabel(request)} from ${this.counterpartyLabel(request)} for ${request.targetPlanetName}.`;
+      return this.i18n.t('communications.mail.summaries.supportOutgoing', {
+        supportType: this.supportTypeLabel(request),
+        player: this.counterpartyLabel(request),
+        targetPlanet: request.targetPlanetName
+      });
     }
 
     if (request.direction === 'incoming') {
-      return `${this.counterpartyLabel(request)} requested ${diplomacyStatusLabel(request.requestedStatus)}.`;
+      return this.i18n.t('communications.mail.summaries.diplomacyIncoming', {
+        player: this.counterpartyLabel(request),
+        status: this.diplomaticStatusLabel(request.requestedStatus)
+      });
     }
 
-    return `You requested ${diplomacyStatusLabel(request.requestedStatus)} with ${this.counterpartyLabel(request)}.`;
+    return this.i18n.t('communications.mail.summaries.diplomacyOutgoing', {
+      status: this.diplomaticStatusLabel(request.requestedStatus),
+      player: this.counterpartyLabel(request)
+    });
   }
 
   protected requestDetailLine(request: MailRequestDto): string {
     if (request.requestType === 'JUMP_GATE') {
-      return `Mission ${request.missionType} | ${request.originPlanetName} -> ${request.targetPlanetName} | Ships: ${request.totalShips}`;
+      return this.i18n.t('communications.mail.details.jumpGate', {
+        mission: this.missionLabel(request.missionType),
+        originPlanet: request.originPlanetName,
+        targetPlanet: request.targetPlanetName,
+        ships: request.totalShips
+      });
     }
 
     if (request.requestType === 'MAINTENANCE') {
       const requestedSummary = this.maintenancePayloadSummary(request.requested);
       const approvedSummary = request.approved ? this.maintenancePayloadSummary(request.approved) : null;
       if (approvedSummary) {
-        return `Requested: ${requestedSummary} | Approved: ${approvedSummary}`;
+        return this.i18n.t('communications.mail.details.requestedApproved', {
+          requested: requestedSummary,
+          approved: approvedSummary
+        });
       }
 
-      return `Requested: ${requestedSummary}`;
+      return this.i18n.t('communications.mail.details.requested', {
+        value: requestedSummary
+      });
     }
 
     if (request.requestType === 'SUPPORT') {
       if (request.supportType === 'RESOURCE_SUPPORT') {
-        const requestedSummary = request.requestedResources ? this.resourcesSummary(request.requestedResources) : 'nothing';
+        const requestedSummary = request.requestedResources
+          ? this.resourcesSummary(request.requestedResources)
+          : this.i18n.t('communications.mail.details.nothing');
         const approvedSummary = request.approvedResources ? this.resourcesSummary(request.approvedResources) : null;
-        const sourceSummary = request.reservedSourcePlanetName ? ` | Reserved at ${request.reservedSourcePlanetName}` : '';
+        const sourceSummary = request.reservedSourcePlanetName
+          ? this.i18n.t('communications.mail.details.reservedAt', { planet: request.reservedSourcePlanetName })
+          : '';
         if (approvedSummary) {
-          return `Requested: ${requestedSummary} | Approved: ${approvedSummary}${sourceSummary}`;
+          return `${this.i18n.t('communications.mail.details.requestedApproved', {
+            requested: requestedSummary,
+            approved: approvedSummary
+          })}${sourceSummary}`;
         }
 
-        return `Requested: ${requestedSummary}${sourceSummary}`;
+        return `${this.i18n.t('communications.mail.details.requested', {
+          value: requestedSummary
+        })}${sourceSummary}`;
       }
 
       if (request.minimumShips && request.minimumShips.length > 0) {
         const shipsSummary = request.minimumShips.map((entry) => `${entry.type} x${entry.amount}`).join(', ');
-        const targetOwnerSummary = request.targetOwnerPlayerName ? ` | Target owner: ${this.playerLabelByName(request.targetOwnerPlayerName)}` : '';
+        const targetOwnerSummary = request.targetOwnerPlayerName
+          ? this.i18n.t('communications.mail.details.targetOwner', {
+            owner: this.playerLabelByName(request.targetOwnerPlayerName)
+          })
+          : '';
         const prioritySummary = request.bombardmentPriorities
-          ? ` | Priorities: ${request.bombardmentPriorities.main ?? 'Random'} / ${request.bombardmentPriorities.secondary ?? 'Random'} / ${request.bombardmentPriorities.tertiary ?? 'Random'}`
+          ? this.i18n.t('communications.mail.details.priorities', {
+            main: this.bombardmentPriorityLabel(request.bombardmentPriorities.main),
+            secondary: this.bombardmentPriorityLabel(request.bombardmentPriorities.secondary),
+            tertiary: this.bombardmentPriorityLabel(request.bombardmentPriorities.tertiary)
+          })
           : '';
         const launchSummary = request.launchedFleetId !== null
-          ? ` | Launched Fleet #${request.launchedFleetId}${request.launchOriginPlanetName ? ` from ${request.launchOriginPlanetName}` : ''}`
+          ? `${this.i18n.t('communications.mail.details.launchedFleet', { fleetId: request.launchedFleetId })}${request.launchOriginPlanetName ? this.i18n.t('communications.mail.details.launchedFleetFrom', { planet: request.launchOriginPlanetName }) : ''}`
           : '';
-        return `Mission ${request.missionType ?? 'Unknown'} | Minimum: ${shipsSummary}${targetOwnerSummary}${prioritySummary}${launchSummary}`;
+        return this.i18n.t(
+          request.missionType ? 'communications.mail.details.supportMission' : 'communications.mail.details.supportUnknownMission',
+          {
+            mission: this.missionLabel(request.missionType),
+            minimum: shipsSummary,
+            targetOwner: targetOwnerSummary,
+            priorities: prioritySummary,
+            launch: launchSummary
+          }
+        );
       }
 
-      return request.resolutionNote ?? `Target ${request.targetPlanetName}`;
+      return request.resolutionNote ?? this.i18n.t('communications.mail.details.targetOnly', {
+        planet: request.targetPlanetName
+      });
     }
 
-    return `Requested status ${diplomacyStatusLabel(request.requestedStatus)}`;
+    return this.i18n.t('communications.mail.details.requestedStatus', {
+      status: this.diplomaticStatusLabel(request.requestedStatus)
+    });
   }
 
   protected requestTimingLine(request: MailRequestDto): string {
     if (request.requestType === 'JUMP_GATE' && request.state === 'PENDING') {
-      return `Created on turn ${request.createdTurn} | Awaiting response`;
+      return this.i18n.t('communications.mail.timing.pendingAwaitingResponse', {
+        createdTurn: request.createdTurn
+      });
     }
 
     if (request.requestType === 'SUPPORT' && request.executionDueTurn !== null) {
-      const fulfilledLabel = request.fulfilledTurn !== null ? ` | Fulfilled on turn ${request.fulfilledTurn}` : '';
-      const expiryLabel = request.executionExpiresOnTurn !== null ? ` | Wait until turn ${request.executionExpiresOnTurn}` : '';
-      return `Created on turn ${request.createdTurn} | Due on turn ${request.executionDueTurn}${expiryLabel}${fulfilledLabel}`;
+      const fulfilledLabel = request.fulfilledTurn !== null
+        ? this.i18n.t('communications.mail.timing.supportFulfilled', { turn: request.fulfilledTurn })
+        : '';
+      const expiryLabel = request.executionExpiresOnTurn !== null
+        ? this.i18n.t('communications.mail.timing.supportExpiry', { turn: request.executionExpiresOnTurn })
+        : '';
+      return this.i18n.t('communications.mail.timing.supportDue', {
+        createdTurn: request.createdTurn,
+        dueTurn: request.executionDueTurn,
+        expiry: expiryLabel,
+        fulfilled: fulfilledLabel
+      });
     }
 
-    return `Created on turn ${request.createdTurn} | Expires on turn ${request.expiresOnTurn}`;
+    return this.i18n.t('communications.mail.timing.default', {
+      createdTurn: request.createdTurn,
+      expiresOnTurn: request.expiresOnTurn
+    });
   }
 
   protected requestDetailRows(request: MailRequestDto): MailDetailRowVm[] {
     return [
-      { label: 'Counterparty', value: this.counterpartyLabel(request) },
-      { label: 'State', value: request.state },
-      { label: 'Direction', value: request.direction === 'incoming' ? 'Incoming' : 'Outgoing' },
-      { label: 'Timing', value: this.requestTimingLine(request) },
-      { label: 'Summary', value: this.requestSummary(request) },
-      { label: 'Details', value: this.requestDetailLine(request) }
+      { label: this.i18n.t('communications.mail.detailRows.counterparty'), value: this.counterpartyLabel(request) },
+      { label: this.i18n.t('communications.mail.detailRows.state'), value: this.proposalStateLabel(request.state) },
+      { label: this.i18n.t('communications.mail.detailRows.direction'), value: this.directionLabel(request.direction) },
+      { label: this.i18n.t('communications.mail.detailRows.timing'), value: this.requestTimingLine(request) },
+      { label: this.i18n.t('communications.mail.detailRows.summary'), value: this.requestSummary(request) },
+      { label: this.i18n.t('communications.mail.detailRows.details'), value: this.requestDetailLine(request) }
     ];
   }
 
@@ -475,10 +602,10 @@ export class MailViewComponent implements OnInit {
 
   protected senderLabel(message: PlayerMailMessageDto): string {
     if (message.senderPlayerId === null || !message.senderPlayerName) {
-      return message.senderPlayerName ?? 'Unknown sender';
+      return message.senderPlayerName ?? this.i18n.t('communications.shared.labels.unknown');
     }
 
-    return ownerLabelWithDiplomacy(message.senderPlayerName, this.playerStatus(message.senderPlayerId));
+    return this.ownerLabelWithStatus(message.senderPlayerName, this.playerStatus(message.senderPlayerId));
   }
 
   protected jumpGateRequest(request: MailRequestDto): JumpGateMailRequestDto | null {
@@ -546,7 +673,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.approveSupportRequest(request.requestId, this.buildPartialSupportPayload(request), token),
-        'Unable to partially approve request.'
+        this.i18n.t('communications.mail.errors.sendPartialApproval')
       );
       return;
     }
@@ -554,7 +681,7 @@ export class MailViewComponent implements OnInit {
     this.runRequestAction(
       request,
       (token) => this.gameApi.approveMaintenanceRequest(request.requestId, this.buildPartialApprovalPayload(request), token),
-      'Unable to partially approve request.'
+      this.i18n.t('communications.mail.errors.sendPartialApproval')
     );
   }
 
@@ -581,10 +708,14 @@ export class MailViewComponent implements OnInit {
             this.syncSelectedMailItem(null);
           }
           this.syncMailCounts();
-          this.actionSuccess = 'Message deleted.';
+          this.actionSuccess = this.i18n.t('communications.mail.success.messageDeleted');
         },
-        error: () => {
-          this.actionError = 'Unable to delete message.';
+        error: (error) => {
+          this.actionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.mail.errors.deleteMessage')
+          );
         }
       });
   }
@@ -614,10 +745,14 @@ export class MailViewComponent implements OnInit {
             this.syncSelectedMailItem(null);
           }
           this.syncMailCounts();
-          this.actionSuccess = 'Request deleted.';
+          this.actionSuccess = this.i18n.t('communications.mail.success.requestDeleted');
         },
-        error: () => {
-          this.actionError = 'Unable to delete request.';
+        error: (error) => {
+          this.actionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.mail.errors.deleteRequest')
+          );
         }
       });
   }
@@ -627,7 +762,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.approveJumpGateRequest(request.requestId, token),
-        'Unable to approve Jump Gate request.'
+        this.i18n.t('communications.mail.errors.approveJumpGate')
       );
       return;
     }
@@ -636,7 +771,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.approveMaintenanceRequest(request.requestId, null, token),
-        'Unable to approve request.'
+        this.i18n.t('communications.mail.errors.approveRequest')
       );
       return;
     }
@@ -645,7 +780,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.approveSupportRequest(request.requestId, null, token),
-        'Unable to approve request.'
+        this.i18n.t('communications.mail.errors.approveRequest')
       );
       return;
     }
@@ -653,7 +788,7 @@ export class MailViewComponent implements OnInit {
     this.runRequestAction(
       request,
       (token) => this.gameApi.acceptDiplomaticProposal(request.requestId, token),
-      'Unable to accept request.'
+      this.i18n.t('communications.mail.errors.acceptRequest')
     );
   }
 
@@ -662,7 +797,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.rejectJumpGateRequest(request.requestId, token),
-        'Unable to reject Jump Gate request.'
+        this.i18n.t('communications.mail.errors.rejectJumpGate')
       );
       return;
     }
@@ -671,7 +806,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.rejectMaintenanceRequest(request.requestId, token),
-        'Unable to reject request.'
+        this.i18n.t('communications.mail.errors.rejectRequest')
       );
       return;
     }
@@ -680,7 +815,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.rejectSupportRequest(request.requestId, token),
-        'Unable to reject request.'
+        this.i18n.t('communications.mail.errors.rejectRequest')
       );
       return;
     }
@@ -688,7 +823,7 @@ export class MailViewComponent implements OnInit {
     this.runRequestAction(
       request,
       (token) => this.gameApi.rejectDiplomaticProposal(request.requestId, token),
-      'Unable to reject request.'
+      this.i18n.t('communications.mail.errors.rejectRequest')
     );
   }
 
@@ -697,7 +832,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.cancelJumpGateRequest(request.requestId, token),
-        'Unable to cancel Jump Gate request.'
+        this.i18n.t('communications.mail.errors.cancelJumpGate')
       );
       return;
     }
@@ -706,7 +841,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.cancelMaintenanceRequest(request.requestId, token),
-        'Unable to cancel request.'
+        this.i18n.t('communications.mail.errors.cancelRequest')
       );
       return;
     }
@@ -715,7 +850,7 @@ export class MailViewComponent implements OnInit {
       this.runRequestAction(
         request,
         (token) => this.gameApi.cancelSupportRequest(request.requestId, token),
-        'Unable to cancel request.'
+        this.i18n.t('communications.mail.errors.cancelRequest')
       );
       return;
     }
@@ -723,14 +858,14 @@ export class MailViewComponent implements OnInit {
     this.runRequestAction(
       request,
       (token) => this.gameApi.cancelDiplomaticProposal(request.requestId, token),
-      'Unable to cancel request.'
+      this.i18n.t('communications.mail.errors.cancelRequest')
     );
   }
 
   private loadMailView(): void {
     const session = this.playerSession.load();
     if (!session) {
-      this.loadError = 'No player session found.';
+      this.loadError = this.i18n.t('communications.mail.errors.noSession');
       return;
     }
 
@@ -748,7 +883,11 @@ export class MailViewComponent implements OnInit {
           this.applyMailResponse(response);
         },
         error: (error) => {
-          this.loadError = error?.error?.error ?? 'Unable to load mail.';
+          this.loadError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('communications.mail.errors.load')
+          );
         }
       });
   }
@@ -792,7 +931,7 @@ export class MailViewComponent implements OnInit {
           this.loadMailView();
         },
         error: (error) => {
-          this.actionError = error?.error?.error ?? fallbackError;
+          this.actionError = resolveApiErrorMessage(this.i18n, error, fallbackError);
         }
       });
   }
@@ -835,8 +974,10 @@ export class MailViewComponent implements OnInit {
       kind: 'message',
       title: message.title,
       summary: this.senderLabel(message),
-      meta: `Turn ${message.createdTurn}`,
-      badgeLabel: message.isRead ? 'Read' : 'Unread',
+      meta: `${this.i18n.t('communications.shared.labels.turn')} ${message.createdTurn}`,
+      badgeLabel: message.isRead
+        ? this.i18n.t('communications.mail.message.read')
+        : this.i18n.t('communications.mail.message.unread'),
       badgeClass: message.isRead ? 'badge' : 'badge badge--jump',
       isUnread: !message.isRead,
       request: null,
@@ -888,7 +1029,7 @@ export class MailViewComponent implements OnInit {
   }
 
   private counterpartyLabel(request: MailRequestDto): string {
-    return ownerLabelWithDiplomacy(
+    return this.ownerLabelWithStatus(
       request.counterpartyPlayerName,
       this.playerStatus(request.counterpartyPlayerId)
     );
@@ -912,13 +1053,13 @@ export class MailViewComponent implements OnInit {
 
   private playerLabelByName(playerName: string): string {
     const recipient = this.recipients.find((entry) => entry.playerName === playerName) ?? null;
-    return ownerLabelWithDiplomacy(playerName, recipient?.currentStatus ?? null);
+    return this.ownerLabelWithStatus(playerName, recipient?.currentStatus ?? null);
   }
 
   private maintenancePayloadSummary(payload: MaintenanceTransferPayloadDto): string {
     const parts: string[] = [];
     if (payload.fuel > 0) {
-      parts.push(`${payload.fuel} deuterium`);
+      parts.push(`${payload.fuel} ${this.i18n.t('communications.mail.partialApproval.deuterium').toLowerCase()}`);
     }
     if (payload.ships.length > 0) {
       parts.push(payload.ships.map((entry) => `${entry.type} x${entry.amount}`).join(', '));
@@ -927,7 +1068,7 @@ export class MailViewComponent implements OnInit {
       parts.push(payload.bombs.map((entry) => `${entry.type} x${entry.amount}`).join(', '));
     }
 
-    return parts.length > 0 ? parts.join(' | ') : 'nothing';
+    return parts.length > 0 ? parts.join(' | ') : this.i18n.t('communications.mail.details.nothing');
   }
 
   private buildPartialApprovalPayload(request: MaintenanceMailRequestDto): MaintenanceTransferPayloadDto {
@@ -959,37 +1100,48 @@ export class MailViewComponent implements OnInit {
   }
 
   private supportTypeLabel(request: SupportMailRequestDto): string {
-    switch (request.supportType) {
-      case 'RESOURCE_SUPPORT':
-        return 'resource support';
-      case 'PLANET_REPAIR':
-        return 'planet repairs';
-      case 'PLANET_DEFENSE':
-        return 'planet defense';
-      case 'ATTACK_TARGET':
-        return 'attack support';
-      case 'BOMBARD_TARGET':
-        return 'bombardment support';
-      case 'SIEGE_TARGET':
-        return 'siege support';
-      default:
-        return request.supportType;
-    }
+    return this.supportTypeDisplayLabel(request.supportType);
   }
 
   private resourcesSummary(payload: { metal: number; crystal: number; deuterium: number }): string {
     const parts: string[] = [];
     if (payload.metal > 0) {
-      parts.push(`${payload.metal} metal`);
+      parts.push(`${payload.metal} ${this.i18n.t('communications.mail.partialApproval.metal').toLowerCase()}`);
     }
     if (payload.crystal > 0) {
-      parts.push(`${payload.crystal} crystal`);
+      parts.push(`${payload.crystal} ${this.i18n.t('communications.mail.partialApproval.crystal').toLowerCase()}`);
     }
     if (payload.deuterium > 0) {
-      parts.push(`${payload.deuterium} deuterium`);
+      parts.push(`${payload.deuterium} ${this.i18n.t('communications.mail.partialApproval.deuterium').toLowerCase()}`);
     }
 
-    return parts.length > 0 ? parts.join(' | ') : 'nothing';
+    return parts.length > 0 ? parts.join(' | ') : this.i18n.t('communications.mail.details.nothing');
+  }
+
+  private missionLabel(missionType: string | null | undefined): string {
+    if (!missionType) {
+      return this.i18n.t('communications.shared.labels.unknown');
+    }
+
+    return this.i18n.t(`communications.shared.missions.${missionType}`);
+  }
+
+  private diplomaticStatusLabel(status: DiplomaticStatus): string {
+    return this.i18n.t(`communications.shared.diplomaticStatuses.${diplomacyStatusLabel(status)}`);
+  }
+
+  private bombardmentPriorityLabel(priority: string | null | undefined): string {
+    if (!priority) {
+      return this.i18n.t('communications.shared.labels.random');
+    }
+
+    return this.i18n.t(`communications.shared.bombardmentPriorities.${priority}`) !== `communications.shared.bombardmentPriorities.${priority}`
+      ? this.i18n.t(`communications.shared.bombardmentPriorities.${priority}`)
+      : priority;
+  }
+
+  private ownerLabelWithStatus(playerName: string, status: DiplomaticStatus | null): string {
+    return status ? `${playerName} (${this.diplomaticStatusLabel(status)})` : playerName;
   }
 
   private normalizeAmount(value: number | string): number {

@@ -1,13 +1,15 @@
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { GameApiService } from '../../../core/game-api.service';
 import { PlayerSessionService } from '../../../core/player-session.service';
 import { MailRecipientDto, MailRecipientMode } from '../../../models/game-api-types';
+import { I18nPipe } from '../../../i18n/i18n.pipe';
+import { I18nService } from '../../../i18n/i18n.service';
 
 @Component({
   selector: 'app-message-compose-dialog',
-  imports: [FormsModule],
+  imports: [FormsModule, I18nPipe],
   templateUrl: './message-compose-dialog.component.html',
   styleUrl: './message-compose-dialog.component.css'
 })
@@ -19,8 +21,8 @@ export class MessageComposeDialogComponent implements OnChanges {
   @Input() public lockedTargetPlayerName: string | null = null;
   @Input() public initialTitle = '';
   @Input() public initialBody = '';
-  @Input() public titleText = 'Compose Mail';
-  @Input() public submitLabel = 'Send message';
+  @Input() public titleText = '';
+  @Input() public submitLabel = '';
   @Input() public allowAlliance = true;
 
   @Output() public readonly closed = new EventEmitter<void>();
@@ -32,6 +34,7 @@ export class MessageComposeDialogComponent implements OnChanges {
   protected body = '';
   protected isSending = false;
   protected error: string | null = null;
+  private readonly i18n = inject(I18nService);
 
   constructor(
     private readonly gameApi: GameApiService,
@@ -97,7 +100,15 @@ export class MessageComposeDialogComponent implements OnChanges {
     }
 
     const target = this.recipients.find((entry) => entry.playerId === this.lockedTargetPlayerId);
-    return target?.playerName ?? 'Unknown player';
+    return target?.playerName ?? this.i18n.t('communications.compose.errors.unknownPlayer');
+  }
+
+  protected resolvedTitleText(): string {
+    return this.titleText || this.i18n.t('communications.compose.defaultTitle');
+  }
+
+  protected resolvedSubmitLabel(): string {
+    return this.submitLabel || this.i18n.t('communications.compose.defaultSubmit');
   }
 
   protected send(): void {
@@ -107,7 +118,7 @@ export class MessageComposeDialogComponent implements OnChanges {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.error = 'No player session found.';
+      this.error = this.i18n.t('communications.compose.errors.noSession');
       return;
     }
 
@@ -132,7 +143,7 @@ export class MessageComposeDialogComponent implements OnChanges {
           this.closed.emit();
         },
         error: (error) => {
-          this.error = error?.error?.error ?? 'Unable to send message.';
+          this.error = error?.error?.error ?? this.i18n.t('communications.compose.errors.sendFailed');
         }
       });
   }

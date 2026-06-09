@@ -1,6 +1,7 @@
 import { authEn } from './auth.en';
 import { apiEn } from './api.en';
 import { commonEn } from './common.en';
+import { communicationsEn } from './communications.en';
 import { encyclopediaEn } from './encyclopedia.en';
 import { gameShellEn } from './game-shell.en';
 import { helpAboutEn } from './help-about.en';
@@ -15,6 +16,7 @@ export const enTranslations = {
   auth: authEn,
   api: apiEn,
   common: commonEn,
+  communications: communicationsEn,
   encyclopedia: encyclopediaEn,
   gameShell: gameShellEn,
   helpAbout: helpAboutEn,

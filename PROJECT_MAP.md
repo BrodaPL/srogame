@@ -176,7 +176,7 @@ Localization:
 - `src/app/i18n/i18n.service.ts`: runtime translation lookup, active-language signal, interpolation, and locale-aware date formatting for migrated views
 - `src/app/i18n/i18n.pipe.ts`: template translation pipe for standalone components
 - `src/app/i18n/language-preference.service.ts`: guest/local fallback persistence under `srogame:language`
-- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `api`, `main-menu`, `settings`, `auth`, `help-about`, `encyclopedia`, `setup`, `load-game`, `multiplayer`, `game-shell`, `top-menu`) aggregated per language
+- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `api`, `main-menu`, `settings`, `auth`, `help-about`, `encyclopedia`, `setup`, `load-game`, `multiplayer`, `game-shell`, `top-menu`, `communications`) aggregated per language
 - `src/app/i18n/api-message.utils.ts`: client bridge that resolves server `errorKey` / `messageKey` metadata through the runtime i18n layer with raw-message fallback during the Phase 2 migration
 - `src/app/game/ui/top-menu/top-menu.component.ts`: consumes keyed `TurnStatusResponse.progressionBlockedReason*` metadata and keyed end-turn / auto-skip API errors
 - `server/src/game-commands/command-result.ts` + `server/src/index.ts::sendGameCommandError(...)`: shared command-error transport point; common `GameCommandError.message` values are now mapped to `api.commands.*` localization keys before hitting the client
@@ -190,6 +190,10 @@ Game snapshot/state:
 
 Load/save note:
 - `src/app/load-game/` now scopes its save list to the selected/current `gameId` when one exists, instead of always showing one undifferentiated global save list
+
+Communications route note:
+- `src/app/game/reports-view/`, `src/app/game/mail-view/`, `src/app/game/diplomacy-view/`, and `src/app/game/ui/message-compose-dialog/` now consume the shared runtime i18n layer through the `communications` locale module
+- This localization slice covers frontend-owned chrome, action labels, summaries, local fallback errors, and diplomacy-aware status labels; it intentionally does not translate raw generated report-body content or deeper domain enum/blueprint naming yet
 
 Tutorial state:
 - `src/app/tutorial/tutorial.service.ts`: overlay control, auto-open rules, step preparation

@@ -4,19 +4,19 @@
     class="mail-compose"
     role="dialog"
     aria-modal="true"
-    [attr.aria-label]="titleText"
+    [attr.aria-label]="resolvedTitleText()"
     (click)="$event.stopPropagation()">
     <div class="mail-compose__header">
       <div>
-        <p class="eyebrow">Mail</p>
-        <h3>{{ titleText }}</h3>
+        <p class="eyebrow">{{ 'communications.compose.eyebrow' | t }}</p>
+        <h3>{{ resolvedTitleText() }}</h3>
       </div>
-      <button type="button" class="mail-compose__close" (click)="close()">Close</button>
+      <button type="button" class="mail-compose__close" (click)="close()">{{ 'communications.compose.close' | t }}</button>
     </div>
 
     @if (error) {
       <section class="status status--error">
-        <h3>Message not sent</h3>
+        <h3>{{ 'communications.compose.errorTitle' | t }}</h3>
         <p>{{ error }}</p>
       </section>
     }
@@ -24,18 +24,18 @@
     <div class="mail-compose__body">
       @if (lockedTargetPlayerId !== null) {
         <div class="mail-compose__meta">
-          <span class="mail-compose__label">Recipient</span>
+          <span class="mail-compose__label">{{ 'communications.compose.fields.recipient' | t }}</span>
           <strong>{{ lockedTargetLabel() }}</strong>
         </div>
       } @else {
         <div class="mail-compose__row">
           <label class="mail-compose__field">
-            <span>Recipient type</span>
+            <span>{{ 'communications.compose.fields.recipientType' | t }}</span>
             <select [(ngModel)]="recipientMode">
-              <option value="player">Single player</option>
+              <option value="player">{{ 'communications.compose.recipientModes.player' | t }}</option>
               @if (showAllianceOption()) {
                 <option value="alliance" [disabled]="allianceRecipientCount === 0">
-                  Whole alliance{{ allianceRecipientCount > 0 ? ' (' + allianceRecipientCount + ')' : '' }}
+                  {{ 'communications.compose.recipientModes.alliance' | t:{ count: allianceRecipientCount } }}
                 </option>
               }
             </select>
@@ -43,7 +43,7 @@
 
           @if (recipientMode === 'player') {
             <label class="mail-compose__field">
-              <span>Player</span>
+              <span>{{ 'communications.compose.fields.player' | t }}</span>
               <select [(ngModel)]="targetPlayerId">
                 @for (recipient of recipients; track recipient.playerId) {
                   <option [ngValue]="recipient.playerId">{{ recipient.playerName }} | {{ recipient.currentStatus }}</option>
@@ -55,26 +55,26 @@
       }
 
       <label class="mail-compose__field">
-        <span>Title</span>
+        <span>{{ 'communications.compose.fields.title' | t }}</span>
         <input type="text" maxlength="50" [(ngModel)]="title" />
       </label>
-      <p class="overview-muted">{{ titleCharactersRemaining() }} characters remaining.</p>
+      <p class="overview-muted">{{ 'communications.compose.counts.titleRemaining' | t:{ count: titleCharactersRemaining() } }}</p>
 
       <label class="mail-compose__field">
-        <span>Body</span>
+        <span>{{ 'communications.compose.fields.body' | t }}</span>
         <textarea rows="8" maxlength="1000" [(ngModel)]="body"></textarea>
       </label>
-      <p class="overview-muted">{{ bodyCharactersRemaining() }} characters remaining.</p>
+      <p class="overview-muted">{{ 'communications.compose.counts.bodyRemaining' | t:{ count: bodyCharactersRemaining() } }}</p>
     </div>
 
     <div class="mail-compose__actions">
-      <button type="button" class="top-menu__button" (click)="close()">Cancel</button>
+      <button type="button" class="top-menu__button" (click)="close()">{{ 'communications.compose.cancel' | t }}</button>
       <button
         type="button"
         class="top-menu__button top-menu__button--end-turn"
         [disabled]="!canSend()"
         (click)="send()">
-        {{ isSending ? 'Sending...' : submitLabel }}
+        {{ isSending ? ('communications.shared.actions.sending' | t) : resolvedSubmitLabel() }}
       </button>
     </div>
   </section>
