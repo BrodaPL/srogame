@@ -42,6 +42,22 @@ export const apiEn = {
       tutorialsReset: 'Tutorial progress was reset for your current session.'
     }
   },
+  game: {
+    start: {
+      requiresLocalAdmin: 'Local admin privileges are required to start a new game.',
+      invalidSetupPayload: 'Invalid setup payload.',
+      saveNewFailed: 'Unable to save the new game.'
+    },
+    saves: {
+      readFailed: 'Unable to read game saves.',
+      savedGameNotFound: 'Saved game not found.',
+      loadFailed: 'Unable to load saved game.',
+      deleteFailed: 'Unable to delete saved game.',
+      requiresLocalAdmin: 'Local admin privileges are required to manage saves.',
+      loginRequiredToManage: 'Login required to manage saves.',
+      requiresLocalAdminToLoad: 'Local admin privileges are required to load the saved game.'
+    }
+  },
   games: {
     current: {
       unavailableResume: 'You do not currently have access to resume this game.',
@@ -68,6 +84,64 @@ export const apiEn = {
     }
   },
   multiplayer: {
+    games: {
+      notFound: 'Multiplayer game not found.',
+      createRequiresLocalAdmin: 'Local admin privileges are required to create a multiplayer lobby.'
+    },
+    lobby: {
+      joinableNotFound: 'Joinable multiplayer lobby not found.',
+      notManageable: 'Draft multiplayer lobby not found or not manageable.',
+      maxHumanPlayersReached: 'This multiplayer lobby already has the maximum number of human players.',
+      joinFirst: 'Join the lobby first.'
+    },
+    resumeLobby: {
+      requiresLocalAdmin: 'Local admin privileges are required to reopen an inactive multiplayer lobby.',
+      savedInactiveNotFound: 'Saved inactive multiplayer game not found.',
+      noSavedSnapshot: 'No saved snapshot is available for this multiplayer game.',
+      savedSnapshotNotFound: 'Saved snapshot not found.',
+      reopenFailed: 'Unable to reopen the saved multiplayer game.'
+    },
+    archive: {
+      requiresLocalAdmin: 'Local admin privileges are required to archive multiplayer games.',
+      inactiveGameNotFound: 'Inactive multiplayer game not found.'
+    },
+    joinRunning: {
+      runningScheduledNotFound: 'Running Scheduled Turns multiplayer game not found.',
+      accountAlreadyBelongs: 'This account already belongs to the selected game.',
+      maxHumanPlayersReached: 'This Scheduled Turns game already has the maximum number of human players.',
+      playerNameExists: 'A player with this name already exists in the selected game.',
+      selectedGameUnavailable: 'The selected game is not currently available.',
+      noSafeStartingSystem: 'No safe starting system is available for late join.',
+      safeHomeworldFailed: 'Unable to create a safe late-join homeworld.'
+    },
+    leaveCurrentGame: {
+      runningGameNotFound: 'Running multiplayer game not found.',
+      joinFirst: 'Join the multiplayer game first.',
+      savedBecauseTooFewOnlinePlayers: 'Not enough online players, saving and stopping the game.'
+    },
+    ready: {
+      invalidPayload: 'Invalid ready payload.'
+    },
+    setup: {
+      resumeLocked: 'Resume lobbies use locked saved-game settings.'
+    },
+    bindSave: {
+      resumeLocked: 'Resume lobbies are already locked to their saved game.',
+      saveSelectionRequired: 'Save selection is required.',
+      failed: 'Unable to bind saved game.'
+    },
+    clearSave: {
+      resumeLocked: 'Resume lobbies stay locked to their saved game.'
+    },
+    assignSeat: {
+      invalidPayload: 'Invalid seat assignment payload.',
+      savedSeatNotFound: 'Saved human seat not found.',
+      memberNotFound: 'Lobby member not found.'
+    },
+    start: {
+      onlyOneScheduledTurnsGame: 'Only one running Scheduled Turns multiplayer game can be active on this server.',
+      failed: 'Unable to start multiplayer game.'
+    },
     presence: {
       runningGameNotFound: 'Running multiplayer game not found.',
       autoSkipRequiresEnabledBoolean: 'Auto skip toggle requires an enabled boolean.'

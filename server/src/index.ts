@@ -1280,21 +1280,26 @@ app.post('/api/games/:gameId/end-turn', (req, res) => {
 app.post('/api/game/start', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   if (!isLocalAdminSession(auth.session)) {
-    return res.status(403).json({ error: 'Local admin privileges are required to start a new game.' });
+    return sendApiError(
+      res,
+      403,
+      'Local admin privileges are required to start a new game.',
+      'api.game.start.requiresLocalAdmin'
+    );
   }
 
   const body = req.body as StartGameRequest | undefined;
   if (!body || !body.setup) {
-    return res.status(400).json({ error: 'Invalid setup payload.' });
+    return sendApiError(res, 400, 'Invalid setup payload.', 'api.game.start.invalidSetupPayload');
   }
 
   const setup = normalizeGalaxySetup(body.setup);
   if (!isValidSetup(setup)) {
-    return res.status(400).json({ error: 'Invalid setup payload.' });
+    return sendApiError(res, 400, 'Invalid setup payload.', 'api.game.start.invalidSetupPayload');
   }
 
   const nextGalaxy = new GalaxyCreator(setup).createGalaxy([auth.session.playerName]);
@@ -1323,7 +1328,7 @@ app.post('/api/game/start', (req, res) => {
     );
   } catch (error) {
     console.error('Initial game save failed.', error);
-    return res.status(500).json({ error: 'Unable to save the new game.' });
+    return sendApiError(res, 500, 'Unable to save the new game.', 'api.game.start.saveNewFailed');
   }
 
   currentGalaxy = nextGalaxy;
@@ -1366,25 +1371,30 @@ app.get('/api/game/saves', (req, res) => {
     return res.status(200).json(buildGameSavesResponse(auth?.session ?? null));
   } catch (error) {
     console.error('Failed to read game saves.', error);
-    return res.status(500).json({ error: 'Unable to read game saves.' });
+    return sendApiError(res, 500, 'Unable to read game saves.', 'api.game.saves.readFailed');
   }
 });
 
 app.post('/api/game/saves/:saveId/load', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   try {
     const save = readGameSaveById(GAME_SAVES_DIRECTORY_PATH, req.params.saveId);
     if (!save) {
-      return res.status(404).json({ error: 'Saved game not found.' });
+      return sendApiError(res, 404, 'Saved game not found.', 'api.game.saves.savedGameNotFound');
     }
 
     const loadAccess = resolveGameSaveLoadAccess(save, auth.session.accountId, auth.session.localAdmin === true);
     if (!loadAccess.canLoad) {
-      return res.status(403).json({ error: loadAccess.canLoadReason ?? 'Forbidden.' });
+      return sendApiError(
+        res,
+        403,
+        loadAccess.canLoadReason ?? 'Forbidden.',
+        'api.game.saves.requiresLocalAdminToLoad'
+      );
     }
 
     const hydrated = hydrateGameSave(save);
@@ -1422,30 +1432,35 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
     return res.status(200).json(response);
   } catch (error) {
     console.error('Failed to load saved game.', error);
-    return res.status(500).json({ error: 'Unable to load saved game.' });
+    return sendApiError(res, 500, 'Unable to load saved game.', 'api.game.saves.loadFailed');
   }
 });
 
 app.delete('/api/game/saves/:saveId', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   if (!isLocalAdminSession(auth.session)) {
-    return res.status(403).json({ error: 'Local admin privileges are required to manage saves.' });
+    return sendApiError(
+      res,
+      403,
+      'Local admin privileges are required to manage saves.',
+      'api.game.saves.requiresLocalAdmin'
+    );
   }
 
   try {
     const deleted = deleteGameSaveById(GAME_SAVES_DIRECTORY_PATH, req.params.saveId);
     if (!deleted) {
-      return res.status(404).json({ error: 'Saved game not found.' });
+      return sendApiError(res, 404, 'Saved game not found.', 'api.game.saves.savedGameNotFound');
     }
 
     return res.status(204).send();
   } catch (error) {
     console.error('Failed to delete saved game.', error);
-    return res.status(500).json({ error: 'Unable to delete saved game.' });
+    return sendApiError(res, 500, 'Unable to delete saved game.', 'api.game.saves.deleteFailed');
   }
 });
 
@@ -1460,11 +1475,16 @@ app.get('/api/multiplayer/games', (req, res) => {
 app.post('/api/multiplayer/games', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   if (!isLocalAdminSession(auth.session)) {
-    return res.status(403).json({ error: 'Local admin privileges are required to create a multiplayer lobby.' });
+    return sendApiError(
+      res,
+      403,
+      'Local admin privileges are required to create a multiplayer lobby.',
+      'api.multiplayer.games.createRequiresLocalAdmin'
+    );
   }
 
   const now = new Date().toISOString();
@@ -1510,7 +1530,7 @@ app.get('/api/multiplayer/games/:gameId', (req, res) => {
   }
   const response = buildMultiplayerGameDetailResponse(req.params.gameId, auth?.session ?? null);
   if (!response) {
-    return res.status(404).json({ error: 'Multiplayer game not found.' });
+    return sendApiError(res, 404, 'Multiplayer game not found.', 'api.multiplayer.games.notFound');
   }
 
   return res.status(200).json(response);
@@ -1519,16 +1539,26 @@ app.get('/api/multiplayer/games/:gameId', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/resume-lobby', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   if (!isLocalAdminSession(auth.session)) {
-    return res.status(403).json({ error: 'Local admin privileges are required to reopen an inactive multiplayer lobby.' });
+    return sendApiError(
+      res,
+      403,
+      'Local admin privileges are required to reopen an inactive multiplayer lobby.',
+      'api.multiplayer.resumeLobby.requiresLocalAdmin'
+    );
   }
 
   const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
   if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING' || hasGameRuntime(req.params.gameId)) {
-    return res.status(404).json({ error: 'Saved inactive multiplayer game not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Saved inactive multiplayer game not found.',
+      'api.multiplayer.resumeLobby.savedInactiveNotFound'
+    );
   }
 
   const existingLobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
@@ -1541,12 +1571,22 @@ app.post('/api/multiplayer/games/:gameId/resume-lobby', (req, res) => {
       ?? listGameSaveSummariesForGame(GAME_SAVES_DIRECTORY_PATH, req.params.gameId)[0]?.saveId
       ?? null;
     if (!saveId) {
-      return res.status(404).json({ error: 'No saved snapshot is available for this multiplayer game.' });
+      return sendApiError(
+        res,
+        404,
+        'No saved snapshot is available for this multiplayer game.',
+        'api.multiplayer.resumeLobby.noSavedSnapshot'
+      );
     }
 
     const save = readGameSaveById(GAME_SAVES_DIRECTORY_PATH, saveId);
     if (!save) {
-      return res.status(404).json({ error: 'Saved snapshot not found.' });
+      return sendApiError(
+        res,
+        404,
+        'Saved snapshot not found.',
+        'api.multiplayer.resumeLobby.savedSnapshotNotFound'
+      );
     }
 
     const summary = buildGameSaveSummary(save, saveId);
@@ -1575,23 +1615,38 @@ app.post('/api/multiplayer/games/:gameId/resume-lobby', (req, res) => {
     return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
   } catch (error) {
     console.error('Failed to reopen inactive multiplayer game as a resume lobby.', error);
-    return res.status(500).json({ error: 'Unable to reopen the saved multiplayer game.' });
+    return sendApiError(
+      res,
+      500,
+      'Unable to reopen the saved multiplayer game.',
+      'api.multiplayer.resumeLobby.reopenFailed'
+    );
   }
 });
 
 app.post('/api/multiplayer/games/:gameId/archive', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   if (!isLocalAdminSession(auth.session)) {
-    return res.status(403).json({ error: 'Local admin privileges are required to archive multiplayer games.' });
+    return sendApiError(
+      res,
+      403,
+      'Local admin privileges are required to archive multiplayer games.',
+      'api.multiplayer.archive.requiresLocalAdmin'
+    );
   }
 
   const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
   if (!record || record.kind !== 'MULTIPLAYER' || hasGameRuntime(req.params.gameId)) {
-    return res.status(404).json({ error: 'Inactive multiplayer game not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Inactive multiplayer game not found.',
+      'api.multiplayer.archive.inactiveGameNotFound'
+    );
   }
 
   deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
@@ -1606,17 +1661,27 @@ app.post('/api/multiplayer/games/:gameId/archive', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/join', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const joinable = loadJoinableMultiplayerLobby(req.params.gameId);
   if (!joinable) {
-    return res.status(404).json({ error: 'Joinable multiplayer lobby not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Joinable multiplayer lobby not found.',
+      'api.multiplayer.lobby.joinableNotFound'
+    );
   }
 
   const alreadyJoinedLobby = joinable.lobby.members.some((member) => member.accountId === auth.session.accountId);
   if (!alreadyJoinedLobby && joinable.lobby.members.length >= maxLobbyMembersForSetup(joinable.lobby.setup)) {
-    return res.status(409).json({ error: 'This multiplayer lobby already has the maximum number of human players.' });
+    return sendApiError(
+      res,
+      409,
+      'This multiplayer lobby already has the maximum number of human players.',
+      'api.multiplayer.lobby.maxHumanPlayersReached'
+    );
   }
 
   removeAccountFromOtherDraftMultiplayerLobbies(auth.session.accountId, req.params.gameId);
@@ -1638,36 +1703,66 @@ app.post('/api/multiplayer/games/:gameId/join', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const gameId = req.params.gameId;
   const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
   const runtime = getGameRuntime(gameId);
   if (!isRunningScheduledMultiplayerRuntime(record, runtime)) {
-    return res.status(404).json({ error: 'Running Scheduled Turns multiplayer game not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Running Scheduled Turns multiplayer game not found.',
+      'api.multiplayer.joinRunning.runningScheduledNotFound'
+    );
   }
 
   if (isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, gameId, auth.session.accountId)) {
-    return res.status(409).json({ error: 'This account already belongs to the selected game.' });
+    return sendApiError(
+      res,
+      409,
+      'This account already belongs to the selected game.',
+      'api.multiplayer.joinRunning.accountAlreadyBelongs'
+    );
   }
 
   if (countHumanPlayersInGalaxy(runtime.galaxy) >= MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS) {
-    return res.status(409).json({ error: 'This Scheduled Turns game already has the maximum number of human players.' });
+    return sendApiError(
+      res,
+      409,
+      'This Scheduled Turns game already has the maximum number of human players.',
+      'api.multiplayer.joinRunning.maxHumanPlayersReached'
+    );
   }
 
   if (runtime.galaxy.playerNameMap.has(auth.session.playerName)) {
-    return res.status(409).json({ error: 'A player with this name already exists in the selected game.' });
+    return sendApiError(
+      res,
+      409,
+      'A player with this name already exists in the selected game.',
+      'api.multiplayer.joinRunning.playerNameExists'
+    );
   }
 
   if (!switchCurrentRuntime(gameId) || !currentGalaxy || !currentGameSetup) {
-    return res.status(409).json({ error: 'The selected game is not currently available.' });
+    return sendApiError(
+      res,
+      409,
+      'The selected game is not currently available.',
+      'api.multiplayer.joinRunning.selectedGameUnavailable'
+    );
   }
 
   const creator = new GalaxyCreator(currentGameSetup);
   const replacementCoordinates = pickLateJoinReplacementSystem(currentGalaxy, creator);
   if (!replacementCoordinates) {
-    return res.status(409).json({ error: 'No safe starting system is available for late join.' });
+    return sendApiError(
+      res,
+      409,
+      'No safe starting system is available for late join.',
+      'api.multiplayer.joinRunning.noSafeStartingSystem'
+    );
   }
 
   const player = creator.replaceSystemWithLateJoinHomeworld(
@@ -1676,7 +1771,12 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
     auth.session.playerName
   );
   if (!player) {
-    return res.status(409).json({ error: 'Unable to create a safe late-join homeworld.' });
+    return sendApiError(
+      res,
+      409,
+      'Unable to create a safe late-join homeworld.',
+      'api.multiplayer.joinRunning.safeHomeworldFailed'
+    );
   }
 
   synchronizeTradePortState(currentGalaxy);
@@ -1724,16 +1824,21 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
 app.post(['/api/multiplayer/games/:gameId/leave', '/api/multiplayer/games/:gameId/leave-lobby'], (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const joinable = loadJoinableMultiplayerLobby(req.params.gameId);
   if (!joinable) {
-    return res.status(404).json({ error: 'Joinable multiplayer lobby not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Joinable multiplayer lobby not found.',
+      'api.multiplayer.lobby.joinableNotFound'
+    );
   }
 
   if (!joinable.lobby.members.some((member) => member.accountId === auth.session.accountId)) {
-    return res.status(403).json({ error: 'Join the lobby first.' });
+    return sendApiError(res, 403, 'Join the lobby first.', 'api.multiplayer.lobby.joinFirst');
   }
 
   const nextLobby = leaveMultiplayerLobby(joinable.lobby, auth.session.accountId);
@@ -1764,16 +1869,26 @@ app.post(['/api/multiplayer/games/:gameId/leave', '/api/multiplayer/games/:gameI
 app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
   if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING') {
-    return res.status(404).json({ error: 'Running multiplayer game not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Running multiplayer game not found.',
+      'api.multiplayer.leaveCurrentGame.runningGameNotFound'
+    );
   }
 
   if (!isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, req.params.gameId, auth.session.accountId)) {
-    return res.status(403).json({ error: 'Join the multiplayer game first.' });
+    return sendApiError(
+      res,
+      403,
+      'Join the multiplayer game first.',
+      'api.multiplayer.leaveCurrentGame.joinFirst'
+    );
   }
 
   const runtime = getGameRuntime(req.params.gameId);
@@ -1905,21 +2020,26 @@ app.post('/api/multiplayer/games/:gameId/auto-skip-turn', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/ready', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const joinable = loadJoinableMultiplayerLobby(req.params.gameId);
   if (!joinable) {
-    return res.status(404).json({ error: 'Joinable multiplayer lobby not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Joinable multiplayer lobby not found.',
+      'api.multiplayer.lobby.joinableNotFound'
+    );
   }
 
   if (!joinable.lobby.members.some((member) => member.accountId === auth.session.accountId)) {
-    return res.status(403).json({ error: 'Join the lobby first.' });
+    return sendApiError(res, 403, 'Join the lobby first.', 'api.multiplayer.lobby.joinFirst');
   }
 
   const body = req.body as ToggleMultiplayerLobbyReadyRequest | undefined;
   if (typeof body?.ready !== 'boolean') {
-    return res.status(400).json({ error: 'Invalid ready payload.' });
+    return sendApiError(res, 400, 'Invalid ready payload.', 'api.multiplayer.ready.invalidPayload');
   }
 
   const nextLobby = setMultiplayerLobbyMemberReady(joinable.lobby, auth.session.accountId, body.ready);
@@ -1936,20 +2056,30 @@ app.post('/api/multiplayer/games/:gameId/ready', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/setup', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
   if (!managed) {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
+    return sendApiError(
+      res,
+      404,
+      'Draft multiplayer lobby not found or not manageable.',
+      'api.multiplayer.lobby.notManageable'
+    );
   }
   if (managed.lobby.isResumeLobby) {
-    return res.status(409).json({ error: 'Resume lobbies use locked saved-game settings.' });
+    return sendApiError(
+      res,
+      409,
+      'Resume lobbies use locked saved-game settings.',
+      'api.multiplayer.setup.resumeLocked'
+    );
   }
 
   const body = req.body as UpdateMultiplayerLobbySetupRequest | undefined;
   if (!body?.setup) {
-    return res.status(400).json({ error: 'Invalid setup payload.' });
+    return sendApiError(res, 400, 'Invalid setup payload.', 'api.game.start.invalidSetupPayload');
   }
 
   const setup = normalizeGalaxySetup({
@@ -1957,7 +2087,7 @@ app.post('/api/multiplayer/games/:gameId/setup', (req, res) => {
     playerAmount: Math.max(1, managed.lobby.members.length)
   });
   if (!isValidSetup(setup)) {
-    return res.status(400).json({ error: 'Invalid setup payload.' });
+    return sendApiError(res, 400, 'Invalid setup payload.', 'api.game.start.invalidSetupPayload');
   }
 
   const nextLobby = updateMultiplayerLobbySetup(managed.lobby, setup);
@@ -1978,28 +2108,52 @@ app.post('/api/multiplayer/games/:gameId/setup', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/bind-save', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
   if (!managed) {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
+    return sendApiError(
+      res,
+      404,
+      'Draft multiplayer lobby not found or not manageable.',
+      'api.multiplayer.lobby.notManageable'
+    );
   }
   if (managed.lobby.isResumeLobby) {
-    return res.status(409).json({ error: 'Resume lobbies are already locked to their saved game.' });
+    return sendApiError(
+      res,
+      409,
+      'Resume lobbies are already locked to their saved game.',
+      'api.multiplayer.bindSave.resumeLocked'
+    );
   }
 
   try {
     const body = req.body as BindMultiplayerLobbySaveRequest | undefined;
     const saveId = typeof body?.saveId === 'string' ? body.saveId.trim() : '';
     if (!saveId) {
-      return res.status(400).json({ error: 'Save selection is required.' });
+      return sendApiError(
+        res,
+        400,
+        'Save selection is required.',
+        'api.multiplayer.bindSave.saveSelectionRequired'
+      );
     }
 
     const save = readGameSaveById(GAME_SAVES_DIRECTORY_PATH, saveId);
     const loadAccess = resolveGameSaveLoadAccess(save, auth.session.accountId, auth.session.localAdmin === true);
     if (!loadAccess.canLoad || !save) {
-      return res.status(save ? 403 : 404).json({ error: loadAccess.canLoadReason ?? 'Saved game not found.' });
+      if (!save) {
+        return sendApiError(res, 404, 'Saved game not found.', 'api.game.saves.savedGameNotFound');
+      }
+
+      return sendApiError(
+        res,
+        403,
+        loadAccess.canLoadReason ?? 'Forbidden.',
+        'api.game.saves.requiresLocalAdminToLoad'
+      );
     }
 
     const nextLobby = bindSaveToLobby(
@@ -2022,22 +2176,32 @@ app.post('/api/multiplayer/games/:gameId/bind-save', (req, res) => {
     return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
   } catch (error) {
     console.error('Failed to bind saved game to multiplayer lobby.', error);
-    return res.status(500).json({ error: 'Unable to bind saved game.' });
+    return sendApiError(res, 500, 'Unable to bind saved game.', 'api.multiplayer.bindSave.failed');
   }
 });
 
 app.post('/api/multiplayer/games/:gameId/clear-save', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
   if (!managed) {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
+    return sendApiError(
+      res,
+      404,
+      'Draft multiplayer lobby not found or not manageable.',
+      'api.multiplayer.lobby.notManageable'
+    );
   }
   if (managed.lobby.isResumeLobby) {
-    return res.status(409).json({ error: 'Resume lobbies stay locked to their saved game.' });
+    return sendApiError(
+      res,
+      409,
+      'Resume lobbies stay locked to their saved game.',
+      'api.multiplayer.clearSave.resumeLocked'
+    );
   }
 
   const nextLobby = clearLobbySaveBinding(managed.lobby);
@@ -2058,30 +2222,50 @@ app.post('/api/multiplayer/games/:gameId/clear-save', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/assign-seat', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
   if (!managed) {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
+    return sendApiError(
+      res,
+      404,
+      'Draft multiplayer lobby not found or not manageable.',
+      'api.multiplayer.lobby.notManageable'
+    );
   }
 
   const body = req.body as AssignMultiplayerLobbySeatRequest | undefined;
   const savedPlayerId = parseBodyPositiveInt(body?.savedPlayerId);
   const accountId = body?.accountId === null ? null : parseBodyPositiveInt(body?.accountId);
   if (savedPlayerId === null || (body?.accountId !== null && accountId === null)) {
-    return res.status(400).json({ error: 'Invalid seat assignment payload.' });
+    return sendApiError(
+      res,
+      400,
+      'Invalid seat assignment payload.',
+      'api.multiplayer.assignSeat.invalidPayload'
+    );
   }
 
   if (!managed.lobby.loadSeats.some((seat) => seat.savedPlayerId === savedPlayerId)) {
-    return res.status(404).json({ error: 'Saved human seat not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Saved human seat not found.',
+      'api.multiplayer.assignSeat.savedSeatNotFound'
+    );
   }
 
   if (
     accountId !== null
     && !managed.lobby.members.some((member) => member.accountId === accountId)
   ) {
-    return res.status(404).json({ error: 'Lobby member not found.' });
+    return sendApiError(
+      res,
+      404,
+      'Lobby member not found.',
+      'api.multiplayer.assignSeat.memberNotFound'
+    );
   }
 
   const nextLobby = assignLobbyLoadSeat(managed.lobby, savedPlayerId, accountId);
@@ -2098,12 +2282,17 @@ app.post('/api/multiplayer/games/:gameId/assign-seat', (req, res) => {
 app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
   const auth = getAuthSession(req);
   if (!auth) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
   }
 
   const managed = loadDraftMultiplayerLobbyForManagement(auth.session, req.params.gameId);
   if (!managed) {
-    return res.status(404).json({ error: 'Draft multiplayer lobby not found or not manageable.' });
+    return sendApiError(
+      res,
+      404,
+      'Draft multiplayer lobby not found or not manageable.',
+      'api.multiplayer.lobby.notManageable'
+    );
   }
 
   const blockedReason = getMultiplayerLobbyStartBlockedReason(managed.lobby);
@@ -2115,9 +2304,12 @@ app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
   if (setup.scheduledTurns.enabled === true) {
     const existingScheduledGameId = findLoadedScheduledMultiplayerGame(req.params.gameId);
     if (existingScheduledGameId) {
-      return res.status(409).json({
-        error: 'Only one running Scheduled Turns multiplayer game can be active on this server.'
-      });
+      return sendApiError(
+        res,
+        409,
+        'Only one running Scheduled Turns multiplayer game can be active on this server.',
+        'api.multiplayer.start.onlyOneScheduledTurnsGame'
+      );
     }
   }
 
@@ -2132,11 +2324,11 @@ app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to start multiplayer game.';
     if (message === 'Saved game not found.') {
-      return res.status(404).json({ error: message });
+      return sendApiError(res, 404, message, 'api.game.saves.savedGameNotFound');
     }
 
     console.error('Failed to start multiplayer game.', error);
-    return res.status(500).json({ error: 'Unable to start multiplayer game.' });
+    return sendApiError(res, 500, 'Unable to start multiplayer game.', 'api.multiplayer.start.failed');
   }
 });
 

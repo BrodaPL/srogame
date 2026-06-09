@@ -5,14 +5,16 @@ import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
+import { resolveApiErrorMessage, resolveApiText } from '../i18n/api-message.utils';
+import { I18nPipe } from '../i18n/i18n.pipe';
+import { I18nService } from '../i18n/i18n.service';
 import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 import { GameType } from '../models/enums/game-type';
 import {
-  STARTING_HOMEWORLD_PRESET_TOOLTIPS,
   STARTING_HOMEWORLD_PRESET_VALUES,
   StartingHomeworldPreset
 } from '../models/enums/starting-homeworld-preset';
-import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
+import { BOT_PROFILE_IDS, type BotProfileId } from '../models/player';
 import {
   type BotProfileCountMap,
   DEFAULT_NEUTRAL_PLANET_PERCENT,
@@ -69,19 +71,17 @@ type LobbySetupForm = {
 
 @Component({
   selector: 'app-multiplayer',
-  imports: [FormsModule, RouterLink, TooltipDirective],
+  imports: [FormsModule, RouterLink, TooltipDirective, I18nPipe],
   templateUrl: './multiplayer.component.html',
   styleUrl: './multiplayer.component.css'
 })
 export class MultiplayerComponent implements OnDestroy {
   protected readonly fixedGameType = GameType.SANDBOX;
+  protected readonly gameTypes = [GameType.PVP, GameType.PVPVE, GameType.PVE, GameType.SANDBOX];
   protected readonly botProfileIds = BOT_PROFILE_IDS;
-  protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly scheduledTurnHours = SCHEDULED_TURN_HOURS;
   protected readonly minScheduledTurnsGalaxySize = MIN_SCHEDULED_TURNS_GALAXY_SIZE;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
-  protected readonly startingHomeworldPresetTooltips = STARTING_HOMEWORLD_PRESET_TOOLTIPS;
-  protected readonly botsUnitedAgainstHumansTooltip = 'When enabled, permanent bot empires start allied with each other and at war with every human player. Neutral resource factions are not affected. Useful for PvE or co-op games where bots should act as a shared opposing bloc.';
   protected readonly session: AuthStateService['session'];
   protected browserResponse: MultiplayerGameBrowserResponse | null = null;
   protected detailResponse: MultiplayerGameDetailResponse | null = null;
@@ -110,7 +110,8 @@ export class MultiplayerComponent implements OnDestroy {
     private readonly authState: AuthStateService,
     private readonly gameApi: GameApiService,
     private readonly gameState: GameStateService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly i18n: I18nService
   ) {
     this.session = this.authState.session;
     effect(() => {
@@ -239,7 +240,10 @@ export class MultiplayerComponent implements OnDestroy {
       return null;
     }
 
-    return `Assigned bot personalities must total exactly ${botsAmount}. Current total: ${assigned}.`;
+    return this.i18n.t('multiplayer.botPersonalities.validation', {
+      required: botsAmount,
+      assigned
+    });
   }
 
   protected botProfileCountValue(profileId: keyof BotProfileCountMap): string {
@@ -288,7 +292,7 @@ export class MultiplayerComponent implements OnDestroy {
       },
       error: (error) => {
         this.isActing = false;
-        this.error = error?.error?.error ?? 'Unable to create a multiplayer lobby.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.createLobbyFailed'));
         this.cdr.markForCheck();
       }
     });
@@ -304,7 +308,7 @@ export class MultiplayerComponent implements OnDestroy {
 
     this.runDetailMutation(
       () => this.gameApi.joinMultiplayerGame(gameId, session.token),
-      'Joined draft lobby. Any previous draft-lobby membership was cleared.'
+      this.i18n.t('multiplayer.messages.joinedDraftLobby')
     );
   }
 
@@ -317,7 +321,7 @@ export class MultiplayerComponent implements OnDestroy {
     }
 
     if (!target.canJoin || target.status !== 'RUNNING') {
-      this.error = 'This running game is not currently joinable.';
+      this.error = this.i18n.t('multiplayer.errors.runningGameNotJoinable');
       return;
     }
 
@@ -333,7 +337,7 @@ export class MultiplayerComponent implements OnDestroy {
         this.router.navigate(['/game/imperium']);
       },
       error: (error) => {
-        this.error = error?.error?.error ?? 'Unable to join the running Scheduled Turns game.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.joinRunningGameFailed'));
         this.isActing = false;
         this.cdr.markForCheck();
         this.loadSelectedGameDetail(false);
@@ -356,14 +360,14 @@ export class MultiplayerComponent implements OnDestroy {
     this.gameApi.leaveMultiplayerLobby(gameId, session.token).subscribe({
       next: () => {
         this.isActing = false;
-        this.infoMessage = 'Left draft lobby.';
+        this.infoMessage = this.i18n.t('multiplayer.messages.leftDraftLobby');
         this.loadBrowser(false);
         this.detailResponse = null;
         this.cdr.markForCheck();
       },
       error: (error) => {
         this.isActing = false;
-        this.error = error?.error?.error ?? 'Unable to leave the draft lobby.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.leaveDraftLobbyFailed'));
         this.cdr.markForCheck();
       }
     });
@@ -387,14 +391,14 @@ export class MultiplayerComponent implements OnDestroy {
           ...session,
           currentGameId: response.currentGameId
         });
-        this.infoMessage = response.message ?? 'Left current multiplayer game. You can rejoin it later.';
+        this.infoMessage = this.translateLeaveCurrentGameMessage(response.message);
         this.loadBrowser(false);
         this.loadSelectedGameDetail(false);
         this.cdr.markForCheck();
       },
       error: (error) => {
         this.isActing = false;
-        this.error = error?.error?.error ?? 'Unable to leave the current multiplayer game.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.leaveCurrentGameFailed'));
         this.cdr.markForCheck();
       }
     });
@@ -410,7 +414,7 @@ export class MultiplayerComponent implements OnDestroy {
 
     this.runDetailMutation(
       () => this.gameApi.reopenMultiplayerResumeLobby(gameId, session.token),
-      'Reopened saved multiplayer game as a resumed lobby.'
+      this.i18n.t('multiplayer.messages.reopenedResumeLobby')
     );
   }
 
@@ -428,14 +432,14 @@ export class MultiplayerComponent implements OnDestroy {
     this.gameApi.archiveMultiplayerGame(gameId, session.token).subscribe({
       next: () => {
         this.isActing = false;
-        this.infoMessage = 'Archived multiplayer game.';
+        this.infoMessage = this.i18n.t('multiplayer.messages.archivedGame');
         this.detailResponse = null;
         this.loadBrowser(false);
         this.cdr.markForCheck();
       },
       error: (error) => {
         this.isActing = false;
-        this.error = error?.error?.error ?? 'Unable to archive the selected multiplayer game.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.archiveFailed'));
         this.cdr.markForCheck();
       }
     });
@@ -450,7 +454,7 @@ export class MultiplayerComponent implements OnDestroy {
 
     this.runDetailMutation(
       () => this.gameApi.setMultiplayerGameReady(gameId, { ready }, session.token),
-      ready ? 'Marked ready.' : 'Marked not ready.'
+      ready ? this.i18n.t('multiplayer.messages.markedReady') : this.i18n.t('multiplayer.messages.markedNotReady')
     );
   }
 
@@ -464,13 +468,13 @@ export class MultiplayerComponent implements OnDestroy {
 
     const setup = this.buildSetup(lobby.members.length);
     if (!setup) {
-      this.error = this.botPersonalityValidationMessage() ?? 'Lobby setup is incomplete or invalid.';
+      this.error = this.botPersonalityValidationMessage() ?? this.i18n.t('multiplayer.errors.lobbySetupInvalid');
       return;
     }
 
     this.runDetailMutation(
       () => this.gameApi.updateMultiplayerGameSetup(gameId, { setup }, session.token),
-      'Lobby setup saved.'
+      this.i18n.t('multiplayer.messages.lobbySetupSaved')
     );
   }
 
@@ -482,13 +486,13 @@ export class MultiplayerComponent implements OnDestroy {
     }
 
     if (!this.selectedSaveId) {
-      this.error = 'Select a save first.';
+      this.error = this.i18n.t('multiplayer.messages.selectedSaveRequired');
       return;
     }
 
     this.runDetailMutation(
       () => this.gameApi.bindMultiplayerGameSave(gameId, { saveId: this.selectedSaveId }, session.token),
-      'Save bound to draft lobby.'
+      this.i18n.t('multiplayer.messages.saveBound')
     );
   }
 
@@ -501,7 +505,7 @@ export class MultiplayerComponent implements OnDestroy {
 
     this.runDetailMutation(
       () => this.gameApi.clearMultiplayerGameSave(gameId, session.token),
-      'Draft lobby switched back to new-game mode.'
+      this.i18n.t('multiplayer.messages.switchedToNewGame')
     );
   }
 
@@ -514,13 +518,13 @@ export class MultiplayerComponent implements OnDestroy {
 
     const accountId = nextValue === '' ? null : Number(nextValue);
     if (nextValue !== '' && !Number.isInteger(accountId)) {
-      this.error = 'Invalid seat assignment.';
+      this.error = this.i18n.t('multiplayer.errors.invalidSeatAssignment');
       return;
     }
 
     this.runDetailMutation(
       () => this.gameApi.assignMultiplayerGameSeat(gameId, { savedPlayerId, accountId }, session.token),
-      'Seat assignment updated.'
+      this.i18n.t('multiplayer.messages.seatAssignmentUpdated')
     );
   }
 
@@ -548,7 +552,7 @@ export class MultiplayerComponent implements OnDestroy {
         this.router.navigate(['/game/imperium']);
       },
       error: (error) => {
-        this.error = error?.error?.error ?? 'Unable to start the multiplayer game.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.startMultiplayerFailed'));
         this.isActing = false;
         this.cdr.markForCheck();
         this.loadSelectedGameDetail(false);
@@ -566,7 +570,7 @@ export class MultiplayerComponent implements OnDestroy {
     }
 
     if (!target.canEnter) {
-      this.error = 'This multiplayer game is not currently enterable.';
+      this.error = this.i18n.t('multiplayer.errors.gameNotEnterable');
       return;
     }
 
@@ -588,12 +592,16 @@ export class MultiplayerComponent implements OnDestroy {
           return;
         }
 
-        this.error = status.unavailableReason ?? 'This multiplayer game is not currently active.';
+        this.error = resolveApiText(this.i18n, {
+          text: status.unavailableReason ?? null,
+          key: status.unavailableReasonKey ?? null,
+          params: status.unavailableReasonParams ?? null
+        }, this.i18n.t('multiplayer.errors.enterRunningGameInactive'));
         this.loadBrowser(false);
       },
       error: (error) => {
         this.isActing = false;
-        this.error = error?.error?.error ?? 'Unable to enter the selected multiplayer game.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.enterRunningGameFailed'));
         this.cdr.markForCheck();
       }
     });
@@ -619,8 +627,8 @@ export class MultiplayerComponent implements OnDestroy {
 
   protected browserStatusLabel(item: MultiplayerGameListItem): string {
     const sections = [
-      item.statusLabel,
-      `${item.memberCount} member${item.memberCount === 1 ? '' : 's'}`
+      this.translateMultiplayerStatusLabel(item.statusLabel),
+      this.memberCountLabel(item.memberCount)
     ];
     return sections.join(' / ');
   }
@@ -631,44 +639,52 @@ export class MultiplayerComponent implements OnDestroy {
       return '';
     }
 
-    const sections: string[] = [game.kind, game.status];
+    const sections: string[] = [this.i18n.t('multiplayer.status.multiplayer'), this.translateMultiplayerStatusLabel(game.status)];
     if (game.currentTurn !== null) {
-      sections.push(`Turn ${game.currentTurn}`);
+      sections.push(this.i18n.t('multiplayer.status.currentTurn', { turn: game.currentTurn }));
     }
     return sections.join(' / ');
   }
 
   protected inactiveReasonLabel(item?: MultiplayerGameListItem | null): string | null {
-    return item?.inactiveReasonText ?? null;
+    if (!item?.inactiveReasonText) {
+      return null;
+    }
+
+    switch (item.inactiveReasonText) {
+      case 'Stopped because no players remained present.':
+        return this.i18n.t('multiplayer.inactiveReasons.noPresentHumans');
+      case 'Stopped because not enough players remained online.':
+        return this.i18n.t('multiplayer.inactiveReasons.tooFewOnlinePlayers');
+      default:
+        return item.inactiveReasonText;
+    }
   }
 
   protected enterButtonLabel(item?: MultiplayerGameListItem | null): string {
     const target = item ?? this.selectedBrowserItem();
-    return target?.canReturnToGame ? 'Return to game' : 'Enter running game';
+    return target?.canReturnToGame
+      ? this.i18n.t('multiplayer.actions.returnToGame')
+      : this.i18n.t('multiplayer.actions.enterRunningGame');
   }
 
   protected updatedAtLabel(item: MultiplayerGameListItem): string {
-    const date = new Date(item.updatedAt);
-    if (Number.isNaN(date.getTime())) {
-      return item.updatedAt;
-    }
-
-    return date.toLocaleString();
+    return this.i18n.formatDateTime(item.updatedAt);
   }
 
   protected runningMemberStatusLabel(member: MultiplayerRunningMemberDto): string {
     if (member.isAutoSkipTurn) {
-      return 'Auto skip turn';
+      return this.i18n.t('multiplayer.status.autoSkipTurn');
     }
 
     if (!member.isOfflineBotControlled) {
-      return 'Online / human-controlled';
+      return this.i18n.t('multiplayer.status.onlineHumanControlled');
     }
 
     const profileLabel = member.offlineBotProfileId
-      ? this.botProfileLabels[member.offlineBotProfileId]
-      : 'Default';
-    return `Offline, bot-controlled (${profileLabel})`;
+      ? this.botProfileLabel(member.offlineBotProfileId)
+      : this.i18n.t('multiplayer.status.defaultBotProfile');
+    return this.i18n.t('multiplayer.status.offlineBotControlled', { profile: profileLabel });
   }
 
   protected logout(): void {
@@ -718,10 +734,12 @@ export class MultiplayerComponent implements OnDestroy {
   protected scheduledTurnsSummary(): string {
     const selected = this.scheduledTurnHours.filter((hour) => this.setupForm.scheduledTurnHours[hour]);
     if (!this.setupForm.scheduledTurnsEnabled) {
-      return 'Disabled';
+      return this.i18n.t('multiplayer.messages.scheduledTurnsDisabled');
     }
 
-    return `${selected.length} turn${selected.length === 1 ? '' : 's'} per day`;
+    return selected.length === 1
+      ? this.i18n.t('multiplayer.messages.scheduledTurnsPerDayOne', { count: selected.length })
+      : this.i18n.t('multiplayer.messages.scheduledTurnsPerDayMany', { count: selected.length });
   }
 
   protected scheduledHourLabel(hour: number): string {
@@ -775,7 +793,7 @@ export class MultiplayerComponent implements OnDestroy {
         this.browserResponse = null;
         this.detailResponse = null;
         this.isLoadingBrowser = false;
-        this.error = error?.error?.error ?? 'Unable to load multiplayer games.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.loadBrowserFailed'));
         this.cdr.markForCheck();
       }
     });
@@ -818,7 +836,7 @@ export class MultiplayerComponent implements OnDestroy {
 
         this.detailResponse = null;
         this.isLoadingDetail = false;
-        this.error = error?.error?.error ?? 'Unable to load multiplayer game details.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.loadDetailFailed'));
         this.cdr.markForCheck();
       }
     });
@@ -851,7 +869,7 @@ export class MultiplayerComponent implements OnDestroy {
         this.saveResponse = null;
         this.isLoadingSaves = false;
         if (resetError) {
-          this.error = error?.error?.error ?? 'Unable to load available saves.';
+          this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.loadSavesFailed'));
         }
         this.cdr.markForCheck();
       }
@@ -882,7 +900,7 @@ export class MultiplayerComponent implements OnDestroy {
       },
       error: (error) => {
         this.isActing = false;
-        this.error = error?.error?.error ?? 'Multiplayer action failed.';
+        this.error = resolveApiErrorMessage(this.i18n, error, this.i18n.t('multiplayer.errors.actionFailed'));
         this.cdr.markForCheck();
         this.loadSelectedGameDetail(false);
         this.loadBrowser(false);
@@ -1131,5 +1149,126 @@ export class MultiplayerComponent implements OnDestroy {
       result[profileId] = String(counts[profileId] ?? 0);
       return result;
     }, {} as Record<string, string>);
+  }
+
+  protected gameTypeLabel(gameType: GameType): string {
+    return this.i18n.t(`multiplayer.gameTypes.${gameType}`);
+  }
+
+  protected botProfileLabel(profileId: BotProfileId): string {
+    return this.i18n.t(`settings.botProfiles.${profileId}`);
+  }
+
+  protected botsUnitedAgainstHumansTooltip(): string {
+    return this.i18n.t('multiplayer.botDiplomacy.tooltip');
+  }
+
+  protected startingHomeworldPresetLabel(preset: StartingHomeworldPreset): string {
+    return this.i18n.t(`multiplayer.startingHomeworldPreset.presets.${preset}.label`);
+  }
+
+  protected startingHomeworldPresetTooltip(preset: StartingHomeworldPreset): string {
+    return this.i18n.t(`multiplayer.startingHomeworldPreset.presets.${preset}.tooltip`);
+  }
+
+  protected autoSaveLabel(turns: number): string {
+    return turns === 0
+      ? this.i18n.t('multiplayer.messages.autoSaveDisabled')
+      : this.i18n.t('multiplayer.messages.autoSaveEveryTurns', { turns });
+  }
+
+  protected selectedGameNoticeTitle(): string {
+    return this.selectedBrowserItem()?.statusLabel === 'Saved / Inactive'
+      ? this.i18n.t('multiplayer.sections.savedInactive')
+      : this.i18n.t('multiplayer.sections.runningMultiplayerGame');
+  }
+
+  protected selectedGameNoticeBody(): string {
+    return this.selectedBrowserItem()?.statusLabel === 'Saved / Inactive'
+      ? this.i18n.t('multiplayer.detail.savedInactiveBody')
+      : this.i18n.t('multiplayer.detail.runningBody');
+  }
+
+  protected selectedLobbyModeLabel(): string {
+    return this.selectedLobby()?.mode === 'LOAD_SAVE'
+      ? this.i18n.t('multiplayer.status.modeLoadSave')
+      : this.i18n.t('multiplayer.status.modeNewGame');
+  }
+
+  protected seatAssignmentDescription(seat: MultiplayerLobbyLoadSeatDto): string {
+    switch (seat.assignmentMode) {
+      case 'BOT':
+        return this.i18n.t('multiplayer.saveBinding.seatWillBecomeBot');
+      case 'ORIGINAL':
+        return this.i18n.t('multiplayer.saveBinding.originalSavedPlayerMatched');
+      default:
+        return this.i18n.t('multiplayer.saveBinding.replacementPlayerAssigned');
+    }
+  }
+
+  protected translatedStartBlockedReason(reason: string | null): string | null {
+    if (!reason) {
+      return null;
+    }
+
+    if (reason === 'At least two joined players are required.') {
+      return this.i18n.t('multiplayer.startBlockedReasons.atLeastTwoJoinedPlayers');
+    }
+    if (reason === 'All non-admin players must be ready.') {
+      return this.i18n.t('multiplayer.startBlockedReasons.allNonAdminReady');
+    }
+    if (reason === 'Bind a saved game first.') {
+      return this.i18n.t('multiplayer.startBlockedReasons.bindSaveFirst');
+    }
+    if (reason === 'Every joined player must be assigned to a saved human seat or leave the lobby.') {
+      return this.i18n.t('multiplayer.startBlockedReasons.everyJoinedPlayerAssigned');
+    }
+    if (reason.startsWith('Scheduled Turns games can have at most ')) {
+      return this.i18n.t('multiplayer.startBlockedReasons.scheduledTurnsMaxHumans', {
+        count: MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS
+      });
+    }
+    if (reason.startsWith('Standard multiplayer games can have at most ')) {
+      return this.i18n.t('multiplayer.startBlockedReasons.standardMaxHumans', {
+        count: MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS
+      });
+    }
+
+    return reason;
+  }
+
+  private translateMultiplayerStatusLabel(statusLabel: string): string {
+    switch (statusLabel) {
+      case 'DRAFT':
+        return this.i18n.t('multiplayer.status.draft');
+      case 'RUNNING':
+        return this.i18n.t('multiplayer.status.running');
+      case 'ARCHIVED':
+        return this.i18n.t('multiplayer.status.archived');
+      case 'Resumed lobby':
+        return this.i18n.t('multiplayer.status.resumedLobby');
+      case 'Saved / Inactive':
+        return this.i18n.t('multiplayer.status.savedInactive');
+      default:
+        return statusLabel;
+    }
+  }
+
+  private memberCountLabel(count: number): string {
+    return count === 1
+      ? this.i18n.t('multiplayer.messages.selectedMembersCountOne', { count })
+      : this.i18n.t('multiplayer.messages.selectedMembersCountMany', { count });
+  }
+
+  private translateLeaveCurrentGameMessage(message: string | null): string {
+    if (!message) {
+      return this.i18n.t('multiplayer.messages.leftCurrentGameDefault');
+    }
+
+    if (message === 'Not enough online players, saving and stopping the game.') {
+      return this.i18n.t('api.multiplayer.leaveCurrentGame.savedBecauseTooFewOnlinePlayers');
+    }
+
+    return message;
   }
 }

@@ -42,6 +42,22 @@ export const apiPl = {
       tutorialsReset: 'Postep samouczkow zostal zresetowany dla biezacej sesji.'
     }
   },
+  game: {
+    start: {
+      requiresLocalAdmin: 'Do rozpoczecia nowej gry wymagane sa uprawnienia localAdmin.',
+      invalidSetupPayload: 'Nieprawidlowy payload ustawien.',
+      saveNewFailed: 'Nie udalo sie zapisac nowej gry.'
+    },
+    saves: {
+      readFailed: 'Nie udalo sie odczytac zapisow gry.',
+      savedGameNotFound: 'Nie znaleziono zapisanej gry.',
+      loadFailed: 'Nie udalo sie wczytac zapisanej gry.',
+      deleteFailed: 'Nie udalo sie usunac zapisanej gry.',
+      requiresLocalAdmin: 'Do zarzadzania zapisami wymagane sa uprawnienia localAdmin.',
+      loginRequiredToManage: 'Aby zarzadzac zapisami, musisz sie zalogowac.',
+      requiresLocalAdminToLoad: 'Do wczytania zapisanej gry wymagane sa uprawnienia localAdmin.'
+    }
+  },
   games: {
     current: {
       unavailableResume: 'Nie masz obecnie dostepu do wznowienia tej gry.',
@@ -68,6 +84,64 @@ export const apiPl = {
     }
   },
   multiplayer: {
+    games: {
+      notFound: 'Nie znaleziono gry multiplayer.',
+      createRequiresLocalAdmin: 'Do utworzenia lobby multiplayer wymagane sa uprawnienia localAdmin.'
+    },
+    lobby: {
+      joinableNotFound: 'Nie znaleziono lobby multiplayer, do ktorego mozna dolaczyc.',
+      notManageable: 'Nie znaleziono lobby roboczego multiplayer albo nie mozna nim zarzadzac.',
+      maxHumanPlayersReached: 'To lobby multiplayer ma juz maksymalna liczbe ludzkich graczy.',
+      joinFirst: 'Najpierw dolacz do lobby.'
+    },
+    resumeLobby: {
+      requiresLocalAdmin: 'Do ponownego otwarcia nieaktywnego lobby multiplayer wymagane sa uprawnienia localAdmin.',
+      savedInactiveNotFound: 'Nie znaleziono zapisanej nieaktywnej gry multiplayer.',
+      noSavedSnapshot: 'Dla tej gry multiplayer nie jest dostepny zaden zapisany snapshot.',
+      savedSnapshotNotFound: 'Nie znaleziono zapisanego snapshotu.',
+      reopenFailed: 'Nie udalo sie ponownie otworzyc zapisanej gry multiplayer.'
+    },
+    archive: {
+      requiresLocalAdmin: 'Do archiwizacji gier multiplayer wymagane sa uprawnienia localAdmin.',
+      inactiveGameNotFound: 'Nie znaleziono nieaktywnej gry multiplayer.'
+    },
+    joinRunning: {
+      runningScheduledNotFound: 'Nie znaleziono uruchomionej gry multiplayer Zaplanowane Tury.',
+      accountAlreadyBelongs: 'To konto juz nalezy do wybranej gry.',
+      maxHumanPlayersReached: 'Ta gra Zaplanowane Tury ma juz maksymalna liczbe ludzkich graczy.',
+      playerNameExists: 'Gracz o tej nazwie juz istnieje w wybranej grze.',
+      selectedGameUnavailable: 'Wybrana gra nie jest obecnie dostepna.',
+      noSafeStartingSystem: 'Nie ma dostepnego bezpiecznego ukladu startowego dla poznego dolaczenia.',
+      safeHomeworldFailed: 'Nie udalo sie utworzyc bezpiecznej planety macierzystej dla poznego dolaczenia.'
+    },
+    leaveCurrentGame: {
+      runningGameNotFound: 'Nie znaleziono uruchomionej gry multiplayer.',
+      joinFirst: 'Najpierw dolacz do gry multiplayer.',
+      savedBecauseTooFewOnlinePlayers: 'Zbyt malo graczy online, zapisywanie i zatrzymywanie gry.'
+    },
+    ready: {
+      invalidPayload: 'Nieprawidlowy payload gotowosci.'
+    },
+    setup: {
+      resumeLocked: 'Lobby wznowienia uzywaja zablokowanych ustawien zapisanej gry.'
+    },
+    bindSave: {
+      resumeLocked: 'Lobby wznowienia sa juz zablokowane do swojej zapisanej gry.',
+      saveSelectionRequired: 'Wymagany jest wybor zapisu.',
+      failed: 'Nie udalo sie powiazac zapisanej gry.'
+    },
+    clearSave: {
+      resumeLocked: 'Lobby wznowienia pozostaja zablokowane do swojej zapisanej gry.'
+    },
+    assignSeat: {
+      invalidPayload: 'Nieprawidlowy payload przypisania miejsca.',
+      savedSeatNotFound: 'Nie znaleziono zapisanego ludzkiego miejsca.',
+      memberNotFound: 'Nie znaleziono czlonka lobby.'
+    },
+    start: {
+      onlyOneScheduledTurnsGame: 'Na tym serwerze moze byc aktywna tylko jedna uruchomiona gra Zaplanowane Tury.',
+      failed: 'Nie udalo sie uruchomic gry multiplayer.'
+    },
     presence: {
       runningGameNotFound: 'Nie znaleziono uruchomionej gry multiplayer.',
       autoSkipRequiresEnabledBoolean: 'Przelacznik auto skip wymaga wartosci enabled typu boolean.'

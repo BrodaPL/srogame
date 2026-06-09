@@ -1,41 +1,39 @@
 <main class="page">
   <section class="panel">
     <header class="panel__header">
-      <p class="eyebrow">SroGame Core</p>
-      <h1>Galaxy Initialization</h1>
-      <p class="subtitle">
-        Configure the galaxy layout, populations, and starting resources.
-      </p>
+      <p class="eyebrow">{{ 'setup.eyebrow' | t }}</p>
+      <h1>{{ 'setup.title' | t }}</h1>
+      <p class="subtitle">{{ 'setup.subtitle' | t }}</p>
     </header>
 
     <form class="setup-form" (ngSubmit)="startGame()">
       <div class="field">
-        <label>Player name</label>
+        <label>{{ 'setup.fields.playerName' | t }}</label>
         @if (session()) {
           <div class="readonly-value">{{ session()!.playerName }}</div>
           @if (!session()!.localAdmin) {
-            <p class="form-error">Local admin privileges are required to start a single-player game on this server.</p>
+            <p class="form-error">{{ 'setup.errors.localAdminRequiredServer' | t }}</p>
           }
         } @else {
-          <p class="form-error">Login required to start a game.</p>
-          <a class="link button" routerLink="/login">Go to login</a>
+          <p class="form-error">{{ 'setup.errors.loginRequired' | t }}</p>
+          <a class="link button" routerLink="/login">{{ 'setup.actions.goToLogin' | t }}</a>
         }
       </div>
 
       <div class="field">
-        <label for="galaxyName">Galaxy name</label>
+        <label for="galaxyName">{{ 'setup.fields.galaxyName' | t }}</label>
         <input
           id="galaxyName"
           name="galaxyName"
           type="text"
-          placeholder="Aetheria"
+          [placeholder]="'setup.placeholders.galaxyName' | t"
           [(ngModel)]="form.galaxyName"
           required
         />
       </div>
 
       <div class="field">
-        <label for="gameType">Game type</label>
+        <label for="gameType">{{ 'setup.fields.gameType' | t }}</label>
         <select
           id="gameType"
           name="gameType"
@@ -43,16 +41,15 @@
           disabled
           required
         >
-          <option value="PvP">PvP</option>
-          <option value="PvPvE">PvPvE</option>
-          <option value="PvE">PvE</option>
-          <option value="Sandbox">Sandbox</option>
+          @for (gameType of gameTypes; track gameType) {
+            <option [value]="gameType">{{ gameTypeLabel(gameType) }}</option>
+          }
         </select>
       </div>
 
       <div class="field-row">
         <div class="field">
-          <label for="galaxyWidth">Galaxy width</label>
+          <label for="galaxyWidth">{{ 'setup.fields.galaxyWidth' | t }}</label>
           <input
             id="galaxyWidth"
             name="galaxyWidth"
@@ -67,7 +64,7 @@
         </div>
 
         <div class="field">
-          <label for="galaxyHeight">Galaxy height</label>
+          <label for="galaxyHeight">{{ 'setup.fields.galaxyHeight' | t }}</label>
           <input
             id="galaxyHeight"
             name="galaxyHeight"
@@ -84,7 +81,7 @@
 
       <div class="field-row">
         <div class="field">
-          <label for="galaxyCenterSize">Galaxy center size (%)</label>
+          <label for="galaxyCenterSize">{{ 'setup.fields.galaxyCenterSize' | t }}</label>
           <input
             id="galaxyCenterSize"
             name="galaxyCenterSize"
@@ -99,7 +96,7 @@
         </div>
 
         <div class="field">
-          <label for="voidChance">Void chance (%)</label>
+          <label for="voidChance">{{ 'setup.fields.voidChance' | t }}</label>
           <input
             id="voidChance"
             name="voidChance"
@@ -116,7 +113,7 @@
 
       <div class="field-row">
         <div class="field">
-          <label for="starsAmountModifierMin">Stars amount modifier min</label>
+          <label for="starsAmountModifierMin">{{ 'setup.fields.starsAmountModifierMin' | t }}</label>
           <input
             id="starsAmountModifierMin"
             name="starsAmountModifierMin"
@@ -131,7 +128,7 @@
         </div>
 
         <div class="field">
-          <label for="starsAmountModifierMax">Stars amount modifier max</label>
+          <label for="starsAmountModifierMax">{{ 'setup.fields.starsAmountModifierMax' | t }}</label>
           <input
             id="starsAmountModifierMax"
             name="starsAmountModifierMax"
@@ -147,7 +144,7 @@
       </div>
 
       <div class="field">
-        <label for="playerAmount">Player amount</label>
+        <label for="playerAmount">{{ 'setup.fields.playerAmount' | t }}</label>
         <input
           id="playerAmount"
           name="playerAmount"
@@ -163,7 +160,7 @@
 
       <div class="field-row">
         <div class="field">
-          <label for="botsAmount">Bots amount</label>
+          <label for="botsAmount">{{ 'setup.fields.botsAmount' | t }}</label>
           <input
             id="botsAmount"
             name="botsAmount"
@@ -178,7 +175,7 @@
         </div>
 
         <div class="field">
-          <label for="botDifficulty">Bot difficulty (%)</label>
+          <label for="botDifficulty">{{ 'setup.fields.botDifficulty' | t }}</label>
           <input
             id="botDifficulty"
             name="botDifficulty"
@@ -195,15 +192,15 @@
 
       @if (configuredBotsAmount() > 0) {
         <div class="field">
-          <label>Bot personalities</label>
+          <label>{{ 'setup.fields.botPersonalities' | t }}</label>
           <div class="saved">
-            <p class="saved__title">Assigned: {{ assignedBotProfilesCount() }} / {{ configuredBotsAmount() }}</p>
-            <p>Choose the exact amount of each implemented bot personality.</p>
+            <p class="saved__title">{{ 'setup.botPersonalities.assigned' | t:{ assigned: assignedBotProfilesCount(), total: configuredBotsAmount() } }}</p>
+            <p>{{ 'setup.botPersonalities.help' | t }}</p>
           </div>
           <div class="field-row">
             @for (profileId of botProfileIds; track profileId) {
               <div class="field">
-                <label for="bot-profile-{{ profileId }}">{{ botProfileLabels[profileId] }}</label>
+                <label for="bot-profile-{{ profileId }}">{{ botProfileLabel(profileId) }}</label>
                 <input
                   id="bot-profile-{{ profileId }}"
                   name="bot-profile-{{ profileId }}"
@@ -224,28 +221,28 @@
       }
 
       <div class="field">
-        <label>Bot diplomacy</label>
+        <label>{{ 'setup.fields.botDiplomacy' | t }}</label>
         <div class="test-options">
           <label
             class="checkbox-field"
             for="botsUnitedAgainstHumans"
-            [appTooltip]="botsUnitedAgainstHumansTooltip"
+            [appTooltip]="botsUnitedAgainstHumansTooltip()"
           >
             <input
               id="botsUnitedAgainstHumans"
               name="botsUnitedAgainstHumans"
               type="checkbox"
               [(ngModel)]="form.botsUnitedAgainstHumans"
-              [appTooltip]="botsUnitedAgainstHumansTooltip"
+              [appTooltip]="botsUnitedAgainstHumansTooltip()"
             />
-            <span>Bots united against humans</span>
+            <span>{{ 'setup.botDiplomacy.botsUnitedAgainstHumans' | t }}</span>
           </label>
         </div>
       </div>
 
       <div class="field-row">
         <div class="field">
-          <label for="neutralBotsAmount">Neutral bots amount (%)</label>
+          <label for="neutralBotsAmount">{{ 'setup.fields.neutralBotsAmount' | t }}</label>
           <input
             id="neutralBotsAmount"
             name="neutralBotsAmount"
@@ -260,7 +257,7 @@
         </div>
 
         <div class="field">
-          <label for="neutralBotsDifficulty">Neutral bots difficulty (%)</label>
+          <label for="neutralBotsDifficulty">{{ 'setup.fields.neutralBotsDifficulty' | t }}</label>
           <input
             id="neutralBotsDifficulty"
             name="neutralBotsDifficulty"
@@ -276,7 +273,7 @@
       </div>
 
       <div class="field">
-        <label for="autoSaveTurns">Auto save every N turns</label>
+        <label for="autoSaveTurns">{{ 'setup.fields.autoSaveTurns' | t }}</label>
         <input
           id="autoSaveTurns"
           name="autoSaveTurns"
@@ -288,11 +285,11 @@
           [(ngModel)]="form.autoSaveTurns"
           required
         />
-        <small>Use 0 to disable auto saving after end turn.</small>
+        <small>{{ 'setup.autoSave.hint' | t }}</small>
       </div>
 
       <div class="field">
-        <label>Player action logging</label>
+        <label>{{ 'setup.fields.playerActionLogging' | t }}</label>
         <div class="test-options">
           <label class="checkbox-field" for="enablePlayerActionLogging">
             <input
@@ -301,20 +298,20 @@
               type="checkbox"
               [(ngModel)]="form.enablePlayerActionLogging"
             />
-            <span>Log successful local player actions to disk</span>
+            <span>{{ 'setup.playerActionLogging.enable' | t }}</span>
           </label>
         </div>
-        <small>Writes building, shipyard, research, and fleet actions to <code>server/data/player-action-logs/</code>.</small>
+        <small>{{ 'setup.playerActionLogging.hint' | t }}</small>
       </div>
 
       <div class="field">
-        <label>Starting homeworld preset</label>
+        <label>{{ 'setup.fields.startingHomeworldPreset' | t }}</label>
         <div class="test-options">
           @for (preset of startingHomeworldPresetValues; track preset) {
             <label
               class="checkbox-field"
               for="startingHomeworldPreset-{{ preset }}"
-              [appTooltip]="startingHomeworldPresetTooltips[preset]"
+              [appTooltip]="startingHomeworldPresetTooltip(preset)"
             >
               <input
                 id="startingHomeworldPreset-{{ preset }}"
@@ -322,17 +319,17 @@
                 type="radio"
                 [value]="preset"
                 [(ngModel)]="form.startingHomeworldPreset"
-                [appTooltip]="startingHomeworldPresetTooltips[preset]"
+                [appTooltip]="startingHomeworldPresetTooltip(preset)"
               />
-              <span>{{ preset }}</span>
+              <span>{{ startingHomeworldPresetLabel(preset) }}</span>
             </label>
           }
         </div>
-        <small>Applies only to human and bot home planets. Neutral starts stay RNG-based.</small>
+        <small>{{ 'setup.startingHomeworldPreset.help' | t }}</small>
       </div>
 
       <div class="field">
-        <label>Testing options</label>
+        <label>{{ 'setup.fields.testingOptions' | t }}</label>
         <div class="test-options">
           <label class="checkbox-field" for="createRandomPlanets">
             <input
@@ -341,7 +338,7 @@
               type="checkbox"
               [(ngModel)]="form.createRandomPlanets"
             />
-            <span>Create random planets</span>
+            <span>{{ 'setup.testingOptions.createRandomPlanets' | t }}</span>
           </label>
           <label class="checkbox-field" for="createStartingShips">
             <input
@@ -350,7 +347,7 @@
               type="checkbox"
               [(ngModel)]="form.createStartingShips"
             />
-            <span>Create starting ships</span>
+            <span>{{ 'setup.testingOptions.createStartingShips' | t }}</span>
           </label>
           <label class="checkbox-field" for="skipTutorial">
             <input
@@ -359,17 +356,17 @@
               type="checkbox"
               [(ngModel)]="form.skipTutorial"
             />
-            <span>Skip tutorial</span>
+            <span>{{ 'setup.testingOptions.skipTutorial' | t }}</span>
           </label>
         </div>
       </div>
 
       <div class="field">
-        <label for="starting-resources">Starting resources</label>
+        <label for="starting-resources">{{ 'setup.fields.startingResources' | t }}</label>
         <div class="resource-group" id="starting-resources">
           <div class="resource-input">
-            <label class="sr-only" for="metal">Metal</label>
-            <img class="resource-icon" src="images/icons/normal/metal.png" alt="Metal" />
+            <label class="sr-only" for="metal">{{ 'setup.resources.metal' | t }}</label>
+            <img class="resource-icon" src="images/icons/normal/metal.png" [alt]="'setup.resources.metal' | t" />
             <input
               id="metal"
               name="metal"
@@ -384,8 +381,8 @@
           </div>
 
           <div class="resource-input">
-            <label class="sr-only" for="crystal">Crystal</label>
-            <img class="resource-icon" src="images/icons/normal/crystal.png" alt="Crystal" />
+            <label class="sr-only" for="crystal">{{ 'setup.resources.crystal' | t }}</label>
+            <img class="resource-icon" src="images/icons/normal/crystal.png" [alt]="'setup.resources.crystal' | t" />
             <input
               id="crystal"
               name="crystal"
@@ -400,8 +397,8 @@
           </div>
 
           <div class="resource-input">
-            <label class="sr-only" for="deuterium">Deuterium</label>
-            <img class="resource-icon" src="images/icons/normal/deuter.png" alt="Deuterium" />
+            <label class="sr-only" for="deuterium">{{ 'setup.resources.deuterium' | t }}</label>
+            <img class="resource-icon" src="images/icons/normal/deuter.png" [alt]="'setup.resources.deuterium' | t" />
             <input
               id="deuterium"
               name="deuterium"
@@ -418,7 +415,7 @@
       </div>
 
       <button class="start-button" type="submit" [disabled]="!canStart() || isStarting">
-        Start new game
+        {{ isStarting ? ('setup.actions.starting' | t) : ('setup.actions.startNewGame' | t) }}
       </button>
 
       @if (startError) {
@@ -428,23 +425,12 @@
 
     @if (savedConfig()) {
       <div class="saved">
-        <p class="saved__title">Saved config</p>
-        <p>
-          {{ savedConfig()!.galaxyName }} ({{ savedConfig()!.galaxyWidth }}x{{ savedConfig()!.galaxyHeight }}) with
-          {{ savedConfig()!.playerAmount }} players, {{ savedConfig()!.botsAmount }} bots.
-          Auto save:
-          {{ savedConfig()!.autoSaveTurns === 0 ? 'disabled' : 'every ' + savedConfig()!.autoSaveTurns + ' turns' }}.
-          Homeworld preset:
-          {{ savedConfig()!.startingHomeworldPreset }}.
-          Starting resources:
-          {{ savedConfig()!.startingResources.metal }} metal,
-          {{ savedConfig()!.startingResources.crystal }} crystal,
-          {{ savedConfig()!.startingResources.deuterium }} deuterium.
-        </p>
+        <p class="saved__title">{{ 'setup.savedConfig.title' | t }}</p>
+        <p>{{ savedConfigSummary() }}</p>
       </div>
     }
     <div class="saved">
-      <a class="link button" routerLink="/">Back to main menu</a>
+      <a class="link button" routerLink="/">{{ 'common.actions.backToMainMenu' | t }}</a>
     </div>
 
   </section>

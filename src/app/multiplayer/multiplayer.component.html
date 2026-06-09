@@ -1,14 +1,10 @@
 <main class="page">
   <section class="panel multiplayer-panel">
     <header class="panel__header">
-      <p class="eyebrow">Multiplayer</p>
-      <h1>Lobby Browser</h1>
-      <p class="subtitle">
-        Browse many draft lobbies and running multiplayer games. Joining a draft lobby removes you from any other draft lobby.
-      </p>
-      <p class="subtitle">
-        If a running multiplayer member enabled logout replacement, their seat can continue as a bot until they return. Standard multiplayer turns still require online humans and ready-state; Scheduled Turns games progress by server schedule.
-      </p>
+      <p class="eyebrow">{{ 'multiplayer.eyebrow' | t }}</p>
+      <h1>{{ 'multiplayer.title' | t }}</h1>
+      <p class="subtitle">{{ 'multiplayer.subtitle' | t }}</p>
+      <p class="subtitle">{{ 'multiplayer.subtitleSecondary' | t }}</p>
     </header>
 
     @if (error) {
@@ -17,35 +13,35 @@
 
     @if (infoMessage) {
       <div class="saved">
-        <p class="saved__title">Update</p>
+        <p class="saved__title">{{ 'multiplayer.sections.update' | t }}</p>
         <p>{{ infoMessage }}</p>
       </div>
     }
 
     @if (!session()) {
       <div class="saved">
-        <p class="saved__title">Login Required</p>
-        <p>You can browse multiplayer games, but joining or managing them requires login.</p>
+        <p class="saved__title">{{ 'multiplayer.sections.loginRequired' | t }}</p>
+        <p>{{ 'multiplayer.messages.browseWithoutLogin' | t }}</p>
       </div>
     } @else {
       <div class="multiplayer-account">
         <div>
-          <p class="saved__title">Current account</p>
+          <p class="saved__title">{{ 'multiplayer.sections.currentAccount' | t }}</p>
           <p>
             {{ session()!.playerName }}
             @if (session()!.localAdmin) {
-              <span>(Local Admin)</span>
+              <span>({{ 'multiplayer.account.localAdmin' | t }})</span>
             }
           </p>
         </div>
         <div class="multiplayer-account__actions">
           @if (canCreateLobby()) {
             <button class="start-button" type="button" (click)="createLobby()" [disabled]="isActing">
-              {{ isActing ? 'Creating...' : 'Create draft lobby' }}
+              {{ isActing ? ('multiplayer.actions.creating' | t) : ('multiplayer.actions.createDraftLobby' | t) }}
             </button>
           }
           <button class="start-button" type="button" (click)="logout()" [disabled]="isActing || isLoadingBrowser">
-            Logout
+            {{ 'multiplayer.actions.logout' | t }}
           </button>
         </div>
       </div>
@@ -56,18 +52,18 @@
         <section class="multiplayer-browser-section">
           <div class="multiplayer-browser-section__head">
             <div>
-              <p class="saved__title">Active Draft Lobbies</p>
-              <p class="multiplayer-browser-section__meta">Open multiplayer drafts updated within the last hour.</p>
+              <p class="saved__title">{{ 'multiplayer.sections.activeDraftLobbies' | t }}</p>
+              <p class="multiplayer-browser-section__meta">{{ 'multiplayer.browser.activeDraftMeta' | t }}</p>
             </div>
           </div>
 
           @if (isLoadingBrowser && activeDraftLobbies().length === 0) {
             <div class="saved">
-              <p>Loading draft lobbies.</p>
+              <p>{{ 'multiplayer.browser.loadingDrafts' | t }}</p>
             </div>
           } @else if (activeDraftLobbies().length === 0) {
             <div class="saved">
-              <p>No current draft lobbies are open right now.</p>
+              <p>{{ 'multiplayer.browser.noDrafts' | t }}</p>
             </div>
           } @else {
             <div class="multiplayer-browser-list">
@@ -75,15 +71,15 @@
                 <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
                   <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
                     <span class="multiplayer-browser-card__title">{{ item.name }}</span>
-                    <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                    <span class="multiplayer-browser-card__meta">{{ 'multiplayer.browser.host' | t:{ host: item.hostPlayerName ?? ('loadGame.labels.unknown' | t) } }}</span>
                     <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
                     @if (item.isResumeLobby) {
-                      <span class="multiplayer-browser-card__badge multiplayer-browser-card__badge--resume">Resumed lobby</span>
+                      <span class="multiplayer-browser-card__badge multiplayer-browser-card__badge--resume">{{ 'multiplayer.status.resumedLobby' | t }}</span>
                     }
                     @if (item.offlineBotControlledCount > 0) {
-                      <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
+                      <span class="multiplayer-browser-card__badge">{{ 'multiplayer.browser.offlineBotSeats' | t:{ count: item.offlineBotControlledCount } }}</span>
                     }
-                    <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                    <span class="multiplayer-browser-card__meta">{{ 'multiplayer.browser.updated' | t:{ date: updatedAtLabel(item) } }}</span>
                   </button>
                 </article>
               }
@@ -94,18 +90,18 @@
         <section class="multiplayer-browser-section">
           <div class="multiplayer-browser-section__head">
             <div>
-              <p class="saved__title">Active Running Games</p>
-              <p class="multiplayer-browser-section__meta">Currently loaded multiplayer games you can enter or inspect.</p>
+              <p class="saved__title">{{ 'multiplayer.sections.activeRunningGames' | t }}</p>
+              <p class="multiplayer-browser-section__meta">{{ 'multiplayer.browser.activeRunningMeta' | t }}</p>
             </div>
           </div>
 
           @if (isLoadingBrowser && activeRunningGames().length === 0) {
             <div class="saved">
-              <p>Loading running multiplayer games.</p>
+              <p>{{ 'multiplayer.browser.loadingRunning' | t }}</p>
             </div>
           } @else if (activeRunningGames().length === 0) {
             <div class="saved">
-              <p>No running multiplayer games are visible to this account yet.</p>
+              <p>{{ 'multiplayer.browser.noRunning' | t }}</p>
             </div>
           } @else {
             <div class="multiplayer-browser-list">
@@ -113,21 +109,21 @@
                 <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
                   <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
                     <span class="multiplayer-browser-card__title">{{ item.name }}</span>
-                    <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                    <span class="multiplayer-browser-card__meta">{{ 'multiplayer.browser.host' | t:{ host: item.hostPlayerName ?? ('loadGame.labels.unknown' | t) } }}</span>
                     <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
                     @if (item.offlineBotControlledCount > 0) {
-                      <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
+                      <span class="multiplayer-browser-card__badge">{{ 'multiplayer.browser.offlineBotSeats' | t:{ count: item.offlineBotControlledCount } }}</span>
                     }
-                    <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                    <span class="multiplayer-browser-card__meta">{{ 'multiplayer.browser.updated' | t:{ date: updatedAtLabel(item) } }}</span>
                   </button>
                   @if (item.canEnter) {
                     <button class="start-button multiplayer-browser-card__action" type="button" (click)="enterRunningGame(item)" [disabled]="isActing">
-                      Enter
+                      {{ 'multiplayer.actions.enter' | t }}
                     </button>
                   }
                   @if (item.canJoin) {
                     <button class="start-button multiplayer-browser-card__action" type="button" (click)="joinSelectedRunningGame(item)" [disabled]="isActing">
-                      Join
+                      {{ 'multiplayer.actions.join' | t }}
                     </button>
                   }
                 </article>
@@ -139,18 +135,18 @@
         <section class="multiplayer-browser-section">
           <div class="multiplayer-browser-section__head">
             <div>
-              <p class="saved__title">Other Multiplayer Games</p>
-              <p class="multiplayer-browser-section__meta">Older drafts and saved inactive multiplayer games that are not currently joinable.</p>
+              <p class="saved__title">{{ 'multiplayer.sections.otherMultiplayerGames' | t }}</p>
+              <p class="multiplayer-browser-section__meta">{{ 'multiplayer.browser.otherGamesMeta' | t }}</p>
             </div>
             <button class="start-button multiplayer-browser-section__toggle" type="button" (click)="showOtherGames = !showOtherGames">
-              {{ showOtherGames ? 'Hide other games' : 'Show other games' }}
+              {{ showOtherGames ? ('multiplayer.actions.hideOtherGames' | t) : ('multiplayer.actions.showOtherGames' | t) }}
             </button>
           </div>
 
           @if (showOtherGames) {
             @if (visibleOtherMultiplayerGames().length === 0) {
               <div class="saved">
-                <p>No other multiplayer games are visible to this account.</p>
+                <p>{{ 'multiplayer.browser.noOtherGames' | t }}</p>
               </div>
             } @else {
               <div class="multiplayer-browser-list">
@@ -158,15 +154,15 @@
                   <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
                     <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
                       <span class="multiplayer-browser-card__title">{{ item.name }}</span>
-                      <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                      <span class="multiplayer-browser-card__meta">{{ 'multiplayer.browser.host' | t:{ host: item.hostPlayerName ?? ('loadGame.labels.unknown' | t) } }}</span>
                       <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
                       @if (item.inactiveReasonText) {
-                        <span class="multiplayer-browser-card__meta">{{ item.inactiveReasonText }}</span>
+                        <span class="multiplayer-browser-card__meta">{{ inactiveReasonLabel(item) }}</span>
                       }
                       @if (item.offlineBotControlledCount > 0) {
-                        <span class="multiplayer-browser-card__badge">Offline bot seats: {{ item.offlineBotControlledCount }}</span>
+                        <span class="multiplayer-browser-card__badge">{{ 'multiplayer.browser.offlineBotSeats' | t:{ count: item.offlineBotControlledCount } }}</span>
                       }
-                      <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                      <span class="multiplayer-browser-card__meta">{{ 'multiplayer.browser.updated' | t:{ date: updatedAtLabel(item) } }}</span>
                     </button>
                     @if (item.canEnter) {
                       <button class="start-button multiplayer-browser-card__action" type="button" (click)="enterRunningGame(item)" [disabled]="isActing">
@@ -175,12 +171,12 @@
                     }
                     @if (item.canResumeLobby) {
                       <button class="start-button multiplayer-browser-card__action" type="button" (click)="selectGame(item); reopenSelectedResumeLobby()" [disabled]="isActing">
-                        Resume lobby
+                        {{ 'multiplayer.actions.resumeLobby' | t }}
                       </button>
                     }
                     @if (item.canArchive) {
                       <button class="start-button multiplayer-browser-card__action" type="button" (click)="selectGame(item); archiveSelectedGame()" [disabled]="isActing">
-                        Archive
+                        {{ 'multiplayer.actions.archive' | t }}
                       </button>
                     }
                   </article>
@@ -193,18 +189,18 @@
         <section class="multiplayer-browser-section">
           <div class="multiplayer-browser-section__head">
             <div>
-              <p class="saved__title">Archived Multiplayer Games</p>
-              <p class="multiplayer-browser-section__meta">Historical multiplayer records kept out of the normal recovery flow by default.</p>
+              <p class="saved__title">{{ 'multiplayer.sections.archivedMultiplayerGames' | t }}</p>
+              <p class="multiplayer-browser-section__meta">{{ 'multiplayer.browser.archivedGamesMeta' | t }}</p>
             </div>
             <button class="start-button multiplayer-browser-section__toggle" type="button" (click)="showArchivedGames = !showArchivedGames">
-              {{ showArchivedGames ? 'Hide archived' : 'Show archived' }}
+              {{ showArchivedGames ? ('multiplayer.actions.hideArchived' | t) : ('multiplayer.actions.showArchived' | t) }}
             </button>
           </div>
 
           @if (showArchivedGames) {
             @if (archivedMultiplayerGames().length === 0) {
               <div class="saved">
-                <p>No archived multiplayer games are visible to this account.</p>
+                <p>{{ 'multiplayer.browser.noArchivedGames' | t }}</p>
               </div>
             } @else {
               <div class="multiplayer-browser-list">
@@ -212,9 +208,9 @@
                   <article class="multiplayer-browser-card" [class.multiplayer-browser-card--selected]="isSelected(item)">
                     <button class="multiplayer-browser-card__select" type="button" (click)="selectGame(item)">
                       <span class="multiplayer-browser-card__title">{{ item.name }}</span>
-                      <span class="multiplayer-browser-card__meta">Host: {{ item.hostPlayerName ?? 'Unknown' }}</span>
+                      <span class="multiplayer-browser-card__meta">{{ 'multiplayer.browser.host' | t:{ host: item.hostPlayerName ?? ('loadGame.labels.unknown' | t) } }}</span>
                       <span class="multiplayer-browser-card__meta">{{ browserStatusLabel(item) }}</span>
-                      <span class="multiplayer-browser-card__meta">Updated: {{ updatedAtLabel(item) }}</span>
+                      <span class="multiplayer-browser-card__meta">{{ 'multiplayer.browser.updated' | t:{ date: updatedAtLabel(item) } }}</span>
                     </button>
                   </article>
                 }
@@ -227,23 +223,23 @@
       <section class="multiplayer-detail">
         @if (!selectedGameId) {
           <div class="saved">
-            <p class="saved__title">No Selection</p>
-            <p>Select a draft lobby or running game from the browser.</p>
+            <p class="saved__title">{{ 'multiplayer.sections.noSelection' | t }}</p>
+            <p>{{ 'multiplayer.detail.noSelection' | t }}</p>
           </div>
         } @else if (isLoadingDetail && !detailResponse) {
           <div class="saved">
-            <p class="saved__title">Loading</p>
-            <p>Reading selected multiplayer game details.</p>
+            <p class="saved__title">{{ 'multiplayer.sections.loading' | t }}</p>
+            <p>{{ 'multiplayer.detail.loading' | t }}</p>
           </div>
         } @else if (!detailResponse) {
           <div class="saved">
-            <p class="saved__title">Unavailable</p>
-            <p>The selected multiplayer game is no longer available.</p>
+            <p class="saved__title">{{ 'multiplayer.sections.unavailable' | t }}</p>
+            <p>{{ 'multiplayer.detail.unavailable' | t }}</p>
           </div>
         } @else {
           <header class="multiplayer-detail__header">
             <div>
-              <p class="saved__title">Selected Game</p>
+              <p class="saved__title">{{ 'multiplayer.sections.selectedGame' | t }}</p>
               <h2>{{ detailResponse.game.name }}</h2>
               <p class="multiplayer-detail__subtitle">{{ detailedStatusLabel() }}</p>
             </div>
@@ -255,32 +251,32 @@
               }
               @if (!selectedLobby() && selectedBrowserItem()?.canJoin) {
                 <button class="start-button" type="button" (click)="joinSelectedRunningGame()" [disabled]="isActing">
-                  Join running game
+                  {{ 'multiplayer.actions.joinRunningGame' | t }}
                 </button>
               }
               @if (canResumeSelectedLobby()) {
                 <button class="start-button" type="button" (click)="reopenSelectedResumeLobby()" [disabled]="isActing">
-                  Resume lobby
+                  {{ 'multiplayer.actions.resumeLobby' | t }}
                 </button>
               }
               @if (canArchiveSelectedGame()) {
                 <button class="start-button" type="button" (click)="archiveSelectedGame()" [disabled]="isActing">
-                  Archive
+                  {{ 'multiplayer.actions.archive' | t }}
                 </button>
               }
               @if (selectedBrowserItem()?.isCurrentGame && !selectedLobby()) {
                 <button class="start-button" type="button" (click)="leaveCurrentGame()" [disabled]="isActing">
-                  Leave current game
+                  {{ 'multiplayer.actions.leaveCurrentGame' | t }}
                 </button>
               }
               @if (selectedLobby()?.canJoin) {
                 <button class="start-button" type="button" (click)="joinSelectedLobby()" [disabled]="isActing">
-                  Join draft lobby
+                  {{ 'multiplayer.actions.joinDraftLobby' | t }}
                 </button>
               }
               @if (selectedLobby()?.canLeave) {
                 <button class="start-button" type="button" (click)="leaveSelectedLobby()" [disabled]="isActing">
-                  Leave draft lobby
+                  {{ 'multiplayer.actions.leaveDraftLobby' | t }}
                 </button>
               }
             </div>
@@ -288,14 +284,8 @@
 
           @if (!selectedLobby()) {
             <div class="saved">
-              <p class="saved__title">{{ selectedBrowserItem()?.statusLabel === 'Saved / Inactive' ? 'Saved / Inactive' : 'Running Multiplayer Game' }}</p>
-              <p>
-                {{
-                  selectedBrowserItem()?.statusLabel === 'Saved / Inactive'
-                    ? 'This multiplayer game is saved but not currently loaded. Ask localAdmin to resume it before entering again.'
-                    : 'This game is already running. Use Enter to rejoin it if you have access.'
-                }}
-              </p>
+              <p class="saved__title">{{ selectedGameNoticeTitle() }}</p>
+              <p>{{ selectedGameNoticeBody() }}</p>
               @if (inactiveReasonLabel(selectedBrowserItem())) {
                 <p>{{ inactiveReasonLabel(selectedBrowserItem()) }}</p>
               }
@@ -314,10 +304,10 @@
                           [class.multiplayer-member__status-pill--auto-skip]="member.isAutoSkipTurn">
                           {{
                             member.isOfflineBotControlled
-                              ? 'Offline bot'
+                              ? ('multiplayer.status.offlineBot' | t)
                               : member.isAutoSkipTurn
-                                ? 'Auto skip'
-                                : 'Online'
+                                ? ('multiplayer.status.autoSkip' | t)
+                                : ('multiplayer.status.online' | t)
                           }}
                         </span>
                         <span>{{ runningMemberStatusLabel(member) }}</span>
@@ -330,53 +320,53 @@
           } @else {
             <div class="multiplayer-detail__grid">
               <section class="saved">
-                <p class="saved__title">Lobby Overview</p>
-                <p>Host: {{ selectedLobby()!.hostPlayerName }}</p>
-                <p>Mode: {{ selectedLobby()!.mode === 'LOAD_SAVE' ? 'Load saved game' : 'Start new game' }}</p>
+                <p class="saved__title">{{ 'multiplayer.sections.lobbyOverview' | t }}</p>
+                <p>{{ 'multiplayer.browser.host' | t:{ host: selectedLobby()!.hostPlayerName } }}</p>
+                <p>{{ 'multiplayer.labels.mode' | t }}: {{ selectedLobbyModeLabel() }}</p>
                 @if (selectedLobby()!.isResumeLobby) {
                   <div class="multiplayer-callout multiplayer-callout--resume">
-                    <p class="multiplayer-callout__title">Resumed lobby</p>
-                    <p>This lobby resumes a saved multiplayer game. Settings stay locked to the saved snapshot while players rejoin and localAdmin prepares the restart.</p>
+                    <p class="multiplayer-callout__title">{{ 'multiplayer.callouts.resumedLobbyTitle' | t }}</p>
+                    <p>{{ 'multiplayer.callouts.resumedLobbyBody' | t }}</p>
                   </div>
                 }
-                <p>Joined players: {{ selectedLobby()!.members.length }}</p>
+                <p>{{ 'multiplayer.status.joinedPlayers' | t:{ count: selectedLobby()!.members.length } }}</p>
                 @if (selectedLobby()!.startBlockedReason) {
-                  <p class="form-error">{{ selectedLobby()!.startBlockedReason }}</p>
+                  <p class="form-error">{{ translatedStartBlockedReason(selectedLobby()!.startBlockedReason) }}</p>
                 }
                 @if (selectedLobby()!.setup.scheduledTurns.enabled) {
-                  <p>Scheduled Turns: {{ selectedLobby()!.setup.scheduledTurns.enabledHours.length }} turn(s) per day.</p>
+                  <p>{{ 'multiplayer.status.scheduledTurnsPerDay' | t:{ count: selectedLobby()!.setup.scheduledTurns.enabledHours.length } }}</p>
                 }
               </section>
 
               <section class="saved">
-                <p class="saved__title">Members</p>
+                <p class="saved__title">{{ 'multiplayer.sections.members' | t }}</p>
                 <div class="multiplayer-member-list">
                   @for (member of selectedLobby()!.members; track member.accountId) {
                     <div class="multiplayer-member">
                       <strong>{{ member.playerName }}</strong>
                       <span class="multiplayer-member__status">
                         <span class="multiplayer-member__status-pill multiplayer-member__status-pill--draft">
-                          {{ member.isReady ? 'Ready' : 'Not ready' }}
+                          {{ member.isReady ? ('multiplayer.status.ready' | t) : ('multiplayer.status.notReady' | t) }}
                         </span>
                         <span>
                         @if (member.isLocalAdmin) {
-                          Local Admin /
+                          {{ 'multiplayer.account.localAdmin' | t }} /
                         }
-                        {{ member.isReady ? 'Ready for start' : 'Waiting for ready' }}
+                        {{ member.isReady ? ('multiplayer.status.readyForStart' | t) : ('multiplayer.status.waitingForReady' | t) }}
                         </span>
                       </span>
                     </div>
                   }
                 </div>
                 <div class="multiplayer-callout">
-                  <p class="multiplayer-callout__title">Logout replacement</p>
-                  <p>Players who enable logout replacement can be temporarily bot-controlled in the running game. Standard games still require online humans; Scheduled Turns games keep progressing by schedule.</p>
+                  <p class="multiplayer-callout__title">{{ 'multiplayer.callouts.logoutReplacementTitle' | t }}</p>
+                  <p>{{ 'multiplayer.callouts.logoutReplacementBody' | t }}</p>
                 </div>
 
                 @if (selectedLobby()!.canToggleReady) {
                   <div class="field-row">
-                    <button class="start-button" type="button" (click)="setReady(true)" [disabled]="isActing">Ready</button>
-                    <button class="start-button" type="button" (click)="setReady(false)" [disabled]="isActing">Not ready</button>
+                    <button class="start-button" type="button" (click)="setReady(true)" [disabled]="isActing">{{ 'multiplayer.actions.ready' | t }}</button>
+                    <button class="start-button" type="button" (click)="setReady(false)" [disabled]="isActing">{{ 'multiplayer.actions.notReady' | t }}</button>
                   </div>
                 }
               </section>
@@ -384,18 +374,18 @@
 
             @if (selectedLobby()!.boundSave) {
               <section class="saved">
-                <p class="saved__title">Bound Save</p>
+                <p class="saved__title">{{ 'multiplayer.sections.boundSave' | t }}</p>
                 <p>{{ selectedLobby()!.boundSave!.displayName }}</p>
                 <p>
-                  Auto save:
-                  {{ selectedLobby()!.boundSave!.autoSaveTurns === 0 ? 'disabled' : 'every ' + selectedLobby()!.boundSave!.autoSaveTurns + ' turns' }}
+                  {{ 'loadGame.labels.autoSave' | t }}:
+                  {{ autoSaveLabel(selectedLobby()!.boundSave!.autoSaveTurns) }}
                 </p>
               </section>
             }
 
             @if (selectedLobby()!.loadSeats.length > 0) {
               <section class="saved">
-                <p class="saved__title">Saved Human Seats</p>
+                <p class="saved__title">{{ 'multiplayer.sections.savedHumanSeats' | t }}</p>
                 @for (seat of selectedLobby()!.loadSeats; track seat.savedPlayerId) {
                   <div class="field">
                     <label for="seat-{{ seat.savedPlayerId }}">{{ seat.savedPlayerName }}</label>
@@ -405,22 +395,14 @@
                       [ngModel]="seatValue(seat)"
                       (ngModelChange)="assignSeat(seat.savedPlayerId, $event)"
                       [disabled]="!selectedLobby()!.canManage || isActing">
-                      <option value="">Convert to bot</option>
+                      <option value="">{{ 'multiplayer.saveBinding.convertToBot' | t }}</option>
                       @for (member of selectedLobby()!.members; track member.accountId) {
                         @if (canSelectSeatMember(seat, member.accountId) || seat.assignedAccountId === member.accountId) {
                           <option [value]="member.accountId">{{ member.playerName }}</option>
                         }
                       }
                     </select>
-                    <small>
-                      {{
-                        seat.assignmentMode === 'BOT'
-                          ? 'This seat will become a bot.'
-                          : seat.assignmentMode === 'ORIGINAL'
-                            ? 'Original saved player matched.'
-                            : 'Replacement player assigned.'
-                      }}
-                    </small>
+                    <small>{{ seatAssignmentDescription(seat) }}</small>
                   </div>
                 }
               </section>
@@ -429,84 +411,83 @@
             @if (canManageSelectedLobby() && !selectedLobby()!.isResumeLobby) {
               <section class="multiplayer-management" (input)="markSetupDirty()" (change)="markSetupDirty()">
                 <div class="saved">
-                  <p class="saved__title">Host Controls</p>
-                  <p>Only the local-admin host can manage this draft lobby and start the game.</p>
+                  <p class="saved__title">{{ 'multiplayer.sections.hostControls' | t }}</p>
+                  <p>{{ 'multiplayer.hostControls.title' | t }}</p>
                 </div>
 
                 <div class="field">
-                  <label for="galaxyName">Galaxy name</label>
+                  <label for="galaxyName">{{ 'multiplayer.fields.galaxyName' | t }}</label>
                   <input id="galaxyName" name="galaxyName" type="text" [(ngModel)]="setupForm.galaxyName" />
                 </div>
 
                 <div class="field">
-                  <label for="gameType">Game type</label>
+                  <label for="gameType">{{ 'multiplayer.fields.gameType' | t }}</label>
                   <select id="gameType" name="gameType" [(ngModel)]="setupForm.gameType" disabled>
-                    <option value="PvP">PvP</option>
-                    <option value="PvPvE">PvPvE</option>
-                    <option value="PvE">PvE</option>
-                    <option value="Sandbox">Sandbox</option>
+                    @for (gameType of gameTypes; track gameType) {
+                      <option [value]="gameType">{{ gameTypeLabel(gameType) }}</option>
+                    }
                   </select>
                 </div>
 
                 <div class="field-row">
                   <div class="field">
-                    <label for="galaxyWidth">Galaxy width</label>
+                    <label for="galaxyWidth">{{ 'multiplayer.fields.galaxyWidth' | t }}</label>
                     <input id="galaxyWidth" name="galaxyWidth" type="number" min="10" max="100" [(ngModel)]="setupForm.galaxyWidth" />
                   </div>
                   <div class="field">
-                    <label for="galaxyHeight">Galaxy height</label>
+                    <label for="galaxyHeight">{{ 'multiplayer.fields.galaxyHeight' | t }}</label>
                     <input id="galaxyHeight" name="galaxyHeight" type="number" min="10" max="100" [(ngModel)]="setupForm.galaxyHeight" />
                   </div>
                 </div>
 
                 <div class="field-row">
                   <div class="field">
-                    <label for="galaxyCenterSize">Galaxy center size (%)</label>
+                    <label for="galaxyCenterSize">{{ 'multiplayer.fields.galaxyCenterSize' | t }}</label>
                     <input id="galaxyCenterSize" name="galaxyCenterSize" type="number" min="5" max="35" [(ngModel)]="setupForm.galaxyCenterSize" />
                   </div>
                   <div class="field">
-                    <label for="voidChance">Void chance (%)</label>
+                    <label for="voidChance">{{ 'multiplayer.fields.voidChance' | t }}</label>
                     <input id="voidChance" name="voidChance" type="number" min="0" max="35" [(ngModel)]="setupForm.voidChance" />
                   </div>
                 </div>
 
                 <div class="field-row">
                   <div class="field">
-                    <label for="starsAmountModifierMin">Stars modifier min</label>
+                    <label for="starsAmountModifierMin">{{ 'multiplayer.fields.starsAmountModifierMin' | t }}</label>
                     <input id="starsAmountModifierMin" name="starsAmountModifierMin" type="number" min="-10" max="0" [(ngModel)]="setupForm.starsAmountModifierMin" />
                   </div>
                   <div class="field">
-                    <label for="starsAmountModifierMax">Stars modifier max</label>
+                    <label for="starsAmountModifierMax">{{ 'multiplayer.fields.starsAmountModifierMax' | t }}</label>
                     <input id="starsAmountModifierMax" name="starsAmountModifierMax" type="number" min="1" max="9" [(ngModel)]="setupForm.starsAmountModifierMax" />
                   </div>
                 </div>
 
                 <div class="saved">
-                  <p>Human player amount is taken from joined lobby members: {{ selectedLobby()!.members.length }}.</p>
+                  <p>{{ 'multiplayer.messages.humanPlayerAmountDerived' | t:{ count: selectedLobby()!.members.length } }}</p>
                 </div>
 
                 <div class="field-row">
                   <div class="field">
-                    <label for="botsAmount">Bots amount</label>
+                    <label for="botsAmount">{{ 'multiplayer.fields.botsAmount' | t }}</label>
                     <input id="botsAmount" name="botsAmount" type="number" min="0" max="12" [(ngModel)]="setupForm.botsAmount" />
                   </div>
                   <div class="field">
-                    <label for="botDifficulty">Bot difficulty (%)</label>
+                    <label for="botDifficulty">{{ 'multiplayer.fields.botDifficulty' | t }}</label>
                     <input id="botDifficulty" name="botDifficulty" type="number" min="-75" max="200" [(ngModel)]="setupForm.botDifficulty" />
                   </div>
                 </div>
 
                 @if (configuredBotsAmount() > 0) {
                   <div class="field">
-                    <label>Bot personalities</label>
+                    <label>{{ 'multiplayer.fields.botPersonalities' | t }}</label>
                     <div class="saved">
-                      <p class="saved__title">Assigned: {{ assignedBotProfilesCount() }} / {{ configuredBotsAmount() }}</p>
-                      <p>Choose the exact amount of each implemented bot personality.</p>
+                      <p class="saved__title">{{ 'multiplayer.botPersonalities.assigned' | t:{ assigned: assignedBotProfilesCount(), total: configuredBotsAmount() } }}</p>
+                      <p>{{ 'multiplayer.botPersonalities.help' | t }}</p>
                     </div>
                     <div class="field-row">
                       @for (profileId of botProfileIds; track profileId) {
                         <div class="field">
-                          <label for="lobby-bot-profile-{{ profileId }}">{{ botProfileLabels[profileId] }}</label>
+                          <label for="lobby-bot-profile-{{ profileId }}">{{ botProfileLabel(profileId) }}</label>
                           <input
                             id="lobby-bot-profile-{{ profileId }}"
                             name="lobby-bot-profile-{{ profileId }}"
@@ -526,38 +507,38 @@
                 }
 
                 <div class="field">
-                  <label>Bot diplomacy</label>
+                  <label>{{ 'multiplayer.fields.botDiplomacy' | t }}</label>
                   <div class="test-options">
                     <label
                       class="checkbox-field"
                       for="lobby-botsUnitedAgainstHumans"
-                      [appTooltip]="botsUnitedAgainstHumansTooltip">
+                      [appTooltip]="botsUnitedAgainstHumansTooltip()">
                       <input
                         id="lobby-botsUnitedAgainstHumans"
                         name="lobby-botsUnitedAgainstHumans"
                         type="checkbox"
                         [(ngModel)]="setupForm.botsUnitedAgainstHumans"
-                        [appTooltip]="botsUnitedAgainstHumansTooltip" />
-                      <span>Bots united against humans</span>
+                        [appTooltip]="botsUnitedAgainstHumansTooltip()" />
+                      <span>{{ 'multiplayer.botDiplomacy.botsUnitedAgainstHumans' | t }}</span>
                     </label>
                   </div>
                 </div>
 
                 <div class="field-row">
                   <div class="field">
-                    <label for="neutralBotsAmount">Neutral bots amount (%)</label>
+                    <label for="neutralBotsAmount">{{ 'multiplayer.fields.neutralBotsAmount' | t }}</label>
                     <input id="neutralBotsAmount" name="neutralBotsAmount" type="number" min="0" max="100" [(ngModel)]="setupForm.neutralBotsAmount" />
                   </div>
                   <div class="field">
-                    <label for="neutralBotsDifficulty">Neutral bots difficulty (%)</label>
+                    <label for="neutralBotsDifficulty">{{ 'multiplayer.fields.neutralBotsDifficulty' | t }}</label>
                     <input id="neutralBotsDifficulty" name="neutralBotsDifficulty" type="number" min="-100" max="200" [(ngModel)]="setupForm.neutralBotsDifficulty" />
                   </div>
                 </div>
 
                 <div class="field">
-                  <label for="autoSaveTurns">Auto save every N turns</label>
+                  <label for="autoSaveTurns">{{ 'multiplayer.fields.autoSaveTurns' | t }}</label>
                   <input id="autoSaveTurns" name="autoSaveTurns" type="number" min="0" max="999" [(ngModel)]="setupForm.autoSaveTurns" />
-                  <small>Use 0 to disable autosaving.</small>
+                  <small>{{ 'setup.autoSave.hint' | t }}</small>
                 </div>
 
                 <div class="field scheduled-turns-field">
@@ -568,87 +549,87 @@
                       type="checkbox"
                       [(ngModel)]="setupForm.scheduledTurnsEnabled"
                       (ngModelChange)="markSetupDirty()" />
-                    <span>Scheduled Turns</span>
+                    <span>{{ 'multiplayer.fields.scheduledTurns' | t }}</span>
                   </label>
                   <div class="scheduled-turns-field__summary">
                     <span>{{ scheduledTurnsSummary() }}</span>
                     <button class="start-button" type="button" (click)="openScheduledTurnsModal()">
-                      Edit schedule
+                      {{ 'multiplayer.actions.editSchedule' | t }}
                     </button>
                   </div>
                   @if (setupForm.scheduledTurnsEnabled && selectedScheduledTurnCount() === 0) {
-                    <p class="form-error">Select at least one scheduled turn hour.</p>
+                    <p class="form-error">{{ 'multiplayer.scheduledTurns.selectAtLeastOneHour' | t }}</p>
                   }
                   @if (setupForm.scheduledTurnsEnabled && isScheduledMapTooSmall()) {
-                    <p class="form-error">Scheduled Turns games require at least {{ minScheduledTurnsGalaxySize }}x{{ minScheduledTurnsGalaxySize }} galaxy size.</p>
+                    <p class="form-error">{{ 'multiplayer.scheduledTurns.mapTooSmall' | t:{ size: minScheduledTurnsGalaxySize } }}</p>
                   }
-                  <small>Only one running Scheduled Turns multiplayer game can be active on this server.</small>
+                  <small>{{ 'multiplayer.scheduledTurns.onlyOneRunningGame' | t }}</small>
                 </div>
 
                 <div class="field">
-                  <label>Starting homeworld preset</label>
+                  <label>{{ 'multiplayer.fields.startingHomeworldPreset' | t }}</label>
                   <div class="test-options">
                     @for (preset of startingHomeworldPresetValues; track preset) {
                       <label
                         class="checkbox-field"
                         for="lobby-startingHomeworldPreset-{{ preset }}"
-                        [appTooltip]="startingHomeworldPresetTooltips[preset]">
+                        [appTooltip]="startingHomeworldPresetTooltip(preset)">
                         <input
                           id="lobby-startingHomeworldPreset-{{ preset }}"
                           name="lobby-startingHomeworldPreset"
                           type="radio"
                           [value]="preset"
                           [(ngModel)]="setupForm.startingHomeworldPreset"
-                          [appTooltip]="startingHomeworldPresetTooltips[preset]" />
-                        <span>{{ preset }}</span>
+                          [appTooltip]="startingHomeworldPresetTooltip(preset)" />
+                        <span>{{ startingHomeworldPresetLabel(preset) }}</span>
                       </label>
                     }
                   </div>
-                  <small>Applies only to human and bot home planets. Neutral starts stay RNG-based.</small>
+                  <small>{{ 'multiplayer.startingHomeworldPreset.help' | t }}</small>
                 </div>
 
                 <div class="field">
-                  <label>Testing options</label>
+                  <label>{{ 'multiplayer.fields.testingOptions' | t }}</label>
                   <div class="test-options">
                     <label class="checkbox-field" for="createRandomPlanets">
                       <input id="createRandomPlanets" name="createRandomPlanets" type="checkbox" [(ngModel)]="setupForm.createRandomPlanets" />
-                      <span>Create random planets</span>
+                      <span>{{ 'multiplayer.testingOptions.createRandomPlanets' | t }}</span>
                     </label>
                     <label class="checkbox-field" for="createStartingShips">
                       <input id="createStartingShips" name="createStartingShips" type="checkbox" [(ngModel)]="setupForm.createStartingShips" />
-                      <span>Create starting ships</span>
+                      <span>{{ 'multiplayer.testingOptions.createStartingShips' | t }}</span>
                     </label>
                     <label class="checkbox-field" for="skipTutorial">
                       <input id="skipTutorial" name="skipTutorial" type="checkbox" [(ngModel)]="setupForm.skipTutorial" />
-                      <span>Skip tutorial</span>
+                      <span>{{ 'multiplayer.testingOptions.skipTutorial' | t }}</span>
                     </label>
                   </div>
                 </div>
 
                 <div class="field">
-                  <label>Starting resources</label>
+                  <label>{{ 'multiplayer.fields.startingResources' | t }}</label>
                   <div class="resource-group">
                     <div class="resource-input">
-                      <label class="sr-only" for="startingMetal">Starting metal</label>
-                      <img class="resource-icon" src="images/icons/normal/metal.png" alt="Metal" />
-                      <input id="startingMetal" name="startingMetal" type="number" min="0" max="999999" aria-label="Starting metal" [(ngModel)]="setupForm.startingMetal" />
+                      <label class="sr-only" for="startingMetal">{{ 'multiplayer.resources.startingMetal' | t }}</label>
+                      <img class="resource-icon" src="images/icons/normal/metal.png" [alt]="'multiplayer.resources.metal' | t" />
+                      <input id="startingMetal" name="startingMetal" type="number" min="0" max="999999" [attr.aria-label]="'multiplayer.resources.startingMetal' | t" [(ngModel)]="setupForm.startingMetal" />
                     </div>
                     <div class="resource-input">
-                      <label class="sr-only" for="startingCrystal">Starting crystal</label>
-                      <img class="resource-icon" src="images/icons/normal/crystal.png" alt="Crystal" />
-                      <input id="startingCrystal" name="startingCrystal" type="number" min="0" max="999999" aria-label="Starting crystal" [(ngModel)]="setupForm.startingCrystal" />
+                      <label class="sr-only" for="startingCrystal">{{ 'multiplayer.resources.startingCrystal' | t }}</label>
+                      <img class="resource-icon" src="images/icons/normal/crystal.png" [alt]="'multiplayer.resources.crystal' | t" />
+                      <input id="startingCrystal" name="startingCrystal" type="number" min="0" max="999999" [attr.aria-label]="'multiplayer.resources.startingCrystal' | t" [(ngModel)]="setupForm.startingCrystal" />
                     </div>
                     <div class="resource-input">
-                      <label class="sr-only" for="startingDeuterium">Starting deuterium</label>
-                      <img class="resource-icon" src="images/icons/normal/deuter.png" alt="Deuterium" />
-                      <input id="startingDeuterium" name="startingDeuterium" type="number" min="0" max="999999" aria-label="Starting deuterium" [(ngModel)]="setupForm.startingDeuterium" />
+                      <label class="sr-only" for="startingDeuterium">{{ 'multiplayer.resources.startingDeuterium' | t }}</label>
+                      <img class="resource-icon" src="images/icons/normal/deuter.png" [alt]="'multiplayer.resources.deuterium' | t" />
+                      <input id="startingDeuterium" name="startingDeuterium" type="number" min="0" max="999999" [attr.aria-label]="'multiplayer.resources.startingDeuterium' | t" [(ngModel)]="setupForm.startingDeuterium" />
                     </div>
                   </div>
                 </div>
 
                 <div class="field-row">
                   <button class="start-button" type="button" (click)="saveSetup()" [disabled]="isActing">
-                    Save lobby setup
+                    {{ 'multiplayer.actions.saveLobbySetup' | t }}
                   </button>
                   @if (availableSaves().length > 0) {
                     <select id="lobby-save-id" name="lobby-save-id" [(ngModel)]="selectedSaveId" [disabled]="isActing || isLoadingSaves">
@@ -657,28 +638,28 @@
                       }
                     </select>
                     <button class="start-button" type="button" (click)="bindSave()" [disabled]="isActing || !selectedSaveId">
-                      Bind selected save
+                      {{ 'multiplayer.actions.bindSelectedSave' | t }}
                     </button>
                   }
                   @if (selectedLobby()!.mode === 'LOAD_SAVE') {
                     <button class="start-button" type="button" (click)="clearSaveBinding()" [disabled]="isActing">
-                      Switch to new game
+                      {{ 'multiplayer.actions.switchToNewGame' | t }}
                     </button>
                   }
                 </div>
 
                 <button class="start-button multiplayer-management__start" type="button" (click)="startLobbyGame()" [disabled]="!canStartSelectedLobby()">
-                  {{ isActing ? 'Starting...' : (selectedLobby()!.mode === 'LOAD_SAVE' ? 'Start from save' : 'Start multiplayer game') }}
+                  {{ isActing ? ('multiplayer.actions.starting' | t) : (selectedLobby()!.mode === 'LOAD_SAVE' ? ('multiplayer.actions.startFromSave' | t) : ('multiplayer.actions.startMultiplayerGame' | t)) }}
                 </button>
               </section>
             }
 
             @if (canManageSelectedLobby() && selectedLobby()!.isResumeLobby) {
               <section class="saved">
-                <p class="saved__title">Resume Lobby</p>
-                <p>This resumed lobby is locked to the saved multiplayer snapshot. Players can rejoin here, seat replacements can still be adjusted if needed, and localAdmin can start the saved game again once everyone is ready.</p>
+                <p class="saved__title">{{ 'multiplayer.sections.resumeLobby' | t }}</p>
+                <p>{{ 'multiplayer.callouts.resumeLobbyBody' | t }}</p>
                 <button class="start-button multiplayer-management__start" type="button" (click)="startLobbyGame()" [disabled]="!canStartSelectedLobby()">
-                  {{ isActing ? 'Starting...' : 'Start from save' }}
+                  {{ isActing ? ('multiplayer.actions.starting' | t) : ('multiplayer.actions.startFromSave' | t) }}
                 </button>
               </section>
             }
@@ -689,9 +670,9 @@
 
     <div class="field-row">
       <button class="start-button" type="button" (click)="loadBrowser()" [disabled]="isLoadingBrowser || isActing">
-        {{ isLoadingBrowser ? 'Refreshing...' : 'Refresh browser' }}
+        {{ isLoadingBrowser ? ('multiplayer.actions.refreshing' | t) : ('multiplayer.actions.refreshBrowser' | t) }}
       </button>
-      <a class="link button" routerLink="/">Back to main menu</a>
+      <a class="link button" routerLink="/">{{ 'common.actions.backToMainMenu' | t }}</a>
     </div>
   </section>
 </main>
@@ -701,10 +682,10 @@
     <section class="multiplayer-modal" (click)="$event.stopPropagation()">
       <header class="multiplayer-modal__header">
         <div>
-          <p class="saved__title">Scheduled Turns</p>
-          <h2>Turn hours</h2>
+          <p class="saved__title">{{ 'multiplayer.sections.scheduledTurns' | t }}</p>
+          <h2>{{ 'multiplayer.scheduledTurns.turnHoursTitle' | t }}</h2>
         </div>
-        <button class="top-menu__button" type="button" (click)="closeScheduledTurnsModal()">Close</button>
+        <button class="top-menu__button" type="button" (click)="closeScheduledTurnsModal()">{{ 'multiplayer.actions.close' | t }}</button>
       </header>
 
       <div class="scheduled-turn-grid">
@@ -726,9 +707,9 @@
       </div>
 
       <footer class="multiplayer-modal__footer">
-        <span>{{ selectedScheduledTurnCount() }} selected</span>
+        <span>{{ 'multiplayer.messages.selectedHours' | t:{ count: selectedScheduledTurnCount() } }}</span>
         <button class="start-button" type="button" (click)="setDefaultScheduledTurns()">
-          Restore default
+          {{ 'multiplayer.actions.restoreDefault' | t }}
         </button>
       </footer>
     </section>

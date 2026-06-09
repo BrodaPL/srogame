@@ -1,9 +1,9 @@
 <main class="page">
   <section class="panel">
     <header class="panel__header">
-      <p class="eyebrow">Load Game</p>
-      <h1>Load Game</h1>
-      <p class="subtitle">Manage server saves, reopen recently closed singleplayer games, and replace the active runtime game with a selected save.</p>
+      <p class="eyebrow">{{ 'loadGame.eyebrow' | t }}</p>
+      <h1>{{ 'loadGame.title' | t }}</h1>
+      <p class="subtitle">{{ 'loadGame.subtitle' | t }}</p>
       @if (session()) {
         <p class="subtitle">{{ selectedGameLabel() }}</p>
       }
@@ -11,47 +11,47 @@
 
     @if (isSummaryLoading && !response) {
       <div class="saved">
-        <p class="saved__title">Loading</p>
-        <p>Reading saved games from the server.</p>
+        <p class="saved__title">{{ 'loadGame.loading.title' | t }}</p>
+        <p>{{ 'loadGame.loading.body' | t }}</p>
       </div>
     } @else if (summaryError) {
       <div class="saved">
-        <p class="saved__title">Summary Error</p>
+        <p class="saved__title">{{ 'loadGame.sections.summaryError' | t }}</p>
         <p>{{ summaryError }}</p>
       </div>
     } @else if (response && response.saves.length === 0) {
       <div class="saved">
-        <p class="saved__title">No Saves Found</p>
-        <p>No saves were found for the currently selected game context.</p>
+        <p class="saved__title">{{ 'loadGame.sections.noSavesFound' | t }}</p>
+        <p>{{ 'loadGame.messages.noSavesForContext' | t }}</p>
       </div>
     }
 
     @if (response; as currentResponse) {
       @if (currentResponse.activeGame) {
         <div class="saved">
-          <p class="saved__title">Active Runtime Game</p>
+          <p class="saved__title">{{ 'loadGame.sections.activeRuntimeGame' | t }}</p>
           <p>
-            Galaxy: {{ currentResponse.activeGame.galaxyName }}.
-            Turn: {{ currentResponse.activeGame.currentTurn }}.
-            Owner: {{ currentResponse.activeGame.ownerPlayerName ?? 'Unknown' }}
+            {{ 'loadGame.labels.galaxy' | t }}: {{ currentResponse.activeGame.galaxyName }}.
+            {{ 'loadGame.labels.turn' | t }}: {{ currentResponse.activeGame.currentTurn }}.
+            {{ 'loadGame.labels.owner' | t }}: {{ currentResponse.activeGame.ownerPlayerName ?? ('loadGame.labels.unknown' | t) }}
             @if (currentResponse.activeGame.ownerAccountId !== null) {
-              <span>(account {{ currentResponse.activeGame.ownerAccountId }})</span>
+              <span>({{ 'loadGame.labels.account' | t }} {{ currentResponse.activeGame.ownerAccountId }})</span>
             }.
           </p>
-          <p class="form-error">Loading will replace the currently active in-memory game.</p>
+          <p class="form-error">{{ 'loadGame.messages.activeRuntimeReplacementWarning' | t }}</p>
         </div>
       }
 
       @if (!currentResponse.canManage && currentResponse.canManageReason) {
-        <p class="form-error">{{ currentResponse.canManageReason }}</p>
+        <p class="form-error">{{ translatedCanManageReason(currentResponse.canManageReason) }}</p>
       }
     }
 
     @if (!session()) {
-      <a class="link button" routerLink="/login">Login to load</a>
+      <a class="link button" routerLink="/login">{{ 'loadGame.actions.loginToLoad' | t }}</a>
     } @else {
       <button class="start-button" type="button" (click)="logout()" [disabled]="isSummaryLoading || pendingAction !== null">
-        Logout
+        {{ 'loadGame.actions.logout' | t }}
       </button>
     }
 
@@ -64,7 +64,7 @@
             type="checkbox"
             [(ngModel)]="confirmReplaceActiveGame"
           />
-          <span>I understand that loading will replace the active game.</span>
+          <span>{{ 'loadGame.messages.confirmReplaceActiveGame' | t }}</span>
         </label>
       </div>
     }
@@ -75,16 +75,16 @@
 
     @if (recommendedReopen(); as recommendation) {
       <div class="saved">
-        <p class="saved__title">Recommended Reopen</p>
-        <p>{{ recommendation.reasonText }}</p>
+        <p class="saved__title">{{ 'loadGame.sections.recommendedReopen' | t }}</p>
+        <p>{{ 'loadGame.messages.recommendedReopenReason' | t }}</p>
         <p>
           {{ recommendation.gameName }}.
-          {{ recommendation.statusLabel }}.
-          Latest save: {{ recommendation.save.displayName }}.
+          {{ translatedGroupStatusLabel(recommendation.statusLabel) }}.
+          {{ 'loadGame.labels.latestSave' | t }}: {{ recommendation.save.displayName }}.
         </p>
         <div class="field-row">
           <button class="start-button" type="button" (click)="loadGame(recommendation.save)" [disabled]="!canLoadGame(recommendation.save)">
-            {{ isPendingLoad(recommendation.save) ? 'Loading...' : 'Load latest save' }}
+            {{ isPendingLoad(recommendation.save) ? ('loadGame.actions.loading' | t) : ('loadGame.actions.loadLatestSave' | t) }}
           </button>
         </div>
       </div>
@@ -98,22 +98,22 @@
               <p class="saved__title">{{ group.gameName }}</p>
               <p class="subtitle load-game-group__meta">{{ groupSubtitle(group) }}</p>
             </div>
-            <span class="badge">{{ group.saves.length }} save{{ group.saves.length === 1 ? '' : 's' }}</span>
+            <span class="badge">{{ saveCountLabel(group.saves.length) }}</span>
           </div>
           @for (save of group.saves; track save.saveId) {
           <div class="field">
             <p>
               {{ save.displayName }}.
-              Owner: {{ save.ownerPlayerName ?? 'Unknown' }} (account {{ save.ownerAccountId }}).
-              Auto save:
-              {{ save.autoSaveTurns === 0 ? 'disabled' : 'every ' + save.autoSaveTurns + ' turns' }}.
+              {{ 'loadGame.labels.owner' | t }}: {{ save.ownerPlayerName ?? ('loadGame.labels.unknown' | t) }} ({{ 'loadGame.labels.account' | t }} {{ save.ownerAccountId }}).
+              {{ 'loadGame.labels.autoSave' | t }}:
+              {{ autoSaveLabel(save.autoSaveTurns) }}.
             </p>
             <div class="field-row">
               <button class="start-button" type="button" (click)="loadGame(save)" [disabled]="!canLoadGame(save)">
-                {{ isPendingLoad(save) ? 'Loading...' : 'Load' }}
+                {{ isPendingLoad(save) ? ('loadGame.actions.loading' | t) : ('loadGame.actions.load' | t) }}
               </button>
               <button class="start-button" type="button" (click)="deleteSave(save)" [disabled]="!canDeleteGame(save)">
-                {{ isPendingDelete(save) ? 'Deleting...' : 'Delete' }}
+                {{ isPendingDelete(save) ? ('loadGame.actions.deleting' | t) : ('loadGame.actions.delete' | t) }}
               </button>
             </div>
           </div>
@@ -124,10 +124,10 @@
 
     <div class="field-row">
       <button class="start-button" type="button" (click)="loadSaves()" [disabled]="isSummaryLoading || pendingAction !== null">
-        {{ isSummaryLoading ? 'Refreshing...' : 'Refresh summary' }}
+        {{ isSummaryLoading ? ('loadGame.actions.refreshing' | t) : ('loadGame.actions.refreshSummary' | t) }}
       </button>
     </div>
 
-    <a class="link button" routerLink="/">Back to main menu</a>
+    <a class="link button" routerLink="/">{{ 'common.actions.backToMainMenu' | t }}</a>
   </section>
 </main>

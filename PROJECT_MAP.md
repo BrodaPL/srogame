@@ -110,12 +110,17 @@ Settings route note:
 Auth route note:
 - `src/app/auth/` now also consumes the shared `src/app/i18n/` runtime localization layer for all frontend-owned login/register/resend labels, placeholders, and client-side validation fallbacks, while still resolving backend `errorKey` / `messageKey` metadata through `src/app/i18n/api-message.utils.ts`
 
+Setup route note:
+- `src/app/setup/` now also consumes the shared `src/app/i18n/` runtime localization layer for frontend-owned setup copy, bot-profile labels, starting-homeworld preset descriptions, and client-side validation fallbacks
+- `/api/game/start` now returns keyed validation/runtime errors for the common setup failures used by the setup screen, and `src/app/setup/galaxy.setup.component.ts` resolves those through `src/app/i18n/api-message.utils.ts`
+
 Game shell note:
 - `src/app/game/game.component.ts` and `src/app/game/ui/top-menu/` now also consume the shared `src/app/i18n/` runtime localization layer for shell overlays, in-game navigation labels, multiplayer auto-skip copy, and local fallback messages
 
 Load route note:
 - `src/app/load-game/` still owns explicit save browsing and reopen flows
 - `/load` now consumes grouped save metadata from `/api/game/saves`, surfaces a `Recommended Reopen` card for the last closed single-player game when possible, and keeps current/selected game saves first without moving that browser back onto `/`
+- `src/app/load-game/` now also consumes the shared `src/app/i18n/` runtime localization layer for frontend-owned save-browser copy and resolves keyed `/api/game/saves*` errors plus known raw legacy status/reason labels through `src/app/i18n/api-message.utils.ts`
 
 Multiplayer route note:
 - `src/app/multiplayer/` now uses the per-game `/api/multiplayer/games*` family and renders a browser/detail layout with four sections: `Active Draft Lobbies`, `Active Running Games`, collapsed `Other Multiplayer Games`, and collapsed `Archived Multiplayer Games`
@@ -125,6 +130,7 @@ Multiplayer route note:
   - multiplayer lobby setup now also owns the `Scheduled Turns` editor: a multiplayer-only setup flag plus 24 hour-slot checkboxes stored compactly as selected hour numbers in `GalaxySetup.scheduledTurns`
   - loaded running Scheduled Turns games are visible to non-members until they hit the human-player cap, and `/multiplayer` can join them directly as a late human player
   - resumed lobbies now get a clearer locked-snapshot callout, and the selected running-game detail now also exposes `Leave current game` for the current account
+- `src/app/multiplayer/` now also consumes the shared `src/app/i18n/` runtime localization layer for browser/detail/setup copy and resolves keyed `/api/multiplayer/games*` plus shared save-management errors, while still mapping a few older raw status/reason labels during the ongoing backend migration
 
 Game child routes:
 
@@ -163,11 +169,11 @@ Localization:
 - `src/app/i18n/i18n.service.ts`: runtime translation lookup, active-language signal, interpolation, and locale-aware date formatting for migrated views
 - `src/app/i18n/i18n.pipe.ts`: template translation pipe for standalone components
 - `src/app/i18n/language-preference.service.ts`: guest/local fallback persistence under `srogame:language`
-- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `api`, `main-menu`, `settings`, `auth`, `game-shell`, `top-menu`) aggregated per language
+- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `api`, `main-menu`, `settings`, `auth`, `setup`, `load-game`, `multiplayer`, `game-shell`, `top-menu`) aggregated per language
 - `src/app/i18n/api-message.utils.ts`: client bridge that resolves server `errorKey` / `messageKey` metadata through the runtime i18n layer with raw-message fallback during the Phase 2 migration
 - `src/app/game/ui/top-menu/top-menu.component.ts`: consumes keyed `TurnStatusResponse.progressionBlockedReason*` metadata and keyed end-turn / auto-skip API errors
 - `server/src/game-commands/command-result.ts` + `server/src/index.ts::sendGameCommandError(...)`: shared command-error transport point; common `GameCommandError.message` values are now mapped to `api.commands.*` localization keys before hitting the client
-- `server/src/index.ts`: also shapes localization-ready auth/account/runtime message params for translated minute/attempt/mail blockers without relying on English-only suffix interpolation
+- `server/src/index.ts`: also shapes localization-ready auth/account/runtime message params for translated minute/attempt/mail blockers without relying on English-only suffix interpolation, and now emits keyed setup/save/multiplayer route errors for the common `/api/game/start`, `/api/game/saves*`, and `/api/multiplayer/games*` flows used by the pre-game management screens
 
 Game snapshot/state:
 - `src/app/core/game-api.service.ts`: game HTTP calls; now includes the first game-registry/current-game endpoints and supports optional explicit `gameId` for state/turn/save/end-turn calls

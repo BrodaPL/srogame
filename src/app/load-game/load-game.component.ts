@@ -5,11 +5,14 @@ import { AuthApiService } from '../core/auth-api.service';
 import { AuthStateService } from '../core/auth-state.service';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
+import { resolveApiErrorMessage } from '../i18n/api-message.utils';
+import { I18nPipe } from '../i18n/i18n.pipe';
+import { I18nService } from '../i18n/i18n.service';
 import { GameSaveGroup, GameSaveSummary, GameSavesResponse, RecommendedReopenSave } from '../models/game-api-types';
 
 @Component({
   selector: 'app-load-game',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, I18nPipe],
   templateUrl: './load-game.component.html',
   styleUrl: './load-game.component.css'
 })
@@ -30,7 +33,8 @@ export class LoadGameComponent {
     private readonly authState: AuthStateService,
     private readonly gameApi: GameApiService,
     private readonly gameState: GameStateService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly i18n: I18nService
   ) {
     this.session = this.authState.session;
     this.loadSaves();
@@ -49,7 +53,7 @@ export class LoadGameComponent {
           this.authState.clearSession();
           this.response = response;
           this.selectedGameId = null;
-          this.summaryError = 'Session expired. Please log in again.';
+          this.summaryError = this.i18n.t('loadGame.messages.sessionExpired');
           this.isSummaryLoading = false;
           this.confirmReplaceActiveGame = false;
           this.cdr.markForCheck();
@@ -68,14 +72,14 @@ export class LoadGameComponent {
         if (error?.status === 401) {
           this.authState.clearSession();
           this.selectedGameId = null;
-          this.summaryError = 'Session expired. Please log in again.';
+          this.summaryError = this.i18n.t('loadGame.messages.sessionExpired');
           this.isSummaryLoading = false;
           this.cdr.markForCheck();
           return;
         }
 
         this.response = null;
-        this.summaryError = error?.error?.error ?? 'Unable to load save summary.';
+        this.summaryError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('loadGame.errors.loadSummary'));
         this.isSummaryLoading = false;
         this.cdr.markForCheck();
       }
@@ -88,8 +92,8 @@ export class LoadGameComponent {
 
   protected selectedGameLabel(): string {
     return this.response?.currentSelectedGameName
-      ? `Current selection: ${this.response.currentSelectedGameName}`
-      : 'Showing all server saves.';
+      ? this.i18n.t('loadGame.messages.currentSelection', { gameName: this.response.currentSelectedGameName })
+      : this.i18n.t('loadGame.messages.showingAllServerSaves');
   }
 
   protected recommendedReopen(): RecommendedReopenSave | null {
@@ -136,7 +140,7 @@ export class LoadGameComponent {
         this.router.navigate(['/game/imperium']);
       },
       error: (error) => {
-        this.actionError = error?.error?.error ?? 'Unable to load saved game.';
+        this.actionError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('loadGame.errors.loadSavedGame'));
         this.pendingAction = null;
         this.pendingSaveId = null;
         this.cdr.markForCheck();
@@ -168,7 +172,7 @@ export class LoadGameComponent {
         this.loadSaves();
       },
       error: (error) => {
-        this.actionError = error?.error?.error ?? 'Unable to delete saved game.';
+        this.actionError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('loadGame.errors.deleteSavedGame'));
         this.pendingAction = null;
         this.pendingSaveId = null;
         this.cdr.markForCheck();
@@ -207,17 +211,65 @@ export class LoadGameComponent {
 
   protected groupSubtitle(group: GameSaveGroup): string {
     const kindLabel = group.gameKind === 'MULTIPLAYER'
-      ? 'Multiplayer'
+      ? this.i18n.t('loadGame.status.kindMultiplayer')
       : group.gameKind === 'SINGLEPLAYER'
-        ? 'Singleplayer'
-        : 'Untracked';
-    const badges: string[] = [kindLabel, group.statusLabel];
+        ? this.i18n.t('loadGame.status.kindSingleplayer')
+        : this.i18n.t('loadGame.status.kindUntracked');
+    const badges: string[] = [kindLabel, this.translatedGroupStatusLabel(group.statusLabel)];
     if (group.isCurrentGame) {
-      badges.push('Current selection');
+      badges.push(this.i18n.t('loadGame.status.currentSelectedGame'));
     } else if (group.isLastClosedGame) {
-      badges.push('Recently closed');
+      badges.push(this.i18n.t('loadGame.status.recentlyClosedSingleplayerGame'));
     }
 
     return badges.join(' / ');
+  }
+
+  protected translatedGroupStatusLabel(statusLabel: string): string {
+    switch (statusLabel) {
+      case 'Current selected game':
+        return this.i18n.t('loadGame.status.currentSelectedGame');
+      case 'Recently closed single-player game':
+        return this.i18n.t('loadGame.status.recentlyClosedSingleplayerGame');
+      case 'Tracked saves':
+        return this.i18n.t('loadGame.status.trackedSaves');
+      case 'Untracked saves':
+        return this.i18n.t('loadGame.status.untrackedSaves');
+      case 'Active runtime':
+        return this.i18n.t('loadGame.status.activeRuntime');
+      case 'Saved / Inactive':
+        return this.i18n.t('loadGame.status.savedInactive');
+      case 'Archived':
+        return this.i18n.t('loadGame.status.archived');
+      case 'Singleplayer saves':
+        return this.i18n.t('loadGame.status.singleplayerSaves');
+      case 'Multiplayer saves':
+        return this.i18n.t('loadGame.status.multiplayerSaves');
+      default:
+        return statusLabel;
+    }
+  }
+
+  protected translatedCanManageReason(reason: string | null | undefined): string | null {
+    switch (reason) {
+      case 'Local admin privileges are required to manage saves.':
+        return this.i18n.t('api.game.saves.requiresLocalAdmin');
+      case 'Login required to manage saves.':
+        return this.i18n.t('api.game.saves.loginRequiredToManage');
+      default:
+        return reason ?? null;
+    }
+  }
+
+  protected autoSaveLabel(turns: number): string {
+    return turns === 0
+      ? this.i18n.t('loadGame.labels.disabled')
+      : this.i18n.t('loadGame.labels.everyTurns', { turns });
+  }
+
+  protected saveCountLabel(count: number): string {
+    return count === 1
+      ? this.i18n.t('loadGame.labels.saveCountOne', { count })
+      : this.i18n.t('loadGame.labels.saveCountMany', { count });
   }
 }

@@ -4,12 +4,14 @@ import { Router, RouterLink } from '@angular/router';
 import { GameApiService } from '../core/game-api.service';
 import { GameStateService } from '../core/game-state.service';
 import { AuthStateService } from '../core/auth-state.service';
+import { resolveApiErrorMessage } from '../i18n/api-message.utils';
+import { I18nPipe } from '../i18n/i18n.pipe';
+import { I18nService } from '../i18n/i18n.service';
 import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
 import { NAMES_LIST } from '../models/enums/names-list';
 import { GameType } from '../models/enums/game-type';
-import { BOT_PROFILE_IDS, BOT_PROFILE_LABELS } from '../models/player';
+import { BOT_PROFILE_IDS, type BotProfileId } from '../models/player';
 import {
-  STARTING_HOMEWORLD_PRESET_TOOLTIPS,
   STARTING_HOMEWORLD_PRESET_VALUES,
   StartingHomeworldPreset
 } from '../models/enums/starting-homeworld-preset';
@@ -56,16 +58,14 @@ type GalaxySetupForm = {
 
 @Component({
   selector: 'app-galaxy-setup',
-  imports: [FormsModule, RouterLink, TooltipDirective],
+  imports: [FormsModule, RouterLink, TooltipDirective, I18nPipe],
   templateUrl: './galaxy.setup.component.html'
 })
 export class GalaxySetupComponent {
   protected readonly fixedGameType = GameType.SANDBOX;
+  protected readonly gameTypes = [GameType.PVP, GameType.PVPVE, GameType.PVE, GameType.SANDBOX];
   protected readonly botProfileIds = BOT_PROFILE_IDS;
-  protected readonly botProfileLabels = BOT_PROFILE_LABELS;
   protected readonly startingHomeworldPresetValues = STARTING_HOMEWORLD_PRESET_VALUES;
-  protected readonly startingHomeworldPresetTooltips = STARTING_HOMEWORLD_PRESET_TOOLTIPS;
-  protected readonly botsUnitedAgainstHumansTooltip = 'When enabled, permanent bot empires start allied with each other and at war with every human player. Neutral resource factions are not affected. Useful for PvE or co-op games where bots should act as a shared opposing bloc.';
   protected readonly savedConfig = signal<GalaxySetup | null>(null);
   protected readonly session: AuthStateService['session'];
   protected isStarting = false;
@@ -76,7 +76,8 @@ export class GalaxySetupComponent {
     private readonly router: Router,
     private readonly gameState: GameStateService,
     private readonly gameApi: GameApiService,
-    private readonly authState: AuthStateService
+    private readonly authState: AuthStateService,
+    private readonly i18n: I18nService
   ) {
     this.session = this.authState.session;
     this.form = this.createDefaultForm();
@@ -158,11 +159,11 @@ export class GalaxySetupComponent {
 
     const session = this.session();
     if (!session) {
-      this.startError = 'Login required to start a game.';
+      this.startError = this.i18n.t('setup.errors.loginRequiredToStart');
       return;
     }
     if (!session.localAdmin) {
-      this.startError = 'Local admin privileges are required to start a single-player game.';
+      this.startError = this.i18n.t('setup.errors.localAdminRequiredToStart');
       return;
     }
 
@@ -216,10 +217,56 @@ export class GalaxySetupComponent {
         this.isStarting = false;
         this.router.navigate(['/game/galactic']);
       },
-      error: () => {
-        this.startError = 'Unable to reach the game server.';
+      error: (error) => {
+        this.startError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('setup.errors.startFailed'));
         this.isStarting = false;
       }
+    });
+  }
+
+  protected gameTypeLabel(gameType: GameType): string {
+    return this.i18n.t(`setup.gameTypes.${gameType}`);
+  }
+
+  protected botProfileLabel(profileId: BotProfileId): string {
+    return this.i18n.t(`settings.botProfiles.${profileId}`);
+  }
+
+  protected botsUnitedAgainstHumansTooltip(): string {
+    return this.i18n.t('setup.botDiplomacy.tooltip');
+  }
+
+  protected startingHomeworldPresetLabel(preset: StartingHomeworldPreset): string {
+    return this.i18n.t(`setup.startingHomeworldPreset.presets.${preset}.label`);
+  }
+
+  protected startingHomeworldPresetTooltip(preset: StartingHomeworldPreset): string {
+    return this.i18n.t(`setup.startingHomeworldPreset.presets.${preset}.tooltip`);
+  }
+
+  protected autoSaveSummaryLabel(turns: number): string {
+    return turns === 0
+      ? this.i18n.t('setup.autoSave.disabled')
+      : this.i18n.t('setup.autoSave.everyTurns', { turns });
+  }
+
+  protected savedConfigSummary(): string | null {
+    const config = this.savedConfig();
+    if (!config) {
+      return null;
+    }
+
+    return this.i18n.t('setup.savedConfig.summary', {
+      name: config.galaxyName,
+      width: config.galaxyWidth,
+      height: config.galaxyHeight,
+      players: config.playerAmount,
+      bots: config.botsAmount,
+      autoSave: this.autoSaveSummaryLabel(config.autoSaveTurns),
+      preset: this.startingHomeworldPresetLabel(config.startingHomeworldPreset),
+      metal: config.startingResources.metal,
+      crystal: config.startingResources.crystal,
+      deuterium: config.startingResources.deuterium
     });
   }
 
@@ -397,7 +444,10 @@ export class GalaxySetupComponent {
       return null;
     }
 
-    return `Assigned bot personalities must total exactly ${botsAmount}. Current total: ${assigned}.`;
+    return this.i18n.t('setup.botPersonalities.validation', {
+      required: botsAmount,
+      assigned
+    });
   }
 
   protected assignedBotProfilesCount(): number {
