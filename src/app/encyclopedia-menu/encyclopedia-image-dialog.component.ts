@@ -1,7 +1,9 @@
 import { ChangeDetectorRef, Component, EventEmitter, HostListener, Input, NgZone, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { I18nPipe } from '../i18n/i18n.pipe';
 
 @Component({
   selector: 'app-encyclopedia-image-dialog',
+  imports: [I18nPipe],
   templateUrl: './encyclopedia-image-dialog.component.html',
   styleUrl: './encyclopedia-image-dialog.component.css'
 })

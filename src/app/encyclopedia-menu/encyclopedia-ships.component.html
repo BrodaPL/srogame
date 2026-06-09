@@ -1,14 +1,14 @@
 <main class="page">
   <section class="panel">
     <header class="panel__header">
-      <p class="eyebrow">Encyclopedia</p>
-      <h1>Ships</h1>
-      <p class="subtitle">Detailed hull data sourced from the ship blueprints.</p>
+      <p class="eyebrow">{{ 'encyclopedia.shared.eyebrow' | t }}</p>
+      <h1>{{ 'encyclopedia.ships.title' | t }}</h1>
+      <p class="subtitle">{{ 'encyclopedia.ships.subtitle' | t }}</p>
     </header>
 
     <div class="encyclopedia-toolbar">
-      <p class="encyclopedia-meta">{{ ships.length }} ships cataloged</p>
-      <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+      <p class="encyclopedia-meta">{{ itemCountLabel(ships.length) }}</p>
+      <a class="link button" routerLink="/encyclopedia">{{ 'encyclopedia.shared.actions.backToEncyclopedia' | t }}</a>
     </div>
 
     <div class="encyclopedia-grid">
@@ -16,12 +16,12 @@
         <button
           type="button"
           class="ship-media ship-media-button"
-          [appTooltip]="'Open large image for ' + ship.getName()"
+          [appTooltip]="largeImageTooltip(ship.getName())"
           (click)="openImageDialog(ship)">
           <img
             class="ship-image"
             [src]="ship.imagePath"
-            [alt]="ship.getName() + ' image'"
+            [alt]="'encyclopedia.shared.dialog.imageAlt' | t:{ title: ship.getName() }"
             [attr.loading]="isFirst ? 'eager' : 'lazy'"
           />
         </button>
@@ -39,51 +39,51 @@
 
         <div class="ship-stats">
           <div class="ship-stat">
-            <span class="ship-stat__label">Size</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.size' | t }}</span>
             <span class="ship-stat__value">{{ ship.size }}</span>
           </div>
           <div class="ship-stat">
-            <span class="ship-stat__label">Evasion</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.evasion' | t }}</span>
             <span class="ship-stat__value">{{ ship.evasionChance * 100 }}%</span>
           </div>
           <div class="ship-stat">
-            <span class="ship-stat__label">Hull</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.hull' | t }}</span>
             <span class="ship-stat__value">{{ ship.hullPointsCapacity }}</span>
           </div>
           <div class="ship-stat">
-            <span class="ship-stat__label">Critical</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.critical' | t }}</span>
             <span class="ship-stat__value">{{ ship.criticalThreshold }}%</span>
           </div>
           <div class="ship-stat">
-            <span class="ship-stat__label">Shield</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.shield' | t }}</span>
             <span class="ship-stat__value">{{ ship.shieldCapacity }}</span>
           </div>
           <div class="ship-stat">
-            <span class="ship-stat__label">Armor</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.armor' | t }}</span>
             <span class="ship-stat__value">{{ ship.armor }}</span>
           </div>
           <div class="ship-stat">
-            <span class="ship-stat__label">Cargo</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.cargo' | t }}</span>
             <span class="ship-stat__value">{{ ship.cargoCapacity }}</span>
           </div>
           <div class="ship-stat">
-            <span class="ship-stat__label">Hangar</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.hangar' | t }}</span>
             <span class="ship-stat__value">{{ ship.hangarCapacity }}</span>
           </div>
           <div class="ship-stat" *ngIf="ship.canJump; else noJump">
-            <span class="ship-stat__label">Jump cost</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.jumpCost' | t }}</span>
             <span class="ship-stat__value">{{ ship.jumpCost }}</span>
           </div>
           <ng-template #noJump>
             <div class="ship-stat">
-              <span class="ship-stat__label">Jump</span>
-              <span class="ship-stat__value">No Hyper Jump Ability</span>
+              <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.jump' | t }}</span>
+              <span class="ship-stat__value">{{ 'encyclopedia.shared.empty.noHyperJumpAbility' | t }}</span>
             </div>
           </ng-template>
         </div>
 
         <div class="ship-section">
-          <p class="ship-section__title">Weapons</p>
+          <p class="ship-section__title">{{ 'encyclopedia.shared.sections.weapons' | t }}</p>
           <ul class="weapon-list" *ngIf="ship.weapons.length > 0; else noWeapons">
             <li class="weapon-item" *ngFor="let weapon of ship.weapons">
               <span class="weapon-chip">{{ weapon.type }}</span>
@@ -92,48 +92,48 @@
             </li>
           </ul>
           <ng-template #noWeapons>
-            <p class="ship-empty">Unarmed</p>
+            <p class="ship-empty">{{ 'encyclopedia.shared.empty.unarmed' | t }}</p>
           </ng-template>
         </div>
 
         <div class="ship-section">
-          <p class="ship-section__title">Requirements</p>
-          <p class="ship-card__subtitle ship-card__subtitle--wide">Buildings</p>
+          <p class="ship-section__title">{{ 'encyclopedia.shared.sections.requirements' | t }}</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">{{ 'encyclopedia.shared.sections.buildings' | t }}</p>
           <ul class="weapon-list" *ngIf="ship.buildingRequirements.length > 0; else noBuildingReq">
             <li class="weapon-item" *ngFor="let requirement of ship.buildingRequirements">
               <span class="weapon-chip">{{ requirement.building }}</span>
-              <span class="weapon-meta">Level {{ requirement.level }}</span>
+              <span class="weapon-meta">{{ 'encyclopedia.shared.labels.level' | t:{ level: requirement.level } }}</span>
             </li>
           </ul>
           <ng-template #noBuildingReq>
-            <p class="ship-empty">No building requirements</p>
+            <p class="ship-empty">{{ 'encyclopedia.shared.empty.noBuildingRequirements' | t }}</p>
           </ng-template>
 
-          <p class="ship-card__subtitle ship-card__subtitle--wide">Technologies</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">{{ 'encyclopedia.shared.sections.technologies' | t }}</p>
           <ul class="weapon-list" *ngIf="ship.techRequirements.length > 0; else noTechReq">
             <li class="weapon-item" *ngFor="let requirement of ship.techRequirements">
               <span class="weapon-chip">{{ requirement.tech }}</span>
-              <span class="weapon-meta">Level {{ requirement.level }}</span>
+              <span class="weapon-meta">{{ 'encyclopedia.shared.labels.level' | t:{ level: requirement.level } }}</span>
             </li>
           </ul>
           <ng-template #noTechReq>
-            <p class="ship-empty">No tech requirements</p>
+            <p class="ship-empty">{{ 'encyclopedia.shared.empty.noTechRequirements' | t }}</p>
           </ng-template>
         </div>
 
         <div class="ship-section">
-          <p class="ship-section__title">Cost</p>
+          <p class="ship-section__title">{{ 'encyclopedia.shared.sections.cost' | t }}</p>
           <div class="cost-row">
             <span class="cost-chip">
-              <img class="cost-icon" src="images/icons/normal/metal.png" alt="Metal" />
+              <img class="cost-icon" src="images/icons/normal/metal.png" [alt]="'encyclopedia.shared.resources.metal' | t" />
               {{ ship.cost.metal }}
             </span>
             <span class="cost-chip cost-chip--crystal">
-              <img class="cost-icon" src="images/icons/normal/crystal.png" alt="Crystal" />
+              <img class="cost-icon" src="images/icons/normal/crystal.png" [alt]="'encyclopedia.shared.resources.crystal' | t" />
               {{ ship.cost.crystal }}
             </span>
             <span class="cost-chip cost-chip--deuterium">
-              <img class="cost-icon" src="images/icons/normal/deuter.png" alt="Deuterium" />
+              <img class="cost-icon" src="images/icons/normal/deuter.png" [alt]="'encyclopedia.shared.resources.deuterium' | t" />
               {{ ship.cost.deuterium }}
             </span>
           </div>
@@ -142,7 +142,7 @@
     </div>
 
     <div class="encyclopedia-toolbar">
-      <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+      <a class="link button" routerLink="/encyclopedia">{{ 'encyclopedia.shared.actions.backToEncyclopedia' | t }}</a>
     </div>
   </section>
 </main>

@@ -1,14 +1,14 @@
 <main class="page">
   <section class="panel">
     <header class="panel__header">
-      <p class="eyebrow">Encyclopedia</p>
-      <h1>Technologies</h1>
-      <p class="subtitle">Research paths, drives, and combat science.</p>
+      <p class="eyebrow">{{ 'encyclopedia.shared.eyebrow' | t }}</p>
+      <h1>{{ 'encyclopedia.technologies.title' | t }}</h1>
+      <p class="subtitle">{{ 'encyclopedia.technologies.subtitle' | t }}</p>
     </header>
 
     <div class="encyclopedia-toolbar">
-      <p class="encyclopedia-meta">{{ technologies.length }} technologies cataloged</p>
-      <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+      <p class="encyclopedia-meta">{{ itemCountLabel(technologies.length) }}</p>
+      <a class="link button" routerLink="/encyclopedia">{{ 'encyclopedia.shared.actions.backToEncyclopedia' | t }}</a>
     </div>
 
     <div class="encyclopedia-grid">
@@ -16,12 +16,12 @@
         <button
           type="button"
           class="ship-media ship-media-button"
-          [appTooltip]="'Open large image for ' + tech.type"
+          [appTooltip]="largeImageTooltip(tech.type)"
           (click)="openImageDialog(tech)">
           <img
             class="building-image"
             [src]="tech.imagePath"
-            [alt]="tech.type + ' image'"
+            [alt]="'encyclopedia.shared.dialog.imageAlt' | t:{ title: tech.type }"
             [attr.loading]="isFirst ? 'eager' : 'lazy'"
           />
         </button>
@@ -33,49 +33,49 @@
 
         <div class="ship-stats">
           <div class="ship-stat">
-            <span class="ship-stat__label">Research</span>
+            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.research' | t }}</span>
             <span class="ship-stat__value">{{ tech.researchTime[0] }}</span>
           </div>
         </div>
 
         <div class="ship-section">
-          <p class="ship-section__title">Requirements</p>
-          <p class="ship-card__subtitle ship-card__subtitle--wide">Buildings</p>
+          <p class="ship-section__title">{{ 'encyclopedia.shared.sections.requirements' | t }}</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">{{ 'encyclopedia.shared.sections.buildings' | t }}</p>
           <ul class="weapon-list" *ngIf="tech.buildingRequirements.length > 0; else noBuildingReq">
             <li class="weapon-item" *ngFor="let requirement of tech.buildingRequirements">
               <span class="weapon-chip">{{ requirement.building }}</span>
-              <span class="weapon-meta">Level {{ requirement.level }}</span>
+              <span class="weapon-meta">{{ 'encyclopedia.shared.labels.level' | t:{ level: requirement.level } }}</span>
             </li>
           </ul>
           <ng-template #noBuildingReq>
-            <p class="ship-empty">No building requirements</p>
+            <p class="ship-empty">{{ 'encyclopedia.shared.empty.noBuildingRequirements' | t }}</p>
           </ng-template>
 
-          <p class="ship-card__subtitle ship-card__subtitle--wide">Technologies</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">{{ 'encyclopedia.shared.sections.technologies' | t }}</p>
           <ul class="weapon-list" *ngIf="tech.techRequirements.length > 0; else noTechReq">
             <li class="weapon-item" *ngFor="let requirement of tech.techRequirements">
               <span class="weapon-chip">{{ requirement.tech }}</span>
-              <span class="weapon-meta">Level {{ requirement.level }}</span>
+              <span class="weapon-meta">{{ 'encyclopedia.shared.labels.level' | t:{ level: requirement.level } }}</span>
             </li>
           </ul>
           <ng-template #noTechReq>
-            <p class="ship-empty">No tech requirements</p>
+            <p class="ship-empty">{{ 'encyclopedia.shared.empty.noTechRequirements' | t }}</p>
           </ng-template>
         </div>
 
         <div class="ship-section">
-          <p class="ship-section__title">Cost</p>
+          <p class="ship-section__title">{{ 'encyclopedia.shared.sections.cost' | t }}</p>
           <div class="cost-row">
             <span class="cost-chip">
-              <img class="cost-icon" src="images/icons/normal/metal.png" alt="Metal" />
+              <img class="cost-icon" src="images/icons/normal/metal.png" [alt]="'encyclopedia.shared.resources.metal' | t" />
               {{ tech.basicCost.metal }}
             </span>
             <span class="cost-chip cost-chip--crystal">
-              <img class="cost-icon" src="images/icons/normal/crystal.png" alt="Crystal" />
+              <img class="cost-icon" src="images/icons/normal/crystal.png" [alt]="'encyclopedia.shared.resources.crystal' | t" />
               {{ tech.basicCost.crystal }}
             </span>
             <span class="cost-chip cost-chip--deuterium">
-              <img class="cost-icon" src="images/icons/normal/deuter.png" alt="Deuterium" />
+              <img class="cost-icon" src="images/icons/normal/deuter.png" [alt]="'encyclopedia.shared.resources.deuterium' | t" />
               {{ tech.basicCost.deuterium }}
             </span>
           </div>
@@ -84,7 +84,7 @@
     </div>
 
     <div class="encyclopedia-toolbar">
-      <a class="link button" routerLink="/encyclopedia">Back to encyclopedia</a>
+      <a class="link button" routerLink="/encyclopedia">{{ 'encyclopedia.shared.actions.backToEncyclopedia' | t }}</a>
     </div>
   </section>
 </main>

@@ -132,6 +132,13 @@ Multiplayer route note:
   - resumed lobbies now get a clearer locked-snapshot callout, and the selected running-game detail now also exposes `Leave current game` for the current account
 - `src/app/multiplayer/` now also consumes the shared `src/app/i18n/` runtime localization layer for browser/detail/setup copy and resolves keyed `/api/multiplayer/games*` plus shared save-management errors, while still mapping a few older raw status/reason labels during the ongoing backend migration
 
+Help/About route note:
+- `src/app/help-about/` now consumes the shared `src/app/i18n/` runtime localization layer for its small public-facing placeholder copy
+
+Encyclopedia route note:
+- `src/app/encyclopedia-menu/` now consumes the shared `src/app/i18n/` runtime localization layer for the menu, shared image dialog, and the frontend-owned labels/tooltips/chrome around the ships, defences, buildings, technologies, and mechanics subpages
+- blueprint-owned item names/descriptions and the large mechanics rulebook body still live directly in the existing blueprint/component data and remain a separate future terminology/content migration
+
 Game child routes:
 
 - `/game/galactic` -> `src/app/game/galactic-view/`
@@ -169,7 +176,7 @@ Localization:
 - `src/app/i18n/i18n.service.ts`: runtime translation lookup, active-language signal, interpolation, and locale-aware date formatting for migrated views
 - `src/app/i18n/i18n.pipe.ts`: template translation pipe for standalone components
 - `src/app/i18n/language-preference.service.ts`: guest/local fallback persistence under `srogame:language`
-- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `api`, `main-menu`, `settings`, `auth`, `setup`, `load-game`, `multiplayer`, `game-shell`, `top-menu`) aggregated per language
+- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `api`, `main-menu`, `settings`, `auth`, `help-about`, `encyclopedia`, `setup`, `load-game`, `multiplayer`, `game-shell`, `top-menu`) aggregated per language
 - `src/app/i18n/api-message.utils.ts`: client bridge that resolves server `errorKey` / `messageKey` metadata through the runtime i18n layer with raw-message fallback during the Phase 2 migration
 - `src/app/game/ui/top-menu/top-menu.component.ts`: consumes keyed `TurnStatusResponse.progressionBlockedReason*` metadata and keyed end-turn / auto-skip API errors
 - `server/src/game-commands/command-result.ts` + `server/src/index.ts::sendGameCommandError(...)`: shared command-error transport point; common `GameCommandError.message` values are now mapped to `api.commands.*` localization keys before hitting the client

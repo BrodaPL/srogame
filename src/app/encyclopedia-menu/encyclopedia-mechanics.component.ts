@@ -1,6 +1,8 @@
 import { NgClass, NgFor, NgIf } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { I18nPipe } from '../i18n/i18n.pipe';
+import { I18nService } from '../i18n/i18n.service';
 
 type MechanicStatus = 'Live' | 'Partial' | 'Planned' | 'Not Planned';
 type MechanicCategory =
@@ -24,7 +26,7 @@ type MechanicSection = {
 
 @Component({
   selector: 'app-encyclopedia-mechanics',
-  imports: [NgClass, NgFor, NgIf, RouterLink],
+  imports: [NgClass, NgFor, NgIf, RouterLink, I18nPipe],
   templateUrl: './encyclopedia-mechanics.component.html'
 })
 export class EncyclopediaMechanicsComponent {
@@ -42,6 +44,7 @@ export class EncyclopediaMechanicsComponent {
 
   selectedStatus: 'All' | MechanicStatus = 'All';
   selectedCategory: 'All' | MechanicCategory = 'All';
+  private readonly i18n = inject(I18nService);
 
   readonly mechanics: MechanicSection[] = [
     {
@@ -593,5 +596,25 @@ export class EncyclopediaMechanicsComponent {
 
   trackByTitle(_index: number, mechanic: MechanicSection): string {
     return mechanic.title;
+  }
+
+  protected statusLabel(status: 'All' | MechanicStatus): string {
+    if (status === 'All') {
+      return this.i18n.t('encyclopedia.mechanics.filters.all');
+    }
+
+    return this.i18n.t(`encyclopedia.mechanics.statuses.${status}`);
+  }
+
+  protected categoryLabel(category: 'All' | MechanicCategory): string {
+    if (category === 'All') {
+      return this.i18n.t('encyclopedia.mechanics.filters.all');
+    }
+
+    return this.i18n.t(`encyclopedia.mechanics.categories.${category}`);
+  }
+
+  protected topicsShownLabel(shown: number, total: number): string {
+    return this.i18n.t('encyclopedia.shared.counts.topicsShown', { shown, total });
   }
 }

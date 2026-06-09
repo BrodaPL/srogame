@@ -1,29 +1,29 @@
 <main class="page">
   <section class="panel panel--compact">
     <header class="panel__header">
-      <p class="eyebrow">Encyclopedia</p>
-      <h1>Encyclopedia</h1>
-      <p class="subtitle">Reference guides for ships, defences, buildings, technologies, and mechanics covering missions, diplomacy, tutorials, scanning, and turn rules.</p>
+      <p class="eyebrow">{{ 'encyclopedia.menu.eyebrow' | t }}</p>
+      <h1>{{ 'encyclopedia.menu.title' | t }}</h1>
+      <p class="subtitle">{{ 'encyclopedia.menu.subtitle' | t }}</p>
     </header>
 
     <nav class="menu">
       <button class="menu-button" type="button" routerLink="/encyclopedia/ships">
-        Ships
+        {{ 'encyclopedia.menu.actions.ships' | t }}
       </button>
       <button class="menu-button" type="button" routerLink="/encyclopedia/defences">
-        Defences
+        {{ 'encyclopedia.menu.actions.defences' | t }}
       </button>
       <button class="menu-button" type="button" routerLink="/encyclopedia/buildings">
-        Buildings
+        {{ 'encyclopedia.menu.actions.buildings' | t }}
       </button>
       <button class="menu-button" type="button" routerLink="/encyclopedia/technologies">
-        Technologies
+        {{ 'encyclopedia.menu.actions.technologies' | t }}
       </button>
       <button class="menu-button" type="button" routerLink="/encyclopedia/mechanics">
-        Mechanics
+        {{ 'encyclopedia.menu.actions.mechanics' | t }}
       </button>
       <button class="menu-button" type="button" routerLink="/">
-        Back to main menu
+        {{ 'encyclopedia.menu.actions.backToMainMenu' | t }}
       </button>
     </nav>
   </section>

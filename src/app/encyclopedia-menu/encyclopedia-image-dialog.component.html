@@ -4,31 +4,31 @@
     class="encyclopedia-image-dialog"
     role="dialog"
     aria-modal="true"
-    [attr.aria-label]="title + ' image preview'"
+    [attr.aria-label]="'encyclopedia.shared.dialog.ariaLabel' | t:{ title }"
     (click)="$event.stopPropagation()">
     <div class="encyclopedia-image-dialog__header">
       <div>
-        <p class="eyebrow">Encyclopedia</p>
+        <p class="eyebrow">{{ 'encyclopedia.shared.eyebrow' | t }}</p>
         <h3>{{ title }}</h3>
       </div>
-      <button type="button" class="encyclopedia-image-dialog__close" (click)="close()">Close</button>
+      <button type="button" class="encyclopedia-image-dialog__close" (click)="close()">{{ 'encyclopedia.shared.actions.close' | t }}</button>
     </div>
 
     <div class="encyclopedia-image-dialog__body">
       <img
         class="encyclopedia-image-dialog__image"
         [src]="displayedImagePath"
-        [alt]="title + ' image'"
+        [alt]="'encyclopedia.shared.dialog.imageAlt' | t:{ title }"
       />
     </div>
 
     <div class="encyclopedia-image-dialog__meta">
       @if (isRawLoading) {
-        <p class="overview-muted">Loading raw image...</p>
+        <p class="overview-muted">{{ 'encyclopedia.shared.dialog.loadingRaw' | t }}</p>
       } @else if (rawLoadFailed) {
-        <p class="overview-muted">Raw image could not be loaded. Showing optimized preview.</p>
+        <p class="overview-muted">{{ 'encyclopedia.shared.dialog.rawLoadFailed' | t }}</p>
       } @else {
-        <p class="overview-muted">Showing raw image.</p>
+        <p class="overview-muted">{{ 'encyclopedia.shared.dialog.showingRaw' | t }}</p>
       }
     </div>
   </section>
