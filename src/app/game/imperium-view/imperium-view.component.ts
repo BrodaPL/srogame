@@ -4,6 +4,9 @@ import { RouterLink } from '@angular/router';
 import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
+import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nPipe } from '../../i18n/i18n.pipe';
+import { I18nService } from '../../i18n/i18n.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { Building } from '../../models/buildings/building';
@@ -124,7 +127,8 @@ type ImperiumBuildingStatsVm = {
     MiniPlanetPreviewComponent,
     FormsModule,
     RouterLink,
-    TooltipDirective
+    TooltipDirective,
+    I18nPipe
   ],
   templateUrl: './imperium-view.component.html',
   styleUrl: './imperium-view.component.css'
@@ -185,7 +189,8 @@ export class ImperiumViewComponent implements OnInit {
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly tutorialService: TutorialService
+    private readonly tutorialService: TutorialService,
+    private readonly i18n: I18nService
   ) {}
 
   public ngOnInit(): void {
@@ -254,7 +259,23 @@ export class ImperiumViewComponent implements OnInit {
   }
 
   protected abandonBlockedCopy(): string {
-    return 'Your last owned planet cannot be abandoned.';
+    return this.i18n.t('imperium.planets.abandon.blocked');
+  }
+
+  protected sortOptionLabel(value: ImperiumSortOption): string {
+    return this.i18n.t(`imperium.planets.sortOptions.${value}`);
+  }
+
+  protected filterOptionLabel(value: ImperiumFilterOption): string {
+    return this.i18n.t(`imperium.planets.filterOptions.${value}`);
+  }
+
+  protected attentionDisplayLabel(label: string): string {
+    return this.i18n.t(`imperium.attention.labels.${this.attentionLabelKey(label)}`);
+  }
+
+  protected idleLabel(): string {
+    return this.i18n.t('imperium.planets.queues.idle');
   }
 
   protected beginAbandonPlanet(planetVm: ImperiumPlanetVm): void {
@@ -281,7 +302,7 @@ export class ImperiumViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.planetActionError = 'No player session found.';
+      this.planetActionError = this.i18n.t('imperium.errors.noSession');
       return;
     }
 
@@ -298,7 +319,11 @@ export class ImperiumViewComponent implements OnInit {
           this.applyAbandonPlanetResponse(response);
         },
         error: (error) => {
-          this.planetActionError = error?.error?.error ?? 'Unable to abandon planet.';
+          this.planetActionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('imperium.errors.abandon')
+          );
         }
       });
   }
@@ -306,7 +331,7 @@ export class ImperiumViewComponent implements OnInit {
   private loadOwnedPlanets(): void {
     const session = this.playerSession.load();
     if (!session) {
-      this.loadError = 'No player session found.';
+      this.loadError = this.i18n.t('imperium.errors.noSession');
       return;
     }
 
@@ -330,8 +355,12 @@ export class ImperiumViewComponent implements OnInit {
           this.rebuildDashboardState();
           this.tutorialService.autoOpenTutorial('imperiumView');
         },
-        error: () => {
-          this.loadError = 'Unable to load owned planets.';
+        error: (error) => {
+          this.loadError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('imperium.errors.load')
+          );
         }
       });
   }
@@ -457,7 +486,7 @@ export class ImperiumViewComponent implements OnInit {
     const averageEnergyPenalty = this.ownedPlanets.length <= 0
       ? 0
       : this.roundNumber(totalEnergyPenalty / this.ownedPlanets.length, 2);
-    this.energyTooltip = `Average energy penalty: ${averageEnergyPenalty}%.`;
+    this.energyTooltip = this.i18n.t('imperium.energyTooltip', { penalty: averageEnergyPenalty });
     this.powersDisplay = {
       industryPower: this.roundNumber(totalIndustryPower - totalDroneIndustryPower, 2),
       droneIndustryPower: this.roundNumber(totalDroneIndustryPower, 2),
@@ -511,80 +540,80 @@ export class ImperiumViewComponent implements OnInit {
     return [
       this.createAttentionItem(
         'energyDeficit',
-        'Energy insufficient',
-        'Energy usage is above available output.',
+        this.i18n.t('imperium.attention.labels.energyDeficit'),
+        this.i18n.t('imperium.attention.descriptions.energyDeficit'),
         planetVms.filter((planetVm) => planetVm.energy.used > planetVm.energy.available)
       ),
       this.createAttentionItem(
         'energyReduction',
-        'Energy reduction',
-        'At least one building is manually set below its maximum power usage.',
+        this.i18n.t('imperium.attention.labels.energyReduction'),
+        this.i18n.t('imperium.attention.descriptions.energyReduction'),
         planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Energy reduction'))
       ),
       this.createAttentionItem(
         'idleBuildingQueue',
-        'Empty building queue',
-        'No construction is currently queued.',
+        this.i18n.t('imperium.attention.labels.idleBuildingQueue'),
+        this.i18n.t('imperium.attention.descriptions.idleBuildingQueue'),
         planetVms.filter((planetVm) => planetVm.buildingQueueSummary.length === 0)
       ),
       this.createAttentionItem(
         'idleShipyardQueue',
-        'Empty shipyard queue',
-        'No ships are currently queued for production.',
+        this.i18n.t('imperium.attention.labels.idleShipyardQueue'),
+        this.i18n.t('imperium.attention.descriptions.idleShipyardQueue'),
         planetVms.filter((planetVm) => planetVm.shipyardQueueSummary.length === 0)
       ),
       this.createAttentionItem(
         'idleResearchRole',
-        'No active research role',
-        'Planet is neither researching nor helping another lab.',
+        this.i18n.t('imperium.attention.labels.idleResearchRole'),
+        this.i18n.t('imperium.attention.descriptions.idleResearchRole'),
         planetVms.filter((planetVm) => planetVm.researchSummary.startsWith('Idle'))
       ),
       this.createAttentionItem(
         'limitedIndustryPower',
-        'Reduced industry power',
-        'Robotics or Nanite power allocation is below the selected maximum.',
+        this.i18n.t('imperium.attention.labels.limitedIndustryPower'),
+        this.i18n.t('imperium.attention.descriptions.limitedIndustryPower'),
         planetVms.filter((planetVm) => planetVm.powers.industryPowerLimited)
       ),
       this.createAttentionItem(
         'limitedShipyardPower',
-        'Reduced shipyard power',
-        'Shipyard or Nanite power allocation is below the selected maximum.',
+        this.i18n.t('imperium.attention.labels.limitedShipyardPower'),
+        this.i18n.t('imperium.attention.descriptions.limitedShipyardPower'),
         planetVms.filter((planetVm) => planetVm.powers.shipyardPowerLimited)
       ),
       this.createAttentionItem(
         'limitedResearchPower',
-        'Reduced research power',
-        'Research Lab power allocation is below the selected maximum.',
+        this.i18n.t('imperium.attention.labels.limitedResearchPower'),
+        this.i18n.t('imperium.attention.descriptions.limitedResearchPower'),
         planetVms.filter((planetVm) => planetVm.powers.researchPowerLimited)
       ),
       this.createAttentionItem(
         'damagedShipsPresent',
-        'Damaged ships present',
-        'Stationed or idle orbit fleets above these planets still have hull damage.',
+        this.i18n.t('imperium.attention.labels.damagedShipsPresent'),
+        this.i18n.t('imperium.attention.descriptions.damagedShipsPresent'),
         planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Damaged ships present'))
       ),
       this.createAttentionItem(
         'damagedShipsNoRepair',
-        'Damaged ships without repair capability',
-        'Damaged ships are present but this location currently has no repair capability.',
+        this.i18n.t('imperium.attention.labels.damagedShipsNoRepair'),
+        this.i18n.t('imperium.attention.descriptions.damagedShipsNoRepair'),
         planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Damaged ships without repair capability'))
       ),
       this.createAttentionItem(
         'damagedBuildingsPresent',
-        'Damaged buildings present',
-        'Planetary infrastructure is damaged and working below full efficiency.',
+        this.i18n.t('imperium.attention.labels.damagedBuildingsPresent'),
+        this.i18n.t('imperium.attention.descriptions.damagedBuildingsPresent'),
         planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Damaged buildings present'))
       ),
       this.createAttentionItem(
         'damagedDefencesPresent',
-        'Damaged defences present',
-        'Planetary defences survived combat but still need repairs.',
+        this.i18n.t('imperium.attention.labels.damagedDefencesPresent'),
+        this.i18n.t('imperium.attention.descriptions.damagedDefencesPresent'),
         planetVms.filter((planetVm) => planetVm.attentionLabels.includes('Damaged defences present'))
       ),
       this.createAttentionItem(
         'damagedGroundNoRepair',
-        'Damaged structures without repair capability',
-        'Buildings or defences are damaged but the location currently has no effective industry or drone repair.',
+        this.i18n.t('imperium.attention.labels.damagedGroundNoRepair'),
+        this.i18n.t('imperium.attention.descriptions.damagedGroundNoRepair'),
         planetVms.filter((planetVm) =>
           planetVm.attentionLabels.includes('Damaged buildings without repair capability')
           || planetVm.attentionLabels.includes('Damaged defences without repair capability')
@@ -1227,5 +1256,40 @@ export class ImperiumViewComponent implements OnInit {
   private roundNumber(value: number, precision: number): number {
     const multiplier = 10 ** precision;
     return Math.round(value * multiplier) / multiplier;
+  }
+
+  private attentionLabelKey(label: string): string {
+    switch (label) {
+      case 'Energy insufficient':
+        return 'energyDeficit';
+      case 'Energy reduction':
+        return 'energyReduction';
+      case 'Empty building queue':
+        return 'idleBuildingQueue';
+      case 'Empty shipyard queue':
+        return 'idleShipyardQueue';
+      case 'No active research role':
+        return 'idleResearchRole';
+      case 'Reduced industry power':
+        return 'limitedIndustryPower';
+      case 'Reduced shipyard power':
+        return 'limitedShipyardPower';
+      case 'Reduced research power':
+        return 'limitedResearchPower';
+      case 'Damaged ships present':
+        return 'damagedShipsPresent';
+      case 'Damaged ships without repair capability':
+        return 'damagedShipsNoRepair';
+      case 'Damaged buildings present':
+        return 'damagedBuildingsPresent';
+      case 'Damaged buildings without repair capability':
+        return 'damagedBuildingsNoRepair';
+      case 'Damaged defences present':
+        return 'damagedDefencesPresent';
+      case 'Damaged defences without repair capability':
+        return 'damagedDefencesNoRepair';
+      default:
+        return 'energyDeficit';
+    }
   }
 }

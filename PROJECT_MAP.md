@@ -116,6 +116,7 @@ Setup route note:
 
 Game shell note:
 - `src/app/game/game.component.ts` and `src/app/game/ui/top-menu/` now also consume the shared `src/app/i18n/` runtime localization layer for shell overlays, in-game navigation labels, multiplayer auto-skip copy, and local fallback messages
+- `src/app/game/imperium-view/` and `src/app/game/planet-view/` now also consume the shared `src/app/i18n/` runtime localization layer for their frontend-owned chrome, local tooltips, and local fallback errors; deeper blueprint/detail terminology is still a separate later migration
 
 Load route note:
 - `src/app/load-game/` still owns explicit save browsing and reopen flows
@@ -156,6 +157,16 @@ Game child routes:
 - `/game/operations` -> `src/app/game/operations-view/`
 - `/game/mission-planner` -> `src/app/game/mission-planner-view/`
 
+Imperium route note:
+- `src/app/game/imperium-view/` owns the empire aggregate dashboard, abandon-planet flow, and now its frontend-owned runtime-localized summary/attention/filter chrome
+
+Planet route note:
+- `src/app/game/planet-view/` owns the owned-planet workbench, including overview/tabs, local build + queue management, local trade-port popup, local orbit-maintenance popup, and the shared planet-object dialog shell
+- the route now consumes the shared runtime i18n layer for frontend-owned chrome and local fallbacks, while deeper requirement/detail row terminology still remains mostly raw domain text
+
+Star-system route note:
+- `src/app/game/star-system-view/` is still an effectively empty shell around `TopMenu`; there was no meaningful frontend copy to migrate in the current localization slice
+
 Researches route note:
 - `src/app/game/researches-view/` owns both technology start flow and active helper-lab reassignment for queued research; the technology cards remain the start surface, while the queued-technologies table now owns live helper assignment with a fixed main lab
 
@@ -176,7 +187,7 @@ Localization:
 - `src/app/i18n/i18n.service.ts`: runtime translation lookup, active-language signal, interpolation, and locale-aware date formatting for migrated views
 - `src/app/i18n/i18n.pipe.ts`: template translation pipe for standalone components
 - `src/app/i18n/language-preference.service.ts`: guest/local fallback persistence under `srogame:language`
-- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `api`, `main-menu`, `settings`, `auth`, `help-about`, `encyclopedia`, `setup`, `load-game`, `multiplayer`, `game-shell`, `top-menu`, `communications`) aggregated per language
+- `src/app/i18n/locales/`: feature-scoped TypeScript translation modules (`common`, `api`, `main-menu`, `settings`, `auth`, `help-about`, `encyclopedia`, `setup`, `load-game`, `multiplayer`, `game-shell`, `top-menu`, `communications`, `imperium`, `planet-view`) aggregated per language
 - `src/app/i18n/api-message.utils.ts`: client bridge that resolves server `errorKey` / `messageKey` metadata through the runtime i18n layer with raw-message fallback during the Phase 2 migration
 - `src/app/game/ui/top-menu/top-menu.component.ts`: consumes keyed `TurnStatusResponse.progressionBlockedReason*` metadata and keyed end-turn / auto-skip API errors
 - `server/src/game-commands/command-result.ts` + `server/src/index.ts::sendGameCommandError(...)`: shared command-error transport point; common `GameCommandError.message` values are now mapped to `api.commands.*` localization keys before hitting the client

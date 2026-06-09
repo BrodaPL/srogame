@@ -1,4 +1,5 @@
 import { ChangeDetectorRef, Component, EventEmitter, HostListener, Input, NgZone, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { I18nPipe } from '../../i18n/i18n.pipe';
 
 export type PlanetObjectDetailTone = 'default' | 'good' | 'warn' | 'bad' | 'muted';
 
@@ -25,6 +26,7 @@ export interface PlanetObjectDetailDialogData {
 
 @Component({
   selector: 'app-planet-object-dialog',
+  imports: [I18nPipe],
   templateUrl: './planet-object-dialog.component.html',
   styleUrl: './planet-object-dialog.component.css'
 })

@@ -2,13 +2,13 @@
 
 <section class="planet-view">
   @if (isLoading) {
-    <p class="overview-empty">Loading planet data...</p>
+    <p class="overview-empty">{{ 'planetView.loading' | t }}</p>
   } @else if (loadError) {
     <p class="overview-empty">{{ loadError }}</p>
   } @else if (planet) {
     <div data-tutorial-id="planet-summary">
       <app-resources
-        [viewName]="'Planet View'"
+        [viewName]="'planetView.viewName' | t"
         [headerIndicators]="planetHeaderIndicators()"
         [metal]="metalDisplay"
         [crystal]="crystalDisplay"
@@ -25,7 +25,7 @@
       data-tutorial-id="planet-overview"
     >
       <div class="planet-view__parameters">
-        <h3 class="planet-view__section-title">Planet Parameters</h3>
+        <h3 class="planet-view__section-title">{{ 'planetView.overview.parameters' | t }}</h3>
         <div class="planet-parameters-grid">
           @for (row of planetaryParameterRows(); track row.label) {
             <div class="planet-parameters-grid__row">
@@ -47,7 +47,7 @@
               class="planet-parameters-grid__label"
               [appTooltip]="averagePlanetIndustryTooltip()"
             >
-              Average planet industry level
+              {{ 'planetView.overview.averageIndustry' | t }}
             </span>
             <span
               class="planet-parameters-grid__value planet-parameters-grid__value--neutral"
@@ -56,7 +56,7 @@
             </span>
           </div>
           <div class="planet-parameters-grid__row">
-            <span class="planet-parameters-grid__label">Bomb Depot storage</span>
+            <span class="planet-parameters-grid__label">{{ 'planetView.overview.bombDepotStorage' | t }}</span>
             <span class="planet-parameters-grid__value planet-parameters-grid__value--neutral">
               {{ bombDepotOverviewValue() }}
             </span>
@@ -65,7 +65,7 @@
       </div>
 
       <div class="planet-view__attention">
-        <h3 class="planet-view__section-title">Needs Attention</h3>
+        <h3 class="planet-view__section-title">{{ 'planetView.overview.attention' | t }}</h3>
         @if (attentionLabels().length > 0) {
           <div class="planet-view__attention-list">
             @for (label of attentionLabels(); track label) {
@@ -73,12 +73,12 @@
                 class="planet-view__attention-item"
                 [class.planet-view__attention-item--danger]="label === 'Energy insufficient'"
               >
-                {{ label }}
+                {{ attentionLabel(label) }}
               </p>
             }
           </div>
         } @else {
-          <p class="overview-muted planet-view__attention-empty">No warnings right now.</p>
+          <p class="overview-muted planet-view__attention-empty">{{ 'planetView.overview.noWarnings' | t }}</p>
         }
       </div>
 
@@ -97,7 +97,7 @@
             <img
               class="planet-view__planet-image"
               [src]="imagePath"
-              [alt]="planet.basicInfo.name + ' image'"
+              [alt]="objectImageAlt(planet.basicInfo.name)"
               [style.transform]="planetHeroImageTransform()"
               [style.filter]="planetHeroImageFilter()"
             />
@@ -115,21 +115,21 @@
           <button
             type="button"
             class="planet-view__coordinates-button"
-            [appTooltip]="'Copy: ' + coordinatesLabel"
+            [appTooltip]="copyCoordinatesTooltip()"
             (click)="copyCoordinates()"
           >
             {{ coordinatesLabel }}
           </button>
-          <span> | {{ planet.basicInfo.type }} | Size {{ usedPlanetSize() }} / {{ planet.basicInfo.size }}</span>
+          <span> | {{ planet.basicInfo.type }} | {{ 'planetView.overview.size' | t:{ used: usedPlanetSize(), total: planet.basicInfo.size } }}</span>
         </p>
         <button
           type="button"
           class="planet-view__trade-port-button"
           [disabled]="!hasTradePort()"
-          [appTooltip]="hasTradePort() ? 'Open local Trade Port offers.' : 'Build Interstellar Trade Port to unlock trade offers.'"
+          [appTooltip]="tradePortTooltip()"
           (click)="openTradePortDialog()"
         >
-          Trade Port
+          {{ 'planetView.overview.tradePort' | t }}
         </button>
       </div>
     </section>
@@ -137,19 +137,19 @@
     <section class="planet-tabs">
       <div class="planet-tabs__header" data-tutorial-id="planet-tab-bar">
         <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('resources')" (click)="setTab('resources')">
-          Resources
+          {{ tabLabel('resources') }}
         </button>
         <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('facilities')" (click)="setTab('facilities')">
-          Facilities
+          {{ tabLabel('facilities') }}
         </button>
         <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('ships')" (click)="setTab('ships')">
-          Ships
+          {{ tabLabel('ships') }}
         </button>
         <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('defences')" (click)="setTab('defences')">
-          Defences
+          {{ tabLabel('defences') }}
         </button>
         <button type="button" class="planet-tabs__tab" [class.planet-tabs__tab--active]="isActiveTab('operations')" (click)="setTab('operations')">
-          Operations
+          {{ tabLabel('operations') }}
         </button>
         <button
           type="button"
@@ -170,42 +170,42 @@
                 <button
                   type="button"
                   class="planet-building-card__image-button"
-                  [attr.aria-label]="'Open details for ' + building.type"
+                  [attr.aria-label]="objectDetailsAriaLabel(building.type)"
                   (click)="openBuildingDetails(building)"
                 >
                   <img
                     class="planet-building-card__image"
                     [class.planet-building-card__image--empty]="buildingLevel(building.type) <= 0"
                     [src]="building.imagePath"
-                    [alt]="building.type + ' image'"
+                    [alt]="objectImageAlt(building.type)"
                   />
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ building.type }}</h4>
-                  <p class="planet-building-card__meta">Level: {{ buildingLevel(building.type) }}</p>
+                  <p class="planet-building-card__meta">{{ 'planetView.card.level' | t }}: {{ buildingLevel(building.type) }}</p>
                   @if (buildingLevel(building.type) > 0) {
                     <p class="planet-building-card__meta">
                       {{ buildingProductionLabel(building) }}: {{ buildingProductionAtCurrentLevel(building) }}
                     </p>
                     <p class="planet-building-card__meta">
-                      Structural points: {{ buildingCurrentStructuralPoints(building) }} / {{ buildingMaxStructuralPoints(building) }}
+                      {{ 'planetView.card.structuralPoints' | t }}: {{ buildingCurrentStructuralPoints(building) }} / {{ buildingMaxStructuralPoints(building) }}
                     </p>
                     <p class="planet-building-card__meta">
-                      Structural efficiency: {{ buildingStructuralUtilizationPercent(building) }}% (Floor {{ buildingMinimumStructuralUtilizationPercent(building) }}%)
+                      {{ 'planetView.card.structuralEfficiency' | t }}: {{ buildingStructuralUtilizationPercent(building) }}% ({{ 'planetView.card.floor' | t }} {{ buildingMinimumStructuralUtilizationPercent(building) }}%)
                     </p>
                     @if (building.type === BuildingType.FUSION_REACTOR) {
                       <p class="planet-building-card__meta">
-                        Fusion stage: {{ selectedFusionReactorStage(building) }} (deuterium usage {{ fusionReactorDeuteriumUsage(building) }})
+                        {{ 'planetView.card.fusionStage' | t }}: {{ selectedFusionReactorStage(building) }} ({{ 'planetView.card.deuteriumUsage' | t }} {{ fusionReactorDeuteriumUsage(building) }})
                       </p>
                     } @else {
                       <p class="planet-building-card__meta">
-                        Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
+                        {{ 'planetView.card.powerConsumption' | t }}: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
                       </p>
                     }
                   }
                   @if (shouldShowPowerManagement(building)) {
                     <label class="planet-building-card__power-management">
-                      <span>Current power usage:</span>
+                      <span>{{ 'planetView.card.currentPowerUsage' | t }}</span>
                       <select
                         class="planet-building-card__power-select"
                         [disabled]="isPowerManagementDisabled(building)"
@@ -223,7 +223,7 @@
                   }
                   @if (shouldShowFusionReactorManagement(building)) {
                     <label class="planet-building-card__power-management">
-                      <span>Current deuterium stage:</span>
+                      <span>{{ 'planetView.card.currentDeuteriumStage' | t }}</span>
                       <select
                         class="planet-building-card__power-select"
                         [disabled]="isFusionReactorManagementDisabled(building)"
@@ -257,7 +257,7 @@
                   }
                 </div>
                 <div class="planet-building-card__requirements">
-                  <p class="planet-building-card__section-title">Requirements (next level)</p>
+                  <p class="planet-building-card__section-title">{{ 'planetView.card.requirementsNext' | t }}</p>
                   @for (requirement of buildingRequirementRows(building); track requirement.label) {
                     <p
                       class="planet-building-card__line"
@@ -293,42 +293,42 @@
                 <button
                   type="button"
                   class="planet-building-card__image-button"
-                  [attr.aria-label]="'Open details for ' + building.type"
+                  [attr.aria-label]="objectDetailsAriaLabel(building.type)"
                   (click)="openBuildingDetails(building)"
                 >
                   <img
                     class="planet-building-card__image"
                     [class.planet-building-card__image--empty]="buildingLevel(building.type) <= 0"
                     [src]="building.imagePath"
-                    [alt]="building.type + ' image'"
+                    [alt]="objectImageAlt(building.type)"
                   />
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ building.type }}</h4>
-                  <p class="planet-building-card__meta">Level: {{ buildingLevel(building.type) }}</p>
+                  <p class="planet-building-card__meta">{{ 'planetView.card.level' | t }}: {{ buildingLevel(building.type) }}</p>
                   @if (buildingLevel(building.type) > 0) {
                     <p class="planet-building-card__meta">
                       {{ buildingProductionLabel(building) }}: {{ buildingProductionAtCurrentLevel(building) }}
                     </p>
                     <p class="planet-building-card__meta">
-                      Structural points: {{ buildingCurrentStructuralPoints(building) }} / {{ buildingMaxStructuralPoints(building) }}
+                      {{ 'planetView.card.structuralPoints' | t }}: {{ buildingCurrentStructuralPoints(building) }} / {{ buildingMaxStructuralPoints(building) }}
                     </p>
                     <p class="planet-building-card__meta">
-                      Structural efficiency: {{ buildingStructuralUtilizationPercent(building) }}% (Floor {{ buildingMinimumStructuralUtilizationPercent(building) }}%)
+                      {{ 'planetView.card.structuralEfficiency' | t }}: {{ buildingStructuralUtilizationPercent(building) }}% ({{ 'planetView.card.floor' | t }} {{ buildingMinimumStructuralUtilizationPercent(building) }}%)
                     </p>
                     @if (building.type === BuildingType.FUSION_REACTOR) {
                       <p class="planet-building-card__meta">
-                        Fusion stage: {{ selectedFusionReactorStage(building) }} (deuterium usage {{ fusionReactorDeuteriumUsage(building) }})
+                        {{ 'planetView.card.fusionStage' | t }}: {{ selectedFusionReactorStage(building) }} ({{ 'planetView.card.deuteriumUsage' | t }} {{ fusionReactorDeuteriumUsage(building) }})
                       </p>
                     } @else {
                       <p class="planet-building-card__meta">
-                        Power consumption: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
+                        {{ 'planetView.card.powerConsumption' | t }}: {{ buildingCurrentPowerConsumption(building) }} / {{ buildingMaxPowerConsumption(building) }}
                       </p>
                     }
                   }
                   @if (shouldShowPowerManagement(building)) {
                     <label class="planet-building-card__power-management">
-                      <span>Current power usage:</span>
+                      <span>{{ 'planetView.card.currentPowerUsage' | t }}</span>
                       <select
                         class="planet-building-card__power-select"
                         [disabled]="isPowerManagementDisabled(building)"
@@ -346,7 +346,7 @@
                   }
                   @if (shouldShowFusionReactorManagement(building)) {
                     <label class="planet-building-card__power-management">
-                      <span>Current deuterium stage:</span>
+                      <span>{{ 'planetView.card.currentDeuteriumStage' | t }}</span>
                       <select
                         class="planet-building-card__power-select"
                         [disabled]="isFusionReactorManagementDisabled(building)"
@@ -380,7 +380,7 @@
                   }
                 </div>
                 <div class="planet-building-card__requirements">
-                  <p class="planet-building-card__section-title">Requirements (next level)</p>
+                  <p class="planet-building-card__section-title">{{ 'planetView.card.requirementsNext' | t }}</p>
                   @for (requirement of buildingRequirementRows(building); track requirement.label) {
                     <p
                       class="planet-building-card__line"
@@ -412,7 +412,7 @@
         @if (isActiveTab('ships')) {
           <section class="planet-ships-status">
             <div class="planet-ships-status__header planet-ships-status__header--inline">
-              <h4 class="planet-view__section-title">Ship Damage Status</h4>
+              <h4 class="planet-view__section-title">{{ 'planetView.ships.damageStatus' | t }}</h4>
               @if (hasShipsOnPlanet()) {
                 <article
                   class="planet-ships-status__card planet-ships-status__card--inline"
@@ -422,7 +422,7 @@
                   [class.planet-ships-status__card--red]="planetShipDamageTone() === 'red'"
                   [appTooltip]="planetUndamagedShipsTooltip()"
                 >
-                  <span class="planet-ships-status__label">Undamaged ships:</span>
+                  <span class="planet-ships-status__label">{{ 'planetView.ships.undamaged' | t }}</span>
                   <strong class="planet-ships-status__value">{{ planetUndamagedShipsPercent() }}%</strong>
                 </article>
                 <article
@@ -433,20 +433,20 @@
                   [class.planet-ships-status__card--red]="planetShipDamageTone() === 'red'"
                   [appTooltip]="planetDamagedShipsTooltip()"
                 >
-                  <span class="planet-ships-status__label">Damaged ships:</span>
+                  <span class="planet-ships-status__label">{{ 'planetView.ships.damaged' | t }}</span>
                   <strong class="planet-ships-status__value">{{ planetDamagedShipsPercent() }}%</strong>
                 </article>
               }
             </div>
 
             @if (!hasShipsOnPlanet()) {
-              <p class="planet-tab-placeholder">No ships available.</p>
+              <p class="planet-tab-placeholder">{{ 'planetView.ships.none' | t }}</p>
             }
           </section>
 
           <section class="planet-view__filters-card">
             <div class="planet-view__filters-bar">
-              <h4 class="planet-view__section-title">Ship Filters</h4>
+              <h4 class="planet-view__section-title">{{ 'planetView.ships.filters' | t }}</h4>
               <div class="planet-view__filters">
                 @for (filter of shipPurposeFilterEntries(); track filter.purpose) {
                   <label class="planet-view__filter-chip">
@@ -460,7 +460,7 @@
                 }
               </div>
               @if (hasShipsOnPlanet()) {
-                <p class="planet-view__filters-total">Total ships: {{ planetTotalShipsCount() }}</p>
+                <p class="planet-view__filters-total">{{ 'planetView.ships.total' | t:{ count: planetTotalShipsCount() } }}</p>
               }
             </div>
           </section>
@@ -475,57 +475,57 @@
                 <button
                   type="button"
                   class="planet-building-card__image-button"
-                  [attr.aria-label]="'Open details for ' + ship.type"
+                  [attr.aria-label]="objectDetailsAriaLabel(ship.type)"
                   (click)="openShipDetails(ship)"
                 >
                   <img
                     class="planet-building-card__image"
                     [class.planet-building-card__image--empty]="shipHasZeroOwnedCount(ship)"
                     [src]="ship.imagePath"
-                    [alt]="ship.type + ' image'"
+                    [alt]="objectImageAlt(ship.type)"
                   />
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ ship.type }}</h4>
                   <p class="planet-building-card__meta">
-                    Current amount: <strong class="planet-building-card__meta-value">{{ currentShipAmount(ship.type) }}</strong>
+                    {{ 'planetView.card.currentAmount' | t }}: <strong class="planet-building-card__meta-value">{{ currentShipAmount(ship.type) }}</strong>
                   </p>
-                  <p class="planet-building-card__meta">Hull class: {{ ship.hullClass }}</p>
-                  <p class="planet-building-card__meta">Cargo: {{ ship.cargoCapacity }}</p>
+                  <p class="planet-building-card__meta">{{ 'planetView.card.hullClass' | t }}: {{ ship.hullClass }}</p>
+                  <p class="planet-building-card__meta">{{ 'planetView.card.cargo' | t }}: {{ ship.cargoCapacity }}</p>
                   <div class="planet-building-card__purpose-tags">
                     @for (purpose of shipPurposeTags(ship); track purpose) {
                       <span class="planet-building-card__purpose-tag">{{ purpose }}</span>
                     }
                     @if (!ship.canJump) {
-                      <span class="planet-building-card__purpose-tag planet-building-card__purpose-tag--warning">No hyperspace drive.</span>
+                      <span class="planet-building-card__purpose-tag planet-building-card__purpose-tag--warning">{{ 'planetView.card.noHyperspaceDrive' | t }}</span>
                     }
                   </div>
                 </div>
                 <div class="planet-building-card__cost">
-                  <p class="planet-building-card__section-title">Single ship cost</p>
+                  <p class="planet-building-card__section-title">{{ 'planetView.card.singleShipCost' | t }}</p>
                   @for (cost of shipSingleCostRows(ship); track cost.label) {
                     <p
                       class="planet-building-card__line"
                       [class.planet-building-card__line--insufficient]="!cost.isEnough"
                     >
-                      {{ cost.label }}: {{ cost.amount }}
+                      {{ resourceCostLabel(cost.label) }}: {{ cost.amount }}
                     </p>
                   }
-                  <p class="planet-building-card__section-title planet-building-card__section-title--spaced">Total cost</p>
+                  <p class="planet-building-card__section-title planet-building-card__section-title--spaced">{{ 'planetView.card.totalCost' | t }}</p>
                   @for (cost of shipTotalCostRows(ship); track cost.label) {
                     <p
                       class="planet-building-card__line planet-building-card__line--cost"
                       [class.planet-building-card__line--insufficient]="!cost.isEnough && !cost.isPlaceholder"
                       [class.planet-building-card__line--placeholder]="cost.isPlaceholder"
                     >
-                      <span class="sr-only">{{ cost.label }}:</span>
-                      <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                      <span class="sr-only">{{ resourceCostLabel(cost.label) }}:</span>
+                      <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="resourceCostLabel(cost.label)" />
                       {{ cost.amount === null ? '--' : cost.amount }}
                     </p>
                   }
                 </div>
                 <div class="planet-building-card__requirements">
-                  <p class="planet-building-card__section-title">Requirements</p>
+                  <p class="planet-building-card__section-title">{{ 'planetView.card.requirements' | t }}</p>
                   @for (requirement of shipRequirementRows(ship); track requirement.label) {
                     <p
                       class="planet-building-card__line"
@@ -539,7 +539,7 @@
                 </div>
                 <div class="planet-building-card__action-stack">
                   <label class="planet-building-card__amount">
-                    <span>Amount:</span>
+                    <span>{{ 'planetView.card.amount' | t }}</span>
                     <input
                       class="planet-building-card__amount-input"
                       type="number"
@@ -548,7 +548,7 @@
                       step="1"
                       [ngModel]="shipAmountInput(ship.type)"
                       (ngModelChange)="onShipAmountInput(ship.type, $event)"
-                      placeholder="amount"
+                      [placeholder]="'planetView.card.amountPlaceholder' | t"
                     />
                   </label>
                   <button
@@ -568,14 +568,14 @@
             }
           </div>
           } @else {
-            <p class="planet-tab-placeholder">No ships match the current filters.</p>
+            <p class="planet-tab-placeholder">{{ 'planetView.ships.noMatches' | t }}</p>
           }
         }
 
         @if (isActiveTab('defences')) {
           <section class="planet-ships-status">
             <div class="planet-ships-status__header planet-ships-status__header--inline">
-              <h4 class="planet-view__section-title">Defence Damage Status</h4>
+              <h4 class="planet-view__section-title">{{ 'planetView.defences.damageStatus' | t }}</h4>
               @if (hasDefencesOnPlanet()) {
                 <article
                   class="planet-ships-status__card planet-ships-status__card--inline"
@@ -585,7 +585,7 @@
                   [class.planet-ships-status__card--red]="planetDefenceDamageTone() === 'red'"
                   [appTooltip]="planetUndamagedDefencesTooltip()"
                 >
-                  <span class="planet-ships-status__label">Undamaged defences:</span>
+                  <span class="planet-ships-status__label">{{ 'planetView.defences.undamaged' | t }}</span>
                   <strong class="planet-ships-status__value">{{ planetUndamagedDefencesPercent() }}%</strong>
                 </article>
 
@@ -597,7 +597,7 @@
                   [class.planet-ships-status__card--red]="planetDefenceDamageTone() === 'red'"
                   [appTooltip]="planetDamagedDefencesTooltip()"
                 >
-                  <span class="planet-ships-status__label">Damaged defences:</span>
+                  <span class="planet-ships-status__label">{{ 'planetView.defences.damaged' | t }}</span>
                   <strong class="planet-ships-status__value">{{ planetDamagedDefencesPercent() }}%</strong>
                 </article>
               }
@@ -607,13 +607,13 @@
             }
 
             @if (!hasDefencesOnPlanet()) {
-              <p class="planet-tab-placeholder">No planetary defences deployed.</p>
+              <p class="planet-tab-placeholder">{{ 'planetView.defences.none' | t }}</p>
             }
           </section>
 
           <section class="planet-view__filters-card">
             <div class="planet-view__filters-bar">
-              <h4 class="planet-view__section-title">Defence Filters</h4>
+              <h4 class="planet-view__section-title">{{ 'planetView.defences.filters' | t }}</h4>
               <div class="planet-view__filters">
                 <label class="planet-view__filter-chip">
                   <input
@@ -621,7 +621,7 @@
                     [ngModel]="showRegularDefences"
                     (ngModelChange)="showRegularDefences = !!$event"
                   />
-                  <span>Defences</span>
+                  <span>{{ 'planetView.defences.regular' | t }}</span>
                 </label>
                 <label class="planet-view__filter-chip">
                   <input
@@ -629,11 +629,11 @@
                     [ngModel]="showPlanetaryBombDefences"
                     (ngModelChange)="showPlanetaryBombDefences = !!$event"
                   />
-                  <span>Planetary bombs</span>
+                  <span>{{ 'planetView.defences.bombs' | t }}</span>
                 </label>
               </div>
               @if (hasDefencesOnPlanet()) {
-                <p class="planet-view__filters-total">Total defences: {{ planetTotalDefencesCount() }}</p>
+                <p class="planet-view__filters-total">{{ 'planetView.defences.total' | t:{ count: planetTotalDefencesCount() } }}</p>
               }
             </div>
           </section>
@@ -648,58 +648,58 @@
                 <button
                   type="button"
                   class="planet-building-card__image-button"
-                  [attr.aria-label]="'Open details for ' + defence.type"
+                  [attr.aria-label]="objectDetailsAriaLabel(defence.type)"
                   (click)="openDefenceDetails(defence)"
                 >
                   <img
                     class="planet-building-card__image"
                     [class.planet-building-card__image--empty]="defenceHasZeroOwnedCount(defence)"
                     [src]="defence.imagePath"
-                    [alt]="defence.type + ' image'"
+                    [alt]="objectImageAlt(defence.type)"
                   />
                 </button>
                 <div class="planet-building-card__main">
                   <h4 class="planet-building-card__title">{{ defence.type }}</h4>
                   <p class="planet-building-card__meta">
-                    Current amount: <strong class="planet-building-card__meta-value">{{ currentDefenceAmount(defence.type) }}</strong>
+                    {{ 'planetView.card.currentAmount' | t }}: <strong class="planet-building-card__meta-value">{{ currentDefenceAmount(defence.type) }}</strong>
                   </p>
-                  <p class="planet-building-card__meta">Hull class: {{ defence.hullClass }}</p>
+                  <p class="planet-building-card__meta">{{ 'planetView.card.hullClass' | t }}: {{ defence.hullClass }}</p>
                   @if (defence.hullClass === HullClass.PLANETARY_BOMB) {
-                    <p class="planet-building-card__meta">Stored in Bomb Depot. Not active in combat yet.</p>
-                    <p class="planet-building-card__meta">{{ currentPlanetaryBombStorageUsed() }}/{{ bombDepotCapacity() }} stored</p>
+                    <p class="planet-building-card__meta">{{ 'planetView.defences.storedBomb' | t }}</p>
+                    <p class="planet-building-card__meta">{{ 'planetView.defences.stored' | t:{ used: currentPlanetaryBombStorageUsed(), capacity: bombDepotCapacity() } }}</p>
                   } @else {
-                    <p class="planet-building-card__meta">Can shoot to orbit: {{ defence.canShootToOrbit ? 'Yes' : 'No' }}</p>
+                    <p class="planet-building-card__meta">{{ 'planetView.defences.canShootToOrbit' | t:{ value: yesNoLabel(defence.canShootToOrbit) } }}</p>
                   }
                   <div class="planet-building-card__purpose-tags">
                     @if (defence.canShootToOrbit) {
-                      <span class="planet-building-card__purpose-tag planet-building-card__purpose-tag--good">Can shoot to orbit.</span>
+                      <span class="planet-building-card__purpose-tag planet-building-card__purpose-tag--good">{{ 'planetView.defences.canShoot' | t }}</span>
                     } @else {
-                      <span class="planet-building-card__purpose-tag planet-building-card__purpose-tag--muted">Atmosphere guard only.</span>
+                      <span class="planet-building-card__purpose-tag planet-building-card__purpose-tag--muted">{{ 'planetView.defences.atmosphereOnly' | t }}</span>
                     }
                   </div>
                 </div>
                 <div class="planet-building-card__cost">
-                  <p class="planet-building-card__section-title">Single defence cost</p>
+                  <p class="planet-building-card__section-title">{{ 'planetView.card.singleDefenceCost' | t }}</p>
                   @for (cost of defenceSingleCostRows(defence); track cost.label) {
                     <p class="planet-building-card__line" [class.planet-building-card__line--insufficient]="!cost.isEnough">
-                      {{ cost.label }}: {{ cost.amount }}
+                      {{ resourceCostLabel(cost.label) }}: {{ cost.amount }}
                     </p>
                   }
-                  <p class="planet-building-card__section-title planet-building-card__section-title--spaced">Total cost</p>
+                  <p class="planet-building-card__section-title planet-building-card__section-title--spaced">{{ 'planetView.card.totalCost' | t }}</p>
                   @for (cost of defenceTotalCostRows(defence); track cost.label) {
                     <p
                       class="planet-building-card__line planet-building-card__line--cost"
                       [class.planet-building-card__line--insufficient]="!cost.isEnough && !cost.isPlaceholder"
                       [class.planet-building-card__line--placeholder]="cost.isPlaceholder"
                     >
-                      <span class="sr-only">{{ cost.label }}:</span>
-                      <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                      <span class="sr-only">{{ resourceCostLabel(cost.label) }}:</span>
+                      <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="resourceCostLabel(cost.label)" />
                       {{ cost.amount === null ? '--' : cost.amount }}
                     </p>
                   }
                 </div>
                 <div class="planet-building-card__requirements">
-                  <p class="planet-building-card__section-title">Requirements</p>
+                  <p class="planet-building-card__section-title">{{ 'planetView.card.requirements' | t }}</p>
                   @for (requirement of defenceRequirementRows(defence); track requirement.label) {
                     <p
                       class="planet-building-card__line"
@@ -713,7 +713,7 @@
                 </div>
                 <div class="planet-building-card__action-stack">
                   <label class="planet-building-card__amount">
-                    <span>Amount:</span>
+                    <span>{{ 'planetView.card.amount' | t }}</span>
                     <input
                       class="planet-building-card__amount-input"
                       type="number"
@@ -722,7 +722,7 @@
                       step="1"
                       [ngModel]="defenceAmountInput(defence.type)"
                       (ngModelChange)="onDefenceAmountInput(defence.type, $event)"
-                      placeholder="amount"
+                      [placeholder]="'planetView.card.amountPlaceholder' | t"
                     />
                   </label>
                   <button
@@ -742,7 +742,7 @@
             }
           </div>
           } @else {
-            <p class="planet-tab-placeholder">No defences match the current filters.</p>
+            <p class="planet-tab-placeholder">{{ 'planetView.defences.noMatches' | t }}</p>
           }
         }
 
@@ -760,8 +760,8 @@
 
             <section class="planet-operations__section">
               <header class="planet-operations__section-head">
-                <h4 class="planet-view__section-title">Outgoing</h4>
-                <span class="overview-muted">{{ planetOutgoingFleets.length }} active</span>
+                <h4 class="planet-view__section-title">{{ 'planetView.operations.outgoing' | t }}</h4>
+                <span class="overview-muted">{{ 'planetView.operations.active' | t:{ count: planetOutgoingFleets.length } }}</span>
               </header>
               <div class="planet-operations__grid">
                 @for (fleet of planetOutgoingFleets; track fleet.fleetId) {
@@ -776,15 +776,15 @@
                     (maintenanceRequested)="openPlanetMaintenanceRequest($event)"
                   />
                 } @empty {
-                  <p class="planet-tab-placeholder">No outgoing fleets from this planet.</p>
+                  <p class="planet-tab-placeholder">{{ 'planetView.operations.noOutgoing' | t }}</p>
                 }
               </div>
             </section>
 
             <section class="planet-operations__section">
               <header class="planet-operations__section-head">
-                <h4 class="planet-view__section-title">Returning</h4>
-                <span class="overview-muted">{{ planetReturningFleets.length }} active</span>
+                <h4 class="planet-view__section-title">{{ 'planetView.operations.returning' | t }}</h4>
+                <span class="overview-muted">{{ 'planetView.operations.active' | t:{ count: planetReturningFleets.length } }}</span>
               </header>
               <div class="planet-operations__grid">
                 @for (fleet of planetReturningFleets; track fleet.fleetId) {
@@ -799,15 +799,15 @@
                     (maintenanceRequested)="openPlanetMaintenanceRequest($event)"
                   />
                 } @empty {
-                  <p class="planet-tab-placeholder">No fleets returning to this planet.</p>
+                  <p class="planet-tab-placeholder">{{ 'planetView.operations.noReturning' | t }}</p>
                 }
               </div>
             </section>
 
             <section class="planet-operations__section">
               <header class="planet-operations__section-head">
-                <h4 class="planet-view__section-title">Incoming</h4>
-                <span class="overview-muted">{{ planetIncomingFleets.length }} known</span>
+                <h4 class="planet-view__section-title">{{ 'planetView.operations.incoming' | t }}</h4>
+                <span class="overview-muted">{{ 'planetView.operations.known' | t:{ count: planetIncomingFleets.length } }}</span>
               </header>
               <div class="planet-operations__grid">
                 @for (fleet of planetIncomingFleets; track fleet.fleetId) {
@@ -822,15 +822,15 @@
                     (maintenanceRequested)="openPlanetMaintenanceRequest($event)"
                   />
                 } @empty {
-                  <p class="planet-tab-placeholder">No known incoming fleets to this planet.</p>
+                  <p class="planet-tab-placeholder">{{ 'planetView.operations.noIncoming' | t }}</p>
                 }
               </div>
             </section>
 
             <section class="planet-operations__section">
               <header class="planet-operations__section-head">
-                <h4 class="planet-view__section-title">Resolved</h4>
-                <span class="overview-muted">{{ planetResolvedOperations.length }} last turn</span>
+                <h4 class="planet-view__section-title">{{ 'planetView.operations.resolved' | t }}</h4>
+                <span class="overview-muted">{{ 'planetView.operations.lastTurn' | t:{ count: planetResolvedOperations.length } }}</span>
               </header>
               <div class="planet-operations__grid">
                 @for (operation of planetResolvedOperations; track operation.resolvedTurn + ':' + operation.fleetId + ':' + operation.outcomeType) {
@@ -842,7 +842,7 @@
                     [showActions]="false"
                   />
                 } @empty {
-                  <p class="planet-tab-placeholder">No operations resolved here last turn.</p>
+                  <p class="planet-tab-placeholder">{{ 'planetView.operations.noResolved' | t }}</p>
                 }
               </div>
             </section>
@@ -852,21 +852,21 @@
               <section class="planet-operations__modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
                 <div class="planet-operations__modal-head">
                   <div>
-                    <h3>Request maintenance</h3>
-                    <p class="overview-muted">Transfer fuel, ships, or bombs from this planet to the orbiting fleet.</p>
+                    <h3>{{ 'planetView.operations.maintenanceTitle' | t }}</h3>
+                    <p class="overview-muted">{{ 'planetView.operations.maintenanceBody' | t }}</p>
                   </div>
-                  <button type="button" class="planet-operations__action" (click)="closePlanetMaintenanceRequest()">Close</button>
+                  <button type="button" class="planet-operations__action" (click)="closePlanetMaintenanceRequest()">{{ 'planetView.operations.close' | t }}</button>
                 </div>
 
                 @if (planetMaintenanceDialogLoading) {
-                  <p class="overview-muted">Loading maintenance options...</p>
+                  <p class="overview-muted">{{ 'planetView.operations.loadingOptions' | t }}</p>
                 } @else if (planetMaintenanceOptions; as options) {
                   <div class="planet-operations__modal-body">
                     @if (planetMaintenanceDialogError) {
                       <p class="planet-operations__message planet-operations__message--error">{{ planetMaintenanceDialogError }}</p>
                     }
                     <label class="planet-operations__field">
-                      <span>Fuel</span>
+                      <span>{{ 'planetView.operations.fuel' | t }}</span>
                       <input
                         type="number"
                         min="0"
@@ -874,15 +874,15 @@
                         [ngModel]="planetMaintenanceRequestedFuel"
                         (ngModelChange)="updatePlanetMaintenanceRequestedFuel($event)"
                       />
-                      <small>Available {{ options.availableFuel }} | Fleet cargo room {{ options.remainingCargoCapacity }} | Fuel cap {{ options.fuelCap }}</small>
+                      <small>{{ 'planetView.operations.maintenanceCaps' | t:{ available: options.availableFuel, cargo: options.remainingCargoCapacity, cap: options.fuelCap } }}</small>
                     </label>
 
                     @if (planetMaintenanceShipOptions().length > 0) {
                       <section class="planet-operations__request-group">
-                        <h4>Ships</h4>
+                        <h4>{{ 'planetView.operations.ships' | t }}</h4>
                         @for (option of planetMaintenanceShipOptions(); track option.type) {
                           <label class="planet-operations__field">
-                            <span>{{ option.type }} | available {{ option.available }} | size {{ option.size }}</span>
+                            <span>{{ maintenanceOptionLabel(option.type, option.available, option.size) }}</span>
                             <input
                               type="number"
                               min="0"
@@ -897,10 +897,10 @@
 
                     @if (planetMaintenanceBombOptions().length > 0) {
                       <section class="planet-operations__request-group">
-                        <h4>Bombs</h4>
+                        <h4>{{ 'planetView.operations.bombs' | t }}</h4>
                         @for (option of planetMaintenanceBombOptions(); track option.type) {
                           <label class="planet-operations__field">
-                            <span>{{ option.type }} | available {{ option.available }} | size {{ option.size }}</span>
+                            <span>{{ maintenanceOptionLabel(option.type, option.available, option.size) }}</span>
                             <input
                               type="number"
                               min="0"
@@ -913,20 +913,20 @@
                       </section>
                     }
 
-                    <p class="overview-muted">Support cargo usage: {{ selectedPlanetMaintenanceSupportUsage() }} / {{ options.supportCap }}</p>
+                    <p class="overview-muted">{{ 'planetView.operations.supportUsage' | t:{ used: selectedPlanetMaintenanceSupportUsage(), cap: options.supportCap } }}</p>
                   </div>
                 } @else if (planetMaintenanceDialogError) {
                   <p class="planet-operations__message planet-operations__message--error">{{ planetMaintenanceDialogError }}</p>
                 }
 
                 <div class="planet-operations__actions">
-                  <button type="button" class="planet-operations__action" (click)="closePlanetMaintenanceRequest()">Cancel</button>
+                  <button type="button" class="planet-operations__action" (click)="closePlanetMaintenanceRequest()">{{ 'planetView.operations.cancel' | t }}</button>
                   <button
                     type="button"
                     class="planet-operations__action"
                     [disabled]="!canSubmitPlanetMaintenanceRequest()"
                     (click)="submitPlanetMaintenanceRequest()">
-                    Submit request
+                    {{ 'planetView.operations.submit' | t }}
                   </button>
                 </div>
               </section>
@@ -937,20 +937,20 @@
         @if (isActiveTab('queues')) {
           <div class="planet-queues-grid" data-tutorial-id="planet-queues-grid">
             <article class="planet-queue-card">
-              <h4 class="planet-view__section-title">Queued Buildings</h4>
+              <h4 class="planet-view__section-title">{{ 'planetView.queues.buildings' | t }}</h4>
               @if (hasBuildingQueueEntries()) {
                 <div class="overview-table-wrapper">
                   <table class="overview-table">
                     <thead>
                     <tr>
-                      <th>Drag</th>
+                      <th>{{ 'planetView.queues.drag' | t }}</th>
                       <th>#</th>
-                      <th>Type</th>
-                      <th>Upgrade</th>
-                      <th>Status</th>
-                      <th>Invested / base</th>
-                      <th>ETA (turns)</th>
-                      <th>Action</th>
+                      <th>{{ 'planetView.queues.type' | t }}</th>
+                      <th>{{ 'planetView.queues.upgrade' | t }}</th>
+                      <th>{{ 'planetView.queues.status' | t }}</th>
+                      <th>{{ 'planetView.queues.investedBase' | t }}</th>
+                      <th>{{ 'planetView.queues.eta' | t }}</th>
+                      <th>{{ 'planetView.queues.action' | t }}</th>
                     </tr>
                     </thead>
                     <tbody
@@ -969,15 +969,15 @@
                             class="queue-management__drag-handle"
                             cdkDragHandle
                             [disabled]="isBuildingQueueInteractionDisabled()"
-                            [attr.aria-label]="'Drag ' + queuedBuilding.buildingType"
+                            [attr.aria-label]="queueDragAriaLabel(queuedBuilding.buildingType)"
                           >
-                            Drag
+                            {{ 'planetView.queues.drag' | t }}
                           </button>
                         </td>
                         <td>{{ queuedBuilding.position }}</td>
                         <td>{{ queuedBuilding.buildingType }}</td>
                         <td>L{{ queuedBuilding.fromLevel }} -> L{{ queuedBuilding.toLevel }}</td>
-                        <td>{{ queuedBuilding.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
+                        <td>{{ queueStatusLabel(queuedBuilding.isHeadOfQueue) }}</td>
                         <td>{{ queuedBuilding.investedIndustryPower }} / {{ queuedBuilding.baseTotalConstructionTime }}</td>
                         <td>{{ queuedBuilding.estimatedTurnsForCompletion ?? '--' }}</td>
                         <td>
@@ -988,7 +988,7 @@
                             [appTooltip]="buildingQueueCancelTitle(queuedBuilding)"
                             (click)="onCancelBuildingQueue(queuedBuilding)"
                           >
-                            Cancel
+                            {{ 'planetView.queues.cancel' | t }}
                           </button>
                         </td>
                       </tr>
@@ -1000,28 +1000,28 @@
                   <p class="game-dashboard__build-error">{{ buildingQueueActionError }}</p>
                 }
               } @else {
-                <p class="overview-empty">No buildings queued.</p>
+                <p class="overview-empty">{{ 'planetView.queues.noBuildings' | t }}</p>
               }
             </article>
 
             <article class="planet-queue-card">
               <h4 class="planet-view__section-title">
-                Queued Shipyard ({{ currentShipQueueLength() }}/{{ maxShipQueueLength() }})
+                {{ 'planetView.queues.shipyard' | t }} ({{ currentShipQueueLength() }}/{{ maxShipQueueLength() }})
               </h4>
               @if (hasShipyardQueueEntries()) {
                 <div class="overview-table-wrapper">
                   <table class="overview-table">
                     <thead>
                     <tr>
-                      <th>Drag</th>
+                      <th>{{ 'planetView.queues.drag' | t }}</th>
                       <th>#</th>
-                      <th>Kind</th>
-                      <th>Name</th>
-                      <th>Amount completed</th>
-                      <th>Status</th>
-                      <th>Invested / unit base</th>
-                      <th>ETA (turns)</th>
-                      <th>Action</th>
+                      <th>{{ 'planetView.queues.kind' | t }}</th>
+                      <th>{{ 'planetView.queues.name' | t }}</th>
+                      <th>{{ 'planetView.queues.amountCompleted' | t }}</th>
+                      <th>{{ 'planetView.queues.status' | t }}</th>
+                      <th>{{ 'planetView.queues.investedUnitBase' | t }}</th>
+                      <th>{{ 'planetView.queues.eta' | t }}</th>
+                      <th>{{ 'planetView.queues.action' | t }}</th>
                     </tr>
                     </thead>
                     <tbody
@@ -1040,16 +1040,16 @@
                             class="queue-management__drag-handle"
                             cdkDragHandle
                             [disabled]="isShipyardQueueInteractionDisabled()"
-                            [attr.aria-label]="'Drag ' + shipyardQueueItemLabel(queueRow)"
+                            [attr.aria-label]="queueDragAriaLabel(shipyardQueueItemLabel(queueRow))"
                           >
-                            Drag
+                            {{ 'planetView.queues.drag' | t }}
                           </button>
                         </td>
                         <td>{{ queueRow.position }}</td>
                         <td>{{ shipyardQueueItemTypeLabel(queueRow) }}</td>
                         <td>{{ shipyardQueueItemLabel(queueRow) }}</td>
                         <td>{{ queueRow.amountCompleted }}/{{ queueRow.amountTotal }}</td>
-                        <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
+                        <td>{{ queueStatusLabel(queueRow.isHeadOfQueue) }}</td>
                         <td>{{ queueRow.currentUnitInvestedShipyardPower }} / {{ queueRow.currentUnitBaseConstructionTime }}</td>
                         <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
                         <td>
@@ -1060,7 +1060,7 @@
                             [appTooltip]="shipyardQueueCancelTitle(queueRow)"
                             (click)="onCancelShipyardQueue(queueRow)"
                           >
-                            Cancel
+                            {{ 'planetView.queues.cancel' | t }}
                           </button>
                         </td>
                       </tr>
@@ -1072,26 +1072,26 @@
                   <p class="game-dashboard__build-error">{{ shipyardQueueActionError }}</p>
                 }
               } @else {
-                <p class="overview-empty">No shipyard or defence items queued.</p>
+                <p class="overview-empty">{{ 'planetView.queues.noShipyard' | t }}</p>
               }
             </article>
 
             <article class="planet-queue-card">
-              <h4 class="planet-view__section-title">Research</h4>
+              <h4 class="planet-view__section-title">{{ 'planetView.queues.research' | t }}</h4>
               @if (hasResearchQueueEntries()) {
                 <div class="overview-table-wrapper">
                   <table class="overview-table">
                     <thead>
                     <tr>
                       <th>#</th>
-                      <th>Role</th>
-                      <th>Technology</th>
-                      <th>Level</th>
-                      <th>Helpers</th>
-                      <th>Main target</th>
-                      <th>Status</th>
-                      <th>Invested / base</th>
-                      <th>ETA (turns)</th>
+                      <th>{{ 'planetView.queues.role' | t }}</th>
+                      <th>{{ 'planetView.queues.technology' | t }}</th>
+                      <th>{{ 'planetView.queues.level' | t }}</th>
+                      <th>{{ 'planetView.queues.helpers' | t }}</th>
+                      <th>{{ 'planetView.queues.mainTarget' | t }}</th>
+                      <th>{{ 'planetView.queues.status' | t }}</th>
+                      <th>{{ 'planetView.queues.investedBase' | t }}</th>
+                      <th>{{ 'planetView.queues.eta' | t }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -1112,7 +1112,7 @@
                   </table>
                 </div>
               } @else {
-                <p class="overview-empty">No research activity on this planet.</p>
+                <p class="overview-empty">{{ 'planetView.queues.noResearch' | t }}</p>
               }
             </article>
           </div>
@@ -1120,7 +1120,7 @@
       </div>
     </section>
   } @else {
-    <p class="overview-empty">Planet data not loaded yet.</p>
+    <p class="overview-empty">{{ 'planetView.notLoaded' | t }}</p>
   }
 </section>
 
@@ -1135,12 +1135,12 @@
   <section class="planet-view__modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
     <div class="planet-view__modal-head">
       <div>
-        <h3 class="planet-view__section-title">Trade Port Offers</h3>
+        <h3 class="planet-view__section-title">{{ 'planetView.trade.title' | t }}</h3>
         <p class="planet-view__modal-meta">
-          {{ planet.basicInfo.name }} | Level {{ buildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT) }}
+          {{ planet.basicInfo.name }} | {{ 'planetView.trade.level' | t:{ level: buildingLevel(BuildingType.INTERSTELLAR_TRADE_PORT) } }}
         </p>
       </div>
-      <button type="button" class="planet-view__modal-close" (click)="closeTradePortDialog()">Close</button>
+      <button type="button" class="planet-view__modal-close" (click)="closeTradePortDialog()">{{ 'planetView.trade.close' | t }}</button>
     </div>
 
     <div class="planet-view__modal-body">
@@ -1149,7 +1149,7 @@
       }
 
       @if (tradePortOffers().length === 0) {
-        <p class="planet-tab-placeholder">No trade offers are available on this planet this turn.</p>
+        <p class="planet-tab-placeholder">{{ 'planetView.trade.none' | t }}</p>
       } @else {
         <div class="planet-view__trade-port-list">
           @for (offer of tradePortOffers(); track offer.offerId) {
@@ -1169,7 +1169,7 @@
                     [src]="tradePortResourceIconPath(offer.costResourceType)"
                     [alt]="tradePortResourceLabel(offer.costResourceType)"
                   />
-                  Cost: {{ tradePortOfferCostLabel(offer) }} {{ tradePortOfferModifierLabel(offer) }}
+                  {{ 'planetView.trade.cost' | t:{ cost: tradePortOfferCostLabel(offer), modifier: tradePortOfferModifierLabel(offer) } }}
                 </p>
               </div>
               <button
@@ -1179,7 +1179,7 @@
                 [appTooltip]="tradePortOfferActionTitle(offer)"
                 (click)="useTradePortOffer(offer)"
               >
-                {{ offer.used ? 'Used' : tradePortActionOfferId === offer.offerId ? 'Trading...' : 'Use offer' }}
+                {{ tradePortOfferButtonLabel(offer) }}
               </button>
             </article>
           }

@@ -1,26 +1,32 @@
 @if (isOpen && details) {
   <div class="planet-object-dialog__backdrop" (click)="close()"></div>
-  <section class="planet-object-dialog" role="dialog" aria-modal="true" [attr.aria-label]="details.title + ' details'" (click)="$event.stopPropagation()">
+  <section
+    class="planet-object-dialog"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'planetView.dialog.aria' | t:{ title: details.title }"
+    (click)="$event.stopPropagation()"
+  >
     <div class="planet-object-dialog__head">
       <div class="planet-object-dialog__title-block">
         <p class="planet-object-dialog__kind">{{ details.kindLabel }}</p>
         <h3 class="planet-object-dialog__title">{{ details.title }}</h3>
         <p class="planet-object-dialog__subtitle">{{ details.subtitle }}</p>
       </div>
-      <button type="button" class="planet-object-dialog__close" (click)="close()">Close</button>
+      <button type="button" class="planet-object-dialog__close" (click)="close()">{{ 'planetView.dialog.close' | t }}</button>
     </div>
 
     <div class="planet-object-dialog__body">
       <div class="planet-object-dialog__media">
         <div class="planet-object-dialog__image-frame">
-          <img class="planet-object-dialog__image" [src]="displayedImagePath" [alt]="details.title + ' image'" />
+          <img class="planet-object-dialog__image" [src]="displayedImagePath" [alt]="'planetView.card.imageAlt' | t:{ name: details.title }" />
         </div>
         @if (isRawLoading) {
-          <p class="planet-object-dialog__image-status">Loading raw image...</p>
+          <p class="planet-object-dialog__image-status">{{ 'planetView.dialog.loadingRaw' | t }}</p>
         }
         @if (rawLoadFailed) {
           <p class="planet-object-dialog__image-status planet-object-dialog__image-status--warn">
-            Raw image unavailable. Showing optimized image.
+            {{ 'planetView.dialog.rawUnavailable' | t }}
           </p>
         }
       </div>
