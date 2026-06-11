@@ -2,20 +2,30 @@
 
 <section class="researches-view">
   @if (isLoading) {
-    <p class="overview-empty">Loading researches data...</p>
+    <p class="overview-empty">{{ 'researches.loading' | t }}</p>
   } @else if (loadError) {
     <p class="overview-empty">{{ loadError }}</p>
   } @else {
     <section class="researches-view__labs" data-tutorial-id="researches-labs-panel">
-      <h3 class="planet-view__section-title">Research Labs</h3>
+      <h3 class="planet-view__section-title">{{ 'researches.sections.labs' | t }}</h3>
       <p class="researches-view__labs-meta">
-        Free labs: {{ freeResearchLabs.length }} / {{ allOwnedPlanetsWithResearchLab.length }}
-        | Max labs per technology: {{ maxLabsPerTechnology }}
+        {{
+          'researches.labs.meta'
+            | t
+              : {
+                  free: freeResearchLabs.length,
+                  total: allOwnedPlanetsWithResearchLab.length,
+                  max: maxLabsPerTechnology,
+                }
+        }}
       </p>
 
       @if (allOwnedPlanetsWithResearchLab.length > 0) {
         <div class="researches-view__labs-grid">
-          @for (planet of allOwnedPlanetsWithResearchLab; track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z) {
+          @for (
+            planet of allOwnedPlanetsWithResearchLab;
+            track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z
+          ) {
             <div class="researches-view__lab-item">
               <app-mini-planet-preview [planet]="planet"></app-mini-planet-preview>
               <p class="researches-view__lab-caption">{{ researchLabSummaryLabel(planet) }}</p>
@@ -23,28 +33,30 @@
           }
         </div>
       } @else {
-        <p class="overview-empty">No owned planets with Research Lab level greater than 0.</p>
+        <p class="overview-empty">{{ 'researches.labs.noneOwned' | t }}</p>
       }
     </section>
 
     <section class="researches-view__body">
       <div data-tutorial-id="researches-queue-card">
-        <h3 class="planet-view__section-title">Queued Technologies</h3>
+        <h3 class="planet-view__section-title">
+          {{ 'researches.sections.queuedTechnologies' | t }}
+        </h3>
         @if (hasResearchQueueEntries()) {
           <article class="planet-queue-card">
             <div class="planet-queue-table-wrap">
               <table class="planet-queue-table">
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>Planet</th>
-                    <th>Technology</th>
-                    <th>Level</th>
-                    <th>Helpers</th>
-                    <th>Status</th>
-                    <th>Invested / base</th>
-                    <th>ETA (turns)</th>
-                    <th>Lab Assignment</th>
+                    <th>{{ 'researches.queue.position' | t }}</th>
+                    <th>{{ 'researches.queue.planet' | t }}</th>
+                    <th>{{ 'researches.queue.technology' | t }}</th>
+                    <th>{{ 'researches.queue.level' | t }}</th>
+                    <th>{{ 'researches.queue.helpers' | t }}</th>
+                    <th>{{ 'researches.queue.status' | t }}</th>
+                    <th>{{ 'researches.queue.investedBase' | t }}</th>
+                    <th>{{ 'researches.queue.eta' | t }}</th>
+                    <th>{{ 'researches.queue.labAssignment' | t }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -56,25 +68,53 @@
                       <td>L{{ queuedResearch.fromLevel }} -> L{{ queuedResearch.toLevel }}</td>
                       <td>{{ queuedResearch.helperLabsCount }}</td>
                       <td>{{ queuedResearch.status }}</td>
-                      <td>{{ queuedResearch.investedResearchPower }} / {{ queuedResearch.baseTotalResearchTime }}</td>
+                      <td>
+                        {{ queuedResearch.investedResearchPower }} /
+                        {{ queuedResearch.baseTotalResearchTime }}
+                      </td>
                       <td>{{ queuedResearch.estimatedTurnsForCompletion ?? '--' }}</td>
                       <td>
                         <div class="research-tech-card__labs">
                           <div class="research-tech-card__lab-row">
-                            <span class="research-tech-card__lab-label">Main Lab:</span>
+                            <span class="research-tech-card__lab-label">{{
+                              'researches.queue.mainLab' | t
+                            }}</span>
                             <span>{{ queuedResearch.mainLabLabel }}</span>
                           </div>
                           @for (slotIndex of helperSlotIndexes; track slotIndex) {
                             <div class="research-tech-card__lab-row">
-                              <span class="research-tech-card__lab-label">Helper:</span>
+                              <span class="research-tech-card__lab-label">{{
+                                'researches.queue.helper' | t
+                              }}</span>
                               <select
                                 class="research-tech-card__lab-select"
-                                [disabled]="isQueuedHelperDropdownDisabled(queuedResearch.mainPlanetId, slotIndex)"
-                                [ngModel]="queuedHelperSelectedLabId(queuedResearch.mainPlanetId, slotIndex) ?? ''"
-                                (ngModelChange)="onQueuedHelperSelectionChange(queuedResearch.mainPlanetId, slotIndex, $event)"
+                                [disabled]="
+                                  isQueuedHelperDropdownDisabled(
+                                    queuedResearch.mainPlanetId,
+                                    slotIndex
+                                  )
+                                "
+                                [ngModel]="
+                                  queuedHelperSelectedLabId(
+                                    queuedResearch.mainPlanetId,
+                                    slotIndex
+                                  ) ?? ''
+                                "
+                                (ngModelChange)="
+                                  onQueuedHelperSelectionChange(
+                                    queuedResearch.mainPlanetId,
+                                    slotIndex,
+                                    $event
+                                  )
+                                "
                               >
-                                <option [ngValue]="''">Select helper lab</option>
-                                @for (lab of queuedHelperOptionsForSlot(queuedResearch, slotIndex); track lab.id) {
+                                <option [ngValue]="''">
+                                  {{ 'researches.queue.selectHelperLab' | t }}
+                                </option>
+                                @for (
+                                  lab of queuedHelperOptionsForSlot(queuedResearch, slotIndex);
+                                  track lab.id
+                                ) {
                                   <option [ngValue]="lab.id">{{ lab.label }}</option>
                                 }
                               </select>
@@ -83,7 +123,9 @@
                           <button
                             type="button"
                             class="research-tech-card__action"
-                            [class.research-tech-card__action--ready]="canApplyQueuedHelperChanges(queuedResearch)"
+                            [class.research-tech-card__action--ready]="
+                              canApplyQueuedHelperChanges(queuedResearch)
+                            "
                             [disabled]="!canApplyQueuedHelperChanges(queuedResearch)"
                             (click)="onApplyQueuedHelperChanges(queuedResearch)"
                           >
@@ -98,7 +140,7 @@
             </div>
           </article>
         } @else {
-          <p class="overview-empty">No technologies queued.</p>
+          <p class="overview-empty">{{ 'researches.queue.noQueued' | t }}</p>
         }
       </div>
 
@@ -110,38 +152,57 @@
         <p class="planet-building-card__power-error">{{ updateResearchHelpersError }}</p>
       }
 
-      <h3 class="planet-view__section-title">Technologies</h3>
+      <h3 class="planet-view__section-title">{{ 'researches.sections.technologies' | t }}</h3>
       <div class="research-tech-list" data-tutorial-id="researches-tech-list">
         @for (technology of technologies; track technology.type; let isFirst = $first) {
-          <article class="research-tech-card" [attr.data-tutorial-id]="isFirst ? 'researches-primary-tech-card' : null">
+          <article
+            class="research-tech-card"
+            [attr.data-tutorial-id]="isFirst ? 'researches-primary-tech-card' : null"
+          >
             <div class="research-tech-card__media">
               <button
                 type="button"
                 class="research-tech-card__image-button"
-                [appTooltip]="'Open details for ' + technology.type"
-                (click)="openTechnologyDetails(technology)">
-                <img class="research-tech-card__image" [src]="technology.imagePath" [alt]="technology.type + ' image'" />
+                [appTooltip]="'researches.list.openDetails' | t: { name: technology.type }"
+                (click)="openTechnologyDetails(technology)"
+              >
+                <img
+                  class="research-tech-card__image"
+                  [src]="technology.imagePath"
+                  [alt]="'researches.list.imageAlt' | t: { name: technology.type }"
+                />
               </button>
               <h4 class="research-tech-card__title">{{ technology.type }}</h4>
             </div>
 
             <div class="research-tech-card__main">
               @if (currentTechnologyLevel(technology.type) > 0) {
-                <p class="research-tech-card__meta">Level: {{ currentTechnologyLevel(technology.type) }}</p>
+                <p class="research-tech-card__meta">
+                  {{
+                    'researches.list.level' | t: { level: currentTechnologyLevel(technology.type) }
+                  }}
+                </p>
               } @else {
-                <p class="research-tech-card__meta">Not researched yet.</p>
+                <p class="research-tech-card__meta">{{ 'researches.list.notResearchedYet' | t }}</p>
               }
               <p class="research-tech-card__meta">
-                Research time: {{ technologyResearchTimeForTargetLevel(technology) }}
+                {{
+                  'researches.list.researchTime'
+                    | t: { time: technologyResearchTimeForTargetLevel(technology) }
+                }}
               </p>
             </div>
 
             <div class="research-tech-card__requirements">
-              <p class="planet-building-card__section-title">Requirements</p>
+              <p class="planet-building-card__section-title">
+                {{ 'researches.sections.requirements' | t }}
+              </p>
               @for (requirement of technologyRequirementRows(technology); track requirement.label) {
                 <p
                   class="planet-building-card__line"
-                  [class.planet-building-card__line--met]="requirement.isMet && !requirement.isPlaceholder"
+                  [class.planet-building-card__line--met]="
+                    requirement.isMet && !requirement.isPlaceholder
+                  "
                   [class.planet-building-card__line--not-met]="!requirement.isMet"
                   [class.planet-building-card__line--placeholder]="requirement.isPlaceholder"
                 >
@@ -151,11 +212,17 @@
             </div>
 
             <div class="research-tech-card__labs">
-              <p class="planet-building-card__section-title">Assigned Research Labs</p>
+              <p class="planet-building-card__section-title">
+                {{ 'researches.sections.assignedLabs' | t }}
+              </p>
               @for (slotIndex of labSlotIndexes; track slotIndex) {
                 <div class="research-tech-card__lab-row">
                   <span class="research-tech-card__lab-label">
-                    {{ slotIndex === 0 ? 'Main Lab:' : 'Helper:' }}
+                    {{
+                      slotIndex === 0
+                        ? ('researches.queue.mainLab' | t)
+                        : ('researches.queue.helper' | t)
+                    }}
                   </span>
                   <select
                     class="research-tech-card__lab-select"
@@ -164,7 +231,11 @@
                     (ngModelChange)="onLabSelectionChange(technology.type, slotIndex, $event)"
                   >
                     <option [ngValue]="''">
-                      {{ slotIndex === 0 ? 'Select main lab' : 'Select helper lab' }}
+                      {{
+                        slotIndex === 0
+                          ? ('researches.list.selectMainLab' | t)
+                          : ('researches.list.selectHelperLab' | t)
+                      }}
                     </option>
                     @for (lab of labOptionsForSlot(technology.type, slotIndex); track lab.id) {
                       <option [ngValue]="lab.id">{{ lab.label }}</option>
@@ -177,7 +248,10 @@
             <div class="research-tech-card__cost-action">
               <div class="research-tech-card__cost">
                 <p class="planet-building-card__section-title">
-                  Next level cost (L{{ technologyTargetLevel(technology.type) }})
+                  {{
+                    'researches.list.nextLevelCost'
+                      | t: { level: technologyTargetLevel(technology.type) }
+                  }}
                 </p>
                 @for (cost of technologyCostRows(technology); track cost.label) {
                   <p
@@ -185,7 +259,11 @@
                     [class.planet-building-card__line--insufficient]="!cost.isEnough"
                   >
                     <span class="sr-only">{{ cost.label }}:</span>
-                    <img class="planet-building-card__cost-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                    <img
+                      class="planet-building-card__cost-icon"
+                      [src]="resourceCostIconPath(cost.label)"
+                      [alt]="cost.label"
+                    />
                     {{ cost.amount }}
                   </p>
                 }
@@ -204,7 +282,9 @@
             </div>
 
             <div class="research-tech-card__description">
-              <p class="planet-building-card__section-title">Description</p>
+              <p class="planet-building-card__section-title">
+                {{ 'researches.sections.description' | t }}
+              </p>
               <p class="research-tech-card__description-text">{{ technology.description }}</p>
             </div>
           </article>
@@ -219,4 +299,3 @@
   [details]="selectedTechnologyDetails"
   (closed)="closeTechnologyDetails()"
 ></app-planet-object-dialog>
-

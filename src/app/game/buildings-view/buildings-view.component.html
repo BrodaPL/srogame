@@ -3,19 +3,19 @@
 <section class="buildings-view">
   @if (isLoading) {
     <section class="status status--info">
-      <h3>Loading Buildings</h3>
-      <p>Owned planets and building data are being prepared.</p>
+      <h3>{{ 'buildings.loading.title' | t }}</h3>
+      <p>{{ 'buildings.loading.body' | t }}</p>
     </section>
   } @else if (loadError) {
     <section class="status status--error">
-      <h3>Buildings unavailable</h3>
+      <h3>{{ 'buildings.status.unavailable' | t }}</h3>
       <p>{{ loadError }}</p>
     </section>
   } @else if (selectedPlanet(); as planet) {
     <div class="game-dashboard__layout">
       <div class="game-dashboard__resources" data-tutorial-id="buildings-summary-bar">
         <app-resources
-          [titlePrefix]="'Buildings | '"
+          [titlePrefix]="'buildings.summary.titlePrefix' | t"
           [titleLink]="selectedPlanetTitleLink()"
           [titleSuffix]="' (' + selectedPlanetCoordinatesLabel() + ')'"
           [metal]="metalDisplay"
@@ -28,7 +28,10 @@
       </div>
 
       <div class="game-dashboard__main">
-        <section class="overview-card game-dashboard__categories-card" data-tutorial-id="buildings-mode-toggle">
+        <section
+          class="overview-card game-dashboard__categories-card"
+          data-tutorial-id="buildings-mode-toggle"
+        >
           <div class="game-dashboard__toggle-row">
             @for (mode of modeOptions; track mode.value) {
               <button
@@ -46,9 +49,11 @@
         <section class="overview-card" data-tutorial-id="buildings-queue-card">
           <div class="game-dashboard__section-head">
             <div>
-              <h3>Current Building Queue</h3>
+              <h3>{{ 'buildings.queue.title' | t }}</h3>
               <p class="overview-muted">
-                {{ selectedPlanetLabel() }} | {{ currentBuildingQueueLength() }}/{{ maxBuildingQueueLength() }}
+                {{ selectedPlanetLabel() }} | {{ currentBuildingQueueLength() }}/{{
+                  maxBuildingQueueLength()
+                }}
               </p>
             </div>
           </div>
@@ -58,14 +63,14 @@
               <table class="overview-table">
                 <thead>
                   <tr>
-                    <th>Drag</th>
-                    <th>#</th>
-                    <th>Building</th>
-                    <th>Upgrade</th>
-                    <th>Status</th>
-                    <th>Invested / base</th>
-                    <th>ETA (turns)</th>
-                    <th>Action</th>
+                    <th>{{ 'buildings.table.drag' | t }}</th>
+                    <th>{{ 'buildings.table.position' | t }}</th>
+                    <th>{{ 'buildings.table.building' | t }}</th>
+                    <th>{{ 'buildings.table.upgrade' | t }}</th>
+                    <th>{{ 'buildings.table.status' | t }}</th>
+                    <th>{{ 'buildings.table.investedBase' | t }}</th>
+                    <th>{{ 'buildings.table.eta' | t }}</th>
+                    <th>{{ 'buildings.table.action' | t }}</th>
                   </tr>
                 </thead>
                 <tbody
@@ -84,16 +89,27 @@
                           class="queue-management__drag-handle"
                           cdkDragHandle
                           [disabled]="isBuildingQueueInteractionDisabled()"
-                          [attr.aria-label]="'Drag ' + queueRow.buildingType"
+                          [attr.aria-label]="
+                            'buildings.queue.dragAria' | t: { name: queueRow.buildingType }
+                          "
                         >
-                          Drag
+                          {{ 'buildings.queue.dragLabel' | t }}
                         </button>
                       </td>
                       <td>{{ queueRow.position }}</td>
                       <td>{{ queueRow.buildingType }}</td>
                       <td>L{{ queueRow.fromLevel }} -> L{{ queueRow.toLevel }}</td>
-                      <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
-                      <td>{{ queueRow.investedIndustryPower }} / {{ queueRow.baseTotalConstructionTime }}</td>
+                      <td>
+                        {{
+                          queueRow.isHeadOfQueue
+                            ? ('buildings.queue.statusUnderConstruction' | t)
+                            : ('buildings.queue.statusQueued' | t)
+                        }}
+                      </td>
+                      <td>
+                        {{ queueRow.investedIndustryPower }} /
+                        {{ queueRow.baseTotalConstructionTime }}
+                      </td>
                       <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
                       <td>
                         <button
@@ -103,7 +119,7 @@
                           [appTooltip]="buildingQueueCancelTitle(queueRow)"
                           (click)="onCancelBuildingQueue(queueRow)"
                         >
-                          Cancel
+                          {{ 'buildings.queue.cancel' | t }}
                         </button>
                       </td>
                     </tr>
@@ -116,8 +132,8 @@
             }
           } @else {
             <article class="planet-queue-card">
-              <h4 class="planet-view__section-title">No buildings queued</h4>
-              <p class="overview-empty">This planet does not have any building construction queued right now.</p>
+              <h4 class="planet-view__section-title">{{ 'buildings.queue.emptyTitle' | t }}</h4>
+              <p class="overview-empty">{{ 'buildings.queue.emptyBody' | t }}</p>
             </article>
           }
         </section>
@@ -125,31 +141,44 @@
         <section class="overview-card" data-tutorial-id="buildings-list">
           <div class="game-dashboard__section-head">
             <div>
-              <h3>{{ selectedMode === 'r' ? 'Resources Infrastructure' : 'Facilities' }}</h3>
-              <p class="overview-muted">Compact construction rows with next-level costs and unmet requirements only.</p>
+              <h3>
+                {{
+                  selectedMode === 'r'
+                    ? ('buildings.list.resourcesTitle' | t)
+                    : ('buildings.list.facilitiesTitle' | t)
+                }}
+              </h3>
+              <p class="overview-muted">{{ 'buildings.list.subtitle' | t }}</p>
             </div>
           </div>
 
           <div class="buildings-view__building-list">
             @for (building of visibleBuildings(); track building.type; let isFirst = $first) {
-              <article class="buildings-view__building-row" [attr.data-tutorial-id]="isFirst ? 'buildings-primary-row' : null">
+              <article
+                class="buildings-view__building-row"
+                [attr.data-tutorial-id]="isFirst ? 'buildings-primary-row' : null"
+              >
                 <button
                   type="button"
                   class="buildings-view__image-button"
-                  [attr.aria-label]="'Open ' + building.type + ' details'"
+                  [attr.aria-label]="'buildings.list.openDetails' | t: { name: building.type }"
                   (click)="openBuildingDetails(building)"
                 >
                   <img
                     class="buildings-view__building-image"
-                    [class.buildings-view__building-image--empty]="buildingLevel(building.type) <= 0"
+                    [class.buildings-view__building-image--empty]="
+                      buildingLevel(building.type) <= 0
+                    "
                     [src]="building.imagePath"
-                    [alt]="building.type + ' image'"
+                    [alt]="'buildings.list.imageAlt' | t: { name: building.type }"
                   />
                 </button>
 
                 <div class="buildings-view__building-main">
                   <h4 class="buildings-view__building-title">{{ building.type }}</h4>
-                  <p class="buildings-view__building-meta">Level {{ buildingLevel(building.type) }}</p>
+                  <p class="buildings-view__building-meta">
+                    {{ 'buildings.list.level' | t: { level: buildingLevel(building.type) } }}
+                  </p>
                 </div>
 
                 <div class="buildings-view__building-cost">
@@ -159,7 +188,11 @@
                       [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough"
                     >
                       <span class="sr-only">{{ cost.label }}</span>
-                      <img class="game-dashboard__cost-chip-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                      <img
+                        class="game-dashboard__cost-chip-icon"
+                        [src]="resourceCostIconPath(cost.label)"
+                        [alt]="cost.label"
+                      />
                       {{ cost.amount }}
                     </span>
                   }
@@ -174,7 +207,7 @@
                       {{ unmetLabel }}
                     </span>
                   } @else {
-                    <span class="game-dashboard__req-ok">Ready</span>
+                    <span class="game-dashboard__req-ok">{{ 'buildings.list.ready' | t }}</span>
                   }
                 </div>
 
@@ -201,8 +234,8 @@
       <aside class="overview-card game-dashboard__rail" data-tutorial-id="buildings-planet-rail">
         <div class="game-dashboard__section-head">
           <div>
-            <h3>Owned Planets</h3>
-            <p class="overview-muted">Select the active construction planet.</p>
+            <h3>{{ 'buildings.sidebar.title' | t }}</h3>
+            <p class="overview-muted">{{ 'buildings.sidebar.subtitle' | t }}</p>
           </div>
         </div>
 
@@ -219,7 +252,11 @@
                   [class.game-dashboard__planet-radio--selected]="isSelectedPlanet(ownedPlanet)"
                 ></span>
                 <span class="game-dashboard__planet-select-label">
-                  {{ isSelectedPlanet(ownedPlanet) ? 'Selected' : 'Select' }}
+                  {{
+                    isSelectedPlanet(ownedPlanet)
+                      ? ('buildings.sidebar.selected' | t)
+                      : ('buildings.sidebar.select' | t)
+                  }}
                 </span>
               </div>
 
@@ -241,8 +278,8 @@
     ></app-planet-object-dialog>
   } @else {
     <section class="overview-card">
-      <h3>No owned planets</h3>
-      <p class="overview-muted">Buildings View requires at least one owned planet.</p>
+      <h3>{{ 'buildings.status.noOwnedPlanets' | t }}</h3>
+      <p class="overview-muted">{{ 'buildings.status.noOwnedPlanetsBody' | t }}</p>
     </section>
   }
 </section>

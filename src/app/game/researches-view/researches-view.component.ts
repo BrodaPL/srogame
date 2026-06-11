@@ -4,6 +4,7 @@ import { finalize, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nPipe } from '../../i18n/i18n.pipe';
 import { I18nService } from '../../i18n/i18n.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
@@ -19,7 +20,7 @@ import type {
   ClientPlanetDto,
   StartTechnologyResearchRequest,
   UpdateResearchHelpersRequest,
-  TechnologyQueueEntryDto
+  TechnologyQueueEntryDto,
 } from '../../models/game-api-types';
 import { energyDeficitEfficiencyMultiplier } from '../../models/planets/energy-deficit';
 import { resolveFusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
@@ -36,7 +37,7 @@ import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import type {
   PlanetObjectDetailDialogData,
   PlanetObjectDetailRow,
-  PlanetObjectDetailSection
+  PlanetObjectDetailSection,
 } from '../planet-view/planet-object-dialog.component';
 
 type EnergyState = {
@@ -76,7 +77,7 @@ type ResearchQueueRowVm = {
   toLevel: number;
   helperLabsCount: number;
   helperSlotCount: number;
-  status: 'Researching';
+  status: string;
   investedResearchPower: number;
   baseTotalResearchTime: number;
   estimatedTurnsForCompletion: number | null;
@@ -84,8 +85,15 @@ type ResearchQueueRowVm = {
 
 @Component({
   selector: 'app-researches-view',
-  imports: [TopMenuComponent, MiniPlanetPreviewComponent, FormsModule, PlanetObjectDialogComponent, TooltipDirective],
-  templateUrl: './researches-view.component.html'
+  imports: [
+    TopMenuComponent,
+    MiniPlanetPreviewComponent,
+    FormsModule,
+    PlanetObjectDialogComponent,
+    TooltipDirective,
+    I18nPipe,
+  ],
+  templateUrl: './researches-view.component.html',
 })
 export class ResearchesViewComponent implements OnInit {
   private readonly i18n = inject(I18nService);
@@ -115,7 +123,7 @@ export class ResearchesViewComponent implements OnInit {
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly tutorialService: TutorialService
+    private readonly tutorialService: TutorialService,
   ) {
     const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
     this.buildingBlueprintsByType = new Map(buildingBlueprints.buildingsMap);
@@ -139,19 +147,28 @@ export class ResearchesViewComponent implements OnInit {
   protected researchLabSummaryLabel(planet: ClientPlanetDto): string {
     const lab = this.allResearchLabsById.get(this.planetId(planet));
     if (!lab) {
-      return 'Research Lab not available.';
+      return this.i18n.t('researches.labs.unavailable');
     }
 
-    let stateLabel = 'FREE';
+    let stateLabel = this.i18n.t('researches.labs.free');
     if (planet.objects.currentResearchQueue) {
-      stateLabel = `RESEARCHING ${planet.objects.currentResearchQueue.technologyType}`;
+      stateLabel = this.i18n.t('researches.labs.researching', {
+        technology: planet.objects.currentResearchQueue.technologyType,
+      });
     } else if (planet.objects.researchHelperFor) {
       const helper = planet.objects.researchHelperFor;
       const target = helper.mainResearchCoordinates;
-      stateLabel = `HELPING ${helper.technologyType} @ ${target.x}:${target.y}:${target.z}`;
+      stateLabel = this.i18n.t('researches.labs.helping', {
+        technology: helper.technologyType,
+        coordinates: `${target.x}:${target.y}:${target.z}`,
+      });
     }
 
-    return `Research Lab L${lab.labLevel} | Power ${lab.researchPower} | ${stateLabel}`;
+    return this.i18n.t('researches.labs.summary', {
+      level: lab.labLevel,
+      power: lab.researchPower,
+      state: stateLabel,
+    });
   }
 
   protected currentTechnologyLevel(technologyType: TechnologyType): number {
@@ -182,20 +199,20 @@ export class ResearchesViewComponent implements OnInit {
 
     return [
       {
-        label: 'Metal',
+        label: this.i18n.t('researches.labels.metal'),
         amount: cost.metal,
-        isEnough: resources ? resources.metal >= cost.metal : true
+        isEnough: resources ? resources.metal >= cost.metal : true,
       },
       {
-        label: 'Crystal',
+        label: this.i18n.t('researches.labels.crystal'),
         amount: cost.crystal,
-        isEnough: resources ? resources.crystal >= cost.crystal : true
+        isEnough: resources ? resources.crystal >= cost.crystal : true,
       },
       {
-        label: 'Deuterium',
+        label: this.i18n.t('researches.labels.deuterium'),
         amount: cost.deuterium,
-        isEnough: resources ? resources.deuterium >= cost.deuterium : true
-      }
+        isEnough: resources ? resources.deuterium >= cost.deuterium : true,
+      },
     ];
   }
 
@@ -217,33 +234,33 @@ export class ResearchesViewComponent implements OnInit {
     const firstLab = this.firstAssignedLab(technology.type);
     const rows: ResearchRequirementRowVm[] = [];
 
-      for (const requirement of technology.buildingRequirements) {
-        const requiredLevel = Math.ceil(targetLevel * requirement.level);
-        const currentLevel = firstLab ? this.buildingLevel(firstLab.planet, requirement.building) : 0;
-        rows.push({
-          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
-          isMet: firstLab ? currentLevel >= requiredLevel : false,
-          isPlaceholder: false
-        });
+    for (const requirement of technology.buildingRequirements) {
+      const requiredLevel = Math.ceil(targetLevel * requirement.level);
+      const currentLevel = firstLab ? this.buildingLevel(firstLab.planet, requirement.building) : 0;
+      rows.push({
+        label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+        isMet: firstLab ? currentLevel >= requiredLevel : false,
+        isPlaceholder: false,
+      });
     }
 
-      for (const requirement of technology.techRequirements) {
-        const requiredLevel = Math.ceil(targetLevel * requirement.level);
-        const currentLevel = this.currentTechnologyLevel(requirement.tech);
-        rows.push({
-          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
-          isMet: currentLevel >= requiredLevel,
-          isPlaceholder: false
-        });
+    for (const requirement of technology.techRequirements) {
+      const requiredLevel = Math.ceil(targetLevel * requirement.level);
+      const currentLevel = this.currentTechnologyLevel(requirement.tech);
+      rows.push({
+        label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false,
+      });
     }
 
     if (rows.length === 0) {
       return [
         {
-          label: 'None',
+          label: this.i18n.t('researches.labels.none'),
           isMet: true,
-          isPlaceholder: true
-        }
+          isPlaceholder: true,
+        },
       ];
     }
 
@@ -294,11 +311,10 @@ export class ResearchesViewComponent implements OnInit {
   protected onLabSelectionChange(
     technologyType: TechnologyType,
     slotIndex: number,
-    rawValue: unknown
+    rawValue: unknown,
   ): void {
-    const normalized = typeof rawValue === 'string' && rawValue.trim().length > 0
-      ? rawValue.trim()
-      : null;
+    const normalized =
+      typeof rawValue === 'string' && rawValue.trim().length > 0 ? rawValue.trim() : null;
     const selected = this.selectionArray(technologyType);
 
     selected[slotIndex] = normalized;
@@ -341,7 +357,9 @@ export class ResearchesViewComponent implements OnInit {
       return false;
     }
 
-    if (!this.hasBuildingRequirements(firstLab.planet, technology.buildingRequirements, targetLevel)) {
+    if (
+      !this.hasBuildingRequirements(firstLab.planet, technology.buildingRequirements, targetLevel)
+    ) {
       return false;
     }
 
@@ -354,43 +372,43 @@ export class ResearchesViewComponent implements OnInit {
 
   protected researchButtonLabel(technology: Technology): string {
     if (this.researchStartInFlightByType.has(technology.type)) {
-      return 'Researching';
+      return this.i18n.t('researches.actions.researching');
     }
 
     if (this.isTechnologyQueued(technology.type)) {
-      return 'Researching';
+      return this.i18n.t('researches.actions.researching');
     }
 
     const firstLab = this.firstAssignedLab(technology.type);
     if (!firstLab) {
-      return 'START RESEARCH';
+      return this.i18n.t('researches.actions.startResearch');
     }
 
     if (firstLab.planet.objects.currentResearchQueue) {
       return firstLab.planet.objects.currentResearchQueue.technologyType === technology.type
-        ? 'Researching'
-        : 'Queued';
+        ? this.i18n.t('researches.actions.researching')
+        : this.i18n.t('researches.actions.queued');
     }
 
     if (firstLab.planet.objects.researchHelperFor) {
-      return 'Queued';
+      return this.i18n.t('researches.actions.queued');
     }
 
-    return 'START RESEARCH';
+    return this.i18n.t('researches.actions.startResearch');
   }
 
   protected researchButtonTitle(technology: Technology): string {
     if (this.researchStartInFlightByType.has(technology.type)) {
-      return 'Starting research...';
+      return this.i18n.t('researches.actions.startingResearch');
     }
 
     if (this.isTechnologyQueued(technology.type)) {
-      return 'Technology is already being researched.';
+      return this.i18n.t('researches.actions.alreadyResearching');
     }
 
     return this.canStartResearch(technology)
-      ? 'Start research and add technology to queue.'
-      : 'Select first free Research Lab and meet conditions to unlock.';
+      ? this.i18n.t('researches.actions.startResearchAndQueue')
+      : this.i18n.t('researches.actions.selectLabToUnlock');
   }
 
   protected onStartResearch(technology: Technology): void {
@@ -410,20 +428,21 @@ export class ResearchesViewComponent implements OnInit {
       y: firstLab.planet.coordinates.y,
       z: firstLab.planet.coordinates.z,
       technologyType: technology.type,
-      helperPlanets
+      helperPlanets,
     };
 
     this.researchStartInFlightByType.add(technology.type);
     this.startResearchError = null;
     this.cdr.markForCheck();
 
-    this.gameApi.startTechnologyResearch(request, session.token)
+    this.gameApi
+      .startTechnologyResearch(request, session.token)
       .pipe(
         timeout(10000),
         finalize(() => {
           this.researchStartInFlightByType.delete(technology.type);
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: (ownedPlanets) => {
@@ -432,9 +451,13 @@ export class ResearchesViewComponent implements OnInit {
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {
-          this.startResearchError = resolveApiErrorMessage(this.i18n, error, 'Unable to add technology to queue.');
+          this.startResearchError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('researches.errors.addTechnologyToQueue'),
+          );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -442,22 +465,29 @@ export class ResearchesViewComponent implements OnInit {
     return this.queuedHelperSelectionArray(mainPlanetId)[slotIndex] ?? null;
   }
 
-  protected queuedHelperOptionsForSlot(queuedResearch: ResearchQueueRowVm, slotIndex: number): ResearchLabVm[] {
+  protected queuedHelperOptionsForSlot(
+    queuedResearch: ResearchQueueRowVm,
+    slotIndex: number,
+  ): ResearchLabVm[] {
     const selectedId = this.queuedHelperSelectedLabId(queuedResearch.mainPlanetId, slotIndex);
     const selectedLab = selectedId ? (this.allResearchLabsById.get(selectedId) ?? null) : null;
     if (this.isQueuedHelperDropdownDisabled(queuedResearch.mainPlanetId, slotIndex)) {
       return selectedLab ? [selectedLab] : [];
     }
 
-    const assignedElsewhere = this.assignedQueuedHelperIdsExcluding(queuedResearch.mainPlanetId, slotIndex);
+    const assignedElsewhere = this.assignedQueuedHelperIdsExcluding(
+      queuedResearch.mainPlanetId,
+      slotIndex,
+    );
     const options = Array.from(this.allResearchLabsById.values())
-      .filter((lab) =>
-        !assignedElsewhere.has(lab.id)
-        && this.canLabBeAssignedAsHelperForResearch(
-          lab,
-          queuedResearch.mainPlanetId,
-          queuedResearch.technologyType
-        )
+      .filter(
+        (lab) =>
+          !assignedElsewhere.has(lab.id) &&
+          this.canLabBeAssignedAsHelperForResearch(
+            lab,
+            queuedResearch.mainPlanetId,
+            queuedResearch.technologyType,
+          ),
       )
       .sort((left, right) => left.label.localeCompare(right.label));
     if (!selectedLab) {
@@ -487,11 +517,10 @@ export class ResearchesViewComponent implements OnInit {
   protected onQueuedHelperSelectionChange(
     mainPlanetId: string,
     slotIndex: number,
-    rawValue: unknown
+    rawValue: unknown,
   ): void {
-    const normalized = typeof rawValue === 'string' && rawValue.trim().length > 0
-      ? rawValue.trim()
-      : null;
+    const normalized =
+      typeof rawValue === 'string' && rawValue.trim().length > 0 ? rawValue.trim() : null;
     const selected = this.queuedHelperSelectionArray(mainPlanetId);
 
     selected[slotIndex] = normalized;
@@ -512,10 +541,10 @@ export class ResearchesViewComponent implements OnInit {
 
   protected applyQueuedHelperButtonLabel(queuedResearch: ResearchQueueRowVm): string {
     if (this.researchHelperUpdateInFlightByPlanetId.has(queuedResearch.mainPlanetId)) {
-      return 'Applying...';
+      return this.i18n.t('researches.actions.applying');
     }
 
-    return 'Apply helpers';
+    return this.i18n.t('researches.actions.applyHelpers');
   }
 
   protected onApplyQueuedHelperChanges(queuedResearch: ResearchQueueRowVm): void {
@@ -532,20 +561,21 @@ export class ResearchesViewComponent implements OnInit {
       x: queuedResearch.mainPlanetCoordinates.x,
       y: queuedResearch.mainPlanetCoordinates.y,
       z: queuedResearch.mainPlanetCoordinates.z,
-      helperPlanets: this.selectedQueuedHelperCoordinates(queuedResearch.mainPlanetId)
+      helperPlanets: this.selectedQueuedHelperCoordinates(queuedResearch.mainPlanetId),
     };
 
     this.researchHelperUpdateInFlightByPlanetId.add(queuedResearch.mainPlanetId);
     this.updateResearchHelpersError = null;
     this.cdr.markForCheck();
 
-    this.gameApi.updateResearchHelpers(request, session.token)
+    this.gameApi
+      .updateResearchHelpers(request, session.token)
       .pipe(
         timeout(10000),
         finalize(() => {
           this.researchHelperUpdateInFlightByPlanetId.delete(queuedResearch.mainPlanetId);
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: (ownedPlanets) => {
@@ -556,10 +586,10 @@ export class ResearchesViewComponent implements OnInit {
           this.updateResearchHelpersError = resolveApiErrorMessage(
             this.i18n,
             error,
-            'Unable to update research helpers.'
+            this.i18n.t('researches.errors.updateHelpers'),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -583,9 +613,8 @@ export class ResearchesViewComponent implements OnInit {
       const baseTotalResearchTime = this.baseResearchTime(technologyType, toLevel);
       const remaining = Math.max(0, baseTotalResearchTime - investedResearchPower);
       const researchPower = this.researchQueuePower(planet, technologyType, helperLabs);
-      const estimatedTurnsForCompletion = researchPower > 0
-        ? Math.ceil(remaining / researchPower)
-        : null;
+      const estimatedTurnsForCompletion =
+        researchPower > 0 ? Math.ceil(remaining / researchPower) : null;
 
       rows.push({
         position,
@@ -593,7 +622,7 @@ export class ResearchesViewComponent implements OnInit {
         mainPlanetCoordinates: {
           x: planet.coordinates.x,
           y: planet.coordinates.y,
-          z: planet.coordinates.z
+          z: planet.coordinates.z,
         },
         planetLabel: `${planet.basicInfo.name} [${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}]`,
         mainLabLabel: this.researchLabCardLabel(planet),
@@ -602,10 +631,10 @@ export class ResearchesViewComponent implements OnInit {
         toLevel,
         helperLabsCount: helperLabs.length,
         helperSlotCount: this.helperSlotIndexes.length,
-        status: 'Researching',
+        status: this.i18n.t('researches.queue.statusResearching'),
         investedResearchPower,
         baseTotalResearchTime,
-        estimatedTurnsForCompletion
+        estimatedTurnsForCompletion,
       });
       position += 1;
     }
@@ -616,7 +645,7 @@ export class ResearchesViewComponent implements OnInit {
   private loadResearchesData(): void {
     const session = this.playerSession.load();
     if (!session) {
-      this.loadError = 'No player session found. Start a new game.';
+      this.loadError = this.i18n.t('researches.errors.noSession');
       return;
     }
 
@@ -624,11 +653,14 @@ export class ResearchesViewComponent implements OnInit {
     this.loadError = null;
     this.startResearchError = null;
 
-    this.gameApi.getOwnedPlanets(session.token)
-      .pipe(finalize(() => {
-        this.isLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .getOwnedPlanets(session.token)
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (ownedPlanets) => {
           this.applyOwnedPlanets(ownedPlanets);
@@ -636,14 +668,16 @@ export class ResearchesViewComponent implements OnInit {
           this.cdr.markForCheck();
         },
         error: () => {
-          this.loadError = 'Unable to load owned planets from server.';
+          this.loadError = this.i18n.t('researches.errors.loadPlanets');
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
   private applyOwnedPlanets(ownedPlanets: ClientPlanetDto[]): void {
-    const sorted = [...ownedPlanets].sort((left, right) => this.comparePlanetCoordinates(left, right));
+    const sorted = [...ownedPlanets].sort((left, right) =>
+      this.comparePlanetCoordinates(left, right),
+    );
     this.allOwnedPlanets = sorted;
     this.allOwnedPlanetsById.clear();
     for (const planet of sorted) {
@@ -652,7 +686,9 @@ export class ResearchesViewComponent implements OnInit {
 
     this.techLevelsByType = this.buildTechLevelsMap(sorted);
 
-    const planetsWithResearchLab = sorted.filter((planet) => this.buildingLevel(planet, BuildingType.RESEARCH_LAB) > 0);
+    const planetsWithResearchLab = sorted.filter(
+      (planet) => this.buildingLevel(planet, BuildingType.RESEARCH_LAB) > 0,
+    );
     this.allOwnedPlanetsWithResearchLab = planetsWithResearchLab;
 
     const allResearchLabs = planetsWithResearchLab.map((planet) => this.toResearchLabVm(planet));
@@ -669,7 +705,7 @@ export class ResearchesViewComponent implements OnInit {
     this.labSlotIndexes = Array.from({ length: this.maxLabsPerTechnology }, (_, index) => index);
     this.helperSlotIndexes = Array.from(
       { length: Math.max(0, this.maxLabsPerTechnology - 1) },
-      (_, index) => index
+      (_, index) => index,
     );
     this.rebuildLabSelections();
     this.rebuildQueuedHelperSelections();
@@ -685,8 +721,13 @@ export class ResearchesViewComponent implements OnInit {
       planet,
       labLevel,
       researchPower,
-      label: `${planet.basicInfo.name} L${labLevel} (${researchPower})`,
-      isBusy: planet.objects.currentResearchQueue !== null || planet.objects.researchHelperFor !== null
+      label: this.i18n.t('researches.labs.optionLabel', {
+        name: planet.basicInfo.name,
+        level: labLevel,
+        power: researchPower,
+      }),
+      isBusy:
+        planet.objects.currentResearchQueue !== null || planet.objects.researchHelperFor !== null,
     };
   }
 
@@ -700,22 +741,27 @@ export class ResearchesViewComponent implements OnInit {
   }
 
   private researchPower(planet: ClientPlanetDto, researchLabLevel: number): number {
-    const basePower = this.buildingProductionValue(planet, BuildingType.RESEARCH_LAB, researchLabLevel);
+    const basePower = this.buildingProductionValue(
+      planet,
+      BuildingType.RESEARCH_LAB,
+      researchLabLevel,
+    );
     const computerLevel = this.currentTechnologyLevel(TechnologyType.COMPUTER_TECHNOLOGY);
     const adaptiveLevel = this.currentTechnologyLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const irnLevel = this.currentTechnologyLevel(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK);
     const scienceModifier = planet.info.planetaryParameters.scienceModifier;
     const energyState = this.calculateEnergyState(planet);
-    const result = basePower
-      * researchPowerMultiplier(computerLevel, adaptiveLevel, irnLevel)
-      * scienceModifier
-      * energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
+    const result =
+      basePower *
+      researchPowerMultiplier(computerLevel, adaptiveLevel, irnLevel) *
+      scienceModifier *
+      energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
     return Number.isFinite(result) ? Math.floor(result) : 0;
   }
 
   private calculateMaxLabsPerTechnology(): number {
     const irnLevel = this.currentTechnologyLevel(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK);
-    const formulaResult = Math.floor((1.5 * Math.sqrt(irnLevel)) + 1);
+    const formulaResult = Math.floor(1.5 * Math.sqrt(irnLevel) + 1);
     return Math.max(1, formulaResult);
   }
 
@@ -725,7 +771,7 @@ export class ResearchesViewComponent implements OnInit {
       const existing = this.selectedLabsByTechnology.get(technology.type) ?? [];
       const resized = Array.from(
         { length: this.maxLabsPerTechnology },
-        (_, index) => existing[index] ?? null
+        (_, index) => existing[index] ?? null,
       );
 
       const queued = this.queuedResearchForTechnology(technology.type);
@@ -759,7 +805,7 @@ export class ResearchesViewComponent implements OnInit {
       const helperIds = this.queuedHelperLabIds(queue);
       const selection = Array.from(
         { length: this.helperSlotIndexes.length },
-        (_, index) => helperIds[index] ?? null
+        (_, index) => helperIds[index] ?? null,
       );
       next.set(this.planetId(planet), selection);
     }
@@ -786,7 +832,7 @@ export class ResearchesViewComponent implements OnInit {
       lockedMainLabByTechnology.set(technology.type, this.planetId(queued.planet));
       queuedHelperLabIdsByTechnology.set(
         technology.type,
-        new Set(this.queuedHelperLabIds(queued.queue))
+        new Set(this.queuedHelperLabIds(queued.queue)),
       );
     }
 
@@ -797,7 +843,8 @@ export class ResearchesViewComponent implements OnInit {
         selection[0] = lockedMainLabId;
       }
 
-      const queuedHelperIds = queuedHelperLabIdsByTechnology.get(technology.type) ?? new Set<string>();
+      const queuedHelperIds =
+        queuedHelperLabIdsByTechnology.get(technology.type) ?? new Set<string>();
       for (let slotIndex = 0; slotIndex < selection.length; slotIndex += 1) {
         const previousSelected = slotIndex === 0 || selection[slotIndex - 1] !== null;
         const selectedLabId = selection[slotIndex];
@@ -840,9 +887,9 @@ export class ResearchesViewComponent implements OnInit {
 
         const selectedLab = this.allResearchLabsById.get(selectedLabId) ?? null;
         if (
-          !selectedLab
-          || globallyAssigned.has(selectedLabId)
-          || !this.canLabBeAssignedAsHelperForResearch(selectedLab, mainPlanetId, technologyType)
+          !selectedLab ||
+          globallyAssigned.has(selectedLabId) ||
+          !this.canLabBeAssignedAsHelperForResearch(selectedLab, mainPlanetId, technologyType)
         ) {
           selection[slotIndex] = null;
           continue;
@@ -856,7 +903,7 @@ export class ResearchesViewComponent implements OnInit {
   private clearDuplicateLabAssignment(
     selectedLabId: string,
     keepTechnologyType: TechnologyType,
-    keepSlotIndex: number
+    keepSlotIndex: number,
   ): void {
     for (const technology of this.technologies) {
       const selection = this.selectionArray(technology.type);
@@ -897,7 +944,7 @@ export class ResearchesViewComponent implements OnInit {
   private canLabBeAssignedAsHelperForResearch(
     lab: ResearchLabVm,
     mainPlanetId: string,
-    technologyType: TechnologyType
+    technologyType: TechnologyType,
   ): boolean {
     if (lab.id === mainPlanetId) {
       return false;
@@ -912,14 +959,17 @@ export class ResearchesViewComponent implements OnInit {
       return true;
     }
 
-    return helperReference.technologyType === technologyType
-      && this.coordinatesId(helperReference.mainResearchCoordinates) === mainPlanetId;
+    return (
+      helperReference.technologyType === technologyType &&
+      this.coordinatesId(helperReference.mainResearchCoordinates) === mainPlanetId
+    );
   }
 
   private isQueuedHelperSelectionDirty(queuedResearch: ResearchQueueRowVm): boolean {
     const currentHelperIds = this.queuedHelperLabIdsForPlanetId(queuedResearch.mainPlanetId);
-    const selectedHelperIds = this.queuedHelperSelectionArray(queuedResearch.mainPlanetId)
-      .filter((entry): entry is string => Boolean(entry));
+    const selectedHelperIds = this.queuedHelperSelectionArray(queuedResearch.mainPlanetId).filter(
+      (entry): entry is string => Boolean(entry),
+    );
     if (currentHelperIds.length !== selectedHelperIds.length) {
       return true;
     }
@@ -967,7 +1017,7 @@ export class ResearchesViewComponent implements OnInit {
   }
 
   private queuedResearchForTechnology(
-    technologyType: TechnologyType
+    technologyType: TechnologyType,
   ): { planet: ClientPlanetDto; queue: TechnologyQueueEntryDto } | null {
     for (const planet of this.allOwnedPlanets) {
       const queue = planet.objects.currentResearchQueue;
@@ -1021,7 +1071,7 @@ export class ResearchesViewComponent implements OnInit {
       helperCoordinates.push({
         x: helperLab.planet.coordinates.x,
         y: helperLab.planet.coordinates.y,
-        z: helperLab.planet.coordinates.z
+        z: helperLab.planet.coordinates.z,
       });
     }
 
@@ -1046,7 +1096,7 @@ export class ResearchesViewComponent implements OnInit {
       helperCoordinates.push({
         x: helperLab.planet.coordinates.x,
         y: helperLab.planet.coordinates.y,
-        z: helperLab.planet.coordinates.z
+        z: helperLab.planet.coordinates.z,
       });
     }
 
@@ -1083,7 +1133,12 @@ export class ResearchesViewComponent implements OnInit {
     const uniqueIds = new Set<string>();
     const result: ClientCoordinates[] = [];
     for (const helper of entry.helperLabs) {
-      if (!helper || !Number.isInteger(helper.x) || !Number.isInteger(helper.y) || !Number.isInteger(helper.z)) {
+      if (
+        !helper ||
+        !Number.isInteger(helper.x) ||
+        !Number.isInteger(helper.y) ||
+        !Number.isInteger(helper.z)
+      ) {
         continue;
       }
 
@@ -1121,16 +1176,16 @@ export class ResearchesViewComponent implements OnInit {
   private researchQueuePower(
     starterPlanet: ClientPlanetDto,
     technologyType: TechnologyType,
-    helperLabs: ClientCoordinates[]
+    helperLabs: ClientCoordinates[],
   ): number {
     let total = this.researchPower(
       starterPlanet,
-      this.buildingLevel(starterPlanet, BuildingType.RESEARCH_LAB)
+      this.buildingLevel(starterPlanet, BuildingType.RESEARCH_LAB),
     );
 
     for (const helperCoordinates of helperLabs) {
       const helperPlanet = this.allOwnedPlanetsById.get(
-        `${helperCoordinates.x}:${helperCoordinates.y}:${helperCoordinates.z}`
+        `${helperCoordinates.x}:${helperCoordinates.y}:${helperCoordinates.z}`,
       );
       if (!helperPlanet) {
         continue;
@@ -1143,9 +1198,9 @@ export class ResearchesViewComponent implements OnInit {
 
       const target = helperReference.mainResearchCoordinates;
       if (
-        target.x !== starterPlanet.coordinates.x
-        || target.y !== starterPlanet.coordinates.y
-        || target.z !== starterPlanet.coordinates.z
+        target.x !== starterPlanet.coordinates.x ||
+        target.y !== starterPlanet.coordinates.y ||
+        target.z !== starterPlanet.coordinates.z
       ) {
         continue;
       }
@@ -1197,16 +1252,16 @@ export class ResearchesViewComponent implements OnInit {
   private hasEnoughResources(planet: ClientPlanetDto, required: ResourcesPack): boolean {
     const resources = planet.objects.resources;
     return (
-      resources.metal >= required.metal
-      && resources.crystal >= required.crystal
-      && resources.deuterium >= required.deuterium
+      resources.metal >= required.metal &&
+      resources.crystal >= required.crystal &&
+      resources.deuterium >= required.deuterium
     );
   }
 
   private hasBuildingRequirements(
     planet: ClientPlanetDto,
     requirements: BuildingRequirement[],
-    targetTechnologyLevel: number
+    targetTechnologyLevel: number,
   ): boolean {
     for (const requirement of requirements) {
       const requiredLevel = Math.ceil(targetTechnologyLevel * requirement.level);
@@ -1219,7 +1274,10 @@ export class ResearchesViewComponent implements OnInit {
     return true;
   }
 
-  private hasTechRequirements(requirements: TechRequirement[], targetTechnologyLevel: number): boolean {
+  private hasTechRequirements(
+    requirements: TechRequirement[],
+    targetTechnologyLevel: number,
+  ): boolean {
     for (const requirement of requirements) {
       const requiredLevel = Math.ceil(targetTechnologyLevel * requirement.level);
       const currentLevel = this.currentTechnologyLevel(requirement.tech);
@@ -1235,12 +1293,12 @@ export class ResearchesViewComponent implements OnInit {
     const solarProduction = this.buildingProductionValue(
       planet,
       BuildingType.SOLAR_WIND_GEOTHERMAL,
-      this.buildingLevel(planet, BuildingType.SOLAR_WIND_GEOTHERMAL)
+      this.buildingLevel(planet, BuildingType.SOLAR_WIND_GEOTHERMAL),
     );
     const nuclearProduction = this.buildingProductionValue(
       planet,
       BuildingType.NUCLEAR_PLANT,
-      this.buildingLevel(planet, BuildingType.NUCLEAR_PLANT)
+      this.buildingLevel(planet, BuildingType.NUCLEAR_PLANT),
     );
     const fusionProduction = this.resolveFusionReactorOperationForPlanet(planet).powerOutput;
 
@@ -1248,11 +1306,11 @@ export class ResearchesViewComponent implements OnInit {
     const energyModifierNuclear = planet.info.planetaryParameters.energyModifierNuclear;
     const energyTechLevel = this.currentTechnologyLevel(TechnologyType.ENERGY_TECHNOLOGY);
 
-    const availableEnergy = (
-      (solarProduction * energyModifierRES)
-      + (nuclearProduction * energyModifierNuclear)
-      + fusionProduction
-    ) * (1 + ((energyTechLevel * 2) / 100));
+    const availableEnergy =
+      (solarProduction * energyModifierRES +
+        nuclearProduction * energyModifierNuclear +
+        fusionProduction) *
+      (1 + (energyTechLevel * 2) / 100);
 
     let usedEnergy = 0;
     for (const entry of planet.objects.buildingsLevels) {
@@ -1279,14 +1337,14 @@ export class ResearchesViewComponent implements OnInit {
 
     return {
       used: usedEnergy,
-      available: availableEnergy
+      available: availableEnergy,
     };
   }
 
   private buildingProductionValue(
     planet: ClientPlanetDto,
     buildingType: BuildingType,
-    level: number
+    level: number,
   ): number {
     if (level <= 0) {
       return 0;
@@ -1330,7 +1388,10 @@ export class ResearchesViewComponent implements OnInit {
       return 0;
     }
 
-    const entry = this.findPowerConsumptionEntry(planet.objects.buildingsCurrentPowerConsumption, buildingType);
+    const entry = this.findPowerConsumptionEntry(
+      planet.objects.buildingsCurrentPowerConsumption,
+      buildingType,
+    );
     if (!entry) {
       return maxConsumption;
     }
@@ -1354,18 +1415,21 @@ export class ResearchesViewComponent implements OnInit {
     return resolveFusionReactorOperation({
       selectedStage: this.selectedFusionReactorStageForPlanet(planet),
       maxStage: fusionLevel,
-      structuralUtilization: this.structuralUtilizationForPlanet(planet, BuildingType.FUSION_REACTOR),
+      structuralUtilization: this.structuralUtilizationForPlanet(
+        planet,
+        BuildingType.FUSION_REACTOR,
+      ),
       energyTechnologyLevel: this.currentTechnologyLevel(TechnologyType.ENERGY_TECHNOLOGY),
       adaptiveTechnologyLevel: this.currentTechnologyLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
       solarProduction: this.buildingProductionValue(
         planet,
         BuildingType.SOLAR_WIND_GEOTHERMAL,
-        this.buildingLevel(planet, BuildingType.SOLAR_WIND_GEOTHERMAL)
+        this.buildingLevel(planet, BuildingType.SOLAR_WIND_GEOTHERMAL),
       ),
       nuclearProduction: this.buildingProductionValue(
         planet,
         BuildingType.NUCLEAR_PLANT,
-        this.buildingLevel(planet, BuildingType.NUCLEAR_PLANT)
+        this.buildingLevel(planet, BuildingType.NUCLEAR_PLANT),
       ),
       otherEnergyUsed,
       energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
@@ -1373,11 +1437,13 @@ export class ResearchesViewComponent implements OnInit {
       deuteriumSynthesizerProduction: this.buildingProductionValue(
         planet,
         BuildingType.DEUTERIUM_SYNTHESIZER,
-        this.buildingLevel(planet, BuildingType.DEUTERIUM_SYNTHESIZER)
+        this.buildingLevel(planet, BuildingType.DEUTERIUM_SYNTHESIZER),
       ),
       deuteriumModifier: planet.info.planetaryParameters.deuteriumModifier,
-      fusionPowerAtStage: (stage) => this.rawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
-      fusionDeuteriumAtStage: (stage) => this.rawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2')
+      fusionPowerAtStage: (stage) =>
+        this.rawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
+      fusionDeuteriumAtStage: (stage) =>
+        this.rawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2'),
     });
   }
 
@@ -1398,7 +1464,7 @@ export class ResearchesViewComponent implements OnInit {
   private rawBuildingProductionAtStage(
     buildingType: BuildingType,
     stage: number,
-    key: 'production1' | 'production2'
+    key: 'production1' | 'production2',
   ): number {
     if (stage <= 0) {
       return 0;
@@ -1420,7 +1486,7 @@ export class ResearchesViewComponent implements OnInit {
 
   private findBuildingLevelEntry(
     entries: BuildingLevelEntry[],
-    buildingType: BuildingType
+    buildingType: BuildingType,
   ): BuildingLevelEntry | null {
     for (const entry of entries) {
       if ((entry.type as BuildingType) === buildingType) {
@@ -1433,7 +1499,7 @@ export class ResearchesViewComponent implements OnInit {
 
   private findPowerConsumptionEntry(
     entries: BuildingPowerConsumptionEntry[],
-    buildingType: BuildingType
+    buildingType: BuildingType,
   ): BuildingPowerConsumptionEntry | null {
     for (const entry of entries) {
       if ((entry.type as BuildingType) === buildingType) {
@@ -1444,8 +1510,14 @@ export class ResearchesViewComponent implements OnInit {
     return null;
   }
 
-  private structuralUtilizationForPlanet(planet: ClientPlanetDto, buildingType: BuildingType): number {
-    const entry = this.findStructuralPointsEntry(planet.objects.buildingsCurrentStructuralPoints, buildingType);
+  private structuralUtilizationForPlanet(
+    planet: ClientPlanetDto,
+    buildingType: BuildingType,
+  ): number {
+    const entry = this.findStructuralPointsEntry(
+      planet.objects.buildingsCurrentStructuralPoints,
+      buildingType,
+    );
     if (!entry || entry.maxStructuralPoints <= 0) {
       return 1;
     }
@@ -1455,7 +1527,7 @@ export class ResearchesViewComponent implements OnInit {
 
   private findStructuralPointsEntry(
     entries: BuildingStructuralPointsEntry[],
-    buildingType: BuildingType
+    buildingType: BuildingType,
   ): BuildingStructuralPointsEntry | null {
     for (const entry of entries) {
       if ((entry.type as BuildingType) === buildingType) {
@@ -1502,85 +1574,93 @@ export class ResearchesViewComponent implements OnInit {
 
     const summaryRows: PlanetObjectDetailRow[] = [
       {
-        label: 'Current level',
-        value: String(currentLevel)
+        label: this.i18n.t('researches.details.currentLevel'),
+        value: String(currentLevel),
       },
       {
-        label: 'Target level',
-        value: `L${targetLevel}`
+        label: this.i18n.t('researches.details.targetLevel'),
+        value: `L${targetLevel}`,
       },
       {
-        label: 'Research time',
-        value: String(this.technologyResearchTimeForTargetLevel(technology))
-      }
+        label: this.i18n.t('researches.details.researchTime'),
+        value: String(this.technologyResearchTimeForTargetLevel(technology)),
+      },
     ];
 
     const assignmentRows: PlanetObjectDetailRow[] = [
       {
-        label: 'Main lab',
-        value: firstLab ? firstLab.label : 'Not selected',
-        tone: firstLab ? 'default' : 'warn'
+        label: this.i18n.t('researches.details.mainLab'),
+        value: firstLab ? firstLab.label : this.i18n.t('researches.details.notSelected'),
+        tone: firstLab ? 'default' : 'warn',
       },
       {
-        label: 'Helper labs',
-        value: selectedHelpers.length > 0
-          ? selectedHelpers.map((coordinates) => `${coordinates.x}:${coordinates.y}:${coordinates.z}`).join(', ')
-          : 'None selected',
-        tone: selectedHelpers.length > 0 ? 'default' : 'muted'
-      }
+        label: this.i18n.t('researches.details.helperLabs'),
+        value:
+          selectedHelpers.length > 0
+            ? selectedHelpers
+                .map((coordinates) => `${coordinates.x}:${coordinates.y}:${coordinates.z}`)
+                .join(', ')
+            : this.i18n.t('researches.details.noneSelected'),
+        tone: selectedHelpers.length > 0 ? 'default' : 'muted',
+      },
     ];
 
     if (queuedResearch) {
       assignmentRows.push(
         {
-          label: 'Queued on',
+          label: this.i18n.t('researches.details.queuedOn'),
           value: `${queuedResearch.planet.basicInfo.name} [${queuedResearch.planet.coordinates.x}:${queuedResearch.planet.coordinates.y}:${queuedResearch.planet.coordinates.z}]`,
-          tone: 'good'
+          tone: 'good',
         },
         {
-          label: 'Queue status',
-          value: 'Researching',
-          tone: 'good'
-        }
+          label: this.i18n.t('researches.details.queueStatus'),
+          value: this.i18n.t('researches.queue.statusResearching'),
+          tone: 'good',
+        },
       );
     } else {
       assignmentRows.push({
-        label: 'Queue status',
-        value: this.canStartResearch(technology) ? 'Ready to start' : 'Not ready',
-        tone: this.canStartResearch(technology) ? 'good' : 'warn'
+        label: this.i18n.t('researches.details.queueStatus'),
+        value: this.canStartResearch(technology)
+          ? this.i18n.t('researches.details.readyToStart')
+          : this.i18n.t('researches.details.notReady'),
+        tone: this.canStartResearch(technology) ? 'good' : 'warn',
       });
     }
 
     const sections: PlanetObjectDetailSection[] = [
-      this.createDetailSection('Summary', summaryRows),
-      this.createDetailSection('Lab assignment', assignmentRows),
+      this.createDetailSection(this.i18n.t('researches.details.summary'), summaryRows),
+      this.createDetailSection(this.i18n.t('researches.sections.labAssignment'), assignmentRows),
       this.createDetailSection(
-        `Next level cost (L${targetLevel})`,
-        this.detailRowsFromCostRows(this.technologyCostRows(technology))
+        this.i18n.t('researches.list.nextLevelCost', { level: targetLevel }),
+        this.detailRowsFromCostRows(this.technologyCostRows(technology)),
       ),
       this.createDetailSection(
-        'Requirements',
-        this.detailRowsFromRequirementRows(this.technologyRequirementRows(technology))
-      )
+        this.i18n.t('researches.sections.requirements'),
+        this.detailRowsFromRequirementRows(this.technologyRequirementRows(technology)),
+      ),
     ];
 
     return {
-      kindLabel: 'Technology',
+      kindLabel: this.i18n.t('researches.details.kindLabel'),
       title: technology.type,
       subtitle: firstLab
-        ? `${firstLab.planet.basicInfo.name} | Research View`
-        : 'Research View | Technology',
+        ? `${firstLab.planet.basicInfo.name} | ${this.i18n.t('researches.details.subtitleView')}`
+        : `${this.i18n.t('researches.details.subtitleView')} | ${this.i18n.t('researches.details.subtitleObject')}`,
       description: technology.description,
       previewImagePath: technology.imagePath,
       rawImagePath: toRawImagePath(technology.imagePath),
-      sections
+      sections,
     };
   }
 
-  private createDetailSection(title: string, rows: PlanetObjectDetailRow[]): PlanetObjectDetailSection {
+  private createDetailSection(
+    title: string,
+    rows: PlanetObjectDetailRow[],
+  ): PlanetObjectDetailSection {
     return {
       title,
-      rows
+      rows,
     };
   }
 
@@ -1588,7 +1668,7 @@ export class ResearchesViewComponent implements OnInit {
     return rows.map((row) => ({
       label: row.label,
       value: String(row.amount),
-      tone: row.isEnough ? 'default' : 'bad'
+      tone: row.isEnough ? 'default' : 'bad',
     }));
   }
 
@@ -1596,21 +1676,26 @@ export class ResearchesViewComponent implements OnInit {
     return rows.map((row) => {
       if (row.isPlaceholder) {
         return {
-          label: 'Requirement',
+          label: this.i18n.t('researches.details.requirement'),
           value: row.label,
-          tone: 'muted'
+          tone: 'muted',
         };
       }
 
-        const separatorIndex = row.label.indexOf(':');
-        const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
-        const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
+      const separatorIndex = row.label.indexOf(':');
+      const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
+      const value =
+        separatorIndex >= 0
+          ? row.label.slice(separatorIndex + 1).trim()
+          : row.isMet
+            ? this.i18n.t('researches.details.met')
+            : this.i18n.t('researches.details.missing');
 
-        return {
-          label: rawLabel,
-          value,
-          tone: row.isMet ? 'good' : 'bad'
-        };
-      });
+      return {
+        label: rawLabel,
+        value,
+        tone: row.isMet ? 'good' : 'bad',
+      };
+    });
   }
 }

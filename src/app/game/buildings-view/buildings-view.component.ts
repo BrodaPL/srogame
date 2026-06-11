@@ -5,9 +5,13 @@ import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { I18nPipe } from '../../i18n/i18n.pipe';
 import { I18nService } from '../../i18n/i18n.service';
 import { Building } from '../../models/buildings/building';
-import { buildingProductionLabel, contextualBuildingProductionLabel } from '../../models/buildings/building-production-label';
+import {
+  buildingProductionLabel,
+  contextualBuildingProductionLabel,
+} from '../../models/buildings/building-production-label';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
 import { ShipType } from '../../models/enums/ship-type';
@@ -16,16 +20,25 @@ import type {
   CancelBuildingQueueEntryRequest,
   ClientPlanetDto,
   ReorderBuildingQueueRequest,
-  StartBuildingConstructionRequest
+  StartBuildingConstructionRequest,
 } from '../../models/game-api-types';
-import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
-import { resolveFusionReactorOperation, type FusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
+import {
+  energyDeficitEfficiencyMultiplier,
+  energyDeficitPenaltyPercent,
+} from '../../models/planets/energy-deficit';
+import {
+  resolveFusionReactorOperation,
+  type FusionReactorOperation,
+} from '../../models/planets/fusion-reactor-operation';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
-import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
+import {
+  industryPowerMultiplier,
+  researchPowerMultiplier,
+} from '../../models/tech/technology-effects';
 import {
   calculateRepairDroneProductionBasePower,
-  routeRepairDroneProduction
+  routeRepairDroneProduction,
 } from '../../models/turns/repair-drone-production';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
@@ -34,14 +47,14 @@ import {
   PlanetObjectDetailDialogData,
   PlanetObjectDetailRow,
   PlanetObjectDetailSection,
-  PlanetObjectDialogComponent
+  PlanetObjectDialogComponent,
 } from '../planet-view/planet-object-dialog.component';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import {
   PlanetPowersDisplay,
   ResourceDisplay,
   ResourcesComponent,
-  ResourceTitleLink
+  ResourceTitleLink,
 } from '../ui/resources/resources.component';
 import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import { TopMenuComponent } from '../ui/top-menu/top-menu.component';
@@ -86,16 +99,17 @@ type BuildingQueueRowVm = {
     CdkDrag,
     CdkDragHandle,
     PlanetObjectDialogComponent,
-    TooltipDirective
+    TooltipDirective,
+    I18nPipe,
   ],
   templateUrl: './buildings-view.component.html',
-  styleUrl: './buildings-view.component.css'
+  styleUrl: './buildings-view.component.css',
 })
 export class BuildingsViewComponent implements OnInit {
   private readonly i18n = inject(I18nService);
   protected readonly modeOptions: Array<{ value: BuildingsMode; label: string }> = [
-    { value: 'r', label: 'Resources infrastructure' },
-    { value: 'f', label: 'Facilities' }
+    { value: 'r', label: this.i18n.t('buildings.modes.resources') },
+    { value: 'f', label: this.i18n.t('buildings.modes.facilities') },
   ];
 
   protected isLoading = false;
@@ -128,7 +142,7 @@ export class BuildingsViewComponent implements OnInit {
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly tutorialService: TutorialService
+    private readonly tutorialService: TutorialService,
   ) {
     const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
     const allBuildings = Array.from(buildingBlueprints.buildingsMap.values());
@@ -147,7 +161,9 @@ export class BuildingsViewComponent implements OnInit {
       return null;
     }
 
-    return this.ownedPlanets.find((planet) => this.planetId(planet) === this.selectedPlanetId) ?? null;
+    return (
+      this.ownedPlanets.find((planet) => this.planetId(planet) === this.selectedPlanetId) ?? null
+    );
   }
 
   protected visibleBuildings(): Building[] {
@@ -170,19 +186,23 @@ export class BuildingsViewComponent implements OnInit {
   protected selectedPlanetLabel(): string {
     const planet = this.selectedPlanet();
     if (!planet) {
-      return 'No planet selected';
+      return this.i18n.t('buildings.summary.noPlanetSelected');
     }
 
     return `${planet.basicInfo.name} (${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z})`;
   }
 
   protected selectedPlanetName(): string {
-    return this.selectedPlanet()?.basicInfo.name ?? 'No planet selected';
+    return (
+      this.selectedPlanet()?.basicInfo.name ?? this.i18n.t('buildings.summary.noPlanetSelected')
+    );
   }
 
   protected selectedPlanetCoordinatesLabel(): string {
     const planet = this.selectedPlanet();
-    return planet ? `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}` : '--:--:--';
+    return planet
+      ? `${planet.coordinates.x}:${planet.coordinates.y}:${planet.coordinates.z}`
+      : '--:--:--';
   }
 
   protected selectedPlanetTitleLink(): ResourceTitleLink | null {
@@ -197,9 +217,9 @@ export class BuildingsViewComponent implements OnInit {
       queryParams: {
         x: planet.coordinates.x,
         y: planet.coordinates.y,
-        z: planet.coordinates.z
+        z: planet.coordinates.z,
       },
-      title: `Open ${planet.basicInfo.name} in Planet View`
+      title: this.i18n.t('buildings.summary.openPlanetView', { name: planet.basicInfo.name }),
     };
   }
 
@@ -236,18 +256,18 @@ export class BuildingsViewComponent implements OnInit {
       {
         label: 'M',
         amount: cost.metal,
-        isEnough: (currentResources?.metal ?? 0) >= cost.metal
+        isEnough: (currentResources?.metal ?? 0) >= cost.metal,
       },
       {
         label: 'C',
         amount: cost.crystal,
-        isEnough: (currentResources?.crystal ?? 0) >= cost.crystal
+        isEnough: (currentResources?.crystal ?? 0) >= cost.crystal,
       },
       {
         label: 'D',
         amount: cost.deuterium,
-        isEnough: (currentResources?.deuterium ?? 0) >= cost.deuterium
-      }
+        isEnough: (currentResources?.deuterium ?? 0) >= cost.deuterium,
+      },
     ];
   }
 
@@ -278,7 +298,10 @@ export class BuildingsViewComponent implements OnInit {
     }
 
     const totalRows = this.buildingRequirementRows(building).length;
-    return `Requirements ${unmetRows.length}/${totalRows}`;
+    return this.i18n.t('buildings.requirements.unmet', {
+      unmet: unmetRows.length,
+      total: totalRows,
+    });
   }
 
   protected unmetRequirementsTooltip(building: Building): string | null {
@@ -292,38 +315,38 @@ export class BuildingsViewComponent implements OnInit {
 
   protected buildingBuildLabel(building: Building): string {
     if (this.isBuildingUnderConstruction(building.type)) {
-      return 'Under construction';
+      return this.i18n.t('buildings.actions.underConstruction');
     }
 
     if (this.isBuildingQueued(building.type)) {
-      return 'Queued';
+      return this.i18n.t('buildings.actions.queued');
     }
 
-    return 'Build';
+    return this.i18n.t('buildings.actions.build');
   }
 
   protected buildingBuildTitle(building: Building): string {
     if (this.isBuildingQueueFull()) {
-      return 'Queue full.';
+      return this.i18n.t('buildings.actions.queueFull');
     }
 
     if (this.buildingStartInFlightByType.has(building.type)) {
-      return 'Adding to queue...';
+      return this.i18n.t('buildings.actions.addingToQueue');
     }
 
     if (this.isBuildingUnderConstruction(building.type)) {
-      return 'Under construction.';
+      return this.i18n.t('buildings.actions.underConstructionTitle');
     }
 
     if (this.isBuildingQueued(building.type)) {
-      return 'Queued.';
+      return this.i18n.t('buildings.actions.queuedTitle');
     }
 
     if (!this.canBuildBuilding(building)) {
-      return 'Requirements not met or insufficient resources.';
+      return this.i18n.t('buildings.actions.requirementsOrResources');
     }
 
-    return 'Add building to queue.';
+    return this.i18n.t('buildings.actions.addToQueue');
   }
 
   protected canBuildBuilding(building: Building): boolean {
@@ -380,21 +403,22 @@ export class BuildingsViewComponent implements OnInit {
       x: planet.coordinates.x,
       y: planet.coordinates.y,
       z: planet.coordinates.z,
-      buildingType: building.type
+      buildingType: building.type,
     };
 
-    this.gameApi.startBuildingConstruction(request, session.token)
+    this.gameApi
+      .startBuildingConstruction(request, session.token)
       .pipe(
         timeout(10000),
         finalize(() => {
           this.buildingStartInFlightByType.delete(building.type);
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: (updatedPlanet) => {
           this.ownedPlanets = this.ownedPlanets.map((entry) =>
-            this.planetId(entry) === this.planetId(updatedPlanet) ? updatedPlanet : entry
+            this.planetId(entry) === this.planetId(updatedPlanet) ? updatedPlanet : entry,
           );
           this.selectedPlanetId = this.planetId(updatedPlanet);
           this.rebuildSelectedPlanetState();
@@ -403,10 +427,10 @@ export class BuildingsViewComponent implements OnInit {
         error: (error: { error?: { error?: string } }) => {
           this.buildingStartErrorByType.set(
             building.type,
-            resolveApiErrorMessage(this.i18n, error, 'Unable to add building to queue.')
+            resolveApiErrorMessage(this.i18n, error, this.i18n.t('buildings.errors.addToQueue')),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -441,13 +465,12 @@ export class BuildingsViewComponent implements OnInit {
       const baseTotalConstructionTime = this.baseConstructionTime(buildingType, toLevel);
       const investedIndustryPower = Math.min(
         this.queueEntryInvestedIndustryPower(entry),
-        baseTotalConstructionTime
+        baseTotalConstructionTime,
       );
       const remaining = Math.max(0, baseTotalConstructionTime - investedIndustryPower);
       cumulativeRemaining += remaining;
-      const estimatedTurnsForCompletion = industryPower > 0
-        ? Math.ceil(cumulativeRemaining / industryPower)
-        : null;
+      const estimatedTurnsForCompletion =
+        industryPower > 0 ? Math.ceil(cumulativeRemaining / industryPower) : null;
 
       return {
         queueIndex: index,
@@ -458,7 +481,7 @@ export class BuildingsViewComponent implements OnInit {
         investedIndustryPower,
         baseTotalConstructionTime,
         estimatedTurnsForCompletion,
-        isHeadOfQueue: index === 0
+        isHeadOfQueue: index === 0,
       };
     });
   }
@@ -473,10 +496,10 @@ export class BuildingsViewComponent implements OnInit {
 
   protected buildingQueueCancelTitle(row: BuildingQueueRowVm): string {
     if (row.investedIndustryPower <= 0) {
-      return 'Cancel and refund 100% of this queued building.';
+      return this.i18n.t('buildings.queue.cancelQueued');
     }
 
-    return 'Cancel and refund 75% of this started building.';
+    return this.i18n.t('buildings.queue.cancelStarted');
   }
 
   protected onBuildingQueueDrop(event: CdkDragDrop<BuildingQueueRowVm[]>): void {
@@ -498,26 +521,33 @@ export class BuildingsViewComponent implements OnInit {
       y: planet.coordinates.y,
       z: planet.coordinates.z,
       fromIndex: movedRow.queueIndex,
-      toIndex: targetRow.queueIndex
+      toIndex: targetRow.queueIndex,
     };
 
     this.buildingQueueMutationInFlight = true;
     this.buildingQueueActionError = null;
     this.cdr.markForCheck();
 
-    this.gameApi.reorderBuildingQueue(request, session.token)
-      .pipe(finalize(() => {
-        this.buildingQueueMutationInFlight = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .reorderBuildingQueue(request, session.token)
+      .pipe(
+        finalize(() => {
+          this.buildingQueueMutationInFlight = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (updatedPlanet) => {
           this.applyUpdatedPlanet(updatedPlanet);
         },
         error: (error: { error?: { error?: string } }) => {
-          this.buildingQueueActionError = resolveApiErrorMessage(this.i18n, error, 'Unable to reorder building queue.');
+          this.buildingQueueActionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('buildings.errors.reorderQueue'),
+          );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -536,44 +566,54 @@ export class BuildingsViewComponent implements OnInit {
       x: planet.coordinates.x,
       y: planet.coordinates.y,
       z: planet.coordinates.z,
-      index: row.queueIndex
+      index: row.queueIndex,
     };
 
     this.buildingQueueMutationInFlight = true;
     this.buildingQueueActionError = null;
     this.cdr.markForCheck();
 
-    this.gameApi.cancelBuildingQueueEntry(request, session.token)
-      .pipe(finalize(() => {
-        this.buildingQueueMutationInFlight = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .cancelBuildingQueueEntry(request, session.token)
+      .pipe(
+        finalize(() => {
+          this.buildingQueueMutationInFlight = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (updatedPlanet) => {
           this.applyUpdatedPlanet(updatedPlanet);
         },
         error: (error: { error?: { error?: string } }) => {
-          this.buildingQueueActionError = resolveApiErrorMessage(this.i18n, error, 'Unable to cancel building queue entry.');
+          this.buildingQueueActionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('buildings.errors.cancelQueue'),
+          );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
   private loadOwnedPlanets(): void {
     const session = this.playerSession.load();
     if (!session) {
-      this.loadError = 'No player session found.';
+      this.loadError = this.i18n.t('buildings.errors.noSession');
       return;
     }
 
     this.isLoading = true;
     this.loadError = null;
 
-    this.gameApi.getOwnedPlanets(session.token)
-      .pipe(finalize(() => {
-        this.isLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .getOwnedPlanets(session.token)
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (ownedPlanets) => {
           this.ownedPlanets = [...ownedPlanets];
@@ -582,8 +622,8 @@ export class BuildingsViewComponent implements OnInit {
           this.tutorialService.autoOpenTutorial('buildingsView');
         },
         error: () => {
-          this.loadError = 'Unable to load owned planets.';
-        }
+          this.loadError = this.i18n.t('buildings.errors.loadPlanets');
+        },
       });
   }
 
@@ -617,14 +657,14 @@ export class BuildingsViewComponent implements OnInit {
     for (const entry of planet.objects.buildingsCurrentPowerConsumption ?? []) {
       this.buildingCurrentPowerByType.set(
         entry.type as BuildingType,
-        this.roundNumber(Math.max(0, entry.currentPowerConsumption), 2)
+        this.roundNumber(Math.max(0, entry.currentPowerConsumption), 2),
       );
     }
 
     for (const entry of planet.objects.buildingsCurrentStructuralPoints ?? []) {
       this.buildingCurrentStructuralPointsByType.set(
         entry.type as BuildingType,
-        Math.max(0, Math.floor(entry.currentStructuralPoints))
+        Math.max(0, Math.floor(entry.currentStructuralPoints)),
       );
     }
 
@@ -654,7 +694,10 @@ export class BuildingsViewComponent implements OnInit {
 
     const adaptiveTechLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const resources = planet.objects.resources;
-    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+    const energy = this.calculateEnergyState(
+      this.buildingLevelsByType,
+      this.buildingCurrentPowerByType,
+    );
     const fusionOperation = this.currentFusionReactorOperation();
     const energyEfficiency = energyDeficitEfficiencyMultiplier(energy.available, energy.used);
 
@@ -664,23 +707,37 @@ export class BuildingsViewComponent implements OnInit {
 
     this.metalDisplay = {
       current: resources.metal,
-      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.METAL_MINE, adaptiveTechLevel, planet.info.planetaryParameters.metalModifier) * energyEfficiency, 2),
-      capacityPercent: this.capacityPercent(resources.metal, metalCapacity)
+      productionPerTurn: this.roundNumber(
+        this.resourceGain(
+          BuildingType.METAL_MINE,
+          adaptiveTechLevel,
+          planet.info.planetaryParameters.metalModifier,
+        ) * energyEfficiency,
+        2,
+      ),
+      capacityPercent: this.capacityPercent(resources.metal, metalCapacity),
     };
     this.crystalDisplay = {
       current: resources.crystal,
-      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.CRYSTAL_MINE, adaptiveTechLevel, planet.info.planetaryParameters.crystalModifier) * energyEfficiency, 2),
-      capacityPercent: this.capacityPercent(resources.crystal, crystalCapacity)
+      productionPerTurn: this.roundNumber(
+        this.resourceGain(
+          BuildingType.CRYSTAL_MINE,
+          adaptiveTechLevel,
+          planet.info.planetaryParameters.crystalModifier,
+        ) * energyEfficiency,
+        2,
+      ),
+      capacityPercent: this.capacityPercent(resources.crystal, crystalCapacity),
     };
     this.deuteriumDisplay = {
       current: resources.deuterium,
       productionPerTurn: this.roundNumber(fusionOperation.netDeuteriumIncome, 2),
-      capacityPercent: this.capacityPercent(resources.deuterium, deuteriumCapacity)
+      capacityPercent: this.capacityPercent(resources.deuterium, deuteriumCapacity),
     };
 
     this.energyDisplay = {
       used: energy.used,
-      available: energy.available
+      available: energy.available,
     };
     this.energyTooltip = this.energyPenaltyTooltip(energy.available, energy.used);
     this.powersDisplay = {
@@ -691,47 +748,51 @@ export class BuildingsViewComponent implements OnInit {
       droneShipyardPower: this.currentDroneShipyardPower(),
       totalShipyardPower: this.currentTotalShipyardPower(),
       researchPower: this.currentResearchPower(),
-      industryPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
-        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
-        || (energyEfficiency < 0.9999 && (
-          this.buildingLevel(BuildingType.ROBOTICS_FACTORY) > 0
-          || this.buildingLevel(BuildingType.NANITE_FACTORY) > 0
-        )),
-      shipyardPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD)
-        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
-        || (energyEfficiency < 0.9999 && (
-          this.buildingLevel(BuildingType.SHIPYARD) > 0
-          || this.buildingLevel(BuildingType.NANITE_FACTORY) > 0
-        )),
-      researchPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.RESEARCH_LAB)
-        || (energyEfficiency < 0.9999 && this.buildingLevel(BuildingType.RESEARCH_LAB) > 0)
+      industryPowerLimited:
+        this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY) ||
+        this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY) ||
+        (energyEfficiency < 0.9999 &&
+          (this.buildingLevel(BuildingType.ROBOTICS_FACTORY) > 0 ||
+            this.buildingLevel(BuildingType.NANITE_FACTORY) > 0)),
+      shipyardPowerLimited:
+        this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD) ||
+        this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY) ||
+        (energyEfficiency < 0.9999 &&
+          (this.buildingLevel(BuildingType.SHIPYARD) > 0 ||
+            this.buildingLevel(BuildingType.NANITE_FACTORY) > 0)),
+      researchPowerLimited:
+        this.isBuildingNotUsingFullPower(BuildingType.RESEARCH_LAB) ||
+        (energyEfficiency < 0.9999 && this.buildingLevel(BuildingType.RESEARCH_LAB) > 0),
     };
   }
 
   private calculateEnergyState(
     levels: Map<BuildingType, number>,
-    currentPowerByType: Map<BuildingType, number>
+    currentPowerByType: Map<BuildingType, number>,
   ): EnergyState {
     const solarProduction = this.getProductionAtLevelByType(
       BuildingType.SOLAR_WIND_GEOTHERMAL,
-      levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0
+      levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0,
     );
     const nuclearProduction = this.getProductionAtLevelByType(
       BuildingType.NUCLEAR_PLANT,
-      levels.get(BuildingType.NUCLEAR_PLANT) ?? 0
+      levels.get(BuildingType.NUCLEAR_PLANT) ?? 0,
     );
-    const fusionProduction = this.resolveFusionReactorOperationForCurrentState(levels, currentPowerByType).powerOutput;
+    const fusionProduction = this.resolveFusionReactorOperationForCurrentState(
+      levels,
+      currentPowerByType,
+    ).powerOutput;
 
     const parameters = this.selectedPlanet()?.info.planetaryParameters;
     const energyModifierRES = parameters?.energyModifierRES ?? 1;
     const energyModifierNuclear = parameters?.energyModifierNuclear ?? 1;
     const energyTechLevel = this.techLevel(TechnologyType.ENERGY_TECHNOLOGY);
 
-    const availableEnergy = (
-      (solarProduction * energyModifierRES)
-      + (nuclearProduction * energyModifierNuclear)
-      + fusionProduction
-    ) * (1 + ((energyTechLevel * 2) / 100));
+    const availableEnergy =
+      (solarProduction * energyModifierRES +
+        nuclearProduction * energyModifierNuclear +
+        fusionProduction) *
+      (1 + (energyTechLevel * 2) / 100);
 
     let usedEnergy = 0;
     for (const [buildingType, level] of levels.entries()) {
@@ -746,15 +807,16 @@ export class BuildingsViewComponent implements OnInit {
 
       const maxConsumption = Math.max(0, level * (blueprint.powerConsumption ?? 0));
       const selectedConsumption = currentPowerByType.get(buildingType);
-      const normalizedConsumption = selectedConsumption === undefined
-        ? maxConsumption
-        : Math.min(maxConsumption, Math.max(0, selectedConsumption));
+      const normalizedConsumption =
+        selectedConsumption === undefined
+          ? maxConsumption
+          : Math.min(maxConsumption, Math.max(0, selectedConsumption));
       usedEnergy += normalizedConsumption;
     }
 
     return {
       used: this.roundNumber(usedEnergy, 2),
-      available: this.roundNumber(availableEnergy, 2)
+      available: this.roundNumber(availableEnergy, 2),
     };
   }
 
@@ -764,18 +826,23 @@ export class BuildingsViewComponent implements OnInit {
     const roboticsFactoryLevel = this.buildingLevel(BuildingType.ROBOTICS_FACTORY);
     const naniteFactoryLevel = this.buildingLevel(BuildingType.NANITE_FACTORY);
 
-    const roboticsPower = roboticsFactoryLevel <= 0
-      ? 5
-      : this.getProductionAtLevelByType(BuildingType.ROBOTICS_FACTORY, roboticsFactoryLevel);
-    const naniteMultiplier = naniteFactoryLevel <= 0
-      ? 1
-      : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+    const roboticsPower =
+      roboticsFactoryLevel <= 0
+        ? 5
+        : this.getProductionAtLevelByType(BuildingType.ROBOTICS_FACTORY, roboticsFactoryLevel);
+    const naniteMultiplier =
+      naniteFactoryLevel <= 0
+        ? 1
+        : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
-    const industryPower = roboticsPower
-      * naniteMultiplier
-      * industryModifier
-      * industryPowerMultiplier(adaptiveTechnologyLevel);
-    return !Number.isFinite(industryPower) || industryPower <= 0 ? 0 : Math.floor(industryPower * this.currentEnergyEfficiency());
+    const industryPower =
+      roboticsPower *
+      naniteMultiplier *
+      industryModifier *
+      industryPowerMultiplier(adaptiveTechnologyLevel);
+    return !Number.isFinite(industryPower) || industryPower <= 0
+      ? 0
+      : Math.floor(industryPower * this.currentEnergyEfficiency());
   }
 
   private currentDroneIndustryPower(): number {
@@ -811,13 +878,13 @@ export class BuildingsViewComponent implements OnInit {
   private currentFusionReactorOperation(): FusionReactorOperation {
     return this.resolveFusionReactorOperationForCurrentState(
       this.buildingLevelsByType,
-      this.buildingCurrentPowerByType
+      this.buildingCurrentPowerByType,
     );
   }
 
   private resolveFusionReactorOperationForCurrentState(
     levels: Map<BuildingType, number>,
-    currentPowerByType: Map<BuildingType, number>
+    currentPowerByType: Map<BuildingType, number>,
   ): FusionReactorOperation {
     const fusionLevel = levels.get(BuildingType.FUSION_REACTOR) ?? 0;
 
@@ -834,36 +901,43 @@ export class BuildingsViewComponent implements OnInit {
 
       const maxConsumption = Math.max(0, level * (blueprint.powerConsumption ?? 0));
       const selectedConsumption = currentPowerByType.get(buildingType);
-      const normalizedConsumption = selectedConsumption === undefined
-        ? maxConsumption
-        : Math.min(maxConsumption, Math.max(0, selectedConsumption));
+      const normalizedConsumption =
+        selectedConsumption === undefined
+          ? maxConsumption
+          : Math.min(maxConsumption, Math.max(0, selectedConsumption));
       otherEnergyUsed += normalizedConsumption;
     }
 
     return resolveFusionReactorOperation({
       selectedStage: this.currentFusionReactorSelectedStage(),
       maxStage: fusionLevel,
-      structuralUtilization: this.structuralUtilizationAtLevel(BuildingType.FUSION_REACTOR, fusionLevel),
+      structuralUtilization: this.structuralUtilizationAtLevel(
+        BuildingType.FUSION_REACTOR,
+        fusionLevel,
+      ),
       energyTechnologyLevel: this.techLevel(TechnologyType.ENERGY_TECHNOLOGY),
       adaptiveTechnologyLevel: this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
       solarProduction: this.getProductionAtLevelByType(
         BuildingType.SOLAR_WIND_GEOTHERMAL,
-        levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0
+        levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0,
       ),
       nuclearProduction: this.getProductionAtLevelByType(
         BuildingType.NUCLEAR_PLANT,
-        levels.get(BuildingType.NUCLEAR_PLANT) ?? 0
+        levels.get(BuildingType.NUCLEAR_PLANT) ?? 0,
       ),
       otherEnergyUsed,
       energyModifierRES: this.selectedPlanet()?.info.planetaryParameters.energyModifierRES ?? 1,
-      energyModifierNuclear: this.selectedPlanet()?.info.planetaryParameters.energyModifierNuclear ?? 1,
+      energyModifierNuclear:
+        this.selectedPlanet()?.info.planetaryParameters.energyModifierNuclear ?? 1,
       deuteriumSynthesizerProduction: this.getProductionAtLevelByType(
         BuildingType.DEUTERIUM_SYNTHESIZER,
-        levels.get(BuildingType.DEUTERIUM_SYNTHESIZER) ?? 0
+        levels.get(BuildingType.DEUTERIUM_SYNTHESIZER) ?? 0,
       ),
       deuteriumModifier: this.selectedPlanet()?.info.planetaryParameters.deuteriumModifier ?? 1,
-      fusionPowerAtStage: (stage) => this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
-      fusionDeuteriumAtStage: (stage) => this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2')
+      fusionPowerAtStage: (stage) =>
+        this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
+      fusionDeuteriumAtStage: (stage) =>
+        this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2'),
     });
   }
 
@@ -873,36 +947,42 @@ export class BuildingsViewComponent implements OnInit {
     const shipyardLevel = this.buildingLevel(BuildingType.SHIPYARD);
     const naniteFactoryLevel = this.buildingLevel(BuildingType.NANITE_FACTORY);
 
-    const shipyardBasePower = shipyardLevel <= 0
-      ? 0
-      : this.getProductionAtLevelByType(BuildingType.SHIPYARD, shipyardLevel);
-    const naniteMultiplier = naniteFactoryLevel <= 0
-      ? 1
-      : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+    const shipyardBasePower =
+      shipyardLevel <= 0
+        ? 0
+        : this.getProductionAtLevelByType(BuildingType.SHIPYARD, shipyardLevel);
+    const naniteMultiplier =
+      naniteFactoryLevel <= 0
+        ? 1
+        : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
-    const shipyardPower = shipyardBasePower
-      * naniteMultiplier
-      * industryModifier
-      * industryPowerMultiplier(adaptiveTechnologyLevel);
-    return !Number.isFinite(shipyardPower) || shipyardPower <= 0 ? 0 : Math.floor(shipyardPower * this.currentEnergyEfficiency());
+    const shipyardPower =
+      shipyardBasePower *
+      naniteMultiplier *
+      industryModifier *
+      industryPowerMultiplier(adaptiveTechnologyLevel);
+    return !Number.isFinite(shipyardPower) || shipyardPower <= 0
+      ? 0
+      : Math.floor(shipyardPower * this.currentEnergyEfficiency());
   }
 
   private currentDroneProductionRouting(): ReturnType<typeof routeRepairDroneProduction> {
     const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const industryModifier = this.selectedPlanet()?.info.planetaryParameters.industryModifier ?? 1;
-    const repairDroneCount = ManyShips.countByType(this.selectedPlanet()?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
+    const repairDroneCount =
+      ManyShips.countByType(this.selectedPlanet()?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
 
     return routeRepairDroneProduction(
       calculateRepairDroneProductionBasePower({
         repairDroneCount,
         industryModifier,
         adaptiveIndustryMultiplier: industryPowerMultiplier(adaptiveTechnologyLevel),
-        energyEfficiency: this.currentEnergyEfficiency()
+        energyEfficiency: this.currentEnergyEfficiency(),
       }),
       {
         hasBuildingQueueWork: (this.selectedPlanet()?.objects.buildingQueue?.length ?? 0) > 0,
-        hasShipyardQueueWork: (this.selectedPlanet()?.objects.shipyardQueue?.length ?? 0) > 0
-      }
+        hasShipyardQueueWork: (this.selectedPlanet()?.objects.shipyardQueue?.length ?? 0) > 0,
+      },
     );
   }
 
@@ -911,49 +991,62 @@ export class BuildingsViewComponent implements OnInit {
     const researchLabLevel = this.buildingLevel(BuildingType.RESEARCH_LAB);
     const computerTechnologyLevel = this.techLevel(TechnologyType.COMPUTER_TECHNOLOGY);
     const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
-    const intergalacticResearchNetworkLevel = this.techLevel(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK);
-    const researchLabProduction = this.getProductionAtLevelByType(BuildingType.RESEARCH_LAB, researchLabLevel);
+    const intergalacticResearchNetworkLevel = this.techLevel(
+      TechnologyType.INTERGALACTIC_RESEARCH_NETWORK,
+    );
+    const researchLabProduction = this.getProductionAtLevelByType(
+      BuildingType.RESEARCH_LAB,
+      researchLabLevel,
+    );
     const totalResearchMultiplier = researchPowerMultiplier(
       computerTechnologyLevel,
       adaptiveTechnologyLevel,
-      intergalacticResearchNetworkLevel
+      intergalacticResearchNetworkLevel,
     );
 
     const researchPower = researchLabProduction * totalResearchMultiplier * scienceModifier;
-    return !Number.isFinite(researchPower) || researchPower <= 0 ? 0 : Math.floor(researchPower * this.currentEnergyEfficiency());
+    return !Number.isFinite(researchPower) || researchPower <= 0
+      ? 0
+      : Math.floor(researchPower * this.currentEnergyEfficiency());
   }
 
   private currentEnergyEfficiency(): number {
-    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+    const energy = this.calculateEnergyState(
+      this.buildingLevelsByType,
+      this.buildingCurrentPowerByType,
+    );
     return energyDeficitEfficiencyMultiplier(energy.available, energy.used);
   }
 
   private energyPenaltyTooltip(availableEnergy: number, usedEnergy: number): string {
-    const penaltyPercent = this.roundNumber(energyDeficitPenaltyPercent(availableEnergy, usedEnergy), 2);
-    return `Current energy penalty: ${penaltyPercent}%.`;
+    const penaltyPercent = this.roundNumber(
+      energyDeficitPenaltyPercent(availableEnergy, usedEnergy),
+      2,
+    );
+    return this.i18n.t('buildings.warnings.energyPenalty', { penaltyPercent });
   }
 
   private buildingRequirementRows(building: Building): BuildingRequirementRowVm[] {
     const targetLevel = this.buildingNextLevel(building);
     const rows: BuildingRequirementRowVm[] = [];
 
-      for (const requirement of building.buildingRequirements) {
-        const requiredLevel = Math.ceil(targetLevel * requirement.level);
-        const currentLevel = this.buildingLevel(requirement.building);
-        rows.push({
-          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
-          isMet: currentLevel >= requiredLevel
-        });
-      }
+    for (const requirement of building.buildingRequirements) {
+      const requiredLevel = Math.ceil(targetLevel * requirement.level);
+      const currentLevel = this.buildingLevel(requirement.building);
+      rows.push({
+        label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+      });
+    }
 
-      for (const requirement of building.techRequirements) {
-        const requiredLevel = Math.ceil(targetLevel * requirement.level);
-        const currentLevel = this.techLevel(requirement.tech);
-        rows.push({
-          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
-          isMet: currentLevel >= requiredLevel
-        });
-      }
+    for (const requirement of building.techRequirements) {
+      const requiredLevel = Math.ceil(targetLevel * requirement.level);
+      const currentLevel = this.techLevel(requirement.tech);
+      rows.push({
+        label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+      });
+    }
 
     return rows;
   }
@@ -962,152 +1055,178 @@ export class BuildingsViewComponent implements OnInit {
     const currentLevel = this.buildingLevel(building.type);
     const maxPower = this.maxBuildingPowerConsumption(building.type);
     const currentPower = this.buildingCurrentPowerByType.get(building.type) ?? maxPower;
-    const fusionOperation = building.type === BuildingType.FUSION_REACTOR
-      ? this.currentFusionReactorOperation()
-      : null;
+    const fusionOperation =
+      building.type === BuildingType.FUSION_REACTOR ? this.currentFusionReactorOperation() : null;
     const summaryRows: PlanetObjectDetailRow[] = [
       {
-        label: 'Category',
-        value: building.isFacility ? 'Facility' : 'Resource building'
+        label: this.i18n.t('buildings.dialog.category'),
+        value: building.isFacility
+          ? this.i18n.t('buildings.dialog.facility')
+          : this.i18n.t('buildings.dialog.resourceBuilding'),
       },
       {
-        label: 'Base armor',
-        value: String(building.armor)
+        label: this.i18n.t('buildings.dialog.baseArmor'),
+        value: String(building.armor),
       },
       {
-        label: 'Damage multiplier',
-        value: `${this.roundNumber(building.damageMultiplier, 2)}x`
-      }
+        label: this.i18n.t('buildings.dialog.damageMultiplier'),
+        value: `${this.roundNumber(building.damageMultiplier, 2)}x`,
+      },
     ];
 
     if (building.production1.length > 0) {
       summaryRows.push({
-        label: contextualBuildingProductionLabel(building.type, currentLevel > 0 ? 'Current' : 'Level 1'),
-        value: String(currentLevel > 0 ? this.currentBuildingDetailProduction(building) : this.detailProductionAtLevel(building, 1))
+        label: contextualBuildingProductionLabel(
+          building.type,
+          currentLevel > 0 ? 'Current' : 'Level 1',
+        ),
+        value: String(
+          currentLevel > 0
+            ? this.currentBuildingDetailProduction(building)
+            : this.detailProductionAtLevel(building, 1),
+        ),
       });
     }
 
     if (fusionOperation) {
       summaryRows.push(
         {
-          label: 'Selected stage',
-          value: String(fusionOperation.selectedStage)
+          label: this.i18n.t('buildings.dialog.selectedStage'),
+          value: String(fusionOperation.selectedStage),
         },
         {
-          label: 'Deuterium upkeep',
-          value: String(fusionOperation.deuteriumUpkeep)
-        }
+          label: this.i18n.t('buildings.dialog.deuteriumUpkeep'),
+          value: String(fusionOperation.deuteriumUpkeep),
+        },
       );
     } else if (building.powerConsumption > 0) {
       summaryRows.push({
-        label: 'Power per level',
-        value: String(building.powerConsumption)
+        label: this.i18n.t('buildings.dialog.powerPerLevel'),
+        value: String(building.powerConsumption),
       });
     } else {
       summaryRows.push({
-        label: 'Power',
-        value: 'No direct power draw',
-        tone: 'muted'
+        label: this.i18n.t('buildings.dialog.power'),
+        value: this.i18n.t('buildings.dialog.noDirectPowerDraw'),
+        tone: 'muted',
       });
     }
 
     const stateRows: PlanetObjectDetailRow[] = [
       {
-        label: 'Current level',
-        value: String(currentLevel)
+        label: this.i18n.t('buildings.dialog.currentLevel'),
+        value: String(currentLevel),
       },
       {
-        label: 'Next level',
-        value: `L${currentLevel + 1}`
-      }
+        label: this.i18n.t('buildings.dialog.nextLevel'),
+        value: `L${currentLevel + 1}`,
+      },
     ];
 
     if (currentLevel <= 0) {
       stateRows.push({
-        label: 'Status',
-        value: 'Not built yet',
-        tone: 'muted'
+        label: this.i18n.t('buildings.dialog.status'),
+        value: this.i18n.t('buildings.dialog.notBuiltYet'),
+        tone: 'muted',
       });
     } else {
       if (building.production1.length > 0) {
         stateRows.push({
           label: contextualBuildingProductionLabel(building.type, 'Current'),
-          value: String(this.currentBuildingDetailProduction(building))
+          value: String(this.currentBuildingDetailProduction(building)),
         });
       }
 
       stateRows.push(
         {
-          label: 'Structural points',
-          value: `${this.currentBuildingStructuralPoints(building.type)} / ${this.maxBuildingStructuralPoints(building.type, currentLevel)}`
+          label: this.i18n.t('buildings.dialog.structuralPoints'),
+          value: `${this.currentBuildingStructuralPoints(building.type)} / ${this.maxBuildingStructuralPoints(building.type, currentLevel)}`,
         },
         {
-          label: 'Structural efficiency',
-          value: `${this.buildingStructuralUtilizationPercent(building.type)}%`
-        }
+          label: this.i18n.t('buildings.dialog.structuralEfficiency'),
+          value: `${this.buildingStructuralUtilizationPercent(building.type)}%`,
+        },
       );
 
       if (fusionOperation) {
         stateRows.push(
           {
-            label: 'Effective stage',
+            label: this.i18n.t('buildings.dialog.effectiveStage'),
             value: String(fusionOperation.effectiveStage),
-            tone: fusionOperation.isClamped ? 'warn' : 'default'
+            tone: fusionOperation.isClamped ? 'warn' : 'default',
           },
           {
-            label: 'Gross deuterium income',
-            value: String(fusionOperation.grossDeuteriumIncome)
+            label: this.i18n.t('buildings.dialog.grossDeuteriumIncome'),
+            value: String(fusionOperation.grossDeuteriumIncome),
           },
           {
-            label: 'Net deuterium income',
-            value: String(fusionOperation.netDeuteriumIncome)
-          }
+            label: this.i18n.t('buildings.dialog.netDeuteriumIncome'),
+            value: String(fusionOperation.netDeuteriumIncome),
+          },
         );
       } else if (maxPower > 0) {
         stateRows.push({
-          label: 'Power usage',
+          label: this.i18n.t('buildings.dialog.powerUsage'),
           value: `${currentPower} / ${maxPower}`,
-          tone: currentPower < maxPower ? 'warn' : 'default'
+          tone: currentPower < maxPower ? 'warn' : 'default',
         });
       }
     }
 
     const sections: PlanetObjectDetailSection[] = [
-      this.createDetailSection('Summary', summaryRows),
-      this.createDetailSection('Current state', stateRows),
-      this.createDetailSection(this.buildingCostHeader(building), this.detailRowsFromCostRows(this.buildingCostRows(building))),
-      this.createDetailSection('Requirements', this.detailRowsFromRequirementRows(this.buildingRequirementRows(building)))
+      this.createDetailSection(this.i18n.t('buildings.dialog.summary'), summaryRows),
+      this.createDetailSection(this.i18n.t('buildings.dialog.currentState'), stateRows),
+      this.createDetailSection(
+        this.buildingCostHeader(building),
+        this.detailRowsFromCostRows(this.buildingCostRows(building)),
+      ),
+      this.createDetailSection(
+        this.i18n.t('buildings.sections.requirements'),
+        this.detailRowsFromRequirementRows(this.buildingRequirementRows(building)),
+      ),
     ];
 
     return {
-      kindLabel: 'Building',
+      kindLabel: this.i18n.t('buildings.dialog.kindLabel'),
       title: building.type,
-      subtitle: `${this.selectedPlanet()?.basicInfo.name ?? 'Buildings View'} | Building`,
+      subtitle: `${this.selectedPlanet()?.basicInfo.name ?? this.i18n.t('buildings.dialog.subtitleView')} | ${this.i18n.t('buildings.dialog.subtitleObject')}`,
       description: building.description,
       previewImagePath: building.imagePath,
       rawImagePath: toRawImagePath(building.imagePath),
-      sections: sections.filter((section) => section.rows.length > 0)
+      sections: sections.filter((section) => section.rows.length > 0),
     };
   }
 
-  private createDetailSection(title: string, rows: PlanetObjectDetailRow[]): PlanetObjectDetailSection {
+  private createDetailSection(
+    title: string,
+    rows: PlanetObjectDetailRow[],
+  ): PlanetObjectDetailSection {
     return {
       title,
-      rows
+      rows,
     };
   }
 
   private buildingCostHeader(building: Building): string {
     return this.buildingLevel(building.type) <= 0
-      ? 'Initial cost'
-      : `Next level cost (L${this.buildingLevel(building.type) + 1})`;
+      ? this.i18n.t('buildings.dialog.initialCost')
+      : this.i18n.t('buildings.dialog.nextLevelCost', {
+          level: this.buildingLevel(building.type) + 1,
+        });
   }
 
   private detailRowsFromCostRows(rows: BuildingCostRowVm[]): PlanetObjectDetailRow[] {
     return rows.map((row) => ({
-      label: row.label === 'M' ? 'Metal' : row.label === 'C' ? 'Crystal' : row.label === 'D' ? 'Deuterium' : row.label,
+      label:
+        row.label === 'M'
+          ? this.i18n.t('buildings.labels.metal')
+          : row.label === 'C'
+            ? this.i18n.t('buildings.labels.crystal')
+            : row.label === 'D'
+              ? this.i18n.t('buildings.labels.deuterium')
+              : row.label,
       value: String(row.amount),
-      tone: row.isEnough ? 'default' : 'bad'
+      tone: row.isEnough ? 'default' : 'bad',
     }));
   }
 
@@ -1115,27 +1234,35 @@ export class BuildingsViewComponent implements OnInit {
     if (rows.length === 0) {
       return [
         {
-          label: 'Requirement',
-          value: 'None',
-          tone: 'muted'
-        }
+          label: this.i18n.t('buildings.requirements.requirement'),
+          value: this.i18n.t('buildings.requirements.none'),
+          tone: 'muted',
+        },
       ];
     }
 
-      return rows.map((row) => {
-        const separatorIndex = row.label.indexOf(':');
-        const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
-        const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
+    return rows.map((row) => {
+      const separatorIndex = row.label.indexOf(':');
+      const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
+      const value =
+        separatorIndex >= 0
+          ? row.label.slice(separatorIndex + 1).trim()
+          : row.isMet
+            ? this.i18n.t('buildings.requirements.met')
+            : this.i18n.t('buildings.requirements.missing');
 
-        return {
-          label: rawLabel,
-          value,
-          tone: row.isMet ? 'good' : 'bad'
-        };
-      });
+      return {
+        label: rawLabel,
+        value,
+        tone: row.isMet ? 'good' : 'bad',
+      };
+    });
   }
 
-  private hasBuildingRequirements(requirements: BuildingRequirement[], levelWeAreUpgradingTo: number): boolean {
+  private hasBuildingRequirements(
+    requirements: BuildingRequirement[],
+    levelWeAreUpgradingTo: number,
+  ): boolean {
     for (const requirement of requirements) {
       const requiredLevel = Math.ceil(levelWeAreUpgradingTo * requirement.level);
       const currentLevel = this.buildingLevel(requirement.building);
@@ -1147,7 +1274,10 @@ export class BuildingsViewComponent implements OnInit {
     return true;
   }
 
-  private hasTechRequirements(requirements: TechRequirement[], levelWeAreUpgradingTo: number): boolean {
+  private hasTechRequirements(
+    requirements: TechRequirement[],
+    levelWeAreUpgradingTo: number,
+  ): boolean {
     for (const requirement of requirements) {
       const requiredLevel = Math.ceil(levelWeAreUpgradingTo * requirement.level);
       const currentLevel = this.techLevel(requirement.tech);
@@ -1170,9 +1300,9 @@ export class BuildingsViewComponent implements OnInit {
     }
 
     return (
-      resources.metal >= cost.metal
-      && resources.crystal >= cost.crystal
-      && resources.deuterium >= cost.deuterium
+      resources.metal >= cost.metal &&
+      resources.crystal >= cost.crystal &&
+      resources.deuterium >= cost.deuterium
     );
   }
 
@@ -1196,11 +1326,13 @@ export class BuildingsViewComponent implements OnInit {
   private resourceGain(
     buildingType: BuildingType,
     adaptiveTechLevel: number,
-    planetaryModifier: number
+    planetaryModifier: number,
   ): number {
-    return this.currentBuildingProduction(buildingType)
-      * (1 + adaptiveTechLevel / 100)
-      * planetaryModifier;
+    return (
+      this.currentBuildingProduction(buildingType) *
+      (1 + adaptiveTechLevel / 100) *
+      planetaryModifier
+    );
   }
 
   private currentBuildingProduction(buildingType: BuildingType): number {
@@ -1234,7 +1366,7 @@ export class BuildingsViewComponent implements OnInit {
     const utilization = this.powerUtilizationAtLevel(
       building.type,
       level,
-      building.powerConsumption ?? 0
+      building.powerConsumption ?? 0,
     );
     return Math.floor(baseProduction * utilization);
   }
@@ -1248,7 +1380,7 @@ export class BuildingsViewComponent implements OnInit {
     const utilization = this.powerUtilizationAtLevel(
       building.type,
       level,
-      building.powerConsumption ?? 0
+      building.powerConsumption ?? 0,
     );
     return baseProduction * utilization;
   }
@@ -1262,7 +1394,7 @@ export class BuildingsViewComponent implements OnInit {
     const utilization = this.powerUtilizationAtLevel(
       building.type,
       level,
-      building.powerConsumption ?? 0
+      building.powerConsumption ?? 0,
     );
     const structuralUtilization = this.structuralUtilizationAtLevel(building.type, level);
     return Math.floor(baseProduction * utilization * structuralUtilization);
@@ -1288,7 +1420,7 @@ export class BuildingsViewComponent implements OnInit {
   private getRawBuildingProductionAtStage(
     buildingType: BuildingType,
     stage: number,
-    key: 'production1' | 'production2'
+    key: 'production1' | 'production2',
   ): number {
     if (stage <= 0) {
       return 0;
@@ -1306,7 +1438,7 @@ export class BuildingsViewComponent implements OnInit {
   private powerUtilizationAtLevel(
     buildingType: BuildingType,
     level: number,
-    powerPerLevel: number
+    powerPerLevel: number,
   ): number {
     if (level <= 0) {
       return 0;
@@ -1322,9 +1454,10 @@ export class BuildingsViewComponent implements OnInit {
     }
 
     const selectedConsumption = this.buildingCurrentPowerByType.get(buildingType);
-    const normalizedConsumption = selectedConsumption === undefined
-      ? maxConsumption
-      : Math.min(maxConsumption, Math.max(0, selectedConsumption));
+    const normalizedConsumption =
+      selectedConsumption === undefined
+        ? maxConsumption
+        : Math.min(maxConsumption, Math.max(0, selectedConsumption));
     return normalizedConsumption / maxConsumption;
   }
 
@@ -1340,7 +1473,9 @@ export class BuildingsViewComponent implements OnInit {
   }
 
   private buildingStructuralUtilizationPercent(buildingType: BuildingType): number {
-    return Math.round(this.structuralUtilizationAtLevel(buildingType, this.buildingLevel(buildingType)) * 100);
+    return Math.round(
+      this.structuralUtilizationAtLevel(buildingType, this.buildingLevel(buildingType)) * 100,
+    );
   }
 
   private structuralUtilizationAtLevel(buildingType: BuildingType, level: number): number {
@@ -1372,7 +1507,10 @@ export class BuildingsViewComponent implements OnInit {
     }
 
     const cost = blueprint.getCostForLevel(level);
-    return Math.max(0, Math.floor((cost.metal * 2) + cost.crystal + Math.floor(cost.deuterium * 0.5)));
+    return Math.max(
+      0,
+      Math.floor(cost.metal * 2 + cost.crystal + Math.floor(cost.deuterium * 0.5)),
+    );
   }
 
   private minimumStructuralUtilization(buildingType: BuildingType): number {
@@ -1380,13 +1518,15 @@ export class BuildingsViewComponent implements OnInit {
       return 0;
     }
 
-    return Math.min(1, 0.02 + (this.buildingLevel(BuildingType.BUNKER_NETWORK) * 0.01));
+    return Math.min(1, 0.02 + this.buildingLevel(BuildingType.BUNKER_NETWORK) * 0.01);
   }
 
   private isZeroFloorBuilding(buildingType: BuildingType): boolean {
-    return buildingType === BuildingType.JUMP_GATE
-      || buildingType === BuildingType.SENSOR_PHALANX
-      || buildingType === BuildingType.BOMB_DEPOT;
+    return (
+      buildingType === BuildingType.JUMP_GATE ||
+      buildingType === BuildingType.SENSOR_PHALANX ||
+      buildingType === BuildingType.BOMB_DEPOT
+    );
   }
 
   private isBuildingNotUsingFullPower(buildingType: BuildingType): boolean {
@@ -1409,7 +1549,7 @@ export class BuildingsViewComponent implements OnInit {
     return new ResourcesPack(
       building.basicCost.metal * multiplier,
       building.basicCost.crystal * multiplier,
-      building.basicCost.deuterium * multiplier
+      building.basicCost.deuterium * multiplier,
     );
   }
 
@@ -1417,14 +1557,17 @@ export class BuildingsViewComponent implements OnInit {
     const defaults = this.createDefaultPowerConsumptionMap(this.buildingLevelsByType);
     for (const [buildingType, maxConsumption] of defaults.entries()) {
       const currentConsumption = this.buildingCurrentPowerByType.get(buildingType);
-      const normalizedConsumption = currentConsumption === undefined
-        ? maxConsumption
-        : Math.min(maxConsumption, Math.max(0, currentConsumption));
+      const normalizedConsumption =
+        currentConsumption === undefined
+          ? maxConsumption
+          : Math.min(maxConsumption, Math.max(0, currentConsumption));
       this.setBuildingCurrentPowerConsumption(buildingType, normalizedConsumption);
     }
   }
 
-  private createDefaultPowerConsumptionMap(levels: Map<BuildingType, number>): Map<BuildingType, number> {
+  private createDefaultPowerConsumptionMap(
+    levels: Map<BuildingType, number>,
+  ): Map<BuildingType, number> {
     const defaults = new Map<BuildingType, number>();
     for (const [buildingType, level] of levels.entries()) {
       const blueprint = this.buildingBlueprintsByType.get(buildingType);
@@ -1449,7 +1592,10 @@ export class BuildingsViewComponent implements OnInit {
     return this.roundNumber(Math.max(0, level * (blueprint.powerConsumption ?? 0)), 2);
   }
 
-  private setBuildingCurrentPowerConsumption(buildingType: BuildingType, powerConsumption: number): void {
+  private setBuildingCurrentPowerConsumption(
+    buildingType: BuildingType,
+    powerConsumption: number,
+  ): void {
     const maxConsumption = this.maxBuildingPowerConsumption(buildingType);
     if (maxConsumption <= 0) {
       this.buildingCurrentPowerByType.delete(buildingType);
@@ -1458,7 +1604,7 @@ export class BuildingsViewComponent implements OnInit {
 
     const normalizedPower = this.roundNumber(
       Math.min(maxConsumption, Math.max(0, powerConsumption)),
-      2
+      2,
     );
     this.buildingCurrentPowerByType.set(buildingType, normalizedPower);
   }
@@ -1492,7 +1638,7 @@ export class BuildingsViewComponent implements OnInit {
 
   private applyUpdatedPlanet(updatedPlanet: ClientPlanetDto): void {
     this.ownedPlanets = this.ownedPlanets.map((entry) =>
-      this.planetId(entry) === this.planetId(updatedPlanet) ? updatedPlanet : entry
+      this.planetId(entry) === this.planetId(updatedPlanet) ? updatedPlanet : entry,
     );
     this.selectedPlanetId = this.planetId(updatedPlanet);
     this.rebuildSelectedPlanetState();
@@ -1503,5 +1649,4 @@ export class BuildingsViewComponent implements OnInit {
     const multiplier = 10 ** precision;
     return Math.round(value * multiplier) / multiplier;
   }
-
 }

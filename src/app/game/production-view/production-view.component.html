@@ -5,19 +5,19 @@
 <section class="production-view">
   @if (isLoading) {
     <section class="status status--info">
-      <h3>Loading Production</h3>
-      <p>Owned planets and shipyard data are being prepared.</p>
+      <h3>{{ 'production.loading.title' | t }}</h3>
+      <p>{{ 'production.loading.body' | t }}</p>
     </section>
   } @else if (loadError) {
     <section class="status status--error">
-      <h3>Production unavailable</h3>
+      <h3>{{ 'production.status.unavailable' | t }}</h3>
       <p>{{ loadError }}</p>
     </section>
   } @else if (selectedPlanet(); as planet) {
     <div class="game-dashboard__layout">
       <div class="game-dashboard__resources" data-tutorial-id="production-summary-bar">
         <app-resources
-          [titlePrefix]="'Production | '"
+          [titlePrefix]="'production.summary.titlePrefix' | t"
           [titleLink]="selectedPlanetTitleLink()"
           [titleSuffix]="' (' + selectedPlanetCoordinatesLabel() + ')'"
           [metal]="metalDisplay"
@@ -31,7 +31,10 @@
 
       <div class="game-dashboard__main">
         @if (!forcedMode) {
-          <section class="overview-card game-dashboard__categories-card" data-tutorial-id="production-mode-toggle">
+          <section
+            class="overview-card game-dashboard__categories-card"
+            data-tutorial-id="production-mode-toggle"
+          >
             <div class="game-dashboard__toggle-row">
               @for (mode of modeOptions; track mode.value) {
                 <button
@@ -51,9 +54,11 @@
           <section class="overview-card" data-tutorial-id="production-shipyard-queue">
             <div class="game-dashboard__section-head">
               <div>
-                <h3>Current Shipyard Queue</h3>
+                <h3>{{ 'production.queue.title' | t }}</h3>
                 <p class="overview-muted">
-                  {{ selectedPlanetLabel() }} | {{ currentShipQueueLength() }}/{{ maxShipQueueLength() }}
+                  {{ selectedPlanetLabel() }} | {{ currentShipQueueLength() }}/{{
+                    maxShipQueueLength()
+                  }}
                 </p>
                 @if (bombDepotStorageSummary(); as bombDepotSummary) {
                   <p class="overview-muted">{{ bombDepotSummary }}</p>
@@ -66,15 +71,15 @@
                 <table class="overview-table">
                   <thead>
                     <tr>
-                      <th>Drag</th>
-                      <th>#</th>
-                      <th>Type</th>
-                      <th>Name</th>
-                      <th>Amount completed</th>
-                      <th>Status</th>
-                      <th>Invested / unit base</th>
-                      <th>ETA (turns)</th>
-                      <th>Action</th>
+                      <th>{{ 'production.table.drag' | t }}</th>
+                      <th>{{ 'production.table.position' | t }}</th>
+                      <th>{{ 'production.table.type' | t }}</th>
+                      <th>{{ 'production.table.name' | t }}</th>
+                      <th>{{ 'production.table.amountCompleted' | t }}</th>
+                      <th>{{ 'production.table.status' | t }}</th>
+                      <th>{{ 'production.table.investedUnitBase' | t }}</th>
+                      <th>{{ 'production.table.eta' | t }}</th>
+                      <th>{{ 'production.table.action' | t }}</th>
                     </tr>
                   </thead>
                   <tbody
@@ -85,7 +90,10 @@
                     cdkDropListLockAxis="y"
                     (cdkDropListDropped)="onShipyardQueueDrop($event)"
                   >
-                    @for (queueRow of shipyardQueueRows(); track trackShipyardQueueRow($index, queueRow)) {
+                    @for (
+                      queueRow of shipyardQueueRows();
+                      track trackShipyardQueueRow($index, queueRow)
+                    ) {
                       <tr cdkDrag>
                         <td class="queue-management__drag-cell">
                           <button
@@ -93,17 +101,29 @@
                             class="queue-management__drag-handle"
                             cdkDragHandle
                             [disabled]="isShipyardQueueInteractionDisabled()"
-                            [attr.aria-label]="'Drag ' + shipyardQueueItemLabel(queueRow)"
+                            [attr.aria-label]="
+                              'production.queue.dragAria'
+                                | t: { name: shipyardQueueItemLabel(queueRow) }
+                            "
                           >
-                            Drag
+                            {{ 'production.queue.dragLabel' | t }}
                           </button>
                         </td>
                         <td>{{ queueRow.position }}</td>
                         <td>{{ shipyardQueueItemTypeLabel(queueRow) }}</td>
                         <td>{{ shipyardQueueItemLabel(queueRow) }}</td>
                         <td>{{ queueRow.amountCompleted }}/{{ queueRow.amountTotal }}</td>
-                        <td>{{ queueRow.isHeadOfQueue ? 'Under construction' : 'Queued' }}</td>
-                        <td>{{ queueRow.currentUnitInvestedShipyardPower }} / {{ queueRow.currentUnitBaseConstructionTime }}</td>
+                        <td>
+                          {{
+                            queueRow.isHeadOfQueue
+                              ? ('production.queue.statusUnderConstruction' | t)
+                              : ('production.queue.statusQueued' | t)
+                          }}
+                        </td>
+                        <td>
+                          {{ queueRow.currentUnitInvestedShipyardPower }} /
+                          {{ queueRow.currentUnitBaseConstructionTime }}
+                        </td>
                         <td>{{ queueRow.estimatedTurnsForCompletion ?? '--' }}</td>
                         <td>
                           <button
@@ -113,7 +133,7 @@
                             [appTooltip]="shipyardQueueCancelTitle(queueRow)"
                             (click)="onCancelShipyardQueue(queueRow)"
                           >
-                            Cancel
+                            {{ 'production.queue.cancel' | t }}
                           </button>
                         </td>
                       </tr>
@@ -126,8 +146,8 @@
               }
             } @else {
               <article class="planet-queue-card">
-                <h4 class="planet-view__section-title">No shipyard items queued</h4>
-                <p class="overview-empty">This planet does not have any shipyard or defence production queued right now.</p>
+                <h4 class="planet-view__section-title">{{ 'production.queue.emptyTitle' | t }}</h4>
+                <p class="overview-empty">{{ 'production.queue.emptyBody' | t }}</p>
                 <p class="overview-muted">{{ selectedPlanetDefenceSummary() }}</p>
               </article>
             }
@@ -137,11 +157,19 @@
         <section class="overview-card" data-tutorial-id="production-list">
           <div class="game-dashboard__section-head">
             <div>
-              <h3>{{ currentMode() === 's' ? 'Shipyard' : 'Defences' }}</h3>
+              <h3>
+                {{
+                  currentMode() === 's'
+                    ? ('production.list.shipyardTitle' | t)
+                    : ('production.list.defencesTitle' | t)
+                }}
+              </h3>
               <p class="overview-muted">
-                {{ currentMode() === 's'
-                  ? 'Compact ship-production rows with amount input, costs, and unmet requirements only.'
-                  : 'Compact defence-production rows with amount input, costs, and unmet requirements only.' }}
+                {{
+                  currentMode() === 's'
+                    ? ('production.list.shipyardSubtitle' | t)
+                    : ('production.list.defencesSubtitle' | t)
+                }}
               </p>
             </div>
           </div>
@@ -157,35 +185,43 @@
                   <button
                     type="button"
                     class="production-view__image-button"
-                    [attr.aria-label]="'Open details for ' + ship.type"
+                    [attr.aria-label]="'production.list.openDetails' | t: { name: ship.type }"
                     (click)="openShipDetails(ship)"
                   >
                     <img
                       class="production-view__ship-image"
                       [class.production-view__ship-image--empty]="shipHasZeroOwnedCount(ship)"
                       [src]="ship.imagePath"
-                      [alt]="ship.type + ' image'"
+                      [alt]="'production.list.imageAlt' | t: { name: ship.type }"
                     />
                   </button>
 
                   <div class="production-view__ship-main">
                     <h4 class="production-view__ship-title">{{ ship.type }}</h4>
                     <p class="production-view__ship-meta">
-                      Current amount: <strong class="production-view__ship-meta-value">{{ currentShipAmount(ship.type) }}</strong>
+                      {{ 'production.list.currentAmount' | t }}
+                      <strong class="production-view__ship-meta-value">{{
+                        currentShipAmount(ship.type)
+                      }}</strong>
                     </p>
                     <div class="production-view__purpose-tags">
                       @for (purpose of shipPurposeTags(ship); track purpose) {
                         <span class="production-view__purpose-tag">{{ purpose }}</span>
                       }
                       @if (!ship.canJump) {
-                        <span class="production-view__purpose-tag production-view__purpose-tag--warning">No hyperspace drive.</span>
+                        <span
+                          class="production-view__purpose-tag production-view__purpose-tag--warning"
+                          >{{ 'production.list.noHyperspaceDrive' | t }}</span
+                        >
                       }
                     </div>
                   </div>
 
                   <div class="production-view__ship-costs">
                     <div class="production-view__cost-group">
-                      <p class="production-view__cost-title">Single</p>
+                      <p class="production-view__cost-title">
+                        {{ 'production.list.singleCost' | t }}
+                      </p>
                       <div class="production-view__cost-row">
                         @for (cost of shipSingleCostRows(ship); track 'single-' + cost.label) {
                           <span
@@ -202,16 +238,24 @@
                     </div>
 
                     <div class="production-view__cost-group">
-                      <p class="production-view__cost-title">Total</p>
+                      <p class="production-view__cost-title">
+                        {{ 'production.list.totalCost' | t }}
+                      </p>
                       <div class="production-view__cost-row">
                         @for (cost of shipTotalCostRows(ship); track 'total-' + cost.label) {
                           <span
                             class="game-dashboard__cost-chip"
-                            [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough && !cost.isPlaceholder"
+                            [class.game-dashboard__cost-chip--insufficient]="
+                              !cost.isEnough && !cost.isPlaceholder
+                            "
                             [class.game-dashboard__cost-chip--placeholder]="cost.isPlaceholder"
                           >
                             <span class="sr-only">{{ cost.label }}</span>
-                            <img class="game-dashboard__cost-chip-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                            <img
+                              class="game-dashboard__cost-chip-icon"
+                              [src]="resourceCostIconPath(cost.label)"
+                              [alt]="cost.label"
+                            />
                             {{ cost.amount === null ? '--' : cost.amount }}
                           </span>
                         }
@@ -221,11 +265,14 @@
 
                   <div class="production-view__ship-req">
                     @if (unmetRequirementsLabel(ship); as unmetLabel) {
-                      <span class="game-dashboard__req-warning" [appTooltip]="unmetRequirementsTooltip(ship) ?? ''">
+                      <span
+                        class="game-dashboard__req-warning"
+                        [appTooltip]="unmetRequirementsTooltip(ship) ?? ''"
+                      >
                         {{ unmetLabel }}
                       </span>
                     } @else {
-                      <span class="game-dashboard__req-ok">Ready</span>
+                      <span class="game-dashboard__req-ok">{{ 'production.list.ready' | t }}</span>
                     }
                   </div>
 
@@ -239,7 +286,7 @@
                         step="1"
                         [ngModel]="shipAmountInput(ship.type)"
                         (ngModelChange)="onShipAmountInput(ship.type, $event)"
-                        placeholder="amount"
+                        [placeholder]="'production.list.amountPlaceholder' | t"
                       />
                     </label>
                     <button
@@ -263,50 +310,80 @@
               @for (defence of defenceBlueprints; track defence.type) {
                 <article
                   class="production-view__ship-row"
-                  [class.production-view__ship-row--unavailable]="defenceHasUnmetRequirements(defence)"
+                  [class.production-view__ship-row--unavailable]="
+                    defenceHasUnmetRequirements(defence)
+                  "
                 >
                   <button
                     type="button"
                     class="production-view__image-button"
-                    [attr.aria-label]="'Open details for ' + defence.type"
+                    [attr.aria-label]="'production.list.openDetails' | t: { name: defence.type }"
                     (click)="openDefenceDetails(defence)"
                   >
                     <img
                       class="production-view__ship-image"
                       [class.production-view__ship-image--empty]="defenceHasZeroOwnedCount(defence)"
                       [src]="defence.imagePath"
-                      [alt]="defence.type + ' image'"
+                      [alt]="'production.list.imageAlt' | t: { name: defence.type }"
                     />
                   </button>
 
                   <div class="production-view__ship-main">
                     <h4 class="production-view__ship-title">{{ defence.type }}</h4>
                     <p class="production-view__ship-meta">
-                      Current amount: <strong class="production-view__ship-meta-value">{{ currentDefenceAmount(defence.type) }}</strong>
+                      {{ 'production.list.currentAmount' | t }}
+                      <strong class="production-view__ship-meta-value">{{
+                        currentDefenceAmount(defence.type)
+                      }}</strong>
                     </p>
                     @if (defence.hullClass === HullClass.PLANETARY_BOMB) {
-                      <p class="production-view__ship-meta">Stored in Bomb Depot. Not active in combat yet.</p>
-                      <p class="production-view__ship-meta">{{ currentPlanetaryBombStorageUsed() }}/{{ bombDepotCapacity() }} stored</p>
+                      <p class="production-view__ship-meta">
+                        {{ 'production.list.storedInBombDepot' | t }}
+                      </p>
+                      <p class="production-view__ship-meta">
+                        {{
+                          'production.list.stored'
+                            | t
+                              : {
+                                  used: currentPlanetaryBombStorageUsed(),
+                                  capacity: bombDepotCapacity(),
+                                }
+                        }}
+                      </p>
                     } @else {
                       <p class="production-view__ship-meta">
-                        {{ defence.canShootToOrbit ? 'Can engage orbit targets' : 'Atmosphere guard only' }}
+                        {{
+                          defence.canShootToOrbit
+                            ? ('production.list.canEngageOrbitTargets' | t)
+                            : ('production.list.atmosphereGuardOnly' | t)
+                        }}
                       </p>
                     }
                     <div class="production-view__purpose-tags">
                       @if (defence.canShootToOrbit) {
-                        <span class="production-view__purpose-tag production-view__purpose-tag--good">Can shoot to orbit.</span>
+                        <span
+                          class="production-view__purpose-tag production-view__purpose-tag--good"
+                          >{{ 'production.list.canShootToOrbit' | t }}</span
+                        >
                       } @else {
-                        <span class="production-view__purpose-tag production-view__purpose-tag--muted">Atmosphere guard only.</span>
+                        <span
+                          class="production-view__purpose-tag production-view__purpose-tag--muted"
+                          >{{ 'production.list.atmosphereOnly' | t }}</span
+                        >
                       }
                     </div>
-
                   </div>
 
                   <div class="production-view__ship-costs">
                     <div class="production-view__cost-group">
-                      <p class="production-view__cost-title">Single</p>
+                      <p class="production-view__cost-title">
+                        {{ 'production.list.singleCost' | t }}
+                      </p>
                       <div class="production-view__cost-row">
-                        @for (cost of defenceSingleCostRows(defence); track 'single-' + cost.label) {
+                        @for (
+                          cost of defenceSingleCostRows(defence);
+                          track 'single-' + cost.label
+                        ) {
                           <span
                             class="game-dashboard__cost-chip"
                             [class.game-dashboard__cost-chip--metal]="cost.label === 'M'"
@@ -321,16 +398,24 @@
                     </div>
 
                     <div class="production-view__cost-group">
-                      <p class="production-view__cost-title">Total</p>
+                      <p class="production-view__cost-title">
+                        {{ 'production.list.totalCost' | t }}
+                      </p>
                       <div class="production-view__cost-row">
                         @for (cost of defenceTotalCostRows(defence); track 'total-' + cost.label) {
                           <span
                             class="game-dashboard__cost-chip"
-                            [class.game-dashboard__cost-chip--insufficient]="!cost.isEnough && !cost.isPlaceholder"
+                            [class.game-dashboard__cost-chip--insufficient]="
+                              !cost.isEnough && !cost.isPlaceholder
+                            "
                             [class.game-dashboard__cost-chip--placeholder]="cost.isPlaceholder"
                           >
                             <span class="sr-only">{{ cost.label }}</span>
-                            <img class="game-dashboard__cost-chip-icon" [src]="resourceCostIconPath(cost.label)" [alt]="cost.label" />
+                            <img
+                              class="game-dashboard__cost-chip-icon"
+                              [src]="resourceCostIconPath(cost.label)"
+                              [alt]="cost.label"
+                            />
                             {{ cost.amount === null ? '--' : cost.amount }}
                           </span>
                         }
@@ -340,11 +425,14 @@
 
                   <div class="production-view__ship-req">
                     @if (unmetDefenceRequirementsLabel(defence); as unmetLabel) {
-                      <span class="game-dashboard__req-warning" [appTooltip]="unmetDefenceRequirementsTooltip(defence) ?? ''">
+                      <span
+                        class="game-dashboard__req-warning"
+                        [appTooltip]="unmetDefenceRequirementsTooltip(defence) ?? ''"
+                      >
                         {{ unmetLabel }}
                       </span>
                     } @else {
-                      <span class="game-dashboard__req-ok">Ready</span>
+                      <span class="game-dashboard__req-ok">{{ 'production.list.ready' | t }}</span>
                     }
                   </div>
 
@@ -358,7 +446,7 @@
                         step="1"
                         [ngModel]="defenceAmountInput(defence.type)"
                         (ngModelChange)="onDefenceAmountInput(defence.type, $event)"
-                        placeholder="amount"
+                        [placeholder]="'production.list.amountPlaceholder' | t"
                       />
                     </label>
                     <button
@@ -387,8 +475,8 @@
       <aside class="overview-card game-dashboard__rail" data-tutorial-id="production-planet-rail">
         <div class="game-dashboard__section-head">
           <div>
-            <h3>Owned Planets</h3>
-            <p class="overview-muted">Select the active production planet.</p>
+            <h3>{{ 'production.sidebar.title' | t }}</h3>
+            <p class="overview-muted">{{ 'production.sidebar.subtitle' | t }}</p>
           </div>
         </div>
 
@@ -405,7 +493,11 @@
                   [class.game-dashboard__planet-radio--selected]="isSelectedPlanet(ownedPlanet)"
                 ></span>
                 <span class="game-dashboard__planet-select-label">
-                  {{ isSelectedPlanet(ownedPlanet) ? 'Selected' : 'Select' }}
+                  {{
+                    isSelectedPlanet(ownedPlanet)
+                      ? ('production.sidebar.selected' | t)
+                      : ('production.sidebar.select' | t)
+                  }}
                 </span>
               </div>
 
@@ -421,8 +513,8 @@
     </div>
   } @else {
     <section class="overview-card">
-      <h3>No owned planets</h3>
-      <p class="overview-muted">Production View requires at least one owned planet.</p>
+      <h3>{{ 'production.status.noOwnedPlanets' | t }}</h3>
+      <p class="overview-muted">{{ 'production.status.noOwnedPlanetsBody' | t }}</p>
     </section>
   }
 </section>
