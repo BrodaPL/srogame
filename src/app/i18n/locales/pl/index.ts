@@ -1,5 +1,6 @@
 import { authPl } from './auth.pl';
 import { apiPl } from './api.pl';
+import { blueprintsPl } from './blueprints.pl';
 import { buildingsPl } from './buildings.pl';
 import { commonPl } from './common.pl';
 import { communicationsPl } from './communications.pl';
@@ -20,6 +21,7 @@ import { topMenuPl } from './top-menu.pl';
 export const plTranslations = {
   auth: authPl,
   api: apiPl,
+  blueprints: blueprintsPl,
   buildings: buildingsPl,
   common: commonPl,
   communications: communicationsPl,

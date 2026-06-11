@@ -285,7 +285,9 @@
               <p class="planet-building-card__section-title">
                 {{ 'researches.sections.description' | t }}
               </p>
-              <p class="research-tech-card__description-text">{{ technology.description }}</p>
+              <p class="research-tech-card__description-text">
+                {{ technologyDescription(technology) }}
+              </p>
             </div>
           </article>
         }

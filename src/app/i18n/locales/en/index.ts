@@ -1,5 +1,6 @@
 import { authEn } from './auth.en';
 import { apiEn } from './api.en';
+import { blueprintsEn } from './blueprints.en';
 import { buildingsEn } from './buildings.en';
 import { commonEn } from './common.en';
 import { communicationsEn } from './communications.en';
@@ -20,6 +21,7 @@ import { topMenuEn } from './top-menu.en';
 export const enTranslations = {
   auth: authEn,
   api: apiEn,
+  blueprints: blueprintsEn,
   buildings: buildingsEn,
   common: commonEn,
   communications: communicationsEn,

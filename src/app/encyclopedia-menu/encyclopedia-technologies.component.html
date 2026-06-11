@@ -8,7 +8,9 @@
 
     <div class="encyclopedia-toolbar">
       <p class="encyclopedia-meta">{{ itemCountLabel(technologies.length) }}</p>
-      <a class="link button" routerLink="/encyclopedia">{{ 'encyclopedia.shared.actions.backToEncyclopedia' | t }}</a>
+      <a class="link button" routerLink="/encyclopedia">{{
+        'encyclopedia.shared.actions.backToEncyclopedia' | t
+      }}</a>
     </div>
 
     <div class="encyclopedia-grid">
@@ -17,17 +19,21 @@
           type="button"
           class="ship-media ship-media-button"
           [appTooltip]="largeImageTooltip(tech.type)"
-          (click)="openImageDialog(tech)">
+          (click)="openImageDialog(tech)"
+        >
           <img
             class="building-image"
             [src]="tech.imagePath"
-            [alt]="'encyclopedia.shared.dialog.imageAlt' | t:{ title: tech.type }"
+            [alt]="'encyclopedia.shared.dialog.imageAlt' | t: { title: tech.type }"
             [attr.loading]="isFirst ? 'eager' : 'lazy'"
           />
         </button>
         <header class="ship-card__header">
           <div>
             <h2 class="ship-card__title">{{ tech.type }}</h2>
+            <p class="ship-card__subtitle ship-card__subtitle--wide">
+              {{ technologyDescription(tech) }}
+            </p>
           </div>
         </header>
 
@@ -40,22 +46,30 @@
 
         <div class="ship-section">
           <p class="ship-section__title">{{ 'encyclopedia.shared.sections.requirements' | t }}</p>
-          <p class="ship-card__subtitle ship-card__subtitle--wide">{{ 'encyclopedia.shared.sections.buildings' | t }}</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">
+            {{ 'encyclopedia.shared.sections.buildings' | t }}
+          </p>
           <ul class="weapon-list" *ngIf="tech.buildingRequirements.length > 0; else noBuildingReq">
             <li class="weapon-item" *ngFor="let requirement of tech.buildingRequirements">
               <span class="weapon-chip">{{ requirement.building }}</span>
-              <span class="weapon-meta">{{ 'encyclopedia.shared.labels.level' | t:{ level: requirement.level } }}</span>
+              <span class="weapon-meta">{{
+                'encyclopedia.shared.labels.level' | t: { level: requirement.level }
+              }}</span>
             </li>
           </ul>
           <ng-template #noBuildingReq>
             <p class="ship-empty">{{ 'encyclopedia.shared.empty.noBuildingRequirements' | t }}</p>
           </ng-template>
 
-          <p class="ship-card__subtitle ship-card__subtitle--wide">{{ 'encyclopedia.shared.sections.technologies' | t }}</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">
+            {{ 'encyclopedia.shared.sections.technologies' | t }}
+          </p>
           <ul class="weapon-list" *ngIf="tech.techRequirements.length > 0; else noTechReq">
             <li class="weapon-item" *ngFor="let requirement of tech.techRequirements">
               <span class="weapon-chip">{{ requirement.tech }}</span>
-              <span class="weapon-meta">{{ 'encyclopedia.shared.labels.level' | t:{ level: requirement.level } }}</span>
+              <span class="weapon-meta">{{
+                'encyclopedia.shared.labels.level' | t: { level: requirement.level }
+              }}</span>
             </li>
           </ul>
           <ng-template #noTechReq>
@@ -67,15 +81,27 @@
           <p class="ship-section__title">{{ 'encyclopedia.shared.sections.cost' | t }}</p>
           <div class="cost-row">
             <span class="cost-chip">
-              <img class="cost-icon" src="images/icons/normal/metal.png" [alt]="'encyclopedia.shared.resources.metal' | t" />
+              <img
+                class="cost-icon"
+                src="images/icons/normal/metal.png"
+                [alt]="'encyclopedia.shared.resources.metal' | t"
+              />
               {{ tech.basicCost.metal }}
             </span>
             <span class="cost-chip cost-chip--crystal">
-              <img class="cost-icon" src="images/icons/normal/crystal.png" [alt]="'encyclopedia.shared.resources.crystal' | t" />
+              <img
+                class="cost-icon"
+                src="images/icons/normal/crystal.png"
+                [alt]="'encyclopedia.shared.resources.crystal' | t"
+              />
               {{ tech.basicCost.crystal }}
             </span>
             <span class="cost-chip cost-chip--deuterium">
-              <img class="cost-icon" src="images/icons/normal/deuter.png" [alt]="'encyclopedia.shared.resources.deuterium' | t" />
+              <img
+                class="cost-icon"
+                src="images/icons/normal/deuter.png"
+                [alt]="'encyclopedia.shared.resources.deuterium' | t"
+              />
               {{ tech.basicCost.deuterium }}
             </span>
           </div>
@@ -84,7 +110,9 @@
     </div>
 
     <div class="encyclopedia-toolbar">
-      <a class="link button" routerLink="/encyclopedia">{{ 'encyclopedia.shared.actions.backToEncyclopedia' | t }}</a>
+      <a class="link button" routerLink="/encyclopedia">{{
+        'encyclopedia.shared.actions.backToEncyclopedia' | t
+      }}</a>
     </div>
   </section>
 </main>

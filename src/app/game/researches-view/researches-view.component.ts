@@ -4,6 +4,7 @@ import { finalize, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { resolveBlueprintText } from '../../i18n/blueprint-text.utils';
 import { I18nPipe } from '../../i18n/i18n.pipe';
 import { I18nService } from '../../i18n/i18n.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
@@ -177,6 +178,10 @@ export class ResearchesViewComponent implements OnInit {
 
   protected technologyTargetLevel(technologyType: TechnologyType): number {
     return this.currentTechnologyLevel(technologyType) + 1;
+  }
+
+  protected technologyDescription(technology: Technology): string {
+    return resolveBlueprintText(this.i18n, technology.description);
   }
 
   protected technologyResearchTimeForTargetLevel(technology: Technology): number {
@@ -1647,7 +1652,7 @@ export class ResearchesViewComponent implements OnInit {
       subtitle: firstLab
         ? `${firstLab.planet.basicInfo.name} | ${this.i18n.t('researches.details.subtitleView')}`
         : `${this.i18n.t('researches.details.subtitleView')} | ${this.i18n.t('researches.details.subtitleObject')}`,
-      description: technology.description,
+      description: this.technologyDescription(technology),
       previewImagePath: technology.imagePath,
       rawImagePath: toRawImagePath(technology.imagePath),
       sections,

@@ -3,230 +3,414 @@
     {
       "type": "ENERGY_TECHNOLOGY",
       "imagePath": "images/technologies/normal/ENERGY_TECHNOLOGY.jpg",
-      "description": "Give +2% bonus to energy generation.",
-      "basicCost": { "metal": 10, "crystal": 10, "deuterium": 20 },
+      "description": "blueprints.technologies.descriptions.ENERGY_TECHNOLOGY",
+      "basicCost": {
+        "metal": 10,
+        "crystal": 10,
+        "deuterium": 20
+      },
       "energyRequired": [0],
       "researchTime": [1.5],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": []
     },
     {
       "type": "MATERIAL_TECHNOLOGY",
       "imagePath": "images/technologies/normal/MATERIAL_TECHNOLOGY.jpg",
-      "description": "Incrase every defense value by 5%. Increase REPAIR EQIPMENT efficiency by 5%.",
-      "basicCost": { "metal": 30, "crystal": 20, "deuterium": 10 },
+      "description": "blueprints.technologies.descriptions.MATERIAL_TECHNOLOGY",
+      "basicCost": {
+        "metal": 30,
+        "crystal": 20,
+        "deuterium": 10
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": []
     },
     {
       "type": "HYPERSPACE_TECHNOLOGY",
       "imagePath": "images/technologies/normal/HYPERSPACE_TECHNOLOGY.jpg",
-      "description": "Gives +2% bonus to Sensor Phlanx range, increases Jump Gate and Interstellar Trade Port capacity by 5%, and reduces total fleet travel fuel cost by 2% per level.",
-      "basicCost": { "metal": 0, "crystal": 20, "deuterium": 30 },
+      "description": "blueprints.technologies.descriptions.HYPERSPACE_TECHNOLOGY",
+      "basicCost": {
+        "metal": 0,
+        "crystal": 20,
+        "deuterium": 30
+      },
       "energyRequired": [0],
       "researchTime": [1.5],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": [
-        { "tech": "ENERGY_TECHNOLOGY", "level": 0.5 },
-        { "tech": "COMPUTER_TECHNOLOGY", "level": 0.5 }
+        {
+          "tech": "ENERGY_TECHNOLOGY",
+          "level": 0.5
+        },
+        {
+          "tech": "COMPUTER_TECHNOLOGY",
+          "level": 0.5
+        }
       ]
     },
     {
       "type": "ESPIONAGE_TECHNOLOGY",
       "imagePath": "images/technologies/normal/ESPIONAGE_TECHNOLOGY.jpg",
-      "description": "Gives more information from spy missions. Gives +2% bonus to Sensor Phlanx range for detecting incoming fleets.",
-      "basicCost": { "metal": 10, "crystal": 10, "deuterium": 10 },
+      "description": "blueprints.technologies.descriptions.ESPIONAGE_TECHNOLOGY",
+      "basicCost": {
+        "metal": 10,
+        "crystal": 10,
+        "deuterium": 10
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": [
-        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 0.5 }
+        {
+          "tech": "ASTROPHYSICS_TECHNOLOGY",
+          "level": 0.5
+        }
       ]
     },
     {
       "type": "COMPUTER_TECHNOLOGY",
       "imagePath": "images/technologies/normal/COMPUTER_TECHNOLOGY.jpg",
-      "description": "Every level give +2 to maximum fleet amount, also gives +5% to research power.",
-      "basicCost": { "metal": 0, "crystal": 20, "deuterium": 0 },
+      "description": "blueprints.technologies.descriptions.COMPUTER_TECHNOLOGY",
+      "basicCost": {
+        "metal": 0,
+        "crystal": 20,
+        "deuterium": 0
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 0.5 }
+        {
+          "tech": "MATERIAL_TECHNOLOGY",
+          "level": 0.5
+        }
       ]
     },
     {
       "type": "ASTROPHYSICS_TECHNOLOGY",
       "imagePath": "images/technologies/normal/ASTROPHYSICS_TECHNOLOGY.jpg",
-      "description": "Give +5% to expeditions income, and decreases bad expedition outcomes by 2%, also increases Sensor Phlanx range by 1%.",
-      "basicCost": { "metal": 10, "crystal": 10, "deuterium": 10 },
+      "description": "blueprints.technologies.descriptions.ASTROPHYSICS_TECHNOLOGY",
+      "basicCost": {
+        "metal": 10,
+        "crystal": 10,
+        "deuterium": 10
+      },
       "energyRequired": [0],
       "researchTime": [2.5],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": []
     },
     {
       "type": "ADAPTIVE_TECHNOLOGY",
       "imagePath": "images/technologies/normal/ADAPTIVE_TECHNOLOGY.jpg",
-      "description": "Make possible to colonise more types of planets and increases the owned planet cap at defined levels: 1=>2, 3=>3, 5=>4, 7=>5, 9=>6, 12=>7, 15=>8, 18=>9. Increases all resources income, research and industry by +1%.",
-      "basicCost": { "metal": 50, "crystal": 30, "deuterium": 10 },
+      "description": "blueprints.technologies.descriptions.ADAPTIVE_TECHNOLOGY",
+      "basicCost": {
+        "metal": 50,
+        "crystal": 30,
+        "deuterium": 10
+      },
       "energyRequired": [0],
       "researchTime": [2.5],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.5 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.5
+        }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 0.75 },
-        { "tech": "SHIELDING_TECHNOLOGY", "level": 0.75 },
-        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 0.75 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 0.75 }
+        {
+          "tech": "MATERIAL_TECHNOLOGY",
+          "level": 0.75
+        },
+        {
+          "tech": "SHIELDING_TECHNOLOGY",
+          "level": 0.75
+        },
+        {
+          "tech": "ASTROPHYSICS_TECHNOLOGY",
+          "level": 0.75
+        },
+        {
+          "tech": "ENERGY_TECHNOLOGY",
+          "level": 0.75
+        }
       ]
     },
     {
       "type": "INTERGALACTIC_RESEARCH_NETWORK",
       "imagePath": "images/technologies/normal/INTERGALACTIC_RESEARCH_NETWORK.jpg",
-      "description": "Makes possible for different Research Labs to work on one technology. And gives +2% for total research power.",
-      "basicCost": { "metal": 10, "crystal": 120, "deuterium": 50 },
+      "description": "blueprints.technologies.descriptions.INTERGALACTIC_RESEARCH_NETWORK",
+      "basicCost": {
+        "metal": 10,
+        "crystal": 120,
+        "deuterium": 50
+      },
       "energyRequired": [0],
       "researchTime": [1],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 1 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 1
+        }
       ],
       "techRequirements": [
-        { "tech": "HYPERSPACE_TECHNOLOGY", "level": 1.5 },
-        { "tech": "COMPUTER_TECHNOLOGY", "level": 1 }
+        {
+          "tech": "HYPERSPACE_TECHNOLOGY",
+          "level": 1.5
+        },
+        {
+          "tech": "COMPUTER_TECHNOLOGY",
+          "level": 1
+        }
       ]
     },
     {
       "type": "GRAVITON_TECHNOLOGY",
       "imagePath": "images/technologies/normal/GRAVITON_TECHNOLOGY.jpg",
-      "description": "Gives 5% ship bonus evasion bonus. Increases jump range by 1. Increses Jump Gate and Interstellar Trade Port capacity by 25%. Increase Sensor Phlanx base range by 0.5",
-      "basicCost": { "metal": 0, "crystal": 4000, "deuterium": 40000 },
+      "description": "blueprints.technologies.descriptions.GRAVITON_TECHNOLOGY",
+      "basicCost": {
+        "metal": 0,
+        "crystal": 4000,
+        "deuterium": 40000
+      },
       "energyRequired": [0],
       "researchTime": [0.1],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 2 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 2
+        }
       ],
       "techRequirements": [
-        { "tech": "ENERGY_TECHNOLOGY", "level": 3 }
+        {
+          "tech": "ENERGY_TECHNOLOGY",
+          "level": 3
+        }
       ]
     },
     {
       "type": "SHIELDING_TECHNOLOGY",
       "imagePath": "images/technologies/normal/SHIELDING_TECHNOLOGY.jpg",
-      "description": "Give +10% to every shield durability.",
-      "basicCost": { "metal": 0, "crystal": 10, "deuterium": 20 },
+      "description": "blueprints.technologies.descriptions.SHIELDING_TECHNOLOGY",
+      "basicCost": {
+        "metal": 0,
+        "crystal": 10,
+        "deuterium": 20
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.5 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.5
+        }
       ],
       "techRequirements": [
-        { "tech": "ENERGY_TECHNOLOGY", "level": 0.5 }
+        {
+          "tech": "ENERGY_TECHNOLOGY",
+          "level": 0.5
+        }
       ]
     },
     {
       "type": "ARMOUR_TECHNOLOGY",
       "imagePath": "images/technologies/normal/ARMOUR_TECHNOLOGY.jpg",
-      "description": "Give +10% to every hull durability, and decreases ship destruction chance by 1%.",
-      "basicCost": { "metal": 30, "crystal": 5, "deuterium": 0 },
+      "description": "blueprints.technologies.descriptions.ARMOUR_TECHNOLOGY",
+      "basicCost": {
+        "metal": 30,
+        "crystal": 5,
+        "deuterium": 0
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 0.5 }
+        {
+          "tech": "MATERIAL_TECHNOLOGY",
+          "level": 0.5
+        }
       ]
     },
     {
       "type": "RAILGUNS_WEAPONS",
       "imagePath": "images/technologies/normal/RAILGUNS_WEAPONS.jpg",
-      "description": "Give +10% to every RAILGUNS weapon damage.",
-      "basicCost": { "metal": 15, "crystal": 5, "deuterium":5 },
+      "description": "blueprints.technologies.descriptions.RAILGUNS_WEAPONS",
+      "basicCost": {
+        "metal": 15,
+        "crystal": 5,
+        "deuterium": 5
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 0.5 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 0.5 }
+        {
+          "tech": "MATERIAL_TECHNOLOGY",
+          "level": 0.5
+        },
+        {
+          "tech": "ENERGY_TECHNOLOGY",
+          "level": 0.5
+        }
       ]
     },
     {
       "type": "BEAMS_WEAPONS",
       "imagePath": "images/technologies/normal/BEAMS_WEAPONS.jpg",
-      "description": "Give +10% to every BEAM weapon damage.",
-      "basicCost": { "metal": 5, "crystal": 15, "deuterium": 5 },
+      "description": "blueprints.technologies.descriptions.BEAMS_WEAPONS",
+      "basicCost": {
+        "metal": 5,
+        "crystal": 15,
+        "deuterium": 5
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": [
-        { "tech": "ENERGY_TECHNOLOGY", "level": 0.5 }
+        {
+          "tech": "ENERGY_TECHNOLOGY",
+          "level": 0.5
+        }
       ]
     },
     {
       "type": "MISSILES_WEAPONS",
       "imagePath": "images/technologies/normal/MISSILES_WEAPONS.jpg",
-      "description": "Give +10% to every MISSILE weapon damage.",
-      "basicCost": { "metal": 10, "crystal": 5, "deuterium": 10 },
+      "description": "blueprints.technologies.descriptions.MISSILES_WEAPONS",
+      "basicCost": {
+        "metal": 10,
+        "crystal": 5,
+        "deuterium": 10
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 1 },
-        { "tech": "FUSION_DRIVE", "level": 0.5 }
+        {
+          "tech": "MATERIAL_TECHNOLOGY",
+          "level": 1
+        },
+        {
+          "tech": "FUSION_DRIVE",
+          "level": 0.5
+        }
       ]
     },
     {
       "type": "FUSION_DRIVE",
       "imagePath": "images/technologies/normal/FUSION_DRIVE.jpg",
-      "description": "Increases in star system ship speed by 1, increases evasion chance by 3%, and reduces total fleet travel fuel cost by 1% per level.",
-      "basicCost": { "metal": 40, "crystal": 30, "deuterium": 20 },
+      "description": "blueprints.technologies.descriptions.FUSION_DRIVE",
+      "basicCost": {
+        "metal": 40,
+        "crystal": 30,
+        "deuterium": 20
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 0.25 }
+        {
+          "building": "RESEARCH_LAB",
+          "level": 0.25
+        }
       ],
       "techRequirements": [
-        { "tech": "MATERIAL_TECHNOLOGY", "level": 0.75 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 0.75 }
+        {
+          "tech": "MATERIAL_TECHNOLOGY",
+          "level": 0.75
+        },
+        {
+          "tech": "ENERGY_TECHNOLOGY",
+          "level": 0.75
+        }
       ]
     },
     {
       "type": "HYPERSPACE_DRIVE",
       "imagePath": "images/technologies/normal/HYPERSPACE_DRIVE.jpg",
-      "description": "Increases jump range by 1 and reduces total fleet travel fuel cost by 1% per level.",
-      "basicCost": { "metal": 30, "crystal": 60, "deuterium": 90 },
+      "description": "blueprints.technologies.descriptions.HYPERSPACE_DRIVE",
+      "basicCost": {
+        "metal": 30,
+        "crystal": 60,
+        "deuterium": 90
+      },
       "energyRequired": [0],
       "researchTime": [2],
       "buildingRequirements": [
-        { "building": "RESEARCH_LAB", "level": 1.0}
+        {
+          "building": "RESEARCH_LAB",
+          "level": 1.0
+        }
       ],
       "techRequirements": [
-        { "tech": "HYPERSPACE_TECHNOLOGY", "level": 1.0 },
-        { "tech": "ASTROPHYSICS_TECHNOLOGY", "level": 0.75 },
-        { "tech": "COMPUTER_TECHNOLOGY", "level": 0.75 },
-        { "tech": "ENERGY_TECHNOLOGY", "level": 0.75 }
+        {
+          "tech": "HYPERSPACE_TECHNOLOGY",
+          "level": 1.0
+        },
+        {
+          "tech": "ASTROPHYSICS_TECHNOLOGY",
+          "level": 0.75
+        },
+        {
+          "tech": "COMPUTER_TECHNOLOGY",
+          "level": 0.75
+        },
+        {
+          "tech": "ENERGY_TECHNOLOGY",
+          "level": 0.75
+        }
       ]
     }
   ]

@@ -8,7 +8,9 @@
 
     <div class="encyclopedia-toolbar">
       <p class="encyclopedia-meta">{{ itemCountLabel(buildings.length) }}</p>
-      <a class="link button" routerLink="/encyclopedia">{{ 'encyclopedia.shared.actions.backToEncyclopedia' | t }}</a>
+      <a class="link button" routerLink="/encyclopedia">{{
+        'encyclopedia.shared.actions.backToEncyclopedia' | t
+      }}</a>
     </div>
 
     <div class="encyclopedia-grid">
@@ -17,18 +19,21 @@
           type="button"
           class="ship-media ship-media-button"
           [appTooltip]="largeImageTooltip(building.type)"
-          (click)="openImageDialog(building)">
+          (click)="openImageDialog(building)"
+        >
           <img
             class="building-image"
             [src]="building.imagePath"
-            [alt]="'encyclopedia.shared.dialog.imageAlt' | t:{ title: building.type }"
+            [alt]="'encyclopedia.shared.dialog.imageAlt' | t: { title: building.type }"
             [attr.loading]="isFirst ? 'eager' : 'lazy'"
           />
         </button>
         <header class="ship-card__header">
           <div>
             <h2 class="ship-card__title">{{ building.type }}</h2>
-            <p class="ship-card__subtitle ship-card__subtitle--wide">{{ building.description }}</p>
+            <p class="ship-card__subtitle ship-card__subtitle--wide">
+              {{ buildingDescription(building) }}
+            </p>
           </div>
         </header>
 
@@ -46,29 +51,42 @@
             <span class="ship-stat__value">{{ building.armor }}</span>
           </div>
           <div class="ship-stat">
-            <span class="ship-stat__label">{{ 'encyclopedia.shared.stats.damageMultiplier' | t }}</span>
+            <span class="ship-stat__label">{{
+              'encyclopedia.shared.stats.damageMultiplier' | t
+            }}</span>
             <span class="ship-stat__value">{{ building.damageMultiplier }}</span>
           </div>
         </div>
 
         <div class="ship-section">
           <p class="ship-section__title">{{ 'encyclopedia.shared.sections.requirements' | t }}</p>
-          <p class="ship-card__subtitle ship-card__subtitle--wide">{{ 'encyclopedia.shared.sections.buildings' | t }}</p>
-          <ul class="weapon-list" *ngIf="building.buildingRequirements.length > 0; else noBuildingReq">
+          <p class="ship-card__subtitle ship-card__subtitle--wide">
+            {{ 'encyclopedia.shared.sections.buildings' | t }}
+          </p>
+          <ul
+            class="weapon-list"
+            *ngIf="building.buildingRequirements.length > 0; else noBuildingReq"
+          >
             <li class="weapon-item" *ngFor="let requirement of building.buildingRequirements">
               <span class="weapon-chip">{{ requirement.building }}</span>
-              <span class="weapon-meta">{{ 'encyclopedia.shared.labels.level' | t:{ level: requirement.level } }}</span>
+              <span class="weapon-meta">{{
+                'encyclopedia.shared.labels.level' | t: { level: requirement.level }
+              }}</span>
             </li>
           </ul>
           <ng-template #noBuildingReq>
             <p class="ship-empty">{{ 'encyclopedia.shared.empty.noBuildingRequirements' | t }}</p>
           </ng-template>
 
-          <p class="ship-card__subtitle ship-card__subtitle--wide">{{ 'encyclopedia.shared.sections.technologies' | t }}</p>
+          <p class="ship-card__subtitle ship-card__subtitle--wide">
+            {{ 'encyclopedia.shared.sections.technologies' | t }}
+          </p>
           <ul class="weapon-list" *ngIf="building.techRequirements.length > 0; else noTechReq">
             <li class="weapon-item" *ngFor="let requirement of building.techRequirements">
               <span class="weapon-chip">{{ requirement.tech }}</span>
-              <span class="weapon-meta">{{ 'encyclopedia.shared.labels.level' | t:{ level: requirement.level } }}</span>
+              <span class="weapon-meta">{{
+                'encyclopedia.shared.labels.level' | t: { level: requirement.level }
+              }}</span>
             </li>
           </ul>
           <ng-template #noTechReq>
@@ -80,15 +98,27 @@
           <p class="ship-section__title">{{ 'encyclopedia.shared.sections.cost' | t }}</p>
           <div class="cost-row">
             <span class="cost-chip">
-              <img class="cost-icon" src="images/icons/normal/metal.png" [alt]="'encyclopedia.shared.resources.metal' | t" />
+              <img
+                class="cost-icon"
+                src="images/icons/normal/metal.png"
+                [alt]="'encyclopedia.shared.resources.metal' | t"
+              />
               {{ building.basicCost.metal }}
             </span>
             <span class="cost-chip cost-chip--crystal">
-              <img class="cost-icon" src="images/icons/normal/crystal.png" [alt]="'encyclopedia.shared.resources.crystal' | t" />
+              <img
+                class="cost-icon"
+                src="images/icons/normal/crystal.png"
+                [alt]="'encyclopedia.shared.resources.crystal' | t"
+              />
               {{ building.basicCost.crystal }}
             </span>
             <span class="cost-chip cost-chip--deuterium">
-              <img class="cost-icon" src="images/icons/normal/deuter.png" [alt]="'encyclopedia.shared.resources.deuterium' | t" />
+              <img
+                class="cost-icon"
+                src="images/icons/normal/deuter.png"
+                [alt]="'encyclopedia.shared.resources.deuterium' | t"
+              />
               {{ building.basicCost.deuterium }}
             </span>
           </div>
@@ -97,7 +127,7 @@
         <div class="ship-section" *ngIf="building.production1.length > 0; else noProduction">
           <p class="ship-section__title">{{ buildingProductionLabel(building) }}</p>
           <p class="ship-card__subtitle ship-card__subtitle--wide">
-            {{ 'encyclopedia.shared.labels.baseValue' | t:{ value: building.production1[0] } }}
+            {{ 'encyclopedia.shared.labels.baseValue' | t: { value: building.production1[0] } }}
           </p>
           <p class="ship-card__subtitle ship-card__subtitle--wide">
             {{ 'encyclopedia.buildings.structureNote' | t }}
@@ -106,14 +136,18 @@
         <ng-template #noProduction>
           <div class="ship-section">
             <p class="ship-section__title">{{ 'encyclopedia.shared.sections.output' | t }}</p>
-            <p class="ship-card__subtitle ship-card__subtitle--wide">{{ 'encyclopedia.shared.empty.noOutputValue' | t }}</p>
+            <p class="ship-card__subtitle ship-card__subtitle--wide">
+              {{ 'encyclopedia.shared.empty.noOutputValue' | t }}
+            </p>
           </div>
         </ng-template>
       </article>
     </div>
 
     <div class="encyclopedia-toolbar">
-      <a class="link button" routerLink="/encyclopedia">{{ 'encyclopedia.shared.actions.backToEncyclopedia' | t }}</a>
+      <a class="link button" routerLink="/encyclopedia">{{
+        'encyclopedia.shared.actions.backToEncyclopedia' | t
+      }}</a>
     </div>
   </section>
 </main>

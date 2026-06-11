@@ -5,6 +5,7 @@ import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
+import { resolveBlueprintText } from '../../i18n/blueprint-text.utils';
 import { I18nPipe } from '../../i18n/i18n.pipe';
 import { I18nService } from '../../i18n/i18n.service';
 import { Building } from '../../models/buildings/building';
@@ -238,6 +239,10 @@ export class BuildingsViewComponent implements OnInit {
 
   protected buildingProductionLabel(building: Building): string {
     return buildingProductionLabel(building.type);
+  }
+
+  protected buildingDescription(building: Building): string {
+    return resolveBlueprintText(this.i18n, building.description);
   }
 
   protected openBuildingDetails(building: Building): void {
@@ -1190,7 +1195,7 @@ export class BuildingsViewComponent implements OnInit {
       kindLabel: this.i18n.t('buildings.dialog.kindLabel'),
       title: building.type,
       subtitle: `${this.selectedPlanet()?.basicInfo.name ?? this.i18n.t('buildings.dialog.subtitleView')} | ${this.i18n.t('buildings.dialog.subtitleObject')}`,
-      description: building.description,
+      description: this.buildingDescription(building),
       previewImagePath: building.imagePath,
       rawImagePath: toRawImagePath(building.imagePath),
       sections: sections.filter((section) => section.rows.length > 0),

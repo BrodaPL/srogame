@@ -6,6 +6,7 @@ import { catchError, finalize, forkJoin, of, timeout } from 'rxjs';
 import { GameApiService } from '../../core/game-api.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { resolveApiErrorMessage, resolveApiMessage } from '../../i18n/api-message.utils';
+import { resolveBlueprintText } from '../../i18n/blueprint-text.utils';
 import { I18nPipe } from '../../i18n/i18n.pipe';
 import { I18nService } from '../../i18n/i18n.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
@@ -13,7 +14,10 @@ import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.fac
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
 import { Building } from '../../models/buildings/building';
-import { buildingProductionLabel, contextualBuildingProductionLabel } from '../../models/buildings/building-production-label';
+import {
+  buildingProductionLabel,
+  contextualBuildingProductionLabel,
+} from '../../models/buildings/building-production-label';
 import { BuildingRequirement } from '../../models/buildings/building-requirement';
 import { BuildingType } from '../../models/enums/building-type';
 import { DefenceType } from '../../models/enums/defence-type';
@@ -42,20 +46,32 @@ import type {
   FleetMaintenanceBombOptionDto,
   FleetMaintenanceOptionsDto,
   FleetMaintenanceShipOptionDto,
-  MaintenanceTransferPayloadDto
+  MaintenanceTransferPayloadDto,
 } from '../../models/game-api-types';
-import { energyDeficitEfficiencyMultiplier, energyDeficitPenaltyPercent } from '../../models/planets/energy-deficit';
-import { resolveFusionReactorOperation, type FusionReactorOperation } from '../../models/planets/fusion-reactor-operation';
+import {
+  energyDeficitEfficiencyMultiplier,
+  energyDeficitPenaltyPercent,
+} from '../../models/planets/energy-deficit';
+import {
+  resolveFusionReactorOperation,
+  type FusionReactorOperation,
+} from '../../models/planets/fusion-reactor-operation';
 import { PlanetImageHelper } from '../../models/planets/planet-image-helper';
 import { planetImageVariantToStyle } from '../../models/planets/planet-image-variant';
 import { ResourcesPack } from '../../models/resources-pack';
 import { TechRequirement } from '../../models/tech/tech-requirement';
-import { industryPowerMultiplier, researchPowerMultiplier } from '../../models/tech/technology-effects';
+import {
+  industryPowerMultiplier,
+  researchPowerMultiplier,
+} from '../../models/tech/technology-effects';
 import { Fleet, FleetState } from '../../models/fleets/fleet';
 import type { FleetOperationHistoryEntry } from '../../models/fleets/fleet-operation-history';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { ManyDefences } from '../../models/defences/many-defences';
-import { isPlanetaryBombDefenceType, totalPlanetaryBombSize } from '../../models/defences/planetary-bomb';
+import {
+  isPlanetaryBombDefenceType,
+  totalPlanetaryBombSize,
+} from '../../models/defences/planetary-bomb';
 import { Defence } from '../../models/defences/defence';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { Ship } from '../../models/fleets/ship';
@@ -66,21 +82,21 @@ import {
   PlanetPowersDisplay,
   ResourceDisplay,
   ResourceHeaderIndicator,
-  ResourcesComponent
+  ResourcesComponent,
 } from '../ui/resources/resources.component';
 import { TutorialService } from '../../tutorial/tutorial.service';
 import { tradeResourceLabel } from '../../models/trade/trade-resource-type';
 import type { TradeResourceType } from '../../models/trade/trade-resource-type';
 import {
   calculateRepairDroneProductionBasePower,
-  routeRepairDroneProduction
+  routeRepairDroneProduction,
 } from '../../models/turns/repair-drone-production';
 import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
 import { PlanetObjectDialogComponent } from './planet-object-dialog.component';
 import type {
   PlanetObjectDetailDialogData,
   PlanetObjectDetailRow,
-  PlanetObjectDetailSection
+  PlanetObjectDetailSection,
 } from './planet-object-dialog.component';
 import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import { FleetOperationCardComponent } from '../ui/fleet-operation-card/fleet-operation-card.component';
@@ -161,10 +177,10 @@ type ResearchQueueRowVm = {
     PlanetObjectDialogComponent,
     TooltipDirective,
     FleetOperationCardComponent,
-    I18nPipe
+    I18nPipe,
   ],
   templateUrl: './planet-view.component.html',
-  styleUrl: './planet-view.component.css'
+  styleUrl: './planet-view.component.css',
 })
 export class PlanetViewComponent implements OnInit, OnDestroy {
   protected readonly HullClass = HullClass;
@@ -185,7 +201,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected planetOperationsActionMessage: string | null = null;
   protected planetOperationsActionError: string | null = null;
   protected planetOperationsActionFleetId: number | null = null;
-  protected planetOperationOwnerInfoByCoordinates = new Map<string, { ownerId: number | null; ownerName: string | null }>();
+  protected planetOperationOwnerInfoByCoordinates = new Map<
+    string,
+    { ownerId: number | null; ownerName: string | null }
+  >();
   protected planetMaintenanceDialogFleetId: number | null = null;
   protected planetMaintenanceOptions: FleetMaintenanceOptionsDto | null = null;
   protected planetMaintenanceDialogError: string | null = null;
@@ -216,7 +235,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     [ShipPurpose.CARGO, true],
     [ShipPurpose.UTILITY, true],
     [ShipPurpose.CARRIER, true],
-    [ShipPurpose.RECYCLING, true]
+    [ShipPurpose.RECYCLING, true],
   ]);
   protected showRegularDefences = true;
   protected showPlanetaryBombDefences = true;
@@ -260,7 +279,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
     private readonly tutorialService: TutorialService,
-    private readonly i18n: I18nService
+    private readonly i18n: I18nService,
   ) {
     const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
     const allBuildings = Array.from(buildingBlueprints.buildingsMap.values());
@@ -280,7 +299,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.technologiesByType = new Map(technologies.techByType);
     this.unregisterTutorialStepPreparer = this.tutorialService.registerStepPreparer(
       'planetView',
-      (step) => this.prepareTutorialStep(step.targetId)
+      (step) => this.prepareTutorialStep(step.targetId),
     );
   }
 
@@ -303,7 +322,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
       this.applyActiveTab(tab);
       this.coordinatesLabel = `${x}:${y}:${z}`;
-      if (this.planet && this.planet.coordinates.x === x && this.planet.coordinates.y === y && this.planet.coordinates.z === z) {
+      if (
+        this.planet &&
+        this.planet.coordinates.x === x &&
+        this.planet.coordinates.y === y &&
+        this.planet.coordinates.z === z
+      ) {
         this.cdr.markForCheck();
         return;
       }
@@ -334,7 +358,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { tab },
-      queryParamsHandling: 'merge'
+      queryParamsHandling: 'merge',
     });
   }
 
@@ -347,17 +371,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected hasPlanetOperations(): boolean {
-    return this.planetOutgoingFleets.length > 0
-      || this.planetReturningFleets.length > 0
-      || this.planetIncomingFleets.length > 0
-      || this.planetResolvedOperations.length > 0;
+    return (
+      this.planetOutgoingFleets.length > 0 ||
+      this.planetReturningFleets.length > 0 ||
+      this.planetIncomingFleets.length > 0 ||
+      this.planetResolvedOperations.length > 0
+    );
   }
 
   protected isPlanetOperationActionPending(fleet: Fleet): boolean {
     return this.planetOperationsActionFleetId === fleet.fleetId;
   }
 
-  protected planetOperationOwnerInfos(): Map<string, { ownerId: number | null; ownerName: string | null }> {
+  protected planetOperationOwnerInfos(): Map<
+    string,
+    { ownerId: number | null; ownerName: string | null }
+  > {
     return this.planetOperationOwnerInfoByCoordinates;
   }
 
@@ -366,7 +395,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       fleet,
       (token) => this.gameApi.returnFleet(fleet.fleetId, token),
       this.i18n.t('planetView.operations.fleetReturnSent'),
-      this.i18n.t('planetView.errors.returnFleet')
+      this.i18n.t('planetView.errors.returnFleet'),
     );
   }
 
@@ -375,7 +404,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       fleet,
       (token) => this.gameApi.delayFleet(fleet.fleetId, token),
       this.i18n.t('planetView.operations.fleetDelaySent'),
-      this.i18n.t('planetView.errors.delayFleet')
+      this.i18n.t('planetView.errors.delayFleet'),
     );
   }
 
@@ -392,28 +421,49 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected selectedPlanetMaintenanceSupportUsage(): number {
-    return this.planetMaintenanceShipOptions().reduce((sum, option) =>
-      sum + ((this.planetMaintenanceRequestedShipAmounts[option.type] ?? 0) * option.size), 0)
-      + this.planetMaintenanceBombOptions().reduce((sum, option) =>
-        sum + ((this.planetMaintenanceRequestedBombAmounts[option.type] ?? 0) * option.size), 0);
+    return (
+      this.planetMaintenanceShipOptions().reduce(
+        (sum, option) =>
+          sum + (this.planetMaintenanceRequestedShipAmounts[option.type] ?? 0) * option.size,
+        0,
+      ) +
+      this.planetMaintenanceBombOptions().reduce(
+        (sum, option) =>
+          sum + (this.planetMaintenanceRequestedBombAmounts[option.type] ?? 0) * option.size,
+        0,
+      )
+    );
   }
 
   protected hasPlanetMaintenanceSelection(): boolean {
-    return this.planetMaintenanceRequestedFuel > 0
-      || this.planetMaintenanceShipOptions().some((option) => (this.planetMaintenanceRequestedShipAmounts[option.type] ?? 0) > 0)
-      || this.planetMaintenanceBombOptions().some((option) => (this.planetMaintenanceRequestedBombAmounts[option.type] ?? 0) > 0);
+    return (
+      this.planetMaintenanceRequestedFuel > 0 ||
+      this.planetMaintenanceShipOptions().some(
+        (option) => (this.planetMaintenanceRequestedShipAmounts[option.type] ?? 0) > 0,
+      ) ||
+      this.planetMaintenanceBombOptions().some(
+        (option) => (this.planetMaintenanceRequestedBombAmounts[option.type] ?? 0) > 0,
+      )
+    );
   }
 
   protected canSubmitPlanetMaintenanceRequest(): boolean {
-    if (this.planetMaintenanceSubmitting || !this.planetMaintenanceOptions || !this.hasPlanetMaintenanceSelection()) {
+    if (
+      this.planetMaintenanceSubmitting ||
+      !this.planetMaintenanceOptions ||
+      !this.hasPlanetMaintenanceSelection()
+    ) {
       return false;
     }
 
-    if (this.planetMaintenanceRequestedFuel > Math.min(
-      this.planetMaintenanceOptions.fuelCap,
-      this.planetMaintenanceOptions.availableFuel,
-      this.planetMaintenanceOptions.remainingCargoCapacity
-    )) {
+    if (
+      this.planetMaintenanceRequestedFuel >
+      Math.min(
+        this.planetMaintenanceOptions.fuelCap,
+        this.planetMaintenanceOptions.availableFuel,
+        this.planetMaintenanceOptions.remainingCargoCapacity,
+      )
+    ) {
       return false;
     }
 
@@ -447,11 +497,14 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.planetMaintenanceRequestedShipAmounts = {};
     this.planetMaintenanceRequestedBombAmounts = {};
 
-    this.gameApi.getFleetMaintenanceOptions(fleet.fleetId, session.token)
-      .pipe(finalize(() => {
-        this.planetMaintenanceDialogLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .getFleetMaintenanceOptions(fleet.fleetId, session.token)
+      .pipe(
+        finalize(() => {
+          this.planetMaintenanceDialogLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (options) => {
           this.planetMaintenanceOptions = options;
@@ -460,9 +513,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.planetMaintenanceDialogError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('planetView.errors.loadMaintenanceOptions')
+            this.i18n.t('planetView.errors.loadMaintenanceOptions'),
           );
-        }
+        },
       });
   }
 
@@ -495,15 +548,18 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.planetOperationsActionError = null;
     this.planetOperationsActionMessage = null;
 
-    this.gameApi.createMaintenanceRequest(
-      this.planetMaintenanceDialogFleetId,
-      this.buildPlanetMaintenancePayload(),
-      session.token
-    )
-      .pipe(finalize(() => {
-        this.planetMaintenanceSubmitting = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .createMaintenanceRequest(
+        this.planetMaintenanceDialogFleetId,
+        this.buildPlanetMaintenancePayload(),
+        session.token,
+      )
+      .pipe(
+        finalize(() => {
+          this.planetMaintenanceSubmitting = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (response) => {
           this.handlePlanetMaintenanceResponse(response, session.token);
@@ -512,9 +568,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.planetMaintenanceDialogError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('planetView.errors.submitMaintenanceRequest')
+            this.i18n.t('planetView.errors.submitMaintenanceRequest'),
           );
-        }
+        },
       });
   }
 
@@ -558,7 +614,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected buildingStructuralUtilizationPercent(building: Building): number {
-    return Math.round(this.structuralUtilizationAtLevel(building.type, this.buildingLevel(building.type)) * 100);
+    return Math.round(
+      this.structuralUtilizationAtLevel(building.type, this.buildingLevel(building.type)) * 100,
+    );
   }
 
   protected buildingMinimumStructuralUtilizationPercent(building: Building): number {
@@ -574,11 +632,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected isPowerManagementDisabled(building: Building): boolean {
     const level = this.buildingLevel(building.type);
     const powerPerLevel = building.powerConsumption ?? 0;
-    return (
-      level <= 0
-      || powerPerLevel <= 0
-      || this.powerUpdateInFlightByType.has(building.type)
-    );
+    return level <= 0 || powerPerLevel <= 0 || this.powerUpdateInFlightByType.has(building.type);
   }
 
   protected powerManagementError(building: Building): string | null {
@@ -590,7 +644,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected isFusionReactorManagementDisabled(building: Building): boolean {
-    return this.buildingLevel(building.type) <= 0 || this.powerUpdateInFlightByType.has(building.type);
+    return (
+      this.buildingLevel(building.type) <= 0 || this.powerUpdateInFlightByType.has(building.type)
+    );
   }
 
   protected fusionReactorStageOptions(building: Building): number[] {
@@ -630,12 +686,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     return this.i18n.t('planetView.warnings.fusionStageClamped', {
       effectiveStage: operation.effectiveStage,
-      selectedStage: operation.selectedStage
+      selectedStage: operation.selectedStage,
     });
   }
 
   protected onFusionReactorStageChange(building: Building, rawValue: unknown): void {
-    if (building.type !== BuildingType.FUSION_REACTOR || this.isFusionReactorManagementDisabled(building)) {
+    if (
+      building.type !== BuildingType.FUSION_REACTOR ||
+      this.isFusionReactorManagementDisabled(building)
+    ) {
       return;
     }
 
@@ -665,24 +724,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       x: planet.coordinates.x,
       y: planet.coordinates.y,
       z: planet.coordinates.z,
-      selectedStage: normalized
+      selectedStage: normalized,
     };
 
-    this.gameApi.setFusionReactorStage(request, session.token)
+    this.gameApi
+      .setFusionReactorStage(request, session.token)
       .pipe(
         timeout(10000),
         finalize(() => {
           this.powerUpdateInFlightByType.delete(building.type);
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: (response) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
@@ -693,10 +753,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         },
         error: (error: { error?: { error?: string } }) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
@@ -705,10 +765,14 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.updateResourceDisplays();
           this.powerUpdateErrorByType.set(
             building.type,
-            resolveApiErrorMessage(this.i18n, error, this.i18n.t('planetView.errors.updateFusionStage'))
+            resolveApiErrorMessage(
+              this.i18n,
+              error,
+              this.i18n.t('planetView.errors.updateFusionStage'),
+            ),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -759,24 +823,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       y: planet.coordinates.y,
       z: planet.coordinates.z,
       buildingType: building.type,
-      currentPowerConsumption: normalized
+      currentPowerConsumption: normalized,
     };
 
-    this.gameApi.setBuildingPowerConsumption(request, session.token)
+    this.gameApi
+      .setBuildingPowerConsumption(request, session.token)
       .pipe(
         timeout(10000),
         finalize(() => {
           this.powerUpdateInFlightByType.delete(building.type);
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: (response) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
@@ -787,10 +852,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         },
         error: (error: { error?: { error?: string } }) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
@@ -799,10 +864,14 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.updateResourceDisplays();
           this.powerUpdateErrorByType.set(
             building.type,
-            resolveApiErrorMessage(this.i18n, error, this.i18n.t('planetView.errors.updatePowerConsumption'))
+            resolveApiErrorMessage(
+              this.i18n,
+              error,
+              this.i18n.t('planetView.errors.updatePowerConsumption'),
+            ),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -832,7 +901,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return PlanetImageHelper.getPlanetImage(
       this.planet.basicInfo.type,
       this.planet.basicInfo.size,
-      'normal'
+      'normal',
     );
   }
 
@@ -841,7 +910,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return '';
     }
 
-    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type).transform;
+    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type)
+      .transform;
   }
 
   protected planetHeroImageFilter(): string {
@@ -941,24 +1011,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       x: planet.coordinates.x,
       y: planet.coordinates.y,
       z: planet.coordinates.z,
-      buildingType: building.type
+      buildingType: building.type,
     };
 
-    this.gameApi.startBuildingConstruction(request, session.token)
+    this.gameApi
+      .startBuildingConstruction(request, session.token)
       .pipe(
         timeout(10000),
         finalize(() => {
           this.buildingStartInFlightByType.delete(building.type);
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: (updatedPlanet) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
@@ -970,20 +1041,20 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         },
         error: (error: { error?: { error?: string } }) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
 
           this.buildingStartErrorByType.set(
             building.type,
-            resolveApiErrorMessage(this.i18n, error, this.i18n.t('planetView.errors.addBuilding'))
+            resolveApiErrorMessage(this.i18n, error, this.i18n.t('planetView.errors.addBuilding')),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -1008,7 +1079,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected shipPurposeFilterEntries(): Array<{ purpose: ShipPurpose; checked: boolean }> {
-    return Array.from(this.shipPurposeFilters.entries()).map(([purpose, checked]) => ({ purpose, checked }));
+    return Array.from(this.shipPurposeFilters.entries()).map(([purpose, checked]) => ({
+      purpose,
+      checked,
+    }));
   }
 
   protected toggleShipPurposeFilter(purpose: ShipPurpose, enabled: boolean): void {
@@ -1071,9 +1145,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return this.i18n.t('planetView.ships.noUndamagedTooltip');
     }
 
-    return entries
-      .map((entry) => `${entry.type}: ${entry.amount}`)
-      .join('\n');
+    return entries.map((entry) => `${entry.type}: ${entry.amount}`).join('\n');
   }
 
   protected planetDamagedShipsTooltip(): string {
@@ -1088,8 +1160,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           type: entry.type,
           amount: entry.amount,
           missingHull: entry.totalMissingHull,
-          averageDamagePercent: entry.averageDamagePercent
-        })
+          averageDamagePercent: entry.averageDamagePercent,
+        }),
       )
       .join('\n');
   }
@@ -1120,7 +1192,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected bombDepotCapacity(): number {
-    return Math.max(0, Math.floor(this.getProductionAtLevelByType(BuildingType.BOMB_DEPOT, this.buildingLevel(BuildingType.BOMB_DEPOT))));
+    return Math.max(
+      0,
+      Math.floor(
+        this.getProductionAtLevelByType(
+          BuildingType.BOMB_DEPOT,
+          this.buildingLevel(BuildingType.BOMB_DEPOT),
+        ),
+      ),
+    );
   }
 
   protected currentPlanetaryBombStorageUsed(): number {
@@ -1134,7 +1214,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       .reduce((sum, entry) => {
         const defenceType = this.queueEntryDefenceType(entry);
         const blueprint = defenceType ? this.defenceBlueprintsByType.get(defenceType) : null;
-        return sum + ((blueprint?.size ?? 0) * this.queueEntryShipAmount(entry));
+        return sum + (blueprint?.size ?? 0) * this.queueEntryShipAmount(entry);
       }, 0);
   }
 
@@ -1149,7 +1229,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return this.i18n.t('planetView.defences.bombDepotSummary', {
       current,
       capacity,
-      queuedSuffix: queued > 0 ? this.i18n.t('planetView.labels.queuedSuffix', { queued }) : ''
+      queuedSuffix: queued > 0 ? this.i18n.t('planetView.labels.queuedSuffix', { queued }) : '',
     });
   }
 
@@ -1159,8 +1239,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return 100;
     }
 
-    const undamaged = [...ManyDefences.undamagedCountByType(this.planet?.objects.defences).values()]
-      .reduce((sum, amount) => sum + amount, 0);
+    const undamaged = [
+      ...ManyDefences.undamagedCountByType(this.planet?.objects.defences).values(),
+    ].reduce((sum, amount) => sum + amount, 0);
     return Math.round((undamaged / total) * 100);
   }
 
@@ -1170,8 +1251,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return 0;
     }
 
-    const damaged = [...ManyDefences.damagedCountByType(this.planet?.objects.defences).values()]
-      .reduce((sum, amount) => sum + amount, 0);
+    const damaged = [
+      ...ManyDefences.damagedCountByType(this.planet?.objects.defences).values(),
+    ].reduce((sum, amount) => sum + amount, 0);
     return Math.round((damaged / total) * 100);
   }
 
@@ -1181,9 +1263,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return this.i18n.t('planetView.defences.noUndamagedTooltip');
     }
 
-    return entries
-      .map((entry) => `${entry.type}: ${entry.amount}`)
-      .join('\n');
+    return entries.map((entry) => `${entry.type}: ${entry.amount}`).join('\n');
   }
 
   protected planetDamagedDefencesTooltip(): string {
@@ -1198,8 +1278,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           type: entry.type,
           amount: entry.amount,
           missingHull: entry.totalMissingHull,
-          averageDamagePercent: entry.averageDamagePercent
-        })
+          averageDamagePercent: entry.averageDamagePercent,
+        }),
       )
       .join('\n');
   }
@@ -1222,20 +1302,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected onShipAmountInput(shipType: ShipType, rawValue: unknown): void {
-    const normalized = typeof rawValue === 'number'
-      ? String(rawValue)
-      : typeof rawValue === 'string'
-        ? rawValue
-        : '';
+    const normalized =
+      typeof rawValue === 'number'
+        ? String(rawValue)
+        : typeof rawValue === 'string'
+          ? rawValue
+          : '';
     this.shipAmountInputs.set(shipType, normalized);
   }
 
   protected onDefenceAmountInput(defenceType: DefenceType, rawValue: unknown): void {
-    const normalized = typeof rawValue === 'number'
-      ? String(rawValue)
-      : typeof rawValue === 'string'
-        ? rawValue
-        : '';
+    const normalized =
+      typeof rawValue === 'number'
+        ? String(rawValue)
+        : typeof rawValue === 'string'
+          ? rawValue
+          : '';
     this.defenceAmountInputs.set(defenceType, normalized);
   }
 
@@ -1245,18 +1327,18 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       {
         label: 'Metal',
         amount: ship.cost.metal,
-        isEnough: (currentResources?.metal ?? 0) >= ship.cost.metal
+        isEnough: (currentResources?.metal ?? 0) >= ship.cost.metal,
       },
       {
         label: 'Crystal',
         amount: ship.cost.crystal,
-        isEnough: (currentResources?.crystal ?? 0) >= ship.cost.crystal
+        isEnough: (currentResources?.crystal ?? 0) >= ship.cost.crystal,
       },
       {
         label: 'Deuterium',
         amount: ship.cost.deuterium,
-        isEnough: (currentResources?.deuterium ?? 0) >= ship.cost.deuterium
-      }
+        isEnough: (currentResources?.deuterium ?? 0) >= ship.cost.deuterium,
+      },
     ];
   }
 
@@ -1266,7 +1348,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return [
         { label: 'Metal', amount: null, isEnough: true, isPlaceholder: true },
         { label: 'Crystal', amount: null, isEnough: true, isPlaceholder: true },
-        { label: 'Deuterium', amount: null, isEnough: true, isPlaceholder: true }
+        { label: 'Deuterium', amount: null, isEnough: true, isPlaceholder: true },
       ];
     }
 
@@ -1277,20 +1359,20 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         label: 'Metal',
         amount: total.metal,
         isEnough: (currentResources?.metal ?? 0) >= total.metal,
-        isPlaceholder: false
+        isPlaceholder: false,
       },
       {
         label: 'Crystal',
         amount: total.crystal,
         isEnough: (currentResources?.crystal ?? 0) >= total.crystal,
-        isPlaceholder: false
+        isPlaceholder: false,
       },
       {
         label: 'Deuterium',
         amount: total.deuterium,
         isEnough: (currentResources?.deuterium ?? 0) >= total.deuterium,
-        isPlaceholder: false
-      }
+        isPlaceholder: false,
+      },
     ];
   }
 
@@ -1300,18 +1382,18 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       {
         label: 'Metal',
         amount: defence.cost.metal,
-        isEnough: (currentResources?.metal ?? 0) >= defence.cost.metal
+        isEnough: (currentResources?.metal ?? 0) >= defence.cost.metal,
       },
       {
         label: 'Crystal',
         amount: defence.cost.crystal,
-        isEnough: (currentResources?.crystal ?? 0) >= defence.cost.crystal
+        isEnough: (currentResources?.crystal ?? 0) >= defence.cost.crystal,
       },
       {
         label: 'Deuterium',
         amount: defence.cost.deuterium,
-        isEnough: (currentResources?.deuterium ?? 0) >= defence.cost.deuterium
-      }
+        isEnough: (currentResources?.deuterium ?? 0) >= defence.cost.deuterium,
+      },
     ];
   }
 
@@ -1321,16 +1403,31 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return [
         { label: 'Metal', amount: null, isEnough: true, isPlaceholder: true },
         { label: 'Crystal', amount: null, isEnough: true, isPlaceholder: true },
-        { label: 'Deuterium', amount: null, isEnough: true, isPlaceholder: true }
+        { label: 'Deuterium', amount: null, isEnough: true, isPlaceholder: true },
       ];
     }
 
     const total = this.multiplyCost(defence.cost, amount);
     const currentResources = this.planet?.objects.resources;
     return [
-      { label: 'Metal', amount: total.metal, isEnough: (currentResources?.metal ?? 0) >= total.metal, isPlaceholder: false },
-      { label: 'Crystal', amount: total.crystal, isEnough: (currentResources?.crystal ?? 0) >= total.crystal, isPlaceholder: false },
-      { label: 'Deuterium', amount: total.deuterium, isEnough: (currentResources?.deuterium ?? 0) >= total.deuterium, isPlaceholder: false }
+      {
+        label: 'Metal',
+        amount: total.metal,
+        isEnough: (currentResources?.metal ?? 0) >= total.metal,
+        isPlaceholder: false,
+      },
+      {
+        label: 'Crystal',
+        amount: total.crystal,
+        isEnough: (currentResources?.crystal ?? 0) >= total.crystal,
+        isPlaceholder: false,
+      },
+      {
+        label: 'Deuterium',
+        amount: total.deuterium,
+        isEnough: (currentResources?.deuterium ?? 0) >= total.deuterium,
+        isPlaceholder: false,
+      },
     ];
   }
 
@@ -1338,23 +1435,23 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const rows: BuildingRequirementRowVm[] = [];
 
     for (const requirement of ship.buildingRequirements) {
-        const requiredLevel = Math.ceil(requirement.level);
-        const currentLevel = this.buildingLevel(requirement.building);
-        rows.push({
-          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
-          isMet: currentLevel >= requiredLevel,
-          isPlaceholder: false
-        });
+      const requiredLevel = Math.ceil(requirement.level);
+      const currentLevel = this.buildingLevel(requirement.building);
+      rows.push({
+        label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false,
+      });
     }
 
     for (const requirement of ship.techRequirements) {
-        const requiredLevel = Math.ceil(requirement.level);
-        const currentLevel = this.techLevel(requirement.tech);
-        rows.push({
-          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
-          isMet: currentLevel >= requiredLevel,
-          isPlaceholder: false
-        });
+      const requiredLevel = Math.ceil(requirement.level);
+      const currentLevel = this.techLevel(requirement.tech);
+      rows.push({
+        label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false,
+      });
     }
 
     if (rows.length === 0) {
@@ -1362,8 +1459,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         {
           label: 'None',
           isMet: true,
-          isPlaceholder: true
-        }
+          isPlaceholder: true,
+        },
       ];
     }
 
@@ -1374,23 +1471,23 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const rows: BuildingRequirementRowVm[] = [];
 
     for (const requirement of defence.buildingRequirements) {
-        const requiredLevel = Math.ceil(requirement.level);
-        const currentLevel = this.buildingLevel(requirement.building);
-        rows.push({
-          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
-          isMet: currentLevel >= requiredLevel,
-          isPlaceholder: false
-        });
+      const requiredLevel = Math.ceil(requirement.level);
+      const currentLevel = this.buildingLevel(requirement.building);
+      rows.push({
+        label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false,
+      });
     }
 
     for (const requirement of defence.techRequirements) {
-        const requiredLevel = Math.ceil(requirement.level);
-        const currentLevel = this.techLevel(requirement.tech);
-        rows.push({
-          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
-          isMet: currentLevel >= requiredLevel,
-          isPlaceholder: false
-        });
+      const requiredLevel = Math.ceil(requirement.level);
+      const currentLevel = this.techLevel(requirement.tech);
+      rows.push({
+        label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false,
+      });
     }
 
     if (rows.length === 0) {
@@ -1579,24 +1676,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       z: planet.coordinates.z,
       itemKind: 'ship',
       shipType: ship.type,
-      amount
+      amount,
     };
 
-    this.gameApi.startShipyardConstruction(request, session.token)
+    this.gameApi
+      .startShipyardConstruction(request, session.token)
       .pipe(
         timeout(10000),
         finalize(() => {
           this.shipStartInFlightByType.delete(ship.type);
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: (updatedPlanet) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
@@ -1608,20 +1706,20 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         },
         error: (error: { error?: { error?: string } }) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
 
           this.shipStartErrorByType.set(
             ship.type,
-            resolveApiErrorMessage(this.i18n, error, this.i18n.t('planetView.errors.addShip'))
+            resolveApiErrorMessage(this.i18n, error, this.i18n.t('planetView.errors.addShip')),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -1647,24 +1745,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       z: planet.coordinates.z,
       itemKind: 'defence',
       defenceType: defence.type,
-      amount
+      amount,
     };
 
-    this.gameApi.startShipyardConstruction(request, session.token)
+    this.gameApi
+      .startShipyardConstruction(request, session.token)
       .pipe(
         timeout(10000),
         finalize(() => {
           this.defenceStartInFlightByType.delete(defence.type);
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: (updatedPlanet) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
@@ -1676,20 +1775,20 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         },
         error: (error: { error?: { error?: string } }) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
 
           this.defenceStartErrorByType.set(
             defence.type,
-            resolveApiErrorMessage(this.i18n, error, this.i18n.t('planetView.errors.addDefence'))
+            resolveApiErrorMessage(this.i18n, error, this.i18n.t('planetView.errors.addDefence')),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -1732,7 +1831,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       buildingCurrent: this.currentBuildingQueueLength(),
       buildingMax: this.maxBuildingQueueLength(),
       shipyardCurrent: this.currentShipQueueLength(),
-      shipyardMax: this.maxShipQueueLength()
+      shipyardMax: this.maxShipQueueLength(),
     });
   }
 
@@ -1752,13 +1851,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       const baseTotalConstructionTime = this.baseConstructionTime(buildingType, toLevel);
       const investedIndustryPower = Math.min(
         this.queueEntryInvestedIndustryPower(entry),
-        baseTotalConstructionTime
+        baseTotalConstructionTime,
       );
       const remaining = Math.max(0, baseTotalConstructionTime - investedIndustryPower);
       cumulativeRemaining += remaining;
-      const estimatedTurnsForCompletion = industryPower > 0
-        ? Math.ceil(cumulativeRemaining / industryPower)
-        : null;
+      const estimatedTurnsForCompletion =
+        industryPower > 0 ? Math.ceil(cumulativeRemaining / industryPower) : null;
 
       return {
         queueIndex: index,
@@ -1769,7 +1867,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         investedIndustryPower,
         baseTotalConstructionTime,
         estimatedTurnsForCompletion,
-        isHeadOfQueue: index === 0
+        isHeadOfQueue: index === 0,
       };
     });
   }
@@ -1786,7 +1884,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     queueEntries.forEach((entry, index) => {
       const baseTotalConstructionTime = this.queueEntryBaseConstructionTime(entry);
-      const remaining = Math.max(0, baseTotalConstructionTime - this.queueEntryInvestedShipyardPower(entry));
+      const remaining = Math.max(
+        0,
+        baseTotalConstructionTime - this.queueEntryInvestedShipyardPower(entry),
+      );
       cumulativeRemaining += remaining;
       const itemKind = this.queueEntryItemKind(entry);
       const amountTotal = this.queueEntryShipAmount(entry);
@@ -1794,10 +1895,13 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       if (itemKind === 'ship') {
         const shipType = this.queueEntryShipType(entry);
         const singleShipBaseConstructionTime = this.baseShipConstructionTime(shipType, 1);
-        const estimatedTurnsForCompletion = shipyardPower > 0
-          ? Math.ceil(cumulativeRemaining / shipyardPower)
-          : null;
-        const amountCompleted = this.shipAmountCompleted(shipType, amountTotal, investedShipyardPower);
+        const estimatedTurnsForCompletion =
+          shipyardPower > 0 ? Math.ceil(cumulativeRemaining / shipyardPower) : null;
+        const amountCompleted = this.shipAmountCompleted(
+          shipType,
+          amountTotal,
+          investedShipyardPower,
+        );
         rows.push({
           queueIndex: index,
           position: index + 1,
@@ -1810,18 +1914,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
             amountCompleted,
             amountTotal,
             investedShipyardPower,
-            singleShipBaseConstructionTime
+            singleShipBaseConstructionTime,
           ),
           currentUnitBaseConstructionTime: singleShipBaseConstructionTime,
           estimatedTurnsForCompletion,
-          isHeadOfQueue: index === 0
+          isHeadOfQueue: index === 0,
         });
         return;
       }
 
       const defenceType = this.queueEntryDefenceType(entry);
       const singleDefenceBaseConstructionTime = this.baseDefenceConstructionTime(defenceType, 1);
-      const amountCompleted = this.defenceAmountCompleted(defenceType, amountTotal, investedShipyardPower);
+      const amountCompleted = this.defenceAmountCompleted(
+        defenceType,
+        amountTotal,
+        investedShipyardPower,
+      );
       rows.push({
         queueIndex: index,
         position: index + 1,
@@ -1834,11 +1942,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           amountCompleted,
           amountTotal,
           investedShipyardPower,
-          singleDefenceBaseConstructionTime
+          singleDefenceBaseConstructionTime,
         ),
         currentUnitBaseConstructionTime: singleDefenceBaseConstructionTime,
-        estimatedTurnsForCompletion: shipyardPower > 0 ? Math.ceil(cumulativeRemaining / shipyardPower) : null,
-        isHeadOfQueue: index === 0
+        estimatedTurnsForCompletion:
+          shipyardPower > 0 ? Math.ceil(cumulativeRemaining / shipyardPower) : null,
+        isHeadOfQueue: index === 0,
       });
     });
 
@@ -1876,7 +1985,11 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected shipyardQueueItemTypeLabel(row: ShipyardQueueRowVm): string {
-    return this.i18n.t(row.itemKind === 'defence' ? 'planetView.queues.shipyardKindDefence' : 'planetView.queues.shipyardKindShip');
+    return this.i18n.t(
+      row.itemKind === 'defence'
+        ? 'planetView.queues.shipyardKindDefence'
+        : 'planetView.queues.shipyardKindShip',
+    );
   }
 
   protected shipyardQueueCancelTitle(row: ShipyardQueueRowVm): string {
@@ -1910,18 +2023,21 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       y: planet.coordinates.y,
       z: planet.coordinates.z,
       fromIndex: movedRow.queueIndex,
-      toIndex: targetRow.queueIndex
+      toIndex: targetRow.queueIndex,
     };
 
     this.buildingQueueMutationInFlight = true;
     this.buildingQueueActionError = null;
     this.cdr.markForCheck();
 
-    this.gameApi.reorderBuildingQueue(request, session.token)
-      .pipe(finalize(() => {
-        this.buildingQueueMutationInFlight = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .reorderBuildingQueue(request, session.token)
+      .pipe(
+        finalize(() => {
+          this.buildingQueueMutationInFlight = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (updatedPlanet) => {
           this.planet = updatedPlanet;
@@ -1933,10 +2049,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.buildingQueueActionError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('planetView.errors.reorderBuildingQueue')
+            this.i18n.t('planetView.errors.reorderBuildingQueue'),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -1955,18 +2071,21 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       x: planet.coordinates.x,
       y: planet.coordinates.y,
       z: planet.coordinates.z,
-      index: row.queueIndex
+      index: row.queueIndex,
     };
 
     this.buildingQueueMutationInFlight = true;
     this.buildingQueueActionError = null;
     this.cdr.markForCheck();
 
-    this.gameApi.cancelBuildingQueueEntry(request, session.token)
-      .pipe(finalize(() => {
-        this.buildingQueueMutationInFlight = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .cancelBuildingQueueEntry(request, session.token)
+      .pipe(
+        finalize(() => {
+          this.buildingQueueMutationInFlight = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (updatedPlanet) => {
           this.planet = updatedPlanet;
@@ -1978,10 +2097,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.buildingQueueActionError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('planetView.errors.cancelBuildingQueue')
+            this.i18n.t('planetView.errors.cancelBuildingQueue'),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -2004,18 +2123,21 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       y: planet.coordinates.y,
       z: planet.coordinates.z,
       fromIndex: movedRow.queueIndex,
-      toIndex: targetRow.queueIndex
+      toIndex: targetRow.queueIndex,
     };
 
     this.shipyardQueueMutationInFlight = true;
     this.shipyardQueueActionError = null;
     this.cdr.markForCheck();
 
-    this.gameApi.reorderShipyardQueue(request, session.token)
-      .pipe(finalize(() => {
-        this.shipyardQueueMutationInFlight = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .reorderShipyardQueue(request, session.token)
+      .pipe(
+        finalize(() => {
+          this.shipyardQueueMutationInFlight = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (updatedPlanet) => {
           this.planet = updatedPlanet;
@@ -2027,10 +2149,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.shipyardQueueActionError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('planetView.errors.reorderShipyardQueue')
+            this.i18n.t('planetView.errors.reorderShipyardQueue'),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -2049,18 +2171,21 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       x: planet.coordinates.x,
       y: planet.coordinates.y,
       z: planet.coordinates.z,
-      index: row.queueIndex
+      index: row.queueIndex,
     };
 
     this.shipyardQueueMutationInFlight = true;
     this.shipyardQueueActionError = null;
     this.cdr.markForCheck();
 
-    this.gameApi.cancelShipyardQueueEntry(request, session.token)
-      .pipe(finalize(() => {
-        this.shipyardQueueMutationInFlight = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .cancelShipyardQueueEntry(request, session.token)
+      .pipe(
+        finalize(() => {
+          this.shipyardQueueMutationInFlight = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (updatedPlanet) => {
           this.planet = updatedPlanet;
@@ -2072,10 +2197,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.shipyardQueueActionError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('planetView.errors.cancelShipyardQueue')
+            this.i18n.t('planetView.errors.cancelShipyardQueue'),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -2093,12 +2218,13 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       const investedResearchPower = this.queueEntryInvestedResearchPower(currentResearchQueue);
       const baseTotalResearchTime = this.baseResearchTime(
         this.queueEntryTechnologyType(currentResearchQueue),
-        toLevel
+        toLevel,
       );
       const remainingResearchTime = Math.max(0, baseTotalResearchTime - investedResearchPower);
-      const estimatedTurnsForCompletion = this.currentResearchPower() > 0
-        ? Math.ceil(remainingResearchTime / this.currentResearchPower())
-        : null;
+      const estimatedTurnsForCompletion =
+        this.currentResearchPower() > 0
+          ? Math.ceil(remainingResearchTime / this.currentResearchPower())
+          : null;
 
       rows.push({
         position: rows.length + 1,
@@ -2109,7 +2235,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         targetLabel: '--',
         status: this.i18n.t('planetView.queues.statusResearching'),
         investedLabel: `${investedResearchPower} / ${baseTotalResearchTime}`,
-        etaLabel: estimatedTurnsForCompletion === null ? '--' : String(estimatedTurnsForCompletion)
+        etaLabel: estimatedTurnsForCompletion === null ? '--' : String(estimatedTurnsForCompletion),
       });
     }
 
@@ -2124,7 +2250,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         targetLabel: this.coordinatesToLabel(helperReference.mainResearchCoordinates),
         status: this.i18n.t('planetView.queues.statusHelping'),
         investedLabel: '--',
-        etaLabel: '--'
+        etaLabel: '--',
       });
     }
 
@@ -2138,15 +2264,42 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     return [
-      { label: this.i18n.t('planetView.parameters.metalModifier'), value: parameters.metalModifier },
-      { label: this.i18n.t('planetView.parameters.crystalModifier'), value: parameters.crystalModifier },
-      { label: this.i18n.t('planetView.parameters.deuteriumModifier'), value: parameters.deuteriumModifier },
-      { label: this.i18n.t('planetView.parameters.energyModifierRes'), value: parameters.energyModifierRES },
-      { label: this.i18n.t('planetView.parameters.energyModifierNuclear'), value: parameters.energyModifierNuclear },
-      { label: this.i18n.t('planetView.parameters.scienceModifier'), value: parameters.scienceModifier },
-      { label: this.i18n.t('planetView.parameters.industryModifier'), value: parameters.industryModifier },
-      { label: this.i18n.t('planetView.parameters.anomaliesAndNoise'), value: parameters.anomaliesAndNoise },
-      { label: this.i18n.t('planetView.parameters.hyperspaceParameters'), value: parameters.hyperspaceParameters }
+      {
+        label: this.i18n.t('planetView.parameters.metalModifier'),
+        value: parameters.metalModifier,
+      },
+      {
+        label: this.i18n.t('planetView.parameters.crystalModifier'),
+        value: parameters.crystalModifier,
+      },
+      {
+        label: this.i18n.t('planetView.parameters.deuteriumModifier'),
+        value: parameters.deuteriumModifier,
+      },
+      {
+        label: this.i18n.t('planetView.parameters.energyModifierRes'),
+        value: parameters.energyModifierRES,
+      },
+      {
+        label: this.i18n.t('planetView.parameters.energyModifierNuclear'),
+        value: parameters.energyModifierNuclear,
+      },
+      {
+        label: this.i18n.t('planetView.parameters.scienceModifier'),
+        value: parameters.scienceModifier,
+      },
+      {
+        label: this.i18n.t('planetView.parameters.industryModifier'),
+        value: parameters.industryModifier,
+      },
+      {
+        label: this.i18n.t('planetView.parameters.anomaliesAndNoise'),
+        value: parameters.anomaliesAndNoise,
+      },
+      {
+        label: this.i18n.t('planetView.parameters.hyperspaceParameters'),
+        value: parameters.hyperspaceParameters,
+      },
     ];
   }
 
@@ -2167,7 +2320,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       { buildingType: BuildingType.FUSION_REACTOR, existenceBonus: 1 },
       { buildingType: BuildingType.ROBOTICS_FACTORY, existenceBonus: 0 },
       { buildingType: BuildingType.SHIPYARD, existenceBonus: 0 },
-      { buildingType: BuildingType.NANITE_FACTORY, existenceBonus: 3 }
+      { buildingType: BuildingType.NANITE_FACTORY, existenceBonus: 3 },
     ];
 
     let totalEffectiveLevel = 0;
@@ -2196,7 +2349,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected bombDepotOverviewValue(): string {
     return this.i18n.t('planetView.overview.bombDepotUsed', {
       used: this.currentPlanetaryBombStorageUsed(),
-      capacity: this.bombDepotCapacity()
+      capacity: this.bombDepotCapacity(),
     });
   }
 
@@ -2235,7 +2388,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected tradePortOfferGetLabel(offer: TradePortOfferDto): string {
     return this.i18n.t('planetView.trade.get', {
       amount: offer.getAmount,
-      resource: tradeResourceLabel(offer.getResourceType)
+      resource: tradeResourceLabel(offer.getResourceType),
     });
   }
 
@@ -2262,7 +2415,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   protected tradePortOfferModifierLabel(offer: TradePortOfferDto): string {
     return this.i18n.t('planetView.trade.modifier', {
-      value: `${offer.costModifierPercent >= 0 ? '+' : ''}${offer.costModifierPercent}`
+      value: `${offer.costModifierPercent >= 0 ? '+' : ''}${offer.costModifierPercent}`,
     });
   }
 
@@ -2317,24 +2470,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       x: planet.coordinates.x,
       y: planet.coordinates.y,
       z: planet.coordinates.z,
-      offerId: offer.offerId
+      offerId: offer.offerId,
     };
 
-    this.gameApi.useTradePortOffer(request, session.token)
+    this.gameApi
+      .useTradePortOffer(request, session.token)
       .pipe(
         timeout(10000),
         finalize(() => {
           this.tradePortActionOfferId = null;
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: (updatedPlanet) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== request.x
-            || this.planet.coordinates.y !== request.y
-            || this.planet.coordinates.z !== request.z
+            !this.planet ||
+            this.planet.coordinates.x !== request.x ||
+            this.planet.coordinates.y !== request.y ||
+            this.planet.coordinates.z !== request.z
           ) {
             return;
           }
@@ -2348,10 +2502,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.tradePortActionError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('planetView.errors.useTradeOffer')
+            this.i18n.t('planetView.errors.useTradeOffer'),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -2376,11 +2530,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected copyCoordinatesTooltip(): string {
-    return this.i18n.t('planetView.overview.copyCoordinates', { coordinates: this.coordinatesLabel });
+    return this.i18n.t('planetView.overview.copyCoordinates', {
+      coordinates: this.coordinatesLabel,
+    });
   }
 
   protected tradePortTooltip(): string {
-    return this.i18n.t(this.hasTradePort() ? 'planetView.overview.tradePortOpen' : 'planetView.overview.tradePortLocked');
+    return this.i18n.t(
+      this.hasTradePort()
+        ? 'planetView.overview.tradePortOpen'
+        : 'planetView.overview.tradePortLocked',
+    );
   }
 
   protected yesNoLabel(value: boolean): string {
@@ -2388,7 +2548,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected queueStatusLabel(isHeadOfQueue: boolean): string {
-    return this.i18n.t(isHeadOfQueue ? 'planetView.queues.underConstruction' : 'planetView.queues.queued');
+    return this.i18n.t(
+      isHeadOfQueue ? 'planetView.queues.underConstruction' : 'planetView.queues.queued',
+    );
   }
 
   protected queueDragAriaLabel(name: string): string {
@@ -2431,17 +2593,20 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const currentPlanet = this.planet;
     return this.ownedPlanets.map((planet) => ({
       label: '•',
-      isCurrent: currentPlanet ? this.sameCoordinates(currentPlanet.coordinates, planet.coordinates) : false,
-      tone: currentPlanet && this.sameCoordinates(currentPlanet.coordinates, planet.coordinates)
-        ? this.headerIndicatorToneFromLabels(this.currentPlanetAttentionLabels())
-        : this.headerIndicatorToneForPlanet(planet),
+      isCurrent: currentPlanet
+        ? this.sameCoordinates(currentPlanet.coordinates, planet.coordinates)
+        : false,
+      tone:
+        currentPlanet && this.sameCoordinates(currentPlanet.coordinates, planet.coordinates)
+          ? this.headerIndicatorToneFromLabels(this.currentPlanetAttentionLabels())
+          : this.headerIndicatorToneForPlanet(planet),
       queryParams: {
         x: planet.coordinates.x,
         y: planet.coordinates.y,
         z: planet.coordinates.z,
-        tab: this.activeTab
+        tab: this.activeTab,
       },
-      title: `${planet.basicInfo.name} (${this.coordinatesLabelForPlanet(planet)})`
+      title: `${planet.basicInfo.name} (${this.coordinatesLabelForPlanet(planet)})`,
     }));
   }
 
@@ -2456,8 +2621,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         x: target.coordinates.x,
         y: target.coordinates.y,
         z: target.coordinates.z,
-        tab: this.activeTab
-      }
+        tab: this.activeTab,
+      },
     });
   }
 
@@ -2472,8 +2637,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         x: target.coordinates.x,
         y: target.coordinates.y,
         z: target.coordinates.z,
-        tab: this.activeTab
-      }
+        tab: this.activeTab,
+      },
     });
   }
 
@@ -2491,18 +2656,18 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       {
         label: 'Metal',
         amount: cost.metal,
-        isEnough: (currentResources?.metal ?? 0) >= cost.metal
+        isEnough: (currentResources?.metal ?? 0) >= cost.metal,
       },
       {
         label: 'Crystal',
         amount: cost.crystal,
-        isEnough: (currentResources?.crystal ?? 0) >= cost.crystal
+        isEnough: (currentResources?.crystal ?? 0) >= cost.crystal,
       },
       {
         label: 'Deuterium',
         amount: cost.deuterium,
-        isEnough: (currentResources?.deuterium ?? 0) >= cost.deuterium
-      }
+        isEnough: (currentResources?.deuterium ?? 0) >= cost.deuterium,
+      },
     ];
   }
 
@@ -2511,23 +2676,23 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const rows: BuildingRequirementRowVm[] = [];
 
     for (const requirement of building.buildingRequirements) {
-        const requiredLevel = Math.ceil(targetLevel * requirement.level);
-        const currentLevel = this.buildingLevel(requirement.building);
-        rows.push({
-          label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
-          isMet: currentLevel >= requiredLevel,
-          isPlaceholder: false
-        });
+      const requiredLevel = Math.ceil(targetLevel * requirement.level);
+      const currentLevel = this.buildingLevel(requirement.building);
+      rows.push({
+        label: `${requirement.building}: ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false,
+      });
     }
 
     for (const requirement of building.techRequirements) {
-        const requiredLevel = Math.ceil(targetLevel * requirement.level);
-        const currentLevel = this.techLevel(requirement.tech);
-        rows.push({
-          label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
-          isMet: currentLevel >= requiredLevel,
-          isPlaceholder: false
-        });
+      const requiredLevel = Math.ceil(targetLevel * requirement.level);
+      const currentLevel = this.techLevel(requirement.tech);
+      rows.push({
+        label: `${requirement.tech} (Tech): ${currentLevel}/${requiredLevel}`,
+        isMet: currentLevel >= requiredLevel,
+        isPlaceholder: false,
+      });
     }
 
     if (rows.length === 0) {
@@ -2535,8 +2700,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         {
           label: 'None',
           isMet: true,
-          isPlaceholder: true
-        }
+          isPlaceholder: true,
+        },
       ];
     }
 
@@ -2560,28 +2725,34 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const currentLevel = this.buildingLevel(building.type);
     const maxPower = this.buildingMaxPowerConsumption(building);
     const currentPower = this.buildingCurrentPowerConsumption(building);
-    const fusionOperation = building.type === BuildingType.FUSION_REACTOR
-      ? this.currentFusionReactorOperation()
-      : null;
+    const fusionOperation =
+      building.type === BuildingType.FUSION_REACTOR ? this.currentFusionReactorOperation() : null;
     const summaryRows: PlanetObjectDetailRow[] = [
       {
         label: 'Category',
-        value: building.isFacility ? 'Facility' : 'Resource building'
+        value: building.isFacility ? 'Facility' : 'Resource building',
       },
       {
         label: 'Base armor',
-        value: String(building.armor)
+        value: String(building.armor),
       },
       {
         label: 'Damage multiplier',
-        value: `${this.roundNumber(building.damageMultiplier, 2)}x`
-      }
+        value: `${this.roundNumber(building.damageMultiplier, 2)}x`,
+      },
     ];
 
     if (building.production1.length > 0) {
       summaryRows.push({
-        label: contextualBuildingProductionLabel(building.type, currentLevel > 0 ? 'Current' : 'Level 1'),
-        value: String(currentLevel > 0 ? this.buildingProductionAtCurrentLevel(building) : this.getProductionAtLevel(building, 1))
+        label: contextualBuildingProductionLabel(
+          building.type,
+          currentLevel > 0 ? 'Current' : 'Level 1',
+        ),
+        value: String(
+          currentLevel > 0
+            ? this.buildingProductionAtCurrentLevel(building)
+            : this.getProductionAtLevel(building, 1),
+        ),
       });
     }
 
@@ -2589,60 +2760,60 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       summaryRows.push(
         {
           label: 'Selected stage',
-          value: String(fusionOperation.selectedStage)
+          value: String(fusionOperation.selectedStage),
         },
         {
           label: 'Deuterium upkeep',
-          value: String(fusionOperation.deuteriumUpkeep)
-        }
+          value: String(fusionOperation.deuteriumUpkeep),
+        },
       );
     } else if (building.powerConsumption > 0) {
       summaryRows.push({
         label: 'Power per level',
-        value: String(building.powerConsumption)
+        value: String(building.powerConsumption),
       });
     } else {
       summaryRows.push({
         label: 'Power',
         value: 'No direct power draw',
-        tone: 'muted'
+        tone: 'muted',
       });
     }
 
     const stateRows: PlanetObjectDetailRow[] = [
       {
         label: 'Current level',
-        value: String(currentLevel)
+        value: String(currentLevel),
       },
       {
         label: 'Next level',
-        value: `L${this.buildingNextLevel(building)}`
-      }
+        value: `L${this.buildingNextLevel(building)}`,
+      },
     ];
 
     if (currentLevel <= 0) {
       stateRows.push({
         label: 'Status',
         value: 'Not built yet',
-        tone: 'muted'
+        tone: 'muted',
       });
     } else {
       if (building.production1.length > 0) {
         stateRows.push({
           label: contextualBuildingProductionLabel(building.type, 'Current'),
-          value: String(this.buildingProductionAtCurrentLevel(building))
+          value: String(this.buildingProductionAtCurrentLevel(building)),
         });
       }
 
       stateRows.push(
         {
           label: 'Structural points',
-          value: `${this.buildingCurrentStructuralPoints(building)} / ${this.buildingMaxStructuralPoints(building)}`
+          value: `${this.buildingCurrentStructuralPoints(building)} / ${this.buildingMaxStructuralPoints(building)}`,
         },
         {
           label: 'Structural efficiency',
-          value: `${this.buildingStructuralUtilizationPercent(building)}%`
-        }
+          value: `${this.buildingStructuralUtilizationPercent(building)}%`,
+        },
       );
 
       if (fusionOperation) {
@@ -2650,22 +2821,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           {
             label: 'Effective stage',
             value: String(fusionOperation.effectiveStage),
-            tone: fusionOperation.isClamped ? 'warn' : 'default'
+            tone: fusionOperation.isClamped ? 'warn' : 'default',
           },
           {
             label: 'Gross deuterium income',
-            value: String(fusionOperation.grossDeuteriumIncome)
+            value: String(fusionOperation.grossDeuteriumIncome),
           },
           {
             label: 'Net deuterium income',
-            value: String(fusionOperation.netDeuteriumIncome)
-          }
+            value: String(fusionOperation.netDeuteriumIncome),
+          },
         );
       } else if (maxPower > 0) {
         stateRows.push({
           label: 'Power usage',
           value: `${currentPower} / ${maxPower}`,
-          tone: currentPower < maxPower ? 'warn' : 'default'
+          tone: currentPower < maxPower ? 'warn' : 'default',
         });
       }
     }
@@ -2673,11 +2844,23 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const sections: PlanetObjectDetailSection[] = [
       this.createDetailSection('Summary', summaryRows),
       this.createDetailSection('Current state', stateRows),
-      this.createDetailSection(this.buildingCostHeader(building), this.detailRowsFromCostRows(this.buildingCostRows(building))),
-      this.createDetailSection('Requirements', this.detailRowsFromRequirementRows(this.buildingRequirementRows(building)))
+      this.createDetailSection(
+        this.buildingCostHeader(building),
+        this.detailRowsFromCostRows(this.buildingCostRows(building)),
+      ),
+      this.createDetailSection(
+        'Requirements',
+        this.detailRowsFromRequirementRows(this.buildingRequirementRows(building)),
+      ),
     ];
 
-    return this.buildPlanetObjectDialogData('Building', building.type, building.description, building.imagePath, sections);
+    return this.buildPlanetObjectDialogData(
+      'Building',
+      building.type,
+      resolveBlueprintText(this.i18n, building.description),
+      building.imagePath,
+      sections,
+    );
   }
 
   private createShipDetailDialogData(ship: Ship): PlanetObjectDetailDialogData {
@@ -2686,80 +2869,86 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       this.createDetailSection('Summary', [
         {
           label: 'Hull class',
-          value: ship.hullClass
+          value: ship.hullClass,
         },
         {
           label: 'Purposes',
-          value: Array.from(ship.purposes).join(', ') || 'None'
+          value: Array.from(ship.purposes).join(', ') || 'None',
         },
         {
           label: 'Size',
-          value: String(ship.size)
+          value: String(ship.size),
         },
         {
           label: 'Cargo',
-          value: String(ship.cargoCapacity)
+          value: String(ship.cargoCapacity),
         },
         {
           label: 'Hangar',
-          value: String(ship.hangarCapacity)
+          value: String(ship.hangarCapacity),
         },
         {
           label: 'Jump capable',
           value: ship.canJump ? 'Yes' : 'No',
-          tone: ship.canJump ? 'good' : 'muted'
+          tone: ship.canJump ? 'good' : 'muted',
         },
         {
           label: 'Jump cost',
           value: ship.canJump ? String(ship.jumpCost) : 'N/A',
-          tone: ship.canJump ? 'default' : 'muted'
-        }
+          tone: ship.canJump ? 'default' : 'muted',
+        },
       ]),
       this.createDetailSection('Current state', [
         {
           label: 'Owned on planet',
-          value: String(counts.total)
+          value: String(counts.total),
         },
         {
           label: 'Undamaged',
-          value: String(counts.undamaged)
+          value: String(counts.undamaged),
         },
         {
           label: 'Damaged',
           value: String(counts.damaged),
-          tone: counts.damaged > 0 ? 'warn' : 'default'
+          tone: counts.damaged > 0 ? 'warn' : 'default',
         },
         {
           label: 'Missing hull',
           value: String(counts.missingHull),
-          tone: counts.missingHull > 0 ? 'warn' : 'muted'
-        }
+          tone: counts.missingHull > 0 ? 'warn' : 'muted',
+        },
       ]),
       this.createDetailSection('Combat', [
         {
           label: 'Hull points',
-          value: String(ship.hullPointsCapacity)
+          value: String(ship.hullPointsCapacity),
         },
         {
           label: 'Shield',
-          value: String(ship.shieldCapacity)
+          value: String(ship.shieldCapacity),
         },
         {
           label: 'Armor',
-          value: String(ship.armor)
+          value: String(ship.armor),
         },
         {
           label: 'Critical threshold',
-          value: `${ship.criticalThreshold}%`
+          value: `${ship.criticalThreshold}%`,
         },
         {
           label: 'Evasion',
-          value: `${Math.round(ship.evasionChance * 100)}%`
-        }
+          value: `${Math.round(ship.evasionChance * 100)}%`,
+        },
       ]),
       this.createDetailSection('Weapons', this.detailRowsFromWeapons(ship.weapons)),
-      this.createDetailSection('Single ship cost', this.detailRowsFromCostRows(this.shipSingleCostRows(ship))),
-      this.createDetailSection('Requirements', this.detailRowsFromRequirementRows(this.shipRequirementRows(ship)))
+      this.createDetailSection(
+        'Single ship cost',
+        this.detailRowsFromCostRows(this.shipSingleCostRows(ship)),
+      ),
+      this.createDetailSection(
+        'Requirements',
+        this.detailRowsFromRequirementRows(this.shipRequirementRows(ship)),
+      ),
     ];
 
     return this.buildPlanetObjectDialogData('Ship', ship.type, '', ship.imagePath, sections);
@@ -2771,29 +2960,29 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const stateRows: PlanetObjectDetailRow[] = [
       {
         label: 'Owned on planet',
-        value: String(counts.total)
+        value: String(counts.total),
       },
       {
         label: 'Undamaged',
-        value: String(counts.undamaged)
+        value: String(counts.undamaged),
       },
       {
         label: 'Damaged',
         value: String(counts.damaged),
-        tone: counts.damaged > 0 ? 'warn' : 'default'
+        tone: counts.damaged > 0 ? 'warn' : 'default',
       },
       {
         label: 'Missing hull',
         value: String(counts.missingHull),
-        tone: counts.missingHull > 0 ? 'warn' : 'muted'
-      }
+        tone: counts.missingHull > 0 ? 'warn' : 'muted',
+      },
     ];
 
     if (isPlanetaryBomb) {
       stateRows.push({
         label: 'Bomb depot storage',
         value: `${this.currentPlanetaryBombStorageUsed()} / ${this.bombDepotCapacity()}${this.queuedPlanetaryBombStorageUsed() > 0 ? ` (+${this.queuedPlanetaryBombStorageUsed()} queued)` : ''}`,
-        tone: 'warn'
+        tone: 'warn',
       });
     }
 
@@ -2801,47 +2990,59 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       this.createDetailSection('Summary', [
         {
           label: 'Hull class',
-          value: defence.hullClass
+          value: defence.hullClass,
         },
         {
           label: 'Role',
-          value: isPlanetaryBomb ? 'Stored bomb payload' : 'Planetary defence platform'
+          value: isPlanetaryBomb ? 'Stored bomb payload' : 'Planetary defence platform',
         },
         {
           label: 'Size',
-          value: String(defence.size)
+          value: String(defence.size),
         },
         {
           label: 'Can shoot to orbit',
           value: defence.canShootToOrbit ? 'Yes' : 'No',
-          tone: defence.canShootToOrbit ? 'good' : 'muted'
-        }
+          tone: defence.canShootToOrbit ? 'good' : 'muted',
+        },
       ]),
       this.createDetailSection('Current state', stateRows),
       this.createDetailSection('Combat', [
         {
           label: 'Hull points',
-          value: String(defence.hullPointsCapacity)
+          value: String(defence.hullPointsCapacity),
         },
         {
           label: 'Shield',
-          value: String(defence.shieldCapacity)
+          value: String(defence.shieldCapacity),
         },
         {
           label: 'Armor',
-          value: String(defence.armor)
+          value: String(defence.armor),
         },
         {
           label: 'Critical threshold',
-          value: `${defence.criticalThreshold}%`
-        }
+          value: `${defence.criticalThreshold}%`,
+        },
       ]),
       this.createDetailSection('Weapons', this.detailRowsFromWeapons(defence.weapons)),
-      this.createDetailSection('Single defence cost', this.detailRowsFromCostRows(this.defenceSingleCostRows(defence))),
-      this.createDetailSection('Requirements', this.detailRowsFromRequirementRows(this.defenceRequirementRows(defence)))
+      this.createDetailSection(
+        'Single defence cost',
+        this.detailRowsFromCostRows(this.defenceSingleCostRows(defence)),
+      ),
+      this.createDetailSection(
+        'Requirements',
+        this.detailRowsFromRequirementRows(this.defenceRequirementRows(defence)),
+      ),
     ];
 
-    return this.buildPlanetObjectDialogData('Defence', defence.type, '', defence.imagePath, sections);
+    return this.buildPlanetObjectDialogData(
+      'Defence',
+      defence.type,
+      '',
+      defence.imagePath,
+      sections,
+    );
   }
 
   private buildPlanetObjectDialogData(
@@ -2849,7 +3050,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     title: string,
     description: string,
     imagePath: string,
-    sections: PlanetObjectDetailSection[]
+    sections: PlanetObjectDetailSection[],
   ): PlanetObjectDetailDialogData {
     return {
       kindLabel,
@@ -2858,14 +3059,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       description,
       previewImagePath: imagePath,
       rawImagePath: toRawImagePath(imagePath),
-      sections: sections.filter((section) => section.rows.length > 0)
+      sections: sections.filter((section) => section.rows.length > 0),
     };
   }
 
-  private createDetailSection(title: string, rows: PlanetObjectDetailRow[]): PlanetObjectDetailSection {
+  private createDetailSection(
+    title: string,
+    rows: PlanetObjectDetailRow[],
+  ): PlanetObjectDetailSection {
     return {
       title,
-      rows
+      rows,
     };
   }
 
@@ -2873,7 +3077,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return rows.map((row) => ({
       label: row.label,
       value: String(row.amount),
-      tone: row.isEnough ? 'default' : 'bad'
+      tone: row.isEnough ? 'default' : 'bad',
     }));
   }
 
@@ -2883,20 +3087,25 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         return {
           label: 'Requirement',
           value: row.label,
-          tone: 'muted'
+          tone: 'muted',
         };
       }
 
-        const separatorIndex = row.label.indexOf(':');
-        const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
-        const value = separatorIndex >= 0 ? row.label.slice(separatorIndex + 1).trim() : (row.isMet ? 'Met' : 'Missing');
+      const separatorIndex = row.label.indexOf(':');
+      const rawLabel = separatorIndex >= 0 ? row.label.slice(0, separatorIndex).trim() : row.label;
+      const value =
+        separatorIndex >= 0
+          ? row.label.slice(separatorIndex + 1).trim()
+          : row.isMet
+            ? 'Met'
+            : 'Missing';
 
-        return {
-          label: rawLabel,
-          value,
-          tone: row.isMet ? 'good' : 'bad'
-        };
-      });
+      return {
+        label: rawLabel,
+        value,
+        tone: row.isMet ? 'good' : 'bad',
+      };
+    });
   }
 
   private detailRowsFromWeapons(weapons: Weapon[]): PlanetObjectDetailRow[] {
@@ -2905,14 +3114,14 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         {
           label: 'Loadout',
           value: 'None',
-          tone: 'muted'
-        }
+          tone: 'muted',
+        },
       ];
     }
 
     return weapons.map((weapon, index) => ({
       label: weapons.length === 1 ? weapon.type : `${weapon.type} ${index + 1}`,
-      value: `${weapon.shots} x ${weapon.dmg}`
+      value: `${weapon.shots} x ${weapon.dmg}`,
     }));
   }
 
@@ -2924,14 +3133,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   } {
     const total = ManyShips.countByType(this.planet?.objects.ships).get(shipType) ?? 0;
     const undamaged = ManyShips.undamagedCountByType(this.planet?.objects.ships).get(shipType) ?? 0;
-    const damagedEntry = ManyShips.groupedDamagedEntries(this.planet?.objects.ships)
-      .find((entry) => entry.type === shipType);
+    const damagedEntry = ManyShips.groupedDamagedEntries(this.planet?.objects.ships).find(
+      (entry) => entry.type === shipType,
+    );
 
     return {
       total,
       undamaged,
       damaged: damagedEntry?.amount ?? 0,
-      missingHull: damagedEntry?.totalMissingHull ?? 0
+      missingHull: damagedEntry?.totalMissingHull ?? 0,
     };
   }
 
@@ -2942,15 +3152,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     missingHull: number;
   } {
     const total = ManyDefences.countByType(this.planet?.objects.defences).get(defenceType) ?? 0;
-    const undamaged = ManyDefences.undamagedCountByType(this.planet?.objects.defences).get(defenceType) ?? 0;
-    const damagedEntry = ManyDefences.groupedDamagedEntries(this.planet?.objects.defences)
-      .find((entry) => entry.type === defenceType);
+    const undamaged =
+      ManyDefences.undamagedCountByType(this.planet?.objects.defences).get(defenceType) ?? 0;
+    const damagedEntry = ManyDefences.groupedDamagedEntries(this.planet?.objects.defences).find(
+      (entry) => entry.type === defenceType,
+    );
 
     return {
       total,
       undamaged,
       damaged: damagedEntry?.amount ?? 0,
-      missingHull: damagedEntry?.totalMissingHull ?? 0
+      missingHull: damagedEntry?.totalMissingHull ?? 0,
     };
   }
 
@@ -2967,7 +3179,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   private matchesDefenceFilter(defence: Defence): boolean {
-    const isPlanetaryBomb = isPlanetaryBombDefenceType(defence.type) || defence.hullClass === HullClass.PLANETARY_BOMB;
+    const isPlanetaryBomb =
+      isPlanetaryBombDefenceType(defence.type) || defence.hullClass === HullClass.PLANETARY_BOMB;
     const matchesRegularDefence = this.showRegularDefences && !isPlanetaryBomb;
     const matchesPlanetaryBomb = this.showPlanetaryBombDefences && isPlanetaryBomb;
 
@@ -3002,7 +3215,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       planet: this.gameApi.getClientPlanet(x, y, z, session.token, { ownedOnly: true }),
       ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
       activeFleets: this.gameApi.getActiveFleets(session.token),
-      planetOperations: this.gameApi.getPlanetOperations(x, y, z, session.token, 1)
+      planetOperations: this.gameApi.getPlanetOperations(x, y, z, session.token, 1),
     })
       .pipe(
         timeout(10000),
@@ -3014,7 +3227,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.pendingPlanetRequests = Math.max(0, this.pendingPlanetRequests - 1);
           this.isLoading = this.pendingPlanetRequests > 0;
           this.cdr.markForCheck();
-        })
+        }),
       )
       .subscribe({
         next: ({ planet, ownedPlanets, activeFleets, planetOperations }) => {
@@ -3050,10 +3263,14 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
             return;
           }
 
-          this.loadError = resolveApiErrorMessage(this.i18n, error, this.i18n.t('planetView.errors.loadServer'));
+          this.loadError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('planetView.errors.loadServer'),
+          );
           this.planet = null;
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -3061,7 +3278,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     fleet: Fleet,
     action: (token: string) => ReturnType<GameApiService['getActiveFleets']>,
     successMessage: string,
-    fallbackError: string
+    fallbackError: string,
   ): void {
     const session = this.playerSession.load();
     const planet = this.planet;
@@ -3075,10 +3292,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
 
     action(session.token)
-      .pipe(finalize(() => {
-        this.planetOperationsActionFleetId = null;
-        this.cdr.markForCheck();
-      }))
+      .pipe(
+        finalize(() => {
+          this.planetOperationsActionFleetId = null;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (activeFleets) => {
           this.activeFleets = [...activeFleets];
@@ -3086,13 +3305,18 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.reloadPlanetOperations(planet.coordinates, session.token);
         },
         error: (error) => {
-          this.planetOperationsActionError = resolveApiErrorMessage(this.i18n, error, fallbackError);
-        }
+          this.planetOperationsActionError = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            fallbackError,
+          );
+        },
       });
   }
 
   private reloadPlanetOperations(coordinates: ClientCoordinates, token: string): void {
-    this.gameApi.getPlanetOperations(coordinates.x, coordinates.y, coordinates.z, token, 1)
+    this.gameApi
+      .getPlanetOperations(coordinates.x, coordinates.y, coordinates.z, token, 1)
       .subscribe({
         next: (operations) => {
           this.applyPlanetOperations(operations, token);
@@ -3102,10 +3326,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           this.planetOperationsError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('planetView.errors.refreshOperations')
+            this.i18n.t('planetView.errors.refreshOperations'),
           );
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -3124,21 +3348,34 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       ships: this.planetMaintenanceShipOptions()
         .map((option) => ({
           type: option.type,
-          amount: Math.min(this.planetMaintenanceRequestedShipAmounts[option.type] ?? 0, option.available)
+          amount: Math.min(
+            this.planetMaintenanceRequestedShipAmounts[option.type] ?? 0,
+            option.available,
+          ),
         }))
         .filter((entry) => entry.amount > 0),
       bombs: this.planetMaintenanceBombOptions()
         .map((option) => ({
           type: option.type,
-          amount: Math.min(this.planetMaintenanceRequestedBombAmounts[option.type] ?? 0, option.available)
+          amount: Math.min(
+            this.planetMaintenanceRequestedBombAmounts[option.type] ?? 0,
+            option.available,
+          ),
         }))
-        .filter((entry) => entry.amount > 0)
+        .filter((entry) => entry.amount > 0),
     };
   }
 
-  private handlePlanetMaintenanceResponse(response: CreateMaintenanceRequestResponse, token: string): void {
+  private handlePlanetMaintenanceResponse(
+    response: CreateMaintenanceRequestResponse,
+    token: string,
+  ): void {
     this.activeFleets = [...response.activeFleets];
-    this.planetOperationsActionMessage = resolveApiMessage(this.i18n, response, response.message ?? null);
+    this.planetOperationsActionMessage = resolveApiMessage(
+      this.i18n,
+      response,
+      response.message ?? null,
+    );
     this.closePlanetMaintenanceRequest();
     if (this.planet) {
       this.reloadPlanetOperations(this.planet.coordinates, token);
@@ -3184,14 +3421,14 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     for (const entry of this.planet.objects.buildingsCurrentPowerConsumption ?? []) {
       this.buildingCurrentPowerByType.set(
         entry.type as BuildingType,
-        this.roundNumber(Math.max(0, entry.currentPowerConsumption), 2)
+        this.roundNumber(Math.max(0, entry.currentPowerConsumption), 2),
       );
     }
 
     for (const entry of this.planet.objects.buildingsCurrentStructuralPoints ?? []) {
       this.buildingCurrentStructuralPointsByType.set(
         entry.type as BuildingType,
-        Math.max(0, Math.floor(entry.currentStructuralPoints))
+        Math.max(0, Math.floor(entry.currentStructuralPoints)),
       );
     }
 
@@ -3245,7 +3482,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     const adaptiveTechLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const resources = this.planet.objects.resources;
-    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+    const energy = this.calculateEnergyState(
+      this.buildingLevelsByType,
+      this.buildingCurrentPowerByType,
+    );
     const fusionOperation = this.currentFusionReactorOperation();
     const energyEfficiency = energyDeficitEfficiencyMultiplier(energy.available, energy.used);
 
@@ -3255,24 +3495,38 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     this.metalDisplay = {
       current: resources.metal,
-      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.METAL_MINE, adaptiveTechLevel, this.planet.info.planetaryParameters.metalModifier) * energyEfficiency, 2),
-      capacityPercent: this.capacityPercent(resources.metal, metalCapacity)
+      productionPerTurn: this.roundNumber(
+        this.resourceGain(
+          BuildingType.METAL_MINE,
+          adaptiveTechLevel,
+          this.planet.info.planetaryParameters.metalModifier,
+        ) * energyEfficiency,
+        2,
+      ),
+      capacityPercent: this.capacityPercent(resources.metal, metalCapacity),
     };
 
     this.crystalDisplay = {
       current: resources.crystal,
-      productionPerTurn: this.roundNumber(this.resourceGain(BuildingType.CRYSTAL_MINE, adaptiveTechLevel, this.planet.info.planetaryParameters.crystalModifier) * energyEfficiency, 2),
-      capacityPercent: this.capacityPercent(resources.crystal, crystalCapacity)
+      productionPerTurn: this.roundNumber(
+        this.resourceGain(
+          BuildingType.CRYSTAL_MINE,
+          adaptiveTechLevel,
+          this.planet.info.planetaryParameters.crystalModifier,
+        ) * energyEfficiency,
+        2,
+      ),
+      capacityPercent: this.capacityPercent(resources.crystal, crystalCapacity),
     };
 
     this.deuteriumDisplay = {
       current: resources.deuterium,
       productionPerTurn: this.roundNumber(fusionOperation.netDeuteriumIncome, 2),
-      capacityPercent: this.capacityPercent(resources.deuterium, deuteriumCapacity)
+      capacityPercent: this.capacityPercent(resources.deuterium, deuteriumCapacity),
     };
     this.energyDisplay = {
       used: energy.used,
-      available: energy.available
+      available: energy.available,
     };
     this.energyTooltip = this.energyPenaltyTooltip(energy.available, energy.used);
 
@@ -3287,15 +3541,13 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       shipRepair: this.currentShipRepairCapability(),
       industryRepair: this.currentIndustryRepairCapability(),
       droneRepair: this.currentDroneRepairCapability(),
-      industryPowerLimited: (
-        this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
-        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
-      ),
-      shipyardPowerLimited: (
-        this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD)
-        || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
-      ),
-      researchPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.RESEARCH_LAB)
+      industryPowerLimited:
+        this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY) ||
+        this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY),
+      shipyardPowerLimited:
+        this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD) ||
+        this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY),
+      researchPowerLimited: this.isBuildingNotUsingFullPower(BuildingType.RESEARCH_LAB),
     };
   }
 
@@ -3307,8 +3559,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return this.roundNumber((current / capacity) * 100, 1);
   }
 
-  private resourceGain(buildingType: BuildingType, adaptiveTechLevel: number, modifier: number): number {
-    const baseProduction = this.getProductionAtLevelByType(buildingType, this.buildingLevel(buildingType));
+  private resourceGain(
+    buildingType: BuildingType,
+    adaptiveTechLevel: number,
+    modifier: number,
+  ): number {
+    const baseProduction = this.getProductionAtLevelByType(
+      buildingType,
+      this.buildingLevel(buildingType),
+    );
     const gain = baseProduction * (1 + adaptiveTechLevel / 100) * modifier;
     return Number.isFinite(gain) ? Math.floor(gain) : 0;
   }
@@ -3319,28 +3578,31 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   private calculateEnergyState(
     levels: Map<BuildingType, number>,
-    currentPowerByType: Map<BuildingType, number>
+    currentPowerByType: Map<BuildingType, number>,
   ): EnergyState {
     const solarProduction = this.getProductionAtLevelByType(
       BuildingType.SOLAR_WIND_GEOTHERMAL,
-      levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0
+      levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0,
     );
     const nuclearProduction = this.getProductionAtLevelByType(
       BuildingType.NUCLEAR_PLANT,
-      levels.get(BuildingType.NUCLEAR_PLANT) ?? 0
+      levels.get(BuildingType.NUCLEAR_PLANT) ?? 0,
     );
-    const fusionProduction = this.resolveFusionReactorOperationForCurrentState(levels, currentPowerByType).powerOutput;
+    const fusionProduction = this.resolveFusionReactorOperationForCurrentState(
+      levels,
+      currentPowerByType,
+    ).powerOutput;
 
     const parameters = this.planet?.info.planetaryParameters;
     const energyModifierRES = parameters?.energyModifierRES ?? 1;
     const energyModifierNuclear = parameters?.energyModifierNuclear ?? 1;
     const energyTechLevel = this.techLevel(TechnologyType.ENERGY_TECHNOLOGY);
 
-    const availableEnergy = (
-      (solarProduction * energyModifierRES)
-      + (nuclearProduction * energyModifierNuclear)
-      + fusionProduction
-    ) * (1 + ((energyTechLevel * 2) / 100));
+    const availableEnergy =
+      (solarProduction * energyModifierRES +
+        nuclearProduction * energyModifierNuclear +
+        fusionProduction) *
+      (1 + (energyTechLevel * 2) / 100);
 
     let usedEnergy = 0;
     for (const [buildingType, level] of levels.entries()) {
@@ -3355,19 +3617,23 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
       const maxConsumption = Math.max(0, level * (blueprint.powerConsumption ?? 0));
       const selectedConsumption = currentPowerByType.get(buildingType);
-      const normalizedConsumption = selectedConsumption === undefined
-        ? maxConsumption
-        : Math.min(maxConsumption, Math.max(0, selectedConsumption));
+      const normalizedConsumption =
+        selectedConsumption === undefined
+          ? maxConsumption
+          : Math.min(maxConsumption, Math.max(0, selectedConsumption));
       usedEnergy += normalizedConsumption;
     }
 
     return {
       used: this.roundNumber(usedEnergy, 2),
-      available: this.roundNumber(availableEnergy, 2)
+      available: this.roundNumber(availableEnergy, 2),
     };
   }
 
-  private hasBuildingRequirements(requirements: BuildingRequirement[], levelWeAreUpgradingTo: number): boolean {
+  private hasBuildingRequirements(
+    requirements: BuildingRequirement[],
+    levelWeAreUpgradingTo: number,
+  ): boolean {
     for (const requirement of requirements) {
       const requiredLevel = Math.ceil(levelWeAreUpgradingTo * requirement.level);
       const currentLevel = this.buildingLevel(requirement.building);
@@ -3379,7 +3645,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return true;
   }
 
-  private hasTechRequirements(requirements: TechRequirement[], levelWeAreUpgradingTo: number): boolean {
+  private hasTechRequirements(
+    requirements: TechRequirement[],
+    levelWeAreUpgradingTo: number,
+  ): boolean {
     for (const requirement of requirements) {
       const requiredLevel = Math.ceil(levelWeAreUpgradingTo * requirement.level);
       const currentLevel = this.techLevel(requirement.tech);
@@ -3429,7 +3698,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return new ResourcesPack(
       baseCost.metal * amount,
       baseCost.crystal * amount,
-      baseCost.deuterium * amount
+      baseCost.deuterium * amount,
     );
   }
 
@@ -3440,9 +3709,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     const current = this.planet.objects.resources;
     return (
-      current.metal >= cost.metal
-      && current.crystal >= cost.crystal
-      && current.deuterium >= cost.deuterium
+      current.metal >= cost.metal &&
+      current.crystal >= cost.crystal &&
+      current.deuterium >= cost.deuterium
     );
   }
 
@@ -3473,7 +3742,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return false;
     }
 
-    return this.queueEntryItemKind(firstQueueEntry) === 'ship' && this.queueEntryShipType(firstQueueEntry) === shipType;
+    return (
+      this.queueEntryItemKind(firstQueueEntry) === 'ship' &&
+      this.queueEntryShipType(firstQueueEntry) === shipType
+    );
   }
 
   private isHeadDefenceQueueType(defenceType: DefenceType): boolean {
@@ -3482,8 +3754,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return false;
     }
 
-    return this.queueEntryItemKind(firstQueueEntry) === 'defence'
-      && this.queueEntryDefenceType(firstQueueEntry) === defenceType;
+    return (
+      this.queueEntryItemKind(firstQueueEntry) === 'defence' &&
+      this.queueEntryDefenceType(firstQueueEntry) === defenceType
+    );
   }
 
   private queueEntryBuildingType(entry: BuildingQueueEntryDto): BuildingType {
@@ -3594,7 +3868,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const uniqueIds = new Set<string>();
     const result: ClientCoordinates[] = [];
     for (const helper of entry.helperLabs) {
-      if (!helper || !Number.isInteger(helper.x) || !Number.isInteger(helper.y) || !Number.isInteger(helper.z)) {
+      if (
+        !helper ||
+        !Number.isInteger(helper.x) ||
+        !Number.isInteger(helper.y) ||
+        !Number.isInteger(helper.z)
+      ) {
         continue;
       }
 
@@ -3611,7 +3890,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       result.push({
         x: helper.x,
         y: helper.y,
-        z: helper.z
+        z: helper.z,
       });
     }
 
@@ -3662,7 +3941,11 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return Math.floor(total);
   }
 
-  private shipAmountCompleted(shipType: ShipType, amount: number, investedShipyardPower: number): number {
+  private shipAmountCompleted(
+    shipType: ShipType,
+    amount: number,
+    investedShipyardPower: number,
+  ): number {
     const blueprint = this.shipBlueprintsByType.get(shipType);
     if (!blueprint || amount <= 0) {
       return 0;
@@ -3677,7 +3960,11 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return Math.max(0, Math.min(amount, completed));
   }
 
-  private defenceAmountCompleted(defenceType: DefenceType, amount: number, investedShipyardPower: number): number {
+  private defenceAmountCompleted(
+    defenceType: DefenceType,
+    amount: number,
+    investedShipyardPower: number,
+  ): number {
     const blueprint = this.defenceBlueprintsByType.get(defenceType);
     if (!blueprint || amount <= 0) {
       return 0;
@@ -3696,7 +3983,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     amountCompleted: number,
     amountTotal: number,
     investedShipyardPower: number,
-    singleShipBaseConstructionTime: number
+    singleShipBaseConstructionTime: number,
   ): number {
     if (singleShipBaseConstructionTime <= 0) {
       return 0;
@@ -3716,17 +4003,20 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
 
-    const roboticsPower = roboticsFactoryLevel <= 0
-      ? 5
-      : this.getProductionAtLevelByType(BuildingType.ROBOTICS_FACTORY, roboticsFactoryLevel);
-    const naniteMultiplier = naniteFactoryLevel <= 0
-      ? 1
-      : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+    const roboticsPower =
+      roboticsFactoryLevel <= 0
+        ? 5
+        : this.getProductionAtLevelByType(BuildingType.ROBOTICS_FACTORY, roboticsFactoryLevel);
+    const naniteMultiplier =
+      naniteFactoryLevel <= 0
+        ? 1
+        : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
-    const industryPower = roboticsPower
-      * naniteMultiplier
-      * industryModifier
-      * industryPowerMultiplier(adaptiveTechnologyLevel);
+    const industryPower =
+      roboticsPower *
+      naniteMultiplier *
+      industryModifier *
+      industryPowerMultiplier(adaptiveTechnologyLevel);
     if (!Number.isFinite(industryPower) || industryPower <= 0) {
       return 0;
     }
@@ -3777,13 +4067,13 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private currentFusionReactorOperation(): FusionReactorOperation {
     return this.resolveFusionReactorOperationForCurrentState(
       this.buildingLevelsByType,
-      this.buildingCurrentPowerByType
+      this.buildingCurrentPowerByType,
     );
   }
 
   private resolveFusionReactorOperationForCurrentState(
     levels: Map<BuildingType, number>,
-    currentPowerByType: Map<BuildingType, number>
+    currentPowerByType: Map<BuildingType, number>,
   ): FusionReactorOperation {
     const fusionLevel = levels.get(BuildingType.FUSION_REACTOR) ?? 0;
 
@@ -3800,36 +4090,42 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
       const maxConsumption = Math.max(0, level * (blueprint.powerConsumption ?? 0));
       const selectedConsumption = currentPowerByType.get(buildingType);
-      const normalizedConsumption = selectedConsumption === undefined
-        ? maxConsumption
-        : Math.min(maxConsumption, Math.max(0, selectedConsumption));
+      const normalizedConsumption =
+        selectedConsumption === undefined
+          ? maxConsumption
+          : Math.min(maxConsumption, Math.max(0, selectedConsumption));
       otherEnergyUsed += normalizedConsumption;
     }
 
     return resolveFusionReactorOperation({
       selectedStage: this.currentFusionReactorSelectedStage(),
       maxStage: fusionLevel,
-      structuralUtilization: this.structuralUtilizationAtLevel(BuildingType.FUSION_REACTOR, fusionLevel),
+      structuralUtilization: this.structuralUtilizationAtLevel(
+        BuildingType.FUSION_REACTOR,
+        fusionLevel,
+      ),
       energyTechnologyLevel: this.techLevel(TechnologyType.ENERGY_TECHNOLOGY),
       adaptiveTechnologyLevel: this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY),
       solarProduction: this.getProductionAtLevelByType(
         BuildingType.SOLAR_WIND_GEOTHERMAL,
-        levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0
+        levels.get(BuildingType.SOLAR_WIND_GEOTHERMAL) ?? 0,
       ),
       nuclearProduction: this.getProductionAtLevelByType(
         BuildingType.NUCLEAR_PLANT,
-        levels.get(BuildingType.NUCLEAR_PLANT) ?? 0
+        levels.get(BuildingType.NUCLEAR_PLANT) ?? 0,
       ),
       otherEnergyUsed,
       energyModifierRES: this.planet?.info.planetaryParameters.energyModifierRES ?? 1,
       energyModifierNuclear: this.planet?.info.planetaryParameters.energyModifierNuclear ?? 1,
       deuteriumSynthesizerProduction: this.getProductionAtLevelByType(
         BuildingType.DEUTERIUM_SYNTHESIZER,
-        levels.get(BuildingType.DEUTERIUM_SYNTHESIZER) ?? 0
+        levels.get(BuildingType.DEUTERIUM_SYNTHESIZER) ?? 0,
       ),
       deuteriumModifier: this.planet?.info.planetaryParameters.deuteriumModifier ?? 1,
-      fusionPowerAtStage: (stage) => this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
-      fusionDeuteriumAtStage: (stage) => this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2')
+      fusionPowerAtStage: (stage) =>
+        this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
+      fusionDeuteriumAtStage: (stage) =>
+        this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2'),
     });
   }
 
@@ -3839,17 +4135,20 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
 
-    const shipyardBasePower = shipyardLevel <= 0
-      ? 0
-      : this.getProductionAtLevelByType(BuildingType.SHIPYARD, shipyardLevel);
-    const naniteMultiplier = naniteFactoryLevel <= 0
-      ? 1
-      : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
+    const shipyardBasePower =
+      shipyardLevel <= 0
+        ? 0
+        : this.getProductionAtLevelByType(BuildingType.SHIPYARD, shipyardLevel);
+    const naniteMultiplier =
+      naniteFactoryLevel <= 0
+        ? 1
+        : this.getProductionAtLevelByTypeExact(BuildingType.NANITE_FACTORY, naniteFactoryLevel);
 
-    const shipyardPower = shipyardBasePower
-      * naniteMultiplier
-      * industryModifier
-      * industryPowerMultiplier(adaptiveTechnologyLevel);
+    const shipyardPower =
+      shipyardBasePower *
+      naniteMultiplier *
+      industryModifier *
+      industryPowerMultiplier(adaptiveTechnologyLevel);
     if (!Number.isFinite(shipyardPower) || shipyardPower <= 0) {
       return 0;
     }
@@ -3860,19 +4159,20 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private currentDroneProductionRouting(): ReturnType<typeof routeRepairDroneProduction> {
     const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
     const industryModifier = this.planet?.info.planetaryParameters.industryModifier ?? 1;
-    const repairDroneCount = ManyShips.countByType(this.planet?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
+    const repairDroneCount =
+      ManyShips.countByType(this.planet?.objects.ships).get(ShipType.REPAIR_DRONE) ?? 0;
 
     return routeRepairDroneProduction(
       calculateRepairDroneProductionBasePower({
         repairDroneCount,
         industryModifier,
         adaptiveIndustryMultiplier: industryPowerMultiplier(adaptiveTechnologyLevel),
-        energyEfficiency: this.currentEnergyEfficiency()
+        energyEfficiency: this.currentEnergyEfficiency(),
       }),
       {
         hasBuildingQueueWork: (this.planet?.objects.buildingQueue?.length ?? 0) > 0,
-        hasShipyardQueueWork: (this.planet?.objects.shipyardQueue?.length ?? 0) > 0
-      }
+        hasShipyardQueueWork: (this.planet?.objects.shipyardQueue?.length ?? 0) > 0,
+      },
     );
   }
 
@@ -3880,13 +4180,18 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const researchLabLevel = this.buildingLevel(BuildingType.RESEARCH_LAB);
     const computerTechnologyLevel = this.techLevel(TechnologyType.COMPUTER_TECHNOLOGY);
     const adaptiveTechnologyLevel = this.techLevel(TechnologyType.ADAPTIVE_TECHNOLOGY);
-    const intergalacticResearchNetworkLevel = this.techLevel(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK);
+    const intergalacticResearchNetworkLevel = this.techLevel(
+      TechnologyType.INTERGALACTIC_RESEARCH_NETWORK,
+    );
     const scienceModifier = this.planet?.info.planetaryParameters.scienceModifier ?? 1;
-    const researchLabProduction = this.getProductionAtLevelByType(BuildingType.RESEARCH_LAB, researchLabLevel);
+    const researchLabProduction = this.getProductionAtLevelByType(
+      BuildingType.RESEARCH_LAB,
+      researchLabLevel,
+    );
     const totalResearchMultiplier = researchPowerMultiplier(
       computerTechnologyLevel,
       adaptiveTechnologyLevel,
-      intergalacticResearchNetworkLevel
+      intergalacticResearchNetworkLevel,
     );
 
     const researchPower = researchLabProduction * totalResearchMultiplier * scienceModifier;
@@ -3904,7 +4209,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     let total = calculateRepairCapabilityForManyShips(planet.objects.ships, {
-      shipyardPower: this.currentBaseShipyardPower()
+      shipyardPower: this.currentBaseShipyardPower(),
     }).shipRepair;
     for (const fleet of this.currentPlanetIdleRepairFleets()) {
       total += calculateRepairCapabilityForManyShips(fleet.ships).shipRepair;
@@ -3934,22 +4239,29 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private baseShipyardPowerForPlanet(planet: ClientPlanetDto): number {
     const shipyardLevel = this.buildingLevelForPlanet(planet, BuildingType.SHIPYARD);
     const naniteFactoryLevel = this.buildingLevelForPlanet(planet, BuildingType.NANITE_FACTORY);
-    const adaptiveTechnologyLevel = this.techLevelForPlanet(planet, TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const adaptiveTechnologyLevel = this.techLevelForPlanet(
+      planet,
+      TechnologyType.ADAPTIVE_TECHNOLOGY,
+    );
     const industryModifier = planet.info.planetaryParameters.industryModifier;
     const energyState = this.calculateEnergyStateForPlanet(planet);
-    const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
+    const energyEfficiency = energyDeficitEfficiencyMultiplier(
+      energyState.available,
+      energyState.used,
+    );
 
-    const shipyardBasePower = shipyardLevel <= 0
-      ? 0
-      : this.productionAtPlanetBuildingLevel(planet, BuildingType.SHIPYARD);
-    const naniteMultiplier = naniteFactoryLevel <= 0
-      ? 1
-      : this.productionAtPlanetBuildingLevelExact(planet, BuildingType.NANITE_FACTORY);
+    const shipyardBasePower =
+      shipyardLevel <= 0 ? 0 : this.productionAtPlanetBuildingLevel(planet, BuildingType.SHIPYARD);
+    const naniteMultiplier =
+      naniteFactoryLevel <= 0
+        ? 1
+        : this.productionAtPlanetBuildingLevelExact(planet, BuildingType.NANITE_FACTORY);
 
-    const shipyardPower = shipyardBasePower
-      * naniteMultiplier
-      * industryModifier
-      * industryPowerMultiplier(adaptiveTechnologyLevel);
+    const shipyardPower =
+      shipyardBasePower *
+      naniteMultiplier *
+      industryModifier *
+      industryPowerMultiplier(adaptiveTechnologyLevel);
     if (!Number.isFinite(shipyardPower) || shipyardPower <= 0) {
       return 0;
     }
@@ -3958,7 +4270,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   private currentEnergyEfficiency(): number {
-    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+    const energy = this.calculateEnergyState(
+      this.buildingLevelsByType,
+      this.buildingCurrentPowerByType,
+    );
     return energyDeficitEfficiencyMultiplier(energy.available, energy.used);
   }
 
@@ -3968,7 +4283,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return null;
     }
 
-    const currentIndex = this.ownedPlanets.findIndex((planet) => this.sameCoordinates(planet.coordinates, currentPlanet.coordinates));
+    const currentIndex = this.ownedPlanets.findIndex((planet) =>
+      this.sameCoordinates(planet.coordinates, currentPlanet.coordinates),
+    );
     if (currentIndex < 0) {
       return null;
     }
@@ -4002,15 +4319,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     if (
-      this.isPlanetPowerLimited(planet, BuildingType.ROBOTICS_FACTORY)
-      || this.isPlanetPowerLimited(planet, BuildingType.NANITE_FACTORY)
+      this.isPlanetPowerLimited(planet, BuildingType.ROBOTICS_FACTORY) ||
+      this.isPlanetPowerLimited(planet, BuildingType.NANITE_FACTORY)
     ) {
       labels.push('Reduced industry power');
     }
 
     if (
-      this.isPlanetPowerLimited(planet, BuildingType.SHIPYARD)
-      || this.isPlanetPowerLimited(planet, BuildingType.NANITE_FACTORY)
+      this.isPlanetPowerLimited(planet, BuildingType.SHIPYARD) ||
+      this.isPlanetPowerLimited(planet, BuildingType.NANITE_FACTORY)
     ) {
       labels.push('Reduced shipyard power');
     }
@@ -4024,8 +4341,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     if (
-      this.hasDamagedShipsAtPlanet(planet)
-      && this.shipRepairCapabilityForPlanet(planet) + this.droneRepairCapabilityForPlanet(planet) <= 0
+      this.hasDamagedShipsAtPlanet(planet) &&
+      this.shipRepairCapabilityForPlanet(planet) + this.droneRepairCapabilityForPlanet(planet) <= 0
     ) {
       labels.push('Damaged ships without repair capability');
     }
@@ -4035,8 +4352,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     if (
-      this.hasDamagedBuildingsAtPlanet(planet)
-      && this.industryRepairCapabilityForPlanet(planet) + this.droneRepairCapabilityForPlanet(planet) <= 0
+      this.hasDamagedBuildingsAtPlanet(planet) &&
+      this.industryRepairCapabilityForPlanet(planet) +
+        this.droneRepairCapabilityForPlanet(planet) <=
+        0
     ) {
       labels.push('Damaged buildings without repair capability');
     }
@@ -4046,8 +4365,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     if (
-      this.hasDamagedDefencesAtPlanet(planet)
-      && this.industryRepairCapabilityForPlanet(planet) + this.droneRepairCapabilityForPlanet(planet) <= 0
+      this.hasDamagedDefencesAtPlanet(planet) &&
+      this.industryRepairCapabilityForPlanet(planet) +
+        this.droneRepairCapabilityForPlanet(planet) <=
+        0
     ) {
       labels.push('Damaged defences without repair capability');
     }
@@ -4067,7 +4388,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     const labels: string[] = [];
-    const energy = this.calculateEnergyState(this.buildingLevelsByType, this.buildingCurrentPowerByType);
+    const energy = this.calculateEnergyState(
+      this.buildingLevelsByType,
+      this.buildingCurrentPowerByType,
+    );
 
     if (energy.used > energy.available) {
       labels.push('Energy insufficient');
@@ -4090,15 +4414,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     if (
-      this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY)
-      || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+      this.isBuildingNotUsingFullPower(BuildingType.ROBOTICS_FACTORY) ||
+      this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
     ) {
       labels.push('Reduced industry power');
     }
 
     if (
-      this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD)
-      || this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
+      this.isBuildingNotUsingFullPower(BuildingType.SHIPYARD) ||
+      this.isBuildingNotUsingFullPower(BuildingType.NANITE_FACTORY)
     ) {
       labels.push('Reduced shipyard power');
     }
@@ -4112,8 +4436,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     if (
-      this.hasDamagedShipsAtCurrentPlanet()
-      && this.currentShipRepairCapability() + this.currentDroneRepairCapability() <= 0
+      this.hasDamagedShipsAtCurrentPlanet() &&
+      this.currentShipRepairCapability() + this.currentDroneRepairCapability() <= 0
     ) {
       labels.push('Damaged ships without repair capability');
     }
@@ -4123,8 +4447,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     if (
-      this.hasDamagedBuildingsAtCurrentPlanet()
-      && this.currentIndustryRepairCapability() + this.currentDroneRepairCapability() <= 0
+      this.hasDamagedBuildingsAtCurrentPlanet() &&
+      this.currentIndustryRepairCapability() + this.currentDroneRepairCapability() <= 0
     ) {
       labels.push('Damaged buildings without repair capability');
     }
@@ -4134,8 +4458,8 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     if (
-      this.hasDamagedDefencesAtCurrentPlanet()
-      && this.currentIndustryRepairCapability() + this.currentDroneRepairCapability() <= 0
+      this.hasDamagedDefencesAtCurrentPlanet() &&
+      this.currentIndustryRepairCapability() + this.currentDroneRepairCapability() <= 0
     ) {
       labels.push('Damaged defences without repair capability');
     }
@@ -4153,7 +4477,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return true;
     }
 
-    return this.currentPlanetIdleRepairFleets().some((fleet) => ManyShips.hasDamagedShips(fleet.ships));
+    return this.currentPlanetIdleRepairFleets().some((fleet) =>
+      ManyShips.hasDamagedShips(fleet.ships),
+    );
   }
 
   private hasDamagedShipsAtPlanet(planet: ClientPlanetDto): boolean {
@@ -4161,7 +4487,9 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return true;
     }
 
-    return this.idleRepairFleetsForPlanet(planet).some((fleet) => ManyShips.hasDamagedShips(fleet.ships));
+    return this.idleRepairFleetsForPlanet(planet).some((fleet) =>
+      ManyShips.hasDamagedShips(fleet.ships),
+    );
   }
 
   private hasDamagedBuildingsAtCurrentPlanet(): boolean {
@@ -4170,8 +4498,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return false;
     }
 
-    return [...this.buildingLevelsByType.entries()].some(([type, level]) =>
-      level > 0 && this.currentBuildingStructuralPoints(type) < this.maxBuildingStructuralPoints(type, level)
+    return [...this.buildingLevelsByType.entries()].some(
+      ([type, level]) =>
+        level > 0 &&
+        this.currentBuildingStructuralPoints(type) < this.maxBuildingStructuralPoints(type, level),
     );
   }
 
@@ -4179,7 +4509,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return planet.objects.buildingsLevels.some((entry) => {
       const buildingType = entry.type as BuildingType;
       const max = this.maxBuildingStructuralPoints(buildingType, entry.level);
-      return entry.level > 0 && this.currentPlanetBuildingStructuralPoints(planet, buildingType, max) < max;
+      return (
+        entry.level > 0 &&
+        this.currentPlanetBuildingStructuralPoints(planet, buildingType, max) < max
+      );
     });
   }
 
@@ -4198,7 +4531,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   private shipRepairCapabilityForPlanet(planet: ClientPlanetDto): number {
     let total = calculateRepairCapabilityForManyShips(planet.objects.ships, {
-      shipyardPower: this.baseShipyardPowerForPlanet(planet)
+      shipyardPower: this.baseShipyardPowerForPlanet(planet),
     }).shipRepair;
     for (const fleet of this.idleRepairFleetsForPlanet(planet)) {
       total += calculateRepairCapabilityForManyShips(fleet.ships).shipRepair;
@@ -4219,21 +4552,30 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private industryRepairCapabilityForPlanet(planet: ClientPlanetDto): number {
     const roboticsFactoryLevel = this.buildingLevelForPlanet(planet, BuildingType.ROBOTICS_FACTORY);
     const naniteFactoryLevel = this.buildingLevelForPlanet(planet, BuildingType.NANITE_FACTORY);
-    const adaptiveTechnologyLevel = this.techLevelForPlanet(planet, TechnologyType.ADAPTIVE_TECHNOLOGY);
+    const adaptiveTechnologyLevel = this.techLevelForPlanet(
+      planet,
+      TechnologyType.ADAPTIVE_TECHNOLOGY,
+    );
     const industryModifier = planet.info.planetaryParameters.industryModifier;
     const energyState = this.calculateEnergyStateForPlanet(planet);
-    const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
+    const energyEfficiency = energyDeficitEfficiencyMultiplier(
+      energyState.available,
+      energyState.used,
+    );
 
-    const roboticsPower = roboticsFactoryLevel <= 0
-      ? 5
-      : this.productionAtPlanetBuildingLevel(planet, BuildingType.ROBOTICS_FACTORY);
-    const naniteMultiplier = naniteFactoryLevel <= 0
-      ? 1
-      : this.productionAtPlanetBuildingLevelExact(planet, BuildingType.NANITE_FACTORY);
-    const industryPower = roboticsPower
-      * naniteMultiplier
-      * industryModifier
-      * industryPowerMultiplier(adaptiveTechnologyLevel);
+    const roboticsPower =
+      roboticsFactoryLevel <= 0
+        ? 5
+        : this.productionAtPlanetBuildingLevel(planet, BuildingType.ROBOTICS_FACTORY);
+    const naniteMultiplier =
+      naniteFactoryLevel <= 0
+        ? 1
+        : this.productionAtPlanetBuildingLevelExact(planet, BuildingType.NANITE_FACTORY);
+    const industryPower =
+      roboticsPower *
+      naniteMultiplier *
+      industryModifier *
+      industryPowerMultiplier(adaptiveTechnologyLevel);
     if (!Number.isFinite(industryPower) || industryPower <= 0) {
       return 0;
     }
@@ -4306,16 +4648,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   private calculateEnergyStateForPlanet(planet: ClientPlanetDto): EnergyState {
     const energyTechLevel = this.techLevelForPlanet(planet, TechnologyType.ENERGY_TECHNOLOGY);
-    const solarProduction = this.productionAtPlanetBuildingLevel(planet, BuildingType.SOLAR_WIND_GEOTHERMAL);
-    const nuclearProduction = this.productionAtPlanetBuildingLevel(planet, BuildingType.NUCLEAR_PLANT);
+    const solarProduction = this.productionAtPlanetBuildingLevel(
+      planet,
+      BuildingType.SOLAR_WIND_GEOTHERMAL,
+    );
+    const nuclearProduction = this.productionAtPlanetBuildingLevel(
+      planet,
+      BuildingType.NUCLEAR_PLANT,
+    );
     const fusionProduction = this.resolveFusionReactorOperationForPlanet(planet).powerOutput;
     const parameters = planet.info.planetaryParameters;
 
-    const availableEnergy = (
-      (solarProduction * parameters.energyModifierRES)
-      + (nuclearProduction * parameters.energyModifierNuclear)
-      + fusionProduction
-    ) * (1 + ((energyTechLevel * 2) / 100));
+    const availableEnergy =
+      (solarProduction * parameters.energyModifierRES +
+        nuclearProduction * parameters.energyModifierNuclear +
+        fusionProduction) *
+      (1 + (energyTechLevel * 2) / 100);
 
     let usedEnergy = 0;
     for (const entry of planet.objects.buildingsLevels) {
@@ -4331,14 +4679,15 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
       const maxConsumption = Math.max(0, entry.level * (blueprint.powerConsumption ?? 0));
       const currentConsumption = this.currentPlanetBuildingPowerConsumption(planet, buildingType);
-      usedEnergy += currentConsumption === null
-        ? maxConsumption
-        : Math.min(maxConsumption, Math.max(0, currentConsumption));
+      usedEnergy +=
+        currentConsumption === null
+          ? maxConsumption
+          : Math.min(maxConsumption, Math.max(0, currentConsumption));
     }
 
     return {
       used: this.roundNumber(usedEnergy, 2),
-      available: this.roundNumber(availableEnergy, 2)
+      available: this.roundNumber(availableEnergy, 2),
     };
   }
 
@@ -4363,14 +4712,22 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return false;
   }
 
-  private maxPlanetBuildingPowerConsumption(planet: ClientPlanetDto, buildingType: BuildingType): number {
+  private maxPlanetBuildingPowerConsumption(
+    planet: ClientPlanetDto,
+    buildingType: BuildingType,
+  ): number {
     const level = this.buildingLevelForPlanet(planet, buildingType);
     const blueprint = this.buildingBlueprintsByType.get(buildingType);
     return this.roundNumber(level * (blueprint?.powerConsumption ?? 0), 2);
   }
 
-  private currentPlanetBuildingPowerConsumption(planet: ClientPlanetDto, buildingType: BuildingType): number | null {
-    const entry = planet.objects.buildingsCurrentPowerConsumption.find((item) => item.type === buildingType);
+  private currentPlanetBuildingPowerConsumption(
+    planet: ClientPlanetDto,
+    buildingType: BuildingType,
+  ): number | null {
+    const entry = planet.objects.buildingsCurrentPowerConsumption.find(
+      (item) => item.type === buildingType,
+    );
     return entry ? this.roundNumber(entry.currentPowerConsumption, 2) : null;
   }
 
@@ -4378,7 +4735,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return planet.objects.buildingsLevels.find((entry) => entry.type === buildingType)?.level ?? 0;
   }
 
-  private productionAtPlanetBuildingLevel(planet: ClientPlanetDto, buildingType: BuildingType): number {
+  private productionAtPlanetBuildingLevel(
+    planet: ClientPlanetDto,
+    buildingType: BuildingType,
+  ): number {
     if (buildingType === BuildingType.FUSION_REACTOR) {
       return this.resolveFusionReactorOperationForPlanet(planet).powerOutput;
     }
@@ -4393,11 +4753,14 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       blueprint,
       level,
       this.currentPlanetBuildingPowerConsumption(planet, buildingType),
-      this.structuralUtilizationForPlanet(planet, buildingType)
+      this.structuralUtilizationForPlanet(planet, buildingType),
     );
   }
 
-  private productionAtPlanetBuildingLevelExact(planet: ClientPlanetDto, buildingType: BuildingType): number {
+  private productionAtPlanetBuildingLevelExact(
+    planet: ClientPlanetDto,
+    buildingType: BuildingType,
+  ): number {
     if (buildingType === BuildingType.FUSION_REACTOR) {
       return this.resolveFusionReactorOperationForPlanet(planet).powerOutput;
     }
@@ -4412,7 +4775,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       blueprint,
       level,
       this.currentPlanetBuildingPowerConsumption(planet, buildingType),
-      this.structuralUtilizationForPlanet(planet, buildingType)
+      this.structuralUtilizationForPlanet(planet, buildingType),
     );
   }
 
@@ -4437,28 +4800,32 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
       const maxConsumption = Math.max(0, entry.level * (blueprint.powerConsumption ?? 0));
       const currentConsumption = this.currentPlanetBuildingPowerConsumption(planet, buildingType);
-      otherEnergyUsed += currentConsumption === null
-        ? maxConsumption
-        : Math.min(maxConsumption, Math.max(0, currentConsumption));
+      otherEnergyUsed +=
+        currentConsumption === null
+          ? maxConsumption
+          : Math.min(maxConsumption, Math.max(0, currentConsumption));
     }
 
     return resolveFusionReactorOperation({
       selectedStage: this.selectedFusionReactorStageForPlanet(planet),
       maxStage: fusionLevel,
-      structuralUtilization: this.structuralUtilizationForPlanet(planet, BuildingType.FUSION_REACTOR),
+      structuralUtilization: this.structuralUtilizationForPlanet(
+        planet,
+        BuildingType.FUSION_REACTOR,
+      ),
       energyTechnologyLevel: this.techLevelForPlanet(planet, TechnologyType.ENERGY_TECHNOLOGY),
       adaptiveTechnologyLevel: this.techLevelForPlanet(planet, TechnologyType.ADAPTIVE_TECHNOLOGY),
       solarProduction: this.getProductionAtLevel(
         this.buildingBlueprintsByType.get(BuildingType.SOLAR_WIND_GEOTHERMAL)!,
         this.buildingLevelForPlanet(planet, BuildingType.SOLAR_WIND_GEOTHERMAL),
         this.currentPlanetBuildingPowerConsumption(planet, BuildingType.SOLAR_WIND_GEOTHERMAL),
-        this.structuralUtilizationForPlanet(planet, BuildingType.SOLAR_WIND_GEOTHERMAL)
+        this.structuralUtilizationForPlanet(planet, BuildingType.SOLAR_WIND_GEOTHERMAL),
       ),
       nuclearProduction: this.getProductionAtLevel(
         this.buildingBlueprintsByType.get(BuildingType.NUCLEAR_PLANT)!,
         this.buildingLevelForPlanet(planet, BuildingType.NUCLEAR_PLANT),
         this.currentPlanetBuildingPowerConsumption(planet, BuildingType.NUCLEAR_PLANT),
-        this.structuralUtilizationForPlanet(planet, BuildingType.NUCLEAR_PLANT)
+        this.structuralUtilizationForPlanet(planet, BuildingType.NUCLEAR_PLANT),
       ),
       otherEnergyUsed,
       energyModifierRES: planet.info.planetaryParameters.energyModifierRES,
@@ -4467,11 +4834,13 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         this.buildingBlueprintsByType.get(BuildingType.DEUTERIUM_SYNTHESIZER)!,
         this.buildingLevelForPlanet(planet, BuildingType.DEUTERIUM_SYNTHESIZER),
         this.currentPlanetBuildingPowerConsumption(planet, BuildingType.DEUTERIUM_SYNTHESIZER),
-        this.structuralUtilizationForPlanet(planet, BuildingType.DEUTERIUM_SYNTHESIZER)
+        this.structuralUtilizationForPlanet(planet, BuildingType.DEUTERIUM_SYNTHESIZER),
       ),
       deuteriumModifier: planet.info.planetaryParameters.deuteriumModifier,
-      fusionPowerAtStage: (stage) => this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
-      fusionDeuteriumAtStage: (stage) => this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2')
+      fusionPowerAtStage: (stage) =>
+        this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production1'),
+      fusionDeuteriumAtStage: (stage) =>
+        this.getRawBuildingProductionAtStage(BuildingType.FUSION_REACTOR, stage, 'production2'),
     });
   }
 
@@ -4490,16 +4859,19 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   private sortOwnedPlanets(planets: ClientPlanetDto[]): ClientPlanetDto[] {
-    return [...planets].sort((left, right) =>
-      left.basicInfo.name.localeCompare(right.basicInfo.name)
-      || left.coordinates.y - right.coordinates.y
-      || left.coordinates.x - right.coordinates.x
-      || left.coordinates.z - right.coordinates.z
+    return [...planets].sort(
+      (left, right) =>
+        left.basicInfo.name.localeCompare(right.basicInfo.name) ||
+        left.coordinates.y - right.coordinates.y ||
+        left.coordinates.x - right.coordinates.x ||
+        left.coordinates.z - right.coordinates.z,
     );
   }
 
   private syncOwnedPlanet(updatedPlanet: ClientPlanetDto): void {
-    const existingIndex = this.ownedPlanets.findIndex((planet) => this.sameCoordinates(planet.coordinates, updatedPlanet.coordinates));
+    const existingIndex = this.ownedPlanets.findIndex((planet) =>
+      this.sameCoordinates(planet.coordinates, updatedPlanet.coordinates),
+    );
     if (existingIndex < 0) {
       return;
     }
@@ -4509,23 +4881,30 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   private refreshPlanetOperationOwnerNames(token: string): void {
-    const ownerInfoByCoordinates = new Map<string, { ownerId: number | null; ownerName: string | null }>();
+    const ownerInfoByCoordinates = new Map<
+      string,
+      { ownerId: number | null; ownerName: string | null }
+    >();
     for (const planet of this.ownedPlanets) {
       ownerInfoByCoordinates.set(this.coordinatesKey(planet.coordinates), {
         ownerId: planet.info.ownerId,
-        ownerName: planet.info.ownerPlayerName ?? null
+        ownerName: planet.info.ownerPlayerName ?? null,
       });
     }
 
     if (this.planet) {
       ownerInfoByCoordinates.set(this.coordinatesKey(this.planet.coordinates), {
         ownerId: this.planet.info.ownerId,
-        ownerName: this.planet.info.ownerPlayerName ?? null
+        ownerName: this.planet.info.ownerPlayerName ?? null,
       });
     }
 
     const coordinatesToFetch = new Map<string, ClientCoordinates>();
-    for (const fleet of [...this.planetOutgoingFleets, ...this.planetReturningFleets, ...this.planetIncomingFleets]) {
+    for (const fleet of [
+      ...this.planetOutgoingFleets,
+      ...this.planetReturningFleets,
+      ...this.planetIncomingFleets,
+    ]) {
       for (const coordinates of [fleet.origin, fleet.target]) {
         const key = this.coordinatesKey(coordinates);
         if (!ownerInfoByCoordinates.has(key) && !coordinatesToFetch.has(key)) {
@@ -4551,10 +4930,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const coordinateEntries = [...coordinatesToFetch.entries()];
     forkJoin(
       coordinateEntries.map(([_, coordinates]) =>
-        this.gameApi.getClientPlanet(coordinates.x, coordinates.y, coordinates.z, token).pipe(
-          catchError(() => of(null))
-        )
-      )
+        this.gameApi
+          .getClientPlanet(coordinates.x, coordinates.y, coordinates.z, token)
+          .pipe(catchError(() => of(null))),
+      ),
     ).subscribe({
       next: (planets) => {
         planets.forEach((planet, index) => {
@@ -4564,18 +4943,20 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
           }
           ownerInfoByCoordinates.set(key, {
             ownerId: planet?.info.ownerId ?? null,
-            ownerName: planet?.info.ownerPlayerName ?? null
+            ownerName: planet?.info.ownerPlayerName ?? null,
           });
         });
         this.replacePlanetOperationOwnerInfos(ownerInfoByCoordinates);
       },
       error: () => {
         this.replacePlanetOperationOwnerInfos(ownerInfoByCoordinates);
-      }
+      },
     });
   }
 
-  private replacePlanetOperationOwnerInfos(entries: Map<string, { ownerId: number | null; ownerName: string | null }>): void {
+  private replacePlanetOperationOwnerInfos(
+    entries: Map<string, { ownerId: number | null; ownerName: string | null }>,
+  ): void {
     this.planetOperationOwnerInfoByCoordinates.clear();
     for (const [key, ownerInfo] of entries.entries()) {
       this.planetOperationOwnerInfoByCoordinates.set(key, ownerInfo);
@@ -4593,15 +4974,16 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   private sameCoordinates(
     left: ClientPlanetDto['coordinates'],
-    right: ClientPlanetDto['coordinates']
+    right: ClientPlanetDto['coordinates'],
   ): boolean {
-    return left.x === right.x
-      && left.y === right.y
-      && left.z === right.z;
+    return left.x === right.x && left.y === right.y && left.z === right.z;
   }
 
   private energyPenaltyTooltip(availableEnergy: number, usedEnergy: number): string {
-    const penaltyPercent = this.roundNumber(energyDeficitPenaltyPercent(availableEnergy, usedEnergy), 2);
+    const penaltyPercent = this.roundNumber(
+      energyDeficitPenaltyPercent(availableEnergy, usedEnergy),
+      2,
+    );
     return this.i18n.t('planetView.warnings.energyPenalty', { penaltyPercent });
   }
 
@@ -4647,7 +5029,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     building: Building,
     level: number,
     explicitPowerConsumption?: number | null,
-    explicitStructuralUtilization?: number | null
+    explicitStructuralUtilization?: number | null,
   ): number {
     const baseProduction = this.getRawProductionAtLevel(building, level);
     if (baseProduction <= 0) {
@@ -4658,9 +5040,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       building.type,
       level,
       building.powerConsumption ?? 0,
-      explicitPowerConsumption
+      explicitPowerConsumption,
     );
-    const structuralUtilization = explicitStructuralUtilization ?? this.structuralUtilizationAtLevel(building.type, level);
+    const structuralUtilization =
+      explicitStructuralUtilization ?? this.structuralUtilizationAtLevel(building.type, level);
     return Math.floor(baseProduction * utilization * structuralUtilization);
   }
 
@@ -4668,7 +5051,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     building: Building,
     level: number,
     explicitPowerConsumption?: number | null,
-    explicitStructuralUtilization?: number | null
+    explicitStructuralUtilization?: number | null,
   ): number {
     const baseProduction = this.getRawProductionAtLevel(building, level);
     if (baseProduction <= 0) {
@@ -4679,9 +5062,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       building.type,
       level,
       building.powerConsumption ?? 0,
-      explicitPowerConsumption
+      explicitPowerConsumption,
     );
-    const structuralUtilization = explicitStructuralUtilization ?? this.structuralUtilizationAtLevel(building.type, level);
+    const structuralUtilization =
+      explicitStructuralUtilization ?? this.structuralUtilizationAtLevel(building.type, level);
     return baseProduction * utilization * structuralUtilization;
   }
 
@@ -4702,7 +5086,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   private getRawBuildingProductionAtStage(
     buildingType: BuildingType,
     stage: number,
-    key: 'production1' | 'production2'
+    key: 'production1' | 'production2',
   ): number {
     if (stage <= 0) {
       return 0;
@@ -4721,7 +5105,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     buildingType: BuildingType,
     level: number,
     powerPerLevel: number,
-    explicitPowerConsumption?: number | null
+    explicitPowerConsumption?: number | null,
   ): number {
     if (level <= 0) {
       return 0;
@@ -4736,10 +5120,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return 1;
     }
 
-    const selectedConsumption = explicitPowerConsumption ?? this.buildingCurrentPowerByType.get(buildingType);
-    const normalizedConsumption = selectedConsumption === undefined
-      ? maxConsumption
-      : Math.min(maxConsumption, Math.max(0, selectedConsumption));
+    const selectedConsumption =
+      explicitPowerConsumption ?? this.buildingCurrentPowerByType.get(buildingType);
+    const normalizedConsumption =
+      selectedConsumption === undefined
+        ? maxConsumption
+        : Math.min(maxConsumption, Math.max(0, selectedConsumption));
     return normalizedConsumption / maxConsumption;
   }
 
@@ -4772,7 +5158,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return Math.min(1, Math.max(this.minimumStructuralUtilization(buildingType), ratio));
   }
 
-  private structuralUtilizationForPlanet(planet: ClientPlanetDto, buildingType: BuildingType): number {
+  private structuralUtilizationForPlanet(
+    planet: ClientPlanetDto,
+    buildingType: BuildingType,
+  ): number {
     const level = this.buildingLevelForPlanet(planet, buildingType);
     if (level <= 0) {
       return 0;
@@ -4788,20 +5177,30 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     const current = this.currentPlanetBuildingStructuralPoints(planet, buildingType, max);
-    return Math.min(1, Math.max(this.minimumStructuralUtilizationForPlanet(planet, buildingType), current / max));
+    return Math.min(
+      1,
+      Math.max(this.minimumStructuralUtilizationForPlanet(planet, buildingType), current / max),
+    );
   }
 
   private currentPlanetBuildingStructuralPoints(
     planet: ClientPlanetDto,
     buildingType: BuildingType,
-    fallbackMax?: number
+    fallbackMax?: number,
   ): number {
-    const max = fallbackMax ?? this.maxBuildingStructuralPoints(buildingType, this.buildingLevelForPlanet(planet, buildingType));
+    const max =
+      fallbackMax ??
+      this.maxBuildingStructuralPoints(
+        buildingType,
+        this.buildingLevelForPlanet(planet, buildingType),
+      );
     if (max <= 0) {
       return 0;
     }
 
-    const entry = planet.objects.buildingsCurrentStructuralPoints.find((item) => item.type === buildingType);
+    const entry = planet.objects.buildingsCurrentStructuralPoints.find(
+      (item) => item.type === buildingType,
+    );
     return entry ? Math.min(max, Math.max(0, Math.floor(entry.currentStructuralPoints))) : max;
   }
 
@@ -4816,7 +5215,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     const cost = blueprint.getCostForLevel(level);
-    return Math.max(0, Math.floor((cost.metal * 2) + cost.crystal + Math.floor(cost.deuterium * 0.5)));
+    return Math.max(
+      0,
+      Math.floor(cost.metal * 2 + cost.crystal + Math.floor(cost.deuterium * 0.5)),
+    );
   }
 
   private minimumStructuralUtilization(buildingType: BuildingType): number {
@@ -4824,7 +5226,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
       return 0;
     }
 
-    return Math.min(1, 0.02 + (this.buildingLevel(BuildingType.BUNKER_NETWORK) * 0.01));
+    return Math.min(1, 0.02 + this.buildingLevel(BuildingType.BUNKER_NETWORK) * 0.01);
   }
 
   private terraformerPenaltyReduction(): number {
@@ -4841,34 +5243,46 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const powerUtilization = this.powerUtilizationAtLevel(
       BuildingType.TERRAFORMER,
       terraformerLevel,
-      blueprint.powerConsumption ?? 0
+      blueprint.powerConsumption ?? 0,
     );
-    const maxStructuralPoints = this.maxBuildingStructuralPoints(BuildingType.TERRAFORMER, terraformerLevel);
-    const structuralUtilization = maxStructuralPoints <= 0
-      ? 1
-      : Math.min(
-        1,
-        Math.max(
-          this.minimumStructuralUtilization(BuildingType.TERRAFORMER),
-          this.currentBuildingStructuralPoints(BuildingType.TERRAFORMER) / maxStructuralPoints
-        )
-      );
+    const maxStructuralPoints = this.maxBuildingStructuralPoints(
+      BuildingType.TERRAFORMER,
+      terraformerLevel,
+    );
+    const structuralUtilization =
+      maxStructuralPoints <= 0
+        ? 1
+        : Math.min(
+            1,
+            Math.max(
+              this.minimumStructuralUtilization(BuildingType.TERRAFORMER),
+              this.currentBuildingStructuralPoints(BuildingType.TERRAFORMER) / maxStructuralPoints,
+            ),
+          );
 
     return Math.max(0, (terraformerLevel * powerUtilization * structuralUtilization) / 100);
   }
 
-  private minimumStructuralUtilizationForPlanet(planet: ClientPlanetDto, buildingType: BuildingType): number {
+  private minimumStructuralUtilizationForPlanet(
+    planet: ClientPlanetDto,
+    buildingType: BuildingType,
+  ): number {
     if (this.isZeroFloorBuilding(buildingType)) {
       return 0;
     }
 
-    return Math.min(1, 0.02 + (this.buildingLevelForPlanet(planet, BuildingType.BUNKER_NETWORK) * 0.01));
+    return Math.min(
+      1,
+      0.02 + this.buildingLevelForPlanet(planet, BuildingType.BUNKER_NETWORK) * 0.01,
+    );
   }
 
   private isZeroFloorBuilding(buildingType: BuildingType): boolean {
-    return buildingType === BuildingType.JUMP_GATE
-      || buildingType === BuildingType.SENSOR_PHALANX
-      || buildingType === BuildingType.BOMB_DEPOT;
+    return (
+      buildingType === BuildingType.JUMP_GATE ||
+      buildingType === BuildingType.SENSOR_PHALANX ||
+      buildingType === BuildingType.BOMB_DEPOT
+    );
   }
 
   private wouldExceedBombDepotCapacity(defenceType: DefenceType, requestedAmount: number): boolean {
@@ -4878,7 +5292,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     const blueprint = this.defenceBlueprintsByType.get(defenceType);
     const requestedStorage = (blueprint?.size ?? 0) * requestedAmount;
-    return this.currentPlanetaryBombStorageUsed() + this.queuedPlanetaryBombStorageUsed() + requestedStorage > this.bombDepotCapacity();
+    return (
+      this.currentPlanetaryBombStorageUsed() +
+        this.queuedPlanetaryBombStorageUsed() +
+        requestedStorage >
+      this.bombDepotCapacity()
+    );
   }
 
   private buildingNextLevel(building: Building): number {
@@ -4891,7 +5310,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return new ResourcesPack(
       building.basicCost.metal * multiplier,
       building.basicCost.crystal * multiplier,
-      building.basicCost.deuterium * multiplier
+      building.basicCost.deuterium * multiplier,
     );
   }
 
@@ -4899,14 +5318,17 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const defaults = this.createDefaultPowerConsumptionMap(this.buildingLevelsByType);
     for (const [buildingType, maxConsumption] of defaults.entries()) {
       const currentConsumption = this.buildingCurrentPowerByType.get(buildingType);
-      const normalizedConsumption = currentConsumption === undefined
-        ? maxConsumption
-        : Math.min(maxConsumption, Math.max(0, currentConsumption));
+      const normalizedConsumption =
+        currentConsumption === undefined
+          ? maxConsumption
+          : Math.min(maxConsumption, Math.max(0, currentConsumption));
       this.setBuildingCurrentPowerConsumption(buildingType, normalizedConsumption);
     }
   }
 
-  private createProjectedPowerConsumptionMap(levels: Map<BuildingType, number>): Map<BuildingType, number> {
+  private createProjectedPowerConsumptionMap(
+    levels: Map<BuildingType, number>,
+  ): Map<BuildingType, number> {
     const projected = this.createDefaultPowerConsumptionMap(levels);
     for (const [buildingType, currentConsumption] of this.buildingCurrentPowerByType.entries()) {
       const maxConsumption = this.maxBuildingPowerConsumptionAtLevels(buildingType, levels);
@@ -4916,14 +5338,16 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
       projected.set(
         buildingType,
-        this.roundNumber(Math.min(maxConsumption, Math.max(0, currentConsumption)), 2)
+        this.roundNumber(Math.min(maxConsumption, Math.max(0, currentConsumption)), 2),
       );
     }
 
     return projected;
   }
 
-  private createDefaultPowerConsumptionMap(levels: Map<BuildingType, number>): Map<BuildingType, number> {
+  private createDefaultPowerConsumptionMap(
+    levels: Map<BuildingType, number>,
+  ): Map<BuildingType, number> {
     const defaults = new Map<BuildingType, number>();
     for (const [buildingType, level] of levels.entries()) {
       const blueprint = this.buildingBlueprintsByType.get(buildingType);
@@ -4944,7 +5368,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
   private maxBuildingPowerConsumptionAtLevels(
     buildingType: BuildingType,
-    levels: Map<BuildingType, number>
+    levels: Map<BuildingType, number>,
   ): number {
     const level = levels.get(buildingType) ?? 0;
     const blueprint = this.buildingBlueprintsByType.get(buildingType);
@@ -4955,7 +5379,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     return this.roundNumber(Math.max(0, level * (blueprint.powerConsumption ?? 0)), 2);
   }
 
-  private setBuildingCurrentPowerConsumption(buildingType: BuildingType, powerConsumption: number): void {
+  private setBuildingCurrentPowerConsumption(
+    buildingType: BuildingType,
+    powerConsumption: number,
+  ): void {
     const maxConsumption = this.maxBuildingPowerConsumption(buildingType);
     if (maxConsumption <= 0) {
       this.buildingCurrentPowerByType.delete(buildingType);
@@ -4964,7 +5391,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
 
     const normalizedPower = this.roundNumber(
       Math.min(maxConsumption, Math.max(0, powerConsumption)),
-      2
+      2,
     );
     this.buildingCurrentPowerByType.set(buildingType, normalizedPower);
   }
@@ -5036,10 +5463,10 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     }
 
     if (
-      this.queueTabRefreshInFlight
-      || this.isLoading
-      || this.buildingQueueMutationInFlight
-      || this.shipyardQueueMutationInFlight
+      this.queueTabRefreshInFlight ||
+      this.isLoading ||
+      this.buildingQueueMutationInFlight ||
+      this.shipyardQueueMutationInFlight
     ) {
       return;
     }
@@ -5055,20 +5482,21 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     const expectedZ = planet.coordinates.z;
 
     this.queueTabRefreshInFlight = true;
-    this.gameApi.getClientPlanet(expectedX, expectedY, expectedZ, session.token, { ownedOnly: true })
+    this.gameApi
+      .getClientPlanet(expectedX, expectedY, expectedZ, session.token, { ownedOnly: true })
       .pipe(
         timeout(8000),
         finalize(() => {
           this.queueTabRefreshInFlight = false;
-        })
+        }),
       )
       .subscribe({
         next: (updatedPlanet) => {
           if (
-            !this.planet
-            || this.planet.coordinates.x !== expectedX
-            || this.planet.coordinates.y !== expectedY
-            || this.planet.coordinates.z !== expectedZ
+            !this.planet ||
+            this.planet.coordinates.x !== expectedX ||
+            this.planet.coordinates.y !== expectedY ||
+            this.planet.coordinates.z !== expectedZ
           ) {
             return;
           }
@@ -5080,7 +5508,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         },
         error: () => {
           // Keep polling silent for queue auto-refresh.
-        }
+        },
       });
   }
 

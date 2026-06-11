@@ -3,6 +3,7 @@ import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { EncyclopediaImageDialogComponent } from './encyclopedia-image-dialog.component';
 import { TechnologyBlueprintsFactory } from '../factories/technology-blueprints.factory';
+import { resolveBlueprintText } from '../i18n/blueprint-text.utils';
 import { Technology } from '../models/tech/technology';
 import { toRawImagePath } from './encyclopedia-image-paths';
 import { TooltipDirective } from '../shared/tooltip/tooltip.directive';
@@ -12,18 +13,22 @@ import { I18nService } from '../i18n/i18n.service';
 @Component({
   selector: 'app-encyclopedia-technologies',
   imports: [NgFor, NgIf, RouterLink, EncyclopediaImageDialogComponent, TooltipDirective, I18nPipe],
-  templateUrl: './encyclopedia-technologies.component.html'
+  templateUrl: './encyclopedia-technologies.component.html',
 })
 export class EncyclopediaTechnologiesComponent {
   readonly technologies = this.loadTechnologies();
-  protected selectedImage: { title: string; previewImagePath: string; rawImagePath: string } | null = null;
+  protected selectedImage: {
+    title: string;
+    previewImagePath: string;
+    rawImagePath: string;
+  } | null = null;
   private readonly i18n = inject(I18nService);
 
   protected openImageDialog(technology: Technology): void {
     this.selectedImage = {
       title: technology.type,
       previewImagePath: technology.imagePath,
-      rawImagePath: toRawImagePath(technology.imagePath)
+      rawImagePath: toRawImagePath(technology.imagePath),
     };
   }
 
@@ -39,6 +44,10 @@ export class EncyclopediaTechnologiesComponent {
     return count === 1
       ? this.i18n.t('encyclopedia.shared.counts.technologiesOne', { count })
       : this.i18n.t('encyclopedia.shared.counts.technologiesMany', { count });
+  }
+
+  protected technologyDescription(technology: Technology): string {
+    return resolveBlueprintText(this.i18n, technology.description);
   }
 
   private loadTechnologies(): Technology[] {
