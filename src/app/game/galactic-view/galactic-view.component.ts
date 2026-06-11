@@ -4,7 +4,7 @@ import {
   ElementRef,
   HostListener,
   OnInit,
-  ViewChild
+  ViewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -24,10 +24,12 @@ import type {
   SensorPhalanxCapabilitiesDto,
   SensorPhalanxFleetContactDto,
   SensorPhalanxScanResponse,
-  ClientCoordinates
+  ClientCoordinates,
 } from '../../models/game-api-types';
 import { finalize } from 'rxjs';
 import { GameStateService } from '../../core/game-state.service';
+import { I18nPipe } from '../../i18n/i18n.pipe';
+import { I18nService } from '../../i18n/i18n.service';
 import { MiniPlanetPreviewComponent } from '../ui/mini-planet-preview/mini-planet-preview.component';
 import { NoteBorderColor } from '../../models/enums/note-border-color';
 import { PlanetType } from '../../models/enums/planet-type';
@@ -38,7 +40,7 @@ import { BuildingType } from '../../models/enums/building-type';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import {
   calculateSensorPhalanxActiveScanRange,
-  calculateSensorPhalanxNormalRange
+  calculateSensorPhalanxNormalRange,
 } from '../../models/sensor-phalanx/sensor-phalanx';
 
 type CellFillKind =
@@ -52,12 +54,7 @@ type CellFillKind =
   | 'humanBotAnyNeutral'
   | 'playerAndEnemyAnyNeutral';
 
-type CellRelationKey =
-  | 'self'
-  | 'war'
-  | 'neutral'
-  | 'peace'
-  | 'allied';
+type CellRelationKey = 'self' | 'war' | 'neutral' | 'peace' | 'allied';
 
 type GalacticCellVm = {
   x: number;
@@ -114,9 +111,16 @@ type SensorPhalanxOriginOption = {
 
 @Component({
   selector: 'app-galactic-view',
-  imports: [TopMenuComponent, MiniPlanetPreviewComponent, SpySolarSystemDialogComponent, FormsModule, TooltipDirective],
+  imports: [
+    TopMenuComponent,
+    MiniPlanetPreviewComponent,
+    SpySolarSystemDialogComponent,
+    FormsModule,
+    TooltipDirective,
+    I18nPipe,
+  ],
   templateUrl: './galactic-view.component.html',
-  styleUrl: './galactic-view.styles.css'
+  styleUrl: './galactic-view.styles.css',
 })
 export class GalacticViewComponent implements OnInit {
   private static readonly buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
@@ -125,21 +129,7 @@ export class GalacticViewComponent implements OnInit {
   protected readonly gridPadding = 12;
   protected readonly maxNoteLength = 500;
   protected showFleetRoutes = true;
-  protected readonly noteColorOptions: Array<{ label: string; value: NoteBorderColor }> = [
-    { label: 'White', value: NoteBorderColor.WHITE },
-    { label: 'Light Gray', value: NoteBorderColor.LIGHT_GRAY },
-    { label: 'Gray', value: NoteBorderColor.GRAY },
-    { label: 'Yellow', value: NoteBorderColor.YELLOW },
-    { label: 'Orange', value: NoteBorderColor.ORANGE },
-    { label: 'Red', value: NoteBorderColor.RED },
-    { label: 'Light Green', value: NoteBorderColor.LIGHT_GREEN },
-    { label: 'Green', value: NoteBorderColor.GREEN },
-    { label: 'Light Blue', value: NoteBorderColor.LIGHT_BLUE },
-    { label: 'Blue', value: NoteBorderColor.BLUE },
-    { label: 'Light Purple', value: NoteBorderColor.LIGHT_PURPLE },
-    { label: 'Purple', value: NoteBorderColor.PURPLE },
-    { label: 'Brown', value: NoteBorderColor.BROWN }
-  ];
+  protected readonly noteColorOptions: Array<{ label: string; value: NoteBorderColor }>;
   protected galaxyPresentation: GalaxyPresentationDataDto | null = null;
   protected grid: GalacticCellVm[][] = [];
   protected gridWidth = 0;
@@ -193,8 +183,28 @@ export class GalacticViewComponent implements OnInit {
     private readonly playerSession: PlayerSessionService,
     private readonly gameState: GameStateService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly tutorialService: TutorialService
-  ) {}
+    private readonly tutorialService: TutorialService,
+    private readonly i18n: I18nService,
+  ) {
+    this.noteColorOptions = [
+      { label: this.i18n.t('galactic.noteColors.white'), value: NoteBorderColor.WHITE },
+      { label: this.i18n.t('galactic.noteColors.lightGray'), value: NoteBorderColor.LIGHT_GRAY },
+      { label: this.i18n.t('galactic.noteColors.gray'), value: NoteBorderColor.GRAY },
+      { label: this.i18n.t('galactic.noteColors.yellow'), value: NoteBorderColor.YELLOW },
+      { label: this.i18n.t('galactic.noteColors.orange'), value: NoteBorderColor.ORANGE },
+      { label: this.i18n.t('galactic.noteColors.red'), value: NoteBorderColor.RED },
+      { label: this.i18n.t('galactic.noteColors.lightGreen'), value: NoteBorderColor.LIGHT_GREEN },
+      { label: this.i18n.t('galactic.noteColors.green'), value: NoteBorderColor.GREEN },
+      { label: this.i18n.t('galactic.noteColors.lightBlue'), value: NoteBorderColor.LIGHT_BLUE },
+      { label: this.i18n.t('galactic.noteColors.blue'), value: NoteBorderColor.BLUE },
+      {
+        label: this.i18n.t('galactic.noteColors.lightPurple'),
+        value: NoteBorderColor.LIGHT_PURPLE,
+      },
+      { label: this.i18n.t('galactic.noteColors.purple'), value: NoteBorderColor.PURPLE },
+      { label: this.i18n.t('galactic.noteColors.brown'), value: NoteBorderColor.BROWN },
+    ];
+  }
 
   public ngOnInit(): void {
     this.galaxyName = this.resolveGalaxyName();
@@ -202,7 +212,7 @@ export class GalacticViewComponent implements OnInit {
       this.pendingRouteFocus = this.parseRouteFocus({
         x: params.get('x'),
         y: params.get('y'),
-        z: params.get('z')
+        z: params.get('z'),
       });
       if (this.gridHeight > 0 && this.gridWidth > 0) {
         this.applyRouteFocusIfPossible();
@@ -292,7 +302,7 @@ export class GalacticViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.selectedSystemError = 'No player session found. Start a new game.';
+      this.selectedSystemError = this.i18n.t('galactic.errors.noSession');
       options.onSettled?.();
       this.cdr.markForCheck();
       return;
@@ -301,16 +311,19 @@ export class GalacticViewComponent implements OnInit {
     this.selectedSystemLoading = true;
     this.selectedSystemRequestKey = key;
 
-    this.gameApi.getClientStarSystem(cell.x, cell.y, session.token)
-      .pipe(finalize(() => {
-        if (this.selectedSystemRequestKey !== key) {
-          return;
-        }
+    this.gameApi
+      .getClientStarSystem(cell.x, cell.y, session.token)
+      .pipe(
+        finalize(() => {
+          if (this.selectedSystemRequestKey !== key) {
+            return;
+          }
 
-        this.selectedSystemLoading = false;
-        options.onSettled?.();
-        this.cdr.markForCheck();
-      }))
+          this.selectedSystemLoading = false;
+          options.onSettled?.();
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (system) => {
           if (this.selectedSystemRequestKey !== key) {
@@ -327,9 +340,9 @@ export class GalacticViewComponent implements OnInit {
             return;
           }
 
-          this.selectedSystemError = 'Unable to load selected star system.';
+          this.selectedSystemError = this.i18n.t('galactic.errors.loadSelectedSystem');
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -347,13 +360,13 @@ export class GalacticViewComponent implements OnInit {
     }
 
     if (this.selectedCell?.isVoid) {
-      return 'Void';
+      return this.i18n.t('galactic.labels.void');
     }
     if (this.selectedCell?.isCenter) {
-      return 'Galaxy Center';
+      return this.i18n.t('galactic.labels.galaxyCenter');
     }
 
-    return 'Unknown Star System';
+    return this.i18n.t('galactic.labels.unknownStarSystem');
   }
 
   protected selectedPlanetsCountLabel(): number {
@@ -369,9 +382,11 @@ export class GalacticViewComponent implements OnInit {
       return 0;
     }
 
-    return (this.gridWidth * this.gridCellSize)
-      + (Math.max(0, this.gridWidth - 1) * this.gridCellGap)
-      + (this.gridPadding * 2);
+    return (
+      this.gridWidth * this.gridCellSize +
+      Math.max(0, this.gridWidth - 1) * this.gridCellGap +
+      this.gridPadding * 2
+    );
   }
 
   protected gridCanvasHeight(): number {
@@ -379,9 +394,11 @@ export class GalacticViewComponent implements OnInit {
       return 0;
     }
 
-    return (this.gridHeight * this.gridCellSize)
-      + (Math.max(0, this.gridHeight - 1) * this.gridCellGap)
-      + (this.gridPadding * 2);
+    return (
+      this.gridHeight * this.gridCellSize +
+      Math.max(0, this.gridHeight - 1) * this.gridCellGap +
+      this.gridPadding * 2
+    );
   }
 
   protected ownFleetMissionLabel(fleet: GalaxyOwnFleetMovementDto): string {
@@ -391,15 +408,15 @@ export class GalacticViewComponent implements OnInit {
   protected ownFleetStatusLabel(fleet: GalaxyOwnFleetMovementDto): string {
     switch (fleet.state) {
       case 'PENDING_JUMP_GATE':
-        return 'Pending Jump Gate';
+        return this.i18n.t('galactic.labels.pendingJumpGate');
       case 'MOVING_TO_TARGET':
-        return 'En route';
+        return this.i18n.t('galactic.labels.enRoute');
       case 'ORBITING':
-        return 'On station';
+        return this.i18n.t('galactic.labels.onStation');
       case 'RETURNING':
-        return 'Returning';
+        return this.i18n.t('galactic.labels.returning');
       case 'MISSION_FAILURE_RETURNING':
-        return 'Failure return';
+        return this.i18n.t('galactic.labels.failureReturn');
       default:
         return fleet.state;
     }
@@ -415,10 +432,12 @@ export class GalacticViewComponent implements OnInit {
 
   protected ownFleetEtaLabel(fleet: GalaxyOwnFleetMovementDto): string {
     if (fleet.etaTurns === null) {
-      return 'No active ETA';
+      return this.i18n.t('galactic.labels.noActiveEta');
     }
 
-    return `${fleet.etaTurns} turn${fleet.etaTurns === 1 ? '' : 's'}`;
+    return fleet.etaTurns === 1
+      ? this.i18n.t('galactic.labels.etaTurn', { count: fleet.etaTurns })
+      : this.i18n.t('galactic.labels.etaTurns', { count: fleet.etaTurns });
   }
 
   protected ownFleetTooltip(fleet: GalaxyOwnFleetMovementDto): string {
@@ -435,7 +454,7 @@ export class GalacticViewComponent implements OnInit {
       `Cargo capacity: ${this.formatInteger(fleet.usedCargoCapacity)} / ${this.formatInteger(fleet.totalCargoCapacity)}`,
       `Fuel: cost ${this.formatInteger(fleet.fuelCost)} | reserve ${this.formatInteger(fleet.remainingFuelReserve)}`,
       `Ships: ${this.formatAmountEntries(fleet.undamagedShips)}`,
-      `Total ships: ${this.formatInteger(fleet.shipCount)}`
+      `Total ships: ${this.formatInteger(fleet.shipCount)}`,
     ];
 
     if (fleet.damagedShips.length > 0) {
@@ -450,7 +469,7 @@ export class GalacticViewComponent implements OnInit {
       `Repair capability: Ship ${this.formatInteger(fleet.repairCapability.shipRepair)} | Drone repair ${this.formatInteger(fleet.repairCapability.droneRepair)}`,
       `Industry repair contribution: ${this.formatInteger(fleet.repairCapability.industryRepair)}`,
       `Repair equipment: Ship ${this.formatInteger(fleet.repairCapability.nonDroneEquipmentCount)} | Drone ${this.formatInteger(fleet.repairCapability.droneEquipmentCount)}`,
-      `Recycle capability: ${this.formatInteger(fleet.recycleCapability)} / turn`
+      `Recycle capability: ${this.formatInteger(fleet.recycleCapability)} / turn`,
     );
 
     if (fleet.orbitActivity !== 'IDLE') {
@@ -475,7 +494,9 @@ export class GalacticViewComponent implements OnInit {
       lines.push(`Last maintenance request turn: ${fleet.lastMaintenanceRequestTurn}`);
     }
     if (fleet.isRemoteOrigin) {
-      lines.push(`Remote origin: yes${fleet.remoteOriginSourceFleetId !== null ? ` | source fleet #${fleet.remoteOriginSourceFleetId}` : ''}`);
+      lines.push(
+        `Remote origin: yes${fleet.remoteOriginSourceFleetId !== null ? ` | source fleet #${fleet.remoteOriginSourceFleetId}` : ''}`,
+      );
     }
 
     return lines.join('\n');
@@ -490,9 +511,11 @@ export class GalacticViewComponent implements OnInit {
       return null;
     }
 
-    return this.starSystemNotesByCoordinates.get(
-      this.buildCoordinatesKey(this.selectedCell.x, this.selectedCell.y)
-    ) ?? null;
+    return (
+      this.starSystemNotesByCoordinates.get(
+        this.buildCoordinatesKey(this.selectedCell.x, this.selectedCell.y),
+      ) ?? null
+    );
   }
 
   protected isSpecialSelectedCell(): boolean {
@@ -505,10 +528,10 @@ export class GalacticViewComponent implements OnInit {
     }
 
     if (this.selectedCell.isVoid) {
-      return 'This is void.';
+      return this.i18n.t('galactic.labels.thisIsVoid');
     }
     if (this.selectedCell.isCenter) {
-      return 'This is galaxy center.';
+      return this.i18n.t('galactic.labels.thisIsGalaxyCenter');
     }
 
     return null;
@@ -519,23 +542,27 @@ export class GalacticViewComponent implements OnInit {
   }
 
   protected canOpenSpySolarSystemDialog(): boolean {
-    return !!this.selectedSystem
-      && !this.selectedSystemLoading
-      && this.selectedSystemSpyTargets().length > 0;
+    return (
+      !!this.selectedSystem &&
+      !this.selectedSystemLoading &&
+      this.selectedSystemSpyTargets().length > 0
+    );
   }
 
   protected spySolarSystemButtonTitle(): string {
     if (this.selectedSystemLoading) {
-      return 'Wait for the selected system to finish loading.';
+      return this.i18n.t('galactic.labels.waitForSystem');
     }
     if (!this.selectedSystem) {
-      return 'Select a star system first.';
+      return this.i18n.t('galactic.labels.selectSystemFirst');
     }
     if (this.selectedSystemSpyTargets().length <= 0) {
-      return 'No non-owned, non-asteroid planets are available in this star system.';
+      return this.i18n.t('galactic.labels.noSpyTargets');
     }
 
-    return `Launch one probe per eligible planet in ${this.selectedStarSystemNameLabel()}.`;
+    return this.i18n.t('galactic.labels.spyLaunchReady', {
+      name: this.selectedStarSystemNameLabel(),
+    });
   }
 
   protected openSpySolarSystemDialog(): void {
@@ -555,7 +582,7 @@ export class GalacticViewComponent implements OnInit {
     this.isSpySolarSystemDialogOpen = false;
     this.loadGalaxyPresentation({
       restoreSelectedCell: true,
-      spyLaunchNotice: event.message
+      spyLaunchNotice: event.message,
     });
   }
 
@@ -564,8 +591,8 @@ export class GalacticViewComponent implements OnInit {
       return [];
     }
 
-    return this.selectedSystem.planets.filter((planet) =>
-      planet.basicInfo.type !== PlanetType.ASTEROIDS && !planet.info.isOwnedByViewer
+    return this.selectedSystem.planets.filter(
+      (planet) => planet.basicInfo.type !== PlanetType.ASTEROIDS && !planet.info.isOwnedByViewer,
     );
   }
 
@@ -602,7 +629,11 @@ export class GalacticViewComponent implements OnInit {
   }
 
   protected selectedSensorPhalanxOrigin(): SensorPhalanxOriginOption | null {
-    return this.sensorPhalanxOriginOptions.find((origin) => origin.key === this.selectedSensorPhalanxOriginKey) ?? null;
+    return (
+      this.sensorPhalanxOriginOptions.find(
+        (origin) => origin.key === this.selectedSensorPhalanxOriginKey,
+      ) ?? null
+    );
   }
 
   protected onSensorPhalanxOriginChanged(originKey: string): void {
@@ -616,13 +647,15 @@ export class GalacticViewComponent implements OnInit {
   protected canSubmitSensorPhalanxScan(): boolean {
     const origin = this.selectedSensorPhalanxOrigin();
     const capabilities = this.sensorPhalanxCapabilities;
-    return !!this.sensorPhalanxTarget
-      && !!origin
-      && !!capabilities
-      && !this.sensorPhalanxLoading
-      && !this.sensorPhalanxScanning
-      && capabilities.remainingScans > 0
-      && origin.availableDeuterium >= capabilities.scanCostDeuterium;
+    return (
+      !!this.sensorPhalanxTarget &&
+      !!origin &&
+      !!capabilities &&
+      !this.sensorPhalanxLoading &&
+      !this.sensorPhalanxScanning &&
+      capabilities.remainingScans > 0 &&
+      origin.availableDeuterium >= capabilities.scanCostDeuterium
+    );
   }
 
   protected executeSensorPhalanxScan(): void {
@@ -636,14 +669,20 @@ export class GalacticViewComponent implements OnInit {
     this.sensorPhalanxScanning = true;
     this.sensorPhalanxError = null;
 
-    this.gameApi.scanSensorPhalanx({
-      origin: origin.planet.coordinates,
-      target: target.coordinates
-    }, session.token)
-      .pipe(finalize(() => {
-        this.sensorPhalanxScanning = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .scanSensorPhalanx(
+        {
+          origin: origin.planet.coordinates,
+          target: target.coordinates,
+        },
+        session.token,
+      )
+      .pipe(
+        finalize(() => {
+          this.sensorPhalanxScanning = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (response) => {
           this.sensorPhalanxResult = response;
@@ -651,31 +690,41 @@ export class GalacticViewComponent implements OnInit {
           this.sensorPhalanxOriginOptions = this.sensorPhalanxOriginOptions.map((option) =>
             option.key === origin.key
               ? {
-                ...option,
-                availableDeuterium: Math.max(0, option.availableDeuterium - response.capabilities.scanCostDeuterium)
-              }
-              : option
+                  ...option,
+                  availableDeuterium: Math.max(
+                    0,
+                    option.availableDeuterium - response.capabilities.scanCostDeuterium,
+                  ),
+                }
+              : option,
           );
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {
-          this.sensorPhalanxError = error?.error?.error ?? 'Unable to run Sensor Phalanx scan.';
+          this.sensorPhalanxError = error?.error?.error ?? this.i18n.t('galactic.errors.runScan');
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
   protected sensorPhalanxTargetLabel(): string {
     const target = this.sensorPhalanxTarget;
     if (!target) {
-      return 'No target selected';
+      return this.i18n.t('galactic.sensorPhalanx.noTarget');
     }
 
     return `${target.basicInfo.name} (${target.coordinates.x}:${target.coordinates.y}:${target.coordinates.z})`;
   }
 
   protected sensorPhalanxContactLabel(contact: SensorPhalanxFleetContactDto): string {
-    return `${contact.direction} | Size ${contact.fleetSize} | ETA ${contact.etaTurns} | ${contact.isAllied ? 'Allied' : 'Unknown or hostile'}`;
+    return this.i18n.t('galactic.sensorPhalanx.contact', {
+      direction: contact.direction,
+      size: contact.fleetSize,
+      eta: contact.etaTurns,
+      relation: contact.isAllied
+        ? this.i18n.t('galactic.sensorPhalanx.allied')
+        : this.i18n.t('galactic.sensorPhalanx.hostileUnknown'),
+    });
   }
 
   protected openAddNoteDialog(): void {
@@ -721,17 +770,19 @@ export class GalacticViewComponent implements OnInit {
 
     const noteText = this.noteEditorText.trim();
     if (!noteText) {
-      this.noteEditorError = 'Note text cannot be empty.';
+      this.noteEditorError = this.i18n.t('galactic.notes.emptyError');
       return;
     }
     if (noteText.length > this.maxNoteLength) {
-      this.noteEditorError = `Note text cannot exceed ${this.maxNoteLength} characters.`;
+      this.noteEditorError = this.i18n.t('galactic.notes.tooLongError', {
+        max: this.maxNoteLength,
+      });
       return;
     }
 
     const session = this.playerSession.load();
     if (!session) {
-      this.noteEditorError = 'No player session found. Start a new game.';
+      this.noteEditorError = this.i18n.t('galactic.errors.noSession');
       return;
     }
 
@@ -740,19 +791,22 @@ export class GalacticViewComponent implements OnInit {
     this.noteActionError = null;
 
     const { x, y } = this.selectedCell;
-    this.gameApi.createOrUpdateStarSystemNote(
-      {
-        x,
-        y,
-        borderColor: this.noteEditorColor,
-        text: noteText
-      },
-      session.token
-    )
-      .pipe(finalize(() => {
-        this.isNoteActionLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .createOrUpdateStarSystemNote(
+        {
+          x,
+          y,
+          borderColor: this.noteEditorColor,
+          text: noteText,
+        },
+        session.token,
+      )
+      .pipe(
+        finalize(() => {
+          this.isNoteActionLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (note) => {
           this.upsertLocalNote(note);
@@ -760,9 +814,9 @@ export class GalacticViewComponent implements OnInit {
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {
-          this.noteEditorError = error?.error?.error ?? 'Unable to save note.';
+          this.noteEditorError = error?.error?.error ?? this.i18n.t('galactic.errors.saveNote');
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -786,7 +840,7 @@ export class GalacticViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.noteActionError = 'No player session found. Start a new game.';
+      this.noteActionError = this.i18n.t('galactic.errors.noSession');
       return;
     }
 
@@ -794,11 +848,14 @@ export class GalacticViewComponent implements OnInit {
     this.noteActionError = null;
 
     const { x, y } = this.selectedCell;
-    this.gameApi.deleteStarSystemNote(x, y, session.token)
-      .pipe(finalize(() => {
-        this.isNoteActionLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .deleteStarSystemNote(x, y, session.token)
+      .pipe(
+        finalize(() => {
+          this.isNoteActionLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: () => {
           this.removeLocalNote(x, y);
@@ -806,41 +863,50 @@ export class GalacticViewComponent implements OnInit {
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {
-          this.noteActionError = error?.error?.error ?? 'Unable to delete note.';
+          this.noteActionError = error?.error?.error ?? this.i18n.t('galactic.errors.deleteNote');
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
   protected noteEditorTitleLabel(): string {
-    return this.noteEditorMode === 'add' ? 'Add Note' : 'Modify Note';
+    return this.noteEditorMode === 'add'
+      ? this.i18n.t('galactic.notes.addTitle')
+      : this.i18n.t('galactic.notes.modifyTitle');
   }
 
   private loadGalaxyPresentation(options: ReloadGalaxyPresentationOptions = {}): void {
     const session = this.playerSession.load();
     if (!session) {
-      this.loadError = 'No player session found. Start a new game.';
+      this.loadError = this.i18n.t('galactic.errors.noSession');
       return;
     }
 
-    const selectedCoordinates = options.restoreSelectedCell && this.selectedCell
-      ? { x: this.selectedCell.x, y: this.selectedCell.y }
-      : null;
+    const selectedCoordinates =
+      options.restoreSelectedCell && this.selectedCell
+        ? { x: this.selectedCell.x, y: this.selectedCell.y }
+        : null;
 
     this.isLoading = true;
     this.loadError = null;
 
-    this.gameApi.getGalaxyPresentationData(session.token)
-      .pipe(finalize(() => {
-        this.isLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .getGalaxyPresentationData(session.token)
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (response) => {
           this.galaxyPresentation = response;
-          this.starSystemNotesByCoordinates = this.buildStarSystemNotesMap(response.starSystemNotes);
+          this.starSystemNotesByCoordinates = this.buildStarSystemNotesMap(
+            response.starSystemNotes,
+          );
           this.ownFleetPresenceBySystemKey = this.buildOwnFleetPresenceBySystemKey(response);
-          this.sensorPhalanxScannableSystemKeys = this.buildSensorPhalanxScannableSystemKeys(response);
+          this.sensorPhalanxScannableSystemKeys =
+            this.buildSensorPhalanxScannableSystemKeys(response);
           this.ownFleetRoutes = this.buildOwnFleetRoutes(response.ownFleetMovements);
           this.starSystemCache.clear();
           this.grid = this.buildGrid(response);
@@ -858,7 +924,7 @@ export class GalacticViewComponent implements OnInit {
                   if (options.spyLaunchNotice) {
                     this.spySolarSystemNotice = options.spyLaunchNotice;
                   }
-                }
+                },
               });
             } else if (this.applyRouteFocusIfPossible()) {
               // Route focus handled.
@@ -874,9 +940,9 @@ export class GalacticViewComponent implements OnInit {
           this.cdr.markForCheck();
         },
         error: () => {
-          this.loadError = 'Unable to load galaxy from server.';
+          this.loadError = this.i18n.t('galactic.errors.loadGalaxy');
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -884,7 +950,7 @@ export class GalacticViewComponent implements OnInit {
     const session = this.playerSession.load();
     const origin = this.selectedSensorPhalanxOrigin();
     if (!session || !origin) {
-      this.sensorPhalanxError = 'No Sensor Phalanx origin selected.';
+      this.sensorPhalanxError = this.i18n.t('galactic.errors.noOriginSelected');
       return;
     }
 
@@ -892,25 +958,24 @@ export class GalacticViewComponent implements OnInit {
     this.sensorPhalanxError = null;
 
     const coordinates = origin.planet.coordinates;
-    this.gameApi.getSensorPhalanxCapabilities(
-      coordinates.x,
-      coordinates.y,
-      coordinates.z,
-      session.token
-    )
-      .pipe(finalize(() => {
-        this.sensorPhalanxLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .getSensorPhalanxCapabilities(coordinates.x, coordinates.y, coordinates.z, session.token)
+      .pipe(
+        finalize(() => {
+          this.sensorPhalanxLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (capabilities) => {
           this.sensorPhalanxCapabilities = capabilities;
           this.cdr.markForCheck();
         },
         error: (error: { error?: { error?: string } }) => {
-          this.sensorPhalanxError = error?.error?.error ?? 'Unable to load Sensor Phalanx capability.';
+          this.sensorPhalanxError =
+            error?.error?.error ?? this.i18n.t('galactic.errors.loadCapability');
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -919,16 +984,17 @@ export class GalacticViewComponent implements OnInit {
     return ownedPlanets
       .map((planet) => this.toSensorPhalanxOriginOption(planet, target.coordinates))
       .filter((option): option is SensorPhalanxOriginOption => option !== null)
-      .sort((left, right) =>
-        (right.activeScanRange - right.distance) - (left.activeScanRange - left.distance)
-          || left.scanCostDeuterium - right.scanCostDeuterium
-          || left.label.localeCompare(right.label)
+      .sort(
+        (left, right) =>
+          right.activeScanRange - right.distance - (left.activeScanRange - left.distance) ||
+          left.scanCostDeuterium - right.scanCostDeuterium ||
+          left.label.localeCompare(right.label),
       );
   }
 
   private toSensorPhalanxOriginOption(
     planet: ClientPlanetDto,
-    target: ClientCoordinates
+    target: ClientCoordinates,
   ): SensorPhalanxOriginOption | null {
     const level = this.getBuildingLevel(planet, BuildingType.SENSOR_PHALANX);
     if (level <= 0) {
@@ -941,11 +1007,15 @@ export class GalacticViewComponent implements OnInit {
     }
 
     const baseRange = blueprint.production1[level - 1] ?? 0;
-    const effectiveness = this.getBuildingEffectiveness(planet, BuildingType.SENSOR_PHALANX, blueprint.powerConsumption);
+    const effectiveness = this.getBuildingEffectiveness(
+      planet,
+      BuildingType.SENSOR_PHALANX,
+      blueprint.powerConsumption,
+    );
     const normalRange = calculateSensorPhalanxNormalRange(
       baseRange,
       planet.info.planetaryParameters.anomaliesAndNoise,
-      effectiveness
+      effectiveness,
     );
     const activeScanRange = calculateSensorPhalanxActiveScanRange(normalRange);
     const distance = this.calculatePlanetDistance(planet.coordinates, target);
@@ -961,30 +1031,42 @@ export class GalacticViewComponent implements OnInit {
       normalRange,
       activeScanRange,
       scanCostDeuterium: Math.max(0, Math.floor(blueprint.production2[level - 1] ?? 0)),
-      availableDeuterium: Math.max(0, Math.floor(planet.objects.resources.deuterium))
+      availableDeuterium: Math.max(0, Math.floor(planet.objects.resources.deuterium)),
     };
   }
 
   private getBuildingLevel(planet: ClientPlanetDto, type: BuildingType): number {
-    return Math.max(0, Math.floor(
-      planet.objects.buildingsLevels.find((entry) => entry.type === type)?.level ?? 0
-    ));
+    return Math.max(
+      0,
+      Math.floor(planet.objects.buildingsLevels.find((entry) => entry.type === type)?.level ?? 0),
+    );
   }
 
-  private getBuildingEffectiveness(planet: ClientPlanetDto, type: BuildingType, powerConsumption: number): number {
-    return this.getBuildingPowerUtilization(planet, type, powerConsumption)
-      * this.getBuildingStructuralUtilization(planet, type);
+  private getBuildingEffectiveness(
+    planet: ClientPlanetDto,
+    type: BuildingType,
+    powerConsumption: number,
+  ): number {
+    return (
+      this.getBuildingPowerUtilization(planet, type, powerConsumption) *
+      this.getBuildingStructuralUtilization(planet, type)
+    );
   }
 
-  private getBuildingPowerUtilization(planet: ClientPlanetDto, type: BuildingType, powerConsumption: number): number {
+  private getBuildingPowerUtilization(
+    planet: ClientPlanetDto,
+    type: BuildingType,
+    powerConsumption: number,
+  ): number {
     const level = this.getBuildingLevel(planet, type);
     const maxPower = level * Math.max(0, powerConsumption);
     if (maxPower <= 0) {
       return 1;
     }
 
-    const currentPower = planet.objects.buildingsCurrentPowerConsumption
-      .find((entry) => entry.type === type)?.currentPowerConsumption ?? maxPower;
+    const currentPower =
+      planet.objects.buildingsCurrentPowerConsumption.find((entry) => entry.type === type)
+        ?.currentPowerConsumption ?? maxPower;
     if (!Number.isFinite(currentPower) || currentPower <= 0) {
       return 0;
     }
@@ -993,26 +1075,34 @@ export class GalacticViewComponent implements OnInit {
   }
 
   private getBuildingStructuralUtilization(planet: ClientPlanetDto, type: BuildingType): number {
-    const structural = planet.objects.buildingsCurrentStructuralPoints.find((entry) => entry.type === type);
+    const structural = planet.objects.buildingsCurrentStructuralPoints.find(
+      (entry) => entry.type === type,
+    );
     if (!structural || structural.maxStructuralPoints <= 0) {
       return 1;
     }
 
-    const ratio = structural.currentStructuralPoints > 0
-      ? structural.currentStructuralPoints / structural.maxStructuralPoints
-      : 0;
+    const ratio =
+      structural.currentStructuralPoints > 0
+        ? structural.currentStructuralPoints / structural.maxStructuralPoints
+        : 0;
     return Math.min(1, Math.max(0, ratio));
   }
 
   private calculatePlanetDistance(origin: ClientCoordinates, target: ClientCoordinates): number {
-    return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
+    return (
+      Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z)
+    );
   }
 
   private buildSensorPhalanxScannableSystemKeys(data: GalaxyPresentationDataDto): Set<string> {
     const keys = new Set<string>();
     const origins = data.ownedPlanets
       .map((planet) => this.toSensorPhalanxCoverage(planet))
-      .filter((coverage): coverage is { coordinates: ClientCoordinates; activeScanRange: number } => coverage !== null);
+      .filter(
+        (coverage): coverage is { coordinates: ClientCoordinates; activeScanRange: number } =>
+          coverage !== null,
+      );
 
     if (origins.length <= 0) {
       return keys;
@@ -1029,7 +1119,12 @@ export class GalacticViewComponent implements OnInit {
         const planetCount = Math.max(0, cell.planetsAndAsteroids[0]);
         for (let z = 0; z < planetCount; z += 1) {
           const target = { x, y, z };
-          if (origins.some((origin) => this.calculatePlanetDistance(origin.coordinates, target) <= origin.activeScanRange)) {
+          if (
+            origins.some(
+              (origin) =>
+                this.calculatePlanetDistance(origin.coordinates, target) <= origin.activeScanRange,
+            )
+          ) {
             keys.add(this.buildCoordinatesKey(x, y));
             break;
           }
@@ -1040,7 +1135,9 @@ export class GalacticViewComponent implements OnInit {
     return keys;
   }
 
-  private toSensorPhalanxCoverage(planet: ClientPlanetDto): { coordinates: ClientCoordinates; activeScanRange: number } | null {
+  private toSensorPhalanxCoverage(
+    planet: ClientPlanetDto,
+  ): { coordinates: ClientCoordinates; activeScanRange: number } | null {
     const level = this.getBuildingLevel(planet, BuildingType.SENSOR_PHALANX);
     if (level <= 0) {
       return null;
@@ -1054,12 +1151,14 @@ export class GalacticViewComponent implements OnInit {
     const normalRange = calculateSensorPhalanxNormalRange(
       blueprint.production1[level - 1] ?? 0,
       planet.info.planetaryParameters.anomaliesAndNoise,
-      this.getBuildingEffectiveness(planet, BuildingType.SENSOR_PHALANX, blueprint.powerConsumption)
+      this.getBuildingEffectiveness(
+        planet,
+        BuildingType.SENSOR_PHALANX,
+        blueprint.powerConsumption,
+      ),
     );
     const activeScanRange = calculateSensorPhalanxActiveScanRange(normalRange);
-    return activeScanRange > 0
-      ? { coordinates: planet.coordinates, activeScanRange }
-      : null;
+    return activeScanRange > 0 ? { coordinates: planet.coordinates, activeScanRange } : null;
   }
 
   private syncScrollbars(): void {
@@ -1128,12 +1227,16 @@ export class GalacticViewComponent implements OnInit {
     }
 
     this.selectCell(targetCell, {
-      focusPlanetZ: this.pendingRouteFocus.z
+      focusPlanetZ: this.pendingRouteFocus.z,
     });
     return true;
   }
 
-  private parseRouteFocus(query: { x: string | null; y: string | null; z: string | null }): { x: number; y: number; z: number | null } | null {
+  private parseRouteFocus(query: {
+    x: string | null;
+    y: string | null;
+    z: string | null;
+  }): { x: number; y: number; z: number | null } | null {
     const x = this.parseQueryCoordinate(query.x);
     const y = this.parseQueryCoordinate(query.y);
     if (x === null || y === null) {
@@ -1143,7 +1246,7 @@ export class GalacticViewComponent implements OnInit {
     return {
       x,
       y,
-      z: this.parseQueryCoordinate(query.z)
+      z: this.parseQueryCoordinate(query.z),
     };
   }
 
@@ -1161,19 +1264,19 @@ export class GalacticViewComponent implements OnInit {
   }
 
   private resolveHomeSystemCoordinates(
-    ownedPlanets: ClientPlanetDto[]
+    ownedPlanets: ClientPlanetDto[],
   ): { x: number; y: number } | null {
     if (ownedPlanets.length === 0) {
       return null;
     }
 
     const homePlanet = [...ownedPlanets].sort(
-      (left, right) => left.basicInfo.order - right.basicInfo.order
+      (left, right) => left.basicInfo.order - right.basicInfo.order,
     )[0];
 
     return {
       x: homePlanet.coordinates.x,
-      y: homePlanet.coordinates.y
+      y: homePlanet.coordinates.y,
     };
   }
 
@@ -1183,7 +1286,7 @@ export class GalacticViewComponent implements OnInit {
         const ownershipCell = data.ownershipBytes[y]?.[x] ?? null;
         const note = this.starSystemNotesByCoordinates.get(this.buildCoordinatesKey(x, y)) ?? null;
         return this.toCellVm(cell, ownershipCell, note, x, y);
-      })
+      }),
     );
   }
 
@@ -1192,7 +1295,7 @@ export class GalacticViewComponent implements OnInit {
     ownershipCell: OwnershipByteCellDto | null,
     note: StarSystemNoteDto | null,
     x: number,
-    y: number
+    y: number,
   ): GalacticCellVm {
     const planets = galaxyByte.planetsAndAsteroids[0];
     const asteroids = galaxyByte.planetsAndAsteroids[1];
@@ -1205,10 +1308,13 @@ export class GalacticViewComponent implements OnInit {
     const relationBackground = this.resolveRelationBackground(ownershipCell, isVoid, isCenter);
     const valueLabel = this.buildValueLabel(planets, asteroids, isVoid, isCenter);
     const ownedPlanetsDotsLabel = this.buildOwnedPlanetsDotsLabel(ownership, isVoid, isCenter);
-    const hasOwnFleetPresence = this.ownFleetPresenceBySystemKey.has(this.buildCoordinatesKey(x, y));
-    const isSensorScannable = !isVoid
-      && !isCenter
-      && this.sensorPhalanxScannableSystemKeys.has(this.buildCoordinatesKey(x, y));
+    const hasOwnFleetPresence = this.ownFleetPresenceBySystemKey.has(
+      this.buildCoordinatesKey(x, y),
+    );
+    const isSensorScannable =
+      !isVoid &&
+      !isCenter &&
+      this.sensorPhalanxScannableSystemKeys.has(this.buildCoordinatesKey(x, y));
     const noteBorderColor = note?.borderColor ?? null;
     const noteText = note?.text?.trim() ? note.text.trim() : null;
 
@@ -1227,23 +1333,14 @@ export class GalacticViewComponent implements OnInit {
       noteBorderColor,
       relationBackground,
       coordsLabel: `${x}:${y}`,
-      tooltip: this.buildTooltip(
-        x,
-        y,
-        planets,
-        asteroids,
-        ownership,
-        isVoid,
-        isCenter,
-        noteText
-      )
+      tooltip: this.buildTooltip(x, y, planets, asteroids, ownership, isVoid, isCenter, noteText),
     };
   }
 
   private resolveFillKind(
     ownership: [number, number, number, number] | null,
     isVoid: boolean,
-    isCenter: boolean
+    isCenter: boolean,
   ): CellFillKind {
     if (isVoid) {
       return 'void';
@@ -1286,7 +1383,7 @@ export class GalacticViewComponent implements OnInit {
   private resolveRelationBackground(
     ownershipCell: OwnershipByteCellDto | null,
     isVoid: boolean,
-    isCenter: boolean
+    isCenter: boolean,
   ): string | null {
     if (isVoid || isCenter || !ownershipCell?.relationOwnership) {
       return null;
@@ -1312,8 +1409,11 @@ export class GalacticViewComponent implements OnInit {
     return `linear-gradient(135deg, ${bands.join(', ')})`;
   }
 
-  private resolveRelationKeys(relationOwnership: [number, number, number, number, number, number]): CellRelationKey[] {
-    const [selfOwned, unmanagedNeutralOwned, warOwned, neutralOwned, peaceOwned, alliedOwned] = relationOwnership;
+  private resolveRelationKeys(
+    relationOwnership: [number, number, number, number, number, number],
+  ): CellRelationKey[] {
+    const [selfOwned, unmanagedNeutralOwned, warOwned, neutralOwned, peaceOwned, alliedOwned] =
+      relationOwnership;
     const keys: CellRelationKey[] = [];
 
     if (selfOwned > 0) {
@@ -1359,7 +1459,7 @@ export class GalacticViewComponent implements OnInit {
     planets: number,
     asteroids: number,
     isVoid: boolean,
-    isCenter: boolean
+    isCenter: boolean,
   ): string {
     if (isVoid || isCenter) {
       return '';
@@ -1373,7 +1473,7 @@ export class GalacticViewComponent implements OnInit {
   private buildOwnedPlanetsDotsLabel(
     ownership: [number, number, number, number] | null,
     isVoid: boolean,
-    isCenter: boolean
+    isCenter: boolean,
   ): string {
     if (isVoid || isCenter || ownership === null) {
       return '';
@@ -1391,7 +1491,7 @@ export class GalacticViewComponent implements OnInit {
     ownership: [number, number, number, number] | null,
     isVoid: boolean,
     isCenter: boolean,
-    noteText: string | null
+    noteText: string | null,
   ): string {
     const noteSegment = noteText ? `\nNote: ${noteText}` : '';
 
@@ -1425,21 +1525,25 @@ export class GalacticViewComponent implements OnInit {
       return 'none';
     }
 
-    return entries
-      .map((entry) => `${entry.type} x${this.formatInteger(entry.amount)}`)
-      .join(', ');
+    return entries.map((entry) => `${entry.type} x${this.formatInteger(entry.amount)}`).join(', ');
   }
 
   private formatDamagedShipEntries(
-    entries: Array<{ type: string; amount: number; totalMissingHull: number; averageDamagePercent: number }>
+    entries: Array<{
+      type: string;
+      amount: number;
+      totalMissingHull: number;
+      averageDamagePercent: number;
+    }>,
   ): string {
     if (entries.length <= 0) {
       return 'none';
     }
 
     return entries
-      .map((entry) =>
-        `${entry.type} x${this.formatInteger(entry.amount)} (${this.formatInteger(entry.averageDamagePercent)}% avg damage, missing hull ${this.formatInteger(entry.totalMissingHull)})`
+      .map(
+        (entry) =>
+          `${entry.type} x${this.formatInteger(entry.amount)} (${this.formatInteger(entry.averageDamagePercent)}% avg damage, missing hull ${this.formatInteger(entry.totalMissingHull)})`,
       )
       .join(', ');
   }
@@ -1478,12 +1582,14 @@ export class GalacticViewComponent implements OnInit {
     const routesByKey = new Map<string, GalacticRouteVm>();
 
     for (const fleet of fleets) {
-      const start = fleet.routeKind === 'RETURNING'
-        ? fleet.targetSystemCoordinates
-        : fleet.originSystemCoordinates;
-      const end = fleet.routeKind === 'RETURNING'
-        ? fleet.originSystemCoordinates
-        : fleet.targetSystemCoordinates;
+      const start =
+        fleet.routeKind === 'RETURNING'
+          ? fleet.targetSystemCoordinates
+          : fleet.originSystemCoordinates;
+      const end =
+        fleet.routeKind === 'RETURNING'
+          ? fleet.originSystemCoordinates
+          : fleet.targetSystemCoordinates;
       if (start.x === end.x && start.y === end.y) {
         continue;
       }
@@ -1506,20 +1612,20 @@ export class GalacticViewComponent implements OnInit {
         endY: endCenter.y,
         badgeX: (startCenter.x + endCenter.x) / 2,
         badgeY: (startCenter.y + endCenter.y) / 2,
-        count: 1
+        count: 1,
       });
     }
 
-    return Array.from(routesByKey.values()).sort((left, right) =>
-      left.routeKind.localeCompare(right.routeKind)
-        || left.key.localeCompare(right.key)
+    return Array.from(routesByKey.values()).sort(
+      (left, right) =>
+        left.routeKind.localeCompare(right.routeKind) || left.key.localeCompare(right.key),
     );
   }
 
   private cellCenter(x: number, y: number): { x: number; y: number } {
     return {
-      x: this.gridPadding + (x * (this.gridCellSize + this.gridCellGap)) + (this.gridCellSize / 2),
-      y: this.gridPadding + (y * (this.gridCellSize + this.gridCellGap)) + (this.gridCellSize / 2)
+      x: this.gridPadding + x * (this.gridCellSize + this.gridCellGap) + this.gridCellSize / 2,
+      y: this.gridPadding + y * (this.gridCellSize + this.gridCellGap) + this.gridCellSize / 2,
     };
   }
 
@@ -1539,22 +1645,23 @@ export class GalacticViewComponent implements OnInit {
       .filter((fleet) => {
         const destination = this.resolveFleetDestinationSystemCoordinates(fleet);
         const current = fleet.currentSystemCoordinates;
-        return destination.x === x
-          && destination.y === y
-          && !(current?.x === x && current.y === y);
+        return destination.x === x && destination.y === y && !(current?.x === x && current.y === y);
       })
       .sort((left, right) => left.fleetId - right.fleetId);
   }
 
-  private resolveFleetDestinationSystemCoordinates(
-    fleet: GalaxyOwnFleetMovementDto
-  ): { x: number; y: number } {
+  private resolveFleetDestinationSystemCoordinates(fleet: GalaxyOwnFleetMovementDto): {
+    x: number;
+    y: number;
+  } {
     return fleet.routeKind === 'RETURNING'
       ? fleet.originSystemCoordinates
       : fleet.targetSystemCoordinates;
   }
 
-  private buildStarSystemNotesMap(starSystemNotes: StarSystemNoteDto[]): Map<string, StarSystemNoteDto> {
+  private buildStarSystemNotesMap(
+    starSystemNotes: StarSystemNoteDto[],
+  ): Map<string, StarSystemNoteDto> {
     const map = new Map<string, StarSystemNoteDto>();
     for (const note of starSystemNotes) {
       map.set(this.buildCoordinatesKey(note.coordinates.x, note.coordinates.y), note);

@@ -3,12 +3,12 @@
 <section class="mission-planner">
   @if (isLoading) {
     <section class="status status--info">
-      <h3>Loading Mission Planner</h3>
-      <p>Owned planets are being loaded.</p>
+      <h3>{{ 'missionPlanner.loading.title' | t }}</h3>
+      <p>{{ 'missionPlanner.loading.body' | t }}</p>
     </section>
   } @else if (loadError) {
     <section class="status status--error">
-      <h3>Mission Planner unavailable</h3>
+      <h3>{{ 'missionPlanner.status.unavailable' | t }}</h3>
       <p>{{ loadError }}</p>
     </section>
   } @else {
@@ -17,7 +17,7 @@
         class="mission-planner__section mission-planner__section--full overview-card"
         data-tutorial-id="mission-planner-mission-types"
       >
-        <h3>Mission type</h3>
+        <h3>{{ 'missionPlanner.sections.missionType' | t }}</h3>
         <div class="mission-planner__mission-list">
           @for (option of missionOptions; track option.type) {
             <button
@@ -39,17 +39,23 @@
             class="overview-card mission-planner__target-card"
             data-tutorial-id="mission-planner-target-card"
           >
-            <h3>Target</h3>
-            <p class="overview-muted mission-planner__microcopy">Paste coordinates like <code>32:22:7</code> or use the planet rail.</p>
+            <h3>{{ 'missionPlanner.sections.target' | t }}</h3>
+            <p class="overview-muted mission-planner__microcopy">
+              {{ 'missionPlanner.target.microcopy' | t: { example: '32:22:7' } }}
+            </p>
             <div class="mission-planner__coordinate-row">
               <input
                 class="mission-planner__coordinate-input"
                 type="text"
                 [(ngModel)]="targetCoordinatesInput"
-                placeholder="x:y:z"
+                [placeholder]="'missionPlanner.target.placeholder' | t"
               />
-              <button class="mission-planner__small-button" type="button" (click)="applyTargetCoordinatesInput()">
-                Resolve
+              <button
+                class="mission-planner__small-button"
+                type="button"
+                (click)="applyTargetCoordinatesInput()"
+              >
+                {{ 'missionPlanner.target.resolve' | t }}
               </button>
             </div>
             @if (targetLookupError) {
@@ -61,7 +67,7 @@
                 [showDefaultActions]="false"
               ></app-mini-planet-preview>
             } @else {
-              <p class="overview-empty">No target planet resolved yet.</p>
+              <p class="overview-empty">{{ 'missionPlanner.target.noneResolved' | t }}</p>
             }
           </article>
 
@@ -69,46 +75,71 @@
             class="overview-card mission-planner__details-card mission-planner__details-card--tall"
             data-tutorial-id="mission-planner-details-card"
           >
-            <h3>Mission Details</h3>
-            <p class="overview-muted mission-planner__microcopy">Origins can be owned planets or orbiting fleets with fuel in cargo.</p>
+            <h3>{{ 'missionPlanner.sections.missionDetails' | t }}</h3>
+            <p class="overview-muted mission-planner__microcopy">
+              {{ 'missionPlanner.details.originMicrocopy' | t }}
+            </p>
             <p class="mission-planner__detail-line">
-              Origin:
+              {{ 'missionPlanner.details.origin' | t }}:
               {{ currentOriginNameLabel() }}
             </p>
             <div class="overview-stat mission-planner__detail-stat">
-              <span class="overview-stat__label">Active fleets</span>
+              <span class="overview-stat__label">{{
+                'missionPlanner.details.activeFleets' | t
+              }}</span>
               <span class="overview-stat__value">{{ activeFleetCountLabel() }}</span>
             </div>
             <div class="overview-stat mission-planner__detail-stat">
-              <span class="overview-stat__label">Ship repair capability</span>
+              <span class="overview-stat__label">{{
+                'missionPlanner.details.shipRepairCapability' | t
+              }}</span>
               <span class="overview-stat__value">{{ shipRepairCapabilityLabel() }}</span>
             </div>
             <div class="overview-stat mission-planner__detail-stat">
-              <span class="overview-stat__label">Drone repair capability</span>
+              <span class="overview-stat__label">{{
+                'missionPlanner.details.droneRepairCapability' | t
+              }}</span>
               <span class="overview-stat__value">{{ droneRepairCapabilityLabel() }}</span>
             </div>
             @if (!missionAllowsCargo()) {
-              <p class="overview-muted mission-planner__compact-copy">Cargo is disabled for this mission.</p>
+              <p class="overview-muted mission-planner__compact-copy">
+                {{ 'missionPlanner.details.cargoDisabled' | t }}
+              </p>
             } @else {
               <div class="mission-planner__cargo-grid">
                 <label class="mission-planner__cargo-field">
                   <span class="mission-planner__resource-label">
-                    <img class="mission-planner__resource-icon" [src]="resourceIcons.metal" alt="" aria-hidden="true" />
-                    Metal
+                    <img
+                      class="mission-planner__resource-icon"
+                      [src]="resourceIcons.metal"
+                      alt=""
+                      aria-hidden="true"
+                    />
+                    {{ 'missionPlanner.resources.metal' | t }}
                   </span>
                   <input type="number" min="0" [(ngModel)]="cargoMetal" />
                 </label>
                 <label class="mission-planner__cargo-field">
                   <span class="mission-planner__resource-label">
-                    <img class="mission-planner__resource-icon" [src]="resourceIcons.crystal" alt="" aria-hidden="true" />
-                    Crystal
+                    <img
+                      class="mission-planner__resource-icon"
+                      [src]="resourceIcons.crystal"
+                      alt=""
+                      aria-hidden="true"
+                    />
+                    {{ 'missionPlanner.resources.crystal' | t }}
                   </span>
                   <input type="number" min="0" [(ngModel)]="cargoCrystal" />
                 </label>
                 <label class="mission-planner__cargo-field">
                   <span class="mission-planner__resource-label">
-                    <img class="mission-planner__resource-icon" [src]="resourceIcons.deuterium" alt="" aria-hidden="true" />
-                    Deuterium
+                    <img
+                      class="mission-planner__resource-icon"
+                      [src]="resourceIcons.deuterium"
+                      alt=""
+                      aria-hidden="true"
+                    />
+                    {{ 'missionPlanner.resources.deuterium' | t }}
                   </span>
                   <input type="number" min="0" [(ngModel)]="cargoDeuterium" />
                 </label>
@@ -117,28 +148,42 @@
 
             <div class="mission-planner__cargo-grid">
               <div class="overview-stat mission-planner__detail-stat">
-                <span class="overview-stat__label">Carried bombs</span>
+                <span class="overview-stat__label">{{
+                  'missionPlanner.details.carriedBombs' | t
+                }}</span>
                 <span class="overview-stat__value">{{ totalSelectedBombs() }}</span>
               </div>
               <div class="overview-stat mission-planner__detail-stat">
-                <span class="overview-stat__label">Bomber hangars</span>
-                <span class="overview-stat__value">{{ usedBombHangarCapacity() }} / {{ totalBomberHangarCapacity() }}</span>
+                <span class="overview-stat__label">{{
+                  'missionPlanner.details.bomberHangars' | t
+                }}</span>
+                <span class="overview-stat__value"
+                  >{{ usedBombHangarCapacity() }} / {{ totalBomberHangarCapacity() }}</span
+                >
               </div>
             </div>
 
             <div class="mission-planner__disabled-row">
-              <button class="mission-planner__small-button" type="button" [disabled]="!speedSelectorEnabled">
-                Speed selector (later)
+              <button
+                class="mission-planner__small-button"
+                type="button"
+                [disabled]="!speedSelectorEnabled"
+              >
+                {{ 'missionPlanner.details.speedSelectorLater' | t }}
               </button>
-              <button class="mission-planner__small-button" type="button" [disabled]="!fleetTemplatesEnabled">
-                Save as fleet template (later)
+              <button
+                class="mission-planner__small-button"
+                type="button"
+                [disabled]="!fleetTemplatesEnabled"
+              >
+                {{ 'missionPlanner.details.fleetTemplateLater' | t }}
               </button>
             </div>
 
             @if (supportsJumpGate()) {
               <div class="mission-planner__jump-gate-footer">
                 <div>
-                  <h4>Jump Gate</h4>
+                  <h4>{{ 'missionPlanner.jumpGate.title' | t }}</h4>
                   <p class="overview-muted mission-planner__compact-copy">{{ jumpGateHint() }}</p>
                 </div>
                 <label class="mission-planner__purpose-filter mission-planner__jump-gate-toggle">
@@ -148,27 +193,29 @@
                     [disabled]="!canToggleJumpGate()"
                     (ngModelChange)="setUseJumpGate($event)"
                   />
-                  <span>Use Jump Gate</span>
+                  <span>{{ 'missionPlanner.jumpGate.use' | t }}</span>
                 </label>
               </div>
             }
           </article>
 
           @if (supportsBombardmentPriorities()) {
-            <article class="overview-card mission-planner__details-card mission-planner__bombard-card">
-              <h3>Bombard Priorities</h3>
+            <article
+              class="overview-card mission-planner__details-card mission-planner__bombard-card"
+            >
+              <h3>{{ 'missionPlanner.sections.bombardPriorities' | t }}</h3>
               <p class="overview-muted mission-planner__compact-copy">
-                Empty priorities keep current random targeting. Used options are disabled in the other dropdowns.
+                {{ 'missionPlanner.bombardment.body' | t }}
               </p>
               <div class="mission-planner__bombard-grid">
                 <label class="mission-planner__cargo-field">
-                  <span>Main</span>
+                  <span>{{ 'missionPlanner.bombardment.main' | t }}</span>
                   <select
                     class="mission-planner__bombard-select"
                     [ngModel]="bombardmentPriorityValue('main')"
                     (ngModelChange)="setBombardmentPriority('main', $event)"
                   >
-                    <option value="">Random</option>
+                    <option value="">{{ 'missionPlanner.bombardment.random' | t }}</option>
                     @for (group of bombardmentPriorityGroups; track group.label) {
                       <optgroup [label]="group.label">
                         @for (option of group.options; track option.value) {
@@ -184,19 +231,21 @@
                   </select>
                 </label>
                 <label class="mission-planner__cargo-field">
-                  <span>Secondary</span>
+                  <span>{{ 'missionPlanner.bombardment.secondary' | t }}</span>
                   <select
                     class="mission-planner__bombard-select"
                     [ngModel]="bombardmentPriorityValue('secondary')"
                     (ngModelChange)="setBombardmentPriority('secondary', $event)"
                   >
-                    <option value="">Random</option>
+                    <option value="">{{ 'missionPlanner.bombardment.random' | t }}</option>
                     @for (group of bombardmentPriorityGroups; track group.label) {
                       <optgroup [label]="group.label">
                         @for (option of group.options; track option.value) {
                           <option
                             [value]="option.value"
-                            [disabled]="isBombardmentPriorityOptionDisabled('secondary', option.value)"
+                            [disabled]="
+                              isBombardmentPriorityOptionDisabled('secondary', option.value)
+                            "
                           >
                             {{ option.label }}
                           </option>
@@ -206,19 +255,21 @@
                   </select>
                 </label>
                 <label class="mission-planner__cargo-field">
-                  <span>Tertiary</span>
+                  <span>{{ 'missionPlanner.bombardment.tertiary' | t }}</span>
                   <select
                     class="mission-planner__bombard-select"
                     [ngModel]="bombardmentPriorityValue('tertiary')"
                     (ngModelChange)="setBombardmentPriority('tertiary', $event)"
                   >
-                    <option value="">Random</option>
+                    <option value="">{{ 'missionPlanner.bombardment.random' | t }}</option>
                     @for (group of bombardmentPriorityGroups; track group.label) {
                       <optgroup [label]="group.label">
                         @for (option of group.options; track option.value) {
                           <option
                             [value]="option.value"
-                            [disabled]="isBombardmentPriorityOptionDisabled('tertiary', option.value)"
+                            [disabled]="
+                              isBombardmentPriorityOptionDisabled('tertiary', option.value)
+                            "
                           >
                             {{ option.label }}
                           </option>
@@ -235,50 +286,72 @@
             class="overview-card mission-planner__summary-card"
             data-tutorial-id="mission-planner-travel-summary"
           >
-            <h3>Travel Summary</h3>
+            <h3>{{ 'missionPlanner.sections.travelSummary' | t }}</h3>
             <div class="mission-planner__summary-columns">
               <div class="mission-planner__summary-column">
                 <div class="overview-stat">
-                  <span class="overview-stat__label">Distance</span>
+                  <span class="overview-stat__label">{{
+                    'missionPlanner.travel.distance' | t
+                  }}</span>
                   <span class="overview-stat__value">{{ distancePreview() }}</span>
                 </div>
                 <div class="overview-stat" [appTooltip]="travelFormulaTooltipLabel()">
-                  <span class="overview-stat__label">ETA</span>
+                  <span class="overview-stat__label">{{ 'missionPlanner.travel.eta' | t }}</span>
                   <span class="overview-stat__value">{{ travelTurnsPreview() }}</span>
                 </div>
                 <div class="overview-stat" [appTooltip]="travelFormulaTooltipLabel()">
-                  <span class="overview-stat__label">Return ETA</span>
+                  <span class="overview-stat__label">{{
+                    'missionPlanner.travel.returnEta' | t
+                  }}</span>
                   <span class="overview-stat__value">{{ travelTurnsPreview() }}</span>
                 </div>
                 <div class="overview-stat">
-                  <span class="overview-stat__label">Fuel reserve</span>
+                  <span class="overview-stat__label">{{
+                    'missionPlanner.travel.fuelReserve' | t
+                  }}</span>
                   <span class="overview-stat__value mission-planner__fuel-value">
                     <span>{{ fuelCostPreview() }}</span>
-                    <img class="mission-planner__fuel-icon" [src]="resourceIcons.deuterium" alt="Deuterium" />
+                    <img
+                      class="mission-planner__fuel-icon"
+                      [src]="resourceIcons.deuterium"
+                      alt="Deuterium"
+                    />
                   </span>
                 </div>
               </div>
 
               <div class="mission-planner__summary-column">
                 <div class="overview-stat">
-                  <span class="overview-stat__label">Cargo used</span>
+                  <span class="overview-stat__label">{{
+                    'missionPlanner.travel.cargoUsed' | t
+                  }}</span>
                   <span class="overview-stat__value">{{ usedCargoCapacity() }}</span>
                 </div>
                 <div class="overview-stat">
-                  <span class="overview-stat__label">Cargo free</span>
+                  <span class="overview-stat__label">{{
+                    'missionPlanner.travel.cargoFree' | t
+                  }}</span>
                   <span class="overview-stat__value">{{ remainingCargoCapacity() }}</span>
                 </div>
                 <div class="overview-stat">
-                  <span class="overview-stat__label">Hangar used</span>
+                  <span class="overview-stat__label">{{
+                    'missionPlanner.travel.hangarUsed' | t
+                  }}</span>
                   <span class="overview-stat__value">{{ usedHangarCapacity() }}</span>
                 </div>
                 <div class="overview-stat">
-                  <span class="overview-stat__label">Hangar total</span>
+                  <span class="overview-stat__label">{{
+                    'missionPlanner.travel.hangarTotal' | t
+                  }}</span>
                   <span class="overview-stat__value">{{ totalHangarCapacity() }}</span>
                 </div>
                 <div class="overview-stat">
-                  <span class="overview-stat__label">Bomber hangars</span>
-                  <span class="overview-stat__value">{{ usedBombHangarCapacity() }} / {{ totalBomberHangarCapacity() }}</span>
+                  <span class="overview-stat__label">{{
+                    'missionPlanner.travel.bomberHangars' | t
+                  }}</span>
+                  <span class="overview-stat__value"
+                    >{{ usedBombHangarCapacity() }} / {{ totalBomberHangarCapacity() }}</span
+                  >
                 </div>
               </div>
             </div>
@@ -290,17 +363,11 @@
           data-tutorial-id="mission-planner-launch-readiness"
         >
           <article class="overview-card">
-            <h3>Launch Summary</h3>
-            <p class="overview-muted">
-              Mission: {{ selectedMissionType }} |
-              Ships: {{ totalSelectedShips() }} |
-              Cargo: {{ usedCargoCapacity() }} |
-              Fuel reserve: {{ fuelCostPreview() }}
-            </p>
-            @if ((selectedOriginPlanet || selectedOriginFleet) && selectedTargetPlanet) {
+            <h3>{{ 'missionPlanner.sections.launchSummary' | t }}</h3>
+            <p class="overview-muted">{{ launchSummaryLabel() }}</p>
+            @if (launchRouteLabel(); as routeLabel) {
               <p class="overview-muted">
-                From {{ currentOriginNameLabel() }}
-                to {{ selectedTargetPlanet.basicInfo.name }} ({{ targetCoordinatesInput }})
+                {{ routeLabel }}
               </p>
             }
             @if (launchError) {
@@ -315,12 +382,16 @@
               [disabled]="!canLaunch()"
               (click)="launchMission()"
             >
-              {{ isLaunching ? 'Launching...' : 'Launch mission' }}
+              {{
+                isLaunching
+                  ? ('missionPlanner.launch.launching' | t)
+                  : ('missionPlanner.launch.launch' | t)
+              }}
             </button>
           </article>
 
           <article class="overview-card">
-            <h3>Requirements and Warnings</h3>
+            <h3>{{ 'missionPlanner.sections.requirementsWarnings' | t }}</h3>
             <div class="mission-planner__warnings">
               @for (warning of warningRows(); track warning.text) {
                 <p
@@ -341,8 +412,8 @@
         >
           <div class="mission-planner__section-head">
             <div>
-              <h3>Fleet Composition</h3>
-              <p class="overview-muted">Mission type highlights the ships that are useful or required.</p>
+              <h3>{{ 'missionPlanner.sections.fleetComposition' | t }}</h3>
+              <p class="overview-muted">{{ 'missionPlanner.fleet.subtitle' | t }}</p>
               <div class="mission-planner__purpose-filters">
                 @for (filter of purposeFilterEntries(); track filter.purpose) {
                   <label class="mission-planner__purpose-filter">
@@ -356,7 +427,9 @@
                 }
               </div>
             </div>
-            <button class="mission-planner__small-button" type="button" (click)="clearAllShips()">Clear all</button>
+            <button class="mission-planner__small-button" type="button" (click)="clearAllShips()">
+              {{ 'missionPlanner.fleet.clearAll' | t }}
+            </button>
           </div>
 
           <div class="mission-planner__ships">
@@ -368,7 +441,11 @@
                 [class.mission-planner__ship-row--unavailable]="row.isUnavailable"
               >
                 <div class="mission-planner__ship-visual">
-                  <img class="mission-planner__ship-image" [src]="row.imagePath" [alt]="row.label + ' image'" />
+                  <img
+                    class="mission-planner__ship-image"
+                    [src]="row.imagePath"
+                    [alt]="row.label + ' image'"
+                  />
                 </div>
                 <div class="mission-planner__ship-main">
                   <div class="mission-planner__ship-head">
@@ -378,22 +455,34 @@
                         <span class="mission-planner__ship-tag">{{ purpose }}</span>
                       }
                       @if (!row.canJump) {
-                        <span class="mission-planner__ship-tag mission-planner__ship-tag--warning">No hyperspace drive.</span>
+                        <span class="mission-planner__ship-tag mission-planner__ship-tag--warning">
+                          {{ 'missionPlanner.fleet.noHyperspaceDrive' | t }}
+                        </span>
                       }
                     </div>
                   </div>
-                  <p class="mission-planner__ship-meta">
-                    Available: {{ row.available }} (Damaged: {{ row.availableDamaged }}) | Cargo: {{ row.cargoCapacity }} | Hangar: {{ row.hangarCapacity }}
-                  </p>
+                  <p class="mission-planner__ship-meta">{{ shipRowMetaLabel(row) }}</p>
                 </div>
                 <div class="mission-planner__ship-actions">
                   <div class="mission-planner__selection-group">
-                    <span class="mission-planner__selection-label">Ready</span>
-                    <button class="mission-planner__small-button" type="button" (click)="fillMaxUndamaged(row.type)" [disabled]="row.availableUndamaged <= 0">
-                      Max
+                    <span class="mission-planner__selection-label">{{
+                      'missionPlanner.fleet.ready' | t
+                    }}</span>
+                    <button
+                      class="mission-planner__small-button"
+                      type="button"
+                      (click)="fillMaxUndamaged(row.type)"
+                      [disabled]="row.availableUndamaged <= 0"
+                    >
+                      {{ 'missionPlanner.fleet.max' | t }}
                     </button>
-                    <button class="mission-planner__small-button" type="button" (click)="clearUndamagedShip(row.type)" [disabled]="row.selectedUndamaged <= 0">
-                      Clear
+                    <button
+                      class="mission-planner__small-button"
+                      type="button"
+                      (click)="clearUndamagedShip(row.type)"
+                      [disabled]="row.selectedUndamaged <= 0"
+                    >
+                      {{ 'missionPlanner.fleet.clear' | t }}
                     </button>
                     <input
                       class="mission-planner__amount-input"
@@ -404,13 +493,27 @@
                       (ngModelChange)="setUndamagedShipAmount(row.type, $event)"
                     />
                   </div>
-                  <div class="mission-planner__selection-group mission-planner__selection-group--damaged">
-                    <span class="mission-planner__selection-label">Damaged</span>
-                    <button class="mission-planner__small-button mission-planner__small-button--compact" type="button" (click)="fillMaxDamaged(row.type)" [disabled]="row.availableDamaged <= 0">
-                      Max
+                  <div
+                    class="mission-planner__selection-group mission-planner__selection-group--damaged"
+                  >
+                    <span class="mission-planner__selection-label">{{
+                      'missionPlanner.fleet.damaged' | t
+                    }}</span>
+                    <button
+                      class="mission-planner__small-button mission-planner__small-button--compact"
+                      type="button"
+                      (click)="fillMaxDamaged(row.type)"
+                      [disabled]="row.availableDamaged <= 0"
+                    >
+                      {{ 'missionPlanner.fleet.max' | t }}
                     </button>
-                    <button class="mission-planner__small-button mission-planner__small-button--compact" type="button" (click)="clearDamagedShip(row.type)" [disabled]="row.availableDamaged <= 0 || row.selectedDamaged <= 0">
-                      Clear
+                    <button
+                      class="mission-planner__small-button mission-planner__small-button--compact"
+                      type="button"
+                      (click)="clearDamagedShip(row.type)"
+                      [disabled]="row.availableDamaged <= 0 || row.selectedDamaged <= 0"
+                    >
+                      {{ 'missionPlanner.fleet.clear' | t }}
                     </button>
                     <input
                       class="mission-planner__amount-input mission-planner__amount-input--compact"
@@ -426,7 +529,7 @@
               </article>
             }
             @if (selectedShipRows().length === 0) {
-              <p class="overview-empty">No ships match the current purpose filters.</p>
+              <p class="overview-empty">{{ 'missionPlanner.fleet.noMatches' | t }}</p>
             }
           </div>
         </section>
@@ -434,10 +537,12 @@
         <section class="mission-planner__section overview-card">
           <div class="mission-planner__section-head">
             <div>
-              <h3>Bomb Loadout</h3>
-              <p class="overview-muted">Bomber hangars can carry PLANETARY_BOMB units from the origin planet.</p>
+              <h3>{{ 'missionPlanner.sections.bombLoadout' | t }}</h3>
+              <p class="overview-muted">{{ 'missionPlanner.bombs.subtitle' | t }}</p>
             </div>
-            <button class="mission-planner__small-button" type="button" (click)="clearAllBombs()">Clear bombs</button>
+            <button class="mission-planner__small-button" type="button" (click)="clearAllBombs()">
+              {{ 'missionPlanner.bombs.clearAll' | t }}
+            </button>
           </div>
 
           <div class="mission-planner__ships">
@@ -447,21 +552,33 @@
                   <div class="mission-planner__ship-head">
                     <h4 class="mission-planner__ship-title">{{ row.label }}</h4>
                     <div class="mission-planner__ship-tags">
-                      <span class="mission-planner__ship-tag">Planetary bomb</span>
+                      <span class="mission-planner__ship-tag">{{
+                        'missionPlanner.bombs.tag' | t
+                      }}</span>
                     </div>
                   </div>
-                  <p class="mission-planner__ship-meta">
-                    Available: {{ row.available }} | Size: {{ row.size }} | Hull: {{ row.hull }} | Payload: {{ row.damage }} x {{ row.shots }}
-                  </p>
+                  <p class="mission-planner__ship-meta">{{ bombRowMetaLabel(row) }}</p>
                 </div>
                 <div class="mission-planner__ship-actions">
                   <div class="mission-planner__selection-group">
-                    <span class="mission-planner__selection-label">Loaded</span>
-                    <button class="mission-planner__small-button" type="button" (click)="fillMaxBomb(row.type)" [disabled]="row.available <= 0">
-                      Max
+                    <span class="mission-planner__selection-label">{{
+                      'missionPlanner.bombs.loaded' | t
+                    }}</span>
+                    <button
+                      class="mission-planner__small-button"
+                      type="button"
+                      (click)="fillMaxBomb(row.type)"
+                      [disabled]="row.available <= 0"
+                    >
+                      {{ 'missionPlanner.fleet.max' | t }}
                     </button>
-                    <button class="mission-planner__small-button" type="button" (click)="clearBomb(row.type)" [disabled]="row.selected <= 0">
-                      Clear
+                    <button
+                      class="mission-planner__small-button"
+                      type="button"
+                      (click)="clearBomb(row.type)"
+                      [disabled]="row.selected <= 0"
+                    >
+                      {{ 'missionPlanner.fleet.clear' | t }}
                     </button>
                     <input
                       class="mission-planner__amount-input"
@@ -476,7 +593,7 @@
               </article>
             }
             @if (selectedBombRows().length === 0) {
-              <p class="overview-empty">No PLANETARY_BOMB units are available on the selected origin planet.</p>
+              <p class="overview-empty">{{ 'missionPlanner.bombs.noAvailable' | t }}</p>
             }
           </div>
         </section>
@@ -484,9 +601,11 @@
 
       <aside class="mission-planner__rail">
         <section class="overview-card" data-tutorial-id="mission-planner-origin-rail">
-          <h3>Origin</h3>
+          <h3>{{ 'missionPlanner.sections.origin' | t }}</h3>
           <label class="mission-planner__origin-field">
-            <span class="overview-muted mission-planner__microcopy">Coordinates</span>
+            <span class="overview-muted mission-planner__microcopy">{{
+              'missionPlanner.origin.coordinates' | t
+            }}</span>
             <div class="mission-planner__origin-row">
               <input
                 class="mission-planner__origin-input"
@@ -500,13 +619,18 @@
                 [disabled]="!selectedOriginPlanet"
                 (click)="selectedOriginPlanet && chooseTargetPlanet(selectedOriginPlanet)"
               >
-                Use as target
+                {{ 'missionPlanner.origin.useAsTarget' | t }}
               </button>
             </div>
           </label>
-          <p class="overview-muted mission-planner__microcopy">Select the active origin planet from your empire.</p>
+          <p class="overview-muted mission-planner__microcopy">
+            {{ 'missionPlanner.origin.subtitle' | t }}
+          </p>
           <div class="mission-planner__rail-list">
-            @for (planet of ownedPlanets; track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z) {
+            @for (
+              planet of ownedPlanets;
+              track planet.coordinates.x + ':' + planet.coordinates.y + ':' + planet.coordinates.z
+            ) {
               <div
                 class="game-dashboard__planet-option"
                 [class.game-dashboard__planet-option--selected]="selectedOriginMatches(planet)"
@@ -518,7 +642,11 @@
                     [class.game-dashboard__planet-radio--selected]="selectedOriginMatches(planet)"
                   ></span>
                   <span class="game-dashboard__planet-select-label">
-                    {{ selectedOriginMatches(planet) ? 'Selected' : 'Select' }}
+                    {{
+                      selectedOriginMatches(planet)
+                        ? ('missionPlanner.origin.selected' | t)
+                        : ('missionPlanner.origin.select' | t)
+                    }}
                   </span>
                 </div>
 
@@ -533,8 +661,10 @@
         </section>
 
         <section class="overview-card">
-          <h3>Remote Origins</h3>
-          <p class="overview-muted mission-planner__microcopy">Orbiting fleets can launch follow-up missions from their current location. Fuel is taken from fleet cargo.</p>
+          <h3>{{ 'missionPlanner.sections.remoteOrigins' | t }}</h3>
+          <p class="overview-muted mission-planner__microcopy">
+            {{ 'missionPlanner.remoteOrigins.subtitle' | t }}
+          </p>
           <div class="mission-planner__rail-list">
             @for (fleet of remoteOriginFleets(); track fleet.fleetId) {
               <div
@@ -545,18 +675,24 @@
                 <div class="game-dashboard__planet-select-row">
                   <span
                     class="game-dashboard__planet-radio"
-                    [class.game-dashboard__planet-radio--selected]="selectedOriginFleetMatches(fleet)"
+                    [class.game-dashboard__planet-radio--selected]="
+                      selectedOriginFleetMatches(fleet)
+                    "
                   ></span>
                   <span class="game-dashboard__planet-select-label">
-                    {{ selectedOriginFleetMatches(fleet) ? 'Selected' : 'Select' }}
+                    {{
+                      selectedOriginFleetMatches(fleet)
+                        ? ('missionPlanner.origin.selected' | t)
+                        : ('missionPlanner.origin.select' | t)
+                    }}
                   </span>
                 </div>
-                <p class="overview-muted">Fleet #{{ fleet.fleetId }} orbiting {{ fleet.targetPlanetName }}</p>
-                <p class="overview-muted">Ships: {{ totalFleetShips(fleet) }} | Cargo fuel: {{ fleet.cargo.deuterium }}</p>
+                <p class="overview-muted">{{ remoteOriginSummaryLabel(fleet) }}</p>
+                <p class="overview-muted">{{ remoteOriginStatsLabel(fleet) }}</p>
               </div>
             }
             @if (remoteOriginFleets().length === 0) {
-              <p class="overview-empty">No orbiting fleets are available as remote origins yet.</p>
+              <p class="overview-empty">{{ 'missionPlanner.remoteOrigins.noneAvailable' | t }}</p>
             }
           </div>
         </section>

@@ -3,7 +3,7 @@
   <section class="galaxy-preview">
     <div class="galaxy-preview__header">
       <h3>
-        Galaxy Preview
+        {{ 'galactic.preview.title' | t }}
         @if (gridHeight > 0 && gridWidth > 0) {
           <span class="galaxy-preview__meta">
             @if (galaxyName) {
@@ -18,20 +18,13 @@
 
       <label class="galaxy-preview__toggle" data-tutorial-id="galactic-route-toggle">
         <input type="checkbox" [(ngModel)]="showFleetRoutes" />
-        <span>Show fleet routes</span>
+        <span>{{ 'galactic.preview.showFleetRoutes' | t }}</span>
       </label>
     </div>
 
     @if (gridHeight > 0 && gridWidth > 0) {
-      <div
-        #topScroll
-        class="galaxy-grid-top-scroll"
-        (scroll)="onTopScrollbarScroll()"
-      >
-        <div
-          class="galaxy-grid-top-scroll__content"
-          [style.width.px]="topScrollContentWidth"
-        ></div>
+      <div #topScroll class="galaxy-grid-top-scroll" (scroll)="onTopScrollbarScroll()">
+        <div class="galaxy-grid-top-scroll__content" [style.width.px]="topScrollContentWidth"></div>
       </div>
       <div
         #bottomScroll
@@ -39,7 +32,11 @@
         data-tutorial-id="galactic-grid"
         (scroll)="onBottomScrollbarScroll()"
       >
-        <div class="galaxy-grid-stage" [style.width.px]="gridCanvasWidth()" [style.height.px]="gridCanvasHeight()">
+        <div
+          class="galaxy-grid-stage"
+          [style.width.px]="gridCanvasWidth()"
+          [style.height.px]="gridCanvasHeight()"
+        >
           <svg
             class="galaxy-grid-routes"
             [attr.width]="gridCanvasWidth()"
@@ -48,11 +45,31 @@
             aria-hidden="true"
           >
             <defs>
-              <marker id="galaxy-route-arrowhead-outbound" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-                <polygon points="0 0, 7 3.5, 0 7" class="galaxy-grid-routes__arrowhead galaxy-grid-routes__arrowhead--outbound"></polygon>
+              <marker
+                id="galaxy-route-arrowhead-outbound"
+                markerWidth="7"
+                markerHeight="7"
+                refX="6"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon
+                  points="0 0, 7 3.5, 0 7"
+                  class="galaxy-grid-routes__arrowhead galaxy-grid-routes__arrowhead--outbound"
+                ></polygon>
               </marker>
-              <marker id="galaxy-route-arrowhead-returning" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-                <polygon points="0 0, 7 3.5, 0 7" class="galaxy-grid-routes__arrowhead galaxy-grid-routes__arrowhead--returning"></polygon>
+              <marker
+                id="galaxy-route-arrowhead-returning"
+                markerWidth="7"
+                markerHeight="7"
+                refX="6"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon
+                  points="0 0, 7 3.5, 0 7"
+                  class="galaxy-grid-routes__arrowhead galaxy-grid-routes__arrowhead--returning"
+                ></polygon>
               </marker>
             </defs>
 
@@ -65,14 +82,20 @@
                   [attr.y1]="route.startY"
                   [attr.x2]="route.endX"
                   [attr.y2]="route.endY"
-                  [attr.marker-end]="route.routeKind === 'RETURNING' ? 'url(#galaxy-route-arrowhead-returning)' : 'url(#galaxy-route-arrowhead-outbound)'"
+                  [attr.marker-end]="
+                    route.routeKind === 'RETURNING'
+                      ? 'url(#galaxy-route-arrowhead-returning)'
+                      : 'url(#galaxy-route-arrowhead-outbound)'
+                  "
                 />
 
                 @if (route.count > 1) {
                   <g class="galaxy-grid-routes__badge">
                     <circle
                       class="galaxy-grid-routes__badge-circle"
-                      [class.galaxy-grid-routes__badge-circle--returning]="route.routeKind === 'RETURNING'"
+                      [class.galaxy-grid-routes__badge-circle--returning]="
+                        route.routeKind === 'RETURNING'
+                      "
                       [attr.cx]="route.badgeX"
                       [attr.cy]="route.badgeY"
                       r="6.5"
@@ -92,16 +115,16 @@
 
           <div
             class="galaxy-grid"
-            [style.grid-template-columns]="
-              'repeat(' + gridWidth + ', ' + gridCellSize + 'px)'
-            "
+            [style.grid-template-columns]="'repeat(' + gridWidth + ', ' + gridCellSize + 'px)'"
           >
             @for (row of grid; track $index) {
               @for (cell of row; track $index) {
                 <div
                   class="galaxy-cell"
                   [attr.data-tutorial-id]="isHomeSystemCell(cell) ? 'galactic-home-cell' : null"
-                  [class.galaxy-cell--selected]="selectedCell?.x === cell.x && selectedCell?.y === cell.y"
+                  [class.galaxy-cell--selected]="
+                    selectedCell?.x === cell.x && selectedCell?.y === cell.y
+                  "
                   [class.galaxy-cell--void]="cell.isVoid"
                   [class.galaxy-cell--center]="cell.isCenter"
                   [class.galaxy-cell--no-data]="cell.fillKind === 'noData'"
@@ -109,8 +132,12 @@
                   [class.galaxy-cell--player-only]="cell.fillKind === 'playerOnly'"
                   [class.galaxy-cell--bot-or-neutral]="cell.fillKind === 'botOrNeutral'"
                   [class.galaxy-cell--human-or-neutral]="cell.fillKind === 'humanOrNeutral'"
-                  [class.galaxy-cell--human-bot-any-neutral]="cell.fillKind === 'humanBotAnyNeutral'"
-                  [class.galaxy-cell--player-and-enemy-any-neutral]="cell.fillKind === 'playerAndEnemyAnyNeutral'"
+                  [class.galaxy-cell--human-bot-any-neutral]="
+                    cell.fillKind === 'humanBotAnyNeutral'
+                  "
+                  [class.galaxy-cell--player-and-enemy-any-neutral]="
+                    cell.fillKind === 'playerAndEnemyAnyNeutral'
+                  "
                   [class.galaxy-cell--sensor-scannable]="cell.isSensorScannable"
                   [class.galaxy-cell--with-note]="cell.noteBorderColor"
                   [style.background]="cell.relationBackground"
@@ -142,25 +169,31 @@
         </div>
       </div>
     } @else if (isLoading) {
-      <p class="overview-empty">Loading galaxy data...</p>
+      <p class="overview-empty">{{ 'galactic.preview.loading' | t }}</p>
     } @else if (loadError) {
       <p class="overview-empty">{{ loadError }}</p>
     } @else {
-      <p class="overview-empty">Galaxy data not loaded yet.</p>
+      <p class="overview-empty">{{ 'galactic.preview.notLoaded' | t }}</p>
     }
   </section>
 
   <aside class="star-system-preview" data-tutorial-id="galactic-system-preview">
-    <h3 class="star-system-preview__title">Star System Preview</h3>
+    <h3 class="star-system-preview__title">{{ 'galactic.system.title' | t }}</h3>
 
     @if (!selectedCell) {
-      <p class="overview-empty">Click a galaxy cell to preview a star system.</p>
+      <p class="overview-empty">{{ 'galactic.system.empty' | t }}</p>
     } @else {
       <div class="star-system-preview__summary">
         <p class="star-system-preview__name">{{ selectedStarSystemNameLabel() }}</p>
-        <p class="star-system-preview__meta-line">Coordinates: {{ selectedCoordinatesLabel() }}</p>
-        <p class="star-system-preview__meta-line">Planets: {{ selectedPlanetsCountLabel() }}</p>
-        <p class="star-system-preview__meta-line">Asteroids: {{ selectedAsteroidsCountLabel() }}</p>
+        <p class="star-system-preview__meta-line">
+          {{ 'galactic.system.coordinates' | t: { value: selectedCoordinatesLabel() } }}
+        </p>
+        <p class="star-system-preview__meta-line">
+          {{ 'galactic.system.planets' | t: { value: selectedPlanetsCountLabel() } }}
+        </p>
+        <p class="star-system-preview__meta-line">
+          {{ 'galactic.system.asteroids' | t: { value: selectedAsteroidsCountLabel() } }}
+        </p>
       </div>
 
       <div class="star-system-preview__actions" data-tutorial-id="galactic-note-action">
@@ -171,7 +204,7 @@
           [appTooltip]="spySolarSystemButtonTitle()"
           (click)="openSpySolarSystemDialog()"
         >
-          Spy solar system
+          {{ 'galactic.actions.spySolarSystem' | t }}
         </button>
 
         @if (selectedStarSystemNote()) {
@@ -181,7 +214,7 @@
             [disabled]="areNoteActionsDisabled()"
             (click)="openModifyNoteDialog()"
           >
-            Modify note
+            {{ 'galactic.actions.modifyNote' | t }}
           </button>
           <button
             type="button"
@@ -189,7 +222,7 @@
             [disabled]="areNoteActionsDisabled()"
             (click)="openDeleteNoteConfirm()"
           >
-            Delete note
+            {{ 'galactic.actions.deleteNote' | t }}
           </button>
         } @else {
           <button
@@ -198,7 +231,7 @@
             [disabled]="areNoteActionsDisabled()"
             (click)="openAddNoteDialog()"
           >
-            Add note
+            {{ 'galactic.actions.addNote' | t }}
           </button>
         }
       </div>
@@ -225,7 +258,7 @@
       }
 
       @if (selectedSystemLoading) {
-        <p class="overview-empty">Loading selected star system...</p>
+        <p class="overview-empty">{{ 'galactic.system.loading' | t }}</p>
       } @else if (selectedSystemError) {
         <p class="overview-empty">{{ selectedSystemError }}</p>
       } @else if (selectedSystem) {
@@ -234,7 +267,8 @@
             @for (planet of selectedSystemPlanets; track planet.coordinates.z) {
               <div
                 class="star-system-preview__planet-slot"
-                [class.star-system-preview__planet-slot--highlighted]="isHighlightedPlanet(planet)">
+                [class.star-system-preview__planet-slot--highlighted]="isHighlightedPlanet(planet)"
+              >
                 <app-mini-planet-preview
                   [planet]="planet"
                   [showSensorPhalanxAction]="canSensorPhalanxScanPlanet(planet)"
@@ -244,12 +278,12 @@
             }
           </div>
         } @else {
-          <p class="overview-empty">No planets in this star system.</p>
+          <p class="overview-empty">{{ 'galactic.system.noPlanets' | t }}</p>
         }
 
         <section class="star-system-preview__fleet-section" data-tutorial-id="galactic-own-fleets">
           <div class="star-system-preview__fleet-head">
-            <h4>Own Fleets In System</h4>
+            <h4>{{ 'galactic.system.ownFleets' | t }}</h4>
             <span class="badge">{{ selectedSystemOwnFleets.length }}</span>
           </div>
 
@@ -264,20 +298,27 @@
                     <strong>Fleet #{{ fleet.fleetId }}</strong>
                     <span class="badge">{{ ownFleetMissionLabel(fleet) }}</span>
                   </div>
-                  <p class="star-system-preview__fleet-line">{{ ownFleetStatusLabel(fleet) }} | {{ ownFleetEtaLabel(fleet) }}</p>
-                  <p class="star-system-preview__fleet-line">Ships: {{ fleet.shipCount }}</p>
+                  <p class="star-system-preview__fleet-line">
+                    {{
+                      'galactic.system.fleetStatusEta'
+                        | t: { status: ownFleetStatusLabel(fleet), eta: ownFleetEtaLabel(fleet) }
+                    }}
+                  </p>
+                  <p class="star-system-preview__fleet-line">
+                    {{ 'galactic.system.fleetShips' | t: { count: fleet.shipCount } }}
+                  </p>
                   <p class="star-system-preview__fleet-line">{{ ownFleetRouteLabel(fleet) }}</p>
                 </article>
               }
             </div>
           } @else {
-            <p class="overview-empty">No own fleets currently stationed in this system.</p>
+            <p class="overview-empty">{{ 'galactic.system.noOwnFleets' | t }}</p>
           }
         </section>
 
         <section class="star-system-preview__fleet-section">
           <div class="star-system-preview__fleet-head">
-            <h4>Own Fleets Flying To This System</h4>
+            <h4>{{ 'galactic.system.inboundFleets' | t }}</h4>
             <span class="badge">{{ selectedSystemInboundOwnFleets.length }}</span>
           </div>
 
@@ -292,14 +333,21 @@
                     <strong>Fleet #{{ fleet.fleetId }}</strong>
                     <span class="badge">{{ ownFleetMissionLabel(fleet) }}</span>
                   </div>
-                  <p class="star-system-preview__fleet-line">{{ ownFleetStatusLabel(fleet) }} | {{ ownFleetEtaLabel(fleet) }}</p>
-                  <p class="star-system-preview__fleet-line">Ships: {{ fleet.shipCount }}</p>
+                  <p class="star-system-preview__fleet-line">
+                    {{
+                      'galactic.system.fleetStatusEta'
+                        | t: { status: ownFleetStatusLabel(fleet), eta: ownFleetEtaLabel(fleet) }
+                    }}
+                  </p>
+                  <p class="star-system-preview__fleet-line">
+                    {{ 'galactic.system.fleetShips' | t: { count: fleet.shipCount } }}
+                  </p>
                   <p class="star-system-preview__fleet-line">{{ ownFleetRouteLabel(fleet) }}</p>
                 </article>
               }
             </div>
           } @else {
-            <p class="overview-empty">No own fleets currently flying to this system.</p>
+            <p class="overview-empty">{{ 'galactic.system.noInboundFleets' | t }}</p>
           }
         </section>
       }
@@ -322,7 +370,7 @@
       {{ selectedStarSystemNameLabel() }} | {{ selectedCoordinatesLabel() }}
     </p>
 
-    <label class="note-modal__label" for="note-color">Border color</label>
+    <label class="note-modal__label" for="note-color">{{ 'galactic.notes.borderColor' | t }}</label>
     <select
       id="note-color"
       class="note-modal__select"
@@ -334,7 +382,7 @@
       }
     </select>
 
-    <label class="note-modal__label" for="note-text">Note text</label>
+    <label class="note-modal__label" for="note-text">{{ 'galactic.notes.noteText' | t }}</label>
     <textarea
       id="note-text"
       class="note-modal__textarea"
@@ -349,11 +397,21 @@
     }
 
     <div class="note-modal__actions">
-      <button type="button" class="star-system-preview__button" (click)="closeNoteEditor()" [disabled]="isNoteActionLoading">
-        Cancel
+      <button
+        type="button"
+        class="star-system-preview__button"
+        (click)="closeNoteEditor()"
+        [disabled]="isNoteActionLoading"
+      >
+        {{ 'galactic.notes.cancel' | t }}
       </button>
-      <button type="button" class="star-system-preview__button" (click)="saveNote()" [disabled]="isNoteActionLoading">
-        Confirm
+      <button
+        type="button"
+        class="star-system-preview__button"
+        (click)="saveNote()"
+        [disabled]="isNoteActionLoading"
+      >
+        {{ 'galactic.notes.confirm' | t }}
       </button>
     </div>
   </section>
@@ -362,13 +420,21 @@
 @if (isDeleteNoteConfirmOpen) {
   <div class="note-modal-backdrop" (click)="closeDeleteNoteConfirm()"></div>
   <section class="note-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
-    <h4 class="note-modal__title">Delete Note</h4>
+    <h4 class="note-modal__title">{{ 'galactic.notes.deleteTitle' | t }}</h4>
     <p class="note-modal__meta">
-      Delete note for {{ selectedStarSystemNameLabel() }} ({{ selectedCoordinatesLabel() }})?
+      {{
+        'galactic.notes.deleteBody'
+          | t: { name: selectedStarSystemNameLabel(), coordinates: selectedCoordinatesLabel() }
+      }}
     </p>
     <div class="note-modal__actions">
-      <button type="button" class="star-system-preview__button" (click)="closeDeleteNoteConfirm()" [disabled]="isNoteActionLoading">
-        Cancel
+      <button
+        type="button"
+        class="star-system-preview__button"
+        (click)="closeDeleteNoteConfirm()"
+        [disabled]="isNoteActionLoading"
+      >
+        {{ 'galactic.notes.cancel' | t }}
       </button>
       <button
         type="button"
@@ -376,7 +442,7 @@
         (click)="deleteNote()"
         [disabled]="isNoteActionLoading"
       >
-        Delete
+        {{ 'galactic.notes.delete' | t }}
       </button>
     </div>
   </section>
@@ -384,16 +450,29 @@
 
 @if (isSensorPhalanxDialogOpen) {
   <div class="note-modal-backdrop" (click)="closeSensorPhalanxDialog()"></div>
-  <section class="sensor-phalanx-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+  <section
+    class="sensor-phalanx-modal"
+    role="dialog"
+    aria-modal="true"
+    (click)="$event.stopPropagation()"
+  >
     <div class="sensor-phalanx-modal__head">
       <div>
-        <p class="note-modal__meta">Sensor Phalanx</p>
+        <p class="note-modal__meta">{{ 'galactic.sensorPhalanx.title' | t }}</p>
         <h4 class="note-modal__title">{{ sensorPhalanxTargetLabel() }}</h4>
       </div>
-      <button type="button" class="star-system-preview__button" (click)="closeSensorPhalanxDialog()">Close</button>
+      <button
+        type="button"
+        class="star-system-preview__button"
+        (click)="closeSensorPhalanxDialog()"
+      >
+        {{ 'galactic.sensorPhalanx.close' | t }}
+      </button>
     </div>
 
-    <label class="note-modal__label" for="sensor-phalanx-origin">Origin</label>
+    <label class="note-modal__label" for="sensor-phalanx-origin">{{
+      'galactic.sensorPhalanx.origin' | t
+    }}</label>
     <select
       id="sensor-phalanx-origin"
       class="note-modal__select"
@@ -402,26 +481,39 @@
     >
       @for (origin of sensorPhalanxOriginOptions; track origin.key) {
         <option [ngValue]="origin.key">
-          {{ origin.label }} | range {{ origin.activeScanRange }} | cost {{ origin.scanCostDeuterium }}
+          {{ origin.label }} |
+          {{ 'galactic.sensorPhalanx.activeRange' | t: { value: origin.activeScanRange } }} |
+          {{ 'galactic.sensorPhalanx.cost' | t: { value: origin.scanCostDeuterium } }}
         </option>
       }
     </select>
 
     @if (selectedSensorPhalanxOrigin(); as origin) {
       <div class="sensor-phalanx-modal__stats">
-        <span>Distance {{ origin.distance }}</span>
-        <span>Normal range {{ origin.normalRange }}</span>
-        <span>Active range {{ origin.activeScanRange }}</span>
-        <span>Deuterium {{ origin.availableDeuterium }}</span>
+        <span>{{ 'galactic.sensorPhalanx.distance' | t: { value: origin.distance } }}</span>
+        <span>{{ 'galactic.sensorPhalanx.normalRange' | t: { value: origin.normalRange } }}</span>
+        <span>{{
+          'galactic.sensorPhalanx.activeRange' | t: { value: origin.activeScanRange }
+        }}</span>
+        <span>{{
+          'galactic.sensorPhalanx.deuterium' | t: { value: origin.availableDeuterium }
+        }}</span>
       </div>
     }
 
     @if (sensorPhalanxCapabilities; as capabilities) {
       <div class="sensor-phalanx-modal__stats sensor-phalanx-modal__stats--strong">
-        <span>Level {{ capabilities.level }}</span>
-        <span>Scans {{ capabilities.remainingScans }} / {{ capabilities.scansPerTurn }}</span>
-        <span>Used {{ capabilities.scansUsedThisTurn }}</span>
-        <span>Cost {{ capabilities.scanCostDeuterium }} D</span>
+        <span>{{ 'galactic.sensorPhalanx.level' | t: { value: capabilities.level } }}</span>
+        <span>{{
+          'galactic.sensorPhalanx.scans'
+            | t: { remaining: capabilities.remainingScans, total: capabilities.scansPerTurn }
+        }}</span>
+        <span>{{
+          'galactic.sensorPhalanx.used' | t: { value: capabilities.scansUsedThisTurn }
+        }}</span>
+        <span>{{
+          'galactic.sensorPhalanx.cost' | t: { value: capabilities.scanCostDeuterium }
+        }}</span>
       </div>
     }
 
@@ -436,14 +528,24 @@
         [disabled]="!canSubmitSensorPhalanxScan()"
         (click)="executeSensorPhalanxScan()"
       >
-        {{ sensorPhalanxScanning ? 'Scanning...' : (sensorPhalanxLoading ? 'Loading...' : 'Scan') }}
+        {{
+          sensorPhalanxScanning
+            ? ('galactic.sensorPhalanx.scanning' | t)
+            : sensorPhalanxLoading
+              ? ('galactic.sensorPhalanx.loading' | t)
+              : ('galactic.sensorPhalanx.scan' | t)
+        }}
       </button>
     </div>
 
     @if (sensorPhalanxResult; as result) {
       <section class="sensor-phalanx-modal__results">
-        <h5>Scan result</h5>
-        <p class="note-modal__meta">{{ result.targetPlanetName }} | {{ result.target.x }}:{{ result.target.y }}:{{ result.target.z }}</p>
+        <h5>{{ 'galactic.sensorPhalanx.result' | t }}</h5>
+        <p class="note-modal__meta">
+          {{ result.targetPlanetName }} | {{ result.target.x }}:{{ result.target.y }}:{{
+            result.target.z
+          }}
+        </p>
         @if (result.contacts.length > 0) {
           <div class="sensor-phalanx-modal__contacts">
             @for (contact of result.contacts; track $index) {
@@ -451,7 +553,7 @@
             }
           </div>
         } @else {
-          <p class="overview-empty">No fleet contacts detected.</p>
+          <p class="overview-empty">{{ 'galactic.sensorPhalanx.noContacts' | t }}</p>
         }
       </section>
     }

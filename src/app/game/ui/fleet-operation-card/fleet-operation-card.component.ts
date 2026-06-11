@@ -3,11 +3,22 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Router } from '@angular/router';
 import { GameStateService } from '../../../core/game-state.service';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
-import { diplomacyVisualKey, ownerLabelWithDiplomacy, type DiplomacyVisualKey } from '../../../models/diplomacy/diplomacy-display';
+import { I18nPipe } from '../../../i18n/i18n.pipe';
+import { I18nService } from '../../../i18n/i18n.service';
+import {
+  diplomacyVisualKey,
+  ownerLabelWithDiplomacy,
+  type DiplomacyVisualKey,
+} from '../../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../../models/diplomacy/diplomatic-status';
 import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
 import { WeaponType } from '../../../models/enums/weapon-type';
-import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../../models/fleets/fleet';
+import {
+  Fleet,
+  FleetOrbitActivity,
+  FleetReturnReason,
+  FleetState,
+} from '../../../models/fleets/fleet';
 import type { FleetOperationHistoryEntry } from '../../../models/fleets/fleet-operation-history';
 import { ManyShips } from '../../../models/fleets/many-ships';
 import type { ClientPlanetDto } from '../../../models/game-api-types';
@@ -28,9 +39,9 @@ type CoordinateOwnerInfo = {
 
 @Component({
   selector: 'app-fleet-operation-card',
-  imports: [NgClass, TooltipDirective],
+  imports: [NgClass, TooltipDirective, I18nPipe],
   templateUrl: './fleet-operation-card.component.html',
-  styleUrl: './fleet-operation-card.component.css'
+  styleUrl: './fleet-operation-card.component.css',
 })
 export class FleetOperationCardComponent {
   @Input({ required: true }) public ownPlayerId: number | null = null;
@@ -50,7 +61,8 @@ export class FleetOperationCardComponent {
 
   public constructor(
     private readonly gameState: GameStateService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly i18n: I18nService,
   ) {}
 
   protected activeFleet(): Fleet | null {
@@ -78,27 +90,29 @@ export class FleetOperationCardComponent {
   }
 
   protected canReturn(fleet: Fleet): boolean {
-    return this.showActions
-      && this.showMaintenanceAction
-      && this.isOwnFleet(fleet)
-      && (
-        fleet.state === FleetState.PENDING_JUMP_GATE
-        || fleet.state === FleetState.MOVING_TO_TARGET
-        || fleet.state === FleetState.ORBITING
-      );
+    return (
+      this.showActions &&
+      this.showMaintenanceAction &&
+      this.isOwnFleet(fleet) &&
+      (fleet.state === FleetState.PENDING_JUMP_GATE ||
+        fleet.state === FleetState.MOVING_TO_TARGET ||
+        fleet.state === FleetState.ORBITING)
+    );
   }
 
   protected canDelay(fleet: Fleet): boolean {
-    return this.showActions
-      && this.isOwnFleet(fleet)
-      && fleet.state === FleetState.MOVING_TO_TARGET;
+    return (
+      this.showActions && this.isOwnFleet(fleet) && fleet.state === FleetState.MOVING_TO_TARGET
+    );
   }
 
   protected canRequestMaintenance(fleet: Fleet): boolean {
-    return this.showActions
-      && this.isOwnFleet(fleet)
-      && fleet.state === FleetState.ORBITING
-      && fleet.maintenanceRequestAvailable;
+    return (
+      this.showActions &&
+      this.isOwnFleet(fleet) &&
+      fleet.state === FleetState.ORBITING &&
+      fleet.maintenanceRequestAvailable
+    );
   }
 
   protected requestReturn(fleet: Fleet): void {
@@ -122,34 +136,47 @@ export class FleetOperationCardComponent {
   protected missionLabel(): string {
     const missionType = this.missionType();
     if (!missionType) {
-      return 'Operation';
+      return this.i18n.t('operations.card.operation');
     }
 
-    return missionType === FleetMissionType.DEFEND ? 'Guard' : missionType;
+    return missionType === FleetMissionType.DEFEND
+      ? this.i18n.t('operations.card.guard')
+      : missionType;
   }
 
   protected stateLabel(fleet: Fleet): string {
     if (fleet.state === FleetState.PENDING_JUMP_GATE) {
-      return 'PENDING JUMP GATE APPROVAL';
+      return this.i18n.t('operations.card.pendingJumpGateApproval');
     }
 
     if (fleet.state === FleetState.ORBITING) {
-      return `ORBITING | ${this.orbitActivityLabel(fleet.orbitActivity)}`;
+      return this.i18n.t('operations.card.orbiting', {
+        activity: this.orbitActivityLabel(fleet.orbitActivity),
+      });
     }
 
-    if (fleet.returnReason === FleetReturnReason.MANUAL_RECALL && fleet.state === FleetState.RETURNING) {
-      return 'RETURNING | MANUAL RECALL';
+    if (
+      fleet.returnReason === FleetReturnReason.MANUAL_RECALL &&
+      fleet.state === FleetState.RETURNING
+    ) {
+      return this.i18n.t('operations.card.returningManualRecall');
     }
 
-    if (fleet.returnReason === FleetReturnReason.MISSION_FAILURE && fleet.state === FleetState.MISSION_FAILURE_RETURNING) {
-      return 'MISSION FAILURE RETURNING';
+    if (
+      fleet.returnReason === FleetReturnReason.MISSION_FAILURE &&
+      fleet.state === FleetState.MISSION_FAILURE_RETURNING
+    ) {
+      return this.i18n.t('operations.card.missionFailureReturning');
     }
 
     return fleet.state.replaceAll('_', ' ');
   }
 
   protected resolvedStateLabel(operation: FleetOperationHistoryEntry): string {
-    return `${operation.outcomeType.replaceAll('_', ' ')} | Turn ${operation.resolvedTurn}`;
+    return this.i18n.t('operations.card.turnResolved', {
+      outcome: operation.outcomeType.replaceAll('_', ' '),
+      turn: operation.resolvedTurn,
+    });
   }
 
   protected currentLocationPlanetName(fleet: Fleet): string {
@@ -158,10 +185,12 @@ export class FleetOperationCardComponent {
     }
 
     if (this.isRecalledInTransit(fleet)) {
-      return 'Recalled in transit';
+      return this.i18n.t('operations.card.recalledInTransit');
     }
 
-    return this.usesOriginCoordinates(fleet.state) ? fleet.originPlanetName : fleet.targetPlanetName;
+    return this.usesOriginCoordinates(fleet.state)
+      ? fleet.originPlanetName
+      : fleet.targetPlanetName;
   }
 
   protected currentLocationSegments(fleet: Fleet): CoordinateSegmentVm[] {
@@ -170,10 +199,7 @@ export class FleetOperationCardComponent {
     }
 
     if (this.isRecalledInTransit(fleet)) {
-      return [
-        this.toCoordinateSegment(fleet.origin),
-        this.toCoordinateSegment(fleet.target)
-      ];
+      return [this.toCoordinateSegment(fleet.origin), this.toCoordinateSegment(fleet.target)];
     }
 
     const coordinates = this.usesOriginCoordinates(fleet.state) ? fleet.origin : fleet.target;
@@ -188,7 +214,7 @@ export class FleetOperationCardComponent {
       case FleetState.MISSION_FAILURE_RETURNING:
         return fleet.originPlanetName;
       case FleetState.ORBITING:
-        return 'Holding position';
+        return this.i18n.t('operations.card.holdingPosition');
       default:
         return fleet.targetPlanetName;
     }
@@ -209,11 +235,17 @@ export class FleetOperationCardComponent {
   }
 
   protected operationOriginName(operation: FleetOperationHistoryEntry): string {
-    return operation.originPlanetName ?? this.coordinatesLabel(operation.origin.x, operation.origin.y, operation.origin.z);
+    return (
+      operation.originPlanetName ??
+      this.coordinatesLabel(operation.origin.x, operation.origin.y, operation.origin.z)
+    );
   }
 
   protected operationTargetName(operation: FleetOperationHistoryEntry): string {
-    return operation.targetPlanetName ?? this.coordinatesLabel(operation.target.x, operation.target.y, operation.target.z);
+    return (
+      operation.targetPlanetName ??
+      this.coordinatesLabel(operation.target.x, operation.target.y, operation.target.z)
+    );
   }
 
   protected operationOriginSegments(operation: FleetOperationHistoryEntry): CoordinateSegmentVm[] {
@@ -225,9 +257,11 @@ export class FleetOperationCardComponent {
   }
 
   protected hasEta(fleet: Fleet): boolean {
-    return fleet.state === FleetState.MOVING_TO_TARGET
-      || fleet.state === FleetState.RETURNING
-      || fleet.state === FleetState.MISSION_FAILURE_RETURNING;
+    return (
+      fleet.state === FleetState.MOVING_TO_TARGET ||
+      fleet.state === FleetState.RETURNING ||
+      fleet.state === FleetState.MISSION_FAILURE_RETURNING
+    );
   }
 
   protected remainingEta(fleet: Fleet): number {
@@ -241,23 +275,30 @@ export class FleetOperationCardComponent {
     }
 
     const elapsedTurns = Math.max(0, currentTurn - fleet.createdAtTurn);
-    const totalLegTurns = fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
+    const totalLegTurns =
+      fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
     return Math.max(0, totalLegTurns - elapsedTurns);
   }
 
   protected progressLabel(fleet: Fleet): string {
     if (!this.hasEta(fleet)) {
-      return 'No active travel ETA';
+      return this.i18n.t('operations.card.noActiveEta');
     }
 
     const currentTurn = this.gameState.currentTurn();
     if (currentTurn === null) {
-      return `Travel time ${fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns}`;
+      return this.i18n.t('operations.card.travelTime', {
+        turns: fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns,
+      });
     }
 
-    const totalLegTurns = fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
+    const totalLegTurns =
+      fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
     const elapsedTurns = Math.max(0, Math.min(totalLegTurns, currentTurn - fleet.createdAtTurn));
-    return `${elapsedTurns}/${totalLegTurns} turns elapsed`;
+    return this.i18n.t('operations.card.turnsElapsed', {
+      elapsed: elapsedTurns,
+      total: totalLegTurns,
+    });
   }
 
   protected shipSummary(fleet: Fleet): string {
@@ -278,24 +319,35 @@ export class FleetOperationCardComponent {
   protected operationDetail(fleet: Fleet): string | null {
     if (fleet.state === FleetState.PENDING_JUMP_GATE) {
       return fleet.pendingJumpGateRequestId
-        ? `Waiting for Jump Gate request #${fleet.pendingJumpGateRequestId}.`
-        : 'Waiting for Jump Gate approval.';
+        ? this.i18n.t('operations.card.waitingJumpGateRequest', {
+            id: fleet.pendingJumpGateRequestId,
+          })
+        : this.i18n.t('operations.card.waitingJumpGateApproval');
     }
 
     if (fleet.missionType === FleetMissionType.SIEGE) {
-      return `Siege orbit: ${this.bombardmentCapability(fleet)}`;
+      return this.i18n.t('operations.card.siegeOrbit', {
+        value: this.bombardmentCapability(fleet),
+      });
     }
 
     if (fleet.missionType === FleetMissionType.BOMBARD) {
-      return `Bombardment pass: ${this.bombardmentCapability(fleet)}`;
+      return this.i18n.t('operations.card.bombardmentPass', {
+        value: this.bombardmentCapability(fleet),
+      });
     }
 
     if (fleet.missionType === FleetMissionType.REPAIR) {
-      return `Repair support: Ship ${this.shipRepairCapability(fleet)} | Drone ${this.droneRepairCapability(fleet)}`;
+      return this.i18n.t('operations.card.repairSupport', {
+        ship: this.shipRepairCapability(fleet),
+        drone: this.droneRepairCapability(fleet),
+      });
     }
 
     if (fleet.missionType === FleetMissionType.RECYCLE) {
-      return `Recycling rate: ${calculateRecycleCapabilityForManyShips(fleet.ships)} / turn`;
+      return this.i18n.t('operations.card.recyclingRate', {
+        value: calculateRecycleCapabilityForManyShips(fleet.ships),
+      });
     }
 
     return null;
@@ -306,16 +358,13 @@ export class FleetOperationCardComponent {
   }
 
   protected openCoordinatesInGalaxy(coordinates: { x: number; y: number; z: number }): void {
-    void this.router.navigate(
-      ['/game/galactic'],
-      {
-        queryParams: {
-          x: coordinates.x,
-          y: coordinates.y,
-          z: coordinates.z
-        }
-      }
-    );
+    void this.router.navigate(['/game/galactic'], {
+      queryParams: {
+        x: coordinates.x,
+        y: coordinates.y,
+        z: coordinates.z,
+      },
+    });
   }
 
   protected isRemoteOriginFleet(fleet: Fleet): boolean {
@@ -333,11 +382,11 @@ export class FleetOperationCardComponent {
     }
 
     if (
-      missionType === FleetMissionType.ATTACK
-      || missionType === FleetMissionType.PLUNDER
-      || missionType === FleetMissionType.INVADE
-      || missionType === FleetMissionType.INTERCEPT
-      || missionType === FleetMissionType.BLOCK
+      missionType === FleetMissionType.ATTACK ||
+      missionType === FleetMissionType.PLUNDER ||
+      missionType === FleetMissionType.INVADE ||
+      missionType === FleetMissionType.INTERCEPT ||
+      missionType === FleetMissionType.BLOCK
     ) {
       return 'fleet-operation-card--attack';
     }
@@ -346,7 +395,10 @@ export class FleetOperationCardComponent {
       return 'fleet-operation-card--repair';
     }
 
-    if (missionType === FleetMissionType.TRANSPORT || missionType === FleetMissionType.ARMAMENT_DELIVERY) {
+    if (
+      missionType === FleetMissionType.TRANSPORT ||
+      missionType === FleetMissionType.ARMAMENT_DELIVERY
+    ) {
       return 'fleet-operation-card--transport';
     }
 
@@ -355,9 +407,9 @@ export class FleetOperationCardComponent {
     }
 
     if (
-      missionType === FleetMissionType.MOVE
-      || missionType === FleetMissionType.HOLD
-      || missionType === FleetMissionType.RECYCLE
+      missionType === FleetMissionType.MOVE ||
+      missionType === FleetMissionType.HOLD ||
+      missionType === FleetMissionType.RECYCLE
     ) {
       return 'fleet-operation-card--movement';
     }
@@ -380,9 +432,9 @@ export class FleetOperationCardComponent {
   private orbitActivityLabel(activity: FleetOrbitActivity): string {
     switch (activity) {
       case FleetOrbitActivity.PASSIVE_HOLD:
-        return 'PASSIVE ORBIT';
+        return this.i18n.t('operations.card.passiveOrbit');
       case FleetOrbitActivity.GUARDING:
-        return 'GUARDING ORBIT';
+        return this.i18n.t('operations.card.guardingOrbit');
       default:
         return activity.replaceAll('_', ' ');
     }
@@ -393,9 +445,11 @@ export class FleetOperationCardComponent {
   }
 
   private isRecalledInTransit(fleet: Fleet): boolean {
-    return fleet.state === FleetState.RETURNING
-      && fleet.returnReason === FleetReturnReason.MANUAL_RECALL
-      && fleet.returnTurns < fleet.travelTurns;
+    return (
+      fleet.state === FleetState.RETURNING &&
+      fleet.returnReason === FleetReturnReason.MANUAL_RECALL &&
+      fleet.returnTurns < fleet.travelTurns
+    );
   }
 
   private bombardmentCapability(fleet: Fleet): string {
@@ -419,25 +473,39 @@ export class FleetOperationCardComponent {
     }
 
     if (shots <= 0) {
-      return 'No bombardment weapons';
+      return this.i18n.t('operations.card.noBombardmentWeapons');
     }
 
     return `${shots} shots / ${damage} raw damage`;
   }
 
-  private toCoordinateSegment(coordinates: { x: number; y: number; z: number }): CoordinateSegmentVm {
+  private toCoordinateSegment(coordinates: {
+    x: number;
+    y: number;
+    z: number;
+  }): CoordinateSegmentVm {
     const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
     const status = this.coordinatesDiplomaticStatus(coordinates);
     return {
       coordinates,
-      ownerLabel: ownerInfo?.ownerName ? ownerLabelWithDiplomacy(ownerInfo.ownerName, status) : null,
-      relation: status ? diplomacyVisualKey(status) : 'none'
+      ownerLabel: ownerInfo?.ownerName
+        ? ownerLabelWithDiplomacy(ownerInfo.ownerName, status)
+        : null,
+      relation: status ? diplomacyVisualKey(status) : 'none',
     };
   }
 
-  private coordinatesDiplomaticStatus(coordinates: { x: number; y: number; z: number }): DiplomaticStatus | null {
+  private coordinatesDiplomaticStatus(coordinates: {
+    x: number;
+    y: number;
+    z: number;
+  }): DiplomaticStatus | null {
     const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
-    if (ownerInfo?.ownerId === null || ownerInfo?.ownerId === undefined || this.ownPlayerId === null) {
+    if (
+      ownerInfo?.ownerId === null ||
+      ownerInfo?.ownerId === undefined ||
+      this.ownPlayerId === null
+    ) {
       return null;
     }
 

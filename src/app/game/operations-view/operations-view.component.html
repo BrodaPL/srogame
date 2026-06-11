@@ -3,47 +3,54 @@
 <section class="operations-view">
   @if (isLoading) {
     <section class="status status--info">
-      <h3>Loading Operations</h3>
-      <p>Active fleets are being read from the central game state.</p>
+      <h3>{{ 'operations.loading.title' | t }}</h3>
+      <p>{{ 'operations.loading.body' | t }}</p>
     </section>
   } @else if (loadError) {
     <section class="status status--error">
-      <h3>Operations unavailable</h3>
+      <h3>{{ 'operations.status.unavailable' | t }}</h3>
       <p>{{ loadError }}</p>
     </section>
   } @else {
     @if (actionError) {
       <section class="status status--error">
-        <h3>Fleet command failed</h3>
+        <h3>{{ 'operations.status.actionFailed' | t }}</h3>
         <p>{{ actionError }}</p>
       </section>
     }
 
     @if (actionSuccess) {
       <section class="status status--success">
-        <h3>Operations updated</h3>
+        <h3>{{ 'operations.status.updated' | t }}</h3>
         <p>{{ actionSuccess }}</p>
       </section>
     }
 
     <header class="overview-card operations-view__header" data-tutorial-id="operations-header">
       <div>
-        <h1 class="operations-view__title">Operations</h1>
-        <p class="overview-muted">Active fleets and launched missions with live turn-based ETA progress.</p>
-        <p class="overview-muted">Active fleets: {{ activeFleetCountLabel() }}</p>
+        <h1 class="operations-view__title">{{ 'operations.header.title' | t }}</h1>
+        <p class="overview-muted">{{ 'operations.header.body' | t }}</p>
+        <p class="overview-muted">
+          {{ 'operations.header.activeFleets' | t: { count: activeFleetCountLabel() } }}
+        </p>
       </div>
-      <a class="overview-nav__button" routerLink="/game/mission-planner">Open Mission Planner</a>
+      <a class="overview-nav__button" routerLink="/game/mission-planner">{{
+        'operations.header.openMissionPlanner' | t
+      }}</a>
     </header>
 
     @if (activeFleets.length === 0) {
       <section class="overview-card" data-tutorial-id="operations-main-state">
-        <h3>No active fleets</h3>
-        <p class="overview-muted">Launch a mission in Mission Planner to populate this screen.</p>
+        <h3>{{ 'operations.status.noActiveFleets' | t }}</h3>
+        <p class="overview-muted">{{ 'operations.status.noActiveFleetsBody' | t }}</p>
       </section>
     } @else {
-      <section class="overview-card operations-view__filters" aria-label="Operations filters">
+      <section
+        class="overview-card operations-view__filters"
+        [attr.aria-label]="'operations.filters.ariaLabel' | t"
+      >
         <fieldset class="operations-view__mode-field">
-          <legend>Display</legend>
+          <legend>{{ 'operations.filters.display' | t }}</legend>
           <div class="operations-view__mode-options">
             @for (option of viewModeOptions(); track option.value) {
               <label class="operations-view__mode-option">
@@ -61,10 +68,11 @@
         </fieldset>
 
         <label class="operations-view__filter-field">
-          <span>Mission type</span>
+          <span>{{ 'operations.filters.missionType' | t }}</span>
           <select
             [ngModel]="selectedMissionTypeFilter"
-            (ngModelChange)="missionTypeFilterChanged($event)">
+            (ngModelChange)="missionTypeFilterChanged($event)"
+          >
             @for (option of missionTypeFilterOptions(); track option.value) {
               <option [ngValue]="option.value">{{ option.label }}</option>
             }
@@ -92,7 +100,9 @@
               <section class="operations-view__category">
                 <header class="operations-view__category-head">
                   <h4>{{ category.label }}</h4>
-                  <span class="overview-muted">{{ category.fleets.length }} fleet{{ category.fleets.length === 1 ? '' : 's' }}</span>
+                  <span class="overview-muted">{{
+                    'operations.groups.fleetCount' | t: { count: category.fleets.length }
+                  }}</span>
                 </header>
                 <div class="operations-view__category-grid">
                   @for (fleet of category.fleets; track fleet.fleetId; let isFirstFleet = $first) {
@@ -114,8 +124,8 @@
           </section>
         } @empty {
           <section class="overview-card">
-            <h3>No fleets match this mission filter</h3>
-            <p class="overview-muted">Select another mission type or show all missions.</p>
+            <h3>{{ 'operations.status.noFilterMatch' | t }}</h3>
+            <p class="overview-muted">{{ 'operations.status.noFilterMatchBody' | t }}</p>
           </section>
         }
       </div>
@@ -125,59 +135,93 @@
 
 @if (maintenanceDialogOpen()) {
   <div class="operations-view__modal-backdrop" (click)="closeMaintenanceRequest()"></div>
-  <section class="operations-view__modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+  <section
+    class="operations-view__modal"
+    role="dialog"
+    aria-modal="true"
+    (click)="$event.stopPropagation()"
+  >
     <div class="operations-view__modal-head">
       <div>
-        <p class="eyebrow">Alliance Depot</p>
-        <h3>Request maintenance</h3>
+        <p class="eyebrow">{{ 'operations.maintenance.eyebrow' | t }}</p>
+        <h3>{{ 'operations.maintenance.title' | t }}</h3>
       </div>
-      <button type="button" class="operations-view__action" (click)="closeMaintenanceRequest()">Close</button>
+      <button type="button" class="operations-view__action" (click)="closeMaintenanceRequest()">
+        {{ 'operations.maintenance.close' | t }}
+      </button>
     </div>
 
     @if (maintenanceDialogLoading) {
-      <p class="overview-muted">Loading depot maintenance options.</p>
+      <p class="overview-muted">{{ 'operations.maintenance.loading' | t }}</p>
     } @else if (maintenanceDialogError) {
       <section class="status status--error">
-        <h3>Maintenance unavailable</h3>
+        <h3>{{ 'operations.maintenance.unavailable' | t }}</h3>
         <p>{{ maintenanceDialogError }}</p>
       </section>
     } @else if (maintenanceOptions) {
       <p class="overview-muted">
-        Target: {{ maintenanceOptions.targetPlanetName }}
-        | Fuel cap {{ maintenanceOptions.fuelCap }}
-        | Support cap {{ maintenanceOptions.supportCap }}
-        | {{ maintenanceOptions.autoApprove ? 'Auto-approval' : 'Manual approval required' }}
+        {{
+          'operations.maintenance.targetSummary'
+            | t
+              : {
+                  target: maintenanceOptions.targetPlanetName,
+                  fuelCap: maintenanceOptions.fuelCap,
+                  supportCap: maintenanceOptions.supportCap,
+                  approval: maintenanceOptions.autoApprove
+                    ? ('operations.maintenance.autoApproval' | t)
+                    : ('operations.maintenance.manualApproval' | t),
+                }
+        }}
       </p>
       <p class="overview-muted">
-        Fleet free capacity: Cargo {{ maintenanceOptions.remainingCargoCapacity }}
-        | Hangar {{ maintenanceOptions.remainingHangarCapacity }}
-        | Bomber hangar {{ maintenanceOptions.remainingBomberHangarCapacity }}
+        {{
+          'operations.maintenance.capacitySummary'
+            | t
+              : {
+                  cargo: maintenanceOptions.remainingCargoCapacity,
+                  hangar: maintenanceOptions.remainingHangarCapacity,
+                  bomberHangar: maintenanceOptions.remainingBomberHangarCapacity,
+                }
+        }}
       </p>
 
       <div class="operations-view__modal-body">
         <label class="operations-view__field">
-          <span>Fuel (deuterium)</span>
+          <span>{{ 'operations.maintenance.fuel' | t }}</span>
           <input
             type="number"
             min="0"
             [max]="maintenanceOptions.fuelCap"
             [ngModel]="requestedFuel"
-            (ngModelChange)="updateRequestedFuel($event)" />
-          <small>Planet has {{ maintenanceOptions.availableFuel }} deuterium available.</small>
+            (ngModelChange)="updateRequestedFuel($event)"
+          />
+          <small>{{
+            'operations.maintenance.fuelHelp' | t: { available: maintenanceOptions.availableFuel }
+          }}</small>
         </label>
 
         @if (maintenanceShipOptions().length > 0) {
           <section class="operations-view__request-group">
-            <h4>Small ships</h4>
+            <h4>{{ 'operations.maintenance.smallShips' | t }}</h4>
             @for (option of maintenanceShipOptions(); track option.type) {
               <label class="operations-view__field">
-                <span>{{ option.type }} | available {{ option.available }} (ready {{ option.undamagedAvailable }}, damaged {{ option.damagedAvailable }})</span>
+                <span>{{
+                  'operations.maintenance.shipOption'
+                    | t
+                      : {
+                          type: option.type,
+                          available: option.available,
+                          ready: option.undamagedAvailable,
+                          damaged: option.damagedAvailable,
+                        }
+                }}</span>
                 <input
                   type="number"
                   min="0"
                   [max]="option.available"
                   [ngModel]="requestedShipAmounts[option.type] ?? 0"
-                  (ngModelChange)="updateRequestedShipAmount(option.type, $event)" />
+                  (ngModelChange)="updateRequestedShipAmount(option.type, $event)"
+                />
               </label>
             }
           </section>
@@ -185,35 +229,56 @@
 
         @if (maintenanceBombOptions().length > 0) {
           <section class="operations-view__request-group">
-            <h4>PLANETARY_BOMB</h4>
+            <h4>{{ 'operations.maintenance.bombs' | t }}</h4>
             @for (option of maintenanceBombOptions(); track option.type) {
               <label class="operations-view__field">
-                <span>{{ option.type }} | available {{ option.available }} (ready {{ option.undamagedAvailable }}, damaged {{ option.damagedAvailable }})</span>
+                <span>{{
+                  'operations.maintenance.shipOption'
+                    | t
+                      : {
+                          type: option.type,
+                          available: option.available,
+                          ready: option.undamagedAvailable,
+                          damaged: option.damagedAvailable,
+                        }
+                }}</span>
                 <input
                   type="number"
                   min="0"
                   [max]="option.available"
                   [ngModel]="requestedBombAmounts[option.type] ?? 0"
-                  (ngModelChange)="updateRequestedBombAmount(option.type, $event)" />
+                  (ngModelChange)="updateRequestedBombAmount(option.type, $event)"
+                />
               </label>
             }
           </section>
         }
 
-        <p class="overview-muted">Selected support size: {{ selectedSupportUsage() }} / {{ maintenanceOptions.supportCap }}</p>
+        <p class="overview-muted">
+          {{
+            'operations.maintenance.selectedSupport'
+              | t: { used: selectedSupportUsage(), cap: maintenanceOptions.supportCap }
+          }}
+        </p>
       </div>
 
       <div class="operations-view__actions">
-        <button type="button" class="operations-view__action" (click)="closeMaintenanceRequest()">Cancel</button>
+        <button type="button" class="operations-view__action" (click)="closeMaintenanceRequest()">
+          {{ 'operations.maintenance.cancel' | t }}
+        </button>
         <button
           type="button"
           class="operations-view__action"
           [disabled]="!canSubmitMaintenanceRequest()"
-          (click)="submitMaintenanceRequest()">
-          {{ maintenanceSubmitting ? 'Submitting...' : 'Send request' }}
+          (click)="submitMaintenanceRequest()"
+        >
+          {{
+            maintenanceSubmitting
+              ? ('operations.maintenance.submitting' | t)
+              : ('operations.maintenance.sendRequest' | t)
+          }}
         </button>
       </div>
     }
   </section>
 }
-

@@ -5,12 +5,15 @@ import { buildingsEn } from './buildings.en';
 import { commonEn } from './common.en';
 import { communicationsEn } from './communications.en';
 import { encyclopediaEn } from './encyclopedia.en';
+import { galacticEn } from './galactic.en';
 import { gameShellEn } from './game-shell.en';
 import { helpAboutEn } from './help-about.en';
 import { imperiumEn } from './imperium.en';
 import { loadGameEn } from './load-game.en';
 import { mainMenuEn } from './main-menu.en';
+import { missionPlannerEn } from './mission-planner.en';
 import { multiplayerEn } from './multiplayer.en';
+import { operationsEn } from './operations.en';
 import { planetViewEn } from './planet-view.en';
 import { productionEn } from './production.en';
 import { researchesEn } from './researches.en';
@@ -26,12 +29,15 @@ export const enTranslations = {
   common: commonEn,
   communications: communicationsEn,
   encyclopedia: encyclopediaEn,
+  galactic: galacticEn,
   gameShell: gameShellEn,
   helpAbout: helpAboutEn,
   imperium: imperiumEn,
   loadGame: loadGameEn,
   mainMenu: mainMenuEn,
+  missionPlanner: missionPlannerEn,
   multiplayer: multiplayerEn,
+  operations: operationsEn,
   planetView: planetViewEn,
   production: productionEn,
   researches: researchesEn,

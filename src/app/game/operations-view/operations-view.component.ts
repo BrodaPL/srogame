@@ -6,20 +6,31 @@ import { GameApiService } from '../../core/game-api.service';
 import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
+import { I18nPipe } from '../../i18n/i18n.pipe';
+import { I18nService } from '../../i18n/i18n.service';
 import {
   ClientPlanetDto,
   CreateMaintenanceRequestResponse,
   FleetMaintenanceBombOptionDto,
   FleetMaintenanceOptionsDto,
   FleetMaintenanceShipOptionDto,
-  MaintenanceTransferPayloadDto
+  MaintenanceTransferPayloadDto,
 } from '../../models/game-api-types';
-import { diplomacyVisualKey, ownerLabelWithDiplomacy, type DiplomacyVisualKey } from '../../models/diplomacy/diplomacy-display';
+import {
+  diplomacyVisualKey,
+  ownerLabelWithDiplomacy,
+  type DiplomacyVisualKey,
+} from '../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { FleetMissionType } from '../../models/enums/fleet-mission-type';
 import { TechnologyType } from '../../models/enums/technology-type';
 import { WeaponType } from '../../models/enums/weapon-type';
-import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../../models/fleets/fleet';
+import {
+  Fleet,
+  FleetOrbitActivity,
+  FleetReturnReason,
+  FleetState,
+} from '../../models/fleets/fleet';
 import { ManyShips } from '../../models/fleets/many-ships';
 import { calculateRepairCapabilityForManyShips } from '../../models/repairs/ship-repair-capability';
 import { calculateRecycleCapabilityForManyShips } from '../../models/recycling/recycling-capability';
@@ -36,7 +47,12 @@ type CoordinateSegmentVm = {
 
 type MissionTypeFilterValue = FleetMissionType | 'ALL';
 type OperationsViewMode = 'AGGREGATE_BY_ORIGIN' | 'GROUP_BY_MISSION_TYPE' | 'SORT_BY_ETA';
-type FleetOperationCategoryKey = 'OUTGOING' | 'RETURNING' | 'ORBITING' | 'PENDING_JUMP_GATE' | 'ACTIVE';
+type FleetOperationCategoryKey =
+  | 'OUTGOING'
+  | 'RETURNING'
+  | 'ORBITING'
+  | 'PENDING_JUMP_GATE'
+  | 'ACTIVE';
 
 type OperationsViewModeOption = {
   value: OperationsViewMode;
@@ -58,9 +74,9 @@ type FleetOperationGroupVm = {
 
 @Component({
   selector: 'app-operations-view',
-  imports: [TopMenuComponent, RouterLink, FormsModule, FleetOperationCardComponent],
+  imports: [TopMenuComponent, RouterLink, FormsModule, FleetOperationCardComponent, I18nPipe],
   templateUrl: './operations-view.component.html',
-  styleUrl: './operations-view.styles.css'
+  styleUrl: './operations-view.styles.css',
 })
 export class OperationsViewComponent implements OnInit {
   protected readonly fleetState = FleetState;
@@ -84,7 +100,10 @@ export class OperationsViewComponent implements OnInit {
   protected requestedFuel = 0;
   protected requestedShipAmounts: Partial<Record<string, number>> = {};
   protected requestedBombAmounts: Partial<Record<string, number>> = {};
-  private readonly ownerInfoByCoordinates = new Map<string, { ownerId: number | null; ownerName: string | null }>();
+  private readonly ownerInfoByCoordinates = new Map<
+    string,
+    { ownerId: number | null; ownerName: string | null }
+  >();
 
   private readonly shipBlueprints = ShipBlueprintsFactory.fromDefaultJson();
 
@@ -94,7 +113,8 @@ export class OperationsViewComponent implements OnInit {
     private readonly playerSession: PlayerSessionService,
     private readonly cdr: ChangeDetectorRef,
     private readonly tutorialService: TutorialService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly i18n: I18nService,
   ) {}
 
   public ngOnInit(): void {
@@ -103,9 +123,15 @@ export class OperationsViewComponent implements OnInit {
 
   protected viewModeOptions(): OperationsViewModeOption[] {
     return [
-      { value: 'AGGREGATE_BY_ORIGIN', label: 'Aggregate by origin' },
-      { value: 'GROUP_BY_MISSION_TYPE', label: 'Sort by mission type' },
-      { value: 'SORT_BY_ETA', label: 'Sort by ETA' }
+      {
+        value: 'AGGREGATE_BY_ORIGIN',
+        label: this.i18n.t('operations.modes.aggregateByOrigin'),
+      },
+      {
+        value: 'GROUP_BY_MISSION_TYPE',
+        label: this.i18n.t('operations.modes.groupByMissionType'),
+      },
+      { value: 'SORT_BY_ETA', label: this.i18n.t('operations.modes.sortByEta') },
     ];
   }
 
@@ -125,7 +151,10 @@ export class OperationsViewComponent implements OnInit {
     return this.ownedPlanets[0]?.info.ownerId ?? null;
   }
 
-  protected coordinateOwnerInfos(): Map<string, { ownerId: number | null; ownerName: string | null }> {
+  protected coordinateOwnerInfos(): Map<
+    string,
+    { ownerId: number | null; ownerName: string | null }
+  > {
     return this.ownerInfoByCoordinates;
   }
 
@@ -138,15 +167,16 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected missionTypeFilterOptions(): Array<{ value: MissionTypeFilterValue; label: string }> {
-    const missionTypes = [...new Set(this.activeFleets.map((fleet) => fleet.missionType))]
-      .sort((left, right) => this.missionFilterLabel(left).localeCompare(this.missionFilterLabel(right)));
+    const missionTypes = [...new Set(this.activeFleets.map((fleet) => fleet.missionType))].sort(
+      (left, right) => this.missionFilterLabel(left).localeCompare(this.missionFilterLabel(right)),
+    );
 
     return [
-      { value: 'ALL', label: 'All missions' },
+      { value: 'ALL', label: this.i18n.t('operations.filters.allMissions') },
       ...missionTypes.map((missionType) => ({
         value: missionType,
-        label: this.missionFilterLabel(missionType)
-      }))
+        label: this.missionFilterLabel(missionType),
+      })),
     ];
   }
 
@@ -155,7 +185,9 @@ export class OperationsViewComponent implements OnInit {
       return this.activeFleets;
     }
 
-    return this.activeFleets.filter((fleet) => fleet.missionType === this.selectedMissionTypeFilter);
+    return this.activeFleets.filter(
+      (fleet) => fleet.missionType === this.selectedMissionTypeFilter,
+    );
   }
 
   protected operationGroups(): FleetOperationGroupVm[] {
@@ -165,26 +197,33 @@ export class OperationsViewComponent implements OnInit {
     }
 
     if (this.selectedViewMode === 'SORT_BY_ETA') {
-      return [{
-        key: 'eta',
-        label: 'Sorted by ETA',
-        subtitle: 'Traveling fleets first, then pending and orbiting fleets.',
-        categories: [{
-          key: 'ACTIVE',
-          label: 'All visible operations',
-          fleets: this.sortFleetsByEta(fleets)
-        }]
-      }];
+      return [
+        {
+          key: 'eta',
+          label: this.i18n.t('operations.groups.sortedByEta'),
+          subtitle: this.i18n.t('operations.groups.sortedByEtaBody'),
+          categories: [
+            {
+              key: 'ACTIVE',
+              label: this.i18n.t('operations.groups.allVisibleOperations'),
+              fleets: this.sortFleetsByEta(fleets),
+            },
+          ],
+        },
+      ];
     }
 
-    const groups = this.selectedViewMode === 'GROUP_BY_MISSION_TYPE'
-      ? this.groupFleetsByMissionType(fleets)
-      : this.groupFleetsByOrigin(fleets);
+    const groups =
+      this.selectedViewMode === 'GROUP_BY_MISSION_TYPE'
+        ? this.groupFleetsByMissionType(fleets)
+        : this.groupFleetsByOrigin(fleets);
 
     return groups
       .map((group) => ({
         ...group,
-        categories: this.buildStateCategories(group.categories.flatMap((category) => category.fleets))
+        categories: this.buildStateCategories(
+          group.categories.flatMap((category) => category.fleets),
+        ),
       }))
       .filter((group) => group.categories.length > 0)
       .sort((left, right) => left.label.localeCompare(right.label));
@@ -195,18 +234,21 @@ export class OperationsViewComponent implements OnInit {
       return null;
     }
 
-    return `Showing ${this.filteredActiveFleets().length} of ${this.activeFleets.length} active fleets.`;
+    return this.i18n.t('operations.filters.showing', {
+      shown: this.filteredActiveFleets().length,
+      total: this.activeFleets.length,
+    });
   }
 
   protected operationModeSummary(): string {
     switch (this.selectedViewMode) {
       case 'GROUP_BY_MISSION_TYPE':
-        return 'Grouped by mission type, with state categories inside each mission.';
+        return this.i18n.t('operations.modes.summaryMission');
       case 'SORT_BY_ETA':
-        return 'Flat list sorted by soonest travel ETA.';
+        return this.i18n.t('operations.modes.summaryEta');
       case 'AGGREGATE_BY_ORIGIN':
       default:
-        return 'Grouped by origin planet, with state categories inside each origin.';
+        return this.i18n.t('operations.modes.summaryAggregate');
     }
   }
 
@@ -231,10 +273,12 @@ export class OperationsViewComponent implements OnInit {
     }
 
     if (this.isRecalledInTransit(fleet)) {
-      return 'Recalled in transit';
+      return this.i18n.t('operations.card.recalledInTransit');
     }
 
-    return this.usesOriginCoordinates(fleet.state) ? fleet.originPlanetName : fleet.targetPlanetName;
+    return this.usesOriginCoordinates(fleet.state)
+      ? fleet.originPlanetName
+      : fleet.targetPlanetName;
   }
 
   protected currentLocationCoordinates(fleet: Fleet): string {
@@ -269,10 +313,7 @@ export class OperationsViewComponent implements OnInit {
     }
 
     if (this.isRecalledInTransit(fleet)) {
-      return [
-        this.toCoordinateSegment(fleet.origin),
-        this.toCoordinateSegment(fleet.target)
-      ];
+      return [this.toCoordinateSegment(fleet.origin), this.toCoordinateSegment(fleet.target)];
     }
 
     const coordinates = this.usesOriginCoordinates(fleet.state) ? fleet.origin : fleet.target;
@@ -287,7 +328,7 @@ export class OperationsViewComponent implements OnInit {
       case FleetState.MISSION_FAILURE_RETURNING:
         return fleet.originPlanetName;
       case FleetState.ORBITING:
-        return 'Holding position';
+        return this.i18n.t('operations.card.holdingPosition');
       default:
         return fleet.targetPlanetName;
     }
@@ -336,32 +377,35 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected openCoordinatesInGalaxy(coordinates: { x: number; y: number; z: number }): void {
-    void this.router.navigate(
-      ['/game/galactic'],
-      {
-        queryParams: {
-          x: coordinates.x,
-          y: coordinates.y,
-          z: coordinates.z
-        }
-      }
-    );
+    void this.router.navigate(['/game/galactic'], {
+      queryParams: {
+        x: coordinates.x,
+        y: coordinates.y,
+        z: coordinates.z,
+      },
+    });
   }
 
   protected missionLabel(fleet: Fleet): string {
-    return fleet.missionType === FleetMissionType.DEFEND ? 'Guard' : fleet.missionType;
+    return fleet.missionType === FleetMissionType.DEFEND
+      ? this.i18n.t('operations.card.guard')
+      : fleet.missionType;
   }
 
   protected missionFilterLabel(missionType: FleetMissionType): string {
-    return missionType === FleetMissionType.DEFEND ? 'Guard' : missionType;
+    return missionType === FleetMissionType.DEFEND
+      ? this.i18n.t('operations.card.guard')
+      : missionType;
   }
 
   protected isAttackMission(fleet: Fleet): boolean {
-    return fleet.missionType === FleetMissionType.ATTACK
-      || fleet.missionType === FleetMissionType.PLUNDER
-      || fleet.missionType === FleetMissionType.INVADE
-      || fleet.missionType === FleetMissionType.INTERCEPT
-      || fleet.missionType === FleetMissionType.BLOCK;
+    return (
+      fleet.missionType === FleetMissionType.ATTACK ||
+      fleet.missionType === FleetMissionType.PLUNDER ||
+      fleet.missionType === FleetMissionType.INVADE ||
+      fleet.missionType === FleetMissionType.INTERCEPT ||
+      fleet.missionType === FleetMissionType.BLOCK
+    );
   }
 
   protected isRepairMission(fleet: Fleet): boolean {
@@ -369,8 +413,10 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected isTransportMission(fleet: Fleet): boolean {
-    return fleet.missionType === FleetMissionType.TRANSPORT
-      || fleet.missionType === FleetMissionType.ARMAMENT_DELIVERY;
+    return (
+      fleet.missionType === FleetMissionType.TRANSPORT ||
+      fleet.missionType === FleetMissionType.ARMAMENT_DELIVERY
+    );
   }
 
   protected isColonizeMission(fleet: Fleet): boolean {
@@ -378,19 +424,24 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected isMovementMission(fleet: Fleet): boolean {
-    return fleet.missionType === FleetMissionType.MOVE
-      || fleet.missionType === FleetMissionType.HOLD
-      || fleet.missionType === FleetMissionType.RECYCLE;
+    return (
+      fleet.missionType === FleetMissionType.MOVE ||
+      fleet.missionType === FleetMissionType.HOLD ||
+      fleet.missionType === FleetMissionType.RECYCLE
+    );
   }
 
   protected isSpyMission(fleet: Fleet): boolean {
-    return fleet.missionType === FleetMissionType.SPY
-      || fleet.missionType === FleetMissionType.STAR_SYSTEM_SPY;
+    return (
+      fleet.missionType === FleetMissionType.SPY ||
+      fleet.missionType === FleetMissionType.STAR_SYSTEM_SPY
+    );
   }
 
   protected isBombardMission(fleet: Fleet): boolean {
-    return fleet.missionType === FleetMissionType.BOMBARD
-      || fleet.missionType === FleetMissionType.SIEGE;
+    return (
+      fleet.missionType === FleetMissionType.BOMBARD || fleet.missionType === FleetMissionType.SIEGE
+    );
   }
 
   protected isDefendMission(fleet: Fleet): boolean {
@@ -399,19 +450,27 @@ export class OperationsViewComponent implements OnInit {
 
   protected stateLabel(fleet: Fleet): string {
     if (fleet.state === FleetState.PENDING_JUMP_GATE) {
-      return 'PENDING JUMP GATE APPROVAL';
+      return this.i18n.t('operations.card.pendingJumpGateApproval');
     }
 
     if (fleet.state === FleetState.ORBITING) {
-      return `ORBITING | ${this.orbitActivityLabel(fleet.orbitActivity)}`;
+      return this.i18n.t('operations.card.orbiting', {
+        activity: this.orbitActivityLabel(fleet.orbitActivity),
+      });
     }
 
-    if (fleet.returnReason === FleetReturnReason.MANUAL_RECALL && fleet.state === FleetState.RETURNING) {
-      return 'RETURNING | MANUAL RECALL';
+    if (
+      fleet.returnReason === FleetReturnReason.MANUAL_RECALL &&
+      fleet.state === FleetState.RETURNING
+    ) {
+      return this.i18n.t('operations.card.returningManualRecall');
     }
 
-    if (fleet.returnReason === FleetReturnReason.MISSION_FAILURE && fleet.state === FleetState.MISSION_FAILURE_RETURNING) {
-      return 'MISSION FAILURE RETURNING';
+    if (
+      fleet.returnReason === FleetReturnReason.MISSION_FAILURE &&
+      fleet.state === FleetState.MISSION_FAILURE_RETURNING
+    ) {
+      return this.i18n.t('operations.card.missionFailureReturning');
     }
 
     return fleet.state.replaceAll('_', ' ');
@@ -420,18 +479,20 @@ export class OperationsViewComponent implements OnInit {
   protected orbitActivityLabel(activity: FleetOrbitActivity): string {
     switch (activity) {
       case FleetOrbitActivity.PASSIVE_HOLD:
-        return 'PASSIVE ORBIT';
+        return this.i18n.t('operations.card.passiveOrbit');
       case FleetOrbitActivity.GUARDING:
-        return 'GUARDING ORBIT';
+        return this.i18n.t('operations.card.guardingOrbit');
       default:
         return activity.replaceAll('_', ' ');
     }
   }
 
   protected canReturn(fleet: Fleet): boolean {
-    return fleet.state === FleetState.PENDING_JUMP_GATE
-      || fleet.state === FleetState.MOVING_TO_TARGET
-      || fleet.state === FleetState.ORBITING;
+    return (
+      fleet.state === FleetState.PENDING_JUMP_GATE ||
+      fleet.state === FleetState.MOVING_TO_TARGET ||
+      fleet.state === FleetState.ORBITING
+    );
   }
 
   protected canDelay(fleet: Fleet): boolean {
@@ -447,9 +508,11 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected hasEta(fleet: Fleet): boolean {
-    return fleet.state === FleetState.MOVING_TO_TARGET
-      || fleet.state === FleetState.RETURNING
-      || fleet.state === FleetState.MISSION_FAILURE_RETURNING;
+    return (
+      fleet.state === FleetState.MOVING_TO_TARGET ||
+      fleet.state === FleetState.RETURNING ||
+      fleet.state === FleetState.MISSION_FAILURE_RETURNING
+    );
   }
 
   protected remainingEta(fleet: Fleet): number {
@@ -463,23 +526,30 @@ export class OperationsViewComponent implements OnInit {
     }
 
     const elapsedTurns = Math.max(0, currentTurn - fleet.createdAtTurn);
-    const totalLegTurns = fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
+    const totalLegTurns =
+      fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
     return Math.max(0, totalLegTurns - elapsedTurns);
   }
 
   protected progressLabel(fleet: Fleet): string {
     if (!this.hasEta(fleet)) {
-      return 'No active travel ETA';
+      return this.i18n.t('operations.card.noActiveEta');
     }
 
     const currentTurn = this.gameState.currentTurn();
     if (currentTurn === null) {
-      return `Travel time ${fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns}`;
+      return this.i18n.t('operations.card.travelTime', {
+        turns: fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns,
+      });
     }
 
-    const totalLegTurns = fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
+    const totalLegTurns =
+      fleet.state === FleetState.MOVING_TO_TARGET ? fleet.travelTurns : fleet.returnTurns;
     const elapsedTurns = Math.max(0, Math.min(totalLegTurns, currentTurn - fleet.createdAtTurn));
-    return `${elapsedTurns}/${totalLegTurns} turns elapsed`;
+    return this.i18n.t('operations.card.turnsElapsed', {
+      elapsed: elapsedTurns,
+      total: totalLegTurns,
+    });
   }
 
   protected shipRepairCapability(fleet: Fleet): number {
@@ -511,7 +581,7 @@ export class OperationsViewComponent implements OnInit {
     }
 
     if (shots <= 0) {
-      return 'No bombardment weapons';
+      return this.i18n.t('operations.card.noBombardmentWeapons');
     }
 
     return `${shots} shots / ${damage} raw damage`;
@@ -520,24 +590,35 @@ export class OperationsViewComponent implements OnInit {
   protected operationDetail(fleet: Fleet): string | null {
     if (fleet.state === FleetState.PENDING_JUMP_GATE) {
       return fleet.pendingJumpGateRequestId
-        ? `Waiting for Jump Gate request #${fleet.pendingJumpGateRequestId}.`
-        : 'Waiting for Jump Gate approval.';
+        ? this.i18n.t('operations.card.waitingJumpGateRequest', {
+            id: fleet.pendingJumpGateRequestId,
+          })
+        : this.i18n.t('operations.card.waitingJumpGateApproval');
     }
 
     if (fleet.missionType === FleetMissionType.SIEGE) {
-      return `Siege orbit: ${this.bombardmentCapability(fleet)}`;
+      return this.i18n.t('operations.card.siegeOrbit', {
+        value: this.bombardmentCapability(fleet),
+      });
     }
 
     if (fleet.missionType === FleetMissionType.BOMBARD) {
-      return `Bombardment pass: ${this.bombardmentCapability(fleet)}`;
+      return this.i18n.t('operations.card.bombardmentPass', {
+        value: this.bombardmentCapability(fleet),
+      });
     }
 
     if (fleet.missionType === FleetMissionType.REPAIR) {
-      return `Repair support: Ship ${this.shipRepairCapability(fleet)} | Drone ${this.droneRepairCapability(fleet)}`;
+      return this.i18n.t('operations.card.repairSupport', {
+        ship: this.shipRepairCapability(fleet),
+        drone: this.droneRepairCapability(fleet),
+      });
     }
 
     if (fleet.missionType === FleetMissionType.RECYCLE) {
-      return `Recycling rate: ${calculateRecycleCapabilityForManyShips(fleet.ships)} / turn`;
+      return this.i18n.t('operations.card.recyclingRate', {
+        value: calculateRecycleCapabilityForManyShips(fleet.ships),
+      });
     }
 
     return null;
@@ -556,16 +637,28 @@ export class OperationsViewComponent implements OnInit {
   }
 
   protected selectedSupportUsage(): number {
-    return this.maintenanceShipOptions().reduce((sum, option) =>
-      sum + ((this.requestedShipAmounts[option.type] ?? 0) * option.size), 0)
-      + this.maintenanceBombOptions().reduce((sum, option) =>
-        sum + ((this.requestedBombAmounts[option.type] ?? 0) * option.size), 0);
+    return (
+      this.maintenanceShipOptions().reduce(
+        (sum, option) => sum + (this.requestedShipAmounts[option.type] ?? 0) * option.size,
+        0,
+      ) +
+      this.maintenanceBombOptions().reduce(
+        (sum, option) => sum + (this.requestedBombAmounts[option.type] ?? 0) * option.size,
+        0,
+      )
+    );
   }
 
   protected hasMaintenanceSelection(): boolean {
-    return this.requestedFuel > 0
-      || this.maintenanceShipOptions().some((option) => (this.requestedShipAmounts[option.type] ?? 0) > 0)
-      || this.maintenanceBombOptions().some((option) => (this.requestedBombAmounts[option.type] ?? 0) > 0);
+    return (
+      this.requestedFuel > 0 ||
+      this.maintenanceShipOptions().some(
+        (option) => (this.requestedShipAmounts[option.type] ?? 0) > 0,
+      ) ||
+      this.maintenanceBombOptions().some(
+        (option) => (this.requestedBombAmounts[option.type] ?? 0) > 0,
+      )
+    );
   }
 
   protected canSubmitMaintenanceRequest(): boolean {
@@ -573,7 +666,14 @@ export class OperationsViewComponent implements OnInit {
       return false;
     }
 
-    if (this.requestedFuel > Math.min(this.maintenanceOptions.fuelCap, this.maintenanceOptions.availableFuel, this.maintenanceOptions.remainingCargoCapacity)) {
+    if (
+      this.requestedFuel >
+      Math.min(
+        this.maintenanceOptions.fuelCap,
+        this.maintenanceOptions.availableFuel,
+        this.maintenanceOptions.remainingCargoCapacity,
+      )
+    ) {
       return false;
     }
 
@@ -603,7 +703,7 @@ export class OperationsViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.actionError = 'No player session found.';
+      this.actionError = this.i18n.t('operations.errors.noSession');
       return;
     }
 
@@ -615,18 +715,22 @@ export class OperationsViewComponent implements OnInit {
     this.requestedShipAmounts = {};
     this.requestedBombAmounts = {};
 
-    this.gameApi.getFleetMaintenanceOptions(fleet.fleetId, session.token)
-      .pipe(finalize(() => {
-        this.maintenanceDialogLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .getFleetMaintenanceOptions(fleet.fleetId, session.token)
+      .pipe(
+        finalize(() => {
+          this.maintenanceDialogLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (options) => {
           this.maintenanceOptions = options;
         },
         error: (error) => {
-          this.maintenanceDialogError = error?.error?.error ?? 'Unable to load maintenance options.';
-        }
+          this.maintenanceDialogError =
+            error?.error?.error ?? this.i18n.t('operations.errors.loadMaintenance');
+        },
       });
   }
 
@@ -650,7 +754,7 @@ export class OperationsViewComponent implements OnInit {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.maintenanceDialogError = 'No player session found.';
+      this.maintenanceDialogError = this.i18n.t('operations.errors.noSession');
       return;
     }
 
@@ -659,22 +763,26 @@ export class OperationsViewComponent implements OnInit {
     this.actionError = null;
     this.actionSuccess = null;
 
-    this.gameApi.createMaintenanceRequest(
-      this.maintenanceDialogFleetId,
-      this.buildMaintenancePayload(),
-      session.token
-    )
-      .pipe(finalize(() => {
-        this.maintenanceSubmitting = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .createMaintenanceRequest(
+        this.maintenanceDialogFleetId,
+        this.buildMaintenancePayload(),
+        session.token,
+      )
+      .pipe(
+        finalize(() => {
+          this.maintenanceSubmitting = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (response) => {
           this.handleMaintenanceResponse(response);
         },
         error: (error) => {
-          this.maintenanceDialogError = error?.error?.error ?? 'Unable to submit maintenance request.';
-        }
+          this.maintenanceDialogError =
+            error?.error?.error ?? this.i18n.t('operations.errors.submitMaintenance');
+        },
       });
   }
 
@@ -686,7 +794,7 @@ export class OperationsViewComponent implements OnInit {
     this.runFleetAction(
       fleet.fleetId,
       (token) => this.gameApi.returnFleet(fleet.fleetId, token),
-      'Unable to return fleet.'
+      this.i18n.t('operations.errors.returnFleet'),
     );
   }
 
@@ -698,14 +806,14 @@ export class OperationsViewComponent implements OnInit {
     this.runFleetAction(
       fleet.fleetId,
       (token) => this.gameApi.delayFleet(fleet.fleetId, token),
-      'Unable to delay fleet.'
+      this.i18n.t('operations.errors.delayFleet'),
     );
   }
 
   private loadActiveFleets(): void {
     const session = this.playerSession.load();
     if (!session) {
-      this.loadError = 'No player session found.';
+      this.loadError = this.i18n.t('operations.errors.noSession');
       return;
     }
 
@@ -715,12 +823,14 @@ export class OperationsViewComponent implements OnInit {
 
     forkJoin({
       activeFleets: this.gameApi.getActiveFleets(session.token),
-      ownedPlanets: this.gameApi.getOwnedPlanets(session.token)
+      ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
     })
-      .pipe(finalize(() => {
-        this.isLoading = false;
-        this.cdr.markForCheck();
-      }))
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: ({ activeFleets, ownedPlanets }) => {
           this.ownedPlanets = [...ownedPlanets];
@@ -730,8 +840,8 @@ export class OperationsViewComponent implements OnInit {
           }
         },
         error: () => {
-          this.loadError = 'Unable to load active fleets.';
-        }
+          this.loadError = this.i18n.t('operations.errors.loadActiveFleets');
+        },
       });
   }
 
@@ -740,9 +850,11 @@ export class OperationsViewComponent implements OnInit {
   }
 
   private isRecalledInTransit(fleet: Fleet): boolean {
-    return fleet.state === FleetState.RETURNING
-      && fleet.returnReason === FleetReturnReason.MANUAL_RECALL
-      && fleet.returnTurns < fleet.travelTurns;
+    return (
+      fleet.state === FleetState.RETURNING &&
+      fleet.returnReason === FleetReturnReason.MANUAL_RECALL &&
+      fleet.returnTurns < fleet.travelTurns
+    );
   }
 
   private applyActiveFleetUpdate(activeFleets: Fleet[], token?: string): void {
@@ -765,11 +877,13 @@ export class OperationsViewComponent implements OnInit {
         key,
         label: firstFleet?.originPlanetName ?? key,
         subtitle: firstFleet ? this.coordinatesWithOwnerLabel(firstFleet.origin) : key,
-        categories: [{
-          key: 'ACTIVE',
-          label: 'All visible operations',
-          fleets: groupFleets
-        }]
+        categories: [
+          {
+            key: 'ACTIVE',
+            label: this.i18n.t('operations.groups.allVisibleOperations'),
+            fleets: groupFleets,
+          },
+        ],
       };
     });
   }
@@ -781,16 +895,20 @@ export class OperationsViewComponent implements OnInit {
     }
 
     return [...groups.entries()]
-      .sort(([left], [right]) => this.missionFilterLabel(left).localeCompare(this.missionFilterLabel(right)))
+      .sort(([left], [right]) =>
+        this.missionFilterLabel(left).localeCompare(this.missionFilterLabel(right)),
+      )
       .map(([missionType, groupFleets]) => ({
         key: missionType,
         label: this.missionFilterLabel(missionType),
-        subtitle: `${groupFleets.length} fleet${groupFleets.length === 1 ? '' : 's'}`,
-        categories: [{
-          key: 'ACTIVE',
-          label: 'All visible operations',
-          fleets: groupFleets
-        }]
+        subtitle: this.i18n.t('operations.groups.fleetCount', { count: groupFleets.length }),
+        categories: [
+          {
+            key: 'ACTIVE',
+            label: this.i18n.t('operations.groups.allVisibleOperations'),
+            fleets: groupFleets,
+          },
+        ],
       }));
   }
 
@@ -800,7 +918,7 @@ export class OperationsViewComponent implements OnInit {
       'RETURNING',
       'ORBITING',
       'PENDING_JUMP_GATE',
-      'ACTIVE'
+      'ACTIVE',
     ];
     const grouped = new Map<FleetOperationCategoryKey, Fleet[]>();
 
@@ -813,7 +931,7 @@ export class OperationsViewComponent implements OnInit {
       .map((key) => ({
         key,
         label: this.operationCategoryLabel(key),
-        fleets: this.sortFleetsWithinCategory(grouped.get(key) ?? [])
+        fleets: this.sortFleetsWithinCategory(grouped.get(key) ?? []),
       }))
       .filter((category) => category.fleets.length > 0);
   }
@@ -837,33 +955,35 @@ export class OperationsViewComponent implements OnInit {
   private operationCategoryLabel(category: FleetOperationCategoryKey): string {
     switch (category) {
       case 'OUTGOING':
-        return 'Outgoing';
+        return this.i18n.t('operations.categories.outgoing');
       case 'RETURNING':
-        return 'Returning';
+        return this.i18n.t('operations.categories.returning');
       case 'ORBITING':
-        return 'Orbiting';
+        return this.i18n.t('operations.categories.orbiting');
       case 'PENDING_JUMP_GATE':
-        return 'Pending Jump Gate';
+        return this.i18n.t('operations.categories.pendingJumpGate');
       case 'ACTIVE':
       default:
-        return 'Active';
+        return this.i18n.t('operations.categories.active');
     }
   }
 
   private sortFleetsWithinCategory(fleets: Fleet[]): Fleet[] {
-    return [...fleets].sort((left, right) =>
-      this.etaSortValue(left) - this.etaSortValue(right)
-      || left.createdAtTurn - right.createdAtTurn
-      || left.fleetId - right.fleetId
+    return [...fleets].sort(
+      (left, right) =>
+        this.etaSortValue(left) - this.etaSortValue(right) ||
+        left.createdAtTurn - right.createdAtTurn ||
+        left.fleetId - right.fleetId,
     );
   }
 
   private sortFleetsByEta(fleets: Fleet[]): Fleet[] {
-    return [...fleets].sort((left, right) =>
-      this.etaSortRank(left) - this.etaSortRank(right)
-      || this.etaSortValue(left) - this.etaSortValue(right)
-      || left.createdAtTurn - right.createdAtTurn
-      || left.fleetId - right.fleetId
+    return [...fleets].sort(
+      (left, right) =>
+        this.etaSortRank(left) - this.etaSortRank(right) ||
+        this.etaSortValue(left) - this.etaSortValue(right) ||
+        left.createdAtTurn - right.createdAtTurn ||
+        left.fleetId - right.fleetId,
     );
   }
 
@@ -890,7 +1010,7 @@ export class OperationsViewComponent implements OnInit {
   private runFleetAction(
     fleetId: number,
     action: (token: string) => ReturnType<GameApiService['getActiveFleets']>,
-    fallbackError: string
+    fallbackError: string,
   ): void {
     const session = this.playerSession.load();
     if (!session || this.activeActionFleetId !== null) {
@@ -902,10 +1022,12 @@ export class OperationsViewComponent implements OnInit {
     this.actionSuccess = null;
 
     action(session.token)
-      .pipe(finalize(() => {
-        this.activeActionFleetId = null;
-        this.cdr.markForCheck();
-      }))
+      .pipe(
+        finalize(() => {
+          this.activeActionFleetId = null;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (activeFleets) => {
           this.applyActiveFleetUpdate(activeFleets, session.token);
@@ -915,7 +1037,7 @@ export class OperationsViewComponent implements OnInit {
         },
         error: (error) => {
           this.actionError = error?.error?.error ?? fallbackError;
-        }
+        },
       });
   }
 
@@ -925,15 +1047,15 @@ export class OperationsViewComponent implements OnInit {
       ships: this.maintenanceShipOptions()
         .map((option) => ({
           type: option.type,
-          amount: Math.min(this.requestedShipAmounts[option.type] ?? 0, option.available)
+          amount: Math.min(this.requestedShipAmounts[option.type] ?? 0, option.available),
         }))
         .filter((entry) => entry.amount > 0),
       bombs: this.maintenanceBombOptions()
         .map((option) => ({
           type: option.type,
-          amount: Math.min(this.requestedBombAmounts[option.type] ?? 0, option.available)
+          amount: Math.min(this.requestedBombAmounts[option.type] ?? 0, option.available),
         }))
-        .filter((entry) => entry.amount > 0)
+        .filter((entry) => entry.amount > 0),
     };
   }
 
@@ -945,15 +1067,15 @@ export class OperationsViewComponent implements OnInit {
   }
 
   private refreshCoordinateOwnerNames(token: string, activeFleets: Fleet[]): void {
-    const ownerInfoByCoordinates = new Map<string, { ownerId: number | null; ownerName: string | null }>();
+    const ownerInfoByCoordinates = new Map<
+      string,
+      { ownerId: number | null; ownerName: string | null }
+    >();
     for (const planet of this.ownedPlanets) {
-      ownerInfoByCoordinates.set(
-        this.coordinatesKey(planet.coordinates),
-        {
-          ownerId: planet.info.ownerId,
-          ownerName: planet.info.ownerPlayerName ?? null
-        }
-      );
+      ownerInfoByCoordinates.set(this.coordinatesKey(planet.coordinates), {
+        ownerId: planet.info.ownerId,
+        ownerName: planet.info.ownerPlayerName ?? null,
+      });
     }
 
     const coordinatesToFetch = new Map<string, { x: number; y: number; z: number }>();
@@ -974,10 +1096,10 @@ export class OperationsViewComponent implements OnInit {
     const coordinateEntries = [...coordinatesToFetch.entries()];
     forkJoin(
       coordinateEntries.map(([_, coordinates]) =>
-        this.gameApi.getClientPlanet(coordinates.x, coordinates.y, coordinates.z, token).pipe(
-          catchError(() => of(null))
-        )
-      )
+        this.gameApi
+          .getClientPlanet(coordinates.x, coordinates.y, coordinates.z, token)
+          .pipe(catchError(() => of(null))),
+      ),
     ).subscribe({
       next: (planets) => {
         planets.forEach((planet, index) => {
@@ -987,18 +1109,20 @@ export class OperationsViewComponent implements OnInit {
           }
           ownerInfoByCoordinates.set(key, {
             ownerId: planet?.info.ownerId ?? null,
-            ownerName: planet?.info.ownerPlayerName ?? null
+            ownerName: planet?.info.ownerPlayerName ?? null,
           });
         });
         this.replaceCoordinateOwnerInfos(ownerInfoByCoordinates);
       },
       error: () => {
         this.replaceCoordinateOwnerInfos(ownerInfoByCoordinates);
-      }
+      },
     });
   }
 
-  private replaceCoordinateOwnerInfos(entries: Map<string, { ownerId: number | null; ownerName: string | null }>): void {
+  private replaceCoordinateOwnerInfos(
+    entries: Map<string, { ownerId: number | null; ownerName: string | null }>,
+  ): void {
     this.ownerInfoByCoordinates.clear();
     for (const [key, ownerInfo] of entries.entries()) {
       this.ownerInfoByCoordinates.set(key, ownerInfo);
@@ -1016,12 +1140,20 @@ export class OperationsViewComponent implements OnInit {
     return `${coordinatesLabel} - ${ownerLabelWithDiplomacy(ownerInfo.ownerName, this.coordinatesDiplomaticStatus(coordinates))}`;
   }
 
-  private coordinatesRelation(coordinates: { x: number; y: number; z: number }): DiplomacyVisualKey | 'none' {
+  private coordinatesRelation(coordinates: {
+    x: number;
+    y: number;
+    z: number;
+  }): DiplomacyVisualKey | 'none' {
     const status = this.coordinatesDiplomaticStatus(coordinates);
     return status ? diplomacyVisualKey(status) : 'none';
   }
 
-  private coordinatesDiplomaticStatus(coordinates: { x: number; y: number; z: number }): DiplomaticStatus | null {
+  private coordinatesDiplomaticStatus(coordinates: {
+    x: number;
+    y: number;
+    z: number;
+  }): DiplomaticStatus | null {
     const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
     if (ownerInfo?.ownerId === null || ownerInfo?.ownerId === undefined) {
       return null;
@@ -1035,13 +1167,19 @@ export class OperationsViewComponent implements OnInit {
     return this.gameState.diplomacyResolver().getStatus(ownPlayerId, ownerInfo.ownerId);
   }
 
-  private toCoordinateSegment(coordinates: { x: number; y: number; z: number }): CoordinateSegmentVm {
+  private toCoordinateSegment(coordinates: {
+    x: number;
+    y: number;
+    z: number;
+  }): CoordinateSegmentVm {
     const ownerInfo = this.ownerInfoByCoordinates.get(this.coordinatesKey(coordinates)) ?? null;
     const status = this.coordinatesDiplomaticStatus(coordinates);
     return {
       coordinates,
-      ownerLabel: ownerInfo?.ownerName ? ownerLabelWithDiplomacy(ownerInfo.ownerName, status) : null,
-      relation: status ? diplomacyVisualKey(status) : 'none'
+      ownerLabel: ownerInfo?.ownerName
+        ? ownerLabelWithDiplomacy(ownerInfo.ownerName, status)
+        : null,
+      relation: status ? diplomacyVisualKey(status) : 'none',
     };
   }
 
