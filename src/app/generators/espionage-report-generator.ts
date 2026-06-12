@@ -12,6 +12,7 @@ import { BuildingQueue } from '../models/reports/building-queue';
 import { DefenceBuildingInstances } from '../models/reports/defence-building-instances';
 import { ManyShips } from '../models/fleets/many-ships';
 import { ManyDefences } from '../models/defences/many-defences';
+import { encodeRuntimeText } from '../i18n/runtime-text.utils';
 
 export type EspionageReportOptions = {
   forcedReportLevel?: number;
@@ -51,18 +52,25 @@ export class EspionageReportGenerator {
     planetOwner: Player | null,
     planet: Planet,
     probeAmount: number,
-    options?: EspionageReportOptions
+    options?: EspionageReportOptions,
   ): EspionageReportData {
     const reportLevel = this.resolveReportLevel(player, planetOwner, planet, probeAmount, options);
     const createdTurn = this.resolveCreatedTurn(options);
     const sourceCoordinates = options?.sourceCoordinates ?? {
       x: planet.basicInfo.solarSystem.coordinates.x,
       y: planet.basicInfo.solarSystem.coordinates.y,
-      z: Math.max(0, planet.basicInfo.order - 1)
+      z: Math.max(0, planet.basicInfo.order - 1),
     };
     const sourcePlanetName = options?.sourcePlanetName ?? planet.basicInfo.name;
     const sourceSystemName = options?.sourceSystemName ?? planet.basicInfo.solarSystem.name;
-    const title = options?.title ?? `Espionage Report: ${sourcePlanetName} (${sourceCoordinates.x}:${sourceCoordinates.y}:${sourceCoordinates.z})`;
+    const title =
+      options?.title ??
+      encodeRuntimeText('generated.reports.espionageTitle', {
+        planet: sourcePlanetName,
+        x: sourceCoordinates.x,
+        y: sourceCoordinates.y,
+        z: sourceCoordinates.z,
+      });
 
     const includeAverageBuildings = reportLevel >= 2;
     const includeTotalResources = reportLevel >= 3;
@@ -86,30 +94,26 @@ export class EspionageReportGenerator {
       ? this.averageMapValue(planetOwner?.tech ?? new Map())
       : 0;
     const totalDefences = includeTotalDefences ? this.getDefencesAmount(planet) : 0;
-    const totalShips = includeTotalShips
-      ? ManyShips.totalShipsCount(planet.rBDSFTQ.ships)
-      : 0;
+    const totalShips = includeTotalShips ? ManyShips.totalShipsCount(planet.rBDSFTQ.ships) : 0;
 
     const detailedBuildings = includeDetailedBuildings
       ? new Map(planet.rBDSFTQ.buildingsLevels)
       : new Map();
     const detailedResources = includeDetailedResources
       ? new ResourcesPack(
-        planet.rBDSFTQ.resources.metal,
-        planet.rBDSFTQ.resources.crystal,
-        planet.rBDSFTQ.resources.deuterium
-      )
+          planet.rBDSFTQ.resources.metal,
+          planet.rBDSFTQ.resources.crystal,
+          planet.rBDSFTQ.resources.deuterium,
+        )
       : new ResourcesPack(0, 0, 0);
     const detailedSpaceDebris = includeDetailedResources
       ? new ResourcesPack(
-        planet.rBDSFTQ.spaceDebris.metal,
-        planet.rBDSFTQ.spaceDebris.crystal,
-        planet.rBDSFTQ.spaceDebris.deuterium
-      )
+          planet.rBDSFTQ.spaceDebris.metal,
+          planet.rBDSFTQ.spaceDebris.crystal,
+          planet.rBDSFTQ.spaceDebris.deuterium,
+        )
       : new ResourcesPack(0, 0, 0);
-    const detailedTech = includeDetailedTech
-      ? new Map(planetOwner?.tech ?? new Map())
-      : new Map();
+    const detailedTech = includeDetailedTech ? new Map(planetOwner?.tech ?? new Map()) : new Map();
     const detailedDefences = includeDetailedDefences ? this.getDefenceInstances(planet) : [];
     const detailedShips = includeDetailedShips
       ? this.toShipAmountsMap(planet.rBDSFTQ.ships)
@@ -130,7 +134,7 @@ export class EspionageReportGenerator {
         sourceCoordinates,
         sourcePlanetName,
         sourceSystemName,
-        senderPlayerName: options?.senderPlayerName ?? planetOwner?.playerName ?? null
+        senderPlayerName: options?.senderPlayerName ?? planetOwner?.playerName ?? null,
       },
       planet.basicInfo.colonizationDifficulty,
       includeTotalDefences || includeDetailedDefences,
@@ -151,7 +155,7 @@ export class EspionageReportGenerator {
       shipyardProduction,
       defencesProduction,
       researchProduction,
-      buildingProduction
+      buildingProduction,
     );
   }
 
@@ -164,7 +168,7 @@ export class EspionageReportGenerator {
     planetOwner: Player | null,
     planet: Planet,
     probeAmount: number,
-    options?: EspionageReportOptions
+    options?: EspionageReportOptions,
   ): number {
     const forcedReportLevel = options?.forcedReportLevel;
     if (Number.isFinite(forcedReportLevel)) {
@@ -191,17 +195,19 @@ export class EspionageReportGenerator {
     player: Player,
     planetOwner: Player | null,
     planet: Planet,
-    probeAmount: number
+    probeAmount: number,
   ): number {
     const attackerTech = player.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY);
     const defenderTech = planetOwner?.getTechLevel(TechnologyType.ESPIONAGE_TECHNOLOGY) ?? 0;
     const bunkerLevel = planet.getBuildingLevel(BuildingType.BUNKER_NETWORK);
-    const planetModifier = 1 + (planet.info.planetaryParameters.anomaliesAndNoise / 100);
+    const planetModifier = 1 + planet.info.planetaryParameters.anomaliesAndNoise / 100;
 
-    return Math.floor(attackerTech * planetModifier)
-      + calculateProbeEspionageLevelBonus(probeAmount)
-      - Math.floor(Math.sqrt(defenderTech) * 2)
-      - Math.ceil(Math.sqrt(Math.max(0, bunkerLevel)));
+    return (
+      Math.floor(attackerTech * planetModifier) +
+      calculateProbeEspionageLevelBonus(probeAmount) -
+      Math.floor(Math.sqrt(defenderTech) * 2) -
+      Math.ceil(Math.sqrt(Math.max(0, bunkerLevel)))
+    );
   }
 
   private averageMapValue<T>(map: Map<T, number>): number {
@@ -228,9 +234,8 @@ export class EspionageReportGenerator {
   }
 
   private getDefenceInstances(planet: Planet): DefenceBuildingInstances[] {
-    return [...ManyDefences.countByType(planet.rBDSFTQ.defences).entries()]
-      .map(([type, amount]) => new DefenceBuildingInstances(type, amount));
+    return [...ManyDefences.countByType(planet.rBDSFTQ.defences).entries()].map(
+      ([type, amount]) => new DefenceBuildingInstances(type, amount),
+    );
   }
 }
-
-

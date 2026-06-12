@@ -123,6 +123,7 @@ export const generatedPl = {
   reports: {
     researchCompletedTitle: 'Badania zakonczone: {{technology}} L{{level}}',
     researchCompletedBody: '{{technology}} osiagnela poziom {{level}} na {{planet}}.',
+    espionageTitle: 'Raport szpiegowski: {{planet}} ({{x}}:{{y}}:{{z}})',
     plunderTitle: 'Raport grabiezy: {{targetPlanet}}',
     incomingAttackTitle: 'Raport nadchodzacego ataku: {{targetPlanet}}',
     bombardmentTitle: 'Raport bombardowania: {{mission}} przy {{targetPlanet}}',
@@ -196,6 +197,47 @@ export const generatedPl = {
       currentDebrisField:
         'Aktualne pole szczatkow: Metal {{metal}}, Krysztal {{crystal}}, Deuter {{deuterium}}',
       missionResolvedAt: 'Misja {{mission}} zostala rozstrzygnieta przy {{targetPlanet}}.',
+    },
+  },
+  battleReport: {
+    titles: {
+      coordinates: 'Raport bitwy: {{x}}:{{y}}:{{z}}',
+      versus: 'Raport bitwy: {{attacker}} kontra {{defender}}',
+      sharedCoordinates: 'Wspoldzielony raport bitwy: {{x}}:{{y}}:{{z}}',
+      sharedVersus: 'Wspoldzielony raport bitwy: {{attacker}} kontra {{defender}}',
+    },
+    winners: {
+      Attacker: 'Atakujacy',
+      Defender: 'Obronca',
+      Draw: 'Remis',
+    },
+    body: {
+      battleResult: 'Wynik bitwy: {{winner}}',
+      perspective: 'Perspektywa: {{label}}',
+      roundsFought: 'Rozegrane rundy: {{rounds}} / {{maxRounds}}',
+      ownShips:
+        'Wlasne statki ({{label}}): przetrwalo {{surviving}}/{{initial}}, utracono {{destroyed}}.',
+      ownDefences:
+        'Wlasna obrona ({{label}}): przetrwalo {{surviving}}/{{initial}}, utracono {{destroyed}}.',
+      enemyShips:
+        'Wrogie statki ({{label}}): przetrwalo {{surviving}}/{{initial}}, utracono {{destroyed}}.',
+      enemyDefences:
+        'Wroga obrona ({{label}}): przetrwalo {{surviving}}/{{initial}}, utracono {{destroyed}}.',
+      ownShipLossesByType: 'Wlasne straty statkow wedlug typu: {{summary}}',
+      ownDefenceLossesByType: 'Wlasne straty obrony wedlug typu: {{summary}}',
+      enemyShipLossesByType: 'Straty wrogich statkow wedlug typu: {{summary}}',
+      enemyDefenceLossesByType: 'Straty wrogiej obrony wedlug typu: {{summary}}',
+      ownSurvivorsByType: 'Wlasni ocaleni wedlug typu: {{summary}}',
+      ownDefenceSurvivorsByType: 'Wlasna ocala obrona wedlug typu: {{summary}}',
+      enemySurvivorsByType: 'Wrodzy ocaleni wedlug typu: {{summary}}',
+      enemyDefenceSurvivorsByType: 'Ocala wroga obrona wedlug typu: {{summary}}',
+      roundSummaries: 'Podsumowania rund:',
+      roundSummary:
+        'Runda {{round}}: strzaly {{attackerLabel}} {{attackerShots}}, strzaly {{defenderLabel}} {{defenderShots}}, straty {{attackerLabel}} {{attackerLosses}}, straty {{defenderLabel}} {{defenderLosses}}.',
+      planetaryBombs: '  Bomby planetarne: {{summary}}',
+      planetaryBombSummary:
+        'wystrzelono {{launched}}, aktywowano {{activated}}, przechwycono {{intercepted}}, utracono {{lost}}, uszkodzenia {{damage}}',
+      noRounds: 'Nie rozegrano zadnych rund.',
     },
   },
   systemMail: {

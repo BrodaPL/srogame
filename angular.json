@@ -30,17 +30,15 @@
                 "output": "images"
               }
             ],
-            "styles": [
-              "src/styles.css"
-            ]
+            "styles": ["src/styles.css"]
           },
           "configurations": {
             "production": {
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "1800kB",
-                  "maximumError": "1.94MB"
+                  "maximumWarning": "2MB",
+                  "maximumError": "2.1MB"
                 },
                 {
                   "type": "anyComponentStyle",

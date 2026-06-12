@@ -16,13 +16,17 @@ import { Player } from '../../player';
 import { FleetReport } from '../../reports/fleet-report';
 import { ResourcesPack } from '../../resources-pack';
 import {
+  resolveEnglishRuntimeText,
+  resolveEnglishRuntimeTextBlock,
+} from '../../../i18n/testing/runtime-text-test.utils';
+import {
   createPersistentManyDefencesFromBattleSurvivors,
   createPersistentManyShipsFromBattleSurvivors,
   SpaceBattleResolver,
   type BattleRandomSource,
   type BattleFleetSummary,
   type BattleRoundSummary,
-  type SpaceBattleResult
+  type SpaceBattleResult,
 } from '../space-battle-resolver';
 
 describe('SpaceBattleResolver', () => {
@@ -41,19 +45,23 @@ describe('SpaceBattleResolver', () => {
   const createPlayer = (
     playerId: number,
     playerName: string,
-    techLevels: Partial<Record<TechnologyType, number>> = {}
-  ): Player => new Player(
-    playerId,
-    playerName,
-    [],
-    new Map(
-      Object.entries(techLevels)
-        .filter((entry) => Number.isFinite(entry[1]) && Number(entry[1]) > 0)
-        .map(([technologyType, level]) => [technologyType as TechnologyType, Math.floor(Number(level))])
-    ),
-    [],
-    PlayerType.PLAYER
-  );
+    techLevels: Partial<Record<TechnologyType, number>> = {},
+  ): Player =>
+    new Player(
+      playerId,
+      playerName,
+      [],
+      new Map(
+        Object.entries(techLevels)
+          .filter((entry) => Number.isFinite(entry[1]) && Number(entry[1]) > 0)
+          .map(([technologyType, level]) => [
+            technologyType as TechnologyType,
+            Math.floor(Number(level)),
+          ]),
+      ),
+      [],
+      PlayerType.PLAYER,
+    );
 
   const createShip = (
     type: ShipType,
@@ -62,38 +70,39 @@ describe('SpaceBattleResolver', () => {
       hullPointsCapacity = 100,
       criticalThreshold = 30,
       shieldCapacity = 0,
-      armor = 0
+      armor = 0,
     }: {
       hullPointsCapacity?: number;
       criticalThreshold?: number;
       shieldCapacity?: number;
       armor?: number;
-    } = {}
-  ): Ship => new Ship(
-    type,
-    '',
-    HullClass.SMALL,
-    false,
-    1,
-    0,
-    hullPointsCapacity,
-    criticalThreshold,
-    shieldCapacity,
-    armor,
-    weapons,
-    0,
-    0,
-    new Set(),
-    0,
-    new ResourcesPack(0, 0, 0),
-    [],
-    []
-  );
+    } = {},
+  ): Ship =>
+    new Ship(
+      type,
+      '',
+      HullClass.SMALL,
+      false,
+      1,
+      0,
+      hullPointsCapacity,
+      criticalThreshold,
+      shieldCapacity,
+      armor,
+      weapons,
+      0,
+      0,
+      new Set(),
+      0,
+      new ResourcesPack(0, 0, 0),
+      [],
+      [],
+    );
 
   const createShipInstance = (
     ship: Ship,
     hull = ship.hullPointsCapacity,
-    shield = ship.shieldCapacity
+    shield = ship.shieldCapacity,
   ): ShipInstance => new ShipInstance(ship, hull, shield, 0, []);
 
   const createDefence = (
@@ -106,7 +115,7 @@ describe('SpaceBattleResolver', () => {
       hullPointsCapacity = 50,
       criticalThreshold = 25,
       shieldCapacity = 0,
-      armor = 0
+      armor = 0,
     }: {
       canShootToOrbit?: boolean;
       size?: number;
@@ -114,65 +123,63 @@ describe('SpaceBattleResolver', () => {
       criticalThreshold?: number;
       shieldCapacity?: number;
       armor?: number;
-    } = {}
-  ): Defence => new Defence(
-    type,
-    '',
-    hullClass,
-    canShootToOrbit,
-    size,
-    hullPointsCapacity,
-    criticalThreshold,
-    shieldCapacity,
-    armor,
-    weapons,
-    new ResourcesPack(0, 0, 0),
-    [],
-    []
-  );
+    } = {},
+  ): Defence =>
+    new Defence(
+      type,
+      '',
+      hullClass,
+      canShootToOrbit,
+      size,
+      hullPointsCapacity,
+      criticalThreshold,
+      shieldCapacity,
+      armor,
+      weapons,
+      new ResourcesPack(0, 0, 0),
+      [],
+      [],
+    );
 
   const createDefenceInstance = (
     defence: Defence,
     hull = defence.hullPointsCapacity,
-    shield = defence.shieldCapacity
+    shield = defence.shieldCapacity,
   ): DefenceInstance => new DefenceInstance(defence, hull, shield);
 
   const createFleet = (
     ship: Ship,
     amount: number,
     hull = ship.hullPointsCapacity,
-    shield = ship.shieldCapacity
-  ): ShipInstance[] => Array.from(
-    { length: amount },
-    () => createShipInstance(ship, hull, shield)
-  );
+    shield = ship.shieldCapacity,
+  ): ShipInstance[] => Array.from({ length: amount }, () => createShipInstance(ship, hull, shield));
 
   const logFleetSummary = (
     battleLabel: string,
     side: 'attacker' | 'defender',
-    summary: BattleFleetSummary
+    summary: BattleFleetSummary,
   ): void => {
     console.log(`[${battleLabel}] ${side.toUpperCase()} final summary`);
     console.log(
-      `[${battleLabel}] ${side} counts | initial=${summary.initialShipCount} surviving=${summary.survivingShipCount} destroyed=${summary.destroyedShipCount}`
+      `[${battleLabel}] ${side} counts | initial=${summary.initialShipCount} surviving=${summary.survivingShipCount} destroyed=${summary.destroyedShipCount}`,
     );
 
     summary.byType.forEach((entry, index) => {
       console.log(
-        `[${battleLabel}] ${side} type[${index}] ${entry.shipType} | initial=${entry.initial} surviving=${entry.surviving} destroyed=${entry.destroyed} survivingHull=${entry.survivingHull} survivingShield=${entry.survivingShield}`
+        `[${battleLabel}] ${side} type[${index}] ${entry.shipType} | initial=${entry.initial} surviving=${entry.surviving} destroyed=${entry.destroyed} survivingHull=${entry.survivingHull} survivingShield=${entry.survivingShield}`,
       );
     });
 
     summary.ships.forEach((ship, index) => {
       console.log(
-        `[${battleLabel}] ${side} ship[${index}] ${ship.type.type} | hull=${ship.hull} shield=${ship.shield}`
+        `[${battleLabel}] ${side} ship[${index}] ${ship.type.type} | hull=${ship.hull} shield=${ship.shield}`,
       );
     });
   };
 
   const logRoundSummary = (battleLabel: string, round: BattleRoundSummary): void => {
     console.log(
-      `[${battleLabel}] round ${round.roundNumber} start | attackerActive=${round.attackerActiveShips} defenderActive=${round.defenderActiveShips} attackerWeapons=${round.attackerWeapons} defenderWeapons=${round.defenderWeapons}`
+      `[${battleLabel}] round ${round.roundNumber} start | attackerActive=${round.attackerActiveShips} defenderActive=${round.defenderActiveShips} attackerWeapons=${round.attackerWeapons} defenderWeapons=${round.defenderWeapons}`,
     );
 
     if (round.shots.length === 0) {
@@ -180,8 +187,8 @@ describe('SpaceBattleResolver', () => {
     } else {
       round.shots.forEach((shot, index) => {
         console.log(
-          `[${battleLabel}] round ${round.roundNumber} shot ${index + 1} | side=${shot.side} shooter=${shot.shooterShipType} target=${shot.targetShipType} weapon=${shot.weaponType} shield ${shot.shieldBefore}->${shot.shieldAfter} (-${shot.shieldDamage}) hull ${shot.hullBefore}->${shot.hullAfter} (-${shot.hullDamage})`
-          + ` baseDamage=${shot.weaponDamage} evaded=${shot.evaded} targetEvasion=${(shot.targetEvasionChance * 100).toFixed(2)}%`
+          `[${battleLabel}] round ${round.roundNumber} shot ${index + 1} | side=${shot.side} shooter=${shot.shooterShipType} target=${shot.targetShipType} weapon=${shot.weaponType} shield ${shot.shieldBefore}->${shot.shieldAfter} (-${shot.shieldDamage}) hull ${shot.hullBefore}->${shot.hullAfter} (-${shot.hullDamage})` +
+            ` baseDamage=${shot.weaponDamage} evaded=${shot.evaded} targetEvasion=${(shot.targetEvasionChance * 100).toFixed(2)}%`,
         );
       });
     }
@@ -191,20 +198,20 @@ describe('SpaceBattleResolver', () => {
     } else {
       round.destroyedShips.forEach((entry, index) => {
         console.log(
-          `[${battleLabel}] round ${round.roundNumber} destroyed ${index + 1} | side=${entry.side} ship=${entry.shipType} reason=${entry.reason} hullBeforeCheck=${entry.hullBeforeCheck} criticalThreshold=${entry.criticalHullThreshold} chance=${entry.destructionChancePercent}%`
+          `[${battleLabel}] round ${round.roundNumber} destroyed ${index + 1} | side=${entry.side} ship=${entry.shipType} reason=${entry.reason} hullBeforeCheck=${entry.hullBeforeCheck} criticalThreshold=${entry.criticalHullThreshold} chance=${entry.destructionChancePercent}%`,
         );
       });
     }
 
     console.log(
-      `[${battleLabel}] round ${round.roundNumber} end | attackerShots=${round.attackerShots} defenderShots=${round.defenderShots}`
+      `[${battleLabel}] round ${round.roundNumber} end | attackerShots=${round.attackerShots} defenderShots=${round.defenderShots}`,
     );
   };
 
   const logBattleResult = (battleLabel: string, result: SpaceBattleResult): void => {
     console.log(`[${battleLabel}] battle start`);
     console.log(
-      `[${battleLabel}] result | winner=${result.winner} roundsFought=${result.roundsFought}/${result.maxRounds}`
+      `[${battleLabel}] result | winner=${result.winner} roundsFought=${result.roundsFought}/${result.maxRounds}`,
     );
 
     result.roundSummaries.forEach((round) => logRoundSummary(battleLabel, round));
@@ -215,37 +222,37 @@ describe('SpaceBattleResolver', () => {
   const logLargeBattleResult = (battleLabel: string, result: SpaceBattleResult): void => {
     console.log(`[${battleLabel}] large battle start`);
     console.log(
-      `[${battleLabel}] result | winner=${result.winner} roundsFought=${result.roundsFought}/${result.maxRounds}`
+      `[${battleLabel}] result | winner=${result.winner} roundsFought=${result.roundsFought}/${result.maxRounds}`,
     );
 
     result.roundSummaries.forEach((round) => {
       console.log(
-        `[${battleLabel}] round ${round.roundNumber} aggregate | attackerActive=${round.attackerActiveShips} defenderActive=${round.defenderActiveShips} attackerWeapons=${round.attackerWeapons} defenderWeapons=${round.defenderWeapons} attackerShots=${round.attackerShots} defenderShots=${round.defenderShots} destroyed=${round.destroyedShips.length}`
+        `[${battleLabel}] round ${round.roundNumber} aggregate | attackerActive=${round.attackerActiveShips} defenderActive=${round.defenderActiveShips} attackerWeapons=${round.attackerWeapons} defenderWeapons=${round.defenderWeapons} attackerShots=${round.attackerShots} defenderShots=${round.defenderShots} destroyed=${round.destroyedShips.length}`,
       );
 
       const sampleShots = round.shots.slice(0, 5);
       sampleShots.forEach((shot, index) => {
         console.log(
-          `[${battleLabel}] round ${round.roundNumber} sample shot ${index + 1} | side=${shot.side} shooter=${shot.shooterShipType} target=${shot.targetShipType} weapon=${shot.weaponType} shield ${shot.shieldBefore}->${shot.shieldAfter} hull ${shot.hullBefore}->${shot.hullAfter}`
-          + ` baseDamage=${shot.weaponDamage} evaded=${shot.evaded} targetEvasion=${(shot.targetEvasionChance * 100).toFixed(2)}%`
+          `[${battleLabel}] round ${round.roundNumber} sample shot ${index + 1} | side=${shot.side} shooter=${shot.shooterShipType} target=${shot.targetShipType} weapon=${shot.weaponType} shield ${shot.shieldBefore}->${shot.shieldAfter} hull ${shot.hullBefore}->${shot.hullAfter}` +
+            ` baseDamage=${shot.weaponDamage} evaded=${shot.evaded} targetEvasion=${(shot.targetEvasionChance * 100).toFixed(2)}%`,
         );
       });
 
       if (round.shots.length > sampleShots.length) {
         console.log(
-          `[${battleLabel}] round ${round.roundNumber} additional shots omitted=${round.shots.length - sampleShots.length}`
+          `[${battleLabel}] round ${round.roundNumber} additional shots omitted=${round.shots.length - sampleShots.length}`,
         );
       }
 
       round.destroyedShips.slice(0, 10).forEach((entry, index) => {
         console.log(
-          `[${battleLabel}] round ${round.roundNumber} destroyed ${index + 1} | side=${entry.side} ship=${entry.shipType} reason=${entry.reason} hullBeforeCheck=${entry.hullBeforeCheck} chance=${entry.destructionChancePercent}%`
+          `[${battleLabel}] round ${round.roundNumber} destroyed ${index + 1} | side=${entry.side} ship=${entry.shipType} reason=${entry.reason} hullBeforeCheck=${entry.hullBeforeCheck} chance=${entry.destructionChancePercent}%`,
         );
       });
 
       if (round.destroyedShips.length > 10) {
         console.log(
-          `[${battleLabel}] round ${round.roundNumber} additional destroyed entries omitted=${round.destroyedShips.length - 10}`
+          `[${battleLabel}] round ${round.roundNumber} additional destroyed entries omitted=${round.destroyedShips.length - 10}`,
         );
       }
     });
@@ -258,21 +265,14 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const missileShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.MISSILE, 100, 1)]
-    );
-    const targetShip = createShip(
-      ShipType.CRUISER,
-      [],
-      { shieldCapacity: 8, armor: 3 }
-    );
+    const missileShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.MISSILE, 100, 1)]);
+    const targetShip = createShip(ShipType.CRUISER, [], { shieldCapacity: 8, armor: 3 });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(missileShip)] },
       defender: { player: defender, ships: [createShipInstance(targetShip)] },
       reportContext: { createdTurn: 7 },
-      maxRounds: 1
+      maxRounds: 1,
     });
 
     logBattleResult('battle-test-missile-spillover', result);
@@ -289,21 +289,14 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const beamShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 30, 1)]
-    );
-    const targetShip = createShip(
-      ShipType.CRUISER,
-      [],
-      { shieldCapacity: 10, armor: 3 }
-    );
+    const beamShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 30, 1)]);
+    const targetShip = createShip(ShipType.CRUISER, [], { shieldCapacity: 10, armor: 3 });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(beamShip)] },
       defender: { player: defender, ships: [createShipInstance(targetShip)] },
       reportContext: { createdTurn: 7 },
-      maxRounds: 1
+      maxRounds: 1,
     });
 
     logBattleResult('battle-test-beam-spillover', result);
@@ -317,21 +310,14 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const railGunShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.RAIL_GUN, 20, 1)]
-    );
-    const targetShip = createShip(
-      ShipType.CRUISER,
-      [],
-      { shieldCapacity: 50, armor: 99 }
-    );
+    const railGunShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.RAIL_GUN, 20, 1)]);
+    const targetShip = createShip(ShipType.CRUISER, [], { shieldCapacity: 50, armor: 99 });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(railGunShip)] },
       defender: { player: defender, ships: [createShipInstance(targetShip)] },
       reportContext: { createdTurn: 7 },
-      maxRounds: 1
+      maxRounds: 1,
     });
 
     logBattleResult('battle-test-rail-gun', result);
@@ -345,20 +331,17 @@ describe('SpaceBattleResolver', () => {
   it('applies weapon technology modifiers to the base damage before battle damage is resolved', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker', {
-      [TechnologyType.BEAMS_WEAPONS]: 2
+      [TechnologyType.BEAMS_WEAPONS]: 2,
     });
     const defender = createPlayer(2, 'Defender');
-    const beamShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 50, 1)]
-    );
+    const beamShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 50, 1)]);
     const targetShip = createShip(ShipType.CRUISER, []);
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(beamShip)] },
       defender: { player: defender, ships: [createShipInstance(targetShip)] },
       reportContext: { createdTurn: 7 },
-      maxRounds: 1
+      maxRounds: 1,
     });
 
     logBattleResult('battle-test-weapon-tech-bonus', result);
@@ -373,20 +356,19 @@ describe('SpaceBattleResolver', () => {
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender', {
       [TechnologyType.SHIELDING_TECHNOLOGY]: 1,
-      [TechnologyType.ARMOUR_TECHNOLOGY]: 2
+      [TechnologyType.ARMOUR_TECHNOLOGY]: 2,
     });
     const supportShip = createShip(ShipType.FIGHTER, []);
-    const targetShip = createShip(
-      ShipType.CRUISER,
-      [],
-      { hullPointsCapacity: 100, shieldCapacity: 20 }
-    );
+    const targetShip = createShip(ShipType.CRUISER, [], {
+      hullPointsCapacity: 100,
+      shieldCapacity: 20,
+    });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(supportShip)] },
       defender: { player: defender, ships: [createShipInstance(targetShip)] },
       reportContext: { createdTurn: 7 },
-      maxRounds: 1
+      maxRounds: 1,
     });
 
     logBattleResult('battle-test-tech-capacity-scaling', result);
@@ -398,17 +380,13 @@ describe('SpaceBattleResolver', () => {
 
   it('preserves proportional hull damage when battle survivors are stored back with armour technology', () => {
     const defender = createPlayer(2, 'Defender', {
-      [TechnologyType.ARMOUR_TECHNOLOGY]: 2
+      [TechnologyType.ARMOUR_TECHNOLOGY]: 2,
     });
-    const targetShip = createShip(
-      ShipType.CRUISER,
-      [],
-      { hullPointsCapacity: 100 }
-    );
+    const targetShip = createShip(ShipType.CRUISER, [], { hullPointsCapacity: 100 });
 
     const persistedShips = createPersistentManyShipsFromBattleSurvivors(
       [createShipInstance(targetShip, 110, 0)],
-      defender
+      defender,
     );
 
     expect(ManyShips.undamagedCountByType(persistedShips).get(ShipType.CRUISER) ?? 0).toBe(0);
@@ -418,22 +396,23 @@ describe('SpaceBattleResolver', () => {
 
   it('preserves proportional defence hull damage when battle survivors are stored back with armour technology', () => {
     const defender = createPlayer(2, 'Defender', {
-      [TechnologyType.ARMOUR_TECHNOLOGY]: 2
+      [TechnologyType.ARMOUR_TECHNOLOGY]: 2,
     });
-    const targetDefence = createDefence(
-      DefenceType.RAIL_GUN_CANNON,
-      HullClass.BIG_DEFENCE,
-      [],
-      { hullPointsCapacity: 100 }
-    );
+    const targetDefence = createDefence(DefenceType.RAIL_GUN_CANNON, HullClass.BIG_DEFENCE, [], {
+      hullPointsCapacity: 100,
+    });
 
     const persistedDefences = createPersistentManyDefencesFromBattleSurvivors(
       [createDefenceInstance(targetDefence, 110, 0)],
-      defender
+      defender,
     );
 
-    expect(ManyDefences.undamagedCountByType(persistedDefences).get(DefenceType.RAIL_GUN_CANNON) ?? 0).toBe(0);
-    expect(ManyDefences.damagedCountByType(persistedDefences).get(DefenceType.RAIL_GUN_CANNON) ?? 0).toBe(1);
+    expect(
+      ManyDefences.undamagedCountByType(persistedDefences).get(DefenceType.RAIL_GUN_CANNON) ?? 0,
+    ).toBe(0);
+    expect(
+      ManyDefences.damagedCountByType(persistedDefences).get(DefenceType.RAIL_GUN_CANNON) ?? 0,
+    ).toBe(1);
     expect(persistedDefences.damagedDefences[0]?.hull).toBeCloseTo(91.6666667, 5);
   });
 
@@ -441,23 +420,16 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender', {
-      [TechnologyType.MATERIAL_TECHNOLOGY]: 2
+      [TechnologyType.MATERIAL_TECHNOLOGY]: 2,
     });
-    const beamShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 30, 1)]
-    );
-    const targetShip = createShip(
-      ShipType.CRUISER,
-      [],
-      { armor: 10 }
-    );
+    const beamShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 30, 1)]);
+    const targetShip = createShip(ShipType.CRUISER, [], { armor: 10 });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(beamShip)] },
       defender: { player: defender, ships: [createShipInstance(targetShip)] },
       reportContext: { createdTurn: 7 },
-      maxRounds: 1
+      maxRounds: 1,
     });
 
     logBattleResult('battle-test-material-tech-armor', result);
@@ -470,20 +442,14 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const attackerShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 20, 2)]
-    );
-    const defenderShip = createShip(
-      ShipType.CORVETTE,
-      [new Weapon(WeaponType.BEAM, 20, 2)]
-    );
+    const attackerShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 20, 2)]);
+    const defenderShip = createShip(ShipType.CORVETTE, [new Weapon(WeaponType.BEAM, 20, 2)]);
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(attackerShip)] },
       defender: { player: defender, ships: [createShipInstance(defenderShip)] },
       reportContext: { createdTurn: 7 },
-      maxRounds: 1
+      maxRounds: 1,
     });
 
     logBattleResult('battle-test-alternating-fire-order', result);
@@ -496,7 +462,7 @@ describe('SpaceBattleResolver', () => {
       'defender',
       'attacker',
       'defender',
-      'attacker'
+      'attacker',
     ]);
     expect(result.attacker.ships[0].hull).toBe(80);
     expect(result.defender.ships[0].hull).toBe(80);
@@ -506,19 +472,13 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const attackerShip = createShip(
-      ShipType.CRUISER,
-      [new Weapon(WeaponType.BEAM, 10, 1)]
-    );
-    const defenderShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 10, 1)]
-    );
+    const attackerShip = createShip(ShipType.CRUISER, [new Weapon(WeaponType.BEAM, 10, 1)]);
+    const defenderShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 10, 1)]);
     const groundOnlyDefence = createDefence(
       DefenceType.SAM_SITE,
       HullClass.SMALL_DEFENCE,
       [new Weapon(WeaponType.MISSILE, 10, 4)],
-      { canShootToOrbit: false }
+      { canShootToOrbit: false },
     );
 
     const result = resolver.resolve({
@@ -526,18 +486,18 @@ describe('SpaceBattleResolver', () => {
       defender: {
         player: defender,
         ships: [createShipInstance(defenderShip)],
-        defences: [createDefenceInstance(groundOnlyDefence)]
+        defences: [createDefenceInstance(groundOnlyDefence)],
       },
       reportContext: { createdTurn: 7 },
       maxRounds: 1,
-      randomSource: new SequenceRandomSource([0])
+      randomSource: new SequenceRandomSource([0]),
     });
 
     expect(result.roundSummaries[0].attackerShots).toBe(1);
     expect(result.roundSummaries[0].defenderShots).toBe(1);
     expect(result.roundSummaries[0].shots.map((shot) => shot.shooterShipType)).toEqual([
       ShipType.FIGHTER,
-      ShipType.CRUISER
+      ShipType.CRUISER,
     ]);
     expect(result.attacker.ships[0].hull).toBe(95);
   });
@@ -546,22 +506,18 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const beamShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 20, 1)]
-    );
-    const targetShip = createShip(
-      ShipType.CRUISER,
-      [],
-      { hullPointsCapacity: 100, criticalThreshold: 30 }
-    );
+    const beamShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 20, 1)]);
+    const targetShip = createShip(ShipType.CRUISER, [], {
+      hullPointsCapacity: 100,
+      criticalThreshold: 30,
+    });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(beamShip)] },
       defender: { player: defender, ships: [createShipInstance(targetShip, 39, 0)] },
       reportContext: { createdTurn: 7 },
       maxRounds: 1,
-      randomSource: new SequenceRandomSource([0.02])
+      randomSource: new SequenceRandomSource([0.02]),
     });
 
     logBattleResult('battle-test-critical-explosion', result);
@@ -577,24 +533,20 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender', {
-      [TechnologyType.ARMOUR_TECHNOLOGY]: 4
+      [TechnologyType.ARMOUR_TECHNOLOGY]: 4,
     });
-    const beamShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 40, 1)]
-    );
-    const targetShip = createShip(
-      ShipType.CRUISER,
-      [],
-      { hullPointsCapacity: 100, criticalThreshold: 30 }
-    );
+    const beamShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 40, 1)]);
+    const targetShip = createShip(ShipType.CRUISER, [], {
+      hullPointsCapacity: 100,
+      criticalThreshold: 30,
+    });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(beamShip)] },
       defender: { player: defender, ships: [createShipInstance(targetShip, 39, 0)] },
       reportContext: { createdTurn: 7 },
       maxRounds: 1,
-      randomSource: new SequenceRandomSource([0.04])
+      randomSource: new SequenceRandomSource([0.04]),
     });
 
     logBattleResult('battle-test-armour-tech-threshold', result);
@@ -611,25 +563,22 @@ describe('SpaceBattleResolver', () => {
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender', {
       [TechnologyType.GRAVITON_TECHNOLOGY]: 1,
-      [TechnologyType.FUSION_DRIVE]: 3
+      [TechnologyType.FUSION_DRIVE]: 3,
     });
-    const railGunShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.RAIL_GUN, 200, 1)]
-    );
-    const evasiveShip = createShip(
-      ShipType.CRUISER,
-      [],
-      { hullPointsCapacity: 100, shieldCapacity: 30, armor: 5 }
-    );
-    evasiveShip.evasionChance = 0.10;
+    const railGunShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.RAIL_GUN, 200, 1)]);
+    const evasiveShip = createShip(ShipType.CRUISER, [], {
+      hullPointsCapacity: 100,
+      shieldCapacity: 30,
+      armor: 5,
+    });
+    evasiveShip.evasionChance = 0.1;
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(railGunShip)] },
       defender: { player: defender, ships: [createShipInstance(evasiveShip)] },
       reportContext: { createdTurn: 7 },
       maxRounds: 1,
-      randomSource: new SequenceRandomSource([0.11])
+      randomSource: new SequenceRandomSource([0.11]),
     });
 
     logBattleResult('battle-test-evasion-tech', result);
@@ -646,15 +595,14 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const bombardmentShip = createShip(
-      ShipType.ATMOSPHERIC_BOMBER,
-      [new Weapon(WeaponType.BOMBARDMENT_WEAPONS, 60, 1)]
-    );
-    const evasiveTarget = createShip(
-      ShipType.CRUISER,
-      [],
-      { hullPointsCapacity: 100, shieldCapacity: 20, armor: 0 }
-    );
+    const bombardmentShip = createShip(ShipType.ATMOSPHERIC_BOMBER, [
+      new Weapon(WeaponType.BOMBARDMENT_WEAPONS, 60, 1),
+    ]);
+    const evasiveTarget = createShip(ShipType.CRUISER, [], {
+      hullPointsCapacity: 100,
+      shieldCapacity: 20,
+      armor: 0,
+    });
     evasiveTarget.evasionChance = 1;
 
     const result = resolver.resolve({
@@ -662,7 +610,7 @@ describe('SpaceBattleResolver', () => {
       defender: { player: defender, ships: [createShipInstance(evasiveTarget)] },
       reportContext: { createdTurn: 7 },
       maxRounds: 1,
-      randomSource: new SequenceRandomSource([0.8])
+      randomSource: new SequenceRandomSource([0.8]),
     });
 
     expect(result.roundSummaries[0].shots).toHaveLength(1);
@@ -678,28 +626,26 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const bombardmentShip = createShip(
-      ShipType.ATMOSPHERIC_BOMBER,
-      [new Weapon(WeaponType.BOMBARDMENT_WEAPONS, 60, 1)]
-    );
+    const bombardmentShip = createShip(ShipType.ATMOSPHERIC_BOMBER, [
+      new Weapon(WeaponType.BOMBARDMENT_WEAPONS, 60, 1),
+    ]);
     const screenShip = createShip(ShipType.FIGHTER, []);
-    const targetDefence = createDefence(
-      DefenceType.LIGHT_BEAM_CANNON,
-      HullClass.SMALL,
-      [],
-      { hullPointsCapacity: 50, shieldCapacity: 10, armor: 0 }
-    );
+    const targetDefence = createDefence(DefenceType.LIGHT_BEAM_CANNON, HullClass.SMALL, [], {
+      hullPointsCapacity: 50,
+      shieldCapacity: 10,
+      armor: 0,
+    });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(bombardmentShip)] },
       defender: {
         player: defender,
         ships: [createShipInstance(screenShip)],
-        defences: [createDefenceInstance(targetDefence)]
+        defences: [createDefenceInstance(targetDefence)],
       },
       reportContext: { createdTurn: 7 },
       maxRounds: 1,
-      randomSource: new SequenceRandomSource([0.6])
+      randomSource: new SequenceRandomSource([0.6]),
     });
 
     expect(result.roundSummaries[0].shots).toHaveLength(1);
@@ -715,14 +661,8 @@ describe('SpaceBattleResolver', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const railGunShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.RAIL_GUN, 200, 1)]
-    );
-    const targetShip = createShip(
-      ShipType.CRUISER,
-      []
-    );
+    const railGunShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.RAIL_GUN, 200, 1)]);
+    const targetShip = createShip(ShipType.CRUISER, []);
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(railGunShip)] },
@@ -731,8 +671,8 @@ describe('SpaceBattleResolver', () => {
         createdTurn: 11,
         sourceCoordinates: { x: 4, y: 5, z: 6 },
         sourcePlanetName: 'Target',
-        sourceSystemName: 'Sigma'
-      }
+        sourceSystemName: 'Sigma',
+      },
     });
 
     logBattleResult('battle-test-reports', result);
@@ -748,43 +688,56 @@ describe('SpaceBattleResolver', () => {
     expect(defender.reports[0]).toBeInstanceOf(FleetReport);
     expect(attacker.reports[0].reportId).toBe(1);
     expect(defender.reports[0].reportId).toBe(1);
-    expect(attacker.reports[0].title).toBe('Battle Report: 4:5:6');
-    expect(attacker.reports[0].show()).toContain('Perspective: Attacker');
-    expect(defender.reports[0].show()).toContain('Perspective: Defender');
-    expect(attacker.reports[0].show()).toContain('Battle result: Attacker');
-    expect(attacker.reports[0].show()).toContain('Enemy ship losses by type: Cruiser x1');
-    expect(defender.reports[0].show()).toContain('Own ship losses by type: Cruiser x1');
+    expect(resolveEnglishRuntimeText(attacker.reports[0].title)).toBe('Battle Report: 4:5:6');
+    expect(resolveEnglishRuntimeTextBlock(attacker.reports[0].show())).toContain(
+      'Perspective: Attacker',
+    );
+    expect(resolveEnglishRuntimeTextBlock(defender.reports[0].show())).toContain(
+      'Perspective: Defender',
+    );
+    expect(resolveEnglishRuntimeTextBlock(attacker.reports[0].show())).toContain(
+      'Battle result: Attacker',
+    );
+    expect(resolveEnglishRuntimeTextBlock(attacker.reports[0].show())).toContain(
+      'Enemy ship losses by type: Cruiser x1',
+    );
+    expect(resolveEnglishRuntimeTextBlock(defender.reports[0].show())).toContain(
+      'Own ship losses by type: Cruiser x1',
+    );
   });
 
   it('resolves carried size-1 planetary bombs after the normal round fire against planetary defences', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const carrierShip = createShip(
-      ShipType.CARRIER,
-      [],
-      { hullPointsCapacity: 200, shieldCapacity: 100 }
-    );
+    const carrierShip = createShip(ShipType.CARRIER, [], {
+      hullPointsCapacity: 200,
+      shieldCapacity: 100,
+    });
     const interceptorDefence = createDefence(
       DefenceType.LIGHT_BEAM_CANNON,
       HullClass.SMALL,
       [new Weapon(WeaponType.BEAM, 10, 1)],
-      { hullPointsCapacity: 30, armor: 1 }
+      { hullPointsCapacity: 30, armor: 1 },
     );
     const bombDefence = createDefence(
       DefenceType.SMALL_BOMB,
       HullClass.PLANETARY_BOMB,
       [new Weapon(WeaponType.ORBIT_TO_SURFACE_BOMB, 100, 1)],
-      { canShootToOrbit: false, size: 1, hullPointsCapacity: 10 }
+      { canShootToOrbit: false, size: 1, hullPointsCapacity: 10 },
     );
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: [createShipInstance(carrierShip)] },
-      defender: { player: defender, ships: [], defences: [createDefenceInstance(interceptorDefence)] },
+      defender: {
+        player: defender,
+        ships: [],
+        defences: [createDefenceInstance(interceptorDefence)],
+      },
       attackerPlanetaryBombs: [createDefenceInstance(bombDefence)],
       reportContext: { createdTurn: 9 },
       maxRounds: 1,
-      randomSource: new SequenceRandomSource([0.6, 0.6, 0.6, 0.6, 0.6, 0.6])
+      randomSource: new SequenceRandomSource([0.6, 0.6, 0.6, 0.6, 0.6, 0.6]),
     });
 
     expect(result.roundSummaries).toHaveLength(1);
@@ -793,30 +746,30 @@ describe('SpaceBattleResolver', () => {
     expect(result.roundSummaries[0].planetaryBombActions[0].bombHullAfter).toBe(0);
     expect(result.roundSummaries[0].planetaryBombActions[0].damage).toBeGreaterThan(0);
     expect(result.defender.survivingDefenceCount).toBe(0);
-    expect(result.reports.attacker.show()).toContain('Enemy defense losses by type: Light Beam Cannon x1');
-    expect(result.reports.defender.show()).toContain('Own defense losses by type: Light Beam Cannon x1');
+    expect(resolveEnglishRuntimeTextBlock(result.reports.attacker.show())).toContain(
+      'Enemy defence losses by type: Light Beam Cannon x1',
+    );
+    expect(resolveEnglishRuntimeTextBlock(result.reports.defender.show())).toContain(
+      'Own defence losses by type: Light Beam Cannon x1',
+    );
   });
 
   it('simulates a full 4-round battle when armor prevents all hull damage', () => {
     const resolver = new SpaceBattleResolver();
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
-    const attackerShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 2, 2)],
-      { armor: 10 }
-    );
-    const defenderShip = createShip(
-      ShipType.CORVETTE,
-      [new Weapon(WeaponType.MISSILE, 2, 2)],
-      { armor: 10 }
-    );
+    const attackerShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 2, 2)], {
+      armor: 10,
+    });
+    const defenderShip = createShip(ShipType.CORVETTE, [new Weapon(WeaponType.MISSILE, 2, 2)], {
+      armor: 10,
+    });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: createFleet(attackerShip, 2) },
       defender: { player: defender, ships: createFleet(defenderShip, 2) },
       reportContext: { createdTurn: 17 },
-      randomSource: new SequenceRandomSource([0.999, 0, 0.999, 0, 0.999, 0])
+      randomSource: new SequenceRandomSource([0.999, 0, 0.999, 0, 0.999, 0]),
     });
 
     logBattleResult('battle-test-full-four-rounds', result);
@@ -840,7 +793,7 @@ describe('SpaceBattleResolver', () => {
       attacker: { player: attacker, ships: createFleet(passiveShip, 2) },
       defender: { player: defender, ships: createFleet(passiveShip, 1) },
       reportContext: { createdTurn: 21 },
-      maxRounds: 1
+      maxRounds: 1,
     });
 
     expect(result.roundsFought).toBe(1);
@@ -856,19 +809,17 @@ describe('SpaceBattleResolver', () => {
     const attackerShip = createShip(
       ShipType.BATTLE_SHIP,
       [new Weapon(WeaponType.RAIL_GUN, 60, 1)],
-      { hullPointsCapacity: 100 }
+      { hullPointsCapacity: 100 },
     );
-    const defenderShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 10, 1)],
-      { hullPointsCapacity: 50 }
-    );
+    const defenderShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 10, 1)], {
+      hullPointsCapacity: 50,
+    });
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: createFleet(attackerShip, 2) },
       defender: { player: defender, ships: createFleet(defenderShip, 3, 50, 0) },
       reportContext: { createdTurn: 23 },
-      randomSource: new SequenceRandomSource([0])
+      randomSource: new SequenceRandomSource([0]),
     });
 
     logBattleResult('battle-test-multi-ship', result);
@@ -889,32 +840,30 @@ describe('SpaceBattleResolver', () => {
       [TechnologyType.BEAMS_WEAPONS]: 1,
       [TechnologyType.SHIELDING_TECHNOLOGY]: 1,
       [TechnologyType.GRAVITON_TECHNOLOGY]: 1,
-      [TechnologyType.FUSION_DRIVE]: 3
+      [TechnologyType.FUSION_DRIVE]: 3,
     });
     const defender = createPlayer(2, 'Defender', {
       [TechnologyType.MISSILES_WEAPONS]: 1,
       [TechnologyType.MATERIAL_TECHNOLOGY]: 2,
       [TechnologyType.GRAVITON_TECHNOLOGY]: 1,
-      [TechnologyType.FUSION_DRIVE]: 3
+      [TechnologyType.FUSION_DRIVE]: 3,
     });
-    const attackerShip = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 20, 2)],
-      { shieldCapacity: 20, armor: 20 }
-    );
-    const defenderShip = createShip(
-      ShipType.CORVETTE,
-      [new Weapon(WeaponType.MISSILE, 20, 2)],
-      { shieldCapacity: 20, armor: 20 }
-    );
-    attackerShip.evasionChance = 0.10;
-    defenderShip.evasionChance = 0.10;
+    const attackerShip = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 20, 2)], {
+      shieldCapacity: 20,
+      armor: 20,
+    });
+    const defenderShip = createShip(ShipType.CORVETTE, [new Weapon(WeaponType.MISSILE, 20, 2)], {
+      shieldCapacity: 20,
+      armor: 20,
+    });
+    attackerShip.evasionChance = 0.1;
+    defenderShip.evasionChance = 0.1;
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: createFleet(attackerShip, 2) },
       defender: { player: defender, ships: createFleet(defenderShip, 2) },
       reportContext: { createdTurn: 19 },
-      randomSource: new SequenceRandomSource([0.05])
+      randomSource: new SequenceRandomSource([0.05]),
     });
 
     logBattleResult('battle-test-tech-evasion-four-rounds', result);
@@ -924,7 +873,9 @@ describe('SpaceBattleResolver', () => {
     expect(result.attacker.survivingShipCount).toBe(2);
     expect(result.defender.survivingShipCount).toBe(2);
     expect(result.roundSummaries.every((round) => round.shots.length === 8)).toBe(true);
-    expect(result.roundSummaries.every((round) => round.shots.every((shot) => shot.evaded))).toBe(true);
+    expect(result.roundSummaries.every((round) => round.shots.every((shot) => shot.evaded))).toBe(
+      true,
+    );
     expect(result.roundSummaries.every((round) => round.destroyedShips.length === 0)).toBe(true);
   });
 
@@ -933,74 +884,61 @@ describe('SpaceBattleResolver', () => {
     const attacker = createPlayer(1, 'Attacker');
     const defender = createPlayer(2, 'Defender');
 
-    const fighter = createShip(
-      ShipType.FIGHTER,
-      [new Weapon(WeaponType.BEAM, 12, 1)],
-      { hullPointsCapacity: 20, criticalThreshold: 35 }
-    );
+    const fighter = createShip(ShipType.FIGHTER, [new Weapon(WeaponType.BEAM, 12, 1)], {
+      hullPointsCapacity: 20,
+      criticalThreshold: 35,
+    });
     const assaultFighter = createShip(
       ShipType.ASSAULT_FIGHTER,
       [new Weapon(WeaponType.MISSILE, 18, 2)],
-      { hullPointsCapacity: 30, criticalThreshold: 35 }
+      { hullPointsCapacity: 30, criticalThreshold: 35 },
     );
     const corvette = createShip(
       ShipType.CORVETTE,
-      [
-        new Weapon(WeaponType.BEAM, 14, 1),
-        new Weapon(WeaponType.MISSILE, 18, 1)
-      ],
-      { hullPointsCapacity: 80, criticalThreshold: 30, shieldCapacity: 20, armor: 2 }
+      [new Weapon(WeaponType.BEAM, 14, 1), new Weapon(WeaponType.MISSILE, 18, 1)],
+      { hullPointsCapacity: 80, criticalThreshold: 30, shieldCapacity: 20, armor: 2 },
     );
     const cruiser = createShip(
       ShipType.CRUISER,
       [
         new Weapon(WeaponType.BEAM, 18, 1),
         new Weapon(WeaponType.MISSILE, 22, 1),
-        new Weapon(WeaponType.RAIL_GUN, 12, 1)
+        new Weapon(WeaponType.RAIL_GUN, 12, 1),
       ],
-      { hullPointsCapacity: 100, criticalThreshold: 30, shieldCapacity: 30, armor: 3 }
+      { hullPointsCapacity: 100, criticalThreshold: 30, shieldCapacity: 30, armor: 3 },
     );
     const battleShip = createShip(
       ShipType.BATTLE_SHIP,
-      [
-        new Weapon(WeaponType.BEAM, 24, 1),
-        new Weapon(WeaponType.MISSILE, 30, 1)
-      ],
-      { hullPointsCapacity: 140, criticalThreshold: 28, shieldCapacity: 40, armor: 4 }
+      [new Weapon(WeaponType.BEAM, 24, 1), new Weapon(WeaponType.MISSILE, 30, 1)],
+      { hullPointsCapacity: 140, criticalThreshold: 28, shieldCapacity: 40, armor: 4 },
     );
     const frigate = createShip(
       ShipType.FRIGATE,
       [
         new Weapon(WeaponType.BEAM, 18, 1),
         new Weapon(WeaponType.MISSILE, 36, 1),
-        new Weapon(WeaponType.RAIL_GUN, 12, 2)
+        new Weapon(WeaponType.RAIL_GUN, 12, 2),
       ],
-      { hullPointsCapacity: 160, criticalThreshold: 28, shieldCapacity: 50, armor: 4 }
+      { hullPointsCapacity: 160, criticalThreshold: 28, shieldCapacity: 50, armor: 4 },
     );
     const battleCruiser = createShip(
       ShipType.BATTLE_CRUISER,
       [
         new Weapon(WeaponType.BEAM, 24, 4),
         new Weapon(WeaponType.MISSILE, 30, 1),
-        new Weapon(WeaponType.RAIL_GUN, 14, 1)
+        new Weapon(WeaponType.RAIL_GUN, 14, 1),
       ],
-      { hullPointsCapacity: 300, criticalThreshold: 25, shieldCapacity: 80, armor: 6 }
+      { hullPointsCapacity: 300, criticalThreshold: 25, shieldCapacity: 80, armor: 6 },
     );
     const destroyer = createShip(
       ShipType.DESTROYER,
-      [
-        new Weapon(WeaponType.MISSILE, 40, 1),
-        new Weapon(WeaponType.RAIL_GUN, 28, 2)
-      ],
-      { hullPointsCapacity: 250, criticalThreshold: 25, shieldCapacity: 100, armor: 6 }
+      [new Weapon(WeaponType.MISSILE, 40, 1), new Weapon(WeaponType.RAIL_GUN, 28, 2)],
+      { hullPointsCapacity: 250, criticalThreshold: 25, shieldCapacity: 100, armor: 6 },
     );
     const dreadnought = createShip(
       ShipType.DREADNOUGHT,
-      [
-        new Weapon(WeaponType.BEAM, 30, 1),
-        new Weapon(WeaponType.MISSILE, 50, 3)
-      ],
-      { hullPointsCapacity: 200, criticalThreshold: 24, shieldCapacity: 120, armor: 6 }
+      [new Weapon(WeaponType.BEAM, 30, 1), new Weapon(WeaponType.MISSILE, 50, 3)],
+      { hullPointsCapacity: 200, criticalThreshold: 24, shieldCapacity: 120, armor: 6 },
     );
 
     const attackerFleet = [
@@ -1012,7 +950,7 @@ describe('SpaceBattleResolver', () => {
       ...createFleet(frigate, 10),
       ...createFleet(battleCruiser, 6),
       ...createFleet(destroyer, 4),
-      ...createFleet(dreadnought, 3)
+      ...createFleet(dreadnought, 3),
     ];
     const defenderFleet = [
       ...createFleet(fighter, 70),
@@ -1023,14 +961,14 @@ describe('SpaceBattleResolver', () => {
       ...createFleet(frigate, 15),
       ...createFleet(battleCruiser, 10),
       ...createFleet(destroyer, 8),
-      ...createFleet(dreadnought, 7)
+      ...createFleet(dreadnought, 7),
     ];
 
     const result = resolver.resolve({
       attacker: { player: attacker, ships: attackerFleet },
       defender: { player: defender, ships: defenderFleet },
       reportContext: { createdTurn: 30 },
-      randomSource: new SequenceRandomSource([0.13, 0.71, 0.29, 0.87, 0.43, 0.57, 0.19, 0.91])
+      randomSource: new SequenceRandomSource([0.13, 0.71, 0.29, 0.87, 0.43, 0.57, 0.19, 0.91]),
     });
 
     logLargeBattleResult('battle-test-large-mixed-fleets', result);
@@ -1044,11 +982,9 @@ describe('SpaceBattleResolver', () => {
     expect(result.attacker.survivingShipCount + result.attacker.destroyedShipCount).toBe(150);
     expect(result.defender.survivingShipCount + result.defender.destroyedShipCount).toBe(250);
     expect(result.roundSummaries.some((round) => round.shots.length > 100)).toBe(true);
-    expect(
-      result.attacker.byType.some((entry) => entry.shipType === ShipType.DREADNOUGHT)
-    ).toBe(true);
-    expect(
-      result.defender.byType.some((entry) => entry.shipType === ShipType.FIGHTER)
-    ).toBe(true);
+    expect(result.attacker.byType.some((entry) => entry.shipType === ShipType.DREADNOUGHT)).toBe(
+      true,
+    );
+    expect(result.defender.byType.some((entry) => entry.shipType === ShipType.FIGHTER)).toBe(true);
   });
 });

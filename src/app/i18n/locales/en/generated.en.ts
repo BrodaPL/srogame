@@ -126,6 +126,7 @@ export const generatedEn = {
   reports: {
     researchCompletedTitle: 'Research Completed: {{technology}} L{{level}}',
     researchCompletedBody: '{{technology}} reached level {{level}} on {{planet}}.',
+    espionageTitle: 'Espionage Report: {{planet}} ({{x}}:{{y}}:{{z}})',
     plunderTitle: 'Plunder Report: {{targetPlanet}}',
     incomingAttackTitle: 'Incoming Attack Report: {{targetPlanet}}',
     bombardmentTitle: 'Bombardment Report: {{mission}} at {{targetPlanet}}',
@@ -194,6 +195,46 @@ export const generatedEn = {
       currentDebrisField:
         'Current debris field: Metal {{metal}}, Crystal {{crystal}}, Deuterium {{deuterium}}',
       missionResolvedAt: '{{mission}} resolved at {{targetPlanet}}.',
+    },
+  },
+  battleReport: {
+    titles: {
+      coordinates: 'Battle Report: {{x}}:{{y}}:{{z}}',
+      versus: 'Battle Report: {{attacker}} vs {{defender}}',
+      sharedCoordinates: 'Shared Battle Report: {{x}}:{{y}}:{{z}}',
+      sharedVersus: 'Shared Battle Report: {{attacker}} vs {{defender}}',
+    },
+    winners: {
+      Attacker: 'Attacker',
+      Defender: 'Defender',
+      Draw: 'Draw',
+    },
+    body: {
+      battleResult: 'Battle result: {{winner}}',
+      perspective: 'Perspective: {{label}}',
+      roundsFought: 'Rounds fought: {{rounds}} / {{maxRounds}}',
+      ownShips: 'Own ships ({{label}}): {{surviving}}/{{initial}} survived, {{destroyed}} lost.',
+      ownDefences:
+        'Own defences ({{label}}): {{surviving}}/{{initial}} survived, {{destroyed}} lost.',
+      enemyShips:
+        'Enemy ships ({{label}}): {{surviving}}/{{initial}} survived, {{destroyed}} lost.',
+      enemyDefences:
+        'Enemy defences ({{label}}): {{surviving}}/{{initial}} survived, {{destroyed}} lost.',
+      ownShipLossesByType: 'Own ship losses by type: {{summary}}',
+      ownDefenceLossesByType: 'Own defence losses by type: {{summary}}',
+      enemyShipLossesByType: 'Enemy ship losses by type: {{summary}}',
+      enemyDefenceLossesByType: 'Enemy defence losses by type: {{summary}}',
+      ownSurvivorsByType: 'Own survivors by type: {{summary}}',
+      ownDefenceSurvivorsByType: 'Own defence survivors by type: {{summary}}',
+      enemySurvivorsByType: 'Enemy survivors by type: {{summary}}',
+      enemyDefenceSurvivorsByType: 'Enemy defence survivors by type: {{summary}}',
+      roundSummaries: 'Round summaries:',
+      roundSummary:
+        'Round {{round}}: {{attackerLabel}} shots {{attackerShots}}, {{defenderLabel}} shots {{defenderShots}}, {{attackerLabel}} losses {{attackerLosses}}, {{defenderLabel}} losses {{defenderLosses}}.',
+      planetaryBombs: '  Planetary bombs: {{summary}}',
+      planetaryBombSummary:
+        'launched {{launched}}, activated {{activated}}, intercepted {{intercepted}}, lost {{lost}}, damage {{damage}}',
+      noRounds: 'No rounds were fought.',
     },
   },
   systemMail: {

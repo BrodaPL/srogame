@@ -3329,7 +3329,16 @@ function shareHostileFleetReportWithFriendlyHumans(
   for (const recipient of recipients) {
     const copy = fleetReport.copy();
     copy.reportId = recipient.createReportId();
-    copy.title = copy.title.replace(/^Battle Report:/, 'Shared Battle Report:');
+    copy.title = fleetReport.sourceCoordinates
+      ? encodeRuntimeText('generated.battleReport.titles.sharedCoordinates', {
+          x: fleetReport.sourceCoordinates.x,
+          y: fleetReport.sourceCoordinates.y,
+          z: fleetReport.sourceCoordinates.z,
+        })
+      : encodeRuntimeText('generated.battleReport.titles.sharedVersus', {
+          attacker: attacker.playerName,
+          defender: victim.playerName,
+        });
     recipient.addReport(copy);
   }
 }
