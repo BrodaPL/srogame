@@ -35,6 +35,10 @@ import { TutorialService } from '../../tutorial/tutorial.service';
 import { toRawImagePath } from '../../encyclopedia-menu/encyclopedia-image-paths';
 import { PlanetObjectDialogComponent } from '../planet-view/planet-object-dialog.component';
 import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
+import {
+  smallResourceCostIconPath,
+  type ResourceCostIconKey,
+} from '../ui/resource-cost-icon-path';
 import type {
   PlanetObjectDetailDialogData,
   PlanetObjectDetailRow,
@@ -56,6 +60,7 @@ type ResearchLabVm = {
 };
 
 type ResearchCostRowVm = {
+  key: ResourceCostIconKey;
   label: string;
   amount: number;
   isEnough: boolean;
@@ -204,16 +209,19 @@ export class ResearchesViewComponent implements OnInit {
 
     return [
       {
+        key: 'metal',
         label: this.i18n.t('researches.labels.metal'),
         amount: cost.metal,
         isEnough: resources ? resources.metal >= cost.metal : true,
       },
       {
+        key: 'crystal',
         label: this.i18n.t('researches.labels.crystal'),
         amount: cost.crystal,
         isEnough: resources ? resources.crystal >= cost.crystal : true,
       },
       {
+        key: 'deuterium',
         label: this.i18n.t('researches.labels.deuterium'),
         amount: cost.deuterium,
         isEnough: resources ? resources.deuterium >= cost.deuterium : true,
@@ -221,17 +229,8 @@ export class ResearchesViewComponent implements OnInit {
     ];
   }
 
-  protected resourceCostIconPath(label: string): string {
-    switch (label) {
-      case 'Metal':
-        return 'images/icons/small/metal.png';
-      case 'Crystal':
-        return 'images/icons/small/crystal.png';
-      case 'Deuterium':
-        return 'images/icons/small/deuter.png';
-      default:
-        return '';
-    }
+  protected resourceCostIconPath(resource: ResourceCostIconKey): string {
+    return smallResourceCostIconPath(resource);
   }
 
   protected technologyRequirementRows(technology: Technology): ResearchRequirementRowVm[] {

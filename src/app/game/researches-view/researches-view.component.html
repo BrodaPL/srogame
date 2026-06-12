@@ -253,7 +253,7 @@
                       | t: { level: technologyTargetLevel(technology.type) }
                   }}
                 </p>
-                @for (cost of technologyCostRows(technology); track cost.label) {
+                @for (cost of technologyCostRows(technology); track cost.key) {
                   <p
                     class="planet-building-card__line planet-building-card__line--cost"
                     [class.planet-building-card__line--insufficient]="!cost.isEnough"
@@ -261,7 +261,7 @@
                     <span class="sr-only">{{ cost.label }}:</span>
                     <img
                       class="planet-building-card__cost-icon"
-                      [src]="resourceCostIconPath(cost.label)"
+                      [src]="resourceCostIconPath(cost.key)"
                       [alt]="cost.label"
                     />
                     {{ cost.amount }}
