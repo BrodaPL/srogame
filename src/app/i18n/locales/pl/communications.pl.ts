@@ -3,7 +3,7 @@ export const communicationsPl = {
     playerTypes: {
       PLAYER: 'Gracz',
       BOT: 'Bot',
-      NEUTRAL: 'Neutralny'
+      NEUTRAL: 'Neutralny',
     },
     diplomaticStatuses: {
       SELF: 'WLASNY',
@@ -11,18 +11,18 @@ export const communicationsPl = {
       PEACE: 'POKOJ',
       NEUTRAL: 'NEUTRALNY',
       PASSIVE: 'NEUTRALNY',
-      WAR: 'WOJNA'
+      WAR: 'WOJNA',
     },
     proposalStates: {
       PENDING: 'Oczekuje',
       ACCEPTED: 'Zaakceptowano',
       REJECTED: 'Odrzucono',
       CANCELLED: 'Anulowano',
-      EXPIRED: 'Wygaslo'
+      EXPIRED: 'Wygaslo',
     },
     directions: {
       incoming: 'Przychodzace',
-      outgoing: 'Wychodzace'
+      outgoing: 'Wychodzace',
     },
     supportTypes: {
       RESOURCE_SUPPORT: 'Wsparcie zasobow',
@@ -30,13 +30,13 @@ export const communicationsPl = {
       PLANET_DEFENSE: 'Obrona planety',
       ATTACK_TARGET: 'Atak na cel',
       BOMBARD_TARGET: 'Bombardowanie celu',
-      SIEGE_TARGET: 'Oblezenie celu'
+      SIEGE_TARGET: 'Oblezenie celu',
     },
     requestTypes: {
       JUMP_GATE: 'Brama skokowa',
       MAINTENANCE: 'Konserwacja',
       SUPPORT: 'Wsparcie',
-      DIPLOMACY_PROPOSAL: 'Propozycja dyplomatyczna'
+      DIPLOMACY_PROPOSAL: 'Propozycja dyplomatyczna',
     },
     actions: {
       sendMessage: 'Wyslij wiadomosc',
@@ -45,7 +45,7 @@ export const communicationsPl = {
       reject: 'Odrzuc',
       cancel: 'Anuluj',
       delete: 'Usun',
-      sending: 'Wysylanie...'
+      sending: 'Wysylanie...',
     },
     labels: {
       turn: 'Tura',
@@ -54,14 +54,14 @@ export const communicationsPl = {
       none: 'Brak',
       yes: 'Tak',
       no: 'Nie',
-      random: 'Losowo'
+      random: 'Losowo',
     },
     bombardmentPriorities: {
       DEFENCES: 'Obrona',
       DEFENCES_CAN_SHOOT_TO_ORBIT: 'Obrona canShootToOrbit=true',
       DEFENCES_CANNOT_SHOOT_TO_ORBIT: 'Obrona canShootToOrbit=false',
       RESOURCE_BUILDINGS: 'Budynki surowcowe',
-      FACILITIES: 'Obiekty'
+      FACILITIES: 'Obiekty',
     },
     missions: {
       Attack: 'Atak',
@@ -80,8 +80,8 @@ export const communicationsPl = {
       'Star System Spy': 'Szpiegowanie ukladu',
       Recycle: 'Recykling',
       Repair: 'Naprawa',
-      Hold: 'Postoj'
-    }
+      Hold: 'Postoj',
+    },
   },
   compose: {
     eyebrow: 'Poczta',
@@ -97,37 +97,38 @@ export const communicationsPl = {
       recipientType: 'Typ adresata',
       player: 'Gracz',
       title: 'Tytul',
-      body: 'Tresc'
+      body: 'Tresc',
     },
     recipientModes: {
       player: 'Jeden gracz',
-      alliance: 'Caly sojusz ({{count}})'
+      alliance: 'Caly sojusz ({{count}})',
     },
     counts: {
       titleRemaining: 'Pozostalo {{count}} znakow.',
-      bodyRemaining: 'Pozostalo {{count}} znakow.'
+      bodyRemaining: 'Pozostalo {{count}} znakow.',
     },
     errors: {
       noSession: 'Nie znaleziono sesji gracza.',
       sendFailed: 'Nie udalo sie wyslac wiadomosci.',
-      unknownPlayer: 'Nieznany gracz'
-    }
+      unknownPlayer: 'Nieznany gracz',
+    },
   },
   reports: {
     loading: {
       title: 'Wczytywanie raportow',
-      body: 'Dane skrzynki raportow gracza sa odczytywane z aktualnego stanu galaktyki.'
+      body: 'Dane skrzynki raportow gracza sa odczytywane z aktualnego stanu galaktyki.',
     },
     unavailable: {
-      title: 'Raporty niedostepne'
+      title: 'Raporty niedostepne',
     },
     actionFailed: {
-      title: 'Akcja nie powiodla sie'
+      title: 'Akcja nie powiodla sie',
     },
     tabs: {
-      all: 'Wszystkie'
+      all: 'Wszystkie',
     },
     reportTypes: {
+      Message: 'Wiadomosc',
       'Defense Report': 'Raport obrony',
       'Research Report': 'Raport badan',
       'Production Report': 'Raport produkcji',
@@ -136,40 +137,40 @@ export const communicationsPl = {
       'Star System Espionage Report': 'Raport szpiegowania ukladu',
       'Espionage Report': 'Raport szpiegowski',
       'Sensor Phalanx Report': 'Raport Falangi Sensorow',
-      'Colonization Report': 'Raport kolonizacji'
+      'Colonization Report': 'Raport kolonizacji',
     },
     inbox: {
       title: 'Skrzynka',
       noReports: 'Brak raportow w tej zakladce.',
       visibleCountOne: '{{count}} widoczny raport',
       visibleCountMany: '{{count}} widocznych raportow',
-      selectedCount: '{{count}} zaznaczono'
+      selectedCount: '{{count}} zaznaczono',
     },
     actions: {
       selectAllVisible: 'Zaznacz wszystkie widoczne',
       deleteSelected: 'Usun zaznaczone',
       loadingPreview: 'Wczytywanie podgladu...',
-      previewLocation: 'Podglad lokalizacji'
+      previewLocation: 'Podglad lokalizacji',
     },
     tooltips: {
       selectAllVisible: 'Zaznacz wszystkie widoczne raporty poza ulubionymi.',
       deleteSelected: 'Usun zaznaczone raporty. Ulubione raporty sa chronione.',
       favouriteOn: 'Usun znacznik ulubionego.',
-      favouriteOff: 'Ulubione raporty sa chronione przed Zaznacz wszystkie i Usun zaznaczone.'
+      favouriteOff: 'Ulubione raporty sa chronione przed Zaznacz wszystkie i Usun zaznaczone.',
     },
     badges: {
       favourite: 'Ulubione',
       read: 'Przeczytane',
-      unread: 'Nieprzeczytane'
+      unread: 'Nieprzeczytane',
     },
     detail: {
       eyebrow: 'Szczegoly raportu',
       title: 'Wybierz raport',
-      body: 'Wybierz wpis ze skrzynki, aby obejrzec pelna tresc i podglad wspolrzednych, gdy dane planety sa dostepne.'
+      body: 'Wybierz wpis ze skrzynki, aby obejrzec pelna tresc i podglad wspolrzednych, gdy dane planety sa dostepne.',
     },
     preview: {
       unavailable: 'Podglad planety jest niedostepny dla tego raportu.',
-      failed: 'Nie udalo sie wczytac podgladu planety.'
+      failed: 'Nie udalo sie wczytac podgladu planety.',
     },
     stats: {
       status: 'Status',
@@ -177,7 +178,7 @@ export const communicationsPl = {
       coordinates: 'Wspolrzedne',
       origin: 'Pochodzenie',
       sender: 'Nadawca',
-      owner: 'Wlasciciel'
+      owner: 'Wlasciciel',
     },
     dossier: {
       title: 'Dossier szpiegowskie',
@@ -195,9 +196,9 @@ export const communicationsPl = {
         perimeterCheck: 'Kontrola obwodu',
         defences: 'Obrona',
         profileKicker: 'Profil',
-        profile: 'Profil'
+        profile: 'Profil',
       },
-      empty: 'Brak danych.'
+      empty: 'Brak danych.',
     },
     plain: {
       title: 'Zapis raportu',
@@ -206,8 +207,8 @@ export const communicationsPl = {
         header: 'Naglowek',
         metadata: 'Metadane',
         log: 'Dziennik',
-        defaultTitle: 'Szczegoly raportu'
-      }
+        defaultTitle: 'Szczegoly raportu',
+      },
     },
     rowLabels: {
       avgBuilding: 'Sr. budynek',
@@ -232,7 +233,7 @@ export const communicationsPl = {
       scienceModifier: 'Modyfikator nauki',
       industryModifier: 'Modyfikator przemyslu',
       anomaliesAndNoise: 'Anomalie i szum',
-      hyperspaceParameters: 'Parametry nadprzestrzeni'
+      hyperspaceParameters: 'Parametry nadprzestrzeni',
     },
     errors: {
       noSession: 'Nie znaleziono sesji gracza.',
@@ -242,26 +243,26 @@ export const communicationsPl = {
       load: 'Nie udalo sie wczytac raportow.',
       noCoordinates: 'Brak wspolrzednych',
       noOriginCoordinates: 'Brak wspolrzednych pochodzenia',
-      noSourceMetadata: 'Brak metadanych zrodla'
-    }
+      noSourceMetadata: 'Brak metadanych zrodla',
+    },
   },
   mail: {
     loading: {
       title: 'Wczytywanie poczty',
-      body: 'Wiadomosci i kolejki prosb sa synchronizowane.'
+      body: 'Wiadomosci i kolejki prosb sa synchronizowane.',
     },
     unavailable: {
-      title: 'Poczta niedostepna'
+      title: 'Poczta niedostepna',
     },
     status: {
       actionFailed: 'Akcja poczty nie powiodla sie',
-      updated: 'Poczta zaktualizowana'
+      updated: 'Poczta zaktualizowana',
     },
     header: {
       eyebrow: 'Komunikacja',
       title: 'Poczta',
       unread: '{{count}} nieprzeczytanych',
-      actionRequired: '{{count}} wymaga akcji'
+      actionRequired: '{{count}} wymaga akcji',
     },
     folders: {
       title: 'Foldery',
@@ -271,7 +272,7 @@ export const communicationsPl = {
       history: 'Historia',
       itemsOne: '{{count}} element',
       itemsMany: '{{count}} elementow',
-      empty: 'Brak elementow w tym folderze.'
+      empty: 'Brak elementow w tym folderze.',
     },
     requestCards: {
       incomingJumpGate: 'Przychodzaca prosba o brame skokowa',
@@ -283,11 +284,11 @@ export const communicationsPl = {
       incomingGeneric: 'Przychodzaca prosba',
       outgoingGeneric: 'Wychodzaca prosba',
       incomingEyebrow: 'Przychodzaca prosba',
-      outgoingEyebrow: 'Wychodzaca prosba'
+      outgoingEyebrow: 'Wychodzaca prosba',
     },
     requestBadges: {
       jumpGate: 'BRAMA SKOKOWA',
-      maintenance: 'KONSERWACJA'
+      maintenance: 'KONSERWACJA',
     },
     detailRows: {
       counterparty: 'Druga strona',
@@ -295,17 +296,20 @@ export const communicationsPl = {
       direction: 'Kierunek',
       timing: 'Czas',
       summary: 'Podsumowanie',
-      details: 'Szczegoly'
+      details: 'Szczegoly',
     },
     summaries: {
-      jumpGateIncoming: '{{player}} prosi o dostep do Bramy Skokowej dla Floty #{{fleetId}} do {{targetPlanet}}.',
+      jumpGateIncoming:
+        '{{player}} prosi o dostep do Bramy Skokowej dla Floty #{{fleetId}} do {{targetPlanet}}.',
       jumpGateOutgoing: 'Flota #{{fleetId}} oczekuje na dostep do Bramy Skokowej od {{player}}.',
-      maintenanceIncoming: '{{player}} prosi o konserwacje dla Floty #{{fleetId}} przy {{targetPlanet}}.',
-      maintenanceOutgoing: 'Flota #{{fleetId}} poprosila o konserwacje od {{player}} przy {{targetPlanet}}.',
+      maintenanceIncoming:
+        '{{player}} prosi o konserwacje dla Floty #{{fleetId}} przy {{targetPlanet}}.',
+      maintenanceOutgoing:
+        'Flota #{{fleetId}} poprosila o konserwacje od {{player}} przy {{targetPlanet}}.',
       supportIncoming: '{{player}} poprosil o {{supportType}} dla {{targetPlanet}}.',
       supportOutgoing: 'Poprosiles o {{supportType}} od {{player}} dla {{targetPlanet}}.',
       diplomacyIncoming: '{{player}} poprosil o {{status}}.',
-      diplomacyOutgoing: 'Poprosiles o {{status}} z {{player}}.'
+      diplomacyOutgoing: 'Poprosiles o {{status}} z {{player}}.',
     },
     details: {
       jumpGate: 'Misja {{mission}} | {{originPlanet}} -> {{targetPlanet}} | Statki: {{ships}}',
@@ -316,18 +320,21 @@ export const communicationsPl = {
       priorities: ' | Priorytety: {{main}} / {{secondary}} / {{tertiary}}',
       launchedFleet: ' | Wyslano Flote #{{fleetId}}',
       launchedFleetFrom: ' z {{planet}}',
-      supportMission: 'Misja {{mission}} | Minimum: {{minimum}}{{targetOwner}}{{priorities}}{{launch}}',
-      supportUnknownMission: 'Misja Nieznana | Minimum: {{minimum}}{{targetOwner}}{{priorities}}{{launch}}',
+      supportMission:
+        'Misja {{mission}} | Minimum: {{minimum}}{{targetOwner}}{{priorities}}{{launch}}',
+      supportUnknownMission:
+        'Misja Nieznana | Minimum: {{minimum}}{{targetOwner}}{{priorities}}{{launch}}',
       targetOnly: 'Cel {{planet}}',
       requestedStatus: 'Zadany status {{status}}',
-      nothing: 'nic'
+      nothing: 'nic',
     },
     timing: {
       pendingAwaitingResponse: 'Utworzono w turze {{createdTurn}} | Oczekuje na odpowiedz',
-      supportDue: 'Utworzono w turze {{createdTurn}} | Termin w turze {{dueTurn}}{{expiry}}{{fulfilled}}',
+      supportDue:
+        'Utworzono w turze {{createdTurn}} | Termin w turze {{dueTurn}}{{expiry}}{{fulfilled}}',
       supportExpiry: ' | Czekaj do tury {{turn}}',
       supportFulfilled: ' | Zrealizowano w turze {{turn}}',
-      default: 'Utworzono w turze {{createdTurn}} | Wygasa w turze {{expiresOnTurn}}'
+      default: 'Utworzono w turze {{createdTurn}} | Wygasa w turze {{expiresOnTurn}}',
     },
     partialApproval: {
       maintenanceTitle: 'Czesciowa akceptacja konserwacji',
@@ -340,7 +347,7 @@ export const communicationsPl = {
       crystal: 'Krysztal',
       deuterium: 'Deuter',
       maxAmount: '{{type}} (maks. {{amount}})',
-      send: 'Wyslij czesciowa akceptacje'
+      send: 'Wyslij czesciowa akceptacje',
     },
     message: {
       eyebrow: 'Wiadomosc',
@@ -348,18 +355,18 @@ export const communicationsPl = {
       read: 'Przeczytane',
       unread: 'Nieprzeczytane',
       noSelectionTitle: 'Nie wybrano poczty',
-      noSelectionBody: 'Wybierz element folderu, aby obejrzec szczegoly i dostepne akcje.'
+      noSelectionBody: 'Wybierz element folderu, aby obejrzec szczegoly i dostepne akcje.',
     },
     actions: {
       partialApprove: 'Akceptacja czesciowa',
       closePartial: 'Zamknij czesciowa',
-      deleteHistoryItem: 'Usun element historii'
+      deleteHistoryItem: 'Usun element historii',
     },
     success: {
       deliveredOne: 'Wiadomosc dostarczono do 1 odbiorcy.',
       deliveredMany: 'Wiadomosc dostarczono do {{count}} odbiorcow.',
       messageDeleted: 'Wiadomosc usunieta.',
-      requestDeleted: 'Prosba usunieta.'
+      requestDeleted: 'Prosba usunieta.',
     },
     errors: {
       noSession: 'Nie znaleziono sesji gracza.',
@@ -374,39 +381,41 @@ export const communicationsPl = {
       rejectJumpGate: 'Nie udalo sie odrzucic prosby o Brame Skokowa.',
       rejectRequest: 'Nie udalo sie odrzucic prosby.',
       cancelJumpGate: 'Nie udalo sie anulowac prosby o Brame Skokowa.',
-      cancelRequest: 'Nie udalo sie anulowac prosby.'
-    }
+      cancelRequest: 'Nie udalo sie anulowac prosby.',
+    },
   },
   diplomacy: {
     loading: {
       title: 'Wczytywanie dyplomacji',
-      body: 'Odkryte frakcje, propozycje traktatow i znane dane wywiadowcze sa synchronizowane.'
+      body: 'Odkryte frakcje, propozycje traktatow i znane dane wywiadowcze sa synchronizowane.',
     },
     unavailable: {
-      title: 'Dyplomacja niedostepna'
+      title: 'Dyplomacja niedostepna',
     },
     status: {
       actionFailed: 'Akcja dyplomatyczna nie powiodla sie',
-      updated: 'Dyplomacja zaktualizowana'
+      updated: 'Dyplomacja zaktualizowana',
     },
     header: {
       eyebrow: 'Relacje miedzygwiezdne',
       title: 'Dyplomacja',
-      subtitle: 'Przegladaj odkryte frakcje, negocjuj zmiany statusu i wysylaj wiadomosci do znanych mocarstw.',
+      subtitle:
+        'Przegladaj odkryte frakcje, negocjuj zmiany statusu i wysylaj wiadomosci do znanych mocarstw.',
       currentTurn: 'Biezaca tura',
       discoveredContacts: 'Odkryte kontakty',
       pendingProposals: 'Oczekujace propozycje',
-      ownedPlanets: 'Posiadane planety'
+      ownedPlanets: 'Posiadane planety',
     },
     contacts: {
       title: 'Odkryte kontakty',
-      subtitle: 'Pojawiaja sie tu tylko ludzkie i botowe potegi. Neutralne frakcje surowcowe sa wykluczone z dyplomacji.',
+      subtitle:
+        'Pojawiaja sie tu tylko ludzkie i botowe potegi. Neutralne frakcje surowcowe sa wykluczone z dyplomacji.',
       proposalUsed: 'Propozycja zuzyta w tej turze',
       proposalAvailable: 'Propozycja dostepna',
       none: 'Brak dostepnych ludzkich lub botowych kontaktow dyplomatycznych.',
       contactType: 'Kontakt typu {{type}}',
       knownPlanetsOne: '{{count}} znana planeta',
-      knownPlanetsMany: '{{count}} znanych planet'
+      knownPlanetsMany: '{{count}} znanych planet',
     },
     detail: {
       playerType: 'Typ gracza',
@@ -415,27 +424,30 @@ export const communicationsPl = {
       treatyControls: 'Kontrole traktatu',
       available: 'Dostepne',
       blocked: 'Zablokowane',
-      none: 'Wybierz kontakt, aby przejrzec znane planety, wyslac wiadomosc lub przygotowac propozycje traktatu.'
+      none: 'Wybierz kontakt, aby przejrzec znane planety, wyslac wiadomosc lub przygotowac propozycje traktatu.',
     },
     treaty: {
       title: 'Propozycja traktatu',
       sending: 'Wysylanie...',
       declareWar: 'Wypowiedz wojne',
       sendProposal: 'Wyslij propozycje',
-      availableCopy: 'Wyslij jedna akcje dyplomatyczna do tego gracza w tej turze. Wypowiedzenia wojny dzialaja natychmiast; traktaty wymagaja akceptacji.',
-      unavailableCopy: 'Propozycje dyplomatyczne sa niedostepne dla tego kontaktu.'
+      availableCopy:
+        'Wyslij jedna akcje dyplomatyczna do tego gracza w tej turze. Wypowiedzenia wojny dzialaja natychmiast; traktaty wymagaja akceptacji.',
+      unavailableCopy: 'Propozycje dyplomatyczne sa niedostepne dla tego kontaktu.',
     },
     messaging: {
       title: 'Wiadomosc bezposrednia',
       subtitle: 'Wiadomosci sa teraz obslugiwane przez Poczte i wspolne okno tworzenia.',
       send: 'Wyslij wiadomosc',
-      composeTitle: 'Napisz wiadomosc'
+      composeTitle: 'Napisz wiadomosc',
     },
     support: {
       title: 'Prosba o wsparcie',
       unavailableCopy: 'Prosby o wsparcie sa dostepne tylko dla kontaktow POKOJ i SOJUSZ.',
-      offensiveCopy: 'Ofensywne prosby o wsparcie celuja w znane wrogie planety, niosa minimalne wymagania statkow i po akceptacji czekaja do 3 tur na automatyczne wyslanie.',
-      defaultCopy: 'Prosby sa tworzone tutaj i rozstrzygane przez Poczte. Wsparcie zasobow pozwala na czesciowa akceptacje; wszystkie prosby o wsparcie wygasaja po 2 turach.',
+      offensiveCopy:
+        'Ofensywne prosby o wsparcie celuja w znane wrogie planety, niosa minimalne wymagania statkow i po akceptacji czekaja do 3 tur na automatyczne wyslanie.',
+      defaultCopy:
+        'Prosby sa tworzone tutaj i rozstrzygane przez Poczte. Wsparcie zasobow pozwala na czesciowa akceptacje; wszystkie prosby o wsparcie wygasaja po 2 turach.',
       type: 'Typ wsparcia',
       targetOwnPlanet: 'Cel wlasna planeta',
       targetHostilePlanet: 'Zadany wrogi cel',
@@ -443,23 +455,27 @@ export const communicationsPl = {
       crystal: 'Krysztal',
       deuterium: 'Deuter',
       minimumDesiredShips: 'Minimalnie wymagane statki',
-      minimumDesiredShipsHelp: 'Sojusznik automatycznie wystartuje tylko wtedy, gdy bedzie mogl spelnic co najmniej dokladnie ten sklad statkow.',
+      minimumDesiredShipsHelp:
+        'Sojusznik automatycznie wystartuje tylko wtedy, gdy bedzie mogl spelnic co najmniej dokladnie ten sklad statkow.',
       bombardmentPriorities: 'Priorytety bombardowania',
-      bombardmentPrioritiesHelp: 'Opcjonalne priorytety zostana zastosowane, jesli misja zostanie automatycznie wyslana.',
+      bombardmentPrioritiesHelp:
+        'Opcjonalne priorytety zostana zastosowane, jesli misja zostanie automatycznie wyslana.',
       main: 'Glowny',
       secondary: 'Drugorzedny',
       tertiary: 'Trzeciorzedny',
       send: 'Wyslij prosbe o wsparcie',
-      sending: 'Wysylanie...'
+      sending: 'Wysylanie...',
     },
     planets: {
       title: 'Znane planety',
-      subtitle: 'Pojawiaja sie tu tylko planety obecnie nalezace do tego kontaktu i objete twoim wywiadem szpiegowskim.',
-      none: 'Brak aktualnych danych planetarnych dla tego kontaktu.'
+      subtitle:
+        'Pojawiaja sie tu tylko planety obecnie nalezace do tego kontaktu i objete twoim wywiadem szpiegowskim.',
+      none: 'Brak aktualnych danych planetarnych dla tego kontaktu.',
     },
     proposals: {
       title: 'Aktywne propozycje',
-      subtitle: 'Najpierw wyswietlane sa propozycje przychodzace, a potem twoje propozycje wychodzace.',
+      subtitle:
+        'Najpierw wyswietlane sa propozycje przychodzace, a potem twoje propozycje wychodzace.',
       none: 'Brak aktywnych propozycji dyplomatycznych.',
       incoming: 'Przychodzaca propozycja',
       outgoing: 'Wychodzaca propozycja',
@@ -467,19 +483,19 @@ export const communicationsPl = {
       to: 'Do {{player}}',
       createdExpires: 'Utworzono w turze {{createdTurn}} | Wygasa w turze {{expiresOnTurn}}',
       answerInMail: 'Otworz Poczte, aby odpowiedziec',
-      reviewInMail: 'Otworz Poczte, aby przejrzec'
+      reviewInMail: 'Otworz Poczte, aby przejrzec',
     },
     success: {
       supportSent: 'Prosba o wsparcie zostala wyslana.',
       messageSentSingle: 'Wiadomosc wyslano do {{recipient}}.',
-      messageSentMany: 'Wiadomosc wyslano do {{count}} odbiorcow.'
+      messageSentMany: 'Wiadomosc wyslano do {{count}} odbiorcow.',
     },
     errors: {
       noSession: 'Nie znaleziono sesji gracza.',
       selectTargetPlanet: 'Wybierz docelowa planete dla wsparcia.',
       sendDiplomacyProposal: 'Nie udalo sie wyslac propozycji dyplomatycznej.',
       sendSupportRequest: 'Nie udalo sie wyslac prosby o wsparcie.',
-      load: 'Nie udalo sie wczytac danych dyplomacji.'
-    }
-  }
+      load: 'Nie udalo sie wczytac danych dyplomacji.',
+    },
+  },
 } as const;

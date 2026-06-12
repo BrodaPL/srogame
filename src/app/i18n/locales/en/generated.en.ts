@@ -1,4 +1,13 @@
 export const generatedEn = {
+  reportMetadata: {
+    title: 'Title: {{value}}',
+    type: 'Type: {{value}}',
+    turn: 'Turn: {{value}}',
+    sender: 'Sender: {{value}}',
+    system: 'System: {{value}}',
+    planet: 'Planet: {{value}}',
+    coordinates: 'Coordinates: {{value}}',
+  },
   shared: {
     noResources: 'no resources',
     resourcesInline: '{{metal}} metal, {{crystal}} crystal, {{deuterium}} deuterium',

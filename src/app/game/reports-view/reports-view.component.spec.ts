@@ -96,6 +96,7 @@ describe('ReportsViewComponent', () => {
       {} as never,
       createRouter() as never,
       createGameState() as never,
+      createI18n() as never,
     );
     const report = {
       sourceCoordinates: {
@@ -123,6 +124,7 @@ describe('ReportsViewComponent', () => {
       {} as never,
       createRouter() as never,
       createGameState() as never,
+      createI18n() as never,
     );
     const regularReport = createProductionReport(1, 'Regular report');
     const favouriteReport = createProductionReport(2, 'Favourite report', true);
@@ -148,6 +150,7 @@ describe('ReportsViewComponent', () => {
       {} as never,
       createRouter() as never,
       createGameState() as never,
+      createI18n() as never,
     );
     const report = createProductionReport(
       7,
@@ -192,15 +195,7 @@ describe('ReportsViewComponent', () => {
       {} as never,
       createRouter() as never,
       createGameState() as never,
-      {
-        t: vi.fn((key: string, params?: Record<string, unknown>) => {
-          if (key === 'generated.reports.espionageTitle') {
-            return `Espionage Report: ${params?.planet} (${params?.x}:${params?.y}:${params?.z})`;
-          }
-
-          return key;
-        }),
-      } as never,
+      createI18n() as never,
     );
     const report = createProductionReport(
       8,
@@ -241,6 +236,26 @@ function createGameState() {
     diplomacyResolver: vi.fn(() => ({
       getStatus: vi.fn(() => 'SELF'),
     })),
+  };
+}
+
+function createI18n() {
+  return {
+    t: vi.fn((key: string, params?: Record<string, unknown>) => {
+      const templates: Record<string, string> = {
+        'generated.reportMetadata.title': 'Title: {{value}}',
+        'generated.reportMetadata.type': 'Type: {{value}}',
+        'generated.reportMetadata.turn': 'Turn: {{value}}',
+        'communications.reports.reportTypes.Production Report': 'Production Report',
+        'generated.reports.espionageTitle': 'Espionage Report: {{planet}} ({{x}}:{{y}}:{{z}})',
+      };
+
+      const template = templates[key] ?? key;
+      return template.replace(/\{\{(\w+)\}\}/g, (_match, token: string) => {
+        const value = params?.[token];
+        return value === undefined || value === null ? '' : String(value);
+      });
+    }),
   };
 }
 

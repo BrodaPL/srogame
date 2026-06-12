@@ -1,5 +1,6 @@
 import { ReportType } from '../enums/report-type';
 import type { ReportCoordinates } from './report-coordinates';
+import { encodeRuntimeText } from '../../i18n/runtime-text.utils';
 
 export type PlayerReportBaseData = {
   reportId: number;
@@ -32,7 +33,7 @@ export abstract class PlayerReport {
 
   protected constructor(
     public reportType: ReportType,
-    data: PlayerReportBaseData
+    data: PlayerReportBaseData,
   ) {
     this.reportId = data.reportId;
     this.createdTurn = data.createdTurn;
@@ -69,7 +70,7 @@ export abstract class PlayerReport {
       originCoordinates: this.originCoordinates ? { ...this.originCoordinates } : null,
       originPlanetName: this.originPlanetName,
       originSystemName: this.originSystemName,
-      senderPlayerName: this.senderPlayerName
+      senderPlayerName: this.senderPlayerName,
     };
   }
 
@@ -91,26 +92,48 @@ export abstract class PlayerReport {
 
   protected buildMetadataLines(): string[] {
     const lines = [
-      `Title: ${this.title}`,
-      `Type: ${this.reportType}`,
-      `Turn: ${this.createdTurn}`
+      encodeRuntimeText('generated.reportMetadata.title', {
+        value: this.title,
+      }),
+      encodeRuntimeText('generated.reportMetadata.type', {
+        value: encodeRuntimeText(`communications.reports.reportTypes.${this.reportType}`),
+      }),
+      encodeRuntimeText('generated.reportMetadata.turn', {
+        value: this.createdTurn,
+      }),
     ];
 
     if (this.senderPlayerName) {
-      lines.push(`Sender: ${this.senderPlayerName}`);
+      lines.push(
+        encodeRuntimeText('generated.reportMetadata.sender', {
+          value: this.senderPlayerName,
+        }),
+      );
     }
 
     if (this.sourceSystemName) {
-      lines.push(`System: ${this.sourceSystemName}`);
+      lines.push(
+        encodeRuntimeText('generated.reportMetadata.system', {
+          value: this.sourceSystemName,
+        }),
+      );
     }
 
     if (this.sourcePlanetName) {
-      lines.push(`Planet: ${this.sourcePlanetName}`);
+      lines.push(
+        encodeRuntimeText('generated.reportMetadata.planet', {
+          value: this.sourcePlanetName,
+        }),
+      );
     }
 
     const coordinates = this.coordinatesLabel();
     if (coordinates) {
-      lines.push(`Coordinates: ${coordinates}`);
+      lines.push(
+        encodeRuntimeText('generated.reportMetadata.coordinates', {
+          value: coordinates,
+        }),
+      );
     }
 
     return lines;

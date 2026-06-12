@@ -3,7 +3,7 @@ export const communicationsEn = {
     playerTypes: {
       PLAYER: 'Player',
       BOT: 'Bot',
-      NEUTRAL: 'Neutral'
+      NEUTRAL: 'Neutral',
     },
     diplomaticStatuses: {
       SELF: 'SELF',
@@ -11,18 +11,18 @@ export const communicationsEn = {
       PEACE: 'PEACE',
       NEUTRAL: 'NEUTRAL',
       PASSIVE: 'NEUTRAL',
-      WAR: 'WAR'
+      WAR: 'WAR',
     },
     proposalStates: {
       PENDING: 'Pending',
       ACCEPTED: 'Accepted',
       REJECTED: 'Rejected',
       CANCELLED: 'Cancelled',
-      EXPIRED: 'Expired'
+      EXPIRED: 'Expired',
     },
     directions: {
       incoming: 'Incoming',
-      outgoing: 'Outgoing'
+      outgoing: 'Outgoing',
     },
     supportTypes: {
       RESOURCE_SUPPORT: 'Resource support',
@@ -30,13 +30,13 @@ export const communicationsEn = {
       PLANET_DEFENSE: 'Planet defense',
       ATTACK_TARGET: 'Attack target',
       BOMBARD_TARGET: 'Bombard target',
-      SIEGE_TARGET: 'Siege target'
+      SIEGE_TARGET: 'Siege target',
     },
     requestTypes: {
       JUMP_GATE: 'Jump Gate',
       MAINTENANCE: 'Maintenance',
       SUPPORT: 'Support',
-      DIPLOMACY_PROPOSAL: 'Diplomacy proposal'
+      DIPLOMACY_PROPOSAL: 'Diplomacy proposal',
     },
     actions: {
       sendMessage: 'Send message',
@@ -45,7 +45,7 @@ export const communicationsEn = {
       reject: 'Reject',
       cancel: 'Cancel',
       delete: 'Delete',
-      sending: 'Sending...'
+      sending: 'Sending...',
     },
     labels: {
       turn: 'Turn',
@@ -54,14 +54,14 @@ export const communicationsEn = {
       none: 'None',
       yes: 'Yes',
       no: 'No',
-      random: 'Random'
+      random: 'Random',
     },
     bombardmentPriorities: {
       DEFENCES: 'Defences',
       DEFENCES_CAN_SHOOT_TO_ORBIT: 'Defences canShootToOrbit=true',
       DEFENCES_CANNOT_SHOOT_TO_ORBIT: 'Defences canShootToOrbit=false',
       RESOURCE_BUILDINGS: 'Resource buildings',
-      FACILITIES: 'Facilities'
+      FACILITIES: 'Facilities',
     },
     missions: {
       Attack: 'Attack',
@@ -80,8 +80,8 @@ export const communicationsEn = {
       'Star System Spy': 'Star System Spy',
       Recycle: 'Recycle',
       Repair: 'Repair',
-      Hold: 'Hold'
-    }
+      Hold: 'Hold',
+    },
   },
   compose: {
     eyebrow: 'Mail',
@@ -97,37 +97,38 @@ export const communicationsEn = {
       recipientType: 'Recipient type',
       player: 'Player',
       title: 'Title',
-      body: 'Body'
+      body: 'Body',
     },
     recipientModes: {
       player: 'Single player',
-      alliance: 'Whole alliance ({{count}})'
+      alliance: 'Whole alliance ({{count}})',
     },
     counts: {
       titleRemaining: '{{count}} characters remaining.',
-      bodyRemaining: '{{count}} characters remaining.'
+      bodyRemaining: '{{count}} characters remaining.',
     },
     errors: {
       noSession: 'No player session found.',
       sendFailed: 'Unable to send message.',
-      unknownPlayer: 'Unknown player'
-    }
+      unknownPlayer: 'Unknown player',
+    },
   },
   reports: {
     loading: {
       title: 'Loading Reports',
-      body: 'Player inbox data is being read from the current galaxy state.'
+      body: 'Player inbox data is being read from the current galaxy state.',
     },
     unavailable: {
-      title: 'Reports unavailable'
+      title: 'Reports unavailable',
     },
     actionFailed: {
-      title: 'Action failed'
+      title: 'Action failed',
     },
     tabs: {
-      all: 'All'
+      all: 'All',
     },
     reportTypes: {
+      Message: 'Message',
       'Defense Report': 'Defense Report',
       'Research Report': 'Research Report',
       'Production Report': 'Production Report',
@@ -136,40 +137,40 @@ export const communicationsEn = {
       'Star System Espionage Report': 'Star System Espionage Report',
       'Espionage Report': 'Espionage Report',
       'Sensor Phalanx Report': 'Sensor Phalanx Report',
-      'Colonization Report': 'Colonization Report'
+      'Colonization Report': 'Colonization Report',
     },
     inbox: {
       title: 'Inbox',
       noReports: 'No reports in this tab.',
       visibleCountOne: '{{count}} visible report',
       visibleCountMany: '{{count}} visible reports',
-      selectedCount: '{{count}} selected'
+      selectedCount: '{{count}} selected',
     },
     actions: {
       selectAllVisible: 'Select all visible',
       deleteSelected: 'Delete selected',
       loadingPreview: 'Loading preview...',
-      previewLocation: 'Preview location'
+      previewLocation: 'Preview location',
     },
     tooltips: {
       selectAllVisible: 'Select all visible reports except favourites.',
       deleteSelected: 'Delete selected reports. Favourite reports are protected.',
       favouriteOn: 'Remove favourite marker.',
-      favouriteOff: 'Favourite reports are protected from Select all and Delete selected.'
+      favouriteOff: 'Favourite reports are protected from Select all and Delete selected.',
     },
     badges: {
       favourite: 'Favourite',
       read: 'Read',
-      unread: 'Unread'
+      unread: 'Unread',
     },
     detail: {
       eyebrow: 'Report Detail',
       title: 'Select a report',
-      body: 'Choose an inbox entry to inspect its full content and preview its coordinates when planet data is available.'
+      body: 'Choose an inbox entry to inspect its full content and preview its coordinates when planet data is available.',
     },
     preview: {
       unavailable: 'Planet preview is unavailable for this report.',
-      failed: 'Unable to load the planet preview.'
+      failed: 'Unable to load the planet preview.',
     },
     stats: {
       status: 'Status',
@@ -177,7 +178,7 @@ export const communicationsEn = {
       coordinates: 'Coordinates',
       origin: 'Origin',
       sender: 'Sender',
-      owner: 'Owner'
+      owner: 'Owner',
     },
     dossier: {
       title: 'Espionage Dossier',
@@ -195,9 +196,9 @@ export const communicationsEn = {
         perimeterCheck: 'Perimeter Check',
         defences: 'Defences',
         profileKicker: 'Profile',
-        profile: 'Profile'
+        profile: 'Profile',
       },
-      empty: 'No data.'
+      empty: 'No data.',
     },
     plain: {
       title: 'Report Record',
@@ -206,8 +207,8 @@ export const communicationsEn = {
         header: 'Header',
         metadata: 'Metadata',
         log: 'Log',
-        defaultTitle: 'Report Details'
-      }
+        defaultTitle: 'Report Details',
+      },
     },
     rowLabels: {
       avgBuilding: 'Avg building',
@@ -232,7 +233,7 @@ export const communicationsEn = {
       scienceModifier: 'Science modifier',
       industryModifier: 'Industry modifier',
       anomaliesAndNoise: 'Anomalies and Noise',
-      hyperspaceParameters: 'Hyperspace parameters'
+      hyperspaceParameters: 'Hyperspace parameters',
     },
     errors: {
       noSession: 'No player session found.',
@@ -242,26 +243,26 @@ export const communicationsEn = {
       load: 'Unable to load reports.',
       noCoordinates: 'No coordinates',
       noOriginCoordinates: 'No origin coordinates',
-      noSourceMetadata: 'No source metadata'
-    }
+      noSourceMetadata: 'No source metadata',
+    },
   },
   mail: {
     loading: {
       title: 'Loading Mail',
-      body: 'Messages and request queues are being synchronized.'
+      body: 'Messages and request queues are being synchronized.',
     },
     unavailable: {
-      title: 'Mail unavailable'
+      title: 'Mail unavailable',
     },
     status: {
       actionFailed: 'Mail action failed',
-      updated: 'Mail updated'
+      updated: 'Mail updated',
     },
     header: {
       eyebrow: 'Communications',
       title: 'Mail',
       unread: '{{count}} unread',
-      actionRequired: '{{count}} action required'
+      actionRequired: '{{count}} action required',
     },
     folders: {
       title: 'Folders',
@@ -271,7 +272,7 @@ export const communicationsEn = {
       history: 'History',
       itemsOne: '{{count}} item',
       itemsMany: '{{count}} items',
-      empty: 'No items in this folder.'
+      empty: 'No items in this folder.',
     },
     requestCards: {
       incomingJumpGate: 'Incoming Jump Gate Request',
@@ -283,11 +284,11 @@ export const communicationsEn = {
       incomingGeneric: 'Incoming Request',
       outgoingGeneric: 'Outgoing Request',
       incomingEyebrow: 'Incoming request',
-      outgoingEyebrow: 'Outgoing request'
+      outgoingEyebrow: 'Outgoing request',
     },
     requestBadges: {
       jumpGate: 'JUMP GATE',
-      maintenance: 'MAINTENANCE'
+      maintenance: 'MAINTENANCE',
     },
     detailRows: {
       counterparty: 'Counterparty',
@@ -295,17 +296,20 @@ export const communicationsEn = {
       direction: 'Direction',
       timing: 'Timing',
       summary: 'Summary',
-      details: 'Details'
+      details: 'Details',
     },
     summaries: {
-      jumpGateIncoming: '{{player}} requests Jump Gate access for Fleet #{{fleetId}} to {{targetPlanet}}.',
+      jumpGateIncoming:
+        '{{player}} requests Jump Gate access for Fleet #{{fleetId}} to {{targetPlanet}}.',
       jumpGateOutgoing: 'Fleet #{{fleetId}} is waiting for Jump Gate access from {{player}}.',
-      maintenanceIncoming: '{{player}} requests maintenance for Fleet #{{fleetId}} at {{targetPlanet}}.',
-      maintenanceOutgoing: 'Fleet #{{fleetId}} requested maintenance from {{player}} at {{targetPlanet}}.',
+      maintenanceIncoming:
+        '{{player}} requests maintenance for Fleet #{{fleetId}} at {{targetPlanet}}.',
+      maintenanceOutgoing:
+        'Fleet #{{fleetId}} requested maintenance from {{player}} at {{targetPlanet}}.',
       supportIncoming: '{{player}} requested {{supportType}} for {{targetPlanet}}.',
       supportOutgoing: 'You requested {{supportType}} from {{player}} for {{targetPlanet}}.',
       diplomacyIncoming: '{{player}} requested {{status}}.',
-      diplomacyOutgoing: 'You requested {{status}} with {{player}}.'
+      diplomacyOutgoing: 'You requested {{status}} with {{player}}.',
     },
     details: {
       jumpGate: 'Mission {{mission}} | {{originPlanet}} -> {{targetPlanet}} | Ships: {{ships}}',
@@ -316,18 +320,21 @@ export const communicationsEn = {
       priorities: ' | Priorities: {{main}} / {{secondary}} / {{tertiary}}',
       launchedFleet: ' | Launched Fleet #{{fleetId}}',
       launchedFleetFrom: ' from {{planet}}',
-      supportMission: 'Mission {{mission}} | Minimum: {{minimum}}{{targetOwner}}{{priorities}}{{launch}}',
-      supportUnknownMission: 'Mission Unknown | Minimum: {{minimum}}{{targetOwner}}{{priorities}}{{launch}}',
+      supportMission:
+        'Mission {{mission}} | Minimum: {{minimum}}{{targetOwner}}{{priorities}}{{launch}}',
+      supportUnknownMission:
+        'Mission Unknown | Minimum: {{minimum}}{{targetOwner}}{{priorities}}{{launch}}',
       targetOnly: 'Target {{planet}}',
       requestedStatus: 'Requested status {{status}}',
-      nothing: 'nothing'
+      nothing: 'nothing',
     },
     timing: {
       pendingAwaitingResponse: 'Created on turn {{createdTurn}} | Awaiting response',
-      supportDue: 'Created on turn {{createdTurn}} | Due on turn {{dueTurn}}{{expiry}}{{fulfilled}}',
+      supportDue:
+        'Created on turn {{createdTurn}} | Due on turn {{dueTurn}}{{expiry}}{{fulfilled}}',
       supportExpiry: ' | Wait until turn {{turn}}',
       supportFulfilled: ' | Fulfilled on turn {{turn}}',
-      default: 'Created on turn {{createdTurn}} | Expires on turn {{expiresOnTurn}}'
+      default: 'Created on turn {{createdTurn}} | Expires on turn {{expiresOnTurn}}',
     },
     partialApproval: {
       maintenanceTitle: 'Partial maintenance approval',
@@ -340,7 +347,7 @@ export const communicationsEn = {
       crystal: 'Crystal',
       deuterium: 'Deuterium',
       maxAmount: '{{type}} (max {{amount}})',
-      send: 'Send partial approval'
+      send: 'Send partial approval',
     },
     message: {
       eyebrow: 'Message',
@@ -348,18 +355,18 @@ export const communicationsEn = {
       read: 'Read',
       unread: 'Unread',
       noSelectionTitle: 'No mail selected',
-      noSelectionBody: 'Choose a folder item to inspect details and available actions.'
+      noSelectionBody: 'Choose a folder item to inspect details and available actions.',
     },
     actions: {
       partialApprove: 'Partial approve',
       closePartial: 'Close partial',
-      deleteHistoryItem: 'Delete history item'
+      deleteHistoryItem: 'Delete history item',
     },
     success: {
       deliveredOne: 'Message delivered to 1 recipient.',
       deliveredMany: 'Message delivered to {{count}} recipients.',
       messageDeleted: 'Message deleted.',
-      requestDeleted: 'Request deleted.'
+      requestDeleted: 'Request deleted.',
     },
     errors: {
       noSession: 'No player session found.',
@@ -374,39 +381,41 @@ export const communicationsEn = {
       rejectJumpGate: 'Unable to reject Jump Gate request.',
       rejectRequest: 'Unable to reject request.',
       cancelJumpGate: 'Unable to cancel Jump Gate request.',
-      cancelRequest: 'Unable to cancel request.'
-    }
+      cancelRequest: 'Unable to cancel request.',
+    },
   },
   diplomacy: {
     loading: {
       title: 'Loading Diplomacy',
-      body: 'Discovered factions, treaty proposals, and known intel are being synchronized.'
+      body: 'Discovered factions, treaty proposals, and known intel are being synchronized.',
     },
     unavailable: {
-      title: 'Diplomacy unavailable'
+      title: 'Diplomacy unavailable',
     },
     status: {
       actionFailed: 'Diplomacy action failed',
-      updated: 'Diplomacy updated'
+      updated: 'Diplomacy updated',
     },
     header: {
       eyebrow: 'Interstellar Relations',
       title: 'Diplomacy',
-      subtitle: 'Review discovered factions, negotiate status changes, and message known powers directly.',
+      subtitle:
+        'Review discovered factions, negotiate status changes, and message known powers directly.',
       currentTurn: 'Current turn',
       discoveredContacts: 'Discovered contacts',
       pendingProposals: 'Pending proposals',
-      ownedPlanets: 'Owned planets'
+      ownedPlanets: 'Owned planets',
     },
     contacts: {
       title: 'Discovered Contacts',
-      subtitle: 'Only human and bot powers appear here. Neutral resource factions are excluded from diplomacy.',
+      subtitle:
+        'Only human and bot powers appear here. Neutral resource factions are excluded from diplomacy.',
       proposalUsed: 'Proposal used this turn',
       proposalAvailable: 'Proposal available',
       none: 'No human or bot diplomatic contacts are available yet.',
       contactType: '{{type}} contact',
       knownPlanetsOne: '{{count}} known planet',
-      knownPlanetsMany: '{{count}} known planets'
+      knownPlanetsMany: '{{count}} known planets',
     },
     detail: {
       playerType: 'Player type',
@@ -415,27 +424,30 @@ export const communicationsEn = {
       treatyControls: 'Treaty controls',
       available: 'Available',
       blocked: 'Blocked',
-      none: 'Select a contact to inspect known planets, send a message, or prepare a treaty proposal.'
+      none: 'Select a contact to inspect known planets, send a message, or prepare a treaty proposal.',
     },
     treaty: {
       title: 'Treaty Proposal',
       sending: 'Sending...',
       declareWar: 'Declare war',
       sendProposal: 'Send proposal',
-      availableCopy: 'Send one diplomacy action to this player this turn. WAR declarations apply immediately; treaties require acceptance.',
-      unavailableCopy: 'Diplomacy proposals are unavailable for this contact.'
+      availableCopy:
+        'Send one diplomacy action to this player this turn. WAR declarations apply immediately; treaties require acceptance.',
+      unavailableCopy: 'Diplomacy proposals are unavailable for this contact.',
     },
     messaging: {
       title: 'Direct Message',
       subtitle: 'Messages are now handled through Mail and the shared compose popup.',
       send: 'Send message',
-      composeTitle: 'Compose Message'
+      composeTitle: 'Compose Message',
     },
     support: {
       title: 'Support Request',
       unavailableCopy: 'Support requests are available only for PEACE and ALLIED contacts.',
-      offensiveCopy: 'Offensive support requests target known hostile planets, carry minimum ship requirements, and after acceptance wait up to 3 turns for auto-launch.',
-      defaultCopy: 'Requests are created here and resolved through Mail. Resource support allows partial approval; all support requests expire after 2 turns.',
+      offensiveCopy:
+        'Offensive support requests target known hostile planets, carry minimum ship requirements, and after acceptance wait up to 3 turns for auto-launch.',
+      defaultCopy:
+        'Requests are created here and resolved through Mail. Resource support allows partial approval; all support requests expire after 2 turns.',
       type: 'Support type',
       targetOwnPlanet: 'Target own planet',
       targetHostilePlanet: 'Requested hostile target',
@@ -443,19 +455,21 @@ export const communicationsEn = {
       crystal: 'Crystal',
       deuterium: 'Deuterium',
       minimumDesiredShips: 'Minimum desired ships',
-      minimumDesiredShipsHelp: 'The ally will auto-launch only when they can meet at least this exact ship mix.',
+      minimumDesiredShipsHelp:
+        'The ally will auto-launch only when they can meet at least this exact ship mix.',
       bombardmentPriorities: 'Bombardment priorities',
       bombardmentPrioritiesHelp: 'Optional priorities are applied if the mission is auto-launched.',
       main: 'Main',
       secondary: 'Secondary',
       tertiary: 'Tertiary',
       send: 'Send support request',
-      sending: 'Sending...'
+      sending: 'Sending...',
     },
     planets: {
       title: 'Known Planets',
-      subtitle: 'Only planets currently owned by this contact and covered by your espionage intel appear here.',
-      none: 'No current planetary intel is available for this contact.'
+      subtitle:
+        'Only planets currently owned by this contact and covered by your espionage intel appear here.',
+      none: 'No current planetary intel is available for this contact.',
     },
     proposals: {
       title: 'Active Proposals',
@@ -467,19 +481,19 @@ export const communicationsEn = {
       to: 'To {{player}}',
       createdExpires: 'Created on turn {{createdTurn}} | Expires on turn {{expiresOnTurn}}',
       answerInMail: 'Open Mail to answer',
-      reviewInMail: 'Open Mail to review'
+      reviewInMail: 'Open Mail to review',
     },
     success: {
       supportSent: 'Support request sent.',
       messageSentSingle: 'Message sent to {{recipient}}.',
-      messageSentMany: 'Message sent to {{count}} recipients.'
+      messageSentMany: 'Message sent to {{count}} recipients.',
     },
     errors: {
       noSession: 'No player session found.',
       selectTargetPlanet: 'Select a target planet for support.',
       sendDiplomacyProposal: 'Unable to send diplomacy proposal.',
       sendSupportRequest: 'Unable to send support request.',
-      load: 'Unable to load diplomacy data.'
-    }
-  }
+      load: 'Unable to load diplomacy data.',
+    },
+  },
 } as const;

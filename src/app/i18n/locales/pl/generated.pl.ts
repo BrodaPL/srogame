@@ -1,4 +1,13 @@
 export const generatedPl = {
+  reportMetadata: {
+    title: 'Tytul: {{value}}',
+    type: 'Typ: {{value}}',
+    turn: 'Tura: {{value}}',
+    sender: 'Nadawca: {{value}}',
+    system: 'Uklad: {{value}}',
+    planet: 'Planeta: {{value}}',
+    coordinates: 'Koordynaty: {{value}}',
+  },
   shared: {
     noResources: 'brak zasobow',
     resourcesInline: '{{metal}} metalu, {{crystal}} krysztalu, {{deuterium}} deuteru',
