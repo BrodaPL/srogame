@@ -50,6 +50,7 @@ import technologyEffectsModule from '../../src/app/models/tech/technology-effect
 import phaseOneTurnResolverModule from '../../src/app/models/turns/phase-one-turn-resolver.js';
 import smokeTestScenariosModule from '../../src/app/models/testing/smoke-test-scenarios.js';
 import queueManagementModule from '../../src/app/models/queues/queue-management.js';
+import runtimeTextUtilsModule from '../../src/app/i18n/runtime-text.utils.js';
 import {
   AUTO_SAVE_ROTATION_LIMIT,
   MAX_GAME_SAVE_FILES,
@@ -61,7 +62,7 @@ import {
   readGameSaveById,
   resolveGameSaveLoadAccess,
   shouldAutoSaveAfterTurn,
-  writeRotatingAutoSave
+  writeRotatingAutoSave,
 } from './game-save.js';
 import {
   createGameId,
@@ -69,20 +70,20 @@ import {
   getGameById,
   listGames,
   upsertGameRecord,
-  updateGameRecord
+  updateGameRecord,
 } from './game-registry.js';
 import {
   isAccountMemberOfGame,
   listMembershipsForGame,
   listMembershipsForAccount,
   removeMembership,
-  upsertMembership
+  upsertMembership,
 } from './game-membership.js';
 import {
   deleteMultiplayerLobby,
   getMultiplayerLobbyByGameId,
   listMultiplayerLobbies,
-  upsertMultiplayerLobby
+  upsertMultiplayerLobby,
 } from './multiplayer-lobby-store.js';
 import {
   deleteGameRuntime,
@@ -90,7 +91,7 @@ import {
   hasGameRuntime,
   listLoadedGameIds,
   setGameRuntime,
-  updateGameRuntime
+  updateGameRuntime,
 } from './game-runtime-store.js';
 import {
   acknowledgeAutoSkipTurnNotice,
@@ -100,7 +101,7 @@ import {
   markPresenceSeen,
   removePresence,
   removePresenceForGame,
-  setAutoSkipTurnEnabled
+  setAutoSkipTurnEnabled,
 } from './multiplayer-presence.js';
 import {
   applyLobbyLoadSeatsToGalaxy,
@@ -115,14 +116,14 @@ import {
   maxLobbyMembersForSetup,
   openMultiplayerLobby,
   setMultiplayerLobbyMemberReady,
-  updateMultiplayerLobbySetup
+  updateMultiplayerLobbySetup,
 } from './multiplayer-lobby.js';
 import { reconcileOfflineBotControlledSeats } from './offline-bot-control.js';
 import {
   activeHumanPlayers,
   areAllHumanPlayersReady,
   buildTurnStatusResponse,
-  requiresAllPlayersReady
+  requiresAllPlayersReady,
 } from './active-game-turn.js';
 import {
   buildResendConfirmationCooldownMessage,
@@ -136,7 +137,7 @@ import {
   getLoginBlockResponse,
   getResendConfirmationNextAllowedAt,
   markConfirmationResent,
-  registerFailedPasswordAttempt
+  registerFailedPasswordAttempt,
 } from './auth-account-security.js';
 import { consumeRateLimit } from './auth-rate-limit.js';
 import { clearBotDecisionTracesV2, getBotDecisionTracesV2 } from './bots-v2/bot-v2-trace.js';
@@ -148,7 +149,7 @@ import {
   resetBotAdminRuntimeState,
   resumeBot,
   setBotProfile,
-  toBotAdminState
+  toBotAdminState,
 } from './bots/bot-admin.js';
 import { BOT_PROFILE_IDS } from './bots/bot-profile.js';
 import { buildRegisterConfigResponse, verifyTurnstileToken } from './turnstile.js';
@@ -161,7 +162,7 @@ import {
   currentDiplomaticStatusForPair,
   hasOutgoingProposalSentThisTurn,
   isPlayerVisibleInDiplomacy,
-  rejectDiplomaticProposalCommand
+  rejectDiplomaticProposalCommand,
 } from './game-commands/diplomacy-commands.js';
 import { createFleetMission } from './game-commands/fleet-commands.js';
 import { returnActiveFleetCommand } from './game-commands/fleet-lifecycle-commands.js';
@@ -169,7 +170,7 @@ import { createStarSystemSpyMissions } from './game-commands/star-system-spy-com
 import {
   approveJumpGateRequestCommand,
   cancelJumpGateRequestCommand,
-  rejectJumpGateRequestCommand
+  rejectJumpGateRequestCommand,
 } from './game-commands/jump-gate-request-commands.js';
 import {
   canFleetRequestMaintenance as canFleetRequestMaintenanceCommand,
@@ -177,23 +178,26 @@ import {
   cancelFleetMaintenanceRequest,
   createFleetMaintenanceRequest,
   rejectFleetMaintenanceRequest,
-  resolveFleetMaintenanceOptions
+  resolveFleetMaintenanceOptions,
 } from './game-commands/maintenance-commands.js';
 import {
   createSupportRequestCommand as createSupportRequestCommandShared,
   approveSupportRequestCommand,
-  rejectSupportRequestCommand
+  rejectSupportRequestCommand,
 } from './game-commands/support-request-commands.js';
 import {
   collectSensorPhalanxPassiveDetections,
-  type SensorPhalanxPassiveDetection
+  type SensorPhalanxPassiveDetection,
 } from './sensor-phalanx-passive.js';
 import { startShipyardConstruction } from './game-commands/shipyard-commands.js';
-import { startTechnologyResearch, updateResearchHelpers } from './game-commands/research-commands.js';
+import {
+  startTechnologyResearch,
+  updateResearchHelpers,
+} from './game-commands/research-commands.js';
 import {
   appendPlayerActionLogEntry,
   createTrackedPlayerActionFleetIds,
-  ensurePlayerActionLogFile
+  ensurePlayerActionLogFile,
 } from './player-action-log.js';
 import playerMessageModule from '../../src/app/models/mail/player-message.js';
 import fleetReportModule from '../../src/app/models/reports/fleet-report.js';
@@ -203,7 +207,7 @@ import type { GameCommandError } from './game-commands/command-result.ts';
 import type { Galaxy } from '../../src/app/models/planets/galaxy.ts';
 import type {
   CounterIntelEventLogEvent,
-  PlayerFleetOutcomeLogEvent
+  PlayerFleetOutcomeLogEvent,
 } from '../../src/app/models/turns/phase-one-turn-resolver.ts';
 import type {
   BotAdminActionResponse,
@@ -326,7 +330,7 @@ import type {
   SensorPhalanxFleetContactDto,
   SensorPhalanxScanRequest,
   SensorPhalanxScanResponse,
-  PlanetOperationsResponse
+  PlanetOperationsResponse,
 } from '../../src/app/models/game-api-types.ts';
 import type { MultiplayerLobbyState } from './multiplayer-lobby.js';
 import type { ClientGalaxy } from '../../src/app/models/planets/client-galaxy.ts';
@@ -339,7 +343,7 @@ import type { ResourcesPack as ResourcesPackType } from '../../src/app/models/re
 import type { EspionageReportData } from '../../src/app/models/reports/espionage-report-data.ts';
 import type {
   FleetMovementSummary,
-  GalaxyPresentationData as GalaxyPresentationDataType
+  GalaxyPresentationData as GalaxyPresentationDataType,
 } from '../../src/app/models/planets/galaxy-presentation-data.ts';
 import type { GalaxyByteCell } from '../../src/app/models/planets/galaxy-byte-cell.ts';
 import type { OwnershipByteCell } from '../../src/app/models/planets/ownership-byte-cell.ts';
@@ -362,7 +366,7 @@ import type { Fleet } from '../../src/app/models/fleets/fleet.ts';
 import type { FleetOperationHistoryEntry } from '../../src/app/models/fleets/fleet-operation-history.ts';
 import type {
   BombardmentPriorities as BombardmentPrioritiesType,
-  BombardmentPrioritySelection as BombardmentPrioritySelectionType
+  BombardmentPrioritySelection as BombardmentPrioritySelectionType,
 } from '../../src/app/models/bombardment/bombardment-priority.ts';
 import type { MaintenanceRequest } from '../../src/app/models/requests/maintenance-request.ts';
 import type { JumpGateRequest } from '../../src/app/models/requests/jump-gate-request.ts';
@@ -374,7 +378,7 @@ import type { DiplomaticProposal } from '../../src/app/models/diplomacy/diplomat
 import type { DiplomaticProposalState as DiplomaticProposalStateType } from '../../src/app/models/diplomacy/diplomatic-proposal-state.ts';
 import type {
   ManyShips as ManyShipsType,
-  ShipSelectionEntry as ShipSelectionEntryType
+  ShipSelectionEntry as ShipSelectionEntryType,
 } from '../../src/app/models/fleets/many-ships.ts';
 import type { PlayerReport } from '../../src/app/models/reports/player-report.ts';
 import type { ReportType as ReportTypeType } from '../../src/app/models/enums/report-type.ts';
@@ -392,7 +396,7 @@ const {
   MIN_SCHEDULED_TURNS_GALAXY_SIZE,
   SCHEDULED_TURN_HOURS,
   hasExactBotProfileCountMatch,
-  normalizeGalaxySetup
+  normalizeGalaxySetup,
 } = gameApiTypesModule as {
   MAX_AUTO_SAVE_TURNS: typeof import('../../src/app/models/game-api-types.js').MAX_AUTO_SAVE_TURNS;
   MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS: typeof import('../../src/app/models/game-api-types.js').MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS;
@@ -402,7 +406,8 @@ const {
   hasExactBotProfileCountMatch: typeof import('../../src/app/models/game-api-types.js').hasExactBotProfileCountMatch;
   normalizeGalaxySetup: typeof import('../../src/app/models/game-api-types.js').normalizeGalaxySetup;
 };
-const { abandonPlanetToNewNeutralOwner } = planetAbandonmentModule as typeof import('../../src/app/models/planets/planet-abandonment.js');
+const { abandonPlanetToNewNeutralOwner } =
+  planetAbandonmentModule as typeof import('../../src/app/models/planets/planet-abandonment.js');
 const { GalaxyPresentationData } = galaxyPresentationDataModule as {
   GalaxyPresentationData: typeof import('../../src/app/models/planets/galaxy-presentation-data.js').GalaxyPresentationData;
 };
@@ -450,6 +455,8 @@ const { ManyDefences } = manyDefencesModule as {
 const { ReportType } = reportTypeEnumModule as {
   ReportType: typeof import('../../src/app/models/enums/report-type.js').ReportType;
 };
+const { encodeRuntimeText } =
+  runtimeTextUtilsModule as typeof import('../../src/app/i18n/runtime-text.utils.js');
 const { DiplomaticStatus } = diplomaticStatusEnumModule as {
   DiplomaticStatus: typeof import('../../src/app/models/diplomacy/diplomatic-status.js').DiplomaticStatus;
 };
@@ -462,37 +469,32 @@ const { DiplomaticProposalState } = diplomaticProposalStateModule as {
 const {
   expirePendingDiplomaticProposals: expirePendingDiplomaticProposalsForTurn,
   hasPendingDiplomaticItemExpired,
-  isPendingDiplomaticProposalForPair
+  isPendingDiplomaticProposalForPair,
 } = diplomaticProposalModule as typeof import('../../src/app/models/diplomacy/diplomatic-proposal.js');
-const {
-  allowedDiplomaticProposalStatuses
-} = diplomacyProposalRulesModule as typeof import('../../src/app/models/diplomacy/diplomatic-proposal-rules.js');
+const { allowedDiplomaticProposalStatuses } =
+  diplomacyProposalRulesModule as typeof import('../../src/app/models/diplomacy/diplomatic-proposal-rules.js');
 const {
   applyBotsUnitedAgainstHumansDiplomacy,
   expectedBotsUnitedAgainstHumansStatus,
-  isBotsUnitedAgainstHumansDiplomacyStatusAllowed
-} = botsUnitedAgainstHumansModule as typeof import('../../src/app/models/diplomacy/bots-united-against-humans.js');
-const {
-  countPlanetaryBombs,
-  isPlanetaryBombDefenceType
-} = planetaryBombModule as typeof import('../../src/app/models/defences/planetary-bomb.js');
-const {
-  normalizeBombardmentPriorities,
-  isBombardmentPrioritySelection
-} = bombardmentPriorityModule as typeof import('../../src/app/models/bombardment/bombardment-priority.js');
-const { calculateJumpGateCapacity } = jumpGateCapacityModule as typeof import('../../src/app/models/jump-gates/jump-gate-capacity.js');
-const { createJumpGateRequest } = jumpGateRequestModule as typeof import('../../src/app/models/requests/jump-gate-request.js');
-const {
-  createMaintenanceRequest,
-  normalizeMaintenanceTransferPayload
-} = maintenanceRequestModule as typeof import('../../src/app/models/requests/maintenance-request.js');
-const {
-  clampSupportResourcesToRequested,
-  normalizeSupportResources,
-  supportResourcesHasAnyValue
-} = supportRequestModule as typeof import('../../src/app/models/requests/support-request.js');
-const { synchronizeTradePortOffers } = tradePortOffersModule as typeof import('../../src/app/models/trade/trade-port-offers.js');
-const { TUTORIAL_VIEW_KEYS, createTutorialReadState } = tutorialTypesModule as typeof import('../../src/app/tutorial/tutorial-types.js');
+  isBotsUnitedAgainstHumansDiplomacyStatusAllowed,
+} =
+  botsUnitedAgainstHumansModule as typeof import('../../src/app/models/diplomacy/bots-united-against-humans.js');
+const { countPlanetaryBombs, isPlanetaryBombDefenceType } =
+  planetaryBombModule as typeof import('../../src/app/models/defences/planetary-bomb.js');
+const { normalizeBombardmentPriorities, isBombardmentPrioritySelection } =
+  bombardmentPriorityModule as typeof import('../../src/app/models/bombardment/bombardment-priority.js');
+const { calculateJumpGateCapacity } =
+  jumpGateCapacityModule as typeof import('../../src/app/models/jump-gates/jump-gate-capacity.js');
+const { createJumpGateRequest } =
+  jumpGateRequestModule as typeof import('../../src/app/models/requests/jump-gate-request.js');
+const { createMaintenanceRequest, normalizeMaintenanceTransferPayload } =
+  maintenanceRequestModule as typeof import('../../src/app/models/requests/maintenance-request.js');
+const { clampSupportResourcesToRequested, normalizeSupportResources, supportResourcesHasAnyValue } =
+  supportRequestModule as typeof import('../../src/app/models/requests/support-request.js');
+const { synchronizeTradePortOffers } =
+  tradePortOffersModule as typeof import('../../src/app/models/trade/trade-port-offers.js');
+const { TUTORIAL_VIEW_KEYS, createTutorialReadState } =
+  tutorialTypesModule as typeof import('../../src/app/tutorial/tutorial-types.js');
 const { BuildingBlueprintsFactory } = buildingBlueprintsFactoryModule as {
   BuildingBlueprintsFactory: typeof import('../../src/app/factories/building-blueprints.factory.js').BuildingBlueprintsFactory;
 };
@@ -520,14 +522,14 @@ const { TechnologyQueueEntry } = technologyQueueEntryModule as {
 const { ResearchHelperFor } = researchHelperForModule as {
   ResearchHelperFor: typeof import('../../src/app/models/tech/research-helper-for.js').ResearchHelperFor;
 };
-const { maxActiveFleets } = technologyEffectsModule as typeof import('../../src/app/models/tech/technology-effects.js');
-const { resolvePhaseOneTurn } = phaseOneTurnResolverModule as typeof import('../../src/app/models/turns/phase-one-turn-resolver.js');
-const { applySmokeTestScenario, isSmokeTestScenarioKey } = smokeTestScenariosModule as typeof import('../../src/app/models/testing/smoke-test-scenarios.js');
-const {
-  moveQueueEntry,
-  calculateBuildingCancellationRefund,
-  calculateShipyardCancellation
-} = queueManagementModule as typeof import('../../src/app/models/queues/queue-management.js');
+const { maxActiveFleets } =
+  technologyEffectsModule as typeof import('../../src/app/models/tech/technology-effects.js');
+const { resolvePhaseOneTurn } =
+  phaseOneTurnResolverModule as typeof import('../../src/app/models/turns/phase-one-turn-resolver.js');
+const { applySmokeTestScenario, isSmokeTestScenarioKey } =
+  smokeTestScenariosModule as typeof import('../../src/app/models/testing/smoke-test-scenarios.js');
+const { moveQueueEntry, calculateBuildingCancellationRefund, calculateShipyardCancellation } =
+  queueManagementModule as typeof import('../../src/app/models/queues/queue-management.js');
 const { PlayerMessage: PlayerMessageModel } = playerMessageModule as {
   PlayerMessage: typeof import('../../src/app/models/mail/player-message.js').PlayerMessage;
 };
@@ -571,13 +573,34 @@ function resolveDurationEnv(envName: string, fallbackMs: number): number {
 }
 
 const AUTH_DATA_PATH = resolveDataPath('SROGAME_AUTH_DATA_PATH', '../data/auth.json');
-const GAME_REGISTRY_DATA_PATH = resolveDataPath('SROGAME_GAME_REGISTRY_DATA_PATH', '../data/games.json');
-const GAME_MEMBERSHIPS_DATA_PATH = resolveDataPath('SROGAME_GAME_MEMBERSHIPS_DATA_PATH', '../data/game-memberships.json');
-const MULTIPLAYER_LOBBY_STORE_DATA_PATH = resolveDataPath('SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH', '../data/multiplayer-lobbies.json');
-const MULTIPLAYER_PRESENCE_DATA_PATH = resolveDataPath('SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH', '../data/multiplayer-presence.json');
-const GAME_SAVES_DIRECTORY_PATH = resolveDataPath('SROGAME_GAME_SAVES_DIRECTORY_PATH', '../data/saves');
-const MULTIPLAYER_PRESENCE_TIMEOUT_MS = resolveDurationEnv('SROGAME_MULTIPLAYER_PRESENCE_TIMEOUT_MS', 30 * 60 * 1000);
-const MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS = resolveDurationEnv('SROGAME_MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS', 3 * 60 * 1000);
+const GAME_REGISTRY_DATA_PATH = resolveDataPath(
+  'SROGAME_GAME_REGISTRY_DATA_PATH',
+  '../data/games.json',
+);
+const GAME_MEMBERSHIPS_DATA_PATH = resolveDataPath(
+  'SROGAME_GAME_MEMBERSHIPS_DATA_PATH',
+  '../data/game-memberships.json',
+);
+const MULTIPLAYER_LOBBY_STORE_DATA_PATH = resolveDataPath(
+  'SROGAME_MULTIPLAYER_LOBBY_STORE_DATA_PATH',
+  '../data/multiplayer-lobbies.json',
+);
+const MULTIPLAYER_PRESENCE_DATA_PATH = resolveDataPath(
+  'SROGAME_MULTIPLAYER_PRESENCE_DATA_PATH',
+  '../data/multiplayer-presence.json',
+);
+const GAME_SAVES_DIRECTORY_PATH = resolveDataPath(
+  'SROGAME_GAME_SAVES_DIRECTORY_PATH',
+  '../data/saves',
+);
+const MULTIPLAYER_PRESENCE_TIMEOUT_MS = resolveDurationEnv(
+  'SROGAME_MULTIPLAYER_PRESENCE_TIMEOUT_MS',
+  30 * 60 * 1000,
+);
+const MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS = resolveDurationEnv(
+  'SROGAME_MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS',
+  3 * 60 * 1000,
+);
 const PLAYER_NAME_MIN = 3;
 const PLAYER_NAME_MAX = 24;
 const PASSWORD_MIN = 6;
@@ -610,14 +633,15 @@ const DIPLOMATIC_STATUS_VALUES = new Set<string>([
   DiplomaticStatus.PEACE,
   DiplomaticStatus.NEUTRAL,
   DiplomaticStatus.PASSIVE,
-  DiplomaticStatus.WAR
+  DiplomaticStatus.WAR,
 ]);
 const TUTORIAL_VIEW_KEY_VALUES = new Set<string>(TUTORIAL_VIEW_KEYS);
 const BUILDING_TYPE_ROBOTICS_FACTORY = BuildingType.ROBOTICS_FACTORY as BuildingTypeType;
 const BUILDING_TYPE_SHIPYARD = BuildingType.SHIPYARD as BuildingTypeType;
 const BUILDING_TYPE_RESEARCH_LAB = BuildingType.RESEARCH_LAB as BuildingTypeType;
 const TECH_TYPE_COMPUTER_TECHNOLOGY = TechnologyType.COMPUTER_TECHNOLOGY as TechnologyTypeType;
-const TECH_TYPE_INTERGALACTIC_RESEARCH_NETWORK = TechnologyType.INTERGALACTIC_RESEARCH_NETWORK as TechnologyTypeType;
+const TECH_TYPE_INTERGALACTIC_RESEARCH_NETWORK =
+  TechnologyType.INTERGALACTIC_RESEARCH_NETWORK as TechnologyTypeType;
 const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
   FleetMissionType.ATTACK as FleetMissionTypeType,
   FleetMissionType.MOVE as FleetMissionTypeType,
@@ -629,7 +653,7 @@ const PHASE_ONE_MISSION_TYPES = new Set<FleetMissionTypeType>([
   FleetMissionType.SIEGE as FleetMissionTypeType,
   FleetMissionType.RECYCLE as FleetMissionTypeType,
   FleetMissionType.REPAIR as FleetMissionTypeType,
-  FleetMissionType.COLONIZE as FleetMissionTypeType
+  FleetMissionType.COLONIZE as FleetMissionTypeType,
 ]);
 
 let currentGalaxy: Galaxy | null = null;
@@ -666,7 +690,8 @@ function moveMountedRuntimeAwayFromGame(gameId: string): void {
   }
 
   clearMountedRuntimeState();
-  const fallbackRuntimeId = listLoadedGameIds().find((loadedGameId) => loadedGameId !== gameId) ?? null;
+  const fallbackRuntimeId =
+    listLoadedGameIds().find((loadedGameId) => loadedGameId !== gameId) ?? null;
   if (fallbackRuntimeId) {
     switchCurrentRuntime(fallbackRuntimeId);
   }
@@ -682,18 +707,13 @@ function ensureCurrentPlayerActionLog(playerName: string): void {
 
 function appendCurrentPlayerActionLog(
   playerName: string,
-  entry: Parameters<typeof appendPlayerActionLogEntry>[3]
+  entry: Parameters<typeof appendPlayerActionLogEntry>[3],
 ): void {
   if (!currentRuntimeGameId || !currentGameSetup) {
     return;
   }
 
-  appendPlayerActionLogEntry(
-    currentRuntimeGameId,
-    currentGameSetup,
-    playerName,
-    entry
-  );
+  appendPlayerActionLogEntry(currentRuntimeGameId, currentGameSetup, playerName, entry);
 }
 
 function trackCurrentPlayerActionFleet(fleetId: number): void {
@@ -709,7 +729,7 @@ function untrackCurrentPlayerActionFleet(fleetId: number): void {
 }
 
 function resolvePlayerFleetOutcomeLogKind(
-  outcomeType: PlayerFleetOutcomeLogEvent['outcomeType']
+  outcomeType: PlayerFleetOutcomeLogEvent['outcomeType'],
 ): import('./player-action-log.js').PlayerActionLogKind {
   switch (outcomeType) {
     case 'ATTACK':
@@ -743,14 +763,18 @@ app.get('/api/auth/register-config', (_req, res) => {
 });
 
 app.post('/api/auth/register', async (req, res) => {
-  const registerRateLimit = consumeRateLimit('auth-register', getRequestIdentity(req), REGISTER_RATE_LIMIT);
+  const registerRateLimit = consumeRateLimit(
+    'auth-register',
+    getRequestIdentity(req),
+    REGISTER_RATE_LIMIT,
+  );
   if (!registerRateLimit.allowed) {
     return sendApiError(
       res,
       429,
       `Too many registration attempts. Try again in ${registerRateLimit.retryAfterSeconds} seconds.`,
       'api.auth.register.rateLimited',
-      { retryAfterSeconds: registerRateLimit.retryAfterSeconds }
+      { retryAfterSeconds: registerRateLimit.retryAfterSeconds },
     );
   }
 
@@ -760,7 +784,12 @@ app.post('/api/auth/register', async (req, res) => {
   const password = normalizePassword(body?.password);
 
   if (!playerName || !email || !password) {
-    return sendApiError(res, 400, 'Invalid player name, email, or password.', 'api.auth.register.invalidPayload');
+    return sendApiError(
+      res,
+      400,
+      'Invalid player name, email, or password.',
+      'api.auth.register.invalidPayload',
+    );
   }
 
   const data = loadAuthData();
@@ -784,7 +813,7 @@ app.post('/api/auth/register', async (req, res) => {
       res,
       400,
       turnstile.error ?? 'CAPTCHA verification failed.',
-      'api.auth.register.captchaFailed'
+      'api.auth.register.captchaFailed',
     );
   }
 
@@ -800,7 +829,9 @@ app.post('/api/auth/register', async (req, res) => {
     localAdmin: false,
     createdAt: now,
     emailConfirmedAt: null,
-    confirmationExpiresAt: new Date(Date.parse(now) + PENDING_CONFIRMATION_LIFETIME_MS).toISOString(),
+    confirmationExpiresAt: new Date(
+      Date.parse(now) + PENDING_CONFIRMATION_LIFETIME_MS,
+    ).toISOString(),
     lastConfirmationSentAt: now,
     lastPasswordResetRequestedAt: null,
     failedLoginAttempts: 0,
@@ -810,33 +841,41 @@ app.post('/api/auth/register', async (req, res) => {
     language: null,
     currentGameId: null,
     lastClosedGameId: null,
-    lastClosedAt: null
+    lastClosedAt: null,
   };
 
   data.nextAccountId += 1;
   data.accounts.push(account);
   saveAuthData(data);
 
-  const response: RegisterResponse = withApiMessage({
-    playerName: account.playerName,
-    email: account.email,
-    accountStatus: account.status,
-    requiresConfirmation: true,
-    confirmationExpiresAt: account.confirmationExpiresAt,
-    message: 'Account created. Email confirmation is required before login. For now activation must be completed manually on the server.'
-  }, 'api.auth.register.successManualActivation');
+  const response: RegisterResponse = withApiMessage(
+    {
+      playerName: account.playerName,
+      email: account.email,
+      accountStatus: account.status,
+      requiresConfirmation: true,
+      confirmationExpiresAt: account.confirmationExpiresAt,
+      message:
+        'Account created. Email confirmation is required before login. For now activation must be completed manually on the server.',
+    },
+    'api.auth.register.successManualActivation',
+  );
   return res.status(201).json(response);
 });
 
 app.post('/api/auth/resend-confirmation', (req, res) => {
-  const resendRateLimit = consumeRateLimit('auth-resend-confirmation', getRequestIdentity(req), RESEND_CONFIRMATION_RATE_LIMIT);
+  const resendRateLimit = consumeRateLimit(
+    'auth-resend-confirmation',
+    getRequestIdentity(req),
+    RESEND_CONFIRMATION_RATE_LIMIT,
+  );
   if (!resendRateLimit.allowed) {
     return sendApiError(
       res,
       429,
       `Too many confirmation resend attempts. Try again in ${resendRateLimit.retryAfterSeconds} seconds.`,
       'api.auth.resendConfirmation.rateLimited',
-      { retryAfterSeconds: resendRateLimit.retryAfterSeconds }
+      { retryAfterSeconds: resendRateLimit.retryAfterSeconds },
     );
   }
 
@@ -853,11 +892,15 @@ app.post('/api/auth/resend-confirmation', (req, res) => {
 
   const emailKey = toEmailKey(email);
   const account = data.accounts.find((entry) => entry.emailKey === emailKey);
-  const genericResponse: ResendConfirmationResponse = withApiMessage({
-    message: 'If a pending account exists for that email, the confirmation window was refreshed. Email delivery is not configured yet on this server; activation must still be completed manually on the server.',
-    confirmationExpiresAt: null,
-    nextAllowedAt: null
-  }, 'api.auth.resendConfirmation.successGeneric');
+  const genericResponse: ResendConfirmationResponse = withApiMessage(
+    {
+      message:
+        'If a pending account exists for that email, the confirmation window was refreshed. Email delivery is not configured yet on this server; activation must still be completed manually on the server.',
+      confirmationExpiresAt: null,
+      nextAllowedAt: null,
+    },
+    'api.auth.resendConfirmation.successGeneric',
+  );
 
   if (!account || account.status !== 'PENDING_CONFIRMATION') {
     return res.status(200).json(genericResponse);
@@ -865,7 +908,10 @@ app.post('/api/auth/resend-confirmation', (req, res) => {
 
   const nowMs = Date.now();
   if (!canResendConfirmation(account, nowMs, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS)) {
-    const nextAllowedAt = getResendConfirmationNextAllowedAt(account, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS);
+    const nextAllowedAt = getResendConfirmationNextAllowedAt(
+      account,
+      DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS,
+    );
     const nextAllowedAtMs = nextAllowedAt ? Date.parse(nextAllowedAt) : Number.NaN;
     const retryAfterMs = Number.isFinite(nextAllowedAtMs)
       ? Math.max(0, nextAllowedAtMs - nowMs)
@@ -873,21 +919,31 @@ app.post('/api/auth/resend-confirmation', (req, res) => {
     const retryAfterMinutes = Math.max(1, Math.ceil(retryAfterMs / 60000));
     return res.status(429).json({
       ...buildApiErrorBody(
-        buildResendConfirmationCooldownMessage(account, nowMs, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS),
+        buildResendConfirmationCooldownMessage(
+          account,
+          nowMs,
+          DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS,
+        ),
         'api.auth.resendConfirmation.cooldown',
-        buildRetryAfterMinutesParams(retryAfterMinutes)
+        buildRetryAfterMinutesParams(retryAfterMinutes),
       ),
-      nextAllowedAt
+      nextAllowedAt,
     });
   }
 
   const updated = markConfirmationResent(account, nowMs, PENDING_CONFIRMATION_LIFETIME_MS);
   saveAuthData(data);
-  const response: ResendConfirmationResponse = withApiMessage({
-    message: genericResponse.message,
-    confirmationExpiresAt: updated.confirmationExpiresAt,
-    nextAllowedAt: getResendConfirmationNextAllowedAt(account, DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS)
-  }, 'api.auth.resendConfirmation.successGeneric');
+  const response: ResendConfirmationResponse = withApiMessage(
+    {
+      message: genericResponse.message,
+      confirmationExpiresAt: updated.confirmationExpiresAt,
+      nextAllowedAt: getResendConfirmationNextAllowedAt(
+        account,
+        DEFAULT_RESEND_CONFIRMATION_COOLDOWN_MS,
+      ),
+    },
+    'api.auth.resendConfirmation.successGeneric',
+  );
   return res.status(200).json(response);
 });
 
@@ -899,7 +955,7 @@ app.post('/api/auth/login', (req, res) => {
       429,
       `Too many login attempts. Try again in ${loginRateLimit.retryAfterSeconds} seconds.`,
       'api.auth.login.rateLimited',
-      { retryAfterSeconds: loginRateLimit.retryAfterSeconds }
+      { retryAfterSeconds: loginRateLimit.retryAfterSeconds },
     );
   }
 
@@ -908,7 +964,12 @@ app.post('/api/auth/login', (req, res) => {
   const password = normalizePassword(body?.password);
 
   if (!playerName || !password) {
-    return sendApiError(res, 400, 'Invalid player name or password.', 'api.auth.login.invalidCredentials');
+    return sendApiError(
+      res,
+      400,
+      'Invalid player name or password.',
+      'api.auth.login.invalidCredentials',
+    );
   }
 
   const data = loadAuthData();
@@ -933,8 +994,10 @@ app.post('/api/auth/login', (req, res) => {
       res,
       loginBlock.status,
       loginBlock.error,
-      loginBlock.status === 403 ? 'api.auth.login.pendingConfirmation' : 'api.auth.login.accountLocked',
-      loginBlock.status === 423 ? buildRetryAfterMinutesParams(retryAfterMinutes) : null
+      loginBlock.status === 403
+        ? 'api.auth.login.pendingConfirmation'
+        : 'api.auth.login.accountLocked',
+      loginBlock.status === 423 ? buildRetryAfterMinutesParams(retryAfterMinutes) : null,
     );
   }
   if (!verifyPassword(password, account.passwordHash)) {
@@ -947,18 +1010,21 @@ app.post('/api/auth/login', (req, res) => {
         423,
         buildLockedAccountMessage(account, nowMs),
         'api.auth.login.accountLocked',
-        buildRetryAfterMinutesParams(retryAfterMinutes)
+        buildRetryAfterMinutesParams(retryAfterMinutes),
       );
     }
-    const attemptsLeft = Math.max(0, DEFAULT_MAX_PASSWORD_RETRY_ATTEMPTS - account.failedLoginAttempts);
+    const attemptsLeft = Math.max(
+      0,
+      DEFAULT_MAX_PASSWORD_RETRY_ATTEMPTS - account.failedLoginAttempts,
+    );
     return sendApiError(
       res,
       401,
       `Wrong password. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} left before a 10 minute lock.`,
       'api.auth.login.wrongPasswordAttemptsLeft',
       {
-        attemptsLeft
-      }
+        attemptsLeft,
+      },
     );
   }
 
@@ -1024,14 +1090,18 @@ app.get('/api/account/settings', (req, res) => {
 });
 
 app.post('/api/account/settings/preferences', (req, res) => {
-  const rateLimit = consumeRateLimit('account-settings', getRequestIdentity(req), ACCOUNT_MUTATION_RATE_LIMIT);
+  const rateLimit = consumeRateLimit(
+    'account-settings',
+    getRequestIdentity(req),
+    ACCOUNT_MUTATION_RATE_LIMIT,
+  );
   if (!rateLimit.allowed) {
     return sendApiError(
       res,
       429,
       `Too many settings updates. Try again in ${rateLimit.retryAfterSeconds} seconds.`,
       'api.account.settings.rateLimited',
-      { retryAfterSeconds: rateLimit.retryAfterSeconds }
+      { retryAfterSeconds: rateLimit.retryAfterSeconds },
     );
   }
 
@@ -1053,7 +1123,12 @@ app.post('/api/account/settings/preferences', (req, res) => {
   const replaceWithBotOnLogout = body?.replaceWithBotOnLogout === true;
   const logoutBotProfileId = normalizeBotProfileId(body?.logoutBotProfileId);
   if (replaceWithBotOnLogout && !logoutBotProfileId) {
-    return sendApiError(res, 400, 'A valid bot profile is required when bot replacement is enabled.', 'api.account.settings.invalidBotProfile');
+    return sendApiError(
+      res,
+      400,
+      'A valid bot profile is required when bot replacement is enabled.',
+      'api.account.settings.invalidBotProfile',
+    );
   }
 
   const language = normalizeLanguagePreference(body?.language);
@@ -1066,14 +1141,18 @@ app.post('/api/account/settings/preferences', (req, res) => {
 });
 
 app.post('/api/account/settings/tutorials/reset', (req, res) => {
-  const rateLimit = consumeRateLimit('account-settings', getRequestIdentity(req), ACCOUNT_MUTATION_RATE_LIMIT);
+  const rateLimit = consumeRateLimit(
+    'account-settings',
+    getRequestIdentity(req),
+    ACCOUNT_MUTATION_RATE_LIMIT,
+  );
   if (!rateLimit.allowed) {
     return sendApiError(
       res,
       429,
       `Too many settings updates. Try again in ${rateLimit.retryAfterSeconds} seconds.`,
       'api.account.settings.rateLimited',
-      { retryAfterSeconds: rateLimit.retryAfterSeconds }
+      { retryAfterSeconds: rateLimit.retryAfterSeconds },
     );
   }
 
@@ -1105,15 +1184,18 @@ app.post('/api/account/settings/tutorials/reset', (req, res) => {
   } else {
     playerSession = {
       ...playerSession,
-      tutorialRead: createTutorialReadState(false)
+      tutorialRead: createTutorialReadState(false),
     };
   }
 
-  const response: ResetAccountTutorialsResponse = withApiMessage({
-    settings: buildAccountSettingsResponse(account),
-    player: playerSession,
-    message: 'Tutorial progress was reset for your current session.'
-  }, 'api.account.settings.tutorialsReset');
+  const response: ResetAccountTutorialsResponse = withApiMessage(
+    {
+      settings: buildAccountSettingsResponse(account),
+      player: playerSession,
+      message: 'Tutorial progress was reset for your current session.',
+    },
+    'api.account.settings.tutorialsReset',
+  );
   return res.status(200).json(response);
 });
 
@@ -1156,12 +1238,7 @@ app.post('/api/games/:gameId/select', (req, res) => {
   } else if (record.kind === 'SINGLEPLAYER') {
     const resumeResult = loadSingleplayerGameRecord(auth.data, auth.session, record);
     if (!resumeResult.ok) {
-      return sendApiError(
-        res,
-        resumeResult.status,
-        resumeResult.error,
-        resumeResult.errorKey
-      );
+      return sendApiError(res, resumeResult.status, resumeResult.error, resumeResult.errorKey);
     }
   }
 
@@ -1179,7 +1256,7 @@ app.post('/api/games/:gameId/close-current', (req, res) => {
       res,
       403,
       'Local admin privileges are required to close a single-player game.',
-      'api.games.closeCurrent.requiresLocalAdmin'
+      'api.games.closeCurrent.requiresLocalAdmin',
     );
   }
 
@@ -1189,7 +1266,7 @@ app.post('/api/games/:gameId/close-current', (req, res) => {
       res,
       403,
       'Select this game as your current game first.',
-      'api.games.closeCurrent.selectFirst'
+      'api.games.closeCurrent.selectFirst',
     );
   }
 
@@ -1203,7 +1280,7 @@ app.post('/api/games/:gameId/close-current', (req, res) => {
       res,
       400,
       'Use multiplayer leave/resume actions for multiplayer games.',
-      'api.games.closeCurrent.useMultiplayerActions'
+      'api.games.closeCurrent.useMultiplayerActions',
     );
   }
 
@@ -1225,7 +1302,7 @@ app.post('/api/games/:gameId/close-current', (req, res) => {
       res,
       500,
       'Unable to close the current single-player game.',
-      'api.games.closeCurrent.failed'
+      'api.games.closeCurrent.failed',
     );
   }
 });
@@ -1251,14 +1328,16 @@ app.get('/api/games/:gameId/saves', (req, res) => {
 });
 
 app.get('/api/games/:gameId/state', (req, res) => {
-  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId, { markPresenceSeen: true });
+  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId, {
+    markPresenceSeen: true,
+  });
   if ('error' in access) {
     return sendApiRouteError(res, access);
   }
 
   const response: GameStateResponse = {
     player: toPlayerSession(access.auth.session, access.galaxy),
-    galaxy: buildGalaxySnapshot(access.galaxy)
+    galaxy: buildGalaxySnapshot(access.galaxy),
   };
 
   return res.status(200).json(response);
@@ -1288,7 +1367,7 @@ app.post('/api/game/start', (req, res) => {
       res,
       403,
       'Local admin privileges are required to start a new game.',
-      'api.game.start.requiresLocalAdmin'
+      'api.game.start.requiresLocalAdmin',
     );
   }
 
@@ -1323,8 +1402,8 @@ app.post('/api/game/start', (req, res) => {
         rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
         maxSaveFiles: MAX_GAME_SAVE_FILES,
         gameId: nextGameId,
-        trackedPlayerActionFleetIds: []
-      }
+        trackedPlayerActionFleetIds: [],
+      },
     );
   } catch (error) {
     console.error('Initial game save failed.', error);
@@ -1339,26 +1418,28 @@ app.post('/api/game/start', (req, res) => {
   resetActiveTurnState();
   clearBotDecisionTracesV2();
   resetBotAdminRuntimeState();
-    registerRunningGame(auth.data, 'SINGLEPLAYER', nextGalaxy, {
-      gameId: nextGameId,
-      ownerAccountId: auth.session.accountId,
+  registerRunningGame(auth.data, 'SINGLEPLAYER', nextGalaxy, {
+    gameId: nextGameId,
+    ownerAccountId: auth.session.accountId,
     ownerPlayerName: auth.session.playerName,
     hostAccountId: auth.session.accountId,
     hostPlayerName: auth.session.playerName,
     currentSaveId: initialSaveSummary?.saveId ?? null,
     lastSavedAt: initialSaveSummary?.savedAt ?? null,
     currentGameAccountIds: [auth.session.accountId],
-    memberships: [{
-      accountId: auth.session.accountId,
-      playerName: auth.session.playerName,
-      role: 'OWNER'
-      }]
+    memberships: [
+      {
+        accountId: auth.session.accountId,
+        playerName: auth.session.playerName,
+        role: 'OWNER',
+      },
+    ],
   });
   ensureCurrentPlayerActionLog(auth.session.playerName);
 
   const response: StartGameResponse = {
     player: toPlayerSession(auth.session, nextGalaxy),
-    galaxy: buildGalaxySnapshot(nextGalaxy)
+    galaxy: buildGalaxySnapshot(nextGalaxy),
   };
 
   return res.status(200).json(response);
@@ -1387,13 +1468,17 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
       return sendApiError(res, 404, 'Saved game not found.', 'api.game.saves.savedGameNotFound');
     }
 
-    const loadAccess = resolveGameSaveLoadAccess(save, auth.session.accountId, auth.session.localAdmin === true);
+    const loadAccess = resolveGameSaveLoadAccess(
+      save,
+      auth.session.accountId,
+      auth.session.localAdmin === true,
+    );
     if (!loadAccess.canLoad) {
       return sendApiError(
         res,
         403,
         loadAccess.canLoadReason ?? 'Forbidden.',
-        'api.game.saves.requiresLocalAdminToLoad'
+        'api.game.saves.requiresLocalAdminToLoad',
       );
     }
 
@@ -1402,7 +1487,9 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
     currentGameOwnerId = auth.session.accountId;
     currentGameOwnerPlayerName = auth.session.playerName;
     currentGameSetup = hydrated.setup;
-    currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(hydrated.trackedPlayerActionFleetIds);
+    currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(
+      hydrated.trackedPlayerActionFleetIds,
+    );
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
     clearBotDecisionTracesV2();
@@ -1416,17 +1503,19 @@ app.post('/api/game/saves/:saveId/load', (req, res) => {
       currentSaveId: req.params.saveId,
       lastSavedAt: save.savedAt,
       currentGameAccountIds: [auth.session.accountId],
-      memberships: [{
-        accountId: auth.session.accountId,
-        playerName: auth.session.playerName,
-        role: 'OWNER'
-      }]
+      memberships: [
+        {
+          accountId: auth.session.accountId,
+          playerName: auth.session.playerName,
+          role: 'OWNER',
+        },
+      ],
     });
     ensureCurrentPlayerActionLog(auth.session.playerName);
 
     const response: LoadGameResponse = {
       player: toPlayerSession(auth.session, currentGalaxy),
-      galaxy: buildGalaxySnapshot(currentGalaxy)
+      galaxy: buildGalaxySnapshot(currentGalaxy),
     };
 
     return res.status(200).json(response);
@@ -1447,7 +1536,7 @@ app.delete('/api/game/saves/:saveId', (req, res) => {
       res,
       403,
       'Local admin privileges are required to manage saves.',
-      'api.game.saves.requiresLocalAdmin'
+      'api.game.saves.requiresLocalAdmin',
     );
   }
 
@@ -1483,7 +1572,7 @@ app.post('/api/multiplayer/games', (req, res) => {
       res,
       403,
       'Local admin privileges are required to create a multiplayer lobby.',
-      'api.multiplayer.games.createRequiresLocalAdmin'
+      'api.multiplayer.games.createRequiresLocalAdmin',
     );
   }
 
@@ -1493,7 +1582,7 @@ app.post('/api/multiplayer/games', (req, res) => {
     auth.session.accountId,
     auth.session.playerName,
     now,
-    createDefaultMultiplayerLobbySetup()
+    createDefaultMultiplayerLobbySetup(),
   );
   const record = createGameRecord({
     gameId,
@@ -1510,14 +1599,14 @@ app.post('/api/multiplayer/games', (req, res) => {
     lastStartedAt: null,
     lastSavedAt: null,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   });
   upsertGameRecord(GAME_REGISTRY_DATA_PATH, record);
   upsertDraftLobbyWithMemberships({
     ...lobby,
     gameId,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   });
 
   return res.status(200).json(buildMultiplayerGameDetailResponse(gameId, auth.session));
@@ -1547,35 +1636,46 @@ app.post('/api/multiplayer/games/:gameId/resume-lobby', (req, res) => {
       res,
       403,
       'Local admin privileges are required to reopen an inactive multiplayer lobby.',
-      'api.multiplayer.resumeLobby.requiresLocalAdmin'
+      'api.multiplayer.resumeLobby.requiresLocalAdmin',
     );
   }
 
   const record = getGameById(GAME_REGISTRY_DATA_PATH, req.params.gameId);
-  if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING' || hasGameRuntime(req.params.gameId)) {
+  if (
+    !record ||
+    record.kind !== 'MULTIPLAYER' ||
+    record.status !== 'RUNNING' ||
+    hasGameRuntime(req.params.gameId)
+  ) {
     return sendApiError(
       res,
       404,
       'Saved inactive multiplayer game not found.',
-      'api.multiplayer.resumeLobby.savedInactiveNotFound'
+      'api.multiplayer.resumeLobby.savedInactiveNotFound',
     );
   }
 
-  const existingLobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
+  const existingLobby = getMultiplayerLobbyByGameId(
+    MULTIPLAYER_LOBBY_STORE_DATA_PATH,
+    req.params.gameId,
+  );
   if (existingLobby) {
-    return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
+    return res
+      .status(200)
+      .json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
   }
 
   try {
-    const saveId = record.currentSaveId
-      ?? listGameSaveSummariesForGame(GAME_SAVES_DIRECTORY_PATH, req.params.gameId)[0]?.saveId
-      ?? null;
+    const saveId =
+      record.currentSaveId ??
+      listGameSaveSummariesForGame(GAME_SAVES_DIRECTORY_PATH, req.params.gameId)[0]?.saveId ??
+      null;
     if (!saveId) {
       return sendApiError(
         res,
         404,
         'No saved snapshot is available for this multiplayer game.',
-        'api.multiplayer.resumeLobby.noSavedSnapshot'
+        'api.multiplayer.resumeLobby.noSavedSnapshot',
       );
     }
 
@@ -1585,41 +1685,47 @@ app.post('/api/multiplayer/games/:gameId/resume-lobby', (req, res) => {
         res,
         404,
         'Saved snapshot not found.',
-        'api.multiplayer.resumeLobby.savedSnapshotNotFound'
+        'api.multiplayer.resumeLobby.savedSnapshotNotFound',
       );
     }
 
     const summary = buildGameSaveSummary(save, saveId);
     const lobby = bindSaveToLobby(
       {
-        ...openMultiplayerLobby(auth.session.accountId, auth.session.playerName, new Date().toISOString()),
-        isResumeLobby: true
+        ...openMultiplayerLobby(
+          auth.session.accountId,
+          auth.session.playerName,
+          new Date().toISOString(),
+        ),
+        isResumeLobby: true,
       },
       saveId,
       save,
-      summary
+      summary,
     );
     upsertDraftLobbyWithMemberships({
       ...lobby,
       isResumeLobby: true,
       gameId: req.params.gameId,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     });
     updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
       hostAccountId: auth.session.accountId,
       hostPlayerName: auth.session.playerName,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     });
 
-    return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
+    return res
+      .status(200)
+      .json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
   } catch (error) {
     console.error('Failed to reopen inactive multiplayer game as a resume lobby.', error);
     return sendApiError(
       res,
       500,
       'Unable to reopen the saved multiplayer game.',
-      'api.multiplayer.resumeLobby.reopenFailed'
+      'api.multiplayer.resumeLobby.reopenFailed',
     );
   }
 });
@@ -1635,7 +1741,7 @@ app.post('/api/multiplayer/games/:gameId/archive', (req, res) => {
       res,
       403,
       'Local admin privileges are required to archive multiplayer games.',
-      'api.multiplayer.archive.requiresLocalAdmin'
+      'api.multiplayer.archive.requiresLocalAdmin',
     );
   }
 
@@ -1645,14 +1751,14 @@ app.post('/api/multiplayer/games/:gameId/archive', (req, res) => {
       res,
       404,
       'Inactive multiplayer game not found.',
-      'api.multiplayer.archive.inactiveGameNotFound'
+      'api.multiplayer.archive.inactiveGameNotFound',
     );
   }
 
   deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
   updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
     status: 'ARCHIVED',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
 
   return res.status(204).send();
@@ -1670,31 +1776,40 @@ app.post('/api/multiplayer/games/:gameId/join', (req, res) => {
       res,
       404,
       'Joinable multiplayer lobby not found.',
-      'api.multiplayer.lobby.joinableNotFound'
+      'api.multiplayer.lobby.joinableNotFound',
     );
   }
 
-  const alreadyJoinedLobby = joinable.lobby.members.some((member) => member.accountId === auth.session.accountId);
-  if (!alreadyJoinedLobby && joinable.lobby.members.length >= maxLobbyMembersForSetup(joinable.lobby.setup)) {
+  const alreadyJoinedLobby = joinable.lobby.members.some(
+    (member) => member.accountId === auth.session.accountId,
+  );
+  if (
+    !alreadyJoinedLobby &&
+    joinable.lobby.members.length >= maxLobbyMembersForSetup(joinable.lobby.setup)
+  ) {
     return sendApiError(
       res,
       409,
       'This multiplayer lobby already has the maximum number of human players.',
-      'api.multiplayer.lobby.maxHumanPlayersReached'
+      'api.multiplayer.lobby.maxHumanPlayersReached',
     );
   }
 
   removeAccountFromOtherDraftMultiplayerLobbies(auth.session.accountId, req.params.gameId);
-  const nextLobby = joinMultiplayerLobby(joinable.lobby, {
-    accountId: auth.session.accountId,
-    playerName: auth.session.playerName,
-    isLocalAdmin: auth.session.localAdmin === true
-  }, new Date().toISOString());
+  const nextLobby = joinMultiplayerLobby(
+    joinable.lobby,
+    {
+      accountId: auth.session.accountId,
+      playerName: auth.session.playerName,
+      isLocalAdmin: auth.session.localAdmin === true,
+    },
+    new Date().toISOString(),
+  );
   upsertDraftLobbyWithMemberships({
     ...nextLobby,
     gameId: req.params.gameId,
     createdAt: joinable.lobby.createdAt,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
 
   return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
@@ -1714,7 +1829,7 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
       res,
       404,
       'Running Scheduled Turns multiplayer game not found.',
-      'api.multiplayer.joinRunning.runningScheduledNotFound'
+      'api.multiplayer.joinRunning.runningScheduledNotFound',
     );
   }
 
@@ -1723,7 +1838,7 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
       res,
       409,
       'This account already belongs to the selected game.',
-      'api.multiplayer.joinRunning.accountAlreadyBelongs'
+      'api.multiplayer.joinRunning.accountAlreadyBelongs',
     );
   }
 
@@ -1732,7 +1847,7 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
       res,
       409,
       'This Scheduled Turns game already has the maximum number of human players.',
-      'api.multiplayer.joinRunning.maxHumanPlayersReached'
+      'api.multiplayer.joinRunning.maxHumanPlayersReached',
     );
   }
 
@@ -1741,7 +1856,7 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
       res,
       409,
       'A player with this name already exists in the selected game.',
-      'api.multiplayer.joinRunning.playerNameExists'
+      'api.multiplayer.joinRunning.playerNameExists',
     );
   }
 
@@ -1750,7 +1865,7 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
       res,
       409,
       'The selected game is not currently available.',
-      'api.multiplayer.joinRunning.selectedGameUnavailable'
+      'api.multiplayer.joinRunning.selectedGameUnavailable',
     );
   }
 
@@ -1761,21 +1876,21 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
       res,
       409,
       'No safe starting system is available for late join.',
-      'api.multiplayer.joinRunning.noSafeStartingSystem'
+      'api.multiplayer.joinRunning.noSafeStartingSystem',
     );
   }
 
   const player = creator.replaceSystemWithLateJoinHomeworld(
     currentGalaxy,
     replacementCoordinates,
-    auth.session.playerName
+    auth.session.playerName,
   );
   if (!player) {
     return sendApiError(
       res,
       409,
       'Unable to create a safe late-join homeworld.',
-      'api.multiplayer.joinRunning.safeHomeworldFailed'
+      'api.multiplayer.joinRunning.safeHomeworldFailed',
     );
   }
 
@@ -1792,7 +1907,7 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
       'New Player Joined',
       `${player.playerName} joined the scheduled multiplayer game.`,
       null,
-      'System'
+      'System',
     );
   }
 
@@ -1804,7 +1919,7 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
     role: 'MEMBER',
     joinedAt: now,
     lastSeenAt: now,
-    isActive: true
+    isActive: true,
   });
   setAccountCurrentGameId(auth.data, auth.session.accountId, gameId);
   auth.session.currentGameId = gameId;
@@ -1817,54 +1932,63 @@ app.post('/api/multiplayer/games/:gameId/join-running', (req, res) => {
 
   return res.status(200).json({
     player: toPlayerSession(auth.session, currentGalaxy),
-    galaxy: buildGalaxySnapshot(currentGalaxy)
+    galaxy: buildGalaxySnapshot(currentGalaxy),
   });
 });
 
-app.post(['/api/multiplayer/games/:gameId/leave', '/api/multiplayer/games/:gameId/leave-lobby'], (req, res) => {
-  const auth = getAuthSession(req);
-  if (!auth) {
-    return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
-  }
+app.post(
+  ['/api/multiplayer/games/:gameId/leave', '/api/multiplayer/games/:gameId/leave-lobby'],
+  (req, res) => {
+    const auth = getAuthSession(req);
+    if (!auth) {
+      return sendApiError(res, 401, 'Unauthorized.', 'api.errors.unauthorized');
+    }
 
-  const joinable = loadJoinableMultiplayerLobby(req.params.gameId);
-  if (!joinable) {
-    return sendApiError(
-      res,
-      404,
-      'Joinable multiplayer lobby not found.',
-      'api.multiplayer.lobby.joinableNotFound'
-    );
-  }
+    const joinable = loadJoinableMultiplayerLobby(req.params.gameId);
+    if (!joinable) {
+      return sendApiError(
+        res,
+        404,
+        'Joinable multiplayer lobby not found.',
+        'api.multiplayer.lobby.joinableNotFound',
+      );
+    }
 
-  if (!joinable.lobby.members.some((member) => member.accountId === auth.session.accountId)) {
-    return sendApiError(res, 403, 'Join the lobby first.', 'api.multiplayer.lobby.joinFirst');
-  }
+    if (!joinable.lobby.members.some((member) => member.accountId === auth.session.accountId)) {
+      return sendApiError(res, 403, 'Join the lobby first.', 'api.multiplayer.lobby.joinFirst');
+    }
 
-  const nextLobby = leaveMultiplayerLobby(joinable.lobby, auth.session.accountId);
-  removeMembership(GAME_MEMBERSHIPS_DATA_PATH, req.params.gameId, auth.session.accountId);
-  if (!nextLobby) {
-    deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
-    updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, joinable.record.status === 'DRAFT'
-      ? {
-        status: 'ARCHIVED',
-        updatedAt: new Date().toISOString()
-      }
-      : {
-        updatedAt: new Date().toISOString()
-      });
-    return res.status(204).send();
-  }
+    const nextLobby = leaveMultiplayerLobby(joinable.lobby, auth.session.accountId);
+    removeMembership(GAME_MEMBERSHIPS_DATA_PATH, req.params.gameId, auth.session.accountId);
+    if (!nextLobby) {
+      deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, req.params.gameId);
+      updateGameRecord(
+        GAME_REGISTRY_DATA_PATH,
+        req.params.gameId,
+        joinable.record.status === 'DRAFT'
+          ? {
+              status: 'ARCHIVED',
+              updatedAt: new Date().toISOString(),
+            }
+          : {
+              updatedAt: new Date().toISOString(),
+            },
+      );
+      return res.status(204).send();
+    }
 
-  upsertDraftLobbyWithMemberships({
-    ...nextLobby,
-    gameId: req.params.gameId,
-    createdAt: joinable.lobby.createdAt,
-    updatedAt: new Date().toISOString()
-  });
+    upsertDraftLobbyWithMemberships({
+      ...nextLobby,
+      gameId: req.params.gameId,
+      createdAt: joinable.lobby.createdAt,
+      updatedAt: new Date().toISOString(),
+    });
 
-  return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
-});
+    return res
+      .status(200)
+      .json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
+  },
+);
 
 app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
   const auth = getAuthSession(req);
@@ -1878,16 +2002,18 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
       res,
       404,
       'Running multiplayer game not found.',
-      'api.multiplayer.leaveCurrentGame.runningGameNotFound'
+      'api.multiplayer.leaveCurrentGame.runningGameNotFound',
     );
   }
 
-  if (!isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, req.params.gameId, auth.session.accountId)) {
+  if (
+    !isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, req.params.gameId, auth.session.accountId)
+  ) {
     return sendApiError(
       res,
       403,
       'Join the multiplayer game first.',
-      'api.multiplayer.leaveCurrentGame.joinFirst'
+      'api.multiplayer.leaveCurrentGame.joinFirst',
     );
   }
 
@@ -1897,7 +2023,7 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
     saveAuthData(auth.data);
     const response: LeaveCurrentMultiplayerGameResponse = {
       currentGameId: null,
-      message: null
+      message: null,
     };
     return res.status(200).json(response);
   }
@@ -1911,7 +2037,12 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
   const presenceSummary = buildMultiplayerPresenceSummary(auth.data, req.params.gameId, runtime);
   let message: string | null = null;
   if (runtime.setup.scheduledTurns.enabled !== true && presenceSummary.presentHumanCount < 2) {
-    saveAndUnloadRunningMultiplayerGame(req.params.gameId, runtime, record, 'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS');
+    saveAndUnloadRunningMultiplayerGame(
+      req.params.gameId,
+      runtime,
+      record,
+      'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS',
+    );
     message = 'Not enough online players, saving and stopping the game.';
   } else {
     moveMountedRuntimeAwayFromGame(req.params.gameId);
@@ -1920,13 +2051,15 @@ app.post('/api/multiplayer/games/:gameId/leave-current-game', (req, res) => {
   saveAuthData(auth.data);
   const response: LeaveCurrentMultiplayerGameResponse = {
     currentGameId: null,
-    message
+    message,
   };
   return res.status(200).json(response);
 });
 
 app.post('/api/multiplayer/games/:gameId/presence', (req, res) => {
-  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId, { markPresenceSeen: true });
+  const access = resolveAuthenticatedGameAccessForGame(req, req.params.gameId, {
+    markPresenceSeen: true,
+  });
   if ('error' in access) {
     return sendApiRouteError(res, access);
   }
@@ -1937,7 +2070,7 @@ app.post('/api/multiplayer/games/:gameId/presence', (req, res) => {
       res,
       404,
       'Running multiplayer game not found.',
-      'api.multiplayer.presence.runningGameNotFound'
+      'api.multiplayer.presence.runningGameNotFound',
     );
   }
 
@@ -1946,11 +2079,17 @@ app.post('/api/multiplayer/games/:gameId/presence', (req, res) => {
     acknowledgeAutoSkipTurnNotice(
       MULTIPLAYER_PRESENCE_DATA_PATH,
       req.params.gameId,
-      access.auth.session.accountId
+      access.auth.session.accountId,
     );
   }
   if (body?.acknowledgePresenceRemovedNotice === true) {
-    if (clearPresenceRemovedNoticeForAccount(access.auth.data, access.auth.session.accountId, req.params.gameId)) {
+    if (
+      clearPresenceRemovedNoticeForAccount(
+        access.auth.data,
+        access.auth.session.accountId,
+        req.params.gameId,
+      )
+    ) {
       saveAuthData(access.auth.data);
       access.auth.session.pendingPresenceRemovedNoticeGameId = null;
     }
@@ -1971,7 +2110,7 @@ app.post('/api/multiplayer/games/:gameId/auto-skip-turn', (req, res) => {
       res,
       404,
       'Running multiplayer game not found.',
-      'api.multiplayer.presence.runningGameNotFound'
+      'api.multiplayer.presence.runningGameNotFound',
     );
   }
 
@@ -1981,7 +2120,7 @@ app.post('/api/multiplayer/games/:gameId/auto-skip-turn', (req, res) => {
       res,
       400,
       'Auto skip toggle requires an enabled boolean.',
-      'api.multiplayer.presence.autoSkipRequiresEnabledBoolean'
+      'api.multiplayer.presence.autoSkipRequiresEnabledBoolean',
     );
   }
 
@@ -1989,14 +2128,14 @@ app.post('/api/multiplayer/games/:gameId/auto-skip-turn', (req, res) => {
     activateAutoSkipTurn(
       MULTIPLAYER_PRESENCE_DATA_PATH,
       req.params.gameId,
-      access.auth.session.accountId
+      access.auth.session.accountId,
     );
   } else {
     setAutoSkipTurnEnabled(
       MULTIPLAYER_PRESENCE_DATA_PATH,
       req.params.gameId,
       access.auth.session.accountId,
-      body.enabled
+      body.enabled,
     );
   }
 
@@ -2004,11 +2143,17 @@ app.post('/api/multiplayer/games/:gameId/auto-skip-turn', (req, res) => {
     acknowledgeAutoSkipTurnNotice(
       MULTIPLAYER_PRESENCE_DATA_PATH,
       req.params.gameId,
-      access.auth.session.accountId
+      access.auth.session.accountId,
     );
   }
   if (body.acknowledgePresenceRemovedNotice === true) {
-    if (clearPresenceRemovedNoticeForAccount(access.auth.data, access.auth.session.accountId, req.params.gameId)) {
+    if (
+      clearPresenceRemovedNoticeForAccount(
+        access.auth.data,
+        access.auth.session.accountId,
+        req.params.gameId,
+      )
+    ) {
       saveAuthData(access.auth.data);
       access.auth.session.pendingPresenceRemovedNoticeGameId = null;
     }
@@ -2029,7 +2174,7 @@ app.post('/api/multiplayer/games/:gameId/ready', (req, res) => {
       res,
       404,
       'Joinable multiplayer lobby not found.',
-      'api.multiplayer.lobby.joinableNotFound'
+      'api.multiplayer.lobby.joinableNotFound',
     );
   }
 
@@ -2042,12 +2187,16 @@ app.post('/api/multiplayer/games/:gameId/ready', (req, res) => {
     return sendApiError(res, 400, 'Invalid ready payload.', 'api.multiplayer.ready.invalidPayload');
   }
 
-  const nextLobby = setMultiplayerLobbyMemberReady(joinable.lobby, auth.session.accountId, body.ready);
+  const nextLobby = setMultiplayerLobbyMemberReady(
+    joinable.lobby,
+    auth.session.accountId,
+    body.ready,
+  );
   upsertDraftLobbyWithMemberships({
     ...nextLobby,
     gameId: req.params.gameId,
     createdAt: joinable.lobby.createdAt,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
 
   return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
@@ -2065,7 +2214,7 @@ app.post('/api/multiplayer/games/:gameId/setup', (req, res) => {
       res,
       404,
       'Draft multiplayer lobby not found or not manageable.',
-      'api.multiplayer.lobby.notManageable'
+      'api.multiplayer.lobby.notManageable',
     );
   }
   if (managed.lobby.isResumeLobby) {
@@ -2073,7 +2222,7 @@ app.post('/api/multiplayer/games/:gameId/setup', (req, res) => {
       res,
       409,
       'Resume lobbies use locked saved-game settings.',
-      'api.multiplayer.setup.resumeLocked'
+      'api.multiplayer.setup.resumeLocked',
     );
   }
 
@@ -2084,7 +2233,7 @@ app.post('/api/multiplayer/games/:gameId/setup', (req, res) => {
 
   const setup = normalizeGalaxySetup({
     ...body.setup,
-    playerAmount: Math.max(1, managed.lobby.members.length)
+    playerAmount: Math.max(1, managed.lobby.members.length),
   });
   if (!isValidSetup(setup)) {
     return sendApiError(res, 400, 'Invalid setup payload.', 'api.game.start.invalidSetupPayload');
@@ -2095,11 +2244,11 @@ app.post('/api/multiplayer/games/:gameId/setup', (req, res) => {
     ...nextLobby,
     gameId: req.params.gameId,
     createdAt: managed.lobby.createdAt,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
   updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
     name: nextLobby.setup.galaxyName,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
 
   return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
@@ -2117,7 +2266,7 @@ app.post('/api/multiplayer/games/:gameId/bind-save', (req, res) => {
       res,
       404,
       'Draft multiplayer lobby not found or not manageable.',
-      'api.multiplayer.lobby.notManageable'
+      'api.multiplayer.lobby.notManageable',
     );
   }
   if (managed.lobby.isResumeLobby) {
@@ -2125,7 +2274,7 @@ app.post('/api/multiplayer/games/:gameId/bind-save', (req, res) => {
       res,
       409,
       'Resume lobbies are already locked to their saved game.',
-      'api.multiplayer.bindSave.resumeLocked'
+      'api.multiplayer.bindSave.resumeLocked',
     );
   }
 
@@ -2137,12 +2286,16 @@ app.post('/api/multiplayer/games/:gameId/bind-save', (req, res) => {
         res,
         400,
         'Save selection is required.',
-        'api.multiplayer.bindSave.saveSelectionRequired'
+        'api.multiplayer.bindSave.saveSelectionRequired',
       );
     }
 
     const save = readGameSaveById(GAME_SAVES_DIRECTORY_PATH, saveId);
-    const loadAccess = resolveGameSaveLoadAccess(save, auth.session.accountId, auth.session.localAdmin === true);
+    const loadAccess = resolveGameSaveLoadAccess(
+      save,
+      auth.session.accountId,
+      auth.session.localAdmin === true,
+    );
     if (!loadAccess.canLoad || !save) {
       if (!save) {
         return sendApiError(res, 404, 'Saved game not found.', 'api.game.saves.savedGameNotFound');
@@ -2152,7 +2305,7 @@ app.post('/api/multiplayer/games/:gameId/bind-save', (req, res) => {
         res,
         403,
         loadAccess.canLoadReason ?? 'Forbidden.',
-        'api.game.saves.requiresLocalAdminToLoad'
+        'api.game.saves.requiresLocalAdminToLoad',
       );
     }
 
@@ -2160,20 +2313,22 @@ app.post('/api/multiplayer/games/:gameId/bind-save', (req, res) => {
       managed.lobby,
       saveId,
       save,
-      buildGameSaveSummary(save, saveId)
+      buildGameSaveSummary(save, saveId),
     );
     upsertDraftLobbyWithMemberships({
       ...nextLobby,
       gameId: req.params.gameId,
       createdAt: managed.lobby.createdAt,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     });
     updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
       name: nextLobby.boundSave?.galaxyName ?? nextLobby.setup.galaxyName,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     });
 
-    return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
+    return res
+      .status(200)
+      .json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
   } catch (error) {
     console.error('Failed to bind saved game to multiplayer lobby.', error);
     return sendApiError(res, 500, 'Unable to bind saved game.', 'api.multiplayer.bindSave.failed');
@@ -2192,7 +2347,7 @@ app.post('/api/multiplayer/games/:gameId/clear-save', (req, res) => {
       res,
       404,
       'Draft multiplayer lobby not found or not manageable.',
-      'api.multiplayer.lobby.notManageable'
+      'api.multiplayer.lobby.notManageable',
     );
   }
   if (managed.lobby.isResumeLobby) {
@@ -2200,7 +2355,7 @@ app.post('/api/multiplayer/games/:gameId/clear-save', (req, res) => {
       res,
       409,
       'Resume lobbies stay locked to their saved game.',
-      'api.multiplayer.clearSave.resumeLocked'
+      'api.multiplayer.clearSave.resumeLocked',
     );
   }
 
@@ -2209,11 +2364,11 @@ app.post('/api/multiplayer/games/:gameId/clear-save', (req, res) => {
     ...nextLobby,
     gameId: req.params.gameId,
     createdAt: managed.lobby.createdAt,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
   updateGameRecord(GAME_REGISTRY_DATA_PATH, req.params.gameId, {
     name: nextLobby.setup.galaxyName,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
 
   return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
@@ -2231,7 +2386,7 @@ app.post('/api/multiplayer/games/:gameId/assign-seat', (req, res) => {
       res,
       404,
       'Draft multiplayer lobby not found or not manageable.',
-      'api.multiplayer.lobby.notManageable'
+      'api.multiplayer.lobby.notManageable',
     );
   }
 
@@ -2243,7 +2398,7 @@ app.post('/api/multiplayer/games/:gameId/assign-seat', (req, res) => {
       res,
       400,
       'Invalid seat assignment payload.',
-      'api.multiplayer.assignSeat.invalidPayload'
+      'api.multiplayer.assignSeat.invalidPayload',
     );
   }
 
@@ -2252,19 +2407,19 @@ app.post('/api/multiplayer/games/:gameId/assign-seat', (req, res) => {
       res,
       404,
       'Saved human seat not found.',
-      'api.multiplayer.assignSeat.savedSeatNotFound'
+      'api.multiplayer.assignSeat.savedSeatNotFound',
     );
   }
 
   if (
-    accountId !== null
-    && !managed.lobby.members.some((member) => member.accountId === accountId)
+    accountId !== null &&
+    !managed.lobby.members.some((member) => member.accountId === accountId)
   ) {
     return sendApiError(
       res,
       404,
       'Lobby member not found.',
-      'api.multiplayer.assignSeat.memberNotFound'
+      'api.multiplayer.assignSeat.memberNotFound',
     );
   }
 
@@ -2273,7 +2428,7 @@ app.post('/api/multiplayer/games/:gameId/assign-seat', (req, res) => {
     ...nextLobby,
     gameId: req.params.gameId,
     createdAt: managed.lobby.createdAt,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
 
   return res.status(200).json(buildMultiplayerGameDetailResponse(req.params.gameId, auth.session));
@@ -2291,7 +2446,7 @@ app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
       res,
       404,
       'Draft multiplayer lobby not found or not manageable.',
-      'api.multiplayer.lobby.notManageable'
+      'api.multiplayer.lobby.notManageable',
     );
   }
 
@@ -2308,7 +2463,7 @@ app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
         res,
         409,
         'Only one running Scheduled Turns multiplayer game can be active on this server.',
-        'api.multiplayer.start.onlyOneScheduledTurnsGame'
+        'api.multiplayer.start.onlyOneScheduledTurnsGame',
       );
     }
   }
@@ -2318,7 +2473,7 @@ app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
       auth.data,
       auth.session,
       req.params.gameId,
-      managed.lobby
+      managed.lobby,
     );
     return res.status(200).json(response);
   } catch (error) {
@@ -2328,7 +2483,12 @@ app.post('/api/multiplayer/games/:gameId/start', (req, res) => {
     }
 
     console.error('Failed to start multiplayer game.', error);
-    return sendApiError(res, 500, 'Unable to start multiplayer game.', 'api.multiplayer.start.failed');
+    return sendApiError(
+      res,
+      500,
+      'Unable to start multiplayer game.',
+      'api.multiplayer.start.failed',
+    );
   }
 });
 
@@ -2340,7 +2500,7 @@ app.get('/api/game/state', (req, res) => {
 
   const response: GameStateResponse = {
     player: toPlayerSession(access.auth.session, access.galaxy),
-    galaxy: buildGalaxySnapshot(access.galaxy)
+    galaxy: buildGalaxySnapshot(access.galaxy),
   };
 
   return res.status(200).json(response);
@@ -2362,16 +2522,14 @@ app.get('/api/admin/bots/traces', (req, res) => {
     return res.status(controller.status).json({ error: controller.error });
   }
 
-  const requestedPlayerId = typeof req.query.playerId === 'string'
-    ? Number.parseInt(req.query.playerId, 10)
-    : NaN;
-  const playerId = Number.isInteger(requestedPlayerId) && requestedPlayerId > 0
-    ? requestedPlayerId
-    : undefined;
+  const requestedPlayerId =
+    typeof req.query.playerId === 'string' ? Number.parseInt(req.query.playerId, 10) : NaN;
+  const playerId =
+    Number.isInteger(requestedPlayerId) && requestedPlayerId > 0 ? requestedPlayerId : undefined;
 
   return res.status(200).json({
     turn: controller.galaxy.currentTurn,
-    traces: getBotDecisionTracesV2(playerId)
+    traces: getBotDecisionTracesV2(playerId),
   });
 });
 
@@ -2383,7 +2541,7 @@ app.get('/api/admin/bots', (req, res) => {
 
   const response: BotAdminStatesResponse = {
     turn: controller.galaxy.currentTurn,
-    bots: listBotAdminStates(controller.galaxy)
+    bots: listBotAdminStates(controller.galaxy),
   };
   return res.status(200).json(response);
 });
@@ -2395,7 +2553,9 @@ app.post('/api/admin/bots/:playerId/profile', (req, res) => {
   }
 
   const playerId = parseRoutePositiveInt(req.params.playerId);
-  const profileId = normalizeBotProfileId((req.body as UpdateBotProfileRequest | undefined)?.profileId);
+  const profileId = normalizeBotProfileId(
+    (req.body as UpdateBotProfileRequest | undefined)?.profileId,
+  );
   if (playerId === null || !profileId) {
     return res.status(400).json({ error: 'Invalid bot profile payload.' });
   }
@@ -2408,7 +2568,7 @@ app.post('/api/admin/bots/:playerId/profile', (req, res) => {
   setBotProfile(bot, profileId);
   const response: BotAdminActionResponse = {
     turn: controller.galaxy.currentTurn,
-    bot: toBotAdminState(controller.galaxy, bot)
+    bot: toBotAdminState(controller.galaxy, bot),
   };
   return res.status(200).json(response);
 });
@@ -2420,9 +2580,7 @@ app.post('/api/admin/bots/:playerId/pause', (req, res) => {
   }
 
   const playerId = parseRoutePositiveInt(req.params.playerId);
-  const bot = playerId === null
-    ? null
-    : controller.galaxy.botPlayerMap.get(playerId) ?? null;
+  const bot = playerId === null ? null : (controller.galaxy.botPlayerMap.get(playerId) ?? null);
   if (!bot) {
     return res.status(404).json({ error: 'Bot player not found.' });
   }
@@ -2430,7 +2588,7 @@ app.post('/api/admin/bots/:playerId/pause', (req, res) => {
   pauseBot(bot.playerId);
   const response: BotAdminActionResponse = {
     turn: controller.galaxy.currentTurn,
-    bot: toBotAdminState(controller.galaxy, bot)
+    bot: toBotAdminState(controller.galaxy, bot),
   };
   return res.status(200).json(response);
 });
@@ -2442,9 +2600,7 @@ app.post('/api/admin/bots/:playerId/resume', (req, res) => {
   }
 
   const playerId = parseRoutePositiveInt(req.params.playerId);
-  const bot = playerId === null
-    ? null
-    : controller.galaxy.botPlayerMap.get(playerId) ?? null;
+  const bot = playerId === null ? null : (controller.galaxy.botPlayerMap.get(playerId) ?? null);
   if (!bot) {
     return res.status(404).json({ error: 'Bot player not found.' });
   }
@@ -2452,7 +2608,7 @@ app.post('/api/admin/bots/:playerId/resume', (req, res) => {
   resumeBot(bot.playerId);
   const response: BotAdminActionResponse = {
     turn: controller.galaxy.currentTurn,
-    bot: toBotAdminState(controller.galaxy, bot)
+    bot: toBotAdminState(controller.galaxy, bot),
   };
   return res.status(200).json(response);
 });
@@ -2464,9 +2620,7 @@ app.post('/api/admin/bots/:playerId/clear-memory', (req, res) => {
   }
 
   const playerId = parseRoutePositiveInt(req.params.playerId);
-  const bot = playerId === null
-    ? null
-    : controller.galaxy.botPlayerMap.get(playerId) ?? null;
+  const bot = playerId === null ? null : (controller.galaxy.botPlayerMap.get(playerId) ?? null);
   if (!bot) {
     return res.status(404).json({ error: 'Bot player not found.' });
   }
@@ -2474,7 +2628,7 @@ app.post('/api/admin/bots/:playerId/clear-memory', (req, res) => {
   clearBotMemory(bot);
   const response: BotAdminActionResponse = {
     turn: controller.galaxy.currentTurn,
-    bot: toBotAdminState(controller.galaxy, bot)
+    bot: toBotAdminState(controller.galaxy, bot),
   };
   return res.status(200).json(response);
 });
@@ -2507,27 +2661,33 @@ app.post('/api/game/diplomacy', (req, res) => {
     return res.status(400).json({ error: 'Diplomacy relation must target two different players.' });
   }
 
-  if (!resolvePlayerById(controller.galaxy, playerAId) || !resolvePlayerById(controller.galaxy, playerBId)) {
+  if (
+    !resolvePlayerById(controller.galaxy, playerAId) ||
+    !resolvePlayerById(controller.galaxy, playerBId)
+  ) {
     return res.status(404).json({ error: 'One or more diplomacy players were not found.' });
   }
 
-  if (!isBotsUnitedAgainstHumansDiplomacyStatusAllowed(
-    controller.galaxy,
-    playerAId,
-    playerBId,
-    status,
-    currentGameSetup
-  )) {
+  if (
+    !isBotsUnitedAgainstHumansDiplomacyStatusAllowed(
+      controller.galaxy,
+      playerAId,
+      playerBId,
+      status,
+      currentGameSetup,
+    )
+  ) {
     const expectedStatus = expectedBotsUnitedAgainstHumansStatus(
       controller.galaxy,
       playerAId,
       playerBId,
-      currentGameSetup
+      currentGameSetup,
     );
     return res.status(409).json({
-      error: expectedStatus === DiplomaticStatus.ALLIED
-        ? 'This game mode keeps permanent bot empires allied with each other.'
-        : 'This game mode keeps permanent bot empires at war with human players.'
+      error:
+        expectedStatus === DiplomaticStatus.ALLIED
+          ? 'This game mode keeps permanent bot empires allied with each other.'
+          : 'This game mode keeps permanent bot empires at war with human players.',
     });
   }
 
@@ -2560,7 +2720,7 @@ app.post('/api/game/diplomacy/proposals', (req, res) => {
 
   const result = createDiplomaticProposalCommand(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId, setup: currentGameSetup },
-    { targetPlayerId, requestedStatus }
+    { targetPlayerId, requestedStatus },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -2582,7 +2742,7 @@ app.post('/api/game/diplomacy/proposals/:proposalId/accept', (req, res) => {
 
   const result = approveDiplomaticProposalCommand(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId, setup: currentGameSetup },
-    { proposalId }
+    { proposalId },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -2604,7 +2764,7 @@ app.post('/api/game/diplomacy/proposals/:proposalId/reject', (req, res) => {
 
   const result = rejectDiplomaticProposalCommand(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId, setup: currentGameSetup },
-    { proposalId }
+    { proposalId },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -2626,7 +2786,7 @@ app.post('/api/game/diplomacy/proposals/:proposalId/cancel', (req, res) => {
 
   const result = cancelDiplomaticProposalCommand(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId, setup: currentGameSetup },
-    { proposalId }
+    { proposalId },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -2650,14 +2810,14 @@ app.post('/api/game/diplomacy/support-requests', (req, res) => {
   const bombardmentPriorities = parseBombardmentPriorities(body?.bombardmentPriorities);
   const requestedResources = normalizeSupportResources(body?.requestedResources);
   if (
-    targetPlayerId === null
-    || supportType === null
-    || targetCoordinates === null
-    || (body?.missionType !== undefined && missionType === null)
-    || (body?.minimumShips !== undefined && minimumShips === null)
-    || (body?.bombardmentPriorities !== undefined
-      && body?.bombardmentPriorities !== null
-      && bombardmentPriorities === null)
+    targetPlayerId === null ||
+    supportType === null ||
+    targetCoordinates === null ||
+    (body?.missionType !== undefined && missionType === null) ||
+    (body?.minimumShips !== undefined && minimumShips === null) ||
+    (body?.bombardmentPriorities !== undefined &&
+      body?.bombardmentPriorities !== null &&
+      bombardmentPriorities === null)
   ) {
     return res.status(400).json({ error: 'Invalid support request payload.' });
   }
@@ -2671,8 +2831,8 @@ app.post('/api/game/diplomacy/support-requests', (req, res) => {
       requestedResources,
       missionType,
       minimumShips: minimumShips ?? [],
-      bombardmentPriorities
-    }
+      bombardmentPriorities,
+    },
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -2742,86 +2902,92 @@ app.post('/api/game/mail/requests/delete', (req, res) => {
   const diplomacyRequestIds = new Set(
     requestRefs
       .filter((entry) => entry.requestType === 'DIPLOMACY_PROPOSAL')
-      .map((entry) => entry.requestId)
+      .map((entry) => entry.requestId),
   );
   const maintenanceRequestIds = new Set(
     requestRefs
       .filter((entry) => entry.requestType === 'MAINTENANCE')
-      .map((entry) => entry.requestId)
+      .map((entry) => entry.requestId),
   );
   const jumpGateRequestIds = new Set(
     requestRefs
       .filter((entry) => entry.requestType === 'JUMP_GATE')
-      .map((entry) => entry.requestId)
+      .map((entry) => entry.requestId),
   );
   const supportRequestIds = new Set(
-    requestRefs
-      .filter((entry) => entry.requestType === 'SUPPORT')
-      .map((entry) => entry.requestId)
+    requestRefs.filter((entry) => entry.requestType === 'SUPPORT').map((entry) => entry.requestId),
   );
 
   const deletableDiplomacyIds = new Set(
     authPlayer.galaxy.diplomaticProposals
-      .filter((proposal) =>
-        diplomacyRequestIds.has(proposal.proposalId)
-        && proposal.state !== DiplomaticProposalState.PENDING
-        && (proposal.fromPlayerId === authPlayer.player.playerId || proposal.toPlayerId === authPlayer.player.playerId)
+      .filter(
+        (proposal) =>
+          diplomacyRequestIds.has(proposal.proposalId) &&
+          proposal.state !== DiplomaticProposalState.PENDING &&
+          (proposal.fromPlayerId === authPlayer.player.playerId ||
+            proposal.toPlayerId === authPlayer.player.playerId),
       )
-      .map((proposal) => proposal.proposalId)
+      .map((proposal) => proposal.proposalId),
   );
   const diplomacyBefore = authPlayer.galaxy.diplomaticProposals.length;
-  authPlayer.galaxy.diplomaticProposals = authPlayer.galaxy.diplomaticProposals.filter((proposal) =>
-    !deletableDiplomacyIds.has(proposal.proposalId)
+  authPlayer.galaxy.diplomaticProposals = authPlayer.galaxy.diplomaticProposals.filter(
+    (proposal) => !deletableDiplomacyIds.has(proposal.proposalId),
   );
   deletedCount += diplomacyBefore - authPlayer.galaxy.diplomaticProposals.length;
 
   const deletableMaintenanceIds = new Set(
     authPlayer.galaxy.maintenanceRequests
-      .filter((request) =>
-        maintenanceRequestIds.has(request.requestId)
-        && request.state !== DiplomaticProposalState.PENDING
-        && (request.fromPlayerId === authPlayer.player.playerId || request.toPlayerId === authPlayer.player.playerId)
+      .filter(
+        (request) =>
+          maintenanceRequestIds.has(request.requestId) &&
+          request.state !== DiplomaticProposalState.PENDING &&
+          (request.fromPlayerId === authPlayer.player.playerId ||
+            request.toPlayerId === authPlayer.player.playerId),
       )
-      .map((request) => request.requestId)
+      .map((request) => request.requestId),
   );
   const maintenanceBefore = authPlayer.galaxy.maintenanceRequests.length;
-  authPlayer.galaxy.maintenanceRequests = authPlayer.galaxy.maintenanceRequests.filter((request) =>
-    !deletableMaintenanceIds.has(request.requestId)
+  authPlayer.galaxy.maintenanceRequests = authPlayer.galaxy.maintenanceRequests.filter(
+    (request) => !deletableMaintenanceIds.has(request.requestId),
   );
   deletedCount += maintenanceBefore - authPlayer.galaxy.maintenanceRequests.length;
 
   const deletableJumpGateIds = new Set(
     authPlayer.galaxy.jumpGateRequests
-      .filter((request) =>
-        jumpGateRequestIds.has(request.requestId)
-        && request.state !== DiplomaticProposalState.PENDING
-        && (request.fromPlayerId === authPlayer.player.playerId || request.toPlayerId === authPlayer.player.playerId)
+      .filter(
+        (request) =>
+          jumpGateRequestIds.has(request.requestId) &&
+          request.state !== DiplomaticProposalState.PENDING &&
+          (request.fromPlayerId === authPlayer.player.playerId ||
+            request.toPlayerId === authPlayer.player.playerId),
       )
-      .map((request) => request.requestId)
+      .map((request) => request.requestId),
   );
   const jumpGateBefore = authPlayer.galaxy.jumpGateRequests.length;
-  authPlayer.galaxy.jumpGateRequests = authPlayer.galaxy.jumpGateRequests.filter((request) =>
-    !deletableJumpGateIds.has(request.requestId)
+  authPlayer.galaxy.jumpGateRequests = authPlayer.galaxy.jumpGateRequests.filter(
+    (request) => !deletableJumpGateIds.has(request.requestId),
   );
   deletedCount += jumpGateBefore - authPlayer.galaxy.jumpGateRequests.length;
 
   const deletableSupportIds = new Set(
     authPlayer.galaxy.supportRequests
-      .filter((request) =>
-        supportRequestIds.has(request.requestId)
-        && request.state !== DiplomaticProposalState.PENDING
-        && (request.fromPlayerId === authPlayer.player.playerId || request.toPlayerId === authPlayer.player.playerId)
+      .filter(
+        (request) =>
+          supportRequestIds.has(request.requestId) &&
+          request.state !== DiplomaticProposalState.PENDING &&
+          (request.fromPlayerId === authPlayer.player.playerId ||
+            request.toPlayerId === authPlayer.player.playerId),
       )
-      .map((request) => request.requestId)
+      .map((request) => request.requestId),
   );
   const supportBefore = authPlayer.galaxy.supportRequests.length;
-  authPlayer.galaxy.supportRequests = authPlayer.galaxy.supportRequests.filter((request) =>
-    !deletableSupportIds.has(request.requestId)
+  authPlayer.galaxy.supportRequests = authPlayer.galaxy.supportRequests.filter(
+    (request) => !deletableSupportIds.has(request.requestId),
   );
   deletedCount += supportBefore - authPlayer.galaxy.supportRequests.length;
 
   const response: DeleteMailRequestsResponse = {
-    deletedCount
+    deletedCount,
   };
   return res.status(200).json(response);
 });
@@ -2837,7 +3003,9 @@ app.post('/api/game/mail/maintenance-requests/:requestId/approve', (req, res) =>
     return res.status(400).json({ error: 'Invalid maintenance request id.' });
   }
 
-  const request = authPlayer.galaxy.maintenanceRequests.find((entry) => entry.requestId === requestId);
+  const request = authPlayer.galaxy.maintenanceRequests.find(
+    (entry) => entry.requestId === requestId,
+  );
   if (!request) {
     return res.status(404).json({ error: 'Maintenance request not found.' });
   }
@@ -2855,7 +3023,7 @@ app.post('/api/game/mail/maintenance-requests/:requestId/approve', (req, res) =>
   const result = approveFleetMaintenanceRequest(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
     requestId,
-    isExplicitMaintenancePayload(body) ? requestedApproval : null
+    isExplicitMaintenancePayload(body) ? requestedApproval : null,
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -2875,7 +3043,9 @@ app.post('/api/game/mail/maintenance-requests/:requestId/reject', (req, res) => 
     return res.status(400).json({ error: 'Invalid maintenance request id.' });
   }
 
-  const request = authPlayer.galaxy.maintenanceRequests.find((entry) => entry.requestId === requestId);
+  const request = authPlayer.galaxy.maintenanceRequests.find(
+    (entry) => entry.requestId === requestId,
+  );
   if (!request) {
     return res.status(404).json({ error: 'Maintenance request not found.' });
   }
@@ -2890,7 +3060,7 @@ app.post('/api/game/mail/maintenance-requests/:requestId/reject', (req, res) => 
 
   const result = rejectFleetMaintenanceRequest(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
-    requestId
+    requestId,
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -2909,7 +3079,9 @@ app.post('/api/game/mail/maintenance-requests/:requestId/cancel', (req, res) => 
     return res.status(400).json({ error: 'Invalid maintenance request id.' });
   }
 
-  const request = authPlayer.galaxy.maintenanceRequests.find((entry) => entry.requestId === requestId);
+  const request = authPlayer.galaxy.maintenanceRequests.find(
+    (entry) => entry.requestId === requestId,
+  );
   if (!request) {
     return res.status(404).json({ error: 'Maintenance request not found.' });
   }
@@ -2924,7 +3096,7 @@ app.post('/api/game/mail/maintenance-requests/:requestId/cancel', (req, res) => 
 
   const result = cancelFleetMaintenanceRequest(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
-    requestId
+    requestId,
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -2958,7 +3130,7 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/approve', (req, res) => {
 
   const result = approveJumpGateRequestCommand(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
-    requestId
+    requestId,
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -2993,7 +3165,7 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/reject', (req, res) => {
 
   const result = rejectJumpGateRequestCommand(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
-    requestId
+    requestId,
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -3027,7 +3199,7 @@ app.post('/api/game/mail/jump-gate-requests/:requestId/cancel', (req, res) => {
 
   const result = cancelJumpGateRequestCommand(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
-    requestId
+    requestId,
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -3051,7 +3223,7 @@ app.post('/api/game/mail/support-requests/:requestId/approve', (req, res) => {
   const result = approveSupportRequestCommand(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
     requestId,
-    approvedResources
+    approvedResources,
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -3073,7 +3245,7 @@ app.post('/api/game/mail/support-requests/:requestId/reject', (req, res) => {
 
   const result = rejectSupportRequestCommand(
     { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
-    requestId
+    requestId,
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -3109,7 +3281,7 @@ app.post('/api/game/mail/support-requests/:requestId/cancel', (req, res) => {
     authPlayer.galaxy,
     request,
     'Support request cancelled.',
-    'The support request was cancelled by the requester.'
+    'The support request was cancelled by the requester.',
   );
   return res.status(200).json(buildMailViewResponse(authPlayer.galaxy, authPlayer.player));
 });
@@ -3139,7 +3311,13 @@ app.post('/api/game/mail/messages/send', (req, res) => {
       return res.status(404).json({ error: 'Message target not found.' });
     }
 
-    if (!canSendDirectMailToPlayer(authPlayer.galaxy, authPlayer.player.playerId, targetPlayer.playerId)) {
+    if (
+      !canSendDirectMailToPlayer(
+        authPlayer.galaxy,
+        authPlayer.player.playerId,
+        targetPlayer.playerId,
+      )
+    ) {
       return res.status(403).json({ error: 'Target player is not available for direct mail.' });
     }
 
@@ -3149,16 +3327,21 @@ app.post('/api/game/mail/messages/send', (req, res) => {
       title,
       messageBody,
       authPlayer.player.playerId,
-      authPlayer.player.playerName
+      authPlayer.player.playerName,
     );
 
     const response: SendMailMessageResponse = { deliveredCount: 1 };
     return res.status(200).json(response);
   }
 
-  const allianceRecipients = resolveAllianceMailRecipients(authPlayer.galaxy, authPlayer.player.playerId);
+  const allianceRecipients = resolveAllianceMailRecipients(
+    authPlayer.galaxy,
+    authPlayer.player.playerId,
+  );
   if (allianceRecipients.length === 0) {
-    return res.status(409).json({ error: 'No allied human players are currently available for alliance mail.' });
+    return res
+      .status(409)
+      .json({ error: 'No allied human players are currently available for alliance mail.' });
   }
 
   for (const recipient of allianceRecipients) {
@@ -3168,7 +3351,7 @@ app.post('/api/game/mail/messages/send', (req, res) => {
       title,
       messageBody,
       authPlayer.player.playerId,
-      authPlayer.player.playerName
+      authPlayer.player.playerName,
     );
   }
 
@@ -3187,10 +3370,13 @@ app.get('/api/game/galaxy-presentation-data', (req, res) => {
   }
 
   const presentation = getPresentationData(access.galaxy, access.playerId);
-  const starSystemNotes = GalaxyPresentationData.collectStarSystemNotes(access.galaxy, access.playerId);
+  const starSystemNotes = GalaxyPresentationData.collectStarSystemNotes(
+    access.galaxy,
+    access.playerId,
+  );
   const response: GalaxyPresentationDataDto = toGalaxyPresentationDataDto(
     presentation,
-    starSystemNotes
+    starSystemNotes,
   );
   return res.status(200).json(response);
 });
@@ -3337,7 +3523,7 @@ app.get('/api/game/client-planet', (req, res) => {
   const response: ClientPlanetDto = toClientPlanetDto(clientPlanet, {
     x,
     y,
-    z
+    z,
   });
   return res.status(200).json(response);
 });
@@ -3398,24 +3584,34 @@ app.post('/api/game/sensor-phalanx/scan', (req, res) => {
   }
 
   originPlanet.synchronizeSensorPhalanxTurn(authPlayer.galaxy.currentTurn);
-  const phalanxLevel = originPlanet.getBuildingLevel(BuildingType.SENSOR_PHALANX as BuildingTypeType);
+  const phalanxLevel = originPlanet.getBuildingLevel(
+    BuildingType.SENSOR_PHALANX as BuildingTypeType,
+  );
   if (phalanxLevel <= 0 || originPlanet.getSensorPhalanxNormalRange() <= 0) {
-    return res.status(409).json({ error: 'Sensor Phalanx is not operational on the origin planet.' });
+    return res
+      .status(409)
+      .json({ error: 'Sensor Phalanx is not operational on the origin planet.' });
   }
 
   const activeScanRange = originPlanet.getSensorPhalanxActiveScanRange();
   const distance = calculateTravelDistance(origin, target);
   if (distance > activeScanRange) {
-    return res.status(409).json({ error: `Target planet is outside Sensor Phalanx scan range (${activeScanRange}).` });
+    return res
+      .status(409)
+      .json({ error: `Target planet is outside Sensor Phalanx scan range (${activeScanRange}).` });
   }
 
   const scanCost = originPlanet.getSensorPhalanxScanCost();
   if (originPlanet.rBDSFTQ.resources.deuterium < scanCost) {
-    return res.status(409).json({ error: 'Not enough deuterium on the origin planet for a Sensor Phalanx scan.' });
+    return res
+      .status(409)
+      .json({ error: 'Not enough deuterium on the origin planet for a Sensor Phalanx scan.' });
   }
 
   if (!originPlanet.consumeSensorPhalanxScan(authPlayer.galaxy.currentTurn)) {
-    return res.status(409).json({ error: 'No Sensor Phalanx scans remain on this planet for the current turn.' });
+    return res
+      .status(409)
+      .json({ error: 'No Sensor Phalanx scans remain on this planet for the current turn.' });
   }
 
   originPlanet.rBDSFTQ.resources.deuterium -= scanCost;
@@ -3425,17 +3621,19 @@ app.post('/api/game/sensor-phalanx/scan', (req, res) => {
     originPlanet,
     origin,
     targetPlanet,
-    target
-  );
-  authPlayer.player.addReport(createSensorPhalanxActiveScanReport(
-    authPlayer.player,
-    originPlanet,
-    origin,
-    targetPlanet,
     target,
-    response.contacts,
-    authPlayer.galaxy.currentTurn
-  ));
+  );
+  authPlayer.player.addReport(
+    createSensorPhalanxActiveScanReport(
+      authPlayer.player,
+      originPlanet,
+      origin,
+      targetPlanet,
+      target,
+      response.contacts,
+      authPlayer.galaxy.currentTurn,
+    ),
+  );
 
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(authPlayer.galaxy);
   return res.status(200).json(response);
@@ -3478,19 +3676,21 @@ app.post('/api/game/abandon-planet', (req, res) => {
     authPlayer.galaxy,
     authPlayer.player.playerId,
     neutralOwner.playerId,
-    DiplomaticStatus.PASSIVE
+    DiplomaticStatus.PASSIVE,
   );
   refreshPlanetIntelForPlayer(
     authPlayer.player,
     neutralOwner,
     planet,
-    authPlayer.galaxy.currentTurn
+    authPlayer.galaxy.currentTurn,
   );
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(authPlayer.galaxy);
 
   const presentation = getPresentationData(authPlayer.galaxy, authPlayer.player.playerId);
   const response: AbandonPlanetResponse = {
-    ownedPlanets: presentation.ownedPlanets.map((entry) => toClientPlanetDtoFromClientPlanet(entry))
+    ownedPlanets: presentation.ownedPlanets.map((entry) =>
+      toClientPlanetDtoFromClientPlanet(entry),
+    ),
   };
   return res.status(200).json(response);
 });
@@ -3537,7 +3737,10 @@ app.post('/api/game/trade-port/use-offer', (req, res) => {
     return res.status(409).json({ error: 'This trade offer was already used this turn.' });
   }
 
-  const currentResourceAmount = resourceAmountForType(planet.rBDSFTQ.resources, offer.costResourceType);
+  const currentResourceAmount = resourceAmountForType(
+    planet.rBDSFTQ.resources,
+    offer.costResourceType,
+  );
   if (currentResourceAmount < offer.totalCost) {
     return res.status(409).json({ error: 'Not enough local resources to use this trade offer.' });
   }
@@ -3587,7 +3790,7 @@ app.post('/api/game/building-queue', (req, res) => {
 
   const result = startBuildingConstruction(
     { galaxy: currentGalaxy, playerId },
-    { x, y, z, buildingType }
+    { x, y, z, buildingType },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -3601,16 +3804,16 @@ app.post('/api/game/building-queue', (req, res) => {
     coordinates: { x, y, z },
     payload: {
       buildingType,
-      targetLevel: result.value.planet.getBuildingLevel(buildingType) + 1
+      targetLevel: result.value.planet.getBuildingLevel(buildingType) + 1,
     },
     deltas: {
       spent: {
         metal: result.value.spent.metal,
         crystal: result.value.spent.crystal,
-        deuterium: result.value.spent.deuterium
+        deuterium: result.value.spent.deuterium,
       },
-      buildingQueueLength: result.value.queueLength
-    }
+      buildingQueueLength: result.value.queueLength,
+    },
   });
 
   const clientPlanet = currentGalaxy.createClientPlanet(result.value.planet, playerId);
@@ -3678,11 +3881,11 @@ app.post('/api/game/building-queue/reorder', (req, res) => {
     coordinates: { x, y, z },
     payload: {
       fromIndex,
-      toIndex
+      toIndex,
     },
     deltas: {
-      buildingQueueLength: planet.rBDSFTQ.buildingQueue.length
-    }
+      buildingQueueLength: planet.rBDSFTQ.buildingQueue.length,
+    },
   });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
@@ -3757,16 +3960,16 @@ app.post('/api/game/building-queue/cancel', (req, res) => {
     payload: {
       index,
       buildingType: canceledBuildingType,
-      targetLevel: canceledTargetLevel
+      targetLevel: canceledTargetLevel,
     },
     deltas: {
       refund: {
         metal: refund.metal,
         crystal: refund.crystal,
-        deuterium: refund.deuterium
+        deuterium: refund.deuterium,
       },
-      buildingQueueLength: planet.rBDSFTQ.buildingQueue.length
-    }
+      buildingQueueLength: planet.rBDSFTQ.buildingQueue.length,
+    },
   });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
@@ -3802,25 +4005,26 @@ app.post('/api/game/shipyard-queue', (req, res) => {
   const x = parseBodyNonNegativeInt(body?.x);
   const y = parseBodyNonNegativeInt(body?.y);
   const z = parseBodyNonNegativeInt(body?.z);
-  const itemKind = body?.itemKind === 'defence' ? 'defence' : body?.itemKind === 'ship' ? 'ship' : null;
+  const itemKind =
+    body?.itemKind === 'defence' ? 'defence' : body?.itemKind === 'ship' ? 'ship' : null;
   const shipType = normalizeShipType(body?.shipType);
   const defenceType = normalizeDefenceType(body?.defenceType);
   const amount = parseBodyIntInRange(body?.amount, 1, 100000);
   if (
-    x === null
-    || y === null
-    || z === null
-    || !itemKind
-    || amount === null
-    || (itemKind === 'ship' && !shipType)
-    || (itemKind === 'defence' && !defenceType)
+    x === null ||
+    y === null ||
+    z === null ||
+    !itemKind ||
+    amount === null ||
+    (itemKind === 'ship' && !shipType) ||
+    (itemKind === 'defence' && !defenceType)
   ) {
     return res.status(400).json({ error: 'Invalid shipyard queue payload.' });
   }
 
   const result = startShipyardConstruction(
     { galaxy: currentGalaxy, playerId },
-    { x, y, z, itemKind, shipType, defenceType, amount }
+    { x, y, z, itemKind, shipType, defenceType, amount },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -3837,16 +4041,16 @@ app.post('/api/game/shipyard-queue', (req, res) => {
       itemKind,
       shipType,
       defenceType,
-      amount
+      amount,
     },
     deltas: {
       spent: {
         metal: result.value.spent.metal,
         crystal: result.value.spent.crystal,
-        deuterium: result.value.spent.deuterium
+        deuterium: result.value.spent.deuterium,
       },
-      shipyardQueueLength: result.value.queueLength
-    }
+      shipyardQueueLength: result.value.queueLength,
+    },
   });
 
   const clientPlanet = currentGalaxy.createClientPlanet(result.value.planet, playerId);
@@ -3914,11 +4118,11 @@ app.post('/api/game/shipyard-queue/reorder', (req, res) => {
     coordinates: { x, y, z },
     payload: {
       fromIndex,
-      toIndex
+      toIndex,
     },
     deltas: {
-      shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length
-    }
+      shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length,
+    },
   });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
@@ -3973,9 +4177,14 @@ app.post('/api/game/shipyard-queue/cancel', (req, res) => {
     return res.status(400).json({ error: 'Queue index out of range.' });
   }
 
-  const blueprint = queueEntry.itemKind === 'defence'
-    ? (queueEntry.defenceType ? DEFENCE_BLUEPRINTS.get(queueEntry.defenceType) : null)
-    : (queueEntry.shipType ? SHIP_BLUEPRINTS.get(queueEntry.shipType) : null);
+  const blueprint =
+    queueEntry.itemKind === 'defence'
+      ? queueEntry.defenceType
+        ? DEFENCE_BLUEPRINTS.get(queueEntry.defenceType)
+        : null
+      : queueEntry.shipType
+        ? SHIP_BLUEPRINTS.get(queueEntry.shipType)
+        : null;
   if (!blueprint) {
     return res.status(400).json({ error: 'Unknown queued shipyard item type.' });
   }
@@ -3986,7 +4195,12 @@ app.post('/api/game/shipyard-queue/cancel', (req, res) => {
   const canceledDefenceType = queueEntry.defenceType ?? null;
   const canceledAmount = queueEntry.amount;
   if (cancellation.deliveredAmount > 0) {
-    addProducedShipyardUnitsToPlanet(planet, blueprint, queueEntry.itemKind, cancellation.deliveredAmount);
+    addProducedShipyardUnitsToPlanet(
+      planet,
+      blueprint,
+      queueEntry.itemKind,
+      cancellation.deliveredAmount,
+    );
   }
   planet.rBDSFTQ.resources.addResourcePack(cancellation.refund);
   planet.rBDSFTQ.shipyardQueue.splice(index, 1);
@@ -4002,17 +4216,17 @@ app.post('/api/game/shipyard-queue/cancel', (req, res) => {
       itemKind: canceledItemKind,
       shipType: canceledShipType,
       defenceType: canceledDefenceType,
-      amount: canceledAmount
+      amount: canceledAmount,
     },
     deltas: {
       refund: {
         metal: cancellation.refund.metal,
         crystal: cancellation.refund.crystal,
-        deuterium: cancellation.refund.deuterium
+        deuterium: cancellation.refund.deuterium,
       },
       deliveredAmount: cancellation.deliveredAmount,
-      shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length
-    }
+      shipyardQueueLength: planet.rBDSFTQ.shipyardQueue.length,
+    },
   });
 
   const clientPlanet = currentGalaxy.createClientPlanet(planet, playerId);
@@ -4056,7 +4270,7 @@ app.post('/api/game/technology-queue', (req, res) => {
 
   const result = startTechnologyResearch(
     { galaxy: currentGalaxy, playerId },
-    { x, y, z, technologyType, helperPlanets: helperCoordinates }
+    { x, y, z, technologyType, helperPlanets: helperCoordinates },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -4070,21 +4284,23 @@ app.post('/api/game/technology-queue', (req, res) => {
     coordinates: { x, y, z },
     payload: {
       technologyType,
-      helperPlanets: helperCoordinates
+      helperPlanets: helperCoordinates,
     },
     deltas: {
       helperCount: result.value.helperPlanets.length,
       spent: {
         metal: result.value.spent.metal,
         crystal: result.value.spent.crystal,
-        deuterium: result.value.spent.deuterium
+        deuterium: result.value.spent.deuterium,
       },
-      queueActive: result.value.mainPlanet.rBDSFTQ.currentResearchQueue !== null
-    }
+      queueActive: result.value.mainPlanet.rBDSFTQ.currentResearchQueue !== null,
+    },
   });
 
   const presentation = getPresentationData(currentGalaxy, playerId);
-  const response = presentation.ownedPlanets.map((entry) => toClientPlanetDtoFromClientPlanet(entry));
+  const response = presentation.ownedPlanets.map((entry) =>
+    toClientPlanetDtoFromClientPlanet(entry),
+  );
   return res.status(200).json(response);
 });
 
@@ -4123,14 +4339,16 @@ app.post('/api/game/technology-queue/helpers', (req, res) => {
 
   const result = updateResearchHelpers(
     { galaxy: currentGalaxy, playerId },
-    { x, y, z, helperPlanets: helperCoordinates }
+    { x, y, z, helperPlanets: helperCoordinates },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
   }
 
   const presentation = getPresentationData(currentGalaxy, playerId);
-  const response = presentation.ownedPlanets.map((entry) => toClientPlanetDtoFromClientPlanet(entry));
+  const response = presentation.ownedPlanets.map((entry) =>
+    toClientPlanetDtoFromClientPlanet(entry),
+  );
   return res.status(200).json(response);
 });
 
@@ -4189,18 +4407,20 @@ app.post('/api/game/power-consumption', (req, res) => {
     const ratio = currentPowerConsumption / powerPerLevel;
     const isMultiple = Math.abs(ratio - Math.round(ratio)) < 1e-9;
     if (!withinBounds || !isMultiple) {
-      return res.status(400).json({ error: 'Invalid power consumption value for current building level.' });
+      return res
+        .status(400)
+        .json({ error: 'Invalid power consumption value for current building level.' });
     }
   }
 
   const updatedPowerConsumption = planet.setCurrentBuildingPowerConsumption(
     buildingType,
-    currentPowerConsumption
+    currentPowerConsumption,
   );
 
   const response: SetBuildingPowerConsumptionResponse = {
     buildingType,
-    currentPowerConsumption: updatedPowerConsumption
+    currentPowerConsumption: updatedPowerConsumption,
   };
   return res.status(200).json(response);
 });
@@ -4246,11 +4466,13 @@ app.post('/api/game/fusion-reactor-stage', (req, res) => {
 
   const maxStage = planet.getMaxFusionReactorStage();
   if (selectedStage > maxStage) {
-    return res.status(400).json({ error: 'Invalid fusion reactor stage for current building level.' });
+    return res
+      .status(400)
+      .json({ error: 'Invalid fusion reactor stage for current building level.' });
   }
 
   const response: SetFusionReactorStageResponse = {
-    selectedStage: planet.setFusionReactorSelectedStage(selectedStage)
+    selectedStage: planet.setFusionReactorSelectedStage(selectedStage),
   };
   return res.status(200).json(response);
 });
@@ -4278,7 +4500,9 @@ app.get('/api/game/owned-planets', (req, res) => {
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
   }
   const presentation = getPresentationData(currentGalaxy, playerId);
-  const response = presentation.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet));
+  const response = presentation.ownedPlanets.map((planet) =>
+    toClientPlanetDtoFromClientPlanet(planet),
+  );
   return res.status(200).json(response);
 });
 
@@ -4524,8 +4748,16 @@ app.get('/api/game/planet-operations', (req, res) => {
     return res.status(404).json({ error: 'Owned planet not found.' });
   }
 
-  const resolvedTurns = Math.max(1, Math.min(RECENT_FLEET_OPERATION_HISTORY_TURNS, parseOptionalInt(req.query.resolvedTurns) ?? 1));
-  const response = buildPlanetOperationsResponse(currentGalaxy, playerId, coordinates, resolvedTurns);
+  const resolvedTurns = Math.max(
+    1,
+    Math.min(RECENT_FLEET_OPERATION_HISTORY_TURNS, parseOptionalInt(req.query.resolvedTurns) ?? 1),
+  );
+  const response = buildPlanetOperationsResponse(
+    currentGalaxy,
+    playerId,
+    coordinates,
+    resolvedTurns,
+  );
   return res.status(200).json(response);
 });
 
@@ -4540,7 +4772,10 @@ app.get('/api/game/active-fleets/:fleetId/maintenance-options', (req, res) => {
     return res.status(400).json({ error: 'Invalid fleet id.' });
   }
 
-  const result = resolveFleetMaintenanceOptions({ galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId }, fleetId);
+  const result = resolveFleetMaintenanceOptions(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    fleetId,
+  );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
   }
@@ -4561,7 +4796,11 @@ app.post('/api/game/active-fleets/:fleetId/maintenance-request', (req, res) => {
 
   const body = req.body as CreateMaintenanceRequestRequest | undefined;
   const payload = normalizeMaintenanceTransferPayload(body);
-  const result = createFleetMaintenanceRequest({ galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId }, fleetId, payload);
+  const result = createFleetMaintenanceRequest(
+    { galaxy: authPlayer.galaxy, playerId: authPlayer.player.playerId },
+    fleetId,
+    payload,
+  );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
   }
@@ -4569,7 +4808,7 @@ app.post('/api/game/active-fleets/:fleetId/maintenance-request', (req, res) => {
   const response: CreateMaintenanceRequestResponse = {
     activeFleets: buildOwnedActiveFleetsResponse(authPlayer.galaxy, authPlayer.player.playerId),
     mode: result.value.mode,
-    message: result.value.message
+    message: result.value.message,
   };
   return res.status(200).json(response);
 });
@@ -4601,9 +4840,9 @@ app.post('/api/game/active-fleets/:fleetId/return', (req, res) => {
   const result = returnActiveFleetCommand(
     {
       galaxy: currentGalaxy,
-      playerId
+      playerId,
     },
-    { fleetId }
+    { fleetId },
   );
   if (!result.ok) {
     return res.status(result.error.status).json({ error: result.error.message });
@@ -4639,7 +4878,9 @@ app.post('/api/game/active-fleets/:fleetId/delay', (req, res) => {
     return res.status(400).json({ error: 'Invalid fleet id.' });
   }
 
-  const fleet = currentGalaxy.activeFleets.find((entry) => entry.fleetId === fleetId && entry.ownerId === playerId);
+  const fleet = currentGalaxy.activeFleets.find(
+    (entry) => entry.fleetId === fleetId && entry.ownerId === playerId,
+  );
   if (!fleet) {
     return res.status(404).json({ error: 'Fleet not found.' });
   }
@@ -4676,9 +4917,10 @@ app.post('/api/game/active-fleets', (req, res) => {
   const body = req.body as CreateFleetMissionRequest | undefined;
   const missionType = normalizeFleetMissionType(body?.missionType);
   const origin = parseMissionCoordinates(body?.origin);
-  const originFleetId = body?.originFleetId === null || body?.originFleetId === undefined
-    ? null
-    : Number(body.originFleetId);
+  const originFleetId =
+    body?.originFleetId === null || body?.originFleetId === undefined
+      ? null
+      : Number(body.originFleetId);
   const target = parseMissionCoordinates(body?.target);
   const ships = parseFleetShipSelections(body?.ships);
   const carriedBombs = parseFleetBombSelections(body?.carriedBombs);
@@ -4687,24 +4929,34 @@ app.post('/api/game/active-fleets', (req, res) => {
   const bombardmentPriorities = parseBombardmentPriorities(body?.bombardmentPriorities);
 
   if (
-    !missionType
-    || !origin
-    || !target
-    || !ships
-    || !carriedBombs
-    || !cargo
-    || (originFleetId !== null && (!Number.isInteger(originFleetId) || originFleetId <= 0))
-    || (body?.bombardmentPriorities !== undefined
-      && body?.bombardmentPriorities !== null
-      && bombardmentPriorities === null)
-    || (body?.useJumpGate !== undefined && typeof body.useJumpGate !== 'boolean')
+    !missionType ||
+    !origin ||
+    !target ||
+    !ships ||
+    !carriedBombs ||
+    !cargo ||
+    (originFleetId !== null && (!Number.isInteger(originFleetId) || originFleetId <= 0)) ||
+    (body?.bombardmentPriorities !== undefined &&
+      body?.bombardmentPriorities !== null &&
+      bombardmentPriorities === null) ||
+    (body?.useJumpGate !== undefined && typeof body.useJumpGate !== 'boolean')
   ) {
     return res.status(400).json({ error: 'Invalid fleet mission payload.' });
   }
 
   const result = createFleetMission(
     { galaxy: currentGalaxy, playerId },
-    { missionType, origin, originFleetId, target, ships, carriedBombs, cargo, useJumpGate, bombardmentPriorities }
+    {
+      missionType,
+      origin,
+      originFleetId,
+      target,
+      ships,
+      carriedBombs,
+      cargo,
+      useJumpGate,
+      bombardmentPriorities,
+    },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -4723,7 +4975,7 @@ app.post('/api/game/active-fleets', (req, res) => {
       carriedBombs,
       cargo,
       useJumpGate,
-      bombardmentPriorities
+      bombardmentPriorities,
     },
     deltas: {
       fleetId: result.value.fleet.fleetId,
@@ -4732,8 +4984,8 @@ app.post('/api/game/active-fleets', (req, res) => {
       fuelCost: result.value.fleet.fuelCost,
       totalCargoCapacity: result.value.fleet.totalCargoCapacity,
       usedCargoCapacity: result.value.fleet.usedCargoCapacity,
-      state: result.value.fleet.state
-    }
+      state: result.value.fleet.state,
+    },
   });
   if (missionType !== FleetMissionType.SPY && missionType !== FleetMissionType.STAR_SYSTEM_SPY) {
     trackCurrentPlayerActionFleet(result.value.fleet.fleetId);
@@ -4741,10 +4993,12 @@ app.post('/api/game/active-fleets', (req, res) => {
 
   const presentation = getPresentationData(currentGalaxy, playerId);
   const response: CreateFleetMissionResponse = {
-    ownedPlanets: presentation.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet)),
+    ownedPlanets: presentation.ownedPlanets.map((planet) =>
+      toClientPlanetDtoFromClientPlanet(planet),
+    ),
     activeFleets: buildOwnedActiveFleetsResponse(currentGalaxy, playerId),
     mode: result.value.mode,
-    message: result.value.message
+    message: result.value.message,
   };
   return res.status(201).json(response);
 });
@@ -4771,16 +5025,21 @@ app.post('/api/game/star-system-spy', (req, res) => {
   const body = req.body as CreateStarSystemSpyRequest | undefined;
   const systemCoordinates = parseStarSystemCoordinates(body?.systemCoordinates);
   const origin = parseMissionCoordinates(body?.origin);
-  const originFleetId = body?.originFleetId === null || body?.originFleetId === undefined
-    ? null
-    : Number(body.originFleetId);
-  if (!systemCoordinates || !origin || (originFleetId !== null && (!Number.isInteger(originFleetId) || originFleetId <= 0))) {
+  const originFleetId =
+    body?.originFleetId === null || body?.originFleetId === undefined
+      ? null
+      : Number(body.originFleetId);
+  if (
+    !systemCoordinates ||
+    !origin ||
+    (originFleetId !== null && (!Number.isInteger(originFleetId) || originFleetId <= 0))
+  ) {
     return res.status(400).json({ error: 'Invalid star system spy payload.' });
   }
 
   const result = createStarSystemSpyMissions(
     { galaxy: currentGalaxy, playerId },
-    { systemX: systemCoordinates.x, systemY: systemCoordinates.y, origin, originFleetId }
+    { systemX: systemCoordinates.x, systemY: systemCoordinates.y, origin, originFleetId },
   );
   if (!result.ok) {
     return sendGameCommandError(res, result.error);
@@ -4789,7 +5048,7 @@ app.post('/api/game/star-system-spy', (req, res) => {
   const response: CreateStarSystemSpyResponse = {
     activeFleets: buildOwnedActiveFleetsResponse(currentGalaxy, playerId),
     launchedFleetCount: result.value.launchedFleetCount,
-    message: `Launched ${result.value.launchedFleetCount} espionage probe${result.value.launchedFleetCount === 1 ? '' : 's'} across system ${systemCoordinates.x}:${systemCoordinates.y}.`
+    message: `Launched ${result.value.launchedFleetCount} espionage probe${result.value.launchedFleetCount === 1 ? '' : 's'} across system ${systemCoordinates.x}:${systemCoordinates.y}.`,
   };
   return res.status(201).json(response);
 });
@@ -4815,12 +5074,12 @@ if (isMainModule) {
 function withApiMessage<T extends { message: string }>(
   body: T,
   messageKey: string,
-  messageParams: ApiMessageParams | null = null
+  messageParams: ApiMessageParams | null = null,
 ): T & { messageKey: string; messageParams: ApiMessageParams | null } {
   return {
     ...body,
     messageKey,
-    messageParams
+    messageParams,
   };
 }
 
@@ -4828,13 +5087,16 @@ function buildApiErrorBody(
   error: string,
   errorKey: string,
   errorParams: ApiMessageParams | null = null,
-  extra: Record<string, unknown> = {}
-): { error: string; errorKey: string; errorParams: ApiMessageParams | null } & Record<string, unknown> {
+  extra: Record<string, unknown> = {},
+): { error: string; errorKey: string; errorParams: ApiMessageParams | null } & Record<
+  string,
+  unknown
+> {
   return {
     ...extra,
     error,
     errorKey,
-    errorParams
+    errorParams,
   };
 }
 
@@ -4844,7 +5106,7 @@ function sendApiError(
   error: string,
   errorKey: string,
   errorParams: ApiMessageParams | null = null,
-  extra: Record<string, unknown> = {}
+  extra: Record<string, unknown> = {},
 ) {
   return res.status(status).json(buildApiErrorBody(error, errorKey, errorParams, extra));
 }
@@ -4860,32 +5122,35 @@ function createApiRouteError(
   status: number,
   error: string,
   errorKey: string,
-  errorParams: ApiMessageParams | null = null
+  errorParams: ApiMessageParams | null = null,
 ): ApiRouteError {
   return {
     status,
     error,
     errorKey,
-    errorParams
+    errorParams,
   };
 }
 
 function sendApiRouteError(res: express.Response, routeError: ApiRouteError) {
-  return res.status(routeError.status).json(
-    buildApiErrorBody(routeError.error, routeError.errorKey, routeError.errorParams)
-  );
+  return res
+    .status(routeError.status)
+    .json(buildApiErrorBody(routeError.error, routeError.errorKey, routeError.errorParams));
 }
 
 function buildRetryAfterMinutesParams(retryAfterMinutes: number): ApiMessageParams {
   return {
-    retryAfterMinutes
+    retryAfterMinutes,
   };
 }
 
-function buildEndTurnMailBlockParams(unreadMailCount: number, pendingRequestCount: number): ApiMessageParams {
+function buildEndTurnMailBlockParams(
+  unreadMailCount: number,
+  pendingRequestCount: number,
+): ApiMessageParams {
   return {
     pendingRequestCount,
-    unreadMailCount
+    unreadMailCount,
   };
 }
 
@@ -4898,14 +5163,14 @@ function buildOnlineHumansRequiredMessageMetadata(gameId: string): {
     return {
       message: null,
       key: null,
-      params: null
+      params: null,
     };
   }
 
   return {
     message: 'At least 2 human players must be online to progress this multiplayer game.',
     key: 'api.gameplay.endTurn.notEnoughOnlineHumans',
-    params: null
+    params: null,
   };
 }
 
@@ -4918,14 +5183,14 @@ function buildActiveHumanRequiredMessageMetadata(gameId: string): {
     return {
       message: null,
       key: null,
-      params: null
+      params: null,
     };
   }
 
   return {
     message: 'At least 1 active human player must be present to progress this multiplayer game.',
     key: 'api.gameplay.endTurn.activeHumanRequired',
-    params: null
+    params: null,
   };
 }
 
@@ -5021,9 +5286,7 @@ function normalizePassword(value: unknown): string | null {
 }
 
 function normalizeAccountStatus(value: unknown, fallback: AccountStatus = 'ACTIVE'): AccountStatus {
-  return value === 'PENDING_CONFIRMATION' || value === 'ACTIVE'
-    ? value
-    : fallback;
+  return value === 'PENDING_CONFIRMATION' || value === 'ACTIVE' ? value : fallback;
 }
 
 function normalizeLanguagePreference(value: unknown): 'en' | 'pl' | null {
@@ -5085,44 +5348,52 @@ function loadAuthData(): AuthData {
       account.emailKey = account.email ? toEmailKey(account.email) : '';
       account.status = normalizeAccountStatus(account.status, 'ACTIVE');
       account.localAdmin = account.localAdmin === true;
-      account.emailConfirmedAt = typeof account.emailConfirmedAt === 'string' && account.emailConfirmedAt.trim()
-        ? account.emailConfirmedAt
-        : account.status === 'ACTIVE' && account.email
-          ? normalizedCreatedAt
+      account.emailConfirmedAt =
+        typeof account.emailConfirmedAt === 'string' && account.emailConfirmedAt.trim()
+          ? account.emailConfirmedAt
+          : account.status === 'ACTIVE' && account.email
+            ? normalizedCreatedAt
+            : null;
+      account.confirmationExpiresAt =
+        typeof account.confirmationExpiresAt === 'string' && account.confirmationExpiresAt.trim()
+          ? account.confirmationExpiresAt
+          : account.status === 'PENDING_CONFIRMATION'
+            ? new Date(normalizedCreatedAtMs + PENDING_CONFIRMATION_LIFETIME_MS).toISOString()
+            : null;
+      account.lastConfirmationSentAt =
+        typeof account.lastConfirmationSentAt === 'string' && account.lastConfirmationSentAt.trim()
+          ? account.lastConfirmationSentAt
+          : account.status === 'PENDING_CONFIRMATION'
+            ? normalizedCreatedAt
+            : null;
+      account.lastPasswordResetRequestedAt =
+        typeof account.lastPasswordResetRequestedAt === 'string' &&
+        account.lastPasswordResetRequestedAt.trim()
+          ? account.lastPasswordResetRequestedAt
           : null;
-      account.confirmationExpiresAt = typeof account.confirmationExpiresAt === 'string' && account.confirmationExpiresAt.trim()
-        ? account.confirmationExpiresAt
-        : account.status === 'PENDING_CONFIRMATION'
-          ? new Date(normalizedCreatedAtMs + PENDING_CONFIRMATION_LIFETIME_MS).toISOString()
-          : null;
-      account.lastConfirmationSentAt = typeof account.lastConfirmationSentAt === 'string' && account.lastConfirmationSentAt.trim()
-        ? account.lastConfirmationSentAt
-        : account.status === 'PENDING_CONFIRMATION'
-          ? normalizedCreatedAt
-          : null;
-      account.lastPasswordResetRequestedAt = typeof account.lastPasswordResetRequestedAt === 'string'
-        && account.lastPasswordResetRequestedAt.trim()
-        ? account.lastPasswordResetRequestedAt
-        : null;
       account.failedLoginAttempts = Number.isInteger(account.failedLoginAttempts)
         ? Math.max(0, account.failedLoginAttempts)
         : 0;
-      account.loginLockedUntil = typeof account.loginLockedUntil === 'string' && account.loginLockedUntil.trim()
-        ? account.loginLockedUntil
-        : null;
+      account.loginLockedUntil =
+        typeof account.loginLockedUntil === 'string' && account.loginLockedUntil.trim()
+          ? account.loginLockedUntil
+          : null;
       clearExpiredLoginLock(account);
       account.replaceWithBotOnLogout = account.replaceWithBotOnLogout === true;
       account.logoutBotProfileId = normalizeBotProfileId(account.logoutBotProfileId);
       account.language = normalizeLanguagePreference(account.language);
-      account.currentGameId = typeof account.currentGameId === 'string' && account.currentGameId.trim()
-        ? account.currentGameId
-        : null;
-      account.lastClosedGameId = typeof account.lastClosedGameId === 'string' && account.lastClosedGameId.trim()
-        ? account.lastClosedGameId
-        : null;
-      account.lastClosedAt = typeof account.lastClosedAt === 'string' && account.lastClosedAt.trim()
-        ? account.lastClosedAt
-        : null;
+      account.currentGameId =
+        typeof account.currentGameId === 'string' && account.currentGameId.trim()
+          ? account.currentGameId
+          : null;
+      account.lastClosedGameId =
+        typeof account.lastClosedGameId === 'string' && account.lastClosedGameId.trim()
+          ? account.lastClosedGameId
+          : null;
+      account.lastClosedAt =
+        typeof account.lastClosedAt === 'string' && account.lastClosedAt.trim()
+          ? account.lastClosedAt
+          : null;
     }
 
     for (const entry of sessions) {
@@ -5132,17 +5403,21 @@ function loadAuthData(): AuthData {
 
       const session = entry as AuthSession;
       session.language = normalizeLanguagePreference(session.language);
-      session.currentGameId = typeof session.currentGameId === 'string' && session.currentGameId.trim()
-        ? session.currentGameId
-        : null;
-      session.lastClosedGameId = typeof session.lastClosedGameId === 'string' && session.lastClosedGameId.trim()
-        ? session.lastClosedGameId
-        : null;
-      session.lastClosedAt = typeof session.lastClosedAt === 'string' && session.lastClosedAt.trim()
-        ? session.lastClosedAt
-        : null;
+      session.currentGameId =
+        typeof session.currentGameId === 'string' && session.currentGameId.trim()
+          ? session.currentGameId
+          : null;
+      session.lastClosedGameId =
+        typeof session.lastClosedGameId === 'string' && session.lastClosedGameId.trim()
+          ? session.lastClosedGameId
+          : null;
+      session.lastClosedAt =
+        typeof session.lastClosedAt === 'string' && session.lastClosedAt.trim()
+          ? session.lastClosedAt
+          : null;
       session.pendingPresenceRemovedNoticeGameId =
-        typeof session.pendingPresenceRemovedNoticeGameId === 'string' && session.pendingPresenceRemovedNoticeGameId.trim()
+        typeof session.pendingPresenceRemovedNoticeGameId === 'string' &&
+        session.pendingPresenceRemovedNoticeGameId.trim()
           ? session.pendingPresenceRemovedNoticeGameId
           : null;
     }
@@ -5150,7 +5425,7 @@ function loadAuthData(): AuthData {
     return {
       nextAccountId: Number.isInteger(parsed.nextAccountId) ? parsed.nextAccountId : 1,
       accounts,
-      sessions
+      sessions,
     };
   } catch {
     const fallback: AuthData = { nextAccountId: 1, accounts: [], sessions: [] };
@@ -5164,10 +5439,13 @@ function saveAuthData(data: AuthData): void {
   fs.writeFileSync(AUTH_DATA_PATH, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-function setAccountCurrentGameId(data: AuthData, accountId: number, currentGameId: string | null): void {
-  const normalizedCurrentGameId = typeof currentGameId === 'string' && currentGameId.trim()
-    ? currentGameId
-    : null;
+function setAccountCurrentGameId(
+  data: AuthData,
+  accountId: number,
+  currentGameId: string | null,
+): void {
+  const normalizedCurrentGameId =
+    typeof currentGameId === 'string' && currentGameId.trim() ? currentGameId : null;
   const account = data.accounts.find((entry) => entry.id === accountId);
   if (account) {
     account.currentGameId = normalizedCurrentGameId;
@@ -5176,7 +5454,10 @@ function setAccountCurrentGameId(data: AuthData, accountId: number, currentGameI
   for (const session of data.sessions) {
     if (session.accountId === accountId) {
       session.currentGameId = normalizedCurrentGameId;
-      if (session.pendingPresenceRemovedNoticeGameId && session.pendingPresenceRemovedNoticeGameId !== normalizedCurrentGameId) {
+      if (
+        session.pendingPresenceRemovedNoticeGameId &&
+        session.pendingPresenceRemovedNoticeGameId !== normalizedCurrentGameId
+      ) {
         session.pendingPresenceRemovedNoticeGameId = null;
       }
     }
@@ -5186,7 +5467,7 @@ function setAccountCurrentGameId(data: AuthData, accountId: number, currentGameI
 function setAccountLanguagePreference(
   data: AuthData,
   accountId: number,
-  language: 'en' | 'pl' | null
+  language: 'en' | 'pl' | null,
 ): void {
   const normalizedLanguage = normalizeLanguagePreference(language);
   const account = data.accounts.find((entry) => entry.id === accountId);
@@ -5201,13 +5482,14 @@ function setAccountLanguagePreference(
   }
 }
 
-function setLastClosedGameInfo(data: AuthData, accountId: number, gameId: string | null, timestamp: string | null): void {
-  const normalizedGameId = typeof gameId === 'string' && gameId.trim()
-    ? gameId
-    : null;
-  const normalizedTimestamp = typeof timestamp === 'string' && timestamp.trim()
-    ? timestamp
-    : null;
+function setLastClosedGameInfo(
+  data: AuthData,
+  accountId: number,
+  gameId: string | null,
+  timestamp: string | null,
+): void {
+  const normalizedGameId = typeof gameId === 'string' && gameId.trim() ? gameId : null;
+  const normalizedTimestamp = typeof timestamp === 'string' && timestamp.trim() ? timestamp : null;
 
   const account = data.accounts.find((entry) => entry.id === accountId);
   if (account) {
@@ -5224,7 +5506,11 @@ function setLastClosedGameInfo(data: AuthData, accountId: number, gameId: string
   }
 }
 
-function setPresenceRemovedNoticeForAccount(data: AuthData, accountId: number, gameId: string): boolean {
+function setPresenceRemovedNoticeForAccount(
+  data: AuthData,
+  accountId: number,
+  gameId: string,
+): boolean {
   let changed = false;
   for (const session of data.sessions) {
     if (session.accountId !== accountId) {
@@ -5239,7 +5525,11 @@ function setPresenceRemovedNoticeForAccount(data: AuthData, accountId: number, g
   return changed;
 }
 
-function clearPresenceRemovedNoticeForAccount(data: AuthData, accountId: number, gameId: string): boolean {
+function clearPresenceRemovedNoticeForAccount(
+  data: AuthData,
+  accountId: number,
+  gameId: string,
+): boolean {
   let changed = false;
   for (const session of data.sessions) {
     if (session.accountId !== accountId || session.pendingPresenceRemovedNoticeGameId !== gameId) {
@@ -5270,22 +5560,22 @@ function saveCurrentGameSnapshot(): void {
       rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
       maxSaveFiles: MAX_GAME_SAVE_FILES,
       gameId: currentRuntimeGameId,
-      trackedPlayerActionFleetIds: [...currentTrackedPlayerActionFleetIds]
-    }
+      trackedPlayerActionFleetIds: [...currentTrackedPlayerActionFleetIds],
+    },
   );
 
   updateGameRecord(GAME_REGISTRY_DATA_PATH, currentRuntimeGameId, {
     currentTurn: currentGalaxy.currentTurn,
     currentSaveId: summary.saveId,
     lastSavedAt: summary.savedAt,
-    updatedAt: summary.savedAt
+    updatedAt: summary.savedAt,
   });
 }
 
 function saveRuntimeSnapshot(
   gameId: string,
   runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
-  ownerAccountId: number
+  ownerAccountId: number,
 ): void {
   const summary = writeRotatingAutoSave(
     GAME_SAVES_DIRECTORY_PATH,
@@ -5296,15 +5586,15 @@ function saveRuntimeSnapshot(
       rotationLimit: AUTO_SAVE_ROTATION_LIMIT,
       maxSaveFiles: MAX_GAME_SAVE_FILES,
       gameId,
-      trackedPlayerActionFleetIds: [...runtime.trackedPlayerActionFleetIds]
-    }
+      trackedPlayerActionFleetIds: [...runtime.trackedPlayerActionFleetIds],
+    },
   );
 
   updateGameRecord(GAME_REGISTRY_DATA_PATH, gameId, {
     currentTurn: runtime.galaxy.currentTurn,
     currentSaveId: summary.saveId,
     lastSavedAt: summary.savedAt,
-    updatedAt: summary.savedAt
+    updatedAt: summary.savedAt,
   });
 }
 
@@ -5316,7 +5606,7 @@ function isRunningMultiplayerGame(gameId: string): boolean {
 function buildMultiplayerPresenceSummary(
   authData: AuthData,
   gameId: string,
-  runtime: NonNullable<ReturnType<typeof getGameRuntime>>
+  runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
 ): {
   presentHumanCount: number;
   activeHumanCount: number;
@@ -5324,21 +5614,22 @@ function buildMultiplayerPresenceSummary(
 } {
   if (!isRunningMultiplayerGame(gameId)) {
     const blockingPlayerIds = new Set(
-      activeHumanPlayers(runtime.galaxy).map((player) => player.playerId)
+      activeHumanPlayers(runtime.galaxy).map((player) => player.playerId),
     );
     return {
       presentHumanCount: blockingPlayerIds.size,
       activeHumanCount: blockingPlayerIds.size,
-      blockingPlayerIds
+      blockingPlayerIds,
     };
   }
 
-  const memberships = listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId)
-    .filter((entry) => entry.isActive);
+  const memberships = listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId).filter(
+    (entry) => entry.isActive,
+  );
   const sessionByAccountId = new Map(
     authData.sessions
       .filter((session) => session.currentGameId === gameId)
-      .map((session) => [session.accountId, session] as const)
+      .map((session) => [session.accountId, session] as const),
   );
   let presentHumanCount = 0;
   let activeHumanCount = 0;
@@ -5354,7 +5645,11 @@ function buildMultiplayerPresenceSummary(
       continue;
     }
 
-    const presence = getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, membership.accountId);
+    const presence = getPresenceForGameAccount(
+      MULTIPLAYER_PRESENCE_DATA_PATH,
+      gameId,
+      membership.accountId,
+    );
     const derivedState = presence?.state;
     if (derivedState !== 'ACTIVE' && derivedState !== 'AUTO_SKIP_TURN') {
       continue;
@@ -5370,7 +5665,7 @@ function buildMultiplayerPresenceSummary(
   return {
     presentHumanCount,
     activeHumanCount,
-    blockingPlayerIds
+    blockingPlayerIds,
   };
 }
 
@@ -5378,7 +5673,7 @@ function reconcileTimedOutMultiplayerPresence(
   gameId: string,
   runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
   authData: AuthData,
-  nowMs = Date.now()
+  nowMs = Date.now(),
 ): boolean {
   if (!isRunningMultiplayerGame(gameId)) {
     return false;
@@ -5387,13 +5682,14 @@ function reconcileTimedOutMultiplayerPresence(
   const membershipsByAccountId = new Map(
     listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId)
       .filter((membership) => membership.isActive)
-      .map((membership) => [membership.accountId, membership] as const)
+      .map((membership) => [membership.accountId, membership] as const),
   );
-  const timedOutPresences = listPresenceForGame(MULTIPLAYER_PRESENCE_DATA_PATH, gameId)
-    .filter((presence) => {
+  const timedOutPresences = listPresenceForGame(MULTIPLAYER_PRESENCE_DATA_PATH, gameId).filter(
+    (presence) => {
       const lastSeenMs = Date.parse(presence.lastSeenAt);
       return Number.isNaN(lastSeenMs) || nowMs - lastSeenMs >= MULTIPLAYER_PRESENCE_TIMEOUT_MS;
-    });
+    },
+  );
 
   if (timedOutPresences.length === 0) {
     return false;
@@ -5408,10 +5704,11 @@ function reconcileTimedOutMultiplayerPresence(
     }
 
     changed = true;
-    authChanged = setPresenceRemovedNoticeForAccount(authData, presence.accountId, gameId) || authChanged;
+    authChanged =
+      setPresenceRemovedNoticeForAccount(authData, presence.accountId, gameId) || authChanged;
     const membership = membershipsByAccountId.get(presence.accountId);
     const playerId = membership
-      ? runtime.galaxy.playerNameMap.get(membership.playerName) ?? null
+      ? (runtime.galaxy.playerNameMap.get(membership.playerName) ?? null)
       : null;
     if (playerId !== null) {
       nextReadyPlayerIds.delete(playerId);
@@ -5423,7 +5720,7 @@ function reconcileTimedOutMultiplayerPresence(
   }
 
   updateGameRuntime(gameId, {
-    currentTurnReadyPlayerIds: nextReadyPlayerIds
+    currentTurnReadyPlayerIds: nextReadyPlayerIds,
   });
   if (currentRuntimeGameId === gameId) {
     currentTurnReadyPlayerIds = nextReadyPlayerIds;
@@ -5439,7 +5736,7 @@ function reconcileEmptyPresenceUnloadState(
   runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
   record: NonNullable<ReturnType<typeof getGameById>>,
   presentHumanCount: number,
-  nowMs = Date.now()
+  nowMs = Date.now(),
 ): boolean {
   if (presentHumanCount > 0) {
     if (runtime.emptyPresenceUnloadAt) {
@@ -5450,7 +5747,7 @@ function reconcileEmptyPresenceUnloadState(
 
   if (!runtime.emptyPresenceUnloadAt) {
     updateGameRuntime(gameId, {
-      emptyPresenceUnloadAt: new Date(nowMs + MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS).toISOString()
+      emptyPresenceUnloadAt: new Date(nowMs + MULTIPLAYER_EMPTY_RUNTIME_UNLOAD_MS).toISOString(),
     });
     return false;
   }
@@ -5467,7 +5764,7 @@ function reconcileEmptyPresenceUnloadState(
 function reconcileRunningMultiplayerLifecycle(
   gameId: string,
   authData: AuthData,
-  nowMs = Date.now()
+  nowMs = Date.now(),
 ): { unloaded: boolean } {
   const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
   const runtime = getGameRuntime(gameId);
@@ -5494,7 +5791,13 @@ function reconcileRunningMultiplayerLifecycle(
     }
     return { unloaded: false };
   }
-  const unloaded = reconcileEmptyPresenceUnloadState(gameId, runtimeAfterBotControl, record, presenceSummary.presentHumanCount, nowMs);
+  const unloaded = reconcileEmptyPresenceUnloadState(
+    gameId,
+    runtimeAfterBotControl,
+    record,
+    presenceSummary.presentHumanCount,
+    nowMs,
+  );
   return { unloaded };
 }
 
@@ -5504,7 +5807,10 @@ function reconcileLoadedRunningMultiplayerGames(authData: AuthData, nowMs = Date
   }
 }
 
-function buildCurrentPlayerPresenceOptions(gameId: string, session: AuthSession): {
+function buildCurrentPlayerPresenceOptions(
+  gameId: string,
+  session: AuthSession,
+): {
   currentPlayerPresenceState: TurnStatusResponse['currentPlayerPresenceState'];
   currentPlayerAutoSkipEnabled: boolean;
   currentPlayerAutoSkipActivatedAt: string | null;
@@ -5517,18 +5823,22 @@ function buildCurrentPlayerPresenceOptions(gameId: string, session: AuthSession)
       currentPlayerAutoSkipEnabled: false,
       currentPlayerAutoSkipActivatedAt: null,
       showAutoSkipReturnNotice: false,
-      showPresenceRemovedReturnNotice: false
+      showPresenceRemovedReturnNotice: false,
     };
   }
 
-  const presence = getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, session.accountId);
+  const presence = getPresenceForGameAccount(
+    MULTIPLAYER_PRESENCE_DATA_PATH,
+    gameId,
+    session.accountId,
+  );
   if (!presence) {
     return {
       currentPlayerPresenceState: null,
       currentPlayerAutoSkipEnabled: false,
       currentPlayerAutoSkipActivatedAt: null,
       showAutoSkipReturnNotice: false,
-      showPresenceRemovedReturnNotice: session.pendingPresenceRemovedNoticeGameId === gameId
+      showPresenceRemovedReturnNotice: session.pendingPresenceRemovedNoticeGameId === gameId,
     };
   }
 
@@ -5537,7 +5847,7 @@ function buildCurrentPlayerPresenceOptions(gameId: string, session: AuthSession)
     currentPlayerAutoSkipEnabled: presence.autoSkipTurnEnabled,
     currentPlayerAutoSkipActivatedAt: presence.autoSkipTurnActivatedAt,
     showAutoSkipReturnNotice: presence.returnNoticePending,
-    showPresenceRemovedReturnNotice: session.pendingPresenceRemovedNoticeGameId === gameId
+    showPresenceRemovedReturnNotice: session.pendingPresenceRemovedNoticeGameId === gameId,
   };
 }
 
@@ -5603,9 +5913,9 @@ function findLoadedScheduledMultiplayerGame(exceptGameId: string | null = null):
     const runtime = getGameRuntime(gameId);
     const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
     if (
-      runtime?.setup.scheduledTurns.enabled === true
-      && record?.kind === 'MULTIPLAYER'
-      && record.status === 'RUNNING'
+      runtime?.setup.scheduledTurns.enabled === true &&
+      record?.kind === 'MULTIPLAYER' &&
+      record.status === 'RUNNING'
     ) {
       return gameId;
     }
@@ -5625,7 +5935,7 @@ function buildActiveHumanRequiredMessage(gameId: string): string | null {
 function reconcileReadyStateForOnlineHumans(
   gameId: string,
   runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
-  authData: AuthData
+  authData: AuthData,
 ): {
   presentHumanCount: number;
   activeHumanCount: number;
@@ -5634,8 +5944,9 @@ function reconcileReadyStateForOnlineHumans(
   const presenceSummary = buildMultiplayerPresenceSummary(authData, gameId, runtime);
   const minimumOnlineHumansRequired = minimumOnlineHumansRequiredForGame(gameId);
   if (
-    minimumOnlineHumansRequired <= 1
-    || (presenceSummary.presentHumanCount >= minimumOnlineHumansRequired && presenceSummary.activeHumanCount >= 1)
+    minimumOnlineHumansRequired <= 1 ||
+    (presenceSummary.presentHumanCount >= minimumOnlineHumansRequired &&
+      presenceSummary.activeHumanCount >= 1)
   ) {
     return presenceSummary;
   }
@@ -5646,7 +5957,7 @@ function reconcileReadyStateForOnlineHumans(
 
   runtime.currentTurnReadyPlayerIds.clear();
   updateGameRuntime(gameId, {
-    currentTurnReadyPlayerIds: new Set<number>()
+    currentTurnReadyPlayerIds: new Set<number>(),
   });
   if (currentRuntimeGameId === gameId) {
     currentTurnReadyPlayerIds.clear();
@@ -5654,24 +5965,26 @@ function reconcileReadyStateForOnlineHumans(
   return presenceSummary;
 }
 
-function buildGameTurnStatusResponse(
-  access: {
-    gameId: string;
-    galaxy: Galaxy;
-    auth: { data: AuthData; session: AuthSession };
-    playerId: number;
-    readyPlayerIds: ReadonlySet<number>;
-    isProcessing: boolean;
-    runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
-  }
-): TurnStatusResponse {
-  const presenceSummary = reconcileReadyStateForOnlineHumans(access.gameId, access.runtime, access.auth.data);
-  const readyPlayerIds = currentRuntimeGameId === access.gameId
-    ? currentTurnReadyPlayerIds
-    : access.runtime.currentTurnReadyPlayerIds;
-  const isProcessing = currentRuntimeGameId === access.gameId
-    ? isTurnProcessing
-    : access.isProcessing;
+function buildGameTurnStatusResponse(access: {
+  gameId: string;
+  galaxy: Galaxy;
+  auth: { data: AuthData; session: AuthSession };
+  playerId: number;
+  readyPlayerIds: ReadonlySet<number>;
+  isProcessing: boolean;
+  runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
+}): TurnStatusResponse {
+  const presenceSummary = reconcileReadyStateForOnlineHumans(
+    access.gameId,
+    access.runtime,
+    access.auth.data,
+  );
+  const readyPlayerIds =
+    currentRuntimeGameId === access.gameId
+      ? currentTurnReadyPlayerIds
+      : access.runtime.currentTurnReadyPlayerIds;
+  const isProcessing =
+    currentRuntimeGameId === access.gameId ? isTurnProcessing : access.isProcessing;
   const scheduledTurnsEnabled = access.runtime.setup.scheduledTurns.enabled === true;
   const minimumOnlineHumansRequired = minimumOnlineHumansRequiredForGame(access.gameId);
   const progressionBlockedReason = scheduledTurnsEnabled
@@ -5681,32 +5994,26 @@ function buildGameTurnStatusResponse(
       : presenceSummary.activeHumanCount < 1
         ? buildActiveHumanRequiredMessageMetadata(access.gameId)
         : { message: null, key: null, params: null };
-  return buildTurnStatusResponse(
-    access.galaxy,
-    readyPlayerIds,
-    access.playerId,
-    isProcessing,
-    {
-      onlineHumanCount: presenceSummary.presentHumanCount,
-      minimumOnlineHumanCount: minimumOnlineHumansRequired,
-      progressionBlockedReason: progressionBlockedReason.message,
-      progressionBlockedReasonKey: progressionBlockedReason.key,
-      progressionBlockedReasonParams: progressionBlockedReason.params,
-      scheduledTurnsEnabled,
-      scheduledTurnsNextTurnAt: calculateNextScheduledTurnAt(access.runtime.setup),
-      scheduledTurnsServerTime: scheduledTurnsEnabled ? new Date().toISOString() : null,
-      requiresAllPlayersReady: scheduledTurnsEnabled ? false : undefined,
-      blockingPlayerIds: presenceSummary.blockingPlayerIds,
-      ...buildCurrentPlayerPresenceOptions(access.gameId, access.auth.session)
-    }
-  );
+  return buildTurnStatusResponse(access.galaxy, readyPlayerIds, access.playerId, isProcessing, {
+    onlineHumanCount: presenceSummary.presentHumanCount,
+    minimumOnlineHumanCount: minimumOnlineHumansRequired,
+    progressionBlockedReason: progressionBlockedReason.message,
+    progressionBlockedReasonKey: progressionBlockedReason.key,
+    progressionBlockedReasonParams: progressionBlockedReason.params,
+    scheduledTurnsEnabled,
+    scheduledTurnsNextTurnAt: calculateNextScheduledTurnAt(access.runtime.setup),
+    scheduledTurnsServerTime: scheduledTurnsEnabled ? new Date().toISOString() : null,
+    requiresAllPlayersReady: scheduledTurnsEnabled ? false : undefined,
+    blockingPlayerIds: presenceSummary.blockingPlayerIds,
+    ...buildCurrentPlayerPresenceOptions(access.gameId, access.auth.session),
+  });
 }
 
 function saveAndUnloadRunningMultiplayerGame(
   gameId: string,
   runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
   record: NonNullable<ReturnType<typeof getGameById>>,
-  inactiveReason: 'NO_PRESENT_HUMANS' | 'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS'
+  inactiveReason: 'NO_PRESENT_HUMANS' | 'LEFT_WITH_TOO_FEW_ONLINE_PLAYERS',
 ): void {
   const ownerAccountId = record.ownerAccountId ?? record.hostAccountId;
   if (ownerAccountId !== null) {
@@ -5719,7 +6026,7 @@ function saveAndUnloadRunningMultiplayerGame(
 
   updateGameRecord(GAME_REGISTRY_DATA_PATH, gameId, {
     inactiveReason,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
 }
 
@@ -5741,10 +6048,12 @@ function registerRunningGame(
       playerName: string;
       role: 'OWNER' | 'HOST' | 'MEMBER';
     }>;
-  }
+  },
 ): string {
   const now = new Date().toISOString();
-  const existingRecord = options.gameId ? getGameById(GAME_REGISTRY_DATA_PATH, options.gameId) : null;
+  const existingRecord = options.gameId
+    ? getGameById(GAME_REGISTRY_DATA_PATH, options.gameId)
+    : null;
   const record = createGameRecord({
     gameId: options.gameId,
     kind,
@@ -5760,7 +6069,7 @@ function registerRunningGame(
     lastStartedAt: now,
     lastSavedAt: options.lastSavedAt ?? null,
     createdAt: existingRecord?.createdAt ?? now,
-    updatedAt: now
+    updatedAt: now,
   });
 
   upsertGameRecord(GAME_REGISTRY_DATA_PATH, record);
@@ -5773,7 +6082,7 @@ function registerRunningGame(
       role: membership.role,
       joinedAt: now,
       lastSeenAt: now,
-      isActive: true
+      isActive: true,
     });
   }
 
@@ -5797,7 +6106,7 @@ function updateCurrentRuntimeGameRegistryRecord(): void {
     inactiveReason: null,
     name: currentGalaxy.name,
     currentTurn: currentGalaxy.currentTurn,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   });
 }
 
@@ -5822,7 +6131,7 @@ function persistCurrentRuntimeStoreState(): void {
       isTurnProcessing,
       offlineBotControlledPlayerIds: new Set<number>(),
       emptyPresenceUnloadAt: null,
-      lastScheduledTurnSlot: initialScheduledTurnSlotForSetup(currentGameSetup)
+      lastScheduledTurnSlot: initialScheduledTurnSlotForSetup(currentGameSetup),
     });
     return;
   }
@@ -5837,7 +6146,7 @@ function persistCurrentRuntimeStoreState(): void {
     emptyPresenceUnloadAt: existingRuntime.emptyPresenceUnloadAt,
     lastScheduledTurnSlot: existingRuntime.lastScheduledTurnSlot,
     isTurnProcessing,
-    isDirty: false
+    isDirty: false,
   });
 }
 
@@ -5879,15 +6188,18 @@ function buildActiveGameSummary() {
     ownerAccountId: currentGameOwnerId,
     ownerPlayerName: currentGameOwnerPlayerName,
     galaxyName: currentGalaxy.name,
-    currentTurn: currentGalaxy.currentTurn
+    currentTurn: currentGalaxy.currentTurn,
   };
 }
 
 function buildGameListResponse(session: AuthSession | null): GameListResponse {
   const records = listGames(GAME_REGISTRY_DATA_PATH);
-  const visibleRecords = session?.localAdmin === true
-    ? records
-    : records.filter((record) => session ? canSessionViewGameRecord(record.gameId, session) : false);
+  const visibleRecords =
+    session?.localAdmin === true
+      ? records
+      : records.filter((record) =>
+          session ? canSessionViewGameRecord(record.gameId, session) : false,
+        );
 
   return {
     games: visibleRecords.map((record) => buildGameSummary(record, session)),
@@ -5895,7 +6207,7 @@ function buildGameListResponse(session: AuthSession | null): GameListResponse {
     isLoggedIn: !!session,
     currentAccountId: session?.accountId ?? null,
     currentPlayerName: session?.playerName ?? null,
-    currentPlayerIsLocalAdmin: session?.localAdmin === true
+    currentPlayerIsLocalAdmin: session?.localAdmin === true,
   };
 }
 
@@ -5907,7 +6219,7 @@ function buildCurrentGameStatusResponse(session: AuthSession): CurrentGameStatus
       canResume: false,
       unavailableReason: null,
       unavailableReasonKey: null,
-      unavailableReasonParams: null
+      unavailableReasonParams: null,
     };
   }
 
@@ -5919,7 +6231,7 @@ function buildCurrentGameStatusResponse(session: AuthSession): CurrentGameStatus
       canResume: false,
       unavailableReason: null,
       unavailableReasonKey: null,
-      unavailableReasonParams: null
+      unavailableReasonParams: null,
     };
   }
 
@@ -5938,7 +6250,7 @@ function buildCurrentGameStatusResponse(session: AuthSession): CurrentGameStatus
       : record.status === 'RUNNING'
         ? 'api.games.current.unavailableResume'
         : 'api.games.current.inactiveAskAdmin',
-    unavailableReasonParams: null
+    unavailableReasonParams: null,
   };
 }
 
@@ -5964,21 +6276,22 @@ function buildAccountSettingsResponse(account: AuthAccount): AccountSettingsResp
     forgotPasswordAvailableAt: account.lastPasswordResetRequestedAt,
     forgotPasswordInfo: 'Password reset by email is not available yet.',
     forgotPasswordInfoKey: 'api.account.settings.forgotPasswordUnavailable',
-    forgotPasswordInfoParams: null
+    forgotPasswordInfoParams: null,
   };
 }
 
-function buildGameSummary(record: ReturnType<typeof listGames>[number], session: AuthSession | null): GameSummary {
+function buildGameSummary(
+  record: ReturnType<typeof listGames>[number],
+  session: AuthSession | null,
+): GameSummary {
   const canView = !!session && canSessionViewGameRecord(record.gameId, session);
   const isCurrentGame = session?.currentGameId === record.gameId;
   const isLoaded = hasGameRuntime(record.gameId);
-  const canResume = canView
-    && isCurrentGame
-    && record.status === 'RUNNING'
-    && (
-      isLoaded
-      || canResumeSingleplayerGameRecord(record)
-    );
+  const canResume =
+    canView &&
+    isCurrentGame &&
+    record.status === 'RUNNING' &&
+    (isLoaded || canResumeSingleplayerGameRecord(record));
   return {
     gameId: record.gameId,
     kind: record.kind,
@@ -5994,27 +6307,29 @@ function buildGameSummary(record: ReturnType<typeof listGames>[number], session:
     isLoaded,
     canResume,
     canJoin: canView && record.status === 'RUNNING',
-    canManage: session?.localAdmin === true
+    canManage: session?.localAdmin === true,
   };
 }
 
 function canResumeSingleplayerGameRecord(record: ReturnType<typeof listGames>[number]): boolean {
-  return record.kind === 'SINGLEPLAYER'
-    && typeof record.currentSaveId === 'string'
-    && record.currentSaveId.trim().length > 0;
+  return (
+    record.kind === 'SINGLEPLAYER' &&
+    typeof record.currentSaveId === 'string' &&
+    record.currentSaveId.trim().length > 0
+  );
 }
 
 function loadSingleplayerGameRecord(
   authData: AuthData,
   session: AuthSession,
-  record: ReturnType<typeof getGameById>
+  record: ReturnType<typeof getGameById>,
 ): { ok: true } | { ok: false; status: number; error: string; errorKey: string } {
   if (!record || record.kind !== 'SINGLEPLAYER') {
     return {
       ok: false,
       status: 404,
       error: 'Game not found.',
-      errorKey: 'api.errors.gameNotFound'
+      errorKey: 'api.errors.gameNotFound',
     };
   }
 
@@ -6024,7 +6339,7 @@ function loadSingleplayerGameRecord(
       ok: false,
       status: 404,
       error: 'No save is available for this game.',
-      errorKey: 'api.games.current.noSaveAvailable'
+      errorKey: 'api.games.current.noSaveAvailable',
     };
   }
 
@@ -6034,17 +6349,21 @@ function loadSingleplayerGameRecord(
       ok: false,
       status: 404,
       error: 'Saved game not found.',
-      errorKey: 'api.games.current.savedGameNotFound'
+      errorKey: 'api.games.current.savedGameNotFound',
     };
   }
 
-  const loadAccess = resolveGameSaveLoadAccess(save, session.accountId, session.localAdmin === true);
+  const loadAccess = resolveGameSaveLoadAccess(
+    save,
+    session.accountId,
+    session.localAdmin === true,
+  );
   if (!loadAccess.canLoad) {
     return {
       ok: false,
       status: 403,
       error: loadAccess.canLoadReason ?? 'Forbidden.',
-      errorKey: 'api.errors.forbidden'
+      errorKey: 'api.errors.forbidden',
     };
   }
 
@@ -6053,7 +6372,9 @@ function loadSingleplayerGameRecord(
   currentGameOwnerId = session.accountId;
   currentGameOwnerPlayerName = session.playerName;
   currentGameSetup = hydrated.setup;
-  currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(hydrated.trackedPlayerActionFleetIds);
+  currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(
+    hydrated.trackedPlayerActionFleetIds,
+  );
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
   resetActiveTurnState();
   clearBotDecisionTracesV2();
@@ -6067,18 +6388,22 @@ function loadSingleplayerGameRecord(
     currentSaveId: saveId,
     lastSavedAt: save.savedAt,
     currentGameAccountIds: [session.accountId],
-    memberships: [{
-      accountId: session.accountId,
-      playerName: session.playerName,
-      role: 'OWNER'
-    }]
+    memberships: [
+      {
+        accountId: session.accountId,
+        playerName: session.playerName,
+        role: 'OWNER',
+      },
+    ],
   });
   ensureCurrentPlayerActionLog(session.playerName);
 
   return { ok: true };
 }
 
-function buildMultiplayerGameBrowserResponse(session: AuthSession | null): MultiplayerGameBrowserResponse {
+function buildMultiplayerGameBrowserResponse(
+  session: AuthSession | null,
+): MultiplayerGameBrowserResponse {
   const nowMs = Date.now();
   const multiplayerRecords = listGames(GAME_REGISTRY_DATA_PATH)
     .filter((record) => record.kind === 'MULTIPLAYER')
@@ -6090,10 +6415,14 @@ function buildMultiplayerGameBrowserResponse(session: AuthSession | null): Multi
     .filter((record) => isActiveRunningMultiplayerGameForBrowser(record))
     .map((record) => buildMultiplayerGameListItem(record, session));
   const otherMultiplayerGames = multiplayerRecords
-    .filter((record) => !isActiveDraftLobbyForBrowser(record, nowMs) && !isActiveRunningMultiplayerGameForBrowser(record))
+    .filter(
+      (record) =>
+        !isActiveDraftLobbyForBrowser(record, nowMs) &&
+        !isActiveRunningMultiplayerGameForBrowser(record),
+    )
     .map((record) => buildMultiplayerGameListItem(record, session));
   const selectedRecord = session?.currentGameId
-    ? multiplayerRecords.find((record) => record.gameId === session.currentGameId) ?? null
+    ? (multiplayerRecords.find((record) => record.gameId === session.currentGameId) ?? null)
     : null;
 
   return {
@@ -6104,13 +6433,13 @@ function buildMultiplayerGameBrowserResponse(session: AuthSession | null): Multi
     isLoggedIn: !!session,
     currentAccountId: session?.accountId ?? null,
     currentPlayerName: session?.playerName ?? null,
-    currentPlayerIsLocalAdmin: session?.localAdmin === true
+    currentPlayerIsLocalAdmin: session?.localAdmin === true,
   };
 }
 
 function buildMultiplayerGameDetailResponse(
   gameId: string,
-  session: AuthSession | null
+  session: AuthSession | null,
 ): MultiplayerGameDetailResponse | null {
   const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
   if (!record || record.kind !== 'MULTIPLAYER') {
@@ -6119,9 +6448,12 @@ function buildMultiplayerGameDetailResponse(
 
   const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
   const runtime = getGameRuntime(gameId);
-  const canViewScheduledRunning = !!session && isRunningScheduledMultiplayerRuntime(record, runtime);
-  const canViewRunning = canViewScheduledRunning
-    || (!!session && (session.localAdmin === true || canSessionViewGameRecord(record.gameId, session)));
+  const canViewScheduledRunning =
+    !!session && isRunningScheduledMultiplayerRuntime(record, runtime);
+  const canViewRunning =
+    canViewScheduledRunning ||
+    (!!session &&
+      (session.localAdmin === true || canSessionViewGameRecord(record.gameId, session)));
   if (record.status !== 'DRAFT' && !lobby && !canViewRunning) {
     return null;
   }
@@ -6129,41 +6461,39 @@ function buildMultiplayerGameDetailResponse(
   return {
     game: buildGameSummary(record, session),
     lobby: lobby
-      ? buildMultiplayerLobbyDto(
-        lobby,
-        session?.accountId ?? null,
-        session?.localAdmin === true
-      )
+      ? buildMultiplayerLobbyDto(lobby, session?.accountId ?? null, session?.localAdmin === true)
       : null,
-    runningMembers: record.status === 'RUNNING'
-      ? buildRunningMultiplayerMembers(record.gameId, runtime)
-      : []
+    runningMembers:
+      record.status === 'RUNNING' ? buildRunningMultiplayerMembers(record.gameId, runtime) : [],
   };
 }
 
 function buildMultiplayerGameListItem(
   record: ReturnType<typeof listGames>[number],
-  session: AuthSession | null
+  session: AuthSession | null,
 ): MultiplayerGameBrowserResponse['activeDraftLobbies'][number] {
   const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId);
-  const runtime = record.status === 'RUNNING'
-    ? getGameRuntime(record.gameId)
-    : null;
+  const runtime = record.status === 'RUNNING' ? getGameRuntime(record.gameId) : null;
   const membershipCount = lobby
     ? (lobby?.members.length ?? 0)
-    : listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId)
-      .filter((entry) => entry.isActive)
-      .length;
-  const isMember = !!session && (
-    lobby
+    : listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId).filter(
+        (entry) => entry.isActive,
+      ).length;
+  const isMember =
+    !!session &&
+    (lobby
       ? lobby.members.some((member) => member.accountId === session.accountId)
-      : isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId, session.accountId)
-  );
-  const canEnter = record.status === 'RUNNING' && !lobby && !!session && canSessionViewGameRecord(record.gameId, session);
-  const canJoinRunningScheduled = !!session
-    && !isMember
-    && isRunningScheduledMultiplayerRuntime(record, runtime)
-    && countHumanPlayersInGalaxy(runtime.galaxy) < MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS;
+      : isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, record.gameId, session.accountId));
+  const canEnter =
+    record.status === 'RUNNING' &&
+    !lobby &&
+    !!session &&
+    canSessionViewGameRecord(record.gameId, session);
+  const canJoinRunningScheduled =
+    !!session &&
+    !isMember &&
+    isRunningScheduledMultiplayerRuntime(record, runtime) &&
+    countHumanPlayersInGalaxy(runtime.galaxy) < MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS;
   return {
     gameId: record.gameId,
     name: record.name,
@@ -6177,20 +6507,26 @@ function buildMultiplayerGameListItem(
     offlineBotControlledCount: runtime?.offlineBotControlledPlayerIds.size ?? 0,
     isMember,
     isCurrentGame: session?.currentGameId === record.gameId,
-    canJoin: (!!lobby && !!session && !isMember && lobby.members.length < maxLobbyMembersForSetup(lobby.setup))
-      || canJoinRunningScheduled,
+    canJoin:
+      (!!lobby &&
+        !!session &&
+        !isMember &&
+        lobby.members.length < maxLobbyMembersForSetup(lobby.setup)) ||
+      canJoinRunningScheduled,
     canEnter,
     canReturnToGame: canEnter && isMember && session?.currentGameId !== record.gameId,
-    canResumeLobby: record.status === 'RUNNING' && !runtime && !lobby && session?.localAdmin === true,
-    canManage: session?.localAdmin === true && (!lobby || lobby.hostAccountId === session.accountId),
+    canResumeLobby:
+      record.status === 'RUNNING' && !runtime && !lobby && session?.localAdmin === true,
+    canManage:
+      session?.localAdmin === true && (!lobby || lobby.hostAccountId === session.accountId),
     canArchive: record.status === 'RUNNING' && !runtime && !lobby && session?.localAdmin === true,
-    updatedAt: record.updatedAt
+    updatedAt: record.updatedAt,
   };
 }
 
 function canSessionViewMultiplayerBrowserRecord(
   record: ReturnType<typeof listGames>[number],
-  session: AuthSession | null
+  session: AuthSession | null,
 ): boolean {
   if (getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId)) {
     return true;
@@ -6201,18 +6537,23 @@ function canSessionViewMultiplayerBrowserRecord(
     return true;
   }
 
-  return session?.localAdmin === true || (session ? canSessionViewGameRecord(record.gameId, session) : false);
+  return (
+    session?.localAdmin === true ||
+    (session ? canSessionViewGameRecord(record.gameId, session) : false)
+  );
 }
 
 function isRunningScheduledMultiplayerRuntime(
   record: ReturnType<typeof listGames>[number] | null,
-  runtime: ReturnType<typeof getGameRuntime>
+  runtime: ReturnType<typeof getGameRuntime>,
 ): runtime is NonNullable<ReturnType<typeof getGameRuntime>> {
-  return !!record
-    && record.kind === 'MULTIPLAYER'
-    && record.status === 'RUNNING'
-    && !!runtime
-    && runtime.setup.scheduledTurns.enabled === true;
+  return (
+    !!record &&
+    record.kind === 'MULTIPLAYER' &&
+    record.status === 'RUNNING' &&
+    !!runtime &&
+    runtime.setup.scheduledTurns.enabled === true
+  );
 }
 
 function countHumanPlayersInGalaxy(galaxy: Galaxy): number {
@@ -6221,7 +6562,7 @@ function countHumanPlayersInGalaxy(galaxy: Galaxy): number {
 
 function pickLateJoinReplacementSystem(
   galaxy: Galaxy,
-  creator: InstanceType<typeof GalaxyCreator>
+  creator: InstanceType<typeof GalaxyCreator>,
 ): { x: number; y: number } | null {
   const candidates: SolarSystem[] = [];
   for (const row of galaxy.stars) {
@@ -6245,13 +6586,15 @@ function pickLateJoinReplacementSystem(
 function isLateJoinReplacementCandidate(
   galaxy: Galaxy,
   creator: InstanceType<typeof GalaxyCreator>,
-  system: SolarSystem
+  system: SolarSystem,
 ): boolean {
   if (system.isGalaxyCenter) {
     return false;
   }
 
-  if (creator.distanceFromCenter(system.coordinates.x, system.coordinates.y) > creator.galaxyRadius) {
+  if (
+    creator.distanceFromCenter(system.coordinates.x, system.coordinates.y) > creator.galaxyRadius
+  ) {
     return false;
   }
 
@@ -6259,12 +6602,15 @@ function isLateJoinReplacementCandidate(
     return false;
   }
 
-  return !galaxy.activeFleets.some((fleet) =>
-    fleet.target.x === system.coordinates.x && fleet.target.y === system.coordinates.y
+  return !galaxy.activeFleets.some(
+    (fleet) => fleet.target.x === system.coordinates.x && fleet.target.y === system.coordinates.y,
   );
 }
 
-function isActiveDraftLobbyForBrowser(record: ReturnType<typeof listGames>[number], nowMs: number): boolean {
+function isActiveDraftLobbyForBrowser(
+  record: ReturnType<typeof listGames>[number],
+  nowMs: number,
+): boolean {
   const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId);
   if (!lobby) {
     return false;
@@ -6284,10 +6630,14 @@ function isActiveDraftLobbyForBrowser(record: ReturnType<typeof listGames>[numbe
   return nowMs - updatedAtMs <= ACTIVE_MULTIPLAYER_DRAFT_WINDOW_MS;
 }
 
-function isActiveRunningMultiplayerGameForBrowser(record: ReturnType<typeof listGames>[number]): boolean {
-  return record.status === 'RUNNING'
-    && hasGameRuntime(record.gameId)
-    && !getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId);
+function isActiveRunningMultiplayerGameForBrowser(
+  record: ReturnType<typeof listGames>[number],
+): boolean {
+  return (
+    record.status === 'RUNNING' &&
+    hasGameRuntime(record.gameId) &&
+    !getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, record.gameId)
+  );
 }
 
 function buildMultiplayerGameStatusLabel(record: ReturnType<typeof listGames>[number]): string {
@@ -6302,7 +6652,9 @@ function buildMultiplayerGameStatusLabel(record: ReturnType<typeof listGames>[nu
   return record.status;
 }
 
-function buildMultiplayerInactiveReasonText(record: ReturnType<typeof listGames>[number]): string | null {
+function buildMultiplayerInactiveReasonText(
+  record: ReturnType<typeof listGames>[number],
+): string | null {
   switch (record.inactiveReason) {
     case 'NO_PRESENT_HUMANS':
       return 'Stopped because no players remained present.';
@@ -6315,24 +6667,26 @@ function buildMultiplayerInactiveReasonText(record: ReturnType<typeof listGames>
 
 function buildRunningMultiplayerMembers(
   gameId: string,
-  runtime: ReturnType<typeof getGameRuntime>
+  runtime: ReturnType<typeof getGameRuntime>,
 ): MultiplayerRunningMemberDto[] {
   const memberships = listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, gameId)
     .filter((entry) => entry.isActive)
-    .sort((left, right) => left.joinedAt.localeCompare(right.joinedAt) || left.accountId - right.accountId);
+    .sort(
+      (left, right) =>
+        left.joinedAt.localeCompare(right.joinedAt) || left.accountId - right.accountId,
+    );
   const offlineBotControlledPlayerIds = runtime?.offlineBotControlledPlayerIds ?? new Set<number>();
   const authData = loadAuthData();
   const sessionByAccountId = new Map(
     authData.sessions
       .filter((session) => session.currentGameId === gameId)
-      .map((session) => [session.accountId, session] as const)
+      .map((session) => [session.accountId, session] as const),
   );
 
   return memberships.map((membership) => {
     const playerId = runtime?.galaxy.playerNameMap.get(membership.playerName) ?? null;
-    const player = playerId !== null && runtime
-      ? resolvePlayerById(runtime.galaxy, playerId)
-      : null;
+    const player =
+      playerId !== null && runtime ? resolvePlayerById(runtime.galaxy, playerId) : null;
     const isOfflineBotControlled = playerId !== null && offlineBotControlledPlayerIds.has(playerId);
     const presence = sessionByAccountId.has(membership.accountId)
       ? getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, membership.accountId)
@@ -6343,21 +6697,25 @@ function buildRunningMultiplayerMembers(
       playerName: membership.playerName,
       isAutoSkipTurn: !isOfflineBotControlled && presence?.state === 'AUTO_SKIP_TURN',
       isOfflineBotControlled,
-      offlineBotProfileId: isOfflineBotControlled ? (player?.botProfileId ?? null) : null
+      offlineBotProfileId: isOfflineBotControlled ? (player?.botProfileId ?? null) : null,
     };
   });
 }
 
-function upsertDraftLobbyWithMemberships(lobby: MultiplayerLobbyState & { gameId: string; createdAt?: string; updatedAt?: string }): void {
+function upsertDraftLobbyWithMemberships(
+  lobby: MultiplayerLobbyState & { gameId: string; createdAt?: string; updatedAt?: string },
+): void {
   const now = new Date().toISOString();
   const existing = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, lobby.gameId);
   const normalizedLobby = upsertMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, {
     ...lobby,
     createdAt: existing?.createdAt ?? lobby.createdAt ?? now,
-    updatedAt: lobby.updatedAt ?? now
+    updatedAt: lobby.updatedAt ?? now,
   });
-  const existingMemberships = listMembershipsForGame(GAME_MEMBERSHIPS_DATA_PATH, lobby.gameId)
-    .filter((entry) => entry.isActive);
+  const existingMemberships = listMembershipsForGame(
+    GAME_MEMBERSHIPS_DATA_PATH,
+    lobby.gameId,
+  ).filter((entry) => entry.isActive);
   const activeAccountIds = new Set(normalizedLobby.members.map((member) => member.accountId));
 
   for (const membership of existingMemberships) {
@@ -6374,28 +6732,34 @@ function upsertDraftLobbyWithMemberships(lobby: MultiplayerLobbyState & { gameId
       role: member.accountId === normalizedLobby.hostAccountId ? 'HOST' : 'MEMBER',
       joinedAt: member.joinedAt,
       lastSeenAt: now,
-      isActive: true
+      isActive: true,
     });
   }
 
   updateGameRecord(GAME_REGISTRY_DATA_PATH, normalizedLobby.gameId, {
     hostAccountId: normalizedLobby.hostAccountId,
     hostPlayerName: normalizedLobby.hostPlayerName,
-    updatedAt: normalizedLobby.updatedAt
+    updatedAt: normalizedLobby.updatedAt,
   });
 }
 
-function removeAccountFromOtherDraftMultiplayerLobbies(accountId: number, exceptGameId: string): void {
-  const memberships = listMembershipsForAccount(GAME_MEMBERSHIPS_DATA_PATH, accountId)
-    .filter((entry) => entry.isActive && entry.gameId !== exceptGameId);
+function removeAccountFromOtherDraftMultiplayerLobbies(
+  accountId: number,
+  exceptGameId: string,
+): void {
+  const memberships = listMembershipsForAccount(GAME_MEMBERSHIPS_DATA_PATH, accountId).filter(
+    (entry) => entry.isActive && entry.gameId !== exceptGameId,
+  );
 
   for (const membership of memberships) {
     const record = getGameById(GAME_REGISTRY_DATA_PATH, membership.gameId);
     const lobby = getMultiplayerLobbyByGameId(MULTIPLAYER_LOBBY_STORE_DATA_PATH, membership.gameId);
-    const isJoinableDraftLikeLobby = !!record
-      && record.kind === 'MULTIPLAYER'
-      && !!lobby
-      && (record.status === 'DRAFT' || (record.status === 'RUNNING' && !hasGameRuntime(membership.gameId) && lobby.isResumeLobby));
+    const isJoinableDraftLikeLobby =
+      !!record &&
+      record.kind === 'MULTIPLAYER' &&
+      !!lobby &&
+      (record.status === 'DRAFT' ||
+        (record.status === 'RUNNING' && !hasGameRuntime(membership.gameId) && lobby.isResumeLobby));
     if (!isJoinableDraftLikeLobby) {
       continue;
     }
@@ -6408,14 +6772,18 @@ function removeAccountFromOtherDraftMultiplayerLobbies(accountId: number, except
     removeMembership(GAME_MEMBERSHIPS_DATA_PATH, membership.gameId, accountId);
     if (!nextLobby) {
       deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, membership.gameId);
-      updateGameRecord(GAME_REGISTRY_DATA_PATH, membership.gameId, record.status === 'DRAFT'
-        ? {
-          status: 'ARCHIVED',
-          updatedAt: new Date().toISOString()
-        }
-        : {
-          updatedAt: new Date().toISOString()
-        });
+      updateGameRecord(
+        GAME_REGISTRY_DATA_PATH,
+        membership.gameId,
+        record.status === 'DRAFT'
+          ? {
+              status: 'ARCHIVED',
+              updatedAt: new Date().toISOString(),
+            }
+          : {
+              updatedAt: new Date().toISOString(),
+            },
+      );
       continue;
     }
 
@@ -6423,14 +6791,14 @@ function removeAccountFromOtherDraftMultiplayerLobbies(accountId: number, except
       ...nextLobby,
       gameId: membership.gameId,
       createdAt: lobby.createdAt,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     });
   }
 }
 
 function loadDraftMultiplayerLobbyForManagement(
   session: AuthSession,
-  gameId: string
+  gameId: string,
 ): {
   record: NonNullable<ReturnType<typeof getGameById>>;
   lobby: NonNullable<ReturnType<typeof getMultiplayerLobbyByGameId>>;
@@ -6452,9 +6820,7 @@ function loadDraftMultiplayerLobbyForManagement(
   return { record, lobby };
 }
 
-function loadJoinableMultiplayerLobby(
-  gameId: string
-): {
+function loadJoinableMultiplayerLobby(gameId: string): {
   record: NonNullable<ReturnType<typeof getGameById>>;
   lobby: NonNullable<ReturnType<typeof getMultiplayerLobbyByGameId>>;
 } | null {
@@ -6483,7 +6849,7 @@ function hydrateRunningMultiplayerGameFromLobby(
   authData: AuthData,
   session: AuthSession,
   gameId: string,
-  lobby: NonNullable<ReturnType<typeof getMultiplayerLobbyByGameId>>
+  lobby: NonNullable<ReturnType<typeof getMultiplayerLobbyByGameId>>,
 ): LoadGameResponse {
   if (currentRuntimeGameId && currentRuntimeGameId !== gameId) {
     persistCurrentRuntimeStoreState();
@@ -6503,7 +6869,9 @@ function hydrateRunningMultiplayerGameFromLobby(
     currentGameOwnerId = session.accountId;
     currentGameOwnerPlayerName = session.playerName;
     currentGameSetup = hydrated.setup;
-    currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(hydrated.trackedPlayerActionFleetIds);
+    currentTrackedPlayerActionFleetIds = createTrackedPlayerActionFleetIds(
+      hydrated.trackedPlayerActionFleetIds,
+    );
     currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(currentGalaxy);
     resetActiveTurnState();
     clearBotDecisionTracesV2();
@@ -6518,17 +6886,17 @@ function hydrateRunningMultiplayerGameFromLobby(
       memberships: lobby.members.map((member) => ({
         accountId: member.accountId,
         playerName: member.playerName,
-        role: member.accountId === lobby.hostAccountId ? 'HOST' : 'MEMBER'
-      }))
+        role: member.accountId === lobby.hostAccountId ? 'HOST' : 'MEMBER',
+      })),
     });
     saveCurrentGameSnapshot();
   } else {
     const setup = normalizeGalaxySetup({
       ...lobby.setup,
-      playerAmount: lobby.members.length
+      playerAmount: lobby.members.length,
     });
     const nextGalaxy = new GalaxyCreator(setup).createGalaxy(
-      lobby.members.map((member) => member.playerName)
+      lobby.members.map((member) => member.playerName),
     );
     if (setup.smokeTestScenario) {
       applySmokeTestScenario(nextGalaxy, setup.smokeTestScenario);
@@ -6554,8 +6922,8 @@ function hydrateRunningMultiplayerGameFromLobby(
       memberships: lobby.members.map((member) => ({
         accountId: member.accountId,
         playerName: member.playerName,
-        role: member.accountId === lobby.hostAccountId ? 'HOST' : 'MEMBER'
-      }))
+        role: member.accountId === lobby.hostAccountId ? 'HOST' : 'MEMBER',
+      })),
     });
     saveCurrentGameSnapshot();
   }
@@ -6563,20 +6931,22 @@ function hydrateRunningMultiplayerGameFromLobby(
   deleteMultiplayerLobby(MULTIPLAYER_LOBBY_STORE_DATA_PATH, gameId);
   return {
     player: toPlayerSession(session, currentGalaxy),
-    galaxy: buildGalaxySnapshot(currentGalaxy)
+    galaxy: buildGalaxySnapshot(currentGalaxy),
   };
 }
 
 function canSessionViewGameRecord(gameId: string, session: AuthSession): boolean {
-  return session.localAdmin === true
-    || session.currentGameId === gameId
-    || isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, gameId, session.accountId);
+  return (
+    session.localAdmin === true ||
+    session.currentGameId === gameId ||
+    isAccountMemberOfGame(GAME_MEMBERSHIPS_DATA_PATH, gameId, session.accountId)
+  );
 }
 
 function buildGameSaveGroupStatusLabel(
   record: ReturnType<typeof getGameById>,
   gameId: string | null,
-  options: { isCurrentGame: boolean; isLastClosedGame: boolean }
+  options: { isCurrentGame: boolean; isLastClosedGame: boolean },
 ): string {
   if (options.isCurrentGame) {
     return 'Current selected game';
@@ -6607,7 +6977,7 @@ function buildGameSaveGroupStatusLabel(
 
 function buildGameSaveGroups(
   saves: GameSavesResponse['saves'],
-  session: AuthSession | null
+  session: AuthSession | null,
 ): GameSavesResponse['saveGroups'] {
   const grouped = new Map<string, GameSavesResponse['saveGroups'][number]>();
 
@@ -6626,17 +6996,22 @@ function buildGameSaveGroups(
       gameId: save.gameId,
       gameName: record?.name ?? save.galaxyName,
       gameKind: record?.kind ?? null,
-      statusLabel: buildGameSaveGroupStatusLabel(record, save.gameId, { isCurrentGame, isLastClosedGame }),
+      statusLabel: buildGameSaveGroupStatusLabel(record, save.gameId, {
+        isCurrentGame,
+        isLastClosedGame,
+      }),
       isCurrentGame,
       isLastClosedGame,
-      saves: [save]
+      saves: [save],
     });
   }
 
   return Array.from(grouped.values())
     .map((group) => ({
       ...group,
-      saves: [...group.saves].sort((left, right) => Date.parse(right.savedAt) - Date.parse(left.savedAt))
+      saves: [...group.saves].sort(
+        (left, right) => Date.parse(right.savedAt) - Date.parse(left.savedAt),
+      ),
     }))
     .sort((left, right) => {
       const leftRank = left.isCurrentGame ? 0 : left.isLastClosedGame ? 1 : 2;
@@ -6651,7 +7026,10 @@ function buildGameSaveGroups(
     });
 }
 
-function buildGameSavesResponse(session: AuthSession | null, gameId: string | null = null): GameSavesResponse {
+function buildGameSavesResponse(
+  session: AuthSession | null,
+  gameId: string | null = null,
+): GameSavesResponse {
   let saves: ReturnType<typeof listGameSaveSummaries> = [];
   try {
     saves = gameId
@@ -6672,19 +7050,19 @@ function buildGameSavesResponse(session: AuthSession | null, gameId: string | nu
   return {
     saves,
     saveGroups,
-    recommendedReopen: recommendedGroup && recommendedGroup.saves[0] && recommendedGroup.gameId
-      ? {
-        gameId: recommendedGroup.gameId,
-        gameName: recommendedGroup.gameName,
-        gameKind: recommendedGroup.gameKind,
-        statusLabel: recommendedGroup.statusLabel,
-        reasonText: 'Recently closed single-player game. Load the latest save to reopen it.',
-        save: recommendedGroup.saves[0]
-      }
-      : null,
-    activeGame: gameId === null || currentRuntimeGameId === gameId
-      ? buildActiveGameSummary()
-      : null,
+    recommendedReopen:
+      recommendedGroup && recommendedGroup.saves[0] && recommendedGroup.gameId
+        ? {
+            gameId: recommendedGroup.gameId,
+            gameName: recommendedGroup.gameName,
+            gameKind: recommendedGroup.gameKind,
+            statusLabel: recommendedGroup.statusLabel,
+            reasonText: 'Recently closed single-player game. Load the latest save to reopen it.',
+            save: recommendedGroup.saves[0],
+          }
+        : null,
+    activeGame:
+      gameId === null || currentRuntimeGameId === gameId ? buildActiveGameSummary() : null,
     currentSelectedGameId: session?.currentGameId ?? null,
     currentSelectedGameName: currentSelectedGameRecord?.name ?? null,
     isLoggedIn: !!session,
@@ -6695,7 +7073,7 @@ function buildGameSavesResponse(session: AuthSession | null, gameId: string | nu
       ? session.localAdmin === true
         ? null
         : 'Local admin privileges are required to manage saves.'
-      : 'Login required to manage saves.'
+      : 'Login required to manage saves.',
   };
 }
 
@@ -6711,14 +7089,17 @@ function createSession(data: AuthData, account: AuthAccount, timestamp: string):
     currentGameId: account.currentGameId,
     lastClosedGameId: account.lastClosedGameId,
     lastClosedAt: account.lastClosedAt,
-    pendingPresenceRemovedNoticeGameId: null
+    pendingPresenceRemovedNoticeGameId: null,
   };
 
   data.sessions.push(session);
   return session;
 }
 
-function toPlayerSession(session: AuthSession, galaxy: Galaxy | null = currentGalaxy): PlayerSession {
+function toPlayerSession(
+  session: AuthSession,
+  galaxy: Galaxy | null = currentGalaxy,
+): PlayerSession {
   const player = galaxy ? resolvePlayerFromSession(galaxy, session) : null;
   return {
     id: session.accountId,
@@ -6728,10 +7109,13 @@ function toPlayerSession(session: AuthSession, galaxy: Galaxy | null = currentGa
     localAdmin: session.localAdmin === true,
     language: session.language,
     tutorialRead: player?.tutorialRead ?? createTutorialReadState(false),
-    unreadReportCount: player?.reports.filter((report) => !report.isRead && report.reportType !== ReportType.MESSAGE).length ?? 0,
+    unreadReportCount:
+      player?.reports.filter((report) => !report.isRead && report.reportType !== ReportType.MESSAGE)
+        .length ?? 0,
     unreadMailCount: player?.messages.filter((message) => !message.isRead).length ?? 0,
-    pendingRequestCount: player && galaxy ? countPendingMailRequestsForPlayer(galaxy, player.playerId) : 0,
-    currentGameId: session.currentGameId
+    pendingRequestCount:
+      player && galaxy ? countPendingMailRequestsForPlayer(galaxy, player.playerId) : 0,
+    currentGameId: session.currentGameId,
   };
 }
 
@@ -6750,9 +7134,7 @@ function getRequestIdentity(req: Request): string {
 
 function getTokenFromRequest(req: Request): string | null {
   const authHeader = req.headers.authorization ?? '';
-  const token = authHeader.startsWith('Bearer ')
-    ? authHeader.slice('Bearer '.length)
-    : '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : '';
   return token.trim() ? token.trim() : null;
 }
 
@@ -6789,7 +7171,11 @@ function isLocalAdminSession(session: AuthSession): boolean {
 }
 
 function isCurrentGameController(session: AuthSession): boolean {
-  return isLocalAdminSession(session) && currentGameOwnerId !== null && session.accountId === currentGameOwnerId;
+  return (
+    isLocalAdminSession(session) &&
+    currentGameOwnerId !== null &&
+    session.accountId === currentGameOwnerId
+  );
 }
 
 function canSessionAccessCurrentGame(galaxy: Galaxy, session: AuthSession): boolean {
@@ -6798,17 +7184,16 @@ function canSessionAccessCurrentGame(galaxy: Galaxy, session: AuthSession): bool
 
 function resolveSessionRuntimeAccess(
   auth: { data: AuthData; session: AuthSession },
-  requestedGameId?: string | null
+  requestedGameId?: string | null,
 ):
   | {
-    gameId: string;
-    runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
-    auth: { data: AuthData; session: AuthSession };
-  }
+      gameId: string;
+      runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
+      auth: { data: AuthData; session: AuthSession };
+    }
   | ApiRouteError {
-  const explicitGameId = typeof requestedGameId === 'string' && requestedGameId.trim()
-    ? requestedGameId.trim()
-    : null;
+  const explicitGameId =
+    typeof requestedGameId === 'string' && requestedGameId.trim() ? requestedGameId.trim() : null;
   const gameId = explicitGameId ?? auth.session.currentGameId ?? currentRuntimeGameId;
   if (!gameId) {
     return createApiRouteError(404, 'No active game.', 'api.errors.noCurrentGameSelected');
@@ -6823,7 +7208,7 @@ function resolveSessionRuntimeAccess(
     return createApiRouteError(
       409,
       'This game is not currently active. Ask localAdmin to resume it.',
-      'api.errors.gameNotActiveAskAdmin'
+      'api.errors.gameNotActiveAskAdmin',
     );
   }
 
@@ -6836,23 +7221,23 @@ function resolveSessionRuntimeAccess(
   return {
     gameId,
     runtime: getGameRuntime(gameId) ?? runtime,
-    auth
+    auth,
   };
 }
 
 function resolveAuthenticatedGameAccess(
   req: Request,
-  options: { markPresenceSeen?: boolean } = {}
+  options: { markPresenceSeen?: boolean } = {},
 ):
   | {
-    gameId: string;
-    runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
-    galaxy: Galaxy;
-    auth: { data: AuthData; session: AuthSession };
-    playerId: number;
-    readyPlayerIds: ReadonlySet<number>;
-    isProcessing: boolean;
-  }
+      gameId: string;
+      runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
+      galaxy: Galaxy;
+      auth: { data: AuthData; session: AuthSession };
+      playerId: number;
+      readyPlayerIds: ReadonlySet<number>;
+      isProcessing: boolean;
+    }
   | ApiRouteError {
   const auth = getAuthSession(req);
   if (!auth) {
@@ -6878,7 +7263,7 @@ function resolveAuthenticatedGameAccess(
     return createApiRouteError(
       409,
       'This game is not currently active. Ask localAdmin to resume it.',
-      'api.errors.gameNotActiveAskAdmin'
+      'api.errors.gameNotActiveAskAdmin',
     );
   }
 
@@ -6887,7 +7272,7 @@ function resolveAuthenticatedGameAccess(
     return createApiRouteError(
       409,
       'This game is not currently active. Ask localAdmin to resume it.',
-      'api.errors.gameNotActiveAskAdmin'
+      'api.errors.gameNotActiveAskAdmin',
     );
   }
 
@@ -6907,24 +7292,24 @@ function resolveAuthenticatedGameAccess(
     auth,
     playerId,
     readyPlayerIds: refreshedRuntime.currentTurnReadyPlayerIds,
-    isProcessing: refreshedRuntime.isTurnProcessing
+    isProcessing: refreshedRuntime.isTurnProcessing,
   };
 }
 
 function resolveAuthenticatedGameAccessForGame(
   req: Request,
   requestedGameId: string,
-  options: { markPresenceSeen?: boolean } = {}
+  options: { markPresenceSeen?: boolean } = {},
 ):
   | {
-    gameId: string;
-    runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
-    galaxy: Galaxy;
-    auth: { data: AuthData; session: AuthSession };
-    playerId: number;
-    readyPlayerIds: ReadonlySet<number>;
-    isProcessing: boolean;
-  }
+      gameId: string;
+      runtime: NonNullable<ReturnType<typeof getGameRuntime>>;
+      galaxy: Galaxy;
+      auth: { data: AuthData; session: AuthSession };
+      playerId: number;
+      readyPlayerIds: ReadonlySet<number>;
+      isProcessing: boolean;
+    }
   | ApiRouteError {
   const gameId = typeof requestedGameId === 'string' ? requestedGameId.trim() : '';
   if (!gameId) {
@@ -6955,7 +7340,7 @@ function resolveAuthenticatedGameAccessForGame(
     return createApiRouteError(
       409,
       'This game is not currently active. Ask localAdmin to resume it.',
-      'api.errors.gameNotActiveAskAdmin'
+      'api.errors.gameNotActiveAskAdmin',
     );
   }
 
@@ -6964,7 +7349,7 @@ function resolveAuthenticatedGameAccessForGame(
     return createApiRouteError(
       409,
       'This game is not currently active. Ask localAdmin to resume it.',
-      'api.errors.gameNotActiveAskAdmin'
+      'api.errors.gameNotActiveAskAdmin',
     );
   }
 
@@ -6986,11 +7371,13 @@ function resolveAuthenticatedGameAccessForGame(
     auth,
     playerId,
     readyPlayerIds: refreshedRuntime.currentTurnReadyPlayerIds,
-    isProcessing: refreshedRuntime.isTurnProcessing
+    isProcessing: refreshedRuntime.isTurnProcessing,
   };
 }
 
-function resolveAuthenticatedController(req: Request):
+function resolveAuthenticatedController(
+  req: Request,
+):
   | { galaxy: Galaxy; auth: { data: AuthData; session: AuthSession } }
   | { status: number; error: string } {
   const auth = getAuthSession(req);
@@ -7009,7 +7396,7 @@ function resolveAuthenticatedController(req: Request):
 
   return {
     galaxy: runtimeAccess.runtime.galaxy,
-    auth
+    auth,
   };
 }
 
@@ -7027,7 +7414,9 @@ function resolvePlayerById(galaxy: Galaxy, playerId: number): Player | null {
   return null;
 }
 
-function resolveAuthenticatedGamePlayer(req: Request):
+function resolveAuthenticatedGamePlayer(
+  req: Request,
+):
   | { galaxy: Galaxy; player: Player; auth: { data: AuthData; session: AuthSession } }
   | ApiRouteError {
   const access = resolveAuthenticatedGameAccess(req);
@@ -7037,13 +7426,17 @@ function resolveAuthenticatedGamePlayer(req: Request):
 
   const player = resolvePlayerById(access.galaxy, access.playerId);
   if (!player) {
-    return createApiRouteError(404, 'Player not found in galaxy.', 'api.errors.playerNotFoundInGame');
+    return createApiRouteError(
+      404,
+      'Player not found in galaxy.',
+      'api.errors.playerNotFoundInGame',
+    );
   }
 
   return {
     galaxy: access.galaxy,
     player,
-    auth: access.auth
+    auth: access.auth,
   };
 }
 
@@ -7076,9 +7469,9 @@ function resolveMountedTurn(galaxy: Galaxy): void {
           outcomeType: event.outcomeType,
           launchSummary: event.launchSummary,
           resultSummary: event.resultSummary,
-          ...(event.payload ?? {})
+          ...(event.payload ?? {}),
         },
-        deltas: event.deltas
+        deltas: event.deltas,
       });
 
       if (event.terminal) {
@@ -7087,7 +7480,7 @@ function resolveMountedTurn(galaxy: Galaxy): void {
     },
     counterIntelLogger: (event) => {
       recordBotCounterIntelFromCounterIntelEvent(galaxy, event);
-    }
+    },
   });
   galaxy.currentTurn = resolvedTurnNumber;
   processSensorPhalanxTurnStart(galaxy, galaxy.currentTurn);
@@ -7100,7 +7493,10 @@ function resolveMountedTurn(galaxy: Galaxy): void {
   currentGalaxyPresentationByPlayer = buildPresentationDataByPlayer(galaxy);
   currentTurnReadyPlayerIds = new Set<number>();
   persistCurrentRuntimeStoreState();
-  if (currentGameSetup && shouldAutoSaveAfterTurn(galaxy.currentTurn, currentGameSetup.autoSaveTurns)) {
+  if (
+    currentGameSetup &&
+    shouldAutoSaveAfterTurn(galaxy.currentTurn, currentGameSetup.autoSaveTurns)
+  ) {
     try {
       saveCurrentGameSnapshot();
     } catch (error) {
@@ -7115,13 +7511,13 @@ function processScheduledTurnsForLoadedGames(now = new Date()): void {
     const runtime = getGameRuntime(gameId);
     const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
     if (
-      !runtime
-      || !record
-      || record.kind !== 'MULTIPLAYER'
-      || record.status !== 'RUNNING'
-      || runtime.setup.scheduledTurns.enabled !== true
-      || runtime.isTurnProcessing
-      || !isScheduledTurnDue(runtime.setup, now)
+      !runtime ||
+      !record ||
+      record.kind !== 'MULTIPLAYER' ||
+      record.status !== 'RUNNING' ||
+      runtime.setup.scheduledTurns.enabled !== true ||
+      runtime.isTurnProcessing ||
+      !isScheduledTurnDue(runtime.setup, now)
     ) {
       continue;
     }
@@ -7158,11 +7554,7 @@ function startScheduledTurnLoop(): ReturnType<typeof setInterval> {
   }, SCHEDULED_TURN_POLL_MS);
 }
 
-function handleEndTurnRequest(
-  req: Request,
-  res: express.Response,
-  requestedGameId?: string
-) {
+function handleEndTurnRequest(req: Request, res: express.Response, requestedGameId?: string) {
   const access = requestedGameId
     ? resolveAuthenticatedGameAccessForGame(req, requestedGameId, { markPresenceSeen: true })
     : resolveAuthenticatedGameAccess(req, { markPresenceSeen: true });
@@ -7175,7 +7567,7 @@ function handleEndTurnRequest(
       res,
       409,
       'Turn processing is already in progress.',
-      'api.gameplay.endTurn.processingInProgress'
+      'api.gameplay.endTurn.processingInProgress',
     );
   }
 
@@ -7189,7 +7581,7 @@ function handleEndTurnRequest(
       res,
       409,
       'This multiplayer game uses Scheduled Turns. Manual End Turn is disabled.',
-      'api.gameplay.endTurn.scheduledTurnsManualDisabled'
+      'api.gameplay.endTurn.scheduledTurnsManualDisabled',
     );
   }
 
@@ -7205,11 +7597,15 @@ function handleEndTurnRequest(
       409,
       buildEndTurnMailBlockMessage(unreadMailCount, pendingRequestCount),
       'api.gameplay.endTurn.mailBlocked',
-      buildEndTurnMailBlockParams(unreadMailCount, pendingRequestCount)
+      buildEndTurnMailBlockParams(unreadMailCount, pendingRequestCount),
     );
   }
 
-  const presenceSummary = reconcileReadyStateForOnlineHumans(access.gameId, access.runtime, access.auth.data);
+  const presenceSummary = reconcileReadyStateForOnlineHumans(
+    access.gameId,
+    access.runtime,
+    access.auth.data,
+  );
   const minimumOnlineHumansRequired = minimumOnlineHumansRequiredForGame(access.gameId);
   if (presenceSummary.presentHumanCount < minimumOnlineHumansRequired) {
     const metadata = buildOnlineHumansRequiredMessageMetadata(access.gameId);
@@ -7218,7 +7614,7 @@ function handleEndTurnRequest(
       409,
       metadata.message ?? 'Not enough human players are online to progress this game.',
       metadata.key ?? 'api.gameplay.endTurn.notEnoughOnlineHumans',
-      metadata.params
+      metadata.params,
     );
   }
   if (presenceSummary.activeHumanCount < 1) {
@@ -7228,7 +7624,7 @@ function handleEndTurnRequest(
       409,
       metadata.message ?? 'At least 1 active human player must be present to progress this game.',
       metadata.key ?? 'api.gameplay.endTurn.activeHumanRequired',
-      metadata.params
+      metadata.params,
     );
   }
 
@@ -7236,12 +7632,18 @@ function handleEndTurnRequest(
   if (requiresReady) {
     currentTurnReadyPlayerIds.add(playerId);
     persistCurrentRuntimeStoreState();
-    if (!areAllHumanPlayersReady(access.galaxy, currentTurnReadyPlayerIds, presenceSummary.blockingPlayerIds)) {
+    if (
+      !areAllHumanPlayersReady(
+        access.galaxy,
+        currentTurnReadyPlayerIds,
+        presenceSummary.blockingPlayerIds,
+      )
+    ) {
       const response: EndTurnResponse = {
         player: toPlayerSession(access.auth.session, access.galaxy),
         galaxy: buildGalaxySnapshot(access.galaxy),
         resolution: 'WAITING',
-        turnStatus: buildGameTurnStatusResponse(access)
+        turnStatus: buildGameTurnStatusResponse(access),
       };
       return res.status(200).json(response);
     }
@@ -7257,7 +7659,7 @@ function handleEndTurnRequest(
       player: toPlayerSession(access.auth.session, access.galaxy),
       galaxy: buildGalaxySnapshot(access.galaxy),
       resolution: 'RESOLVED',
-      turnStatus: buildGameTurnStatusResponse(access)
+      turnStatus: buildGameTurnStatusResponse(access),
     };
 
     return res.status(200).json(response);
@@ -7269,7 +7671,7 @@ function handleEndTurnRequest(
       res,
       500,
       'Turn processing failed.',
-      'api.gameplay.endTurn.processingFailed'
+      'api.gameplay.endTurn.processingFailed',
     );
   } finally {
     isTurnProcessing = false;
@@ -7277,10 +7679,7 @@ function handleEndTurnRequest(
   }
 }
 
-function sendGameCommandError(
-  res: express.Response,
-  error: GameCommandError
-) {
+function sendGameCommandError(res: express.Response, error: GameCommandError) {
   const metadata = resolveGameCommandErrorMetadata(error);
   if (metadata.key) {
     return sendApiError(res, error.status, error.message, metadata.key, metadata.params);
@@ -7376,12 +7775,12 @@ function upsertDiplomaticRelation(
   galaxy: Galaxy,
   leftPlayerId: number,
   rightPlayerId: number,
-  status: DiplomaticStatusType
+  status: DiplomaticStatusType,
 ): void {
   const playerAId = Math.min(leftPlayerId, rightPlayerId);
   const playerBId = Math.max(leftPlayerId, rightPlayerId);
-  const existingIndex = galaxy.diplomaticRelations.findIndex((relation) =>
-    relation.playerAId === playerAId && relation.playerBId === playerBId
+  const existingIndex = galaxy.diplomaticRelations.findIndex(
+    (relation) => relation.playerAId === playerAId && relation.playerBId === playerBId,
   );
 
   if (status === DiplomaticStatus.NEUTRAL) {
@@ -7394,7 +7793,7 @@ function upsertDiplomaticRelation(
   const nextRelation: DiplomaticRelation = {
     playerAId,
     playerBId,
-    status
+    status,
   };
 
   if (existingIndex >= 0) {
@@ -7403,8 +7802,8 @@ function upsertDiplomaticRelation(
     galaxy.diplomaticRelations.push(nextRelation);
   }
 
-  galaxy.diplomaticRelations.sort((left, right) =>
-    left.playerAId - right.playerAId || left.playerBId - right.playerBId
+  galaxy.diplomaticRelations.sort(
+    (left, right) => left.playerAId - right.playerAId || left.playerBId - right.playerBId,
   );
 }
 
@@ -7437,15 +7836,11 @@ function calculateMaxShipyardQueueLength(planet: Planet, player: Player): number
 
 function calculateMaxLabsPerTechnology(player: Player): number {
   const irnLevel = player.getTechLevel(TECH_TYPE_INTERGALACTIC_RESEARCH_NETWORK);
-  const rawLimit = Math.floor((1.5 * Math.sqrt(Math.max(0, irnLevel))) + 1);
+  const rawLimit = Math.floor(1.5 * Math.sqrt(Math.max(0, irnLevel)) + 1);
   return Math.max(1, rawLimit);
 }
 
-function hasBuildingRequirements(
-  planet: Planet,
-  building: Building,
-  nextLevel: number
-): boolean {
+function hasBuildingRequirements(planet: Planet, building: Building, nextLevel: number): boolean {
   for (const requirement of building.buildingRequirements) {
     const requiredLevel = Math.ceil(nextLevel * requirement.level);
     const currentLevel = planet.getBuildingLevel(requirement.building as BuildingTypeType);
@@ -7520,7 +7915,7 @@ function hasDefenceTechnologyRequirements(player: Player, defence: Defence): boo
 function hasResearchBuildingRequirements(
   planet: Planet,
   technology: Technology,
-  nextLevel: number
+  nextLevel: number,
 ): boolean {
   for (const requirement of technology.buildingRequirements) {
     const requiredLevel = Math.ceil(nextLevel * requirement.level);
@@ -7536,7 +7931,7 @@ function hasResearchBuildingRequirements(
 function hasResearchTechnologyRequirements(
   player: Player,
   technology: Technology,
-  nextLevel: number
+  nextLevel: number,
 ): boolean {
   for (const requirement of technology.techRequirements) {
     const requiredLevel = Math.ceil(nextLevel * requirement.level);
@@ -7632,9 +8027,7 @@ function normalizeBotProfileId(value: unknown): BotProfileId | null {
     return null;
   }
 
-  return BOT_PROFILE_IDS.includes(value as BotProfileId)
-    ? value as BotProfileId
-    : null;
+  return BOT_PROFILE_IDS.includes(value as BotProfileId) ? (value as BotProfileId) : null;
 }
 
 function parseBodyIntInRange(value: unknown, min: number, max: number): number | null {
@@ -7659,12 +8052,12 @@ function normalizeDiplomaticStatus(value: unknown): DiplomaticStatusType | null 
 }
 
 function normalizeSupportRequestType(value: unknown): SupportRequestTypeDto | null {
-  return value === 'RESOURCE_SUPPORT'
-    || value === 'PLANET_REPAIR'
-    || value === 'PLANET_DEFENSE'
-    || value === 'ATTACK_TARGET'
-    || value === 'BOMBARD_TARGET'
-    || value === 'SIEGE_TARGET'
+  return value === 'RESOURCE_SUPPORT' ||
+    value === 'PLANET_REPAIR' ||
+    value === 'PLANET_DEFENSE' ||
+    value === 'ATTACK_TARGET' ||
+    value === 'BOMBARD_TARGET' ||
+    value === 'SIEGE_TARGET'
     ? value
     : null;
 }
@@ -7688,7 +8081,7 @@ function parseBodyReportIds(value: unknown): number[] | null {
 }
 
 function parseDeleteMailRequestRefs(
-  value: unknown
+  value: unknown,
 ): Array<{ requestId: number; requestType: MailRequestDto['requestType'] }> | null {
   if (!Array.isArray(value)) {
     return null;
@@ -7707,15 +8100,18 @@ function parseDeleteMailRequestRefs(
     const requestId = parseBodyPositiveInt(candidate.requestId);
     const requestType = candidate.requestType;
     if (
-      requestId === null
-      || (requestType !== 'DIPLOMACY_PROPOSAL' && requestType !== 'MAINTENANCE' && requestType !== 'JUMP_GATE' && requestType !== 'SUPPORT')
+      requestId === null ||
+      (requestType !== 'DIPLOMACY_PROPOSAL' &&
+        requestType !== 'MAINTENANCE' &&
+        requestType !== 'JUMP_GATE' &&
+        requestType !== 'SUPPORT')
     ) {
       return null;
     }
 
     refs.push({
       requestId,
-      requestType
+      requestType,
     });
   }
 
@@ -7897,7 +8293,7 @@ function parseResourcesPackPayload(value: unknown): ResourcesPackType | null {
   return {
     metal,
     crystal,
-    deuterium
+    deuterium,
   } as ResourcesPackType;
 }
 
@@ -7937,7 +8333,7 @@ function parseFleetShipSelections(value: unknown): CreateFleetShipSelectionEntry
   return Array.from(combined.entries()).map(([type, amounts]) => ({
     type,
     undamagedAmount: amounts.undamagedAmount,
-    damagedAmount: amounts.damagedAmount
+    damagedAmount: amounts.damagedAmount,
   }));
 }
 
@@ -7971,7 +8367,7 @@ function parseSupportShipAmounts(value: unknown): ShipAmountEntry[] | null {
 
   return Array.from(combined.entries()).map(([type, amount]) => ({
     type,
-    amount
+    amount,
   }));
 }
 
@@ -8024,7 +8420,7 @@ function parseBombardmentPriorities(value: unknown): BombardmentPrioritiesType |
   const raw = {
     main: candidate.main ?? null,
     secondary: candidate.secondary ?? null,
-    tertiary: candidate.tertiary ?? null
+    tertiary: candidate.tertiary ?? null,
   };
 
   const slots = [raw.main, raw.secondary, raw.tertiary];
@@ -8035,7 +8431,7 @@ function parseBombardmentPriorities(value: unknown): BombardmentPrioritiesType |
   return normalizeBombardmentPriorities({
     main: raw.main as BombardmentPrioritySelectionType | null,
     secondary: raw.secondary as BombardmentPrioritySelectionType | null,
-    tertiary: raw.tertiary as BombardmentPrioritySelectionType | null
+    tertiary: raw.tertiary as BombardmentPrioritySelectionType | null,
   });
 }
 
@@ -8061,16 +8457,16 @@ function countPlanetBombsByType(planet: Planet): Map<DefenceTypeType, number> {
 }
 
 function toShipAmountEntriesFromSelections(
-  ships: Array<Pick<ShipSelectionEntryType, 'type' | 'undamagedAmount' | 'damagedAmount'>>
+  ships: Array<Pick<ShipSelectionEntryType, 'type' | 'undamagedAmount' | 'damagedAmount'>>,
 ): Array<{ type: ShipTypeType; amount: number }> {
   return ships.map((ship) => ({
     type: ship.type,
-    amount: ship.undamagedAmount + ship.damagedAmount
+    amount: ship.undamagedAmount + ship.damagedAmount,
   }));
 }
 
 function toManyShipsFromShipAmounts(
-  ships: Array<{ type: ShipTypeType; amount: number }>
+  ships: Array<{ type: ShipTypeType; amount: number }>,
 ): ManyShipsType {
   const manyShips = ManyShips.empty();
   for (const ship of ships) {
@@ -8123,14 +8519,16 @@ function countJumpGateCapacityShips(ships: Array<{ type: ShipTypeType; amount: n
 }
 
 function calculateTravelDistance(origin: ClientCoordinates, target: ClientCoordinates): number {
-  return Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z);
+  return (
+    Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y) + Math.abs(origin.z - target.z)
+  );
 }
 
 function toPlanetCoordinates(planet: Planet): ClientCoordinates {
   return {
     x: planet.basicInfo.solarSystem.coordinates.x,
     y: planet.basicInfo.solarSystem.coordinates.y,
-    z: Math.max(0, planet.basicInfo.order - 1)
+    z: Math.max(0, planet.basicInfo.order - 1),
   };
 }
 
@@ -8146,7 +8544,7 @@ function remainingTravelTurnsForFleet(fleet: Fleet, currentTurn: number): number
 function isAlliedSensorPhalanxContact(
   diplomacyResolver: InstanceType<typeof DiplomacyResolver>,
   viewerPlayerId: number,
-  fleetOwnerId: number
+  fleetOwnerId: number,
 ): boolean {
   const status = diplomacyResolver.getStatus(viewerPlayerId, fleetOwnerId);
   return status === DiplomaticStatus.SELF || status === DiplomaticStatus.ALLIED;
@@ -8155,7 +8553,7 @@ function isAlliedSensorPhalanxContact(
 function toSensorPhalanxCapabilitiesDto(
   planet: Planet,
   origin: ClientCoordinates,
-  currentTurn: number
+  currentTurn: number,
 ): SensorPhalanxCapabilitiesDto {
   planet.synchronizeSensorPhalanxTurn(currentTurn);
 
@@ -8167,32 +8565,35 @@ function toSensorPhalanxCapabilitiesDto(
     scanCostDeuterium: planet.getSensorPhalanxScanCost(),
     scansPerTurn: planet.getSensorPhalanxScansPerTurn(),
     scansUsedThisTurn: planet.rBDSFTQ.sensorPhalanxScansUsed,
-    remainingScans: planet.getRemainingSensorPhalanxScans(currentTurn)
+    remainingScans: planet.getRemainingSensorPhalanxScans(currentTurn),
   };
 }
 
 function compareSensorPhalanxContacts(
   left: SensorPhalanxFleetContactDto,
-  right: SensorPhalanxFleetContactDto
+  right: SensorPhalanxFleetContactDto,
 ): number {
-  const directionWeight = (contact: SensorPhalanxFleetContactDto) => contact.direction === 'INCOMING' ? 0 : 1;
-  return directionWeight(left) - directionWeight(right)
-    || left.etaTurns - right.etaTurns
-    || right.fleetSize - left.fleetSize
-    || Number(left.isAllied) - Number(right.isAllied);
+  const directionWeight = (contact: SensorPhalanxFleetContactDto) =>
+    contact.direction === 'INCOMING' ? 0 : 1;
+  return (
+    directionWeight(left) - directionWeight(right) ||
+    left.etaTurns - right.etaTurns ||
+    right.fleetSize - left.fleetSize ||
+    Number(left.isAllied) - Number(right.isAllied)
+  );
 }
 
 function toSensorPhalanxFleetContactDto(
   fleet: Fleet,
   direction: 'INCOMING' | 'OUTGOING',
   currentTurn: number,
-  isAllied: boolean
+  isAllied: boolean,
 ): SensorPhalanxFleetContactDto {
   return {
     direction,
     fleetSize: ManyShips.totalShipsCount(fleet.ships),
     etaTurns: remainingTravelTurnsForFleet(fleet, currentTurn),
-    isAllied
+    isAllied,
   };
 }
 
@@ -8202,7 +8603,7 @@ function buildSensorPhalanxScanResponse(
   originPlanet: Planet,
   origin: ClientCoordinates,
   targetPlanet: Planet,
-  target: ClientCoordinates
+  target: ClientCoordinates,
 ): SensorPhalanxScanResponse {
   const diplomacyResolver = createDiplomacyResolver(galaxy);
   const contacts: SensorPhalanxFleetContactDto[] = [];
@@ -8214,12 +8615,16 @@ function buildSensorPhalanxScanResponse(
 
     const isAllied = isAlliedSensorPhalanxContact(diplomacyResolver, viewerPlayerId, fleet.ownerId);
     if (sameCoordinates(fleet.target, target)) {
-      contacts.push(toSensorPhalanxFleetContactDto(fleet, 'INCOMING', galaxy.currentTurn, isAllied));
+      contacts.push(
+        toSensorPhalanxFleetContactDto(fleet, 'INCOMING', galaxy.currentTurn, isAllied),
+      );
       continue;
     }
 
     if (sameCoordinates(fleet.origin, target)) {
-      contacts.push(toSensorPhalanxFleetContactDto(fleet, 'OUTGOING', galaxy.currentTurn, isAllied));
+      contacts.push(
+        toSensorPhalanxFleetContactDto(fleet, 'OUTGOING', galaxy.currentTurn, isAllied),
+      );
     }
   }
 
@@ -8229,7 +8634,7 @@ function buildSensorPhalanxScanResponse(
     capabilities: toSensorPhalanxCapabilitiesDto(originPlanet, origin, galaxy.currentTurn),
     target,
     targetPlanetName: targetPlanet.basicInfo.name,
-    contacts
+    contacts,
   };
 }
 
@@ -8245,8 +8650,8 @@ function processSensorPhalanxTurnStart(galaxy: Galaxy, currentTurn: number): voi
       planet.synchronizeSensorPhalanxTurn(currentTurn);
       const normalRange = planet.getSensorPhalanxNormalRange();
       if (
-        planet.getBuildingLevel(BuildingType.SENSOR_PHALANX as BuildingTypeType) <= 0
-        || normalRange <= 0
+        planet.getBuildingLevel(BuildingType.SENSOR_PHALANX as BuildingTypeType) <= 0 ||
+        normalRange <= 0
       ) {
         planet.rBDSFTQ.sensorPhalanxKnownIncomingFleetIds = [];
         continue;
@@ -8257,13 +8662,15 @@ function processSensorPhalanxTurnStart(galaxy: Galaxy, currentTurn: number): voi
         player.playerId,
         toPlanetCoordinates(planet),
         normalRange,
-        diplomacyResolver
+        diplomacyResolver,
       );
       const knownFleetIds = new Set(planet.rBDSFTQ.sensorPhalanxKnownIncomingFleetIds);
       const newDetections = detections.filter((entry) => !knownFleetIds.has(entry.fleetId));
 
       if (newDetections.length > 0) {
-        player.addReport(createSensorPhalanxPassiveReport(player, planet, newDetections, currentTurn));
+        player.addReport(
+          createSensorPhalanxPassiveReport(player, planet, newDetections, currentTurn),
+        );
       }
 
       planet.rBDSFTQ.sensorPhalanxKnownIncomingFleetIds = detections.map((entry) => entry.fleetId);
@@ -8274,23 +8681,42 @@ function createSensorPhalanxPassiveReport(
   player: Player,
   detectorPlanet: Planet,
   detections: SensorPhalanxPassiveDetection[],
-  currentTurn: number
+  currentTurn: number,
 ): SensorPhalanxReport {
   const sourceCoordinates = toPlanetCoordinates(detectorPlanet);
-  const body = detections.map((entry) =>
-    `Incoming fleet detected for ${entry.targetPlanetName} (${entry.targetCoordinates.x}:${entry.targetCoordinates.y}:${entry.targetCoordinates.z}) | Size: ${entry.contact.fleetSize} | ETA: ${entry.contact.etaTurns} | Allied: ${entry.contact.isAllied ? 'Yes' : 'No'}`
-  ).join('\n');
+  const body = detections
+    .map((entry) =>
+      encodeRuntimeText('generated.reports.body.sensorPhalanxPassiveLine', {
+        targetPlanet: entry.targetPlanetName,
+        x: entry.targetCoordinates.x,
+        y: entry.targetCoordinates.y,
+        z: entry.targetCoordinates.z,
+        fleetSize: entry.contact.fleetSize,
+        etaTurns: entry.contact.etaTurns,
+        allied: encodeRuntimeText(
+          entry.contact.isAllied
+            ? 'communications.shared.labels.yes'
+            : 'communications.shared.labels.no',
+        ),
+      }),
+    )
+    .join('\n');
 
   return new SensorPhalanxReportModel(
     {
       reportId: player.createReportId(),
       createdTurn: currentTurn,
-      title: `Sensor Phalanx Alert: ${detectorPlanet.basicInfo.name} (${sourceCoordinates.x}:${sourceCoordinates.y}:${sourceCoordinates.z})`,
+      title: encodeRuntimeText('generated.reports.sensorPhalanxPassiveTitle', {
+        planet: detectorPlanet.basicInfo.name,
+        x: sourceCoordinates.x,
+        y: sourceCoordinates.y,
+        z: sourceCoordinates.z,
+      }),
       sourceCoordinates,
       sourcePlanetName: detectorPlanet.basicInfo.name,
-      sourceSystemName: detectorPlanet.basicInfo.solarSystem.name
+      sourceSystemName: detectorPlanet.basicInfo.solarSystem.name,
     },
-    body
+    body,
   );
 }
 
@@ -8301,35 +8727,54 @@ function createSensorPhalanxActiveScanReport(
   targetPlanet: Planet,
   targetCoordinates: ClientCoordinates,
   contacts: SensorPhalanxFleetContactDto[],
-  currentTurn: number
+  currentTurn: number,
 ): SensorPhalanxReport {
-  const body = contacts.length > 0
-    ? contacts.map((contact) =>
-      `${contact.direction} fleet contact | Size: ${contact.fleetSize} | ETA: ${contact.etaTurns} | Allied: ${contact.isAllied ? 'Yes' : 'No'}`
-    ).join('\n')
-    : 'No fleet contacts detected.';
+  const body =
+    contacts.length > 0
+      ? contacts
+          .map((contact) =>
+            encodeRuntimeText('generated.reports.body.sensorPhalanxActiveLine', {
+              direction: encodeRuntimeText(
+                `generated.sensorPhalanx.directions.${contact.direction}`,
+              ),
+              fleetSize: contact.fleetSize,
+              etaTurns: contact.etaTurns,
+              allied: encodeRuntimeText(
+                contact.isAllied
+                  ? 'communications.shared.labels.yes'
+                  : 'communications.shared.labels.no',
+              ),
+            }),
+          )
+          .join('\n')
+      : encodeRuntimeText('generated.reports.body.sensorPhalanxNoContacts');
 
   return new SensorPhalanxReportModel(
     {
       reportId: player.createReportId(),
       createdTurn: currentTurn,
-      title: `Sensor Phalanx Scan: ${targetPlanet.basicInfo.name} (${targetCoordinates.x}:${targetCoordinates.y}:${targetCoordinates.z})`,
+      title: encodeRuntimeText('generated.reports.sensorPhalanxActiveTitle', {
+        planet: targetPlanet.basicInfo.name,
+        x: targetCoordinates.x,
+        y: targetCoordinates.y,
+        z: targetCoordinates.z,
+      }),
       sourceCoordinates: targetCoordinates,
       sourcePlanetName: targetPlanet.basicInfo.name,
       sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
       originCoordinates,
       originPlanetName: originPlanet.basicInfo.name,
       originSystemName: originPlanet.basicInfo.solarSystem.name,
-      senderPlayerName: player.playerName
+      senderPlayerName: player.playerName,
     },
-    body
+    body,
   );
 }
 
 function calculateFuelCost(
   ships: Array<{ type: ShipTypeType; amount: number }>,
   distance: number,
-  multiplier = 1
+  multiplier = 1,
 ): number {
   let totalFuel = 0;
   for (const ship of ships) {
@@ -8356,7 +8801,7 @@ function multiplyResourcePack(base: ResourcesPackType, amount: number): Resource
   return {
     metal: base.metal * amount,
     crystal: base.crystal * amount,
-    deuterium: base.deuterium * amount
+    deuterium: base.deuterium * amount,
   } as ResourcesPackType;
 }
 
@@ -8364,7 +8809,7 @@ function addProducedShipyardUnitsToPlanet(
   planet: Planet,
   blueprint: Ship | Defence,
   itemKind: 'ship' | 'defence',
-  amount: number
+  amount: number,
 ): void {
   const normalizedAmount = Math.max(0, Math.floor(amount));
   if (normalizedAmount <= 0) {
@@ -8383,7 +8828,7 @@ function toResourcesPackDto(pack: ResourcesPackType): ResourcesPackDto {
   return {
     metal: pack.metal,
     crystal: pack.crystal,
-    deuterium: pack.deuterium
+    deuterium: pack.deuterium,
   };
 }
 
@@ -8397,7 +8842,7 @@ function toPlanetaryParametersDto(parameters: PlanetaryParameters): PlanetaryPar
     scienceModifier: parameters.scienceModifier,
     industryModifier: parameters.industryModifier,
     anomaliesAndNoise: parameters.anomaliesAndNoise,
-    hyperspaceParameters: parameters.hyperspaceParameters
+    hyperspaceParameters: parameters.hyperspaceParameters,
   };
 }
 
@@ -8409,12 +8854,16 @@ function toBuildingLevelEntries(map: Map<string, number>): BuildingLevelEntry[] 
   return entries;
 }
 
-function toBuildingPowerConsumptionEntries(clientPlanet: ClientPlanet): BuildingPowerConsumptionEntry[] {
+function toBuildingPowerConsumptionEntries(
+  clientPlanet: ClientPlanet,
+): BuildingPowerConsumptionEntry[] {
   const entries: BuildingPowerConsumptionEntry[] = [];
   for (const [type] of clientPlanet.rBDSFTQ.buildingsLevels.entries()) {
     entries.push({
       type: type as BuildingTypeType,
-      currentPowerConsumption: clientPlanet.getCurrentBuildingPowerConsumption(type as BuildingTypeType)
+      currentPowerConsumption: clientPlanet.getCurrentBuildingPowerConsumption(
+        type as BuildingTypeType,
+      ),
     });
   }
 
@@ -8427,17 +8876,21 @@ function toFusionReactorStageEntry(clientPlanet: ClientPlanet): FusionReactorSta
   }
 
   return {
-    selectedStage: clientPlanet.getFusionReactorSelectedStage()
+    selectedStage: clientPlanet.getFusionReactorSelectedStage(),
   };
 }
 
-function toBuildingStructuralPointsEntries(clientPlanet: ClientPlanet): BuildingStructuralPointsEntry[] {
+function toBuildingStructuralPointsEntries(
+  clientPlanet: ClientPlanet,
+): BuildingStructuralPointsEntry[] {
   const entries: BuildingStructuralPointsEntry[] = [];
   for (const [type] of clientPlanet.rBDSFTQ.buildingsLevels.entries()) {
     entries.push({
       type: type as BuildingTypeType,
-      currentStructuralPoints: clientPlanet.getCurrentBuildingStructuralPoints(type as BuildingTypeType),
-      maxStructuralPoints: clientPlanet.getMaxBuildingStructuralPoints(type as BuildingTypeType)
+      currentStructuralPoints: clientPlanet.getCurrentBuildingStructuralPoints(
+        type as BuildingTypeType,
+      ),
+      maxStructuralPoints: clientPlanet.getMaxBuildingStructuralPoints(type as BuildingTypeType),
     });
   }
 
@@ -8471,23 +8924,23 @@ function toPlayerReportBaseDto(report: PlayerReport): PlayerReportDtoBase {
     isFavourite: report.isFavourite,
     sourceCoordinates: report.sourceCoordinates
       ? {
-        x: report.sourceCoordinates.x,
-        y: report.sourceCoordinates.y,
-        z: report.sourceCoordinates.z
-      }
+          x: report.sourceCoordinates.x,
+          y: report.sourceCoordinates.y,
+          z: report.sourceCoordinates.z,
+        }
       : null,
     sourcePlanetName: report.sourcePlanetName,
     sourceSystemName: report.sourceSystemName,
     originCoordinates: report.originCoordinates
       ? {
-        x: report.originCoordinates.x,
-        y: report.originCoordinates.y,
-        z: report.originCoordinates.z
-      }
+          x: report.originCoordinates.x,
+          y: report.originCoordinates.y,
+          z: report.originCoordinates.z,
+        }
       : null,
     originPlanetName: report.originPlanetName,
     originSystemName: report.originSystemName,
-    senderPlayerName: report.senderPlayerName
+    senderPlayerName: report.senderPlayerName,
   };
 }
 
@@ -8511,14 +8964,14 @@ function toClientReportDataDto(reportData: EspionageReportData): ClientReportDat
     shipyardProduction: reportData.shipyardProduction,
     defencesProduction: reportData.defencesProduction,
     researchProduction: reportData.researchProduction,
-    buildingProduction: reportData.buildingProduction
+    buildingProduction: reportData.buildingProduction,
   };
 }
 
 function toTextPlayerReportDto(report: PlayerReport & { body: string }): TextPlayerReportDto {
   return {
     ...toPlayerReportBaseDto(report),
-    body: report.body
+    body: report.body,
   };
 }
 
@@ -8544,7 +8997,7 @@ function toEspionagePlayerReportDto(report: EspionageReportData): EspionagePlaye
     shipyardProduction: report.shipyardProduction,
     defencesProduction: report.defencesProduction,
     researchProduction: report.researchProduction,
-    buildingProduction: report.buildingProduction
+    buildingProduction: report.buildingProduction,
   };
 }
 
@@ -8557,7 +9010,10 @@ function toPlayerReportDto(report: PlayerReport): PlayerReportDto {
   }
 }
 
-function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordinates): ClientPlanetDto {
+function toClientPlanetDto(
+  clientPlanet: ClientPlanet,
+  coordinates: ClientCoordinates,
+): ClientPlanetDto {
   clientPlanet.normalizeBuildingQueueProgress();
   return {
     coordinates,
@@ -8568,14 +9024,14 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       order: clientPlanet.basicInfo.order,
       image: clientPlanet.basicInfo.image,
       iv: clientPlanet.basicInfo.iv,
-      size: clientPlanet.basicInfo.size
+      size: clientPlanet.basicInfo.size,
     },
     info: {
       isOwnedByViewer: clientPlanet.isOwnedByViewer,
       ownerId: clientPlanet.info.ownerId,
       ownerPlayerType: clientPlanet.ownerPlayerType,
       ownerPlayerName: clientPlanet.ownerPlayerName,
-      planetaryParameters: toPlanetaryParametersDto(clientPlanet.info.planetaryParameters)
+      planetaryParameters: toPlanetaryParametersDto(clientPlanet.info.planetaryParameters),
     },
     objects: {
       resources: toResourcesPackDto(clientPlanet.rBDSFTQ.resources),
@@ -8591,9 +9047,9 @@ function toClientPlanetDto(clientPlanet: ClientPlanet, coordinates: ClientCoordi
       shipyardQueue: clientPlanet.rBDSFTQ.shipyardQueue,
       fleets: clientPlanet.rBDSFTQ.fleets,
       spaceDebris: toResourcesPackDto(clientPlanet.rBDSFTQ.spaceDebris),
-      tradePortOffers: toTradePortOfferDtos(clientPlanet.rBDSFTQ.tradePortOffers)
+      tradePortOffers: toTradePortOfferDtos(clientPlanet.rBDSFTQ.tradePortOffers),
     },
-    reportData: clientPlanet.reportData ? toClientReportDataDto(clientPlanet.reportData) : null
+    reportData: clientPlanet.reportData ? toClientReportDataDto(clientPlanet.reportData) : null,
   };
 }
 
@@ -8603,7 +9059,7 @@ function toClientPlanetDtoFromClientPlanet(clientPlanet: ClientPlanet): ClientPl
   return toClientPlanetDto(clientPlanet, {
     x: systemCoordinates.x,
     y: systemCoordinates.y,
-    z
+    z,
   });
 }
 
@@ -8619,7 +9075,7 @@ function toTradePortOfferDtos(offers: TradePortOffer[]): TradePortOfferDto[] {
     rolledModifierPercent: offer.rolledModifierPercent,
     levelDiscountPercent: offer.levelDiscountPercent,
     costModifierPercent: offer.costModifierPercent,
-    used: offer.used
+    used: offer.used,
   }));
 }
 
@@ -8657,7 +9113,7 @@ function generateSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber: number):
 function generateSelfReportsForHumanPlayer(
   galaxy: Galaxy,
   player: Player,
-  turnNumber: number
+  turnNumber: number,
 ): void {
   const reportGenerator = new EspionageReportGenerator();
   const playersById = new Map<number, (typeof galaxy.players)[number]>();
@@ -8672,17 +9128,11 @@ function generateSelfReportsForHumanPlayer(
           continue;
         }
 
-        const report = reportGenerator.createEspionageReport(
-          player,
-          player,
-          planet,
-          0,
-          {
-            reportId: player.createReportId(),
-            forcedReportLevel: SELF_REPORT_LEVEL,
-            createdTurn: turnNumber
-          }
-        );
+        const report = reportGenerator.createEspionageReport(player, player, planet, 0, {
+          reportId: player.createReportId(),
+          forcedReportLevel: SELF_REPORT_LEVEL,
+          createdTurn: turnNumber,
+        });
         planet.lastReportData.set(player.playerId, report.copy());
         player.addReport(report.copy());
       }
@@ -8701,18 +9151,12 @@ function generateSelfReportsForHumanPlayer(
     }
 
     const ownerId = planet.info.ownerId;
-    const planetOwner = ownerId === null ? null : playersById.get(ownerId) ?? null;
-    const report = reportGenerator.createEspionageReport(
-      player,
-      planetOwner,
-      planet,
-      0,
-      {
-        reportId: player.createReportId(),
-        forcedReportLevel: STARTING_SYSTEM_REPORT_LEVEL,
-        createdTurn: turnNumber
-      }
-    );
+    const planetOwner = ownerId === null ? null : (playersById.get(ownerId) ?? null);
+    const report = reportGenerator.createEspionageReport(player, planetOwner, planet, 0, {
+      reportId: player.createReportId(),
+      forcedReportLevel: STARTING_SYSTEM_REPORT_LEVEL,
+      createdTurn: turnNumber,
+    });
     planet.lastReportData.set(player.playerId, report.copy());
     player.addReport(report.copy());
   }
@@ -8727,17 +9171,11 @@ function refreshOwnedPlanetSelfReportsForHumanPlayers(galaxy: Galaxy, turnNumber
     }
 
     for (const planet of player.planets) {
-      const report = reportGenerator.createEspionageReport(
-        player,
-        player,
-        planet,
-        0,
-        {
-          reportId: player.createReportId(),
-          forcedReportLevel: SELF_REPORT_LEVEL,
-          createdTurn: turnNumber
-        }
-      );
+      const report = reportGenerator.createEspionageReport(player, player, planet, 0, {
+        reportId: player.createReportId(),
+        forcedReportLevel: SELF_REPORT_LEVEL,
+        createdTurn: turnNumber,
+      });
       planet.lastReportData.set(player.playerId, report.copy());
     }
   }
@@ -8747,26 +9185,20 @@ function refreshPlanetIntelForPlayer(
   viewer: Player,
   planetOwner: Player | null,
   planet: Planet,
-  turnNumber: number
+  turnNumber: number,
 ): void {
   const reportGenerator = new EspionageReportGenerator();
-  const report = reportGenerator.createEspionageReport(
-    viewer,
-    planetOwner,
-    planet,
-    0,
-    {
-      reportId: viewer.createReportId(),
-      forcedReportLevel: SELF_REPORT_LEVEL,
-      createdTurn: turnNumber
-    }
-  );
+  const report = reportGenerator.createEspionageReport(viewer, planetOwner, planet, 0, {
+    reportId: viewer.createReportId(),
+    forcedReportLevel: SELF_REPORT_LEVEL,
+    createdTurn: turnNumber,
+  });
   planet.lastReportData.set(viewer.playerId, report.copy());
 }
 
 function toGalaxyByteCellDto(cell: GalaxyByteCell): GalaxyByteCellDto {
   return {
-    planetsAndAsteroids: [cell.planetsAndAsteroids[0], cell.planetsAndAsteroids[1]]
+    planetsAndAsteroids: [cell.planetsAndAsteroids[0], cell.planetsAndAsteroids[1]],
   };
 }
 
@@ -8783,8 +9215,8 @@ function toOwnershipByteCellDto(cell: OwnershipByteCell | null): OwnershipByteCe
       cell.relationOwnership[2],
       cell.relationOwnership[3],
       cell.relationOwnership[4],
-      cell.relationOwnership[5]
-    ]
+      cell.relationOwnership[5],
+    ],
   };
 }
 
@@ -8792,29 +9224,33 @@ function toStarSystemNoteDto(note: StarSystemNoteType): StarSystemNoteDto {
   return {
     coordinates: {
       x: note.coordinates.x,
-      y: note.coordinates.y
+      y: note.coordinates.y,
     },
     borderColor: note.borderColor,
-    text: note.text
+    text: note.text,
   };
 }
 
 function toGalaxyPresentationDataDto(
   data: GalaxyPresentationDataType,
-  starSystemNotes: StarSystemNoteType[]
+  starSystemNotes: StarSystemNoteType[],
 ): GalaxyPresentationDataDto {
   return {
     galaxyBytes: data.galaxyBytes.map((row) => row.map((cell) => toGalaxyByteCellDto(cell))),
     ownershipBytes: data.ownershipBytes.map((row) =>
-      row.map((cell) => toOwnershipByteCellDto(cell))
+      row.map((cell) => toOwnershipByteCellDto(cell)),
     ),
     ownedPlanets: data.ownedPlanets.map((planet) => toClientPlanetDtoFromClientPlanet(planet)),
-    ownFleetMovements: data.ownFleetMovements.map((movement) => toGalaxyOwnFleetMovementDto(movement)),
-    starSystemNotes: starSystemNotes.map((note) => toStarSystemNoteDto(note))
+    ownFleetMovements: data.ownFleetMovements.map((movement) =>
+      toGalaxyOwnFleetMovementDto(movement),
+    ),
+    starSystemNotes: starSystemNotes.map((note) => toStarSystemNoteDto(note)),
   };
 }
 
-function toGalaxyOwnFleetMovementDto(movement: FleetMovementSummary): GalaxyPresentationDataDto['ownFleetMovements'][number] {
+function toGalaxyOwnFleetMovementDto(
+  movement: FleetMovementSummary,
+): GalaxyPresentationDataDto['ownFleetMovements'][number] {
   return {
     fleetId: movement.fleetId,
     missionType: movement.missionType,
@@ -8852,7 +9288,7 @@ function toGalaxyOwnFleetMovementDto(movement: FleetMovementSummary): GalaxyPres
     repairCapability: { ...movement.repairCapability },
     recycleCapability: movement.recycleCapability,
     isRemoteOrigin: movement.isRemoteOrigin,
-    remoteOriginSourceFleetId: movement.remoteOriginSourceFleetId
+    remoteOriginSourceFleetId: movement.remoteOriginSourceFleetId,
   };
 }
 
@@ -8861,24 +9297,27 @@ function toClientInfoDto(clientInfo: ClientStarSystem['clientInfo']): ClientInfo
     ownedPlanetCount: clientInfo.ownedPlanetCount,
     neutralPlanetCount: clientInfo.neutralPlanetCount,
     botPlanetCount: clientInfo.botPlanetCount,
-    humanPlanetCount: clientInfo.humanPlanetCount
+    humanPlanetCount: clientInfo.humanPlanetCount,
   };
 }
 
-function toClientStarSystemDto(system: ClientStarSystem, includePlanets: boolean): ClientStarSystemDto {
+function toClientStarSystemDto(
+  system: ClientStarSystem,
+  includePlanets: boolean,
+): ClientStarSystemDto {
   const systemCoordinates: ClientCoordinates = {
     x: system.coordinates.x,
     y: system.coordinates.y,
-    z: -1
+    z: -1,
   };
   const planets = includePlanets
     ? system.planets.map((planet, index) =>
-      toClientPlanetDto(planet, {
-        x: system.coordinates.x,
-        y: system.coordinates.y,
-        z: index
-      })
-    )
+        toClientPlanetDto(planet, {
+          x: system.coordinates.x,
+          y: system.coordinates.y,
+          z: index,
+        }),
+      )
     : [];
 
   return {
@@ -8889,7 +9328,7 @@ function toClientStarSystemDto(system: ClientStarSystem, includePlanets: boolean
     isCenterEdge: system.isCenterEdge,
     discoveredByPlayer: Array.from(system.discoveredByPlayer),
     planets,
-    clientInfo: toClientInfoDto(system.clientInfo)
+    clientInfo: toClientInfoDto(system.clientInfo),
   };
 }
 
@@ -8905,9 +9344,9 @@ function toClientGalaxyDto(clientGalaxy: ClientGalaxy, includePlanets: boolean):
   return {
     name: clientGalaxy.name,
     stars: clientGalaxy.stars.map((row) =>
-      row.map((system) => toClientStarSystemDto(system, includePlanets))
+      row.map((system) => toClientStarSystemDto(system, includePlanets)),
     ),
-    playerNames: toPlayerNameEntries(clientGalaxy.playerNameMap)
+    playerNames: toPlayerNameEntries(clientGalaxy.playerNameMap),
   };
 }
 
@@ -8939,10 +9378,10 @@ function buildGalaxySnapshot(galaxy: Galaxy): GalaxySnapshot {
         isGalaxyCenter: system.isGalaxyCenter,
         coordinates: {
           x: system.coordinates.x,
-          y: system.coordinates.y
-        }
-      }))
-    )
+          y: system.coordinates.y,
+        },
+      })),
+    ),
   };
 }
 
@@ -8950,7 +9389,7 @@ function toDiplomaticRelationDtos(relations: DiplomaticRelation[]): DiplomaticRe
   return relations.map((relation) => ({
     playerAId: relation.playerAId,
     playerBId: relation.playerBId,
-    status: relation.status
+    status: relation.status,
   }));
 }
 
@@ -8958,10 +9397,14 @@ function buildDiplomacyViewResponse(galaxy: Galaxy, viewer: Player): DiplomacyVi
   return {
     currentTurn: galaxy.currentTurn,
     currentPlayerId: viewer.playerId,
-    outgoingProposalSentThisTurn: hasOutgoingProposalSentThisTurn(galaxy, viewer.playerId, galaxy.currentTurn),
+    outgoingProposalSentThisTurn: hasOutgoingProposalSentThisTurn(
+      galaxy,
+      viewer.playerId,
+      galaxy.currentTurn,
+    ),
     ownedPlanets: buildOwnedPlanetsForPlayer(galaxy, viewer.playerId),
     contacts: buildDiplomacyContactDtos(galaxy, viewer),
-    activeProposals: buildActiveDiplomaticProposalDtos(galaxy, viewer.playerId)
+    activeProposals: buildActiveDiplomaticProposalDtos(galaxy, viewer.playerId),
   };
 }
 
@@ -8983,30 +9426,37 @@ function buildMailViewResponse(galaxy: Galaxy, viewer: Player): MailViewResponse
     messages,
     requests,
     recipients,
-    allianceRecipientCount: resolveAllianceMailRecipients(galaxy, viewer.playerId).length
+    allianceRecipientCount: resolveAllianceMailRecipients(galaxy, viewer.playerId).length,
   };
 }
 
 function buildDiplomacyContactDtos(galaxy: Galaxy, viewer: Player): DiplomacyContactDto[] {
   const diplomacyResolver = new DiplomacyResolver(galaxy.diplomaticRelations);
-  const outgoingProposalSentThisTurn = hasOutgoingProposalSentThisTurn(galaxy, viewer.playerId, galaxy.currentTurn);
+  const outgoingProposalSentThisTurn = hasOutgoingProposalSentThisTurn(
+    galaxy,
+    viewer.playerId,
+    galaxy.currentTurn,
+  );
 
   return galaxy.players
-    .filter((candidate) => candidate.playerId !== viewer.playerId && candidate.type !== PLAYER_TYPE_NEUTRAL)
+    .filter(
+      (candidate) =>
+        candidate.playerId !== viewer.playerId && candidate.type !== PLAYER_TYPE_NEUTRAL,
+    )
     .map((candidate) => {
       const currentStatus = diplomacyResolver.getStatus(viewer.playerId, candidate.playerId);
       const availableStatuses = allowedDiplomaticProposalStatuses(currentStatus);
       const pendingPairProposal = galaxy.diplomaticProposals.some((proposal) =>
-        isPendingDiplomaticProposalForPair(proposal, viewer.playerId, candidate.playerId)
+        isPendingDiplomaticProposalForPair(proposal, viewer.playerId, candidate.playerId),
       );
       const isReadOnly = availableStatuses.length <= 0;
-      const canSendProposal = availableStatuses.length > 0
-        && !pendingPairProposal
-        && !outgoingProposalSentThisTurn;
+      const canSendProposal =
+        availableStatuses.length > 0 && !pendingPairProposal && !outgoingProposalSentThisTurn;
 
       let proposalBlockedReason: string | null = null;
       if (availableStatuses.length <= 0) {
-        proposalBlockedReason = 'No diplomacy proposal is available from the current diplomacy status.';
+        proposalBlockedReason =
+          'No diplomacy proposal is available from the current diplomacy status.';
       } else if (pendingPairProposal) {
         proposalBlockedReason = 'A diplomacy proposal for this player pair is already pending.';
       } else if (outgoingProposalSentThisTurn) {
@@ -9022,7 +9472,11 @@ function buildDiplomacyContactDtos(galaxy: Galaxy, viewer: Player): DiplomacyCon
         canSendMessage: true,
         canSendProposal,
         proposalBlockedReason,
-        knownPlanets: buildKnownPlanetsForDiplomacyContact(galaxy, viewer.playerId, candidate.playerId)
+        knownPlanets: buildKnownPlanetsForDiplomacyContact(
+          galaxy,
+          viewer.playerId,
+          candidate.playerId,
+        ),
       } satisfies DiplomacyContactDto;
     })
     .sort((left, right) => compareDiplomacyContacts(left, right));
@@ -9031,7 +9485,7 @@ function buildDiplomacyContactDtos(galaxy: Galaxy, viewer: Player): DiplomacyCon
 function buildKnownPlanetsForDiplomacyContact(
   galaxy: Galaxy,
   viewerPlayerId: number,
-  targetPlayerId: number
+  targetPlayerId: number,
 ): ClientPlanetDto[] {
   const planets: ClientPlanetDto[] = [];
 
@@ -9048,10 +9502,11 @@ function buildKnownPlanetsForDiplomacyContact(
     }
   }
 
-  return planets.sort((left, right) =>
-    left.coordinates.x - right.coordinates.x
-    || left.coordinates.y - right.coordinates.y
-    || left.coordinates.z - right.coordinates.z
+  return planets.sort(
+    (left, right) =>
+      left.coordinates.x - right.coordinates.x ||
+      left.coordinates.y - right.coordinates.y ||
+      left.coordinates.z - right.coordinates.z,
   );
 }
 
@@ -9065,63 +9520,81 @@ function buildOwnedPlanetsForPlayer(galaxy: Galaxy, playerId: number): ClientPla
           continue;
         }
 
-        planets.push(toClientPlanetDtoFromClientPlanet(galaxy.createClientPlanet(planet, playerId)));
+        planets.push(
+          toClientPlanetDtoFromClientPlanet(galaxy.createClientPlanet(planet, playerId)),
+        );
       }
     }
   }
 
-  return planets.sort((left, right) =>
-    left.coordinates.x - right.coordinates.x
-    || left.coordinates.y - right.coordinates.y
-    || left.coordinates.z - right.coordinates.z
+  return planets.sort(
+    (left, right) =>
+      left.coordinates.x - right.coordinates.x ||
+      left.coordinates.y - right.coordinates.y ||
+      left.coordinates.z - right.coordinates.z,
   );
 }
 
 function buildActiveDiplomaticProposalDtos(
   galaxy: Galaxy,
-  viewerPlayerId: number
+  viewerPlayerId: number,
 ): DiplomaticProposalDto[] {
   return galaxy.diplomaticProposals
     .filter((proposal) => proposal.state === DiplomaticProposalState.PENDING)
-    .filter((proposal) => proposal.fromPlayerId === viewerPlayerId || proposal.toPlayerId === viewerPlayerId)
+    .filter(
+      (proposal) =>
+        proposal.fromPlayerId === viewerPlayerId || proposal.toPlayerId === viewerPlayerId,
+    )
     .map((proposal) => toDiplomaticProposalDto(galaxy, proposal, viewerPlayerId))
-    .sort((left, right) =>
-      proposalDirectionOrder(left.direction) - proposalDirectionOrder(right.direction)
-      || right.createdTurn - left.createdTurn
-      || right.proposalId - left.proposalId
+    .sort(
+      (left, right) =>
+        proposalDirectionOrder(left.direction) - proposalDirectionOrder(right.direction) ||
+        right.createdTurn - left.createdTurn ||
+        right.proposalId - left.proposalId,
     );
 }
 
-function buildMailRequestDtos(
-  galaxy: Galaxy,
-  viewerPlayerId: number
-): MailRequestDto[] {
+function buildMailRequestDtos(galaxy: Galaxy, viewerPlayerId: number): MailRequestDto[] {
   const diplomacyRequests = galaxy.diplomaticProposals
-    .filter((proposal) => proposal.fromPlayerId === viewerPlayerId || proposal.toPlayerId === viewerPlayerId)
+    .filter(
+      (proposal) =>
+        proposal.fromPlayerId === viewerPlayerId || proposal.toPlayerId === viewerPlayerId,
+    )
     .map((proposal) => toDiplomacyMailRequestDto(galaxy, proposal, viewerPlayerId));
   const jumpGateRequests = galaxy.jumpGateRequests
-    .filter((request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId)
+    .filter(
+      (request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId,
+    )
     .map((request) => toJumpGateMailRequestDto(galaxy, request, viewerPlayerId));
   const maintenanceRequests = galaxy.maintenanceRequests
-    .filter((request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId)
+    .filter(
+      (request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId,
+    )
     .map((request) => toMaintenanceMailRequestDto(galaxy, request, viewerPlayerId));
   const supportRequests = galaxy.supportRequests
-    .filter((request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId)
+    .filter(
+      (request) => request.fromPlayerId === viewerPlayerId || request.toPlayerId === viewerPlayerId,
+    )
     .map((request) => toSupportMailRequestDto(galaxy, request, viewerPlayerId));
 
-  return [...diplomacyRequests, ...jumpGateRequests, ...maintenanceRequests, ...supportRequests]
-    .sort((left, right) =>
-      mailRequestGroupOrder(left.state) - mailRequestGroupOrder(right.state)
-      || proposalDirectionOrder(left.direction) - proposalDirectionOrder(right.direction)
-      || right.createdTurn - left.createdTurn
-      || right.requestId - left.requestId
-    );
+  return [
+    ...diplomacyRequests,
+    ...jumpGateRequests,
+    ...maintenanceRequests,
+    ...supportRequests,
+  ].sort(
+    (left, right) =>
+      mailRequestGroupOrder(left.state) - mailRequestGroupOrder(right.state) ||
+      proposalDirectionOrder(left.direction) - proposalDirectionOrder(right.direction) ||
+      right.createdTurn - left.createdTurn ||
+      right.requestId - left.requestId,
+  );
 }
 
 function toDiplomaticProposalDto(
   galaxy: Galaxy,
   proposal: DiplomaticProposal,
-  viewerPlayerId: number
+  viewerPlayerId: number,
 ): DiplomaticProposalDto {
   const fromPlayer = resolvePlayerById(galaxy, proposal.fromPlayerId);
   const toPlayer = resolvePlayerById(galaxy, proposal.toPlayerId);
@@ -9136,18 +9609,19 @@ function toDiplomaticProposalDto(
     createdTurn: proposal.createdTurn,
     expiresOnTurn: proposal.expiresOnTurn,
     state: proposal.state,
-    direction: proposal.toPlayerId === viewerPlayerId ? 'incoming' : 'outgoing'
+    direction: proposal.toPlayerId === viewerPlayerId ? 'incoming' : 'outgoing',
   };
 }
 
 function toDiplomacyMailRequestDto(
   galaxy: Galaxy,
   proposal: DiplomaticProposal,
-  viewerPlayerId: number
+  viewerPlayerId: number,
 ): MailRequestDto {
   const dto = toDiplomaticProposalDto(galaxy, proposal, viewerPlayerId);
   const counterpartyPlayerId = dto.direction === 'incoming' ? dto.fromPlayerId : dto.toPlayerId;
-  const counterpartyPlayerName = dto.direction === 'incoming' ? dto.fromPlayerName : dto.toPlayerName;
+  const counterpartyPlayerName =
+    dto.direction === 'incoming' ? dto.fromPlayerName : dto.toPlayerName;
 
   return {
     requestId: dto.proposalId,
@@ -9158,18 +9632,19 @@ function toDiplomacyMailRequestDto(
     direction: dto.direction,
     counterpartyPlayerId,
     counterpartyPlayerName,
-    requestedStatus: dto.requestedStatus
+    requestedStatus: dto.requestedStatus,
   };
 }
 
 function toMaintenanceMailRequestDto(
   galaxy: Galaxy,
   request: MaintenanceRequest,
-  viewerPlayerId: number
+  viewerPlayerId: number,
 ): MailRequestDto {
   const direction = request.toPlayerId === viewerPlayerId ? 'incoming' : 'outgoing';
   const counterpartyPlayerId = direction === 'incoming' ? request.fromPlayerId : request.toPlayerId;
-  const counterpartyPlayerName = resolvePlayerById(galaxy, counterpartyPlayerId)?.playerName ?? `Player ${counterpartyPlayerId}`;
+  const counterpartyPlayerName =
+    resolvePlayerById(galaxy, counterpartyPlayerId)?.playerName ?? `Player ${counterpartyPlayerId}`;
 
   return {
     requestId: request.requestId,
@@ -9183,18 +9658,19 @@ function toMaintenanceMailRequestDto(
     fleetId: request.fleetId,
     targetPlanetName: request.targetPlanetName,
     requested: toMaintenanceTransferPayloadDto(request.requested),
-    approved: request.approved ? toMaintenanceTransferPayloadDto(request.approved) : null
+    approved: request.approved ? toMaintenanceTransferPayloadDto(request.approved) : null,
   };
 }
 
 function toJumpGateMailRequestDto(
   galaxy: Galaxy,
   request: JumpGateRequest,
-  viewerPlayerId: number
+  viewerPlayerId: number,
 ): JumpGateMailRequestDto {
   const direction = request.toPlayerId === viewerPlayerId ? 'incoming' : 'outgoing';
   const counterpartyPlayerId = direction === 'incoming' ? request.fromPlayerId : request.toPlayerId;
-  const counterpartyPlayerName = resolvePlayerById(galaxy, counterpartyPlayerId)?.playerName ?? `Player ${counterpartyPlayerId}`;
+  const counterpartyPlayerName =
+    resolvePlayerById(galaxy, counterpartyPlayerId)?.playerName ?? `Player ${counterpartyPlayerId}`;
 
   return {
     requestId: request.requestId,
@@ -9209,18 +9685,19 @@ function toJumpGateMailRequestDto(
     missionType: request.missionType,
     originPlanetName: request.originPlanetName,
     targetPlanetName: request.targetPlanetName,
-    totalShips: request.totalShips
+    totalShips: request.totalShips,
   };
 }
 
 function toSupportMailRequestDto(
   galaxy: Galaxy,
   request: SupportRequest,
-  viewerPlayerId: number
+  viewerPlayerId: number,
 ): SupportMailRequestDto {
   const direction = request.toPlayerId === viewerPlayerId ? 'incoming' : 'outgoing';
   const counterpartyPlayerId = direction === 'incoming' ? request.fromPlayerId : request.toPlayerId;
-  const counterpartyPlayerName = resolvePlayerById(galaxy, counterpartyPlayerId)?.playerName ?? `Player ${counterpartyPlayerId}`;
+  const counterpartyPlayerName =
+    resolvePlayerById(galaxy, counterpartyPlayerId)?.playerName ?? `Player ${counterpartyPlayerId}`;
 
   return {
     requestId: request.requestId,
@@ -9239,28 +9716,36 @@ function toSupportMailRequestDto(
     executionExpiresOnTurn: request.executionExpiresOnTurn,
     fulfilledTurn: request.fulfilledTurn,
     resolutionNote: request.resolutionNote,
-    requestedResources: 'requestedResources' in request ? toResourcesPackDto(request.requestedResources) : null,
-    approvedResources: 'approvedResources' in request && request.approvedResources ? toResourcesPackDto(request.approvedResources) : null,
-    reservedSourcePlanetName: 'reservedSourcePlanetName' in request ? request.reservedSourcePlanetName : null,
-    reservedSourceCoordinates: 'reservedSourceCoordinates' in request && request.reservedSourceCoordinates
-      ? { ...request.reservedSourceCoordinates }
-      : null,
+    requestedResources:
+      'requestedResources' in request ? toResourcesPackDto(request.requestedResources) : null,
+    approvedResources:
+      'approvedResources' in request && request.approvedResources
+        ? toResourcesPackDto(request.approvedResources)
+        : null,
+    reservedSourcePlanetName:
+      'reservedSourcePlanetName' in request ? request.reservedSourcePlanetName : null,
+    reservedSourceCoordinates:
+      'reservedSourceCoordinates' in request && request.reservedSourceCoordinates
+        ? { ...request.reservedSourceCoordinates }
+        : null,
     missionType: 'missionType' in request ? request.missionType : null,
-    minimumShips: 'minimumShips' in request ? request.minimumShips.map((entry) => ({ ...entry })) : null,
-    bombardmentPriorities: 'bombardmentPriorities' in request ? request.bombardmentPriorities : null,
-    targetOwnerPlayerName: 'targetOwnerPlayerName' in request ? request.targetOwnerPlayerName : null,
+    minimumShips:
+      'minimumShips' in request ? request.minimumShips.map((entry) => ({ ...entry })) : null,
+    bombardmentPriorities:
+      'bombardmentPriorities' in request ? request.bombardmentPriorities : null,
+    targetOwnerPlayerName:
+      'targetOwnerPlayerName' in request ? request.targetOwnerPlayerName : null,
     launchedFleetId: 'launchedFleetId' in request ? request.launchedFleetId : null,
-    launchOriginPlanetName: 'launchOriginPlanetName' in request ? request.launchOriginPlanetName : null,
-    launchOriginCoordinates: 'launchOriginCoordinates' in request && request.launchOriginCoordinates
-      ? { ...request.launchOriginCoordinates }
-      : null
+    launchOriginPlanetName:
+      'launchOriginPlanetName' in request ? request.launchOriginPlanetName : null,
+    launchOriginCoordinates:
+      'launchOriginCoordinates' in request && request.launchOriginCoordinates
+        ? { ...request.launchOriginCoordinates }
+        : null,
   };
 }
 
-function buildMailRecipientDtos(
-  galaxy: Galaxy,
-  viewerPlayerId: number
-): MailRecipientDto[] {
+function buildMailRecipientDtos(galaxy: Galaxy, viewerPlayerId: number): MailRecipientDto[] {
   return galaxy.players
     .filter((candidate) => candidate.playerId !== viewerPlayerId)
     .filter((candidate) => candidate.type === PLAYER_TYPE_PLAYER)
@@ -9272,18 +9757,21 @@ function buildMailRecipientDtos(
         playerName: candidate.playerName,
         playerType: candidate.type as PlayerTypeType,
         currentStatus,
-        isAllianceMember: currentStatus === DiplomaticStatus.ALLIED
+        isAllianceMember: currentStatus === DiplomaticStatus.ALLIED,
       } satisfies MailRecipientDto;
     })
-    .sort((left, right) =>
-      Number(right.isAllianceMember) - Number(left.isAllianceMember)
-      || left.playerName.localeCompare(right.playerName)
+    .sort(
+      (left, right) =>
+        Number(right.isAllianceMember) - Number(left.isAllianceMember) ||
+        left.playerName.localeCompare(right.playerName),
     );
 }
 
 function compareDiplomacyContacts(left: DiplomacyContactDto, right: DiplomacyContactDto): number {
-  return diplomacyPlayerTypeOrder(left.playerType) - diplomacyPlayerTypeOrder(right.playerType)
-    || left.playerName.localeCompare(right.playerName);
+  return (
+    diplomacyPlayerTypeOrder(left.playerType) - diplomacyPlayerTypeOrder(right.playerType) ||
+    left.playerName.localeCompare(right.playerName)
+  );
 }
 
 function diplomacyPlayerTypeOrder(playerType: PlayerTypeType): number {
@@ -9308,21 +9796,21 @@ function mailRequestGroupOrder(state: DiplomaticProposalStateType): number {
 }
 
 function countPendingMailRequestsForPlayer(galaxy: Galaxy, playerId: number): number {
-  const diplomacyPending = galaxy.diplomaticProposals.filter((proposal) =>
-    proposal.state === DiplomaticProposalState.PENDING
-    && proposal.toPlayerId === playerId
+  const diplomacyPending = galaxy.diplomaticProposals.filter(
+    (proposal) =>
+      proposal.state === DiplomaticProposalState.PENDING && proposal.toPlayerId === playerId,
   ).length;
-  const jumpGatePending = galaxy.jumpGateRequests.filter((request) =>
-    request.state === DiplomaticProposalState.PENDING
-    && request.toPlayerId === playerId
+  const jumpGatePending = galaxy.jumpGateRequests.filter(
+    (request) =>
+      request.state === DiplomaticProposalState.PENDING && request.toPlayerId === playerId,
   ).length;
-  const maintenancePending = galaxy.maintenanceRequests.filter((request) =>
-    request.state === DiplomaticProposalState.PENDING
-    && request.toPlayerId === playerId
+  const maintenancePending = galaxy.maintenanceRequests.filter(
+    (request) =>
+      request.state === DiplomaticProposalState.PENDING && request.toPlayerId === playerId,
   ).length;
-  const supportPending = galaxy.supportRequests.filter((request) =>
-    request.state === DiplomaticProposalState.PENDING
-    && request.toPlayerId === playerId
+  const supportPending = galaxy.supportRequests.filter(
+    (request) =>
+      request.state === DiplomaticProposalState.PENDING && request.toPlayerId === playerId,
   ).length;
 
   return diplomacyPending + jumpGatePending + maintenancePending + supportPending;
@@ -9336,7 +9824,7 @@ function countUnreadMailMessagesForPlayer(galaxy: Galaxy, playerId: number): num
 function resolveDiplomaticStatus(
   galaxy: Galaxy,
   leftPlayerId: number,
-  rightPlayerId: number
+  rightPlayerId: number,
 ): DiplomaticStatusType {
   return currentDiplomaticStatusForPair(galaxy, leftPlayerId, rightPlayerId);
 }
@@ -9344,24 +9832,26 @@ function resolveDiplomaticStatus(
 function canSendDirectMailToPlayer(
   galaxy: Galaxy,
   senderPlayerId: number,
-  targetPlayerId: number
+  targetPlayerId: number,
 ): boolean {
   const targetPlayer = resolvePlayerById(galaxy, targetPlayerId);
-  return !!targetPlayer
-    && targetPlayer.type === PLAYER_TYPE_PLAYER
-    && targetPlayer.playerId !== senderPlayerId;
+  return (
+    !!targetPlayer &&
+    targetPlayer.type === PLAYER_TYPE_PLAYER &&
+    targetPlayer.playerId !== senderPlayerId
+  );
 }
 
 function reconcileOfflineBotControlledSeatsForRuntime(
   gameId: string,
   runtime: NonNullable<ReturnType<typeof getGameRuntime>>,
-  authData: AuthData
+  authData: AuthData,
 ): void {
   const record = getGameById(GAME_REGISTRY_DATA_PATH, gameId);
   if (!record || record.kind !== 'MULTIPLAYER' || record.status !== 'RUNNING') {
     if (runtime.offlineBotControlledPlayerIds.size > 0) {
       updateGameRuntime(gameId, {
-        offlineBotControlledPlayerIds: new Set<number>()
+        offlineBotControlledPlayerIds: new Set<number>(),
       });
     }
     return;
@@ -9374,16 +9864,19 @@ function reconcileOfflineBotControlledSeatsForRuntime(
     authData.accounts.map((account) => ({
       id: account.id,
       replaceWithBotOnLogout: account.replaceWithBotOnLogout,
-      logoutBotProfileId: account.logoutBotProfileId
+      logoutBotProfileId: account.logoutBotProfileId,
     })),
     authData.sessions
       .filter((session) => session.currentGameId === gameId)
-      .filter((session) => !!getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, session.accountId))
+      .filter(
+        (session) =>
+          !!getPresenceForGameAccount(MULTIPLAYER_PRESENCE_DATA_PATH, gameId, session.accountId),
+      )
       .map((session) => ({
         accountId: session.accountId,
-        currentGameId: session.currentGameId
+        currentGameId: session.currentGameId,
       })),
-    runtime.offlineBotControlledPlayerIds
+    runtime.offlineBotControlledPlayerIds,
   );
 
   if (!result.changed) {
@@ -9392,16 +9885,16 @@ function reconcileOfflineBotControlledSeatsForRuntime(
 
   const nextPresentation = buildPresentationDataByPlayer(runtime.galaxy);
   const nextReadyPlayerIds = new Set(
-    [...runtime.currentTurnReadyPlayerIds].filter((playerId) =>
-      !result.offlineBotControlledPlayerIds.has(playerId)
-    )
+    [...runtime.currentTurnReadyPlayerIds].filter(
+      (playerId) => !result.offlineBotControlledPlayerIds.has(playerId),
+    ),
   );
 
   updateGameRuntime(gameId, {
     galaxy: runtime.galaxy,
     presentationByPlayer: nextPresentation,
     currentTurnReadyPlayerIds: nextReadyPlayerIds,
-    offlineBotControlledPlayerIds: result.offlineBotControlledPlayerIds
+    offlineBotControlledPlayerIds: result.offlineBotControlledPlayerIds,
   });
 
   if (currentRuntimeGameId === gameId) {
@@ -9417,23 +9910,29 @@ function addPlayerMessage(
   title: string,
   body: string,
   senderPlayerId: number | null,
-  senderPlayerName: string | null
+  senderPlayerName: string | null,
 ): void {
-  recipient.addMessage(new PlayerMessageModel({
-    messageId: recipient.createMessageId(),
-    createdTurn,
-    title,
-    body,
-    senderPlayerId,
-    senderPlayerName
-  }));
+  recipient.addMessage(
+    new PlayerMessageModel({
+      messageId: recipient.createMessageId(),
+      createdTurn,
+      title,
+      body,
+      senderPlayerId,
+      senderPlayerName,
+    }),
+  );
 }
 
 function resolveAllianceMailRecipients(galaxy: Galaxy, senderPlayerId: number): Player[] {
   return galaxy.players
     .filter((candidate) => candidate.playerId !== senderPlayerId)
     .filter((candidate) => candidate.type === PLAYER_TYPE_PLAYER)
-    .filter((candidate) => resolveDiplomaticStatus(galaxy, senderPlayerId, candidate.playerId) === DiplomaticStatus.ALLIED);
+    .filter(
+      (candidate) =>
+        resolveDiplomaticStatus(galaxy, senderPlayerId, candidate.playerId) ===
+        DiplomaticStatus.ALLIED,
+    );
 }
 
 function normalizeMailRecipientMode(value: unknown): 'player' | 'alliance' | null {
@@ -9444,10 +9943,15 @@ function normalizeMailRecipientMode(value: unknown): 'player' | 'alliance' | nul
   return null;
 }
 
-function buildEndTurnMailBlockMessage(unreadMailCount: number, pendingRequestCount: number): string {
+function buildEndTurnMailBlockMessage(
+  unreadMailCount: number,
+  pendingRequestCount: number,
+): string {
   const parts: string[] = [];
   if (pendingRequestCount > 0) {
-    parts.push(`resolve ${pendingRequestCount} pending request${pendingRequestCount === 1 ? '' : 's'}`);
+    parts.push(
+      `resolve ${pendingRequestCount} pending request${pendingRequestCount === 1 ? '' : 's'}`,
+    );
   }
   if (unreadMailCount > 0) {
     parts.push(`read ${unreadMailCount} unread message${unreadMailCount === 1 ? '' : 's'}`);
@@ -9464,24 +9968,24 @@ function toPlayerMailMessageDto(message: PlayerMessage): PlayerMailMessageDto {
     body: message.body,
     isRead: message.isRead,
     senderPlayerId: message.senderPlayerId,
-    senderPlayerName: message.senderPlayerName
+    senderPlayerName: message.senderPlayerName,
   };
 }
 
 function toMaintenanceTransferPayloadDto(
-  payload: MaintenanceRequest['requested'] | MaintenanceRequest['approved']
+  payload: MaintenanceRequest['requested'] | MaintenanceRequest['approved'],
 ): MaintenanceTransferPayloadDto {
   const normalized = normalizeMaintenanceTransferPayload(payload);
   return {
     fuel: normalized.fuel,
     ships: normalized.ships.map((entry) => ({
       type: entry.type,
-      amount: entry.amount
+      amount: entry.amount,
     })),
     bombs: normalized.bombs.map((entry) => ({
       type: entry.type,
-      amount: entry.amount
-    }))
+      amount: entry.amount,
+    })),
   };
 }
 
@@ -9490,9 +9994,11 @@ function isExplicitMaintenancePayload(value: unknown): value is ResolveMaintenan
     return false;
   }
 
-  return Object.prototype.hasOwnProperty.call(value, 'fuel')
-    || Object.prototype.hasOwnProperty.call(value, 'ships')
-    || Object.prototype.hasOwnProperty.call(value, 'bombs');
+  return (
+    Object.prototype.hasOwnProperty.call(value, 'fuel') ||
+    Object.prototype.hasOwnProperty.call(value, 'ships') ||
+    Object.prototype.hasOwnProperty.call(value, 'bombs')
+  );
 }
 
 function buildOwnedActiveFleetsResponse(galaxy: Galaxy, playerId: number): Fleet[] {
@@ -9509,7 +10015,7 @@ function buildPlanetOperationsResponse(
   galaxy: Galaxy,
   playerId: number,
   coordinates: ClientCoordinates,
-  resolvedTurns: number
+  resolvedTurns: number,
 ): PlanetOperationsResponse {
   synchronizeJumpGateRequests(galaxy);
   synchronizeMaintenanceRequests(galaxy);
@@ -9520,71 +10026,65 @@ function buildPlanetOperationsResponse(
   const minimumResolvedTurn = Math.max(1, galaxy.currentTurn - Math.max(1, resolvedTurns) + 1);
 
   const outgoing = galaxy.activeFleets
-    .filter((fleet) =>
-      fleet.ownerId === playerId
-      && sameCoordinates(fleet.origin, coordinates)
-      && !isReturningFleet(fleet)
+    .filter(
+      (fleet) =>
+        fleet.ownerId === playerId &&
+        sameCoordinates(fleet.origin, coordinates) &&
+        !isReturningFleet(fleet),
     )
     .map((fleet) => annotateFleetRequestMetadata(galaxy, fleet))
     .sort(compareFleetsForOperations);
 
   const returning = galaxy.activeFleets
-    .filter((fleet) =>
-      fleet.ownerId === playerId
-      && sameCoordinates(fleet.origin, coordinates)
-      && isReturningFleet(fleet)
+    .filter(
+      (fleet) =>
+        fleet.ownerId === playerId &&
+        sameCoordinates(fleet.origin, coordinates) &&
+        isReturningFleet(fleet),
     )
     .map((fleet) => annotateFleetRequestMetadata(galaxy, fleet))
     .sort(compareFleetsForOperations);
 
   const incoming = galaxy.activeFleets
-    .filter((fleet) =>
-      sameCoordinates(fleet.target, coordinates)
-      && !isReturningFleet(fleet)
-      && (
-        fleet.ownerId === playerId
-        || knownIncomingFleetIds.has(fleet.fleetId)
-      )
+    .filter(
+      (fleet) =>
+        sameCoordinates(fleet.target, coordinates) &&
+        !isReturningFleet(fleet) &&
+        (fleet.ownerId === playerId || knownIncomingFleetIds.has(fleet.fleetId)),
     )
-    .map((fleet) => fleet.ownerId === playerId ? annotateFleetRequestMetadata(galaxy, fleet) : fleet)
+    .map((fleet) =>
+      fleet.ownerId === playerId ? annotateFleetRequestMetadata(galaxy, fleet) : fleet,
+    )
     .sort(compareFleetsForOperations);
 
   const resolved = galaxy.recentFleetOperations
-    .filter((entry) =>
-      entry.resolvedTurn >= minimumResolvedTurn
-      && (
-        (
-          entry.ownerId === playerId
-          && (
-            sameCoordinates(entry.origin, coordinates)
-            || sameCoordinates(entry.target, coordinates)
-          )
-        )
-        || sameCoordinates(entry.target, coordinates)
-      )
+    .filter(
+      (entry) =>
+        entry.resolvedTurn >= minimumResolvedTurn &&
+        ((entry.ownerId === playerId &&
+          (sameCoordinates(entry.origin, coordinates) ||
+            sameCoordinates(entry.target, coordinates))) ||
+          sameCoordinates(entry.target, coordinates)),
     )
     .map((entry) => normalizeFleetOperationHistoryEntry(galaxy, entry))
-    .sort((left, right) =>
-      right.resolvedTurn - left.resolvedTurn
-      || right.fleetId - left.fleetId
-    );
+    .sort((left, right) => right.resolvedTurn - left.resolvedTurn || right.fleetId - left.fleetId);
 
   return {
     outgoing,
     returning,
     incoming,
-    resolved
+    resolved,
   };
 }
 
 function isReturningFleet(fleet: Fleet): boolean {
-  return fleet.state === FleetState.RETURNING
-    || fleet.state === FleetState.MISSION_FAILURE_RETURNING;
+  return (
+    fleet.state === FleetState.RETURNING || fleet.state === FleetState.MISSION_FAILURE_RETURNING
+  );
 }
 
 function compareFleetsForOperations(left: Fleet, right: Fleet): number {
-  return left.createdAtTurn - right.createdAtTurn
-    || left.fleetId - right.fleetId;
+  return left.createdAtTurn - right.createdAtTurn || left.fleetId - right.fleetId;
 }
 
 function recordRecentFleetOperation(galaxy: Galaxy, event: PlayerFleetOutcomeLogEvent): void {
@@ -9592,20 +10092,25 @@ function recordRecentFleetOperation(galaxy: Galaxy, event: PlayerFleetOutcomeLog
   const minimumTurn = Math.max(1, entry.resolvedTurn - RECENT_FLEET_OPERATION_HISTORY_TURNS + 1);
 
   galaxy.recentFleetOperations = [
-    ...galaxy.recentFleetOperations.filter((existing) =>
-      existing.resolvedTurn >= minimumTurn
-      && !(existing.fleetId === entry.fleetId && existing.resolvedTurn === entry.resolvedTurn && existing.outcomeType === entry.outcomeType)
+    ...galaxy.recentFleetOperations.filter(
+      (existing) =>
+        existing.resolvedTurn >= minimumTurn &&
+        !(
+          existing.fleetId === entry.fleetId &&
+          existing.resolvedTurn === entry.resolvedTurn &&
+          existing.outcomeType === entry.outcomeType
+        ),
     ),
-    entry
+    entry,
   ]
-    .sort((left, right) =>
-      right.resolvedTurn - left.resolvedTurn
-      || right.fleetId - left.fleetId
-    )
+    .sort((left, right) => right.resolvedTurn - left.resolvedTurn || right.fleetId - left.fleetId)
     .slice(0, MAX_RECENT_FLEET_OPERATION_HISTORY_ENTRIES);
 }
 
-function recordBotCounterIntelFromFleetOutcome(galaxy: Galaxy, event: PlayerFleetOutcomeLogEvent): void {
+function recordBotCounterIntelFromFleetOutcome(
+  galaxy: Galaxy,
+  event: PlayerFleetOutcomeLogEvent,
+): void {
   if (!isCounterIntelHostileMissionType(event.missionType)) {
     return;
   }
@@ -9622,19 +10127,30 @@ function recordBotCounterIntelFromFleetOutcome(galaxy: Galaxy, event: PlayerFlee
     originCoordinates: toPlanetCoordinates(originPlanet),
     targetCoordinates: toPlanetCoordinates(targetPlanet),
     eventType: 'HOSTILE_FLEET',
-    eventTurn: event.resolvedTurn
+    eventTurn: event.resolvedTurn,
   });
 }
 
-function recordBotCounterIntelFromCounterIntelEvent(galaxy: Galaxy, event: CounterIntelEventLogEvent): void {
+function recordBotCounterIntelFromCounterIntelEvent(
+  galaxy: Galaxy,
+  event: CounterIntelEventLogEvent,
+): void {
   const originPlanet = resolvePlanetAtCoordinates(galaxy, event.origin);
   const targetPlanet = resolvePlanetAtCoordinates(galaxy, event.target);
   if (!originPlanet || !targetPlanet) {
     return;
   }
 
-  if (event.missionType === FleetMissionType.SPY || event.missionType === FleetMissionType.STAR_SYSTEM_SPY) {
-    markBotCounterIntelResponse(galaxy, event.attackerPlayerId, toPlanetCoordinates(targetPlanet), event.resolvedTurn);
+  if (
+    event.missionType === FleetMissionType.SPY ||
+    event.missionType === FleetMissionType.STAR_SYSTEM_SPY
+  ) {
+    markBotCounterIntelResponse(
+      galaxy,
+      event.attackerPlayerId,
+      toPlanetCoordinates(targetPlanet),
+      event.resolvedTurn,
+    );
   }
 
   recordBotCounterIntelEvent(galaxy, {
@@ -9643,7 +10159,7 @@ function recordBotCounterIntelFromCounterIntelEvent(galaxy: Galaxy, event: Count
     originCoordinates: toPlanetCoordinates(originPlanet),
     targetCoordinates: toPlanetCoordinates(targetPlanet),
     eventType: event.missionType === FleetMissionType.STAR_SYSTEM_SPY ? 'STAR_SYSTEM_SPY' : 'SPY',
-    eventTurn: event.resolvedTurn
+    eventTurn: event.resolvedTurn,
   });
 }
 
@@ -9656,7 +10172,7 @@ function recordBotCounterIntelEvent(
     targetCoordinates: ClientCoordinates;
     eventType: 'SPY' | 'STAR_SYSTEM_SPY' | 'HOSTILE_FLEET';
     eventTurn: number;
-  }
+  },
 ): void {
   if (event.attackerPlayerId === event.victimPlayerId) {
     return;
@@ -9669,9 +10185,10 @@ function recordBotCounterIntelEvent(
   }
 
   const memory = ensureBotMemoryV2(victim);
-  const existing = memory.strategicDiplomatic.counterIntelEvents.find((entry) =>
-    entry.attackerPlayerId === event.attackerPlayerId
-    && sameCoordinates(entry.originCoordinates, event.originCoordinates)
+  const existing = memory.strategicDiplomatic.counterIntelEvents.find(
+    (entry) =>
+      entry.attackerPlayerId === event.attackerPlayerId &&
+      sameCoordinates(entry.originCoordinates, event.originCoordinates),
   );
   if (existing) {
     existing.targetCoordinates = { ...event.targetCoordinates };
@@ -9685,19 +10202,20 @@ function recordBotCounterIntelEvent(
       targetCoordinates: { ...event.targetCoordinates },
       eventType: event.eventType,
       eventTurn: Math.max(0, Math.floor(event.eventTurn)),
-      responseTurn: null
+      responseTurn: null,
     });
   }
 
   const oldestUsefulTurn = Math.max(0, Math.floor(event.eventTurn) - 40);
   memory.strategicDiplomatic.counterIntelEvents = memory.strategicDiplomatic.counterIntelEvents
     .filter((entry) => entry.eventTurn >= oldestUsefulTurn)
-    .sort((left, right) =>
-      right.eventTurn - left.eventTurn
-      || left.attackerPlayerId - right.attackerPlayerId
-      || left.originCoordinates.x - right.originCoordinates.x
-      || left.originCoordinates.y - right.originCoordinates.y
-      || left.originCoordinates.z - right.originCoordinates.z
+    .sort(
+      (left, right) =>
+        right.eventTurn - left.eventTurn ||
+        left.attackerPlayerId - right.attackerPlayerId ||
+        left.originCoordinates.x - right.originCoordinates.x ||
+        left.originCoordinates.y - right.originCoordinates.y ||
+        left.originCoordinates.z - right.originCoordinates.z,
     )
     .slice(0, 200);
 }
@@ -9706,7 +10224,7 @@ function markBotCounterIntelResponse(
   galaxy: Galaxy,
   botPlayerId: number,
   targetCoordinates: ClientCoordinates,
-  responseTurn: number
+  responseTurn: number,
 ): void {
   const bot = resolvePlayerById(galaxy, botPlayerId);
   if (!bot || bot.type !== 'BOT') {
@@ -9715,22 +10233,27 @@ function markBotCounterIntelResponse(
 
   const memory = ensureBotMemoryV2(bot);
   for (const entry of memory.strategicDiplomatic.counterIntelEvents) {
-    if (entry.responseTurn === null && sameCoordinates(entry.originCoordinates, targetCoordinates)) {
+    if (
+      entry.responseTurn === null &&
+      sameCoordinates(entry.originCoordinates, targetCoordinates)
+    ) {
       entry.responseTurn = Math.max(0, Math.floor(responseTurn));
     }
   }
 }
 
 function isCounterIntelHostileMissionType(missionType: FleetMissionTypeType): boolean {
-  return missionType === FleetMissionType.ATTACK
-    || missionType === FleetMissionType.PLUNDER
-    || missionType === FleetMissionType.BOMBARD
-    || missionType === FleetMissionType.SIEGE;
+  return (
+    missionType === FleetMissionType.ATTACK ||
+    missionType === FleetMissionType.PLUNDER ||
+    missionType === FleetMissionType.BOMBARD ||
+    missionType === FleetMissionType.SIEGE
+  );
 }
 
 function normalizeFleetOperationHistoryEntry(
   galaxy: Galaxy,
-  entry: FleetOperationHistoryEntry
+  entry: FleetOperationHistoryEntry,
 ): FleetOperationHistoryEntry {
   const originPlanet = resolvePlanetAtCoordinates(galaxy, entry.origin);
   const targetPlanet = resolvePlanetAtCoordinates(galaxy, entry.target);
@@ -9739,16 +10262,30 @@ function normalizeFleetOperationHistoryEntry(
     ...entry,
     origin: { ...entry.origin },
     target: { ...entry.target },
-    originPlanetName: entry.originPlanetName ?? originPlanet?.basicInfo.name ?? `Planet ${entry.origin.x}:${entry.origin.y}:${entry.origin.z}`,
-    targetPlanetName: entry.targetPlanetName ?? targetPlanet?.basicInfo.name ?? `Planet ${entry.target.x}:${entry.target.y}:${entry.target.z}`,
+    originPlanetName:
+      entry.originPlanetName ??
+      originPlanet?.basicInfo.name ??
+      `Planet ${entry.origin.x}:${entry.origin.y}:${entry.origin.z}`,
+    targetPlanetName:
+      entry.targetPlanetName ??
+      targetPlanet?.basicInfo.name ??
+      `Planet ${entry.target.x}:${entry.target.y}:${entry.target.z}`,
     payload: entry.payload ? { ...entry.payload } : undefined,
-    deltas: entry.deltas ? { ...entry.deltas } : undefined
+    deltas: entry.deltas ? { ...entry.deltas } : undefined,
   };
 }
 
 function annotateFleetRequestMetadata(galaxy: Galaxy, fleet: Fleet): Fleet {
-  const pendingMaintenanceRequest = findPendingMaintenanceRequestForFleet(galaxy, fleet.ownerId, fleet.fleetId);
-  const pendingJumpGateRequest = findPendingJumpGateRequestForFleet(galaxy, fleet.ownerId, fleet.fleetId);
+  const pendingMaintenanceRequest = findPendingMaintenanceRequestForFleet(
+    galaxy,
+    fleet.ownerId,
+    fleet.fleetId,
+  );
+  const pendingJumpGateRequest = findPendingJumpGateRequestForFleet(
+    galaxy,
+    fleet.ownerId,
+    fleet.fleetId,
+  );
   fleet.pendingMaintenanceRequestId = pendingMaintenanceRequest?.requestId ?? null;
   fleet.pendingJumpGateRequestId = pendingJumpGateRequest?.requestId ?? null;
   fleet.maintenanceRequestAvailable = canFleetRequestMaintenanceCommand(galaxy, fleet);
@@ -9758,20 +10295,25 @@ function annotateFleetRequestMetadata(galaxy: Galaxy, fleet: Fleet): Fleet {
 function findPendingJumpGateRequestForFleet(
   galaxy: Galaxy,
   ownerId: number,
-  fleetId: number
+  fleetId: number,
 ): JumpGateRequest | null {
-  return galaxy.jumpGateRequests.find((request) =>
-    request.state === DiplomaticProposalState.PENDING
-    && request.fromPlayerId === ownerId
-    && request.fleetId === fleetId
-  ) ?? null;
+  return (
+    galaxy.jumpGateRequests.find(
+      (request) =>
+        request.state === DiplomaticProposalState.PENDING &&
+        request.fromPlayerId === ownerId &&
+        request.fleetId === fleetId,
+    ) ?? null
+  );
 }
 
 function isJumpGateMissionAllowed(missionType: FleetMissionTypeType): boolean {
-  return missionType === FleetMissionType.MOVE
-    || missionType === FleetMissionType.DEFEND
-    || missionType === FleetMissionType.TRANSPORT
-    || missionType === FleetMissionType.REPAIR;
+  return (
+    missionType === FleetMissionType.MOVE ||
+    missionType === FleetMissionType.DEFEND ||
+    missionType === FleetMissionType.TRANSPORT ||
+    missionType === FleetMissionType.REPAIR
+  );
 }
 
 function isJumpGateAutoApprovedStatus(status: DiplomaticStatusType): boolean {
@@ -9779,12 +10321,13 @@ function isJumpGateAutoApprovedStatus(status: DiplomaticStatusType): boolean {
 }
 
 function resolveJumpGateCapacityForPlanet(planet: Planet, owner: Player | null): number {
-  const hyperspaceTechnologyLevel = owner?.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY as TechnologyTypeType) ?? 0;
+  const hyperspaceTechnologyLevel =
+    owner?.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY as TechnologyTypeType) ?? 0;
   return calculateJumpGateCapacity(
     planet.getBuildingLevel(BuildingType.JUMP_GATE as BuildingTypeType),
     planet.info.planetaryParameters.hyperspaceParameters,
     hyperspaceTechnologyLevel,
-    planet.getBuildingEffectiveness(BuildingType.JUMP_GATE as BuildingTypeType)
+    planet.getBuildingEffectiveness(BuildingType.JUMP_GATE as BuildingTypeType),
   );
 }
 
@@ -9804,10 +10347,15 @@ function validateJumpGateLaunchAccess(
   originPlanet: Planet,
   targetPlanet: Planet,
   totalSelectedShips: number,
-  jumpGateCapacityShipCount: number
-): { status: DiplomaticStatusType; targetOwner: Player | null } | { status: number; error: string } {
+  jumpGateCapacityShipCount: number,
+):
+  | { status: DiplomaticStatusType; targetOwner: Player | null }
+  | { status: number; error: string } {
   if (!isJumpGateMissionAllowed(missionType)) {
-    return { status: 400, error: 'Jump Gate is available only for Move, Guard, Transport, and Repair.' };
+    return {
+      status: 400,
+      error: 'Jump Gate is available only for Move, Guard, Transport, and Repair.',
+    };
   }
 
   if (totalSelectedShips <= 0) {
@@ -9830,23 +10378,30 @@ function validateJumpGateLaunchAccess(
   const originOwner = resolvePlayerById(galaxy, originPlanet.info.ownerId ?? playerId);
   const originCapacity = resolveJumpGateCapacityForPlanet(originPlanet, originOwner);
   if (originCapacity < jumpGateCapacityShipCount) {
-    return { status: 409, error: `Origin Jump Gate capacity is too low for ${jumpGateCapacityShipCount} jump-capable ships.` };
+    return {
+      status: 409,
+      error: `Origin Jump Gate capacity is too low for ${jumpGateCapacityShipCount} jump-capable ships.`,
+    };
   }
 
-  const targetOwner = targetPlanet.info.ownerId === null
-    ? null
-    : resolvePlayerById(galaxy, targetPlanet.info.ownerId);
+  const targetOwner =
+    targetPlanet.info.ownerId === null
+      ? null
+      : resolvePlayerById(galaxy, targetPlanet.info.ownerId);
   const targetStatus = targetOwner
     ? resolveDiplomaticStatus(galaxy, playerId, targetOwner.playerId)
     : DiplomaticStatus.SELF;
   const targetCapacity = resolveJumpGateCapacityForPlanet(targetPlanet, targetOwner);
   if (targetCapacity < jumpGateCapacityShipCount) {
-    return { status: 409, error: `Target Jump Gate capacity is too low for ${jumpGateCapacityShipCount} jump-capable ships.` };
+    return {
+      status: 409,
+      error: `Target Jump Gate capacity is too low for ${jumpGateCapacityShipCount} jump-capable ships.`,
+    };
   }
 
   return {
     status: targetStatus,
-    targetOwner
+    targetOwner,
   };
 }
 
@@ -9854,7 +10409,7 @@ function createJumpGatePendingRequest(
   galaxy: Galaxy,
   fleet: Fleet,
   targetOwner: Player,
-  totalShips: number
+  totalShips: number,
 ): JumpGateRequest {
   const request = createJumpGateRequest(
     galaxy.nextJumpGateRequestId,
@@ -9868,7 +10423,7 @@ function createJumpGatePendingRequest(
     fleet.missionType,
     totalShips,
     galaxy.currentTurn,
-    galaxy.currentTurn
+    galaxy.currentTurn,
   );
   galaxy.nextJumpGateRequestId += 1;
   galaxy.jumpGateRequests.push(request);
@@ -9876,10 +10431,7 @@ function createJumpGatePendingRequest(
   return request;
 }
 
-function dispatchJumpGateFleet(
-  galaxy: Galaxy,
-  fleet: Fleet
-): void {
+function dispatchJumpGateFleet(galaxy: Galaxy, fleet: Fleet): void {
   fleet.state = FleetState.MOVING_TO_TARGET;
   fleet.createdAtTurn = galaxy.currentTurn;
   fleet.travelTurns = 1;
@@ -9891,7 +10443,7 @@ function dispatchJumpGateFleet(
 function restorePendingJumpGateFleetToOrigin(
   galaxy: Galaxy,
   fleet: Fleet,
-  restoreFuelReserve: boolean
+  restoreFuelReserve: boolean,
 ): void {
   fleet.pendingJumpGateRequestId = null;
   fleet.usesJumpGate = false;
@@ -9911,19 +10463,23 @@ function restorePendingJumpGateFleetToOrigin(
 
   originPlanet.rBDSFTQ.ships.addManyShips(fleet.ships);
   originPlanet.rBDSFTQ.defences.addManyDefences(fleet.carriedBombs);
-  originPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
-    fleet.cargo.metal,
-    fleet.cargo.crystal,
-    fleet.cargo.deuterium + (restoreFuelReserve ? fleet.fuelCost : 0)
-  ));
+  originPlanet.rBDSFTQ.resources.addResourcePack(
+    new ResourcesPack(
+      fleet.cargo.metal,
+      fleet.cargo.crystal,
+      fleet.cargo.deuterium + (restoreFuelReserve ? fleet.fuelCost : 0),
+    ),
+  );
   galaxy.activeFleets = galaxy.activeFleets.filter((entry) => entry.fleetId !== fleet.fleetId);
 }
 
 function approveJumpGateRequest(
   galaxy: Galaxy,
-  request: JumpGateRequest
+  request: JumpGateRequest,
 ): { ok: true } | { status: number; error: string } {
-  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  const fleet = galaxy.activeFleets.find(
+    (entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId,
+  );
   if (!fleet) {
     return { status: 404, error: 'Requesting fleet is no longer available.' };
   }
@@ -9949,7 +10505,12 @@ function approveJumpGateRequest(
     originPlanet,
     targetPlanet,
     request.totalShips,
-    countJumpGateCapacityShips(Array.from(ManyShips.countByType(fleet.ships).entries()).map(([type, amount]) => ({ type, amount })))
+    countJumpGateCapacityShips(
+      Array.from(ManyShips.countByType(fleet.ships).entries()).map(([type, amount]) => ({
+        type,
+        amount,
+      })),
+    ),
   );
   if ('error' in access) {
     return access;
@@ -9963,10 +10524,12 @@ function approveJumpGateRequest(
 function rejectJumpGateRequest(
   galaxy: Galaxy,
   request: JumpGateRequest,
-  state: DiplomaticProposalStateType
+  state: DiplomaticProposalStateType,
 ): void {
   request.state = state;
-  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  const fleet = galaxy.activeFleets.find(
+    (entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId,
+  );
   if (!fleet) {
     return;
   }
@@ -9980,17 +10543,19 @@ function synchronizeJumpGateRequests(galaxy: Galaxy): void {
       continue;
     }
 
-    const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+    const fleet = galaxy.activeFleets.find(
+      (entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId,
+    );
     const originPlanet = resolvePlanetAtCoordinates(galaxy, request.originCoordinates);
     const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
     if (
-      !fleet
-      || fleet.state !== FleetState.PENDING_JUMP_GATE
-      || fleet.pendingJumpGateRequestId !== request.requestId
-      || !originPlanet
-      || originPlanet.info.ownerId !== request.fromPlayerId
-      || !targetPlanet
-      || targetPlanet.info.ownerId !== request.toPlayerId
+      !fleet ||
+      fleet.state !== FleetState.PENDING_JUMP_GATE ||
+      fleet.pendingJumpGateRequestId !== request.requestId ||
+      !originPlanet ||
+      originPlanet.info.ownerId !== request.fromPlayerId ||
+      !targetPlanet ||
+      targetPlanet.info.ownerId !== request.toPlayerId
     ) {
       request.state = DiplomaticProposalState.CANCELLED;
       if (fleet) {
@@ -10023,44 +10588,54 @@ function canFleetRequestMaintenance(galaxy: Galaxy, fleet: Fleet): boolean {
     return false;
   }
 
-  const fuelCap = Math.max(0, Math.floor(targetPlanet.getBuildingProductionValue1(BuildingType.ALLIANCE_DEPOT as BuildingTypeType)));
-  const supportCap = Math.max(0, Math.floor(targetPlanet.getBuildingProductionValue2(BuildingType.ALLIANCE_DEPOT as BuildingTypeType)));
+  const fuelCap = Math.max(
+    0,
+    Math.floor(
+      targetPlanet.getBuildingProductionValue1(BuildingType.ALLIANCE_DEPOT as BuildingTypeType),
+    ),
+  );
+  const supportCap = Math.max(
+    0,
+    Math.floor(
+      targetPlanet.getBuildingProductionValue2(BuildingType.ALLIANCE_DEPOT as BuildingTypeType),
+    ),
+  );
   return fuelCap > 0 || supportCap > 0;
 }
 
 function resolveMaintenanceOptionsForFleet(
   galaxy: Galaxy,
   requesterPlayerId: number,
-  fleetId: number
-):
-  | { options: FleetMaintenanceOptionsDto }
-  | { status: number; error: string } {
+  fleetId: number,
+): { options: FleetMaintenanceOptionsDto } | { status: number; error: string } {
   const context = resolveMaintenanceContextForFleet(galaxy, requesterPlayerId, fleetId);
   if ('error' in context) {
     return context;
   }
 
   return {
-    options: buildMaintenanceOptionsDto(context)
+    options: buildMaintenanceOptionsDto(context),
   };
 }
 
 function resolveMaintenanceContextForFleet(
   galaxy: Galaxy,
   requesterPlayerId: number,
-  fleetId: number
+  fleetId: number,
 ):
   | {
-    fleet: Fleet;
-    targetPlanet: Planet;
-    targetOwner: Player;
-    status: DiplomaticStatusType;
-    autoApprove: boolean;
-    fuelCap: number;
-    supportCap: number;
-  }
+      fleet: Fleet;
+      targetPlanet: Planet;
+      targetOwner: Player;
+      status: DiplomaticStatusType;
+      autoApprove: boolean;
+      fuelCap: number;
+      supportCap: number;
+    }
   | { status: number; error: string } {
-  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === fleetId && entry.ownerId === requesterPlayerId);
+  const fleet = galaxy.activeFleets.find(
+    (entry) => entry.fleetId === fleetId && entry.ownerId === requesterPlayerId,
+  );
   if (!fleet) {
     return { status: 404, error: 'Fleet not found.' };
   }
@@ -10096,8 +10671,18 @@ function resolveMaintenanceContextForFleet(
     return { status: 403, error: 'Maintenance is allowed only on non-hostile planets.' };
   }
 
-  const fuelCap = Math.max(0, Math.floor(targetPlanet.getBuildingProductionValue1(BuildingType.ALLIANCE_DEPOT as BuildingTypeType)));
-  const supportCap = Math.max(0, Math.floor(targetPlanet.getBuildingProductionValue2(BuildingType.ALLIANCE_DEPOT as BuildingTypeType)));
+  const fuelCap = Math.max(
+    0,
+    Math.floor(
+      targetPlanet.getBuildingProductionValue1(BuildingType.ALLIANCE_DEPOT as BuildingTypeType),
+    ),
+  );
+  const supportCap = Math.max(
+    0,
+    Math.floor(
+      targetPlanet.getBuildingProductionValue2(BuildingType.ALLIANCE_DEPOT as BuildingTypeType),
+    ),
+  );
   if (fuelCap <= 0 && supportCap <= 0) {
     return { status: 409, error: 'Alliance Depot is not operational on this planet.' };
   }
@@ -10109,7 +10694,7 @@ function resolveMaintenanceContextForFleet(
     status,
     autoApprove: status === DiplomaticStatus.SELF || status === DiplomaticStatus.PASSIVE,
     fuelCap,
-    supportCap
+    supportCap,
   };
 }
 
@@ -10117,7 +10702,7 @@ function createMaintenanceRequestForFleet(
   galaxy: Galaxy,
   requesterPlayerId: number,
   fleetId: number,
-  payload: MaintenanceTransferPayloadDto
+  payload: MaintenanceTransferPayloadDto,
 ):
   | { mode: CreateMaintenanceRequestResponse['mode']; message: string }
   | { status: number; error: string } {
@@ -10148,11 +10733,11 @@ function createMaintenanceRequestForFleet(
       context.targetOwner,
       'Maintenance delivered',
       `Alliance Depot delivered ${summary}.`,
-      `Alliance Depot delivered ${summary} to Fleet #${context.fleet.fleetId}.`
+      `Alliance Depot delivered ${summary} to Fleet #${context.fleet.fleetId}.`,
     );
     return {
       mode: 'AUTO_APPROVED',
-      message: `Maintenance delivered immediately: ${summary}.`
+      message: `Maintenance delivered immediately: ${summary}.`,
     };
   }
 
@@ -10165,7 +10750,7 @@ function createMaintenanceRequestForFleet(
     context.fleet.target,
     galaxy.currentTurn,
     galaxy.currentTurn + 1,
-    requested
+    requested,
   );
   galaxy.nextMaintenanceRequestId += 1;
   galaxy.maintenanceRequests.push(maintenanceRequest);
@@ -10173,16 +10758,18 @@ function createMaintenanceRequestForFleet(
 
   return {
     mode: 'PENDING',
-    message: 'Maintenance request sent.'
+    message: 'Maintenance request sent.',
   };
 }
 
 function approveMaintenanceRequestForFleet(
   galaxy: Galaxy,
   request: MaintenanceRequest,
-  requestedApprovalOverride: ResolveMaintenanceRequestRequest | null
+  requestedApprovalOverride: ResolveMaintenanceRequestRequest | null,
 ): { ok: true } | { status: number; error: string } {
-  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  const fleet = galaxy.activeFleets.find(
+    (entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId,
+  );
   if (!fleet) {
     return { status: 404, error: 'Requesting fleet is no longer available.' };
   }
@@ -10210,7 +10797,7 @@ function approveMaintenanceRequestForFleet(
       targetOwner,
       'Maintenance approved',
       `Your maintenance request was approved. Delivered: ${summary}.`,
-      `You approved maintenance for Fleet #${fleet.fleetId}. Delivered: ${summary}.`
+      `You approved maintenance for Fleet #${fleet.fleetId}. Delivered: ${summary}.`,
     );
   }
 
@@ -10221,11 +10808,13 @@ function rejectMaintenanceRequest(
   galaxy: Galaxy,
   request: MaintenanceRequest,
   requesterBody: string,
-  ownerBody: string
+  ownerBody: string,
 ): void {
   request.state = DiplomaticProposalState.REJECTED;
   request.approved = normalizeMaintenanceTransferPayload(null);
-  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  const fleet = galaxy.activeFleets.find(
+    (entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId,
+  );
   if (fleet) {
     fleet.pendingMaintenanceRequestId = null;
   }
@@ -10243,7 +10832,7 @@ function rejectMaintenanceRequest(
     targetOwner,
     'Maintenance rejected',
     requesterBody,
-    ownerBody
+    ownerBody,
   );
 }
 
@@ -10251,11 +10840,13 @@ function cancelMaintenanceRequest(
   galaxy: Galaxy,
   request: MaintenanceRequest,
   requesterBody: string,
-  ownerBody: string
+  ownerBody: string,
 ): void {
   request.state = DiplomaticProposalState.CANCELLED;
   request.approved = normalizeMaintenanceTransferPayload(null);
-  const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+  const fleet = galaxy.activeFleets.find(
+    (entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId,
+  );
   if (fleet) {
     fleet.pendingMaintenanceRequestId = null;
   }
@@ -10273,7 +10864,7 @@ function cancelMaintenanceRequest(
     targetOwner,
     'Maintenance cancelled',
     requesterBody,
-    ownerBody
+    ownerBody,
   );
 }
 
@@ -10283,14 +10874,16 @@ function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
       continue;
     }
 
-    const fleet = galaxy.activeFleets.find((entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId);
+    const fleet = galaxy.activeFleets.find(
+      (entry) => entry.fleetId === request.fleetId && entry.ownerId === request.fromPlayerId,
+    );
     const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
     if (
-      !fleet
-      || fleet.state !== FleetState.ORBITING
-      || !sameCoordinates(fleet.target, request.targetCoordinates)
-      || !targetPlanet
-      || targetPlanet.info.ownerId !== request.toPlayerId
+      !fleet ||
+      fleet.state !== FleetState.ORBITING ||
+      !sameCoordinates(fleet.target, request.targetCoordinates) ||
+      !targetPlanet ||
+      targetPlanet.info.ownerId !== request.toPlayerId
     ) {
       request.state = DiplomaticProposalState.CANCELLED;
       request.approved = normalizeMaintenanceTransferPayload(null);
@@ -10306,7 +10899,7 @@ function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
           targetOwner,
           'Maintenance auto-cancelled',
           'Your maintenance request was cancelled because the fleet left orbit or the target changed.',
-          `Fleet #${fleet.fleetId} left orbit or changed target before maintenance could be resolved.`
+          `Fleet #${fleet.fleetId} left orbit or changed target before maintenance could be resolved.`,
         );
       }
       continue;
@@ -10328,7 +10921,7 @@ function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
         targetOwner,
         'Maintenance expired',
         'Your maintenance request expired before it was answered.',
-        `Maintenance request for Fleet #${fleet.fleetId} expired.`
+        `Maintenance request for Fleet #${fleet.fleetId} expired.`,
       );
     }
   }
@@ -10337,7 +10930,7 @@ function synchronizeMaintenanceRequests(galaxy: Galaxy): void {
 function approveSupportRequest(
   galaxy: Galaxy,
   request: SupportRequest,
-  requestedApproval: ResourcesPackType
+  requestedApproval: ResourcesPackType,
 ): { ok: true } | { status: number; error: string } {
   if (request.supportType === 'RESOURCE_SUPPORT') {
     const approval = supportResourcesHasAnyValue(requestedApproval)
@@ -10347,9 +10940,16 @@ function approveSupportRequest(
       return { status: 400, error: 'Approved support must include at least one resource.' };
     }
 
-    const sourcePlanet = resolveBestResourceSupportSourcePlanet(galaxy, request.toPlayerId, approval);
+    const sourcePlanet = resolveBestResourceSupportSourcePlanet(
+      galaxy,
+      request.toPlayerId,
+      approval,
+    );
     if (!sourcePlanet) {
-      return { status: 409, error: 'No owned planet currently has enough resources to reserve this support.' };
+      return {
+        status: 409,
+        error: 'No owned planet currently has enough resources to reserve this support.',
+      };
     }
 
     sourcePlanet.rBDSFTQ.resources.subtractResourcePack(approval);
@@ -10366,7 +10966,7 @@ function approveSupportRequest(
       request,
       `Resource support accepted`,
       `${resolvePlayerById(galaxy, request.toPlayerId)?.playerName ?? 'Support provider'} reserved ${formatResourcesPackInline(approval)} for ${request.targetPlanetName}. Delivery is scheduled for turn ${request.executionDueTurn}.`,
-      `You reserved ${formatResourcesPackInline(approval)} for delivery to ${request.targetPlanetName} on turn ${request.executionDueTurn}.`
+      `You reserved ${formatResourcesPackInline(approval)} for delivery to ${request.targetPlanetName} on turn ${request.executionDueTurn}.`,
     );
     return { ok: true };
   }
@@ -10386,7 +10986,7 @@ function approveSupportRequest(
       request,
       'Offensive support accepted',
       `${resolvePlayerById(galaxy, request.toPlayerId)?.playerName ?? 'Support provider'} accepted the ${request.missionType} support request for ${request.targetPlanetName}. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`,
-      `You accepted the ${request.missionType} support request for ${request.targetPlanetName}. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`
+      `You accepted the ${request.missionType} support request for ${request.targetPlanetName}. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`,
     );
     return { ok: true };
   }
@@ -10395,15 +10995,16 @@ function approveSupportRequest(
   request.executionDueTurn = galaxy.currentTurn + 1;
   request.executionExpiresOnTurn = galaxy.currentTurn + 5;
   request.state = DiplomaticProposalState.ACCEPTED;
-  request.resolutionNote = request.supportType === 'PLANET_REPAIR'
-    ? `Repair support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`
-    : `Defense support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`;
+  request.resolutionNote =
+    request.supportType === 'PLANET_REPAIR'
+      ? `Repair support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`
+      : `Defense support accepted. Auto-launch will be attempted until turn ${request.executionExpiresOnTurn}.`;
   addSupportRequestMessages(
     galaxy,
     request,
     'Support request accepted',
     request.resolutionNote,
-    request.resolutionNote
+    request.resolutionNote,
   );
   return { ok: true };
 }
@@ -10412,7 +11013,7 @@ function rejectSupportRequest(
   galaxy: Galaxy,
   request: SupportRequest,
   requesterBody: string,
-  ownerBody: string
+  ownerBody: string,
 ): void {
   request.state = DiplomaticProposalState.REJECTED;
   request.resolutionNote = requesterBody;
@@ -10423,7 +11024,7 @@ function cancelSupportRequest(
   galaxy: Galaxy,
   request: SupportRequest,
   requesterBody: string,
-  ownerBody: string
+  ownerBody: string,
 ): void {
   request.state = DiplomaticProposalState.CANCELLED;
   request.resolutionNote = requesterBody;
@@ -10434,17 +11035,23 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
   for (const request of galaxy.supportRequests) {
     if (request.state === DiplomaticProposalState.PENDING) {
       const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
-      const invalidDefensiveTarget = (
-        (request.supportType === 'RESOURCE_SUPPORT' || request.supportType === 'PLANET_REPAIR' || request.supportType === 'PLANET_DEFENSE')
-        && (!targetPlanet || targetPlanet.info.ownerId !== request.fromPlayerId)
-      );
-      const invalidOffensiveTarget = (
-        isOffensiveSupportRequest(request)
-        && !isKnownHostileSupportTarget(galaxy, request.fromPlayerId, targetPlanet, request.supportType)
-      );
+      const invalidDefensiveTarget =
+        (request.supportType === 'RESOURCE_SUPPORT' ||
+          request.supportType === 'PLANET_REPAIR' ||
+          request.supportType === 'PLANET_DEFENSE') &&
+        (!targetPlanet || targetPlanet.info.ownerId !== request.fromPlayerId);
+      const invalidOffensiveTarget =
+        isOffensiveSupportRequest(request) &&
+        !isKnownHostileSupportTarget(
+          galaxy,
+          request.fromPlayerId,
+          targetPlanet,
+          request.supportType,
+        );
       if (invalidDefensiveTarget || invalidOffensiveTarget) {
         request.state = DiplomaticProposalState.CANCELLED;
-        request.resolutionNote = 'Support request auto-cancelled because the target is no longer valid.';
+        request.resolutionNote =
+          'Support request auto-cancelled because the target is no longer valid.';
         continue;
       }
 
@@ -10456,13 +11063,17 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
           request,
           'Support request expired',
           'Your support request expired before it was answered.',
-          `Support request for ${request.targetPlanetName} expired.`
+          `Support request for ${request.targetPlanetName} expired.`,
         );
       }
       continue;
     }
 
-    if (request.state !== DiplomaticProposalState.ACCEPTED || request.fulfilledTurn !== null || request.executionDueTurn === null) {
+    if (
+      request.state !== DiplomaticProposalState.ACCEPTED ||
+      request.fulfilledTurn !== null ||
+      request.executionDueTurn === null
+    ) {
       continue;
     }
 
@@ -10478,13 +11089,14 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
       if (!targetPlanet || targetPlanet.info.ownerId !== request.fromPlayerId) {
         request.state = DiplomaticProposalState.CANCELLED;
         request.fulfilledTurn = galaxy.currentTurn;
-        request.resolutionNote = 'Repair support was auto-cancelled because the target is no longer valid.';
+        request.resolutionNote =
+          'Repair support was auto-cancelled because the target is no longer valid.';
         addSupportRequestMessages(
           galaxy,
           request,
           'Repair support cancelled',
           request.resolutionNote,
-          request.resolutionNote
+          request.resolutionNote,
         );
         continue;
       }
@@ -10498,16 +11110,20 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
         continue;
       }
 
-      if (request.executionExpiresOnTurn !== null && galaxy.currentTurn >= request.executionExpiresOnTurn) {
+      if (
+        request.executionExpiresOnTurn !== null &&
+        galaxy.currentTurn >= request.executionExpiresOnTurn
+      ) {
         request.state = DiplomaticProposalState.REJECTED;
         request.fulfilledTurn = galaxy.currentTurn;
-        request.resolutionNote = 'Repair support auto-rejected after 5 turns because no valid repair fleet was available.';
+        request.resolutionNote =
+          'Repair support auto-rejected after 5 turns because no valid repair fleet was available.';
         addSupportRequestMessages(
           galaxy,
           request,
           'Repair support auto-rejected',
           request.resolutionNote,
-          request.resolutionNote
+          request.resolutionNote,
         );
         continue;
       }
@@ -10521,13 +11137,14 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
       if (!targetPlanet || targetPlanet.info.ownerId !== request.fromPlayerId) {
         request.state = DiplomaticProposalState.CANCELLED;
         request.fulfilledTurn = galaxy.currentTurn;
-        request.resolutionNote = 'Defense support was auto-cancelled because the target is no longer valid.';
+        request.resolutionNote =
+          'Defense support was auto-cancelled because the target is no longer valid.';
         addSupportRequestMessages(
           galaxy,
           request,
           'Defense support cancelled',
           request.resolutionNote,
-          request.resolutionNote
+          request.resolutionNote,
         );
         continue;
       }
@@ -10541,16 +11158,20 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
         continue;
       }
 
-      if (request.executionExpiresOnTurn !== null && galaxy.currentTurn >= request.executionExpiresOnTurn) {
+      if (
+        request.executionExpiresOnTurn !== null &&
+        galaxy.currentTurn >= request.executionExpiresOnTurn
+      ) {
         request.state = DiplomaticProposalState.REJECTED;
         request.fulfilledTurn = galaxy.currentTurn;
-        request.resolutionNote = 'Defense support auto-rejected after 5 turns because no valid guard fleet was available.';
+        request.resolutionNote =
+          'Defense support auto-rejected after 5 turns because no valid guard fleet was available.';
         addSupportRequestMessages(
           galaxy,
           request,
           'Defense support auto-rejected',
           request.resolutionNote,
-          request.resolutionNote
+          request.resolutionNote,
         );
         continue;
       }
@@ -10566,13 +11187,14 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
     if (!isOffensiveSupportTargetStillValid(galaxy, request)) {
       request.state = DiplomaticProposalState.CANCELLED;
       request.fulfilledTurn = galaxy.currentTurn;
-      request.resolutionNote = 'Offensive support was auto-cancelled because the target is no longer a valid hostile target.';
+      request.resolutionNote =
+        'Offensive support was auto-cancelled because the target is no longer a valid hostile target.';
       addSupportRequestMessages(
         galaxy,
         request,
         'Offensive support cancelled',
         request.resolutionNote,
-        request.resolutionNote
+        request.resolutionNote,
       );
       continue;
     }
@@ -10586,16 +11208,20 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
       continue;
     }
 
-    if (request.executionExpiresOnTurn !== null && galaxy.currentTurn >= request.executionExpiresOnTurn) {
+    if (
+      request.executionExpiresOnTurn !== null &&
+      galaxy.currentTurn >= request.executionExpiresOnTurn
+    ) {
       request.state = DiplomaticProposalState.REJECTED;
       request.fulfilledTurn = galaxy.currentTurn;
-      request.resolutionNote = 'Offensive support auto-rejected after 5 turns because no valid fleet met the requested minimum.';
+      request.resolutionNote =
+        'Offensive support auto-rejected after 5 turns because no valid fleet met the requested minimum.';
       addSupportRequestMessages(
         galaxy,
         request,
         'Offensive support auto-rejected',
         request.resolutionNote,
-        request.resolutionNote
+        request.resolutionNote,
       );
       continue;
     }
@@ -10604,7 +11230,10 @@ function synchronizeSupportRequests(galaxy: Galaxy): void {
   }
 }
 
-function executeAcceptedResourceSupportRequest(galaxy: Galaxy, request: Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' }>): void {
+function executeAcceptedResourceSupportRequest(
+  galaxy: Galaxy,
+  request: Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' }>,
+): void {
   if (!request.approvedResources || !supportResourcesHasAnyValue(request.approvedResources)) {
     request.fulfilledTurn = galaxy.currentTurn;
     request.resolutionNote = 'No approved resources were reserved for this support request.';
@@ -10616,13 +11245,14 @@ function executeAcceptedResourceSupportRequest(galaxy: Galaxy, request: Extract<
     refundReservedSupportResources(galaxy, request);
     request.state = DiplomaticProposalState.CANCELLED;
     request.fulfilledTurn = galaxy.currentTurn;
-    request.resolutionNote = 'Delivery failed because the target planet is no longer valid. Reserved resources were refunded.';
+    request.resolutionNote =
+      'Delivery failed because the target planet is no longer valid. Reserved resources were refunded.';
     addSupportRequestMessages(
       galaxy,
       request,
       'Support delivery cancelled',
       request.resolutionNote,
-      request.resolutionNote
+      request.resolutionNote,
     );
     return;
   }
@@ -10635,15 +11265,19 @@ function executeAcceptedResourceSupportRequest(galaxy: Galaxy, request: Extract<
     request,
     'Support delivered',
     request.resolutionNote,
-    request.resolutionNote
+    request.resolutionNote,
   );
 }
 
 function refundReservedSupportResources(
   galaxy: Galaxy,
-  request: Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' }>
+  request: Extract<SupportRequest, { supportType: 'RESOURCE_SUPPORT' }>,
 ): void {
-  if (!request.approvedResources || !supportResourcesHasAnyValue(request.approvedResources) || !request.reservedSourceCoordinates) {
+  if (
+    !request.approvedResources ||
+    !supportResourcesHasAnyValue(request.approvedResources) ||
+    !request.reservedSourceCoordinates
+  ) {
     return;
   }
 
@@ -10656,14 +11290,24 @@ function refundReservedSupportResources(
 }
 
 function isOffensiveSupportRequestType(
-  supportType: SupportRequestTypeDto
-): supportType is Extract<SupportRequestTypeDto, 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET'> {
-  return supportType === 'ATTACK_TARGET' || supportType === 'BOMBARD_TARGET' || supportType === 'SIEGE_TARGET';
+  supportType: SupportRequestTypeDto,
+): supportType is Extract<
+  SupportRequestTypeDto,
+  'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET'
+> {
+  return (
+    supportType === 'ATTACK_TARGET' ||
+    supportType === 'BOMBARD_TARGET' ||
+    supportType === 'SIEGE_TARGET'
+  );
 }
 
 function isOffensiveSupportRequest(
-  request: SupportRequest
-): request is Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }> {
+  request: SupportRequest,
+): request is Extract<
+  SupportRequest,
+  { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }
+> {
   return isOffensiveSupportRequestType(request.supportType);
 }
 
@@ -10671,9 +11315,13 @@ function isKnownHostileSupportTarget(
   galaxy: Galaxy,
   viewerPlayerId: number,
   targetPlanet: Planet | null,
-  supportType: SupportRequestTypeDto
+  supportType: SupportRequestTypeDto,
 ): boolean {
-  if (!targetPlanet || targetPlanet.info.ownerId === null || targetPlanet.info.ownerId === viewerPlayerId) {
+  if (
+    !targetPlanet ||
+    targetPlanet.info.ownerId === null ||
+    targetPlanet.info.ownerId === viewerPlayerId
+  ) {
     return false;
   }
 
@@ -10681,20 +11329,27 @@ function isKnownHostileSupportTarget(
     return false;
   }
 
-  return isSupportMissionLegalForProvider(galaxy, viewerPlayerId, targetPlanet.info.ownerId, supportType);
+  return isSupportMissionLegalForProvider(
+    galaxy,
+    viewerPlayerId,
+    targetPlanet.info.ownerId,
+    supportType,
+  );
 }
 
 function isSupportMissionLegalForProvider(
   galaxy: Galaxy,
   providerPlayerId: number,
   targetOwnerPlayerId: number,
-  supportType: SupportRequestTypeDto
+  supportType: SupportRequestTypeDto,
 ): boolean {
   const status = resolveDiplomaticStatus(galaxy, providerPlayerId, targetOwnerPlayerId);
   if (supportType === 'ATTACK_TARGET') {
-    return status === DiplomaticStatus.WAR
-      || status === DiplomaticStatus.NEUTRAL
-      || status === DiplomaticStatus.PASSIVE;
+    return (
+      status === DiplomaticStatus.WAR ||
+      status === DiplomaticStatus.NEUTRAL ||
+      status === DiplomaticStatus.PASSIVE
+    );
   }
 
   if (supportType === 'BOMBARD_TARGET' || supportType === 'SIEGE_TARGET') {
@@ -10706,19 +11361,30 @@ function isSupportMissionLegalForProvider(
 
 function isOffensiveSupportTargetStillValid(
   galaxy: Galaxy,
-  request: Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }>
+  request: Extract<
+    SupportRequest,
+    { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }
+  >,
 ): boolean {
   const targetPlanet = resolvePlanetAtCoordinates(galaxy, request.targetCoordinates);
   if (!targetPlanet || targetPlanet.info.ownerId === null) {
     return false;
   }
 
-  return isSupportMissionLegalForProvider(galaxy, request.toPlayerId, targetPlanet.info.ownerId, request.supportType);
+  return isSupportMissionLegalForProvider(
+    galaxy,
+    request.toPlayerId,
+    targetPlanet.info.ownerId,
+    request.supportType,
+  );
 }
 
 function tryLaunchAcceptedOffensiveSupportRequest(
   galaxy: Galaxy,
-  request: Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }>
+  request: Extract<
+    SupportRequest,
+    { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }
+  >,
 ): { ok: true } | { ok: false } {
   const candidates = resolveOffensiveSupportLaunchCandidates(galaxy, request);
   for (const candidate of candidates) {
@@ -10732,8 +11398,8 @@ function tryLaunchAcceptedOffensiveSupportRequest(
         carriedBombs: [],
         cargo: { metal: 0, crystal: 0, deuterium: 0 },
         useJumpGate: false,
-        bombardmentPriorities: request.bombardmentPriorities
-      }
+        bombardmentPriorities: request.bombardmentPriorities,
+      },
     );
     if (!result.ok) {
       continue;
@@ -10749,7 +11415,7 @@ function tryLaunchAcceptedOffensiveSupportRequest(
       request,
       'Offensive support launched',
       request.resolutionNote,
-      request.resolutionNote
+      request.resolutionNote,
     );
     return { ok: true };
   }
@@ -10759,13 +11425,13 @@ function tryLaunchAcceptedOffensiveSupportRequest(
 
 function tryLaunchAcceptedRepairSupportRequest(
   galaxy: Galaxy,
-  request: Extract<SupportRequest, { supportType: 'PLANET_REPAIR' }>
+  request: Extract<SupportRequest, { supportType: 'PLANET_REPAIR' }>,
 ): { ok: true } | { ok: false } {
   const existingFleet = findExistingSupportFleet(
     galaxy,
     request.toPlayerId,
     FleetMissionType.REPAIR,
-    request.targetCoordinates
+    request.targetCoordinates,
   );
   if (existingFleet) {
     request.fulfilledTurn = galaxy.currentTurn;
@@ -10775,7 +11441,7 @@ function tryLaunchAcceptedRepairSupportRequest(
       request,
       'Repair support in progress',
       request.resolutionNote,
-      request.resolutionNote
+      request.resolutionNote,
     );
     return { ok: true };
   }
@@ -10792,8 +11458,8 @@ function tryLaunchAcceptedRepairSupportRequest(
         carriedBombs: [],
         cargo: { metal: 0, crystal: 0, deuterium: 0 },
         useJumpGate: false,
-        bombardmentPriorities: null
-      }
+        bombardmentPriorities: null,
+      },
     );
     if (!result.ok) {
       continue;
@@ -10806,7 +11472,7 @@ function tryLaunchAcceptedRepairSupportRequest(
       request,
       'Repair support launched',
       request.resolutionNote,
-      request.resolutionNote
+      request.resolutionNote,
     );
     return { ok: true };
   }
@@ -10816,13 +11482,13 @@ function tryLaunchAcceptedRepairSupportRequest(
 
 function tryLaunchAcceptedDefenseSupportRequest(
   galaxy: Galaxy,
-  request: Extract<SupportRequest, { supportType: 'PLANET_DEFENSE' }>
+  request: Extract<SupportRequest, { supportType: 'PLANET_DEFENSE' }>,
 ): { ok: true } | { ok: false } {
   const existingFleet = findExistingSupportFleet(
     galaxy,
     request.toPlayerId,
     FleetMissionType.DEFEND,
-    request.targetCoordinates
+    request.targetCoordinates,
   );
   if (existingFleet) {
     request.fulfilledTurn = galaxy.currentTurn;
@@ -10832,7 +11498,7 @@ function tryLaunchAcceptedDefenseSupportRequest(
       request,
       'Defense support in progress',
       request.resolutionNote,
-      request.resolutionNote
+      request.resolutionNote,
     );
     return { ok: true };
   }
@@ -10849,8 +11515,8 @@ function tryLaunchAcceptedDefenseSupportRequest(
         carriedBombs: [],
         cargo: { metal: 0, crystal: 0, deuterium: 0 },
         useJumpGate: false,
-        bombardmentPriorities: null
-      }
+        bombardmentPriorities: null,
+      },
     );
     if (!result.ok) {
       continue;
@@ -10863,7 +11529,7 @@ function tryLaunchAcceptedDefenseSupportRequest(
       request,
       'Defense support launched',
       request.resolutionNote,
-      request.resolutionNote
+      request.resolutionNote,
     );
     return { ok: true };
   }
@@ -10875,20 +11541,26 @@ function findExistingSupportFleet(
   galaxy: Galaxy,
   providerPlayerId: number,
   missionType: FleetMissionTypeType,
-  targetCoordinates: ClientCoordinates
+  targetCoordinates: ClientCoordinates,
 ): Fleet | null {
-  return galaxy.activeFleets.find((fleet) =>
-    fleet.ownerId === providerPlayerId
-    && fleet.missionType === missionType
-    && sameCoordinates(fleet.target, targetCoordinates)
-    && fleet.state !== FleetState.RETURNING
-    && fleet.state !== FleetState.MISSION_FAILURE_RETURNING
-  ) ?? null;
+  return (
+    galaxy.activeFleets.find(
+      (fleet) =>
+        fleet.ownerId === providerPlayerId &&
+        fleet.missionType === missionType &&
+        sameCoordinates(fleet.target, targetCoordinates) &&
+        fleet.state !== FleetState.RETURNING &&
+        fleet.state !== FleetState.MISSION_FAILURE_RETURNING,
+    ) ?? null
+  );
 }
 
 function resolveOffensiveSupportLaunchCandidates(
   galaxy: Galaxy,
-  request: Extract<SupportRequest, { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }>
+  request: Extract<
+    SupportRequest,
+    { supportType: 'ATTACK_TARGET' | 'BOMBARD_TARGET' | 'SIEGE_TARGET' }
+  >,
 ): Array<{
   originPlanet: Planet;
   originCoordinates: ClientCoordinates;
@@ -10918,27 +11590,28 @@ function resolveOffensiveSupportLaunchCandidates(
           originPlanet: planet,
           originCoordinates,
           ships,
-          distance: calculateTravelDistance(originCoordinates, request.targetCoordinates)
+          distance: calculateTravelDistance(originCoordinates, request.targetCoordinates),
         });
       }
     }
   }
 
-  candidates.sort((left, right) =>
-    left.distance - right.distance
-    || comparePlanetCoordinates(left.originPlanet, right.originPlanet)
+  candidates.sort(
+    (left, right) =>
+      left.distance - right.distance ||
+      comparePlanetCoordinates(left.originPlanet, right.originPlanet),
   );
 
   return candidates.map(({ originPlanet, originCoordinates, ships }) => ({
     originPlanet,
     originCoordinates,
-    ships
+    ships,
   }));
 }
 
 function resolveRepairSupportLaunchCandidates(
   galaxy: Galaxy,
-  request: Extract<SupportRequest, { supportType: 'PLANET_REPAIR' }>
+  request: Extract<SupportRequest, { supportType: 'PLANET_REPAIR' }>,
 ): Array<{
   originPlanet: Planet;
   originCoordinates: ClientCoordinates;
@@ -10970,27 +11643,28 @@ function resolveRepairSupportLaunchCandidates(
           originPlanet: planet,
           originCoordinates,
           ships,
-          distance: calculateTravelDistance(originCoordinates, request.targetCoordinates)
+          distance: calculateTravelDistance(originCoordinates, request.targetCoordinates),
         });
       }
     }
   }
 
-  candidates.sort((left, right) =>
-    left.distance - right.distance
-    || comparePlanetCoordinates(left.originPlanet, right.originPlanet)
+  candidates.sort(
+    (left, right) =>
+      left.distance - right.distance ||
+      comparePlanetCoordinates(left.originPlanet, right.originPlanet),
   );
 
   return candidates.map(({ originPlanet, originCoordinates, ships }) => ({
     originPlanet,
     originCoordinates,
-    ships
+    ships,
   }));
 }
 
 function resolveDefenseSupportLaunchCandidates(
   galaxy: Galaxy,
-  request: Extract<SupportRequest, { supportType: 'PLANET_DEFENSE' }>
+  request: Extract<SupportRequest, { supportType: 'PLANET_DEFENSE' }>,
 ): Array<{
   originPlanet: Planet;
   originCoordinates: ClientCoordinates;
@@ -11002,7 +11676,11 @@ function resolveDefenseSupportLaunchCandidates(
   }
 
   const targetDefenseStrength = estimatePlanetSupportCombatStrength(targetPlanet);
-  const nearbyThreatStrength = estimateNearbySupportThreatStrength(galaxy, request.fromPlayerId, targetPlanet);
+  const nearbyThreatStrength = estimateNearbySupportThreatStrength(
+    galaxy,
+    request.fromPlayerId,
+    targetPlanet,
+  );
   const candidates: Array<{
     originPlanet: Planet;
     originCoordinates: ClientCoordinates;
@@ -11018,7 +11696,11 @@ function resolveDefenseSupportLaunchCandidates(
           continue;
         }
 
-        const ships = buildDefenseSupportShipSelection(planet, nearbyThreatStrength, targetDefenseStrength);
+        const ships = buildDefenseSupportShipSelection(
+          planet,
+          nearbyThreatStrength,
+          targetDefenseStrength,
+        );
         if (!ships) {
           continue;
         }
@@ -11029,28 +11711,29 @@ function resolveDefenseSupportLaunchCandidates(
           originCoordinates,
           ships,
           distance: calculateTravelDistance(originCoordinates, request.targetCoordinates),
-          selectedStrength: estimateSupportShipSelectionCombatStrength(ships)
+          selectedStrength: estimateSupportShipSelectionCombatStrength(ships),
         });
       }
     }
   }
 
-  candidates.sort((left, right) =>
-    left.distance - right.distance
-    || right.selectedStrength - left.selectedStrength
-    || comparePlanetCoordinates(left.originPlanet, right.originPlanet)
+  candidates.sort(
+    (left, right) =>
+      left.distance - right.distance ||
+      right.selectedStrength - left.selectedStrength ||
+      comparePlanetCoordinates(left.originPlanet, right.originPlanet),
   );
 
   return candidates.map(({ originPlanet, originCoordinates, ships }) => ({
     originPlanet,
     originCoordinates,
-    ships
+    ships,
   }));
 }
 
 function buildMinimumSupportShipSelection(
   planet: Planet,
-  minimumShips: ShipAmountEntry[]
+  minimumShips: ShipAmountEntry[],
 ): CreateFleetShipSelectionEntry[] | null {
   const availableUndamaged = ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
   const availableDamaged = ManyShips.damagedCountByType(planet.rBDSFTQ.ships);
@@ -11068,7 +11751,7 @@ function buildMinimumSupportShipSelection(
     selections.push({
       type: minimum.type,
       undamagedAmount,
-      damagedAmount
+      damagedAmount,
     });
   }
 
@@ -11077,7 +11760,7 @@ function buildMinimumSupportShipSelection(
 
 function buildRepairSupportShipSelection(
   planet: Planet,
-  repairNeed: number
+  repairNeed: number,
 ): CreateFleetShipSelectionEntry[] | null {
   const repairDroneBlueprint = SHIP_BLUEPRINTS.get(ShipType.REPAIR_DRONE);
   if (!repairDroneBlueprint) {
@@ -11098,15 +11781,13 @@ function buildRepairSupportShipSelection(
 
       const blueprint = SHIP_BLUEPRINTS.get(shipType as ShipTypeType);
       return Boolean(
-        blueprint
-        && blueprint.canJump
-        && blueprint.hangarCapacity >= repairDroneBlueprint.size
+        blueprint && blueprint.canJump && blueprint.hangarCapacity >= repairDroneBlueprint.size,
       );
     })
     .map(([shipType]) => SHIP_BLUEPRINTS.get(shipType as ShipTypeType)!)
-    .sort((left, right) =>
-      left.hangarCapacity - right.hangarCapacity
-      || left.type.localeCompare(right.type)
+    .sort(
+      (left, right) =>
+        left.hangarCapacity - right.hangarCapacity || left.type.localeCompare(right.type),
     );
 
   const carrier = carrierCandidates[0];
@@ -11120,20 +11801,20 @@ function buildRepairSupportShipSelection(
     {
       type: carrier.type,
       undamagedAmount: 1,
-      damagedAmount: 0
+      damagedAmount: 0,
     },
     {
       type: ShipType.REPAIR_DRONE,
       undamagedAmount: selectedRepairDrones,
-      damagedAmount: 0
-    }
+      damagedAmount: 0,
+    },
   ];
 }
 
 function buildDefenseSupportShipSelection(
   planet: Planet,
   nearbyThreatStrength: number,
-  targetDefenseStrength: number
+  targetDefenseStrength: number,
 ): CreateFleetShipSelectionEntry[] | null {
   const availableUndamaged = ManyShips.undamagedCountByType(planet.rBDSFTQ.ships);
   const combatShips = [...availableUndamaged.entries()]
@@ -11144,19 +11825,17 @@ function buildDefenseSupportShipSelection(
 
       const blueprint = SHIP_BLUEPRINTS.get(shipType as ShipTypeType);
       return Boolean(
-        blueprint
-        && blueprint.weapons.length > 0
-        && !blueprint.purposes.has(ShipPurpose.CARGO)
+        blueprint && blueprint.weapons.length > 0 && !blueprint.purposes.has(ShipPurpose.CARGO),
       );
     })
     .map(([shipType, amount]) => ({
       type: shipType as ShipTypeType,
       amount,
-      power: estimateSupportShipCombatPower(shipType as ShipTypeType)
+      power: estimateSupportShipCombatPower(shipType as ShipTypeType),
     }))
     .sort((left, right) => right.power - left.power || left.type.localeCompare(right.type));
 
-  const totalCombatPower = combatShips.reduce((sum, entry) => sum + (entry.power * entry.amount), 0);
+  const totalCombatPower = combatShips.reduce((sum, entry) => sum + entry.power * entry.amount, 0);
   const reservePower = totalCombatPower * 0.45;
   const availableLaunchPower = totalCombatPower - reservePower;
   if (availableLaunchPower <= 0) {
@@ -11165,11 +11844,7 @@ function buildDefenseSupportShipSelection(
 
   const desiredLaunchPower = Math.min(
     availableLaunchPower,
-    Math.max(
-      nearbyThreatStrength - targetDefenseStrength,
-      nearbyThreatStrength * 0.45,
-      18
-    )
+    Math.max(nearbyThreatStrength - targetDefenseStrength, nearbyThreatStrength * 0.45, 18),
   );
   if (desiredLaunchPower <= 0) {
     return null;
@@ -11185,8 +11860,8 @@ function buildDefenseSupportShipSelection(
     const remainingPower = desiredLaunchPower - selectedPower;
     let amountToSend = Math.min(entry.amount, Math.max(1, Math.ceil(remainingPower / entry.power)));
     while (
-      amountToSend > 0
-      && (totalCombatPower - (selectedPower + (amountToSend * entry.power))) < reservePower
+      amountToSend > 0 &&
+      totalCombatPower - (selectedPower + amountToSend * entry.power) < reservePower
     ) {
       amountToSend -= 1;
     }
@@ -11198,7 +11873,7 @@ function buildDefenseSupportShipSelection(
     selection.push({
       type: entry.type,
       undamagedAmount: amountToSend,
-      damagedAmount: 0
+      damagedAmount: 0,
     });
     selectedPower += entry.power * amountToSend;
   }
@@ -11223,7 +11898,7 @@ function estimateSupportRepairNeed(planet: Planet): number {
 function estimateNearbySupportThreatStrength(
   galaxy: Galaxy,
   viewerPlayerId: number,
-  targetPlanet: Planet
+  targetPlanet: Planet,
 ): number {
   const targetCoordinates = toPlanetCoordinates(targetPlanet);
   let bestStrength = 0;
@@ -11231,7 +11906,11 @@ function estimateNearbySupportThreatStrength(
   for (const row of galaxy.stars) {
     for (const system of row) {
       for (const planet of system.planets) {
-        if (planet === targetPlanet || planet.info.ownerId === null || planet.info.ownerId === viewerPlayerId) {
+        if (
+          planet === targetPlanet ||
+          planet.info.ownerId === null ||
+          planet.info.ownerId === viewerPlayerId
+        ) {
           continue;
         }
 
@@ -11258,7 +11937,8 @@ function estimateSupportReportCombatStrength(report: EspionageReportData): numbe
     total += estimateSupportShipCombatPower(shipType as ShipTypeType) * amount;
   }
   for (const defenceEntry of report.defences) {
-    total += estimateSupportDefenceCombatPower(defenceEntry.type as DefenceTypeType) * defenceEntry.amount;
+    total +=
+      estimateSupportDefenceCombatPower(defenceEntry.type as DefenceTypeType) * defenceEntry.amount;
   }
 
   if (total <= 0) {
@@ -11281,11 +11961,13 @@ function estimatePlanetSupportCombatStrength(planet: Planet): number {
 }
 
 function estimateSupportShipSelectionCombatStrength(
-  ships: CreateFleetShipSelectionEntry[]
+  ships: CreateFleetShipSelectionEntry[],
 ): number {
   let total = 0;
   for (const entry of ships) {
-    total += estimateSupportShipCombatPower(entry.type as ShipTypeType) * (entry.undamagedAmount + entry.damagedAmount);
+    total +=
+      estimateSupportShipCombatPower(entry.type as ShipTypeType) *
+      (entry.undamagedAmount + entry.damagedAmount);
   }
   return total;
 }
@@ -11296,8 +11978,8 @@ function estimateSupportShipCombatPower(shipType: ShipTypeType): number {
     return 0;
   }
 
-  const weaponPower = blueprint.weapons.reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
-  return weaponPower + (blueprint.hullPointsCapacity / 15) + (blueprint.shieldCapacity / 10);
+  const weaponPower = blueprint.weapons.reduce((sum, weapon) => sum + weapon.dmg * weapon.shots, 0);
+  return weaponPower + blueprint.hullPointsCapacity / 15 + blueprint.shieldCapacity / 10;
 }
 
 function estimateSupportDefenceCombatPower(defenceType: DefenceTypeType): number {
@@ -11306,14 +11988,14 @@ function estimateSupportDefenceCombatPower(defenceType: DefenceTypeType): number
     return 0;
   }
 
-  const weaponPower = blueprint.weapons.reduce((sum, weapon) => sum + (weapon.dmg * weapon.shots), 0);
-  return weaponPower + (blueprint.hullPointsCapacity / 18) + (blueprint.shieldCapacity / 12);
+  const weaponPower = blueprint.weapons.reduce((sum, weapon) => sum + weapon.dmg * weapon.shots, 0);
+  return weaponPower + blueprint.hullPointsCapacity / 18 + blueprint.shieldCapacity / 12;
 }
 
 function resolveBestResourceSupportSourcePlanet(
   galaxy: Galaxy,
   ownerPlayerId: number,
-  requiredResources: ResourcesPackType
+  requiredResources: ResourcesPackType,
 ): Planet | null {
   let bestPlanet: Planet | null = null;
 
@@ -11340,10 +12022,7 @@ function resolveBestResourceSupportSourcePlanet(
           continue;
         }
 
-        if (
-          currentValue === bestValue
-          && comparePlanetCoordinates(planet, bestPlanet) < 0
-        ) {
+        if (currentValue === bestValue && comparePlanetCoordinates(planet, bestPlanet) < 0) {
           bestPlanet = planet;
         }
       }
@@ -11355,13 +12034,13 @@ function resolveBestResourceSupportSourcePlanet(
 
 function isSupportRequestAllowedForStatus(
   supportType: SupportRequestTypeDto,
-  status: DiplomaticStatusType
+  status: DiplomaticStatusType,
 ): boolean {
   if (
-    supportType === 'RESOURCE_SUPPORT'
-    || supportType === 'ATTACK_TARGET'
-    || supportType === 'BOMBARD_TARGET'
-    || supportType === 'SIEGE_TARGET'
+    supportType === 'RESOURCE_SUPPORT' ||
+    supportType === 'ATTACK_TARGET' ||
+    supportType === 'BOMBARD_TARGET' ||
+    supportType === 'SIEGE_TARGET'
   ) {
     return status === DiplomaticStatus.ALLIED;
   }
@@ -11370,9 +12049,11 @@ function isSupportRequestAllowedForStatus(
 }
 
 function comparePlanetCoordinates(left: Planet, right: Planet): number {
-  return left.basicInfo.solarSystem.coordinates.x - right.basicInfo.solarSystem.coordinates.x
-    || left.basicInfo.solarSystem.coordinates.y - right.basicInfo.solarSystem.coordinates.y
-    || left.basicInfo.order - right.basicInfo.order;
+  return (
+    left.basicInfo.solarSystem.coordinates.x - right.basicInfo.solarSystem.coordinates.x ||
+    left.basicInfo.solarSystem.coordinates.y - right.basicInfo.solarSystem.coordinates.y ||
+    left.basicInfo.order - right.basicInfo.order
+  );
 }
 
 function addSupportRequestMessages(
@@ -11380,7 +12061,7 @@ function addSupportRequestMessages(
   request: SupportRequest,
   title: string,
   requesterBody: string,
-  providerBody: string
+  providerBody: string,
 ): void {
   const requester = resolvePlayerById(galaxy, request.fromPlayerId);
   const provider = resolvePlayerById(galaxy, request.toPlayerId);
@@ -11391,7 +12072,7 @@ function addSupportRequestMessages(
       title,
       requesterBody,
       request.toPlayerId,
-      provider?.playerName ?? null
+      provider?.playerName ?? null,
     );
   }
   if (provider) {
@@ -11401,7 +12082,7 @@ function addSupportRequestMessages(
       title,
       providerBody,
       request.fromPlayerId,
-      requester?.playerName ?? null
+      requester?.playerName ?? null,
     );
   }
 }
@@ -11410,7 +12091,7 @@ function formatResourcesPackInline(pack: ResourcesPackType): string {
   const entries = [
     pack.metal > 0 ? `${pack.metal} metal` : null,
     pack.crystal > 0 ? `${pack.crystal} crystal` : null,
-    pack.deuterium > 0 ? `${pack.deuterium} deuterium` : null
+    pack.deuterium > 0 ? `${pack.deuterium} deuterium` : null,
   ].filter((entry): entry is string => !!entry);
   return entries.length > 0 ? entries.join(', ') : 'no resources';
 }
@@ -11446,8 +12127,8 @@ function synchronizeTradePortState(galaxy: Galaxy): boolean {
           jumpGateLevel: planet.getBuildingLevel(BuildingType.JUMP_GATE),
           tradePortCapacity: planet.getTradePortCapacity(
             owner.getTechLevel(TechnologyType.HYPERSPACE_TECHNOLOGY),
-            owner.getTechLevel(TechnologyType.GRAVITON_TECHNOLOGY)
-          )
+            owner.getTechLevel(TechnologyType.GRAVITON_TECHNOLOGY),
+          ),
         });
         if (!syncResult.changed) {
           continue;
@@ -11464,7 +12145,7 @@ function synchronizeTradePortState(galaxy: Galaxy): boolean {
 
 function resourceAmountForType(
   resources: ResourcesPackType,
-  resourceType: TradePortOffer['costResourceType']
+  resourceType: TradePortOffer['costResourceType'],
 ): number {
   return resources[resourceType];
 }
@@ -11472,7 +12153,7 @@ function resourceAmountForType(
 function addResourceAmountByType(
   resources: ResourcesPackType,
   resourceType: TradePortOffer['getResourceType'],
-  amount: number
+  amount: number,
 ): void {
   resources[resourceType] += Math.max(0, Math.floor(amount));
 }
@@ -11480,7 +12161,7 @@ function addResourceAmountByType(
 function subtractResourceAmountByType(
   resources: ResourcesPackType,
   resourceType: TradePortOffer['costResourceType'],
-  amount: number
+  amount: number,
 ): void {
   resources[resourceType] -= Math.max(0, Math.floor(amount));
 }
@@ -11492,34 +12173,44 @@ function addMaintenanceResolutionReports(
   targetOwner: Player,
   title: string,
   requesterBody: string,
-  ownerBody: string
+  ownerBody: string,
 ): void {
   const requester = resolvePlayerById(galaxy, fleet.ownerId);
   if (requester) {
-    requester.addReport(new FleetReport({
-      reportId: requester.createReportId(),
-      createdTurn: galaxy.currentTurn,
-      title,
-      sourceCoordinates: { ...fleet.target },
-      sourcePlanetName: targetPlanet.basicInfo.name,
-      sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
-      senderPlayerName: targetOwner.playerName
-    }, requesterBody));
+    requester.addReport(
+      new FleetReport(
+        {
+          reportId: requester.createReportId(),
+          createdTurn: galaxy.currentTurn,
+          title,
+          sourceCoordinates: { ...fleet.target },
+          sourcePlanetName: targetPlanet.basicInfo.name,
+          sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+          senderPlayerName: targetOwner.playerName,
+        },
+        requesterBody,
+      ),
+    );
   }
 
   if (targetOwner.playerId === fleet.ownerId) {
     return;
   }
 
-  targetOwner.addReport(new FleetReport({
-    reportId: targetOwner.createReportId(),
-    createdTurn: galaxy.currentTurn,
-    title,
-    sourceCoordinates: { ...fleet.target },
-    sourcePlanetName: targetPlanet.basicInfo.name,
-    sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
-    senderPlayerName: requester?.playerName ?? null
-  }, ownerBody));
+  targetOwner.addReport(
+    new FleetReport(
+      {
+        reportId: targetOwner.createReportId(),
+        createdTurn: galaxy.currentTurn,
+        title,
+        sourceCoordinates: { ...fleet.target },
+        sourcePlanetName: targetPlanet.basicInfo.name,
+        sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
+        senderPlayerName: requester?.playerName ?? null,
+      },
+      ownerBody,
+    ),
+  );
 }
 
 function resolvePlanetAtCoordinates(galaxy: Galaxy, coordinates: ClientCoordinates): Planet | null {
@@ -11529,20 +12220,25 @@ function resolvePlanetAtCoordinates(galaxy: Galaxy, coordinates: ClientCoordinat
 function findPendingMaintenanceRequestForFleet(
   galaxy: Galaxy,
   ownerId: number,
-  fleetId: number
+  fleetId: number,
 ): MaintenanceRequest | null {
-  return galaxy.maintenanceRequests.find((request) =>
-    request.state === DiplomaticProposalState.PENDING
-    && request.fromPlayerId === ownerId
-    && request.fleetId === fleetId
-  ) ?? null;
+  return (
+    galaxy.maintenanceRequests.find(
+      (request) =>
+        request.state === DiplomaticProposalState.PENDING &&
+        request.fromPlayerId === ownerId &&
+        request.fleetId === fleetId,
+    ) ?? null
+  );
 }
 
 function isMaintenanceStatusAllowed(status: DiplomaticStatusType): boolean {
-  return status === DiplomaticStatus.SELF
-    || status === DiplomaticStatus.ALLIED
-    || status === DiplomaticStatus.PEACE
-    || status === DiplomaticStatus.PASSIVE;
+  return (
+    status === DiplomaticStatus.SELF ||
+    status === DiplomaticStatus.ALLIED ||
+    status === DiplomaticStatus.PEACE ||
+    status === DiplomaticStatus.PASSIVE
+  );
 }
 
 function buildMaintenanceOptionsDto(context: {
@@ -11552,17 +12248,22 @@ function buildMaintenanceOptionsDto(context: {
   fuelCap: number;
   supportCap: number;
 }): FleetMaintenanceOptionsDto {
-  const remainingCargoCapacity = Math.max(0, context.fleet.totalCargoCapacity - context.fleet.usedCargoCapacity);
-  const currentBombHangarUsage = calculateBombHangarUsageForManyDefences(context.fleet.carriedBombs);
+  const remainingCargoCapacity = Math.max(
+    0,
+    context.fleet.totalCargoCapacity - context.fleet.usedCargoCapacity,
+  );
+  const currentBombHangarUsage = calculateBombHangarUsageForManyDefences(
+    context.fleet.carriedBombs,
+  );
   const remainingHangarCapacity = Math.max(
     0,
-    ManyShips.totalTravelHangarCapacity(context.fleet.ships)
-    - ManyShips.totalRequiredHangarCapacity(context.fleet.ships)
-    - currentBombHangarUsage
+    ManyShips.totalTravelHangarCapacity(context.fleet.ships) -
+      ManyShips.totalRequiredHangarCapacity(context.fleet.ships) -
+      currentBombHangarUsage,
   );
   const remainingBomberHangarCapacity = Math.max(
     0,
-    ManyShips.totalBomberHangarCapacity(context.fleet.ships) - currentBombHangarUsage
+    ManyShips.totalBomberHangarCapacity(context.fleet.ships) - currentBombHangarUsage,
   );
 
   return {
@@ -11576,7 +12277,7 @@ function buildMaintenanceOptionsDto(context: {
     remainingHangarCapacity,
     remainingBomberHangarCapacity,
     availableShips: buildMaintenanceShipOptions(context.targetPlanet),
-    availableBombs: buildMaintenanceBombOptions(context.targetPlanet)
+    availableBombs: buildMaintenanceBombOptions(context.targetPlanet),
   };
 }
 
@@ -11597,7 +12298,7 @@ function buildMaintenanceShipOptions(planet: Planet): FleetMaintenanceShipOption
         available,
         undamagedAvailable: undamagedCounts.get(type) ?? 0,
         damagedAvailable: damagedCounts.get(type) ?? 0,
-        size: blueprint.size
+        size: blueprint.size,
       } satisfies FleetMaintenanceShipOptionDto;
     })
     .filter((entry): entry is FleetMaintenanceShipOptionDto => !!entry && entry.available > 0)
@@ -11625,7 +12326,7 @@ function buildMaintenanceBombOptions(planet: Planet): FleetMaintenanceBombOption
         available,
         undamagedAvailable: undamagedCounts.get(type) ?? 0,
         damagedAvailable: damagedCounts.get(type) ?? 0,
-        size: blueprint.size
+        size: blueprint.size,
       } satisfies FleetMaintenanceBombOptionDto;
     })
     .filter((entry): entry is FleetMaintenanceBombOptionDto => !!entry && entry.available > 0)
@@ -11639,17 +12340,19 @@ function validateRequestedMaintenancePayload(
     fuelCap: number;
     supportCap: number;
   },
-  payload: MaintenanceRequest['requested']
+  payload: MaintenanceRequest['requested'],
 ): { status: number; error: string } | null {
   const options = buildMaintenanceOptionsDto({
     fleet: context.fleet,
     targetPlanet: context.targetPlanet,
     autoApprove: false,
     fuelCap: context.fuelCap,
-    supportCap: context.supportCap
+    supportCap: context.supportCap,
   });
 
-  if (payload.fuel > Math.min(options.fuelCap, options.availableFuel, options.remainingCargoCapacity)) {
+  if (
+    payload.fuel > Math.min(options.fuelCap, options.availableFuel, options.remainingCargoCapacity)
+  ) {
     return { status: 400, error: 'Requested fuel exceeds depot or fleet capacity.' };
   }
 
@@ -11663,10 +12366,16 @@ function validateRequestedMaintenancePayload(
     const option = shipOptions.get(shipRequest.type);
     const blueprint = SHIP_BLUEPRINTS.get(shipRequest.type);
     if (!option || !blueprint || blueprint.hullClass !== HullClass.SMALL) {
-      return { status: 400, error: `${shipRequest.type}: maintenance can request only small ships stored on the target planet.` };
+      return {
+        status: 400,
+        error: `${shipRequest.type}: maintenance can request only small ships stored on the target planet.`,
+      };
     }
     if (shipRequest.amount > option.available) {
-      return { status: 400, error: `${shipRequest.type}: requested amount exceeds local depot stock.` };
+      return {
+        status: 400,
+        error: `${shipRequest.type}: requested amount exceeds local depot stock.`,
+      };
     }
 
     supportSize += blueprint.size * shipRequest.amount;
@@ -11679,10 +12388,16 @@ function validateRequestedMaintenancePayload(
     const option = bombOptions.get(bombRequest.type);
     const blueprint = DEFENCE_BLUEPRINTS.get(bombRequest.type);
     if (!option || !blueprint || !isPlanetaryBombDefenceType(bombRequest.type)) {
-      return { status: 400, error: `${bombRequest.type}: requested bombs are not available in the target depot.` };
+      return {
+        status: 400,
+        error: `${bombRequest.type}: requested bombs are not available in the target depot.`,
+      };
     }
     if (bombRequest.amount > option.available) {
-      return { status: 400, error: `${bombRequest.type}: requested amount exceeds local depot stock.` };
+      return {
+        status: 400,
+        error: `${bombRequest.type}: requested amount exceeds local depot stock.`,
+      };
     }
 
     supportSize += blueprint.size * bombRequest.amount;
@@ -11691,11 +12406,17 @@ function validateRequestedMaintenancePayload(
   }
 
   if (supportSize > options.supportCap) {
-    return { status: 400, error: 'Requested ships and bombs exceed Alliance Depot support capacity.' };
+    return {
+      status: 400,
+      error: 'Requested ships and bombs exceed Alliance Depot support capacity.',
+    };
   }
 
   if (requiredHangar > options.remainingHangarCapacity) {
-    return { status: 400, error: 'Requested ships and bombs do not fit into the fleet hangar capacity.' };
+    return {
+      status: 400,
+      error: 'Requested ships and bombs do not fit into the fleet hangar capacity.',
+    };
   }
 
   if (requiredBomberHangar > options.remainingBomberHangarCapacity) {
@@ -11711,7 +12432,7 @@ function maintenancePayloadHasAnySelection(payload: MaintenanceRequest['requeste
 
 function clampMaintenancePayloadToRequested(
   desired: MaintenanceTransferPayloadDto,
-  requested: MaintenanceRequest['requested']
+  requested: MaintenanceRequest['requested'],
 ): MaintenanceRequest['requested'] {
   const normalizedDesired = normalizeMaintenanceTransferPayload(desired);
   const requestedShips = new Map(requested.ships.map((entry) => [entry.type, entry.amount]));
@@ -11719,27 +12440,31 @@ function clampMaintenancePayloadToRequested(
 
   return {
     fuel: Math.min(normalizedDesired.fuel, requested.fuel),
-    ships: normalizedDesired.ships.map((entry) => ({
-      type: entry.type,
-      amount: Math.min(entry.amount, requestedShips.get(entry.type) ?? 0)
-    })).filter((entry) => entry.amount > 0),
-    bombs: normalizedDesired.bombs.map((entry) => ({
-      type: entry.type,
-      amount: Math.min(entry.amount, requestedBombs.get(entry.type) ?? 0)
-    })).filter((entry) => entry.amount > 0)
+    ships: normalizedDesired.ships
+      .map((entry) => ({
+        type: entry.type,
+        amount: Math.min(entry.amount, requestedShips.get(entry.type) ?? 0),
+      }))
+      .filter((entry) => entry.amount > 0),
+    bombs: normalizedDesired.bombs
+      .map((entry) => ({
+        type: entry.type,
+        amount: Math.min(entry.amount, requestedBombs.get(entry.type) ?? 0),
+      }))
+      .filter((entry) => entry.amount > 0),
   };
 }
 
 function applyMaintenanceTransfer(
   fleet: Fleet,
   targetPlanet: Planet,
-  requested: MaintenanceRequest['requested']
+  requested: MaintenanceRequest['requested'],
 ): MaintenanceRequest['approved'] {
   const normalized = normalizeMaintenanceTransferPayload(requested);
   const approvedFuel = Math.min(
     normalized.fuel,
     Math.max(0, targetPlanet.rBDSFTQ.resources.deuterium),
-    Math.max(0, fleet.totalCargoCapacity - fleet.usedCargoCapacity)
+    Math.max(0, fleet.totalCargoCapacity - fleet.usedCargoCapacity),
   );
   if (approvedFuel > 0) {
     targetPlanet.rBDSFTQ.resources.deuterium -= approvedFuel;
@@ -11759,22 +12484,28 @@ function applyMaintenanceTransfer(
 
   return {
     fuel: approvedFuel,
-    ships: [...ManyShips.countByType(approvedShips).entries()].map(([type, amount]) => ({ type, amount })),
-    bombs: [...ManyDefences.countByType(approvedBombs).entries()].map(([type, amount]) => ({ type, amount }))
+    ships: [...ManyShips.countByType(approvedShips).entries()].map(([type, amount]) => ({
+      type,
+      amount,
+    })),
+    bombs: [...ManyDefences.countByType(approvedBombs).entries()].map(([type, amount]) => ({
+      type,
+      amount,
+    })),
   };
 }
 
 function extractMaintenanceShips(
   targetPlanet: Planet,
   fleet: Fleet,
-  requestedShips: MaintenanceRequest['requested']['ships']
+  requestedShips: MaintenanceRequest['requested']['ships'],
 ): ManyShipsType {
   const extracted = ManyShips.empty();
   let remainingHangarCapacity = Math.max(
     0,
-    ManyShips.totalTravelHangarCapacity(fleet.ships)
-    - ManyShips.totalRequiredHangarCapacity(fleet.ships)
-    - calculateBombHangarUsageForManyDefences(fleet.carriedBombs)
+    ManyShips.totalTravelHangarCapacity(fleet.ships) -
+      ManyShips.totalRequiredHangarCapacity(fleet.ships) -
+      calculateBombHangarUsageForManyDefences(fleet.carriedBombs),
   );
 
   for (const request of requestedShips) {
@@ -11786,11 +12517,15 @@ function extractMaintenanceShips(
     const hangarCost = blueprint.canJump ? 0 : blueprint.size;
     let remaining = request.amount;
     const availableUndamaged = targetPlanet.rBDSFTQ.ships.undamagedShipsCount[request.type] ?? 0;
-    const takeUndamaged = Math.min(availableUndamaged, remaining, hangarCost <= 0 ? remaining : Math.floor(remainingHangarCapacity / hangarCost));
+    const takeUndamaged = Math.min(
+      availableUndamaged,
+      remaining,
+      hangarCost <= 0 ? remaining : Math.floor(remainingHangarCapacity / hangarCost),
+    );
     if (takeUndamaged > 0) {
       extracted.addUndamaged(request.type, takeUndamaged);
       remaining -= takeUndamaged;
-      remainingHangarCapacity = Math.max(0, remainingHangarCapacity - (takeUndamaged * hangarCost));
+      remainingHangarCapacity = Math.max(0, remainingHangarCapacity - takeUndamaged * hangarCost);
       const nextUndamaged = availableUndamaged - takeUndamaged;
       if (nextUndamaged > 0) {
         targetPlanet.rBDSFTQ.ships.undamagedShipsCount[request.type] = nextUndamaged;
@@ -11806,9 +12541,9 @@ function extractMaintenanceShips(
     const updatedDamaged: typeof targetPlanet.rBDSFTQ.ships.damagedShips = [];
     for (const damagedShip of targetPlanet.rBDSFTQ.ships.damagedShips) {
       if (
-        damagedShip.type === request.type
-        && remaining > 0
-        && (hangarCost <= 0 || remainingHangarCapacity >= hangarCost)
+        damagedShip.type === request.type &&
+        remaining > 0 &&
+        (hangarCost <= 0 || remainingHangarCapacity >= hangarCost)
       ) {
         extracted.addDamaged(damagedShip.type, damagedShip.hull);
         remaining -= 1;
@@ -11827,18 +12562,19 @@ function extractMaintenanceShips(
 function extractMaintenanceBombs(
   targetPlanet: Planet,
   fleet: Fleet,
-  requestedBombs: MaintenanceRequest['requested']['bombs']
+  requestedBombs: MaintenanceRequest['requested']['bombs'],
 ): InstanceType<typeof ManyDefences> {
   const extracted = ManyDefences.empty();
   let remainingTotalHangar = Math.max(
     0,
-    ManyShips.totalTravelHangarCapacity(fleet.ships)
-    - ManyShips.totalRequiredHangarCapacity(fleet.ships)
-    - calculateBombHangarUsageForManyDefences(fleet.carriedBombs)
+    ManyShips.totalTravelHangarCapacity(fleet.ships) -
+      ManyShips.totalRequiredHangarCapacity(fleet.ships) -
+      calculateBombHangarUsageForManyDefences(fleet.carriedBombs),
   );
   let remainingBomberHangar = Math.max(
     0,
-    ManyShips.totalBomberHangarCapacity(fleet.ships) - calculateBombHangarUsageForManyDefences(fleet.carriedBombs)
+    ManyShips.totalBomberHangarCapacity(fleet.ships) -
+      calculateBombHangarUsageForManyDefences(fleet.carriedBombs),
   );
 
   for (const request of requestedBombs) {
@@ -11853,20 +12589,22 @@ function extractMaintenanceBombs(
 
     let remaining = request.amount;
     const size = Math.max(0, blueprint.size);
-    const availableUndamaged = targetPlanet.rBDSFTQ.defences.undamagedDefencesCount[request.type] ?? 0;
-    const hangarLimitedAmount = size <= 0
-      ? remaining
-      : Math.min(
-        remaining,
-        Math.floor(remainingTotalHangar / size),
-        Math.floor(remainingBomberHangar / size)
-      );
+    const availableUndamaged =
+      targetPlanet.rBDSFTQ.defences.undamagedDefencesCount[request.type] ?? 0;
+    const hangarLimitedAmount =
+      size <= 0
+        ? remaining
+        : Math.min(
+            remaining,
+            Math.floor(remainingTotalHangar / size),
+            Math.floor(remainingBomberHangar / size),
+          );
     const takeUndamaged = Math.min(availableUndamaged, hangarLimitedAmount);
     if (takeUndamaged > 0) {
       extracted.addUndamaged(request.type, takeUndamaged);
       remaining -= takeUndamaged;
-      remainingTotalHangar = Math.max(0, remainingTotalHangar - (takeUndamaged * size));
-      remainingBomberHangar = Math.max(0, remainingBomberHangar - (takeUndamaged * size));
+      remainingTotalHangar = Math.max(0, remainingTotalHangar - takeUndamaged * size);
+      remainingBomberHangar = Math.max(0, remainingBomberHangar - takeUndamaged * size);
       const nextUndamaged = availableUndamaged - takeUndamaged;
       if (nextUndamaged > 0) {
         targetPlanet.rBDSFTQ.defences.undamagedDefencesCount[request.type] = nextUndamaged;
@@ -11882,9 +12620,9 @@ function extractMaintenanceBombs(
     const updatedDamaged: typeof targetPlanet.rBDSFTQ.defences.damagedDefences = [];
     for (const damagedBomb of targetPlanet.rBDSFTQ.defences.damagedDefences) {
       if (
-        damagedBomb.type === request.type
-        && remaining > 0
-        && (size <= 0 || (remainingTotalHangar >= size && remainingBomberHangar >= size))
+        damagedBomb.type === request.type &&
+        remaining > 0 &&
+        (size <= 0 || (remainingTotalHangar >= size && remainingBomberHangar >= size))
       ) {
         extracted.addDamaged(damagedBomb.type, damagedBomb.hull);
         remaining -= 1;
@@ -11901,7 +12639,9 @@ function extractMaintenanceBombs(
   return extracted;
 }
 
-function calculateBombHangarUsageForManyDefences(defences: InstanceType<typeof ManyDefences>): number {
+function calculateBombHangarUsageForManyDefences(
+  defences: InstanceType<typeof ManyDefences>,
+): number {
   let total = 0;
   for (const [type, amount] of ManyDefences.countByType(defences).entries()) {
     const blueprint = DEFENCE_BLUEPRINTS.get(type);
@@ -11915,7 +12655,9 @@ function calculateBombHangarUsageForManyDefences(defences: InstanceType<typeof M
   return total;
 }
 
-function summarizeMaintenanceTransfer(payload: MaintenanceRequest['approved'] | MaintenanceRequest['requested']): string {
+function summarizeMaintenanceTransfer(
+  payload: MaintenanceRequest['approved'] | MaintenanceRequest['requested'],
+): string {
   const normalized = normalizeMaintenanceTransferPayload(payload);
   const parts: string[] = [];
   if (normalized.fuel > 0) {
@@ -11943,9 +12685,10 @@ function isValidSetup(setup: GalaxySetup): boolean {
     gameTypeValue === 'PvPvE' ||
     gameTypeValue === 'PvE' ||
     gameTypeValue === 'Sandbox';
-  const maxHumanPlayers = setup?.scheduledTurns?.enabled === true
-    ? MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS
-    : MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS;
+  const maxHumanPlayers =
+    setup?.scheduledTurns?.enabled === true
+      ? MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS
+      : MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS;
 
   return (
     !!setup &&
@@ -11996,14 +12739,14 @@ function isValidSetup(setup: GalaxySetup): boolean {
     Array.isArray(setup.scheduledTurns.enabledHours) &&
     setup.scheduledTurns.enabledHours.length >= 1 &&
     setup.scheduledTurns.enabledHours.every((hour) => SCHEDULED_TURN_HOURS.includes(hour)) &&
-    (!setup.scheduledTurns.enabled || (
-      setup.galaxyWidth >= MIN_SCHEDULED_TURNS_GALAXY_SIZE &&
-      setup.galaxyHeight >= MIN_SCHEDULED_TURNS_GALAXY_SIZE
-    )) &&
-    (setup.enablePlayerActionLogging === undefined || typeof setup.enablePlayerActionLogging === 'boolean') &&
-    (setup.startingHomeworldPreset === 'Low'
-      || setup.startingHomeworldPreset === 'Medium'
-      || setup.startingHomeworldPreset === 'High') &&
+    (!setup.scheduledTurns.enabled ||
+      (setup.galaxyWidth >= MIN_SCHEDULED_TURNS_GALAXY_SIZE &&
+        setup.galaxyHeight >= MIN_SCHEDULED_TURNS_GALAXY_SIZE)) &&
+    (setup.enablePlayerActionLogging === undefined ||
+      typeof setup.enablePlayerActionLogging === 'boolean') &&
+    (setup.startingHomeworldPreset === 'Low' ||
+      setup.startingHomeworldPreset === 'Medium' ||
+      setup.startingHomeworldPreset === 'High') &&
     (setup.createRandomPlanets === undefined || typeof setup.createRandomPlanets === 'boolean') &&
     (setup.createStartingShips === undefined || typeof setup.createStartingShips === 'boolean') &&
     (setup.skipTutorial === undefined || typeof setup.skipTutorial === 'boolean') &&
@@ -12016,5 +12759,3 @@ function isValidSetup(setup: GalaxySetup): boolean {
     setup.startingResources.deuterium >= 0
   );
 }
-
-

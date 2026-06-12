@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { of } from 'rxjs';
 import { ReportsViewComponent } from './reports-view.component';
 import { ProductionReport } from '../../models/reports/production-report';
+import { encodeRuntimeText } from '../../i18n/runtime-text.utils';
 
 describe('ReportsViewComponent', () => {
   it('navigates to Galaxy View from report coordinates', () => {
@@ -11,36 +12,33 @@ describe('ReportsViewComponent', () => {
       {} as never,
       {} as never,
       {
-        markForCheck: vi.fn()
+        markForCheck: vi.fn(),
       } as never,
       {
-        autoOpenTutorial: vi.fn()
+        autoOpenTutorial: vi.fn(),
       } as never,
       {} as never,
       router as never,
-      createGameState() as never
+      createGameState() as never,
     );
 
     const report = {
       sourceCoordinates: {
         x: 7,
         y: 8,
-        z: 9
-      }
+        z: 9,
+      },
     };
 
     (component as { openInGalaxy(report: unknown): void }).openInGalaxy(report);
 
-    expect(router.navigate).toHaveBeenCalledWith(
-      ['/game/galactic'],
-      {
-        queryParams: {
-          x: 7,
-          y: 8,
-          z: 9
-        }
-      }
-    );
+    expect(router.navigate).toHaveBeenCalledWith(['/game/galactic'], {
+      queryParams: {
+        x: 7,
+        y: 8,
+        z: 9,
+      },
+    });
   });
 
   it('navigates to Galaxy View from report origin coordinates', () => {
@@ -49,63 +47,62 @@ describe('ReportsViewComponent', () => {
       {} as never,
       {} as never,
       {
-        markForCheck: vi.fn()
+        markForCheck: vi.fn(),
       } as never,
       {
-        autoOpenTutorial: vi.fn()
+        autoOpenTutorial: vi.fn(),
       } as never,
       {} as never,
       router as never,
-      createGameState() as never
+      createGameState() as never,
     );
 
     const report = {
       originCoordinates: {
         x: 3,
         y: 4,
-        z: 5
-      }
+        z: 5,
+      },
     };
 
     (component as { openOriginInGalaxy(report: unknown): void }).openOriginInGalaxy(report);
 
-    expect(router.navigate).toHaveBeenCalledWith(
-      ['/game/galactic'],
-      {
-        queryParams: {
-          x: 3,
-          y: 4,
-          z: 5
-        }
-      }
-    );
+    expect(router.navigate).toHaveBeenCalledWith(['/game/galactic'], {
+      queryParams: {
+        x: 3,
+        y: 4,
+        z: 5,
+      },
+    });
   });
 
   it('converts report planet order to client planet index when previewing a location', () => {
-    const getClientPlanet = vi.fn(() => of({
-      info: {
-        ownerId: null
-      }
-    }));
+    const getClientPlanet = vi.fn(() =>
+      of({
+        info: {
+          ownerId: null,
+        },
+      }),
+    );
     const component = new ReportsViewComponent(
       { getClientPlanet } as never,
       { load: vi.fn(() => ({ token: 'token' })) } as never,
       {
-        markForCheck: vi.fn()
+        markForCheck: vi.fn(),
       } as never,
       {
-        autoOpenTutorial: vi.fn()
+        autoOpenTutorial: vi.fn(),
       } as never,
       {} as never,
       createRouter() as never,
-      createGameState() as never
+      createGameState() as never,
     );
     const report = {
       sourceCoordinates: {
         x: 15,
         y: 17,
-        z: 2
-      }
+        z: 2,
+      },
     };
 
     (component as { previewLocation(report: unknown): void }).previewLocation(report);
@@ -118,14 +115,14 @@ describe('ReportsViewComponent', () => {
       {} as never,
       {} as never,
       {
-        markForCheck: vi.fn()
+        markForCheck: vi.fn(),
       } as never,
       {
-        autoOpenTutorial: vi.fn()
+        autoOpenTutorial: vi.fn(),
       } as never,
       {} as never,
       createRouter() as never,
-      createGameState() as never
+      createGameState() as never,
     );
     const regularReport = createProductionReport(1, 'Regular report');
     const favouriteReport = createProductionReport(2, 'Favourite report', true);
@@ -143,47 +140,107 @@ describe('ReportsViewComponent', () => {
       {} as never,
       {} as never,
       {
-        markForCheck: vi.fn()
+        markForCheck: vi.fn(),
       } as never,
       {
-        autoOpenTutorial: vi.fn()
+        autoOpenTutorial: vi.fn(),
       } as never,
       {} as never,
       createRouter() as never,
-      createGameState() as never
+      createGameState() as never,
     );
     const report = createProductionReport(
       7,
       'Production Report',
       false,
-      'Resources: M 10, C 20, D 30\nProduction finished successfully.'
+      'Resources: M 10, C 20, D 30\nProduction finished successfully.',
     );
 
-    const view = (component as {
-      plainReportView(report: ProductionReport): {
-        metadataRows: Array<{ label: string; value: string }>;
-        bodySections: Array<{ title: string; rows: Array<{ label: string; value: string }>; notes: string[] }>;
-      };
-    }).plainReportView(report);
+    const view = (
+      component as {
+        plainReportView(report: ProductionReport): {
+          metadataRows: Array<{ label: string; value: string }>;
+          bodySections: Array<{
+            title: string;
+            rows: Array<{ label: string; value: string }>;
+            notes: string[];
+          }>;
+        };
+      }
+    ).plainReportView(report);
 
     expect(report.show()).toContain('Resources: M 10, C 20, D 30');
-    expect(view.metadataRows.some((row) => row.label === 'Title' && row.value === 'Production Report')).toBe(true);
-    expect(view.bodySections[0].rows).toEqual([{ label: 'Resources', value: 'M 10, C 20, D 30', tone: 'neutral' }]);
+    expect(
+      view.metadataRows.some((row) => row.label === 'Title' && row.value === 'Production Report'),
+    ).toBe(true);
+    expect(view.bodySections[0].rows).toEqual([
+      { label: 'Resources', value: 'M 10, C 20, D 30', tone: 'neutral' },
+    ]);
     expect(view.bodySections[0].notes).toEqual(['Production finished successfully.']);
+  });
+
+  it('decodes encoded metadata values inside plain report rows', () => {
+    const component = new ReportsViewComponent(
+      {} as never,
+      {} as never,
+      {
+        markForCheck: vi.fn(),
+      } as never,
+      {
+        autoOpenTutorial: vi.fn(),
+      } as never,
+      {} as never,
+      createRouter() as never,
+      createGameState() as never,
+      {
+        t: vi.fn((key: string, params?: Record<string, unknown>) => {
+          if (key === 'generated.reports.espionageTitle') {
+            return `Espionage Report: ${params?.planet} (${params?.x}:${params?.y}:${params?.z})`;
+          }
+
+          return key;
+        }),
+      } as never,
+    );
+    const report = createProductionReport(
+      8,
+      encodeRuntimeText('generated.reports.espionageTitle', {
+        planet: 'Delta',
+        x: 1,
+        y: 2,
+        z: 3,
+      }),
+      false,
+      'Body',
+    );
+
+    const view = (
+      component as {
+        plainReportView(report: ProductionReport): {
+          metadataRows: Array<{ label: string; value: string }>;
+        };
+      }
+    ).plainReportView(report);
+
+    expect(
+      view.metadataRows.some(
+        (row) => row.label === 'Title' && row.value === 'Espionage Report: Delta (1:2:3)',
+      ),
+    ).toBe(true);
   });
 });
 
 function createRouter() {
   return {
-    navigate: vi.fn().mockResolvedValue(true)
+    navigate: vi.fn().mockResolvedValue(true),
   };
 }
 
 function createGameState() {
   return {
     diplomacyResolver: vi.fn(() => ({
-      getStatus: vi.fn(() => 'SELF')
-    }))
+      getStatus: vi.fn(() => 'SELF'),
+    })),
   };
 }
 
@@ -191,15 +248,15 @@ function createProductionReport(
   reportId: number,
   title: string,
   isFavourite = false,
-  body = title
+  body = title,
 ): ProductionReport {
   return new ProductionReport(
     {
       reportId,
       createdTurn: reportId,
       title,
-      isFavourite
+      isFavourite,
     },
-    body
+    body,
   );
 }

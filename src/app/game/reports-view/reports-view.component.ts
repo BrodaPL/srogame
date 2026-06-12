@@ -773,7 +773,7 @@ export class ReportsViewComponent implements OnInit {
     }
 
     const label = line.slice(0, separatorIndex).trim();
-    const value = line.slice(separatorIndex + 1).trim();
+    const value = resolveRuntimeText(this.i18n, line.slice(separatorIndex + 1).trim());
     if (!label || !value) {
       return null;
     }

@@ -127,12 +127,24 @@ export const generatedEn = {
     researchCompletedTitle: 'Research Completed: {{technology}} L{{level}}',
     researchCompletedBody: '{{technology}} reached level {{level}} on {{planet}}.',
     espionageTitle: 'Espionage Report: {{planet}} ({{x}}:{{y}}:{{z}})',
+    espionageAverageBuildingLevel: 'Average building level: {{value}}',
+    espionageAverageTotalResources: 'Average total resources: {{value}}',
+    espionageAverageTechnologyLevel: 'Average technology level: {{value}}',
+    espionageTotalDefencesAmount: 'Total defences amount: {{value}}',
+    espionageTotalShipsAmount: 'Total ships amount: {{value}}',
+    espionageResources: 'Resources: M {{metal}}, C {{crystal}}, D {{deuterium}}',
+    espionageDebris: 'Debris: M {{metal}}, C {{crystal}}, D {{deuterium}}',
+    espionageBuildings: 'Buildings: {{summary}}',
+    espionageTechnologies: 'Technologies: {{summary}}',
+    espionageShips: 'Ships: {{summary}}',
     plunderTitle: 'Plunder Report: {{targetPlanet}}',
     incomingAttackTitle: 'Incoming Attack Report: {{targetPlanet}}',
     bombardmentTitle: 'Bombardment Report: {{mission}} at {{targetPlanet}}',
     incomingBombardmentTitle: 'Incoming Bombardment Report: {{mission}} at {{targetPlanet}}',
     sharedBombardmentTitle: 'Shared Bombardment Report: {{mission}} at {{targetPlanet}}',
     repairTitle: 'Repair Report: {{targetPlanet}} stabilized',
+    sensorPhalanxPassiveTitle: 'Sensor Phalanx Alert: {{planet}} ({{x}}:{{y}}:{{z}})',
+    sensorPhalanxActiveTitle: 'Sensor Phalanx Scan: {{planet}} ({{x}}:{{y}}:{{z}})',
     body: {
       attackOutcomeSummary:
         'Attack resolved at {{targetPlanet}}.{{battleFragment}}{{plunderFragment}}',
@@ -195,6 +207,17 @@ export const generatedEn = {
       currentDebrisField:
         'Current debris field: Metal {{metal}}, Crystal {{crystal}}, Deuterium {{deuterium}}',
       missionResolvedAt: '{{mission}} resolved at {{targetPlanet}}.',
+      sensorPhalanxPassiveLine:
+        'Incoming fleet detected for {{targetPlanet}} ({{x}}:{{y}}:{{z}}) | Size: {{fleetSize}} | ETA: {{etaTurns}} | Allied: {{allied}}',
+      sensorPhalanxActiveLine:
+        '{{direction}} fleet contact | Size: {{fleetSize}} | ETA: {{etaTurns}} | Allied: {{allied}}',
+      sensorPhalanxNoContacts: 'No fleet contacts detected.',
+    },
+  },
+  sensorPhalanx: {
+    directions: {
+      INCOMING: 'Incoming',
+      OUTGOING: 'Outgoing',
     },
   },
   battleReport: {

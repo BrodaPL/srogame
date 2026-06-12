@@ -10,6 +10,7 @@ import { PlanetaryParameters } from '../planets/planetary-parameters';
 import { BuildingQueue } from './building-queue';
 import { ReportType } from '../enums/report-type';
 import { PlayerReport, type PlayerReportBaseData } from './player-report';
+import { encodeRuntimeText } from '../../i18n/runtime-text.utils';
 
 // Note: STAR_SYSTEM_ESPIONAGE requires X Spy Probes, where X is the number of planets in the target StarSystem.
 // Each probe generates EspionageReportData for each planet.
@@ -35,35 +36,75 @@ export class EspionageReportData extends PlayerReport {
     public shipyardProduction: ShipyardQueue,
     public defencesProduction: DefencesQueue,
     public researchProduction: ResearchQueue,
-    public buildingProduction: BuildingQueue
+    public buildingProduction: BuildingQueue,
   ) {
     super(ReportType.ESPIONAGE_REPORT, data);
   }
 
   public override show(): string {
     const lines = this.buildMetadataLines();
-    lines.push(`Average building level: ${this.averageBuildingLevel}`);
-    lines.push(`Average total resources: ${this.averageTotalResources}`);
-    lines.push(`Average technology level: ${this.averageTechLevel}`);
-    lines.push(`Total defences amount: ${this.totalDefencesAmount}`);
-    lines.push(`Total ships amount: ${this.totalShipsAmount}`);
     lines.push(
-      `Resources: M ${this.resourcesAmount.metal}, C ${this.resourcesAmount.crystal}, D ${this.resourcesAmount.deuterium}`
+      encodeRuntimeText('generated.reports.espionageAverageBuildingLevel', {
+        value: this.averageBuildingLevel,
+      }),
     );
     lines.push(
-      `Debris: M ${this.spaceDebrisAmount.metal}, C ${this.spaceDebrisAmount.crystal}, D ${this.spaceDebrisAmount.deuterium}`
+      encodeRuntimeText('generated.reports.espionageAverageTotalResources', {
+        value: this.averageTotalResources,
+      }),
+    );
+    lines.push(
+      encodeRuntimeText('generated.reports.espionageAverageTechnologyLevel', {
+        value: this.averageTechLevel,
+      }),
+    );
+    lines.push(
+      encodeRuntimeText('generated.reports.espionageTotalDefencesAmount', {
+        value: this.totalDefencesAmount,
+      }),
+    );
+    lines.push(
+      encodeRuntimeText('generated.reports.espionageTotalShipsAmount', {
+        value: this.totalShipsAmount,
+      }),
+    );
+    lines.push(
+      encodeRuntimeText('generated.reports.espionageResources', {
+        metal: this.resourcesAmount.metal,
+        crystal: this.resourcesAmount.crystal,
+        deuterium: this.resourcesAmount.deuterium,
+      }),
+    );
+    lines.push(
+      encodeRuntimeText('generated.reports.espionageDebris', {
+        metal: this.spaceDebrisAmount.metal,
+        crystal: this.spaceDebrisAmount.crystal,
+        deuterium: this.spaceDebrisAmount.deuterium,
+      }),
     );
 
     if (this.buildingsLevels.size > 0) {
-      lines.push(`Buildings: ${this.formatMapEntries(this.buildingsLevels)}`);
+      lines.push(
+        encodeRuntimeText('generated.reports.espionageBuildings', {
+          summary: this.formatMapEntries(this.buildingsLevels),
+        }),
+      );
     }
 
     if (this.techLevels.size > 0) {
-      lines.push(`Technologies: ${this.formatMapEntries(this.techLevels)}`);
+      lines.push(
+        encodeRuntimeText('generated.reports.espionageTechnologies', {
+          summary: this.formatMapEntries(this.techLevels),
+        }),
+      );
     }
 
     if (this.ships.size > 0) {
-      lines.push(`Ships: ${this.formatMapEntries(this.ships)}`);
+      lines.push(
+        encodeRuntimeText('generated.reports.espionageShips', {
+          summary: this.formatMapEntries(this.ships),
+        }),
+      );
     }
 
     return lines.join('\n');
@@ -86,12 +127,12 @@ export class EspionageReportData extends PlayerReport {
       new ResourcesPack(
         this.resourcesAmount.metal,
         this.resourcesAmount.crystal,
-        this.resourcesAmount.deuterium
+        this.resourcesAmount.deuterium,
       ),
       new ResourcesPack(
         this.spaceDebrisAmount.metal,
         this.spaceDebrisAmount.crystal,
-        this.spaceDebrisAmount.deuterium
+        this.spaceDebrisAmount.deuterium,
       ),
       new Map(this.techLevels),
       this.defences.map((entry) => entry.copy()),
@@ -99,7 +140,7 @@ export class EspionageReportData extends PlayerReport {
       new ShipyardQueue(),
       new DefencesQueue(),
       new ResearchQueue(),
-      new BuildingQueue()
+      new BuildingQueue(),
     );
   }
 

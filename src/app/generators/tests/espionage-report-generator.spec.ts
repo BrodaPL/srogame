@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { calculateProbeEspionageLevelBonus, EspionageReportGenerator } from '../espionage-report-generator';
+import {
+  calculateProbeEspionageLevelBonus,
+  EspionageReportGenerator,
+} from '../espionage-report-generator';
 import { Player } from '../../models/player';
 import { PlayerType } from '../../models/enums/player-type';
 import { TechnologyType } from '../../models/enums/technology-type';
@@ -19,44 +22,58 @@ import { DefenceBuildingInstances } from '../../models/reports/defence-building-
 import { DefenceType } from '../../models/enums/defence-type';
 import { ManyDefences } from '../../models/defences/many-defences';
 import { createTutorialReadState } from '../../tutorial/tutorial-types';
+import {
+  resolveEnglishRuntimeText,
+  resolveEnglishRuntimeTextBlock,
+} from '../../i18n/testing/runtime-text-test.utils';
 
 describe('EspionageReportGenerator', () => {
   const createPlayer = (
     playerId: number,
     playerName: string,
-    techLevels: Map<TechnologyType, number>
-  ): Player => new Player(playerId, playerName, [], techLevels, [], PlayerType.PLAYER, createTutorialReadState(true));
+    techLevels: Map<TechnologyType, number>,
+  ): Player =>
+    new Player(
+      playerId,
+      playerName,
+      [],
+      techLevels,
+      [],
+      PlayerType.PLAYER,
+      createTutorialReadState(true),
+    );
 
-  const createPlanet = (system: SolarSystem, ships: ShipInstance[]): Planet => new Planet(
-    new PlanetBasicInfo('Test', PlanetType.JUNGLE, 1, 1, system, '', 100),
-    new PlanetInfo(2, new PlanetaryParameters(0, 0, 0, 0, 0, 0, 0, 0, 0)),
-    new rBDSFTQ(
-      new ResourcesPack(100, 200, 300),
-      new Map<BuildingType, number>([
-        [BuildingType.METAL_MINE, 4],
-        [BuildingType.BUNKER_NETWORK, 9],
-        [BuildingType.SHIPYARD, 2]
-      ]),
-      new Map<BuildingType, number>(),
-      null,
-      new Map<BuildingType, number>(),
-      ManyDefences.fromData({
-        undamagedDefencesCount: {
-          [DefenceType.LIGHT_BEAM_CANNON]: 3,
-          [DefenceType.SAM_SITE]: 2
-        },
-        damagedDefences: []
-      }),
-      ManyShips.fromShipInstances(ships),
-      null,
-      null,
-      [],
-      [],
-      [],
-      new ResourcesPack(10, 20, 30)
-    ),
-    new Map()
-  );
+  const createPlanet = (system: SolarSystem, ships: ShipInstance[]): Planet =>
+    new Planet(
+      new PlanetBasicInfo('Test', PlanetType.JUNGLE, 1, 1, system, '', 100),
+      new PlanetInfo(2, new PlanetaryParameters(0, 0, 0, 0, 0, 0, 0, 0, 0)),
+      new rBDSFTQ(
+        new ResourcesPack(100, 200, 300),
+        new Map<BuildingType, number>([
+          [BuildingType.METAL_MINE, 4],
+          [BuildingType.BUNKER_NETWORK, 9],
+          [BuildingType.SHIPYARD, 2],
+        ]),
+        new Map<BuildingType, number>(),
+        null,
+        new Map<BuildingType, number>(),
+        ManyDefences.fromData({
+          undamagedDefencesCount: {
+            [DefenceType.LIGHT_BEAM_CANNON]: 3,
+            [DefenceType.SAM_SITE]: 2,
+          },
+          damagedDefences: [],
+        }),
+        ManyShips.fromShipInstances(ships),
+        null,
+        null,
+        [],
+        [],
+        [],
+        new ResourcesPack(10, 20, 30),
+      ),
+      new Map(),
+    );
 
   it('uses the triangular probe threshold table for report level bonus', () => {
     expect(calculateProbeEspionageLevelBonus(0)).toBe(0);
@@ -102,19 +119,16 @@ describe('EspionageReportGenerator', () => {
       0,
       new ResourcesPack(0, 0, 0),
       [],
-      []
+      [],
     );
-    const ships = [
-      new ShipInstance(ship, 10, 5, 0, []),
-      new ShipInstance(ship, 10, 5, 0, [])
-    ];
+    const ships = [new ShipInstance(ship, 10, 5, 0, []), new ShipInstance(ship, 10, 5, 0, [])];
     const planet = createPlanet(system, ships);
     const attackerTech = new Map<TechnologyType, number>([
-      [TechnologyType.ESPIONAGE_TECHNOLOGY, 20]
+      [TechnologyType.ESPIONAGE_TECHNOLOGY, 20],
     ]);
     const defenderTech = new Map<TechnologyType, number>([
       [TechnologyType.ESPIONAGE_TECHNOLOGY, 4],
-      [TechnologyType.ENERGY_TECHNOLOGY, 2]
+      [TechnologyType.ENERGY_TECHNOLOGY, 2],
     ]);
     const attacker = createPlayer(1, 'Attacker', attackerTech);
     const defender = createPlayer(2, 'Defender', defenderTech);
@@ -134,10 +148,13 @@ describe('EspionageReportGenerator', () => {
       spaceDebrisAmount: report.spaceDebrisAmount,
       techLevels: Array.from(report.techLevels.entries()),
       defences: report.defences,
-      ships: Array.from(report.ships.entries())
+      ships: Array.from(report.ships.entries()),
     });
 
     expect(report.planetaryParameters).not.toBe(planet.info.planetaryParameters);
+    expect(resolveEnglishRuntimeText(report.title)).toBe('Espionage Report: Test (0:0:0)');
+    expect(resolveEnglishRuntimeTextBlock(report.show())).toContain('Average building level: 5');
+    expect(resolveEnglishRuntimeTextBlock(report.show())).toContain('Debris: M 10, C 20, D 30');
     expect(report.size).toBe(100);
     expect(report.diff).toBe(1);
     expect(report.planetaryParameters.metalModifier).toBe(0);
@@ -153,7 +170,7 @@ describe('EspionageReportGenerator', () => {
     expect(report.techLevels.get(TechnologyType.ENERGY_TECHNOLOGY)).toBe(2);
     expect(report.defences.map((entry) => [entry.type, entry.amount])).toEqual([
       [DefenceType.LIGHT_BEAM_CANNON, 3],
-      [DefenceType.SAM_SITE, 2]
+      [DefenceType.SAM_SITE, 2],
     ]);
     expect(report.ships.get(ShipType.FIGHTER)).toBe(2);
   });
@@ -163,10 +180,10 @@ describe('EspionageReportGenerator', () => {
     const system = SolarSystem.createVoid({ x: 0, y: 0 });
     const planet = createPlanet(system, []);
     const attackerTech = new Map<TechnologyType, number>([
-      [TechnologyType.ESPIONAGE_TECHNOLOGY, 0]
+      [TechnologyType.ESPIONAGE_TECHNOLOGY, 0],
     ]);
     const defenderTech = new Map<TechnologyType, number>([
-      [TechnologyType.ESPIONAGE_TECHNOLOGY, 10]
+      [TechnologyType.ESPIONAGE_TECHNOLOGY, 10],
     ]);
     const attacker = createPlayer(1, 'Attacker', attackerTech);
     const defender = createPlayer(2, 'Defender', defenderTech);
@@ -194,7 +211,7 @@ describe('EspionageReportGenerator', () => {
       spaceDebrisAmount: report.spaceDebrisAmount,
       techLevels: Array.from(report.techLevels.entries()),
       defences: report.defences,
-      ships: Array.from(report.ships.entries())
+      ships: Array.from(report.ships.entries()),
     });
 
     expect(report.planetaryParameters).not.toBe(planet.info.planetaryParameters);
@@ -223,16 +240,20 @@ describe('EspionageReportGenerator', () => {
     const generator = new EspionageReportGenerator();
     const system = SolarSystem.createVoid({ x: 0, y: 0 });
     const planet = createPlanet(system, []);
-    const attacker = createPlayer(1, 'Attacker', new Map<TechnologyType, number>([
-      [TechnologyType.ESPIONAGE_TECHNOLOGY, 2]
-    ]));
-    const defender = createPlayer(2, 'Defender', new Map<TechnologyType, number>([
-      [TechnologyType.ESPIONAGE_TECHNOLOGY, 0]
-    ]));
+    const attacker = createPlayer(
+      1,
+      'Attacker',
+      new Map<TechnologyType, number>([[TechnologyType.ESPIONAGE_TECHNOLOGY, 2]]),
+    );
+    const defender = createPlayer(
+      2,
+      'Defender',
+      new Map<TechnologyType, number>([[TechnologyType.ESPIONAGE_TECHNOLOGY, 0]]),
+    );
 
     const baseReport = generator.createEspionageReport(attacker, defender, planet, 1);
     const boostedReport = generator.createEspionageReport(attacker, defender, planet, 1, {
-      reportLevelBonus: 11
+      reportLevelBonus: 11,
     });
 
     expect(baseReport.totalDefencesAmount).toBe(0);
@@ -243,8 +264,7 @@ describe('EspionageReportGenerator', () => {
     expect(boostedReport.spaceDebrisAmount.getTotalResourceAmount()).toBe(60);
     expect(boostedReport.defences.map((entry) => [entry.type, entry.amount])).toEqual([
       [DefenceType.LIGHT_BEAM_CANNON, 3],
-      [DefenceType.SAM_SITE, 2]
+      [DefenceType.SAM_SITE, 2],
     ]);
   });
 });
-

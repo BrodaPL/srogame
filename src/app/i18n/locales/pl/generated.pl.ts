@@ -124,6 +124,16 @@ export const generatedPl = {
     researchCompletedTitle: 'Badania zakonczone: {{technology}} L{{level}}',
     researchCompletedBody: '{{technology}} osiagnela poziom {{level}} na {{planet}}.',
     espionageTitle: 'Raport szpiegowski: {{planet}} ({{x}}:{{y}}:{{z}})',
+    espionageAverageBuildingLevel: 'Sredni poziom budynkow: {{value}}',
+    espionageAverageTotalResources: 'Srednia laczna ilosc zasobow: {{value}}',
+    espionageAverageTechnologyLevel: 'Sredni poziom technologii: {{value}}',
+    espionageTotalDefencesAmount: 'Laczna liczba obrony: {{value}}',
+    espionageTotalShipsAmount: 'Laczna liczba statkow: {{value}}',
+    espionageResources: 'Zasoby: M {{metal}}, C {{crystal}}, D {{deuterium}}',
+    espionageDebris: 'Szczatki: M {{metal}}, C {{crystal}}, D {{deuterium}}',
+    espionageBuildings: 'Budynki: {{summary}}',
+    espionageTechnologies: 'Technologie: {{summary}}',
+    espionageShips: 'Statki: {{summary}}',
     plunderTitle: 'Raport grabiezy: {{targetPlanet}}',
     incomingAttackTitle: 'Raport nadchodzacego ataku: {{targetPlanet}}',
     bombardmentTitle: 'Raport bombardowania: {{mission}} przy {{targetPlanet}}',
@@ -131,6 +141,8 @@ export const generatedPl = {
       'Raport nadchodzacego bombardowania: {{mission}} przy {{targetPlanet}}',
     sharedBombardmentTitle: 'Wspoldzielony raport bombardowania: {{mission}} przy {{targetPlanet}}',
     repairTitle: 'Raport napraw: {{targetPlanet}} ustabilizowana',
+    sensorPhalanxPassiveTitle: 'Alarm Falangi Sensorow: {{planet}} ({{x}}:{{y}}:{{z}})',
+    sensorPhalanxActiveTitle: 'Skan Falangi Sensorow: {{planet}} ({{x}}:{{y}}:{{z}})',
     body: {
       attackOutcomeSummary:
         'Atak zostal rozstrzygniety przy {{targetPlanet}}.{{battleFragment}}{{plunderFragment}}',
@@ -197,6 +209,17 @@ export const generatedPl = {
       currentDebrisField:
         'Aktualne pole szczatkow: Metal {{metal}}, Krysztal {{crystal}}, Deuter {{deuterium}}',
       missionResolvedAt: 'Misja {{mission}} zostala rozstrzygnieta przy {{targetPlanet}}.',
+      sensorPhalanxPassiveLine:
+        'Wykryto nadlatujaca flote dla {{targetPlanet}} ({{x}}:{{y}}:{{z}}) | Rozmiar: {{fleetSize}} | ETA: {{etaTurns}} | Sojusznicza: {{allied}}',
+      sensorPhalanxActiveLine:
+        'Kontakt floty {{direction}} | Rozmiar: {{fleetSize}} | ETA: {{etaTurns}} | Sojusznicza: {{allied}}',
+      sensorPhalanxNoContacts: 'Nie wykryto zadnych kontaktow flot.',
+    },
+  },
+  sensorPhalanx: {
+    directions: {
+      INCOMING: 'nadlatujaca',
+      OUTGOING: 'wylatujaca',
     },
   },
   battleReport: {
