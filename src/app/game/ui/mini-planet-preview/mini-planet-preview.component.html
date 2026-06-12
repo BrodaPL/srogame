@@ -15,7 +15,7 @@
       <img
         class="mini-planet-preview__image"
         [src]="imagePath"
-        [alt]="planetNameLabel() + ' image'"
+        [alt]="planetImageAlt()"
         [style.transform]="planetImageTransform()"
         [style.filter]="planetImageFilter()"
       />
@@ -33,27 +33,21 @@
 
   @if (showSelectionActions) {
     <div class="mini-planet-preview__actions">
-      <button
-        type="button"
-        class="mini-planet-preview__button"
-        (click)="emitChooseAsOrigin()"
-      >
-        Set origin
+      <button type="button" class="mini-planet-preview__button" (click)="emitChooseAsOrigin()">
+        {{ 'generated.miniPlanet.actions.setOrigin' | t }}
+      </button>
+      <button type="button" class="mini-planet-preview__button" (click)="emitChooseAsTarget()">
+        {{ 'generated.miniPlanet.actions.setTarget' | t }}
       </button>
       <button
         type="button"
         class="mini-planet-preview__button"
-        (click)="emitChooseAsTarget()"
-      >
-        Set target
-      </button>
-      <button
-        type="button"
-        class="mini-planet-preview__button"
-        [appTooltip]="'Copy: ' + coordinatesLabel()"
+        [appTooltip]="
+          'generated.miniPlanet.tooltips.copyCoordinates' | t: { coordinates: coordinatesLabel() }
+        "
         (click)="copyCoordinates()"
       >
-        Copy coordinates
+        {{ 'generated.miniPlanet.actions.copyCoordinates' | t }}
       </button>
     </div>
   } @else if (showDefaultActions) {
@@ -62,55 +56,72 @@
         type="button"
         class="mini-planet-preview__button mini-planet-preview__button--intel"
         [disabled]="!canViewPlanet()"
-        [appTooltip]="canViewPlanet() ? 'Open planet intel view' : 'Planet intel is unavailable'"
+        [appTooltip]="
+          canViewPlanet()
+            ? ('generated.miniPlanet.tooltips.openPlanetView' | t)
+            : ('generated.miniPlanet.tooltips.planetIntelUnavailable' | t)
+        "
         (click)="openPlanetView()"
       >
-        View Planet
+        {{ 'generated.miniPlanet.actions.viewPlanet' | t }}
       </button>
       <button
         type="button"
         class="mini-planet-preview__button mini-planet-preview__button--mission"
         [disabled]="!canUseAsMissionOrigin()"
-        [appTooltip]="canUseAsMissionOrigin() ? 'Open Mission Planner with origin ' + coordinatesLabel() : 'Only owned planets can be used as mission origin here'"
+        [appTooltip]="
+          canUseAsMissionOrigin()
+            ? ('generated.miniPlanet.tooltips.openMissionOrigin'
+              | t: { coordinates: coordinatesLabel() })
+            : ('generated.miniPlanet.tooltips.missionOriginUnavailable' | t)
+        "
         (click)="openMissionPlannerAsOrigin()"
       >
-        Mission: origin
+        {{ 'generated.miniPlanet.actions.missionOrigin' | t }}
       </button>
       <button
         type="button"
         class="mini-planet-preview__button mini-planet-preview__button--mission"
-        [appTooltip]="'Open Mission Planner with target ' + coordinatesLabel()"
+        [appTooltip]="
+          'generated.miniPlanet.tooltips.openMissionTarget' | t: { coordinates: coordinatesLabel() }
+        "
         (click)="openMissionPlannerAsTarget()"
       >
-        Mission: target
+        {{ 'generated.miniPlanet.actions.missionTarget' | t }}
       </button>
       @if (showSpyAction()) {
         <button
           type="button"
           class="mini-planet-preview__button mini-planet-preview__button--spy"
-          [appTooltip]="'Launch espionage probes at ' + coordinatesLabel()"
+          [appTooltip]="
+            'generated.miniPlanet.tooltips.openSpy' | t: { coordinates: coordinatesLabel() }
+          "
           (click)="openSpyDialog()"
         >
-          Spy
+          {{ 'generated.miniPlanet.actions.spy' | t }}
         </button>
       }
       @if (showSensorPhalanxAction) {
         <button
           type="button"
           class="mini-planet-preview__button mini-planet-preview__button--sensor"
-          [appTooltip]="'Open Sensor Phalanx scan for ' + coordinatesLabel()"
+          [appTooltip]="
+            'generated.miniPlanet.tooltips.openSensorScan' | t: { coordinates: coordinatesLabel() }
+          "
           (click)="emitSensorPhalanxScan()"
         >
-          Sensor scan
+          {{ 'generated.miniPlanet.actions.sensorScan' | t }}
         </button>
       }
       <button
         type="button"
         class="mini-planet-preview__button mini-planet-preview__button--utility"
-        [appTooltip]="'Copy: ' + coordinatesLabel()"
+        [appTooltip]="
+          'generated.miniPlanet.tooltips.copyCoordinates' | t: { coordinates: coordinatesLabel() }
+        "
         (click)="copyCoordinates()"
       >
-        Copy coordinates
+        {{ 'generated.miniPlanet.actions.copyCoordinates' | t }}
       </button>
     </div>
     @if (spyLaunchNotice) {

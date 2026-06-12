@@ -7,6 +7,7 @@ import { communicationsEn } from './communications.en';
 import { encyclopediaEn } from './encyclopedia.en';
 import { galacticEn } from './galactic.en';
 import { gameShellEn } from './game-shell.en';
+import { generatedEn } from './generated.en';
 import { helpAboutEn } from './help-about.en';
 import { imperiumEn } from './imperium.en';
 import { loadGameEn } from './load-game.en';
@@ -32,6 +33,7 @@ export const enTranslations = {
   encyclopedia: encyclopediaEn,
   galactic: galacticEn,
   gameShell: gameShellEn,
+  generated: generatedEn,
   helpAbout: helpAboutEn,
   imperium: imperiumEn,
   loadGame: loadGameEn,

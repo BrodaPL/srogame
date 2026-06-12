@@ -25,7 +25,8 @@
           class="reports-view__tab"
           type="button"
           [class.reports-view__tab--active]="isTabActive(allTab)"
-          (click)="setActiveTab(allTab)">
+          (click)="setActiveTab(allTab)"
+        >
           <span>{{ reportTabLabel(allTab) }}</span>
           <span class="badge">{{ reportTypeCount(allTab) }}</span>
         </button>
@@ -35,7 +36,8 @@
             class="reports-view__tab"
             type="button"
             [class.reports-view__tab--active]="isTabActive(reportType)"
-            (click)="setActiveTab(reportType)">
+            (click)="setActiveTab(reportType)"
+          >
             <span>{{ reportTabLabel(reportType) }}</span>
             <span class="badge">{{ reportTypeCount(reportType) }}</span>
           </button>
@@ -57,7 +59,8 @@
                 class="reports-view__compact-button"
                 type="button"
                 [appTooltip]="'communications.reports.tooltips.selectAllVisible' | t"
-                (click)="selectAllVisible()">
+                (click)="selectAllVisible()"
+              >
                 {{ 'communications.reports.actions.selectAllVisible' | t }}
               </button>
               <button
@@ -65,7 +68,8 @@
                 type="button"
                 [appTooltip]="'communications.reports.tooltips.deleteSelected' | t"
                 [disabled]="selectedReportIds.size === 0 || isDeleting"
-                (click)="deleteSelectedReports()">
+                (click)="deleteSelectedReports()"
+              >
                 {{ 'communications.reports.actions.deleteSelected' | t }}
               </button>
             </div>
@@ -82,13 +86,15 @@
                 [class.reports-view__item--active]="selectedReportId === report.reportId"
                 [class.reports-view__item--unread]="!report.isRead"
                 [class.reports-view__item--favourite]="report.isFavourite"
-                (click)="openReport(report)">
+                (click)="openReport(report)"
+              >
                 <label class="reports-view__checkbox" (click)="$event.stopPropagation()">
                   <input
                     type="checkbox"
                     [checked]="isSelected(report.reportId)"
                     [disabled]="report.isFavourite"
-                    (change)="toggleReportSelection(report.reportId, $any($event.target).checked)" />
+                    (change)="toggleReportSelection(report.reportId, $any($event.target).checked)"
+                  />
                 </label>
 
                 <div class="reports-view__item-main">
@@ -101,26 +107,34 @@
                         [disabled]="favouriteUpdatingReportId === report.reportId"
                         [appTooltip]="favouriteTooltip(report.isFavourite)"
                         [attr.aria-label]="favouriteAriaLabel(report.isFavourite)"
-                        (click)="toggleReportFavourite(report, $event)">
+                        (click)="toggleReportFavourite(report, $event)"
+                      >
                         {{ report.isFavourite ? '?' : '?' }}
                       </button>
-                      <h4>{{ report.title }}</h4>
+                      <h4>{{ reportTitle(report) }}</h4>
                     </div>
                     <div class="reports-view__item-badges">
                       @if (report.isFavourite) {
-                        <span class="badge badge--jump">{{ 'communications.reports.badges.favourite' | t }}</span>
+                        <span class="badge badge--jump">{{
+                          'communications.reports.badges.favourite' | t
+                        }}</span>
                       }
-                      <span class="badge" [class.badge--jump]="!report.isRead">{{ reportTypeLabel(report.reportType) }}</span>
+                      <span class="badge" [class.badge--jump]="!report.isRead">{{
+                        reportTypeLabel(report.reportType)
+                      }}</span>
                     </div>
                   </div>
                   <div class="reports-view__item-meta">
-                    <span>{{ 'communications.shared.labels.turn' | t }} {{ report.createdTurn }}</span>
+                    <span
+                      >{{ 'communications.shared.labels.turn' | t }} {{ report.createdTurn }}</span
+                    >
                     <span>
                       @if (canOpenInGalaxy(report)) {
                         <button
                           class="reports-view__coordinate-link"
                           type="button"
-                          (click)="openInGalaxy(report, $event)">
+                          (click)="openInGalaxy(report, $event)"
+                        >
                           {{ coordinatesLabel(report) }}
                         </button>
                       } @else {
@@ -149,13 +163,15 @@
                   [disabled]="favouriteUpdatingReportId === report.reportId"
                   [appTooltip]="favouriteTooltip(report.isFavourite)"
                   [attr.aria-label]="favouriteAriaLabel(report.isFavourite)"
-                  (click)="toggleReportFavourite(report, $event)">
+                  (click)="toggleReportFavourite(report, $event)"
+                >
                   {{ report.isFavourite ? '?' : '?' }}
                 </button>
-                <h3>{{ report.title }}</h3>
+                <h3>{{ reportTitle(report) }}</h3>
               </div>
               <p class="overview-muted">
-                {{ reportTypeLabel(report.reportType) }} | {{ 'communications.shared.labels.turn' | t }} {{ report.createdTurn }}
+                {{ reportTypeLabel(report.reportType) }} |
+                {{ 'communications.shared.labels.turn' | t }} {{ report.createdTurn }}
                 @if (report.isFavourite) {
                   <span> | {{ 'communications.reports.badges.favourite' | t }}</span>
                 }
@@ -164,17 +180,20 @@
 
             <div class="reports-view__detail-preview">
               @if (previewPlanet) {
-                <app-mini-planet-preview
-                  [planet]="previewPlanet"
-                  [showDefaultActions]="true">
+                <app-mini-planet-preview [planet]="previewPlanet" [showDefaultActions]="true">
                 </app-mini-planet-preview>
               } @else {
                 <button
                   class="reports-view__compact-button"
                   type="button"
                   [disabled]="!canPreviewLocation(report) || previewLoading"
-                  (click)="previewLocation(report)">
-                  {{ previewLoading ? ('communications.reports.actions.loadingPreview' | t) : ('communications.reports.actions.previewLocation' | t) }}
+                  (click)="previewLocation(report)"
+                >
+                  {{
+                    previewLoading
+                      ? ('communications.reports.actions.loadingPreview' | t)
+                      : ('communications.reports.actions.previewLocation' | t)
+                  }}
                 </button>
               }
 
@@ -184,23 +203,33 @@
             </div>
           </div>
 
-          <div class="overview-stats reports-view__stats-grid" data-tutorial-id="reports-detail-stats">
+          <div
+            class="overview-stats reports-view__stats-grid"
+            data-tutorial-id="reports-detail-stats"
+          >
             <div class="overview-stat">
-              <span class="overview-stat__label">{{ 'communications.reports.stats.status' | t }}</span>
+              <span class="overview-stat__label">{{
+                'communications.reports.stats.status' | t
+              }}</span>
               <span class="overview-stat__value">{{ reportStatusLabel(report.isRead) }}</span>
             </div>
             <div class="overview-stat">
-              <span class="overview-stat__label">{{ 'communications.reports.stats.source' | t }}</span>
+              <span class="overview-stat__label">{{
+                'communications.reports.stats.source' | t
+              }}</span>
               <span class="overview-stat__value">{{ sourceLabel(report) }}</span>
             </div>
             <div class="overview-stat">
-              <span class="overview-stat__label">{{ 'communications.reports.stats.coordinates' | t }}</span>
+              <span class="overview-stat__label">{{
+                'communications.reports.stats.coordinates' | t
+              }}</span>
               <span class="overview-stat__value">
                 @if (canOpenInGalaxy(report)) {
                   <button
                     class="reports-view__coordinate-link"
                     type="button"
-                    (click)="openInGalaxy(report)">
+                    (click)="openInGalaxy(report)"
+                  >
                     {{ coordinatesLabel(report) }}
                   </button>
                 } @else {
@@ -210,13 +239,16 @@
             </div>
             @if (report.originCoordinates) {
               <div class="overview-stat">
-                <span class="overview-stat__label">{{ 'communications.reports.stats.origin' | t }}</span>
+                <span class="overview-stat__label">{{
+                  'communications.reports.stats.origin' | t
+                }}</span>
                 <span class="overview-stat__value">
                   @if (canOpenOriginInGalaxy(report)) {
                     <button
                       class="reports-view__coordinate-link"
                       type="button"
-                      (click)="openOriginInGalaxy(report)">
+                      (click)="openOriginInGalaxy(report)"
+                    >
                       {{ originLabel(report) }}
                     </button>
                   } @else {
@@ -226,13 +258,24 @@
               </div>
             }
             <div class="overview-stat">
-              <span class="overview-stat__label">{{ 'communications.reports.stats.sender' | t }}</span>
-              <span class="overview-stat__value">{{ report.senderPlayerName ?? ('communications.shared.labels.noData' | t) }}</span>
+              <span class="overview-stat__label">{{
+                'communications.reports.stats.sender' | t
+              }}</span>
+              <span class="overview-stat__value">{{
+                report.senderPlayerName ?? ('communications.shared.labels.noData' | t)
+              }}</span>
             </div>
             @if (previewOwnerLabel(); as ownerLabel) {
               <div class="overview-stat">
-                <span class="overview-stat__label">{{ 'communications.reports.stats.owner' | t }}</span>
-                <span [class]="'overview-stat__value diplomacy-status diplomacy-status--' + previewOwnerRelationKey()">
+                <span class="overview-stat__label">{{
+                  'communications.reports.stats.owner' | t
+                }}</span>
+                <span
+                  [class]="
+                    'overview-stat__value diplomacy-status diplomacy-status--' +
+                    previewOwnerRelationKey()
+                  "
+                >
                   {{ ownerLabel }}
                 </span>
               </div>
@@ -244,13 +287,22 @@
               <div class="reports-view__dossier">
                 <section class="reports-view__dossier-banner">
                   <div>
-                    <p class="reports-view__dossier-kicker">{{ 'communications.reports.dossier.title' | t }}</p>
-                    <h4 class="reports-view__dossier-title">{{ espionageReport.sourcePlanetName ?? report.title }}</h4>
+                    <p class="reports-view__dossier-kicker">
+                      {{ 'communications.reports.dossier.title' | t }}
+                    </p>
+                    <h4 class="reports-view__dossier-title">
+                      {{ espionageReport.sourcePlanetName ?? reportTitle(report) }}
+                    </h4>
                     <p class="reports-view__dossier-copy">{{ dossierCopy(espionageReport) }}</p>
                   </div>
                   <div class="reports-view__dossier-badges">
-                    <span class="badge badge--jump">{{ 'communications.reports.dossier.scannerIntel' | t }}</span>
-                    <span class="badge">{{ 'communications.shared.labels.turn' | t }} {{ espionageReport.createdTurn }}</span>
+                    <span class="badge badge--jump">{{
+                      'communications.reports.dossier.scannerIntel' | t
+                    }}</span>
+                    <span class="badge"
+                      >{{ 'communications.shared.labels.turn' | t }}
+                      {{ espionageReport.createdTurn }}</span
+                    >
                   </div>
                 </section>
 
@@ -263,19 +315,32 @@
                   }
                 </section>
 
-                <section class="reports-view__dossier-section reports-view__dossier-section--resources">
+                <section
+                  class="reports-view__dossier-section reports-view__dossier-section--resources"
+                >
                   <div class="reports-view__dossier-section-head">
                     <div>
-                      <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.cargoSweep' | t }}</p>
-                      <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.resourcesOnSite' | t }}</h5>
+                      <p class="reports-view__dossier-section-kicker">
+                        {{ 'communications.reports.dossier.sections.cargoSweep' | t }}
+                      </p>
+                      <h5 class="reports-view__dossier-section-title">
+                        {{ 'communications.reports.dossier.sections.resourcesOnSite' | t }}
+                      </h5>
                     </div>
                   </div>
 
                   <div class="reports-view__dossier-resources">
-                    @for (resource of espionageResourceRows(espionageReport); track resource.label) {
+                    @for (
+                      resource of espionageResourceRows(espionageReport);
+                      track resource.label
+                    ) {
                       <div class="reports-view__dossier-resource">
-                        <span class="reports-view__dossier-resource-label">{{ resource.label }}</span>
-                        <strong class="reports-view__dossier-resource-value">{{ resource.value }}</strong>
+                        <span class="reports-view__dossier-resource-label">{{
+                          resource.label
+                        }}</span>
+                        <strong class="reports-view__dossier-resource-value">{{
+                          resource.value
+                        }}</strong>
                       </div>
                     }
                   </div>
@@ -285,14 +350,21 @@
                   <article class="reports-view__dossier-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.surfaceScan' | t }}</p>
-                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.buildings' | t }}</h5>
+                        <p class="reports-view__dossier-section-kicker">
+                          {{ 'communications.reports.dossier.sections.surfaceScan' | t }}
+                        </p>
+                        <h5 class="reports-view__dossier-section-title">
+                          {{ 'communications.reports.dossier.sections.buildings' | t }}
+                        </h5>
                       </div>
                     </div>
 
                     @if (espionageBuildingRows(espionageReport).length > 0) {
                       <div class="reports-view__dossier-list">
-                        @for (row of espionageBuildingRows(espionageReport); track trackDossierRow($index, row)) {
+                        @for (
+                          row of espionageBuildingRows(espionageReport);
+                          track trackDossierRow($index, row)
+                        ) {
                           <div class="reports-view__dossier-row">
                             <span class="reports-view__dossier-row-label">{{ row.label }}</span>
                             <span class="reports-view__dossier-row-value">{{ row.value }}</span>
@@ -300,21 +372,30 @@
                         }
                       </div>
                     } @else {
-                      <p class="reports-view__dossier-empty">{{ 'communications.reports.dossier.empty' | t }}</p>
+                      <p class="reports-view__dossier-empty">
+                        {{ 'communications.reports.dossier.empty' | t }}
+                      </p>
                     }
                   </article>
 
                   <article class="reports-view__dossier-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.labTrace' | t }}</p>
-                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.technologies' | t }}</h5>
+                        <p class="reports-view__dossier-section-kicker">
+                          {{ 'communications.reports.dossier.sections.labTrace' | t }}
+                        </p>
+                        <h5 class="reports-view__dossier-section-title">
+                          {{ 'communications.reports.dossier.sections.technologies' | t }}
+                        </h5>
                       </div>
                     </div>
 
                     @if (espionageTechnologyRows(espionageReport).length > 0) {
                       <div class="reports-view__dossier-list">
-                        @for (row of espionageTechnologyRows(espionageReport); track trackDossierRow($index, row)) {
+                        @for (
+                          row of espionageTechnologyRows(espionageReport);
+                          track trackDossierRow($index, row)
+                        ) {
                           <div class="reports-view__dossier-row">
                             <span class="reports-view__dossier-row-label">{{ row.label }}</span>
                             <span class="reports-view__dossier-row-value">{{ row.value }}</span>
@@ -322,21 +403,30 @@
                         }
                       </div>
                     } @else {
-                      <p class="reports-view__dossier-empty">{{ 'communications.reports.dossier.empty' | t }}</p>
+                      <p class="reports-view__dossier-empty">
+                        {{ 'communications.reports.dossier.empty' | t }}
+                      </p>
                     }
                   </article>
 
                   <article class="reports-view__dossier-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.hangarSweep' | t }}</p>
-                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.ships' | t }}</h5>
+                        <p class="reports-view__dossier-section-kicker">
+                          {{ 'communications.reports.dossier.sections.hangarSweep' | t }}
+                        </p>
+                        <h5 class="reports-view__dossier-section-title">
+                          {{ 'communications.reports.dossier.sections.ships' | t }}
+                        </h5>
                       </div>
                     </div>
 
                     @if (espionageShipRows(espionageReport).length > 0) {
                       <div class="reports-view__dossier-list">
-                        @for (row of espionageShipRows(espionageReport); track trackDossierRow($index, row)) {
+                        @for (
+                          row of espionageShipRows(espionageReport);
+                          track trackDossierRow($index, row)
+                        ) {
                           <div class="reports-view__dossier-row">
                             <span class="reports-view__dossier-row-label">{{ row.label }}</span>
                             <span class="reports-view__dossier-row-value">{{ row.value }}</span>
@@ -344,21 +434,30 @@
                         }
                       </div>
                     } @else {
-                      <p class="reports-view__dossier-empty">{{ 'communications.reports.dossier.empty' | t }}</p>
+                      <p class="reports-view__dossier-empty">
+                        {{ 'communications.reports.dossier.empty' | t }}
+                      </p>
                     }
                   </article>
 
                   <article class="reports-view__dossier-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.perimeterCheck' | t }}</p>
-                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.defences' | t }}</h5>
+                        <p class="reports-view__dossier-section-kicker">
+                          {{ 'communications.reports.dossier.sections.perimeterCheck' | t }}
+                        </p>
+                        <h5 class="reports-view__dossier-section-title">
+                          {{ 'communications.reports.dossier.sections.defences' | t }}
+                        </h5>
                       </div>
                     </div>
 
                     @if (espionageDefenceRows(espionageReport).length > 0) {
                       <div class="reports-view__dossier-list">
-                        @for (row of espionageDefenceRows(espionageReport); track trackDossierRow($index, row)) {
+                        @for (
+                          row of espionageDefenceRows(espionageReport);
+                          track trackDossierRow($index, row)
+                        ) {
                           <div class="reports-view__dossier-row">
                             <span class="reports-view__dossier-row-label">{{ row.label }}</span>
                             <span class="reports-view__dossier-row-value">{{ row.value }}</span>
@@ -366,27 +465,45 @@
                         }
                       </div>
                     } @else {
-                      <p class="reports-view__dossier-empty">{{ 'communications.reports.dossier.empty' | t }}</p>
+                      <p class="reports-view__dossier-empty">
+                        {{ 'communications.reports.dossier.empty' | t }}
+                      </p>
                     }
                   </article>
 
-                  <article class="reports-view__dossier-section reports-view__dossier-section--wide">
+                  <article
+                    class="reports-view__dossier-section reports-view__dossier-section--wide"
+                  >
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.dossier.sections.profileKicker' | t }}</p>
-                        <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.dossier.sections.profile' | t }}</h5>
+                        <p class="reports-view__dossier-section-kicker">
+                          {{ 'communications.reports.dossier.sections.profileKicker' | t }}
+                        </p>
+                        <h5 class="reports-view__dossier-section-title">
+                          {{ 'communications.reports.dossier.sections.profile' | t }}
+                        </h5>
                       </div>
                     </div>
 
                     <div class="reports-view__dossier-list reports-view__dossier-list--parameters">
-                      @for (row of espionageParameterRows(espionageReport); track trackDossierRow($index, row)) {
+                      @for (
+                        row of espionageParameterRows(espionageReport);
+                        track trackDossierRow($index, row)
+                      ) {
                         <div class="reports-view__dossier-row">
                           <span class="reports-view__dossier-row-label">{{ row.label }}</span>
                           <span
                             class="reports-view__dossier-row-value"
-                            [class.reports-view__dossier-row-value--positive]="row.tone === 'positive'"
-                            [class.reports-view__dossier-row-value--negative]="row.tone === 'negative'"
-                            [class.reports-view__dossier-row-value--neutral]="row.tone === 'neutral'">
+                            [class.reports-view__dossier-row-value--positive]="
+                              row.tone === 'positive'
+                            "
+                            [class.reports-view__dossier-row-value--negative]="
+                              row.tone === 'negative'
+                            "
+                            [class.reports-view__dossier-row-value--neutral]="
+                              row.tone === 'neutral'
+                            "
+                          >
                             {{ row.value }}
                           </span>
                         </div>
@@ -400,21 +517,31 @@
               <div class="reports-view__plain-report">
                 <section class="reports-view__plain-banner">
                   <div>
-                    <p class="reports-view__dossier-kicker">{{ 'communications.reports.plain.title' | t }}</p>
-                    <h4 class="reports-view__dossier-title">{{ report.title }}</h4>
-                    <p class="reports-view__dossier-copy">{{ 'communications.reports.plain.copy' | t }}</p>
+                    <p class="reports-view__dossier-kicker">
+                      {{ 'communications.reports.plain.title' | t }}
+                    </p>
+                    <h4 class="reports-view__dossier-title">{{ reportTitle(report) }}</h4>
+                    <p class="reports-view__dossier-copy">
+                      {{ 'communications.reports.plain.copy' | t }}
+                    </p>
                   </div>
                   <div class="reports-view__dossier-badges">
                     <span class="badge badge--jump">{{ reportTypeLabel(report.reportType) }}</span>
-                    <span class="badge">{{ 'communications.shared.labels.turn' | t }} {{ report.createdTurn }}</span>
+                    <span class="badge"
+                      >{{ 'communications.shared.labels.turn' | t }} {{ report.createdTurn }}</span
+                    >
                   </div>
                 </section>
 
                 <section class="reports-view__plain-section">
                   <div class="reports-view__dossier-section-head">
                     <div>
-                      <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.plain.sections.header' | t }}</p>
-                      <h5 class="reports-view__dossier-section-title">{{ 'communications.reports.plain.sections.metadata' | t }}</h5>
+                      <p class="reports-view__dossier-section-kicker">
+                        {{ 'communications.reports.plain.sections.header' | t }}
+                      </p>
+                      <h5 class="reports-view__dossier-section-title">
+                        {{ 'communications.reports.plain.sections.metadata' | t }}
+                      </h5>
                     </div>
                   </div>
                   <div class="reports-view__dossier-list reports-view__dossier-list--parameters">
@@ -431,7 +558,9 @@
                   <section class="reports-view__plain-section">
                     <div class="reports-view__dossier-section-head">
                       <div>
-                        <p class="reports-view__dossier-section-kicker">{{ 'communications.reports.plain.sections.log' | t }}</p>
+                        <p class="reports-view__dossier-section-kicker">
+                          {{ 'communications.reports.plain.sections.log' | t }}
+                        </p>
                         <h5 class="reports-view__dossier-section-title">{{ section.title }}</h5>
                       </div>
                     </div>
@@ -443,9 +572,16 @@
                             <span class="reports-view__dossier-row-label">{{ row.label }}</span>
                             <span
                               class="reports-view__dossier-row-value"
-                              [class.reports-view__dossier-row-value--positive]="row.tone === 'positive'"
-                              [class.reports-view__dossier-row-value--negative]="row.tone === 'negative'"
-                              [class.reports-view__dossier-row-value--neutral]="row.tone === 'neutral'">
+                              [class.reports-view__dossier-row-value--positive]="
+                                row.tone === 'positive'
+                              "
+                              [class.reports-view__dossier-row-value--negative]="
+                                row.tone === 'negative'
+                              "
+                              [class.reports-view__dossier-row-value--neutral]="
+                                row.tone === 'neutral'
+                              "
+                            >
                               {{ row.value }}
                             </span>
                           </div>
@@ -475,4 +611,3 @@
     </section>
   }
 </section>
-

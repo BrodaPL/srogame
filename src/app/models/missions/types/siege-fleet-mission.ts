@@ -2,6 +2,7 @@ import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import type { Ship } from '../../fleets/ship';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import { ShipPurpose } from '../../enums/ship-purpose';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
@@ -50,7 +51,7 @@ export class SiegeFleetMission extends FleetMission {
   ): MissionResolutionResult {
     if (!context.targetPlanet) {
       return this.failedArrival(
-        'Siege mission failed because the target was no longer available on arrival.',
+        encodeRuntimeText('generated.missionReports.siege.failedTargetUnavailable'),
       );
     }
 
@@ -61,7 +62,7 @@ export class SiegeFleetMission extends FleetMission {
     );
     if (targetStatus !== DiplomaticStatus.WAR) {
       return this.failedArrival(
-        'Siege mission failed because the target was no longer hostile on arrival.',
+        encodeRuntimeText('generated.missionReports.siege.failedTargetNotHostile'),
       );
     }
 
@@ -78,7 +79,9 @@ export class SiegeFleetMission extends FleetMission {
       reports: [
         {
           kind: 'success',
-          body: `Siege mission established orbit over ${context.targetPlanet.basicInfo.name}.`,
+          body: encodeRuntimeText('generated.missionReports.siege.successOrbit', {
+            targetPlanet: context.targetPlanet.basicInfo.name,
+          }),
         },
       ],
     };
@@ -91,9 +94,7 @@ export class SiegeFleetMission extends FleetMission {
   }
 
   public override onBattleRetreat(_context: MissionResolutionContext): MissionResolutionResult {
-    return this.failedArrival(
-      'Siege mission encountered hostile resistance and was forced to retreat.',
-    );
+    return this.failedArrival(encodeRuntimeText('generated.missionReports.siege.failedRetreat'));
   }
 
   private addSiegeChecks(

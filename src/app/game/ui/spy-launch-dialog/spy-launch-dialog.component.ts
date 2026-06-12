@@ -1,13 +1,27 @@
-import { ChangeDetectorRef, Component, EventEmitter, HostListener, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  HostListener,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../../core/game-api.service';
 import { PlayerSessionService } from '../../../core/player-session.service';
 import { resolveApiErrorMessage } from '../../../i18n/api-message.utils';
+import { I18nPipe } from '../../../i18n/i18n.pipe';
 import { I18nService } from '../../../i18n/i18n.service';
 import { ShipType } from '../../../models/enums/ship-type';
 import { TechnologyType } from '../../../models/enums/technology-type';
-import type { ClientCoordinates, ClientPlanetDto, CreateFleetMissionRequest } from '../../../models/game-api-types';
+import type {
+  ClientCoordinates,
+  ClientPlanetDto,
+  CreateFleetMissionRequest,
+} from '../../../models/game-api-types';
 import { FleetMissionType } from '../../../models/enums/fleet-mission-type';
 import { ManyShips } from '../../../models/fleets/many-ships';
 import { FleetState } from '../../../models/fleets/fleet';
@@ -30,9 +44,9 @@ type SpyLaunchOriginVm = {
 
 @Component({
   selector: 'app-spy-launch-dialog',
-  imports: [FormsModule],
+  imports: [FormsModule, I18nPipe],
   templateUrl: './spy-launch-dialog.component.html',
-  styleUrl: './spy-launch-dialog.component.css'
+  styleUrl: './spy-launch-dialog.component.css',
 })
 export class SpyLaunchDialogComponent implements OnChanges {
   @Input() public isOpen = false;
@@ -54,7 +68,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly changeDetectorRef: ChangeDetectorRef,
-    private readonly i18n: I18nService
+    private readonly i18n: I18nService,
   ) {}
 
   public ngOnChanges(changes: SimpleChanges): void {
@@ -91,7 +105,9 @@ export class SpyLaunchDialogComponent implements OnChanges {
   }
 
   protected selectedOrigin(): SpyLaunchOriginVm | null {
-    return this.eligibleOrigins.find((entry) => entry.key === this.selectedOriginCoordinates) ?? null;
+    return (
+      this.eligibleOrigins.find((entry) => entry.key === this.selectedOriginCoordinates) ?? null
+    );
   }
 
   protected selectedOriginMaxProbeAmount(): number {
@@ -99,12 +115,14 @@ export class SpyLaunchDialogComponent implements OnChanges {
   }
 
   protected canLaunch(): boolean {
-    return !this.isLoading
-      && !this.isLaunching
-      && !!this.targetPlanet
-      && !!this.selectedOrigin()
-      && this.probeAmount >= 1
-      && this.probeAmount <= this.selectedOriginMaxProbeAmount();
+    return (
+      !this.isLoading &&
+      !this.isLaunching &&
+      !!this.targetPlanet &&
+      !!this.selectedOrigin() &&
+      this.probeAmount >= 1 &&
+      this.probeAmount <= this.selectedOriginMaxProbeAmount()
+    );
   }
 
   protected activeFleetCountLabel(): string {
@@ -115,7 +133,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
     this.selectedOriginCoordinates = coordinatesLabel;
     this.probeAmount = Math.min(
       Math.max(1, this.probeAmount),
-      Math.max(1, this.selectedOriginMaxProbeAmount())
+      Math.max(1, this.selectedOriginMaxProbeAmount()),
     );
     this.error = null;
   }
@@ -128,7 +146,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.error = 'No player session found.';
+      this.error = this.i18n.t('generated.spyDialog.launch.noSession');
       return;
     }
 
@@ -143,37 +161,46 @@ export class SpyLaunchDialogComponent implements OnChanges {
         {
           type: ShipType.SPY_PROBE,
           undamagedAmount,
-          damagedAmount
-        }
+          damagedAmount,
+        },
       ],
       carriedBombs: [],
       cargo: {
         metal: 0,
         crystal: 0,
-        deuterium: 0
-      }
+        deuterium: 0,
+      },
     };
 
     this.isLaunching = true;
     this.error = null;
 
-    this.gameApi.createFleetMission(request, session.token)
-      .pipe(finalize(() => {
-        this.isLaunching = false;
-        this.changeDetectorRef.markForCheck();
-      }))
+    this.gameApi
+      .createFleetMission(request, session.token)
+      .pipe(
+        finalize(() => {
+          this.isLaunching = false;
+          this.changeDetectorRef.markForCheck();
+        }),
+      )
       .subscribe({
         next: (response) => {
           const message = response.message?.trim().length
             ? response.message
-            : `Spy mission launched from ${selectedOrigin.originName}.`;
+            : this.i18n.t('generated.missionReports.spy.launchedFromOrigin', {
+                origin: selectedOrigin.originName,
+              });
           this.launched.emit({ message });
           this.closed.emit();
         },
         error: (error) => {
-          this.error = resolveApiErrorMessage(this.i18n, error, 'Unable to launch spy mission.');
+          this.error = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('generated.spyDialog.launch.launchFailed'),
+          );
           this.changeDetectorRef.markForCheck();
-        }
+        },
       });
   }
 
@@ -182,7 +209,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
       this.eligibleOrigins = [];
       this.selectedOriginCoordinates = '';
       this.probeAmount = 1;
-      this.error = 'Target planet is unavailable.';
+      this.error = this.i18n.t('generated.spyDialog.launch.targetUnavailable');
       return;
     }
 
@@ -191,7 +218,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
       this.eligibleOrigins = [];
       this.selectedOriginCoordinates = '';
       this.probeAmount = 1;
-      this.error = 'No player session found.';
+      this.error = this.i18n.t('generated.spyDialog.launch.noSession');
       return;
     }
 
@@ -205,28 +232,37 @@ export class SpyLaunchDialogComponent implements OnChanges {
 
     forkJoin({
       ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
-      activeFleets: this.gameApi.getActiveFleets(session.token)
+      activeFleets: this.gameApi.getActiveFleets(session.token),
     })
-      .pipe(finalize(() => {
-        this.isLoading = false;
-        this.changeDetectorRef.markForCheck();
-      }))
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+          this.changeDetectorRef.markForCheck();
+        }),
+      )
       .subscribe({
         next: ({ ownedPlanets, activeFleets }) => {
           this.activeFleetCount = activeFleets.length;
-          this.maxActiveFleetCount = maxActiveFleets(this.techLevel(ownedPlanets, TechnologyType.COMPUTER_TECHNOLOGY));
+          this.maxActiveFleetCount = maxActiveFleets(
+            this.techLevel(ownedPlanets, TechnologyType.COMPUTER_TECHNOLOGY),
+          );
           this.eligibleOrigins = [
-            ...ownedPlanets.map((planet) => this.buildPlanetOriginVm(planet, this.targetPlanet!.coordinates)),
-            ...activeFleets.map((fleet) => this.buildFleetOriginVm(fleet, this.targetPlanet!.coordinates))
+            ...ownedPlanets.map((planet) =>
+              this.buildPlanetOriginVm(planet, this.targetPlanet!.coordinates),
+            ),
+            ...activeFleets.map((fleet) =>
+              this.buildFleetOriginVm(fleet, this.targetPlanet!.coordinates),
+            ),
           ]
             .filter((entry): entry is SpyLaunchOriginVm => entry !== null)
-            .sort((left, right) =>
-              left.distance - right.distance
-              || left.coordinates.y - right.coordinates.y
-              || left.coordinates.x - right.coordinates.x
-              || left.coordinates.z - right.coordinates.z
-              || left.kind.localeCompare(right.kind)
-              || left.originName.localeCompare(right.originName)
+            .sort(
+              (left, right) =>
+                left.distance - right.distance ||
+                left.coordinates.y - right.coordinates.y ||
+                left.coordinates.x - right.coordinates.x ||
+                left.coordinates.z - right.coordinates.z ||
+                left.kind.localeCompare(right.kind) ||
+                left.originName.localeCompare(right.originName),
             );
 
           if (this.eligibleOrigins.length > 0) {
@@ -235,8 +271,12 @@ export class SpyLaunchDialogComponent implements OnChanges {
           }
         },
         error: (error) => {
-          this.error = resolveApiErrorMessage(this.i18n, error, 'Unable to load spy launch origins.');
-        }
+          this.error = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('generated.spyDialog.launch.loadOriginsFailed'),
+          );
+        },
       });
   }
 
@@ -248,10 +288,12 @@ export class SpyLaunchDialogComponent implements OnChanges {
 
   private buildPlanetOriginVm(
     planet: ClientPlanetDto,
-    targetCoordinates: ClientCoordinates
+    targetCoordinates: ClientCoordinates,
   ): SpyLaunchOriginVm | null {
-    const undamagedProbes = ManyShips.undamagedCountByType(planet.objects.ships).get(ShipType.SPY_PROBE) ?? 0;
-    const damagedProbes = ManyShips.damagedCountByType(planet.objects.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const undamagedProbes =
+      ManyShips.undamagedCountByType(planet.objects.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const damagedProbes =
+      ManyShips.damagedCountByType(planet.objects.ships).get(ShipType.SPY_PROBE) ?? 0;
     const totalProbes = undamagedProbes + damagedProbes;
     if (totalProbes <= 0) {
       return null;
@@ -259,9 +301,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
 
     const coordinatesLabel = this.formatCoordinates(planet.coordinates);
     const distance = this.calculateDistance(planet.coordinates, targetCoordinates);
-    const probeLabel = damagedProbes > 0
-      ? `${totalProbes} probe${totalProbes === 1 ? '' : 's'} (${damagedProbes} damaged)`
-      : `${totalProbes} probe${totalProbes === 1 ? '' : 's'}`;
+    const probeLabel = this.probeLabel(totalProbes, damagedProbes);
 
     return {
       key: `planet:${coordinatesLabel}`,
@@ -269,24 +309,29 @@ export class SpyLaunchDialogComponent implements OnChanges {
       originFleetId: null,
       originName: planet.basicInfo.name,
       coordinates: planet.coordinates,
-      label: `${planet.basicInfo.name} (${coordinatesLabel}) | ${probeLabel}`,
+      label: this.i18n.t('generated.spyDialog.launch.planetOriginLabel', {
+        planet: planet.basicInfo.name,
+        coordinates: coordinatesLabel,
+        probeLabel,
+      }),
       coordinatesLabel,
       distance,
       totalProbes,
       undamagedProbes,
-      damagedProbes
+      damagedProbes,
     };
   }
 
   private buildFleetOriginVm(
     fleet: Fleet,
-    targetCoordinates: ClientCoordinates
+    targetCoordinates: ClientCoordinates,
   ): SpyLaunchOriginVm | null {
     if (fleet.state !== FleetState.ORBITING || fleet.pendingMaintenanceRequestId !== null) {
       return null;
     }
 
-    const undamagedProbes = ManyShips.undamagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const undamagedProbes =
+      ManyShips.undamagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
     const damagedProbes = ManyShips.damagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
     const totalProbes = undamagedProbes + damagedProbes;
     if (totalProbes <= 0) {
@@ -296,9 +341,7 @@ export class SpyLaunchDialogComponent implements OnChanges {
     const coordinates = fleet.target;
     const coordinatesLabel = this.formatCoordinates(coordinates);
     const distance = this.calculateDistance(coordinates, targetCoordinates);
-    const probeLabel = damagedProbes > 0
-      ? `${totalProbes} probe${totalProbes === 1 ? '' : 's'} (${damagedProbes} damaged)`
-      : `${totalProbes} probe${totalProbes === 1 ? '' : 's'}`;
+    const probeLabel = this.probeLabel(totalProbes, damagedProbes);
 
     return {
       key: `fleet:${fleet.fleetId}`,
@@ -306,12 +349,17 @@ export class SpyLaunchDialogComponent implements OnChanges {
       originFleetId: fleet.fleetId,
       originName: `Fleet #${fleet.fleetId}`,
       coordinates,
-      label: `Fleet #${fleet.fleetId} orbiting ${fleet.targetPlanetName} (${coordinatesLabel}) | ${probeLabel}`,
+      label: this.i18n.t('generated.spyDialog.launch.fleetOriginLabel', {
+        fleetId: fleet.fleetId,
+        targetPlanet: fleet.targetPlanetName,
+        coordinates: coordinatesLabel,
+        probeLabel,
+      }),
       coordinatesLabel,
       distance,
       totalProbes,
       undamagedProbes,
-      damagedProbes
+      damagedProbes,
     };
   }
 
@@ -321,5 +369,21 @@ export class SpyLaunchDialogComponent implements OnChanges {
 
   private formatCoordinates(coordinates: ClientCoordinates): string {
     return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+  }
+
+  private probeLabel(totalProbes: number, damagedProbes: number): string {
+    if (damagedProbes > 0) {
+      return this.i18n.t('generated.spyDialog.launch.probeLabelDamaged', {
+        count: totalProbes,
+        damaged: damagedProbes,
+      });
+    }
+
+    return this.i18n.t(
+      totalProbes === 1
+        ? 'generated.spyDialog.launch.probeLabelOne'
+        : 'generated.spyDialog.launch.probeLabelMany',
+      { count: totalProbes },
+    );
   }
 }

@@ -1,4 +1,5 @@
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import { FleetState } from '../../fleets/fleet';
 import { PlayerType } from '../../enums/player-type';
 import { TechnologyType } from '../../enums/technology-type';
@@ -76,7 +77,7 @@ export class ColonizeFleetMission extends FleetMission {
         reports: [
           {
             kind: 'failure',
-            body: 'Colonize mission failed because the target was no longer available.',
+            body: encodeRuntimeText('generated.missionReports.colonize.failedTargetUnavailable'),
           },
         ],
       };
@@ -98,7 +99,7 @@ export class ColonizeFleetMission extends FleetMission {
         reports: [
           {
             kind: 'failure',
-            body: 'Colonize mission failed because the target became occupied before arrival.',
+            body: encodeRuntimeText('generated.missionReports.colonize.failedTargetOccupied'),
           },
         ],
       };
@@ -133,7 +134,9 @@ export class ColonizeFleetMission extends FleetMission {
       reports: [
         {
           kind: 'success',
-          body: `Colonize mission established a new colony on ${context.targetPlanet.basicInfo.name}.`,
+          body: encodeRuntimeText('generated.missionReports.colonize.successEstablished', {
+            targetPlanet: context.targetPlanet.basicInfo.name,
+          }),
         },
       ],
     };

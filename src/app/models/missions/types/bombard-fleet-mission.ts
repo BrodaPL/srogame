@@ -2,6 +2,7 @@ import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { FleetState } from '../../fleets/fleet';
 import type { Ship } from '../../fleets/ship';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import { ShipPurpose } from '../../enums/ship-purpose';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
@@ -50,7 +51,7 @@ export class BombardFleetMission extends FleetMission {
   ): MissionResolutionResult {
     if (!context.targetPlanet) {
       return this.failedArrival(
-        'Bombard mission failed because the target was no longer available on arrival.',
+        encodeRuntimeText('generated.missionReports.bombard.failedTargetUnavailable'),
       );
     }
 
@@ -61,7 +62,7 @@ export class BombardFleetMission extends FleetMission {
     );
     if (targetStatus !== DiplomaticStatus.WAR) {
       return this.failedArrival(
-        'Bombard mission failed because the target was no longer hostile on arrival.',
+        encodeRuntimeText('generated.missionReports.bombard.failedTargetNotHostile'),
       );
     }
 
@@ -73,7 +74,9 @@ export class BombardFleetMission extends FleetMission {
       reports: [
         {
           kind: 'success',
-          body: `Bombard mission struck ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+          body: encodeRuntimeText('generated.missionReports.bombard.successHit', {
+            targetPlanet: context.targetPlanet.basicInfo.name,
+          }),
         },
       ],
     };
@@ -86,9 +89,7 @@ export class BombardFleetMission extends FleetMission {
   }
 
   public override onBattleRetreat(_context: MissionResolutionContext): MissionResolutionResult {
-    return this.failedArrival(
-      'Bombard mission encountered hostile resistance and was forced to retreat.',
-    );
+    return this.failedArrival(encodeRuntimeText('generated.missionReports.bombard.failedRetreat'));
   }
 
   private addBombardChecks(

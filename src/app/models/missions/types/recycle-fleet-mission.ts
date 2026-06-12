@@ -1,5 +1,6 @@
 import { FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import type { Ship } from '../../fleets/ship';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import type { MissionCheck } from '../mission-check';
 import type {
   MissionLaunchContext,
@@ -76,14 +77,14 @@ export class RecycleFleetMission extends FleetMission {
   ): MissionResolutionResult | null {
     if (!context.targetPlanet) {
       return this.failedReturn(
-        'Recycle mission failed because the target was no longer available.',
+        encodeRuntimeText('generated.missionReports.recycle.failedTargetUnavailable'),
       );
     }
 
     const recycleStrength = calculateRecycleCapabilityForManyShips(context.fleet.ships);
     if (recycleStrength <= 0) {
       return this.failedReturn(
-        'Recycle mission can no longer operate because no recycle equipment survived.',
+        encodeRuntimeText('generated.missionReports.recycle.failedNoEquipment'),
       );
     }
 
@@ -100,7 +101,9 @@ export class RecycleFleetMission extends FleetMission {
         reports: [
           {
             kind: 'success',
-            body: `Recycle mission filled its cargo holds over ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+            body: encodeRuntimeText('generated.missionReports.recycle.successCargoFull', {
+              targetPlanet: context.targetPlanet.basicInfo.name,
+            }),
           },
         ],
       };
@@ -117,7 +120,9 @@ export class RecycleFleetMission extends FleetMission {
         reports: [
           {
             kind: 'success',
-            body: `Recycle mission cleared the debris field over ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+            body: encodeRuntimeText('generated.missionReports.recycle.successDebrisCleared', {
+              targetPlanet: context.targetPlanet.basicInfo.name,
+            }),
           },
         ],
       };
@@ -155,8 +160,12 @@ export class RecycleFleetMission extends FleetMission {
               kind: 'success',
               body:
                 remainingDebris <= 0
-                  ? `Recycle mission exhausted the debris field over ${context.targetPlanet.basicInfo.name} and started the return flight.`
-                  : `Recycle mission filled its cargo holds over ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+                  ? encodeRuntimeText('generated.missionReports.recycle.successDebrisExhausted', {
+                      targetPlanet: context.targetPlanet.basicInfo.name,
+                    })
+                  : encodeRuntimeText('generated.missionReports.recycle.successCargoFull', {
+                      targetPlanet: context.targetPlanet.basicInfo.name,
+                    }),
             },
           ]
         : [],
@@ -164,21 +173,19 @@ export class RecycleFleetMission extends FleetMission {
   }
 
   public override onBattleRetreat(_context: MissionResolutionContext): MissionResolutionResult {
-    return this.failedReturn(
-      'Recycle mission encountered hostile resistance and was forced to retreat.',
-    );
+    return this.failedReturn(encodeRuntimeText('generated.missionReports.recycle.failedRetreat'));
   }
 
   private resolveArrival(context: MissionResolutionContext): MissionResolutionResult {
     if (!context.targetPlanet) {
       return this.failedReturn(
-        'Recycle mission failed because the target was no longer available on arrival.',
+        encodeRuntimeText('generated.missionReports.recycle.failedTargetUnavailableArrival'),
       );
     }
 
     if (calculateRecycleCapabilityForManyShips(context.fleet.ships) <= 0) {
       return this.failedReturn(
-        'Recycle mission failed because no recycle equipment survived the approach.',
+        encodeRuntimeText('generated.missionReports.recycle.failedNoEquipmentArrival'),
       );
     }
 
@@ -191,7 +198,9 @@ export class RecycleFleetMission extends FleetMission {
         reports: [
           {
             kind: 'success',
-            body: `Recycle mission found no debris over ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+            body: encodeRuntimeText('generated.missionReports.recycle.successNoDebris', {
+              targetPlanet: context.targetPlanet.basicInfo.name,
+            }),
           },
         ],
       };
@@ -210,7 +219,9 @@ export class RecycleFleetMission extends FleetMission {
       reports: [
         {
           kind: 'success',
-          body: `Recycle mission established salvage orbit over ${context.targetPlanet.basicInfo.name}.`,
+          body: encodeRuntimeText('generated.missionReports.recycle.successSalvageOrbit', {
+            targetPlanet: context.targetPlanet.basicInfo.name,
+          }),
         },
       ],
     };

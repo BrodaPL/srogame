@@ -33,14 +33,20 @@
       </div>
       <div class="mail-view__summary">
         <span>{{ 'communications.shared.labels.turn' | t }} {{ currentTurn ?? '--' }}</span>
-        <span>{{ 'communications.mail.header.unread' | t:{ count: unreadMessages().length } }}</span>
-        <span>{{ 'communications.mail.header.actionRequired' | t:{ count: actionRequiredRequests().length } }}</span>
+        <span>{{
+          'communications.mail.header.unread' | t: { count: unreadMessages().length }
+        }}</span>
+        <span>{{
+          'communications.mail.header.actionRequired'
+            | t: { count: actionRequiredRequests().length }
+        }}</span>
       </div>
       <button
         type="button"
         class="mail-view__button mail-view__button--primary"
         data-tutorial-id="mail-compose-action"
-        (click)="openNewMessageComposer()">
+        (click)="openNewMessageComposer()"
+      >
         {{ 'communications.shared.actions.sendMessage' | t }}
       </button>
     </header>
@@ -50,7 +56,10 @@
         <div class="mail-view__pane-head">
           <h3>{{ 'communications.mail.folders.title' | t }}</h3>
         </div>
-        <nav class="mail-view__folder-list" [attr.aria-label]="'communications.mail.folders.title' | t">
+        <nav
+          class="mail-view__folder-list"
+          [attr.aria-label]="'communications.mail.folders.title' | t"
+        >
           @for (folder of mailFolders(); track folder.id) {
             <button
               type="button"
@@ -58,8 +67,15 @@
               [class.mail-view__folder--active]="activeFolderId === folder.id"
               [class.mail-view__folder--urgent]="folder.tone === 'urgent'"
               [class.mail-view__folder--muted]="folder.tone === 'muted'"
-              [attr.data-tutorial-id]="folder.id === 'actionRequired' ? 'mail-pending-requests' : folder.id === 'history' ? 'mail-resolved-requests' : null"
-              (click)="selectFolder(folder.id)">
+              [attr.data-tutorial-id]="
+                folder.id === 'actionRequired'
+                  ? 'mail-pending-requests'
+                  : folder.id === 'history'
+                    ? 'mail-resolved-requests'
+                    : null
+              "
+              (click)="selectFolder(folder.id)"
+            >
               <span>{{ folder.label }}</span>
               <strong>{{ folder.count }}</strong>
             </button>
@@ -85,7 +101,8 @@
                 class="mail-view__item"
                 [class.mail-view__item--selected]="isItemSelected(item)"
                 [class.mail-view__item--unread]="item.isUnread"
-                (click)="selectItem(item)">
+                (click)="selectItem(item)"
+              >
                 <span class="mail-view__item-head">
                   <strong>{{ item.title }}</strong>
                   <span [class]="item.badgeClass">{{ item.badgeLabel }}</span>
@@ -103,7 +120,14 @@
           @if (item.request; as request) {
             <div class="mail-view__detail-head">
               <div>
-                <p class="eyebrow">{{ (request.direction === 'incoming' ? 'communications.mail.requestCards.incomingEyebrow' : 'communications.mail.requestCards.outgoingEyebrow') | t }}</p>
+                <p class="eyebrow">
+                  {{
+                    (request.direction === 'incoming'
+                      ? 'communications.mail.requestCards.incomingEyebrow'
+                      : 'communications.mail.requestCards.outgoingEyebrow'
+                    ) | t
+                  }}
+                </p>
                 <h3>{{ requestCardTitle(request) }}</h3>
               </div>
               <span [class]="requestBadgeClass(request)">{{ requestBadge(request) }}</span>
@@ -123,7 +147,13 @@
                 <section class="mail-view__partial-approval">
                   <div class="mail-view__partial-head">
                     <h4>{{ 'communications.mail.partialApproval.maintenanceTitle' | t }}</h4>
-                    <button type="button" class="mail-view__text-button" (click)="closePartialApproval()">{{ 'communications.mail.partialApproval.close' | t }}</button>
+                    <button
+                      type="button"
+                      class="mail-view__text-button"
+                      (click)="closePartialApproval()"
+                    >
+                      {{ 'communications.mail.partialApproval.close' | t }}
+                    </button>
                   </div>
                   <label class="mail-view__partial-field">
                     <span>{{ 'communications.mail.partialApproval.fuel' | t }}</span>
@@ -132,7 +162,8 @@
                       min="0"
                       [max]="maintenance.requested.fuel"
                       [ngModel]="partialApprovalFuel"
-                      (ngModelChange)="updatePartialApprovalFuel($event)" />
+                      (ngModelChange)="updatePartialApprovalFuel($event)"
+                    />
                   </label>
 
                   @if (maintenance.requested.ships.length > 0) {
@@ -140,13 +171,17 @@
                       <h5>{{ 'communications.mail.partialApproval.ships' | t }}</h5>
                       @for (entry of maintenance.requested.ships; track entry.type) {
                         <label class="mail-view__partial-field">
-                          <span>{{ 'communications.mail.partialApproval.maxAmount' | t:{ type: entry.type, amount: entry.amount } }}</span>
+                          <span>{{
+                            'communications.mail.partialApproval.maxAmount'
+                              | t: { type: entry.type, amount: entry.amount }
+                          }}</span>
                           <input
                             type="number"
                             min="0"
                             [max]="entry.amount"
                             [ngModel]="partialApprovalShipAmounts[entry.type] ?? 0"
-                            (ngModelChange)="updatePartialShipAmount(entry.type, $event)" />
+                            (ngModelChange)="updatePartialShipAmount(entry.type, $event)"
+                          />
                         </label>
                       }
                     </div>
@@ -157,13 +192,17 @@
                       <h5>{{ 'communications.mail.partialApproval.bombs' | t }}</h5>
                       @for (entry of maintenance.requested.bombs; track entry.type) {
                         <label class="mail-view__partial-field">
-                          <span>{{ 'communications.mail.partialApproval.maxAmount' | t:{ type: entry.type, amount: entry.amount } }}</span>
+                          <span>{{
+                            'communications.mail.partialApproval.maxAmount'
+                              | t: { type: entry.type, amount: entry.amount }
+                          }}</span>
                           <input
                             type="number"
                             min="0"
                             [max]="entry.amount"
                             [ngModel]="partialApprovalBombAmounts[entry.type] ?? 0"
-                            (ngModelChange)="updatePartialBombAmount(entry.type, $event)" />
+                            (ngModelChange)="updatePartialBombAmount(entry.type, $event)"
+                          />
                         </label>
                       }
                     </div>
@@ -173,7 +212,8 @@
                     type="button"
                     class="mail-view__button mail-view__button--primary"
                     [disabled]="isRequestActionPending(request)"
-                    (click)="submitPartialApproval(maintenance)">
+                    (click)="submitPartialApproval(maintenance)"
+                  >
                     {{ 'communications.mail.partialApproval.send' | t }}
                   </button>
                 </section>
@@ -184,7 +224,13 @@
                   <section class="mail-view__partial-approval">
                     <div class="mail-view__partial-head">
                       <h4>{{ 'communications.mail.partialApproval.resourceTitle' | t }}</h4>
-                      <button type="button" class="mail-view__text-button" (click)="closePartialApproval()">{{ 'communications.mail.partialApproval.close' | t }}</button>
+                      <button
+                        type="button"
+                        class="mail-view__text-button"
+                        (click)="closePartialApproval()"
+                      >
+                        {{ 'communications.mail.partialApproval.close' | t }}
+                      </button>
                     </div>
                     <label class="mail-view__partial-field">
                       <span>{{ 'communications.mail.partialApproval.metal' | t }}</span>
@@ -193,7 +239,8 @@
                         min="0"
                         [max]="support.requestedResources?.metal ?? 0"
                         [ngModel]="partialApprovalMetal"
-                        (ngModelChange)="updatePartialResourceMetal($event)" />
+                        (ngModelChange)="updatePartialResourceMetal($event)"
+                      />
                     </label>
                     <label class="mail-view__partial-field">
                       <span>{{ 'communications.mail.partialApproval.crystal' | t }}</span>
@@ -202,7 +249,8 @@
                         min="0"
                         [max]="support.requestedResources?.crystal ?? 0"
                         [ngModel]="partialApprovalCrystal"
-                        (ngModelChange)="updatePartialResourceCrystal($event)" />
+                        (ngModelChange)="updatePartialResourceCrystal($event)"
+                      />
                     </label>
                     <label class="mail-view__partial-field">
                       <span>{{ 'communications.mail.partialApproval.deuterium' | t }}</span>
@@ -211,13 +259,15 @@
                         min="0"
                         [max]="support.requestedResources?.deuterium ?? 0"
                         [ngModel]="partialApprovalDeuterium"
-                        (ngModelChange)="updatePartialResourceDeuterium($event)" />
+                        (ngModelChange)="updatePartialResourceDeuterium($event)"
+                      />
                     </label>
                     <button
                       type="button"
                       class="mail-view__button mail-view__button--primary"
                       [disabled]="isRequestActionPending(request)"
-                      (click)="submitPartialApproval(support)">
+                      (click)="submitPartialApproval(support)"
+                    >
                       {{ 'communications.mail.partialApproval.send' | t }}
                     </button>
                   </section>
@@ -231,7 +281,8 @@
                   type="button"
                   class="mail-view__button mail-view__button--primary"
                   [disabled]="isRequestActionPending(request)"
-                  (click)="acceptRequest(request)">
+                  (click)="acceptRequest(request)"
+                >
                   {{ 'communications.shared.actions.accept' | t }}
                 </button>
               }
@@ -240,8 +291,18 @@
                   type="button"
                   class="mail-view__button"
                   [disabled]="isRequestActionPending(request)"
-                  (click)="isPartialApprovalOpen(request) ? closePartialApproval() : openPartialApproval(request)">
-                  {{ (isPartialApprovalOpen(request) ? 'communications.mail.actions.closePartial' : 'communications.mail.actions.partialApprove') | t }}
+                  (click)="
+                    isPartialApprovalOpen(request)
+                      ? closePartialApproval()
+                      : openPartialApproval(request)
+                  "
+                >
+                  {{
+                    (isPartialApprovalOpen(request)
+                      ? 'communications.mail.actions.closePartial'
+                      : 'communications.mail.actions.partialApprove'
+                    ) | t
+                  }}
                 </button>
               }
               @if (canReject(request)) {
@@ -249,7 +310,8 @@
                   type="button"
                   class="mail-view__button mail-view__button--danger"
                   [disabled]="isRequestActionPending(request)"
-                  (click)="rejectRequest(request)">
+                  (click)="rejectRequest(request)"
+                >
                   {{ 'communications.shared.actions.reject' | t }}
                 </button>
               }
@@ -258,7 +320,8 @@
                   type="button"
                   class="mail-view__button mail-view__button--danger"
                   [disabled]="isRequestActionPending(request)"
-                  (click)="cancelRequest(request)">
+                  (click)="cancelRequest(request)"
+                >
                   {{ 'communications.shared.actions.cancel' | t }}
                 </button>
               }
@@ -267,7 +330,8 @@
                   type="button"
                   class="mail-view__button"
                   [disabled]="isDeletingRequest(request)"
-                  (click)="deleteResolvedRequest(request)">
+                  (click)="deleteResolvedRequest(request)"
+                >
                   {{ 'communications.mail.actions.deleteHistoryItem' | t }}
                 </button>
               }
@@ -278,31 +342,39 @@
             <div class="mail-view__detail-head">
               <div>
                 <p class="eyebrow">{{ 'communications.mail.message.eyebrow' | t }}</p>
-                <h3>{{ message.title }}</h3>
+                <h3>{{ messageTitle(message) }}</h3>
               </div>
-              <span [class]="message.isRead ? 'badge' : 'badge badge--jump'">{{ message.isRead ? ('communications.mail.message.read' | t) : ('communications.mail.message.unread' | t) }}</span>
+              <span [class]="message.isRead ? 'badge' : 'badge badge--jump'">{{
+                message.isRead
+                  ? ('communications.mail.message.read' | t)
+                  : ('communications.mail.message.unread' | t)
+              }}</span>
             </div>
 
             <div class="mail-view__message-meta">
-              <span>{{ 'communications.mail.message.from' | t:{ sender: senderLabel(message) } }}</span>
+              <span>{{
+                'communications.mail.message.from' | t: { sender: senderLabel(message) }
+              }}</span>
               <span>{{ 'communications.shared.labels.turn' | t }} {{ message.createdTurn }}</span>
             </div>
 
-            <div class="mail-view__message-body">{{ message.body }}</div>
+            <div class="mail-view__message-body">{{ messageBody(message) }}</div>
 
             <div class="mail-view__actions">
               <button
                 type="button"
                 class="mail-view__button mail-view__button--primary"
                 [disabled]="!canReply(message)"
-                (click)="openReplyComposer(message)">
+                (click)="openReplyComposer(message)"
+              >
                 {{ 'communications.shared.actions.reply' | t }}
               </button>
               <button
                 type="button"
                 class="mail-view__button mail-view__button--danger"
                 [disabled]="activeMessageDeleteId === message.messageId"
-                (click)="deleteMessage(message)">
+                (click)="deleteMessage(message)"
+              >
                 {{ 'communications.shared.actions.delete' | t }}
               </button>
             </div>
@@ -330,6 +402,6 @@
   [initialTitle]="composerInitialTitle"
   [initialBody]="composerInitialBody"
   (closed)="closeComposer()"
-  (sent)="handleComposerSent($event)">
+  (sent)="handleComposerSent($event)"
+>
 </app-message-compose-dialog>
-

@@ -1,6 +1,7 @@
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import { ShipType } from '../../enums/ship-type';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
@@ -45,7 +46,7 @@ export class RepairFleetMission extends FleetMission {
   ): MissionResolutionResult {
     if (!context.targetPlanet) {
       return this.failedArrival(
-        'Repair mission failed because the target was no longer available on arrival.',
+        encodeRuntimeText('generated.missionReports.repair.failedTargetUnavailable'),
       );
     }
 
@@ -55,7 +56,9 @@ export class RepairFleetMission extends FleetMission {
       context.diplomacyResolver ?? null,
     );
     if (targetStatus === DiplomaticStatus.WAR) {
-      return this.failedArrival('Repair mission failed because the target was hostile on arrival.');
+      return this.failedArrival(
+        encodeRuntimeText('generated.missionReports.repair.failedTargetHostile'),
+      );
     }
 
     return {
@@ -71,7 +74,9 @@ export class RepairFleetMission extends FleetMission {
       reports: [
         {
           kind: 'success',
-          body: `Repair mission established orbit over ${context.targetPlanet.basicInfo.name}.`,
+          body: encodeRuntimeText('generated.missionReports.repair.successOrbit', {
+            targetPlanet: context.targetPlanet.basicInfo.name,
+          }),
         },
       ],
     };

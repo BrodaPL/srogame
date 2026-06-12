@@ -1,7 +1,11 @@
 import '@angular/compiler';
 import { describe, expect, it, vi } from 'vitest';
 import { MiniPlanetPreviewComponent } from './mini-planet-preview.component';
-import type { ClientCoordinates, ClientPlanetDto, PlayerSession } from '../../../models/game-api-types';
+import type {
+  ClientCoordinates,
+  ClientPlanetDto,
+  PlayerSession,
+} from '../../../models/game-api-types';
 import { DiplomaticStatus } from '../../../models/diplomacy/diplomatic-status';
 import { PlanetType } from '../../../models/enums/planet-type';
 import { PlayerType } from '../../../models/enums/player-type';
@@ -42,28 +46,20 @@ describe('MiniPlanetPreviewComponent', () => {
     (component as { openMissionPlannerAsOrigin(): void }).openMissionPlannerAsOrigin();
     (component as { openMissionPlannerAsTarget(): void }).openMissionPlannerAsTarget();
 
-    expect(router.navigate).toHaveBeenNthCalledWith(
-      1,
-      ['/game/mission-planner'],
-      {
-        queryParams: {
-          originX: 5,
-          originY: 6,
-          originZ: 7
-        }
-      }
-    );
-    expect(router.navigate).toHaveBeenNthCalledWith(
-      2,
-      ['/game/mission-planner'],
-      {
-        queryParams: {
-          targetX: 5,
-          targetY: 6,
-          targetZ: 7
-        }
-      }
-    );
+    expect(router.navigate).toHaveBeenNthCalledWith(1, ['/game/mission-planner'], {
+      queryParams: {
+        originX: 5,
+        originY: 6,
+        originZ: 7,
+      },
+    });
+    expect(router.navigate).toHaveBeenNthCalledWith(2, ['/game/mission-planner'], {
+      queryParams: {
+        targetX: 5,
+        targetY: 6,
+        targetZ: 7,
+      },
+    });
   });
 
   it('shows a separate debris tag only when report debris is non-zero', () => {
@@ -71,12 +67,18 @@ describe('MiniPlanetPreviewComponent', () => {
     component.planet = createRevealedForeignPlanet('Foreign', { x: 4, y: 4, z: 4 });
 
     component.ngOnChanges();
-    expect((component as { tags: Array<{ label: string; tooltip: string }> }).tags.map((tag) => tag.label)).not.toContain('Debris');
+    expect(
+      (component as { tags: Array<{ label: string; tooltip: string }> }).tags.map(
+        (tag) => tag.label,
+      ),
+    ).not.toContain('Debris');
 
     component.planet.reportData!.spaceDebrisAmount = { metal: 7, crystal: 8, deuterium: 9 };
     component.ngOnChanges();
 
-    const debrisTag = (component as { tags: Array<{ label: string; tooltip: string }> }).tags.find((tag) => tag.label === 'Debris');
+    const debrisTag = (component as { tags: Array<{ label: string; tooltip: string }> }).tags.find(
+      (tag) => tag.label === 'Debris',
+    );
     expect(debrisTag).toBeTruthy();
     expect(debrisTag?.tooltip).toBe('Metal: 7, Crystal: 8, Deuterium: 9');
   });
@@ -84,35 +86,45 @@ describe('MiniPlanetPreviewComponent', () => {
   it('adds diplomacy status to owned-by labels', () => {
     const component = createComponent(
       createRouter(),
-      createGameStateService([
-        { playerAId: 1, playerBId: 9, status: DiplomaticStatus.WAR }
-      ]),
-      createPlayerSessionService(createPlayerSession({ playerId: 1 }))
+      createGameStateService([{ playerAId: 1, playerBId: 9, status: DiplomaticStatus.WAR }]),
+      createPlayerSessionService(createPlayerSession({ playerId: 1 })),
     );
 
     component.planet = createPlanet('Home', { x: 1, y: 1, z: 1 }, 1);
-    expect((component as { ownershipLabel(): string }).ownershipLabel()).toBe('Owned by: Player (SELF)');
+    expect((component as { ownershipLabel(): string }).ownershipLabel()).toBe(
+      'Owned by: Player (SELF)',
+    );
 
     component.planet = createRevealedForeignPlanet('Foreign', { x: 4, y: 4, z: 4 });
-    expect((component as { ownershipLabel(): string }).ownershipLabel()).toBe('Owned by: Enemy (WAR)');
+    expect((component as { ownershipLabel(): string }).ownershipLabel()).toBe(
+      'Owned by: Enemy (WAR)',
+    );
   });
 });
 
 function createComponent(
   router = createRouter(),
   gameState = createGameStateService(),
-  playerSession = createPlayerSessionService()
+  playerSession = createPlayerSessionService(),
+  i18n = createI18nService(),
 ): MiniPlanetPreviewComponent {
-  return new MiniPlanetPreviewComponent(router as never, gameState as never, playerSession as never);
+  return new MiniPlanetPreviewComponent(
+    router as never,
+    gameState as never,
+    playerSession as never,
+    i18n as never,
+  );
 }
 
 function createRouter() {
   return {
-    navigate: vi.fn().mockResolvedValue(true)
+    navigate: vi.fn().mockResolvedValue(true),
   };
 }
 
-function createGameStateService(relations: Array<{ playerAId: number; playerBId: number; status: DiplomaticStatus }> = []) {
+function createGameStateService(
+  relations: Array<{ playerAId: number; playerBId: number; status: DiplomaticStatus }> = [],
+) {
   return {
     diplomacyResolver: () => ({
       getStatus: (leftOwnerId: number | null, rightOwnerId: number | null): DiplomaticStatus => {
@@ -120,20 +132,98 @@ function createGameStateService(relations: Array<{ playerAId: number; playerBId:
           return DiplomaticStatus.SELF;
         }
 
-        const relation = relations.find((entry) =>
-          (entry.playerAId === leftOwnerId && entry.playerBId === rightOwnerId)
-          || (entry.playerAId === rightOwnerId && entry.playerBId === leftOwnerId)
+        const relation = relations.find(
+          (entry) =>
+            (entry.playerAId === leftOwnerId && entry.playerBId === rightOwnerId) ||
+            (entry.playerAId === rightOwnerId && entry.playerBId === leftOwnerId),
         );
 
         return relation?.status ?? DiplomaticStatus.NEUTRAL;
-      }
-    })
+      },
+    }),
   };
 }
 
 function createPlayerSessionService(session: PlayerSession | null = createPlayerSession()) {
   return {
-    load: vi.fn().mockReturnValue(session)
+    load: vi.fn().mockReturnValue(session),
+  };
+}
+
+function createI18nService() {
+  return {
+    t: vi.fn((key: string, params?: Record<string, unknown>) => {
+      switch (key) {
+        case 'generated.miniPlanet.unknownPlanet':
+          return 'Unknown planet';
+        case 'generated.miniPlanet.ownerNoData':
+          return 'NO DATA';
+        case 'generated.miniPlanet.ownerYou':
+          return 'YOU';
+        case 'generated.miniPlanet.ownerUnknown':
+          return 'UNKNOWN';
+        case 'generated.miniPlanet.ownerNeutral':
+          return 'NEUTRAL';
+        case 'generated.miniPlanet.ownerFree':
+          return 'FREE';
+        case 'generated.miniPlanet.ownedBy':
+          return `Owned by: ${params?.['owner'] ?? ''}`;
+        case 'generated.miniPlanet.tags.basicInfo':
+          return 'Basic Info';
+        case 'generated.miniPlanet.tags.planetParameters':
+          return 'Planet Parameters';
+        case 'generated.miniPlanet.tags.resources':
+          return 'Resources';
+        case 'generated.miniPlanet.tags.debris':
+          return 'Debris';
+        case 'generated.miniPlanet.tags.buildings':
+          return 'Buildings';
+        case 'generated.miniPlanet.tags.technology':
+          return 'Technology';
+        case 'generated.miniPlanet.tags.defences':
+          return 'Defences';
+        case 'generated.miniPlanet.tags.ships':
+          return 'Ships';
+        case 'generated.miniPlanet.tags.queues':
+          return 'Queues';
+        case 'generated.miniPlanet.rows.metal':
+          return 'Metal';
+        case 'generated.miniPlanet.rows.crystal':
+          return 'Crystal';
+        case 'generated.miniPlanet.rows.deuterium':
+          return 'Deuterium';
+        case 'generated.miniPlanet.rows.averageTotalResources':
+          return 'Average total resources';
+        case 'generated.miniPlanet.rows.averageBuildingLevel':
+          return 'Average building Level';
+        case 'generated.miniPlanet.rows.averageTechnologyLevel':
+          return 'Average technology Level';
+        case 'generated.miniPlanet.rows.totalDefences':
+          return 'Total defences';
+        case 'generated.miniPlanet.rows.defenceEntries':
+          return 'Defence entries';
+        case 'generated.miniPlanet.rows.totalShips':
+          return 'Total ships';
+        case 'generated.miniPlanet.rows.shipEntries':
+          return 'Ship entries';
+        case 'generated.miniPlanet.rows.shipyard':
+          return 'Shipyard';
+        case 'generated.miniPlanet.rows.defencesQueue':
+          return 'Defences';
+        case 'generated.miniPlanet.rows.research':
+          return 'Research';
+        case 'generated.miniPlanet.rows.buildingsQueue':
+          return 'Buildings';
+        case 'generated.miniPlanet.rows.empty':
+          return 'Empty';
+        default:
+          if (key.startsWith('communications.shared.diplomaticStatuses.')) {
+            return key.split('.').at(-1) ?? key;
+          }
+
+          return key;
+      }
+    }),
   };
 }
 
@@ -150,11 +240,15 @@ function createPlayerSession(overrides: Partial<PlayerSession> = {}): PlayerSess
     unreadMailCount: 0,
     pendingRequestCount: 0,
     currentGameId: null,
-    ...overrides
+    ...overrides,
   };
 }
 
-function createPlanet(name: string, coordinates: ClientCoordinates, ownerId: number | null): ClientPlanetDto {
+function createPlanet(
+  name: string,
+  coordinates: ClientCoordinates,
+  ownerId: number | null,
+): ClientPlanetDto {
   return {
     coordinates,
     basicInfo: {
@@ -163,7 +257,7 @@ function createPlanet(name: string, coordinates: ClientCoordinates, ownerId: num
       colonizationDifficulty: 1,
       order: 1,
       image: '',
-      size: 100
+      size: 100,
     },
     info: {
       isOwnedByViewer: ownerId !== null,
@@ -179,8 +273,8 @@ function createPlanet(name: string, coordinates: ClientCoordinates, ownerId: num
         scienceModifier: 100,
         industryModifier: 100,
         anomaliesAndNoise: 0,
-        hyperspaceParameters: 100
-      }
+        hyperspaceParameters: 100,
+      },
     },
     objects: {
       resources: { metal: 0, crystal: 0, deuterium: 0 },
@@ -195,9 +289,9 @@ function createPlanet(name: string, coordinates: ClientCoordinates, ownerId: num
       shipyardQueue: [],
       fleets: [],
       spaceDebris: { metal: 0, crystal: 0, deuterium: 0 },
-      tradePortOffers: []
+      tradePortOffers: [],
     },
-    reportData: null
+    reportData: null,
   };
 }
 
@@ -218,13 +312,16 @@ function createForeignPlanet(name: string, coordinates: ClientCoordinates): Clie
         scienceModifier: 100,
         industryModifier: 100,
         anomaliesAndNoise: 0,
-        hyperspaceParameters: 100
-      }
-    }
+        hyperspaceParameters: 100,
+      },
+    },
   };
 }
 
-function createRevealedForeignPlanet(name: string, coordinates: ClientCoordinates): ClientPlanetDto {
+function createRevealedForeignPlanet(
+  name: string,
+  coordinates: ClientCoordinates,
+): ClientPlanetDto {
   return {
     ...createPlanet(name, coordinates, null),
     info: {
@@ -241,8 +338,8 @@ function createRevealedForeignPlanet(name: string, coordinates: ClientCoordinate
         scienceModifier: 100,
         industryModifier: 100,
         anomaliesAndNoise: 0,
-        hyperspaceParameters: 100
-      }
+        hyperspaceParameters: 100,
+      },
     },
     reportData: {
       reportId: 1,
@@ -263,7 +360,7 @@ function createRevealedForeignPlanet(name: string, coordinates: ClientCoordinate
         scienceModifier: 100,
         industryModifier: 100,
         anomaliesAndNoise: 0,
-        hyperspaceParameters: 100
+        hyperspaceParameters: 100,
       },
       averageBuildingLevel: 0,
       averageTotalResources: 0,
@@ -279,7 +376,7 @@ function createRevealedForeignPlanet(name: string, coordinates: ClientCoordinate
       shipyardProduction: {},
       defencesProduction: {},
       researchProduction: {},
-      buildingProduction: {}
-    }
+      buildingProduction: {},
+    },
   };
 }

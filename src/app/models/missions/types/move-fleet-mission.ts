@@ -1,5 +1,6 @@
 import { FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
@@ -91,7 +92,10 @@ export class MoveFleetMission extends FleetMission {
         reports: [
           {
             kind: 'success',
-            body: `${context.fleet.missionType} mission completed successfully at ${context.targetPlanet.basicInfo.name}.`,
+            body: encodeRuntimeText('generated.missionReports.move.successCompleted', {
+              mission: encodeRuntimeText('communications.shared.missions.Move'),
+              targetPlanet: context.targetPlanet.basicInfo.name,
+            }),
           },
         ],
       };
@@ -119,7 +123,9 @@ export class MoveFleetMission extends FleetMission {
             ? [
                 {
                   kind: 'success',
-                  body: `Move mission entered friendly orbit over ${context.targetPlanet.basicInfo.name}.`,
+                  body: encodeRuntimeText('generated.missionReports.move.successFriendlyOrbit', {
+                    targetPlanet: context.targetPlanet.basicInfo.name,
+                  }),
                 },
               ]
             : [],
@@ -134,7 +140,7 @@ export class MoveFleetMission extends FleetMission {
       reports: [
         {
           kind: 'failure',
-          body: 'Move mission failed because the destination became owned by another player before arrival.',
+          body: encodeRuntimeText('generated.missionReports.move.failedTargetOwned'),
         },
       ],
     };
@@ -149,7 +155,7 @@ export class MoveFleetMission extends FleetMission {
       reports: [
         {
           kind: 'failure',
-          body: 'Move mission encountered hostile ships and was forced to retreat after the battle.',
+          body: encodeRuntimeText('generated.missionReports.move.failedRetreat'),
         },
       ],
     };

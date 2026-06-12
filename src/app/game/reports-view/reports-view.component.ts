@@ -7,8 +7,12 @@ import { PlayerSessionService } from '../../core/player-session.service';
 import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
 import { I18nPipe } from '../../i18n/i18n.pipe';
 import { I18nService } from '../../i18n/i18n.service';
+import { resolveRuntimeText, resolveRuntimeTextBlock } from '../../i18n/runtime-text.utils';
 import { ClientPlanetDto } from '../../models/game-api-types';
-import { diplomacyVisualKey, type DiplomacyVisualKey } from '../../models/diplomacy/diplomacy-display';
+import {
+  diplomacyVisualKey,
+  type DiplomacyVisualKey,
+} from '../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../models/diplomacy/diplomatic-status';
 import { ReportType } from '../../models/enums/report-type';
 import { EspionageReportData } from '../../models/reports/espionage-report-data';
@@ -45,10 +49,12 @@ type PlainReportSection = {
 @Component({
   selector: 'app-reports-view',
   imports: [TopMenuComponent, MiniPlanetPreviewComponent, TooltipDirective, I18nPipe],
-  templateUrl: './reports-view.component.html'
+  templateUrl: './reports-view.component.html',
 })
 export class ReportsViewComponent implements OnInit {
-  protected readonly reportTypes = Object.values(ReportType).filter((reportType) => reportType !== ReportType.MESSAGE);
+  protected readonly reportTypes = Object.values(ReportType).filter(
+    (reportType) => reportType !== ReportType.MESSAGE,
+  );
   protected readonly allTab = 'All';
   protected activeTab: ReportType | 'All' = 'All';
   protected isLoading = false;
@@ -71,7 +77,7 @@ export class ReportsViewComponent implements OnInit {
     private readonly authState: AuthStateService,
     private readonly router: Router,
     private readonly gameState: GameStateService,
-    private readonly i18n: I18nService
+    private readonly i18n: I18nService,
   ) {}
 
   public ngOnInit(): void {
@@ -79,11 +85,14 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected visibleReports(): PlayerReport[] {
-    const reports = this.activeTab === this.allTab
-      ? this.reports
-      : this.reports.filter((report) => report.reportType === this.activeTab);
+    const reports =
+      this.activeTab === this.allTab
+        ? this.reports
+        : this.reports.filter((report) => report.reportType === this.activeTab);
 
-    return [...reports].sort((left, right) => right.createdTurn - left.createdTurn || right.reportId - left.reportId);
+    return [...reports].sort(
+      (left, right) => right.createdTurn - left.createdTurn || right.reportId - left.reportId,
+    );
   }
 
   protected reportTypeCount(reportType: ReportType | 'All'): number {
@@ -116,20 +125,25 @@ export class ReportsViewComponent implements OnInit {
 
   protected visibleReportCountLabel(): string {
     const count = this.visibleReports().length;
-    const key = count === 1
-      ? 'communications.reports.inbox.visibleCountOne'
-      : 'communications.reports.inbox.visibleCountMany';
+    const key =
+      count === 1
+        ? 'communications.reports.inbox.visibleCountOne'
+        : 'communications.reports.inbox.visibleCountMany';
     return this.i18n.t(key, { count });
   }
 
   protected selectedCountLabel(): string {
-    return this.i18n.t('communications.reports.inbox.selectedCount', { count: this.selectedReportIds.size });
+    return this.i18n.t('communications.reports.inbox.selectedCount', {
+      count: this.selectedReportIds.size,
+    });
   }
 
   protected favouriteTooltip(isFavourite: boolean): string {
-    return this.i18n.t(isFavourite
-      ? 'communications.reports.tooltips.favouriteOn'
-      : 'communications.reports.tooltips.favouriteOff');
+    return this.i18n.t(
+      isFavourite
+        ? 'communications.reports.tooltips.favouriteOn'
+        : 'communications.reports.tooltips.favouriteOff',
+    );
   }
 
   protected favouriteAriaLabel(isFavourite: boolean): string {
@@ -137,9 +151,13 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected reportStatusLabel(isRead: boolean): string {
-    return this.i18n.t(isRead
-      ? 'communications.reports.badges.read'
-      : 'communications.reports.badges.unread');
+    return this.i18n.t(
+      isRead ? 'communications.reports.badges.read' : 'communications.reports.badges.unread',
+    );
+  }
+
+  protected reportTitle(report: PlayerReport): string {
+    return resolveRuntimeText(this.i18n, report.title);
   }
 
   protected ownerLabelWithStatus(ownerName: string, status: DiplomaticStatus | null): string {
@@ -184,7 +202,9 @@ export class ReportsViewComponent implements OnInit {
       return;
     }
 
-    const shouldSelectAll = visibleReports.some((report) => !this.selectedReportIds.has(report.reportId));
+    const shouldSelectAll = visibleReports.some(
+      (report) => !this.selectedReportIds.has(report.reportId),
+    );
 
     if (!shouldSelectAll) {
       for (const report of visibleReports) {
@@ -213,21 +233,25 @@ export class ReportsViewComponent implements OnInit {
     this.favouriteUpdatingReportId = report.reportId;
     this.actionError = null;
 
-    this.gameApi.setPlayerReportFavourite(
-      {
-        reportId: report.reportId,
-        isFavourite: !report.isFavourite
-      },
-      session.token
-    )
-      .pipe(finalize(() => {
-        this.favouriteUpdatingReportId = null;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .setPlayerReportFavourite(
+        {
+          reportId: report.reportId,
+          isFavourite: !report.isFavourite,
+        },
+        session.token,
+      )
+      .pipe(
+        finalize(() => {
+          this.favouriteUpdatingReportId = null;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (updatedReport) => {
           const mappedReport = fromPlayerReportDto(updatedReport);
-          const existingReport = this.reports.find((entry) => entry.reportId === mappedReport.reportId) ?? null;
+          const existingReport =
+            this.reports.find((entry) => entry.reportId === mappedReport.reportId) ?? null;
           if (!existingReport) {
             return;
           }
@@ -241,9 +265,9 @@ export class ReportsViewComponent implements OnInit {
           this.actionError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('communications.reports.errors.favouriteUpdate')
+            this.i18n.t('communications.reports.errors.favouriteUpdate'),
           );
-        }
+        },
       });
   }
 
@@ -269,22 +293,21 @@ export class ReportsViewComponent implements OnInit {
       return;
     }
 
-    this.gameApi.markPlayerReportAsRead({ reportId: report.reportId }, session.token)
-      .subscribe({
-        next: () => {
-          report.markAsRead();
-          this.syncUnreadReportCount();
-          this.cdr.markForCheck();
-        },
-        error: (error) => {
-          this.actionError = resolveApiErrorMessage(
-            this.i18n,
-            error,
-            this.i18n.t('communications.reports.errors.markRead')
-          );
-          this.cdr.markForCheck();
-        }
-      });
+    this.gameApi.markPlayerReportAsRead({ reportId: report.reportId }, session.token).subscribe({
+      next: () => {
+        report.markAsRead();
+        this.syncUnreadReportCount();
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.actionError = resolveApiErrorMessage(
+          this.i18n,
+          error,
+          this.i18n.t('communications.reports.errors.markRead'),
+        );
+        this.cdr.markForCheck();
+      },
+    });
   }
 
   protected canPreviewLocation(report: PlayerReport | null): boolean {
@@ -292,15 +315,19 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected canOpenInGalaxy(report: PlayerReport | null): boolean {
-    return !!report?.sourceCoordinates
-      && report.sourceCoordinates.x >= 0
-      && report.sourceCoordinates.y >= 0;
+    return (
+      !!report?.sourceCoordinates &&
+      report.sourceCoordinates.x >= 0 &&
+      report.sourceCoordinates.y >= 0
+    );
   }
 
   protected canOpenOriginInGalaxy(report: PlayerReport | null): boolean {
-    return !!report?.originCoordinates
-      && report.originCoordinates.x >= 0
-      && report.originCoordinates.y >= 0;
+    return (
+      !!report?.originCoordinates &&
+      report.originCoordinates.x >= 0 &&
+      report.originCoordinates.y >= 0
+    );
   }
 
   protected openInGalaxy(report: PlayerReport | null, event?: Event): void {
@@ -309,16 +336,13 @@ export class ReportsViewComponent implements OnInit {
       return;
     }
 
-    void this.router.navigate(
-      ['/game/galactic'],
-      {
-        queryParams: {
-          x: report.sourceCoordinates.x,
-          y: report.sourceCoordinates.y,
-          z: report.sourceCoordinates.z
-        }
-      }
-    );
+    void this.router.navigate(['/game/galactic'], {
+      queryParams: {
+        x: report.sourceCoordinates.x,
+        y: report.sourceCoordinates.y,
+        z: report.sourceCoordinates.z,
+      },
+    });
   }
 
   protected openOriginInGalaxy(report: PlayerReport | null, event?: Event): void {
@@ -327,16 +351,13 @@ export class ReportsViewComponent implements OnInit {
       return;
     }
 
-    void this.router.navigate(
-      ['/game/galactic'],
-      {
-        queryParams: {
-          x: report.originCoordinates.x,
-          y: report.originCoordinates.y,
-          z: report.originCoordinates.z
-        }
-      }
-    );
+    void this.router.navigate(['/game/galactic'], {
+      queryParams: {
+        x: report.originCoordinates.x,
+        y: report.originCoordinates.y,
+        z: report.originCoordinates.z,
+      },
+    });
   }
 
   protected previewLocation(report: PlayerReport | null): void {
@@ -366,11 +387,19 @@ export class ReportsViewComponent implements OnInit {
     this.previewPlanet = null;
 
     const previewCoordinates = this.toPreviewClientCoordinates(coordinates);
-    this.gameApi.getClientPlanet(previewCoordinates.x, previewCoordinates.y, previewCoordinates.z, session.token)
-      .pipe(finalize(() => {
-        this.previewLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .getClientPlanet(
+        previewCoordinates.x,
+        previewCoordinates.y,
+        previewCoordinates.z,
+        session.token,
+      )
+      .pipe(
+        finalize(() => {
+          this.previewLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (planet) => {
           this.previewPlanet = planet;
@@ -379,17 +408,21 @@ export class ReportsViewComponent implements OnInit {
           this.previewError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('communications.reports.preview.failed')
+            this.i18n.t('communications.reports.preview.failed'),
           );
-        }
+        },
       });
   }
 
-  private toPreviewClientCoordinates(coordinates: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  private toPreviewClientCoordinates(coordinates: { x: number; y: number; z: number }): {
+    x: number;
+    y: number;
+    z: number;
+  } {
     return {
       x: coordinates.x,
       y: coordinates.y,
-      z: Math.max(0, coordinates.z - 1)
+      z: Math.max(0, coordinates.z - 1),
     };
   }
 
@@ -406,26 +439,33 @@ export class ReportsViewComponent implements OnInit {
 
     this.isDeleting = true;
     this.actionError = null;
-    const reportIds = Array.from(this.selectedReportIds.values())
-      .filter((reportId) => !this.reports.find((report) => report.reportId === reportId)?.isFavourite);
+    const reportIds = Array.from(this.selectedReportIds.values()).filter(
+      (reportId) => !this.reports.find((report) => report.reportId === reportId)?.isFavourite,
+    );
     if (reportIds.length === 0) {
       this.isDeleting = false;
       this.selectedReportIds.clear();
       return;
     }
 
-    this.gameApi.deletePlayerReports({ reportIds }, session.token)
-      .pipe(finalize(() => {
-        this.isDeleting = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .deletePlayerReports({ reportIds }, session.token)
+      .pipe(
+        finalize(() => {
+          this.isDeleting = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: () => {
-          const deletedUnreadCount = this.reports.filter((report) =>
-            reportIds.includes(report.reportId) && !report.isRead
+          const deletedUnreadCount = this.reports.filter(
+            (report) => reportIds.includes(report.reportId) && !report.isRead,
           ).length;
           this.reports = this.reports.filter((report) => !reportIds.includes(report.reportId));
-          if (this.selectedReportId !== null && !this.reports.some((report) => report.reportId === this.selectedReportId)) {
+          if (
+            this.selectedReportId !== null &&
+            !this.reports.some((report) => report.reportId === this.selectedReportId)
+          ) {
             this.selectedReportId = null;
           }
           this.selectedReportIds.clear();
@@ -437,9 +477,9 @@ export class ReportsViewComponent implements OnInit {
           this.actionError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('communications.reports.errors.deleteSelected')
+            this.i18n.t('communications.reports.errors.deleteSelected'),
           );
-        }
+        },
       });
   }
 
@@ -448,11 +488,16 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected originCoordinatesLabel(report: PlayerReport): string {
-    return report.originCoordinatesLabel() ?? this.i18n.t('communications.reports.errors.noOriginCoordinates');
+    return (
+      report.originCoordinatesLabel() ??
+      this.i18n.t('communications.reports.errors.noOriginCoordinates')
+    );
   }
 
   protected originLabel(report: PlayerReport): string {
-    const originParts = [report.originSystemName, report.originPlanetName].filter((entry): entry is string => !!entry);
+    const originParts = [report.originSystemName, report.originPlanetName].filter(
+      (entry): entry is string => !!entry,
+    );
     if (originParts.length > 0) {
       return `${originParts.join(' | ')} (${this.originCoordinatesLabel(report)})`;
     }
@@ -465,7 +510,9 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected sourceLabel(report: PlayerReport): string {
-    const sourceParts = [report.sourceSystemName, report.sourcePlanetName].filter((entry): entry is string => !!entry);
+    const sourceParts = [report.sourceSystemName, report.sourcePlanetName].filter(
+      (entry): entry is string => !!entry,
+    );
     if (sourceParts.length > 0) {
       return sourceParts.join(' | ');
     }
@@ -474,11 +521,18 @@ export class ReportsViewComponent implements OnInit {
   }
 
   protected previewOwnerLabel(): string | null {
-    if (this.previewPlanet?.info.ownerId === null || this.previewPlanet?.info.ownerId === undefined || !this.previewPlanet.info.ownerPlayerName) {
+    if (
+      this.previewPlanet?.info.ownerId === null ||
+      this.previewPlanet?.info.ownerId === undefined ||
+      !this.previewPlanet.info.ownerPlayerName
+    ) {
       return null;
     }
 
-    return this.ownerLabelWithStatus(this.previewPlanet.info.ownerPlayerName, this.previewOwnerStatus());
+    return this.ownerLabelWithStatus(
+      this.previewPlanet.info.ownerPlayerName,
+      this.previewOwnerStatus(),
+    );
   }
 
   protected previewOwnerRelationKey(): DiplomacyVisualKey | 'none' {
@@ -488,27 +542,63 @@ export class ReportsViewComponent implements OnInit {
 
   protected espionageSummaryMetrics(report: EspionageReportData): ReportDossierMetric[] {
     return [
-      { label: this.i18n.t('communications.reports.rowLabels.avgBuilding'), value: this.formatMetricValue(report.averageBuildingLevel) },
-      { label: this.i18n.t('communications.reports.rowLabels.avgTech'), value: this.formatMetricValue(report.averageTechLevel) },
-      { label: this.i18n.t('communications.reports.rowLabels.avgResources'), value: this.formatMetricValue(report.averageTotalResources) },
-      { label: this.i18n.t('communications.reports.rowLabels.totalShips'), value: this.formatMetricValue(report.totalShipsAmount) },
-      { label: this.i18n.t('communications.reports.rowLabels.totalDefences'), value: this.formatMetricValue(report.totalDefencesAmount) },
-      { label: this.i18n.t('communications.reports.rowLabels.knownStructures'), value: this.formatMetricValue(report.buildingsLevels.size) }
+      {
+        label: this.i18n.t('communications.reports.rowLabels.avgBuilding'),
+        value: this.formatMetricValue(report.averageBuildingLevel),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.avgTech'),
+        value: this.formatMetricValue(report.averageTechLevel),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.avgResources'),
+        value: this.formatMetricValue(report.averageTotalResources),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.totalShips'),
+        value: this.formatMetricValue(report.totalShipsAmount),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.totalDefences'),
+        value: this.formatMetricValue(report.totalDefencesAmount),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.knownStructures'),
+        value: this.formatMetricValue(report.buildingsLevels.size),
+      },
     ];
   }
 
   protected espionageResourceRows(report: EspionageReportData): ReportDossierRow[] {
     const rows: ReportDossierRow[] = [
-      { label: this.i18n.t('communications.reports.rowLabels.metal'), value: this.formatMetricValue(report.resourcesAmount.metal) },
-      { label: this.i18n.t('communications.reports.rowLabels.crystal'), value: this.formatMetricValue(report.resourcesAmount.crystal) },
-      { label: this.i18n.t('communications.reports.rowLabels.deuterium'), value: this.formatMetricValue(report.resourcesAmount.deuterium) }
+      {
+        label: this.i18n.t('communications.reports.rowLabels.metal'),
+        value: this.formatMetricValue(report.resourcesAmount.metal),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.crystal'),
+        value: this.formatMetricValue(report.resourcesAmount.crystal),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.deuterium'),
+        value: this.formatMetricValue(report.resourcesAmount.deuterium),
+      },
     ];
 
     if (report.spaceDebrisAmount.getTotalResourceAmount() > 0) {
       rows.push(
-        { label: this.i18n.t('communications.reports.rowLabels.debrisMetal'), value: this.formatMetricValue(report.spaceDebrisAmount.metal) },
-        { label: this.i18n.t('communications.reports.rowLabels.debrisCrystal'), value: this.formatMetricValue(report.spaceDebrisAmount.crystal) },
-        { label: this.i18n.t('communications.reports.rowLabels.debrisDeuterium'), value: this.formatMetricValue(report.spaceDebrisAmount.deuterium) }
+        {
+          label: this.i18n.t('communications.reports.rowLabels.debrisMetal'),
+          value: this.formatMetricValue(report.spaceDebrisAmount.metal),
+        },
+        {
+          label: this.i18n.t('communications.reports.rowLabels.debrisCrystal'),
+          value: this.formatMetricValue(report.spaceDebrisAmount.crystal),
+        },
+        {
+          label: this.i18n.t('communications.reports.rowLabels.debrisDeuterium'),
+          value: this.formatMetricValue(report.spaceDebrisAmount.deuterium),
+        },
       );
     }
 
@@ -530,7 +620,7 @@ export class ReportsViewComponent implements OnInit {
   protected espionageDefenceRows(report: EspionageReportData): ReportDossierRow[] {
     return report.defences.map((entry) => ({
       label: entry.type,
-      value: this.formatMetricValue(entry.amount)
+      value: this.formatMetricValue(entry.amount),
     }));
   }
 
@@ -538,33 +628,77 @@ export class ReportsViewComponent implements OnInit {
     const parameters = report.planetaryParameters;
 
     return [
-      { label: this.i18n.t('communications.reports.rowLabels.size'), value: this.formatMetricValue(report.size) },
-      { label: this.i18n.t('communications.reports.rowLabels.diff'), value: this.formatMetricValue(report.diff) },
-      { label: this.i18n.t('communications.reports.rowLabels.metalModifier'), value: this.formatPlanetaryParameterPercent(parameters.metalModifier), tone: this.parameterTone(parameters.metalModifier) },
-      { label: this.i18n.t('communications.reports.rowLabels.crystalModifier'), value: this.formatPlanetaryParameterPercent(parameters.crystalModifier), tone: this.parameterTone(parameters.crystalModifier) },
-      { label: this.i18n.t('communications.reports.rowLabels.deuteriumModifier'), value: this.formatPlanetaryParameterPercent(parameters.deuteriumModifier), tone: this.parameterTone(parameters.deuteriumModifier) },
-      { label: this.i18n.t('communications.reports.rowLabels.energyModifierRes'), value: this.formatPlanetaryParameterPercent(parameters.energyModifierRES), tone: this.parameterTone(parameters.energyModifierRES) },
-      { label: this.i18n.t('communications.reports.rowLabels.energyModifierNuclear'), value: this.formatPlanetaryParameterPercent(parameters.energyModifierNuclear), tone: this.parameterTone(parameters.energyModifierNuclear) },
-      { label: this.i18n.t('communications.reports.rowLabels.scienceModifier'), value: this.formatPlanetaryParameterPercent(parameters.scienceModifier), tone: this.parameterTone(parameters.scienceModifier) },
-      { label: this.i18n.t('communications.reports.rowLabels.industryModifier'), value: this.formatPlanetaryParameterPercent(parameters.industryModifier), tone: this.parameterTone(parameters.industryModifier) },
-      { label: this.i18n.t('communications.reports.rowLabels.anomaliesAndNoise'), value: this.formatPlanetaryParameterPercent(parameters.anomaliesAndNoise), tone: this.parameterTone(parameters.anomaliesAndNoise) },
-      { label: this.i18n.t('communications.reports.rowLabels.hyperspaceParameters'), value: this.formatPlanetaryParameterPercent(parameters.hyperspaceParameters), tone: this.parameterTone(parameters.hyperspaceParameters) }
+      {
+        label: this.i18n.t('communications.reports.rowLabels.size'),
+        value: this.formatMetricValue(report.size),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.diff'),
+        value: this.formatMetricValue(report.diff),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.metalModifier'),
+        value: this.formatPlanetaryParameterPercent(parameters.metalModifier),
+        tone: this.parameterTone(parameters.metalModifier),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.crystalModifier'),
+        value: this.formatPlanetaryParameterPercent(parameters.crystalModifier),
+        tone: this.parameterTone(parameters.crystalModifier),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.deuteriumModifier'),
+        value: this.formatPlanetaryParameterPercent(parameters.deuteriumModifier),
+        tone: this.parameterTone(parameters.deuteriumModifier),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.energyModifierRes'),
+        value: this.formatPlanetaryParameterPercent(parameters.energyModifierRES),
+        tone: this.parameterTone(parameters.energyModifierRES),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.energyModifierNuclear'),
+        value: this.formatPlanetaryParameterPercent(parameters.energyModifierNuclear),
+        tone: this.parameterTone(parameters.energyModifierNuclear),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.scienceModifier'),
+        value: this.formatPlanetaryParameterPercent(parameters.scienceModifier),
+        tone: this.parameterTone(parameters.scienceModifier),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.industryModifier'),
+        value: this.formatPlanetaryParameterPercent(parameters.industryModifier),
+        tone: this.parameterTone(parameters.industryModifier),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.anomaliesAndNoise'),
+        value: this.formatPlanetaryParameterPercent(parameters.anomaliesAndNoise),
+        tone: this.parameterTone(parameters.anomaliesAndNoise),
+      },
+      {
+        label: this.i18n.t('communications.reports.rowLabels.hyperspaceParameters'),
+        value: this.formatPlanetaryParameterPercent(parameters.hyperspaceParameters),
+        tone: this.parameterTone(parameters.hyperspaceParameters),
+      },
     ];
   }
 
   protected dossierCopy(report: EspionageReportData): string {
     return this.i18n.t('communications.reports.dossier.copy', {
-      source: this.sourceLabel(report)
+      source: this.sourceLabel(report),
     });
   }
 
   protected plainReportView(report: PlayerReport): PlainReportView {
-    const [metadataBlock, ...bodyBlocks] = report.show().split(/\n\s*\n/);
+    const [metadataBlock, ...bodyBlocks] = resolveRuntimeTextBlock(this.i18n, report.show()).split(
+      /\n\s*\n/,
+    );
     const metadataRows = this.parsePlainReportRows(metadataBlock.split('\n'));
     const bodyLines = bodyBlocks.join('\n\n').split('\n');
     return {
       metadataRows,
-      bodySections: this.parsePlainReportBodySections(bodyLines)
+      bodySections: this.parsePlainReportBodySections(bodyLines),
     };
   }
 
@@ -587,14 +721,14 @@ export class ReportsViewComponent implements OnInit {
       })
       .map(([label, value]) => ({
         label: String(label),
-        value: this.formatMetricValue(value)
+        value: this.formatMetricValue(value),
       }));
   }
 
   private parsePlainReportBodySections(lines: string[]): PlainReportSection[] {
     const sections: PlainReportSection[] = [];
     let currentSection = this.createPlainReportSection(
-      this.i18n?.t('communications.reports.plain.sections.defaultTitle') ?? 'Report Details'
+      this.i18n?.t('communications.reports.plain.sections.defaultTitle') ?? 'Report Details',
     );
 
     for (const rawLine of lines) {
@@ -647,7 +781,7 @@ export class ReportsViewComponent implements OnInit {
     return {
       label,
       value,
-      tone: this.plainReportTone(label, value)
+      tone: this.plainReportTone(label, value),
     };
   }
 
@@ -663,31 +797,31 @@ export class ReportsViewComponent implements OnInit {
     return {
       title,
       rows: [],
-      notes: []
+      notes: [],
     };
   }
 
   private plainReportTone(label: string, value: string): 'positive' | 'negative' | 'neutral' {
     const text = `${label} ${value}`.toLowerCase();
     if (
-      text.includes('success')
-      || text.includes('survived')
-      || text.includes('stolen')
-      || text.includes('repaired')
-      || text.includes('delivered')
-      || text.includes('created')
+      text.includes('success') ||
+      text.includes('survived') ||
+      text.includes('stolen') ||
+      text.includes('repaired') ||
+      text.includes('delivered') ||
+      text.includes('created')
     ) {
       return 'positive';
     }
 
     if (
-      text.includes('failure')
-      || text.includes('lost')
-      || text.includes('losses')
-      || text.includes('destroyed')
-      || text.includes('damage')
-      || text.includes('blocked')
-      || text.includes('none')
+      text.includes('failure') ||
+      text.includes('lost') ||
+      text.includes('losses') ||
+      text.includes('destroyed') ||
+      text.includes('damage') ||
+      text.includes('blocked') ||
+      text.includes('none')
     ) {
       return 'negative';
     }
@@ -706,7 +840,7 @@ export class ReportsViewComponent implements OnInit {
 
     return value.toLocaleString('en-US', {
       minimumFractionDigits: 0,
-      maximumFractionDigits: 1
+      maximumFractionDigits: 1,
     });
   }
 
@@ -738,12 +872,17 @@ export class ReportsViewComponent implements OnInit {
   }
 
   private previewOwnerStatus(): DiplomaticStatus | null {
-    if (this.previewPlanet?.info.ownerId === null || this.previewPlanet?.info.ownerId === undefined) {
+    if (
+      this.previewPlanet?.info.ownerId === null ||
+      this.previewPlanet?.info.ownerId === undefined
+    ) {
       return null;
     }
 
     const session = this.playerSession.load();
-    const viewerId = session?.playerId ?? (this.previewPlanet.info.isOwnedByViewer ? this.previewPlanet.info.ownerId : null);
+    const viewerId =
+      session?.playerId ??
+      (this.previewPlanet.info.isOwnedByViewer ? this.previewPlanet.info.ownerId : null);
     if (viewerId === null || viewerId === undefined) {
       return null;
     }
@@ -762,11 +901,14 @@ export class ReportsViewComponent implements OnInit {
     this.loadError = null;
     this.actionError = null;
 
-    this.gameApi.getPlayerReports(session.token)
-      .pipe(finalize(() => {
-        this.isLoading = false;
-        this.cdr.markForCheck();
-      }))
+    this.gameApi
+      .getPlayerReports(session.token)
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
         next: (reports) => {
           this.reports = reports.map((report) => fromPlayerReportDto(report));
@@ -780,9 +922,9 @@ export class ReportsViewComponent implements OnInit {
           this.loadError = resolveApiErrorMessage(
             this.i18n,
             error,
-            this.i18n.t('communications.reports.errors.load')
+            this.i18n.t('communications.reports.errors.load'),
           );
-        }
+        },
       });
   }
 
@@ -791,7 +933,9 @@ export class ReportsViewComponent implements OnInit {
   }
 
   private localizedDiplomaticStatus(status: DiplomaticStatus): string {
-    return this.i18n.t(`communications.shared.diplomaticStatuses.${status === DiplomaticStatus.PASSIVE ? DiplomaticStatus.NEUTRAL : status}`);
+    return this.i18n.t(
+      `communications.shared.diplomaticStatuses.${status === DiplomaticStatus.PASSIVE ? DiplomaticStatus.NEUTRAL : status}`,
+    );
   }
 
   private syncUnreadReportCount(): void {
@@ -802,7 +946,7 @@ export class ReportsViewComponent implements OnInit {
 
     this.authState.setSession({
       ...session,
-      unreadReportCount: this.reports.filter((report) => !report.isRead).length
+      unreadReportCount: this.reports.filter((report) => !report.isRead).length,
     });
   }
 }

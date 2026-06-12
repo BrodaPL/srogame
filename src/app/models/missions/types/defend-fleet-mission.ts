@@ -1,5 +1,6 @@
 import { FleetOrbitActivity, FleetState } from '../../fleets/fleet';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
@@ -74,7 +75,9 @@ export class DefendFleetMission extends FleetMission {
         reports: [
           {
             kind: 'success',
-            body: `Guard mission entered orbit over ${context.targetPlanet.basicInfo.name}.`,
+            body: encodeRuntimeText('generated.missionReports.defend.successOrbit', {
+              targetPlanet: context.targetPlanet.basicInfo.name,
+            }),
           },
         ],
       };
@@ -88,7 +91,7 @@ export class DefendFleetMission extends FleetMission {
       reports: [
         {
           kind: 'failure',
-          body: 'Guard mission failed because the destination became hostile before arrival.',
+          body: encodeRuntimeText('generated.missionReports.defend.failedTargetHostile'),
         },
       ],
     };
@@ -103,7 +106,7 @@ export class DefendFleetMission extends FleetMission {
       reports: [
         {
           kind: 'failure',
-          body: 'Guard mission encountered hostile ships and was forced to retreat after the battle.',
+          body: encodeRuntimeText('generated.missionReports.defend.failedRetreat'),
         },
       ],
     };

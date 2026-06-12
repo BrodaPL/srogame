@@ -4,6 +4,7 @@ import { ShipType } from '../../enums/ship-type';
 import type { Ship } from '../../fleets/ship';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { DefenceBlueprintsFactory } from '../../../factories/defence-blueprints.factory';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
@@ -110,7 +111,7 @@ export class ArmamentDeliveryFleetMission extends FleetMission {
       reports: [
         {
           kind: 'failure',
-          body: 'Armament Delivery mission encountered hostile ships, kept its undelivered cargo and armaments, and was forced to retreat after the battle.',
+          body: encodeRuntimeText('generated.missionReports.armamentDelivery.failedRetreat'),
         },
       ],
     };
@@ -128,7 +129,9 @@ export class ArmamentDeliveryFleetMission extends FleetMission {
         reports: [
           {
             kind: 'failure',
-            body: 'Armament Delivery mission failed because the target was no longer available on arrival.',
+            body: encodeRuntimeText(
+              'generated.missionReports.armamentDelivery.failedTargetUnavailable',
+            ),
           },
         ],
       };
@@ -151,7 +154,9 @@ export class ArmamentDeliveryFleetMission extends FleetMission {
         reports: [
           {
             kind: 'failure',
-            body: 'Armament Delivery mission failed because the target was no longer valid on arrival.',
+            body: encodeRuntimeText(
+              'generated.missionReports.armamentDelivery.failedTargetInvalid',
+            ),
           },
         ],
       };
@@ -170,7 +175,10 @@ export class ArmamentDeliveryFleetMission extends FleetMission {
       reports: [
         {
           kind: 'success',
-          body: `${context.fleet.missionType} mission delivered resources and armaments to ${context.targetPlanet.basicInfo.name}.`,
+          body: encodeRuntimeText('generated.missionReports.armamentDelivery.successDelivered', {
+            mission: encodeRuntimeText('communications.shared.missions.Armament Delivery'),
+            targetPlanet: context.targetPlanet.basicInfo.name,
+          }),
         },
       ],
     };

@@ -1,14 +1,29 @@
-import { ChangeDetectorRef, Component, EventEmitter, HostListener, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  HostListener,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
 import { GameApiService } from '../../../core/game-api.service';
 import { PlayerSessionService } from '../../../core/player-session.service';
 import { resolveApiErrorMessage } from '../../../i18n/api-message.utils';
+import { I18nPipe } from '../../../i18n/i18n.pipe';
 import { I18nService } from '../../../i18n/i18n.service';
 import { PlanetType } from '../../../models/enums/planet-type';
 import { ShipType } from '../../../models/enums/ship-type';
 import { TechnologyType } from '../../../models/enums/technology-type';
-import type { ClientCoordinates, ClientPlanetDto, ClientStarSystemDto, CreateStarSystemSpyRequest } from '../../../models/game-api-types';
+import type {
+  ClientCoordinates,
+  ClientPlanetDto,
+  ClientStarSystemDto,
+  CreateStarSystemSpyRequest,
+} from '../../../models/game-api-types';
 import { ManyShips } from '../../../models/fleets/many-ships';
 import { FleetState } from '../../../models/fleets/fleet';
 import type { Fleet } from '../../../models/fleets/fleet';
@@ -32,9 +47,9 @@ type SpySystemOriginVm = {
 
 @Component({
   selector: 'app-spy-solar-system-dialog',
-  imports: [FormsModule, TooltipDirective],
+  imports: [FormsModule, TooltipDirective, I18nPipe],
   templateUrl: './spy-solar-system-dialog.component.html',
-  styleUrl: './spy-solar-system-dialog.component.css'
+  styleUrl: './spy-solar-system-dialog.component.css',
 })
 export class SpySolarSystemDialogComponent implements OnChanges {
   @Input() public isOpen = false;
@@ -56,7 +71,7 @@ export class SpySolarSystemDialogComponent implements OnChanges {
     private readonly gameApi: GameApiService,
     private readonly playerSession: PlayerSessionService,
     private readonly changeDetectorRef: ChangeDetectorRef,
-    private readonly i18n: I18nService
+    private readonly i18n: I18nService,
   ) {}
 
   public ngOnChanges(changes: SimpleChanges): void {
@@ -93,7 +108,9 @@ export class SpySolarSystemDialogComponent implements OnChanges {
   }
 
   protected selectedOrigin(): SpySystemOriginVm | null {
-    return this.eligibleOrigins.find((entry) => entry.key === this.selectedOriginCoordinates) ?? null;
+    return (
+      this.eligibleOrigins.find((entry) => entry.key === this.selectedOriginCoordinates) ?? null
+    );
   }
 
   protected requiredProbeCount(): number {
@@ -119,28 +136,35 @@ export class SpySolarSystemDialogComponent implements OnChanges {
   }
 
   protected fleetSlotBlockerMessage(): string | null {
-    if ((this.activeFleetCount + this.requiredFleetSlots()) <= this.maxActiveFleetCount) {
+    if (this.activeFleetCount + this.requiredFleetSlots() <= this.maxActiveFleetCount) {
       return null;
     }
 
-    return `Spy solar system needs ${this.requiredFleetSlots()} free fleet slots, but only ${this.fleetSlotsRemaining()} are available.`;
+    return this.i18n.t('generated.spyDialog.solarSystem.fleetSlotsBlocked', {
+      required: this.requiredFleetSlots(),
+      available: this.fleetSlotsRemaining(),
+    });
   }
 
   protected originAvailabilityMessage(): string {
     if (this.targetPlanets.length <= 0) {
-      return 'No non-owned, non-asteroid planets are available in this star system.';
+      return this.i18n.t('generated.spyDialog.solarSystem.noTargets');
     }
 
-    return `No owned planets or orbiting fleets with at least ${this.requiredProbeCount()} espionage probes are available.`;
+    return this.i18n.t('generated.spyDialog.solarSystem.noOrigins', {
+      count: this.requiredProbeCount(),
+    });
   }
 
   protected canLaunch(): boolean {
-    return !this.isLoading
-      && !this.isLaunching
-      && !!this.starSystem
-      && this.targetPlanets.length > 0
-      && !!this.selectedOrigin()
-      && this.fleetSlotBlockerMessage() === null;
+    return (
+      !this.isLoading &&
+      !this.isLaunching &&
+      !!this.starSystem &&
+      this.targetPlanets.length > 0 &&
+      !!this.selectedOrigin() &&
+      this.fleetSlotBlockerMessage() === null
+    );
   }
 
   protected setSelectedOrigin(coordinatesLabel: string): void {
@@ -156,39 +180,48 @@ export class SpySolarSystemDialogComponent implements OnChanges {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.error = 'No player session found.';
+      this.error = this.i18n.t('generated.spyDialog.solarSystem.noSession');
       return;
     }
 
     const request: CreateStarSystemSpyRequest = {
       systemCoordinates: {
         x: this.starSystem.coordinates.x,
-        y: this.starSystem.coordinates.y
+        y: this.starSystem.coordinates.y,
       },
       origin: selectedOrigin.coordinates,
-      originFleetId: selectedOrigin.originFleetId
+      originFleetId: selectedOrigin.originFleetId,
     };
 
     this.isLaunching = true;
     this.error = null;
 
-    this.gameApi.createStarSystemSpyMission(request, session.token)
-      .pipe(finalize(() => {
-        this.isLaunching = false;
-        this.changeDetectorRef.markForCheck();
-      }))
+    this.gameApi
+      .createStarSystemSpyMission(request, session.token)
+      .pipe(
+        finalize(() => {
+          this.isLaunching = false;
+          this.changeDetectorRef.markForCheck();
+        }),
+      )
       .subscribe({
         next: (response) => {
           const message = response.message?.trim().length
             ? response.message
-            : `Star system espionage launched across ${this.systemCoordinatesLabel()}.`;
+            : this.i18n.t('generated.missionReports.spy.solarSystemLaunched', {
+                coordinates: this.systemCoordinatesLabel(),
+              });
           this.launched.emit({ message });
           this.closed.emit();
         },
         error: (error) => {
-          this.error = resolveApiErrorMessage(this.i18n, error, 'Unable to launch star system espionage.');
+          this.error = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('generated.spyDialog.solarSystem.launchFailed'),
+          );
           this.changeDetectorRef.markForCheck();
-        }
+        },
       });
   }
 
@@ -199,12 +232,12 @@ export class SpySolarSystemDialogComponent implements OnChanges {
       this.selectedOriginCoordinates = '';
       this.activeFleetCount = 0;
       this.maxActiveFleetCount = maxActiveFleets(0);
-      this.error = 'Star system is unavailable.';
+      this.error = this.i18n.t('generated.spyDialog.solarSystem.starSystemUnavailable');
       return;
     }
 
-    this.targetPlanets = this.starSystem.planets.filter((planet) =>
-      planet.basicInfo.type !== PlanetType.ASTEROIDS && !planet.info.isOwnedByViewer
+    this.targetPlanets = this.starSystem.planets.filter(
+      (planet) => planet.basicInfo.type !== PlanetType.ASTEROIDS && !planet.info.isOwnedByViewer,
     );
     this.eligibleOrigins = [];
     this.selectedOriginCoordinates = '';
@@ -217,7 +250,7 @@ export class SpySolarSystemDialogComponent implements OnChanges {
 
     const session = this.playerSession.load();
     if (!session) {
-      this.error = 'No player session found.';
+      this.error = this.i18n.t('generated.spyDialog.solarSystem.noSession');
       return;
     }
 
@@ -226,30 +259,35 @@ export class SpySolarSystemDialogComponent implements OnChanges {
 
     forkJoin({
       ownedPlanets: this.gameApi.getOwnedPlanets(session.token),
-      activeFleets: this.gameApi.getActiveFleets(session.token)
+      activeFleets: this.gameApi.getActiveFleets(session.token),
     })
-      .pipe(finalize(() => {
-        this.isLoading = false;
-        this.changeDetectorRef.markForCheck();
-      }))
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+          this.changeDetectorRef.markForCheck();
+        }),
+      )
       .subscribe({
         next: ({ ownedPlanets, activeFleets }) => {
           this.activeFleetCount = activeFleets.length;
-          this.maxActiveFleetCount = maxActiveFleets(this.techLevel(ownedPlanets, TechnologyType.COMPUTER_TECHNOLOGY));
+          this.maxActiveFleetCount = maxActiveFleets(
+            this.techLevel(ownedPlanets, TechnologyType.COMPUTER_TECHNOLOGY),
+          );
           this.eligibleOrigins = [
             ...ownedPlanets.map((planet) => this.buildPlanetOriginVm(planet, this.targetPlanets)),
-            ...activeFleets.map((fleet) => this.buildFleetOriginVm(fleet, this.targetPlanets))
+            ...activeFleets.map((fleet) => this.buildFleetOriginVm(fleet, this.targetPlanets)),
           ]
             .filter((entry): entry is SpySystemOriginVm => entry !== null)
             .filter((entry) => entry.totalProbes >= this.requiredProbeCount())
-            .sort((left, right) =>
-              left.totalDistance - right.totalDistance
-              || left.maxDistance - right.maxDistance
-              || left.coordinates.y - right.coordinates.y
-              || left.coordinates.x - right.coordinates.x
-              || left.coordinates.z - right.coordinates.z
-              || left.kind.localeCompare(right.kind)
-              || left.originName.localeCompare(right.originName)
+            .sort(
+              (left, right) =>
+                left.totalDistance - right.totalDistance ||
+                left.maxDistance - right.maxDistance ||
+                left.coordinates.y - right.coordinates.y ||
+                left.coordinates.x - right.coordinates.x ||
+                left.coordinates.z - right.coordinates.z ||
+                left.kind.localeCompare(right.kind) ||
+                left.originName.localeCompare(right.originName),
             );
 
           if (this.eligibleOrigins.length > 0) {
@@ -257,8 +295,12 @@ export class SpySolarSystemDialogComponent implements OnChanges {
           }
         },
         error: (error) => {
-          this.error = resolveApiErrorMessage(this.i18n, error, 'Unable to load star system spy origins.');
-        }
+          this.error = resolveApiErrorMessage(
+            this.i18n,
+            error,
+            this.i18n.t('generated.spyDialog.solarSystem.loadOriginsFailed'),
+          );
+        },
       });
   }
 
@@ -270,10 +312,12 @@ export class SpySolarSystemDialogComponent implements OnChanges {
 
   private buildPlanetOriginVm(
     planet: ClientPlanetDto,
-    targetPlanets: ClientPlanetDto[]
+    targetPlanets: ClientPlanetDto[],
   ): SpySystemOriginVm | null {
-    const undamagedProbes = ManyShips.undamagedCountByType(planet.objects.ships).get(ShipType.SPY_PROBE) ?? 0;
-    const damagedProbes = ManyShips.damagedCountByType(planet.objects.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const undamagedProbes =
+      ManyShips.undamagedCountByType(planet.objects.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const damagedProbes =
+      ManyShips.damagedCountByType(planet.objects.ships).get(ShipType.SPY_PROBE) ?? 0;
     const totalProbes = undamagedProbes + damagedProbes;
     if (totalProbes <= 0) {
       return null;
@@ -288,9 +332,11 @@ export class SpySolarSystemDialogComponent implements OnChanges {
     }
 
     const coordinatesLabel = this.formatCoordinates(planet.coordinates);
-    const probeLabel = damagedProbes > 0
-      ? `${totalProbes} probe${totalProbes === 1 ? '' : 's'} (${damagedProbes} damaged)`
-      : `${totalProbes} probe${totalProbes === 1 ? '' : 's'}`;
+    const probeLabel = this.probeLabel(
+      totalProbes,
+      damagedProbes,
+      'generated.spyDialog.solarSystem',
+    );
 
     return {
       key: `planet:${coordinatesLabel}`,
@@ -298,25 +344,30 @@ export class SpySolarSystemDialogComponent implements OnChanges {
       originFleetId: null,
       originName: planet.basicInfo.name,
       coordinates: planet.coordinates,
-      label: `${planet.basicInfo.name} (${coordinatesLabel}) | ${probeLabel}`,
+      label: this.i18n.t('generated.spyDialog.solarSystem.planetOriginLabel', {
+        planet: planet.basicInfo.name,
+        coordinates: coordinatesLabel,
+        probeLabel,
+      }),
       coordinatesLabel,
       totalProbes,
       undamagedProbes,
       damagedProbes,
       totalDistance,
-      maxDistance
+      maxDistance,
     };
   }
 
   private buildFleetOriginVm(
     fleet: Fleet,
-    targetPlanets: ClientPlanetDto[]
+    targetPlanets: ClientPlanetDto[],
   ): SpySystemOriginVm | null {
     if (fleet.state !== FleetState.ORBITING || fleet.pendingMaintenanceRequestId !== null) {
       return null;
     }
 
-    const undamagedProbes = ManyShips.undamagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
+    const undamagedProbes =
+      ManyShips.undamagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
     const damagedProbes = ManyShips.damagedCountByType(fleet.ships).get(ShipType.SPY_PROBE) ?? 0;
     const totalProbes = undamagedProbes + damagedProbes;
     if (totalProbes <= 0) {
@@ -333,9 +384,11 @@ export class SpySolarSystemDialogComponent implements OnChanges {
     }
 
     const coordinatesLabel = this.formatCoordinates(coordinates);
-    const probeLabel = damagedProbes > 0
-      ? `${totalProbes} probe${totalProbes === 1 ? '' : 's'} (${damagedProbes} damaged)`
-      : `${totalProbes} probe${totalProbes === 1 ? '' : 's'}`;
+    const probeLabel = this.probeLabel(
+      totalProbes,
+      damagedProbes,
+      'generated.spyDialog.solarSystem',
+    );
 
     return {
       key: `fleet:${fleet.fleetId}`,
@@ -343,13 +396,18 @@ export class SpySolarSystemDialogComponent implements OnChanges {
       originFleetId: fleet.fleetId,
       originName: `Fleet #${fleet.fleetId}`,
       coordinates,
-      label: `Fleet #${fleet.fleetId} orbiting ${fleet.targetPlanetName} (${coordinatesLabel}) | ${probeLabel}`,
+      label: this.i18n.t('generated.spyDialog.solarSystem.fleetOriginLabel', {
+        fleetId: fleet.fleetId,
+        targetPlanet: fleet.targetPlanetName,
+        coordinates: coordinatesLabel,
+        probeLabel,
+      }),
       coordinatesLabel,
       totalProbes,
       undamagedProbes,
       damagedProbes,
       totalDistance,
-      maxDistance
+      maxDistance,
     };
   }
 
@@ -359,5 +417,19 @@ export class SpySolarSystemDialogComponent implements OnChanges {
 
   private formatCoordinates(coordinates: ClientCoordinates): string {
     return `${coordinates.x}:${coordinates.y}:${coordinates.z}`;
+  }
+
+  private probeLabel(totalProbes: number, damagedProbes: number, keyPrefix: string): string {
+    if (damagedProbes > 0) {
+      return this.i18n.t(`${keyPrefix}.probeLabelDamaged`, {
+        count: totalProbes,
+        damaged: damagedProbes,
+      });
+    }
+
+    return this.i18n.t(
+      totalProbes === 1 ? `${keyPrefix}.probeLabelOne` : `${keyPrefix}.probeLabelMany`,
+      { count: totalProbes },
+    );
   }
 }

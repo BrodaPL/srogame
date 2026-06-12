@@ -7,6 +7,7 @@ import { communicationsPl } from './communications.pl';
 import { encyclopediaPl } from './encyclopedia.pl';
 import { galacticPl } from './galactic.pl';
 import { gameShellPl } from './game-shell.pl';
+import { generatedPl } from './generated.pl';
 import { helpAboutPl } from './help-about.pl';
 import { imperiumPl } from './imperium.pl';
 import { loadGamePl } from './load-game.pl';
@@ -32,6 +33,7 @@ export const plTranslations = {
   encyclopedia: encyclopediaPl,
   galactic: galacticPl,
   gameShell: gameShellPl,
+  generated: generatedPl,
   helpAbout: helpAboutPl,
   imperium: imperiumPl,
   loadGame: loadGamePl,

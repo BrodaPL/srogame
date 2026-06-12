@@ -1,9 +1,18 @@
 import { Component, EventEmitter, Input, OnChanges, Output } from '@angular/core';
 import { Router } from '@angular/router';
 import { GameStateService } from '../../../core/game-state.service';
+import { I18nPipe } from '../../../i18n/i18n.pipe';
+import { I18nService } from '../../../i18n/i18n.service';
 import { PlayerSessionService } from '../../../core/player-session.service';
-import type { ClientPlanetDto, ClientReportDataDto, PlayerSession } from '../../../models/game-api-types';
-import { diplomacyVisualKey, ownerLabelWithDiplomacy, type DiplomacyVisualKey } from '../../../models/diplomacy/diplomacy-display';
+import type {
+  ClientPlanetDto,
+  ClientReportDataDto,
+  PlayerSession,
+} from '../../../models/game-api-types';
+import {
+  diplomacyVisualKey,
+  type DiplomacyVisualKey,
+} from '../../../models/diplomacy/diplomacy-display';
 import { DiplomaticStatus } from '../../../models/diplomacy/diplomatic-status';
 import { PlayerType } from '../../../models/enums/player-type';
 import { PlanetImageHelper } from '../../../models/planets/planet-image-helper';
@@ -18,8 +27,8 @@ type MiniPlanetTagVm = {
 
 @Component({
   selector: 'app-mini-planet-preview',
-  imports: [SpyLaunchDialogComponent, TooltipDirective],
-  templateUrl: './mini-planet-preview.component.html'
+  imports: [SpyLaunchDialogComponent, TooltipDirective, I18nPipe],
+  templateUrl: './mini-planet-preview.component.html',
 })
 export class MiniPlanetPreviewComponent implements OnChanges {
   @Input() planet: ClientPlanetDto | null = null;
@@ -38,7 +47,8 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   constructor(
     private readonly router: Router,
     private readonly gameState: GameStateService,
-    private readonly playerSession: PlayerSessionService
+    private readonly playerSession: PlayerSessionService,
+    private readonly i18n: I18nService,
   ) {}
 
   public ngOnChanges(): void {
@@ -46,7 +56,11 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   }
 
   protected planetNameLabel(): string {
-    return this.planet?.basicInfo.name ?? 'Unknown planet';
+    return this.planet?.basicInfo.name ?? this.i18n.t('generated.miniPlanet.unknownPlanet');
+  }
+
+  protected planetImageAlt(): string {
+    return this.i18n.t('generated.miniPlanet.imageAlt', { name: this.planetNameLabel() });
   }
 
   protected planetImagePath(): string | null {
@@ -57,7 +71,7 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     return PlanetImageHelper.getPlanetImage(
       this.planet.basicInfo.type,
       this.planet.basicInfo.size,
-      'small'
+      'small',
     );
   }
 
@@ -66,7 +80,8 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       return '';
     }
 
-    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type).transform;
+    return planetImageVariantToStyle(this.planet.basicInfo.iv, this.planet.basicInfo.type)
+      .transform;
   }
 
   protected planetImageFilter(): string {
@@ -99,35 +114,57 @@ export class MiniPlanetPreviewComponent implements OnChanges {
 
   protected ownershipLabel(): string {
     if (!this.planet) {
-      return 'Owned by: NO DATA';
+      return this.i18n.t('generated.miniPlanet.ownedBy', {
+        owner: this.i18n.t('generated.miniPlanet.ownerNoData'),
+      });
     }
 
     if (this.planet.info.isOwnedByViewer) {
-      return `Owned by: ${ownerLabelWithDiplomacy(this.planet.info.ownerPlayerName ?? 'YOU', this.diplomacyStatusForOwner(this.planet.info.ownerId))}`;
+      return this.i18n.t('generated.miniPlanet.ownedBy', {
+        owner: this.ownerLabel(
+          this.planet.info.ownerPlayerName ?? this.i18n.t('generated.miniPlanet.ownerYou'),
+          this.diplomacyStatusForOwner(this.planet.info.ownerId),
+        ),
+      });
     }
 
     if (this.planet.info.ownerId !== null) {
-      return `Owned by: ${ownerLabelWithDiplomacy(this.planet.info.ownerPlayerName ?? 'UNKNOWN', this.diplomacyStatusForOwner(this.planet.info.ownerId))}`;
+      return this.i18n.t('generated.miniPlanet.ownedBy', {
+        owner: this.ownerLabel(
+          this.planet.info.ownerPlayerName ?? this.i18n.t('generated.miniPlanet.ownerUnknown'),
+          this.diplomacyStatusForOwner(this.planet.info.ownerId),
+        ),
+      });
     }
 
     if (this.planet.info.ownerPlayerType === PlayerType.NEUTRAL) {
-      return 'Owned by: NEUTRAL';
+      return this.i18n.t('generated.miniPlanet.ownedBy', {
+        owner: this.i18n.t('generated.miniPlanet.ownerNeutral'),
+      });
     }
 
     if (this.planet.info.ownerPlayerName) {
-      return `Owned by: ${this.planet.info.ownerPlayerName}`;
+      return this.i18n.t('generated.miniPlanet.ownedBy', {
+        owner: this.planet.info.ownerPlayerName,
+      });
     }
 
-    return this.isNoDataPlanet()
-      ? 'Owned by: NO DATA'
-      : 'Owned by: FREE';
+    return this.i18n.t('generated.miniPlanet.ownedBy', {
+      owner: this.i18n.t(
+        this.isNoDataPlanet()
+          ? 'generated.miniPlanet.ownerNoData'
+          : 'generated.miniPlanet.ownerFree',
+      ),
+    });
   }
 
   protected isNoDataPlanet(): boolean {
-    return !!this.planet
-      && !this.planet.info.isOwnedByViewer
-      && this.planet.reportData === null
-      && this.planet.info.ownerPlayerType === null;
+    return (
+      !!this.planet &&
+      !this.planet.info.isOwnedByViewer &&
+      this.planet.reportData === null &&
+      this.planet.info.ownerPlayerType === null
+    );
   }
 
   protected isPlayerOwnedPlanet(): boolean {
@@ -135,21 +172,27 @@ export class MiniPlanetPreviewComponent implements OnChanges {
   }
 
   protected isNeutralOwnedPlanet(): boolean {
-    return !!this.planet
-      && !this.planet.info.isOwnedByViewer
-      && this.planet?.info.ownerPlayerType === PlayerType.NEUTRAL;
+    return (
+      !!this.planet &&
+      !this.planet.info.isOwnedByViewer &&
+      this.planet?.info.ownerPlayerType === PlayerType.NEUTRAL
+    );
   }
 
   protected isHumanOwnedPlanet(): boolean {
-    return !!this.planet
-      && !this.planet.info.isOwnedByViewer
-      && this.planet?.info.ownerPlayerType === PlayerType.PLAYER;
+    return (
+      !!this.planet &&
+      !this.planet.info.isOwnedByViewer &&
+      this.planet?.info.ownerPlayerType === PlayerType.PLAYER
+    );
   }
 
   protected isBotOwnedPlanet(): boolean {
-    return !!this.planet
-      && !this.planet.info.isOwnedByViewer
-      && this.planet?.info.ownerPlayerType === PlayerType.BOT;
+    return (
+      !!this.planet &&
+      !this.planet.info.isOwnedByViewer &&
+      this.planet?.info.ownerPlayerType === PlayerType.BOT
+    );
   }
 
   protected diplomacyRelationKey(): DiplomacyVisualKey | 'none' {
@@ -166,16 +209,13 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       return;
     }
 
-    void this.router.navigate(
-      ['/game/planet'],
-      {
-        queryParams: {
-          x: this.planet.coordinates.x,
-          y: this.planet.coordinates.y,
-          z: this.planet.coordinates.z
-        }
-      }
-    );
+    void this.router.navigate(['/game/planet'], {
+      queryParams: {
+        x: this.planet.coordinates.x,
+        y: this.planet.coordinates.y,
+        z: this.planet.coordinates.z,
+      },
+    });
   }
 
   protected canUseAsMissionOrigin(): boolean {
@@ -191,16 +231,13 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       return;
     }
 
-    void this.router.navigate(
-      ['/game/mission-planner'],
-      {
-        queryParams: {
-          originX: this.planet.coordinates.x,
-          originY: this.planet.coordinates.y,
-          originZ: this.planet.coordinates.z
-        }
-      }
-    );
+    void this.router.navigate(['/game/mission-planner'], {
+      queryParams: {
+        originX: this.planet.coordinates.x,
+        originY: this.planet.coordinates.y,
+        originZ: this.planet.coordinates.z,
+      },
+    });
   }
 
   protected openMissionPlannerAsTarget(): void {
@@ -208,16 +245,13 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       return;
     }
 
-    void this.router.navigate(
-      ['/game/mission-planner'],
-      {
-        queryParams: {
-          targetX: this.planet.coordinates.x,
-          targetY: this.planet.coordinates.y,
-          targetZ: this.planet.coordinates.z
-        }
-      }
-    );
+    void this.router.navigate(['/game/mission-planner'], {
+      queryParams: {
+        targetX: this.planet.coordinates.x,
+        targetY: this.planet.coordinates.y,
+        targetZ: this.planet.coordinates.z,
+      },
+    });
   }
 
   protected openSpyDialog(): void {
@@ -269,9 +303,9 @@ export class MiniPlanetPreviewComponent implements OnChanges {
 
     const tags: MiniPlanetTagVm[] = [
       {
-        label: 'Basic Info',
-        tooltip: this.buildBasicInfoTooltip(this.planet)
-      }
+        label: this.i18n.t('generated.miniPlanet.tags.basicInfo'),
+        tooltip: this.buildBasicInfoTooltip(this.planet),
+      },
     ];
 
     const report = this.planet.reportData;
@@ -280,8 +314,8 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     tags.push({
-      label: 'Planet Parameters',
-      tooltip: this.buildPlanetParametersTooltip(report)
+      label: this.i18n.t('generated.miniPlanet.tags.planetParameters'),
+      tooltip: this.buildPlanetParametersTooltip(report),
     });
 
     const resourcesTag = this.buildResourcesTag(report);
@@ -337,9 +371,7 @@ export class MiniPlanetPreviewComponent implements OnChanges {
 
   private viewerPlayerId(session: PlayerSession | null): number | null {
     if (!session) {
-      return this.planet?.info.isOwnedByViewer === true
-        ? this.planet.info.ownerId
-        : null;
+      return this.planet?.info.isOwnedByViewer === true ? this.planet.info.ownerId : null;
     }
 
     if (Number.isInteger(session.playerId)) {
@@ -355,32 +387,33 @@ export class MiniPlanetPreviewComponent implements OnChanges {
 
   private buildBasicInfoTooltip(planet: ClientPlanetDto): string {
     return [
-      `Name: ${planet.basicInfo.name}`,
-      `Order: ${planet.basicInfo.order}`,
-      `Type: ${planet.basicInfo.type}`,
-      `Size: ${planet.basicInfo.size}`,
-      `Colonization difficulty: ${planet.basicInfo.colonizationDifficulty}`
+      `${this.i18n.t('generated.miniPlanet.rows.name')}: ${planet.basicInfo.name}`,
+      `${this.i18n.t('generated.miniPlanet.rows.order')}: ${planet.basicInfo.order}`,
+      `${this.i18n.t('generated.miniPlanet.rows.type')}: ${planet.basicInfo.type}`,
+      `${this.i18n.t('generated.miniPlanet.rows.size')}: ${planet.basicInfo.size}`,
+      `${this.i18n.t('generated.miniPlanet.rows.colonizationDifficulty')}: ${planet.basicInfo.colonizationDifficulty}`,
     ].join('\n');
   }
 
   private buildPlanetParametersTooltip(report: ClientReportDataDto): string {
     const parameters = report.planetaryParameters;
     return [
-      `Metal: ${parameters.metalModifier}`,
-      `Crystal: ${parameters.crystalModifier}`,
-      `Deuterium: ${parameters.deuteriumModifier}`,
-      `Energy (RES): ${parameters.energyModifierRES}`,
-      `Energy (Nuclear): ${parameters.energyModifierNuclear}`,
-      `Science: ${parameters.scienceModifier}`,
-      `Industry: ${parameters.industryModifier}`,
-      `Anomalies/Noise: ${parameters.anomaliesAndNoise}`,
-      `Hyperspace: ${parameters.hyperspaceParameters}`
+      `${this.i18n.t('generated.miniPlanet.rows.metal')}: ${parameters.metalModifier}`,
+      `${this.i18n.t('generated.miniPlanet.rows.crystal')}: ${parameters.crystalModifier}`,
+      `${this.i18n.t('generated.miniPlanet.rows.deuterium')}: ${parameters.deuteriumModifier}`,
+      `${this.i18n.t('generated.miniPlanet.rows.energyRes')}: ${parameters.energyModifierRES}`,
+      `${this.i18n.t('generated.miniPlanet.rows.energyNuclear')}: ${parameters.energyModifierNuclear}`,
+      `${this.i18n.t('generated.miniPlanet.rows.science')}: ${parameters.scienceModifier}`,
+      `${this.i18n.t('generated.miniPlanet.rows.industry')}: ${parameters.industryModifier}`,
+      `${this.i18n.t('generated.miniPlanet.rows.anomaliesAndNoise')}: ${parameters.anomaliesAndNoise}`,
+      `${this.i18n.t('generated.miniPlanet.rows.hyperspace')}: ${parameters.hyperspaceParameters}`,
     ].join('\n');
   }
 
   private buildResourcesTag(report: ClientReportDataDto): MiniPlanetTagVm | null {
     const resources = report.resourcesAmount;
-    const hasDetailedResources = resources.metal > 0 || resources.crystal > 0 || resources.deuterium > 0;
+    const hasDetailedResources =
+      resources.metal > 0 || resources.crystal > 0 || resources.deuterium > 0;
     const hasAverageResources = report.averageTotalResources > 0;
 
     if (!hasDetailedResources && !hasAverageResources) {
@@ -388,12 +421,14 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     const tooltip = hasDetailedResources
-      ? `Metal: ${resources.metal}, Crystal: ${resources.crystal}, Deuterium: ${resources.deuterium}`
-      : `Average total resources: ${report.averageTotalResources}`;
+      ? `${this.i18n.t('generated.miniPlanet.rows.metal')}: ${resources.metal}, ` +
+        `${this.i18n.t('generated.miniPlanet.rows.crystal')}: ${resources.crystal}, ` +
+        `${this.i18n.t('generated.miniPlanet.rows.deuterium')}: ${resources.deuterium}`
+      : `${this.i18n.t('generated.miniPlanet.rows.averageTotalResources')}: ${report.averageTotalResources}`;
 
     return {
-      label: 'Resources',
-      tooltip
+      label: this.i18n.t('generated.miniPlanet.tags.resources'),
+      tooltip,
     };
   }
 
@@ -405,8 +440,11 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     return {
-      label: 'Debris',
-      tooltip: `Metal: ${debris.metal}, Crystal: ${debris.crystal}, Deuterium: ${debris.deuterium}`
+      label: this.i18n.t('generated.miniPlanet.tags.debris'),
+      tooltip:
+        `${this.i18n.t('generated.miniPlanet.rows.metal')}: ${debris.metal}, ` +
+        `${this.i18n.t('generated.miniPlanet.rows.crystal')}: ${debris.crystal}, ` +
+        `${this.i18n.t('generated.miniPlanet.rows.deuterium')}: ${debris.deuterium}`,
     };
   }
 
@@ -419,8 +457,8 @@ export class MiniPlanetPreviewComponent implements OnChanges {
 
     if (!hasDetailedBuildings) {
       return {
-        label: 'Buildings',
-        tooltip: `Average building Level: ${report.averageBuildingLevel}`
+        label: this.i18n.t('generated.miniPlanet.tags.buildings'),
+        tooltip: `${this.i18n.t('generated.miniPlanet.rows.averageBuildingLevel')}: ${report.averageBuildingLevel}`,
       };
     }
 
@@ -429,12 +467,12 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       .join('\n');
 
     const tooltip = hasAverageBuildings
-      ? `Average building Level: ${report.averageBuildingLevel}\n${details}`
+      ? `${this.i18n.t('generated.miniPlanet.rows.averageBuildingLevel')}: ${report.averageBuildingLevel}\n${details}`
       : details;
 
     return {
-      label: 'Buildings',
-      tooltip
+      label: this.i18n.t('generated.miniPlanet.tags.buildings'),
+      tooltip,
     };
   }
 
@@ -447,22 +485,20 @@ export class MiniPlanetPreviewComponent implements OnChanges {
 
     if (!hasDetailedTech) {
       return {
-        label: 'Technology',
-        tooltip: `Average technology Level: ${report.averageTechLevel}`
+        label: this.i18n.t('generated.miniPlanet.tags.technology'),
+        tooltip: `${this.i18n.t('generated.miniPlanet.rows.averageTechnologyLevel')}: ${report.averageTechLevel}`,
       };
     }
 
-    const details = report.techLevels
-      .map((entry) => `${entry.type}: ${entry.level}`)
-      .join('\n');
+    const details = report.techLevels.map((entry) => `${entry.type}: ${entry.level}`).join('\n');
 
     const tooltip = hasAverageTech
-      ? `Average technology Level: ${report.averageTechLevel}\n${details}`
+      ? `${this.i18n.t('generated.miniPlanet.rows.averageTechnologyLevel')}: ${report.averageTechLevel}\n${details}`
       : details;
 
     return {
-      label: 'Technology',
-      tooltip
+      label: this.i18n.t('generated.miniPlanet.tags.technology'),
+      tooltip,
     };
   }
 
@@ -474,12 +510,12 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     const tooltip = hasTotalDefences
-      ? `Total defences: ${report.totalDefencesAmount}`
-      : `Defence entries: ${report.defences.length}`;
+      ? `${this.i18n.t('generated.miniPlanet.rows.totalDefences')}: ${report.totalDefencesAmount}`
+      : `${this.i18n.t('generated.miniPlanet.rows.defenceEntries')}: ${report.defences.length}`;
 
     return {
-      label: 'Defences',
-      tooltip
+      label: this.i18n.t('generated.miniPlanet.tags.defences'),
+      tooltip,
     };
   }
 
@@ -491,8 +527,8 @@ export class MiniPlanetPreviewComponent implements OnChanges {
     }
 
     let tooltip = hasTotalShips
-      ? `Total ships: ${report.totalShipsAmount}`
-      : `Ship entries: ${report.ships.length}`;
+      ? `${this.i18n.t('generated.miniPlanet.rows.totalShips')}: ${report.totalShipsAmount}`
+      : `${this.i18n.t('generated.miniPlanet.rows.shipEntries')}: ${report.ships.length}`;
 
     if (hasDetailedShips) {
       const sortedDetails = [...report.ships]
@@ -502,33 +538,34 @@ export class MiniPlanetPreviewComponent implements OnChanges {
       const totalFromDetails = report.ships.reduce((sum, entry) => sum + entry.amount, 0);
       const totalLabel = hasTotalShips ? report.totalShipsAmount : totalFromDetails;
 
-      tooltip = `Total ships: ${totalLabel}\n${sortedDetails}`;
+      tooltip = `${this.i18n.t('generated.miniPlanet.rows.totalShips')}: ${totalLabel}\n${sortedDetails}`;
     }
 
     return {
-      label: 'Ships',
-      tooltip
+      label: this.i18n.t('generated.miniPlanet.tags.ships'),
+      tooltip,
     };
   }
 
   private buildQueuesTag(report: ClientReportDataDto): MiniPlanetTagVm | null {
-    const hasAnyQueueData = this.hasQueueData(report.shipyardProduction)
-      || this.hasQueueData(report.defencesProduction)
-      || this.hasQueueData(report.researchProduction)
-      || this.hasQueueData(report.buildingProduction);
+    const hasAnyQueueData =
+      this.hasQueueData(report.shipyardProduction) ||
+      this.hasQueueData(report.defencesProduction) ||
+      this.hasQueueData(report.researchProduction) ||
+      this.hasQueueData(report.buildingProduction);
 
     if (!hasAnyQueueData) {
       return null;
     }
 
     return {
-      label: 'Queues',
+      label: this.i18n.t('generated.miniPlanet.tags.queues'),
       tooltip: [
-        `Shipyard: ${this.formatQueue(report.shipyardProduction)}`,
-        `Defences: ${this.formatQueue(report.defencesProduction)}`,
-        `Research: ${this.formatQueue(report.researchProduction)}`,
-        `Buildings: ${this.formatQueue(report.buildingProduction)}`
-      ].join('\n')
+        `${this.i18n.t('generated.miniPlanet.rows.shipyard')}: ${this.formatQueue(report.shipyardProduction)}`,
+        `${this.i18n.t('generated.miniPlanet.rows.defencesQueue')}: ${this.formatQueue(report.defencesProduction)}`,
+        `${this.i18n.t('generated.miniPlanet.rows.research')}: ${this.formatQueue(report.researchProduction)}`,
+        `${this.i18n.t('generated.miniPlanet.rows.buildingsQueue')}: ${this.formatQueue(report.buildingProduction)}`,
+      ].join('\n'),
     };
   }
 
@@ -542,14 +579,22 @@ export class MiniPlanetPreviewComponent implements OnChanges {
 
   private formatQueue(queue: object | null | undefined): string {
     if (!queue) {
-      return 'Empty';
+      return this.i18n.t('generated.miniPlanet.rows.empty');
     }
 
     const keys = Object.keys(queue);
     if (keys.length === 0) {
-      return 'Empty';
+      return this.i18n.t('generated.miniPlanet.rows.empty');
     }
 
     return JSON.stringify(queue);
+  }
+
+  private localizedDiplomaticStatus(status: DiplomaticStatus): string {
+    return this.i18n.t(`communications.shared.diplomaticStatuses.${status}`);
+  }
+
+  private ownerLabel(ownerName: string, status: DiplomaticStatus | null): string {
+    return status ? `${ownerName} (${this.localizedDiplomaticStatus(status)})` : ownerName;
   }
 }

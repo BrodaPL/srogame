@@ -5,6 +5,7 @@ import { GameStateService } from '../../../core/game-state.service';
 import { ShipBlueprintsFactory } from '../../../factories/ship-blueprints.factory';
 import { I18nPipe } from '../../../i18n/i18n.pipe';
 import { I18nService } from '../../../i18n/i18n.service';
+import { resolveRuntimeText, resolveRuntimeTextBlock } from '../../../i18n/runtime-text.utils';
 import {
   diplomacyVisualKey,
   ownerLabelWithDiplomacy,
@@ -142,6 +143,14 @@ export class FleetOperationCardComponent {
     return missionType === FleetMissionType.DEFEND
       ? this.i18n.t('operations.card.guard')
       : missionType;
+  }
+
+  protected resolvedLaunchSummary(operation: FleetOperationHistoryEntry): string {
+    return resolveRuntimeTextBlock(this.i18n, operation.launchSummary);
+  }
+
+  protected resolvedResultSummary(operation: FleetOperationHistoryEntry): string {
+    return resolveRuntimeTextBlock(this.i18n, operation.resultSummary);
   }
 
   protected stateLabel(fleet: Fleet): string {

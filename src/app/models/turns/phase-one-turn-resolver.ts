@@ -3,27 +3,32 @@ import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.f
 import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import { TechnologyBlueprintsFactory } from '../../factories/technology-blueprints.factory';
+import { encodeRuntimeText } from '../../i18n/runtime-text.utils';
 import {
   applyBuildingBombardment,
   hasBombardmentCapability,
   hasBombardmentWeapons,
-  hasDamagedBuildings
+  hasDamagedBuildings,
 } from '../bombardment/building-bombardment';
 import {
   bombardmentPriorityLabel,
-  hasAnyBombardmentPriority
+  hasAnyBombardmentPriority,
 } from '../bombardment/bombardment-priority';
 import {
   createPersistentManyDefencesFromBattleSurvivors,
   createPersistentManyShipsFromBattleSurvivors,
   SpaceBattleResolver,
   type SpaceBattleReports,
-  type SpaceBattleResult
+  type SpaceBattleResult,
 } from '../battles/space-battle-resolver';
 import { DefenceInstance } from '../defences/defence-instance';
 import { ManyDefences } from '../defences/many-defences';
 import { Defence } from '../defences/defence';
-import { isPlanetaryBombDefenceType, splitPlanetaryBombDefences, totalPlanetaryBombSize } from '../defences/planetary-bomb';
+import {
+  isPlanetaryBombDefenceType,
+  splitPlanetaryBombDefences,
+  totalPlanetaryBombSize,
+} from '../defences/planetary-bomb';
 import { DiplomaticStatus } from '../diplomacy/diplomatic-status';
 import { DiplomacyResolver } from '../diplomacy/diplomacy-resolver';
 import { BuildingType } from '../enums/building-type';
@@ -34,7 +39,10 @@ import { ShipType } from '../enums/ship-type';
 import { TechnologyType } from '../enums/technology-type';
 import { Fleet, FleetOrbitActivity, FleetReturnReason, FleetState } from '../fleets/fleet';
 import { Destination } from '../fleets/destination';
-import type { FleetOperationHistoryEntry, FleetOperationOutcomeType } from '../fleets/fleet-operation-history';
+import type {
+  FleetOperationHistoryEntry,
+  FleetOperationOutcomeType,
+} from '../fleets/fleet-operation-history';
 import { ManyShips, type ManyShipsLike } from '../fleets/many-ships';
 import { Ship } from '../fleets/ship';
 import { ShipInstance } from '../fleets/ship-instance';
@@ -42,7 +50,7 @@ import {
   EncounterResolver,
   type PlanetOrbitEncounterArrival,
   type PlanetOrbitEncounterOccupantFleet,
-  type PlanetOrbitEncounterResolvedArrival
+  type PlanetOrbitEncounterResolvedArrival,
 } from '../missions/encounters/encounter-resolver';
 import { MissionEffectExecutor } from '../missions/mission-effect-executor';
 import { FleetMissionRegistry } from '../missions/fleet-mission-registry';
@@ -54,12 +62,12 @@ import { BuildingsReport } from '../reports/buildings-report';
 import {
   appendFleetReportManifest,
   FleetReport,
-  type FleetReportCargoLike
+  type FleetReportCargoLike,
 } from '../reports/fleet-report';
 import {
   calculateRepairCapabilityForManyShips,
   collectRepairEquipmentBurstGroupsForManyShips,
-  type RepairEquipmentBurstGroup
+  type RepairEquipmentBurstGroup,
 } from '../repairs/ship-repair-capability';
 import { ResearchReport } from '../reports/research-report';
 import { ResourcesPack } from '../resources-pack';
@@ -67,7 +75,7 @@ import { energyDeficitEfficiencyMultiplier } from '../planets/energy-deficit';
 import { industryPowerMultiplier, researchPowerMultiplier } from '../tech/technology-effects';
 import {
   calculateRepairDroneProductionBasePower,
-  routeRepairDroneProduction
+  routeRepairDroneProduction,
 } from './repair-drone-production';
 
 type ResourceSnapshot = {
@@ -159,7 +167,7 @@ function snapshotResourcesPack(pack: ResourcesPack): ResourceSnapshot {
   return {
     metal: pack.metal,
     crystal: pack.crystal,
-    deuterium: pack.deuterium
+    deuterium: pack.deuterium,
   };
 }
 
@@ -167,16 +175,99 @@ function snapshotVisibleResourcesPack(pack: ResourcesPack): ResourcesPack {
   return new ResourcesPack(
     Math.max(0, Math.floor(pack.metal)),
     Math.max(0, Math.floor(pack.crystal)),
-    Math.max(0, Math.floor(pack.deuterium))
+    Math.max(0, Math.floor(pack.deuterium)),
   );
+}
+
+function encodeMissionLabel(missionType: FleetMissionType): string {
+  switch (missionType) {
+    case FleetMissionType.ATTACK:
+      return encodeRuntimeText('communications.shared.missions.Attack');
+    case FleetMissionType.PLUNDER:
+      return encodeRuntimeText('communications.shared.missions.Plunder');
+    case FleetMissionType.BOMBARD:
+      return encodeRuntimeText('communications.shared.missions.Bombard');
+    case FleetMissionType.SIEGE:
+      return encodeRuntimeText('communications.shared.missions.Siege');
+    case FleetMissionType.INVADE:
+      return encodeRuntimeText('communications.shared.missions.Invade');
+    case FleetMissionType.MOVE:
+      return encodeRuntimeText('communications.shared.missions.Move');
+    case FleetMissionType.DEFEND:
+      return encodeRuntimeText('communications.shared.missions.Defend');
+    case FleetMissionType.BLOCK:
+      return encodeRuntimeText('communications.shared.missions.Block');
+    case FleetMissionType.INTERCEPT:
+      return encodeRuntimeText('communications.shared.missions.Intercept');
+    case FleetMissionType.TRANSPORT:
+      return encodeRuntimeText('communications.shared.missions.Transport');
+    case FleetMissionType.ARMAMENT_DELIVERY:
+      return encodeRuntimeText('communications.shared.missions.Armament Delivery');
+    case FleetMissionType.COLONIZE:
+      return encodeRuntimeText('communications.shared.missions.Colonize');
+    case FleetMissionType.SPY:
+      return encodeRuntimeText('communications.shared.missions.Spy');
+    case FleetMissionType.STAR_SYSTEM_SPY:
+      return encodeRuntimeText('communications.shared.missions.Star System Spy');
+    case FleetMissionType.RECYCLE:
+      return encodeRuntimeText('communications.shared.missions.Recycle');
+    case FleetMissionType.REPAIR:
+      return encodeRuntimeText('communications.shared.missions.Repair');
+    case FleetMissionType.HOLD:
+      return encodeRuntimeText('communications.shared.missions.Hold');
+    default:
+      return missionType;
+  }
+}
+
+function encodeBombardmentPriority(
+  priority: ReturnType<typeof bombardmentPriorityLabel> | null | undefined,
+): string {
+  switch (priority) {
+    case 'Defences':
+      return encodeRuntimeText('communications.shared.bombardmentPriorities.DEFENCES');
+    case 'Defences canShootToOrbit=true':
+      return encodeRuntimeText(
+        'communications.shared.bombardmentPriorities.DEFENCES_CAN_SHOOT_TO_ORBIT',
+      );
+    case 'Defences canShootToOrbit=false':
+      return encodeRuntimeText(
+        'communications.shared.bombardmentPriorities.DEFENCES_CANNOT_SHOOT_TO_ORBIT',
+      );
+    case 'Resource buildings':
+      return encodeRuntimeText('communications.shared.bombardmentPriorities.RESOURCE_BUILDINGS');
+    case 'Facilities':
+      return encodeRuntimeText('communications.shared.bombardmentPriorities.FACILITIES');
+    default:
+      return encodeRuntimeText('communications.shared.labels.random');
+  }
+}
+
+function encodeResourcesInline(resources: ResourcesPack): string {
+  if (resources.getTotalResourceAmount() <= 0) {
+    return encodeRuntimeText('generated.shared.noResources');
+  }
+
+  return encodeRuntimeText('generated.shared.resourcesInline', {
+    metal: resources.metal,
+    crystal: resources.crystal,
+    deuterium: resources.deuterium,
+  });
 }
 
 function formatCurrentDebrisFieldLine(debris: ResourcesPack): string {
   const visibleDebris = snapshotVisibleResourcesPack(debris);
-  return `Current debris field: Metal ${visibleDebris.metal}, Crystal ${visibleDebris.crystal}, Deuterium ${visibleDebris.deuterium}`;
+  return encodeRuntimeText('generated.reports.body.currentDebrisField', {
+    metal: visibleDebris.metal,
+    crystal: visibleDebris.crystal,
+    deuterium: visibleDebris.deuterium,
+  });
 }
 
-function appendCurrentDebrisFieldToBattleReports(reports: SpaceBattleReports, debris: ResourcesPack): void {
+function appendCurrentDebrisFieldToBattleReports(
+  reports: SpaceBattleReports,
+  debris: ResourcesPack,
+): void {
   const line = formatCurrentDebrisFieldLine(debris);
   reports.attacker.body = appendBodyLine(reports.attacker.body, line);
   reports.defender.body = appendBodyLine(reports.defender.body, line);
@@ -199,11 +290,20 @@ function updateExistingEspionageDebrisData(planet: Planet): void {
 }
 
 function createFleetLaunchSummary(fleet: Fleet): string {
-  return `${fleet.missionType} ${fleet.origin.x}:${fleet.origin.y}:${fleet.origin.z} -> ${fleet.target.x}:${fleet.target.y}:${fleet.target.z} (fleet ${fleet.fleetId})`;
+  return encodeRuntimeText('generated.fleet.launchSummary', {
+    mission: encodeMissionLabel(fleet.missionType),
+    originX: fleet.origin.x,
+    originY: fleet.origin.y,
+    originZ: fleet.origin.z,
+    targetX: fleet.target.x,
+    targetY: fleet.target.y,
+    targetZ: fleet.target.z,
+    fleetId: fleet.fleetId,
+  });
 }
 
 function summarizeMissionReports(
-  reports: Array<{ kind: 'success' | 'failure' | 'draw'; body: string }>
+  reports: Array<{ kind: 'success' | 'failure' | 'draw'; body: string }>,
 ): string | null {
   const report = reports[0];
   if (!report) {
@@ -224,7 +324,7 @@ function summarizeBattleOutcome(result: SpaceBattleResult): AttackBattleOutcomeD
     roundsFought: result.roundsFought,
     ourShipsLost: summarizeBattleShipTypeCounts(result.attacker.destroyedShips),
     enemyShipsLost: summarizeBattleShipTypeCounts(result.defender.destroyedShips),
-    enemyDefencesLost: summarizeBattleDefenceTypeCounts(result.defender.destroyedDefences)
+    enemyDefencesLost: summarizeBattleDefenceTypeCounts(result.defender.destroyedDefences),
   };
 }
 
@@ -247,22 +347,27 @@ function summarizeBattleDefenceTypeCounts(defences: DefenceInstance[]): Record<s
 function createAttackOutcomeSummary(
   targetPlanet: Planet,
   battle: AttackBattleOutcomeDetails | null,
-  plunder: AttackPlunderSummary | null
+  plunder: AttackPlunderSummary | null,
 ): string {
-  const fragments = [`Attack resolved at ${targetPlanet.basicInfo.name}.`];
-  if (battle) {
-    fragments.push(`Battle winner: ${battle.winner}.`);
-  }
-  if (plunder && plunder.stolenResources.getTotalResourceAmount() > 0) {
-    fragments.push(`Stolen ${formatResourcesInline(plunder.stolenResources)}.`);
-  } else if (plunder) {
-    fragments.push('No resources were stolen.');
-  }
-  return fragments.join(' ');
+  return encodeRuntimeText('generated.reports.body.attackOutcomeSummary', {
+    targetPlanet: targetPlanet.basicInfo.name,
+    battleFragment: battle
+      ? encodeRuntimeText('generated.reports.body.battleWinnerFragment', {
+          winner: battle.winner,
+        })
+      : '',
+    plunderFragment: !plunder
+      ? ''
+      : plunder.stolenResources.getTotalResourceAmount() > 0
+        ? encodeRuntimeText('generated.reports.body.stolenResourcesFragment', {
+            resources: encodeResourcesInline(plunder.stolenResources),
+          })
+        : encodeRuntimeText('generated.reports.body.noResourcesStolenFragment'),
+  });
 }
 
 function resolveMissionOutcomeType(
-  missionType: FleetMissionType
+  missionType: FleetMissionType,
 ): FleetOperationOutcomeType | null {
   switch (missionType) {
     case FleetMissionType.TRANSPORT:
@@ -280,14 +385,14 @@ function resolveMissionOutcomeType(
 
 function emitFleetOutcome(
   difficultyConfig: TurnDifficultyConfig,
-  event: PlayerFleetOutcomeLogEvent
+  event: PlayerFleetOutcomeLogEvent,
 ): void {
   difficultyConfig.fleetOutcomeLogger?.(event);
 }
 
 function emitCounterIntelEvent(
   difficultyConfig: TurnDifficultyConfig,
-  event: CounterIntelEventLogEvent
+  event: CounterIntelEventLogEvent,
 ): void {
   difficultyConfig.counterIntelLogger?.(event);
 }
@@ -295,7 +400,7 @@ function emitCounterIntelEvent(
 export function resolvePhaseOneTurn(
   galaxy: Galaxy,
   resolvedTurnNumber = galaxy.currentTurn + 1,
-  difficultyConfig: TurnDifficultyConfig = {}
+  difficultyConfig: TurnDifficultyConfig = {},
 ): void {
   const playersById = new Map<number, Player>();
   const techLevelsByPlayerId = new Map<number, Map<TechnologyType, number>>();
@@ -318,11 +423,9 @@ export function resolvePhaseOneTurn(
             planet,
             coordinatesId,
             techLevelsByPlayerId.get(planet.info.ownerId ?? -1) ?? null,
-            planet.info.ownerId === null
-              ? null
-              : playersById.get(planet.info.ownerId) ?? null,
-            difficultyConfig
-          )
+            planet.info.ownerId === null ? null : (playersById.get(planet.info.ownerId) ?? null),
+            difficultyConfig,
+          ),
         );
       }
     }
@@ -358,17 +461,8 @@ export function resolvePhaseOneTurn(
       continue;
     }
 
-    const totalResearchPower = calculateQueuedResearchPower(
-      snapshot,
-      snapshotsByPlanetId
-    );
-    advanceResearchQueue(
-      planet,
-      owner,
-      totalResearchPower,
-      planetById,
-      resolvedTurnNumber
-    );
+    const totalResearchPower = calculateQueuedResearchPower(snapshot, snapshotsByPlanetId);
+    advanceResearchQueue(planet, owner, totalResearchPower, planetById, resolvedTurnNumber);
   }
 
   const diplomacyResolver = new DiplomacyResolver(galaxy.diplomaticRelations);
@@ -381,7 +475,7 @@ export function resolvePhaseOneTurn(
     snapshotsByPlanetId,
     diplomacyResolver,
     resolvedTurnNumber,
-    difficultyConfig
+    difficultyConfig,
   );
   resolveActiveFleets(
     galaxy,
@@ -390,7 +484,7 @@ export function resolvePhaseOneTurn(
     resolvedTurnNumber,
     diplomacyResolver,
     encounterResolver,
-    difficultyConfig
+    difficultyConfig,
   );
 }
 
@@ -399,90 +493,107 @@ function createPlanetTurnSnapshot(
   coordinatesId: string,
   techLevels: Map<TechnologyType, number> | null,
   owner: Player | null,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): PlanetTurnSnapshot {
   const adaptiveTechnologyLevel = techLevels?.get(TechnologyType.ADAPTIVE_TECHNOLOGY) ?? 0;
   const computerTechnologyLevel = techLevels?.get(TechnologyType.COMPUTER_TECHNOLOGY) ?? 0;
   const energyTechnologyLevel = techLevels?.get(TechnologyType.ENERGY_TECHNOLOGY) ?? 0;
-  const intergalacticResearchNetworkLevel = techLevels?.get(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK) ?? 0;
-  const fusionOperation = planet.resolveFusionReactorOperation(adaptiveTechnologyLevel, energyTechnologyLevel);
-  const energyState = calculateEnergyState(planet, energyTechnologyLevel, fusionOperation.powerOutput);
-  const energyEfficiency = energyDeficitEfficiencyMultiplier(energyState.available, energyState.used);
+  const intergalacticResearchNetworkLevel =
+    techLevels?.get(TechnologyType.INTERGALACTIC_RESEARCH_NETWORK) ?? 0;
+  const fusionOperation = planet.resolveFusionReactorOperation(
+    adaptiveTechnologyLevel,
+    energyTechnologyLevel,
+  );
+  const energyState = calculateEnergyState(
+    planet,
+    energyTechnologyLevel,
+    fusionOperation.powerOutput,
+  );
+  const energyEfficiency = energyDeficitEfficiencyMultiplier(
+    energyState.available,
+    energyState.used,
+  );
   const effectiveParameters = planet.getEffectivePlanetaryParameters();
-  const naniteMultiplier = planet.getBuildingLevel(BuildingType.NANITE_FACTORY) <= 0
-    ? 1
-    : planet.getBuildingProductionValue1Exact(BuildingType.NANITE_FACTORY);
-  const roboticsPower = planet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY) <= 0
-    ? 5
-    : planet.getBuildingProductionValue1(BuildingType.ROBOTICS_FACTORY);
-  const shipyardBasePower = planet.getBuildingLevel(BuildingType.SHIPYARD) <= 0
-    ? 0
-    : planet.getBuildingProductionValue1(BuildingType.SHIPYARD);
+  const naniteMultiplier =
+    planet.getBuildingLevel(BuildingType.NANITE_FACTORY) <= 0
+      ? 1
+      : planet.getBuildingProductionValue1Exact(BuildingType.NANITE_FACTORY);
+  const roboticsPower =
+    planet.getBuildingLevel(BuildingType.ROBOTICS_FACTORY) <= 0
+      ? 5
+      : planet.getBuildingProductionValue1(BuildingType.ROBOTICS_FACTORY);
+  const shipyardBasePower =
+    planet.getBuildingLevel(BuildingType.SHIPYARD) <= 0
+      ? 0
+      : planet.getBuildingProductionValue1(BuildingType.SHIPYARD);
   const researchLabBasePower = planet.getBuildingProductionValue1(BuildingType.RESEARCH_LAB);
-  const repairDroneCount = ManyShips.countByType(planet.rBDSFTQ.ships).get(ShipType.REPAIR_DRONE) ?? 0;
+  const repairDroneCount =
+    ManyShips.countByType(planet.rBDSFTQ.ships).get(ShipType.REPAIR_DRONE) ?? 0;
   const industryModifier = effectiveParameters.industryModifier;
   const scienceModifier = effectiveParameters.scienceModifier;
   const adaptiveIndustryMultiplier = industryPowerMultiplier(adaptiveTechnologyLevel);
   const totalResearchMultiplier = researchPowerMultiplier(
     computerTechnologyLevel,
     adaptiveTechnologyLevel,
-    intergalacticResearchNetworkLevel
+    intergalacticResearchNetworkLevel,
   );
   const botDifficultyMultiplier = resolveBotDifficultyMultiplier(owner, difficultyConfig);
-  const buildingRepairPower = Math.max(0, Math.floor(
-    roboticsPower
-    * naniteMultiplier
-    * industryModifier
-    * adaptiveIndustryMultiplier
-    * botDifficultyMultiplier
-  ));
-  const industryPower = Math.max(0, Math.floor(
-    roboticsPower
-    * naniteMultiplier
-    * industryModifier
-    * adaptiveIndustryMultiplier
-    * energyEfficiency
-    * botDifficultyMultiplier
-  ));
+  const buildingRepairPower = Math.max(
+    0,
+    Math.floor(
+      roboticsPower *
+        naniteMultiplier *
+        industryModifier *
+        adaptiveIndustryMultiplier *
+        botDifficultyMultiplier,
+    ),
+  );
+  const industryPower = Math.max(
+    0,
+    Math.floor(
+      roboticsPower *
+        naniteMultiplier *
+        industryModifier *
+        adaptiveIndustryMultiplier *
+        energyEfficiency *
+        botDifficultyMultiplier,
+    ),
+  );
   const droneProductionRouting = routeRepairDroneProduction(
     calculateRepairDroneProductionBasePower({
       repairDroneCount,
       industryModifier,
       adaptiveIndustryMultiplier,
       energyEfficiency,
-      difficultyMultiplier: botDifficultyMultiplier
+      difficultyMultiplier: botDifficultyMultiplier,
     }),
     {
       hasBuildingQueueWork: planet.rBDSFTQ.buildingQueue.length > 0,
-      hasShipyardQueueWork: planet.rBDSFTQ.shipyardQueue.length > 0
-    }
+      hasShipyardQueueWork: planet.rBDSFTQ.shipyardQueue.length > 0,
+    },
   );
-  const shipyardPower = Math.max(0, Math.floor(
-    shipyardBasePower
-    * naniteMultiplier
-    * industryModifier
-    * adaptiveIndustryMultiplier
-    * energyEfficiency
-    * botDifficultyMultiplier
-  ));
+  const shipyardPower = Math.max(
+    0,
+    Math.floor(
+      shipyardBasePower *
+        naniteMultiplier *
+        industryModifier *
+        adaptiveIndustryMultiplier *
+        energyEfficiency *
+        botDifficultyMultiplier,
+    ),
+  );
 
   return {
     coordinatesId,
     ownerId: planet.info.ownerId,
     metalIncome: Math.floor(
-      planet.getMetalGain(adaptiveTechnologyLevel)
-      * energyEfficiency
-      * botDifficultyMultiplier
+      planet.getMetalGain(adaptiveTechnologyLevel) * energyEfficiency * botDifficultyMultiplier,
     ),
     crystalIncome: Math.floor(
-      planet.getCrystalGain(adaptiveTechnologyLevel)
-      * energyEfficiency
-      * botDifficultyMultiplier
+      planet.getCrystalGain(adaptiveTechnologyLevel) * energyEfficiency * botDifficultyMultiplier,
     ),
-    deuteriumIncome: Math.floor(
-      fusionOperation.netDeuteriumIncome
-      * botDifficultyMultiplier
-    ),
+    deuteriumIncome: Math.floor(fusionOperation.netDeuteriumIncome * botDifficultyMultiplier),
     metalCapacity: planet.getBuildingProductionValue1(BuildingType.METAL_STORAGE),
     crystalCapacity: planet.getBuildingProductionValue1(BuildingType.CRYSTAL_STORAGE),
     deuteriumCapacity: planet.getBuildingProductionValue1(BuildingType.DEUTERIUM_TANK),
@@ -493,62 +604,68 @@ function createPlanetTurnSnapshot(
     totalIndustryPower: industryPower + droneProductionRouting.droneIndustryPower,
     shipyardPower,
     totalShipyardPower: shipyardPower + droneProductionRouting.droneShipyardPower,
-    researchPower: Math.max(0, Math.floor(
-      researchLabBasePower
-      * totalResearchMultiplier
-      * scienceModifier
-      * energyEfficiency
-      * botDifficultyMultiplier
-    )),
+    researchPower: Math.max(
+      0,
+      Math.floor(
+        researchLabBasePower *
+          totalResearchMultiplier *
+          scienceModifier *
+          energyEfficiency *
+          botDifficultyMultiplier,
+      ),
+    ),
     currentResearchQueue: planet.rBDSFTQ.currentResearchQueue
       ? {
-        technologyType: planet.rBDSFTQ.currentResearchQueue.technologyType,
-        helperLabIds: planet.rBDSFTQ.currentResearchQueue.helperLabs.map((helperCoordinates) =>
-          toCoordinatesId(helperCoordinates.x, helperCoordinates.y, helperCoordinates.z)
-        )
-      }
+          technologyType: planet.rBDSFTQ.currentResearchQueue.technologyType,
+          helperLabIds: planet.rBDSFTQ.currentResearchQueue.helperLabs.map((helperCoordinates) =>
+            toCoordinatesId(helperCoordinates.x, helperCoordinates.y, helperCoordinates.z),
+          ),
+        }
       : null,
     researchHelperFor: planet.rBDSFTQ.researchHelperFor
       ? {
-        targetId: toCoordinatesId(
-          planet.rBDSFTQ.researchHelperFor.mainResearchCoordinates.x,
-          planet.rBDSFTQ.researchHelperFor.mainResearchCoordinates.y,
-          planet.rBDSFTQ.researchHelperFor.mainResearchCoordinates.z
-        ),
-        technologyType: planet.rBDSFTQ.researchHelperFor.technologyType
-      }
-      : null
+          targetId: toCoordinatesId(
+            planet.rBDSFTQ.researchHelperFor.mainResearchCoordinates.x,
+            planet.rBDSFTQ.researchHelperFor.mainResearchCoordinates.y,
+            planet.rBDSFTQ.researchHelperFor.mainResearchCoordinates.z,
+          ),
+          technologyType: planet.rBDSFTQ.researchHelperFor.technologyType,
+        }
+      : null,
   };
 }
 
 function resolveBotDifficultyMultiplier(
   owner: Player | null,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): number {
   if (!owner || owner.type !== PlayerType.BOT) {
     return 1;
   }
 
   const configuredPercent = difficultyConfig.botDifficultyPercent;
-  const percent = typeof configuredPercent === 'number' && Number.isFinite(configuredPercent)
-    ? configuredPercent
-    : 0;
-  return Math.max(0.25, 1 + (percent / 100));
+  const percent =
+    typeof configuredPercent === 'number' && Number.isFinite(configuredPercent)
+      ? configuredPercent
+      : 0;
+  return Math.max(0.25, 1 + percent / 100);
 }
 
 function calculateEnergyState(
   planet: Planet,
   energyTechnologyLevel: number,
-  fusionPowerOutput: number
+  fusionPowerOutput: number,
 ): { used: number; available: number } {
   const solarProduction = planet.getBuildingProductionValue1(BuildingType.SOLAR_WIND_GEOTHERMAL);
   const nuclearProduction = planet.getBuildingProductionValue1(BuildingType.NUCLEAR_PLANT);
   const parameters = planet.info.planetaryParameters;
-  const available = roundNumber((
-    (solarProduction * parameters.energyModifierRES)
-    + (nuclearProduction * parameters.energyModifierNuclear)
-    + fusionPowerOutput
-  ) * (1 + ((energyTechnologyLevel * 2) / 100)), 2);
+  const available = roundNumber(
+    (solarProduction * parameters.energyModifierRES +
+      nuclearProduction * parameters.energyModifierNuclear +
+      fusionPowerOutput) *
+      (1 + (energyTechnologyLevel * 2) / 100),
+    2,
+  );
 
   let used = 0;
   for (const buildingType of ALL_BUILDING_TYPES) {
@@ -557,13 +674,13 @@ function calculateEnergyState(
 
   return {
     available,
-    used: roundNumber(used, 2)
+    used: roundNumber(used, 2),
   };
 }
 
 function calculateQueuedResearchPower(
   snapshot: PlanetTurnSnapshot,
-  snapshotsByPlanetId: Map<string, PlanetTurnSnapshot>
+  snapshotsByPlanetId: Map<string, PlanetTurnSnapshot>,
 ): number {
   let total = snapshot.researchPower;
   const researchQueue = snapshot.currentResearchQueue;
@@ -578,8 +695,8 @@ function calculateQueuedResearchPower(
     }
 
     if (
-      helperSnapshot.researchHelperFor.targetId !== snapshot.coordinatesId
-      || helperSnapshot.researchHelperFor.technologyType !== researchQueue.technologyType
+      helperSnapshot.researchHelperFor.targetId !== snapshot.coordinatesId ||
+      helperSnapshot.researchHelperFor.technologyType !== researchQueue.technologyType
     ) {
       continue;
     }
@@ -595,19 +712,19 @@ function applyIncomeForTurn(planet: Planet, snapshot: PlanetTurnSnapshot): void 
     planet.rBDSFTQ.resources,
     'metal',
     snapshot.metalIncome,
-    snapshot.metalCapacity
+    snapshot.metalCapacity,
   );
   applyIncomeToResource(
     planet.rBDSFTQ.resources,
     'crystal',
     snapshot.crystalIncome,
-    snapshot.crystalCapacity
+    snapshot.crystalCapacity,
   );
   applyIncomeToResource(
     planet.rBDSFTQ.resources,
     'deuterium',
     snapshot.deuteriumIncome,
-    snapshot.deuteriumCapacity
+    snapshot.deuteriumCapacity,
   );
 }
 
@@ -615,7 +732,7 @@ function applyIncomeToResource(
   resources: ResourceSnapshot,
   key: keyof ResourceSnapshot,
   income: number,
-  capacity: number
+  capacity: number,
 ): void {
   const normalizedIncome = Math.max(0, Math.floor(income));
   if (normalizedIncome <= 0) {
@@ -641,9 +758,10 @@ function advanceBuildingQueue(planet: Planet, industryPower: number): void {
       continue;
     }
 
-    const totalRequiredPower = Math.max(0, Math.floor(
-      blueprint.getCostForLevel(queueEntry.nextLevel).getTotalResourceAmount()
-    ));
+    const totalRequiredPower = Math.max(
+      0,
+      Math.floor(blueprint.getCostForLevel(queueEntry.nextLevel).getTotalResourceAmount()),
+    );
     if (totalRequiredPower <= 0) {
       finalizeCompletedBuildingQueueEntry(planet, queueEntry.buildingType, queueEntry.nextLevel);
       planet.rBDSFTQ.buildingQueue.shift();
@@ -654,7 +772,10 @@ function advanceBuildingQueue(planet: Planet, industryPower: number): void {
       break;
     }
 
-    const remainingRequiredPower = Math.max(0, totalRequiredPower - queueEntry.investedIndustryPower);
+    const remainingRequiredPower = Math.max(
+      0,
+      totalRequiredPower - queueEntry.investedIndustryPower,
+    );
     const investedPower = Math.min(remainingIndustryPower, remainingRequiredPower);
     queueEntry.investedIndustryPower += investedPower;
     remainingIndustryPower -= investedPower;
@@ -671,13 +792,14 @@ function advanceBuildingQueue(planet: Planet, industryPower: number): void {
 function finalizeCompletedBuildingQueueEntry(
   planet: Planet,
   buildingType: BuildingType,
-  nextLevel: number
+  nextLevel: number,
 ): void {
   const previousLevel = planet.getBuildingLevel(buildingType);
   const previousMaxPowerConsumption = planet.getMaxBuildingPowerConsumption(buildingType);
-  const wasAtFullPower = previousLevel > 0
-    && previousMaxPowerConsumption > 0
-    && planet.getCurrentBuildingPowerConsumption(buildingType) >= previousMaxPowerConsumption;
+  const wasAtFullPower =
+    previousLevel > 0 &&
+    previousMaxPowerConsumption > 0 &&
+    planet.getCurrentBuildingPowerConsumption(buildingType) >= previousMaxPowerConsumption;
 
   planet.setBuildingLevel(buildingType, nextLevel);
 
@@ -685,7 +807,10 @@ function finalizeCompletedBuildingQueueEntry(
     return;
   }
 
-  planet.setCurrentBuildingPowerConsumption(buildingType, planet.getMaxBuildingPowerConsumption(buildingType));
+  planet.setCurrentBuildingPowerConsumption(
+    buildingType,
+    planet.getMaxBuildingPowerConsumption(buildingType),
+  );
 }
 
 function advanceShipyardQueue(planet: Planet, shipyardPower: number): void {
@@ -693,9 +818,9 @@ function advanceShipyardQueue(planet: Planet, shipyardPower: number): void {
   while (planet.rBDSFTQ.shipyardQueue.length > 0) {
     const queueEntry = planet.rBDSFTQ.shipyardQueue[0];
     if (
-      queueEntry.itemKind === 'defence'
-      && queueEntry.defenceType
-      && isPlanetaryBombDefenceType(queueEntry.defenceType)
+      queueEntry.itemKind === 'defence' &&
+      queueEntry.defenceType &&
+      isPlanetaryBombDefenceType(queueEntry.defenceType)
     ) {
       const bombBlueprint = DEFENCE_BLUEPRINTS.get(queueEntry.defenceType);
       const currentStorageUsed = totalPlanetaryBombSize(planet.rBDSFTQ.defences);
@@ -705,9 +830,14 @@ function advanceShipyardQueue(planet: Planet, shipyardPower: number): void {
       }
     }
 
-    const blueprint = queueEntry.itemKind === 'defence'
-      ? (queueEntry.defenceType ? DEFENCE_BLUEPRINTS.get(queueEntry.defenceType) : undefined)
-      : (queueEntry.shipType ? SHIP_BLUEPRINTS.get(queueEntry.shipType) : undefined);
+    const blueprint =
+      queueEntry.itemKind === 'defence'
+        ? queueEntry.defenceType
+          ? DEFENCE_BLUEPRINTS.get(queueEntry.defenceType)
+          : undefined
+        : queueEntry.shipType
+          ? SHIP_BLUEPRINTS.get(queueEntry.shipType)
+          : undefined;
     if (!blueprint) {
       planet.rBDSFTQ.shipyardQueue.shift();
       continue;
@@ -725,7 +855,10 @@ function advanceShipyardQueue(planet: Planet, shipyardPower: number): void {
       break;
     }
 
-    const remainingRequiredPower = Math.max(0, totalRequiredPower - queueEntry.investedShipyardPower);
+    const remainingRequiredPower = Math.max(
+      0,
+      totalRequiredPower - queueEntry.investedShipyardPower,
+    );
     const investedPower = Math.min(remainingShipyardPower, remainingRequiredPower);
     queueEntry.investedShipyardPower += investedPower;
     remainingShipyardPower -= investedPower;
@@ -743,7 +876,7 @@ function addProducedShipyardUnitsToPlanet(
   planet: Planet,
   blueprint: Ship | Defence,
   itemKind: 'ship' | 'defence',
-  amount: number
+  amount: number,
 ): void {
   const normalizedAmount = Math.max(0, Math.floor(amount));
   if (itemKind === 'defence') {
@@ -759,7 +892,7 @@ function advanceResearchQueue(
   player: Player,
   researchPower: number,
   planetById: Map<string, Planet>,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
 ): void {
   const queueEntry = planet.rBDSFTQ.currentResearchQueue;
   if (!queueEntry) {
@@ -773,9 +906,10 @@ function advanceResearchQueue(
     return;
   }
 
-  const totalRequiredPower = Math.max(0, Math.floor(
-    technology.getCostForLevel(queueEntry.nextLevel).getTotalResourceAmount()
-  ));
+  const totalRequiredPower = Math.max(
+    0,
+    Math.floor(technology.getCostForLevel(queueEntry.nextLevel).getTotalResourceAmount()),
+  );
   if (totalRequiredPower <= 0) {
     player.setTechLevel(queueEntry.technologyType, queueEntry.nextLevel);
     planet.rBDSFTQ.currentResearchQueue = null;
@@ -791,7 +925,7 @@ function advanceResearchQueue(
 
   queueEntry.investedResearchPower += Math.min(
     normalizedResearchPower,
-    Math.max(0, totalRequiredPower - queueEntry.investedResearchPower)
+    Math.max(0, totalRequiredPower - queueEntry.investedResearchPower),
   );
   if (queueEntry.investedResearchPower < totalRequiredPower) {
     return;
@@ -807,7 +941,7 @@ function addResearchCompletionReport(
   player: Player,
   planet: Planet,
   queueEntry: { technologyType: TechnologyType; nextLevel: number },
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
 ): void {
   if (player.type !== PlayerType.PLAYER) {
     return;
@@ -817,12 +951,19 @@ function addResearchCompletionReport(
     {
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
-      title: `Research Completed: ${queueEntry.technologyType} L${queueEntry.nextLevel}`,
+      title: encodeRuntimeText('generated.reports.researchCompletedTitle', {
+        technology: queueEntry.technologyType,
+        level: queueEntry.nextLevel,
+      }),
       sourceCoordinates: toPlanetReportCoordinates(planet),
       sourcePlanetName: planet.basicInfo.name,
-      sourceSystemName: planet.basicInfo.solarSystem.name
+      sourceSystemName: planet.basicInfo.solarSystem.name,
     },
-    `${queueEntry.technologyType} reached level ${queueEntry.nextLevel} on ${planet.basicInfo.name}.`
+    encodeRuntimeText('generated.reports.researchCompletedBody', {
+      technology: queueEntry.technologyType,
+      level: queueEntry.nextLevel,
+      planet: planet.basicInfo.name,
+    }),
   );
   player.addReport(report);
 }
@@ -834,7 +975,7 @@ function resolveActiveFleets(
   resolvedTurnNumber: number,
   diplomacyResolver: DiplomacyResolver,
   encounterResolver: EncounterResolver,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): void {
   const espionageReportGenerator = new EspionageReportGenerator();
   const activeFleets: Fleet[] = [];
@@ -844,8 +985,8 @@ function resolveActiveFleets(
   // TODO: Define a formal deterministic same-turn arrival order once simultaneous arrivals need dedicated rules.
   for (const fleet of galaxy.activeFleets) {
     if (
-      fleet.state !== FleetState.ORBITING
-      && !isFleetResolvingThisTurn(fleet, resolvedTurnNumber)
+      fleet.state !== FleetState.ORBITING &&
+      !isFleetResolvingThisTurn(fleet, resolvedTurnNumber)
     ) {
       activeFleets.push(fleet);
       continue;
@@ -854,11 +995,14 @@ function resolveActiveFleets(
     if (fleet.state === FleetState.MOVING_TO_TARGET) {
       const mission = FLEET_MISSION_REGISTRY.get(fleet.missionType);
       const owner = playersById.get(fleet.ownerId) ?? null;
-      const originPlanet = planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z)) ?? null;
-      const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
-      const targetOwner = targetPlanet?.info.ownerId === null
-        ? null
-        : playersById.get(targetPlanet?.info.ownerId ?? -1) ?? null;
+      const originPlanet =
+        planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z)) ?? null;
+      const targetPlanet =
+        planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
+      const targetOwner =
+        targetPlanet?.info.ownerId === null
+          ? null
+          : (playersById.get(targetPlanet?.info.ownerId ?? -1) ?? null);
       const encounterLocation = mission?.getEncounterLocationForFleet(fleet) ?? null;
 
       if (mission && targetPlanet && encounterLocation?.kind === 'planetOrbit') {
@@ -871,7 +1015,7 @@ function resolveActiveFleets(
           originPlanet,
           targetPlanet,
           targetOwner,
-          resolvedTurnNumber
+          resolvedTurnNumber,
         });
         encounterArrivalsByLocationKey.set(locationKey, current);
         continue;
@@ -889,7 +1033,7 @@ function resolveActiveFleets(
       espionageReportGenerator,
       resolvedTurnNumber,
       diplomacyResolver,
-      difficultyConfig
+      difficultyConfig,
     );
     if (nextFleetState) {
       activeFleets.push(nextFleetState);
@@ -908,24 +1052,27 @@ function resolveActiveFleets(
           const candidateOwnerId = entry.owner?.playerId ?? entry.fleet.ownerId;
           const status = diplomacyResolver.getStatus(currentOwnerId, candidateOwnerId);
           return status === DiplomaticStatus.SELF || status === DiplomaticStatus.ALLIED;
-        })
+        }),
       ].sort(compareEncounterArrivalPriority);
 
       for (const member of coalition.slice(1)) {
-        const memberIndex = pendingArrivals.findIndex((entry) => entry.fleet.fleetId === member.fleet.fleetId);
+        const memberIndex = pendingArrivals.findIndex(
+          (entry) => entry.fleet.fleetId === member.fleet.fleetId,
+        );
         if (memberIndex >= 0) {
           pendingArrivals.splice(memberIndex, 1);
         }
       }
 
       const stationaryOccupants = activeFleets
-        .filter((fleet) =>
-          fleet.state === FleetState.ORBITING
-          && toPlanetOrbitLocationKeyForFleet(fleet) === locationKey
+        .filter(
+          (fleet) =>
+            fleet.state === FleetState.ORBITING &&
+            toPlanetOrbitLocationKeyForFleet(fleet) === locationKey,
         )
         .map((fleet) => ({
           fleet,
-          owner: playersById.get(fleet.ownerId) ?? null
+          owner: playersById.get(fleet.ownerId) ?? null,
         })) satisfies PlanetOrbitEncounterOccupantFleet[];
       const resolvedArrivals = encounterResolver.resolvePlanetOrbit(coalition, stationaryOccupants);
 
@@ -935,7 +1082,7 @@ function resolveActiveFleets(
           resolvedArrival,
           espionageReportGenerator,
           diplomacyResolver,
-          difficultyConfig
+          difficultyConfig,
         );
         if (nextFleetState) {
           activeFleets.push(nextFleetState);
@@ -953,7 +1100,7 @@ function resolveActiveFleets(
       espionageReportGenerator,
       resolvedTurnNumber,
       diplomacyResolver,
-      difficultyConfig
+      difficultyConfig,
     );
     if (nextFleetState) {
       activeFleets.push(nextFleetState);
@@ -961,9 +1108,7 @@ function resolveActiveFleets(
   }
 
   galaxy.activeFleets = activeFleets.filter((fleet) =>
-    fleet.state !== FleetState.ORBITING
-      ? true
-      : ManyShips.totalShipsCount(fleet.ships) > 0
+    fleet.state !== FleetState.ORBITING ? true : ManyShips.totalShipsCount(fleet.ships) > 0,
   );
 }
 
@@ -987,7 +1132,7 @@ function resolveFleetState(
   espionageReportGenerator: EspionageReportGenerator,
   resolvedTurnNumber: number,
   diplomacyResolver: DiplomacyResolver,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): Fleet | null {
   switch (fleet.state) {
     case FleetState.MOVING_TO_TARGET:
@@ -999,7 +1144,7 @@ function resolveFleetState(
         espionageReportGenerator,
         resolvedTurnNumber,
         diplomacyResolver,
-        difficultyConfig
+        difficultyConfig,
       );
     case FleetState.RETURNING:
     case FleetState.MISSION_FAILURE_RETURNING:
@@ -1008,7 +1153,7 @@ function resolveFleetState(
         playersById,
         planetById,
         resolvedTurnNumber,
-        difficultyConfig
+        difficultyConfig,
       );
     case FleetState.ORBITING:
       return resolveIdleFleetState(
@@ -1019,7 +1164,7 @@ function resolveFleetState(
         espionageReportGenerator,
         resolvedTurnNumber,
         diplomacyResolver,
-        difficultyConfig
+        difficultyConfig,
       );
     default:
       return fleet;
@@ -1034,21 +1179,24 @@ function resolveIdleFleetState(
   espionageReportGenerator: EspionageReportGenerator,
   resolvedTurnNumber: number,
   diplomacyResolver: DiplomacyResolver,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): Fleet | null {
   if (fleet.state !== FleetState.ORBITING) {
     return fleet;
   }
 
-  const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
+  const targetPlanet =
+    planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
   if (!targetPlanet) {
     return fleet;
   }
 
   if (
-    fleet.orbitActivity === FleetOrbitActivity.GUARDING
-    && targetPlanet.info.ownerId !== null
-    && !isNonHostileDiplomaticStatus(diplomacyResolver.getStatus(fleet.ownerId, targetPlanet.info.ownerId))
+    fleet.orbitActivity === FleetOrbitActivity.GUARDING &&
+    targetPlanet.info.ownerId !== null &&
+    !isNonHostileDiplomaticStatus(
+      diplomacyResolver.getStatus(fleet.ownerId, targetPlanet.info.ownerId),
+    )
   ) {
     fleet.missionType = FleetMissionType.HOLD;
     fleet.orbitActivity = FleetOrbitActivity.PASSIVE_HOLD;
@@ -1080,9 +1228,11 @@ function resolveIdleFleetState(
       targetPlanet,
       resolvedTurnNumber,
       playersById.get(fleet.ownerId) ?? null,
-      targetPlanet.info.ownerId === null ? null : playersById.get(targetPlanet.info.ownerId) ?? null,
+      targetPlanet.info.ownerId === null
+        ? null
+        : (playersById.get(targetPlanet.info.ownerId) ?? null),
       diplomacyResolver,
-      difficultyConfig
+      difficultyConfig,
     );
     return fleet;
   }
@@ -1100,10 +1250,10 @@ function resolveIdleFleetState(
         resolvedTurn: resolvedTurnNumber,
         outcomeType: 'FAILURE',
         launchSummary: createFleetLaunchSummary(fleet),
-        resultSummary: `Repair mission failed over ${targetPlanet.basicInfo.name} because the target became hostile.`,
+        resultSummary: encodeRuntimeText('generated.missionReports.repair.failedTargetHostile'),
         payload: {
-          failureReason: 'TARGET_BECAME_HOSTILE'
-        }
+          failureReason: 'TARGET_BECAME_HOSTILE',
+        },
       });
       return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
     }
@@ -1115,10 +1265,12 @@ function resolveIdleFleetState(
   }
 
   const owner = playersById.get(fleet.ownerId) ?? null;
-  const originPlanet = planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z)) ?? null;
-  const targetOwner = targetPlanet.info.ownerId === null
-    ? null
-    : playersById.get(targetPlanet.info.ownerId) ?? null;
+  const originPlanet =
+    planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z)) ?? null;
+  const targetOwner =
+    targetPlanet.info.ownerId === null
+      ? null
+      : (playersById.get(targetPlanet.info.ownerId) ?? null);
   const resolution = mission.resolveIdleTurn({
     fleet,
     owner,
@@ -1126,7 +1278,7 @@ function resolveIdleFleetState(
     originPlanet,
     targetPlanet,
     resolvedTurnNumber,
-    diplomacyResolver
+    diplomacyResolver,
   });
   if (!resolution) {
     return fleet;
@@ -1141,10 +1293,10 @@ function resolveIdleFleetState(
       targetOwner,
       originPlanet,
       targetPlanet,
-      resolvedTurnNumber
+      resolvedTurnNumber,
     },
     espionageReportGenerator,
-    difficultyConfig
+    difficultyConfig,
   );
 }
 
@@ -1156,7 +1308,7 @@ function resolveTargetArrival(
   espionageReportGenerator: EspionageReportGenerator,
   resolvedTurnNumber: number,
   diplomacyResolver: DiplomacyResolver,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): Fleet | null {
   const mission = FLEET_MISSION_REGISTRY.get(fleet.missionType);
   if (!mission) {
@@ -1164,8 +1316,10 @@ function resolveTargetArrival(
   }
 
   const owner = playersById.get(fleet.ownerId) ?? null;
-  const originPlanet = planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z)) ?? null;
-  const targetPlanet = planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
+  const originPlanet =
+    planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z)) ?? null;
+  const targetPlanet =
+    planetById.get(toCoordinatesId(fleet.target.x, fleet.target.y, fleet.target.z)) ?? null;
   if (!owner || !targetPlanet) {
     emitFleetOutcome(difficultyConfig, {
       fleetId: fleet.fleetId,
@@ -1179,15 +1333,16 @@ function resolveTargetArrival(
       launchSummary: createFleetLaunchSummary(fleet),
       resultSummary: 'Mission failed because the origin owner or target planet no longer existed.',
       payload: {
-        failureReason: !owner ? 'OWNER_MISSING' : 'TARGET_MISSING'
-      }
+        failureReason: !owner ? 'OWNER_MISSING' : 'TARGET_MISSING',
+      },
     });
     return createMissionFailureReturnFleet(fleet, resolvedTurnNumber);
   }
 
-  const targetOwner = targetPlanet.info.ownerId === null
-    ? null
-    : playersById.get(targetPlanet.info.ownerId) ?? null;
+  const targetOwner =
+    targetPlanet.info.ownerId === null
+      ? null
+      : (playersById.get(targetPlanet.info.ownerId) ?? null);
   const resolutionContext = {
     fleet,
     owner,
@@ -1195,7 +1350,7 @@ function resolveTargetArrival(
     originPlanet,
     targetPlanet,
     resolvedTurnNumber,
-    diplomacyResolver
+    diplomacyResolver,
   };
 
   if (mission.participatesInEncounter()) {
@@ -1206,7 +1361,7 @@ function resolveTargetArrival(
       playersById,
       resolvedTurnNumber,
       mission.getBattleRounds(),
-      diplomacyResolver
+      diplomacyResolver,
     );
     if (battleResolution === 'attacker_destroyed') {
       emitFleetOutcome(difficultyConfig, {
@@ -1219,15 +1374,18 @@ function resolveTargetArrival(
         resolvedTurn: resolvedTurnNumber,
         outcomeType: 'DESTROYED',
         launchSummary: createFleetLaunchSummary(fleet),
-        resultSummary: `${fleet.missionType} fleet was destroyed at ${targetPlanet.basicInfo.name}.`,
+        resultSummary: encodeRuntimeText('generated.fleet.result.fleetDestroyedAt', {
+          mission: encodeMissionLabel(fleet.missionType),
+          targetPlanet: targetPlanet.basicInfo.name,
+        }),
         payload: {
-          targetPlanetName: targetPlanet.basicInfo.name
+          targetPlanetName: targetPlanet.basicInfo.name,
         },
         deltas: {
           survivingShips: snapshotFleetShipCounts(fleet),
-          remainingCargo: snapshotResourcesPack(fleet.cargo)
+          remainingCargo: snapshotResourcesPack(fleet.cargo),
         },
-        terminal: true
+        terminal: true,
       });
       return null;
     }
@@ -1243,19 +1401,15 @@ function resolveTargetArrival(
           resolvedTurn: resolvedTurnNumber,
           outcomeType: 'ATTACK',
           launchSummary: createFleetLaunchSummary(fleet),
-          resultSummary: createAttackOutcomeSummary(
-            targetPlanet,
-            null,
-            null
-          ),
+          resultSummary: createAttackOutcomeSummary(targetPlanet, null, null),
           payload: {
             targetPlanetName: targetPlanet.basicInfo.name,
-            battleOutcome: 'retreat'
+            battleOutcome: 'retreat',
           },
           deltas: {
             survivingShips: snapshotFleetShipCounts(fleet),
-            cargo: snapshotResourcesPack(fleet.cargo)
-          }
+            cargo: snapshotResourcesPack(fleet.cargo),
+          },
         });
       }
       return applyMissionResolution(
@@ -1263,7 +1417,7 @@ function resolveTargetArrival(
         galaxy,
         resolutionContext,
         espionageReportGenerator,
-        difficultyConfig
+        difficultyConfig,
       );
     }
 
@@ -1277,7 +1431,7 @@ function resolveTargetArrival(
         resolvedTurnNumber,
         null,
         diplomacyResolver,
-        difficultyConfig
+        difficultyConfig,
       );
       applyPostArrivalBombardmentIfNeeded(
         galaxy,
@@ -1287,18 +1441,18 @@ function resolveTargetArrival(
         owner,
         targetOwner,
         diplomacyResolver,
-        difficultyConfig
+        difficultyConfig,
       );
       return applyMissionResolution(
-        mission.resolveAfterEncounter(
-          resolutionContext,
-          { fleetId: fleet.fleetId, resolution: 'victory' }
-        ),
+        mission.resolveAfterEncounter(resolutionContext, {
+          fleetId: fleet.fleetId,
+          resolution: 'victory',
+        }),
         galaxy,
         resolutionContext,
         espionageReportGenerator,
         difficultyConfig,
-        plunderSummary
+        plunderSummary,
       );
     }
   }
@@ -1312,7 +1466,7 @@ function resolveTargetArrival(
     resolvedTurnNumber,
     null,
     diplomacyResolver,
-    difficultyConfig
+    difficultyConfig,
   );
   applyPostArrivalBombardmentIfNeeded(
     galaxy,
@@ -1322,7 +1476,7 @@ function resolveTargetArrival(
     owner,
     targetOwner,
     diplomacyResolver,
-    difficultyConfig
+    difficultyConfig,
   );
   return applyMissionResolution(
     mission.resolveWithoutEncounter(resolutionContext),
@@ -1330,7 +1484,7 @@ function resolveTargetArrival(
     resolutionContext,
     espionageReportGenerator,
     difficultyConfig,
-    plunderSummary
+    plunderSummary,
   );
 }
 
@@ -1342,25 +1496,25 @@ function applyPostArrivalBombardmentIfNeeded(
   owner: Player | null = null,
   targetOwner: Player | null = null,
   diplomacyResolver: DiplomacyResolver | null = null,
-  difficultyConfig: TurnDifficultyConfig = {}
+  difficultyConfig: TurnDifficultyConfig = {},
 ): void {
   if (
-    fleet.missionType !== FleetMissionType.BOMBARD
-    && fleet.missionType !== FleetMissionType.SIEGE
+    fleet.missionType !== FleetMissionType.BOMBARD &&
+    fleet.missionType !== FleetMissionType.SIEGE
   ) {
     return;
   }
 
   if (
-    ManyShips.totalShipsCount(fleet.ships) <= 0
-    || !hasBombardmentCapability(fleet.ships, fleet.carriedBombs)
+    ManyShips.totalShipsCount(fleet.ships) <= 0 ||
+    !hasBombardmentCapability(fleet.ships, fleet.carriedBombs)
   ) {
     return;
   }
 
   const summary = applyBuildingBombardment(fleet.ships, targetPlanet, fleet.carriedBombs, {
     missionType: fleet.missionType,
-    priorities: fleet.bombardmentPriorities
+    priorities: fleet.bombardmentPriorities,
   });
   fleet.carriedBombs = summary.remainingBombs;
   if (summary.shots <= 0) {
@@ -1368,16 +1522,17 @@ function applyPostArrivalBombardmentIfNeeded(
   }
 
   addBombardmentReport(owner, fleet, targetPlanet, summary, resolvedTurnNumber);
-  const incomingReport = owner && targetOwner
-    ? createIncomingBombardmentReport(
-      targetOwner.type === PlayerType.PLAYER ? targetOwner.createReportId() : 0,
-      owner,
-      fleet,
-      targetPlanet,
-      summary,
-      resolvedTurnNumber
-    )
-    : null;
+  const incomingReport =
+    owner && targetOwner
+      ? createIncomingBombardmentReport(
+          targetOwner.type === PlayerType.PLAYER ? targetOwner.createReportId() : 0,
+          owner,
+          fleet,
+          targetPlanet,
+          summary,
+          resolvedTurnNumber,
+        )
+      : null;
   if (incomingReport && targetOwner?.type === PlayerType.PLAYER) {
     targetOwner.addReport(incomingReport);
   }
@@ -1386,8 +1541,10 @@ function applyPostArrivalBombardmentIfNeeded(
       galaxy,
       targetOwner,
       owner,
+      fleet,
+      targetPlanet,
       incomingReport,
-      diplomacyResolver
+      diplomacyResolver,
     );
     shareIncomingBombardmentSystemMail(
       galaxy,
@@ -1397,7 +1554,7 @@ function applyPostArrivalBombardmentIfNeeded(
       targetPlanet,
       summary,
       resolvedTurnNumber,
-      diplomacyResolver
+      diplomacyResolver,
     );
   }
   if (fleet.missionType === FleetMissionType.BOMBARD) {
@@ -1414,7 +1571,10 @@ function applyPostArrivalBombardmentIfNeeded(
     resolvedTurn: resolvedTurnNumber,
     outcomeType: fleet.missionType === FleetMissionType.SIEGE ? 'SIEGE' : 'BOMBARD',
     launchSummary: createFleetLaunchSummary(fleet),
-    resultSummary: `${fleet.missionType} tick resolved at ${targetPlanet.basicInfo.name}.`,
+    resultSummary: encodeRuntimeText('generated.fleet.result.tickResolvedAt', {
+      mission: encodeMissionLabel(fleet.missionType),
+      targetPlanet: targetPlanet.basicInfo.name,
+    }),
     payload: {
       targetPlanetName: targetPlanet.basicInfo.name,
       shots: summary.shots,
@@ -1424,13 +1584,13 @@ function applyPostArrivalBombardmentIfNeeded(
       bombsLaunched: summary.bombsLaunched,
       bombsActivated: summary.bombsActivated,
       bombsIntercepted: summary.bombsIntercepted,
-      bombsLost: summary.bombsLost
+      bombsLost: summary.bombsLost,
     },
     deltas: {
       totalStructuralDamage: summary.totalDamage,
       survivingShips: snapshotFleetShipCounts(fleet),
-      remainingBombs: snapshotBombCounts(fleet)
-    }
+      remainingBombs: snapshotBombCounts(fleet),
+    },
   });
 }
 
@@ -1441,7 +1601,7 @@ function resolveShipRepairs(
   snapshotsByPlanetId: Map<string, PlanetTurnSnapshot>,
   diplomacyResolver: DiplomacyResolver,
   resolvedTurnNumber: number,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): void {
   for (const [coordinatesId, planet] of planetById.entries()) {
     const snapshot = snapshotsByPlanetId.get(coordinatesId);
@@ -1452,8 +1612,8 @@ function resolveShipRepairs(
 
     const eligibleOrbitFleets = shuffleCopy(
       galaxy.activeFleets.filter((fleet) =>
-        isFleetEligibleForOrbitRepair(fleet, coordinatesId, planetOwnerId, diplomacyResolver)
-      )
+        isFleetEligibleForOrbitRepair(fleet, coordinatesId, planetOwnerId, diplomacyResolver),
+      ),
     );
     const totalDroneRepair = totalDroneRepairCapabilityAtPlanet(planet, eligibleOrbitFleets);
     const shipDamagePresent = hasShipDamageAtPlanet(planet, eligibleOrbitFleets);
@@ -1463,24 +1623,25 @@ function resolveShipRepairs(
       totalDroneRepair,
       shipDamagePresent,
       buildingDamagePresent,
-      defenceDamagePresent
+      defenceDamagePresent,
     );
     const industryRepairSplit = splitIndustryRepairBudget(
       Math.max(0, Math.floor(snapshot.buildingRepairPower)),
       buildingDamagePresent,
-      defenceDamagePresent
+      defenceDamagePresent,
     );
 
-    let remainingSharedShipyardRepair = Math.max(0, Math.floor(snapshot.shipyardPower)) + droneRepairSplit.shipRepair;
+    let remainingSharedShipyardRepair =
+      Math.max(0, Math.floor(snapshot.shipyardPower)) + droneRepairSplit.shipRepair;
     remainingSharedShipyardRepair = repairShipsWithLocalCapabilitiesAndSharedShipyard(
       planet.rBDSFTQ.ships,
-      remainingSharedShipyardRepair
+      remainingSharedShipyardRepair,
     );
 
     for (const fleet of eligibleOrbitFleets) {
       remainingSharedShipyardRepair = repairShipsWithLocalCapabilitiesAndSharedShipyard(
         fleet.ships,
-        remainingSharedShipyardRepair
+        remainingSharedShipyardRepair,
       );
 
       if (remainingSharedShipyardRepair <= 0) {
@@ -1490,19 +1651,19 @@ function resolveShipRepairs(
 
     repairBuildingsAtPlanet(
       planet,
-      industryRepairSplit.buildingRepair + droneRepairSplit.buildingRepair
+      industryRepairSplit.buildingRepair + droneRepairSplit.buildingRepair,
     );
     repairDefencesAtPlanet(
       planet,
-      industryRepairSplit.defenceRepair + droneRepairSplit.defenceRepair
+      industryRepairSplit.defenceRepair + droneRepairSplit.defenceRepair,
     );
 
     if (!hasRepairableDamageAtPlanet(planet, eligibleOrbitFleets)) {
       for (const fleet of eligibleOrbitFleets) {
         if (
-          fleet.missionType !== FleetMissionType.REPAIR
-          || fleet.state !== FleetState.ORBITING
-          || fleet.orbitActivity !== FleetOrbitActivity.MISSION_IN_PROGRESS
+          fleet.missionType !== FleetMissionType.REPAIR ||
+          fleet.state !== FleetState.ORBITING ||
+          fleet.orbitActivity !== FleetOrbitActivity.MISSION_IN_PROGRESS
         ) {
           continue;
         }
@@ -1510,7 +1671,12 @@ function resolveShipRepairs(
         fleet.state = FleetState.RETURNING;
         fleet.orbitActivity = FleetOrbitActivity.IDLE;
         fleet.createdAtTurn = resolvedTurnNumber;
-        addRepairReturnSummaryReport(playersById.get(fleet.ownerId) ?? null, fleet, planet, resolvedTurnNumber);
+        addRepairReturnSummaryReport(
+          playersById.get(fleet.ownerId) ?? null,
+          fleet,
+          planet,
+          resolvedTurnNumber,
+        );
         emitFleetOutcome(difficultyConfig, {
           fleetId: fleet.fleetId,
           ownerId: fleet.ownerId,
@@ -1521,13 +1687,15 @@ function resolveShipRepairs(
           resolvedTurn: resolvedTurnNumber,
           outcomeType: 'REPAIR',
           launchSummary: createFleetLaunchSummary(fleet),
-          resultSummary: `Repair mission completed at ${planet.basicInfo.name}.`,
+          resultSummary: encodeRuntimeText('generated.reports.body.repairMissionCompletedAt', {
+            targetPlanet: planet.basicInfo.name,
+          }),
           payload: {
-            targetPlanetName: planet.basicInfo.name
+            targetPlanetName: planet.basicInfo.name,
           },
           deltas: {
-            survivingShips: snapshotFleetShipCounts(fleet)
-          }
+            survivingShips: snapshotFleetShipCounts(fleet),
+          },
         });
       }
     }
@@ -1536,7 +1704,7 @@ function resolveShipRepairs(
 
 function repairShipsWithLocalCapabilitiesAndSharedShipyard(
   ships: ManyShips,
-  sharedShipyardRepair: number
+  sharedShipyardRepair: number,
 ): number {
   let remainingSharedShipyardRepair = Math.max(0, Math.floor(sharedShipyardRepair));
   if (!ships.hasDamagedShips()) {
@@ -1545,7 +1713,7 @@ function repairShipsWithLocalCapabilitiesAndSharedShipyard(
 
   applyRepairEquipmentBursts(
     ships,
-    collectRepairEquipmentBurstGroupsForManyShips(ships).filter((group) => !group.isDrone)
+    collectRepairEquipmentBurstGroupsForManyShips(ships).filter((group) => !group.isDrone),
   );
   remainingSharedShipyardRepair = applyPooledShipRepair(ships, remainingSharedShipyardRepair);
   ships.normalizeFullyRepairedShips();
@@ -1554,7 +1722,7 @@ function repairShipsWithLocalCapabilitiesAndSharedShipyard(
 
 function applyRepairEquipmentBursts(
   ships: ManyShips,
-  burstGroups: RepairEquipmentBurstGroup[]
+  burstGroups: RepairEquipmentBurstGroup[],
 ): void {
   for (const group of burstGroups) {
     for (let shotIndex = 0; shotIndex < group.shots; shotIndex += 1) {
@@ -1568,10 +1736,7 @@ function applyRepairEquipmentBursts(
   }
 }
 
-function applyPooledShipRepair(
-  ships: ManyShips,
-  pooledRepair: number
-): number {
+function applyPooledShipRepair(ships: ManyShips, pooledRepair: number): number {
   let remainingRepair = Math.max(0, Math.floor(pooledRepair));
   while (remainingRepair > 0) {
     const targetIndex = selectRandomRepairTargetIndex(ships, false);
@@ -1590,10 +1755,7 @@ function applyPooledShipRepair(
   return remainingRepair;
 }
 
-function repairBuildingsAtPlanet(
-  planet: Planet,
-  pooledRepair: number
-): number {
+function repairBuildingsAtPlanet(planet: Planet, pooledRepair: number): number {
   let remainingRepair = Math.max(0, Math.floor(pooledRepair));
   while (remainingRepair > 0) {
     const targetType = selectRandomDamagedBuildingType(planet);
@@ -1612,10 +1774,7 @@ function repairBuildingsAtPlanet(
   return remainingRepair;
 }
 
-function repairDefencesAtPlanet(
-  planet: Planet,
-  pooledRepair: number
-): number {
+function repairDefencesAtPlanet(planet: Planet, pooledRepair: number): number {
   let remainingRepair = Math.max(0, Math.floor(pooledRepair));
   while (remainingRepair > 0) {
     const targetIndex = selectRandomDamagedDefenceIndex(planet.rBDSFTQ.defences);
@@ -1623,7 +1782,10 @@ function repairDefencesAtPlanet(
       break;
     }
 
-    const usedRepair = planet.rBDSFTQ.defences.repairDamagedDefenceAtIndex(targetIndex, remainingRepair);
+    const usedRepair = planet.rBDSFTQ.defences.repairDamagedDefenceAtIndex(
+      targetIndex,
+      remainingRepair,
+    );
     if (usedRepair <= 0) {
       break;
     }
@@ -1637,25 +1799,25 @@ function repairDefencesAtPlanet(
 
 function selectRandomDamagedBuildingType(planet: Planet): BuildingType | null {
   const candidates = [...planet.rBDSFTQ.buildingsLevels.entries()]
-    .filter(([type, level]) =>
-      level > 0 && planet.getCurrentBuildingStructuralPoints(type) < planet.getMaxBuildingStructuralPoints(type)
+    .filter(
+      ([type, level]) =>
+        level > 0 &&
+        planet.getCurrentBuildingStructuralPoints(type) <
+          planet.getMaxBuildingStructuralPoints(type),
     )
     .map(([type]) => type);
   if (candidates.length <= 0) {
     return null;
   }
 
-  const randomIndex = Math.max(0, Math.min(
-    candidates.length - 1,
-    Math.floor(Math.random() * candidates.length)
-  ));
+  const randomIndex = Math.max(
+    0,
+    Math.min(candidates.length - 1, Math.floor(Math.random() * candidates.length)),
+  );
   return candidates[randomIndex] ?? null;
 }
 
-function totalDroneRepairCapabilityAtPlanet(
-  planet: Planet,
-  eligibleOrbitFleets: Fleet[]
-): number {
+function totalDroneRepairCapabilityAtPlanet(planet: Planet, eligibleOrbitFleets: Fleet[]): number {
   let total = calculateRepairCapabilityForManyShips(planet.rBDSFTQ.ships).droneRepair;
   for (const fleet of eligibleOrbitFleets) {
     total += calculateRepairCapabilityForManyShips(fleet.ships).droneRepair;
@@ -1664,10 +1826,7 @@ function totalDroneRepairCapabilityAtPlanet(
   return total;
 }
 
-function hasShipDamageAtPlanet(
-  planet: Planet,
-  eligibleOrbitFleets: Fleet[]
-): boolean {
+function hasShipDamageAtPlanet(planet: Planet, eligibleOrbitFleets: Fleet[]): boolean {
   if (planet.rBDSFTQ.ships.hasDamagedShips()) {
     return true;
   }
@@ -1683,7 +1842,7 @@ function splitDroneRepairBudget(
   totalDroneRepair: number,
   shipDamagePresent: boolean,
   buildingDamagePresent: boolean,
-  defenceDamagePresent: boolean
+  defenceDamagePresent: boolean,
 ): { shipRepair: number; buildingRepair: number; defenceRepair: number } {
   const normalized = Math.max(0, Math.floor(totalDroneRepair));
   if (normalized <= 0) {
@@ -1693,18 +1852,18 @@ function splitDroneRepairBudget(
   const categories = [
     shipDamagePresent ? 'ship' : null,
     buildingDamagePresent ? 'building' : null,
-    defenceDamagePresent ? 'defence' : null
+    defenceDamagePresent ? 'defence' : null,
   ].filter((entry): entry is 'ship' | 'building' | 'defence' => entry !== null);
   if (categories.length <= 0) {
     return { shipRepair: 0, buildingRepair: 0, defenceRepair: 0 };
   }
 
   const baseShare = Math.floor(normalized / categories.length);
-  let remainder = normalized - (baseShare * categories.length);
+  let remainder = normalized - baseShare * categories.length;
   const result = {
     shipRepair: 0,
     buildingRepair: 0,
-    defenceRepair: 0
+    defenceRepair: 0,
   };
 
   for (const category of categories) {
@@ -1728,7 +1887,7 @@ function splitDroneRepairBudget(
 function splitIndustryRepairBudget(
   totalIndustryRepair: number,
   buildingDamagePresent: boolean,
-  defenceDamagePresent: boolean
+  defenceDamagePresent: boolean,
 ): { buildingRepair: number; defenceRepair: number } {
   const normalized = Math.max(0, Math.floor(totalIndustryRepair));
   if (normalized <= 0) {
@@ -1737,17 +1896,17 @@ function splitIndustryRepairBudget(
 
   const categories = [
     buildingDamagePresent ? 'building' : null,
-    defenceDamagePresent ? 'defence' : null
+    defenceDamagePresent ? 'defence' : null,
   ].filter((entry): entry is 'building' | 'defence' => entry !== null);
   if (categories.length <= 0) {
     return { buildingRepair: 0, defenceRepair: 0 };
   }
 
   const baseShare = Math.floor(normalized / categories.length);
-  let remainder = normalized - (baseShare * categories.length);
+  let remainder = normalized - baseShare * categories.length;
   const result = {
     buildingRepair: 0,
-    defenceRepair: 0
+    defenceRepair: 0,
   };
 
   for (const category of categories) {
@@ -1772,7 +1931,7 @@ function selectRandomDamagedDefenceIndex(defences: ManyDefences): number {
     .filter(({ entry }) => {
       const instances = ManyDefences.toDefenceInstances({
         undamagedDefencesCount: {},
-        damagedDefences: [entry]
+        damagedDefences: [entry],
       });
       const instance = instances[0];
       return instance ? entry.hull < instance.type.hullPointsCapacity : false;
@@ -1782,17 +1941,14 @@ function selectRandomDamagedDefenceIndex(defences: ManyDefences): number {
     return -1;
   }
 
-  const randomIndex = Math.max(0, Math.min(
-    candidates.length - 1,
-    Math.floor(Math.random() * candidates.length)
-  ));
+  const randomIndex = Math.max(
+    0,
+    Math.min(candidates.length - 1, Math.floor(Math.random() * candidates.length)),
+  );
   return candidates[randomIndex] ?? -1;
 }
 
-function selectRandomRepairTargetIndex(
-  ships: ManyShips,
-  preferNonSmallTargets: boolean
-): number {
+function selectRandomRepairTargetIndex(ships: ManyShips, preferNonSmallTargets: boolean): number {
   const allCandidates = ships.damagedShips
     .map((entry, index) => ({ entry, index }))
     .filter(({ entry }) => {
@@ -1809,15 +1965,15 @@ function selectRandomRepairTargetIndex(
 
   const preferredCandidates = preferNonSmallTargets
     ? allCandidates.filter(({ entry }) => {
-      const blueprint = SHIP_BLUEPRINTS.get(entry.type);
-      return blueprint && blueprint.hullClass !== HullClass.SMALL;
-    })
+        const blueprint = SHIP_BLUEPRINTS.get(entry.type);
+        return blueprint && blueprint.hullClass !== HullClass.SMALL;
+      })
     : [];
   const candidates = preferredCandidates.length > 0 ? preferredCandidates : allCandidates;
-  const randomIndex = Math.max(0, Math.min(
-    candidates.length - 1,
-    Math.floor(Math.random() * candidates.length)
-  ));
+  const randomIndex = Math.max(
+    0,
+    Math.min(candidates.length - 1, Math.floor(Math.random() * candidates.length)),
+  );
   return candidates[randomIndex]?.index ?? -1;
 }
 
@@ -1825,26 +1981,28 @@ function isFleetEligibleForOrbitRepair(
   fleet: Fleet,
   planetCoordinatesId: string,
   planetOwnerId: number,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
 ): boolean {
   if (fleet.state !== FleetState.ORBITING) {
     return false;
   }
 
-  if (toPlanetOrbitLocationKeyForFleet(fleet) !== toPlanetOrbitLocationKeyForCoordinatesId(planetCoordinatesId)) {
+  if (
+    toPlanetOrbitLocationKeyForFleet(fleet) !==
+    toPlanetOrbitLocationKeyForCoordinatesId(planetCoordinatesId)
+  ) {
     return false;
   }
 
   const diplomaticStatus = diplomacyResolver.getStatus(planetOwnerId, fleet.ownerId);
-  return diplomaticStatus === DiplomaticStatus.SELF
-    || diplomaticStatus === DiplomaticStatus.ALLIED
-    || diplomaticStatus === DiplomaticStatus.PEACE;
+  return (
+    diplomaticStatus === DiplomaticStatus.SELF ||
+    diplomaticStatus === DiplomaticStatus.ALLIED ||
+    diplomaticStatus === DiplomaticStatus.PEACE
+  );
 }
 
-function hasRepairableDamageAtPlanet(
-  planet: Planet,
-  eligibleOrbitFleets: Fleet[]
-): boolean {
+function hasRepairableDamageAtPlanet(planet: Planet, eligibleOrbitFleets: Fleet[]): boolean {
   if (planet.rBDSFTQ.ships.hasDamagedShips()) {
     return true;
   }
@@ -1865,12 +2023,9 @@ function resolveEncounterArrival(
   resolvedArrival: PlanetOrbitEncounterResolvedArrival,
   espionageReportGenerator: EspionageReportGenerator,
   diplomacyResolver: DiplomacyResolver,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): Fleet | null {
-  const {
-    arrival,
-    outcome
-  } = resolvedArrival;
+  const { arrival, outcome } = resolvedArrival;
   const resolutionContext = {
     fleet: arrival.fleet,
     owner: arrival.owner,
@@ -1878,7 +2033,7 @@ function resolveEncounterArrival(
     originPlanet: arrival.originPlanet,
     targetPlanet: arrival.targetPlanet,
     resolvedTurnNumber: arrival.resolvedTurnNumber,
-    diplomacyResolver
+    diplomacyResolver,
   };
 
   switch (outcome.resolution) {
@@ -1892,7 +2047,7 @@ function resolveEncounterArrival(
         arrival.resolvedTurnNumber,
         outcome.battleReports ?? null,
         diplomacyResolver,
-        difficultyConfig
+        difficultyConfig,
       );
       applyPostArrivalBombardmentIfNeeded(
         galaxy,
@@ -1902,14 +2057,14 @@ function resolveEncounterArrival(
         arrival.owner,
         arrival.targetOwner,
         diplomacyResolver,
-        difficultyConfig
+        difficultyConfig,
       );
       return applyMissionResolution(
         arrival.mission.resolveAfterEncounter(resolutionContext, outcome),
         galaxy,
         resolutionContext,
         espionageReportGenerator,
-        difficultyConfig
+        difficultyConfig,
       );
     case 'retreat':
     case 'stalemate':
@@ -1918,7 +2073,7 @@ function resolveEncounterArrival(
         galaxy,
         resolutionContext,
         espionageReportGenerator,
-        difficultyConfig
+        difficultyConfig,
       );
     case 'defeat':
       emitFleetOutcome(difficultyConfig, {
@@ -1931,16 +2086,19 @@ function resolveEncounterArrival(
         resolvedTurn: arrival.resolvedTurnNumber,
         outcomeType: 'DESTROYED',
         launchSummary: createFleetLaunchSummary(arrival.fleet),
-        resultSummary: `${arrival.fleet.missionType} fleet was destroyed at ${arrival.targetPlanet.basicInfo.name}.`,
+        resultSummary: encodeRuntimeText('generated.fleet.result.fleetDestroyedAt', {
+          mission: encodeMissionLabel(arrival.fleet.missionType),
+          targetPlanet: arrival.targetPlanet.basicInfo.name,
+        }),
         payload: {
           targetPlanetName: arrival.targetPlanet.basicInfo.name,
-          encounterResolution: outcome.resolution
+          encounterResolution: outcome.resolution,
         },
         deltas: {
           survivingShips: snapshotFleetShipCounts(arrival.fleet),
-          remainingCargo: snapshotResourcesPack(arrival.fleet.cargo)
+          remainingCargo: snapshotResourcesPack(arrival.fleet.cargo),
         },
-        terminal: true
+        terminal: true,
       });
       return null;
     case 'notInvolved':
@@ -1954,7 +2112,7 @@ function resolveEncounterArrival(
         arrival.resolvedTurnNumber,
         outcome.battleReports ?? null,
         diplomacyResolver,
-        difficultyConfig
+        difficultyConfig,
       );
       applyPostArrivalBombardmentIfNeeded(
         galaxy,
@@ -1964,14 +2122,14 @@ function resolveEncounterArrival(
         arrival.owner,
         arrival.targetOwner,
         diplomacyResolver,
-        difficultyConfig
+        difficultyConfig,
       );
       return applyMissionResolution(
         arrival.mission.resolveWithoutEncounter(resolutionContext),
         galaxy,
         resolutionContext,
         espionageReportGenerator,
-        difficultyConfig
+        difficultyConfig,
       );
   }
 }
@@ -1985,7 +2143,7 @@ function applyAttackPlunderIfNeeded(
   resolvedTurnNumber: number,
   battleReports: SpaceBattleReports | null,
   diplomacyResolver: DiplomacyResolver,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): AttackPlunderSummary | null {
   if (fleet.missionType !== FleetMissionType.ATTACK) {
     return null;
@@ -1994,12 +2152,10 @@ function applyAttackPlunderIfNeeded(
   const targetOwnerId = targetPlanet.info.ownerId;
   const targetStatus = diplomacyResolver.getStatus(fleet.ownerId, targetOwnerId);
   if (
-    targetOwnerId === null
-    || (
-      targetStatus !== DiplomaticStatus.WAR
-      && targetStatus !== DiplomaticStatus.NEUTRAL
-      && targetStatus !== DiplomaticStatus.PASSIVE
-    )
+    targetOwnerId === null ||
+    (targetStatus !== DiplomaticStatus.WAR &&
+      targetStatus !== DiplomaticStatus.NEUTRAL &&
+      targetStatus !== DiplomaticStatus.PASSIVE)
   ) {
     return null;
   }
@@ -2007,7 +2163,14 @@ function applyAttackPlunderIfNeeded(
   const summary = resolveAttackPlunder(fleet, targetPlanet);
   appendAttackPlunderToBattleReports(battleReports, targetPlanet, summary);
   if (!battleReports) {
-    addAttackPlunderSummaryReport(owner, targetOwner, fleet, targetPlanet, summary, resolvedTurnNumber);
+    addAttackPlunderSummaryReport(
+      owner,
+      targetOwner,
+      fleet,
+      targetPlanet,
+      summary,
+      resolvedTurnNumber,
+    );
     if (owner && targetOwner && targetOwner.type !== PlayerType.NEUTRAL) {
       const incomingReport = createIncomingAttackReport(
         targetOwner.createReportId(),
@@ -2015,7 +2178,7 @@ function applyAttackPlunderIfNeeded(
         fleet,
         targetPlanet,
         summary,
-        resolvedTurnNumber
+        resolvedTurnNumber,
       );
       targetOwner.addReport(incomingReport);
       shareIncomingAttackReportSystemMail(
@@ -2025,7 +2188,7 @@ function applyAttackPlunderIfNeeded(
         targetPlanet,
         summary,
         resolvedTurnNumber,
-        diplomacyResolver
+        diplomacyResolver,
       );
     }
   }
@@ -2044,30 +2207,27 @@ function applyAttackPlunderIfNeeded(
     payload: {
       targetPlanetName: targetPlanet.basicInfo.name,
       plunderPercent: summary.plunderPercent,
-      bunkerReductionPercent: summary.bunkerReductionPercent
+      bunkerReductionPercent: summary.bunkerReductionPercent,
     },
     deltas: {
       availableLoot: snapshotResourcesPack(summary.availableLoot),
       stolenResources: snapshotResourcesPack(summary.stolenResources),
       currentCargoCapacity: summary.currentCargoCapacity,
       totalCargoCapacity: summary.totalCargoCapacity,
-      survivingShips: snapshotFleetShipCounts(fleet)
-    }
+      survivingShips: snapshotFleetShipCounts(fleet),
+    },
   });
 
   return summary;
 }
 
-function resolveAttackPlunder(
-  fleet: Fleet,
-  targetPlanet: Planet
-): AttackPlunderSummary {
+function resolveAttackPlunder(fleet: Fleet, targetPlanet: Planet): AttackPlunderSummary {
   const bunkerReductionPercent = resolveBunkerPlunderReductionPercent(targetPlanet);
   const plunderPercent = Math.max(0, 80 - bunkerReductionPercent) / 100;
   const availableLoot = new ResourcesPack(
     Math.floor(Math.max(0, targetPlanet.rBDSFTQ.resources.metal) * plunderPercent),
     Math.floor(Math.max(0, targetPlanet.rBDSFTQ.resources.crystal) * plunderPercent),
-    Math.floor(Math.max(0, targetPlanet.rBDSFTQ.resources.deuterium) * plunderPercent)
+    Math.floor(Math.max(0, targetPlanet.rBDSFTQ.resources.deuterium) * plunderPercent),
   );
   const freeCargoCapacity = Math.max(0, fleet.totalCargoCapacity - fleet.usedCargoCapacity);
   const stolenResources = distributeAttackPlunder(availableLoot, freeCargoCapacity);
@@ -2077,7 +2237,7 @@ function resolveAttackPlunder(
     fleet.cargo.addResourcePack(stolenResources);
     fleet.usedCargoCapacity = Math.min(
       fleet.totalCargoCapacity,
-      fleet.usedCargoCapacity + stolenResources.getTotalResourceAmount()
+      fleet.usedCargoCapacity + stolenResources.getTotalResourceAmount(),
     );
   }
 
@@ -2088,7 +2248,7 @@ function resolveAttackPlunder(
     stolenResources,
     freeCargoCapacity,
     currentCargoCapacity: fleet.usedCargoCapacity,
-    totalCargoCapacity: fleet.totalCargoCapacity
+    totalCargoCapacity: fleet.totalCargoCapacity,
   };
 }
 
@@ -2109,7 +2269,7 @@ function resolveBunkerPlunderReductionPercent(targetPlanet: Planet): number {
 
 function distributeAttackPlunder(
   availableLoot: ResourcesPack,
-  freeCargoCapacity: number
+  freeCargoCapacity: number,
 ): ResourcesPack {
   const totalLootable = availableLoot.getTotalResourceAmount();
   if (freeCargoCapacity <= 0 || totalLootable <= 0) {
@@ -2119,13 +2279,14 @@ function distributeAttackPlunder(
   const remainingByType: Record<'metal' | 'crystal' | 'deuterium', number> = {
     metal: availableLoot.metal,
     crystal: availableLoot.crystal,
-    deuterium: availableLoot.deuterium
+    deuterium: availableLoot.deuterium,
   };
   const stolen = new ResourcesPack(0, 0, 0);
   let remainingCapacity = Math.min(freeCargoCapacity, totalLootable);
   const resourceTypes: Array<'metal' | 'crystal' | 'deuterium'> = ['metal', 'crystal', 'deuterium'];
-  let activeTypes: Array<'metal' | 'crystal' | 'deuterium'> = resourceTypes
-    .filter((type) => remainingByType[type] > 0);
+  let activeTypes: Array<'metal' | 'crystal' | 'deuterium'> = resourceTypes.filter(
+    (type) => remainingByType[type] > 0,
+  );
 
   while (remainingCapacity > 0 && activeTypes.length > 0) {
     const share = Math.max(1, Math.floor(remainingCapacity / activeTypes.length));
@@ -2159,7 +2320,7 @@ function distributeAttackPlunder(
 function addPlunderResource(
   pack: ResourcesPack,
   type: 'metal' | 'crystal' | 'deuterium',
-  amount: number
+  amount: number,
 ): void {
   switch (type) {
     case 'metal':
@@ -2177,7 +2338,7 @@ function addPlunderResource(
 function appendAttackPlunderToBattleReports(
   battleReports: SpaceBattleReports | null,
   targetPlanet: Planet,
-  summary: AttackPlunderSummary
+  summary: AttackPlunderSummary,
 ): void {
   if (!battleReports) {
     return;
@@ -2187,34 +2348,53 @@ function appendAttackPlunderToBattleReports(
   const availableTotal = summary.availableLoot.getTotalResourceAmount();
   const stolenTotal = summary.stolenResources.getTotalResourceAmount();
   const attackerLines = [
-    'Plunder summary:',
-    `Base plunder: 80%`,
-    `Bunker reduction: ${summary.bunkerReductionPercent}%`,
-    `Effective plunder: ${effectivePercent}%`,
-    `Free cargo space before looting: ${summary.freeCargoCapacity}`,
-    `Fleet cargo after looting: ${summary.currentCargoCapacity}/${summary.totalCargoCapacity}`
+    encodeRuntimeText('generated.reports.body.plunderSummary'),
+    encodeRuntimeText('generated.reports.body.basePlunder', { percent: 80 }),
+    encodeRuntimeText('generated.reports.body.bunkerReduction', {
+      percent: summary.bunkerReductionPercent,
+    }),
+    encodeRuntimeText('generated.reports.body.effectivePlunder', { percent: effectivePercent }),
+    encodeRuntimeText('generated.reports.body.freeCargoBeforeLooting', {
+      value: summary.freeCargoCapacity,
+    }),
+    encodeRuntimeText('generated.reports.body.fleetCargoAfterLooting', {
+      current: summary.currentCargoCapacity,
+      total: summary.totalCargoCapacity,
+    }),
   ];
   const defenderLines = [
-    'Enemy plunder summary:',
-    `Base plunder: 80%`,
-    `Bunker reduction: ${summary.bunkerReductionPercent}%`,
-    `Effective plunder: ${effectivePercent}%`,
-    `Attacking fleet cargo after looting: ${summary.currentCargoCapacity}/${summary.totalCargoCapacity}`
+    encodeRuntimeText('generated.reports.body.enemyPlunderSummary'),
+    encodeRuntimeText('generated.reports.body.basePlunder', { percent: 80 }),
+    encodeRuntimeText('generated.reports.body.bunkerReduction', {
+      percent: summary.bunkerReductionPercent,
+    }),
+    encodeRuntimeText('generated.reports.body.effectivePlunder', { percent: effectivePercent }),
+    encodeRuntimeText('generated.reports.body.attackingFleetCargoAfterLooting', {
+      current: summary.currentCargoCapacity,
+      total: summary.totalCargoCapacity,
+    }),
   ];
 
   if (availableTotal <= 0) {
-    attackerLines.push(`No stealable resources remained on ${targetPlanet.basicInfo.name}.`);
-    defenderLines.push(`No stealable resources remained on ${targetPlanet.basicInfo.name}.`);
+    attackerLines.push(encodeRuntimeText('generated.reports.body.noStealableResources'));
+    defenderLines.push(encodeRuntimeText('generated.reports.body.noStealableResources'));
   } else if (summary.freeCargoCapacity <= 0) {
-    attackerLines.push('No free cargo space remained, so no resources were stolen.');
-    defenderLines.push('Attacking fleet had no free cargo space, so no resources were stolen.');
+    attackerLines.push(encodeRuntimeText('generated.reports.body.noFreeCargoNoStolen'));
+    defenderLines.push(encodeRuntimeText('generated.reports.body.attackerNoFreeCargoNoStolen'));
   } else if (stolenTotal <= 0) {
-    attackerLines.push('Loot attempt failed to secure any resources.');
-    defenderLines.push('Attacking fleet failed to secure any resources.');
+    attackerLines.push(encodeRuntimeText('generated.reports.body.lootAttemptFailed'));
+    defenderLines.push(encodeRuntimeText('generated.reports.body.attackerFailedSecureResources'));
   } else {
-    const breakdown = `Metal ${summary.stolenResources.metal}, Crystal ${summary.stolenResources.crystal}, Deuterium ${summary.stolenResources.deuterium}`;
-    attackerLines.push(`Resources stolen: ${breakdown}.`);
-    defenderLines.push(`Resources lost: ${breakdown}.`);
+    attackerLines.push(
+      encodeRuntimeText('generated.reports.body.resourcesStolenLine', {
+        resources: encodeResourcesInline(summary.stolenResources),
+      }),
+    );
+    defenderLines.push(
+      encodeRuntimeText('generated.reports.body.resourcesLostLine', {
+        resources: encodeResourcesInline(summary.stolenResources),
+      }),
+    );
   }
 
   battleReports.attacker.body = `${battleReports.attacker.body}\n${attackerLines.join('\n')}`;
@@ -2227,7 +2407,7 @@ function addAttackPlunderSummaryReport(
   fleet: Fleet,
   targetPlanet: Planet,
   summary: AttackPlunderSummary,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
 ): void {
   if (!player || player.type === PlayerType.NEUTRAL) {
     return;
@@ -2237,24 +2417,35 @@ function addAttackPlunderSummaryReport(
   const stolenTotal = summary.stolenResources.getTotalResourceAmount();
   const availableTotal = summary.availableLoot.getTotalResourceAmount();
   let body = [
-    `Attack mission reached ${targetPlanet.basicInfo.name}.`,
-    `Base plunder: 80%`,
-    `Bunker reduction: ${summary.bunkerReductionPercent}%`,
-    `Effective plunder: ${effectivePercent}%`,
-    `Fleet cargo after looting: ${summary.currentCargoCapacity}/${summary.totalCargoCapacity}`
+    encodeRuntimeText('generated.reports.body.attackReachedTarget', {
+      targetPlanet: targetPlanet.basicInfo.name,
+    }),
+    encodeRuntimeText('generated.reports.body.basePlunder', {
+      percent: 80,
+    }),
+    encodeRuntimeText('generated.reports.body.bunkerReduction', {
+      percent: summary.bunkerReductionPercent,
+    }),
+    encodeRuntimeText('generated.reports.body.effectivePlunder', {
+      percent: effectivePercent,
+    }),
+    encodeRuntimeText('generated.reports.body.fleetCargoAfterLooting', {
+      current: summary.currentCargoCapacity,
+      total: summary.totalCargoCapacity,
+    }),
   ];
 
   if (availableTotal <= 0) {
-    body.push('No stealable resources remained on the target.');
+    body.push(encodeRuntimeText('generated.reports.body.noStealableResources'));
   } else if (summary.freeCargoCapacity <= 0) {
-    body.push('No free cargo space remained, so no resources were stolen.');
+    body.push(encodeRuntimeText('generated.reports.body.noFreeCargoNoStolen'));
   } else if (stolenTotal <= 0) {
-    body.push('No resources were stolen.');
+    body.push(encodeRuntimeText('generated.reports.body.noResourcesStolen'));
   } else {
     body.push(
-      `Resources stolen: Metal ${summary.stolenResources.metal}, `
-      + `Crystal ${summary.stolenResources.crystal}, `
-      + `Deuterium ${summary.stolenResources.deuterium}.`
+      encodeRuntimeText('generated.reports.body.resourcesStolenLine', {
+        resources: encodeResourcesInline(summary.stolenResources),
+      }),
     );
   }
 
@@ -2262,19 +2453,21 @@ function addAttackPlunderSummaryReport(
     {
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
-      title: `Plunder Report: ${targetPlanet.basicInfo.name}`,
+      title: encodeRuntimeText('generated.reports.plunderTitle', {
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
       sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
       sourcePlanetName: targetPlanet.basicInfo.name,
       sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
       originCoordinates: {
         x: fleet.origin.x,
         y: fleet.origin.y,
-        z: fleet.origin.z + 1
+        z: fleet.origin.z + 1,
       },
       originPlanetName: fleet.originPlanetName,
-      senderPlayerName: targetOwner?.playerName ?? player.playerName
+      senderPlayerName: targetOwner?.playerName ?? player.playerName,
     },
-    appendFleetReportManifest(body.join('\n'), fleet.ships, fleet.cargo)
+    appendFleetReportManifest(body.join('\n'), fleet.ships, fleet.cargo),
   );
   player.addReport(report);
 }
@@ -2285,36 +2478,45 @@ function createIncomingAttackReport(
   fleet: Fleet,
   targetPlanet: Planet,
   summary: AttackPlunderSummary,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
 ): FleetReport {
   const lostTotal = summary.stolenResources.getTotalResourceAmount();
-  const lostLine = lostTotal > 0
-    ? `Resources lost: Metal ${summary.stolenResources.metal}, Crystal ${summary.stolenResources.crystal}, Deuterium ${summary.stolenResources.deuterium}.`
-    : 'Resources lost: none.';
+  const lostLine =
+    lostTotal > 0
+      ? encodeRuntimeText('generated.reports.body.resourcesLostLine', {
+          resources: encodeResourcesInline(summary.stolenResources),
+        })
+      : encodeRuntimeText('generated.reports.body.resourcesLostNone');
   return new FleetReport(
     {
       reportId,
       createdTurn: resolvedTurnNumber,
-      title: `Incoming Attack Report: ${targetPlanet.basicInfo.name}`,
+      title: encodeRuntimeText('generated.reports.incomingAttackTitle', {
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
       sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
       sourcePlanetName: targetPlanet.basicInfo.name,
       sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
       originCoordinates: {
         x: fleet.origin.x,
         y: fleet.origin.y,
-        z: fleet.origin.z + 1
+        z: fleet.origin.z + 1,
       },
       originPlanetName: fleet.originPlanetName,
-      senderPlayerName: attacker.playerName
+      senderPlayerName: attacker.playerName,
     },
     [
-      `Hostile fleet owner: ${attacker.playerName}`,
-      `Target: ${targetPlanet.basicInfo.name}`,
+      encodeRuntimeText('generated.reports.body.hostileFleetOwner', {
+        owner: attacker.playerName,
+      }),
+      encodeRuntimeText('generated.reports.body.target', {
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
       lostLine,
       lostTotal > 0
-        ? 'Your planet was attacked and resources were stolen.'
-        : 'Your planet was attacked but no resources were stolen.'
-    ].join('\n')
+        ? encodeRuntimeText('generated.reports.body.planetAttackedStolen')
+        : encodeRuntimeText('generated.reports.body.planetAttackedNoStolen'),
+    ].join('\n'),
   );
 }
 
@@ -2323,9 +2525,11 @@ function resolveReturnArrival(
   playersById: Map<number, Player>,
   planetById: Map<string, Planet>,
   resolvedTurnNumber: number,
-  difficultyConfig: TurnDifficultyConfig
+  difficultyConfig: TurnDifficultyConfig,
 ): Fleet | null {
-  const originPlanet = planetById.get(toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z));
+  const originPlanet = planetById.get(
+    toCoordinatesId(fleet.origin.x, fleet.origin.y, fleet.origin.z),
+  );
   if (!originPlanet || originPlanet.info.ownerId !== fleet.ownerId) {
     fleet.state = FleetState.ORBITING;
     fleet.missionType = FleetMissionType.HOLD;
@@ -2341,17 +2545,21 @@ function resolveReturnArrival(
   const returningCargo = snapshotResourcesPack(fleet.cargo);
   const survivingShips = snapshotFleetShipCounts(fleet);
   const returningBombs = snapshotBombCounts(fleet);
-  addFleetReturnedReport(playersById.get(fleet.ownerId) ?? null, fleet, originPlanet, resolvedTurnNumber, {
-    ships: fleet.ships,
-    cargo: returningCargo
-  });
+  addFleetReturnedReport(
+    playersById.get(fleet.ownerId) ?? null,
+    fleet,
+    originPlanet,
+    resolvedTurnNumber,
+    {
+      ships: fleet.ships,
+      cargo: returningCargo,
+    },
+  );
   addFleetShipsToPlanet(originPlanet, fleet.ships);
   addFleetBombsToPlanet(originPlanet, fleet.carriedBombs);
-  originPlanet.rBDSFTQ.resources.addResourcePack(new ResourcesPack(
-    fleet.cargo.metal,
-    fleet.cargo.crystal,
-    fleet.cargo.deuterium
-  ));
+  originPlanet.rBDSFTQ.resources.addResourcePack(
+    new ResourcesPack(fleet.cargo.metal, fleet.cargo.crystal, fleet.cargo.deuterium),
+  );
   emitFleetOutcome(difficultyConfig, {
     fleetId: fleet.fleetId,
     ownerId: fleet.ownerId,
@@ -2362,25 +2570,24 @@ function resolveReturnArrival(
     resolvedTurn: resolvedTurnNumber,
     outcomeType: 'RETURN',
     launchSummary: createFleetLaunchSummary(fleet),
-    resultSummary: `Fleet returned to ${originPlanet.basicInfo.name}.`,
+    resultSummary: encodeRuntimeText('generated.fleet.result.returnedTo', {
+      originPlanet: originPlanet.basicInfo.name,
+    }),
     payload: {
       originPlanetName: originPlanet.basicInfo.name,
-      returnReason: fleet.returnReason
+      returnReason: fleet.returnReason,
     },
     deltas: {
       cargoReturned: returningCargo,
       survivingShips,
-      returningBombs
+      returningBombs,
     },
-    terminal: true
+    terminal: true,
   });
   return null;
 }
 
-function createReturningFleet(
-  fleet: Fleet,
-  resolvedTurnNumber: number
-): Fleet {
+function createReturningFleet(fleet: Fleet, resolvedTurnNumber: number): Fleet {
   fleet.state = FleetState.RETURNING;
   fleet.orbitActivity = FleetOrbitActivity.IDLE;
   fleet.returnReason = FleetReturnReason.NORMAL;
@@ -2396,10 +2603,7 @@ function calculateRequiredReturnFuelReserve(fleet: Fleet): number {
   return Math.max(0, Math.ceil(fleet.fuelCost / 2));
 }
 
-function consumeFuelForSiegeTurn(
-  fleet: Fleet,
-  resolvedTurnNumber: number
-): boolean {
+function consumeFuelForSiegeTurn(fleet: Fleet, resolvedTurnNumber: number): boolean {
   if (fleet.fuelCost <= 0) {
     fleet.remainingFuelReserve = Math.max(0, fleet.remainingFuelReserve);
     return true;
@@ -2410,7 +2614,10 @@ function consumeFuelForSiegeTurn(
   const availableReserve = Number.isFinite(fleet.remainingFuelReserve)
     ? Math.max(0, fleet.remainingFuelReserve)
     : Math.max(0, fleet.fuelCost);
-  if (availableReserve <= requiredReturnReserve || (availableReserve - upkeep) < requiredReturnReserve) {
+  if (
+    availableReserve <= requiredReturnReserve ||
+    availableReserve - upkeep < requiredReturnReserve
+  ) {
     createReturningFleet(fleet, resolvedTurnNumber);
     return false;
   }
@@ -2419,10 +2626,7 @@ function consumeFuelForSiegeTurn(
   return true;
 }
 
-function createMissionFailureReturnFleet(
-  fleet: Fleet,
-  resolvedTurnNumber: number
-): Fleet {
+function createMissionFailureReturnFleet(fleet: Fleet, resolvedTurnNumber: number): Fleet {
   fleet.state = FleetState.MISSION_FAILURE_RETURNING;
   fleet.orbitActivity = FleetOrbitActivity.IDLE;
   fleet.returnReason = FleetReturnReason.MISSION_FAILURE;
@@ -2431,22 +2635,18 @@ function createMissionFailureReturnFleet(
 }
 
 function isNonHostileDiplomaticStatus(status: DiplomaticStatus): boolean {
-  return status === DiplomaticStatus.SELF
-    || status === DiplomaticStatus.ALLIED
-    || status === DiplomaticStatus.PEACE;
+  return (
+    status === DiplomaticStatus.SELF ||
+    status === DiplomaticStatus.ALLIED ||
+    status === DiplomaticStatus.PEACE
+  );
 }
 
-function addFleetShipsToPlanet(
-  planet: Planet,
-  ships: ManyShipsLike
-): void {
+function addFleetShipsToPlanet(planet: Planet, ships: ManyShipsLike): void {
   planet.rBDSFTQ.ships.addManyShips(ships);
 }
 
-function addFleetBombsToPlanet(
-  planet: Planet,
-  bombs: ManyDefences
-): void {
+function addFleetBombsToPlanet(planet: Planet, bombs: ManyDefences): void {
   planet.rBDSFTQ.defences.addManyDefences(bombs);
 }
 
@@ -2463,7 +2663,7 @@ function applyMissionResolution(
   },
   espionageReportGenerator: EspionageReportGenerator,
   difficultyConfig: TurnDifficultyConfig,
-  attackPlunderSummary: AttackPlunderSummary | null = null
+  attackPlunderSummary: AttackPlunderSummary | null = null,
 ): Fleet | null {
   const reportShips = ManyShips.fromData(context.fleet.ships);
   const reportCargo = snapshotResourcesPack(context.fleet.cargo);
@@ -2471,16 +2671,19 @@ function applyMissionResolution(
   const beforeDebris = context.targetPlanet
     ? snapshotResourcesPack(context.targetPlanet.rBDSFTQ.spaceDebris)
     : null;
-  MISSION_EFFECT_EXECUTOR.execute({
-    galaxy,
-    fleet: context.fleet,
-    owner: context.owner,
-    targetOwner: context.targetOwner,
-    originPlanet: context.originPlanet,
-    targetPlanet: context.targetPlanet,
-    resolvedTurnNumber: context.resolvedTurnNumber,
-    espionageReportGenerator
-  }, resolution);
+  MISSION_EFFECT_EXECUTOR.execute(
+    {
+      galaxy,
+      fleet: context.fleet,
+      owner: context.owner,
+      targetOwner: context.targetOwner,
+      originPlanet: context.originPlanet,
+      targetPlanet: context.targetPlanet,
+      resolvedTurnNumber: context.resolvedTurnNumber,
+      espionageReportGenerator,
+    },
+    resolution,
+  );
 
   if (context.owner) {
     addMissionReports(
@@ -2490,27 +2693,27 @@ function applyMissionResolution(
       resolution.reports,
       {
         ships: reportShips,
-        cargo: reportCargo
-      }
+        cargo: reportCargo,
+      },
     );
   }
 
   if (
-    context.fleet.missionType === FleetMissionType.SPY
-    || context.fleet.missionType === FleetMissionType.STAR_SYSTEM_SPY
+    context.fleet.missionType === FleetMissionType.SPY ||
+    context.fleet.missionType === FleetMissionType.STAR_SYSTEM_SPY
   ) {
     addDirectSpyAlertMessage(
       context.targetOwner,
       context.owner,
       context.targetPlanet,
       ManyShips.countByType(context.fleet.ships).get(ShipType.SPY_PROBE) ?? 0,
-      context.resolvedTurnNumber
+      context.resolvedTurnNumber,
     );
     if (
-      context.owner
-      && context.targetOwner
-      && context.owner.playerId !== context.targetOwner.playerId
-      && context.targetOwner.type !== PlayerType.NEUTRAL
+      context.owner &&
+      context.targetOwner &&
+      context.owner.playerId !== context.targetOwner.playerId &&
+      context.targetOwner.type !== PlayerType.NEUTRAL
     ) {
       emitCounterIntelEvent(difficultyConfig, {
         attackerPlayerId: context.owner.playerId,
@@ -2518,21 +2721,25 @@ function applyMissionResolution(
         missionType: context.fleet.missionType,
         origin: { x: context.fleet.origin.x, y: context.fleet.origin.y, z: context.fleet.origin.z },
         target: { x: context.fleet.target.x, y: context.fleet.target.y, z: context.fleet.target.z },
-        resolvedTurn: context.resolvedTurnNumber
+        resolvedTurn: context.resolvedTurnNumber,
       });
     }
   }
 
   const outcomeType = resolveMissionOutcomeType(context.fleet.missionType);
   if (outcomeType) {
-    const resultSummary = summarizeMissionReports(resolution.reports)
-      ?? `${context.fleet.missionType} resolved at ${context.targetPlanet?.basicInfo.name ?? 'target'}.`;
+    const resultSummary =
+      summarizeMissionReports(resolution.reports) ??
+      encodeRuntimeText('generated.reports.body.missionResolvedAt', {
+        mission: encodeMissionLabel(context.fleet.missionType),
+        targetPlanet: context.targetPlanet?.basicInfo.name ?? 'target',
+      });
     const payload: Record<string, unknown> = {
       reports: resolution.reports,
-      nextState: resolution.nextState ?? null
+      nextState: resolution.nextState ?? null,
     };
     const deltas: Record<string, unknown> = {
-      survivingShips: snapshotFleetShipCounts(context.fleet)
+      survivingShips: snapshotFleetShipCounts(context.fleet),
     };
 
     if (outcomeType === 'TRANSPORT' || outcomeType === 'ARMAMENT_DELIVERY') {
@@ -2540,7 +2747,7 @@ function applyMissionResolution(
       deltas['deliveredResources'] = {
         metal: beforeCargo.metal - context.fleet.cargo.metal,
         crystal: beforeCargo.crystal - context.fleet.cargo.crystal,
-        deuterium: beforeCargo.deuterium - context.fleet.cargo.deuterium
+        deuterium: beforeCargo.deuterium - context.fleet.cargo.deuterium,
       };
       if (outcomeType === 'ARMAMENT_DELIVERY') {
         deltas['remainingBombs'] = snapshotBombCounts(context.fleet);
@@ -2558,7 +2765,7 @@ function applyMissionResolution(
       deltas['collectedResources'] = {
         metal: context.fleet.cargo.metal - beforeCargo.metal,
         crystal: context.fleet.cargo.crystal - beforeCargo.crystal,
-        deuterium: context.fleet.cargo.deuterium - beforeCargo.deuterium
+        deuterium: context.fleet.cargo.deuterium - beforeCargo.deuterium,
       };
       if (beforeDebris && context.targetPlanet) {
         deltas['debrisBefore'] = beforeDebris;
@@ -2583,7 +2790,7 @@ function applyMissionResolution(
       resultSummary,
       payload,
       deltas,
-      terminal: resolution.fleetOutcome === 'remove' && outcomeType !== 'RECYCLE'
+      terminal: resolution.fleetOutcome === 'remove' && outcomeType !== 'RECYCLE',
     });
   }
 
@@ -2599,14 +2806,16 @@ function applyMissionResolution(
       resolvedTurn: context.resolvedTurnNumber,
       outcomeType: 'FAILURE',
       launchSummary: createFleetLaunchSummary(context.fleet),
-      resultSummary: summarizeMissionReports([failureReport]) ?? 'Mission failed.',
+      resultSummary:
+        summarizeMissionReports([failureReport]) ??
+        encodeRuntimeText('generated.fleet.result.missionFailedDefault'),
       payload: {
-        reports: [failureReport]
+        reports: [failureReport],
       },
       deltas: {
-        survivingShips: snapshotFleetShipCounts(context.fleet)
+        survivingShips: snapshotFleetShipCounts(context.fleet),
       },
-      terminal: resolution.fleetOutcome === 'remove'
+      terminal: resolution.fleetOutcome === 'remove',
     });
   }
 
@@ -2620,7 +2829,7 @@ function resolveHostilePlanetBattle(
   playersById: Map<number, Player>,
   resolvedTurnNumber: number,
   maxRounds = SpaceBattleResolver.DEFAULT_MAX_ROUNDS,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
 ): 'no_battle' | 'attacker_destroyed' | 'attacker_retreating' | 'attacker_won' {
   const activeDefences = splitPlanetaryBombDefences(targetPlanet.rBDSFTQ.defences).activeDefences;
   const defenderOwnerId = targetPlanet.info.ownerId;
@@ -2634,8 +2843,8 @@ function resolveHostilePlanetBattle(
   }
 
   if (
-    ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships) <= 0
-    && ManyDefences.totalDefencesCount(activeDefences) <= 0
+    ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships) <= 0 &&
+    ManyDefences.totalDefencesCount(activeDefences) <= 0
   ) {
     return 'no_battle';
   }
@@ -2654,12 +2863,14 @@ function resolveHostilePlanetBattle(
     defender,
     resolvedTurnNumber,
     diplomacyResolver,
-    maxRounds
+    maxRounds,
   );
   const attackerSurvivors = ManyShips.totalShipsCount(fleet.ships);
   const defenderSurvivors =
-    ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships)
-    + ManyDefences.totalDefencesCount(splitPlanetaryBombDefences(targetPlanet.rBDSFTQ.defences).activeDefences);
+    ManyShips.totalShipsCount(targetPlanet.rBDSFTQ.ships) +
+    ManyDefences.totalDefencesCount(
+      splitPlanetaryBombDefences(targetPlanet.rBDSFTQ.defences).activeDefences,
+    );
   const battleIsUnresolved = attackerSurvivors > 0 && defenderSurvivors > 0;
 
   if (attackerSurvivors <= 0) {
@@ -2685,7 +2896,7 @@ function resolvePlanetBattle(
   defender: Player,
   resolvedTurnNumber: number,
   diplomacyResolver: DiplomacyResolver,
-  maxRounds = SpaceBattleResolver.DEFAULT_MAX_ROUNDS
+  maxRounds = SpaceBattleResolver.DEFAULT_MAX_ROUNDS,
 ): SpaceBattleResult {
   const attackerShips = ManyShips.toShipInstances(fleet.ships);
   const attackerBombs = ManyDefences.toDefenceInstances(fleet.carriedBombs);
@@ -2696,13 +2907,13 @@ function resolvePlanetBattle(
     attacker: {
       player: attacker,
       ships: attackerShips,
-      label: attacker.playerName
+      label: attacker.playerName,
     },
     defender: {
       player: defender,
       ships: defenderShips,
       defences: defenderDefences,
-      label: defender.playerName
+      label: defender.playerName,
     },
     attackerPlanetaryBombs: attackerBombs,
     reportContext: {
@@ -2713,24 +2924,32 @@ function resolvePlanetBattle(
       originCoordinates: {
         x: fleet.origin.x,
         y: fleet.origin.y,
-        z: fleet.origin.z + 1
+        z: fleet.origin.z + 1,
       },
-      originPlanetName: fleet.originPlanetName
+      originPlanetName: fleet.originPlanetName,
     },
-    maxRounds
+    maxRounds,
   });
 
-  fleet.ships = createPersistentManyShipsFromBattleSurvivors(battleResult.attacker.survivingShips, attacker);
+  fleet.ships = createPersistentManyShipsFromBattleSurvivors(
+    battleResult.attacker.survivingShips,
+    attacker,
+  );
   fleet.carriedBombs = ManyDefences.fromDefenceInstances(attackerBombs);
   const overflowShips = fleet.ships.trimNonJumpShipsToTravelHangarCapacity();
-  targetPlanet.rBDSFTQ.ships = createPersistentManyShipsFromBattleSurvivors(battleResult.defender.survivingShips, defender);
+  targetPlanet.rBDSFTQ.ships = createPersistentManyShipsFromBattleSurvivors(
+    battleResult.defender.survivingShips,
+    defender,
+  );
   targetPlanet.rBDSFTQ.defences = createPersistentManyDefencesFromBattleSurvivors(
     battleResult.defender.survivingDefences,
-    defender
+    defender,
   );
   targetPlanet.rBDSFTQ.defences.addManyDefences(splitDefences.planetaryBombs);
   // TODO: Surface `spaceDebris` in the UI and add recycler/recovery gameplay once that layer is implemented.
-  targetPlanet.rBDSFTQ.spaceDebris.addResourcePack(calculateBattleDebris(battleResult, fleet, overflowShips));
+  targetPlanet.rBDSFTQ.spaceDebris.addResourcePack(
+    calculateBattleDebris(battleResult, fleet, overflowShips),
+  );
   targetPlanet.rBDSFTQ.resources.addResourcePack(calculateDefenceBattleRecovery(battleResult));
   appendCurrentDebrisFieldToBattleReports(battleResult.reports, targetPlanet.rBDSFTQ.spaceDebris);
   updateExistingEspionageDebrisData(targetPlanet);
@@ -2742,7 +2961,7 @@ function resolvePlanetBattle(
     defender,
     attacker,
     battleResult.reports.defender,
-    diplomacyResolver
+    diplomacyResolver,
   );
   shareBattleAttackSystemMail(
     galaxy,
@@ -2750,7 +2969,7 @@ function resolvePlanetBattle(
     attacker,
     targetPlanet,
     resolvedTurnNumber,
-    diplomacyResolver
+    diplomacyResolver,
   );
 
   return battleResult;
@@ -2759,21 +2978,22 @@ function resolvePlanetBattle(
 function calculateBattleDebris(
   battleResult: SpaceBattleResult,
   fleet: Fleet,
-  overflowShips: ManyShipsLike
+  overflowShips: ManyShipsLike,
 ): ResourcesPack {
   const destroyedShipResources = new ResourcesPack(0, 0, 0);
   addDestroyedShipResources(destroyedShipResources, battleResult.attacker.destroyedShips);
   addDestroyedShipResources(destroyedShipResources, battleResult.defender.destroyedShips);
   addDestroyedShipResources(destroyedShipResources, ManyShips.toShipInstances(overflowShips));
 
-  const lostCargoResources = ManyShips.totalShipsCount(fleet.ships) <= 0
-    ? new ResourcesPack(fleet.cargo.metal, fleet.cargo.crystal, fleet.cargo.deuterium)
-    : new ResourcesPack(0, 0, 0);
+  const lostCargoResources =
+    ManyShips.totalShipsCount(fleet.ships) <= 0
+      ? new ResourcesPack(fleet.cargo.metal, fleet.cargo.crystal, fleet.cargo.deuterium)
+      : new ResourcesPack(0, 0, 0);
 
   const totalLostResources = new ResourcesPack(
     destroyedShipResources.metal + lostCargoResources.metal,
     destroyedShipResources.crystal + lostCargoResources.crystal,
-    destroyedShipResources.deuterium + lostCargoResources.deuterium
+    destroyedShipResources.deuterium + lostCargoResources.deuterium,
   );
 
   if (totalLostResources.getTotalResourceAmount() <= 0) {
@@ -2787,14 +3007,11 @@ function calculateBattleDebris(
   return new ResourcesPack(
     Math.floor(totalLostResources.metal * metalRate),
     Math.floor(totalLostResources.crystal * crystalRate),
-    Math.floor(totalLostResources.deuterium * deuteriumRate)
+    Math.floor(totalLostResources.deuterium * deuteriumRate),
   );
 }
 
-function addDestroyedShipResources(
-  target: ResourcesPack,
-  ships: ShipInstance[]
-): void {
+function addDestroyedShipResources(target: ResourcesPack, ships: ShipInstance[]): void {
   for (const ship of ships) {
     target.metal += ship.type.cost.metal;
     target.crystal += ship.type.cost.crystal;
@@ -2802,19 +3019,14 @@ function addDestroyedShipResources(
   }
 }
 
-function calculateDefenceBattleRecovery(
-  battleResult: SpaceBattleResult
-): ResourcesPack {
+function calculateDefenceBattleRecovery(battleResult: SpaceBattleResult): ResourcesPack {
   const recoveredResources = new ResourcesPack(0, 0, 0);
   addDestroyedDefenceResources(recoveredResources, battleResult.attacker.destroyedDefences);
   addDestroyedDefenceResources(recoveredResources, battleResult.defender.destroyedDefences);
   return recoveredResources;
 }
 
-function addDestroyedDefenceResources(
-  target: ResourcesPack,
-  defences: DefenceInstance[]
-): void {
+function addDestroyedDefenceResources(target: ResourcesPack, defences: DefenceInstance[]): void {
   for (const defence of defences) {
     target.metal += defence.type.cost.metal;
     target.crystal += defence.type.cost.crystal;
@@ -2835,97 +3047,153 @@ function addBombardmentReport(
   fleet: Fleet,
   targetPlanet: Planet,
   summary: ReturnType<typeof applyBuildingBombardment>,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
 ): void {
   if (!player || player.type !== PlayerType.PLAYER) {
     return;
   }
 
-  const groupedDamage = new Map<BuildingType, {
-    hits: number;
-    damage: number;
-    reducedToZero: number;
-    minimumStructuralUtilization: number;
-    floorApplied: boolean;
-  }>();
+  const groupedDamage = new Map<
+    BuildingType,
+    {
+      hits: number;
+      damage: number;
+      reducedToZero: number;
+      minimumStructuralUtilization: number;
+      floorApplied: boolean;
+    }
+  >();
   for (const target of summary.buildingTargets) {
     const current = groupedDamage.get(target.type) ?? {
       hits: 0,
       damage: 0,
       reducedToZero: 0,
       minimumStructuralUtilization: target.minimumStructuralUtilization,
-      floorApplied: false
+      floorApplied: false,
     };
 
     current.hits += 1;
     current.damage += target.damage;
     current.reducedToZero += target.reducedToZero ? 1 : 0;
     current.minimumStructuralUtilization = target.minimumStructuralUtilization;
-    current.floorApplied = current.floorApplied
-      || (target.minimumStructuralUtilization > 0 && target.structuralUtilization <= target.minimumStructuralUtilization);
+    current.floorApplied =
+      current.floorApplied ||
+      (target.minimumStructuralUtilization > 0 &&
+        target.structuralUtilization <= target.minimumStructuralUtilization);
     groupedDamage.set(target.type, current);
   }
 
-  const detailLines = [...groupedDamage.entries()]
-    .map(([type, entry]) => {
-      const floorSuffix = entry.floorApplied
-        ? `, bunker floor active at ${Math.round(entry.minimumStructuralUtilization * 100)}%`
+  const detailLines = [...groupedDamage.entries()].map(([type, entry]) => {
+    const floorSuffix = entry.floorApplied
+      ? encodeRuntimeText('generated.reports.body.buildingFloorSuffix', {
+          percent: Math.round(entry.minimumStructuralUtilization * 100),
+        })
+      : '';
+    const zeroSuffix =
+      entry.reducedToZero > 0
+        ? encodeRuntimeText('generated.reports.body.buildingZeroSuffix', {
+            count: entry.reducedToZero,
+          })
         : '';
-      const zeroSuffix = entry.reducedToZero > 0
-        ? `, reduced to 0 SP x${entry.reducedToZero}`
-        : '';
-      return `${type}: hits ${entry.hits}, damage ${entry.damage}${zeroSuffix}${floorSuffix}`;
+    return encodeRuntimeText('generated.reports.body.buildingDamageEntry', {
+      type,
+      hits: entry.hits,
+      damage: entry.damage,
+      zeroSuffix,
+      floorSuffix,
     });
-  const groupedDefenceDamage = new Map<string, { hits: number; damage: number; destroyed: number }>();
+  });
+  const groupedDefenceDamage = new Map<
+    string,
+    { hits: number; damage: number; destroyed: number }
+  >();
   for (const target of summary.defenceTargets) {
     const current = groupedDefenceDamage.get(target.type) ?? {
       hits: 0,
       damage: 0,
-      destroyed: 0
+      destroyed: 0,
     };
     current.hits += 1;
     current.damage += target.damage;
     current.destroyed += target.destroyed ? 1 : 0;
     groupedDefenceDamage.set(target.type, current);
   }
-  const defenceDetailLines = [...groupedDefenceDamage.entries()]
-    .map(([type, entry]) => `${type}: hits ${entry.hits}, damage ${entry.damage}${entry.destroyed > 0 ? `, destroyed x${entry.destroyed}` : ''}`);
+  const defenceDetailLines = [...groupedDefenceDamage.entries()].map(([type, entry]) =>
+    encodeRuntimeText('generated.reports.body.defenceDamageEntry', {
+      type,
+      hits: entry.hits,
+      damage: entry.damage,
+      destroyedSuffix:
+        entry.destroyed > 0
+          ? encodeRuntimeText('generated.reports.body.defenceDestroyedSuffix', {
+              count: entry.destroyed,
+            })
+          : '',
+    }),
+  );
   const priorityLines = hasAnyBombardmentPriority(fleet.bombardmentPriorities)
     ? [
-      `Priorities: Main ${bombardmentPriorityLabel(fleet.bombardmentPriorities?.main)}, `
-      + `Secondary ${bombardmentPriorityLabel(fleet.bombardmentPriorities?.secondary)}, `
-      + `Tertiary ${bombardmentPriorityLabel(fleet.bombardmentPriorities?.tertiary)}`
-    ]
-    : ['Priorities: random'];
+        encodeRuntimeText('generated.reports.body.priorities', {
+          main: encodeBombardmentPriority(
+            bombardmentPriorityLabel(fleet.bombardmentPriorities?.main),
+          ),
+          secondary: encodeBombardmentPriority(
+            bombardmentPriorityLabel(fleet.bombardmentPriorities?.secondary),
+          ),
+          tertiary: encodeBombardmentPriority(
+            bombardmentPriorityLabel(fleet.bombardmentPriorities?.tertiary),
+          ),
+        }),
+      ]
+    : [encodeRuntimeText('generated.reports.body.prioritiesRandom')];
 
   const report = new BuildingsReport(
     {
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
-      title: `Bombardment Report: ${fleet.missionType} at ${targetPlanet.basicInfo.name}`,
+      title: encodeRuntimeText('generated.reports.bombardmentTitle', {
+        mission: encodeMissionLabel(fleet.missionType),
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
       sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
       sourcePlanetName: targetPlanet.basicInfo.name,
       sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
-      senderPlayerName: player.playerName
+      senderPlayerName: player.playerName,
     },
     [
-      `Bombardment mission: ${fleet.missionType}`,
-      `Target: ${targetPlanet.basicInfo.name}`,
-      `Shots: ${summary.shots}`,
-      `Hits: ${summary.hits}`,
-      `Total structural damage: ${summary.totalDamage}`,
-      `Planetary bombs launched: ${summary.bombsLaunched}`,
-      `Planetary bombs activated: ${summary.bombsActivated}`,
-      `Planetary bombs intercepted: ${summary.bombsIntercepted}`,
-      `Planetary bombs lost: ${summary.bombsLost}`,
+      encodeRuntimeText('generated.reports.body.bombardmentMission', {
+        mission: encodeMissionLabel(fleet.missionType),
+      }),
+      encodeRuntimeText('generated.reports.body.target', {
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
+      encodeRuntimeText('generated.reports.body.shots', { value: summary.shots }),
+      encodeRuntimeText('generated.reports.body.hits', { value: summary.hits }),
+      encodeRuntimeText('generated.reports.body.totalStructuralDamage', {
+        value: summary.totalDamage,
+      }),
+      encodeRuntimeText('generated.reports.body.bombsLaunched', { value: summary.bombsLaunched }),
+      encodeRuntimeText('generated.reports.body.bombsActivated', { value: summary.bombsActivated }),
+      encodeRuntimeText('generated.reports.body.bombsIntercepted', {
+        value: summary.bombsIntercepted,
+      }),
+      encodeRuntimeText('generated.reports.body.bombsLost', { value: summary.bombsLost }),
       ...priorityLines,
-      `Buildings engaged: ${summary.buildingTargetCount}`,
-      `Defences engaged: ${summary.defenceTargetCount}`,
-      'Building damage summary:',
-      ...(detailLines.length > 0 ? detailLines : ['No lasting building damage recorded.']),
-      'Defence damage summary:',
-      ...(defenceDetailLines.length > 0 ? defenceDetailLines : ['No lasting defence damage recorded.'])
-    ].join('\n')
+      encodeRuntimeText('generated.reports.body.buildingsEngaged', {
+        value: summary.buildingTargetCount,
+      }),
+      encodeRuntimeText('generated.reports.body.defencesEngaged', {
+        value: summary.defenceTargetCount,
+      }),
+      encodeRuntimeText('generated.reports.body.buildingDamageSummary'),
+      ...(detailLines.length > 0
+        ? detailLines
+        : [encodeRuntimeText('generated.reports.body.noBuildingDamage')]),
+      encodeRuntimeText('generated.reports.body.defenceDamageSummary'),
+      ...(defenceDetailLines.length > 0
+        ? defenceDetailLines
+        : [encodeRuntimeText('generated.reports.body.noDefenceDamage')]),
+    ].join('\n'),
   );
   player.addReport(report);
 }
@@ -2936,7 +3204,7 @@ function addIncomingBombardmentReport(
   fleet: Fleet,
   targetPlanet: Planet,
   summary: ReturnType<typeof applyBuildingBombardment>,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
 ): void {
   if (!player || player.type !== PlayerType.PLAYER) {
     return;
@@ -2949,8 +3217,8 @@ function addIncomingBombardmentReport(
       fleet,
       targetPlanet,
       summary,
-      resolvedTurnNumber
-    )
+      resolvedTurnNumber,
+    ),
   );
 }
 
@@ -2960,29 +3228,44 @@ function createIncomingBombardmentReport(
   fleet: Fleet,
   targetPlanet: Planet,
   summary: ReturnType<typeof applyBuildingBombardment>,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
 ): BuildingsReport {
   return new BuildingsReport(
     {
       reportId,
       createdTurn: resolvedTurnNumber,
-      title: `Incoming Bombardment Report: ${fleet.missionType} at ${targetPlanet.basicInfo.name}`,
+      title: encodeRuntimeText('generated.reports.incomingBombardmentTitle', {
+        mission: encodeMissionLabel(fleet.missionType),
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
       sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
       sourcePlanetName: targetPlanet.basicInfo.name,
       sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
-      senderPlayerName: attacker?.playerName ?? null
+      senderPlayerName: attacker?.playerName ?? null,
     },
     [
-      `Bombardment mission: ${fleet.missionType}`,
-      `Target: ${targetPlanet.basicInfo.name}`,
-      `Hostile fleet owner: ${attacker?.playerName ?? 'Unknown'}`,
-      `Shots: ${summary.shots}`,
-      `Hits: ${summary.hits}`,
-      `Total structural damage: ${summary.totalDamage}`,
-      `Buildings engaged: ${summary.buildingTargetCount}`,
-      `Defences engaged: ${summary.defenceTargetCount}`,
-      'Your planet sustained hostile bombardment pressure.'
-    ].join('\n')
+      encodeRuntimeText('generated.reports.body.bombardmentMission', {
+        mission: encodeMissionLabel(fleet.missionType),
+      }),
+      encodeRuntimeText('generated.reports.body.target', {
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
+      encodeRuntimeText('generated.reports.body.hostileFleetOwner', {
+        owner: attacker?.playerName ?? encodeRuntimeText('communications.shared.labels.unknown'),
+      }),
+      encodeRuntimeText('generated.reports.body.shots', { value: summary.shots }),
+      encodeRuntimeText('generated.reports.body.hits', { value: summary.hits }),
+      encodeRuntimeText('generated.reports.body.totalStructuralDamage', {
+        value: summary.totalDamage,
+      }),
+      encodeRuntimeText('generated.reports.body.buildingsEngaged', {
+        value: summary.buildingTargetCount,
+      }),
+      encodeRuntimeText('generated.reports.body.defencesEngaged', {
+        value: summary.defenceTargetCount,
+      }),
+      encodeRuntimeText('generated.reports.body.hostileBombardmentPressure'),
+    ].join('\n'),
   );
 }
 
@@ -2990,7 +3273,7 @@ function addRepairReturnSummaryReport(
   player: Player | null,
   fleet: Fleet,
   targetPlanet: Planet,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
 ): void {
   if (!player || player.type !== PlayerType.PLAYER) {
     return;
@@ -3000,17 +3283,24 @@ function addRepairReturnSummaryReport(
     {
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
-      title: `Repair Report: ${targetPlanet.basicInfo.name} stabilized`,
+      title: encodeRuntimeText('generated.reports.repairTitle', {
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
       sourceCoordinates: toPlanetReportCoordinates(targetPlanet),
       sourcePlanetName: targetPlanet.basicInfo.name,
       sourceSystemName: targetPlanet.basicInfo.solarSystem.name,
-      senderPlayerName: player.playerName
+      senderPlayerName: player.playerName,
     },
     [
-      `Repair mission completed at ${targetPlanet.basicInfo.name}.`,
-      'No non-hostile damaged ships, buildings, or defences remained at the target.',
-      `Fleet ${fleet.fleetId} is returning to ${fleet.originPlanetName}.`
-    ].join('\n')
+      encodeRuntimeText('generated.reports.body.repairMissionCompletedAt', {
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
+      encodeRuntimeText('generated.reports.body.repairNothingLeft'),
+      encodeRuntimeText('generated.reports.body.fleetReturningToOrigin', {
+        fleetId: fleet.fleetId,
+        originPlanet: fleet.originPlanetName,
+      }),
+    ].join('\n'),
   );
   player.addReport(report);
 }
@@ -3028,13 +3318,13 @@ function shareHostileFleetReportWithFriendlyHumans(
   victim: Player,
   attacker: Player,
   fleetReport: FleetReport,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
 ): void {
   const recipients = resolveFriendlyHumanRecipientsForSharedHostileReports(
     galaxy,
     victim,
     attacker,
-    diplomacyResolver
+    diplomacyResolver,
   );
   for (const recipient of recipients) {
     const copy = fleetReport.copy();
@@ -3051,28 +3341,47 @@ function shareIncomingAttackReportSystemMail(
   targetPlanet: Planet,
   summary: AttackPlunderSummary,
   resolvedTurnNumber: number,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
 ): void {
-  const body = summary.stolenResources.getTotalResourceAmount() > 0
-    ? `${attacker.playerName} attacked ${targetPlanet.basicInfo.name} and stole ${formatResourcesInline(summary.stolenResources)}.`
-    : `${attacker.playerName} attacked ${targetPlanet.basicInfo.name}, but no resources were stolen.`;
+  const body =
+    summary.stolenResources.getTotalResourceAmount() > 0
+      ? encodeRuntimeText('generated.systemMail.hostileAttackStolen', {
+          attacker: attacker.playerName,
+          targetPlanet: targetPlanet.basicInfo.name,
+          resources: encodeResourcesInline(summary.stolenResources),
+        })
+      : encodeRuntimeText('generated.systemMail.hostileAttackNoStolen', {
+          attacker: attacker.playerName,
+          targetPlanet: targetPlanet.basicInfo.name,
+        });
   addAggregatedSystemMessage(
     victim,
     resolvedTurnNumber,
-    `Hostile attack alert: ${attacker.playerName} attacked ${targetPlanet.basicInfo.name}`,
-    body
+    encodeRuntimeText('generated.systemMail.hostileAttackTitle', {
+      attacker: attacker.playerName,
+      targetPlanet: targetPlanet.basicInfo.name,
+    }),
+    body,
   );
   for (const recipient of resolveFriendlyHumanRecipientsForSharedHostileReports(
     galaxy,
     victim,
     attacker,
-    diplomacyResolver
+    diplomacyResolver,
   )) {
     addAggregatedSystemMessage(
       recipient,
       resolvedTurnNumber,
-      `Shared attack alert: ${attacker.playerName} attacked ${victim.playerName} at ${targetPlanet.basicInfo.name}`,
-      `${attacker.playerName} attacked ${victim.playerName}'s planet ${targetPlanet.basicInfo.name}.`
+      encodeRuntimeText('generated.systemMail.sharedAttackTitle', {
+        attacker: attacker.playerName,
+        victim: victim.playerName,
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
+      encodeRuntimeText('generated.systemMail.sharedAttackBody', {
+        attacker: attacker.playerName,
+        victim: victim.playerName,
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
     );
   }
 }
@@ -3083,25 +3392,39 @@ function shareBattleAttackSystemMail(
   attacker: Player,
   targetPlanet: Planet,
   resolvedTurnNumber: number,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
 ): void {
   addAggregatedSystemMessage(
     victim,
     resolvedTurnNumber,
-    `Hostile attack alert: ${attacker.playerName} attacked ${targetPlanet.basicInfo.name}`,
-    `${attacker.playerName} attacked ${targetPlanet.basicInfo.name} with a hostile fleet.`
+    encodeRuntimeText('generated.systemMail.hostileAttackTitle', {
+      attacker: attacker.playerName,
+      targetPlanet: targetPlanet.basicInfo.name,
+    }),
+    encodeRuntimeText('generated.systemMail.hostileAttackFleet', {
+      attacker: attacker.playerName,
+      targetPlanet: targetPlanet.basicInfo.name,
+    }),
   );
   for (const recipient of resolveFriendlyHumanRecipientsForSharedHostileReports(
     galaxy,
     victim,
     attacker,
-    diplomacyResolver
+    diplomacyResolver,
   )) {
     addAggregatedSystemMessage(
       recipient,
       resolvedTurnNumber,
-      `Shared attack alert: ${attacker.playerName} attacked ${victim.playerName} at ${targetPlanet.basicInfo.name}`,
-      `${attacker.playerName} attacked ${victim.playerName}'s planet ${targetPlanet.basicInfo.name}.`
+      encodeRuntimeText('generated.systemMail.sharedAttackTitle', {
+        attacker: attacker.playerName,
+        victim: victim.playerName,
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
+      encodeRuntimeText('generated.systemMail.sharedAttackBody', {
+        attacker: attacker.playerName,
+        victim: victim.playerName,
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
     );
   }
 }
@@ -3110,19 +3433,24 @@ function shareHostileBuildingsReportWithFriendlyHumans(
   galaxy: Galaxy,
   victim: Player,
   attacker: Player,
+  fleet: Fleet,
+  targetPlanet: Planet,
   buildingsReport: BuildingsReport,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
 ): void {
   const recipients = resolveFriendlyHumanRecipientsForSharedHostileReports(
     galaxy,
     victim,
     attacker,
-    diplomacyResolver
+    diplomacyResolver,
   );
   for (const recipient of recipients) {
     const copy = buildingsReport.copy();
     copy.reportId = recipient.createReportId();
-    copy.title = copy.title.replace(/^Incoming Bombardment Report:/, 'Shared Bombardment Report:');
+    copy.title = encodeRuntimeText('generated.reports.sharedBombardmentTitle', {
+      mission: encodeMissionLabel(fleet.missionType),
+      targetPlanet: targetPlanet.basicInfo.name,
+    });
     recipient.addReport(copy);
   }
 }
@@ -3135,25 +3463,43 @@ function shareIncomingBombardmentSystemMail(
   targetPlanet: Planet,
   summary: ReturnType<typeof applyBuildingBombardment>,
   resolvedTurnNumber: number,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
 ): void {
   addAggregatedSystemMessage(
     victim,
     resolvedTurnNumber,
-    `Hostile ${fleet.missionType.toLowerCase()} alert: ${attacker.playerName} targeted ${targetPlanet.basicInfo.name}`,
-    `${attacker.playerName} used ${fleet.missionType} on ${targetPlanet.basicInfo.name}, causing ${summary.totalDamage} structural damage.`
+    encodeRuntimeText('generated.systemMail.hostileBombardmentTitle', {
+      mission: encodeMissionLabel(fleet.missionType),
+      attacker: attacker.playerName,
+      targetPlanet: targetPlanet.basicInfo.name,
+    }),
+    encodeRuntimeText('generated.systemMail.hostileBombardmentBody', {
+      attacker: attacker.playerName,
+      missionUpper: encodeMissionLabel(fleet.missionType),
+      targetPlanet: targetPlanet.basicInfo.name,
+      damage: summary.totalDamage,
+    }),
   );
   for (const recipient of resolveFriendlyHumanRecipientsForSharedHostileReports(
     galaxy,
     victim,
     attacker,
-    diplomacyResolver
+    diplomacyResolver,
   )) {
     addAggregatedSystemMessage(
       recipient,
       resolvedTurnNumber,
-      `Shared ${fleet.missionType.toLowerCase()} alert: ${attacker.playerName} targeted ${victim.playerName}`,
-      `${attacker.playerName} used ${fleet.missionType} on ${victim.playerName}'s planet ${targetPlanet.basicInfo.name}.`
+      encodeRuntimeText('generated.systemMail.sharedBombardmentTitle', {
+        mission: encodeMissionLabel(fleet.missionType),
+        attacker: attacker.playerName,
+        victim: victim.playerName,
+      }),
+      encodeRuntimeText('generated.systemMail.sharedBombardmentBody', {
+        attacker: attacker.playerName,
+        missionUpper: encodeMissionLabel(fleet.missionType),
+        victim: victim.playerName,
+        targetPlanet: targetPlanet.basicInfo.name,
+      }),
     );
   }
 }
@@ -3162,16 +3508,15 @@ function resolveFriendlyHumanRecipientsForSharedHostileReports(
   galaxy: Galaxy,
   victim: Player,
   attacker: Player,
-  diplomacyResolver: DiplomacyResolver
+  diplomacyResolver: DiplomacyResolver,
 ): Player[] {
-  return galaxy.players.filter((player) =>
-    player.type === PlayerType.PLAYER
-    && player.playerId !== victim.playerId
-    && player.playerId !== attacker.playerId
-    && (
-      diplomacyResolver.getStatus(victim.playerId, player.playerId) === DiplomaticStatus.ALLIED
-      || diplomacyResolver.getStatus(victim.playerId, player.playerId) === DiplomaticStatus.PEACE
-    )
+  return galaxy.players.filter(
+    (player) =>
+      player.type === PlayerType.PLAYER &&
+      player.playerId !== victim.playerId &&
+      player.playerId !== attacker.playerId &&
+      (diplomacyResolver.getStatus(victim.playerId, player.playerId) === DiplomaticStatus.ALLIED ||
+        diplomacyResolver.getStatus(victim.playerId, player.playerId) === DiplomaticStatus.PEACE),
   );
 }
 
@@ -3180,7 +3525,7 @@ function addDirectSpyAlertMessage(
   attacker: Player | null,
   targetPlanet: Planet | null,
   probeAmount: number,
-  resolvedTurnNumber: number
+  resolvedTurnNumber: number,
 ): void {
   if (!targetOwner || targetOwner.type === PlayerType.NEUTRAL || !attacker || !targetPlanet) {
     return;
@@ -3189,8 +3534,19 @@ function addDirectSpyAlertMessage(
   addAggregatedSystemMessage(
     targetOwner,
     resolvedTurnNumber,
-    `Espionage alert: ${attacker.playerName} spied ${targetPlanet.basicInfo.name}`,
-    `${attacker.playerName} sent ${probeAmount} spy probe${probeAmount === 1 ? '' : 's'} to ${targetPlanet.basicInfo.name}.`
+    encodeRuntimeText('generated.systemMail.espionageTitle', {
+      attacker: attacker.playerName,
+      targetPlanet: targetPlanet.basicInfo.name,
+    }),
+    encodeRuntimeText('generated.systemMail.espionageBody', {
+      attacker: attacker.playerName,
+      probeCount: probeAmount,
+      probeWord:
+        probeAmount === 1
+          ? encodeRuntimeText('generated.systemMail.spyProbeSingular')
+          : encodeRuntimeText('generated.systemMail.spyProbePlural'),
+      targetPlanet: targetPlanet.basicInfo.name,
+    }),
   );
 }
 
@@ -3198,17 +3554,18 @@ function addAggregatedSystemMessage(
   recipient: Player,
   createdTurn: number,
   title: string,
-  body: string
+  body: string,
 ): void {
   if (recipient.type === PlayerType.NEUTRAL) {
     return;
   }
 
-  const existing = recipient.messages.find((message) =>
-    message.createdTurn === createdTurn
-    && message.title === title
-    && message.senderPlayerId === null
-    && message.senderPlayerName === 'System'
+  const existing = recipient.messages.find(
+    (message) =>
+      message.createdTurn === createdTurn &&
+      message.title === title &&
+      message.senderPlayerId === null &&
+      message.senderPlayerName === 'System',
   );
   if (existing) {
     if (!existing.body.includes(body)) {
@@ -3217,21 +3574,23 @@ function addAggregatedSystemMessage(
     return;
   }
 
-  recipient.addMessage(new PlayerMessage({
-    messageId: recipient.createMessageId(),
-    createdTurn,
-    title,
-    body,
-    senderPlayerId: null,
-    senderPlayerName: 'System'
-  }));
+  recipient.addMessage(
+    new PlayerMessage({
+      messageId: recipient.createMessageId(),
+      createdTurn,
+      title,
+      body,
+      senderPlayerId: null,
+      senderPlayerName: 'System',
+    }),
+  );
 }
 
 function formatResourcesInline(resources: ResourcesPack): string {
   const entries = [
     resources.metal > 0 ? `${resources.metal} metal` : null,
     resources.crystal > 0 ? `${resources.crystal} crystal` : null,
-    resources.deuterium > 0 ? `${resources.deuterium} deuterium` : null
+    resources.deuterium > 0 ? `${resources.deuterium} deuterium` : null,
   ].filter((entry): entry is string => entry !== null);
   return entries.length > 0 ? entries.join(', ') : 'no resources';
 }
@@ -3244,7 +3603,7 @@ function addFleetSuccessReport(
   manifest: {
     ships: ManyShipsLike;
     cargo: FleetReportCargoLike;
-  } | null = null
+  } | null = null,
 ): void {
   if (player.type === PlayerType.NEUTRAL) {
     return;
@@ -3254,12 +3613,15 @@ function addFleetSuccessReport(
     {
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
-      title: `Fleet Arrived: ${fleet.missionType} to ${fleet.targetPlanetName}`,
+      title: encodeRuntimeText('generated.fleet.titles.arrived', {
+        mission: encodeMissionLabel(fleet.missionType),
+        targetPlanet: fleet.targetPlanetName,
+      }),
       sourceCoordinates: toFleetTargetReportCoordinates(fleet),
       sourcePlanetName: fleet.targetPlanetName,
-      senderPlayerName: player.playerName
+      senderPlayerName: player.playerName,
     },
-    appendFleetReportManifest(body, manifest?.ships ?? fleet.ships, manifest?.cargo ?? fleet.cargo)
+    appendFleetReportManifest(body, manifest?.ships ?? fleet.ships, manifest?.cargo ?? fleet.cargo),
   );
   player.addReport(report);
 }
@@ -3272,7 +3634,7 @@ function addFleetReturnedReport(
   manifest: {
     ships: ManyShipsLike;
     cargo: FleetReportCargoLike;
-  }
+  },
 ): void {
   if (!player || player.type === PlayerType.NEUTRAL) {
     return;
@@ -3282,23 +3644,29 @@ function addFleetReturnedReport(
     {
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
-      title: `Fleet Returned: ${fleet.missionType} to ${originPlanet.basicInfo.name}`,
+      title: encodeRuntimeText('generated.fleet.titles.returned', {
+        mission: encodeMissionLabel(fleet.missionType),
+        originPlanet: originPlanet.basicInfo.name,
+      }),
       sourceCoordinates: toPlanetReportCoordinates(originPlanet),
       sourcePlanetName: originPlanet.basicInfo.name,
       sourceSystemName: originPlanet.basicInfo.solarSystem.name,
       originCoordinates: {
         x: fleet.origin.x,
         y: fleet.origin.y,
-        z: fleet.origin.z + 1
+        z: fleet.origin.z + 1,
       },
       originPlanetName: originPlanet.basicInfo.name,
-      senderPlayerName: player.playerName
+      senderPlayerName: player.playerName,
     },
     appendFleetReportManifest(
-      `Fleet ${fleet.fleetId} returned to ${originPlanet.basicInfo.name}.`,
+      encodeRuntimeText('generated.fleet.returnedBody', {
+        fleetId: fleet.fleetId,
+        originPlanet: originPlanet.basicInfo.name,
+      }),
       manifest.ships,
-      manifest.cargo
-    )
+      manifest.cargo,
+    ),
   );
   player.addReport(report);
 }
@@ -3307,7 +3675,7 @@ function addFleetFailureReport(
   player: Player,
   fleet: Fleet,
   resolvedTurnNumber: number,
-  reason: string
+  reason: string,
 ): void {
   if (player.type === PlayerType.NEUTRAL) {
     return;
@@ -3317,12 +3685,15 @@ function addFleetFailureReport(
     {
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
-      title: `Fleet Failed: ${fleet.missionType} to ${fleet.targetPlanetName}`,
+      title: encodeRuntimeText('generated.fleet.titles.failed', {
+        mission: encodeMissionLabel(fleet.missionType),
+        targetPlanet: fleet.targetPlanetName,
+      }),
       sourceCoordinates: toFleetTargetReportCoordinates(fleet),
       sourcePlanetName: fleet.targetPlanetName,
-      senderPlayerName: player.playerName
+      senderPlayerName: player.playerName,
     },
-    `${reason}\n\nFleet turned around and started a failure return flight.`
+    encodeRuntimeText('generated.fleet.failedBody', { reason }),
   );
   player.addReport(report);
 }
@@ -3331,7 +3702,7 @@ function addFleetDrawReport(
   player: Player,
   fleet: Fleet,
   resolvedTurnNumber: number,
-  body: string
+  body: string,
 ): void {
   if (player.type === PlayerType.NEUTRAL) {
     return;
@@ -3341,12 +3712,15 @@ function addFleetDrawReport(
     {
       reportId: player.createReportId(),
       createdTurn: resolvedTurnNumber,
-      title: `Fleet Draw: ${fleet.missionType} at ${fleet.targetPlanetName}`,
+      title: encodeRuntimeText('generated.fleet.titles.draw', {
+        mission: encodeMissionLabel(fleet.missionType),
+        targetPlanet: fleet.targetPlanetName,
+      }),
       sourceCoordinates: toFleetTargetReportCoordinates(fleet),
       sourcePlanetName: fleet.targetPlanetName,
-      senderPlayerName: player.playerName
+      senderPlayerName: player.playerName,
     },
-    body
+    body,
   );
   player.addReport(report);
 }
@@ -3359,7 +3733,7 @@ function addMissionReports(
   manifest: {
     ships: ManyShipsLike;
     cargo: FleetReportCargoLike;
-  } | null = null
+  } | null = null,
 ): void {
   for (const report of reports) {
     switch (report.kind) {
@@ -3381,12 +3755,12 @@ function addMissionReports(
 function clearResearchHelpers(
   mainPlanet: Planet,
   helperLabs: Array<{ x: number; y: number; z: number }>,
-  planetById: Map<string, Planet>
+  planetById: Map<string, Planet>,
 ): void {
   const mainPlanetId = toPlanetCoordinatesId(mainPlanet);
   for (const helperCoordinates of helperLabs) {
     const helperPlanet = planetById.get(
-      toCoordinatesId(helperCoordinates.x, helperCoordinates.y, helperCoordinates.z)
+      toCoordinatesId(helperCoordinates.x, helperCoordinates.y, helperCoordinates.z),
     );
     if (!helperPlanet?.rBDSFTQ.researchHelperFor) {
       continue;
@@ -3406,7 +3780,7 @@ function toPlanetCoordinatesId(planet: Planet): string {
   return toCoordinatesId(
     planet.basicInfo.solarSystem.coordinates.x,
     planet.basicInfo.solarSystem.coordinates.y,
-    Math.max(0, planet.basicInfo.order - 1)
+    Math.max(0, planet.basicInfo.order - 1),
   );
 }
 
@@ -3414,7 +3788,7 @@ function toPlanetReportCoordinates(planet: Planet): { x: number; y: number; z: n
   return {
     x: planet.basicInfo.solarSystem.coordinates.x,
     y: planet.basicInfo.solarSystem.coordinates.y,
-    z: planet.basicInfo.order
+    z: planet.basicInfo.order,
   };
 }
 
@@ -3422,7 +3796,7 @@ function toFleetTargetReportCoordinates(fleet: Fleet): { x: number; y: number; z
   return {
     x: fleet.target.x,
     y: fleet.target.y,
-    z: fleet.target.z + 1
+    z: fleet.target.z + 1,
   };
 }
 
@@ -3430,7 +3804,11 @@ function toCoordinatesId(x: number, y: number, z: number): string {
   return `${x}:${y}:${z}`;
 }
 
-function toEncounterLocationKey(location: { kind: 'planetOrbit'; x: number; y: number; z: number } | { kind: 'starSystem'; x: number; y: number }): string {
+function toEncounterLocationKey(
+  location:
+    | { kind: 'planetOrbit'; x: number; y: number; z: number }
+    | { kind: 'starSystem'; x: number; y: number },
+): string {
   if (location.kind === 'planetOrbit') {
     return `planetOrbit:${location.x}:${location.y}:${location.z}`;
   }
@@ -3459,7 +3837,7 @@ function shuffleCopy<T>(values: T[]): T[] {
 
 function compareEncounterArrivalPriority(
   left: PlanetOrbitEncounterArrival,
-  right: PlanetOrbitEncounterArrival
+  right: PlanetOrbitEncounterArrival,
 ): number {
   const priorityByMissionType: Partial<Record<FleetMissionType, number>> = {
     [FleetMissionType.DEFEND]: 0,
@@ -3477,7 +3855,7 @@ function compareEncounterArrivalPriority(
     [FleetMissionType.INTERCEPT]: 12,
     [FleetMissionType.STAR_SYSTEM_SPY]: 13,
     [FleetMissionType.RECYCLE]: 14,
-    [FleetMissionType.REPAIR]: 15
+    [FleetMissionType.REPAIR]: 15,
   };
   const leftPriority = priorityByMissionType[left.fleet.missionType] ?? 999;
   const rightPriority = priorityByMissionType[right.fleet.missionType] ?? 999;

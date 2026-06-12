@@ -1,5 +1,6 @@
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { FleetState } from '../../fleets/fleet';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import { FleetMission } from '../fleet-mission';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
 import type {
@@ -38,7 +39,7 @@ export class AttackFleetMission extends FleetMission {
   ): MissionResolutionResult {
     if (!context.targetPlanet) {
       return this.failedArrival(
-        'Attack mission failed because the target was no longer available on arrival.',
+        encodeRuntimeText('generated.missionReports.attack.failedTargetUnavailable'),
       );
     }
 
@@ -53,7 +54,7 @@ export class AttackFleetMission extends FleetMission {
       targetStatus !== DiplomaticStatus.PASSIVE
     ) {
       return this.failedArrival(
-        'Attack mission failed because the target was no longer attackable on arrival.',
+        encodeRuntimeText('generated.missionReports.attack.failedTargetNotAttackable'),
       );
     }
 
@@ -73,9 +74,7 @@ export class AttackFleetMission extends FleetMission {
   }
 
   public override onBattleRetreat(_context: MissionResolutionContext): MissionResolutionResult {
-    return this.failedArrival(
-      'Attack mission encountered hostile resistance and was forced to retreat.',
-    );
+    return this.failedArrival(encodeRuntimeText('generated.missionReports.attack.failedRetreat'));
   }
 
   private addAttackChecks(

@@ -3,6 +3,7 @@ import { ShipPurpose } from '../../enums/ship-purpose';
 import { ShipType } from '../../enums/ship-type';
 import type { Ship } from '../../fleets/ship';
 import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
+import { encodeRuntimeText } from '../../../i18n/runtime-text.utils';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
@@ -76,7 +77,7 @@ export class TransportFleetMission extends FleetMission {
       reports: [
         {
           kind: 'failure',
-          body: 'Transport mission encountered hostile ships, kept its undelivered cargo, and was forced to retreat after the battle.',
+          body: encodeRuntimeText('generated.missionReports.transport.failedRetreat'),
         },
       ],
     };
@@ -94,7 +95,7 @@ export class TransportFleetMission extends FleetMission {
         reports: [
           {
             kind: 'failure',
-            body: 'Transport mission failed because the target was no longer available on arrival.',
+            body: encodeRuntimeText('generated.missionReports.transport.failedTargetUnavailable'),
           },
         ],
       };
@@ -119,7 +120,7 @@ export class TransportFleetMission extends FleetMission {
         reports: [
           {
             kind: 'failure',
-            body: 'Transport mission failed because the target was no longer friendly on arrival.',
+            body: encodeRuntimeText('generated.missionReports.transport.failedTargetNotFriendly'),
           },
         ],
       };
@@ -136,7 +137,10 @@ export class TransportFleetMission extends FleetMission {
       reports: [
         {
           kind: 'success',
-          body: `${context.fleet.missionType} mission completed successfully at ${context.targetPlanet.basicInfo.name}.`,
+          body: encodeRuntimeText('generated.missionReports.transport.successCompleted', {
+            mission: encodeRuntimeText('communications.shared.missions.Transport'),
+            targetPlanet: context.targetPlanet.basicInfo.name,
+          }),
         },
       ],
     };

@@ -4,40 +4,47 @@
     class="spy-launch-dialog"
     role="dialog"
     aria-modal="true"
-    [attr.aria-label]="'Spy ' + targetPlanet.basicInfo.name"
+    [attr.aria-label]="
+      'generated.spyDialog.launch.ariaLabel' | t: { name: targetPlanet.basicInfo.name }
+    "
     (click)="$event.stopPropagation()"
   >
     <div class="spy-launch-dialog__header">
       <div>
-        <p class="eyebrow">Spy</p>
-        <h3>Launch Espionage Probes</h3>
+        <p class="eyebrow">{{ 'generated.spyDialog.launch.eyebrow' | t }}</p>
+        <h3>{{ 'generated.spyDialog.launch.title' | t }}</h3>
         <p class="spy-launch-dialog__subtitle">
-          Target: {{ targetPlanet.basicInfo.name }} ({{ targetCoordinatesLabel() }})
+          {{
+            'generated.spyDialog.launch.subtitle'
+              | t: { name: targetPlanet.basicInfo.name, coordinates: targetCoordinatesLabel() }
+          }}
         </p>
         @if (!isLoading && eligibleOrigins.length > 0) {
           <p class="spy-launch-dialog__fleet-cap overview-muted">
-            Active fleets {{ activeFleetCountLabel() }}
+            {{ 'generated.spyDialog.launch.activeFleets' | t: { value: activeFleetCountLabel() } }}
           </p>
         }
       </div>
-      <button type="button" class="spy-launch-dialog__close" (click)="close()">Close</button>
+      <button type="button" class="spy-launch-dialog__close" (click)="close()">
+        {{ 'generated.spyDialog.launch.close' | t }}
+      </button>
     </div>
 
     @if (error) {
       <section class="status status--error">
-        <h3>Spy mission unavailable</h3>
+        <h3>{{ 'generated.spyDialog.launch.unavailable' | t }}</h3>
         <p>{{ error }}</p>
       </section>
     }
 
     <div class="spy-launch-dialog__body">
       @if (isLoading) {
-        <p class="overview-muted">Loading available probe origins.</p>
+        <p class="overview-muted">{{ 'generated.spyDialog.launch.loadingOrigins' | t }}</p>
       } @else if (eligibleOrigins.length === 0) {
-        <p class="overview-muted">No owned planets or orbiting fleets with espionage probes are available.</p>
+        <p class="overview-muted">{{ 'generated.spyDialog.launch.noOrigins' | t }}</p>
       } @else {
         <fieldset class="spy-launch-dialog__fieldset">
-          <legend>Mission origin</legend>
+          <legend>{{ 'generated.spyDialog.launch.missionOrigin' | t }}</legend>
           <div class="spy-launch-dialog__origin-list">
             @for (origin of eligibleOrigins; track origin.key) {
               <label class="spy-launch-dialog__origin-option">
@@ -51,10 +58,19 @@
                 <span class="spy-launch-dialog__origin-copy">
                   <strong>{{ origin.label }}</strong>
                   <span>
-                    Distance: {{ origin.distance }} | Available: {{ origin.totalProbes }}
-                    @if (origin.damagedProbes > 0) {
-                      <span> | Damaged: {{ origin.damagedProbes }}</span>
-                    }
+                    {{
+                      'generated.spyDialog.launch.originMeta'
+                        | t
+                          : {
+                              distance: origin.distance,
+                              available: origin.totalProbes,
+                              damaged:
+                                origin.damagedProbes > 0
+                                  ? ('generated.spyDialog.launch.damagedSuffix'
+                                    | t: { count: origin.damagedProbes })
+                                  : '',
+                            }
+                    }}
                   </span>
                 </span>
               </label>
@@ -63,7 +79,7 @@
         </fieldset>
 
         <label class="spy-launch-dialog__field">
-          <span>Probe amount</span>
+          <span>{{ 'generated.spyDialog.launch.probeAmount' | t }}</span>
           <input
             class="spy-launch-dialog__amount-input"
             type="number"
@@ -73,20 +89,29 @@
           />
         </label>
         <p class="overview-muted">
-          Max from selected origin: {{ selectedOriginMaxProbeAmount() }}
+          {{
+            'generated.spyDialog.launch.maxFromOrigin'
+              | t: { count: selectedOriginMaxProbeAmount() }
+          }}
         </p>
       }
     </div>
 
     <div class="spy-launch-dialog__actions">
-      <button type="button" class="top-menu__button" (click)="close()">Cancel</button>
+      <button type="button" class="top-menu__button" (click)="close()">
+        {{ 'generated.spyDialog.launch.cancel' | t }}
+      </button>
       <button
         type="button"
         class="top-menu__button top-menu__button--end-turn"
         [disabled]="!canLaunch()"
         (click)="launch()"
       >
-        {{ isLaunching ? 'Launching...' : 'Launch' }}
+        {{
+          isLaunching
+            ? ('generated.spyDialog.launch.launching' | t)
+            : ('generated.spyDialog.launch.launch' | t)
+        }}
       </button>
     </div>
   </section>
