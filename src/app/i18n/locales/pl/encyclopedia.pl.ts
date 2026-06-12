@@ -96,7 +96,7 @@ export const encyclopediaPl = {
     title: 'Obrona',
     subtitle: 'Planetarne instalacje obronne, zasady celowania i wymagania budowy.',
     descriptions: {
-      planetaryBomb: 'Przechowywane w magazynie Skladu Bomb. Faza 1 dodaje tylko magazynowanie i produkcje; zastosowanie bojowe pojawi sie pozniej.',
+      planetaryBomb: 'Przechowywane w Skladzie Bomb i przewozone przez floty w misjach Bombardowania, Oblezenia oraz Dostawy Uzbrojenia.',
       orbitCapable: 'Moze atakowac statki na orbicie.',
       atmosphereOnly: 'Moze atakowac tylko male statki bombardujace wchodzace w atmosfere.'
     }

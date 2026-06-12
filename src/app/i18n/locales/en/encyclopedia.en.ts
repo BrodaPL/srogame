@@ -96,7 +96,7 @@ export const encyclopediaEn = {
     title: 'Defences',
     subtitle: 'Planetary defense emplacements, target rules, and construction requirements.',
     descriptions: {
-      planetaryBomb: 'Stored in Bomb Depot inventory. Phase 1 adds storage and production only; combat use comes later.',
+      planetaryBomb: 'Stored in Bomb Depot inventory and carried by fleets for Bombard, Siege, and Armament Delivery missions.',
       orbitCapable: 'Can engage orbiting ships.',
       atmosphereOnly: 'Can engage only small bombardment ships entering the atmosphere.'
     }

@@ -127,7 +127,7 @@ export class EncyclopediaMechanicsComponent {
       details: [
         'A planet can hold one currentResearchQueue entry at a time, and helper labs cannot already be busy.',
         'The same technology cannot be researched in parallel on different planets.',
-        'Current research queue management still has no cancel or reorder controls.'
+        'Research is an active one-job lab assignment rather than an ordered backlog; helper labs can be reassigned while the job keeps its invested progress.'
       ],
       formulas: [
         'maxLabsPerTechnology = max(1, floor(1.5 * sqrt(INTERGALACTIC_RESEARCH_NETWORK) + 1))',
@@ -207,13 +207,13 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Sensor Phalanx Scans',
       category: 'Intel',
-      status: 'Partial',
-      summary: 'Sensor Phalanx backend mechanics are live in phase 1, but they currently feed reports and APIs without a dedicated player-facing screen.',
+      status: 'Live',
+      summary: 'Sensor Phalanx active scans and passive fleet detection are live, with player controls integrated into Galactic View.',
       details: [
-        'Planets with Sensor Phalanx already expose live capability data for range, scan cost, scans-per-turn, and already-used scans through server endpoints.',
+        'Galactic View can open a Sensor Phalanx scan dialog for eligible targets, select the origin planet, and show range, cost, scan allowance, and scan results.',
         'Active scans consume deuterium from the origin planet and reveal only minimal fleet-contact data: direction, fleet size, ETA, and allied status.',
         'Passive detection runs during turn processing and creates Sensor Phalanx reports only for newly visible incoming fleets.',
-        'Current coverage is intentionally narrow: there is still no dedicated scan view yet, and the system does not reveal full fleet composition.'
+        'The limited contact data is intentional: Sensor Phalanx scans do not reveal full fleet composition.'
       ],
       formulas: [
         'normalRange = floor(baseRange * anomaliesAndNoise * finalBuildingEffectiveness)',
@@ -292,7 +292,8 @@ export class EncyclopediaMechanicsComponent {
         'Current statuses are SELF, ALLIED, PEACE, PASSIVE, and WAR, stored symmetrically on the galaxy.',
         'Diplomacy View lists only discovered contacts and can create treaty proposals; proposal management now lives in Mail.',
         'Treaty proposals are limited to one outgoing total per turn, block duplicate pending pair proposals, can be cancelled by the proposer, and expire on the proposer next turn if unanswered.',
-        'Move can idle in non-hostile orbit, Transport can deliver to allied and peace planets, PEACE prevents auto-combat, and PASSIVE is stored for future-facing behavior.'
+        'Move can idle in non-hostile orbit, Transport can deliver to allied and peace planets, and PEACE prevents auto-combat.',
+        'PASSIVE marks abandoned neutral ownership: those planets remain valid attack targets and can be recolonized when mission rules allow it.'
       ]
     },
     {
@@ -381,37 +382,37 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'New Views and Screens',
       category: 'Core Loop',
-      status: 'Partial',
-      summary: 'Most game-management screens are now live, with only a small number of top-level utility routes still placeholder-only.',
+      status: 'Live',
+      summary: 'The planned game-management and public reference screens are live.',
       details: [
-        'Imperium, Buildings, Production, Defence, Researches, Reports, Mail, Diplomacy, Operations, Mission Planner, Planet View, Galactic View, Star System View, Load Game, and Multiplayer Lobby are live.',
+        'Imperium, Buildings, Production, Defence, Researches, Reports, Mail, Diplomacy, Operations, Mission Planner, Planet View, Galactic View, Load Game, Multiplayer, Encyclopedia, and Help/About are live.',
         'Buildings and Production provide compact multi-planet management flows, while Reports, Mail, Diplomacy, Operations, Load Game, and Multiplayer Lobby handle strategic information, persistence, and fleet or lobby state.',
-        'Help/About remains a top-level placeholder outside the main live game shell.'
+        'Star-system inspection, notes, planet previews, fleet presence, espionage actions, and Sensor Phalanx scans are integrated into Galactic View; the old standalone Star System route is only a legacy shell and is not a pending feature.'
       ]
     },
     {
       title: 'In-Game Tutorials',
       category: 'Core Loop',
-      status: 'Partial',
-      summary: 'The guided tutorial framework is live for the main desktop management views, but not every route is covered and mobile-specific layouts are intentionally out of scope.',
+      status: 'Live',
+      summary: 'The phase-2 desktop tutorial rollout is complete for all currently supported tutorial views.',
       details: [
         'Tutorials now exist for Galaxy View, Planet View, Mission Planner, Reports, Mail, Diplomacy, Operations, Imperium, Buildings, Production, and Researches.',
         'The overlay uses staged focus, highlight, and bubble presentation with spotlight dimming, scroll locking, and target-aware placement via data-tutorial-id anchors.',
         'Whole-view intro steps can omit a target, and views can register preparation hooks so hidden UI is revealed safely before measurement.',
         'Auto-open behavior is view-specific and tries to land on meaningful data, for example requiring active fleets before opening the Operations tutorial.',
-        'Current polish is desktop-focused; unsupported routes like Help and some lower-priority screens still sit outside the implemented tutorial scope.'
+        'All 11 supported tutorial routes have completed phase-2 polish; mobile-specific layouts and non-game utility screens are intentionally outside the current scope.'
       ]
     },
     {
       title: 'Production Queue Management',
       category: 'Queues',
-      status: 'Partial',
-      summary: 'Queue management is live for buildings and shipyard production, while research queue control is still simpler.',
+      status: 'Live',
+      summary: 'Queue management is live for building and shipyard backlogs, while research uses a managed active-job model.',
       details: [
         'Building queues support drag-and-drop reorder plus cancel, with invested progress preserved.',
         'Shipyard queues use one mixed queue for ships and defences so visible order matches real execution order.',
         'Cancel rules differ by queue state: unstarted entries fully refund, while started entries refund only the unfinished portion at 75%.',
-        'Research queues still expose live state and progress but currently have no cancel or reorder management.'
+        'Research has no reorder action because each lab runs one active job rather than a backlog; active helper-lab assignments can be changed without losing progress.'
       ]
     },
     {
@@ -439,13 +440,13 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Multiplayer Lobby and Seat Assignment',
       category: 'Core Loop',
-      status: 'Partial',
-      summary: 'A real host-controlled multiplayer lobby is live, but broader multiplayer scale and hardening are still future work.',
+      status: 'Live',
+      summary: 'Managed multiplayer games and host-controlled lobbies are live, including saved-game seat assignment and resume flows.',
       details: [
-        'Multiplayer currently runs as one global lobby managed by a local-admin host.',
-        'The host can change lobby setup, bind a saved game, assign missing saved-human seats, and start the game.',
+        'The server can track multiple draft, running, inactive, and archived multiplayer games instead of one global lobby.',
+        'The local-admin host can change lobby setup, bind a saved game, assign missing saved-human seats, start the game, reopen an inactive game as a resume lobby, and archive games.',
         'Regular logged-in users can join, leave, and toggle ready, while saved human seats can be auto-reclaimed or replaced before start.',
-        'Expanded multiplayer support, broader scaling, and more hardened competitive flow remain future work.'
+        'Scheduled-turn games can also accept eligible players into an already running game when capacity and identity checks pass.'
       ]
     },
     {
@@ -512,23 +513,24 @@ export class EncyclopediaMechanicsComponent {
     {
       title: 'Bot Implementation',
       category: 'Core Loop',
-      status: 'Partial',
-      summary: 'Neutral seeding and small-scale PvE pressure already exist, but full strategic AI behavior is still future work.',
+      status: 'Live',
+      summary: 'The V2 bot runtime is live and executes economy, research, military, recovery, diplomacy, and emergency decisions through a shared supervisor.',
       details: [
         'Sandbox generation can already spawn neutral-owned planets with RNG-scaled buildings, ships, technology, and resources.',
-        'Human home systems can also get one guaranteed low-level neutral neighbor when neutral planets are enabled.',
-        'Bots still need broader strategy loops for expansion, diplomacy, and combat behavior.',
-        'PvE remains the primary focus, with PvP supported at smaller scale.'
+        'Economic, Defensive, Warfare, Research, Strategic Development, Strategic Military, Strategic Diplomatic, Weight Manager, and Critical subsystems produce proposals each turn.',
+        'The Supervisor arbitrates those proposals and can execute building, research, shipyard, fleet mission, request, and diplomacy actions through shared game commands.',
+        'Bot traces and outcomes are available through the admin bot-debug tooling; strategic balance and benchmark tuning remain ongoing.'
       ]
     },
     {
       title: 'Functional Multiplayer (4+ Players)',
       category: 'Core Loop',
-      status: 'Planned',
-      summary: 'Expanded multiplayer support for at least 4 concurrent players is planned.',
+      status: 'Live',
+      summary: 'Multi-human games are live with up to 4 human players in standard mode and up to 10 in scheduled-turn mode.',
       details: [
-        'Session, turn, and conflict resolution flow will be expanded for multi-human games.',
-        'Validation and synchronization rules will be hardened for competitive play.'
+        'Standard games use readiness-based turn progression, while scheduled-turn games advance at configured server hours without manual End Turn.',
+        'Per-game memberships, presence, current-game selection, leave/resume flows, and authoritative server-side action validation are implemented.',
+        'The system is intended for small-scale multiplayer; large public-server scaling and competitive hardening are not current goals.'
       ]
     },
     {
@@ -539,8 +541,8 @@ export class EncyclopediaMechanicsComponent {
       details: [
         'localStorage stores setup in srogame:setup and the auth/player session in srogame:player.',
         'Server auth accounts and sessions are stored in server/data/auth.json.',
-        'The server now persists rotating full-game autosaves under server/data/saves/ on game start and on the configured autosave cadence.',
-        'The /load route can inspect the saved snapshot, confirm replacement of the active runtime game, and load that save back into the live server state.',
+        'The server persists rotating full-game autosaves under server/data/saves/ on game start and on the configured autosave cadence, using five autosave slots and a 100-file directory cap.',
+        'The /load route can list, inspect, load, and delete managed saves, with confirmation before replacing the active runtime game.',
         'Startup auto-load is still not implemented, and the active galaxy, diplomacy, fleets, queues, reports, and operations still run from in-memory live state between loads.'
       ]
     }
