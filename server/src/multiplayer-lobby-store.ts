@@ -6,6 +6,13 @@ import type {
 } from './multiplayer-lobby.js';
 import { reconcileLobbyState } from './multiplayer-lobby.js';
 import type { GameSaveSummary, GalaxySetup } from '../../src/app/models/game-api-types.ts';
+import * as gameApiTypesModule from '../../src/app/models/game-api-types.js';
+
+function resolveModule<T>(module: T): T extends { default: infer U } ? U : T {
+  return ((module as { default?: unknown }).default ?? module) as T extends { default: infer U } ? U : T;
+}
+
+const { normalizeGalaxySetup } = resolveModule(gameApiTypesModule) as typeof import('../../src/app/models/game-api-types.js');
 
 export type MultiplayerLobbyRecord = MultiplayerLobbyState & {
   gameId: string;
@@ -140,7 +147,7 @@ function normalizeMultiplayerLobbyRecord(value: unknown): MultiplayerLobbyRecord
     hostPlayerName: record.hostPlayerName,
     mode,
     isResumeLobby: record.isResumeLobby === true,
-    setup,
+    setup: normalizeGalaxySetup(setup),
     members: Array.isArray(record.members) ? record.members : [],
     boundSaveId: typeof record.boundSaveId === 'string' && record.boundSaveId.trim() ? record.boundSaveId : null,
     boundSave: boundSave ?? null,

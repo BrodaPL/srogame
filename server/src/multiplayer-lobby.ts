@@ -332,7 +332,7 @@ export function getMultiplayerLobbyStartBlockedReason(lobby: MultiplayerLobbySta
   }
 
   if (lobby.members.length > maxHumanPlayers) {
-    return lobby.setup.scheduledTurns.enabled
+    return lobby.setup.scheduledTurns?.enabled === true
       ? `Scheduled Turns games can have at most ${MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS} human players.`
       : `Standard multiplayer games can have at most ${MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS} human players.`;
   }
@@ -361,7 +361,7 @@ export function getMultiplayerLobbyStartBlockedReason(lobby: MultiplayerLobbySta
 }
 
 export function maxLobbyMembersForSetup(setup: GalaxySetup): number {
-  return setup.scheduledTurns.enabled
+  return setup.scheduledTurns?.enabled === true
     ? MAX_SCHEDULED_MULTIPLAYER_HUMAN_PLAYERS
     : MAX_STANDARD_MULTIPLAYER_HUMAN_PLAYERS;
 }

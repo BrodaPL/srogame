@@ -52,6 +52,32 @@ describe('multiplayer-lobby-store', () => {
     }
   });
 
+  it('normalizes legacy lobby setups that predate scheduled turns', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'srogame-multiplayer-lobby-store-'));
+    const storePath = path.join(tempDir, 'multiplayer-lobbies.json');
+
+    try {
+      const setup = createDefaultMultiplayerLobbySetup();
+      const { scheduledTurns: _scheduledTurns, ...legacySetup } = setup;
+      fs.writeFileSync(storePath, JSON.stringify({
+        lobbies: [{
+          gameId: 'legacy-lobby',
+          ...openMultiplayerLobby(1, 'Admin A', '2026-04-09T10:00:00.000Z', setup),
+          setup: legacySetup,
+          createdAt: '2026-04-09T10:00:00.000Z',
+          updatedAt: '2026-04-09T10:05:00.000Z'
+        }]
+      }), 'utf-8');
+
+      const lobby = getMultiplayerLobbyByGameId(storePath, 'legacy-lobby');
+
+      expect(lobby?.setup.scheduledTurns.enabled).toBe(false);
+      expect(lobby?.setup.scheduledTurns.enabledHours.length).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('deletes a lobby by gameId', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'srogame-multiplayer-lobby-store-'));
     const storePath = path.join(tempDir, 'multiplayer-lobbies.json');
